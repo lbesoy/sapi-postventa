@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Eurorep – Seguimiento de Servicios</title>
+  <meta name="description" content="Sistema de seguimiento de órdenes de servicio para Eurorep Refacciones"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- ===== LOGIN SCREEN ===== -->
+<div id="login-screen" class="login-screen">
+  <div class="login-bg-grid"></div>
+  <div class="login-container">
+
+    <!-- Logo -->
+    <div class="login-logo-wrap">
+      <img src="logo_transparent.png" alt="Eurorep" class="login-logo-img"/>
+    </div>
+
+    <!-- PASO 1: Formulario de Login -->
+    <div id="login-step-form">
+      <h2 class="login-title">Bienvenido</h2>
+      <p class="login-sub">Ingresa a tu cuenta para continuar</p>
+      
+      <form onsubmit="iniciarSesionSubmit(event)" class="login-crear-form" style="margin-top:1rem;">
+        <div class="form-group">
+          <label>Correo electrónico o Usuario</label>
+          <div style="position:relative;">
+            <i data-lucide="mail" style="position:absolute;left:12px;top:10px;width:1rem;height:1rem;color:var(--text-muted);"></i>
+            <input type="text" id="login-email" placeholder="usuario@eurorep.com" style="padding-left:2.5rem;" required/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <div style="position:relative;">
+            <i data-lucide="lock" style="position:absolute;left:12px;top:10px;width:1rem;height:1rem;color:var(--text-muted);"></i>
+            <input type="password" id="login-password" placeholder="••••••••" style="padding-left:2.5rem;" required/>
+          </div>
+        </div>
+        <div id="login-error" class="pin-error" style="text-align:left;margin-top:0.25rem;"></div>
+        <button type="submit" class="btn-primary" style="width:100%;margin-top:0.5rem;justify-content:center;padding:0.75rem;">
+          <i data-lucide="log-in" class="btn-icon"></i> Iniciar Sesión
+        </button>
+      </form>
+      
+      <div class="login-divider" style="margin-top:1.5rem;"><span>Opciones</span></div>
+      <button class="login-setup-btn" onclick="loginCrearUsuario()">
+        <i data-lucide="user-plus"></i> Registrar nuevo usuario
+      </button>
+    </div>
+
+    <!-- PASO 2: Crear usuario (setup) -->
+    <div id="login-step-crear" class="login-step-crear" style="display:none;">
+      <button class="login-back-btn" onclick="volverSeleccion()">
+        <i data-lucide="arrow-left"></i> Volver al Login
+      </button>
+      <h2 class="login-title" style="font-size:1.2rem;margin-bottom:0.25rem;">Crear Usuario</h2>
+      <p class="login-sub" style="margin-bottom:1.5rem;">Crea tu cuenta para acceder al sistema</p>
+      <div class="login-crear-form">
+        <div class="form-group">
+          <label>Nombre completo</label>
+          <input type="text" id="lc-nombre" placeholder="Ej. Juan García" required/>
+        </div>
+        <div class="form-group">
+          <label>Correo electrónico (Usuario)</label>
+          <input type="email" id="lc-email" placeholder="correo@empresa.com" required/>
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <input type="password" id="lc-pin" placeholder="••••••••" required/>
+        </div>
+        <div class="form-group">
+          <label>Confirmar Contraseña</label>
+          <input type="password" id="lc-pin2" placeholder="••••••••" required/>
+        </div>
+        <div id="lc-error" class="pin-error"></div>
+        <button class="btn-primary" style="width:100%;justify-content:center;display:flex;align-items:center;gap:0.4rem;" onclick="confirmarCrearUsuario()">
+          <i data-lucide="user-plus" class="btn-icon"></i> Crear Usuario
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- APP (hidden until login) -->
+<div id="app-wrapper">
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <img src="logo_transparent.png" alt="Eurorep" class="sidebar-logo-img"/>
+  </div>
+  <nav class="sidebar-nav">
+    <a href="#" class="nav-item active" data-view="dashboard" data-title="Dashboard" id="nav-dashboard">
+      <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span><span>Dashboard</span>
+    </a>
+    <a href="#" class="nav-item" data-view="servicios" data-title="Órdenes de Servicio" id="nav-servicios">
+      <span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span>Órdenes de Servicio</span>
+    </a>
+    <a href="#" class="nav-item" data-view="tickets" data-title="Tickets" id="nav-tickets">
+      <span class="nav-icon"><i data-lucide="ticket"></i></span><span>Tickets</span>
+      <span class="nav-badge" id="nav-badge-tickets"></span>
+    </a>
+    <a href="#" class="nav-item" data-view="clientes" data-title="Clientes" id="nav-clientes">
+      <span class="nav-icon"><i data-lucide="users"></i></span><span>Clientes</span>
+    </a>
+    <a href="#" class="nav-item" data-view="maquinaria" data-title="Maquinaria" id="nav-maquinaria">
+      <span class="nav-icon"><i data-lucide="settings-2"></i></span><span id="nav-maquinaria-text">Maquinaria</span>
+    </a>
+    <a href="#" class="nav-item" data-view="sitios" data-title="Mis Sitios" id="nav-sitios" style="display:none;">
+      <span class="nav-icon"><i data-lucide="map-pin"></i></span><span>Mis Sitios</span>
+    </a>
+    <a href="#" class="nav-item" data-view="tecnicos" data-title="Técnicos" id="nav-tecnicos">
+      <span class="nav-icon"><i data-lucide="user-cog"></i></span><span>Técnicos</span>
+    </a>
+  </nav>
+  <div class="sidebar-bottom">
+    <a href="#" class="nav-item nav-preferencias" data-view="preferencias" data-title="Preferencias" id="nav-preferencias">
+      <span class="nav-icon"><i data-lucide="sliders"></i></span><span>Preferencias</span>
+    </a>
+    <a href="#" class="nav-item nav-config" data-view="config" data-title="Configuración" id="nav-config">
+      <span class="nav-icon"><i data-lucide="settings"></i></span><span>Configuración</span>
+    </a>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="cerrarSesion()">
+        <i data-lucide="log-out"></i>
+        <span>Cerrar Sesión</span>
+      </button>
+      <div class="sidebar-version">v1.0.0</div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main-wrapper">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <h1 id="page-title">Dashboard</h1>
+    </div>
+    <!-- ROLE SWITCHER (visible solo para superadmin) -->
+    <div class="role-switcher" id="role-switcher" style="display:none;">
+      <span class="role-label">Vista como:</span>
+      <div class="role-mode-btns" id="role-mode-btns">
+        <button class="role-mode-btn active" data-role="superadmin" onclick="switchMode('superadmin')"><i data-lucide="shield-check"></i> SuperAdmin</button>
+        <button class="role-mode-btn" data-role="admin" onclick="switchMode('admin')"><i data-lucide="user-circle"></i> Admin</button>
+        <button class="role-mode-btn" data-role="supervisor" onclick="switchMode('supervisor')"><i data-lucide="clipboard-check"></i> Supervisor</button>
+        <button class="role-mode-btn" data-role="tecnico" onclick="switchMode('tecnico')"><i data-lucide="hard-hat"></i> Técnico</button>
+        <button class="role-mode-btn" data-role="empresa" onclick="switchMode('empresa')"><i data-lucide="building-2"></i> Empresa</button>
+      </div>
+    </div>
+    <div class="topbar-right" id="topbar-right">
+      <div class="session-badge" id="session-badge" onclick="abrirSesionModal()">
+        <div class="session-avatar" id="session-avatar">S</div>
+        <div class="session-info">
+          <div class="session-name" id="session-name">SuperAdmin</div>
+          <div class="session-role" id="session-role">Super Administrador</div>
+        </div>
+        <i data-lucide="chevron-down" style="width:0.85rem;height:0.85rem;stroke:currentColor;stroke-width:2;"></i>
+      </div>
+      <div id="topbar-actions" style="display:flex;gap:0.5rem;">
+        <button class="btn-primary" id="btn-nueva-orden" onclick="abrirFormulario()"><i data-lucide="plus" class="btn-icon"></i> Nueva Orden</button>
+        <button class="btn-primary btn-ticket-action" id="btn-nuevo-ticket" onclick="abrirTicket()" style="display:none;"><i data-lucide="plus" class="btn-icon"></i> Nuevo Ticket</button>
+        <button class="btn-secondary btn-cliente-action" id="btn-agregar-maquina" onclick="abrirModalAgregarMaquina()" style="display:none;"><i data-lucide="settings-2" class="btn-icon"></i> Agregar Máquina</button>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- VIEWS -->
+  <main class="content">
+
+    <!-- DASHBOARD VIEW -->
+    <div id="view-dashboard" class="view active">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="file-text"></i></div>
+          <div>
+            <div class="stat-label">Total Órdenes</div>
+            <div class="stat-value" id="stat-total">0</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i data-lucide="clock"></i></div>
+          <div>
+            <div class="stat-label">En Proceso</div>
+            <div class="stat-value" id="stat-proceso">0</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-circle"></i></div>
+          <div>
+            <div class="stat-label">Pendientes</div>
+            <div class="stat-value" id="stat-pendientes">0</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle"></i></div>
+          <div>
+            <div class="stat-label">Completadas</div>
+            <div class="stat-value" id="stat-completas">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <h2>Órdenes Recientes</h2>
+        <div class="search-bar">
+          <input type="text" id="search-input" placeholder="Buscar cliente, técnico, folio..." oninput="filtrarOrdenes()"/>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="orders-table" id="orders-table">
+          <thead>
+            <tr>
+              <th onclick="toggleSortOrdenes('id')" style="cursor:pointer; user-select:none;">Folio <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-id"></i></th>
+              <th onclick="toggleSortOrdenes('cliente')" style="cursor:pointer; user-select:none;">Cliente <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-cliente"></i></th>
+              <th onclick="toggleSortOrdenes('ubicacion')" style="cursor:pointer; user-select:none;">Ubicación <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-ubicacion"></i></th>
+              <th onclick="toggleSortOrdenes('modelo')" style="cursor:pointer; user-select:none;">Modelo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-modelo"></i></th>
+              <th onclick="toggleSortOrdenes('tecnico')" style="cursor:pointer; user-select:none;">Técnico <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-tecnico"></i></th>
+              <th onclick="toggleSortOrdenes('tipo')" style="cursor:pointer; user-select:none;">Tipo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-tipo"></i></th>
+              <th onclick="toggleSortOrdenes('estado')" style="cursor:pointer; user-select:none;">Estado <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-estado"></i></th>
+              <th onclick="toggleSortOrdenes('fecha')" style="cursor:pointer; user-select:none;">Fecha <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-fecha"></i></th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-body">
+            <tr id="empty-row">
+              <td colspan="9" class="empty-state">No hay órdenes registradas. ¡Crea la primera!</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SERVICIOS VIEW -->
+    <div id="view-servicios" class="view">
+      <div class="section-header">
+        <h2>Todas las Órdenes</h2>
+        <div class="search-bar">
+          <input type="text" id="search-servicios" placeholder="Buscar..." oninput="filtrarOrdenes('servicios')"/>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="orders-table" id="orders-table-servicios">
+          <thead>
+            <tr>
+              <th>Folio</th><th>Cliente</th><th>Ubicación</th><th>Modelo</th>
+              <th>Técnico</th><th>Tipo</th><th>Estado</th><th>Fecha</th><th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-body-servicios">
+            <tr><td colspan="9" class="empty-state">Sin órdenes aún.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CLIENTES VIEW -->
+    <div id="view-clientes" class="view">
+      <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+        <h2>Catálogo de Clientes</h2>
+        <div style="display:flex; gap:0.5rem; flex-wrap:nowrap; align-items:center; flex:1; justify-content:flex-end;">
+          <div class="search-bar" style="width:100%; max-width:400px; margin:0; position:relative; display:flex; align-items:center;">
+            <i data-lucide="search" style="position:absolute; left:0.75rem; width:1rem; height:1rem; color:var(--text-muted);"></i>
+            <input type="text" id="busqueda-cliente" placeholder="Buscar por nombre, RFC o correo..." oninput="currentPageClientes = 1; renderClientes()" style="padding-left:2.25rem; width:100%;">
+          </div>
+          <div class="view-toggle" style="display:flex; gap:0.5rem; border-right: 1px solid var(--border); padding-right: 0.5rem; margin-right: 0.5rem;">
+            <button class="btn-secondary active" id="btn-cli-galeria" onclick="setCliView('galeria')" title="Vista Galería" style="padding:0.4rem; background:var(--accent-light); border-color:var(--accent); color:var(--accent);"><i data-lucide="layout-grid" style="width:18px;height:18px;"></i></button>
+            <button class="btn-secondary" id="btn-cli-lista" onclick="setCliView('lista')" title="Vista Lista" style="padding:0.4rem;"><i data-lucide="list" style="width:18px;height:18px;"></i></button>
+          </div>
+          <button class="action-btn" onclick="forzarSincronizacionSAP()" title="Sincronizar con SAP" id="btn-sync-sap" style="height: 38px; width: 38px; display:flex; align-items:center; justify-content:center; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; transition:var(--transition);">
+            <i data-lucide="refresh-cw" id="icon-sync-sap" style="width:16px; height:16px;"></i>
+          </button>
+        </div>
+      </div>
+      
+      <div class="clientes-grid" id="clientes-grid">
+        <div class="empty-state" style="grid-column:1/-1;padding:2rem;">Cargando clientes...</div>
+      </div>
+      
+      <div class="table-wrapper" id="clientes-list-wrapper" style="display:none; margin-top:1rem;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th onclick="toggleSortClientes('id')" style="cursor:pointer; user-select:none;">ID SAP <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-id"></i></th>
+              <th onclick="toggleSortClientes('nombre')" style="cursor:pointer; user-select:none;">Empresa <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-nombre"></i></th>
+              <th onclick="toggleSortClientes('rfc')" style="cursor:pointer; user-select:none;">RFC <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-rfc"></i></th>
+              <th onclick="toggleSortClientes('contacto')" style="cursor:pointer; user-select:none;">Contacto <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-contacto"></i></th>
+              <th onclick="toggleSortClientes('email')" style="cursor:pointer; user-select:none;">Correo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-email"></i></th>
+              <th onclick="toggleSortClientes('telefono')" style="cursor:pointer; user-select:none;">Teléfono <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-telefono"></i></th>
+              <th onclick="toggleSortClientes('grupoSinergia')" style="cursor:pointer; user-select:none;">Grupo SAP <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-grupoSinergia"></i></th>
+              <th onclick="toggleSortClientes('saldoCuenta')" style="cursor:pointer; user-select:none;">Saldo SAP <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-saldoCuenta"></i></th>
+              <th onclick="toggleSortClientes('saldoOrdenes')" style="cursor:pointer; user-select:none;">Órdenes Abiertas <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-saldoOrdenes"></i></th>
+              <th>Máquinas</th>
+            </tr>
+          </thead>
+          <tbody id="clientes-table-body">
+            <!-- Llenado dinámico -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination-controls" id="clientes-pagination" style="display:flex; justify-content:center; align-items:center; gap:1rem; margin-top:2rem; margin-bottom:1rem;">
+        <!-- Controles inyectados vía JS -->
+      </div>
+    </div>
+
+    <!-- MAQUINARIA VIEW -->
+    <div id="view-maquinaria" class="view">
+      <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+        <h2>Catálogo de Maquinaria</h2>
+        <div style="display:flex; gap:0.5rem; flex-wrap:nowrap; align-items:center; flex:1; justify-content:flex-end;">
+          <div class="search-bar" style="width:100%; max-width:400px; margin:0;">
+            <input type="text" id="search-maquinaria" placeholder="Buscar máquina, serie o cliente..." oninput="renderMaquinaria()"/>
+          </div>
+          <div style="position:relative;" id="maq-filters-container">
+            <button class="action-btn" onclick="document.getElementById('maq-filters-popup').classList.toggle('show-filters')" style="border:1px solid var(--border); border-radius:4px; padding:0.4rem 0.6rem; display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; font-weight:500; color:var(--text-secondary); background:var(--bg-body);">
+              <i data-lucide="filter" style="width:16px;height:16px;"></i> Filtros
+            </button>
+            <div id="maq-filters-popup" class="dropdown-popup" style="display:none; position:absolute; top:calc(100% + 0.5rem); right:0; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:1rem; width:220px; box-shadow:var(--shadow); z-index:100; flex-direction:column; gap:0.75rem;">
+              <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary); border-bottom:1px solid var(--border); padding-bottom:0.5rem;">Filtros Avanzados</div>
+              <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                <label style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">Sitio / Ubicación</label>
+                <select id="filter-maq-sitio" style="width:100%; padding:0.4rem; border-radius:4px; border:1px solid var(--border); font-size:0.85rem; outline:none; background:var(--bg-secondary); color:var(--text-primary);" onchange="renderMaquinaria()">
+                  <option value="">Todos los Sitios</option>
+                </select>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                <label style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">Marca</label>
+                <select id="filter-maq-marca" style="width:100%; padding:0.4rem; border-radius:4px; border:1px solid var(--border); font-size:0.85rem; outline:none; background:var(--bg-secondary); color:var(--text-primary);" onchange="renderMaquinaria()">
+                  <option value="">Todas las Marcas</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th id="th-maquinaria-id">ID Interno</th>
+              <th onclick="toggleSortMaquinaria('marca')" style="cursor:pointer; user-select:none;">Marca <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-marca"></i></th>
+              <th onclick="toggleSortMaquinaria('modelo')" style="cursor:pointer; user-select:none;">Modelo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-modelo"></i></th>
+              <th onclick="toggleSortMaquinaria('serie')" style="cursor:pointer; user-select:none;">Serie <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-serie"></i></th>
+              <th onclick="toggleSortMaquinaria('anio')" style="cursor:pointer; user-select:none;">Año <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-anio"></i></th>
+              <th onclick="toggleSortMaquinaria('cliente')" style="cursor:pointer; user-select:none;">Cliente / Ubicación <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cliente"></i></th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-body-maquinaria">
+            <tr><td colspan="7" class="empty-state">Cargando maquinaria...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SITIOS VIEW (Empresa Only) -->
+    <div id="view-sitios" class="view">
+      <div class="section-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <h2>Mis Sitios Registrados</h2>
+        <button class="btn-primary" onclick="agregarSitioClienteDesdeEmpresa()">+ Agregar Sitio</button>
+      </div>
+      <div class="table-wrapper">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th>Nombre del Sitio</th>
+              <th>Código Postal</th>
+              <th>Ciudad / Estado</th>
+              <th style="width:100px;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-body-sitios">
+            <tr><td colspan="4" class="empty-state">No tienes sitios registrados.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TECNICOS VIEW -->
+    <div id="view-tecnicos" class="view">
+      <div class="section-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <h2>Técnicos</h2>
+        <div class="view-toggle" style="display:flex; gap:0.5rem;">
+          <button class="btn-secondary active" id="btn-tec-galeria" onclick="setTecView('galeria')" title="Vista Galería" style="padding:0.4rem; background:var(--accent-light); border-color:var(--accent); color:var(--accent);"><i data-lucide="layout-grid" style="width:18px;height:18px;"></i></button>
+          <button class="btn-secondary" id="btn-tec-lista" onclick="setTecView('lista')" title="Vista Lista" style="padding:0.4rem;"><i data-lucide="list" style="width:18px;height:18px;"></i></button>
+        </div>
+      </div>
+      <div class="tecnicos-grid" id="tecnicos-grid">
+        <div class="empty-state" style="grid-column:1/-1;padding:2rem;">Sin técnicos registrados aún.</div>
+      </div>
+      <div class="table-wrapper" id="tecnicos-list-wrapper" style="display:none; margin-top:1rem;">
+        <table class="orders-table" id="tecnicos-table">
+          <thead>
+            <tr>
+              <th>Nombre del Técnico</th>
+              <th>Total Servicios</th>
+              <th>Completados</th>
+              <th>Siguiente Ticket</th>
+              <th>Último Resuelto</th>
+            </tr>
+          </thead>
+          <tbody id="tecnicos-table-body">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CONFIG VIEW -->
+    <div id="view-config" class="view">
+
+      <div class="config-grid">
+
+        <!-- Empresa -->
+        <div class="config-card" style="grid-column: 1 / -1;">
+          <div class="config-card-header">
+            <div class="config-card-icon"><i data-lucide="building-2"></i></div>
+            <div>
+              <div class="config-card-title">Información de la Empresa</div>
+              <div class="config-card-sub">Datos generales del negocio</div>
+            </div>
+          </div>
+          <div class="form-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin-top:1rem;">
+            <div class="form-group">
+              <label>Nombre de la empresa</label>
+              <input type="text" id="cfg-empresa" value="Eurorep" placeholder="Nombre"/>
+            </div>
+            <div class="form-group">
+              <label>RFC</label>
+              <input type="text" id="cfg-rfc" placeholder="RFC de la empresa"/>
+            </div>
+            <div class="form-group">
+              <label>Teléfono</label>
+              <input type="tel" id="cfg-tel" placeholder="+52 55 0000 0000"/>
+            </div>
+            <div class="form-group">
+              <label>Correo</label>
+              <input type="email" id="cfg-email" placeholder="contacto@empresa.com"/>
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+              <label>Dirección</label>
+              <input type="text" id="cfg-direccion" placeholder="Calle, Número, Ciudad, CP"/>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:1rem;">
+            <button class="btn-primary" onclick="guardarConfig()"><i data-lucide="save" class="btn-icon"></i> Guardar</button>
+          </div>
+        </div>
+
+        <!-- Gestión de Queries SAP -->
+        <div class="config-card" style="grid-column: 1 / -1;">
+          <div class="config-card-header">
+            <div class="config-card-icon" style="background:var(--accent-light);color:var(--accent);"><i data-lucide="database"></i></div>
+            <div>
+              <div class="config-card-title">Programación de Queries SAP</div>
+              <div class="config-card-sub">Inyecta o actualiza sentencias SQL directamente en la base de datos de producción de SAP. (Uso avanzado)</div>
+            </div>
+          </div>
+          <div class="form-grid" style="display:grid; grid-template-columns: 1fr; gap:1rem; margin-top:1rem;">
+            <div class="form-group">
+              <label>Código del Query (Identificador único)</label>
+              <input type="text" id="query-code" placeholder="Ej. eurorep_clientes_v2" style="font-family: monospace;"/>
+            </div>
+            <div class="form-group">
+              <label>Nombre del Query (Opcional)</label>
+              <input type="text" id="query-name" placeholder="Ej. Lista de Clientes Eurorep"/>
+            </div>
+            <div class="form-group">
+              <label>Sentencia SQL (Query)</label>
+              <textarea id="query-sql" placeholder="SELECT * FROM OCRD..." rows="6" style="font-family: monospace; resize: vertical; padding: 0.75rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-body); color: var(--text-primary);"></textarea>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:1rem;">
+            <button class="btn-primary" onclick="programarQuerySAP()"><i data-lucide="upload-cloud" class="btn-icon"></i> Guardar y Enviar a SAP</button>
+          </div>
+        </div>
+
+        <!-- Usuarios -->
+        <div class="config-card" style="grid-column:1/-1;">
+          <div class="config-card-header">
+            <div class="config-card-icon"><i data-lucide="users"></i></div>
+            <div style="flex:1;">
+              <div class="config-card-title">Usuarios y Empresas</div>
+              <div class="config-card-sub">Gestiona accesos de usuarios y el registro de empresas asociadas</div>
+            </div>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:flex-end;">
+              <button class="btn-secondary" style="display:flex;align-items:center;gap:0.4rem;" onclick="abrirModalCliente()">
+                <i data-lucide="building-2" class="btn-icon"></i> Agregar Empresa
+              </button>
+              <button class="btn-primary" style="display:flex;align-items:center;gap:0.4rem;" onclick="abrirModalUsuario()">
+                <i data-lucide="user-plus" class="btn-icon"></i> Agregar Usuario
+              </button>
+            </div>
+          </div>
+          
+          <div class="filters-bar" style="margin-top: 1.25rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 200px; position: relative; display: flex; align-items: center;">
+              <i data-lucide="search" style="position: absolute; left: 0.75rem; width: 1rem; height: 1rem; color: var(--text-muted);"></i>
+              <input type="text" id="busqueda-usuario" placeholder="Buscar por nombre o correo..." onkeyup="renderUsuariosList()" style="width: 100%; padding: 0.6rem 1rem 0.6rem 2.25rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; background: var(--bg-card); color: var(--text-primary); outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+            </div>
+            <select id="filtro-rol-usuario" class="view-filter" style="width: 200px; padding: 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; background: var(--bg-card); color: var(--text-primary); outline: none; transition: border-color 0.2s;" onchange="renderUsuariosList()" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+              <option value="todos">Todos los roles</option>
+              <option value="superadmin">Super Administrador</option>
+              <option value="admin">Administrador</option>
+              <option value="supervisor">Supervisor</option>
+              <option value="tecnico">Técnico / Instalador</option>
+              <option value="empresa">Empresa / Cliente</option>
+            </select>
+          </div>
+          
+          <div class="usuarios-table-wrap" style="margin-top:1rem;">
+            <div id="usuarios-list"></div>
+          </div>
+        </div>
+
+        <!-- Permisos de Vistas -->
+        <div class="config-card" style="grid-column:1/-1;">
+          <div class="config-card-header">
+            <div class="config-card-icon" style="background:var(--blue-light);color:var(--blue);"><i data-lucide="layout-grid"></i></div>
+            <div style="flex:1;">
+              <div class="config-card-title">Permisos de Vistas por Rol</div>
+              <div class="config-card-sub">Controla qué pestañas (vistas) están habilitadas para cada rol del sistema</div>
+            </div>
+            <button class="btn-primary" style="display:flex;align-items:center;gap:0.4rem; white-space:nowrap;" onclick="guardarPermisosRoles()">
+              <i data-lucide="save" class="btn-icon"></i> Guardar Permisos
+            </button>
+          </div>
+          <div class="table-wrapper" style="margin-top:1.25rem;">
+            <table class="orders-table" id="tabla-permisos-roles">
+              <!-- Renderizado por JS -->
+            </table>
+          </div>
+        </div>
+
+        <!-- Técnicos registrados -->
+        <div class="config-card">
+          <div class="config-card-header">
+            <div class="config-card-icon" style="background:var(--purple-light);color:var(--purple);"><i data-lucide="hard-hat"></i></div>
+            <div>
+              <div class="config-card-title">Técnicos Registrados</div>
+              <div class="config-card-sub">Lista de técnicos del sistema</div>
+            </div>
+          </div>
+          <div id="cfg-tecnicos-list" style="margin-top:1rem;"></div>
+          <div class="form-group" style="margin-top:1rem;">
+            <label>Agregar Técnico</label>
+            <div style="display:flex;gap:0.5rem;">
+              <input type="text" id="cfg-nuevo-tecnico" placeholder="Nombre del técnico"/>
+              <button class="btn-primary" style="white-space:nowrap;" onclick="agregarTecnicoConfig()"><i data-lucide="plus" class="btn-icon"></i> Agregar</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ===== VISTA PREFERENCIAS (GLOBAL) ===== -->
+    <div class="view" id="view-preferencias">
+      <div class="stats-grid" style="grid-template-columns: 1fr; max-width: 600px; margin: 0 auto;">
+        
+        <div class="config-card">
+          <div class="config-card-header">
+            <div class="config-card-icon" style="background:var(--green-light);color:var(--green);"><i data-lucide="sliders"></i></div>
+            <div>
+              <div class="config-card-title">Preferencias Personales</div>
+              <div class="config-card-sub">Ajustes para tu cuenta</div>
+            </div>
+          </div>
+          <div style="margin-top:1rem;display:flex;flex-direction:column;gap:0.85rem;">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Notificaciones de tickets</div>
+                <div class="toggle-sub">Alertas al crear nuevos tickets</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="cfg-notif-tickets" checked/>
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Badge en sidebar</div>
+                <div class="toggle-sub">Mostrar contador de tickets activos</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="cfg-badge" checked/>
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Modo Oscuro</div>
+                <div class="toggle-sub">Apágalo para activar el modo claro</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="cfg-darkmode" checked/>
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- TICKETS VIEW -->
+    <div id="view-tickets" class="view">
+      <div class="tickets-kanban-header">
+        <div class="ticket-filters">
+          <button class="filter-btn active" data-filter="todos" onclick="filtrarTickets(this)">Todos</button>
+          <button class="filter-btn" data-filter="Abierto" onclick="filtrarTickets(this)">Abiertos</button>
+          <button class="filter-btn" data-filter="En Proceso" onclick="filtrarTickets(this)">En Proceso</button>
+          <button class="filter-btn" data-filter="Resuelto" onclick="filtrarTickets(this)">Resueltos</button>
+          <button class="filter-btn" data-filter="Cerrado" onclick="filtrarTickets(this)">Cerrados</button>
+        </div>
+        <div class="search-bar">
+          <input type="text" id="search-tickets" placeholder="Buscar ticket..." oninput="renderTickets()"/>
+        </div>
+      </div>
+      <div class="table-wrapper" style="margin-top:1rem;">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Asunto</th><th>Solicitante / Empresa</th><th>Área</th>
+              <th>Prioridad</th><th>Estado</th><th>Asignado</th><th>Fecha</th><th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tickets-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- MODAL FORMULARIO -->
+<div class="modal-overlay" id="modal-overlay" onclick="cerrarFormulario(event)">
+  <div class="modal" id="modal-form">
+    <div class="modal-header">
+      <h2 id="modal-title">Nueva Orden de Servicio</h2>
+      <button class="modal-close" onclick="cerrarFormulario()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-orden" onsubmit="guardarOrden(event)">
+
+        <!-- SECCIÓN 1: DATOS GENERALES -->
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="user" class="section-icon"></i> Información del Cliente</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Folio (Bitácora No.)</label>
+              <input type="text" id="f-folio" placeholder="Ej. 1570-C" required/>
+            </div>
+            <div class="form-group">
+              <label>Pedido No.</label>
+              <input type="text" id="f-pedido" placeholder="Ej. 1200483"/>
+            </div>
+            <div class="form-group">
+              <label>Cliente *</label>
+              <input type="text" id="f-cliente" placeholder="Nombre del cliente" required/>
+            </div>
+            <div class="form-group">
+              <label>Ubicación</label>
+              <input type="text" id="f-ubicacion" placeholder="Ciudad, Estado"/>
+            </div>
+            <div class="form-group">
+              <label>Operador</label>
+              <input type="text" id="f-operador"/>
+            </div>
+            <div class="form-group">
+              <label>No. ECO</label>
+              <input type="text" id="f-eco"/>
+            </div>
+            <div class="form-group">
+              <label>Horómetro</label>
+              <input type="text" id="f-horometro" placeholder="Ej. 1304"/>
+            </div>
+            <div class="form-group">
+              <label>Modelo</label>
+              <input type="text" id="f-modelo" placeholder="Ej. X-50"/>
+            </div>
+            <div class="form-group">
+              <label>Serie</label>
+              <input type="text" id="f-serie"/>
+            </div>
+            <div class="form-group">
+              <label>Técnico *</label>
+              <input type="text" id="f-tecnico" placeholder="Nombre del técnico" required/>
+            </div>
+            <div class="form-group">
+              <label>Soporte</label>
+              <input type="text" id="f-soporte"/>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 2: KM Y TIPO -->
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="map-pin" class="section-icon"></i> Kilómetros de Recorrido</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Origen → Trabajo (km)</label>
+              <input type="number" id="f-km-ida" min="0" oninput="calcKmTotal()"/>
+            </div>
+            <div class="form-group">
+              <label>Trabajo → Origen (km)</label>
+              <input type="number" id="f-km-vuelta" min="0" oninput="calcKmTotal()"/>
+            </div>
+            <div class="form-group">
+              <label>Total Km</label>
+              <input type="number" id="f-km-total" readonly style="background:var(--bg-secondary);"/>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 3: TIPO DE VISITA -->
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="tag" class="section-icon"></i> Tipo de Visita</div>
+          <div class="tipo-chips">
+            <label class="chip"><input type="radio" name="tipo" value="Servicio" checked/><span>Servicio</span></label>
+            <label class="chip"><input type="radio" name="tipo" value="Garantía"/><span>Garantía</span></label>
+            <label class="chip"><input type="radio" name="tipo" value="Correctivo"/><span>Correctivo</span></label>
+            <label class="chip"><input type="radio" name="tipo" value="Otro"/><span>Otro</span></label>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 4: FALLA Y TRABAJOS -->
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="wrench" class="section-icon"></i> Diagnóstico y Trabajos</div>
+          <div class="form-group full-width">
+            <label>Falla informada por el cliente</label>
+            <textarea id="f-falla" rows="2" placeholder="Descripción de la falla..."></textarea>
+          </div>
+          <div class="form-group full-width">
+            <label>Trabajos realizados</label>
+            <textarea id="f-trabajos" rows="4" placeholder="Describe los trabajos realizados..."></textarea>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 5: OBSERVACIONES -->
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="file-pen-line" class="section-icon"></i> Observaciones y Dictamen</div>
+          <div class="form-group full-width">
+            <label>Dictamen</label>
+            <textarea id="f-dictamen" rows="2"></textarea>
+          </div>
+          <div class="form-group full-width">
+            <label>Condiciones en las que se deja el equipo</label>
+            <textarea id="f-condiciones" rows="2"></textarea>
+          </div>
+          <div class="form-group full-width">
+            <label>Observaciones</label>
+            <textarea id="f-observaciones" rows="2"></textarea>
+          </div>
+          <div class="form-group full-width">
+            <label>Pendientes</label>
+            <textarea id="f-pendientes" rows="2"></textarea>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 6: REFACCIONES -->
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="settings" class="section-icon"></i> Refacciones</div>
+          <div class="refacciones-cols">
+            <div>
+              <div class="ref-subtitle">Utilizadas</div>
+              <div id="ref-utilizadas-list">
+                <div class="ref-row" data-section="utilizadas">
+                  <input type="text" placeholder="Descripción" class="ref-desc"/>
+                  <input type="text" placeholder="Clave" class="ref-clave" style="width:80px"/>
+                  <input type="number" placeholder="Cant." class="ref-cant" style="width:60px" min="1"/>
+                  <input type="number" placeholder="Precio" class="ref-precio" style="width:80px" step="0.01"/>
+                  <button type="button" class="btn-del-ref" onclick="eliminarRef(this)">✕</button>
+                </div>
+              </div>
+              <button type="button" class="btn-add-ref" onclick="agregarRef('utilizadas')">+ Agregar</button>
+              <div class="form-group" style="margin-top:0.75rem">
+                <label>No. Factura Refacciones</label>
+                <input type="text" id="f-factura-ref"/>
+              </div>
+            </div>
+            <div>
+              <div class="ref-subtitle">Necesarias</div>
+              <div id="ref-necesarias-list">
+                <div class="ref-row" data-section="necesarias">
+                  <input type="text" placeholder="Descripción" class="ref-desc"/>
+                  <input type="text" placeholder="Clave" class="ref-clave" style="width:80px"/>
+                  <input type="number" placeholder="Cant." class="ref-cant" style="width:60px" min="1"/>
+                  <button type="button" class="btn-del-ref" onclick="eliminarRef(this)">✕</button>
+                </div>
+              </div>
+              <button type="button" class="btn-add-ref" onclick="agregarRef('necesarias')">+ Agregar</button>
+              <div class="form-group" style="margin-top:0.75rem">
+                <label>No. Factura Mano de Obra</label>
+                <input type="text" id="f-factura-mo"/>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 7: FECHA DE SERVICIO -->
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="calendar" class="section-icon"></i> Fecha de Servicio</div>
+          <div class="dias-tabs" id="dias-tabs">
+            <button type="button" class="dia-tab active" onclick="selDia(this,'lunes')">Lun</button>
+            <button type="button" class="dia-tab" onclick="selDia(this,'martes')">Mar</button>
+            <button type="button" class="dia-tab" onclick="selDia(this,'miercoles')">Mié</button>
+            <button type="button" class="dia-tab" onclick="selDia(this,'jueves')">Jue</button>
+            <button type="button" class="dia-tab" onclick="selDia(this,'viernes')">Vie</button>
+            <button type="button" class="dia-tab" onclick="selDia(this,'sabado')">Sáb</button>
+            <button type="button" class="dia-tab" onclick="selDia(this,'domingo')">Dom</button>
+          </div>
+          <div id="dia-panels">
+            <!-- generado por JS -->
+          </div>
+          <div class="form-grid" style="margin-top:1rem">
+            <div class="form-group">
+              <label>No. de Noches</label>
+              <input type="number" id="f-noches" min="0" value="0"/>
+            </div>
+            <div class="form-group">
+              <label>Alimentación</label>
+              <input type="number" id="f-alimentacion" min="0" step="0.01"/>
+            </div>
+            <div class="form-group">
+              <label>Traslado</label>
+              <input type="number" id="f-traslado-costo" min="0" step="0.01"/>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 8: ESTADO -->
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="circle-dot" class="section-icon"></i> Estado de la Orden</div>
+          <div class="form-group">
+            <label>Estado</label>
+            <select id="f-estado">
+              <option value="Pendiente">Pendiente</option>
+              <option value="En Proceso">En Proceso</option>
+              <option value="Completado">Completado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" onclick="cerrarFormulario()">Cancelar</button>
+          <button type="submit" class="btn-primary"><i data-lucide="save" class="btn-icon"></i> Guardar Orden</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETALLE -->
+<div class="modal-overlay" id="modal-detalle-overlay" onclick="cerrarDetalle(event)">
+  <div class="modal" id="modal-detalle">
+    <div class="modal-header">
+      <h2 id="detalle-title">Orden de Servicio</h2>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <button class="btn-secondary" style="font-size:0.8rem;padding:0.4rem 0.8rem;display:flex;align-items:center;gap:0.35rem;" onclick="imprimirOrden()"><i data-lucide="printer" class="btn-icon"></i> Imprimir</button>
+        <button class="modal-close" onclick="cerrarDetalle()">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="detalle-body"></div>
+  </div>
+</div>
+
+<!-- MODAL CLIENTE -->
+<div class="modal-overlay" id="modal-cliente-overlay" onclick="cerrarCliente(event)">
+  <div class="modal" id="modal-cliente" style="max-width:700px;">
+    <div class="modal-header">
+      <h2 id="cliente-modal-title">Nuevo Cliente</h2>
+      <button class="modal-close" onclick="cerrarCliente()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-cliente" onsubmit="guardarCliente(event)">
+        
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="building-2" class="section-icon"></i> Información de la Empresa</div>
+          <div class="form-grid">
+            <div class="form-group" style="grid-column: 1/-1;">
+              <label>Nombre de la Empresa</label>
+              <input type="text" id="cl-nombre" placeholder="Ej. Eurorep S.A. de C.V." required/>
+            </div>
+            <div class="form-group">
+              <label>RFC (Opcional)</label>
+              <input type="text" id="cl-rfc" placeholder="ABCD123456..."/>
+            </div>
+            <div class="form-group">
+              <label>Estado de la República</label>
+              <select id="cl-ubicacion" required>
+                <option value="" disabled selected>Seleccione un estado</option>
+                <option value="Aguascalientes">Aguascalientes</option>
+                <option value="Baja California">Baja California</option>
+                <option value="Baja California Sur">Baja California Sur</option>
+                <option value="Campeche">Campeche</option>
+                <option value="Chiapas">Chiapas</option>
+                <option value="Chihuahua">Chihuahua</option>
+                <option value="Ciudad de México">Ciudad de México</option>
+                <option value="Coahuila">Coahuila</option>
+                <option value="Colima">Colima</option>
+                <option value="Durango">Durango</option>
+                <option value="Estado de México">Estado de México</option>
+                <option value="Guanajuato">Guanajuato</option>
+                <option value="Guerrero">Guerrero</option>
+                <option value="Hidalgo">Hidalgo</option>
+                <option value="Jalisco">Jalisco</option>
+                <option value="Michoacán">Michoacán</option>
+                <option value="Morelos">Morelos</option>
+                <option value="Nayarit">Nayarit</option>
+                <option value="Nuevo León">Nuevo León</option>
+                <option value="Oaxaca">Oaxaca</option>
+                <option value="Puebla">Puebla</option>
+                <option value="Querétaro">Querétaro</option>
+                <option value="Quintana Roo">Quintana Roo</option>
+                <option value="San Luis Potosí">San Luis Potosí</option>
+                <option value="Sinaloa">Sinaloa</option>
+                <option value="Sonora">Sonora</option>
+                <option value="Tabasco">Tabasco</option>
+                <option value="Tamaulipas">Tamaulipas</option>
+                <option value="Tlaxcala">Tlaxcala</option>
+                <option value="Veracruz">Veracruz</option>
+                <option value="Yucatán">Yucatán</option>
+                <option value="Zacatecas">Zacatecas</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="contact" class="section-icon"></i> Contacto Principal</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Nombre del Contacto</label>
+              <input type="text" id="cl-contacto" placeholder="Nombre completo" required/>
+            </div>
+            <div class="form-group">
+              <label>Teléfono / Móvil</label>
+              <input type="tel" id="cl-telefono" placeholder="55 1234 5678"/>
+            </div>
+            <div class="form-group" style="grid-column: 1/-1;">
+              <label>Correo Electrónico</label>
+              <input type="email" id="cl-email" placeholder="correo@empresa.com"/>
+            </div>
+            <div class="form-group" style="grid-column: 1/-1;">
+              <label>Método de Contacto Preferido</label>
+              <select id="cl-metodo-contacto">
+                <option value="Correo">Correo Electrónico</option>
+                <option value="WhatsApp">WhatsApp</option>
+                <option value="Teléfono">Llamada Telefónica</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="users-2" class="section-icon"></i> Personal Asignado</div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="form-group">
+              <label>Supervisores Asignados</label>
+              <select id="cl-supervisor" multiple size="4" style="height:auto;">
+              </select>
+              <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">Mantén presionada la tecla Ctrl (o Cmd en Mac) para seleccionar varios.</div>
+            </div>
+            <div class="form-group">
+              <label>Técnicos de Base</label>
+              <select id="cl-tecnico" multiple size="4" style="height:auto;">
+              </select>
+              <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">Mantén presionada la tecla Ctrl (o Cmd en Mac) para seleccionar varios.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title" style="display:flex; justify-content:space-between; align-items:center;">
+            <span><i data-lucide="settings-2" class="section-icon"></i> Maquinaria Registrada</span>
+            <button type="button" class="btn-secondary" style="font-size:0.75rem; padding:0.25rem 0.6rem;" onclick="agregarMaquinaField()">+ Agregar Máquina</button>
+          </div>
+          <div id="maquinas-container" style="display:flex;flex-direction:column;gap:1rem;">
+            <!-- Renderizado por JS -->
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" onclick="cerrarCliente()">Cancelar</button>
+          <button type="submit" class="btn-primary">Guardar Cliente</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL AGREGAR MÁQUINA A CLIENTE EXISTENTE -->
+<div class="modal-overlay" id="modal-agregar-maquina-overlay" onclick="cerrarModalAgregarMaquina(event)" style="z-index: 300;">
+  <div class="modal" id="modal-agregar-maquina" style="max-width:500px;">
+    <div class="modal-header">
+      <h2 id="agregar-maquina-title">Agregar Máquina a Cliente</h2>
+      <button class="modal-close" onclick="cerrarModalAgregarMaquina()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-agregar-maquina" onsubmit="guardarNuevaMaquina(event)">
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="user-check" class="section-icon"></i> Seleccionar Cliente</div>
+          <div class="form-group">
+            <label>Cliente</label>
+            <select id="am-cliente" required>
+              <option value="" disabled selected>Seleccione un cliente...</option>
+              <!-- Llenado dinámicamente -->
+            </select>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="settings-2" class="section-icon"></i> Datos de la Máquina</div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="form-group">
+              <label>Marca</label>
+              <select id="am-marca-select" required>
+                <option value="" disabled selected>Seleccione una marca...</option>
+                <!-- Opciones dinámicas -->
+              </select>
+              <input type="text" id="am-marca-otra" placeholder="Escriba la marca..." style="display:none; margin-top:0.5rem;"/>
+            </div>
+            <div class="form-group">
+              <label>Modelo *</label>
+              <input type="text" id="am-modelo" placeholder="Ej. CX 160" required/>
+            </div>
+            <div class="form-group">
+              <label>Número de Serie</label>
+              <input type="text" id="am-serie" placeholder="Ej. 12345678"/>
+            </div>
+            <div class="form-group">
+              <label>Año de Fabricación</label>
+              <input type="number" id="am-anio" placeholder="Ej. 2018"/>
+            </div>
+            <div class="form-group">
+              <label>Fecha de Venta</label>
+              <input type="date" id="am-venta"/>
+            </div>
+            <div class="form-group">
+              <label>Ubicación / Sitio</label>
+              <select id="am-ubicacion-select">
+                <option value="" disabled selected>Seleccione una ubicación...</option>
+              </select>
+              <input type="text" id="am-ubicacion-otra" placeholder="Escriba la ubicación..." style="display:none; margin-top:0.5rem;"/>
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" onclick="cerrarModalAgregarMaquina()">Cancelar</button>
+          <button type="submit" class="btn-primary">Guardar Máquina</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MOVER MÁQUINA DE SITIO -->
+<div class="modal-overlay" id="modal-mover-maquina-overlay" onclick="cerrarModalMoverMaquina(event)" style="z-index: 300;">
+  <div class="modal" id="modal-mover-maquina" style="max-width:400px;">
+    <div class="modal-header">
+      <h2 id="mover-maquina-title">Cambiar Sitio de Máquina</h2>
+      <button class="modal-close" onclick="cerrarModalMoverMaquina()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-mover-maquina" onsubmit="guardarMoverMaquina(event)">
+        <input type="hidden" id="mm-cliente" />
+        <input type="hidden" id="mm-idInterno" />
+        <div class="form-group">
+          <label>Sitio / Ubicación Destino *</label>
+          <select id="mm-ubicacion" required>
+            <option value="">Selecciona un sitio registrado...</option>
+          </select>
+        </div>
+        <div class="form-actions" style="margin-top:1.5rem;">
+          <button type="button" class="btn-secondary" onclick="cerrarModalMoverMaquina()">Cancelar</button>
+          <button type="submit" class="btn-primary">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETALLE DE CLIENTE -->
+<div class="modal-overlay" id="modal-detalle-cliente-overlay" onclick="cerrarDetalleCliente(event)">
+  <div class="modal" id="modal-detalle-cliente" style="max-width:800px;">
+    <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 id="detalle-cliente-title">Perfil del Cliente</h2>
+      <div style="display:flex; gap:1rem; align-items:center;">
+        <button id="btn-sync-single-client" class="btn-secondary" style="display:none; font-size:0.75rem; padding:0.4rem 0.8rem; align-items:center; gap:0.3rem;" onclick="sincronizarUnCliente()">
+          <i data-lucide="refresh-cw" id="icon-sync-single" style="width:14px; height:14px;"></i> SAP
+        </button>
+        <button class="modal-close" onclick="cerrarDetalleCliente()">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="detalle-cliente-body" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
+      <!-- Llenado dinámicamente con JS -->
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TICKET -->
+<div class="modal-overlay" id="modal-ticket-overlay" onclick="cerrarTicket(event)">
+  <div class="modal" id="modal-ticket" style="max-width:640px;">
+    <div class="modal-header">
+      <h2 id="ticket-modal-title">Nuevo Ticket</h2>
+      <button class="modal-close" onclick="cerrarTicket()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-ticket" onsubmit="guardarTicket(event)">
+
+        <!-- ORIGEN DEL TICKET -->
+        <div class="form-section" id="section-t-origen">
+          <div class="form-section-title"><i data-lucide="message-circle-question" class="section-icon"></i> ¿Cómo se genera este ticket?</div>
+          <div class="canal-chips">
+            <label class="canal-chip" onclick="seleccionarCanal('correo')">
+              <input type="radio" name="t-canal" value="correo" id="canal-correo"/>
+              <div class="canal-chip-inner">
+                <i data-lucide="mail"></i>
+                <span>Correo</span>
+              </div>
+            </label>
+            <label class="canal-chip" onclick="seleccionarCanal('whatsapp')">
+              <input type="radio" name="t-canal" value="whatsapp" id="canal-whatsapp"/>
+              <div class="canal-chip-inner">
+                <i data-lucide="message-circle"></i>
+                <span>WhatsApp</span>
+              </div>
+            </label>
+            <label class="canal-chip" onclick="seleccionarCanal('telefono')">
+              <input type="radio" name="t-canal" value="telefono" id="canal-telefono"/>
+              <div class="canal-chip-inner">
+                <i data-lucide="phone-call"></i>
+                <span>Llamada</span>
+              </div>
+            </label>
+          </div>
+
+          <!-- Input dinámico según canal -->
+          <div id="canal-input-correo" class="canal-input-box" style="display:none;">
+            <div class="form-group">
+              <label>Dirección de correo electrónico</label>
+              <input type="email" id="t-correo" placeholder="ejemplo@empresa.com"/>
+            </div>
+          </div>
+          <div id="canal-input-whatsapp" class="canal-input-box" style="display:none;">
+            <div class="form-group">
+              <label>Número de WhatsApp</label>
+              <input type="tel" id="t-whatsapp" placeholder="+52 55 1234 5678"/>
+            </div>
+          </div>
+          <div id="canal-input-telefono" class="canal-input-box" style="display:none;">
+            <div class="form-group">
+              <label>Número de teléfono</label>
+              <input type="tel" id="t-telefono" placeholder="+52 55 1234 5678"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="ticket" class="section-icon"></i> Información del Ticket</div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="form-group">
+              <label>Asunto / Título *</label>
+              <input type="text" id="t-asunto" placeholder="Describe brevemente el problema" required/>
+            </div>
+            <div class="form-group" id="group-t-cliente" style="position:relative;">
+              <label>Cliente / Empresa</label>
+              <!-- Selector oculto para guardar el valor -->
+              <input type="hidden" id="t-cliente" value="" />
+              
+              <!-- UI del dropdown personalizado -->
+              <div class="combo-box" id="t-cliente-combo" onclick="toggleCombo('t-cliente')">
+                <span id="t-cliente-display">Ninguno / Uso Interno</span>
+                <i data-lucide="chevron-down" style="width:16px;height:16px;color:var(--text-muted);"></i>
+              </div>
+              
+              <div class="combo-menu" id="t-cliente-menu">
+                <div class="combo-search">
+                  <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted);"></i>
+                  <input type="text" id="t-cliente-search" placeholder="Buscar o crear..." onkeyup="filterCombo('t-cliente', this.value)" onclick="event.stopPropagation()"/>
+                </div>
+                <div class="combo-options" id="t-cliente-options">
+                  <!-- Llenado dinámicamente -->
+                </div>
+                <div class="combo-add" id="t-cliente-add" onclick="agregarEmpresaCombo('t-cliente')">
+                  <i data-lucide="plus-circle" style="width:16px;height:16px;"></i> <span id="t-cliente-add-text">Crear nueva empresa</span>
+                </div>
+              </div>
+            </div>
+            <div class="form-group" id="group-t-sitio" style="display:none;">
+              <label>Sitio / Sucursal</label>
+              <input type="text" id="t-sitio" list="t-sitio-list" placeholder="Seleccione o escriba..." />
+              <datalist id="t-sitio-list"></datalist>
+            </div>
+            <div class="form-group">
+              <label>Solicitante *</label>
+              <input type="text" id="t-solicitante" placeholder="Nombre de quien solicita" required/>
+            </div>
+            <div class="form-group">
+              <label>Área / Departamento</label>
+              <select id="t-area">
+                <option>Operaciones</option>
+                <option>Ventas</option>
+                <option>Almacén</option>
+                <option>Administración</option>
+                <option>Mantenimiento</option>
+                <option>Otro</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Categoría</label>
+              <select id="t-categoria">
+                <option>Refacción</option>
+                <option>Servicio Técnico</option>
+                <option>Soporte</option>
+                <option>Garantía</option>
+                <option>Solicitud de Información</option>
+                <option>Otro</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Prioridad</label>
+              <select id="t-prioridad">
+                <option value="Baja">Baja</option>
+                <option value="Media" selected>Media</option>
+                <option value="Alta">Alta</option>
+                <option value="Urgente">Urgente</option>
+              </select>
+            </div>
+            <div class="form-group" id="group-t-asignado">
+              <label>Asignado a</label>
+              <input type="text" id="t-asignado" placeholder="Técnico o responsable"/>
+            </div>
+          </div>
+          <div class="form-group full-width" style="margin-top:0.5rem;">
+            <label>Descripción detallada *</label>
+            <textarea id="t-descripcion" rows="4" placeholder="Explica el problema o solicitud con detalle..." required></textarea>
+          </div>
+          <div class="form-group full-width">
+            <label>Equipo / Máquina afectada</label>
+            <select id="t-equipo">
+              <option value="">Seleccione una máquina registrada...</option>
+            </select>
+          </div>
+          <div class="form-group full-width" id="group-t-notas">
+            <label>Notas adicionales (Interno)</label>
+            <textarea id="t-notas" rows="2" placeholder="Información extra, ubicación, urgencia..."></textarea>
+          </div>
+          <div class="form-group full-width" id="group-t-evidencias" style="display:none; border-top:1px solid var(--border); padding-top:1rem; margin-top:0.5rem;">
+            <label style="font-size:0.9rem; margin-bottom:0.75rem; color:var(--text); font-weight:600;"><i data-lucide="camera" style="width:16px;height:16px;vertical-align:text-bottom;margin-right:4px;"></i> Evidencia Fotográfica (Opcional)</label>
+            <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+              <div class="form-group">
+                <label>Fotos de la máquina</label>
+                <input type="file" id="t-fotos-maquina" accept="image/*" multiple style="font-size:0.8rem;"/>
+                <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">Sube archivo(s) o toma fotos con tu celular</div>
+              </div>
+              <div class="form-group">
+                <label style="display:flex; align-items:center; gap:4px;">
+                  Foto del Horómetro
+                  <div class="tooltip-container">
+                    <i data-lucide="help-circle" style="width:14px;height:14px;color:var(--blue);cursor:help;"></i>
+                    <div class="tooltip-box">
+                      <strong style="color:var(--text); font-size:0.8rem;">¿Qué es el horómetro?</strong><br/>
+                      <span style="color:var(--text-secondary);">Es el medidor que registra las horas de trabajo de la máquina (similar al odómetro de un auto). Necesitamos foto de la pantalla o reloj donde se muestran los números.</span><br/>
+                      <img src="horometro_ejemplo.png" alt="Ejemplo de Horómetro" style="width:100%; border-radius:4px; margin-top:8px; border:1px solid var(--border);"/>
+                    </div>
+                  </div>
+                </label>
+                <input type="file" id="t-foto-horometro" accept="image/*" style="font-size:0.8rem;"/>
+                <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">Sube un archivo o toma la foto con tu celular</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section" id="section-t-estado">
+          <div class="form-section-title"><i data-lucide="circle-dot" class="section-icon"></i> Estado</div>
+          <div class="tipo-chips">
+            <label class="chip"><input type="radio" name="t-estado" value="Abierto" checked/><span>Abierto</span></label>
+            <label class="chip"><input type="radio" name="t-estado" value="En Proceso"/><span>En Proceso</span></label>
+            <label class="chip"><input type="radio" name="t-estado" value="Resuelto"/><span>Resuelto</span></label>
+            <label class="chip"><input type="radio" name="t-estado" value="Cerrado"/><span>Cerrado</span></label>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" onclick="cerrarTicket()">Cancelar</button>
+          <button type="submit" class="btn-primary"><i data-lucide="save" class="btn-icon"></i> Guardar Ticket</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETALLE TICKET -->
+<div class="modal-overlay" id="modal-ticket-detalle-overlay" onclick="cerrarDetalleTicket(event)">
+  <div class="modal" id="modal-ticket-detalle" style="max-width:640px;">
+    <div class="modal-header">
+      <h2 id="ticket-detalle-title">Detalle del Ticket</h2>
+      <button class="modal-close" onclick="cerrarDetalleTicket()">✕</button>
+    </div>
+    <div class="modal-body" id="ticket-detalle-body"></div>
+  </div>
+</div>
+
+
+
+<!-- MODAL USUARIO -->
+<div class="modal-overlay" id="modal-usuario-overlay" onclick="cerrarModalUsuario(event)">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <h2 id="usuario-modal-title">Nuevo Usuario</h2>
+      <button class="modal-close" onclick="cerrarModalUsuario()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-usuario" onsubmit="guardarUsuario(event)">
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="user" class="section-icon"></i> Datos del Usuario</div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="form-group" style="grid-column:1/-1;">
+              <label>Nombre completo *</label>
+              <input type="text" id="u-nombre" placeholder="Ej. Juan García" required/>
+            </div>
+            <div class="form-group">
+              <label>Correo Electrónico</label>
+              <input type="email" id="u-email" placeholder="correo@empresa.com"/>
+            </div>
+            <div class="form-group">
+              <label>Celular</label>
+              <input type="tel" id="u-telefono" placeholder="55 1234 5678"/>
+            </div>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="shield" class="section-icon"></i> Rol y Acceso</div>
+          <div class="roles-grid">
+            <label class="rol-card">
+              <input type="radio" name="u-rol" value="admin" onchange="toggleEmpresaField(this)"/>
+              <div class="rol-card-inner">
+                <div class="rol-card-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="user-circle"></i></div>
+                <div class="rol-card-name">Administrador</div>
+                <div class="rol-card-desc">Control Total y Configuración</div>
+              </div>
+            </label>
+            <label class="rol-card">
+              <input type="radio" name="u-rol" value="supervisor" onchange="toggleEmpresaField(this)"/>
+              <div class="rol-card-inner">
+                <div class="rol-card-icon" style="background:rgba(234,179,8,0.12);color:#eab308;"><i data-lucide="clipboard-check"></i></div>
+                <div class="rol-card-name">Supervisor</div>
+                <div class="rol-card-desc">Dashboard, Órdenes, Tickets, Clientes</div>
+              </div>
+            </label>
+            <label class="rol-card">
+              <input type="radio" name="u-rol" value="tecnico" onchange="toggleEmpresaField(this)"/>
+              <div class="rol-card-inner">
+                <div class="rol-card-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="hard-hat"></i></div>
+                <div class="rol-card-name">Técnico / Instalador</div>
+                <div class="rol-card-desc">Solo sus Órdenes de Servicio y Tickets asignados</div>
+              </div>
+            </label>
+            <label class="rol-card">
+              <input type="radio" name="u-rol" value="empresa" onchange="toggleEmpresaField(this)"/>
+              <div class="rol-card-inner">
+                <div class="rol-card-icon" style="background:rgba(139,92,246,0.12);color:#8b5cf6;"><i data-lucide="building-2"></i></div>
+                <div class="rol-card-name">Empresa / Cliente</div>
+                <div class="rol-card-desc">Solo sus Tickets. Vista de seguimiento</div>
+              </div>
+            </label>
+          </div>
+          <div id="u-empresa-container" class="form-group" style="display:none; margin-top:1rem; padding-top:1rem; border-top:1px dashed var(--border);">
+            <label>Empresa Asociada * <span style="color:var(--text-muted);font-weight:normal;font-size:0.75rem;">(Escriba o seleccione una empresa del catálogo)</span></label>
+            <input type="text" id="u-empresa" list="u-empresa-list" placeholder="Seleccione o escriba la empresa..." />
+            <datalist id="u-empresa-list"></datalist>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title"><i data-lucide="lock" class="section-icon"></i> PIN de Acceso</div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="form-group">
+              <label>PIN (4 dígitos)</label>
+              <input type="password" id="u-pin" placeholder="••••" maxlength="4" pattern="[0-9]{4}"/>
+            </div>
+            <div class="form-group">
+              <label>Confirmar PIN</label>
+              <input type="password" id="u-pin2" placeholder="••••" maxlength="4"/>
+            </div>
+          </div>
+          <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.4rem;">El PIN se usa para cambiar de usuario en la sesión activa.</p>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" onclick="cerrarModalUsuario()">Cancelar</button>
+          <button type="submit" class="btn-primary"><i data-lucide="save" class="btn-icon"></i> Guardar Usuario</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SESIÓN (cambiar usuario) -->
+<div class="modal-overlay" id="modal-sesion-overlay" onclick="cerrarSesionModal(event)">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <h2>Cambiar Usuario</h2>
+      <button class="modal-close" onclick="cerrarSesionModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="sesion-usuarios-list"></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /app-wrapper -->
+
+<!-- MODAL DETALLE TÉCNICO -->
+<div class="modal-overlay" id="modal-detalle-tecnico-overlay" onclick="cerrarDetalleTecnico(event)">
+  <div class="modal" id="modal-detalle-tecnico" style="max-width: 700px; padding:0;">
+    <div class="modal-header" style="border-bottom: 1px solid var(--border); padding: 1.25rem 1.5rem;">
+      <h2 id="tecnico-detalle-title" style="display:flex; align-items:center; gap:0.5rem;"><i data-lucide="user" style="color:var(--accent);"></i> Perfil del Técnico</h2>
+      <button class="modal-close" onclick="cerrarDetalleTecnico()">✕</button>
+    </div>
+    <div class="modal-body" id="detalle-tecnico-body" style="padding: 1.5rem; max-height: 70vh; overflow-y:auto;">
+      <!-- Llenado dinámicamente -->
+    </div>
+  </div>
+</div>
+
+<!-- MODAL AGREGAR SITIO -->
+<div class="modal-overlay" id="modal-agregar-sitio-overlay" onclick="cerrarModalSitio(event)" style="z-index: 300;">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header">
+      <h2 id="modal-sitio-title">Nuevo Sitio</h2>
+      <button class="modal-close" onclick="cerrarModalSitio()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-agregar-sitio" onsubmit="guardarSitioCliente(event)">
+        <input type="hidden" id="s-cliente-nombre" />
+        <div class="form-group">
+          <label>Nombre del Sitio *</label>
+          <input type="text" id="s-sitio-nombre" placeholder="Ej. Planta Norte, Bodega 3, etc." required/>
+        </div>
+        <div class="form-group" style="margin-top:0.75rem;">
+          <label>Dirección</label>
+          <input type="text" id="s-sitio-direccion" placeholder="Calle, número, colonia, etc."/>
+        </div>
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr; margin-top:0.75rem;">
+          <div class="form-group">
+            <label>Código Postal</label>
+            <input type="text" id="s-sitio-cp" placeholder="Ej. 11000"/>
+          </div>
+          <div class="form-group">
+            <label>Ciudad / Municipio</label>
+            <input type="text" id="s-sitio-ciudad" placeholder="Ej. Miguel Hidalgo"/>
+          </div>
+          <div class="form-group" style="grid-column:1/-1;">
+            <label>Estado</label>
+            <select id="s-sitio-estado">
+              <option value="">Selecciona un estado</option>
+              <option value="Aguascalientes">Aguascalientes</option>
+              <option value="Baja California">Baja California</option>
+              <option value="Baja California Sur">Baja California Sur</option>
+              <option value="Campeche">Campeche</option>
+              <option value="Chiapas">Chiapas</option>
+              <option value="Chihuahua">Chihuahua</option>
+              <option value="Ciudad de México">Ciudad de México</option>
+              <option value="Coahuila">Coahuila</option>
+              <option value="Colima">Colima</option>
+              <option value="Durango">Durango</option>
+              <option value="Estado de México">Estado de México</option>
+              <option value="Guanajuato">Guanajuato</option>
+              <option value="Guerrero">Guerrero</option>
+              <option value="Hidalgo">Hidalgo</option>
+              <option value="Jalisco">Jalisco</option>
+              <option value="Michoacán">Michoacán</option>
+              <option value="Morelos">Morelos</option>
+              <option value="Nayarit">Nayarit</option>
+              <option value="Nuevo León">Nuevo León</option>
+              <option value="Oaxaca">Oaxaca</option>
+              <option value="Puebla">Puebla</option>
+              <option value="Querétaro">Querétaro</option>
+              <option value="Quintana Roo">Quintana Roo</option>
+              <option value="San Luis Potosí">San Luis Potosí</option>
+              <option value="Sinaloa">Sinaloa</option>
+              <option value="Sonora">Sonora</option>
+              <option value="Tabasco">Tabasco</option>
+              <option value="Tamaulipas">Tamaulipas</option>
+              <option value="Tlaxcala">Tlaxcala</option>
+              <option value="Veracruz">Veracruz</option>
+              <option value="Yucatán">Yucatán</option>
+              <option value="Zacatecas">Zacatecas</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-actions" style="margin-top:1.5rem;">
+          <button type="button" class="btn-secondary" onclick="cerrarModalSitio()">Cancelar</button>
+          <button type="submit" class="btn-primary">Agregar Sitio</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- MODAL: DESGLOSE ÓRDENES SAP -->
+<div id="modal-desglose-sap" class="modal-overlay">
+  <div class="modal" style="max-width: 900px; width: 95%;">
+    <div class="modal-header">
+      <h3 id="desglose-sap-title">Saldo pedido cliente</h3>
+      <button class="modal-close" onclick="cerrarDesgloseSAP()">✕</button>
+    </div>
+    <div class="modal-body" style="padding: 0;">
+      <div class="table-container" style="max-height: 60vh; overflow-y: auto;">
+        <table class="data-table" style="margin: 0; width: 100%;">
+          <thead style="position: sticky; top: 0; z-index: 10;">
+            <tr>
+              <th onclick="toggleSortDesglose('fecha')" style="width: 120px; cursor:pointer; user-select:none;">Fecha <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-desg-fecha"></i></th>
+              <th onclick="toggleSortDesglose('docNum')" style="width: 130px; cursor:pointer; user-select:none;">Número de doc. <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-desg-docNum"></i></th>
+              <th onclick="toggleSortDesglose('comments')" style="cursor:pointer; user-select:none;">Comentarios <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-desg-comments"></i></th>
+              <th onclick="toggleSortDesglose('importe')" style="width: 130px; text-align: right; cursor:pointer; user-select:none;">Importe <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-desg-importe"></i></th>
+              <th onclick="toggleSortDesglose('openAmount')" style="width: 140px; text-align: right; cursor:pointer; user-select:none;">Saldo Pendiente <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-desg-openAmount"></i></th>
+              <th style="width: 150px; text-align: right;">Saldo Acumulado</th>
+            </tr>
+          </thead>
+          <tbody id="desglose-sap-tbody">
+            <!-- Renderizado dinámico -->
+          </tbody>
+          <tfoot style="position: sticky; bottom: 0; background: var(--bg-card); box-shadow: 0 -2px 10px rgba(0,0,0,0.2);">
+            <tr>
+              <td colspan="5" style="text-align: right; font-weight: bold; font-size: 1.1rem; padding: 1rem;">Total Abierto:</td>
+              <td id="desglose-sap-total" style="text-align: right; font-weight: bold; font-size: 1.1rem; color: var(--accent); padding: 1rem;">$0.00</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script src="supabaseSync.js"></script>
+<script src="app.js"></script>
+<script>lucide.createIcons();</script>
+</body>
+</html>

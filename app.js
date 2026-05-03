@@ -1,0 +1,3468 @@
+let currentMaqSortCol = 'reciente';
+let currentMaqSortDir = 'desc';
+let currentCliSortCol = 'reciente';
+let currentCliSortDir = 'desc';
+let currentOrdSortCol = 'reciente';
+let currentOrdSortDir = 'desc';
+let currentDesgSortCol = 'fecha';
+let currentDesgSortDir = 'asc';
+let currentDesgloseData = [];
+
+// ===== DATA =====
+let ordenes = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+let tickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+let clientesDb = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+
+// Sincronización con Supabase (escuchar cuando los datos bajen a localStorage)
+window.addEventListener('supabase_datos_cargados', () => {
+  ordenes = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+  tickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+  clientesDb = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+  usuarios = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+  
+  // Re-render UI
+  renderTabla();
+  renderTabla('servicios');
+  renderClientes();
+  renderUsuariosList();
+});
+let editandoId = null;
+let editandoTicketId = null;
+let ticketFiltroActivo = 'todos';
+
+// ==========================================
+// MÓDULO DE INTEGRACIÓN SAP (PRÓXIMAMENTE)
+// ==========================================
+const API_CONFIG = {
+  // Cambia a true cuando el backend Node.js de SAP esté corriendo
+  USE_SAP_BACKEND: true,
+  BASE_URL: 'http://localhost:3000/api'
+};
+
+async function fetchClientesSAP() {
+  if (!API_CONFIG.USE_SAP_BACKEND) return clientesDb; // Retorna los locales si no hay SAP
+  
+  try {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/clientes`);
+    const sapData = await response.json();
+    
+    // Mapeo: Convertimos la estructura del Query de SAP a nuestra estructura del CRM
+    const clientesMapeados = sapData.map(bp => ({
+      id: bp.CardCode || '', // El ID interno en SAP
+      createdAt: new Date().toISOString(),
+      nombre: bp.CardName || 'Sin Nombre',
+      rfc: bp.LicTradNum || 'Genérico', // Ahora usamos LicTradNum del Query
+      ubicacion: '', // El Query no trae dirección, la dejamos en blanco por ahora
+      contacto: '', 
+      telefono: '',
+      email: bp.E_Mail || '', // Ahora usamos E_Mail del Query
+      grupoSinergia: bp.U_OK_Grupo || 'N/A', // UDF
+      saldoCuenta: bp.Balance || 0,
+      saldoOrdenes: bp.OrdersBal || 0,
+      maquinas: [], // Esto se llenaría con otro endpoint (CustomerEquipmentCards)
+      supervisoresAsignados: [],
+      tecnicosAsignados: []
+    }));
+    
+    return clientesMapeados;
+  } catch (error) {
+    console.error('Error conectando al puente SAP:', error);
+    return clientesDb; // Fallback a datos locales
+  }
+}
+// ==========================================
+
+const DIAS = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
+const DIAS_LABEL = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+
+const MARCAS_OFICIALES = ['Fiori', 'Rubble Master', 'Hyundai', 'CIFA', 'SIMEM'];
+
+function getLogoMarca(marca) {
+  if (!marca) return null;
+  const m = marca.toLowerCase().trim();
+  if (m.includes('fiori')) return 'logo_fiori.png?v=2';
+  if (m.includes('rubble')) return 'logo_rublemaster.svg?v=2';
+  if (m.includes('hyundai')) return 'logo_hyundai.png?v=2';
+  if (m.includes('cifa')) return 'logo_cifa.png?v=1';
+  if (m.includes('simem')) return 'logo_simem.png?v=1';
+  return null;
+}
+
+// ===== INIT =====
+// ===== ROLES SYSTEM =====
+let ROLES = {
+  superadmin: {
+    label: 'Super Administrador',
+    color: '#E8820C',
+    views: ['dashboard','servicios','tickets','clientes','maquinaria','tecnicos','config','preferencias'],
+    canSwitchRoles: true,
+  },
+  admin: {
+    label: 'Administrador',
+    color: '#4f8ef7',
+    views: ['dashboard','servicios','tickets','clientes','maquinaria','tecnicos','config','preferencias'],
+  },
+  supervisor: {
+    label: 'Supervisor',
+    color: '#eab308',
+    views: ['dashboard','servicios','tickets','clientes','maquinaria','tecnicos','preferencias'],
+  },
+  tecnico: {
+    label: 'Técnico / Instalador',
+    color: '#10b981',
+    views: ['dashboard','servicios','tickets','preferencias'],
+  },
+  empresa: {
+    label: 'Empresa / Cliente',
+    color: '#8b5cf6',
+    views: ['dashboard','tickets','maquinaria','sitios','preferencias'],
+  },
+};
+
+const ROLES_LABELS = {
+  dashboard: 'Dashboard', servicios: 'Órdenes de Servicio',
+  tickets: 'Tickets', clientes: 'Clientes', maquinaria: 'Maquinaria',
+  sitios: 'Mis Sitios', tecnicos: 'Técnicos', config: 'Configuración',
+  preferencias: 'Preferencias'
+};
+
+const savedRoles = JSON.parse(localStorage.getItem('sapi_roles_config'));
+if (savedRoles) {
+  for (const r in savedRoles) {
+    if (ROLES[r] && savedRoles[r].views) {
+      ROLES[r].views = savedRoles[r].views;
+    }
+  }
+}
+
+// ===== LOGIN STATE =====
+function iniciarSesionSubmit(e) {
+  e.preventDefault();
+  const inputUser = document.getElementById('login-email').value.trim().toLowerCase();
+  const inputPass = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  
+  const all = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+  
+  // Encontrar por correo o por nombre ignorando mayúsculas
+  const user = all.find(u => 
+    (u.email && u.email.toLowerCase() === inputUser) || u.nombre.toLowerCase() === inputUser
+  );
+
+  if (!user) {
+    errEl.textContent = 'Usuario o contraseña incorrectos.';
+    errEl.style.color = 'var(--red)';
+    return;
+  }
+
+  // Comparamos el password con el "pin" almacenado (o password si ya fue migrado)
+  if (inputPass !== (user.pin || '0000')) {
+    errEl.textContent = 'Usuario o contraseña incorrectos.';
+    errEl.style.color = 'var(--red)';
+    return;
+  }
+
+  if (user.activo === false) {
+    errEl.textContent = 'Tu cuenta está pendiente de aprobación por un Administrador.';
+    errEl.style.color = 'var(--text-secondary)';
+    return;
+  }
+
+  // Comparamos el password con el "pin" almacenado (o password si ya fue migrado)
+  if (inputPass === (user.pin || '0000')) {
+    errEl.textContent = '';
+    currentSession = { userId: user.id, viewMode: user.rol };
+    localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
+    document.getElementById('login-email').value = '';
+    document.getElementById('login-password').value = '';
+    entrarApp(user);
+  } else {
+    errEl.textContent = 'Contraseña incorrecta.';
+  }
+}
+
+function entrarApp(user) {
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app-wrapper').classList.add('visible');
+  applyRole(user.rol);
+  renderUsuariosList();
+  lucide.createIcons();
+}
+
+function volverSeleccion() {
+  document.getElementById('login-step-crear').style.display = 'none';
+  document.getElementById('login-step-form').style.display = 'block';
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').textContent = '';
+}
+
+function cerrarSesion() {
+  cerrarSesionModal();
+  localStorage.removeItem('eurorep_session');
+  currentSession = { userId: 'superadmin', viewMode: 'superadmin' };
+  document.getElementById('app-wrapper').classList.remove('visible');
+  document.getElementById('login-screen').classList.remove('hidden');
+  volverSeleccion();
+}
+
+function loginCrearUsuario() {
+  document.getElementById('login-step-form').style.display = 'none';
+  document.getElementById('login-step-crear').style.display = 'block';
+  document.getElementById('lc-error').textContent = '';
+  lucide.createIcons();
+}
+
+function confirmarCrearUsuario() {
+  const all = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+  const nombre = document.getElementById('lc-nombre').value.trim();
+  const email = document.getElementById('lc-email').value.trim();
+  const pin = document.getElementById('lc-pin').value;
+  const pin2 = document.getElementById('lc-pin2').value;
+  const errEl = document.getElementById('lc-error');
+
+  if (!nombre) { errEl.textContent = 'El nombre es obligatorio.'; return; }
+  if (!pin || pin.length < 4) { errEl.textContent = 'La contraseña debe tener al menos 4 caracteres.'; return; }
+  if (pin !== pin2) { errEl.textContent = 'Las contraseñas no coinciden.'; return; }
+
+  // Default rol as pending, it will be updated by Admin
+  all.push({ id: crypto.randomUUID(), nombre, email, rol: 'empresa', pin, activo: false, locked: false });
+  localStorage.setItem('eurorep_usuarios', JSON.stringify(all));
+  usuarios = all;
+  
+  volverSeleccion();
+  document.getElementById('login-error').textContent = 'Cuenta creada. Espera la aprobación de un Administrador.';
+  document.getElementById('login-error').style.color = 'var(--text-secondary)';
+  renderUsuariosList();
+}
+
+// ===== // Banderas globales
+let sidebarOpen = false;
+let notificationCount = 0;
+let userMenuOpen = false;
+let dashboardChartInstance = null;
+let currentPageClientes = 1;
+const CLIENTES_PER_PAGE = 25;
+let isSincronizandoSAP = false;
+
+// Helpers: Inicializar fecha límite por defecto a +3 días
+document.addEventListener('DOMContentLoaded', () => {
+  // Cerrar popup de filtros al hacer click afuera
+  document.addEventListener('click', (e) => {
+    const container = document.getElementById('maq-filters-container');
+    const popup = document.getElementById('maq-filters-popup');
+    if (container && popup && popup.classList.contains('show-filters')) {
+      if (!container.contains(e.target)) {
+        popup.classList.remove('show-filters');
+      }
+    }
+  });
+  lucide.createIcons();
+  
+  // Theme check
+  if (localStorage.getItem('eurorep_darkmode') === 'false') {
+    document.body.classList.add('light-mode');
+  }
+
+  // Asegurarnos de que exista el superadmin
+  const all = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+  if (!all.find(u => u.id === 'superadmin')) {
+    all.unshift({ id:'superadmin', nombre:'Super Admin', rol:'superadmin', email:'', pin:'0000', activo:true, locked:true });
+    localStorage.setItem('eurorep_usuarios', JSON.stringify(all));
+  }
+
+  // Check if there's a valid session
+  const saved = JSON.parse(localStorage.getItem('eurorep_session') || 'null');
+  if (saved) {
+    const all = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+    const user = all.find(u => u.id === saved.userId);
+    if (user) {
+      currentSession = saved;
+      entrarApp(user);
+    }
+  }
+
+  initDiasPanels();
+  renderTabla();
+  renderStats();
+  renderTickets();
+  updateTicketBadge();
+  setupNav();
+  cargarConfig();
+  renderTecnicosConfig();
+  renderUsuariosList();
+});
+
+let usuarios = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+let currentSession = JSON.parse(localStorage.getItem('eurorep_session') || 'null') || { userId: 'superadmin', viewMode: 'superadmin' };
+let editandoUserId = null;
+
+function applyRole(rolKey) {
+  const rol = ROLES[rolKey] || ROLES.superadmin;
+  const navViews = rol.views;
+
+  // Show/hide nav items
+  document.querySelectorAll('.nav-item[data-view]').forEach(item => {
+    const v = item.dataset.view;
+    item.style.display = navViews.includes(v) ? '' : 'none';
+  });
+
+  // If current active view is not allowed, redirect to first allowed
+  const activeView = document.querySelector('.view.active');
+  if (activeView) {
+    const vid = activeView.id.replace('view-','');
+    if (!navViews.includes(vid)) {
+      const firstAllowed = navViews[0];
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById('view-' + firstAllowed)?.classList.add('active');
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.querySelector(`.nav-item[data-view="${firstAllowed}"]`)?.classList.add('active');
+      document.getElementById('page-title').textContent = ROLES_LABELS[firstAllowed] || firstAllowed;
+    }
+  }
+
+  // Show/hide role switcher
+  const user = usuarios.find(u => u.id === currentSession.userId);
+  document.getElementById('role-switcher').style.display = (user?.rol === 'superadmin') ? 'flex' : 'none';
+
+  // Update role mode buttons
+  document.querySelectorAll('.role-mode-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.role === rolKey);
+  });
+
+  // Update session badge
+  if (user) {
+    document.getElementById('session-avatar').textContent = user.nombre[0].toUpperCase();
+    document.getElementById('session-name').textContent = user.nombre;
+    document.getElementById('session-role').textContent = ROLES[currentSession.viewMode]?.label || '';
+    document.getElementById('session-avatar').style.background = ROLES[currentSession.viewMode]?.color || 'var(--accent)';
+  }
+
+  // Rename Maquinaria text if Empresa
+  const isEmpresa = rolKey === 'empresa';
+  const navMaquinariaText = document.getElementById('nav-maquinaria-text');
+  if (navMaquinariaText) navMaquinariaText.textContent = isEmpresa ? 'Mis máquinas' : 'Maquinaria';
+
+  lucide.createIcons();
+}
+
+function switchMode(rolKey) {
+  currentSession.viewMode = rolKey;
+  localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
+  applyRole(rolKey);
+}
+
+// ===== CONFIG =====
+let configData = JSON.parse(localStorage.getItem('eurorep_config') || '{}');
+let tecnicosConfig = JSON.parse(localStorage.getItem('eurorep_tecnicos') || '[]');
+
+function cargarConfig() {
+  if (configData.empresa) document.getElementById('cfg-empresa').value = configData.empresa;
+  if (configData.rfc) document.getElementById('cfg-rfc').value = configData.rfc;
+  if (configData.tel) document.getElementById('cfg-tel').value = configData.tel;
+  if (configData.email) document.getElementById('cfg-email').value = configData.email;
+  if (configData.direccion) document.getElementById('cfg-direccion').value = configData.direccion;
+  
+  const dmToggle = document.getElementById('cfg-darkmode');
+  if (dmToggle) {
+    dmToggle.checked = localStorage.getItem('eurorep_darkmode') !== 'false';
+    dmToggle.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        document.body.classList.remove('light-mode');
+        localStorage.setItem('eurorep_darkmode', 'true');
+      } else {
+        document.body.classList.add('light-mode');
+        localStorage.setItem('eurorep_darkmode', 'false');
+      }
+    });
+  }
+}
+
+function guardarConfig() {
+  configData = {
+    empresa: document.getElementById('cfg-empresa').value.trim(),
+    rfc: document.getElementById('cfg-rfc').value.trim(),
+    tel: document.getElementById('cfg-tel').value.trim(),
+    email: document.getElementById('cfg-email').value.trim(),
+    direccion: document.getElementById('cfg-direccion').value.trim(),
+  };
+  localStorage.setItem('eurorep_config', JSON.stringify(configData));
+  const btn = event.target;
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<i data-lucide="check" class="btn-icon"></i> Guardado';
+  btn.style.background = 'var(--green)';
+  lucide.createIcons();
+  setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; lucide.createIcons(); }, 2000);
+}
+
+async function programarQuerySAP() {
+  const sqlCode = document.getElementById('query-code').value.trim();
+  const sqlName = document.getElementById('query-name').value.trim();
+  const sqlText = document.getElementById('query-sql').value.trim();
+
+  if (!sqlCode || !sqlText) {
+    mostrarNotificacion('El Código del Query y la Sentencia SQL son obligatorios.', 'error');
+    return;
+  }
+
+  const btn = event.target;
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;margin-right:5px;"></div> Enviando...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API_CONFIG.BASE_URL}/sap/queries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sqlCode, sqlName, sqlText })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error desconocido');
+    
+    mostrarNotificacion('Query programado correctamente en SAP.', 'success');
+    document.getElementById('query-code').value = '';
+    document.getElementById('query-name').value = '';
+    document.getElementById('query-sql').value = '';
+  } catch (err) {
+    console.error(err);
+    mostrarNotificacion('Fallo al programar el query en SAP.', 'error');
+  } finally {
+    btn.innerHTML = orig;
+    btn.disabled = false;
+    lucide.createIcons();
+  }
+}
+
+function renderTecnicosConfig() {
+  const list = document.getElementById('cfg-tecnicos-list');
+  if (!list) return;
+  if (!tecnicosConfig.length) {
+    list.innerHTML = '<p style="color:var(--text-muted);font-size:0.82rem;">Sin técnicos registrados aún.</p>';
+    return;
+  }
+  list.innerHTML = tecnicosConfig.map((t, i) => `
+    <div class="usuario-row" style="margin-bottom:0.4rem;">
+      <div class="usuario-avatar">${t[0].toUpperCase()}</div>
+      <div><div class="usuario-name">${t}</div></div>
+      <button onclick="eliminarTecnicoConfig(${i})" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.25rem;border-radius:4px;" title="Eliminar">
+        <i data-lucide="x" style="width:0.85rem;height:0.85rem;stroke:currentColor;stroke-width:2;"></i>
+      </button>
+    </div>
+  `).join('');
+  lucide.createIcons();
+}
+
+function agregarTecnicoConfig() {
+  const input = document.getElementById('cfg-nuevo-tecnico');
+  const nombre = input.value.trim();
+  if (!nombre) return;
+  tecnicosConfig.push(nombre);
+  localStorage.setItem('eurorep_tecnicos', JSON.stringify(tecnicosConfig));
+  input.value = '';
+  renderTecnicosConfig();
+}
+
+function eliminarTecnicoConfig(i) {
+  tecnicosConfig.splice(i, 1);
+  localStorage.setItem('eurorep_tecnicos', JSON.stringify(tecnicosConfig));
+  renderTecnicosConfig();
+}
+
+// ===== USUARIOS CRUD =====
+function renderUsuariosList() {
+  const list = document.getElementById('usuarios-list');
+  if (!list) return;
+
+  const searchText = (document.getElementById('busqueda-usuario')?.value || '').toLowerCase().trim();
+  const filterRole = document.getElementById('filtro-rol-usuario')?.value || 'todos';
+
+  let filtered = usuarios;
+  
+  if (filterRole !== 'todos') {
+    filtered = filtered.filter(u => u.rol === filterRole);
+  }
+  
+  if (searchText) {
+    filtered = filtered.filter(u => 
+      u.nombre.toLowerCase().includes(searchText) || 
+      (u.email && u.email.toLowerCase().includes(searchText)) ||
+      (u.empresa && u.empresa.toLowerCase().includes(searchText))
+    );
+  }
+
+  const ROLE_COLORS = { superadmin:'#E8820C', admin:'#4f8ef7', supervisor:'#eab308', tecnico:'#10b981', empresa:'#8b5cf6' };
+  
+  if (filtered.length === 0) {
+    list.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No se encontraron usuarios que coincidan con la búsqueda.</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(u => `
+    <div class="usuario-row-full">
+      <div class="usuario-avatar" style="background:${ROLE_COLORS[u.rol]||'var(--accent)'};">${u.nombre[0].toUpperCase()}</div>
+      <div class="usuario-info">
+        <div class="usuario-name">${u.nombre} ${u.locked ? '<span style="font-size:0.68rem;color:var(--text-muted);">(sistema)</span>' : ''}</div>
+        <div class="usuario-email">${u.email || ''}</div>
+      </div>
+      <span class="badge" style="background:${ROLE_COLORS[u.rol]}22;color:${ROLE_COLORS[u.rol]};border-radius:99px;padding:0.2rem 0.6rem;font-size:0.72rem;font-weight:600;">${ROLES[u.rol]?.label || u.rol}</span>
+      ${!u.locked ? `
+        <button class="action-btn" onclick="editarUsuario('${u.id}')" title="Editar"><i data-lucide="pencil"></i></button>
+        <button class="action-btn del" onclick="eliminarUsuario('${u.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>
+      ` : ''}
+    </div>
+  `).join('');
+  lucide.createIcons();
+}
+
+function abrirModalUsuario(id) {
+  editandoUserId = id || null;
+  document.getElementById('usuario-modal-title').textContent = id ? 'Editar Usuario' : 'Nuevo Usuario';
+  document.getElementById('form-usuario').reset();
+  
+  // Rellenar datalist de empresas (clientesLegacy + clientesDb)
+  const legacyMap = new Map();
+  ordenes.forEach(o => { if (o.cliente) legacyMap.set(o.cliente, true); });
+  const datalist = document.getElementById('u-empresa-list');
+  const allEmps = [...new Set([...clientesDb.map(c=>c.nombre), ...Array.from(legacyMap.keys())])].sort();
+  if(datalist) datalist.innerHTML = allEmps.map(e => `<option value="${e}">`).join('');
+
+  document.getElementById('u-empresa-container').style.display = 'none';
+  document.getElementById('u-empresa').removeAttribute('required');
+
+  if (id) {
+    const u = usuarios.find(x => x.id === id);
+    if (!u) return;
+    document.getElementById('u-nombre').value = u.nombre;
+    document.getElementById('u-email').value = u.email || '';
+    document.getElementById('u-telefono').value = u.telefono || '';
+    const radio = document.querySelector(`input[name="u-rol"][value="${u.rol}"]`);
+    if (radio) {
+      radio.checked = true;
+      if (u.rol === 'empresa' || u.rol === 'cliente') {
+        document.getElementById('u-empresa-container').style.display = 'block';
+        document.getElementById('u-empresa').setAttribute('required', 'true');
+        document.getElementById('u-empresa').value = u.empresa || u.nombre; // fallback for legacy
+      }
+    }
+  }
+  document.getElementById('modal-usuario-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  lucide.createIcons();
+}
+
+function toggleEmpresaField(radio) {
+  const container = document.getElementById('u-empresa-container');
+  const input = document.getElementById('u-empresa');
+  if (radio.value === 'empresa' || radio.value === 'cliente') {
+    container.style.display = 'block';
+    input.setAttribute('required', 'true');
+  } else {
+    container.style.display = 'none';
+    input.removeAttribute('required');
+    input.value = '';
+  }
+}
+
+function cerrarModalUsuario(e) {
+  if (e && e.target !== document.getElementById('modal-usuario-overlay')) return;
+  document.getElementById('modal-usuario-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  editandoUserId = null;
+}
+
+function guardarUsuario(e) {
+  e.preventDefault();
+  const nombre = document.getElementById('u-nombre').value.trim();
+  const email = document.getElementById('u-email').value.trim();
+  const rol = document.querySelector('input[name="u-rol"]:checked')?.value;
+  const pin = document.getElementById('u-pin').value;
+  const pin2 = document.getElementById('u-pin2').value;
+  const empresa = document.getElementById('u-empresa').value.trim();
+
+  const telefono = document.getElementById('u-telefono').value.trim();
+
+  if (!rol) { alert('Selecciona un rol para el usuario.'); return; }
+  if (pin && pin !== pin2) { alert('Las contraseñas no coinciden.'); return; }
+
+  const userData = { nombre, email, telefono, rol, ...(pin ? { pin } : {}) };
+  if (rol === 'empresa' || rol === 'cliente') {
+    if (!empresa) { alert('La empresa asociada es obligatoria.'); return; }
+    userData.empresa = empresa;
+  }
+
+  if (editandoUserId) {
+    usuarios = usuarios.map(u => u.id === editandoUserId ? { ...u, ...userData } : u);
+  } else {
+    usuarios.push({ id: crypto.randomUUID(), ...userData, pin: pin || '0000', activo: true, locked: false });
+  }
+  localStorage.setItem('eurorep_usuarios', JSON.stringify(usuarios));
+  cerrarModalUsuario();
+  renderUsuariosList();
+}
+
+function editarUsuario(id) { abrirModalUsuario(id); }
+
+function eliminarUsuario(id) {
+  if (!confirm('¿Eliminar este usuario?')) return;
+  usuarios = usuarios.filter(u => u.id !== id);
+  localStorage.setItem('eurorep_usuarios', JSON.stringify(usuarios));
+  renderUsuariosList();
+}
+
+// ===== SESSION MODAL =====
+function abrirSesionModal() {
+  const body = document.getElementById('sesion-usuarios-list');
+  const ROLE_COLORS = { superadmin:'#E8820C', admin:'#4f8ef7', supervisor:'#eab308', tecnico:'#10b981', empresa:'#8b5cf6' };
+  let htmlStr = usuarios.filter(u => u.activo !== false).map(u => `
+    <button class="sesion-user-btn ${currentSession.userId === u.id ? 'current' : ''}" onclick="cambiarUsuario('${u.id}')">
+      <div class="usuario-avatar" style="background:${ROLE_COLORS[u.rol]||'var(--accent)'};">${u.nombre[0].toUpperCase()}</div>
+      <div class="sesion-user-info">
+        <div class="sesion-user-name">${u.nombre} ${currentSession.userId === u.id ? '✓' : ''}</div>
+        <div class="sesion-user-role">${ROLES[u.rol]?.label || u.rol}</div>
+      </div>
+    </button>
+  `).join('');
+  
+  htmlStr += `
+    <div style="margin-top:1rem; border-top:1px solid var(--border); padding-top:1rem;">
+      <button class="logout-btn" style="justify-content:center; background:var(--red-light); color:var(--red); border:1px solid var(--red);" onclick="cerrarSesion()">
+        <i data-lucide="log-out" style="width:1rem; height:1rem;"></i>
+        <span style="font-weight:600;">Cerrar Sesión por completo</span>
+      </button>
+    </div>
+  `;
+  body.innerHTML = htmlStr;
+  document.getElementById('modal-sesion-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  lucide.createIcons();
+}
+
+function cerrarSesionModal(e) {
+  if (e && e.target !== document.getElementById('modal-sesion-overlay')) return;
+  document.getElementById('modal-sesion-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function cambiarUsuario(userId) {
+  const user = usuarios.find(u => u.id === userId);
+  if (!user) return;
+  currentSession = { userId, viewMode: user.rol };
+  localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
+  cerrarSesionModal();
+  applyRole(user.rol);
+  renderUsuariosList();
+}
+
+function agregarUsuario() { abrirModalUsuario(); }
+
+
+function setupNav() {
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', e => {
+      e.preventDefault();
+      const view = item.dataset.view;
+      const viewEl = document.getElementById('view-' + view);
+      if (!viewEl) return;
+
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      item.classList.add('active');
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      viewEl.classList.add('active');
+
+      // Page title via data-title attribute
+      document.getElementById('page-title').textContent = item.dataset.title || view;
+
+      // Toggle action buttons
+      const btnOrden = document.getElementById('btn-nueva-orden');
+      const btnTicket = document.getElementById('btn-nuevo-ticket');
+      const btnCliente = document.getElementById('btn-nuevo-cliente');
+      const btnMaquina = document.getElementById('btn-agregar-maquina');
+      
+      if (btnOrden) btnOrden.style.display = 'none';
+      if (btnTicket) btnTicket.style.display = 'none';
+      if (btnCliente) btnCliente.style.display = 'none';
+      if (btnMaquina) btnMaquina.style.display = 'none';
+
+      const allowedToCreateClientsAndMachines = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
+
+      if (view === 'tickets') {
+        if (btnTicket) btnTicket.style.display = '';
+      } else if (view === 'clientes') {
+        if (btnCliente && allowedToCreateClientsAndMachines) btnCliente.style.display = '';
+        if (btnMaquina && allowedToCreateClientsAndMachines) btnMaquina.style.display = '';
+      } else if (view === 'servicios') {
+        if (btnOrden) btnOrden.style.display = '';
+      }
+
+      if (view === 'clientes') renderClientes();
+      if (view === 'maquinaria') renderMaquinaria();
+      if (view === 'sitios') renderSitios();
+      if (view === 'config') {
+        renderUsuariosList();
+        renderTecnicosConfig();
+        renderPermisosRoles();
+      }
+      if (view === 'servicios') renderTabla('servicios');
+      if (view === 'tickets') renderTickets();
+      if (view === 'tecnicos') {
+        if (typeof renderTecnicos === 'function') renderTecnicos();
+      }
+    });
+  });
+}
+
+// ===== STATS =====
+function renderStats() {
+  const total = ordenes.length;
+  const proceso = ordenes.filter(o => o.estado === 'En Proceso').length;
+  const pendientes = ordenes.filter(o => o.estado === 'Pendiente').length;
+  const completas = ordenes.filter(o => o.estado === 'Completado').length;
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-proceso').textContent = proceso;
+  document.getElementById('stat-pendientes').textContent = pendientes;
+  document.getElementById('stat-completas').textContent = completas;
+}
+
+// ===== TABLE =====
+
+function toggleSortOrdenes(col) {
+  if (currentOrdSortCol === col) {
+    currentOrdSortDir = currentOrdSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    currentOrdSortCol = col;
+    currentOrdSortDir = 'asc';
+  }
+  filtrarOrdenes('servicios');
+  filtrarOrdenes();
+}
+
+function renderTabla(ctx) {
+  const isServiciosView = ctx === 'servicios';
+  const bodyId = isServiciosView ? 'tabla-body-servicios' : 'tabla-body';
+  const searchId = isServiciosView ? 'search-servicios' : 'search-input';
+  const q = (document.getElementById(searchId)?.value || '').toLowerCase();
+  
+  let filtradas = ordenes.filter(o =>
+    !q ||
+    (o.cliente||'').toLowerCase().includes(q) ||
+    (o.tecnico||'').toLowerCase().includes(q) ||
+    (o.folio||'').toLowerCase().includes(q) ||
+    (o.ubicacion||'').toLowerCase().includes(q)
+  );
+
+  // ORDENAMIENTO
+  if (currentOrdSortCol !== 'reciente') {
+    filtradas.sort((a, b) => {
+      let valA = a[currentOrdSortCol] || '';
+      let valB = b[currentOrdSortCol] || '';
+      
+      if (currentOrdSortCol === 'id') {
+        const numA = parseInt(valA.replace(/\D/g, '')) || 0;
+        const numB = parseInt(valB.replace(/\D/g, '')) || 0;
+        return currentOrdSortDir === 'asc' ? numA - numB : numB - numA;
+      } else if (currentOrdSortCol === 'fecha') {
+        const dateA = new Date(valA).getTime() || 0;
+        const dateB = new Date(valB).getTime() || 0;
+        return currentOrdSortDir === 'asc' ? dateA - dateB : dateB - dateA;
+      } else {
+        valA = valA.toString().toLowerCase();
+        valB = valB.toString().toLowerCase();
+        if (valA < valB) return currentOrdSortDir === 'asc' ? -1 : 1;
+        if (valA > valB) return currentOrdSortDir === 'asc' ? 1 : -1;
+        return 0;
+      }
+    });
+  } else {
+    // Ordenamiento por defecto (recientes primero)
+    filtradas.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  }
+
+  // Actualizar iconos de ordenamiento
+  ['id', 'cliente', 'ubicacion', 'modelo', 'tecnico', 'tipo', 'estado', 'fecha'].forEach(col => {
+    const icon = document.getElementById('sort-icon-ord-' + col);
+    if (icon) {
+      const isCurrent = currentOrdSortCol === col;
+      const iconName = isCurrent ? (currentOrdSortDir === 'asc' ? 'arrow-up' : 'arrow-down') : 'arrow-up-down';
+      const color = isCurrent ? 'var(--accent)' : 'var(--text-muted)';
+      icon.outerHTML = `<i id="sort-icon-ord-${col}" data-lucide="${iconName}" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:${color};"></i>`;
+    }
+  });
+
+  const body = document.getElementById(bodyId);
+  if (!filtradas.length) {
+    body.innerHTML = `<tr><td colspan="9" class="empty-state">No hay órdenes${q ? ' que coincidan' : ' registradas'}.</td></tr>`;
+    return;
+  }
+  body.innerHTML = filtradas.map(o => `
+    <tr>
+      <td><strong>${o.folio||'-'}</strong></td>
+      <td>${o.cliente||'-'}</td>
+      <td>${o.ubicacion||'-'}</td>
+      <td>${o.modelo||'-'}</td>
+      <td>${o.tecnico||'-'}</td>
+      <td><span class="badge badge-${(o.tipo||'otro').toLowerCase().replace('é','e').replace('í','i')}">${o.tipo||'-'}</span></td>
+      <td><span class="badge ${badgeEstado(o.estado)}">${o.estado||'-'}</span></td>
+      <td>${o.fecha||'-'}</td>
+      <td style="display:flex;gap:0.25rem;">
+        <button class="action-btn" onclick="verDetalle('${o.id}')" title="Ver"><i data-lucide="eye"></i></button>
+        <button class="action-btn" onclick="editarOrden('${o.id}')" title="Editar"><i data-lucide="pencil"></i></button>
+        <button class="action-btn del" onclick="eliminarOrden('${o.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>
+      </td>
+    </tr>
+  `).join('');
+  if (!ctx) renderStats();
+  lucide.createIcons();
+}
+
+function badgeEstado(estado) {
+  if (estado === 'En Proceso') return 'badge-proceso';
+  if (estado === 'Completado') return 'badge-completado';
+  return 'badge-pendiente';
+}
+
+function filtrarOrdenes(ctx) { renderTabla(ctx); }
+
+let hasSyncedSAPThisSession = false;
+
+// ===== SINCRONIZACIÓN SAP =====
+async function forzarSincronizacionSAP() {
+  if (isSincronizandoSAP) return;
+  
+  const icon = document.getElementById('icon-sync-sap');
+  if (icon) icon.classList.add('rotating');
+  isSincronizandoSAP = true;
+  
+  try {
+    const newData = await fetchClientesSAP();
+    if (newData && newData.length > 0) {
+      clientesDb = newData;
+      localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+      hasSyncedSAPThisSession = true;
+      mostrarNotificacion('Clientes sincronizados con SAP exitosamente.', 'success');
+    }
+  } catch (error) {
+    console.error("Error SAP:", error);
+    mostrarNotificacion('Error al conectar con SAP B1. Usando caché local.', 'error');
+  } finally {
+    isSincronizandoSAP = false;
+    if (icon) icon.classList.remove('rotating');
+    renderClientes();
+  }
+}
+
+// Actualizar un cliente específico desde la vista de detalle
+let currentViewClientName = '';
+async function sincronizarUnCliente() {
+  if (!currentViewClientName) return;
+  const icon = document.getElementById('icon-sync-single');
+  if (icon) icon.classList.add('rotating');
+  
+  try {
+    const newData = await fetchClientesSAP();
+    if (newData && newData.length > 0) {
+      clientesDb = newData;
+      localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+      mostrarNotificacion('Datos del cliente actualizados desde SAP.', 'success');
+      verDetalleCliente(currentViewClientName); // Refrescar el modal
+      renderClientes(); // Refrescar grid de fondo
+    }
+  } catch (error) {
+    console.error("Error SAP single:", error);
+    mostrarNotificacion('Error al actualizar desde SAP B1.', 'error');
+  } finally {
+    if (icon) icon.classList.remove('rotating');
+  }
+}
+// ===== CLIENTES =====
+let currentCliView = 'galeria';
+
+function setCliView(view) {
+  currentCliView = view;
+  document.getElementById('btn-cli-galeria').style.background = view === 'galeria' ? 'var(--accent-light)' : 'transparent';
+  document.getElementById('btn-cli-galeria').style.color = view === 'galeria' ? 'var(--accent)' : 'var(--text-muted)';
+  document.getElementById('btn-cli-galeria').style.borderColor = view === 'galeria' ? 'var(--accent)' : 'transparent';
+  
+  document.getElementById('btn-cli-lista').style.background = view === 'lista' ? 'var(--accent-light)' : 'transparent';
+  document.getElementById('btn-cli-lista').style.color = view === 'lista' ? 'var(--accent)' : 'var(--text-muted)';
+  document.getElementById('btn-cli-lista').style.borderColor = view === 'lista' ? 'var(--accent)' : 'transparent';
+  
+  document.getElementById('clientes-grid').style.display = view === 'galeria' ? 'grid' : 'none';
+  document.getElementById('clientes-list-wrapper').style.display = view === 'lista' ? 'block' : 'none';
+}
+
+// ==========================================
+// DESGLOSE SAP (ÓRDENES ABIERTAS)
+// ==========================================
+async function abrirDesgloseSAP(cardCode, cardName) {
+  if(!cardCode || cardCode === 'N/A') return;
+  
+  const modal = document.getElementById('modal-desglose-sap');
+  const tbody = document.getElementById('desglose-sap-tbody');
+  const title = document.getElementById('desglose-sap-title');
+  const totalSpan = document.getElementById('desglose-sap-total');
+  
+  if(!modal || !tbody) return;
+  
+  title.textContent = `Saldo pedido cliente: ${cardCode} - ${cardName}`;
+  tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 2rem;"><div class="spinner"></div><p style="margin-top:1rem; color:var(--text-muted);">Consultando SAP SBO_SAPI...</p></td></tr>`;
+  totalSpan.textContent = '$0.00';
+  modal.style.display = 'flex';
+  
+  try {
+    const res = await fetch(`${API_CONFIG.BASE_URL}/clientes/${cardCode}/ordenes`);
+    if(!res.ok) throw new Error('Error en SAP');
+    const rawData = await res.json();
+    
+    // Calcular Open Amount en base a las líneas del documento
+    currentDesgloseData = rawData.map(ord => {
+      let openAmount = 0;
+      if (ord.DocumentLines && Array.isArray(ord.DocumentLines)) {
+        openAmount = ord.DocumentLines.reduce((sum, line) => {
+          const lineOpen = line.OpenAmount || 0;
+          const lineTotal = line.LineTotal || 1;
+          const lineGross = line.GrossTotal || line.LineTotal || 0;
+          return sum + ((lineOpen / lineTotal) * lineGross);
+        }, 0);
+      }
+      ord.computedOpenAmount = openAmount > 0 ? openAmount : (ord.DocTotal || 0);
+      return ord;
+    });
+    
+    // Default sort parameters
+    currentDesgSortCol = 'fecha';
+    currentDesgSortDir = 'asc';
+    
+    renderDesgloseSAP();
+  } catch (error) {
+    console.error(error);
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 2rem; color:var(--red);">Error al conectar con SAP. Por favor intenta de nuevo.</td></tr>`;
+  }
+}
+
+function toggleSortDesglose(col) {
+  if (currentDesgSortCol === col) {
+    currentDesgSortDir = currentDesgSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    currentDesgSortCol = col;
+    currentDesgSortDir = 'asc';
+  }
+  renderDesgloseSAP();
+}
+
+function renderDesgloseSAP() {
+  const tbody = document.getElementById('desglose-sap-tbody');
+  const totalSpan = document.getElementById('desglose-sap-total');
+  
+  if(currentDesgloseData.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 2rem; color:var(--text-muted);">No hay órdenes abiertas para este cliente.</td></tr>`;
+    return;
+  }
+  
+  // Clonar para no mutar el array original (necesario para el orden default / saldo acumulado base)
+  let filtrados = [...currentDesgloseData];
+  
+  // ORDENAMIENTO
+  filtrados.sort((a, b) => {
+    let valA, valB;
+    if (currentDesgSortCol === 'docNum') {
+      valA = parseInt(a.DocNum) || 0;
+      valB = parseInt(b.DocNum) || 0;
+      return currentDesgSortDir === 'asc' ? valA - valB : valB - valA;
+    } else if (currentDesgSortCol === 'importe') {
+      valA = parseFloat(a.DocTotal) || 0;
+      valB = parseFloat(b.DocTotal) || 0;
+      return currentDesgSortDir === 'asc' ? valA - valB : valB - valA;
+    } else if (currentDesgSortCol === 'openAmount') {
+      valA = parseFloat(a.computedOpenAmount) || 0;
+      valB = parseFloat(b.computedOpenAmount) || 0;
+      return currentDesgSortDir === 'asc' ? valA - valB : valB - valA;
+    } else if (currentDesgSortCol === 'fecha') {
+      valA = new Date(a.DocDate || 0).getTime();
+      valB = new Date(b.DocDate || 0).getTime();
+      return currentDesgSortDir === 'asc' ? valA - valB : valB - valA;
+    } else {
+      valA = (a.Comments || '').toLowerCase();
+      valB = (b.Comments || '').toLowerCase();
+      if (valA < valB) return currentDesgSortDir === 'asc' ? -1 : 1;
+      if (valA > valB) return currentDesgSortDir === 'asc' ? 1 : -1;
+      return 0;
+    }
+  });
+
+  // Actualizar iconos de ordenamiento
+  ['fecha', 'docNum', 'comments', 'importe', 'openAmount'].forEach(col => {
+    const icon = document.getElementById('sort-icon-desg-' + col);
+    if (icon) {
+      const isCurrent = currentDesgSortCol === col;
+      const iconName = isCurrent ? (currentDesgSortDir === 'asc' ? 'arrow-up' : 'arrow-down') : 'arrow-up-down';
+      const color = isCurrent ? 'var(--accent)' : 'var(--text-muted)';
+      icon.outerHTML = `<i id="sort-icon-desg-${col}" data-lucide="${iconName}" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:${color};"></i>`;
+    }
+  });
+
+  let saldoAcumulado = 0;
+  const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
+  const formatDate = (dateStr) => {
+    if(!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+  
+  tbody.innerHTML = filtrados.map(ord => {
+    const importe = ord.DocTotal || 0;
+    const saldoPendiente = ord.computedOpenAmount || 0;
+    saldoAcumulado += saldoPendiente;
+    return `
+      <tr>
+        <td>${formatDate(ord.DocDate)}</td>
+        <td style="font-weight:600; color:var(--text-primary);">${ord.DocNum}</td>
+        <td style="max-width:300px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${ord.Comments || ''}">${ord.Comments || '-'}</td>
+        <td style="text-align:right;">${formatMoney(importe)}</td>
+        <td style="text-align:right; font-weight:600;">${formatMoney(saldoPendiente)}</td>
+        <td style="text-align:right; font-weight:600; color:var(--accent);">${formatMoney(saldoAcumulado)}</td>
+      </tr>
+    `;
+  }).join('');
+  
+  totalSpan.textContent = formatMoney(saldoAcumulado);
+  
+  if(window.lucide) {
+    setTimeout(() => lucide.createIcons(), 0);
+  }
+}
+function cerrarDesgloseSAP() {
+  const modal = document.getElementById('modal-desglose-sap');
+  if(modal) modal.style.display = 'none';
+}
+
+function toggleSortClientes(col) {
+  if (currentCliSortCol === col) {
+    currentCliSortDir = currentCliSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    currentCliSortCol = col;
+    currentCliSortDir = 'asc';
+  }
+  renderClientes();
+}
+
+function renderClientes() {
+  const grid = document.getElementById('clientes-grid');
+  const tbody = document.getElementById('clientes-table-body');
+  const paginationContainer = document.getElementById('clientes-pagination');
+  
+  // Eliminado el auto-sync bloqueante. Cargamos directamente la caché local.
+  // Combina clientes legacy (de las órdenes) con clientes registrados
+  const legacyMap = new Map();
+  ordenes.forEach(o => {
+    if (o.cliente) {
+      if (!legacyMap.has(o.cliente)) {
+        legacyMap.set(o.cliente, { nombre: o.cliente, ubicacion: o.ubicacion, legacy: true });
+      }
+    }
+  });
+
+  const mergedClientes = [...clientesDb];
+  
+  // Incluir usuarios que son empresas o clientes, agrupándolos por su empresa
+  usuarios.forEach(u => {
+    if (u.rol === 'empresa' || u.rol === 'cliente') {
+      const nomEmpresa = u.empresa || u.nombre; // Fallback for old users
+      if (!mergedClientes.find(c => (c.nombre || '').toLowerCase() === (nomEmpresa || '').toLowerCase())) {
+        mergedClientes.push({ nombre: nomEmpresa, id: u.id, ubicacion: 'Usuario registrado' });
+      }
+    }
+  });
+
+  legacyMap.forEach((legacyClient) => {
+    if (!mergedClientes.find(c => (c.nombre || '').toLowerCase() === (legacyClient.nombre || '').toLowerCase())) {
+      mergedClientes.push(legacyClient);
+    }
+  });
+
+  const searchText = (document.getElementById('busqueda-cliente')?.value || '').toLowerCase().trim();
+  let filtrados = mergedClientes;
+  
+  if (searchText) {
+    filtrados = filtrados.filter(c => 
+      (c.nombre || '').toLowerCase().includes(searchText) || 
+      (c.rfc || '').toLowerCase().includes(searchText) ||
+      (c.email && c.email.toLowerCase().includes(searchText))
+    );
+  }
+
+  if (!filtrados.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;padding:2rem;">No se encontraron clientes.</div>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="10" class="empty-state" style="padding:2rem;">No se encontraron clientes.</td></tr>`;
+    if (paginationContainer) paginationContainer.innerHTML = '';
+    return;
+  }
+  
+  // ORDENAMIENTO
+  if (currentCliSortCol !== 'reciente') {
+    filtrados.sort((a, b) => {
+      let valA = a[currentCliSortCol] || '';
+      let valB = b[currentCliSortCol] || '';
+      
+      if (currentCliSortCol === 'saldoCuenta' || currentCliSortCol === 'saldoOrdenes') {
+        valA = parseFloat(valA) || 0;
+        valB = parseFloat(valB) || 0;
+        return currentCliSortDir === 'asc' ? valA - valB : valB - valA;
+      } else {
+        valA = valA.toString().toLowerCase();
+        valB = valB.toString().toLowerCase();
+        if (valA < valB) return currentCliSortDir === 'asc' ? -1 : 1;
+        if (valA > valB) return currentCliSortDir === 'asc' ? 1 : -1;
+        return 0;
+      }
+    });
+  }
+  
+  // Actualizar iconos de ordenamiento
+  ['id', 'nombre', 'rfc', 'contacto', 'email', 'telefono', 'grupoSinergia', 'saldoCuenta', 'saldoOrdenes'].forEach(col => {
+    const icon = document.getElementById('sort-icon-cli-' + col);
+    if (icon) {
+      const isCurrent = currentCliSortCol === col;
+      const iconName = isCurrent ? (currentCliSortDir === 'asc' ? 'arrow-up' : 'arrow-down') : 'arrow-up-down';
+      const color = isCurrent ? 'var(--accent)' : 'var(--text-muted)';
+      icon.outerHTML = `<i id="sort-icon-cli-${col}" data-lucide="${iconName}" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:${color};"></i>`;
+    }
+  });
+  
+  // Asegurarnos de que lucide actualice los nuevos iconos inyectados
+  if(window.lucide) {
+    setTimeout(() => lucide.createIcons(), 0);
+  }
+
+  // PAGINACIÓN
+  const totalPages = Math.ceil(filtrados.length / CLIENTES_PER_PAGE);
+  if (currentPageClientes > totalPages) currentPageClientes = totalPages;
+  if (currentPageClientes < 1) currentPageClientes = 1;
+  
+  const startIndex = (currentPageClientes - 1) * CLIENTES_PER_PAGE;
+  const paginatedClientes = filtrados.slice(startIndex, startIndex + CLIENTES_PER_PAGE);
+  
+  // RENDERIZAR CUADRÍCULA
+  grid.innerHTML = paginatedClientes.map(c => {
+    const qtyOrdenes = ordenes.filter(x => x.cliente === c.nombre).length;
+    let maquinasText = '';
+    if (c.maquinas && c.maquinas.length > 0) {
+      maquinasText = `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.4rem;"><i data-lucide="settings-2" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:0.2rem;"></i> ${c.maquinas.length} máquina(s)</div>`;
+    }
+    
+    // Formatear moneda (SAP)
+    const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
+    
+    return `
+      <div class="card-person" style="cursor:pointer;" onclick="verDetalleCliente(this.dataset.nombre)" data-nombre="${(c.nombre || 'Sin nombre').replace(/"/g, '&quot;')}">
+        <div class="card-person-name" style="font-weight:700; margin-bottom: 0.2rem;">${c.nombre || 'Sin nombre'}</div>
+        ${c.id && c.id !== 'Usuario registrado' ? `<div style="font-size:0.72rem; color:var(--accent); font-weight:600; margin-bottom:0.4rem;">${c.id} ${c.rfc && c.rfc !== 'Genérico' ? `• ${c.rfc}` : ''}</div>` : ''}
+        
+        <div class="card-person-sub" style="margin-bottom:0.6rem;">
+          ${c.email ? `<div style="margin-bottom:0.2rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${c.email}"><i data-lucide="mail" style="width:11px;height:11px;vertical-align:middle;margin-right:0.3rem;"></i>${c.email}</div>` : ''}
+          ${c.grupoSinergia && c.grupoSinergia !== 'N/A' ? `<div><i data-lucide="users" style="width:11px;height:11px;vertical-align:middle;margin-right:0.3rem;"></i>Grupo: ${c.grupoSinergia}</div>` : ''}
+        </div>
+        
+        ${API_CONFIG.USE_SAP_BACKEND ? `
+        <div style="background: var(--bg-secondary); padding: 0.6rem; border-radius: var(--radius-sm); margin-bottom: 0.6rem;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:0.3rem;">
+            <span style="font-size:0.7rem; color:var(--text-muted);">Saldo SAP:</span>
+            <span style="font-size:0.75rem; font-weight:600; color:${c.saldoCuenta > 0 ? 'var(--red)' : 'var(--text-primary)'};">${formatMoney(c.saldoCuenta)}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span style="font-size:0.7rem; color:var(--text-muted);">Órdenes Abiertas:</span>
+            <span style="font-size:0.75rem; font-weight:600; color:var(--accent); cursor:pointer; text-decoration:underline dashed;" onclick="event.stopPropagation(); abrirDesgloseSAP('${c.id}', '${(c.nombre || 'Sin nombre').replace(/'/g, "\\'")}')">${formatMoney(c.saldoOrdenes)}</span>
+          </div>
+        </div>` : ''}
+        
+        <div class="card-person-sub" style="border-top: 1px dashed var(--border); padding-top:0.6rem;">
+          ${qtyOrdenes} ticket(s) en CRM
+        </div>
+        ${maquinasText}
+      </div>
+    `;
+  }).join('');
+  
+  if (tbody) {
+    tbody.innerHTML = paginatedClientes.map(c => {
+      const qtyOrdenes = ordenes.filter(x => x.cliente === c.nombre).length;
+      const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
+      
+      return `
+        <tr onclick="verDetalleCliente('${(c.nombre || 'Sin nombre').replace(/'/g, "\\'")}')" style="cursor:pointer;">
+          <td><span class="badge" style="background:var(--accent-light); color:var(--accent);">${c.id && c.id !== 'Usuario registrado' ? c.id : 'N/A'}</span></td>
+          <td style="font-weight:600;">${c.nombre || 'Sin nombre'}</td>
+          <td style="font-size:0.8rem; color:var(--text-muted);">${c.rfc && c.rfc !== 'Genérico' ? c.rfc : 'N/A'}</td>
+          <td>${c.contacto || 'N/A'}</td>
+          <td style="font-size:0.85rem; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${c.email || ''}">${c.email || 'N/A'}</td>
+          <td>${c.telefono || 'N/A'}</td>
+          <td>${c.grupoSinergia || 'N/A'}</td>
+          <td style="font-weight:600; color:${c.saldoCuenta > 0 ? 'var(--red)' : 'var(--text-primary)'};">${API_CONFIG.USE_SAP_BACKEND ? formatMoney(c.saldoCuenta) : 'N/A'}</td>
+          <td style="font-weight:600; color:var(--accent);" onclick="event.stopPropagation(); abrirDesgloseSAP('${c.id}', '${(c.nombre || 'Sin nombre').replace(/'/g, "\\'")}')"><span class="table-link">${API_CONFIG.USE_SAP_BACKEND ? formatMoney(c.saldoOrdenes) : 'N/A'}</span></td>
+          <td style="text-align:center;"><span class="badge" style="background:var(--bg-secondary);">${(c.maquinas || []).length}</span></td>
+        </tr>
+      `;
+    }).join('');
+  }
+  
+  // RENDERIZAR CONTROLES DE PAGINACIÓN
+  if (paginationContainer) {
+    if (totalPages > 1) {
+      paginationContainer.innerHTML = `
+        <button class="btn-secondary" style="padding:0.4rem 0.8rem; border-radius:var(--radius-sm);" ${currentPageClientes === 1 ? 'disabled' : ''} onclick="currentPageClientes--; renderClientes();">Anterior</button>
+        <span style="font-size:0.85rem; font-weight:600; color:var(--text-primary);">Página ${currentPageClientes} de ${totalPages}</span>
+        <button class="btn-secondary" style="padding:0.4rem 0.8rem; border-radius:var(--radius-sm);" ${currentPageClientes === totalPages ? 'disabled' : ''} onclick="currentPageClientes++; renderClientes();">Siguiente</button>
+      `;
+    } else {
+      paginationContainer.innerHTML = '';
+    }
+  }
+
+  lucide.createIcons();
+}
+
+// ===== MODAL DETALLE DE CLIENTE =====
+function verDetalleCliente(nombre) {
+  currentViewClientName = nombre;
+  const clienteOb = clientesDb.find(c => c.nombre === nombre);
+  const legacyOrd = ordenes.filter(o => o.cliente === nombre);
+  const clienteTks = tickets.filter(t => t.cliente === nombre || t.solicitante === nombre);
+  
+  const body = document.getElementById('detalle-cliente-body');
+  const syncBtn = document.getElementById('btn-sync-single-client');
+  if (syncBtn) syncBtn.style.display = API_CONFIG.USE_SAP_BACKEND ? 'flex' : 'none';
+  
+  // Información General
+  let html = `
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; background: var(--bg-hover); padding: 1rem; border-radius: var(--radius-md);">
+      <div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Empresa</div>
+        <div style="font-weight: 500; font-size: 1.1rem; color: var(--text-primary);">${nombre}</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Ubicación</div>
+        <div style="font-weight: 500; color: var(--text-primary);">${clienteOb?.ubicacion || legacyOrd[0]?.ubicacion || 'N/A'}</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">RFC</div>
+        <div style="font-weight: 500; color: var(--text-primary);">${clienteOb?.rfc || 'N/A'}</div>
+      </div>
+    </div>
+  `;
+
+  if (clienteOb?.contacto || clienteOb?.email || clienteOb?.telefono) {
+    html += `
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; padding-left: 0.5rem; border-left: 2px solid var(--accent);">
+        <div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Contacto Principal</div>
+          <div style="font-weight: 500;">${clienteOb.contacto || 'N/A'}</div>
+        </div>
+        <div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Teléfono</div>
+          <div style="font-weight: 500;">${clienteOb.telefono || 'N/A'}</div>
+        </div>
+        <div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Correo</div>
+          <div style="font-weight: 500;">${clienteOb.email || 'N/A'}</div>
+        </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Información SAP
+  if (API_CONFIG.USE_SAP_BACKEND && clienteOb) {
+    const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
+    html += `
+      <div style="background: var(--bg-body); padding: 1.5rem; border-radius: var(--radius-md); border: 1px solid var(--border); border-left: 3px solid var(--accent); position:relative; margin-top: 1.5rem;">
+        <div style="position:absolute; top:-12px; left:12px; background:var(--bg-body); padding:0 8px; display:flex; align-items:center;">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/5/59/SAP_2011_logo.svg" alt="SAP" style="height: 24px;">
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+          <div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">ID (CardCode)</div>
+            <div style="font-weight: 600; color: var(--text-primary); font-family: monospace;">${clienteOb.id || 'N/A'}</div>
+          </div>
+          <div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Grupo</div>
+            <div style="font-weight: 600; color: var(--text-primary);">${clienteOb.grupoSinergia || 'N/A'}</div>
+          </div>
+          <div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Saldo SAP</div>
+            <div style="font-weight: 700; font-size: 1.1rem; color: ${clienteOb.saldoCuenta > 0 ? 'var(--red)' : 'var(--text-primary)'};">${formatMoney(clienteOb.saldoCuenta)}</div>
+          </div>
+          <div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Órdenes Abiertas</div>
+            <div style="font-weight: 700; font-size: 1.1rem; color: var(--text-primary);">${formatMoney(clienteOb.saldoOrdenes)}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Mostrar Personal Asignado
+  let supNombre = 'N/A';
+  let tecNombre = 'N/A';
+  if (clienteOb) {
+    if (clienteOb.supervisoresAsignados && clienteOb.supervisoresAsignados.length > 0) {
+      supNombre = clienteOb.supervisoresAsignados.map(id => usuarios.find(x => x.id === id)?.nombre).filter(Boolean).join(', ') || 'N/A';
+    } else if (clienteOb.supervisorAsignado) { // Legacy single support
+      const u = usuarios.find(x => x.id === clienteOb.supervisorAsignado);
+      if (u) supNombre = u.nombre;
+    }
+    
+    if (clienteOb.tecnicosAsignados && clienteOb.tecnicosAsignados.length > 0) {
+      tecNombre = clienteOb.tecnicosAsignados.map(id => usuarios.find(x => x.id === id)?.nombre).filter(Boolean).join(', ') || 'N/A';
+    } else if (clienteOb.tecnicoAsignado) { // Legacy single support
+      const u = usuarios.find(x => x.id === clienteOb.tecnicoAsignado);
+      if (u) tecNombre = u.nombre;
+    }
+  }
+
+  const isAdmin = currentSession.viewMode === 'admin' || currentSession.viewMode === 'superadmin';
+  const isSupervisorOrAdmin = isAdmin || currentSession.viewMode === 'supervisor';
+  
+  const editSupHtml = isAdmin ? `<i data-lucide="edit-2" style="width:14px;height:14px;cursor:pointer;color:var(--accent);margin-left:auto;" onclick="document.getElementById('disp-sup').style.display='none'; document.getElementById('edit-sup').style.display='block';"></i>` : '';
+  const editTecHtml = isSupervisorOrAdmin ? `<i data-lucide="edit-2" style="width:14px;height:14px;cursor:pointer;color:var(--accent);margin-left:auto;" onclick="document.getElementById('disp-tec').style.display='none'; document.getElementById('edit-tec').style.display='block';"></i>` : '';
+
+  const supOptions = `<option value="">-- Sin Asignar --</option>` + usuarios.filter(u=>u.rol==='supervisor').map(u=>`<option value="${u.id}" ${clienteOb?.supervisoresAsignados?.includes(u.id)?'selected':''}>${u.nombre}</option>`).join('');
+  const tecOptions = `<option value="">-- Sin Asignar --</option>` + usuarios.filter(u=>u.rol==='tecnico').map(u=>`<option value="${u.id}" ${clienteOb?.tecnicosAsignados?.includes(u.id)?'selected':''}>${u.nombre}</option>`).join('');
+
+  html += `
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top:1rem; background: var(--bg-card); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+      <div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; display:flex; align-items:center;"><i data-lucide="user-check" style="width:12px;height:12px;vertical-align:middle;margin-right:4px;"></i> Supervisor Asignado ${editSupHtml}</div>
+        <div style="font-weight: 500; color: var(--text-primary); margin-top:0.25rem;" id="disp-sup">${supNombre}</div>
+        <div id="edit-sup" style="display:none; margin-top:0.5rem;">
+          <select style="width:100%; padding:0.4rem; border-radius:4px; border:1px solid var(--border); font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);" onchange="guardarPersonalCliente('${nombre.replace(/'/g, "\\'")}', 'supervisor', this.value)">
+            ${supOptions}
+          </select>
+        </div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; display:flex; align-items:center;"><i data-lucide="wrench" style="width:12px;height:12px;vertical-align:middle;margin-right:4px;"></i> Técnico de Base ${editTecHtml}</div>
+        <div style="font-weight: 500; color: var(--text-primary); margin-top:0.25rem;" id="disp-tec">${tecNombre}</div>
+        <div id="edit-tec" style="display:none; margin-top:0.5rem;">
+          <select style="width:100%; padding:0.4rem; border-radius:4px; border:1px solid var(--border); font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);" onchange="guardarPersonalCliente('${nombre.replace(/'/g, "\\'")}', 'tecnico', this.value)">
+            ${tecOptions}
+          </select>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Sitios
+  let sitios = clienteOb?.sitios || [];
+  if (clienteOb?.ubicacion && !sitios.includes(clienteOb.ubicacion)) {
+    sitios = [clienteOb.ubicacion, ...sitios];
+  }
+  if (sitios.length === 0) sitios = ['Sede Principal'];
+
+  html += `
+    <div style="margin-top: 1rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);">
+        <h3 style="font-size:1rem; margin:0; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="map-pin" style="width:18px;height:18px;color:var(--text-muted);"></i> Sitios Registrados</h3>
+        <button class="btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; height: auto;" onclick="agregarSitioCliente('${nombre.replace(/'/g, "\\'")}')">+ Agregar Sitio</button>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+        ${sitios.map((s, idx) => `
+          <span style="background:var(--bg-hover); padding:0.4rem 0.8rem; border-radius:1rem; border:1px solid var(--border); font-size:0.85rem; font-weight:500; color:var(--text-primary); display:inline-flex; align-items:center; gap:0.4rem;">
+            ${getSitioNombre(s)}
+            ${isAdmin ? `<i data-lucide="x" style="width:14px;height:14px;cursor:pointer;color:var(--red);" onclick="eliminarSitioDeClienteAdmin('${nombre.replace(/'/g, "\\'")}', ${idx})" title="Eliminar Sitio"></i>` : ''}
+          </span>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  // Máquinas
+  if (clienteOb?.maquinas && clienteOb.maquinas.length > 0) {
+    html += `
+      <div style="margin-top: 1.5rem;">
+        <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);"><i data-lucide="settings-2" style="width:18px;height:18px;color:var(--text-muted);"></i> Maquinaria Registrada</h3>
+        <div style="display:flex; flex-direction:column; gap:0.75rem;">
+          ${clienteOb.maquinas.map(m => {
+            const logoPath = getLogoMarca(m.marca);
+            return `
+            <div style="background: var(--bg-hover); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem;">
+              <div style="font-weight:600; font-size:1.05rem; color:var(--text-primary); display:flex; align-items:center;">
+                ${logoPath ? `<img src="${logoPath}" alt="${m.marca}" onerror="this.onerror=null; this.outerHTML='<span>${m.marca} </span>';" style="height:24px; object-fit:contain; margin-right:8px;"/>` : `${m.marca || ''} `}
+                ${m.modelo || 'Sin Modelo'}
+                ${currentSession.viewMode !== 'empresa' ? `<span style="font-size:0.75rem; background:var(--bg-body); padding:0.15rem 0.4rem; border-radius:4px; border:1px solid var(--border); margin-left:0.5rem; color:var(--text-muted); font-family:monospace; font-weight:normal;">ID: ${m.idInterno || 'N/A'}</span>` : ''}
+                <div style="margin-left:auto; display:flex; gap:0.25rem;">
+                  <button class="action-btn" onclick="editarMaquina('${nombre.replace(/'/g, "\\'")}', '${m.idInterno}')" title="Editar Máquina" style="padding:0.25rem; width:auto; height:auto;">
+                    <i data-lucide="edit-2" style="width:16px;height:16px;"></i>
+                  </button>
+                  <button class="action-btn" onclick="abrirModalMoverMaquina('${nombre.replace(/'/g, "\\'")}', '${m.idInterno}')" title="Cambiar Sitio" style="padding:0.25rem; width:auto; height:auto;">
+                    <i data-lucide="map-pin" style="width:16px;height:16px;"></i>
+                  </button>
+                </div>
+              </div>
+              <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; font-size:0.85rem; color:var(--text-muted); margin-top:0.25rem;">
+                <div><strong style="display:block; color:var(--text-secondary); font-size:0.75rem; text-transform:uppercase;">Número de Serie</strong> <span style="font-weight:500;">${m.serie || 'N/A'}</span></div>
+                <div><strong style="display:block; color:var(--text-secondary); font-size:0.75rem; text-transform:uppercase;">Año de Fab.</strong> <span style="font-weight:500;">${m.anio || 'N/A'}</span></div>
+                <div><strong style="display:block; color:var(--text-secondary); font-size:0.75rem; text-transform:uppercase;">Fecha de Venta</strong> <span style="font-weight:500;">${m.venta ? m.venta.split('-').reverse().join('/') : 'N/A'}</span></div>
+                <div><strong style="display:block; color:var(--text-secondary); font-size:0.75rem; text-transform:uppercase;">Ubicación</strong> <span style="font-weight:500;">${m.ubicacion || 'N/A'}</span></div>
+              </div>
+            </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // Órdenes de Servicio
+  if (legacyOrd.length > 0) {
+    html += `
+      <div>
+        <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="file-text" style="width:18px;height:18px;color:var(--text-muted);"></i> Órdenes de Servicio (${legacyOrd.length})</h3>
+        <div style="display:flex; flex-direction:column; gap:0.5rem; max-height: 200px; overflow-y:auto; padding-right:0.5rem;">
+          ${legacyOrd.map(o => `
+            <div style="border: 1px solid var(--border); padding: 0.75rem; border-radius: var(--radius-sm); display:flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-weight:500; color:var(--accent);">Orden #${o.folio || '-'}</div>
+                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.2rem;">${o.fecha?.split('-').reverse().join('/') || 'Sin fecha'} - ${o.tecnico || 'Sin técnico'}</div>
+              </div>
+              <span class="badge badge-${o.estado==='Pendiente'?'pendiente':o.estado==='En Proceso'?'proceso':'completado'}">${o.estado||'Pendiente'}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // Tickets
+  if (clienteTks.length > 0) {
+    html += `
+      <div>
+        <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="ticket" style="width:18px;height:18px;color:var(--text-muted);"></i> Tickets de Soporte (${clienteTks.length})</h3>
+        <div style="display:flex; flex-direction:column; gap:0.5rem; max-height: 200px; overflow-y:auto; padding-right:0.5rem;">
+          ${clienteTks.map(t => `
+            <div style="border: 1px solid var(--border); padding: 0.75rem; border-radius: var(--radius-sm); display:flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-weight:500; color:var(--text-primary);">${t.titulo || 'Sin título'}</div>
+                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.2rem;">ID: #${t.id} - Creado el ${t.fechaCreacion.split('T')[0].split('-').reverse().join('/')}</div>
+              </div>
+              <span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'Abierto'}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  body.innerHTML = html;
+  document.getElementById('modal-detalle-cliente-overlay').classList.add('open');
+  lucide.createIcons();
+}
+
+function guardarPersonalCliente(clienteNombre, rol, userId) {
+  let cliente = clientesDb.find(c => c.nombre === clienteNombre);
+  if (!cliente) {
+    // Si el cliente solo existe como legacy, lo creamos
+    cliente = { id: crypto.randomUUID(), nombre: clienteNombre, sitios: [], maquinas: [] };
+    clientesDb.push(cliente);
+  }
+  
+  if (rol === 'supervisor') {
+    cliente.supervisoresAsignados = userId ? [userId] : [];
+  } else if (rol === 'tecnico') {
+    cliente.tecnicosAsignados = userId ? [userId] : [];
+  }
+  
+  localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+  verDetalleCliente(clienteNombre); // Refrescar modal
+}
+
+function eliminarSitioDeClienteAdmin(clienteNombre, sitioIdx) {
+  if (!confirm('¿Estás seguro de eliminar este sitio del cliente?')) return;
+  const cliente = clientesDb.find(c => c.nombre === clienteNombre);
+  if (cliente && cliente.sitios && cliente.sitios.length > sitioIdx) {
+    cliente.sitios.splice(sitioIdx, 1);
+    localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+    verDetalleCliente(clienteNombre); // Refrescar modal
+  }
+}
+
+function cerrarDetalleCliente(e) {
+  if (e && e.target !== document.getElementById('modal-detalle-cliente-overlay')) return;
+  document.getElementById('modal-detalle-cliente-overlay').classList.remove('open');
+}
+
+// ===== MODAL CLIENTE LOGIC =====
+function abrirModalCliente() {
+  document.getElementById('form-cliente').reset();
+  
+  // Populate assigned personnel dropdowns
+  const selectSup = document.getElementById('cl-supervisor');
+  const selectTec = document.getElementById('cl-tecnico');
+  if (selectSup) {
+    selectSup.innerHTML = usuarios.filter(u => ['superadmin','admin','supervisor'].includes(u.rol) && u.activo !== false)
+              .map(u => `<option value="${u.id}">${u.nombre} (${ROLES[u.rol]?.label || u.rol})</option>`).join('');
+  }
+  if (selectTec) {
+    selectTec.innerHTML = usuarios.filter(u => u.rol === 'tecnico' && u.activo !== false)
+              .map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
+  }
+
+  document.getElementById('maquinas-container').innerHTML = '';
+  agregarMaquinaField(); // At least one empty machine field
+  document.getElementById('modal-cliente-overlay').classList.add('open');
+  lucide.createIcons();
+}
+
+function cerrarCliente(e) {
+  if (e && e.target !== document.getElementById('modal-cliente-overlay')) return;
+  document.getElementById('modal-cliente-overlay').classList.remove('open');
+}
+
+function agregarMaquinaField() {
+  const container = document.getElementById('maquinas-container');
+  const div = document.createElement('div');
+  div.style.display = 'flex';
+  div.style.flexWrap = 'wrap';
+  div.style.gap = '1rem';
+  div.style.background = 'var(--bg-hover)';
+  div.style.padding = '1rem';
+  div.style.borderRadius = 'var(--radius-md)';
+  div.style.alignItems = 'end';
+  div.innerHTML = `
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; width: 100%;">
+      <div class="form-group">
+        <label style="font-size:0.75rem;">Marca</label>
+        <input type="text" class="cl-maquina-marca" placeholder="Ej. Fiori"/>
+      </div>
+      <div class="form-group">
+        <label style="font-size:0.75rem;">Modelo *</label>
+        <input type="text" class="cl-maquina-modelo" placeholder="Ej. CX 160" required/>
+      </div>
+      <div class="form-group">
+        <label style="font-size:0.75rem;">Número de Serie</label>
+        <input type="text" class="cl-maquina-serie" placeholder="Ej. 12345678"/>
+      </div>
+      <div class="form-group">
+        <label style="font-size:0.75rem;">Año de Fabricación</label>
+        <input type="number" class="cl-maquina-anio" placeholder="Ej. 2018"/>
+      </div>
+      <div class="form-group">
+        <label style="font-size:0.75rem;">Fecha de Venta</label>
+        <input type="date" class="cl-maquina-venta"/>
+      </div>
+      <div class="form-group">
+        <label style="font-size:0.75rem;">Ubicación</label>
+        <input type="text" class="cl-maquina-ubicacion" placeholder="Nave, Planta..."/>
+      </div>
+    </div>
+    <div class="form-group" style="flex: 0 0 auto; margin-left: 1rem; align-self: flex-start; padding-top:1.25rem;">
+      <button type="button" class="btn-secondary" style="height: 38px; padding: 0 1rem; color: var(--red);" onclick="this.parentElement.parentElement.remove()" title="Eliminar Máquina">
+        <i data-lucide="trash-2" style="width:18px;height:18px;"></i>
+      </button>
+    </div>
+  `;
+  container.appendChild(div);
+  lucide.createIcons();
+}
+
+function guardarCliente(e) {
+  e.preventDefault();
+  
+  const nombre = document.getElementById('cl-nombre').value.trim();
+  const rfc = document.getElementById('cl-rfc').value.trim();
+  const ubicacion = document.getElementById('cl-ubicacion').value.trim();
+  const contacto = document.getElementById('cl-contacto').value.trim();
+  const telefono = document.getElementById('cl-telefono').value.trim();
+  const email = document.getElementById('cl-email').value.trim();
+  const metodoContacto = document.getElementById('cl-metodo-contacto').value;
+  
+  const maquinasEls = document.querySelectorAll('#maquinas-container > div');
+  const maquinas = [];
+  maquinasEls.forEach(el => {
+    const marca = el.querySelector('.cl-maquina-marca')?.value.trim() || '';
+    const modelo = el.querySelector('.cl-maquina-modelo')?.value.trim() || '';
+    const serie = el.querySelector('.cl-maquina-serie')?.value.trim() || '';
+    const anio = el.querySelector('.cl-maquina-anio')?.value.trim() || '';
+    const venta = el.querySelector('.cl-maquina-venta')?.value || '';
+    const ubicacion = el.querySelector('.cl-maquina-ubicacion')?.value.trim() || '';
+    if (modelo) {
+      const idInterno = generarIdInternoMaquina(marca, venta || anio);
+      maquinas.push({ idInterno, marca, modelo, serie, anio, venta, ubicacion });
+    }
+  });
+
+  const supIds = Array.from(document.getElementById('cl-supervisor')?.selectedOptions || []).map(o => o.value);
+  const tecIds = Array.from(document.getElementById('cl-tecnico')?.selectedOptions || []).map(o => o.value);
+
+  const nuevoCliente = {
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+    nombre,
+    rfc,
+    ubicacion,
+    contacto,
+    telefono,
+    email,
+    metodoContacto,
+    maquinas,
+    supervisoresAsignados: supIds,
+    tecnicosAsignados: tecIds
+  };
+
+  clientesDb.push(nuevoCliente);
+  localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+  
+  cerrarCliente();
+  if (document.getElementById('view-clientes').classList.contains('active')) {
+    renderClientes();
+  }
+}
+
+// ===== MODAL AGREGAR MÁQUINA A CLIENTE =====
+let editandoMaquinaId = null;
+let editandoMaquinaCliente = null;
+
+function abrirModalAgregarMaquina() {
+  editandoMaquinaId = null;
+  editandoMaquinaCliente = null;
+  document.getElementById('agregar-maquina-title').textContent = 'Agregar Máquina a Cliente';
+  document.getElementById('form-agregar-maquina').reset();
+  const select = document.getElementById('am-cliente');
+  select.removeAttribute('disabled');
+  
+  // Lógica del Select de Marca
+  const selectMarca = document.getElementById('am-marca-select');
+  const inputOtraMarca = document.getElementById('am-marca-otra');
+  
+  if (selectMarca && inputOtraMarca) {
+    const marcasSet = new Set(MARCAS_OFICIALES);
+    clientesDb.forEach(c => {
+      if (c.maquinas) c.maquinas.forEach(m => { if (m.marca && !marcasSet.has(m.marca)) marcasSet.add(m.marca); });
+    });
+    
+    // Construir el select
+    let optionsHtml = '<option value="" disabled selected>Seleccione una marca...</option>';
+    Array.from(marcasSet).sort().forEach(m => {
+      optionsHtml += `<option value="${m}">${m}</option>`;
+    });
+    optionsHtml += '<option value="otra">Otra...</option>';
+    selectMarca.innerHTML = optionsHtml;
+    
+    inputOtraMarca.style.display = 'none';
+    inputOtraMarca.value = '';
+    
+    // Clonar para limpiar eventos y evitar acumulaciones
+    const newSelectMarca = selectMarca.cloneNode(true);
+    selectMarca.parentNode.replaceChild(newSelectMarca, selectMarca);
+    
+    newSelectMarca.addEventListener('change', function() {
+      if (this.value === 'otra') {
+        inputOtraMarca.style.display = 'block';
+        inputOtraMarca.focus();
+        inputOtraMarca.required = true;
+      } else {
+        inputOtraMarca.style.display = 'none';
+        inputOtraMarca.required = false;
+      }
+    });
+  }
+  
+  // Llenar el select de clientes
+  select.innerHTML = '<option value="" disabled selected>Seleccione un cliente...</option>';
+  
+  // Obtener lista completa de clientes (legacy + db)
+  const legacyMap = new Map();
+  ordenes.forEach(o => {
+    if (o.cliente && !legacyMap.has(o.cliente)) {
+      legacyMap.set(o.cliente, o.cliente);
+    }
+  });
+  const mergedNames = [...new Set([...clientesDb.map(c => c.nombre), ...legacyMap.values()])].sort();
+  mergedNames.forEach(nombre => {
+    const opt = document.createElement('option');
+    opt.value = nombre;
+    opt.textContent = nombre;
+    select.appendChild(opt);
+  });
+  
+  select.onchange = (e) => {
+    const nombre = e.target.value;
+    const selectUbicacion = document.getElementById('am-ubicacion-select');
+    const inputOtraUbicacion = document.getElementById('am-ubicacion-otra');
+    
+    if (selectUbicacion && inputOtraUbicacion) {
+      const clienteObj = clientesDb.find(c => c.nombre === nombre);
+      let optionsHtml = '<option value="" disabled selected>Seleccione una ubicación...</option>';
+      
+      if (clienteObj) {
+        let sitios = clienteObj.sitios || [];
+        if (clienteObj.ubicacion && !sitios.some(s => getSitioNombre(s) === clienteObj.ubicacion)) {
+          sitios = [clienteObj.ubicacion, ...sitios];
+        }
+        sitios.forEach(s => {
+          const sName = getSitioNombre(s);
+          optionsHtml += `<option value="${sName}">${sName}</option>`;
+        });
+      }
+      optionsHtml += '<option value="otra">Otra...</option>';
+      selectUbicacion.innerHTML = optionsHtml;
+      
+      inputOtraUbicacion.style.display = 'none';
+      inputOtraUbicacion.value = '';
+      
+      const newSelectUbicacion = selectUbicacion.cloneNode(true);
+      selectUbicacion.parentNode.replaceChild(newSelectUbicacion, selectUbicacion);
+      
+      newSelectUbicacion.addEventListener('change', function() {
+        if (this.value === 'otra') {
+          inputOtraUbicacion.style.display = 'block';
+          inputOtraUbicacion.focus();
+        } else {
+          inputOtraUbicacion.style.display = 'none';
+        }
+      });
+    }
+  };
+
+  document.getElementById('modal-agregar-maquina-overlay').classList.add('open');
+  lucide.createIcons();
+}
+
+function cerrarModalAgregarMaquina(e) {
+  if (e && e.target !== document.getElementById('modal-agregar-maquina-overlay')) return;
+  document.getElementById('modal-agregar-maquina-overlay').classList.remove('open');
+  editandoMaquinaId = null;
+  editandoMaquinaCliente = null;
+}
+
+function editarMaquina(clienteNombre, idInterno) {
+  abrirModalAgregarMaquina();
+  editandoMaquinaId = idInterno;
+  editandoMaquinaCliente = clienteNombre;
+  document.getElementById('agregar-maquina-title').textContent = 'Editar Máquina';
+  
+  const select = document.getElementById('am-cliente');
+  select.value = clienteNombre;
+  select.setAttribute('disabled', 'true');
+  
+  const selectUbicacion = document.getElementById('am-ubicacion-select');
+  const inputOtraUbicacion = document.getElementById('am-ubicacion-otra');
+  if (selectUbicacion && inputOtraUbicacion) {
+    let optionsHtml = '<option value="" disabled selected>Seleccione una ubicación...</option>';
+    const clienteObj = clientesDb.find(c => c.nombre === clienteNombre);
+    if (clienteObj) {
+      let sitios = clienteObj.sitios || [];
+      if (clienteObj.ubicacion && !sitios.some(s => getSitioNombre(s) === clienteObj.ubicacion)) {
+        sitios = [clienteObj.ubicacion, ...sitios];
+      }
+      sitios.forEach(s => {
+        const sName = getSitioNombre(s);
+        optionsHtml += `<option value="${sName}">${sName}</option>`;
+      });
+      optionsHtml += '<option value="otra">Otra...</option>';
+      selectUbicacion.innerHTML = optionsHtml;
+      
+      const newSelectUbicacion = selectUbicacion.cloneNode(true);
+      selectUbicacion.parentNode.replaceChild(newSelectUbicacion, selectUbicacion);
+      
+      newSelectUbicacion.addEventListener('change', function() {
+        if (this.value === 'otra') {
+          inputOtraUbicacion.style.display = 'block';
+          inputOtraUbicacion.focus();
+        } else {
+          inputOtraUbicacion.style.display = 'none';
+        }
+      });
+      
+      const maquina = clienteObj.maquinas?.find(m => m.idInterno === idInterno);
+      if (maquina) {
+        const selectMarca = document.getElementById('am-marca-select');
+        const inputOtraMarca = document.getElementById('am-marca-otra');
+        
+        let marcaFound = false;
+        Array.from(selectMarca.options).forEach(opt => {
+          if (opt.value === maquina.marca) marcaFound = true;
+        });
+
+        if (marcaFound) {
+          selectMarca.value = maquina.marca;
+          inputOtraMarca.style.display = 'none';
+          inputOtraMarca.value = '';
+          inputOtraMarca.required = false;
+        } else if (maquina.marca) {
+          selectMarca.value = 'otra';
+          inputOtraMarca.style.display = 'block';
+          inputOtraMarca.value = maquina.marca;
+          inputOtraMarca.required = true;
+        } else {
+          selectMarca.value = '';
+        }
+
+        document.getElementById('am-modelo').value = maquina.modelo || '';
+        document.getElementById('am-serie').value = maquina.serie || '';
+        document.getElementById('am-anio').value = maquina.anio || '';
+        document.getElementById('am-venta').value = maquina.venta || '';
+        
+        const currentSelectUbicacion = document.getElementById('am-ubicacion-select');
+        let ubiFound = false;
+        Array.from(currentSelectUbicacion.options).forEach(opt => {
+          if (opt.value === maquina.ubicacion) ubiFound = true;
+        });
+        
+        if (ubiFound) {
+          currentSelectUbicacion.value = maquina.ubicacion;
+          inputOtraUbicacion.style.display = 'none';
+          inputOtraUbicacion.value = '';
+        } else if (maquina.ubicacion) {
+          currentSelectUbicacion.value = 'otra';
+          inputOtraUbicacion.style.display = 'block';
+          inputOtraUbicacion.value = maquina.ubicacion;
+        } else {
+          currentSelectUbicacion.value = '';
+        }
+      }
+    }
+  }
+}
+
+function guardarNuevaMaquina(e) {
+  e.preventDefault();
+  const clienteSeleccionado = document.getElementById('am-cliente').value;
+  const selectMarca = document.getElementById('am-marca-select');
+  const inputOtraMarca = document.getElementById('am-marca-otra');
+  const marca = selectMarca.value === 'otra' ? inputOtraMarca.value.trim() : selectMarca.value.trim();
+  const modelo = document.getElementById('am-modelo').value.trim();
+  const serie = document.getElementById('am-serie').value.trim();
+  const anio = document.getElementById('am-anio').value.trim();
+  const venta = document.getElementById('am-venta').value;
+  const selectUbicacion = document.getElementById('am-ubicacion-select');
+  const inputOtraUbicacion = document.getElementById('am-ubicacion-otra');
+  const ubicacion = selectUbicacion.value === 'otra' ? inputOtraUbicacion.value.trim() : selectUbicacion.value.trim();
+
+  if (!clienteSeleccionado || !modelo) return;
+
+  // Buscar si el cliente existe en la DB
+  let clienteObj = clientesDb.find(c => c.nombre === clienteSeleccionado);
+  
+  if (!clienteObj) {
+    // Si no existe (es un cliente legacy), lo creamos en la DB
+    clienteObj = {
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      nombre: clienteSeleccionado,
+      maquinas: []
+    };
+    clientesDb.push(clienteObj);
+  }
+
+  if (!clienteObj.maquinas) {
+    clienteObj.maquinas = [];
+  }
+
+  if (editandoMaquinaId && editandoMaquinaCliente) {
+    const maquinaIdx = clienteObj.maquinas.findIndex(m => m.idInterno === editandoMaquinaId);
+    if (maquinaIdx >= 0) {
+      clienteObj.maquinas[maquinaIdx] = {
+        ...clienteObj.maquinas[maquinaIdx],
+        marca, modelo, serie, anio, venta, ubicacion
+      };
+    }
+  } else {
+    const idInterno = generarIdInternoMaquina(marca, venta || anio);
+    clienteObj.maquinas.push({ idInterno, marca, modelo, serie, anio, venta, ubicacion });
+  }
+  
+  localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+  
+  cerrarModalAgregarMaquina();
+  if (document.getElementById('view-clientes').classList.contains('active')) {
+    renderClientes();
+  }
+  if (document.getElementById('view-maquinaria').classList.contains('active')) {
+    renderMaquinaria();
+  }
+  if (document.getElementById('modal-detalle-cliente').classList.contains('open')) {
+    verDetalleCliente(clienteSeleccionado);
+  }
+}
+
+// ===== MODAL MOVER MÁQUINA =====
+function abrirModalMoverMaquina(clienteNombre, idInterno) {
+  document.getElementById('form-mover-maquina').reset();
+  document.getElementById('mm-cliente').value = clienteNombre;
+  document.getElementById('mm-idInterno').value = idInterno;
+  
+  const selectUbi = document.getElementById('mm-ubicacion');
+  if (selectUbi) {
+    selectUbi.innerHTML = '<option value="">Selecciona un sitio registrado...</option>';
+    const clienteObj = clientesDb.find(c => c.nombre === clienteNombre);
+    if (clienteObj) {
+      let sitios = clienteObj.sitios || [];
+      if (clienteObj.ubicacion && !sitios.some(s => getSitioNombre(s) === clienteObj.ubicacion)) sitios = [clienteObj.ubicacion, ...sitios];
+      sitios.forEach(s => {
+        const option = document.createElement('option');
+        const sn = getSitioNombre(s);
+        option.value = sn;
+        option.textContent = sn;
+        selectUbi.appendChild(option);
+      });
+    }
+  }
+  document.getElementById('modal-mover-maquina-overlay').classList.add('open');
+}
+
+function cerrarModalMoverMaquina(e) {
+  if (e && e.target !== document.getElementById('modal-mover-maquina-overlay')) return;
+  document.getElementById('modal-mover-maquina-overlay').classList.remove('open');
+}
+
+function guardarMoverMaquina(e) {
+  e.preventDefault();
+  const clienteNombre = document.getElementById('mm-cliente').value;
+  const idInterno = document.getElementById('mm-idInterno').value;
+  const nuevaUbicacion = document.getElementById('mm-ubicacion').value.trim();
+  
+  if (!nuevaUbicacion) return;
+
+  const clienteObj = clientesDb.find(c => c.nombre === clienteNombre);
+  if (clienteObj && clienteObj.maquinas) {
+    const maq = clienteObj.maquinas.find(m => m.idInterno === idInterno);
+    if (maq) {
+      maq.ubicacion = nuevaUbicacion;
+      
+      // Auto-add to sitios if not there
+      if (!clienteObj.sitios) clienteObj.sitios = [];
+      if (!clienteObj.sitios.includes(nuevaUbicacion)) {
+        clienteObj.sitios.push(nuevaUbicacion);
+      }
+      
+      localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+      
+      cerrarModalMoverMaquina();
+      
+      // Re-render
+      if (document.getElementById('modal-detalle-cliente-overlay').classList.contains('open')) {
+        verDetalleCliente(clienteNombre);
+      }
+      if (document.getElementById('view-maquinaria').classList.contains('active')) {
+        renderMaquinaria();
+      }
+    }
+  }
+}
+
+// ===== CONFIG PERMISOS ROLES =====
+function renderPermisosRoles() {
+  const table = document.getElementById('tabla-permisos-roles');
+  if (!table) return;
+
+  const todasLasVistas = Object.keys(ROLES_LABELS);
+  const rolesParaEditar = ['superadmin', 'admin', 'supervisor', 'tecnico', 'empresa'];
+
+  let html = `
+    <thead>
+      <tr>
+        <th style="text-align:left;">Vista</th>
+        ${rolesParaEditar.map(r => `<th style="text-align:center;">${ROLES[r].label}</th>`).join('')}
+      </tr>
+    </thead>
+    <tbody>
+  `;
+
+  todasLasVistas.forEach(vista => {
+    html += `<tr>`;
+    html += `<td style="font-weight:500;">${ROLES_LABELS[vista]}</td>`;
+    rolesParaEditar.forEach(r => {
+      const tieneVista = ROLES[r].views.includes(vista);
+      // Opcional: hacer que el superadmin no pueda quitarse el dashboard o config, 
+      // pero por ahora lo dejamos libre como lo pide el usuario.
+      html += `
+        <td style="text-align:center; vertical-align:middle;">
+          <input type="checkbox" class="cb-permiso-rol" data-rol="${r}" data-vista="${vista}" ${tieneVista ? 'checked' : ''} style="width:1.2rem; height:1.2rem; cursor:pointer;" />
+        </td>
+      `;
+    });
+    html += `</tr>`;
+  });
+
+  html += `</tbody>`;
+  table.innerHTML = html;
+}
+
+function guardarPermisosRoles() {
+  const checkboxes = document.querySelectorAll('.cb-permiso-rol');
+  
+  // Reset all mutable roles
+  const rolesParaEditar = ['superadmin', 'admin', 'supervisor', 'tecnico', 'empresa'];
+  rolesParaEditar.forEach(r => ROLES[r].views = []);
+  
+  checkboxes.forEach(cb => {
+    if (cb.checked) {
+      ROLES[cb.dataset.rol].views.push(cb.dataset.vista);
+    }
+  });
+  
+  localStorage.setItem('sapi_roles_config', JSON.stringify(ROLES));
+  
+  // Recargar la UI
+  setupNav();
+  
+  // Feedback visual
+  const btn = document.querySelector('button[onclick="guardarPermisosRoles()"]');
+  const oldText = btn.innerHTML;
+  btn.innerHTML = '<i data-lucide="check" class="btn-icon"></i> Guardado';
+  btn.style.background = 'var(--green)';
+  lucide.createIcons();
+  
+  setTimeout(() => {
+    btn.innerHTML = oldText;
+    btn.style.background = 'var(--primary)';
+    lucide.createIcons();
+  }, 2000);
+}
+
+// ===== CONFIG TÉCNICOS =====
+let currentTecView = 'galeria';
+
+function setTecView(view) {
+  currentTecView = view;
+  document.getElementById('btn-tec-galeria').style.background = view === 'galeria' ? 'var(--accent-light)' : 'transparent';
+  document.getElementById('btn-tec-galeria').style.color = view === 'galeria' ? 'var(--accent)' : 'var(--text-muted)';
+  document.getElementById('btn-tec-galeria').style.borderColor = view === 'galeria' ? 'var(--accent)' : 'transparent';
+  
+  document.getElementById('btn-tec-lista').style.background = view === 'lista' ? 'var(--accent-light)' : 'transparent';
+  document.getElementById('btn-tec-lista').style.color = view === 'lista' ? 'var(--accent)' : 'var(--text-muted)';
+  document.getElementById('btn-tec-lista').style.borderColor = view === 'lista' ? 'var(--accent)' : 'transparent';
+  
+  document.getElementById('tecnicos-grid').style.display = view === 'galeria' ? 'grid' : 'none';
+  document.getElementById('tecnicos-list-wrapper').style.display = view === 'lista' ? 'block' : 'none';
+}
+
+function renderTecnicos() {
+  const grid = document.getElementById('tecnicos-grid');
+  const tbody = document.getElementById('tecnicos-table-body');
+  
+  // Combine legacy technitians from orders with actual registered user technitians
+  const legacyTecs = ordenes.map(o => o.tecnico).filter(Boolean);
+  const userTecs = usuarios.filter(u => u.rol === 'tecnico').map(u => u.nombre);
+  
+  const tecs = [...new Set([...legacyTecs, ...userTecs])];
+  
+  if (!tecs.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;padding:2rem;">Sin técnicos registrados aún.</div>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="3" class="empty-state">Sin técnicos registrados aún.</td></tr>`;
+    return;
+  }
+  
+  grid.innerHTML = tecs.map(t => {
+    const total = ordenes.filter(o=>o.tecnico===t).length;
+    const comp = ordenes.filter(o=>o.tecnico===t&&o.estado==='Completado').length;
+    
+    // Calcular Siguiente Ticket y Último Resuelto usando el sistema de tickets
+    const tTickets = tickets.filter(tk => tk.asignado === t);
+    const ticketsAbiertos = tTickets.filter(tk => tk.estado !== 'Resuelto' && tk.estado !== 'Cerrado');
+    const proxTicket = ticketsAbiertos.length > 0 ? ticketsAbiertos[0] : null; // El más antiguo abierto
+    
+    const ticketsCerrados = tTickets.filter(tk => tk.estado === 'Resuelto' || tk.estado === 'Cerrado');
+    const ultResuelto = ticketsCerrados.length > 0 ? ticketsCerrados[ticketsCerrados.length - 1] : null; // El más reciente cerrado
+
+    const proxTxt = proxTicket ? `<span style="color:var(--text-primary);">${proxTicket.cliente}</span> <span style="color:var(--text-muted);">(${proxTicket.fecha})</span>` : '<span style="color:var(--text-muted);">Ninguno</span>';
+    const ultTxt = ultResuelto ? `<span style="color:var(--text-primary);">${ultResuelto.cliente}</span> <span style="color:var(--text-muted);">(${ultResuelto.fecha})</span>` : '<span style="color:var(--text-muted);">Ninguno</span>';
+
+    return `
+    <div class="card-person" onclick="verDetalleTecnico('${t.replace(/'/g, "\\'")}')" style="cursor:pointer; display:flex; flex-direction:column; gap:0.5rem; padding:1.25rem;">
+      <div>
+        <div class="card-person-name" style="margin-bottom:0.2rem;">${t}</div>
+        <div class="card-person-sub" style="display:flex; justify-content:space-between;">
+          <span>${total} servicio(s) históricos</span>
+          <span style="color:var(--green); font-weight:500;">${comp} Completados</span>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border); padding-top:0.75rem; display:flex; flex-direction:column; gap:0.4rem; font-size:0.8rem;">
+        <div style="display:flex; align-items:flex-start; gap:0.4rem;">
+          <i data-lucide="calendar-clock" style="width:14px;height:14px;color:var(--accent);margin-top:2px;flex-shrink:0;"></i>
+          <div style="line-height:1.2;">
+            <div style="font-weight:600; color:var(--text-secondary); font-size:0.7rem; text-transform:uppercase; margin-bottom:2px;">Siguiente Ticket</div>
+            ${proxTxt}
+          </div>
+        </div>
+        <div style="display:flex; align-items:flex-start; gap:0.4rem;">
+          <i data-lucide="check-circle-2" style="width:14px;height:14px;color:var(--green);margin-top:2px;flex-shrink:0;"></i>
+          <div style="line-height:1.2;">
+            <div style="font-weight:600; color:var(--text-secondary); font-size:0.7rem; text-transform:uppercase; margin-bottom:2px;">Último Resuelto</div>
+            ${ultTxt}
+          </div>
+        </div>
+      </div>
+    </div>
+  `}).join('');
+  
+  if (tbody) {
+    tbody.innerHTML = tecs.map(t => {
+      const total = ordenes.filter(o=>o.tecnico===t).length;
+      const comp = ordenes.filter(o=>o.tecnico===t&&o.estado==='Completado').length;
+
+      const tTickets = tickets.filter(tk => tk.asignado === t);
+      const ticketsAbiertos = tTickets.filter(tk => tk.estado !== 'Resuelto' && tk.estado !== 'Cerrado');
+      const proxTicket = ticketsAbiertos.length > 0 ? ticketsAbiertos[0] : null; 
+      
+      const ticketsCerrados = tTickets.filter(tk => tk.estado === 'Resuelto' || tk.estado === 'Cerrado');
+      const ultResuelto = ticketsCerrados.length > 0 ? ticketsCerrados[ticketsCerrados.length - 1] : null;
+
+      const proxTxt = proxTicket ? `<div style="font-weight:500;">${proxTicket.cliente}</div><div style="font-size:0.75rem; color:var(--text-muted);">${proxTicket.fecha}</div>` : '<span style="color:var(--text-muted);">Ninguno</span>';
+      const ultTxt = ultResuelto ? `<div style="font-weight:500;">${ultResuelto.cliente}</div><div style="font-size:0.75rem; color:var(--text-muted);">${ultResuelto.fecha}</div>` : '<span style="color:var(--text-muted);">Ninguno</span>';
+
+      return `
+        <tr onclick="verDetalleTecnico('${t.replace(/'/g, "\\'")}')" style="cursor:pointer;" class="hover-row">
+          <td style="font-weight:500;">${t}</td>
+          <td>${total}</td>
+          <td><span class="badge badge-completado">${comp} completados</span></td>
+          <td>${proxTxt}</td>
+          <td>${ultTxt}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+  
+  lucide.createIcons();
+}
+
+function verDetalleTecnico(nombre) {
+  document.getElementById('tecnico-detalle-title').innerHTML = `<i data-lucide="user" style="color:var(--accent);"></i> Perfil: ${nombre}`;
+  
+  const tUser = usuarios.find(u => u.nombre === nombre);
+  
+  // Find assigned clients
+  let assignedClients = [];
+  if (tUser) {
+    assignedClients = clientesDb.filter(c => 
+      (c.tecnicosAsignados && c.tecnicosAsignados.includes(tUser.id)) ||
+      (c.tecnicoAsignado === tUser.id)
+    );
+  }
+  
+  // Find resolved tickets (Tickets have string assigned, e.g. "Juan Perez")
+  // Tickets are usually assigned to a string. Or if it's multiple, they are comma separated.
+  const resolvedTickets = tickets.filter(t => 
+    t.estado === 'Resuelto' && 
+    t.asignado && 
+    t.asignado.split(',').map(s=>s.trim()).includes(nombre)
+  );
+
+  let html = `
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; background: var(--bg-hover); padding: 1rem; border-radius: var(--radius-md); margin-bottom:1.5rem;">
+      <div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Estado</div>
+        <div style="font-weight: 500; font-size: 1.1rem; color: var(--green);">Activo</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Correo</div>
+        <div style="font-weight: 500; color: var(--text-primary); font-size: 1.1rem;">${tUser?.email || 'N/A'}</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Celular</div>
+        <div style="font-weight: 500; color: var(--text-primary); font-size: 1.1rem;">${tUser?.telefono || 'N/A'}</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Clientes Asignados</div>
+        <div style="font-weight: 500; color: var(--text-primary); font-size: 1.1rem;">${assignedClients.length}</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Tickets Resueltos</div>
+        <div style="font-weight: 500; color: var(--accent); font-size: 1.1rem;">${resolvedTickets.length}</div>
+      </div>
+    </div>
+  `;
+
+  if (assignedClients.length > 0) {
+    html += `
+      <div style="margin-bottom:1.5rem;">
+        <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);">
+          <i data-lucide="building-2" style="width:18px;height:18px;color:var(--text-muted);"></i> Empresas Asignadas
+        </h3>
+        <div style="display:flex; flex-direction:column; gap:0.5rem;">
+          ${assignedClients.map(c => `
+            <div style="background: var(--bg-card); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-weight:600; color:var(--text-primary);">${c.nombre}</div>
+                <div style="font-size:0.8rem; color:var(--text-muted);">${c.ubicacion || 'Sin ubicación'}</div>
+              </div>
+              <button class="action-btn" onclick="cerrarDetalleTecnico(); verDetalleCliente('${c.nombre.replace(/'/g, "\\'")}')" style="font-size:0.75rem;">Ver Perfil</button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  if (resolvedTickets.length > 0) {
+    html += `
+      <div>
+        <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);">
+          <i data-lucide="check-circle" style="width:18px;height:18px;color:var(--text-muted);"></i> Tickets Resueltos Recientes
+        </h3>
+        <div style="display:flex; flex-direction:column; gap:0.5rem; max-height:200px; overflow-y:auto; padding-right:0.5rem;">
+          ${resolvedTickets.slice(0, 10).map(t => `
+            <div style="background: var(--bg-card); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-weight:500; color:var(--text-primary);">${t.folio} - ${t.asunto || 'Sin título'}</div>
+                <div style="font-size:0.8rem; color:var(--text-muted);">${t.cliente || 'Uso Interno'} • ${t.fechaCreacion.split('T')[0].split('-').reverse().join('/')}</div>
+              </div>
+              <span class="badge badge-resuelto">Resuelto</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  document.getElementById('detalle-tecnico-body').innerHTML = html;
+  document.getElementById('modal-detalle-tecnico-overlay').classList.add('open');
+  lucide.createIcons();
+}
+
+function cerrarDetalleTecnico(e) {
+  if (e && e.target !== document.getElementById('modal-detalle-tecnico-overlay')) return;
+  document.getElementById('modal-detalle-tecnico-overlay').classList.remove('open');
+}
+
+// ===== DIAS PANELS =====
+function initDiasPanels() {
+  const container = document.getElementById('dia-panels');
+  container.innerHTML = DIAS.map((dia, i) => `
+    <div class="dia-panel ${i===0?'active':''}" id="panel-${dia}">
+      <div class="form-group">
+        <label>Fecha</label>
+        <input type="date" id="${dia}-fecha"/>
+      </div>
+      <div class="form-group">
+        <label>Origen → Trabajo (hrs)</label>
+        <input type="number" id="${dia}-traslado-ida" min="0" step="0.5"/>
+      </div>
+      <div class="form-group">
+        <label>Trabajo → Origen (hrs)</label>
+        <input type="number" id="${dia}-traslado-vuelta" min="0" step="0.5"/>
+      </div>
+      <div class="form-group">
+        <label>Entrada</label>
+        <input type="time" id="${dia}-entrada"/>
+      </div>
+      <div class="form-group">
+        <label>Salida</label>
+        <input type="time" id="${dia}-salida"/>
+      </div>
+      <div class="form-group">
+        <label>Horas Normales</label>
+        <input type="number" id="${dia}-normales" min="0" step="0.5"/>
+      </div>
+      <div class="form-group">
+        <label>Horas Extra</label>
+        <input type="number" id="${dia}-extras" min="0" step="0.5"/>
+      </div>
+    </div>
+  `).join('');
+}
+
+function selDia(btn, dia) {
+  document.querySelectorAll('.dia-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.dia-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + dia).classList.add('active');
+}
+
+// ===== KM CALC =====
+function calcKmTotal() {
+  const ida = parseFloat(document.getElementById('f-km-ida').value) || 0;
+  const vuelta = parseFloat(document.getElementById('f-km-vuelta').value) || 0;
+  document.getElementById('f-km-total').value = ida + vuelta;
+}
+
+// ===== REFACCIONES =====
+function agregarRef(section) {
+  const list = document.getElementById(`ref-${section}-list`);
+  const row = document.createElement('div');
+  row.className = 'ref-row';
+  row.dataset.section = section;
+  if (section === 'utilizadas') {
+    row.innerHTML = `
+      <input type="text" placeholder="Descripción" class="ref-desc"/>
+      <input type="text" placeholder="Clave" class="ref-clave" style="width:80px"/>
+      <input type="number" placeholder="Cant." class="ref-cant" style="width:60px" min="1"/>
+      <input type="number" placeholder="Precio" class="ref-precio" style="width:80px" step="0.01"/>
+      <button type="button" class="btn-del-ref" onclick="eliminarRef(this)">✕</button>`;
+  } else {
+    row.innerHTML = `
+      <input type="text" placeholder="Descripción" class="ref-desc"/>
+      <input type="text" placeholder="Clave" class="ref-clave" style="width:80px"/>
+      <input type="number" placeholder="Cant." class="ref-cant" style="width:60px" min="1"/>
+      <button type="button" class="btn-del-ref" onclick="eliminarRef(this)">✕</button>`;
+  }
+  list.appendChild(row);
+}
+
+function eliminarRef(btn) {
+  const row = btn.closest('.ref-row');
+  const list = row.parentElement;
+  if (list.querySelectorAll('.ref-row').length > 1) row.remove();
+}
+
+function getRefacciones(section) {
+  const rows = document.querySelectorAll(`#ref-${section}-list .ref-row`);
+  const result = [];
+  rows.forEach(row => {
+    const desc = row.querySelector('.ref-desc')?.value?.trim();
+    if (!desc) return;
+    const item = {
+      descripcion: desc,
+      clave: row.querySelector('.ref-clave')?.value?.trim(),
+      cantidad: row.querySelector('.ref-cant')?.value,
+    };
+    if (section === 'utilizadas') item.precio = row.querySelector('.ref-precio')?.value;
+    result.push(item);
+  });
+  return result;
+}
+
+function setRefacciones(section, items) {
+  const list = document.getElementById(`ref-${section}-list`);
+  list.innerHTML = '';
+  const toSet = items.length ? items : [{}];
+  toSet.forEach(item => {
+    agregarRef(section);
+    const row = list.lastElementChild;
+    if (item.descripcion) row.querySelector('.ref-desc').value = item.descripcion;
+    if (item.clave) row.querySelector('.ref-clave').value = item.clave;
+    if (item.cantidad) row.querySelector('.ref-cant').value = item.cantidad;
+    if (section === 'utilizadas' && item.precio) row.querySelector('.ref-precio').value = item.precio;
+  });
+}
+
+// ===== DIAS DATA =====
+function getDiasData() {
+  const data = {};
+  DIAS.forEach(dia => {
+    data[dia] = {
+      fecha: document.getElementById(`${dia}-fecha`)?.value,
+      trasladoIda: document.getElementById(`${dia}-traslado-ida`)?.value,
+      trasladoVuelta: document.getElementById(`${dia}-traslado-vuelta`)?.value,
+      entrada: document.getElementById(`${dia}-entrada`)?.value,
+      salida: document.getElementById(`${dia}-salida`)?.value,
+      normales: document.getElementById(`${dia}-normales`)?.value,
+      extras: document.getElementById(`${dia}-extras`)?.value,
+    };
+  });
+  return data;
+}
+
+function setDiasData(data) {
+  if (!data) return;
+  DIAS.forEach(dia => {
+    if (!data[dia]) return;
+    const d = data[dia];
+    if (d.fecha) document.getElementById(`${dia}-fecha`).value = d.fecha;
+    if (d.trasladoIda) document.getElementById(`${dia}-traslado-ida`).value = d.trasladoIda;
+    if (d.trasladoVuelta) document.getElementById(`${dia}-traslado-vuelta`).value = d.trasladoVuelta;
+    if (d.entrada) document.getElementById(`${dia}-entrada`).value = d.entrada;
+    if (d.salida) document.getElementById(`${dia}-salida`).value = d.salida;
+    if (d.normales) document.getElementById(`${dia}-normales`).value = d.normales;
+    if (d.extras) document.getElementById(`${dia}-extras`).value = d.extras;
+  });
+}
+
+// ===== FORM =====
+function abrirFormulario(id) {
+  editandoId = id || null;
+  document.getElementById('modal-title').textContent = id ? 'Editar Orden' : 'Nueva Orden de Servicio';
+  document.getElementById('form-orden').reset();
+  initDiasPanels();
+  setRefacciones('utilizadas', []);
+  setRefacciones('necesarias', []);
+  if (id) {
+    const o = ordenes.find(x => x.id === id);
+    if (!o) return;
+    const fields = ['folio','pedido','cliente','ubicacion','operador','eco','horometro',
+      'modelo','serie','tecnico','soporte','km-ida','km-vuelta','km-total',
+      'falla','trabajos','dictamen','condiciones','observaciones','pendientes',
+      'factura-ref','factura-mo','noches','alimentacion','traslado-costo'];
+    fields.forEach(f => {
+      const el = document.getElementById('f-' + f);
+      if (el && o[f.replace(/-/g,'_')] !== undefined) el.value = o[f.replace(/-/g,'_')];
+    });
+    // tipo radio
+    const radio = document.querySelector(`input[name="tipo"][value="${o.tipo}"]`);
+    if (radio) radio.checked = true;
+    // estado
+    const sel = document.getElementById('f-estado');
+    if (sel && o.estado) sel.value = o.estado;
+    // refacciones
+    if (o.ref_utilizadas?.length) setRefacciones('utilizadas', o.ref_utilizadas);
+    if (o.ref_necesarias?.length) setRefacciones('necesarias', o.ref_necesarias);
+    // dias
+    setDiasData(o.dias);
+  }
+  document.getElementById('modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function editarOrden(id) { abrirFormulario(id); }
+
+function cerrarFormulario(e) {
+  if (e && e.target !== document.getElementById('modal-overlay')) return;
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  editandoId = null;
+}
+
+function guardarOrdenes() {
+  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+}
+
+function guardarOrden(e) {
+  e.preventDefault();
+  const tipo = document.querySelector('input[name="tipo"]:checked')?.value || 'Servicio';
+  const orden = {
+    id: editandoId || crypto.randomUUID(),
+    fecha: new Date().toLocaleDateString('es-MX'),
+    folio: document.getElementById('f-folio').value.trim(),
+    pedido: document.getElementById('f-pedido').value.trim(),
+    cliente: document.getElementById('f-cliente').value.trim(),
+    ubicacion: document.getElementById('f-ubicacion').value.trim(),
+    operador: document.getElementById('f-operador').value.trim(),
+    eco: document.getElementById('f-eco').value.trim(),
+    horometro: document.getElementById('f-horometro').value.trim(),
+    modelo: document.getElementById('f-modelo').value.trim(),
+    serie: document.getElementById('f-serie').value.trim(),
+    tecnico: document.getElementById('f-tecnico').value.trim(),
+    soporte: document.getElementById('f-soporte').value.trim(),
+    km_ida: document.getElementById('f-km-ida').value,
+    km_vuelta: document.getElementById('f-km-vuelta').value,
+    km_total: document.getElementById('f-km-total').value,
+    tipo,
+    estado: document.getElementById('f-estado').value,
+    falla: document.getElementById('f-falla').value.trim(),
+    trabajos: document.getElementById('f-trabajos').value.trim(),
+    dictamen: document.getElementById('f-dictamen').value.trim(),
+    condiciones: document.getElementById('f-condiciones').value.trim(),
+    observaciones: document.getElementById('f-observaciones').value.trim(),
+    pendientes: document.getElementById('f-pendientes').value.trim(),
+    ref_utilizadas: getRefacciones('utilizadas'),
+    ref_necesarias: getRefacciones('necesarias'),
+    factura_ref: document.getElementById('f-factura-ref').value.trim(),
+    factura_mo: document.getElementById('f-factura-mo').value.trim(),
+    noches: document.getElementById('f-noches').value,
+    alimentacion: document.getElementById('f-alimentacion').value,
+    traslado_costo: document.getElementById('f-traslado-costo').value,
+    dias: getDiasData(),
+  };
+  if (editandoId) {
+    ordenes = ordenes.map(o => o.id === editandoId ? orden : o);
+  } else {
+    ordenes.unshift(orden);
+  }
+  guardarOrdenes();
+  cerrarFormulario();
+  renderTabla();
+  renderTabla('servicios');
+  renderStats();
+}
+
+// ===== ELIMINAR =====
+function eliminarOrden(id) {
+  if (!confirm('¿Eliminar esta orden de servicio?')) return;
+  ordenes = ordenes.filter(o => o.id !== id);
+  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  renderTabla();
+  renderTabla('servicios');
+  renderStats();
+}
+
+// ===== DETALLE =====
+function verDetalle(id) {
+  const o = ordenes.find(x => x.id === id);
+  if (!o) return;
+  document.getElementById('detalle-title').textContent = `Orden ${o.folio || o.id.slice(0,8)}`;
+
+  const field = (label, val) => `
+    <div class="detalle-field">
+      <div class="detalle-label">${label}</div>
+      <div class="detalle-value">${val || '—'}</div>
+    </div>`;
+
+  const seccion = (title, content) => `
+    <div class="detalle-section">
+      <div class="detalle-section-title">${title}</div>
+      ${content}
+    </div>`;
+
+  const refTable = (items, hasPrice) => {
+    if (!items?.length) return '<p style="color:var(--text-muted);font-size:0.82rem;">Sin refacciones</p>';
+    return `<table class="detalle-ref-table">
+      <thead><tr>
+        <th>Descripción</th><th>Clave</th><th>Cant.</th>
+        ${hasPrice ? '<th>Precio</th>' : ''}
+      </tr></thead>
+      <tbody>${items.map(r => `<tr>
+        <td>${r.descripcion||'—'}</td>
+        <td>${r.clave||'—'}</td>
+        <td>${r.cantidad||'—'}</td>
+        ${hasPrice ? `<td>$${r.precio||'0'}</td>` : ''}
+      </tr>`).join('')}</tbody>
+    </table>`;
+  };
+
+  const diasRows = DIAS.map((dia, i) => {
+    const d = o.dias?.[dia];
+    if (!d || !d.fecha) return '';
+    return `<tr>
+      <td>${DIAS_LABEL[i]}</td>
+      <td>${d.fecha||'—'}</td>
+      <td>${d.entrada||'—'}</td>
+      <td>${d.salida||'—'}</td>
+      <td>${d.normales||'—'}</td>
+      <td>${d.extras||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('detalle-body').innerHTML = `
+    ${seccion('Información General', `
+      <div class="detalle-grid">
+        ${field('Folio', o.folio)} ${field('Pedido', o.pedido)} ${field('Fecha', o.fecha)}
+        ${field('Cliente', o.cliente)} ${field('Ubicación', o.ubicacion)} ${field('Operador', o.operador)}
+        ${field('No. ECO', o.eco)} ${field('Horómetro', o.horometro)} ${field('Modelo', o.modelo)}
+        ${field('Serie', o.serie)} ${field('Técnico', o.tecnico)} ${field('Soporte', o.soporte)}
+      </div>`)}
+    ${seccion('Kilómetros / Tipo', `
+      <div class="detalle-grid">
+        ${field('Origen → Trabajo', o.km_ida + ' km')}
+        ${field('Trabajo → Origen', o.km_vuelta + ' km')}
+        ${field('Total Km', o.km_total + ' km')}
+        ${field('Tipo de Visita', `<span class="badge badge-${(o.tipo||'otro').toLowerCase().replace('é','e').replace('í','i')}">${o.tipo}</span>`)}
+        ${field('Estado', `<span class="badge ${badgeEstado(o.estado)}">${o.estado}</span>`)}
+      </div>`)}
+    ${seccion('Diagnóstico y Trabajos', `
+      ${field('Falla informada', o.falla)}
+      <div style="margin-top:0.5rem">${field('Trabajos realizados', o.trabajos)}</div>
+      <div style="margin-top:0.5rem">${field('Dictamen', o.dictamen)}</div>
+      <div style="margin-top:0.5rem">${field('Condiciones del equipo', o.condiciones)}</div>
+      <div style="margin-top:0.5rem">${field('Observaciones', o.observaciones)}</div>
+      <div style="margin-top:0.5rem">${field('Pendientes', o.pendientes)}</div>`)}
+    ${seccion('Refacciones Utilizadas', refTable(o.ref_utilizadas, true))}
+    ${seccion('Refacciones Necesarias', refTable(o.ref_necesarias, false))}
+    ${diasRows ? seccion('Fechas de Servicio', `
+      <table class="detalle-ref-table">
+        <thead><tr><th>Día</th><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Normales</th><th>Extras</th></tr></thead>
+        <tbody>${diasRows}</tbody>
+      </table>
+      <div class="detalle-grid" style="margin-top:0.75rem">
+        ${field('No. Noches', o.noches)} ${field('Alimentación', o.alimentacion ? '$'+o.alimentacion : '')} ${field('Traslado', o.traslado_costo ? '$'+o.traslado_costo : '')}
+      </div>`) : ''}
+  `;
+
+  document.getElementById('modal-detalle-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarDetalle(e) {
+  if (e && e.target !== document.getElementById('modal-detalle-overlay')) return;
+  document.getElementById('modal-detalle-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function imprimirOrden() { window.print(); }
+
+// ===== TICKETS DATA =====
+function updateTicketBadge() {
+  const abiertos = tickets.filter(t => t.estado === 'Abierto' || t.estado === 'En Proceso').length;
+  const badge = document.getElementById('nav-badge-tickets');
+  if (!badge) return;
+  if (abiertos > 0) {
+    badge.textContent = abiertos;
+    badge.classList.add('visible');
+  } else {
+    badge.classList.remove('visible');
+  }
+}
+
+// ===== RENDER TICKETS =====
+function renderTickets() {
+  const body = document.getElementById('tickets-body');
+  if (!body) return;
+  const q = (document.getElementById('search-tickets')?.value || '').toLowerCase();
+  let filtered = tickets.filter(t =>
+    !q ||
+    (t.asunto||'').toLowerCase().includes(q) ||
+    (t.solicitante||'').toLowerCase().includes(q) ||
+    (t.cliente||'').toLowerCase().includes(q) ||
+    (t.asignado||'').toLowerCase().includes(q) ||
+    (t.folio||'').toLowerCase().includes(q)
+  );
+  if (ticketFiltroActivo !== 'todos') {
+    filtered = filtered.filter(t => t.estado === ticketFiltroActivo);
+  }
+  if (!filtered.length) {
+    body.innerHTML = `<tr><td colspan="9" class="empty-state">No hay tickets${q||ticketFiltroActivo!=='todos'?' que coincidan':' registrados'}.</td></tr>`;
+    return;
+  }
+  body.innerHTML = filtered.map((t, i) => `
+    <tr>
+      <td><strong>${t.folio||('#'+(i+1))}</strong></td>
+      <td>${t.asunto||'—'}</td>
+      <td>
+        <div style="font-weight:500">${t.solicitante||'—'}</div>
+        ${t.cliente ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;"><i data-lucide="building-2" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}</div>` : ''}
+      </td>
+      <td>${t.area||'—'}</td>
+      <td><span class="badge badge-${(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
+      <td><span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'—'}</span></td>
+      <td>${t.asignado||'—'}</td>
+      <td>${t.fecha||'—'}</td>
+      <td style="display:flex;gap:0.25rem;">
+        <button class="action-btn" onclick="verDetalleTicket('${t.id}')" title="Ver"><i data-lucide="eye"></i></button>
+        <button class="action-btn" onclick="editarTicket('${t.id}')" title="Editar"><i data-lucide="pencil"></i></button>
+        <button class="action-btn del" onclick="eliminarTicket('${t.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>
+      </td>
+    </tr>
+  `).join('');
+  lucide.createIcons();
+}
+
+function badgeTicketEstado(estado) {
+  const map = { 'Abierto':'abierto', 'En Proceso':'en-proceso', 'Resuelto':'resuelto', 'Cerrado':'cerrado' };
+  return map[estado] || 'abierto';
+}
+
+// ===== MAQUINARIA VIEW =====
+
+function toggleSortMaquinaria(col) {
+  if (currentMaqSortCol === col) {
+    currentMaqSortDir = currentMaqSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    currentMaqSortCol = col;
+    currentMaqSortDir = 'asc';
+  }
+  renderMaquinaria();
+}
+
+function renderMaquinaria() {
+  const body = document.getElementById('tabla-body-maquinaria');
+  if (!body) return;
+
+  const q = (document.getElementById('search-maquinaria')?.value || '').toLowerCase();
+  
+  // Si es rol empresa, solo vemos las suyas (usando el nombre del user logueado)
+  const isEmpresa = currentSession.viewMode === 'empresa';
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const nombreEmpresaLogged = isEmpresa && currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+
+  let allMachines = [];
+  clientesDb.forEach(c => {
+    if (isEmpresa && c.nombre !== nombreEmpresaLogged) return; // Filtro de seguridad
+    if (c.maquinas) {
+      c.maquinas.forEach(m => {
+        allMachines.push({
+          cliente: c.nombre,
+          idInterno: m.idInterno || 'N/A',
+          marca: m.marca || '',
+          modelo: m.modelo || 'Sin Modelo',
+          serie: m.serie || 'N/A',
+          anio: m.anio || 'N/A',
+          venta: m.venta || '',
+          ubicacion: m.ubicacion || 'N/A'
+        });
+      });
+    }
+  });
+
+  // Opciones de Filtro Dinámico
+  const filterSitioEl = document.getElementById('filter-maq-sitio');
+  const filterMarcaEl = document.getElementById('filter-maq-marca');
+  
+  
+  const filterSitio = filterSitioEl?.value || '';
+  const filterMarca = filterMarcaEl?.value || '';
+  
+
+  if (filterSitioEl && filterMarcaEl) {
+    const valSitio = filterSitioEl.value;
+    const valMarca = filterMarcaEl.value;
+    
+    const uniqueSitios = [...new Set(allMachines.map(m => m.ubicacion).filter(Boolean))].sort();
+    const uniqueMarcas = [...new Set(allMachines.map(m => m.marca).filter(Boolean))].sort();
+    
+    filterSitioEl.innerHTML = '<option value="">Todos los Sitios</option>' + uniqueSitios.map(s => `<option value="${s}">${s}</option>`).join('');
+    filterMarcaEl.innerHTML = '<option value="">Todas las Marcas</option>' + uniqueMarcas.map(m => `<option value="${m}">${m}</option>`).join('');
+    
+    filterSitioEl.value = uniqueSitios.includes(valSitio) ? valSitio : '';
+    filterMarcaEl.value = uniqueMarcas.includes(valMarca) ? valMarca : '';
+  }
+
+  // Filtrar
+  let filtered = allMachines.filter(m => {
+    const matchQ = !q || m.cliente.toLowerCase().includes(q) || m.idInterno.toLowerCase().includes(q) || m.marca.toLowerCase().includes(q) || m.modelo.toLowerCase().includes(q) || m.serie.toLowerCase().includes(q);
+    const matchSitio = !filterSitio || m.ubicacion === filterSitio;
+    const matchMarca = !filterMarca || m.marca === filterMarca;
+    return matchQ && matchSitio && matchMarca;
+  });
+
+  // Ordenar usando variables globales
+  if (currentMaqSortCol === 'reciente') {
+    filtered.reverse();
+  } else {
+    filtered.sort((a, b) => {
+      let valA = a[currentMaqSortCol] || '';
+      let valB = b[currentMaqSortCol] || '';
+      
+      if (currentMaqSortCol === 'anio') {
+        valA = parseInt(valA) || 0;
+        valB = parseInt(valB) || 0;
+        return currentMaqSortDir === 'asc' ? valA - valB : valB - valA;
+      } else {
+        valA = valA.toString().toLowerCase();
+        valB = valB.toString().toLowerCase();
+        if (valA < valB) return currentMaqSortDir === 'asc' ? -1 : 1;
+        if (valA > valB) return currentMaqSortDir === 'asc' ? 1 : -1;
+        return 0;
+      }
+    });
+  }
+
+  // Actualizar iconos rehaciendo las etiquetas <i>
+  ['marca', 'modelo', 'serie', 'anio', 'cliente'].forEach(col => {
+    const icon = document.getElementById('sort-icon-' + col);
+    if (icon) {
+      const isCurrent = currentMaqSortCol === col;
+      const iconName = isCurrent ? (currentMaqSortDir === 'asc' ? 'arrow-up' : 'arrow-down') : 'arrow-up-down';
+      const color = isCurrent ? 'var(--accent)' : 'var(--text-muted)';
+      icon.outerHTML = `<i id="sort-icon-${col}" data-lucide="${iconName}" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:${color};"></i>`;
+    }
+  });
+
+  const thId = document.getElementById('th-maquinaria-id');
+  if (thId) thId.style.display = isEmpresa ? 'none' : '';
+
+  if (filtered.length === 0) {
+    body.innerHTML = `<tr><td colspan="${isEmpresa ? 6 : 7}" class="empty-state">No se encontró maquinaria.</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = filtered.map(m => {
+    const logoPath = getLogoMarca(m.marca);
+    return `
+    <tr>
+      ${!isEmpresa ? `<td><span style="font-family:monospace; font-weight:500; color:var(--accent); background:var(--blue-light); padding:0.2rem 0.5rem; border-radius:4px;">${m.idInterno}</span></td>` : ''}
+      <td>
+        <div style="display:flex; align-items:center;">
+          ${logoPath ? `<img src="${logoPath}" alt="${m.marca}" onerror="this.onerror=null; this.outerHTML='<span>${m.marca}</span>';" style="width:85px; height:32px; object-fit:contain; object-position:left center; margin-right:8px;"/>` : m.marca || '-'}
+        </div>
+      </td>
+      <td style="font-weight:500;">${m.modelo}</td>
+      <td>${m.serie}</td>
+      <td>${m.anio}</td>
+      <td>
+        <div style="font-weight:500;">${m.cliente}</div>
+        ${m.ubicacion !== 'N/A' ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">${m.ubicacion}</div>` : ''}
+      </td>
+      <td>
+        <div style="display:flex; gap:0.25rem;">
+          <button class="action-btn" onclick="verDetalleCliente('${m.cliente.replace(/'/g, "\\'")}')" title="Ver Perfil de la Empresa">
+            <i data-lucide="building-2"></i>
+          </button>
+          <button class="action-btn" onclick="editarMaquina('${m.cliente.replace(/'/g, "\\'")}', '${m.idInterno}')" title="Editar Máquina">
+            <i data-lucide="edit-2"></i>
+          </button>
+          <button class="action-btn" onclick="abrirModalMoverMaquina('${m.cliente.replace(/'/g, "\\'")}', '${m.idInterno}')" title="Mover de Sitio">
+            <i data-lucide="map-pin"></i>
+          </button>
+        </div>
+      </td>
+    </tr>
+    `;
+  }).join('');
+  
+  lucide.createIcons();
+  
+  // Inicializar resizers cada vez que se renderiza o se ordena, asegurando que estén activos
+  setTimeout(initTableResizers, 100);
+}
+
+function renderSitios() {
+  const body = document.getElementById('tabla-body-sitios');
+  if (!body) return;
+  
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const isEmpresa = currentSession.viewMode === 'empresa';
+  if (!isEmpresa || !currentUser) {
+    body.innerHTML = `<tr><td colspan="2" class="empty-state">Esta vista es solo para empresas.</td></tr>`;
+    return;
+  }
+  
+  const clienteObj = clientesDb.find(c => c.nombre === (currentUser.empresa || currentUser.nombre));
+  let sitios = clienteObj && clienteObj.sitios ? clienteObj.sitios : [];
+  if (clienteObj && clienteObj.ubicacion && !sitios.some(s => getSitioNombre(s) === clienteObj.ubicacion)) {
+    sitios = [clienteObj.ubicacion, ...sitios];
+  }
+  
+  if (sitios.length === 0) {
+    body.innerHTML = `<tr><td colspan="4" class="empty-state">No tienes sitios registrados.</td></tr>`;
+    return;
+  }
+  
+  body.innerHTML = sitios.map((s, idx) => {
+    const isObj = typeof s === 'object' && s !== null;
+    const sNombre = isObj ? s.nombre : s;
+    const sCp = isObj && s.cp ? s.cp : 'N/A';
+    const sCiudad = isObj && s.ciudad ? s.ciudad : '';
+    const sEstado = isObj && s.estado ? s.estado : '';
+    const sDireccion = isObj && s.direccion ? s.direccion : '';
+    const sLoc = [sCiudad, sEstado].filter(Boolean).join(', ') || 'N/A';
+
+    return `
+    <tr>
+      <td style="font-weight:500;">
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <i data-lucide="map-pin" style="width:16px;height:16px;color:var(--accent);"></i> 
+          <div>
+            <div>${sNombre}</div>
+            ${sDireccion ? `<div style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">${sDireccion}</div>` : ''}
+          </div>
+        </div>
+      </td>
+      <td><span class="badge" style="background:var(--bg-hover);color:var(--text-muted);">${sCp}</span></td>
+      <td><span style="font-size:0.9rem; color:var(--text-secondary);">${sLoc}</span></td>
+      <td>
+        <button class="action-btn del" onclick="eliminarSitioEmpresa('${idx}')" title="Eliminar Sitio"><i data-lucide="trash-2"></i></button>
+      </td>
+    </tr>
+    `;
+  }).join('');
+  lucide.createIcons();
+}
+
+function eliminarSitioEmpresa(idx) {
+  if (!confirm('¿Seguro que deseas eliminar este sitio de tu lista?')) return;
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const clienteObj = clientesDb.find(c => c.nombre === (currentUser.empresa || currentUser.nombre));
+  if (clienteObj && clienteObj.sitios) {
+    let sitios = clienteObj.sitios;
+    if (clienteObj.ubicacion && !sitios.some(s => getSitioNombre(s) === clienteObj.ubicacion)) {
+      sitios = [clienteObj.ubicacion, ...sitios];
+    }
+    const sitioAEliminar = sitios[idx];
+    
+    clienteObj.sitios = clienteObj.sitios.filter(s => s !== sitioAEliminar);
+    if (clienteObj.ubicacion === sitioAEliminar) clienteObj.ubicacion = '';
+    
+    localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+    renderSitios();
+  }
+}
+
+function filtrarTickets(btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  ticketFiltroActivo = btn.dataset.filter;
+  renderTickets();
+}
+
+// ===== CANAL SELECTION =====
+function seleccionarCanal(canal) {
+  // Hide all boxes
+  ['correo','whatsapp','telefono'].forEach(c => {
+    const box = document.getElementById('canal-input-' + c);
+    if (box) box.style.display = 'none';
+  });
+  // Show selected
+  const box = document.getElementById('canal-input-' + canal);
+  if (box) box.style.display = 'block';
+}
+
+// ===== TICKET FORM =====
+function abrirTicket(id) {
+  editandoTicketId = id || null;
+  document.getElementById('ticket-modal-title').textContent = id ? 'Editar Ticket' : 'Nuevo Ticket';
+  document.getElementById('form-ticket').reset();
+  
+  // Llenar el combo de clientes
+  const comboOptions = document.getElementById('t-cliente-options');
+  const inputHidden = document.getElementById('t-cliente');
+  const displaySpan = document.getElementById('t-cliente-display');
+  
+  const isEmpresa = currentSession.viewMode === 'empresa';
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const nombreEmpresaLogged = isEmpresa && currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+
+  // Ocultar campos internos para el cliente
+  const displayVal = isEmpresa ? 'none' : 'block';
+  const displayValFlex = isEmpresa ? 'none' : 'flex';
+  const elOrigen = document.getElementById('section-t-origen'); if (elOrigen) elOrigen.style.display = displayVal;
+  const elCliente = document.getElementById('group-t-cliente'); if (elCliente) elCliente.style.display = displayVal;
+  const elAsignado = document.getElementById('group-t-asignado'); if (elAsignado) elAsignado.style.display = displayVal;
+  const elNotas = document.getElementById('group-t-notas'); if (elNotas) elNotas.style.display = displayVal;
+  const elEstado = document.getElementById('section-t-estado'); if (elEstado) elEstado.style.display = displayVal;
+  const elEvidencias = document.getElementById('group-t-evidencias'); if (elEvidencias) elEvidencias.style.display = isEmpresa ? 'block' : 'none';
+
+  if (comboOptions && !isEmpresa) {
+    // Resetear valor inicial
+    inputHidden.value = '';
+    displaySpan.textContent = 'Ninguno / Uso Interno';
+    
+    // Generar opciones
+    comboOptions.innerHTML = `<div class="combo-option" onclick="selectComboOption('t-cliente', '', 'Ninguno / Uso Interno')">Ninguno / Uso Interno</div>`;
+    
+    const legacyMap = new Map();
+    ordenes.forEach(o => { if (o.cliente && !legacyMap.has(o.cliente)) legacyMap.set(o.cliente, o.cliente); });
+    const mergedNames = [...new Set([...clientesDb.map(c => c.nombre), ...legacyMap.values()])].sort();
+    
+    mergedNames.forEach(nombre => {
+      const escaped = nombre.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      comboOptions.innerHTML += `<div class="combo-option" onclick="selectComboOption('t-cliente', '${escaped}', '${escaped}')">${nombre}</div>`;
+    });
+  }
+
+  // Reset canal inputs
+  ['correo','whatsapp','telefono'].forEach(c => {
+    const box = document.getElementById('canal-input-' + c);
+    if (box) box.style.display = 'none';
+  });
+  document.getElementById('t-sitio').value = '';
+  document.getElementById('group-t-sitio').style.display = 'none';
+  const equipoSelect = document.getElementById('t-equipo');
+  if (equipoSelect) equipoSelect.innerHTML = '<option value="">Seleccione una máquina registrada...</option><option value="Otra / No registrada">Otra / No registrada</option>';
+
+  // Si es empresa y es un ticket nuevo, autocompletamos su perfil
+  if (isEmpresa && !id) {
+    inputHidden.value = nombreEmpresaLogged || '';
+    document.getElementById('t-solicitante').value = nombreEmpresaLogged || '';
+    
+    const c = clientesDb.find(x => x.nombre === nombreEmpresaLogged);
+    if (c) {
+      document.getElementById('group-t-sitio').style.display = 'block';
+      const datalistSitios = document.getElementById('t-sitio-list');
+      if (datalistSitios) {
+        datalistSitios.innerHTML = '';
+        let sitios = c.sitios || [];
+        if (c.ubicacion && !sitios.some(s => getSitioNombre(s) === c.ubicacion)) sitios = [c.ubicacion, ...sitios];
+        sitios.forEach(s => datalistSitios.innerHTML += `<option value="${getSitioNombre(s)}"></option>`);
+      }
+      if (equipoSelect && c.maquinas) {
+        c.maquinas.forEach(m => {
+          const mName = `${m.marca || ''} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+          equipoSelect.innerHTML += `<option value="${mName}">${mName}</option>`;
+        });
+      }
+    }
+  }
+
+  if (id) {
+    const t = tickets.find(x => x.id === id);
+    if (t) {
+      editandoTicketId = id;
+      document.getElementById('ticket-modal-title').textContent = 'Editar Ticket: ' + t.folio;
+      document.getElementById('t-asunto').value = t.asunto || '';
+      document.getElementById('t-solicitante').value = t.solicitante || '';
+      document.getElementById('t-area').value = t.area || 'Operaciones';
+      document.getElementById('t-cliente').value = t.cliente || '';
+      document.getElementById('t-sitio').value = t.sitio || '';
+      document.getElementById('t-categoria').value = t.categoria || 'Refacción';
+      document.getElementById('t-prioridad').value = t.prioridad || 'Media';
+      document.getElementById('t-asignado').value = t.asignado || '';
+      document.getElementById('t-descripcion').value = t.descripcion || '';
+      document.getElementById('t-notas').value = t.notas || '';
+      
+      const rEstado = document.querySelector(`input[name="t-estado"][value="${t.estado}"]`);
+      if (rEstado) rEstado.checked = true;
+
+      const rCanal = document.querySelector(`input[name="t-canal"][value="${t.canal}"]`);
+      if (rCanal) {
+        rCanal.checked = true;
+        seleccionarCanal(t.canal);
+        if (t.canal === 'correo') document.getElementById('t-correo').value = t.contacto || '';
+        if (t.canal === 'whatsapp') document.getElementById('t-whatsapp').value = t.contacto || '';
+        if (t.canal === 'telefono') document.getElementById('t-telefono').value = t.contacto || '';
+      }
+      
+      if (t.cliente) {
+        document.getElementById('t-cliente-display').textContent = t.cliente;
+        document.getElementById('group-t-sitio').style.display = 'block';
+        const datalist = document.getElementById('t-sitio-list');
+        const equipoSelect = document.getElementById('t-equipo');
+        
+        if (datalist) datalist.innerHTML = '';
+        const c = clientesDb.find(x => x.nombre === t.cliente);
+        if (c) {
+          let sitios = c.sitios || [];
+          if (c.ubicacion && !sitios.some(s => getSitioNombre(s) === c.ubicacion)) sitios = [c.ubicacion, ...sitios];
+          if (datalist) {
+            sitios.forEach(s => {
+              const opt = document.createElement('option');
+              const sn = getSitioNombre(s);
+              opt.value = sn;
+              opt.textContent = sn;
+              datalist.appendChild(opt);
+            });
+          }
+          if (equipoSelect && c.maquinas) {
+            c.maquinas.forEach(m => {
+              const mName = `${m.marca || ''} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+              equipoSelect.innerHTML += `<option value="${mName}">${mName}</option>`;
+            });
+          }
+        }
+      } else {
+        document.getElementById('t-cliente-display').textContent = 'Ninguno / Uso Interno';
+      }
+
+      const equipoSelect = document.getElementById('t-equipo');
+      if (t.equipo && equipoSelect) {
+        let optExists = Array.from(equipoSelect.options).some(o => o.value === t.equipo);
+        if (!optExists) {
+          equipoSelect.innerHTML += `<option value="${t.equipo}">${t.equipo} (Registrado previo)</option>`;
+        }
+        equipoSelect.value = t.equipo;
+      }
+    }
+  }
+  document.getElementById('modal-ticket-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function editarTicket(id) { abrirTicket(id); }
+
+function cerrarTicket(e) {
+  if (e && e.target !== document.getElementById('modal-ticket-overlay')) return;
+  document.getElementById('modal-ticket-overlay').classList.remove('open');
+  document.getElementById('t-cliente-menu')?.classList.remove('open');
+  document.getElementById('t-cliente-combo')?.classList.remove('focus');
+  document.body.style.overflow = '';
+  editandoTicketId = null;
+}
+
+// ===== CUSTOM COMBOBOX LOGIC =====
+function toggleCombo(id) {
+  const menu = document.getElementById(id + '-menu');
+  const combo = document.getElementById(id + '-combo');
+  const search = document.getElementById(id + '-search');
+  
+  if (menu.classList.contains('open')) {
+    menu.classList.remove('open');
+    combo.classList.remove('focus');
+  } else {
+    // Cerrar otros menús si hubiera
+    document.querySelectorAll('.combo-menu').forEach(m => m.classList.remove('open'));
+    document.querySelectorAll('.combo-box').forEach(c => c.classList.remove('focus'));
+    
+    menu.classList.add('open');
+    combo.classList.add('focus');
+    search.value = '';
+    filterCombo(id, ''); // Mostrar todo
+    search.focus();
+  }
+}
+
+function filterCombo(id, query) {
+  const q = query.toLowerCase().trim();
+  const options = document.querySelectorAll(`#${id}-options .combo-option`);
+  let foundMatch = false;
+  
+  options.forEach(opt => {
+    const text = opt.textContent.toLowerCase();
+    if (text.includes(q)) {
+      opt.style.display = 'block';
+      foundMatch = true;
+    } else {
+      opt.style.display = 'none';
+    }
+  });
+
+  const addTextSpan = document.getElementById(id + '-add-text');
+  if (q && !foundMatch) {
+    addTextSpan.textContent = `Crear empresa: "${query}"`;
+  } else {
+    addTextSpan.textContent = `Crear nueva empresa`;
+  }
+}
+
+function selectComboOption(id, value, label) {
+  document.getElementById(id).value = value;
+  document.getElementById(id + '-display').textContent = label;
+  document.getElementById(id + '-menu').classList.remove('open');
+  document.getElementById(id + '-combo').classList.remove('focus');
+
+  if (id === 't-cliente') {
+    const sitGroup = document.getElementById('group-t-sitio');
+    const sitSelect = document.getElementById('t-sitio');
+    const datalist = document.getElementById('t-sitio-list');
+    const equipoSelect = document.getElementById('t-equipo');
+    if (equipoSelect) equipoSelect.innerHTML = '<option value="">Seleccione una máquina registrada...</option><option value="Otra / No registrada">Otra / No registrada</option>';
+    
+    if (value && value !== 'Ninguno') {
+      if (sitGroup) sitGroup.style.display = 'block';
+      if (sitSelect) sitSelect.value = '';
+      if (datalist) {
+        datalist.innerHTML = '';
+        const c = clientesDb.find(x => x.nombre === value);
+        if (c) {
+          let sitios = c.sitios || [];
+          if (c.ubicacion && !sitios.some(s => getSitioNombre(s) === c.ubicacion)) sitios = [c.ubicacion, ...sitios];
+          sitios.forEach(s => {
+            const opt = document.createElement('option');
+            const sn = getSitioNombre(s);
+            opt.value = sn;
+            opt.textContent = sn;
+            datalist.appendChild(opt);
+          });
+          
+          if (equipoSelect && c.maquinas) {
+            c.maquinas.forEach(m => {
+              const opt = document.createElement('option');
+              const mName = `${m.marca || ''} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+              opt.value = mName;
+              opt.textContent = mName;
+              equipoSelect.appendChild(opt);
+            });
+          }
+        }
+      }
+    } else {
+      if (sitGroup) sitGroup.style.display = 'none';
+      if (sitSelect) sitSelect.value = '';
+    }
+  }
+}
+
+function agregarEmpresaCombo(id) {
+  const searchVal = document.getElementById(id + '-search').value.trim();
+  const nombreEmpresa = searchVal || prompt('Ingresa el nombre de la nueva empresa:');
+  
+  if (!nombreEmpresa) return;
+
+  // Registrar localmente como cliente legacy para que aparezca
+  // Si desean crearle toda la metadata, deberán ir a Clientes > Nuevo Cliente
+  // Aquí la damos de alta de forma rápida
+  
+  let clienteObj = clientesDb.find(c => c.nombre.toLowerCase() === nombreEmpresa.toLowerCase());
+  if (!clienteObj) {
+    clienteObj = {
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      nombre: nombreEmpresa,
+      maquinas: []
+    };
+    clientesDb.push(clienteObj);
+    localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+  }
+
+  // Refrescar el combo y seleccionar
+  abrirTicket(editandoTicketId); // Esto recargará las opciones con el valor previo mantenido
+  selectComboOption(id, nombreEmpresa, nombreEmpresa);
+}
+
+// Cerrar combobox si hacen click fuera
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.form-group')) {
+    document.querySelectorAll('.combo-menu').forEach(m => m.classList.remove('open'));
+    document.querySelectorAll('.combo-box').forEach(c => c.classList.remove('focus'));
+  }
+});
+
+function guardarTicket(e) {
+  e.preventDefault();
+  const isEmpresa = currentSession.viewMode === 'empresa';
+  const estado = isEmpresa ? 'Abierto' : (document.querySelector('input[name="t-estado"]:checked')?.value || 'Abierto');
+  const canal = isEmpresa ? 'portal' : (document.querySelector('input[name="t-canal"]:checked')?.value || '');
+  let contacto = '';
+  if (!isEmpresa) {
+    if (canal === 'correo') contacto = document.getElementById('t-correo')?.value?.trim();
+    if (canal === 'whatsapp') contacto = document.getElementById('t-whatsapp')?.value?.trim();
+    if (canal === 'telefono') contacto = document.getElementById('t-telefono')?.value?.trim();
+  } else {
+    // Si es empresa, el contacto es su propio correo si existe
+    const currentUser = usuarios.find(u => u.id === currentSession.userId);
+    contacto = currentUser ? currentUser.email : '';
+  }
+  
+  const t_existente = editandoTicketId ? tickets.find(x=>x.id===editandoTicketId) : null;
+  const ticket = {
+    id: editandoTicketId || crypto.randomUUID(),
+    folio: editandoTicketId ? t_existente?.folio : ('TKT-' + (tickets.length + 1).toString().padStart(4, '0')),
+    fecha: t_existente ? t_existente.fecha : new Date().toLocaleDateString('es-MX'),
+    fechaCreacion: t_existente ? t_existente.fechaCreacion : new Date().toISOString(),
+    canal,
+    contacto,
+    asunto: document.getElementById('t-asunto').value.trim(),
+    cliente: document.getElementById('t-cliente')?.value || '',
+    sitio: document.getElementById('t-sitio')?.value || '',
+    solicitante: document.getElementById('t-solicitante').value.trim(),
+    area: document.getElementById('t-area').value,
+    categoria: document.getElementById('t-categoria').value,
+    prioridad: document.getElementById('t-prioridad').value,
+    asignado: document.getElementById('t-asignado').value.trim(),
+    descripcion: document.getElementById('t-descripcion').value.trim(),
+    equipo: document.getElementById('t-equipo').value.trim(),
+    notas: document.getElementById('t-notas').value.trim(),
+    estado,
+  };
+  
+  if (isEmpresa && !editandoTicketId && !ticket.asignado) {
+    const c = clientesDb.find(x => x.nombre === ticket.cliente);
+    if (c) {
+      if (c.tecnicosAsignados && c.tecnicosAsignados.length > 0) {
+        ticket.asignado = c.tecnicosAsignados.map(id => usuarios.find(u => u.id === id)?.nombre).filter(Boolean).join(', ');
+      } else if (c.tecnicoAsignado) { // Legacy single support
+        const tecUser = usuarios.find(u => u.id === c.tecnicoAsignado);
+        if (tecUser) ticket.asignado = tecUser.nombre;
+      }
+    }
+  }
+  if (editandoTicketId) {
+    tickets = tickets.map(t => t.id === editandoTicketId ? ticket : t);
+  } else {
+    tickets.unshift(ticket);
+  }
+  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  cerrarTicket();
+  renderTickets();
+  updateTicketBadge();
+}
+
+function eliminarTicket(id) {
+  if (!confirm('¿Eliminar este ticket?')) return;
+  tickets = tickets.filter(t => t.id !== id);
+  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  renderTickets();
+  updateTicketBadge();
+}
+
+// ===== DETALLE TICKET =====
+function verDetalleTicket(id) {
+  const t = tickets.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById('ticket-detalle-title').textContent = `Ticket ${t.folio}`;
+  const field = (label, val) => `
+    <div class="detalle-field">
+      <div class="detalle-label">${label}</div>
+      <div class="detalle-value">${val || '—'}</div>
+    </div>`;
+  document.getElementById('ticket-detalle-body').innerHTML = `
+    <div class="detalle-section">
+      <div class="detalle-section-title">Datos del Ticket</div>
+      <div class="detalle-grid">
+        ${field('Folio', t.folio)}
+        ${field('Fecha', t.fecha)}
+        ${t.cliente ? field('Cliente', `${t.cliente}${t.sitio ? ` (Sitio: ${t.sitio})` : ''}`) : ''}
+        ${field('Canal', t.canal ? ({correo:'Correo',whatsapp:'WhatsApp',telefono:'Llamada Tel.'}[t.canal]||t.canal) : '—')}
+        ${field('Contacto', t.contacto)}
+        ${field('Estado', `<span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado}</span>`)}
+        ${field('Prioridad', `<span class="badge badge-${(t.prioridad||'media').toLowerCase()}">${t.prioridad}</span>`)}
+        ${field('Solicitante', t.solicitante)}
+        ${field('Área', t.area)}
+        ${field('Categoría', t.categoria)}
+        ${field('Asignado a', t.asignado)}
+        ${field('Equipo / Máquina', t.equipo)}
+      </div>
+    </div>
+    <div class="detalle-section">
+      <div class="detalle-section-title">Descripción</div>
+      <div class="detalle-field"><div class="detalle-value" style="white-space:pre-wrap;">${t.descripcion||'—'}</div></div>
+    </div>
+    ${t.notas ? `
+    <div class="detalle-section">
+      <div class="detalle-section-title">Notas</div>
+      <div class="detalle-field"><div class="detalle-value" style="white-space:pre-wrap;">${t.notas}</div></div>
+    </div>` : ''}
+    <div class="form-actions" style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.5rem;">
+      <button class="btn-secondary" onclick="cerrarDetalleTicket()">Cerrar</button>
+      <button class="btn-primary" onclick="cerrarDetalleTicket();editarTicket('${t.id}')">✏️ Editar</button>
+    </div>
+  `;
+  document.getElementById('modal-ticket-detalle-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarDetalleTicket(e) {
+  if (e && e.target !== document.getElementById('modal-ticket-detalle-overlay')) return;
+  document.getElementById('modal-ticket-detalle-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// ===== HELPER: GENERAR ID INTERNO MÁQUINA =====
+function getSitioNombre(s) { return typeof s === 'string' ? s : (s?.nombre || ''); }
+
+function generarIdInternoMaquina(marca, anioVenta) {
+  const m = marca ? marca.trim().toUpperCase() : 'XX';
+  let iniciales = m.replace(/[^A-Z]/g, '');
+  if (iniciales.length < 2) {
+    iniciales = (iniciales + 'XX').substring(0, 2);
+  } else {
+    iniciales = iniciales.substring(0, 2);
+  }
+  
+  let yy = '';
+  if (anioVenta) {
+    if (anioVenta.includes('-')) {
+      yy = anioVenta.split('-')[0].substring(2, 4);
+    } else {
+      yy = anioVenta.toString().substring(2, 4);
+    }
+  }
+  if (!yy || yy.length !== 2) {
+    yy = new Date().getFullYear().toString().substring(2, 4);
+  }
+  
+  const prefix = iniciales + yy;
+  
+  let max = 0;
+  clientesDb.forEach(c => {
+    if (c.maquinas) {
+      c.maquinas.forEach(maq => {
+        if (maq.idInterno && maq.idInterno.startsWith(prefix)) {
+          const num = parseInt(maq.idInterno.substring(prefix.length), 10);
+          if (!isNaN(num) && num > max) max = num;
+        }
+      });
+    }
+  });
+  
+  return prefix + (max + 1).toString().padStart(2, '0');
+}
+
+function agregarSitioClienteDesdeEmpresa() {
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  if (!currentUser) return;
+  agregarSitioCliente(currentUser.empresa || currentUser.nombre);
+}
+
+function agregarSitioCliente(nombre) {
+  document.getElementById('form-agregar-sitio').reset();
+  document.getElementById('s-cliente-nombre').value = nombre;
+  document.getElementById('modal-agregar-sitio-overlay').classList.add('open');
+  document.getElementById('s-sitio-nombre').focus();
+}
+
+function cerrarModalSitio(e) {
+  if (e && e.target !== document.getElementById('modal-agregar-sitio-overlay')) return;
+  document.getElementById('modal-agregar-sitio-overlay').classList.remove('open');
+}
+
+function guardarSitioCliente(e) {
+  e.preventDefault();
+  const nombre = document.getElementById('s-cliente-nombre').value;
+  const nuevoSitio = document.getElementById('s-sitio-nombre').value.trim();
+  const cp = document.getElementById('s-sitio-cp')?.value.trim() || '';
+  const ciudad = document.getElementById('s-sitio-ciudad')?.value.trim() || '';
+  const estado = document.getElementById('s-sitio-estado')?.value.trim() || '';
+  const direccion = document.getElementById('s-sitio-direccion')?.value.trim() || '';
+  
+  if (!nuevoSitio || nuevoSitio === '') return;
+
+  let clienteObj = clientesDb.find(c => c.nombre === nombre);
+  if (!clienteObj) {
+    clienteObj = {
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      nombre: nombre,
+      maquinas: [],
+      sitios: []
+    };
+    clientesDb.push(clienteObj);
+  }
+
+  if (!clienteObj.sitios) clienteObj.sitios = [];
+  
+  const siteExists = clienteObj.sitios.some(s => getSitioNombre(s).toLowerCase() === nuevoSitio.toLowerCase());
+
+  if (!siteExists) {
+    clienteObj.sitios.push({
+      nombre: nuevoSitio,
+      direccion, cp, ciudad, estado
+    });
+    localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+  }
+  
+  cerrarModalSitio();
+  
+  // Si estamos en la vista de empresa, actualizamos sus sitios
+  if (currentSession.viewMode === 'empresa') {
+    renderSitios();
+  } else {
+    verDetalleCliente(nombre);
+  }
+}
+
+// ===== COLUMNAS AJUSTABLES =====
+function initTableResizers() {
+  const tables = document.querySelectorAll('.data-table');
+  tables.forEach((table, tableIndex) => {
+    const theadRow = table.querySelector('thead tr');
+    if (!theadRow) return;
+
+    // Load saved widths
+    const storageKey = `table_widths_${tableIndex}`;
+    const savedWidths = JSON.parse(localStorage.getItem(storageKey) || '{}');
+
+    Array.from(theadRow.children).forEach((th, thIndex) => {
+      // Evitar duplicar
+      if (th.querySelector('.column-resizer')) {
+        th.querySelector('.column-resizer').remove();
+      }
+
+      th.style.position = 'relative';
+      
+      // Apply saved width if exists
+      if (savedWidths[thIndex]) {
+        th.style.width = savedWidths[thIndex];
+        th.style.minWidth = savedWidths[thIndex];
+      } else {
+        const currentWidth = window.getComputedStyle(th).width;
+        if (currentWidth && currentWidth !== '0px' && currentWidth !== 'auto') {
+          th.style.minWidth = currentWidth;
+        }
+      }
+
+      const resizer = document.createElement('div');
+      resizer.classList.add('column-resizer');
+      resizer.style.width = '6px';
+      resizer.style.height = '100%';
+      resizer.style.position = 'absolute';
+      resizer.style.right = '0';
+      resizer.style.top = '0';
+      resizer.style.cursor = 'col-resize';
+      resizer.style.userSelect = 'none';
+      resizer.style.zIndex = '1';
+      
+      resizer.addEventListener('mouseenter', () => resizer.style.borderRight = '2px solid var(--accent)');
+      resizer.addEventListener('mouseleave', () => resizer.style.borderRight = 'none');
+      
+      th.appendChild(resizer);
+      
+      let startX = 0;
+      let startWidth = 0;
+      
+      const mouseMoveHandler = function(e) {
+        const dx = e.clientX - startX;
+        const newWidth = `${startWidth + dx}px`;
+        th.style.width = newWidth;
+        th.style.minWidth = newWidth;
+      };
+      
+      const mouseUpHandler = function() {
+        document.removeEventListener('mousemove', mouseMoveHandler);
+        document.removeEventListener('mouseup', mouseUpHandler);
+        
+        // Save new width
+        savedWidths[thIndex] = th.style.width;
+        localStorage.setItem(storageKey, JSON.stringify(savedWidths));
+      };
+      
+      resizer.addEventListener('mousedown', function(e) {
+        startX = e.clientX;
+        startWidth = th.offsetWidth;
+        document.addEventListener('mousemove', mouseMoveHandler);
+        document.addEventListener('mouseup', mouseUpHandler);
+        e.stopPropagation(); // Evita que se active el sort al arrastrar
+      });
+    });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(initTableResizers, 500);
+});
