@@ -34,9 +34,9 @@ let ticketFiltroActivo = 'todos';
 // MÓDULO DE INTEGRACIÓN SAP (PRÓXIMAMENTE)
 // ==========================================
 const API_CONFIG = {
-  // Cambia a true cuando el backend Node.js de SAP esté corriendo
+  // Conexión activa a la API de SAP en la nube
   USE_SAP_BACKEND: true,
-  BASE_URL: 'http://localhost:3000/api'
+  BASE_URL: 'https://eurorep-api.onrender.com/api'
 };
 
 async function fetchClientesSAP() {
