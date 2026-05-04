@@ -777,6 +777,9 @@ async function programarQuerySAP() {
     document.getElementById('query-code').value = '';
     document.getElementById('query-name').value = '';
     document.getElementById('query-sql').value = '';
+    
+    // Auto-refresh the lists to show the new query
+    cargarListaQueriesSAP();
   } catch (err) {
     console.error(err);
     mostrarNotificacion('Fallo al programar el query en SAP.', 'error');
