@@ -777,7 +777,7 @@ async function programarQuerySAP() {
   // 2. Validación proactiva de sintaxis no soportada por Service Layer
   const upperSql = sqlText.toUpperCase();
   if (upperSql.includes('CASE ') && upperSql.includes(' WHEN ')) {
-    mostrarNotificacion('SAP Service Layer no soporta condicionales "CASE WHEN". Crea una Vista en SAP y consúltala aquí.', 'error');
+    alert('⚠️ ERROR DE SINTAXIS\n\nSAP Service Layer no soporta condicionales "CASE WHEN". \n\nPor favor, crea una Vista en la base de datos de SAP que contenga tu lógica CASE WHEN, y luego consúltala aquí usando:\nSELECT * FROM "TuVista"');
     return;
   }
 
@@ -864,10 +864,10 @@ async function probarQuerySAP() {
     console.error(err);
     // Verificar si el error es de que el query no existe
     let userMsg = err.message;
-    if (userMsg.includes('does not exist') || userMsg.includes('Not Found')) {
-      userMsg = 'Este query NO existe en SAP. Asegúrate de presionar "Guardar y Enviar a SAP" primero y que se haya guardado con éxito (palomita verde).';
+    if (userMsg.includes('does not exist') || userMsg.includes('Not Found') || userMsg.includes('-2028')) {
+      userMsg = 'Este query NO existe en SAP. Asegúrate de presionar "Guardar y Enviar a SAP" primero y que se haya guardado con éxito (alerta verde en la esquina).';
     }
-    resultsOutput.textContent = `Fallo en SAP:\n${userMsg}`;
+    resultsOutput.textContent = `Fallo al Ejecutar:\n${userMsg}`;
     resultsContainer.style.display = 'block';
     mostrarNotificacion('Error al ejecutar el query.', 'error');
   } finally {
