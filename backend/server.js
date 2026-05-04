@@ -143,7 +143,9 @@ app.get('/api/clientes/:id/ordenes', ensureSAPConnection, async (req, res) => {
 // Obtener todos los Queries SQL registrados en SAP
 app.get('/api/sap/queries', ensureSAPConnection, async (req, res) => {
     try {
-        const response = await sapApi.get(`${SAP_URL}/SQLQueries?$select=SqlCode,SqlName,SqlText`);
+        const response = await sapApi.get(`${SAP_URL}/SQLQueries?$select=SqlCode,SqlName,SqlText`, {
+            headers: { 'B1S-PageSize': 5000, 'Prefer': 'odata.maxpagesize=5000' }
+        });
         res.json({ success: true, data: response.data.value || [] });
     } catch (error) {
         console.error('Error obteniendo lista de queries:', error.response?.data || error.message);
