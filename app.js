@@ -695,7 +695,7 @@ let listaQueriesCargada = [];
 
 async function cargarListaQueriesSAP() {
   try {
-    const res = await fetch(`${API_CONFIG.BASE_URL}/sap/queries`, {
+    const res = await fetch(`${API_CONFIG.BASE_URL}/sap/queries?_t=${Date.now()}`, {
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache'
@@ -823,7 +823,7 @@ async function probarQuerySAP() {
   resultsContainer.style.display = 'none';
 
   try {
-    const res = await fetch(`${API_CONFIG.BASE_URL}/sap/queries/${encodeURIComponent(sqlCode)}/execute`, {
+    const res = await fetch(`${API_CONFIG.BASE_URL}/sap/queries/${encodeURIComponent(sqlCode)}/execute?_t=${Date.now()}`, {
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache'
