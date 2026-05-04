@@ -757,12 +757,27 @@ function limpiarFormularioQuery() {
 }
 
 async function programarQuerySAP() {
-  const sqlCode = document.getElementById('query-code').value.trim();
-  const sqlName = document.getElementById('query-name').value.trim();
-  const sqlText = document.getElementById('query-sql').value.trim();
+  let sqlCode = document.getElementById('query-code').value.trim();
+  let sqlName = document.getElementById('query-name').value.trim();
+  let rawSqlText = document.getElementById('query-sql').value.trim();
 
-  if (!sqlCode || !sqlText) {
+  if (!sqlCode || !rawSqlText) {
     mostrarNotificacion('El Código del Query y la Sentencia SQL son obligatorios.', 'error');
+    return;
+  }
+
+  // 1. Limpieza automática del código SQL para SAP Service Layer
+  // Eliminar comentarios de bloque /* ... */
+  let sqlText = rawSqlText.replace(/\/\*[\s\S]*?\*\//g, '');
+  // Eliminar comentarios de línea -- ...
+  sqlText = sqlText.replace(/--.*$/gm, '');
+  // Limpiar espacios extra y saltos de línea
+  sqlText = sqlText.replace(/\s+/g, ' ').trim();
+
+  // 2. Validación proactiva de sintaxis no soportada por Service Layer
+  const upperSql = sqlText.toUpperCase();
+  if (upperSql.includes('CASE ') && upperSql.includes(' WHEN ')) {
+    mostrarNotificacion('SAP Service Layer no soporta condicionales "CASE WHEN". Crea una Vista en SAP y consúltala aquí.', 'error');
     return;
   }
 
