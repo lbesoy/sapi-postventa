@@ -223,14 +223,14 @@
         <table class="orders-table" id="orders-table">
           <thead>
             <tr>
-              <th onclick="toggleSortOrdenes('id')" style="cursor:pointer; user-select:none;">Folio <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-id"></i></th>
-              <th onclick="toggleSortOrdenes('cliente')" style="cursor:pointer; user-select:none;">Cliente <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-cliente"></i></th>
-              <th onclick="toggleSortOrdenes('ubicacion')" style="cursor:pointer; user-select:none;">Ubicación <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-ubicacion"></i></th>
-              <th onclick="toggleSortOrdenes('modelo')" style="cursor:pointer; user-select:none;">Modelo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-modelo"></i></th>
-              <th onclick="toggleSortOrdenes('tecnico')" style="cursor:pointer; user-select:none;">Técnico <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-tecnico"></i></th>
-              <th onclick="toggleSortOrdenes('tipo')" style="cursor:pointer; user-select:none;">Tipo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-tipo"></i></th>
-              <th onclick="toggleSortOrdenes('estado')" style="cursor:pointer; user-select:none;">Estado <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-estado"></i></th>
-              <th onclick="toggleSortOrdenes('fecha')" style="cursor:pointer; user-select:none;">Fecha <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-fecha"></i></th>
+              <th id="th-ord-id" onclick="toggleSortOrdenes('id')" style="cursor:pointer; user-select:none;">Folio <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-id"></i></th>
+              <th id="th-ord-cliente" onclick="toggleSortOrdenes('cliente')" style="cursor:pointer; user-select:none;">Cliente <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-cliente"></i></th>
+              <th id="th-ord-ubicacion" onclick="toggleSortOrdenes('ubicacion')" style="cursor:pointer; user-select:none;">Ubicación <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-ubicacion"></i></th>
+              <th id="th-ord-modelo" onclick="toggleSortOrdenes('modelo')" style="cursor:pointer; user-select:none;">Modelo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-modelo"></i></th>
+              <th id="th-ord-tecnico" onclick="toggleSortOrdenes('tecnico')" style="cursor:pointer; user-select:none;">Técnico <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-tecnico"></i></th>
+              <th id="th-ord-tipo" onclick="toggleSortOrdenes('tipo')" style="cursor:pointer; user-select:none;">Tipo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-tipo"></i></th>
+              <th id="th-ord-estado" onclick="toggleSortOrdenes('estado')" style="cursor:pointer; user-select:none;">Estado <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-estado"></i></th>
+              <th id="th-ord-fecha" onclick="toggleSortOrdenes('fecha')" style="cursor:pointer; user-select:none;">Fecha <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-fecha"></i></th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -255,8 +255,8 @@
         <table class="orders-table" id="orders-table-servicios">
           <thead>
             <tr>
-              <th>Folio</th><th>Cliente</th><th>Ubicación</th><th>Modelo</th>
-              <th>Técnico</th><th>Tipo</th><th>Estado</th><th>Fecha</th><th>Acciones</th>
+              <th id="th-ord-id">Folio </th><th id="th-ord-cliente">Cliente </th><th id="th-ord-ubicacion">Ubicación </th><th id="th-ord-modelo">Modelo </th>
+              <th id="th-ord-tecnico">Técnico </th><th id="th-ord-tipo">Tipo </th><th id="th-ord-estado">Estado </th><th id="th-ord-fecha">Fecha </th><th>Acciones</th>
             </tr>
           </thead>
           <tbody id="tabla-body-servicios">
@@ -293,15 +293,15 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th onclick="toggleSortClientes('id')" style="cursor:pointer; user-select:none;">ID SAP <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-id"></i></th>
-              <th onclick="toggleSortClientes('nombre')" style="cursor:pointer; user-select:none;">Empresa <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-nombre"></i></th>
-              <th onclick="toggleSortClientes('rfc')" style="cursor:pointer; user-select:none;">RFC <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-rfc"></i></th>
-              <th onclick="toggleSortClientes('contacto')" style="cursor:pointer; user-select:none;">Contacto <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-contacto"></i></th>
-              <th onclick="toggleSortClientes('email')" style="cursor:pointer; user-select:none;">Correo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-email"></i></th>
-              <th onclick="toggleSortClientes('telefono')" style="cursor:pointer; user-select:none;">Teléfono <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-telefono"></i></th>
-              <th onclick="toggleSortClientes('grupoSinergia')" style="cursor:pointer; user-select:none;">Grupo SAP <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-grupoSinergia"></i></th>
-              <th onclick="toggleSortClientes('saldoCuenta')" style="cursor:pointer; user-select:none;">Saldo SAP <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-saldoCuenta"></i></th>
-              <th onclick="toggleSortClientes('saldoOrdenes')" style="cursor:pointer; user-select:none;">Órdenes Abiertas <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-saldoOrdenes"></i></th>
+              <th id="th-cli-id" onclick="toggleSortClientes('id')" style="cursor:pointer; user-select:none;">ID SAP <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-id"></i></th>
+              <th id="th-cli-nombre" onclick="toggleSortClientes('nombre')" style="cursor:pointer; user-select:none;">Empresa <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-nombre"></i></th>
+              <th id="th-cli-rfc" onclick="toggleSortClientes('rfc')" style="cursor:pointer; user-select:none;">RFC <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-rfc"></i></th>
+              <th id="th-cli-contacto" onclick="toggleSortClientes('contacto')" style="cursor:pointer; user-select:none;">Contacto <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-contacto"></i></th>
+              <th id="th-cli-email" onclick="toggleSortClientes('email')" style="cursor:pointer; user-select:none;">Correo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-email"></i></th>
+              <th id="th-cli-telefono" onclick="toggleSortClientes('telefono')" style="cursor:pointer; user-select:none;">Teléfono <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-telefono"></i></th>
+              <th id="th-cli-grupoSinergia" onclick="toggleSortClientes('grupoSinergia')" style="cursor:pointer; user-select:none;">Grupo SAP <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-grupoSinergia"></i></th>
+              <th id="th-cli-saldoCuenta" onclick="toggleSortClientes('saldoCuenta')" style="cursor:pointer; user-select:none;">Saldo SAP <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-saldoCuenta"></i></th>
+              <th id="th-cli-saldoOrdenes" onclick="toggleSortClientes('saldoOrdenes')" style="cursor:pointer; user-select:none;">Órdenes Abiertas <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-saldoOrdenes"></i></th>
               <th>Máquinas</th>
             </tr>
           </thead>
@@ -350,12 +350,12 @@
         <table class="orders-table">
           <thead>
             <tr>
-              <th id="th-maquinaria-id">ID Interno</th>
-              <th onclick="toggleSortMaquinaria('marca')" style="cursor:pointer; user-select:none;">Marca <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-marca"></i></th>
-              <th onclick="toggleSortMaquinaria('modelo')" style="cursor:pointer; user-select:none;">Modelo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-modelo"></i></th>
-              <th onclick="toggleSortMaquinaria('serie')" style="cursor:pointer; user-select:none;">Serie <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-serie"></i></th>
-              <th onclick="toggleSortMaquinaria('anio')" style="cursor:pointer; user-select:none;">Año <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-anio"></i></th>
-              <th onclick="toggleSortMaquinaria('cliente')" style="cursor:pointer; user-select:none;">Cliente / Ubicación <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cliente"></i></th>
+              <th id="th-maquinaria-id">ID Interno </th>
+              <th id="th-maq-marca" onclick="toggleSortMaquinaria('marca')" style="cursor:pointer; user-select:none;">Marca <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-marca"></i></th>
+              <th id="th-ord-modelo" onclick="toggleSortMaquinaria('modelo')" style="cursor:pointer; user-select:none;">Modelo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-modelo"></i></th>
+              <th id="th-maq-serie" onclick="toggleSortMaquinaria('serie')" style="cursor:pointer; user-select:none;">Serie <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-serie"></i></th>
+              <th id="th-maq-anio" onclick="toggleSortMaquinaria('anio')" style="cursor:pointer; user-select:none;">Año <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-anio"></i></th>
+              <th id="th-maq-cliente" onclick="toggleSortMaquinaria('cliente')" style="cursor:pointer; user-select:none;">Cliente / Ubicación <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cliente"></i></th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -380,11 +380,11 @@
         <table class="orders-table">
           <thead>
             <tr>
-              <th id="th-refacciones-id">ItemCode</th>
-              <th>Descripción</th>
-              <th>Grupo de Artículo</th>
-              <th>Precio</th>
-              <th>Stock</th>
+              <th id="th-refacciones-id">ItemCode </th>
+              <th id="th-ref-nombre">Descripción </th>
+              <th id="th-ref-grupo">Grupo de Artículo </th>
+              <th id="th-ref-precio">Precio </th>
+              <th id="th-ref-stock">Stock </th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -405,9 +405,9 @@
         <table class="orders-table">
           <thead>
             <tr>
-              <th>Nombre del Sitio</th>
-              <th>Código Postal</th>
-              <th>Ciudad / Estado</th>
+              <th id="th-sit-nombre">Nombre del Sitio </th>
+              <th id="th-sit-cp">Código Postal </th>
+              <th id="th-sit-ciudad">Ciudad / Estado </th>
               <th style="width:100px;">Acciones</th>
             </tr>
           </thead>
@@ -434,11 +434,11 @@
         <table class="orders-table" id="tecnicos-table">
           <thead>
             <tr>
-              <th>Nombre del Técnico</th>
-              <th>Total Servicios</th>
-              <th>Completados</th>
-              <th>Siguiente Ticket</th>
-              <th>Último Resuelto</th>
+              <th id="th-tec-nombre">Nombre del Técnico </th>
+              <th id="th-tec-total">Total Servicios </th>
+              <th id="th-tec-completados">Completados </th>
+              <th id="th-tec-siguiente">Siguiente Ticket </th>
+              <th id="th-tec-ultimo">Último Resuelto </th>
             </tr>
           </thead>
           <tbody id="tecnicos-table-body">
@@ -524,23 +524,23 @@
       <div id="mapeo-content-refacciones" class="mapeo-tab-content" style="display:none;">
         <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
           <div class="form-group">
-            <label>ID / Código de Refacción (Ej. ItemCode)</label>
+            <input type="text" id="lbl-ref-id" class="map-label-edit" value="ID / Código de Refacción" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-ref-id" placeholder="ItemCode" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Descripción / Nombre</label>
+            <input type="text" id="lbl-ref-nombre" class="map-label-edit" value="Descripción / Nombre" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-ref-nombre" placeholder="ItemName" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Grupo de Artículo</label>
+            <input type="text" id="lbl-ref-grupo" class="map-label-edit" value="Grupo de Artículo" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-ref-grupo" placeholder="ItmsGrpNam" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Precio</label>
+            <input type="text" id="lbl-ref-precio" class="map-label-edit" value="Precio" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-ref-precio" placeholder="Price" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Stock / Existencias</label>
+            <input type="text" id="lbl-ref-stock" class="map-label-edit" value="Stock / Existencias" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-ref-stock" placeholder="OnHand" style="font-family: monospace;"/>
           </div>
         </div>
@@ -753,7 +753,7 @@
           <thead>
             <tr>
               <th>#</th><th>Asunto</th><th>Solicitante / Empresa</th><th>Área</th>
-              <th>Prioridad</th><th>Estado</th><th>Asignado</th><th>Fecha</th><th>Acciones</th>
+              <th>Prioridad</th><th id="th-ord-estado">Estado </th><th>Asignado</th><th id="th-ord-fecha">Fecha </th><th>Acciones</th>
             </tr>
           </thead>
           <tbody id="tickets-body"></tbody>
@@ -1673,7 +1673,7 @@
         <table class="data-table" style="margin: 0; width: 100%;">
           <thead style="position: sticky; top: 0; z-index: 10;">
             <tr>
-              <th onclick="toggleSortDesglose('fecha')" style="width: 120px; cursor:pointer; user-select:none;">Fecha <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-desg-fecha"></i></th>
+              <th id="th-ord-fecha" onclick="toggleSortDesglose('fecha')" style="width: 120px; cursor:pointer; user-select:none;">Fecha <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-desg-fecha"></i></th>
               <th onclick="toggleSortDesglose('docNum')" style="width: 130px; cursor:pointer; user-select:none;">Número de doc. <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-desg-docNum"></i></th>
               <th onclick="toggleSortDesglose('comments')" style="cursor:pointer; user-select:none;">Comentarios <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-desg-comments"></i></th>
               <th onclick="toggleSortDesglose('importe')" style="width: 130px; text-align: right; cursor:pointer; user-select:none;">Importe <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-desg-importe"></i></th>
@@ -1721,27 +1721,27 @@
       <div id="mapeo-content-clientes" class="mapeo-tab-content">
         <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
           <div class="form-group">
-            <label>ID del Cliente (Ej. CardCode)</label>
+            <input type="text" id="lbl-cli-id" class="map-label-edit" value="ID del Cliente" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-cli-id" placeholder="CardCode" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Nombre / Razón Social</label>
+            <input type="text" id="lbl-cli-nombre" class="map-label-edit" value="Nombre / Razón Social" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-cli-nombre" placeholder="CardName" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>RFC</label>
+            <input type="text" id="lbl-cli-rfc" class="map-label-edit" value="RFC" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-cli-rfc" placeholder="LicTradNum" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Correo Electrónico</label>
+            <input type="text" id="lbl-cli-email" class="map-label-edit" value="Correo Electrónico" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-cli-email" placeholder="E_Mail" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Grupo Sinergia (UDF)</label>
+            <input type="text" id="lbl-cli-grupo" class="map-label-edit" value="Grupo Sinergia (UDF)" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-cli-grupo" placeholder="U_OK_Grupo" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Saldo en Cuenta</label>
+            <input type="text" id="lbl-cli-saldo" class="map-label-edit" value="Saldo en Cuenta" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-cli-saldo" placeholder="Balance" style="font-family: monospace;"/>
           </div>
         </div>
@@ -1757,19 +1757,19 @@
       <div id="mapeo-content-maquinaria" class="mapeo-tab-content" style="display:none;">
         <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
           <div class="form-group">
-            <label>Número de Serie (ID)</label>
+            <input type="text" id="lbl-maq-id" class="map-label-edit" value="Número de Serie (ID)" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-maq-id" placeholder="ManufacturerSerialNum" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Código de Artículo</label>
+            <input type="text" id="lbl-maq-itemcode" class="map-label-edit" value="Código de Artículo" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-maq-itemcode" placeholder="ItemCode" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Descripción / Modelo</label>
+            <input type="text" id="lbl-maq-desc" class="map-label-edit" value="Descripción / Modelo" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-maq-desc" placeholder="ItemDescription" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>ID del Cliente (CardCode)</label>
+            <input type="text" id="lbl-maq-cliente" class="map-label-edit" value="ID del Cliente (CardCode)" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-maq-cliente" placeholder="CustomerCode" style="font-family: monospace;"/>
           </div>
         </div>
@@ -1785,19 +1785,19 @@
       <div id="mapeo-content-sitios" class="mapeo-tab-content" style="display:none;">
         <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
           <div class="form-group">
-            <label>ID del Sitio</label>
+            <input type="text" id="lbl-sit-id" class="map-label-edit" value="ID del Sitio" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-sit-id" placeholder="Address" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Nombre del Sitio</label>
+            <input type="text" id="lbl-sit-nombre" class="map-label-edit" value="Nombre del Sitio" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-sit-nombre" placeholder="Street" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>ID del Cliente (CardCode)</label>
+            <input type="text" id="lbl-sit-cliente" class="map-label-edit" value="ID del Cliente (CardCode)" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-sit-cliente" placeholder="BPCode" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Dirección Completa</label>
+            <input type="text" id="lbl-sit-direccion" class="map-label-edit" value="Dirección Completa" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-sit-direccion" placeholder="Block" style="font-family: monospace;"/>
           </div>
         </div>
@@ -1813,27 +1813,27 @@
       <div id="mapeo-content-ordenes" class="mapeo-tab-content" style="display:none;">
         <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
           <div class="form-group">
-            <label>ID Órden (ServiceCallID)</label>
+            <input type="text" id="lbl-ord-id" class="map-label-edit" value="ID Órden (ServiceCallID)" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-ord-id" placeholder="ServiceCallID" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>ID Cliente (CardCode)</label>
+            <input type="text" id="lbl-ord-cliente" class="map-label-edit" value="ID Cliente (CardCode)" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-ord-cliente" placeholder="CustomerCode" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Número de Serie Maquinaria</label>
+            <input type="text" id="lbl-ord-maquina" class="map-label-edit" value="Número de Serie Maquinaria" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-ord-maquina" placeholder="ManufacturerSerialNum" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Técnico Asignado</label>
+            <input type="text" id="lbl-ord-tecnico" class="map-label-edit" value="Técnico Asignado" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-ord-tecnico" placeholder="TechnicianCode" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Estatus</label>
+            <input type="text" id="lbl-ord-estado" class="map-label-edit" value="Estatus" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-ord-estado" placeholder="Status" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Descripción / Falla</label>
+            <input type="text" id="lbl-ord-falla" class="map-label-edit" value="Descripción / Falla" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-ord-falla" placeholder="Description" style="font-family: monospace;"/>
           </div>
         </div>
@@ -1849,19 +1849,19 @@
       <div id="mapeo-content-tecnicos" class="mapeo-tab-content" style="display:none;">
         <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
           <div class="form-group">
-            <label>ID del Técnico (EmpID)</label>
+            <input type="text" id="lbl-tec-id" class="map-label-edit" value="ID del Técnico (EmpID)" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-tec-id" placeholder="EmployeeID" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Nombre Completo</label>
+            <input type="text" id="lbl-tec-nombre" class="map-label-edit" value="Nombre Completo" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-tec-nombre" placeholder="FirstName" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Teléfono</label>
+            <input type="text" id="lbl-tec-telefono" class="map-label-edit" value="Teléfono" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-tec-telefono" placeholder="MobilePhone" style="font-family: monospace;"/>
           </div>
           <div class="form-group">
-            <label>Correo Electrónico</label>
+            <input type="text" id="lbl-tec-email" class="map-label-edit" value="Correo Electrónico" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
             <input type="text" id="map-tec-email" placeholder="eMail" style="font-family: monospace;"/>
           </div>
         </div>

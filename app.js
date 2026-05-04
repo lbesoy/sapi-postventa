@@ -536,6 +536,18 @@ function abrirModalMapeo() {
     document.getElementById('map-ref-stock').value = mappings.refacciones.stock || 'OnHand';
   }
 
+  // Cargar Labels (Si existen)
+  const modules = ['clientes', 'maquinaria', 'sitios', 'ordenes', 'tecnicos', 'refacciones'];
+  modules.forEach(mod => {
+    if (mappings[mod] && mappings[mod].labels) {
+      for (const [key, val] of Object.entries(mappings[mod].labels)) {
+        const lblInput = document.getElementById('lbl-' + mod + '-' + key);
+        if (lblInput) lblInput.value = val;
+      }
+    }
+  });
+
+
   // Cargar Columnas Personalizadas Existentes
   const modulos = ['clientes', 'maquinaria', 'sitios', 'ordenes', 'tecnicos', 'refacciones'];
   modulos.forEach(mod => {
@@ -546,6 +558,36 @@ function abrirModalMapeo() {
         mappings[mod].customCols.forEach(col => {
           addCustomColumnUI(mod, col.label, col.key);
         });
+      }
+    }
+  });
+}
+
+
+function getLabelsForModule(mod) {
+  const labels = {};
+  document.querySelectorAll('input[id^="lbl-' + mod + '-"]').forEach(el => {
+    const key = el.id.replace('lbl-' + mod + '-', '');
+    labels[key] = el.value.trim();
+  });
+  return labels;
+}
+
+function applyTableHeaders() {
+  const mappings = configData.mappings;
+  if (!mappings) return;
+  
+  const modules = ['clientes', 'maquinaria', 'sitios', 'ordenes', 'tecnicos', 'refacciones'];
+  modules.forEach(mod => {
+    if (mappings[mod] && mappings[mod].labels) {
+      for (const [key, val] of Object.entries(mappings[mod].labels)) {
+        const th = document.getElementById('th-' + mod + '-' + key);
+        if (th && val) {
+          // Keep the sort icon if it exists
+          const icon = th.querySelector('i');
+          th.textContent = val + ' ';
+          if (icon) th.appendChild(icon);
+        }
       }
     }
   });
@@ -599,21 +641,21 @@ function guardarMapeoColumnas() {
       email: document.getElementById('map-cli-email').value.trim() || 'E_Mail',
       grupoSinergia: document.getElementById('map-cli-grupo').value.trim() || 'U_OK_Grupo',
       saldoCuenta: document.getElementById('map-cli-saldo').value.trim() || 'Balance',
-      customCols: getCustomColumnsForModule('clientes')
+      customCols: getCustomColumnsForModule('clientes'), labels: getLabelsForModule('clientes')
     },
     maquinaria: {
       id: document.getElementById('map-maq-id').value.trim() || 'ManufacturerSerialNum',
       itemcode: document.getElementById('map-maq-itemcode').value.trim() || 'ItemCode',
       desc: document.getElementById('map-maq-desc').value.trim() || 'ItemDescription',
       clienteId: document.getElementById('map-maq-cliente').value.trim() || 'CustomerCode',
-      customCols: getCustomColumnsForModule('maquinaria')
+      customCols: getCustomColumnsForModule('maquinaria'), labels: getLabelsForModule('maquinaria')
     },
     sitios: {
       id: document.getElementById('map-sit-id').value.trim() || 'Address',
       nombre: document.getElementById('map-sit-nombre').value.trim() || 'Street',
       clienteId: document.getElementById('map-sit-cliente').value.trim() || 'BPCode',
       direccion: document.getElementById('map-sit-direccion').value.trim() || 'Block',
-      customCols: getCustomColumnsForModule('sitios')
+      customCols: getCustomColumnsForModule('sitios'), labels: getLabelsForModule('sitios')
     },
     ordenes: {
       id: document.getElementById('map-ord-id').value.trim() || 'ServiceCallID',
@@ -622,14 +664,14 @@ function guardarMapeoColumnas() {
       tecnico: document.getElementById('map-ord-tecnico').value.trim() || 'TechnicianCode',
       estado: document.getElementById('map-ord-estado').value.trim() || 'Status',
       falla: document.getElementById('map-ord-falla').value.trim() || 'Description',
-      customCols: getCustomColumnsForModule('ordenes')
+      customCols: getCustomColumnsForModule('ordenes'), labels: getLabelsForModule('ordenes')
     },
     tecnicos: {
       id: document.getElementById('map-tec-id').value.trim() || 'EmployeeID',
       nombre: document.getElementById('map-tec-nombre').value.trim() || 'FirstName',
       telefono: document.getElementById('map-tec-telefono').value.trim() || 'MobilePhone',
       email: document.getElementById('map-tec-email').value.trim() || 'eMail',
-      customCols: getCustomColumnsForModule('tecnicos')
+      customCols: getCustomColumnsForModule('tecnicos'), labels: getLabelsForModule('tecnicos')
     },
     refacciones: {
       id: document.getElementById('map-ref-id').value.trim() || 'ItemCode',
@@ -637,13 +679,14 @@ function guardarMapeoColumnas() {
       grupo: document.getElementById('map-ref-grupo').value.trim() || 'ItmsGrpNam',
       precio: document.getElementById('map-ref-precio').value.trim() || 'Price',
       stock: document.getElementById('map-ref-stock').value.trim() || 'OnHand',
-      customCols: getCustomColumnsForModule('refacciones')
+      customCols: getCustomColumnsForModule('refacciones'), labels: getLabelsForModule('refacciones')
     }
   };
   
   configData.mappings = mappings;
   localStorage.setItem('eurorep_config', JSON.stringify(configData));
   
+  applyTableHeaders();
   cerrarModalMapeo();
   alert("Mapeo de columnas guardado correctamente. El CRM usará esta estructura al consultar SAP.");
 }
