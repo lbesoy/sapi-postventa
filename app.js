@@ -847,6 +847,51 @@ async function probarQuerySAP() {
   }
 }
 
+async function eliminarQuerySAP() {
+  const sqlCode = document.getElementById('query-code').value.trim();
+  if (!sqlCode) {
+    mostrarNotificacion('Selecciona un Query para eliminar.', 'error');
+    return;
+  }
+  
+  if (!confirm(`¿Estás completamente seguro de que deseas eliminar el query "${sqlCode}" directamente de SAP? Esta acción no se puede deshacer.`)) {
+    return;
+  }
+  
+  const btn = event.target.closest('button');
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;margin-right:5px;"></div> Eliminando...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API_CONFIG.BASE_URL}/sap/queries/${encodeURIComponent(sqlCode)}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    
+    if (!res.ok) {
+      let errMsg = 'Error desconocido';
+      if (data.details && data.details.error && data.details.error.message && data.details.error.message.value) {
+        errMsg = data.details.error.message.value;
+      } else if (data.error) {
+        errMsg = data.error;
+      }
+      throw new Error(errMsg);
+    }
+    
+    mostrarNotificacion('Query eliminado correctamente de SAP.', 'success');
+    limpiarFormularioQuery();
+    cargarListaQueriesSAP();
+  } catch (err) {
+    console.error(err);
+    mostrarNotificacion('Fallo al eliminar en SAP: ' + err.message, 'error');
+  } finally {
+    btn.innerHTML = orig;
+    btn.disabled = false;
+    lucide.createIcons();
+  }
+}
+
 function renderTecnicosConfig() {
   const list = document.getElementById('cfg-tecnicos-list');
   if (!list) return;

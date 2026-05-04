@@ -203,6 +203,18 @@ app.get('/api/sap/queries/:id/execute', ensureSAPConnection, async (req, res) =>
     }
 });
 
+// Eliminar un Query SQL en SAP
+app.delete('/api/sap/queries/:id', ensureSAPConnection, async (req, res) => {
+    try {
+        const sqlCode = req.params.id;
+        await sapApi.delete(`${SAP_URL}/SQLQueries('${sqlCode}')`);
+        res.json({ success: true, message: 'Query eliminado correctamente en SAP' });
+    } catch (error) {
+        console.error(`Error eliminando query ${req.params.id}:`, error.response?.data || error.message);
+        res.status(500).json({ error: 'Error eliminando query en SAP', details: error.response?.data || error.message });
+    }
+});
+
 // Obtener Máquinas (Equipments / Activos Fijos)
 // Nota: En SAP B1 la maquinaria de servicio usualmente está en "CustomerEquipmentCards"
 app.get('/api/maquinaria', ensureSAPConnection, async (req, res) => {
