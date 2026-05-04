@@ -378,12 +378,14 @@ let configData = JSON.parse(localStorage.getItem('eurorep_config') || '{}');
 let tecnicosConfig = JSON.parse(localStorage.getItem('eurorep_tecnicos') || '[]');
 
 function cargarConfig() {
+  // Las opciones de query se cargarán de forma asíncrona pero las pedimos primero si estamos en configuración.
+  // Sin embargo, si abrimos la configuración manual, las volvemos a cargar.
+  
   if (configData.empresa) document.getElementById('cfg-empresa').value = configData.empresa;
   if (configData.rfc) document.getElementById('cfg-rfc').value = configData.rfc;
   if (configData.tel) document.getElementById('cfg-tel').value = configData.tel;
   if (configData.email) document.getElementById('cfg-email').value = configData.email;
   if (configData.direccion) document.getElementById('cfg-direccion').value = configData.direccion;
-  if (configData.queryClientes) document.getElementById('cfg-query-clientes').value = configData.queryClientes;
   if (configData.queryMaquinaria) document.getElementById('cfg-query-maquinaria').value = configData.queryMaquinaria;
   if (configData.querySitios) document.getElementById('cfg-query-sitios').value = configData.querySitios;
   if (configData.queryOrdenes) document.getElementById('cfg-query-ordenes').value = configData.queryOrdenes;
@@ -584,9 +586,6 @@ function guardarMapeoColumnas() {
 let listaQueriesCargada = [];
 
 async function cargarListaQueriesSAP() {
-  const selector = document.getElementById('query-selector');
-  if (!selector) return;
-
   try {
     const res = await fetch(`${API_CONFIG.BASE_URL}/sap/queries`);
     const data = await res.json();
@@ -594,11 +593,22 @@ async function cargarListaQueriesSAP() {
 
     listaQueriesCargada = data.data || [];
     
-    // Rellenar dropdown
-    selector.innerHTML = '<option value="">-- Seleccionar un Query existente --</option>';
-    listaQueriesCargada.forEach(q => {
-      selector.innerHTML += `<option value="${q.SqlCode}">${q.SqlCode} - ${q.SqlName}</option>`;
+    // Rellenar todos los selectores de Queries en la UI
+    const selectors = document.querySelectorAll('.query-sap-selector, #query-selector');
+    selectors.forEach(selector => {
+      const placeholder = selector.id === 'query-selector' ? '-- Seleccionar un Query existente --' : '-- Sin asignar --';
+      selector.innerHTML = `<option value="">${placeholder}</option>`;
+      listaQueriesCargada.forEach(q => {
+        selector.innerHTML += `<option value="${q.SqlCode}">${q.SqlCode} - ${q.SqlName}</option>`;
+      });
     });
+
+    // Re-aplicar valores guardados
+    if (configData.queryClientes) document.getElementById('cfg-query-clientes').value = configData.queryClientes;
+    if (configData.queryMaquinaria) document.getElementById('cfg-query-maquinaria').value = configData.queryMaquinaria;
+    if (configData.querySitios) document.getElementById('cfg-query-sitios').value = configData.querySitios;
+    if (configData.queryOrdenes) document.getElementById('cfg-query-ordenes').value = configData.queryOrdenes;
+    if (configData.queryTecnicos) document.getElementById('cfg-query-tecnicos').value = configData.queryTecnicos;
 
   } catch (err) {
     console.error("Error al cargar lista de queries:", err);

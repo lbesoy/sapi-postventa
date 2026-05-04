@@ -456,19 +456,29 @@
               <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Define qué código de Query se debe utilizar para cada módulo.</p>
               <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 0.75rem; align-items: center;">
                 <label style="font-weight: 500;">Query para Clientes:</label>
-                <input type="text" id="cfg-query-clientes" placeholder="Ej. eurorep_clientes" style="font-family: monospace;"/>
+                <select id="cfg-query-clientes" class="query-sap-selector" style="font-family: monospace; padding: 0.4rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-body); color: var(--text-primary);">
+                  <option value="">-- Sin asignar --</option>
+                </select>
                 
                 <label style="font-weight: 500;">Query para Maquinaria:</label>
-                <input type="text" id="cfg-query-maquinaria" placeholder="Ej. eurorep_maquinaria" style="font-family: monospace;"/>
+                <select id="cfg-query-maquinaria" class="query-sap-selector" style="font-family: monospace; padding: 0.4rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-body); color: var(--text-primary);">
+                  <option value="">-- Sin asignar --</option>
+                </select>
 
                 <label style="font-weight: 500;">Query para Sitios:</label>
-                <input type="text" id="cfg-query-sitios" placeholder="Ej. eurorep_sitios" style="font-family: monospace;"/>
+                <select id="cfg-query-sitios" class="query-sap-selector" style="font-family: monospace; padding: 0.4rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-body); color: var(--text-primary);">
+                  <option value="">-- Sin asignar --</option>
+                </select>
 
                 <label style="font-weight: 500;">Query para Órdenes:</label>
-                <input type="text" id="cfg-query-ordenes" placeholder="Ej. eurorep_ordenes" style="font-family: monospace;"/>
+                <select id="cfg-query-ordenes" class="query-sap-selector" style="font-family: monospace; padding: 0.4rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-body); color: var(--text-primary);">
+                  <option value="">-- Sin asignar --</option>
+                </select>
 
                 <label style="font-weight: 500;">Query para Técnicos:</label>
-                <input type="text" id="cfg-query-tecnicos" placeholder="Ej. eurorep_tecnicos" style="font-family: monospace;"/>
+                <select id="cfg-query-tecnicos" class="query-sap-selector" style="font-family: monospace; padding: 0.4rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-body); color: var(--text-primary);">
+                  <option value="">-- Sin asignar --</option>
+                </select>
               </div>
             </div>
           </div>
