@@ -847,14 +847,27 @@ async function probarQuerySAP() {
       }
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Error ejecutando el query');
+    if (!res.ok) {
+      let errMsg = data.error || 'Error ejecutando el query';
+      if (data.details && data.details.error && data.details.error.message && data.details.error.message.value) {
+        errMsg = data.details.error.message.value;
+      } else if (typeof data.details === 'string') {
+        errMsg = data.details;
+      }
+      throw new Error(errMsg);
+    }
     
     resultsOutput.textContent = JSON.stringify(data.data, null, 2);
     resultsContainer.style.display = 'block';
     mostrarNotificacion('Query ejecutado correctamente.', 'success');
   } catch (err) {
     console.error(err);
-    resultsOutput.textContent = `Error: ${err.message}`;
+    // Verificar si el error es de que el query no existe
+    let userMsg = err.message;
+    if (userMsg.includes('does not exist') || userMsg.includes('Not Found')) {
+      userMsg = 'Este query NO existe en SAP. Asegúrate de presionar "Guardar y Enviar a SAP" primero y que se haya guardado con éxito (palomita verde).';
+    }
+    resultsOutput.textContent = `Fallo en SAP:\n${userMsg}`;
     resultsContainer.style.display = 'block';
     mostrarNotificacion('Error al ejecutar el query.', 'error');
   } finally {
