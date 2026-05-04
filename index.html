@@ -450,6 +450,15 @@
               <label>Dirección</label>
               <input type="text" id="cfg-direccion" placeholder="Calle, Número, Ciudad, CP"/>
             </div>
+            
+            <div class="form-group" style="grid-column:1/-1; padding-top: 1rem; border-top: 1px solid var(--border);">
+              <label>Mapeo de Queries SAP</label>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Define qué código de Query se debe utilizar para cada módulo.</p>
+              <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; align-items: center;">
+                <label style="font-weight: 500;">Query para Clientes:</label>
+                <input type="text" id="cfg-query-clientes" placeholder="Ej. eurorep_clientes" style="font-family: monospace;"/>
+              </div>
+            </div>
           </div>
           <div style="display:flex;justify-content:flex-end;margin-top:1rem;">
             <button class="btn-primary" onclick="guardarConfig()"><i data-lucide="save" class="btn-icon"></i> Guardar</button>
@@ -464,7 +473,17 @@
               <div class="config-card-title">Programación de Queries SAP</div>
               <div class="config-card-sub">Inyecta o actualiza sentencias SQL directamente en la base de datos de producción de SAP. (Uso avanzado)</div>
             </div>
+            </div>
           </div>
+          
+          <div style="margin-top: 1rem; margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center;">
+            <select id="query-selector" class="form-group" style="flex: 1; padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border);" onchange="cargarDetalleQuery(this.value)">
+              <option value="">-- Seleccionar un Query existente --</option>
+            </select>
+            <button class="btn-secondary" onclick="cargarListaQueriesSAP()"><i data-lucide="refresh-cw" class="btn-icon"></i> Refrescar</button>
+            <button class="btn-secondary" onclick="limpiarFormularioQuery()"><i data-lucide="plus" class="btn-icon"></i> Nuevo Query</button>
+          </div>
+
           <div class="form-grid" style="display:grid; grid-template-columns: 1fr; gap:1rem; margin-top:1rem;">
             <div class="form-group">
               <label>Código del Query (Identificador único)</label>
@@ -479,8 +498,15 @@
               <textarea id="query-sql" placeholder="SELECT * FROM OCRD..." rows="6" style="font-family: monospace; resize: vertical; padding: 0.75rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-body); color: var(--text-primary);"></textarea>
             </div>
           </div>
-          <div style="display:flex;justify-content:flex-end;margin-top:1rem;">
+          <div style="display:flex;justify-content:flex-end;margin-top:1rem; gap: 0.5rem;">
+            <button class="btn-secondary" onclick="probarQuerySAP()"><i data-lucide="play" class="btn-icon"></i> Ejecutar Query Guardado</button>
             <button class="btn-primary" onclick="programarQuerySAP()"><i data-lucide="upload-cloud" class="btn-icon"></i> Guardar y Enviar a SAP</button>
+          </div>
+          <div id="query-results-container" style="margin-top: 1rem; display: none;">
+            <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Resultados:</div>
+            <div style="background: var(--bg-body); border: 1px solid var(--border); border-radius: 4px; padding: 1rem; max-height: 300px; overflow-y: auto;">
+              <pre id="query-results-output" style="font-family: monospace; font-size: 0.85rem; color: var(--text-muted); margin: 0; white-space: pre-wrap;"></pre>
+            </div>
           </div>
         </div>
 

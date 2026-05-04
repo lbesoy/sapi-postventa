@@ -85,10 +85,11 @@ sapApi.interceptors.response.use(
 // 2. RUTAS DE INTEGRACIÓN (EJEMPLOS)
 // ==========================================
 
-// Obtener Clientes (Mediante Query Personalizado de SAP)
+// Obtener Clientes (Mediante Query Personalizado de SAP o Fallback)
 app.get('/api/clientes', ensureSAPConnection, async (req, res) => {
     try {
-        const response = await sapApi.get(`${SAP_URL}/SQLQueries('eurorep_clientes')/List`, {
+        const queryCode = req.query.queryCode || 'eurorep_clientes';
+        const response = await sapApi.get(`${SAP_URL}/SQLQueries('${queryCode}')/List`, {
             headers: {
                 'B1S-PageSize': 5000,
                 'Prefer': 'odata.maxpagesize=5000'
@@ -97,8 +98,33 @@ app.get('/api/clientes', ensureSAPConnection, async (req, res) => {
         
         res.json(response.data.value || []);
     } catch (error) {
-        console.error('Error en /api/clientes:', error.response?.data || error.message);
-        res.status(500).json({ error: 'Error ejecutando Query de clientes en SAP', details: error.message });
+        if (error.response && error.response.status === 404) {
+            console.log(`Query no encontrado. Usando Fallback a BusinessPartners...`);
+            try {
+                // Intento 2: Fallback a la tabla estándar si el query no se ha programado
+                const fallbackResponse = await sapApi.get(`${SAP_URL}/BusinessPartners?$select=CardCode,CardName,LicTradNum,E_Mail,CurrentAccountBalance&$filter=CardType eq 'cCustomer'`, {
+                    headers: { 'B1S-PageSize': 5000, 'Prefer': 'odata.maxpagesize=5000' }
+                });
+                
+                // Mapear los campos del fallback para que coincidan con la estructura que espera app.js
+                const fallbackData = fallbackResponse.data.value.map(bp => ({
+                    CardCode: bp.CardCode,
+                    CardName: bp.CardName,
+                    LicTradNum: bp.LicTradNum,
+                    E_Mail: bp.E_Mail,
+                    Balance: bp.CurrentAccountBalance,
+                    U_OK_Grupo: 'N/A' // Como es fallback, no exigimos el UDF
+                }));
+                
+                return res.json(fallbackData);
+            } catch (fallbackError) {
+                console.error('Error en fallback de BusinessPartners:', fallbackError.response?.data || fallbackError.message);
+                res.status(500).json({ error: 'Error obteniendo clientes de SAP (Fallback falló)', details: fallbackError.message });
+            }
+        } else {
+            console.error('Error en /api/clientes:', error.response?.data || error.message);
+            res.status(500).json({ error: 'Error ejecutando Query de clientes en SAP', details: error.message });
+        }
     }
 });
 
@@ -111,6 +137,17 @@ app.get('/api/clientes/:id/ordenes', ensureSAPConnection, async (req, res) => {
     } catch (error) {
         console.error(`Error obteniendo órdenes para ${req.params.id}:`, error.response?.data || error.message);
         res.status(500).json({ error: 'Error obteniendo órdenes de SAP', details: error.message });
+    }
+});
+
+// Obtener todos los Queries SQL registrados en SAP
+app.get('/api/sap/queries', ensureSAPConnection, async (req, res) => {
+    try {
+        const response = await sapApi.get(`${SAP_URL}/SQLQueries?$select=SqlCode,SqlName,SqlText`);
+        res.json({ success: true, data: response.data.value || [] });
+    } catch (error) {
+        console.error('Error obteniendo lista de queries:', error.response?.data || error.message);
+        res.status(500).json({ error: 'Error obteniendo queries de SAP' });
     }
 });
 
@@ -149,6 +186,18 @@ app.post('/api/sap/queries', ensureSAPConnection, async (req, res) => {
     } catch (error) {
         console.error(`Error programando query ${req.body.sqlCode}:`, error.response?.data || error.message);
         res.status(500).json({ error: 'Error programando query en SAP', details: error.response?.data || error.message });
+    }
+});
+
+// Ejecutar un Query SQL en SAP
+app.get('/api/sap/queries/:id/execute', ensureSAPConnection, async (req, res) => {
+    try {
+        const sqlCode = req.params.id;
+        const response = await sapApi.get(`${SAP_URL}/SQLQueries('${sqlCode}')/List`);
+        res.json({ success: true, data: response.data.value || [] });
+    } catch (error) {
+        console.error(`Error ejecutando query ${req.params.id}:`, error.response?.data || error.message);
+        res.status(500).json({ error: 'Error ejecutando query en SAP', details: error.response?.data || error.message });
     }
 });
 

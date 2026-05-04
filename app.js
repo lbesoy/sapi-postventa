@@ -43,7 +43,11 @@ async function fetchClientesSAP() {
   if (!API_CONFIG.USE_SAP_BACKEND) return clientesDb; // Retorna los locales si no hay SAP
   
   try {
-    const response = await fetch(`${API_CONFIG.BASE_URL}/clientes`);
+    let url = `${API_CONFIG.BASE_URL}/clientes`;
+    if (configData && configData.queryClientes) {
+      url += `?queryCode=${encodeURIComponent(configData.queryClientes)}`;
+    }
+    const response = await fetch(url);
     const sapData = await response.json();
     
     // Mapeo: Convertimos la estructura del Query de SAP a nuestra estructura del CRM
@@ -362,6 +366,7 @@ function cargarConfig() {
   if (configData.tel) document.getElementById('cfg-tel').value = configData.tel;
   if (configData.email) document.getElementById('cfg-email').value = configData.email;
   if (configData.direccion) document.getElementById('cfg-direccion').value = configData.direccion;
+  if (configData.queryClientes) document.getElementById('cfg-query-clientes').value = configData.queryClientes;
   
   const dmToggle = document.getElementById('cfg-darkmode');
   if (dmToggle) {
@@ -385,6 +390,7 @@ function guardarConfig() {
     tel: document.getElementById('cfg-tel').value.trim(),
     email: document.getElementById('cfg-email').value.trim(),
     direccion: document.getElementById('cfg-direccion').value.trim(),
+    queryClientes: document.getElementById('cfg-query-clientes').value.trim()
   };
   localStorage.setItem('eurorep_config', JSON.stringify(configData));
   const btn = event.target;
@@ -393,6 +399,55 @@ function guardarConfig() {
   btn.style.background = 'var(--green)';
   lucide.createIcons();
   setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; lucide.createIcons(); }, 2000);
+}
+
+let listaQueriesCargada = [];
+
+async function cargarListaQueriesSAP() {
+  const selector = document.getElementById('query-selector');
+  if (!selector) return;
+
+  try {
+    const res = await fetch(`${API_CONFIG.BASE_URL}/sap/queries`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    listaQueriesCargada = data.data || [];
+    
+    // Rellenar dropdown
+    selector.innerHTML = '<option value="">-- Seleccionar un Query existente --</option>';
+    listaQueriesCargada.forEach(q => {
+      selector.innerHTML += `<option value="${q.SqlCode}">${q.SqlCode} - ${q.SqlName}</option>`;
+    });
+
+  } catch (err) {
+    console.error("Error al cargar lista de queries:", err);
+  }
+}
+
+function cargarDetalleQuery(sqlCode) {
+  if (!sqlCode) {
+    limpiarFormularioQuery();
+    return;
+  }
+  const q = listaQueriesCargada.find(x => x.SqlCode === sqlCode);
+  if (q) {
+    document.getElementById('query-code').value = q.SqlCode;
+    document.getElementById('query-name').value = q.SqlName || '';
+    document.getElementById('query-sql').value = q.SqlText || '';
+    // Deshabilitar el código del query para que no lo cambien, ya que es el ID en SAP
+    document.getElementById('query-code').readOnly = true;
+    document.getElementById('query-results-container').style.display = 'none';
+  }
+}
+
+function limpiarFormularioQuery() {
+  document.getElementById('query-selector').value = '';
+  document.getElementById('query-code').value = '';
+  document.getElementById('query-code').readOnly = false;
+  document.getElementById('query-name').value = '';
+  document.getElementById('query-sql').value = '';
+  document.getElementById('query-results-container').style.display = 'none';
 }
 
 async function programarQuerySAP() {
@@ -426,6 +481,42 @@ async function programarQuerySAP() {
   } catch (err) {
     console.error(err);
     mostrarNotificacion('Fallo al programar el query en SAP.', 'error');
+  } finally {
+    btn.innerHTML = orig;
+    btn.disabled = false;
+    lucide.createIcons();
+  }
+}
+
+async function probarQuerySAP() {
+  const sqlCode = document.getElementById('query-code').value.trim();
+  if (!sqlCode) {
+    mostrarNotificacion('Ingresa el Código del Query para ejecutarlo.', 'error');
+    return;
+  }
+
+  const btn = event.target;
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;margin-right:5px;"></div> Ejecutando...';
+  btn.disabled = true;
+  
+  const resultsContainer = document.getElementById('query-results-container');
+  const resultsOutput = document.getElementById('query-results-output');
+  resultsContainer.style.display = 'none';
+
+  try {
+    const res = await fetch(`${API_CONFIG.BASE_URL}/sap/queries/${encodeURIComponent(sqlCode)}/execute`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error ejecutando el query');
+    
+    resultsOutput.textContent = JSON.stringify(data.data, null, 2);
+    resultsContainer.style.display = 'block';
+    mostrarNotificacion('Query ejecutado correctamente.', 'success');
+  } catch (err) {
+    console.error(err);
+    resultsOutput.textContent = `Error: ${err.message}`;
+    resultsContainer.style.display = 'block';
+    mostrarNotificacion('Error al ejecutar el query.', 'error');
   } finally {
     btn.innerHTML = orig;
     btn.disabled = false;
@@ -701,6 +792,7 @@ function setupNav() {
         renderUsuariosList();
         renderTecnicosConfig();
         renderPermisosRoles();
+        cargarListaQueriesSAP();
       }
       if (view === 'servicios') renderTabla('servicios');
       if (view === 'tickets') renderTickets();
