@@ -520,39 +520,6 @@
         </div>
       </div>
 
-      <!-- Mapeo Refacciones -->
-      <div id="mapeo-content-refacciones" class="mapeo-tab-content" style="display:none;">
-        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
-          <div class="form-group">
-            <input type="text" id="lbl-ref-id" class="map-label-edit" value="ID / Código de Refacción" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ref-id" placeholder="ItemCode" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-ref-nombre" class="map-label-edit" value="Descripción / Nombre" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ref-nombre" placeholder="ItemName" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-ref-grupo" class="map-label-edit" value="Grupo de Artículo" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ref-grupo" placeholder="ItmsGrpNam" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-ref-precio" class="map-label-edit" value="Precio" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ref-precio" placeholder="Price" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-ref-stock" class="map-label-edit" value="Stock / Existencias" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ref-stock" placeholder="OnHand" style="font-family: monospace;"/>
-          </div>
-        </div>
-        
-        <hr style="margin: 1.5rem 0 1rem 0; border: none; border-top: 1px solid var(--border);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-          <h4 style="font-size: 0.95rem; color: var(--text-primary); font-weight: 500;">Columnas Personalizadas (Extra)</h4>
-          <button class="btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="addCustomColumnUI('refacciones')">➕ Agregar</button>
-        </div>
-        <div id="custom-columns-refacciones" style="display: flex; flex-direction: column; gap: 0.75rem;"></div>
-      </div>
-
       <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:2rem;">
             <button class="btn-secondary" onclick="abrirModalMapeo()"><i data-lucide="layout-template" class="btn-icon"></i> Mapear Columnas SAP</button>
             <button class="btn-primary" onclick="guardarConfig()"><i data-lucide="save" class="btn-icon"></i> Guardar</button>
@@ -1869,6 +1836,41 @@
         </div>
         <div id="custom-columns-tecnicos" style="display: flex; flex-direction: column; gap: 0.75rem;"></div>
       </div>
+
+      <!-- Mapeo Refacciones -->
+      <div id="mapeo-content-refacciones" class="mapeo-tab-content" style="display:none;">
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <input type="text" id="lbl-ref-id" class="map-label-edit" value="ID / Código de Refacción" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+            <input type="text" id="map-ref-id" placeholder="ItemCode" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <input type="text" id="lbl-ref-nombre" class="map-label-edit" value="Descripción / Nombre" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+            <input type="text" id="map-ref-nombre" placeholder="ItemName" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <input type="text" id="lbl-ref-grupo" class="map-label-edit" value="Grupo de Artículo" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+            <input type="text" id="map-ref-grupo" placeholder="ItmsGrpNam" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <input type="text" id="lbl-ref-precio" class="map-label-edit" value="Precio" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+            <input type="text" id="map-ref-precio" placeholder="Price" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <input type="text" id="lbl-ref-stock" class="map-label-edit" value="Stock / Existencias" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+            <input type="text" id="map-ref-stock" placeholder="OnHand" style="font-family: monospace;"/>
+          </div>
+        </div>
+        
+        <hr style="margin: 1.5rem 0 1rem 0; border: none; border-top: 1px solid var(--border);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <h4 style="font-size: 0.95rem; color: var(--text-primary); font-weight: 500;">Columnas Personalizadas (Extra)</h4>
+          <button class="btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="addCustomColumnUI('refacciones')">➕ Agregar</button>
+        </div>
+        <div id="custom-columns-refacciones" style="display: flex; flex-direction: column; gap: 0.75rem;"></div>
+      </div>
+
+      
 
     </div>
     <div class="modal-footer" style="padding: 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem; background: var(--bg-body); border-radius: 0 0 12px 12px;">
