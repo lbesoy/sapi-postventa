@@ -724,8 +724,10 @@ async function cargarListaQueriesSAP() {
     if (configData.queryTecnicos) document.getElementById('cfg-query-tecnicos').value = configData.queryTecnicos;
     if (configData.queryRefacciones) document.getElementById('cfg-query-refacciones').value = configData.queryRefacciones;
 
+    mostrarNotificacion('Lista de Queries actualizada desde SAP.', 'success');
   } catch (err) {
     console.error("Error al cargar lista de queries:", err);
+    mostrarNotificacion('No se pudo actualizar la lista de queries.', 'error');
   }
 }
 
