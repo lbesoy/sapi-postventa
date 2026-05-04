@@ -1596,9 +1596,12 @@
         Escribe el nombre exacto de la columna que arroja tu Query de SAP para vincularla con el campo que espera el CRM.
       </p>
       
-      <div style="display:flex; gap: 1rem; margin-bottom: 1rem;">
-        <button class="btn-secondary active" id="tab-mapeo-clientes" onclick="switchMapeoTab('clientes')" style="flex:1;">Clientes</button>
-        <button class="btn-secondary" id="tab-mapeo-maquinaria" onclick="switchMapeoTab('maquinaria')" style="flex:1;">Maquinaria</button>
+      <div style="display:flex; gap: 0.5rem; margin-bottom: 1rem; overflow-x: auto; padding-bottom: 0.5rem;">
+        <button class="btn-secondary active" id="tab-mapeo-clientes" onclick="switchMapeoTab('clientes')" style="flex: 1; white-space: nowrap;">Clientes</button>
+        <button class="btn-secondary" id="tab-mapeo-maquinaria" onclick="switchMapeoTab('maquinaria')" style="flex: 1; white-space: nowrap;">Maquinaria</button>
+        <button class="btn-secondary" id="tab-mapeo-sitios" onclick="switchMapeoTab('sitios')" style="flex: 1; white-space: nowrap;">Sitios</button>
+        <button class="btn-secondary" id="tab-mapeo-ordenes" onclick="switchMapeoTab('ordenes')" style="flex: 1; white-space: nowrap;">Órdenes</button>
+        <button class="btn-secondary" id="tab-mapeo-tecnicos" onclick="switchMapeoTab('tecnicos')" style="flex: 1; white-space: nowrap;">Técnicos</button>
       </div>
 
       <!-- Mapeo Clientes -->
@@ -1651,7 +1654,80 @@
             <input type="text" id="map-maq-cliente" placeholder="CustomerCode" style="font-family: monospace;"/>
           </div>
         </div>
-        <p style="font-size: 0.8rem; color: var(--accent); margin-top: 1rem;"><i data-lucide="info" style="width:14px;height:14px;vertical-align:middle;"></i> Pronto añadiremos más campos para Órdenes, Sitios y Técnicos.</p>
+      </div>
+
+      <!-- Mapeo Sitios -->
+      <div id="mapeo-content-sitios" class="mapeo-tab-content" style="display:none;">
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label>ID del Sitio</label>
+            <input type="text" id="map-sit-id" placeholder="Address" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Nombre del Sitio</label>
+            <input type="text" id="map-sit-nombre" placeholder="Street" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>ID del Cliente (CardCode)</label>
+            <input type="text" id="map-sit-cliente" placeholder="BPCode" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Dirección Completa</label>
+            <input type="text" id="map-sit-direccion" placeholder="Block" style="font-family: monospace;"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mapeo Órdenes -->
+      <div id="mapeo-content-ordenes" class="mapeo-tab-content" style="display:none;">
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label>ID Órden (ServiceCallID)</label>
+            <input type="text" id="map-ord-id" placeholder="ServiceCallID" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>ID Cliente (CardCode)</label>
+            <input type="text" id="map-ord-cliente" placeholder="CustomerCode" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Número de Serie Maquinaria</label>
+            <input type="text" id="map-ord-maquina" placeholder="ManufacturerSerialNum" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Técnico Asignado</label>
+            <input type="text" id="map-ord-tecnico" placeholder="TechnicianCode" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Estatus</label>
+            <input type="text" id="map-ord-estado" placeholder="Status" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Descripción / Falla</label>
+            <input type="text" id="map-ord-falla" placeholder="Description" style="font-family: monospace;"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mapeo Técnicos -->
+      <div id="mapeo-content-tecnicos" class="mapeo-tab-content" style="display:none;">
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label>ID del Técnico (EmpID)</label>
+            <input type="text" id="map-tec-id" placeholder="EmployeeID" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Nombre Completo</label>
+            <input type="text" id="map-tec-nombre" placeholder="FirstName" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Teléfono</label>
+            <input type="text" id="map-tec-telefono" placeholder="MobilePhone" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Correo Electrónico</label>
+            <input type="text" id="map-tec-email" placeholder="eMail" style="font-family: monospace;"/>
+          </div>
+        </div>
       </div>
 
     </div>

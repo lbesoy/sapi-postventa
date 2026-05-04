@@ -438,6 +438,32 @@ function abrirModalMapeo() {
     document.getElementById('map-maq-desc').value = mappings.maquinaria.desc || 'ItemDescription';
     document.getElementById('map-maq-cliente').value = mappings.maquinaria.clienteId || 'CustomerCode';
   }
+
+  // Cargar Sitios
+  if(mappings.sitios) {
+    document.getElementById('map-sit-id').value = mappings.sitios.id || 'Address';
+    document.getElementById('map-sit-nombre').value = mappings.sitios.nombre || 'Street';
+    document.getElementById('map-sit-cliente').value = mappings.sitios.clienteId || 'BPCode';
+    document.getElementById('map-sit-direccion').value = mappings.sitios.direccion || 'Block';
+  }
+
+  // Cargar Ordenes
+  if(mappings.ordenes) {
+    document.getElementById('map-ord-id').value = mappings.ordenes.id || 'ServiceCallID';
+    document.getElementById('map-ord-cliente').value = mappings.ordenes.clienteId || 'CustomerCode';
+    document.getElementById('map-ord-maquina').value = mappings.ordenes.maquina || 'ManufacturerSerialNum';
+    document.getElementById('map-ord-tecnico').value = mappings.ordenes.tecnico || 'TechnicianCode';
+    document.getElementById('map-ord-estado').value = mappings.ordenes.estado || 'Status';
+    document.getElementById('map-ord-falla').value = mappings.ordenes.falla || 'Description';
+  }
+
+  // Cargar Tecnicos
+  if(mappings.tecnicos) {
+    document.getElementById('map-tec-id').value = mappings.tecnicos.id || 'EmployeeID';
+    document.getElementById('map-tec-nombre').value = mappings.tecnicos.nombre || 'FirstName';
+    document.getElementById('map-tec-telefono').value = mappings.tecnicos.telefono || 'MobilePhone';
+    document.getElementById('map-tec-email').value = mappings.tecnicos.email || 'eMail';
+  }
 }
 
 function cerrarModalMapeo() {
@@ -467,6 +493,26 @@ function guardarMapeoColumnas() {
       itemcode: document.getElementById('map-maq-itemcode').value.trim() || 'ItemCode',
       desc: document.getElementById('map-maq-desc').value.trim() || 'ItemDescription',
       clienteId: document.getElementById('map-maq-cliente').value.trim() || 'CustomerCode'
+    },
+    sitios: {
+      id: document.getElementById('map-sit-id').value.trim() || 'Address',
+      nombre: document.getElementById('map-sit-nombre').value.trim() || 'Street',
+      clienteId: document.getElementById('map-sit-cliente').value.trim() || 'BPCode',
+      direccion: document.getElementById('map-sit-direccion').value.trim() || 'Block'
+    },
+    ordenes: {
+      id: document.getElementById('map-ord-id').value.trim() || 'ServiceCallID',
+      clienteId: document.getElementById('map-ord-cliente').value.trim() || 'CustomerCode',
+      maquina: document.getElementById('map-ord-maquina').value.trim() || 'ManufacturerSerialNum',
+      tecnico: document.getElementById('map-ord-tecnico').value.trim() || 'TechnicianCode',
+      estado: document.getElementById('map-ord-estado').value.trim() || 'Status',
+      falla: document.getElementById('map-ord-falla').value.trim() || 'Description'
+    },
+    tecnicos: {
+      id: document.getElementById('map-tec-id').value.trim() || 'EmployeeID',
+      nombre: document.getElementById('map-tec-nombre').value.trim() || 'FirstName',
+      telefono: document.getElementById('map-tec-telefono').value.trim() || 'MobilePhone',
+      email: document.getElementById('map-tec-email').value.trim() || 'eMail'
     }
   };
   
