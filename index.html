@@ -1303,8 +1303,12 @@
             <div class="form-grid" style="grid-template-columns:1fr 1fr;">
               <div class="form-group">
                 <label>Fotos de la máquina</label>
-                <input type="file" id="t-fotos-maquina" accept="image/*" multiple style="font-size:0.8rem;"/>
-                <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">Sube archivo(s) o toma fotos con tu celular</div>
+                <label class="custom-file-upload">
+                  <input type="file" id="t-fotos-maquina" accept="image/*" multiple onchange="updateFileLabel(this)"/>
+                  <i data-lucide="upload-cloud" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
+                  <span class="file-label-text">Toca para subir foto(s)</span>
+                </label>
+                <div style="font-size:0.7rem; color:var(--text-muted); margin-top:6px; text-align:center;">Desde tu galería o cámara</div>
               </div>
               <div class="form-group">
                 <label style="display:flex; align-items:center; gap:4px;">
@@ -1318,8 +1322,12 @@
                     </div>
                   </div>
                 </label>
-                <input type="file" id="t-foto-horometro" accept="image/*" style="font-size:0.8rem;"/>
-                <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">Sube un archivo o toma la foto con tu celular</div>
+                <label class="custom-file-upload">
+                  <input type="file" id="t-foto-horometro" accept="image/*" onchange="updateFileLabel(this)"/>
+                  <i data-lucide="camera" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
+                  <span class="file-label-text">Toca para capturar</span>
+                </label>
+                <div style="font-size:0.7rem; color:var(--text-muted); margin-top:6px; text-align:center;">Desde tu galería o cámara</div>
               </div>
             </div>
           </div>

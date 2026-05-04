@@ -3184,6 +3184,25 @@ function seleccionarCanal(canal) {
   if (box) box.style.display = 'block';
 }
 
+function updateFileLabel(input) {
+  const textSpan = input.parentElement.querySelector('.file-label-text');
+  if (input.files && input.files.length > 0) {
+    if (input.files.length === 1) {
+      textSpan.textContent = input.files[0].name;
+    } else {
+      textSpan.textContent = `${input.files.length} archivo(s) listo(s)`;
+    }
+    input.parentElement.style.borderColor = 'var(--accent)';
+    input.parentElement.style.color = 'var(--accent)';
+    input.parentElement.style.background = 'var(--accent-light)';
+  } else {
+    textSpan.textContent = 'Toca para subir foto(s)';
+    input.parentElement.style.borderColor = 'var(--border)';
+    input.parentElement.style.color = 'var(--text-muted)';
+    input.parentElement.style.background = 'rgba(255,255,255,0.02)';
+  }
+}
+
 // ===== TICKET FORM =====
 function abrirTicket(id) {
   editandoTicketId = id || null;
