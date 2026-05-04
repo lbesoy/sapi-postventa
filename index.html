@@ -454,13 +454,26 @@
             <div class="form-group" style="grid-column:1/-1; padding-top: 1rem; border-top: 1px solid var(--border);">
               <label>Mapeo de Queries SAP</label>
               <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Define qué código de Query se debe utilizar para cada módulo.</p>
-              <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; align-items: center;">
+              <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 0.75rem; align-items: center;">
                 <label style="font-weight: 500;">Query para Clientes:</label>
                 <input type="text" id="cfg-query-clientes" placeholder="Ej. eurorep_clientes" style="font-family: monospace;"/>
+                
+                <label style="font-weight: 500;">Query para Maquinaria:</label>
+                <input type="text" id="cfg-query-maquinaria" placeholder="Ej. eurorep_maquinaria" style="font-family: monospace;"/>
+
+                <label style="font-weight: 500;">Query para Sitios:</label>
+                <input type="text" id="cfg-query-sitios" placeholder="Ej. eurorep_sitios" style="font-family: monospace;"/>
+
+                <label style="font-weight: 500;">Query para Órdenes:</label>
+                <input type="text" id="cfg-query-ordenes" placeholder="Ej. eurorep_ordenes" style="font-family: monospace;"/>
+
+                <label style="font-weight: 500;">Query para Técnicos:</label>
+                <input type="text" id="cfg-query-tecnicos" placeholder="Ej. eurorep_tecnicos" style="font-family: monospace;"/>
               </div>
             </div>
           </div>
-          <div style="display:flex;justify-content:flex-end;margin-top:1rem;">
+          <div style="display:flex;justify-content:flex-end; gap: 0.75rem; margin-top:1rem;">
+            <button class="btn-secondary" onclick="abrirModalMapeo()"><i data-lucide="layout-template" class="btn-icon"></i> Mapear Columnas SAP</button>
             <button class="btn-primary" onclick="guardarConfig()"><i data-lucide="save" class="btn-icon"></i> Guardar</button>
           </div>
         </div>
@@ -1567,6 +1580,84 @@
           </tfoot>
         </table>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: MAPEO DE COLUMNAS SAP -->
+<div id="modal-mapeo-columnas" class="modal-overlay">
+  <div class="modal" style="max-width: 600px;">
+    <div class="modal-header">
+      <h3>Estructura de Columnas (Mapeo)</h3>
+      <button class="modal-close" onclick="cerrarModalMapeo()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+        Escribe el nombre exacto de la columna que arroja tu Query de SAP para vincularla con el campo que espera el CRM.
+      </p>
+      
+      <div style="display:flex; gap: 1rem; margin-bottom: 1rem;">
+        <button class="btn-secondary active" id="tab-mapeo-clientes" onclick="switchMapeoTab('clientes')" style="flex:1;">Clientes</button>
+        <button class="btn-secondary" id="tab-mapeo-maquinaria" onclick="switchMapeoTab('maquinaria')" style="flex:1;">Maquinaria</button>
+      </div>
+
+      <!-- Mapeo Clientes -->
+      <div id="mapeo-content-clientes" class="mapeo-tab-content">
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label>ID del Cliente (Ej. CardCode)</label>
+            <input type="text" id="map-cli-id" placeholder="CardCode" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Nombre / Razón Social</label>
+            <input type="text" id="map-cli-nombre" placeholder="CardName" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>RFC</label>
+            <input type="text" id="map-cli-rfc" placeholder="LicTradNum" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Correo Electrónico</label>
+            <input type="text" id="map-cli-email" placeholder="E_Mail" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Grupo Sinergia (UDF)</label>
+            <input type="text" id="map-cli-grupo" placeholder="U_OK_Grupo" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Saldo en Cuenta</label>
+            <input type="text" id="map-cli-saldo" placeholder="Balance" style="font-family: monospace;"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mapeo Maquinaria -->
+      <div id="mapeo-content-maquinaria" class="mapeo-tab-content" style="display:none;">
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label>Número de Serie (ID)</label>
+            <input type="text" id="map-maq-id" placeholder="ManufacturerSerialNum" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Código de Artículo</label>
+            <input type="text" id="map-maq-itemcode" placeholder="ItemCode" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Descripción / Modelo</label>
+            <input type="text" id="map-maq-desc" placeholder="ItemDescription" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>ID del Cliente (CardCode)</label>
+            <input type="text" id="map-maq-cliente" placeholder="CustomerCode" style="font-family: monospace;"/>
+          </div>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--accent); margin-top: 1rem;"><i data-lucide="info" style="width:14px;height:14px;vertical-align:middle;"></i> Pronto añadiremos más campos para Órdenes, Sitios y Técnicos.</p>
+      </div>
+
+    </div>
+    <div class="modal-footer" style="padding: 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem; background: var(--bg-body); border-radius: 0 0 12px 12px;">
+      <button class="btn-secondary" onclick="cerrarModalMapeo()">Cancelar</button>
+      <button class="btn-primary" onclick="guardarMapeoColumnas()"><i data-lucide="save" class="btn-icon"></i> Guardar Mapeo</button>
     </div>
   </div>
 </div>

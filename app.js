@@ -50,18 +50,23 @@ async function fetchClientesSAP() {
     const response = await fetch(url);
     const sapData = await response.json();
     
+    // Configuración de mapeo
+    const map = (configData.mappings && configData.mappings.clientes) ? configData.mappings.clientes : {
+      id: 'CardCode', nombre: 'CardName', rfc: 'LicTradNum', email: 'E_Mail', grupoSinergia: 'U_OK_Grupo', saldoCuenta: 'Balance'
+    };
+
     // Mapeo: Convertimos la estructura del Query de SAP a nuestra estructura del CRM
     const clientesMapeados = sapData.map(bp => ({
-      id: bp.CardCode || '', // El ID interno en SAP
+      id: bp[map.id] || '', // El ID interno en SAP
       createdAt: new Date().toISOString(),
-      nombre: bp.CardName || 'Sin Nombre',
-      rfc: bp.LicTradNum || 'Genérico', // Ahora usamos LicTradNum del Query
-      ubicacion: '', // El Query no trae dirección, la dejamos en blanco por ahora
+      nombre: bp[map.nombre] || 'Sin Nombre',
+      rfc: bp[map.rfc] || 'Genérico',
+      ubicacion: '', 
       contacto: '', 
       telefono: '',
-      email: bp.E_Mail || '', // Ahora usamos E_Mail del Query
-      grupoSinergia: bp.U_OK_Grupo || 'N/A', // UDF
-      saldoCuenta: bp.Balance || 0,
+      email: bp[map.email] || '', 
+      grupoSinergia: bp[map.grupoSinergia] || 'N/A', 
+      saldoCuenta: bp[map.saldoCuenta] || 0,
       saldoOrdenes: bp.OrdersBal || 0,
       maquinas: [], // Esto se llenaría con otro endpoint (CustomerEquipmentCards)
       supervisoresAsignados: [],
@@ -367,6 +372,10 @@ function cargarConfig() {
   if (configData.email) document.getElementById('cfg-email').value = configData.email;
   if (configData.direccion) document.getElementById('cfg-direccion').value = configData.direccion;
   if (configData.queryClientes) document.getElementById('cfg-query-clientes').value = configData.queryClientes;
+  if (configData.queryMaquinaria) document.getElementById('cfg-query-maquinaria').value = configData.queryMaquinaria;
+  if (configData.querySitios) document.getElementById('cfg-query-sitios').value = configData.querySitios;
+  if (configData.queryOrdenes) document.getElementById('cfg-query-ordenes').value = configData.queryOrdenes;
+  if (configData.queryTecnicos) document.getElementById('cfg-query-tecnicos').value = configData.queryTecnicos;
   
   const dmToggle = document.getElementById('cfg-darkmode');
   if (dmToggle) {
@@ -390,7 +399,11 @@ function guardarConfig() {
     tel: document.getElementById('cfg-tel').value.trim(),
     email: document.getElementById('cfg-email').value.trim(),
     direccion: document.getElementById('cfg-direccion').value.trim(),
-    queryClientes: document.getElementById('cfg-query-clientes').value.trim()
+    queryClientes: document.getElementById('cfg-query-clientes').value.trim(),
+    queryMaquinaria: document.getElementById('cfg-query-maquinaria').value.trim(),
+    querySitios: document.getElementById('cfg-query-sitios').value.trim(),
+    queryOrdenes: document.getElementById('cfg-query-ordenes').value.trim(),
+    queryTecnicos: document.getElementById('cfg-query-tecnicos').value.trim()
   };
   localStorage.setItem('eurorep_config', JSON.stringify(configData));
   const btn = event.target;
@@ -399,6 +412,69 @@ function guardarConfig() {
   btn.style.background = 'var(--green)';
   lucide.createIcons();
   setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; lucide.createIcons(); }, 2000);
+}
+
+// ==========================================
+// MAPEO DE COLUMNAS SAP (NO-CODE)
+// ==========================================
+function abrirModalMapeo() {
+  document.getElementById('modal-mapeo-columnas').classList.add('active');
+  const mappings = configData.mappings || { clientes: {}, maquinaria: {} };
+  
+  // Cargar Clientes
+  if(mappings.clientes) {
+    document.getElementById('map-cli-id').value = mappings.clientes.id || 'CardCode';
+    document.getElementById('map-cli-nombre').value = mappings.clientes.nombre || 'CardName';
+    document.getElementById('map-cli-rfc').value = mappings.clientes.rfc || 'LicTradNum';
+    document.getElementById('map-cli-email').value = mappings.clientes.email || 'E_Mail';
+    document.getElementById('map-cli-grupo').value = mappings.clientes.grupoSinergia || 'U_OK_Grupo';
+    document.getElementById('map-cli-saldo').value = mappings.clientes.saldoCuenta || 'Balance';
+  }
+
+  // Cargar Maquinaria
+  if(mappings.maquinaria) {
+    document.getElementById('map-maq-id').value = mappings.maquinaria.id || 'ManufacturerSerialNum';
+    document.getElementById('map-maq-itemcode').value = mappings.maquinaria.itemcode || 'ItemCode';
+    document.getElementById('map-maq-desc').value = mappings.maquinaria.desc || 'ItemDescription';
+    document.getElementById('map-maq-cliente').value = mappings.maquinaria.clienteId || 'CustomerCode';
+  }
+}
+
+function cerrarModalMapeo() {
+  document.getElementById('modal-mapeo-columnas').classList.remove('active');
+}
+
+function switchMapeoTab(tabId) {
+  document.querySelectorAll('.mapeo-tab-content').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('[id^="tab-mapeo-"]').forEach(el => el.classList.remove('active'));
+  
+  document.getElementById('mapeo-content-' + tabId).style.display = 'block';
+  document.getElementById('tab-mapeo-' + tabId).classList.add('active');
+}
+
+function guardarMapeoColumnas() {
+  const mappings = {
+    clientes: {
+      id: document.getElementById('map-cli-id').value.trim() || 'CardCode',
+      nombre: document.getElementById('map-cli-nombre').value.trim() || 'CardName',
+      rfc: document.getElementById('map-cli-rfc').value.trim() || 'LicTradNum',
+      email: document.getElementById('map-cli-email').value.trim() || 'E_Mail',
+      grupoSinergia: document.getElementById('map-cli-grupo').value.trim() || 'U_OK_Grupo',
+      saldoCuenta: document.getElementById('map-cli-saldo').value.trim() || 'Balance'
+    },
+    maquinaria: {
+      id: document.getElementById('map-maq-id').value.trim() || 'ManufacturerSerialNum',
+      itemcode: document.getElementById('map-maq-itemcode').value.trim() || 'ItemCode',
+      desc: document.getElementById('map-maq-desc').value.trim() || 'ItemDescription',
+      clienteId: document.getElementById('map-maq-cliente').value.trim() || 'CustomerCode'
+    }
+  };
+  
+  configData.mappings = mappings;
+  localStorage.setItem('eurorep_config', JSON.stringify(configData));
+  
+  cerrarModalMapeo();
+  alert("Mapeo de columnas guardado correctamente. El CRM usará esta estructura al consultar SAP.");
 }
 
 let listaQueriesCargada = [];
