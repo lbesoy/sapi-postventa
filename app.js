@@ -776,7 +776,18 @@ async function programarQuerySAP() {
       body: JSON.stringify({ sqlCode, sqlName, sqlText })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Error desconocido');
+    if (!res.ok) {
+      // Intenta extraer el detalle exacto del error de SAP
+      let errMsg = 'Error desconocido';
+      if (data.details && data.details.error && data.details.error.message && data.details.error.message.value) {
+        errMsg = data.details.error.message.value;
+      } else if (data.error) {
+        errMsg = data.error;
+      } else if (typeof data.details === 'string') {
+        errMsg = data.details;
+      }
+      throw new Error(errMsg);
+    }
     
     mostrarNotificacion('Query programado correctamente en SAP.', 'success');
     document.getElementById('query-code').value = '';
@@ -787,7 +798,7 @@ async function programarQuerySAP() {
     cargarListaQueriesSAP();
   } catch (err) {
     console.error(err);
-    mostrarNotificacion('Fallo al programar el query en SAP.', 'error');
+    mostrarNotificacion('Fallo en SAP: ' + err.message, 'error');
   } finally {
     btn.innerHTML = orig;
     btn.disabled = false;
