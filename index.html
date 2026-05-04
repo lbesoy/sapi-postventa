@@ -113,6 +113,9 @@
     <a href="#" class="nav-item" data-view="maquinaria" data-title="Maquinaria" id="nav-maquinaria">
       <span class="nav-icon"><i data-lucide="settings-2"></i></span><span id="nav-maquinaria-text">Maquinaria</span>
     </a>
+    <a href="#" class="nav-item" data-view="refacciones" data-title="Refacciones" id="nav-refacciones">
+      <span class="nav-icon"><i data-lucide="package-search"></i></span><span>Refacciones</span>
+    </a>
     <a href="#" class="nav-item" data-view="sitios" data-title="Mis Sitios" id="nav-sitios" style="display:none;">
       <span class="nav-icon"><i data-lucide="map-pin"></i></span><span>Mis Sitios</span>
     </a>
@@ -363,6 +366,35 @@
       </div>
     </div>
 
+    <!-- REFACCIONES VIEW -->
+    <div id="view-refacciones" class="view" style="display:none;">
+      <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+        <h2>Catálogo de Refacciones</h2>
+        <div style="display:flex; gap:0.5rem; flex-wrap:nowrap; align-items:center; flex:1; justify-content:flex-end;">
+          <div class="search-bar" style="width:100%; max-width:400px; margin:0;">
+            <input type="text" id="search-refacciones" placeholder="Buscar refacción por código o nombre..." oninput="renderRefacciones()"/>
+          </div>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th id="th-refacciones-id">ItemCode</th>
+              <th>Descripción</th>
+              <th>Grupo de Artículo</th>
+              <th>Precio</th>
+              <th>Stock</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-body-refacciones">
+            <tr><td colspan="6" class="empty-state">Cargando refacciones...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- SITIOS VIEW (Empresa Only) -->
     <div id="view-sitios" class="view">
       <div class="section-header" style="display:flex; justify-content:space-between; align-items:center;">
@@ -479,10 +511,52 @@
                 <select id="cfg-query-tecnicos" class="query-sap-selector" style="font-family: monospace; padding: 0.4rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-body); color: var(--text-primary);">
                   <option value="">-- Sin asignar --</option>
                 </select>
+
+                <label style="font-weight: 500;">Query para Refacciones:</label>
+                <select id="cfg-query-refacciones" class="query-sap-selector" style="font-family: monospace; padding: 0.4rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-body); color: var(--text-primary);">
+                  <option value="">-- Sin asignar --</option>
+                </select>
               </div>
-            </div>
+        </div>
+      </div>
+
+      <!-- Mapeo Refacciones -->
+      <div id="mapeo-content-refacciones" class="mapeo-tab-content" style="display:none;">
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label>ID / Código de Refacción (Ej. ItemCode)</label>
+            <input type="text" id="map-ref-id" placeholder="ItemCode" style="font-family: monospace;"/>
           </div>
-          <div style="display:flex;justify-content:flex-end; gap: 0.75rem; margin-top:1rem;">
+          <div class="form-group">
+            <label>Descripción / Nombre</label>
+            <input type="text" id="map-ref-nombre" placeholder="ItemName" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Grupo de Artículo</label>
+            <input type="text" id="map-ref-grupo" placeholder="ItmsGrpNam" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Precio</label>
+            <input type="text" id="map-ref-precio" placeholder="Price" style="font-family: monospace;"/>
+          </div>
+          <div class="form-group">
+            <label>Stock / Existencias</label>
+            <input type="text" id="map-ref-stock" placeholder="OnHand" style="font-family: monospace;"/>
+          </div>
+        </div>
+        
+        <div class="form-group" style="margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+          <label style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Columnas Personalizadas Adicionales (Refacciones)</span>
+            <button class="btn-secondary" onclick="agregarColumnaPersonalizada('refacciones')" style="padding:0.25rem 0.5rem; font-size:0.75rem;">+ Agregar Columna</button>
+          </label>
+          <div id="custom-columns-refacciones">
+            <!-- Renderizado dinámico -->
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:2rem;">
             <button class="btn-secondary" onclick="abrirModalMapeo()"><i data-lucide="layout-template" class="btn-icon"></i> Mapear Columnas SAP</button>
             <button class="btn-primary" onclick="guardarConfig()"><i data-lucide="save" class="btn-icon"></i> Guardar</button>
           </div>
@@ -1640,6 +1714,7 @@
         <button class="btn-secondary" id="tab-mapeo-sitios" onclick="switchMapeoTab('sitios')" style="flex: 1; white-space: nowrap;">Sitios</button>
         <button class="btn-secondary" id="tab-mapeo-ordenes" onclick="switchMapeoTab('ordenes')" style="flex: 1; white-space: nowrap;">Órdenes</button>
         <button class="btn-secondary" id="tab-mapeo-tecnicos" onclick="switchMapeoTab('tecnicos')" style="flex: 1; white-space: nowrap;">Técnicos</button>
+        <button class="btn-secondary" id="tab-mapeo-refacciones" onclick="switchMapeoTab('refacciones')" style="flex: 1; white-space: nowrap;">Refacciones</button>
       </div>
 
       <!-- Mapeo Clientes -->

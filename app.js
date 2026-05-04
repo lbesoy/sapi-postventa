@@ -12,6 +12,7 @@ let currentDesgloseData = [];
 let ordenes = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
 let tickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
 let clientesDb = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+let refaccionesDb = JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]');
 
 // Sincronización con Supabase (escuchar cuando los datos bajen a localStorage)
 window.addEventListener('supabase_datos_cargados', () => {
@@ -91,6 +92,51 @@ async function fetchClientesSAP() {
     return clientesDb; // Fallback a datos locales
   }
 }
+}
+
+async function fetchRefaccionesSAP() {
+  if (!API_CONFIG.USE_SAP_BACKEND) return refaccionesDb;
+  
+  try {
+    let url = `${API_CONFIG.BASE_URL}/clientes`; // Usamos el endpoint genérico que ejecuta el query
+    if (configData && configData.queryRefacciones) {
+      url += `?queryCode=${encodeURIComponent(configData.queryRefacciones)}`;
+    } else {
+      return refaccionesDb; // Si no hay query de refacciones, devolvemos cache
+    }
+    const response = await fetch(url);
+    const sapData = await response.json();
+    
+    const map = (configData.mappings && configData.mappings.refacciones) ? configData.mappings.refacciones : {
+      id: 'ItemCode', nombre: 'ItemName', grupo: 'ItmsGrpNam', precio: 'Price', stock: 'OnHand'
+    };
+
+    const refaccionesMapeadas = sapData.map(item => {
+      const refObj = {
+        idInterno: item[map.id] || '',
+        nombre: item[map.nombre] || 'Sin Nombre',
+        grupo: item[map.grupo] || '',
+        precio: item[map.precio] || 0,
+        stock: item[map.stock] || 0
+      };
+
+      if (map.customCols && map.customCols.length > 0) {
+        refObj.customData = {};
+        map.customCols.forEach(col => {
+          refObj.customData[col.label] = item[col.key] || '';
+        });
+      }
+
+      return refObj;
+    });
+    
+    return refaccionesMapeadas;
+  } catch (error) {
+    console.error('Error conectando al puente SAP para refacciones:', error);
+    return refaccionesDb;
+  }
+}
+
 // ==========================================
 
 const DIAS = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
@@ -115,18 +161,18 @@ let ROLES = {
   superadmin: {
     label: 'Super Administrador',
     color: '#E8820C',
-    views: ['dashboard','servicios','tickets','clientes','maquinaria','tecnicos','config','preferencias'],
+    views: ['dashboard','servicios','tickets','clientes','maquinaria','refacciones','tecnicos','config','preferencias'],
     canSwitchRoles: true,
   },
   admin: {
     label: 'Administrador',
     color: '#4f8ef7',
-    views: ['dashboard','servicios','tickets','clientes','maquinaria','tecnicos','config','preferencias'],
+    views: ['dashboard','servicios','tickets','clientes','maquinaria','refacciones','tecnicos','config','preferencias'],
   },
   supervisor: {
     label: 'Supervisor',
     color: '#eab308',
-    views: ['dashboard','servicios','tickets','clientes','maquinaria','tecnicos','preferencias'],
+    views: ['dashboard','servicios','tickets','clientes','maquinaria','refacciones','tecnicos','preferencias'],
   },
   tecnico: {
     label: 'Técnico / Instalador',
@@ -307,6 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderTabla();
   renderStats();
   renderTickets();
+  renderRefacciones();
   updateTicketBadge();
   setupNav();
   cargarConfig();
@@ -390,6 +437,7 @@ function cargarConfig() {
   if (configData.querySitios) document.getElementById('cfg-query-sitios').value = configData.querySitios;
   if (configData.queryOrdenes) document.getElementById('cfg-query-ordenes').value = configData.queryOrdenes;
   if (configData.queryTecnicos) document.getElementById('cfg-query-tecnicos').value = configData.queryTecnicos;
+  if (configData.queryRefacciones) document.getElementById('cfg-query-refacciones').value = configData.queryRefacciones;
   
   const dmToggle = document.getElementById('cfg-darkmode');
   if (dmToggle) {
@@ -417,7 +465,8 @@ function guardarConfig() {
     queryMaquinaria: document.getElementById('cfg-query-maquinaria').value.trim(),
     querySitios: document.getElementById('cfg-query-sitios').value.trim(),
     queryOrdenes: document.getElementById('cfg-query-ordenes').value.trim(),
-    queryTecnicos: document.getElementById('cfg-query-tecnicos').value.trim()
+    queryTecnicos: document.getElementById('cfg-query-tecnicos').value.trim(),
+    queryRefacciones: document.getElementById('cfg-query-refacciones').value.trim()
   };
   localStorage.setItem('eurorep_config', JSON.stringify(configData));
   const btn = event.target;
@@ -479,8 +528,17 @@ function abrirModalMapeo() {
     document.getElementById('map-tec-email').value = mappings.tecnicos.email || 'eMail';
   }
 
+  // Cargar Refacciones
+  if(mappings.refacciones) {
+    document.getElementById('map-ref-id').value = mappings.refacciones.id || 'ItemCode';
+    document.getElementById('map-ref-nombre').value = mappings.refacciones.nombre || 'ItemName';
+    document.getElementById('map-ref-grupo').value = mappings.refacciones.grupo || 'ItmsGrpNam';
+    document.getElementById('map-ref-precio').value = mappings.refacciones.precio || 'Price';
+    document.getElementById('map-ref-stock').value = mappings.refacciones.stock || 'OnHand';
+  }
+
   // Cargar Columnas Personalizadas Existentes
-  const modulos = ['clientes', 'maquinaria', 'sitios', 'ordenes', 'tecnicos'];
+  const modulos = ['clientes', 'maquinaria', 'sitios', 'ordenes', 'tecnicos', 'refacciones'];
   modulos.forEach(mod => {
     const container = document.getElementById(`custom-columns-${mod}`);
     if (container) {
@@ -507,7 +565,7 @@ function switchMapeoTab(tabId) {
 }
 
 function addCustomColumnUI(module, label = '', key = '') {
-  const container = document.getElementById('custom-columns-' + module);
+  const container = document.getElementById('custom-cols-' + module);
   if(!container) return;
   const div = document.createElement('div');
   div.className = 'custom-col-row';
@@ -521,7 +579,7 @@ function addCustomColumnUI(module, label = '', key = '') {
 }
 
 function getCustomColumnsForModule(module) {
-  const container = document.getElementById('custom-columns-' + module);
+  const container = document.getElementById('custom-cols-' + module);
   if(!container) return [];
   const rows = container.querySelectorAll('.custom-col-row');
   const cols = [];
@@ -573,6 +631,14 @@ function guardarMapeoColumnas() {
       telefono: document.getElementById('map-tec-telefono').value.trim() || 'MobilePhone',
       email: document.getElementById('map-tec-email').value.trim() || 'eMail',
       customCols: getCustomColumnsForModule('tecnicos')
+    },
+    refacciones: {
+      id: document.getElementById('map-ref-id').value.trim() || 'ItemCode',
+      nombre: document.getElementById('map-ref-nombre').value.trim() || 'ItemName',
+      grupo: document.getElementById('map-ref-grupo').value.trim() || 'ItmsGrpNam',
+      precio: document.getElementById('map-ref-precio').value.trim() || 'Price',
+      stock: document.getElementById('map-ref-stock').value.trim() || 'OnHand',
+      customCols: getCustomColumnsForModule('refacciones')
     }
   };
   
@@ -609,6 +675,7 @@ async function cargarListaQueriesSAP() {
     if (configData.querySitios) document.getElementById('cfg-query-sitios').value = configData.querySitios;
     if (configData.queryOrdenes) document.getElementById('cfg-query-ordenes').value = configData.queryOrdenes;
     if (configData.queryTecnicos) document.getElementById('cfg-query-tecnicos').value = configData.queryTecnicos;
+    if (configData.queryRefacciones) document.getElementById('cfg-query-refacciones').value = configData.queryRefacciones;
 
   } catch (err) {
     console.error("Error al cargar lista de queries:", err);
@@ -1115,13 +1182,20 @@ async function forzarSincronizacionSAP() {
   isSincronizandoSAP = true;
   
   try {
-    const newData = await fetchClientesSAP();
-    if (newData && newData.length > 0) {
-      clientesDb = newData;
+    const newDataCli = await fetchClientesSAP();
+    if (newDataCli && newDataCli.length > 0) {
+      clientesDb = newDataCli;
       localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
       hasSyncedSAPThisSession = true;
-      mostrarNotificacion('Clientes sincronizados con SAP exitosamente.', 'success');
     }
+
+    const newDataRef = await fetchRefaccionesSAP();
+    if (newDataRef && newDataRef.length > 0) {
+      refaccionesDb = newDataRef;
+      localStorage.setItem('sapi_refacciones_db', JSON.stringify(refaccionesDb));
+    }
+    
+    mostrarNotificacion('Catálogos sincronizados con SAP exitosamente.', 'success');
   } catch (error) {
     console.error("Error SAP:", error);
     mostrarNotificacion('Error al conectar con SAP B1. Usando caché local.', 'error');
@@ -1129,6 +1203,7 @@ async function forzarSincronizacionSAP() {
     isSincronizandoSAP = false;
     if (icon) icon.classList.remove('rotating');
     renderClientes();
+    renderRefacciones();
   }
 }
 
@@ -3101,6 +3176,39 @@ function renderMaquinaria() {
   
   // Inicializar resizers cada vez que se renderiza o se ordena, asegurando que estén activos
   setTimeout(initTableResizers, 100);
+}
+
+function renderRefacciones() {
+  const body = document.getElementById('tabla-body-refacciones');
+  if (!body) return;
+
+  const q = (document.getElementById('search-refacciones')?.value || '').toLowerCase();
+  
+  let html = '';
+  refaccionesDb.forEach(r => {
+    if (q) {
+      const match = (r.idInterno || '').toLowerCase().includes(q) || 
+                    (r.nombre || '').toLowerCase().includes(q) ||
+                    (r.grupo || '').toLowerCase().includes(q);
+      if (!match) return;
+    }
+    
+    html += `
+      <tr>
+        <td style="font-family: monospace; font-weight: 500;">${r.idInterno || 'N/A'}</td>
+        <td style="font-weight: 500; color: var(--text-primary); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${r.nombre}">${r.nombre}</td>
+        <td><span class="status-badge status-open" style="background:var(--bg-secondary); color:var(--text-secondary);">${r.grupo || 'N/A'}</span></td>
+        <td style="font-family: monospace; font-weight: 500;">$${Number(r.precio||0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+        <td style="font-weight: 500; color: ${r.stock > 0 ? 'var(--green)' : 'var(--red)'};">${r.stock}</td>
+        <td>
+           <button class="action-btn" onclick="mostrarNotificacion('Vista de detalle en construcción', 'info')" title="Ver detalles"><i data-lucide="eye"></i></button>
+        </td>
+      </tr>
+    `;
+  });
+  
+  body.innerHTML = html || '<tr><td colspan="6" class="empty-state">No se encontraron refacciones.</td></tr>';
+  lucide.createIcons();
 }
 
 function renderSitios() {
