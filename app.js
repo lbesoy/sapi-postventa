@@ -92,7 +92,6 @@ async function fetchClientesSAP() {
     return clientesDb; // Fallback a datos locales
   }
 }
-}
 
 async function fetchRefaccionesSAP() {
   if (!API_CONFIG.USE_SAP_BACKEND) return refaccionesDb;
@@ -213,7 +212,7 @@ function iniciarSesionSubmit(e) {
   
   // Encontrar por correo o por nombre ignorando mayúsculas
   const user = all.find(u => 
-    (u.email && u.email.toLowerCase() === inputUser) || u.nombre.toLowerCase() === inputUser
+    (u.email && u.email.toLowerCase() === inputUser) || (u.nombre || '').toLowerCase() === inputUser
   );
 
   if (!user) {
