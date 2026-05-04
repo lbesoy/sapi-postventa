@@ -418,7 +418,7 @@ function guardarConfig() {
 // MAPEO DE COLUMNAS SAP (NO-CODE)
 // ==========================================
 function abrirModalMapeo() {
-  document.getElementById('modal-mapeo-columnas').classList.add('active');
+  document.getElementById('modal-mapeo-columnas').classList.add('open');
   const mappings = configData.mappings || { clientes: {}, maquinaria: {} };
   
   // Cargar Clientes
@@ -441,7 +441,7 @@ function abrirModalMapeo() {
 }
 
 function cerrarModalMapeo() {
-  document.getElementById('modal-mapeo-columnas').classList.remove('active');
+  document.getElementById('modal-mapeo-columnas').classList.remove('open');
 }
 
 function switchMapeoTab(tabId) {
