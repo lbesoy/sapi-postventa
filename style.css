@@ -630,6 +630,25 @@ body {
 }
 .nav-badge.visible { display: inline-block; }
 
+/* ===== RECEIPT MODAL (TICKET) ===== */
+.receipt-edge-top, .receipt-edge-bottom {
+  position: absolute;
+  left: 0; right: 0;
+  height: 8px;
+  background-size: 16px 16px;
+  z-index: 10;
+}
+.receipt-edge-top {
+  top: -8px;
+  background-image: linear-gradient(-45deg, var(--bg-card) 8px, transparent 0), linear-gradient(45deg, var(--bg-card) 8px, transparent 0);
+  background-position: left bottom;
+}
+.receipt-edge-bottom {
+  bottom: -8px;
+  background-image: linear-gradient(135deg, var(--bg-card) 8px, transparent 0), linear-gradient(-135deg, var(--bg-card) 8px, transparent 0);
+  background-position: left top;
+}
+
 /* ===== CANAL CHIPS (ORIGEN TICKET) ===== */
 .canal-chips { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .canal-chip { cursor: pointer; flex: 1; min-width: 120px; }
