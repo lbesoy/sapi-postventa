@@ -807,7 +807,12 @@ async function probarQuerySAP() {
   resultsContainer.style.display = 'none';
 
   try {
-    const res = await fetch(`${API_CONFIG.BASE_URL}/sap/queries/${encodeURIComponent(sqlCode)}/execute`);
+    const res = await fetch(`${API_CONFIG.BASE_URL}/sap/queries/${encodeURIComponent(sqlCode)}/execute`, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      }
+    });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Error ejecutando el query');
     
