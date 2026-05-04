@@ -56,22 +56,34 @@ async function fetchClientesSAP() {
     };
 
     // Mapeo: Convertimos la estructura del Query de SAP a nuestra estructura del CRM
-    const clientesMapeados = sapData.map(bp => ({
-      id: bp[map.id] || '', // El ID interno en SAP
-      createdAt: new Date().toISOString(),
-      nombre: bp[map.nombre] || 'Sin Nombre',
-      rfc: bp[map.rfc] || 'Genérico',
-      ubicacion: '', 
-      contacto: '', 
-      telefono: '',
-      email: bp[map.email] || '', 
-      grupoSinergia: bp[map.grupoSinergia] || 'N/A', 
-      saldoCuenta: bp[map.saldoCuenta] || 0,
-      saldoOrdenes: bp.OrdersBal || 0,
-      maquinas: [], // Esto se llenaría con otro endpoint (CustomerEquipmentCards)
-      supervisoresAsignados: [],
-      tecnicosAsignados: []
-    }));
+    const clientesMapeados = sapData.map(bp => {
+      const clienteObj = {
+        id: bp[map.id] || '', // El ID interno en SAP
+        createdAt: new Date().toISOString(),
+        nombre: bp[map.nombre] || 'Sin Nombre',
+        rfc: bp[map.rfc] || 'Genérico',
+        ubicacion: '', 
+        contacto: '', 
+        telefono: '',
+        email: bp[map.email] || '', 
+        grupoSinergia: bp[map.grupoSinergia] || 'N/A', 
+        saldoCuenta: bp[map.saldoCuenta] || 0,
+        saldoOrdenes: bp.OrdersBal || 0,
+        maquinas: [], // Esto se llenaría con otro endpoint (CustomerEquipmentCards)
+        supervisoresAsignados: [],
+        tecnicosAsignados: []
+      };
+
+      // Mapear columnas personalizadas
+      if (map.customCols && map.customCols.length > 0) {
+        clienteObj.customData = {};
+        map.customCols.forEach(col => {
+          clienteObj.customData[col.label] = bp[col.key] || '';
+        });
+      }
+
+      return clienteObj;
+    });
     
     return clientesMapeados;
   } catch (error) {
@@ -464,6 +476,20 @@ function abrirModalMapeo() {
     document.getElementById('map-tec-telefono').value = mappings.tecnicos.telefono || 'MobilePhone';
     document.getElementById('map-tec-email').value = mappings.tecnicos.email || 'eMail';
   }
+
+  // Cargar Columnas Personalizadas Existentes
+  const modulos = ['clientes', 'maquinaria', 'sitios', 'ordenes', 'tecnicos'];
+  modulos.forEach(mod => {
+    const container = document.getElementById(`custom-columns-${mod}`);
+    if (container) {
+      container.innerHTML = ''; // Limpiar anteriores
+      if (mappings[mod] && mappings[mod].customCols) {
+        mappings[mod].customCols.forEach(col => {
+          addCustomColumnUI(mod, col.label, col.key);
+        });
+      }
+    }
+  });
 }
 
 function cerrarModalMapeo() {
@@ -478,6 +504,33 @@ function switchMapeoTab(tabId) {
   document.getElementById('tab-mapeo-' + tabId).classList.add('active');
 }
 
+function addCustomColumnUI(module, label = '', key = '') {
+  const container = document.getElementById('custom-columns-' + module);
+  if(!container) return;
+  const div = document.createElement('div');
+  div.className = 'custom-col-row';
+  div.style = "display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.5rem; align-items: center;";
+  div.innerHTML = `
+    <input type="text" class="custom-label" placeholder="Nombre en Tabla (Ej. País)" value="${label}" style="font-size:0.85rem; padding:0.4rem; border:1px solid var(--border); border-radius:4px;">
+    <input type="text" class="custom-key" placeholder="Columna SAP (Ej. Country)" value="${key}" style="font-family:monospace; font-size:0.85rem; padding:0.4rem; border:1px solid var(--border); border-radius:4px;">
+    <button class="btn-secondary" style="color:var(--red); padding:0.4rem;" onclick="this.parentElement.remove()" title="Eliminar columna">✕</button>
+  `;
+  container.appendChild(div);
+}
+
+function getCustomColumnsForModule(module) {
+  const container = document.getElementById('custom-columns-' + module);
+  if(!container) return [];
+  const rows = container.querySelectorAll('.custom-col-row');
+  const cols = [];
+  rows.forEach(row => {
+    const label = row.querySelector('.custom-label').value.trim();
+    const key = row.querySelector('.custom-key').value.trim();
+    if (label && key) cols.push({ label, key });
+  });
+  return cols;
+}
+
 function guardarMapeoColumnas() {
   const mappings = {
     clientes: {
@@ -486,19 +539,22 @@ function guardarMapeoColumnas() {
       rfc: document.getElementById('map-cli-rfc').value.trim() || 'LicTradNum',
       email: document.getElementById('map-cli-email').value.trim() || 'E_Mail',
       grupoSinergia: document.getElementById('map-cli-grupo').value.trim() || 'U_OK_Grupo',
-      saldoCuenta: document.getElementById('map-cli-saldo').value.trim() || 'Balance'
+      saldoCuenta: document.getElementById('map-cli-saldo').value.trim() || 'Balance',
+      customCols: getCustomColumnsForModule('clientes')
     },
     maquinaria: {
       id: document.getElementById('map-maq-id').value.trim() || 'ManufacturerSerialNum',
       itemcode: document.getElementById('map-maq-itemcode').value.trim() || 'ItemCode',
       desc: document.getElementById('map-maq-desc').value.trim() || 'ItemDescription',
-      clienteId: document.getElementById('map-maq-cliente').value.trim() || 'CustomerCode'
+      clienteId: document.getElementById('map-maq-cliente').value.trim() || 'CustomerCode',
+      customCols: getCustomColumnsForModule('maquinaria')
     },
     sitios: {
       id: document.getElementById('map-sit-id').value.trim() || 'Address',
       nombre: document.getElementById('map-sit-nombre').value.trim() || 'Street',
       clienteId: document.getElementById('map-sit-cliente').value.trim() || 'BPCode',
-      direccion: document.getElementById('map-sit-direccion').value.trim() || 'Block'
+      direccion: document.getElementById('map-sit-direccion').value.trim() || 'Block',
+      customCols: getCustomColumnsForModule('sitios')
     },
     ordenes: {
       id: document.getElementById('map-ord-id').value.trim() || 'ServiceCallID',
@@ -506,13 +562,15 @@ function guardarMapeoColumnas() {
       maquina: document.getElementById('map-ord-maquina').value.trim() || 'ManufacturerSerialNum',
       tecnico: document.getElementById('map-ord-tecnico').value.trim() || 'TechnicianCode',
       estado: document.getElementById('map-ord-estado').value.trim() || 'Status',
-      falla: document.getElementById('map-ord-falla').value.trim() || 'Description'
+      falla: document.getElementById('map-ord-falla').value.trim() || 'Description',
+      customCols: getCustomColumnsForModule('ordenes')
     },
     tecnicos: {
       id: document.getElementById('map-tec-id').value.trim() || 'EmployeeID',
       nombre: document.getElementById('map-tec-nombre').value.trim() || 'FirstName',
       telefono: document.getElementById('map-tec-telefono').value.trim() || 'MobilePhone',
-      email: document.getElementById('map-tec-email').value.trim() || 'eMail'
+      email: document.getElementById('map-tec-email').value.trim() || 'eMail',
+      customCols: getCustomColumnsForModule('tecnicos')
     }
   };
   
@@ -1355,6 +1413,21 @@ function renderClientes() {
   const startIndex = (currentPageClientes - 1) * CLIENTES_PER_PAGE;
   const paginatedClientes = filtrados.slice(startIndex, startIndex + CLIENTES_PER_PAGE);
   
+  // RENDERIZAR CABECERAS PERSONALIZADAS
+  const trHeader = document.querySelector('#clientes .data-table thead tr');
+  if (trHeader) {
+    trHeader.querySelectorAll('.custom-th').forEach(el => el.remove());
+    if (configData.mappings?.clientes?.customCols) {
+      configData.mappings.clientes.customCols.forEach(col => {
+        const th = document.createElement('th');
+        th.className = 'custom-th';
+        th.textContent = col.label;
+        // Insert before the last column (Maquinaria/Acciones) if we want, or just append
+        trHeader.insertBefore(th, trHeader.lastElementChild);
+      });
+    }
+  }
+
   // RENDERIZAR CUADRÍCULA
   grid.innerHTML = paginatedClientes.map(c => {
     const qtyOrdenes = ordenes.filter(x => x.cliente === c.nombre).length;
@@ -1401,6 +1474,13 @@ function renderClientes() {
       const qtyOrdenes = ordenes.filter(x => x.cliente === c.nombre).length;
       const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
       
+      let customTds = '';
+      if (configData.mappings?.clientes?.customCols) {
+        configData.mappings.clientes.customCols.forEach(col => {
+          customTds += `<td style="font-size:0.85rem;">${c.customData && c.customData[col.label] ? c.customData[col.label] : 'N/A'}</td>`;
+        });
+      }
+
       return `
         <tr onclick="verDetalleCliente('${(c.nombre || 'Sin nombre').replace(/'/g, "\\'")}')" style="cursor:pointer;">
           <td><span class="badge" style="background:var(--accent-light); color:var(--accent);">${c.id && c.id !== 'Usuario registrado' ? c.id : 'N/A'}</span></td>
@@ -1412,6 +1492,7 @@ function renderClientes() {
           <td>${c.grupoSinergia || 'N/A'}</td>
           <td style="font-weight:600; color:${c.saldoCuenta > 0 ? 'var(--red)' : 'var(--text-primary)'};">${API_CONFIG.USE_SAP_BACKEND ? formatMoney(c.saldoCuenta) : 'N/A'}</td>
           <td style="font-weight:600; color:var(--accent);" onclick="event.stopPropagation(); abrirDesgloseSAP('${c.id}', '${(c.nombre || 'Sin nombre').replace(/'/g, "\\'")}')"><span class="table-link">${API_CONFIG.USE_SAP_BACKEND ? formatMoney(c.saldoOrdenes) : 'N/A'}</span></td>
+          ${customTds}
           <td style="text-align:center;"><span class="badge" style="background:var(--bg-secondary);">${(c.maquinas || []).length}</span></td>
         </tr>
       `;
