@@ -1589,6 +1589,21 @@ function verDetalleCliente(nombre) {
             <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Órdenes Abiertas</div>
             <div style="font-weight: 700; font-size: 1.1rem; color: var(--text-primary);">${formatMoney(clienteOb.saldoOrdenes)}</div>
           </div>
+`;
+
+    // Inyectar columnas personalizadas de Clientes si existen
+    if (clienteOb.customData) {
+      Object.entries(clienteOb.customData).forEach(([label, value]) => {
+        html += `
+          <div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">${label}</div>
+            <div style="font-weight: 600; color: var(--text-primary);">${value || 'N/A'}</div>
+          </div>
+        `;
+      });
+    }
+
+    html += `
         </div>
       </div>
     `;
