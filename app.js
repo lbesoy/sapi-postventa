@@ -97,17 +97,18 @@ async function fetchRefaccionesSAP() {
   if (!API_CONFIG.USE_SAP_BACKEND) return refaccionesDb;
   
   try {
-    let url = `${API_CONFIG.BASE_URL}/clientes`; // Usamos el endpoint genérico que ejecuta el query
-    if (configData && configData.queryRefacciones) {
-      url += `?queryCode=${encodeURIComponent(configData.queryRefacciones)}`;
-    } else {
+    if (!configData || !configData.queryRefacciones) {
       return refaccionesDb; // Si no hay query de refacciones, devolvemos cache
     }
+    const url = `${API_CONFIG.BASE_URL}/sap/queries/${encodeURIComponent(configData.queryRefacciones)}/execute?_t=${Date.now()}`;
+    
     const response = await fetch(url);
-    const sapData = await response.json();
+    const jsonRes = await response.json();
+    
+    const sapData = jsonRes.data || [];
     
     const map = (configData.mappings && configData.mappings.refacciones) ? configData.mappings.refacciones : {
-      id: 'ItemCode', nombre: 'ItemName', grupo: 'ItmsGrpNam', precio: 'Price', stock: 'OnHand'
+      id: 'ItemCode', nombre: 'ItemName', grupo: 'ItmsGrpNam', precio: 'Price', stock: 'OnHand', origen: 'Origen'
     };
 
     const refaccionesMapeadas = sapData.map(item => {
@@ -116,7 +117,8 @@ async function fetchRefaccionesSAP() {
         nombre: item[map.nombre] || 'Sin Nombre',
         grupo: item[map.grupo] || '',
         precio: item[map.precio] || 0,
-        stock: item[map.stock] || 0
+        stock: item[map.stock] || 0,
+        origen: item[map.origen] || 'N/A'
       };
 
       if (map.customCols && map.customCols.length > 0) {
@@ -534,6 +536,7 @@ function abrirModalMapeo() {
     document.getElementById('map-ref-grupo').value = mappings.refacciones.grupo || 'ItmsGrpNam';
     document.getElementById('map-ref-precio').value = mappings.refacciones.precio || 'Price';
     document.getElementById('map-ref-stock').value = mappings.refacciones.stock || 'OnHand';
+    if(document.getElementById('map-ref-origen')) document.getElementById('map-ref-origen').value = mappings.refacciones.origen || 'Origen';
   }
 
   // Cargar Labels (Si existen)
@@ -679,6 +682,7 @@ function guardarMapeoColumnas() {
       grupo: document.getElementById('map-ref-grupo').value.trim() || 'ItmsGrpNam',
       precio: document.getElementById('map-ref-precio').value.trim() || 'Price',
       stock: document.getElementById('map-ref-stock').value.trim() || 'OnHand',
+      origen: document.getElementById('map-ref-origen') ? (document.getElementById('map-ref-origen').value.trim() || 'Origen') : 'Origen',
       customCols: getCustomColumnsForModule('refacciones'), labels: getLabelsForModule('refacciones')
     }
   };
