@@ -112,13 +112,22 @@ async function fetchRefaccionesSAP() {
     };
 
     const refaccionesMapeadas = sapData.map(item => {
+      const idInternoVal = item[map.id] || '';
+      let origenCalculado = 'N/A';
+      
+      if (item[map.origen]) {
+        origenCalculado = item[map.origen];
+      } else if (idInternoVal) {
+        origenCalculado = idInternoVal.toUpperCase().endsWith('N') ? 'Nacional' : 'Importado';
+      }
+
       const refObj = {
-        idInterno: item[map.id] || '',
+        idInterno: idInternoVal,
         nombre: item[map.nombre] || 'Sin Nombre',
         grupo: item[map.grupo] || '',
         precio: item[map.precio] || 0,
         stock: item[map.stock] || 0,
-        origen: item[map.origen] || 'N/A'
+        origen: origenCalculado
       };
 
       if (map.customCols && map.customCols.length > 0) {
