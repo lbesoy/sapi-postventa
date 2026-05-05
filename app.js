@@ -32,6 +32,39 @@ let editandoTicketId = null;
 let ticketFiltroActivo = 'todos';
 
 // ==========================================
+// UTILIDADES GLOBALES
+// ==========================================
+function mostrarNotificacion(mensaje, tipo = 'success') {
+  const container = document.getElementById('notificaciones-container') || (() => {
+    const el = document.createElement('div');
+    el.id = 'notificaciones-container';
+    el.style = 'position:fixed; bottom:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:10px;';
+    document.body.appendChild(el);
+    return el;
+  })();
+  
+  const toast = document.createElement('div');
+  const bgColor = tipo === 'success' ? '#10b981' : (tipo === 'error' ? '#ef4444' : '#3b82f6');
+  toast.style = `background: ${bgColor}; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-family: system-ui, sans-serif; font-size: 14px; opacity: 0; transform: translateY(20px); transition: all 0.3s ease;`;
+  toast.textContent = mensaje;
+  
+  container.appendChild(toast);
+  
+  // Animar entrada
+  requestAnimationFrame(() => {
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+  });
+  
+  // Remover después de 3s
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(20px)';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// ==========================================
 // MÓDULO DE INTEGRACIÓN SAP (PRÓXIMAMENTE)
 // ==========================================
 const API_CONFIG = {
