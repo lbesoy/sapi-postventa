@@ -564,7 +564,10 @@ function abrirModalMapeo() {
   
   const setMapVal = (id, val) => {
     const el = document.getElementById(id);
-    i  // Cargar Clientes
+    if (el) el.value = val;
+  };
+  
+  // Cargar Clientes
   if(mappings.clientes) {
     setMapVal('map-cli-id', mappings.clientes.id || 'CardCode');
     setMapVal('map-cli-nombre', mappings.clientes.nombre || 'CardName');
