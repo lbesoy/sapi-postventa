@@ -394,7 +394,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   initDiasPanels();
   renderTabla();
+  setupCharts();
   renderStats();
+
+  // Agregar botones de eliminar a los campos de mapeo por defecto
+  document.querySelectorAll('.mapeo-tab-content .form-group').forEach(group => {
+    if (group.querySelector('.map-label-edit') && !group.querySelector('.del-map-btn')) {
+      group.style.position = 'relative';
+      const btn = document.createElement('button');
+      btn.className = 'del-map-btn';
+      btn.innerHTML = '✕';
+      btn.title = "Eliminar esta columna";
+      btn.style = "position:absolute; right:0px; top:5px; background:none; border:none; color:var(--red); cursor:pointer; font-size:0.9rem; padding: 0.2rem;";
+      btn.onclick = (e) => {
+        e.preventDefault();
+        group.remove();
+      };
+      group.appendChild(btn);
+    }
+  });
   renderTickets();
   renderRefacciones();
   updateTicketBadge();
@@ -527,58 +545,60 @@ function abrirModalMapeo() {
   document.getElementById('modal-mapeo-columnas').classList.add('open');
   const mappings = configData.mappings || { clientes: {}, maquinaria: {} };
   
-  // Cargar Clientes
+  const setMapVal = (id, val) => {
+    const el = document.getElementById(id);
+    i  // Cargar Clientes
   if(mappings.clientes) {
-    document.getElementById('map-cli-id').value = mappings.clientes.id || 'CardCode';
-    document.getElementById('map-cli-nombre').value = mappings.clientes.nombre || 'CardName';
-    document.getElementById('map-cli-rfc').value = mappings.clientes.rfc || 'LicTradNum';
-    document.getElementById('map-cli-email').value = mappings.clientes.email || 'E_Mail';
-    document.getElementById('map-cli-grupo').value = mappings.clientes.grupoSinergia || 'U_OK_Grupo';
-    document.getElementById('map-cli-saldo').value = mappings.clientes.saldoCuenta || 'Balance';
+    setMapVal('map-cli-id', mappings.clientes.id || 'CardCode');
+    setMapVal('map-cli-nombre', mappings.clientes.nombre || 'CardName');
+    setMapVal('map-cli-rfc', mappings.clientes.rfc || 'LicTradNum');
+    setMapVal('map-cli-email', mappings.clientes.email || 'E_Mail');
+    setMapVal('map-cli-grupo', mappings.clientes.grupoSinergia || 'U_OK_Grupo');
+    setMapVal('map-cli-saldo', mappings.clientes.saldoCuenta || 'Balance');
   }
 
   // Cargar Maquinaria
   if(mappings.maquinaria) {
-    document.getElementById('map-maq-id').value = mappings.maquinaria.id || 'ManufacturerSerialNum';
-    document.getElementById('map-maq-itemcode').value = mappings.maquinaria.itemcode || 'ItemCode';
-    document.getElementById('map-maq-desc').value = mappings.maquinaria.desc || 'ItemDescription';
-    document.getElementById('map-maq-cliente').value = mappings.maquinaria.clienteId || 'CustomerCode';
+    setMapVal('map-maq-id', mappings.maquinaria.id || 'ManufacturerSerialNum');
+    setMapVal('map-maq-itemcode', mappings.maquinaria.itemcode || 'ItemCode');
+    setMapVal('map-maq-desc', mappings.maquinaria.desc || 'ItemDescription');
+    setMapVal('map-maq-cliente', mappings.maquinaria.clienteId || 'CustomerCode');
   }
 
   // Cargar Sitios
   if(mappings.sitios) {
-    document.getElementById('map-sit-id').value = mappings.sitios.id || 'Address';
-    document.getElementById('map-sit-nombre').value = mappings.sitios.nombre || 'Street';
-    document.getElementById('map-sit-cliente').value = mappings.sitios.clienteId || 'BPCode';
-    document.getElementById('map-sit-direccion').value = mappings.sitios.direccion || 'Block';
+    setMapVal('map-sit-id', mappings.sitios.id || 'Address');
+    setMapVal('map-sit-nombre', mappings.sitios.nombre || 'Street');
+    setMapVal('map-sit-cliente', mappings.sitios.clienteId || 'BPCode');
+    setMapVal('map-sit-direccion', mappings.sitios.direccion || 'Block');
   }
 
   // Cargar Ordenes
   if(mappings.ordenes) {
-    document.getElementById('map-ord-id').value = mappings.ordenes.id || 'ServiceCallID';
-    document.getElementById('map-ord-cliente').value = mappings.ordenes.clienteId || 'CustomerCode';
-    document.getElementById('map-ord-maquina').value = mappings.ordenes.maquina || 'ManufacturerSerialNum';
-    document.getElementById('map-ord-tecnico').value = mappings.ordenes.tecnico || 'TechnicianCode';
-    document.getElementById('map-ord-estado').value = mappings.ordenes.estado || 'Status';
-    document.getElementById('map-ord-falla').value = mappings.ordenes.falla || 'Description';
+    setMapVal('map-ord-id', mappings.ordenes.id || 'ServiceCallID');
+    setMapVal('map-ord-cliente', mappings.ordenes.clienteId || 'CustomerCode');
+    setMapVal('map-ord-maquina', mappings.ordenes.maquina || 'ManufacturerSerialNum');
+    setMapVal('map-ord-tecnico', mappings.ordenes.tecnico || 'TechnicianCode');
+    setMapVal('map-ord-estado', mappings.ordenes.estado || 'Status');
+    setMapVal('map-ord-falla', mappings.ordenes.falla || 'Description');
   }
 
-  // Cargar Tecnicos
+  // Cargar Técnicos
   if(mappings.tecnicos) {
-    document.getElementById('map-tec-id').value = mappings.tecnicos.id || 'EmployeeID';
-    document.getElementById('map-tec-nombre').value = mappings.tecnicos.nombre || 'FirstName';
-    document.getElementById('map-tec-telefono').value = mappings.tecnicos.telefono || 'MobilePhone';
-    document.getElementById('map-tec-email').value = mappings.tecnicos.email || 'eMail';
+    setMapVal('map-tec-id', mappings.tecnicos.id || 'EmployeeID');
+    setMapVal('map-tec-nombre', mappings.tecnicos.nombre || 'FirstName');
+    setMapVal('map-tec-telefono', mappings.tecnicos.telefono || 'MobilePhone');
+    setMapVal('map-tec-email', mappings.tecnicos.email || 'eMail');
   }
 
   // Cargar Refacciones
   if(mappings.refacciones) {
-    document.getElementById('map-ref-id').value = mappings.refacciones.id || 'ItemCode';
-    document.getElementById('map-ref-nombre').value = mappings.refacciones.nombre || 'ItemName';
-    document.getElementById('map-ref-grupo').value = mappings.refacciones.grupo || 'ItmsGrpNam';
-    document.getElementById('map-ref-precio').value = mappings.refacciones.precio || 'Price';
-    document.getElementById('map-ref-stock').value = mappings.refacciones.stock || 'OnHand';
-    if(document.getElementById('map-ref-origen')) document.getElementById('map-ref-origen').value = mappings.refacciones.origen || 'Origen';
+    setMapVal('map-ref-id', mappings.refacciones.id || 'ItemCode');
+    setMapVal('map-ref-nombre', mappings.refacciones.nombre || 'ItemName');
+    setMapVal('map-ref-grupo', mappings.refacciones.grupo || 'ItmsGrpNam');
+    setMapVal('map-ref-precio', mappings.refacciones.precio || 'Price');
+    setMapVal('map-ref-stock', mappings.refacciones.stock || 'OnHand');
+    setMapVal('map-ref-origen', mappings.refacciones.origen || 'Origen');
   }
 
   // Cargar Labels (Si existen)
@@ -651,7 +671,7 @@ function switchMapeoTab(tabId) {
 }
 
 function addCustomColumnUI(module, label = '', key = '') {
-  const container = document.getElementById('custom-cols-' + module);
+  const container = document.getElementById('custom-columns-' + module);
   if(!container) return;
   const div = document.createElement('div');
   div.className = 'custom-col-row';
@@ -665,7 +685,7 @@ function addCustomColumnUI(module, label = '', key = '') {
 }
 
 function getCustomColumnsForModule(module) {
-  const container = document.getElementById('custom-cols-' + module);
+  const container = document.getElementById('custom-columns-' + module);
   if(!container) return [];
   const rows = container.querySelectorAll('.custom-col-row');
   const cols = [];
@@ -678,53 +698,59 @@ function getCustomColumnsForModule(module) {
 }
 
 function guardarMapeoColumnas() {
+  const getMapVal = (id, def) => {
+    const el = document.getElementById(id);
+    if (!el) return ''; // Eliminado intencionalmente
+    return el.value.trim() || def; // En blanco usa default
+  };
+
   const mappings = {
     clientes: {
-      id: document.getElementById('map-cli-id').value.trim() || 'CardCode',
-      nombre: document.getElementById('map-cli-nombre').value.trim() || 'CardName',
-      rfc: document.getElementById('map-cli-rfc').value.trim() || 'LicTradNum',
-      email: document.getElementById('map-cli-email').value.trim() || 'E_Mail',
-      grupoSinergia: document.getElementById('map-cli-grupo').value.trim() || 'U_OK_Grupo',
-      saldoCuenta: document.getElementById('map-cli-saldo').value.trim() || 'Balance',
+      id: getMapVal('map-cli-id', 'CardCode'),
+      nombre: getMapVal('map-cli-nombre', 'CardName'),
+      rfc: getMapVal('map-cli-rfc', 'LicTradNum'),
+      email: getMapVal('map-cli-email', 'E_Mail'),
+      grupoSinergia: getMapVal('map-cli-grupo', 'U_OK_Grupo'),
+      saldoCuenta: getMapVal('map-cli-saldo', 'Balance'),
       customCols: getCustomColumnsForModule('clientes'), labels: getLabelsForModule('clientes')
     },
     maquinaria: {
-      id: document.getElementById('map-maq-id').value.trim() || 'ManufacturerSerialNum',
-      itemcode: document.getElementById('map-maq-itemcode').value.trim() || 'ItemCode',
-      desc: document.getElementById('map-maq-desc').value.trim() || 'ItemDescription',
-      clienteId: document.getElementById('map-maq-cliente').value.trim() || 'CustomerCode',
+      id: getMapVal('map-maq-id', 'ManufacturerSerialNum'),
+      itemcode: getMapVal('map-maq-itemcode', 'ItemCode'),
+      desc: getMapVal('map-maq-desc', 'ItemDescription'),
+      clienteId: getMapVal('map-maq-cliente', 'CustomerCode'),
       customCols: getCustomColumnsForModule('maquinaria'), labels: getLabelsForModule('maquinaria')
     },
     sitios: {
-      id: document.getElementById('map-sit-id').value.trim() || 'Address',
-      nombre: document.getElementById('map-sit-nombre').value.trim() || 'Street',
-      clienteId: document.getElementById('map-sit-cliente').value.trim() || 'BPCode',
-      direccion: document.getElementById('map-sit-direccion').value.trim() || 'Block',
+      id: getMapVal('map-sit-id', 'Address'),
+      nombre: getMapVal('map-sit-nombre', 'Street'),
+      clienteId: getMapVal('map-sit-cliente', 'BPCode'),
+      direccion: getMapVal('map-sit-direccion', 'Block'),
       customCols: getCustomColumnsForModule('sitios'), labels: getLabelsForModule('sitios')
     },
     ordenes: {
-      id: document.getElementById('map-ord-id').value.trim() || 'ServiceCallID',
-      clienteId: document.getElementById('map-ord-cliente').value.trim() || 'CustomerCode',
-      maquina: document.getElementById('map-ord-maquina').value.trim() || 'ManufacturerSerialNum',
-      tecnico: document.getElementById('map-ord-tecnico').value.trim() || 'TechnicianCode',
-      estado: document.getElementById('map-ord-estado').value.trim() || 'Status',
-      falla: document.getElementById('map-ord-falla').value.trim() || 'Description',
+      id: getMapVal('map-ord-id', 'ServiceCallID'),
+      clienteId: getMapVal('map-ord-cliente', 'CustomerCode'),
+      maquina: getMapVal('map-ord-maquina', 'ManufacturerSerialNum'),
+      tecnico: getMapVal('map-ord-tecnico', 'TechnicianCode'),
+      estado: getMapVal('map-ord-estado', 'Status'),
+      falla: getMapVal('map-ord-falla', 'Description'),
       customCols: getCustomColumnsForModule('ordenes'), labels: getLabelsForModule('ordenes')
     },
     tecnicos: {
-      id: document.getElementById('map-tec-id').value.trim() || 'EmployeeID',
-      nombre: document.getElementById('map-tec-nombre').value.trim() || 'FirstName',
-      telefono: document.getElementById('map-tec-telefono').value.trim() || 'MobilePhone',
-      email: document.getElementById('map-tec-email').value.trim() || 'eMail',
+      id: getMapVal('map-tec-id', 'EmployeeID'),
+      nombre: getMapVal('map-tec-nombre', 'FirstName'),
+      telefono: getMapVal('map-tec-telefono', 'MobilePhone'),
+      email: getMapVal('map-tec-email', 'eMail'),
       customCols: getCustomColumnsForModule('tecnicos'), labels: getLabelsForModule('tecnicos')
     },
     refacciones: {
-      id: document.getElementById('map-ref-id').value.trim() || 'ItemCode',
-      nombre: document.getElementById('map-ref-nombre').value.trim() || 'ItemName',
-      grupo: document.getElementById('map-ref-grupo').value.trim() || 'ItmsGrpNam',
-      precio: document.getElementById('map-ref-precio').value.trim() || 'Price',
-      stock: document.getElementById('map-ref-stock').value.trim() || 'OnHand',
-      origen: document.getElementById('map-ref-origen') ? (document.getElementById('map-ref-origen').value.trim() || 'Origen') : 'Origen',
+      id: getMapVal('map-ref-id', 'ItemCode'),
+      nombre: getMapVal('map-ref-nombre', 'ItemName'),
+      grupo: getMapVal('map-ref-grupo', 'ItmsGrpNam'),
+      precio: getMapVal('map-ref-precio', 'Price'),
+      stock: getMapVal('map-ref-stock', 'OnHand'),
+      origen: getMapVal('map-ref-origen', 'Origen'),
       customCols: getCustomColumnsForModule('refacciones'), labels: getLabelsForModule('refacciones')
     }
   };
