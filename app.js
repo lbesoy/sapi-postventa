@@ -265,10 +265,7 @@ function iniciarSesionSubmit(e) {
      }
      currentSession = { userId: adminId, viewMode: 'superadmin' };
      localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
-     document.getElementById('login-screen').classList.add('hidden');
-     document.getElementById('login-email').value = '';
-     document.getElementById('login-password').value = '';
-     applyRole('superadmin');
+     entrarApp({ id: adminId, rol: 'superadmin' });
      return;
   }
 
