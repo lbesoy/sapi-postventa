@@ -101,8 +101,15 @@ async function cargarDatosDeSupabase() {
 
   try {
     const { data: usuarios } = await sb.from('usuarios').select('*');
-    if (usuarios) {
+    if (usuarios && usuarios.length > 0) {
       localStorage.setItem('eurorep_usuarios', JSON.stringify(usuarios));
+    } else {
+      // Si Supabase regresa vacío (quizá por RLS), inyectar lbesoy por seguridad
+      const localU = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+      if (localU.length === 0) {
+        localU.push({ id: 'lbesoy', nombre: 'Pablo Besoy', email: 'lbesoy', pin: 'pbesoy13', rol: 'superadmin', activo: true, locked: false });
+        localStorage.setItem('eurorep_usuarios', JSON.stringify(localU));
+      }
     }
 
     const { data: clientes } = await sb.from('clientes').select('*');

