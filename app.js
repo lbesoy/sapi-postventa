@@ -408,7 +408,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   initDiasPanels();
   renderTabla();
-  setupCharts();
   renderStats();
 
   // Agregar botones de eliminar a los campos de mapeo por defecto
