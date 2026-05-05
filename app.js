@@ -3387,6 +3387,7 @@ function renderRefacciones() {
         <td><span class="status-badge status-open" style="background:var(--bg-secondary); color:var(--text-secondary);">${r.grupo || 'N/A'}</span></td>
         <td style="font-family: monospace; font-weight: 500;">$${Number(r.precio||0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2})}</td>
         <td style="font-weight: 500; color: ${r.stock > 0 ? 'var(--green)' : 'var(--red)'};">${r.stock}</td>
+        <td><span class="badge ${r.origen === 'Nacional' ? 'badge-completado' : (r.origen === 'Importado' ? 'badge-proceso' : 'badge-pendiente')}">${r.origen || 'N/A'}</span></td>
         <td>
            <button class="action-btn" onclick="mostrarNotificacion('Vista de detalle en construcción', 'info')" title="Ver detalles"><i data-lucide="eye"></i></button>
         </td>
