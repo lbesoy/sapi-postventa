@@ -1592,7 +1592,8 @@ async function fetchSitiosSAP() {
     const url = `${API_CONFIG.BASE_URL}/sap/queries/${queryCode}/execute?_t=${Date.now()}`;
     const response = await fetch(url);
     if (!response.ok) return sitiosDb;
-    const sapData = await response.json();
+    const jsonRes = await response.json();
+    const sapData = jsonRes.data || (Array.isArray(jsonRes) ? jsonRes : []);
     
     const map = (configData.mappings && configData.mappings.sitios) ? configData.mappings.sitios : {
       id: 'Address', nombre: 'Street', cliente: 'BPCode', direccion: 'Block'
@@ -1629,7 +1630,8 @@ async function fetchMaquinariaSAP() {
     const url = `${API_CONFIG.BASE_URL}/sap/queries/${queryCode}/execute?_t=${Date.now()}`;
     const response = await fetch(url);
     if (!response.ok) return maquinariaDb;
-    const sapData = await response.json();
+    const jsonRes = await response.json();
+    const sapData = jsonRes.data || (Array.isArray(jsonRes) ? jsonRes : []);
     
     const map = (configData.mappings && configData.mappings.maquinaria) ? configData.mappings.maquinaria : {
       id: 'ManufacturerSerialNum', itemcode: 'ItemCode', desc: 'ItemDescription', cliente: 'CustomerCode'
