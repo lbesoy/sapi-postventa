@@ -1598,12 +1598,21 @@ async function fetchSitiosSAP() {
       id: 'Address', nombre: 'Street', cliente: 'BPCode', direccion: 'Block'
     };
     
-    const sitiosMapeados = sapData.map(s => ({
-      id: s[map.id] || '',
-      nombre: s[map.nombre] || 'Sitio Desconocido',
-      cliente: s[map.cliente] || '',
-      direccion: s[map.direccion] || ''
-    }));
+    const sitiosMapeados = sapData.map(s => {
+      const sitioObj = {
+        id: s[map.id] || '',
+        nombre: s[map.nombre] || 'Sitio Desconocido',
+        cliente: s[map.cliente] || '',
+        direccion: s[map.direccion] || ''
+      };
+      if (map.customCols && map.customCols.length > 0) {
+        sitioObj.customData = {};
+        map.customCols.forEach(col => {
+          sitioObj.customData[col.label] = s[col.key] || '';
+        });
+      }
+      return sitioObj;
+    });
     return sitiosMapeados;
   } catch (err) {
     console.error("Error fetchSitiosSAP:", err);
@@ -1626,15 +1635,24 @@ async function fetchMaquinariaSAP() {
       id: 'ManufacturerSerialNum', itemcode: 'ItemCode', desc: 'ItemDescription', cliente: 'CustomerCode'
     };
     
-    const maquinariaMapeada = sapData.map(m => ({
-      serie: m[map.id] || '',
-      marca: '', // SAP no suele tener un campo "Marca" directo en la tarjeta, o se mapea a otro
-      modelo: m[map.itemcode] || '',
-      anio: '',
-      cliente: m[map.cliente] || '',
-      idInterno: m[map.itemcode] || '',
-      descripcion: m[map.desc] || ''
-    }));
+    const maquinariaMapeada = sapData.map(m => {
+      const maqObj = {
+        serie: m[map.id] || '',
+        marca: '', // SAP no suele tener un campo "Marca" directo en la tarjeta, o se mapea a otro
+        modelo: m[map.itemcode] || '',
+        anio: '',
+        cliente: m[map.cliente] || '',
+        idInterno: m[map.itemcode] || '',
+        descripcion: m[map.desc] || ''
+      };
+      if (map.customCols && map.customCols.length > 0) {
+        maqObj.customData = {};
+        map.customCols.forEach(col => {
+          maqObj.customData[col.label] = m[col.key] || '';
+        });
+      }
+      return maqObj;
+    });
     return maquinariaMapeada;
   } catch (err) {
     console.error("Error fetchMaquinariaSAP:", err);
@@ -2602,7 +2620,9 @@ function editarMaquina(clienteNombre, idInterno) {
         }
       });
       
-      const maquina = clienteObj.maquinas?.find(m => m.idInterno === idInterno);
+      let maquina = clienteObj?.maquinas?.find(m => m.idInterno === idInterno);
+      if (!maquina) maquina = maquinariaDb.find(m => m.idInterno === idInterno);
+      
       if (maquina) {
         const selectMarca = document.getElementById('am-marca-select');
         const inputOtraMarca = document.getElementById('am-marca-otra');
@@ -2647,6 +2667,28 @@ function editarMaquina(clienteNombre, idInterno) {
           inputOtraUbicacion.value = maquina.ubicacion;
         } else {
           currentSelectUbicacion.value = '';
+        }
+        
+        // Renderizar Custom Fields
+        const customContainer = document.getElementById('am-custom-fields-container');
+        if (customContainer) {
+          if (maquina.customData && Object.keys(maquina.customData).length > 0) {
+            customContainer.style.display = 'block';
+            let customHtml = '<div style="font-size:0.75rem; font-weight:600; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;"><i data-lucide="database" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"></i>Datos SAP (Solo Lectura)</div><div class="form-grid" style="grid-template-columns:1fr 1fr;">';
+            Object.entries(maquina.customData).forEach(([label, val]) => {
+              customHtml += `
+                <div class="form-group">
+                  <label>${label}</label>
+                  <input type="text" value="${val || 'N/A'}" readonly style="background:var(--bg-hover); color:var(--text-muted); border-style:dashed;" />
+                </div>
+              `;
+            });
+            customHtml += '</div>';
+            customContainer.innerHTML = customHtml;
+          } else {
+            customContainer.style.display = 'none';
+            customContainer.innerHTML = '';
+          }
         }
       }
     }
@@ -3635,13 +3677,36 @@ function renderMaquinaria() {
   const thId = document.getElementById('th-maquinaria-id');
   if (thId) thId.style.display = isEmpresa ? 'none' : '';
 
+  // RENDERIZAR CABECERAS PERSONALIZADAS
+  const trHeaderMaq = document.querySelector('#view-maquinaria .data-table thead tr');
+  if (trHeaderMaq) {
+    trHeaderMaq.querySelectorAll('.custom-th-maq').forEach(el => el.remove());
+    if (configData.mappings?.maquinaria?.customCols) {
+      configData.mappings.maquinaria.customCols.forEach(col => {
+        const th = document.createElement('th');
+        th.className = 'custom-th-maq';
+        th.textContent = col.label;
+        trHeaderMaq.insertBefore(th, trHeaderMaq.lastElementChild);
+      });
+    }
+  }
+
   if (filtered.length === 0) {
-    body.innerHTML = `<tr><td colspan="${isEmpresa ? 6 : 7}" class="empty-state">No se encontró maquinaria.</td></tr>`;
+    const colspan = (isEmpresa ? 6 : 7) + (configData.mappings?.maquinaria?.customCols?.length || 0);
+    body.innerHTML = `<tr><td colspan="${colspan}" class="empty-state">No se encontró maquinaria.</td></tr>`;
     return;
   }
 
   body.innerHTML = filtered.map(m => {
     const logoPath = getLogoMarca(m.marca);
+    
+    let customTds = '';
+    if (configData.mappings?.maquinaria?.customCols) {
+      configData.mappings.maquinaria.customCols.forEach(col => {
+        customTds += `<td style="font-size:0.85rem;">${m.customData && m.customData[col.label] ? m.customData[col.label] : 'N/A'}</td>`;
+      });
+    }
+
     return `
     <tr>
       ${!isEmpresa ? `<td><span style="font-family:monospace; font-weight:500; color:var(--accent); background:var(--blue-light); padding:0.2rem 0.5rem; border-radius:4px;">${m.idInterno}</span></td>` : ''}
@@ -3657,6 +3722,7 @@ function renderMaquinaria() {
         <div style="font-weight:500;">${m.cliente}</div>
         ${m.ubicacion !== 'N/A' ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">${m.ubicacion}</div>` : ''}
       </td>
+      ${customTds}
       <td>
         <div style="display:flex; gap:0.25rem;">
           <button class="action-btn" onclick="verDetalleCliente('${m.cliente.replace(/'/g, "\\'")}')" title="Ver Perfil de la Empresa">
