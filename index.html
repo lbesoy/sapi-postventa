@@ -1698,31 +1698,79 @@
 
       <!-- Mapeo Clientes -->
       <div id="mapeo-content-clientes" class="mapeo-tab-content">
-        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
-          <div class="form-group">
-            <input type="text" id="lbl-cli-id" class="map-label-edit" value="ID del Cliente" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-cli-id" placeholder="CardCode" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-cli-nombre" class="map-label-edit" value="Nombre / Razón Social" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-cli-nombre" placeholder="CardName" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-cli-rfc" class="map-label-edit" value="RFC" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-cli-rfc" placeholder="LicTradNum" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-cli-email" class="map-label-edit" value="Correo Electrónico" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-cli-email" placeholder="E_Mail" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-cli-grupo" class="map-label-edit" value="Grupo Sinergia (UDF)" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-cli-grupo" placeholder="U_OK_Grupo" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-cli-saldo" class="map-label-edit" value="Saldo en Cuenta" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-cli-saldo" placeholder="Balance" style="font-family: monospace;"/>
-          </div>
+        <div style="overflow-x: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md);">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; min-width: 800px;">
+            <thead>
+              <tr>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-cli-id" class="map-label-edit" value="ID del Cliente" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 180px;">
+                  <input type="text" id="lbl-cli-nombre" class="map-label-edit" value="Nombre / Razón Social" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-cli-rfc" class="map-label-edit" value="RFC" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 180px;">
+                  <input type="text" id="lbl-cli-email" class="map-label-edit" value="Correo Electrónico" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-cli-grupo" class="map-label-edit" value="Grupo Sinergia (UDF)" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); min-width: 150px;">
+                  <input type="text" id="lbl-cli-saldo" class="map-label-edit" value="Saldo en Cuenta" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-cli-id" placeholder="Ej. CardCode" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-cli-nombre" placeholder="Ej. CardName" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-cli-rfc" placeholder="Ej. LicTradNum" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-cli-email" placeholder="Ej. E_Mail" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-cli-grupo" placeholder="Ej. U_OK_Grupo" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-cli-saldo" placeholder="Ej. Balance" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+              </tr>
+              <tr style="background: var(--bg-body);">
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. C23910)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. Empresa S.A.)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. EMP123456)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. contacto@...)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. VIP)</i></td>
+                <td style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. 1500.50)</i></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
         <hr style="margin: 1.5rem 0 1rem 0; border: none; border-top: 1px solid var(--border);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
@@ -1734,23 +1782,59 @@
 
       <!-- Mapeo Maquinaria -->
       <div id="mapeo-content-maquinaria" class="mapeo-tab-content" style="display:none;">
-        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
-          <div class="form-group">
-            <input type="text" id="lbl-maq-id" class="map-label-edit" value="Número de Serie (ID)" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-maq-id" placeholder="ManufacturerSerialNum" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-maq-itemcode" class="map-label-edit" value="Código de Artículo" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-maq-itemcode" placeholder="ItemCode" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-maq-desc" class="map-label-edit" value="Descripción / Modelo" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-maq-desc" placeholder="ItemDescription" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-maq-cliente" class="map-label-edit" value="ID del Cliente (CardCode)" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-maq-cliente" placeholder="CustomerCode" style="font-family: monospace;"/>
-          </div>
+        <div style="overflow-x: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md);">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; min-width: 600px;">
+            <thead>
+              <tr>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-maq-id" class="map-label-edit" value="Número de Serie (ID)" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-maq-itemcode" class="map-label-edit" value="Código de Artículo" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 180px;">
+                  <input type="text" id="lbl-maq-desc" class="map-label-edit" value="Descripción / Modelo" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); min-width: 150px;">
+                  <input type="text" id="lbl-maq-cliente" class="map-label-edit" value="ID Cliente (Dueño)" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-maq-id" placeholder="Ej. ManufacturerSerialNum" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-maq-itemcode" placeholder="Ej. ItemCode" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-maq-desc" placeholder="Ej. ItemDescription" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-maq-cliente" placeholder="Ej. CustomerCode" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+              </tr>
+              <tr style="background: var(--bg-body);">
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. SN-99882)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. A001-B)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. Motor de Bomba)</i></td>
+                <td style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. C23910)</i></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
         <hr style="margin: 1.5rem 0 1rem 0; border: none; border-top: 1px solid var(--border);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
@@ -1762,23 +1846,59 @@
 
       <!-- Mapeo Sitios -->
       <div id="mapeo-content-sitios" class="mapeo-tab-content" style="display:none;">
-        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
-          <div class="form-group">
-            <input type="text" id="lbl-sit-id" class="map-label-edit" value="ID del Sitio" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-sit-id" placeholder="Address" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-sit-nombre" class="map-label-edit" value="Nombre del Sitio" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-sit-nombre" placeholder="Street" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-sit-cliente" class="map-label-edit" value="ID del Cliente (CardCode)" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-sit-cliente" placeholder="BPCode" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-sit-direccion" class="map-label-edit" value="Dirección Completa" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-sit-direccion" placeholder="Block" style="font-family: monospace;"/>
-          </div>
+        <div style="overflow-x: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md);">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; min-width: 600px;">
+            <thead>
+              <tr>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-sit-id" class="map-label-edit" value="ID del Sitio" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-sit-nombre" class="map-label-edit" value="Nombre del Sitio" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-sit-cliente" class="map-label-edit" value="ID Cliente (CardCode)" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); min-width: 200px;">
+                  <input type="text" id="lbl-sit-direccion" class="map-label-edit" value="Dirección Completa" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-sit-id" placeholder="Ej. Address" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-sit-nombre" placeholder="Ej. Street" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-sit-cliente" placeholder="Ej. BPCode" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-sit-direccion" placeholder="Ej. Block" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+              </tr>
+              <tr style="background: var(--bg-body);">
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. SIT-10)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. Planta Norte)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. C23910)</i></td>
+                <td style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. Av. Principal 100...)</i></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
         <hr style="margin: 1.5rem 0 1rem 0; border: none; border-top: 1px solid var(--border);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
@@ -1790,31 +1910,79 @@
 
       <!-- Mapeo Órdenes -->
       <div id="mapeo-content-ordenes" class="mapeo-tab-content" style="display:none;">
-        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
-          <div class="form-group">
-            <input type="text" id="lbl-ord-id" class="map-label-edit" value="ID Órden (ServiceCallID)" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ord-id" placeholder="ServiceCallID" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-ord-cliente" class="map-label-edit" value="ID Cliente (CardCode)" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ord-cliente" placeholder="CustomerCode" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-ord-maquina" class="map-label-edit" value="Número de Serie Maquinaria" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ord-maquina" placeholder="ManufacturerSerialNum" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-ord-tecnico" class="map-label-edit" value="Técnico Asignado" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ord-tecnico" placeholder="TechnicianCode" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-ord-estado" class="map-label-edit" value="Estatus" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ord-estado" placeholder="Status" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-ord-falla" class="map-label-edit" value="Descripción / Falla" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ord-falla" placeholder="Description" style="font-family: monospace;"/>
-          </div>
+        <div style="overflow-x: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md);">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; min-width: 900px;">
+            <thead>
+              <tr>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-ord-id" class="map-label-edit" value="ID Órden" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-ord-cliente" class="map-label-edit" value="ID Cliente (CardCode)" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-ord-maquina" class="map-label-edit" value="Nº Serie Maquinaria" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-ord-tecnico" class="map-label-edit" value="Técnico Asignado" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 120px;">
+                  <input type="text" id="lbl-ord-estado" class="map-label-edit" value="Estatus" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); min-width: 180px;">
+                  <input type="text" id="lbl-ord-falla" class="map-label-edit" value="Descripción / Falla" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-ord-id" placeholder="Ej. ServiceCallID" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-ord-cliente" placeholder="Ej. CustomerCode" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-ord-maquina" placeholder="Ej. ManufacturerSerialNum" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-ord-tecnico" placeholder="Ej. TechnicianCode" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-ord-estado" placeholder="Ej. Status" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-ord-falla" placeholder="Ej. Description" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+              </tr>
+              <tr style="background: var(--bg-body);">
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. 10423)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. C23910)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. SN-99882)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. 102)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. Abierto)</i></td>
+                <td style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. Falla en motor principal)</i></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
         <hr style="margin: 1.5rem 0 1rem 0; border: none; border-top: 1px solid var(--border);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
@@ -1826,23 +1994,59 @@
 
       <!-- Mapeo Técnicos -->
       <div id="mapeo-content-tecnicos" class="mapeo-tab-content" style="display:none;">
-        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
-          <div class="form-group">
-            <input type="text" id="lbl-tec-id" class="map-label-edit" value="ID del Técnico (EmpID)" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-tec-id" placeholder="EmployeeID" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-tec-nombre" class="map-label-edit" value="Nombre Completo" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-tec-nombre" placeholder="FirstName" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-tec-telefono" class="map-label-edit" value="Teléfono" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-tec-telefono" placeholder="MobilePhone" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-tec-email" class="map-label-edit" value="Correo Electrónico" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-tec-email" placeholder="eMail" style="font-family: monospace;"/>
-          </div>
+        <div style="overflow-x: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md);">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; min-width: 600px;">
+            <thead>
+              <tr>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-tec-id" class="map-label-edit" value="ID del Técnico" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 180px;">
+                  <input type="text" id="lbl-tec-nombre" class="map-label-edit" value="Nombre Completo" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-tec-telefono" class="map-label-edit" value="Teléfono" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); min-width: 180px;">
+                  <input type="text" id="lbl-tec-email" class="map-label-edit" value="Correo Electrónico" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-tec-id" placeholder="Ej. EmployeeID" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-tec-nombre" placeholder="Ej. FirstName" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-tec-telefono" placeholder="Ej. MobilePhone" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-tec-email" placeholder="Ej. eMail" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+              </tr>
+              <tr style="background: var(--bg-body);">
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. 102)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. Valeria Hernández)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. 55-1234-5678)</i></td>
+                <td style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. valeria@eurorep.com)</i></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
         <hr style="margin: 1.5rem 0 1rem 0; border: none; border-top: 1px solid var(--border);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
@@ -1854,31 +2058,79 @@
 
       <!-- Mapeo Refacciones -->
       <div id="mapeo-content-refacciones" class="mapeo-tab-content" style="display:none;">
-        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
-          <div class="form-group">
-            <input type="text" id="lbl-ref-id" class="map-label-edit" value="ID / Código de Refacción" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ref-id" placeholder="ItemCode" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-ref-nombre" class="map-label-edit" value="Descripción / Nombre" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ref-nombre" placeholder="ItemName" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-ref-grupo" class="map-label-edit" value="Grupo de Artículo" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ref-grupo" placeholder="ItmsGrpNam" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-ref-precio" class="map-label-edit" value="Precio" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ref-precio" placeholder="Price" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-ref-stock" class="map-label-edit" value="Stock / Existencias" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ref-stock" placeholder="OnHand" style="font-family: monospace;"/>
-          </div>
-          <div class="form-group">
-            <input type="text" id="lbl-ref-origen" class="map-label-edit" value="Origen (Nacional/Importado)" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); background:transparent; border:none; border-bottom:1px dashed var(--border); margin-bottom:0.25rem; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
-            <input type="text" id="map-ref-origen" placeholder="Origen" style="font-family: monospace;"/>
-          </div>
+        <div style="overflow-x: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md);">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; min-width: 900px;">
+            <thead>
+              <tr>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-ref-id" class="map-label-edit" value="Código de Refacción" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 180px;">
+                  <input type="text" id="lbl-ref-nombre" class="map-label-edit" value="Descripción / Nombre" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-ref-grupo" class="map-label-edit" value="Grupo de Artículo" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 120px;">
+                  <input type="text" id="lbl-ref-precio" class="map-label-edit" value="Precio" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 120px;">
+                  <input type="text" id="lbl-ref-stock" class="map-label-edit" value="Stock (Existencias)" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); min-width: 150px;">
+                  <input type="text" id="lbl-ref-origen" class="map-label-edit" value="Origen (UDF)" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-ref-id" placeholder="Ej. ItemCode" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-ref-nombre" placeholder="Ej. ItemName" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-ref-grupo" placeholder="Ej. ItmsGrpNam" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-ref-precio" placeholder="Ej. Price" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-ref-stock" placeholder="Ej. OnHand" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-ref-origen" placeholder="Ej. Origen" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+              </tr>
+              <tr style="background: var(--bg-body);">
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. REF-001)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. Filtro de Aceite)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. Consumibles)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. 150.00)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. 45)</i></td>
+                <td style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. Nacional)</i></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
         
         <hr style="margin: 1.5rem 0 1rem 0; border: none; border-top: 1px solid var(--border);">
