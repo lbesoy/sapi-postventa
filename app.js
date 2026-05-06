@@ -14,6 +14,7 @@ let tickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
 let clientesDb = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
 let refaccionesDb = JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]');
 let tecnicosDb = JSON.parse(localStorage.getItem('sapi_tecnicos_db') || '[]');
+let sitiosDb = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
 
 // Sincronización con Supabase (escuchar cuando los datos bajen a localStorage)
 window.addEventListener('supabase_datos_cargados', () => {
@@ -21,6 +22,7 @@ window.addEventListener('supabase_datos_cargados', () => {
   tickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
   clientesDb = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
   tecnicosDb = JSON.parse(localStorage.getItem('sapi_tecnicos_db') || '[]');
+  sitiosDb = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
   usuarios = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
   
   // Re-render UI
@@ -206,13 +208,13 @@ let ROLES = {
   superadmin: {
     label: 'Super Administrador',
     color: '#E8820C',
-    views: ['dashboard','servicios','tickets','clientes','maquinaria','refacciones','tecnicos','config','preferencias'],
+    views: ['dashboard','servicios','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias'],
     canSwitchRoles: true,
   },
   admin: {
     label: 'Administrador',
     color: '#4f8ef7',
-    views: ['dashboard','servicios','tickets','clientes','maquinaria','refacciones','tecnicos','config','preferencias'],
+    views: ['dashboard','servicios','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias'],
   },
   supervisor: {
     label: 'Supervisor',
@@ -1432,6 +1434,12 @@ async function forzarSincronizacionSAP() {
       localStorage.setItem('sapi_tecnicos_db', JSON.stringify(tecnicosDb));
     }
     
+    const newDataSitios = await fetchSitiosSAP();
+    if (newDataSitios && newDataSitios.length > 0) {
+      sitiosDb = newDataSitios;
+      localStorage.setItem('sapi_sitios_db', JSON.stringify(sitiosDb));
+    }
+    
     mostrarNotificacion('Catálogos sincronizados con SAP exitosamente.', 'success');
   } catch (error) {
     console.error("Error SAP:", error);
@@ -1464,6 +1472,34 @@ async function fetchTecnicosSAP() {
   } catch (err) {
     console.error("Error fetchTecnicosSAP:", err);
     return tecnicosDb;
+  }
+}
+
+async function fetchSitiosSAP() {
+  if (!API_CONFIG.USE_SAP_BACKEND) return sitiosDb;
+  if (!configData || !configData.querySitios) return sitiosDb;
+  
+  try {
+    const queryCode = encodeURIComponent(configData.querySitios);
+    const url = `${API_CONFIG.BASE_URL}/sap/queries/${queryCode}/execute?_t=${Date.now()}`;
+    const response = await fetch(url);
+    if (!response.ok) return sitiosDb;
+    const sapData = await response.json();
+    
+    const map = (configData.mappings && configData.mappings.sitios) ? configData.mappings.sitios : {
+      id: 'Address', nombre: 'Street', cliente: 'BPCode', direccion: 'Block'
+    };
+    
+    const sitiosMapeados = sapData.map(s => ({
+      id: s[map.id] || '',
+      nombre: s[map.nombre] || 'Sitio Desconocido',
+      cliente: s[map.cliente] || '',
+      direccion: s[map.direccion] || ''
+    }));
+    return sitiosMapeados;
+  } catch (err) {
+    console.error("Error fetchSitiosSAP:", err);
+    return sitiosDb;
   }
 }
 
@@ -3479,29 +3515,43 @@ function renderSitios() {
   
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   const isEmpresa = currentSession.viewMode === 'empresa';
-  if (!isEmpresa || !currentUser) {
-    body.innerHTML = `<tr><td colspan="2" class="empty-state">Esta vista es solo para empresas.</td></tr>`;
+  const isAdmin = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
+  
+  if (!isEmpresa && !isAdmin) {
+    body.innerHTML = `<tr><td colspan="4" class="empty-state">No tienes permisos para ver Sitios.</td></tr>`;
     return;
   }
   
-  const clienteObj = clientesDb.find(c => c.nombre === (currentUser.empresa || currentUser.nombre));
-  let sitios = clienteObj && clienteObj.sitios ? clienteObj.sitios : [];
-  if (clienteObj && clienteObj.ubicacion && !sitios.some(s => getSitioNombre(s) === clienteObj.ubicacion)) {
-    sitios = [clienteObj.ubicacion, ...sitios];
+  let sitiosList = [];
+  
+  if (isAdmin) {
+    sitiosList = sitiosDb;
+  } else {
+    const clienteObj = clientesDb.find(c => c.nombre === (currentUser.empresa || currentUser.nombre));
+    let sitios = clienteObj && clienteObj.sitios ? clienteObj.sitios : [];
+    if (clienteObj && clienteObj.ubicacion && !sitios.some(s => getSitioNombre(s) === clienteObj.ubicacion)) {
+      sitios = [clienteObj.ubicacion, ...sitios];
+    }
+    sitiosList = sitios;
   }
   
-  if (sitios.length === 0) {
-    body.innerHTML = `<tr><td colspan="4" class="empty-state">No tienes sitios registrados.</td></tr>`;
+  if (!sitiosList || sitiosList.length === 0) {
+    body.innerHTML = `<tr><td colspan="4" class="empty-state">No se encontraron sitios registrados.</td></tr>`;
     return;
   }
   
-  body.innerHTML = sitios.map((s, idx) => {
+  body.innerHTML = sitiosList.map((s, idx) => {
     const isObj = typeof s === 'object' && s !== null;
     const sNombre = isObj ? s.nombre : s;
     const sCp = isObj && s.cp ? s.cp : 'N/A';
     const sCiudad = isObj && s.ciudad ? s.ciudad : '';
     const sEstado = isObj && s.estado ? s.estado : '';
     const sDireccion = isObj && s.direccion ? s.direccion : '';
+    
+    // Si es admin, mostramos el ID y el BPCode (cliente)
+    const sId = isObj && s.id ? s.id : '-';
+    const sCliente = isObj && s.cliente ? s.cliente : '-';
+    
     const sLoc = [sCiudad, sEstado].filter(Boolean).join(', ') || 'N/A';
 
     return `
@@ -3512,13 +3562,14 @@ function renderSitios() {
           <div>
             <div>${sNombre}</div>
             ${sDireccion ? `<div style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">${sDireccion}</div>` : ''}
+            ${isAdmin && sCliente !== '-' ? `<div style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal; margin-top:2px;">Cliente: ${sCliente}</div>` : ''}
           </div>
         </div>
       </td>
-      <td><span class="badge" style="background:var(--bg-hover);color:var(--text-muted);">${sCp}</span></td>
+      <td><span class="badge" style="background:var(--bg-hover);color:var(--text-muted);">${isAdmin ? sId : sCp}</span></td>
       <td><span style="font-size:0.9rem; color:var(--text-secondary);">${sLoc}</span></td>
       <td>
-        <button class="action-btn del" onclick="eliminarSitioEmpresa('${idx}')" title="Eliminar Sitio"><i data-lucide="trash-2"></i></button>
+        ${!isAdmin ? `<button class="action-btn del" onclick="eliminarSitioEmpresa('${idx}')" title="Eliminar Sitio"><i data-lucide="trash-2"></i></button>` : `<button class="action-btn" onclick="mostrarNotificacion('Vista de detalle en construcción', 'info')" title="Ver detalles"><i data-lucide="eye"></i></button>`}
       </td>
     </tr>
     `;
