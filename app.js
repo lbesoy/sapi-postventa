@@ -2875,9 +2875,17 @@ function renderTecnicos() {
   const userTecs = usuarios.filter(u => u.rol === 'tecnico').map(u => formatNombreCorto(u.nombre));
   const sapTecs = tecnicosDb.map(t => formatNombreCorto(t.nombre)).filter(Boolean);
   
+  let tecsArr = [];
+  if (API_CONFIG.USE_SAP_BACKEND && sapTecs.length > 0) {
+    // Si SAP está activo, usar ESTRICTAMENTE los técnicos activos de SAP para evitar revivir inactivos del historial
+    tecsArr = [...sapTecs];
+  } else {
+    tecsArr = [...legacyTecs, ...userTecs, ...sapTecs];
+  }
+  
   // Filtrar explícitamente cualquier técnico que se llame "N/A" (proveniente de bases locales viejas)
-  const tecs = [...new Set([...legacyTecs, ...userTecs, ...sapTecs])]
-    .filter(t => t.toUpperCase() !== 'N/A' && t.trim() !== '')
+  const tecs = [...new Set(tecsArr)]
+    .filter(t => !t.toUpperCase().includes('N/A') && t.trim() !== '')
     .sort();
   
   if (!tecs.length) {
