@@ -1434,6 +1434,42 @@ async function forzarSincronizacionSAP() {
     if (newDataTec && newDataTec.length > 0) {
       tecnicosDb = newDataTec;
       localStorage.setItem('sapi_tecnicos_db', JSON.stringify(tecnicosDb));
+      
+      // Auto-generar usuarios para técnicos de SAP
+      let allUsers = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+      let usersChanged = false;
+      
+      tecnicosDb.forEach(t => {
+        if (!t.nombre || t.nombre === 'Sin Nombre') return;
+        
+        // Formatear: Nombre y primer apellido (ej. "Adrian Franco")
+        const partes = t.nombre.trim().split(' ').filter(Boolean);
+        let nombreCorto = t.nombre;
+        if (partes.length >= 2) {
+          nombreCorto = `${partes[0]} ${partes[1]}`;
+        }
+        
+        // Verificar si ya existe (por nombre original o corto)
+        const existe = allUsers.find(u => u.nombre === nombreCorto || u.nombre === t.nombre || (u.email && u.email.includes(nombreCorto.toLowerCase().replace(/\s+/g, ''))));
+        
+        if (!existe) {
+          allUsers.push({
+            id: crypto.randomUUID(),
+            nombre: nombreCorto,
+            email: nombreCorto.toLowerCase().replace(/\s+/g, '') + '@tecnico.eurorep.com',
+            pin: '0000',
+            rol: 'tecnico',
+            activo: true, // Auto-aprobado
+            locked: false
+          });
+          usersChanged = true;
+        }
+      });
+      
+      if (usersChanged) {
+        localStorage.setItem('eurorep_usuarios', JSON.stringify(allUsers));
+        usuarios = allUsers;
+      }
     }
     
     const newDataSitios = await fetchSitiosSAP();
