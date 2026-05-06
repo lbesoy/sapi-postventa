@@ -140,6 +140,22 @@ app.get('/api/clientes/:id/ordenes', ensureSAPConnection, async (req, res) => {
     }
 });
 
+// Obtener Técnicos (Empleados de Ventas / OSLP) nativamente de Service Layer
+app.get('/api/tecnicos', ensureSAPConnection, async (req, res) => {
+    try {
+        const response = await sapApi.get(`${SAP_URL}/SalesPersons?$select=SalesEmployeeCode,SalesEmployeeName,Remarks`);
+        const tecnicos = (response.data.value || []).map(t => ({
+            SlpCode: t.SalesEmployeeCode,
+            SlpName: t.SalesEmployeeName,
+            Memo: t.Remarks || ''
+        }));
+        res.json(tecnicos);
+    } catch (error) {
+        console.error('Error obteniendo Técnicos de OSLP:', error.response?.data || error.message);
+        res.status(500).json({ error: 'Error obteniendo técnicos de SAP', details: error.message });
+    }
+});
+
 // Obtener todos los Queries SQL registrados en SAP
 app.get('/api/sap/queries', ensureSAPConnection, async (req, res) => {
     try {

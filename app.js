@@ -1447,16 +1447,14 @@ async function forzarSincronizacionSAP() {
 
 async function fetchTecnicosSAP() {
   if (!API_CONFIG.USE_SAP_BACKEND) return tecnicosDb;
-  if (!configData || !configData.queryTecnicos) return tecnicosDb;
   
   try {
-    const queryCode = encodeURIComponent(configData.queryTecnicos);
-    const url = `${API_CONFIG.BASE_URL}/sap/queries/${queryCode}/execute?_t=${Date.now()}`;
+    const url = `${API_CONFIG.BASE_URL}/tecnicos?_t=${Date.now()}`;
     const response = await fetch(url);
     if (!response.ok) return tecnicosDb;
     const sapData = await response.json();
     
-    // Mapear la respuesta de SAP (Esperamos Memo, SlpCode, SlpName)
+    // Mapear la respuesta de SAP (Esperamos Memo, SlpCode, SlpName desde nuestro backend)
     const tecnicosMapeados = sapData.map(t => ({
       id: t.SlpCode || '',
       nombre: t.SlpName || 'Sin Nombre',
