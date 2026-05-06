@@ -2858,17 +2858,10 @@ function renderTecnicos() {
   const grid = document.getElementById('tecnicos-grid');
   const tbody = document.getElementById('tecnicos-table-body');
   
-  const formatNombreCorto = (nombre) => {
-    if (!nombre) return '';
-    const partes = nombre.trim().split(' ').filter(Boolean);
-    if (partes.length >= 2) return `${partes[0]} ${partes[1]}`;
-    return nombre.trim();
-  };
-  
   // Combine legacy technitians from orders with actual registered user technitians and SAP technitians
-  const legacyTecs = ordenes.map(o => o.tecnico).filter(Boolean).map(formatNombreCorto);
-  const userTecs = usuarios.filter(u => u.rol === 'tecnico').map(u => formatNombreCorto(u.nombre));
-  const sapTecs = tecnicosDb.map(t => formatNombreCorto(t.nombre)).filter(Boolean);
+  const legacyTecs = ordenes.map(o => o.tecnico).filter(Boolean).map(n => n.trim());
+  const userTecs = usuarios.filter(u => u.rol === 'tecnico').map(u => u.nombre.trim());
+  const sapTecs = tecnicosDb.map(t => t.nombre.trim()).filter(Boolean);
   
   const tecs = [...new Set([...legacyTecs, ...userTecs, ...sapTecs])].sort();
   
@@ -2879,18 +2872,18 @@ function renderTecnicos() {
   }
   
   grid.innerHTML = tecs.map(t => {
-    const total = ordenes.filter(o => formatNombreCorto(o.tecnico) === t).length;
-    const comp = ordenes.filter(o => formatNombreCorto(o.tecnico) === t && o.estado === 'Completado').length;
+    const total = ordenes.filter(o => o.tecnico?.trim() === t).length;
+    const comp = ordenes.filter(o => o.tecnico?.trim() === t && o.estado === 'Completado').length;
     
     // Calcular Siguiente Ticket y Último Resuelto usando el sistema de tickets
-    const tTickets = tickets.filter(tk => formatNombreCorto(tk.asignado) === t);
+    const tTickets = tickets.filter(tk => tk.asignado?.trim() === t);
     const ticketsAbiertos = tTickets.filter(tk => tk.estado !== 'Resuelto' && tk.estado !== 'Cerrado');
     const proxTicket = ticketsAbiertos.length > 0 ? ticketsAbiertos[0] : null; // El más antiguo abierto
     
     const ticketsCerrados = tTickets.filter(tk => tk.estado === 'Resuelto' || tk.estado === 'Cerrado');
     const ultResuelto = ticketsCerrados.length > 0 ? ticketsCerrados[ticketsCerrados.length - 1] : null; // El más reciente cerrado
 
-    const tecObj = tecnicosDb.find(x => formatNombreCorto(x.nombre) === t);
+    const tecObj = tecnicosDb.find(x => x.nombre.trim() === t);
     const celular = tecObj?.celular || 'Sin celular';
     const tipoUsuario = tecObj?.tipoUsuario || 'Técnico';
 
@@ -2932,17 +2925,17 @@ function renderTecnicos() {
   
   if (tbody) {
     tbody.innerHTML = tecs.map(t => {
-      const total = ordenes.filter(o => formatNombreCorto(o.tecnico) === t).length;
-      const comp = ordenes.filter(o => formatNombreCorto(o.tecnico) === t && o.estado === 'Completado').length;
+      const total = ordenes.filter(o => o.tecnico?.trim() === t).length;
+      const comp = ordenes.filter(o => o.tecnico?.trim() === t && o.estado === 'Completado').length;
 
-      const tTickets = tickets.filter(tk => formatNombreCorto(tk.asignado) === t);
+      const tTickets = tickets.filter(tk => tk.asignado?.trim() === t);
       const ticketsAbiertos = tTickets.filter(tk => tk.estado !== 'Resuelto' && tk.estado !== 'Cerrado');
       const proxTicket = ticketsAbiertos.length > 0 ? ticketsAbiertos[0] : null; 
       
       const ticketsCerrados = tTickets.filter(tk => tk.estado === 'Resuelto' || tk.estado === 'Cerrado');
       const ultResuelto = ticketsCerrados.length > 0 ? ticketsCerrados[ticketsCerrados.length - 1] : null;
 
-      const tecObj = tecnicosDb.find(x => formatNombreCorto(x.nombre) === t);
+      const tecObj = tecnicosDb.find(x => x.nombre.trim() === t);
       const celular = tecObj?.celular || 'Sin celular';
       const tipoUsuario = tecObj?.tipoUsuario || 'Técnico';
 
