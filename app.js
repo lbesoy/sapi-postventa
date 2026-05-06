@@ -512,7 +512,7 @@ function cargarConfig() {
   if (configData.queryMaquinaria) document.getElementById('cfg-query-maquinaria').value = configData.queryMaquinaria;
   if (configData.querySitios) document.getElementById('cfg-query-sitios').value = configData.querySitios;
   if (configData.queryOrdenes) document.getElementById('cfg-query-ordenes').value = configData.queryOrdenes;
-  if (configData.queryTecnicos) document.getElementById('cfg-query-tecnicos').value = configData.queryTecnicos;
+
   if (configData.queryRefacciones) document.getElementById('cfg-query-refacciones').value = configData.queryRefacciones;
   
   const dmToggle = document.getElementById('cfg-darkmode');
@@ -541,7 +541,7 @@ function guardarConfig() {
     queryMaquinaria: document.getElementById('cfg-query-maquinaria').value.trim(),
     querySitios: document.getElementById('cfg-query-sitios').value.trim(),
     queryOrdenes: document.getElementById('cfg-query-ordenes').value.trim(),
-    queryTecnicos: document.getElementById('cfg-query-tecnicos').value.trim(),
+
     queryRefacciones: document.getElementById('cfg-query-refacciones').value.trim()
   };
   localStorage.setItem('eurorep_config', JSON.stringify(configData));
@@ -811,7 +811,7 @@ async function cargarListaQueriesSAP() {
     if (configData.queryMaquinaria) document.getElementById('cfg-query-maquinaria').value = configData.queryMaquinaria;
     if (configData.querySitios) document.getElementById('cfg-query-sitios').value = configData.querySitios;
     if (configData.queryOrdenes) document.getElementById('cfg-query-ordenes').value = configData.queryOrdenes;
-    if (configData.queryTecnicos) document.getElementById('cfg-query-tecnicos').value = configData.queryTecnicos;
+
     if (configData.queryRefacciones) document.getElementById('cfg-query-refacciones').value = configData.queryRefacciones;
 
     mostrarNotificacion('Lista de Queries actualizada desde SAP.', 'success');
