@@ -3860,7 +3860,7 @@ function actualizarMapaMaquinaria(filteredData) {
   });
   
   if (bounds.length > 0) {
-    maqMap.fitBounds(bounds, { padding: [30, 30] });
+    maqMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 5 });
   } else if (plotted === 0) {
     // No hay datos, resetear al centro de México
     maqMap.setView([23.6345, -102.5528], 5);
