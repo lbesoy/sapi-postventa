@@ -157,6 +157,7 @@
         <button class="role-mode-btn" data-role="supervisor" onclick="switchMode('supervisor')"><i data-lucide="clipboard-check"></i> Supervisor</button>
         <button class="role-mode-btn" data-role="tecnico" onclick="switchMode('tecnico')"><i data-lucide="hard-hat"></i> Técnico</button>
         <button class="role-mode-btn" data-role="empresa" onclick="switchMode('empresa')"><i data-lucide="building-2"></i> Empresa</button>
+        <button class="role-mode-btn" data-role="consulta" onclick="switchMode('consulta')"><i data-lucide="eye"></i> Consulta</button>
       </div>
     </div>
     <div class="topbar-right" id="topbar-right">
@@ -615,6 +616,7 @@
               <option value="supervisor">Supervisor</option>
               <option value="tecnico">Técnico / Instalador</option>
               <option value="empresa">Empresa / Cliente</option>
+              <option value="consulta">Consulta</option>
             </select>
           </div>
           
@@ -1504,6 +1506,14 @@
                 <div class="rol-card-icon" style="background:rgba(139,92,246,0.12);color:#8b5cf6;"><i data-lucide="building-2"></i></div>
                 <div class="rol-card-name">Empresa / Cliente</div>
                 <div class="rol-card-desc">Solo sus Tickets. Vista de seguimiento</div>
+              </div>
+            </label>
+            <label class="rol-card">
+              <input type="radio" name="u-rol" value="consulta" onchange="toggleEmpresaField(this)"/>
+              <div class="rol-card-inner">
+                <div class="rol-card-icon" style="background:rgba(100,116,139,0.12);color:#64748b;"><i data-lucide="eye"></i></div>
+                <div class="rol-card-name">Consulta</div>
+                <div class="rol-card-desc">Vista general, sin crear tickets/órdenes</div>
               </div>
             </label>
           </div>
