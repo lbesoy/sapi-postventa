@@ -638,9 +638,9 @@ function abrirModalMapeo() {
   // Cargar Columnas Personalizadas Existentes
   const modulos = ['clientes', 'maquinaria', 'sitios', 'ordenes', 'tecnicos', 'refacciones'];
   modulos.forEach(mod => {
-    const container = document.getElementById(`custom-columns-${mod}`);
-    if (container) {
-      container.innerHTML = ''; // Limpiar anteriores
+    const table = document.querySelector(`#mapeo-content-${mod} table`);
+    if (table) {
+      table.querySelectorAll('.custom-added-col').forEach(el => el.remove()); // Limpiar anteriores
       if (mappings[mod] && mappings[mod].customCols) {
         mappings[mod].customCols.forEach(col => {
           addCustomColumnUI(mod, col.label, col.key);
@@ -649,7 +649,6 @@ function abrirModalMapeo() {
     }
   });
 }
-
 
 function getLabelsForModule(mod) {
   const labels = {};
@@ -693,28 +692,76 @@ function switchMapeoTab(tabId) {
 }
 
 function addCustomColumnUI(module, label = '', key = '') {
-  const container = document.getElementById('custom-columns-' + module);
-  if(!container) return;
-  const div = document.createElement('div');
-  div.className = 'custom-col-row';
-  div.style = "display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.5rem; align-items: center;";
-  div.innerHTML = `
-    <input type="text" class="custom-label" placeholder="Nombre en Tabla (Ej. País)" value="${label}" style="font-size:0.85rem; padding:0.4rem; border:1px solid var(--border); border-radius:4px;">
-    <input type="text" class="custom-key" placeholder="Columna SAP (Ej. Country)" value="${key}" style="font-family:monospace; font-size:0.85rem; padding:0.4rem; border:1px solid var(--border); border-radius:4px;">
-    <button class="btn-secondary" style="color:var(--red); padding:0.4rem;" onclick="this.parentElement.remove()" title="Eliminar columna">✕</button>
+  const table = document.querySelector(`#mapeo-content-${module} table`);
+  if (!table) return;
+  
+  const theadTr = table.querySelector('thead tr');
+  const tbodyTrs = table.querySelectorAll('tbody tr');
+  const inputRow = tbodyTrs[0];
+  const exampleRow = tbodyTrs[1];
+
+  const colId = 'custom-' + Date.now() + Math.floor(Math.random() * 1000);
+
+  // 1. Agregar el <th>
+  const th = document.createElement('th');
+  th.style = "padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 200px;";
+  th.className = "custom-added-col";
+  th.dataset.colId = colId;
+  th.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <input type="text" class="custom-label map-label-edit" placeholder="Nombre Columna" value="${label}" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:80%; outline:none;"/>
+      <button onclick="removeCustomColumn('${module}', '${colId}')" style="background:none; border:none; color:var(--red); cursor:pointer; font-size:1.1rem; padding:0 5px;" title="Eliminar Columna">✕</button>
+    </div>
   `;
-  container.appendChild(div);
+  theadTr.appendChild(th);
+
+  // 2. Agregar el <td> del input
+  const tdInput = document.createElement('td');
+  tdInput.style = "padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);";
+  tdInput.className = "custom-added-col";
+  tdInput.dataset.colId = colId;
+  tdInput.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:0.25rem;">
+      <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;" title="Deja en blanco si es un valor propio de la App">Columna SAP o Int:</span>
+      <input type="text" class="custom-key" placeholder="(En blanco = Valor Interno)" value="${key}" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+    </div>
+  `;
+  inputRow.appendChild(tdInput);
+
+  // 3. Agregar el <td> del ejemplo
+  const tdExample = document.createElement('td');
+  tdExample.style = "padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border); text-align:center;";
+  tdExample.className = "custom-added-col";
+  tdExample.dataset.colId = colId;
+  tdExample.innerHTML = `<i>(Personalizado)</i>`;
+  exampleRow.appendChild(tdExample);
+}
+
+function removeCustomColumn(module, colId) {
+  const table = document.querySelector(`#mapeo-content-${module} table`);
+  if (!table) return;
+  const elements = table.querySelectorAll(`[data-col-id="${colId}"]`);
+  elements.forEach(el => el.remove());
 }
 
 function getCustomColumnsForModule(module) {
-  const container = document.getElementById('custom-columns-' + module);
-  if(!container) return [];
-  const rows = container.querySelectorAll('.custom-col-row');
+  const table = document.querySelector(`#mapeo-content-${module} table`);
+  if (!table) return [];
+  
   const cols = [];
-  rows.forEach(row => {
-    const label = row.querySelector('.custom-label').value.trim();
-    const key = row.querySelector('.custom-key').value.trim();
-    if (label && key) cols.push({ label, key });
+  const headers = table.querySelectorAll('th.custom-added-col');
+  headers.forEach(th => {
+    const colId = th.dataset.colId;
+    const label = th.querySelector('.custom-label').value.trim();
+    const tdInput = table.querySelector(`td.custom-added-col[data-col-id="${colId}"]`);
+    let key = '';
+    if(tdInput) {
+       key = tdInput.querySelector('.custom-key').value.trim();
+    }
+    // Permitir llave vacía para columnas "Internas" que no se conectan a SAP
+    if (label) {
+      cols.push({ label, key });
+    }
   });
   return cols;
 }
