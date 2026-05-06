@@ -1410,8 +1410,8 @@ let hasSyncedSAPThisSession = false;
 async function forzarSincronizacionSAP() {
   if (isSincronizandoSAP) return;
   
-  const icon = document.getElementById('icon-sync-sap');
-  if (icon) icon.classList.add('rotating');
+  const icons = document.querySelectorAll('.icon-sync-sap');
+  icons.forEach(i => i.classList.add('rotating'));
   isSincronizandoSAP = true;
   
   try {
@@ -1446,10 +1446,11 @@ async function forzarSincronizacionSAP() {
     mostrarNotificacion('Error al conectar con SAP B1. Usando caché local.', 'error');
   } finally {
     isSincronizandoSAP = false;
-    if (icon) icon.classList.remove('rotating');
+    icons.forEach(i => i.classList.remove('rotating'));
     renderClientes();
     renderRefacciones();
     if (typeof renderTecnicos === 'function') renderTecnicos();
+    if (typeof renderSitios === 'function') renderSitios();
   }
 }
 
