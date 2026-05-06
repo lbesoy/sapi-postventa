@@ -351,6 +351,9 @@
               </div>
             </div>
           </div>
+          <button class="action-btn" onclick="abrirModalAgregarMaquina()" style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--accent); color:white; border-radius:var(--radius-sm); font-size:0.85rem; font-weight:500; border:none; cursor:pointer;">
+            <i data-lucide="plus" style="width:16px;height:16px;"></i> Máquina
+          </button>
           <button class="action-btn btn-sync-sap" onclick="forzarSincronizacionSAP()" title="Sincronizar con SAP" style="height: 38px; width: 38px; display:flex; align-items:center; justify-content:center; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; transition:var(--transition);">
             <i data-lucide="refresh-cw" class="icon-sync-sap" style="width:16px; height:16px;"></i>
           </button>
@@ -1164,6 +1167,16 @@
                 <option value="" disabled selected>Seleccione una ubicación...</option>
               </select>
               <input type="text" id="am-ubicacion-otra" placeholder="Escriba la ubicación..." style="display:none; margin-top:0.5rem;"/>
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <label>Coordenadas (Para el Mapa interactivo)</label>
+                <a href="https://maps.google.com" target="_blank" style="font-size:0.75rem; color:var(--accent); text-decoration:none;"><i data-lucide="external-link" style="width:12px;height:12px;"></i> Buscar en Google Maps</a>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-top:0.2rem;">
+                <input type="number" step="any" id="am-latitud" placeholder="Latitud (Ej. 19.4326)"/>
+                <input type="number" step="any" id="am-longitud" placeholder="Longitud (Ej. -99.1332)"/>
+              </div>
             </div>
           </div>
           <div id="am-custom-fields-container" style="display:none; margin-top:1rem; padding-top:1rem; border-top:1px dashed var(--border);"></div>

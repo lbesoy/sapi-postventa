@@ -2650,6 +2650,8 @@ function editarMaquina(clienteNombre, idInterno) {
         document.getElementById('am-serie').value = maquina.serie || '';
         document.getElementById('am-anio').value = maquina.anio || '';
         document.getElementById('am-venta').value = maquina.venta || '';
+        document.getElementById('am-latitud').value = maquina.latitud || '';
+        document.getElementById('am-longitud').value = maquina.longitud || '';
         
         const currentSelectUbicacion = document.getElementById('am-ubicacion-select');
         let ubiFound = false;
@@ -2708,6 +2710,8 @@ function guardarNuevaMaquina(e) {
   const selectUbicacion = document.getElementById('am-ubicacion-select');
   const inputOtraUbicacion = document.getElementById('am-ubicacion-otra');
   const ubicacion = selectUbicacion.value === 'otra' ? inputOtraUbicacion.value.trim() : selectUbicacion.value.trim();
+  const latitud = document.getElementById('am-latitud').value.trim();
+  const longitud = document.getElementById('am-longitud').value.trim();
 
   if (!clienteSeleccionado || !modelo) return;
 
@@ -2734,12 +2738,12 @@ function guardarNuevaMaquina(e) {
     if (maquinaIdx >= 0) {
       clienteObj.maquinas[maquinaIdx] = {
         ...clienteObj.maquinas[maquinaIdx],
-        marca, modelo, serie, anio, venta, ubicacion
+        marca, modelo, serie, anio, venta, ubicacion, latitud, longitud
       };
     }
   } else {
     const idInterno = generarIdInternoMaquina(marca, venta || anio);
-    clienteObj.maquinas.push({ idInterno, marca, modelo, serie, anio, venta, ubicacion });
+    clienteObj.maquinas.push({ idInterno, marca, modelo, serie, anio, venta, ubicacion, latitud, longitud });
   }
   
   localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
@@ -3644,7 +3648,9 @@ function renderMaquinaria() {
             serie: m.serie || 'N/A',
             anio: m.anio || 'N/A',
             venta: m.venta || '',
-            ubicacion: m.ubicacion || 'N/A'
+            ubicacion: m.ubicacion || 'N/A',
+            latitud: m.latitud,
+            longitud: m.longitud
           });
         }
       });
@@ -3810,6 +3816,10 @@ function actualizarMapaMaquinaria(filteredData) {
       if (kLat) lat = parseFloat(m.customData[kLat]);
       if (kLng) lng = parseFloat(m.customData[kLng]);
     }
+    
+    // Fallback a las coordenadas manuales si existen
+    if (!lat && m.latitud) lat = parseFloat(m.latitud);
+    if (!lng && m.longitud) lng = parseFloat(m.longitud);
     
     if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
       const logoPath = getLogoMarca(m.marca);
