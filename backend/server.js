@@ -143,11 +143,19 @@ app.get('/api/clientes/:id/ordenes', ensureSAPConnection, async (req, res) => {
 // Obtener Técnicos (Empleados de Ventas / OSLP) nativamente de Service Layer
 app.get('/api/tecnicos', ensureSAPConnection, async (req, res) => {
     try {
-        const response = await sapApi.get(`${SAP_URL}/SalesPersons?$select=SalesEmployeeCode,SalesEmployeeName,Remarks`);
+        // Query SQL equivalente:
+        // SELECT T0."Memo" as ID_SLP, T0."SlpCode" as ID_SAP, T0."SlpName" as Nombre, T0."Fax" as Tipo_Usuario,  T0."Mobil" as Celular
+        // FROM OSLP T0 Where T0."SlpCode" <> -1 and T0."Active" = 'Y' and T0."Fax" <> 'N/A' order by T0."Memo"
+        const queryParams = `$select=Remarks,SalesEmployeeCode,SalesEmployeeName,Fax,Mobile&$filter=SalesEmployeeCode ne -1 and Active eq 'tYES' and Fax ne 'N/A'&$orderby=Remarks asc`;
+        
+        const response = await sapApi.get(`${SAP_URL}/SalesPersons?${queryParams}`);
+        
         const tecnicos = (response.data.value || []).map(t => ({
             SlpCode: t.SalesEmployeeCode,
             SlpName: t.SalesEmployeeName,
-            Memo: t.Remarks || ''
+            Memo: t.Remarks || '',
+            TipoUsuario: t.Fax || '',
+            Celular: t.Mobile || ''
         }));
         res.json(tecnicos);
     } catch (error) {

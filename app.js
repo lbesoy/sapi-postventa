@@ -1509,11 +1509,13 @@ async function fetchTecnicosSAP() {
     if (!response.ok) return tecnicosDb;
     const sapData = await response.json();
     
-    // Mapear la respuesta de SAP (Esperamos Memo, SlpCode, SlpName desde nuestro backend)
+    // Mapear la respuesta de SAP (Esperamos Memo, SlpCode, SlpName, TipoUsuario, Celular desde nuestro backend)
     const tecnicosMapeados = sapData.map(t => ({
       id: t.SlpCode || '',
       nombre: t.SlpName || 'Sin Nombre',
-      memo: t.Memo || ''
+      memo: t.Memo || '',
+      tipoUsuario: t.TipoUsuario || '',
+      celular: t.Celular || ''
     }));
     return tecnicosMapeados;
   } catch (err) {
