@@ -143,10 +143,11 @@ app.get('/api/clientes/:id/ordenes', ensureSAPConnection, async (req, res) => {
 // Obtener Técnicos (Empleados de Ventas / OSLP) nativamente de Service Layer
 app.get('/api/tecnicos', ensureSAPConnection, async (req, res) => {
     try {
-        // Query SQL equivalente:
-        // SELECT T0."Memo" as ID_SLP, T0."SlpCode" as ID_SAP, T0."SlpName" as Nombre, T0."Fax" as Tipo_Usuario,  T0."Mobil" as Celular
-        // FROM OSLP T0 Where T0."SlpCode" <> -1 and T0."Active" = 'Y' and T0."Fax" <> 'N/A' order by T0."Memo"
-        const queryParams = `$select=Remarks,SalesEmployeeCode,SalesEmployeeName,Fax,Mobile&$filter=SalesEmployeeCode ne -1 and Active eq 'tYES' and Fax ne 'N/A'&$orderby=Remarks asc`;
+        // En SQL, T0."Fax" <> 'N/A' excluye automáticamente los valores NULL. 
+        // En OData, 'ne' sobre un null devuelve true, por lo que debemos excluir null explícitamente.
+        // Además, el caracter '/' en 'N/A' debe ir codificado en la URL.
+        const filterStr = "SalesEmployeeCode ne -1 and Active eq 'tYES' and Fax ne 'N/A' and Fax ne null";
+        const queryParams = `$select=Remarks,SalesEmployeeCode,SalesEmployeeName,Fax,Mobile&$filter=${encodeURIComponent(filterStr)}&$orderby=Remarks asc`;
         
         const response = await sapApi.get(`${SAP_URL}/SalesPersons?${queryParams}`);
         
