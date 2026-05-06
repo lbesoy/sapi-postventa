@@ -13,12 +13,14 @@ let ordenes = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
 let tickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
 let clientesDb = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
 let refaccionesDb = JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]');
+let tecnicosDb = JSON.parse(localStorage.getItem('sapi_tecnicos_db') || '[]');
 
 // Sincronización con Supabase (escuchar cuando los datos bajen a localStorage)
 window.addEventListener('supabase_datos_cargados', () => {
   ordenes = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
   tickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
   clientesDb = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+  tecnicosDb = JSON.parse(localStorage.getItem('sapi_tecnicos_db') || '[]');
   usuarios = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
   
   // Re-render UI
@@ -1424,6 +1426,12 @@ async function forzarSincronizacionSAP() {
       localStorage.setItem('sapi_refacciones_db', JSON.stringify(refaccionesDb));
     }
     
+    const newDataTec = await fetchTecnicosSAP();
+    if (newDataTec && newDataTec.length > 0) {
+      tecnicosDb = newDataTec;
+      localStorage.setItem('sapi_tecnicos_db', JSON.stringify(tecnicosDb));
+    }
+    
     mostrarNotificacion('Catálogos sincronizados con SAP exitosamente.', 'success');
   } catch (error) {
     console.error("Error SAP:", error);
@@ -1433,6 +1441,31 @@ async function forzarSincronizacionSAP() {
     if (icon) icon.classList.remove('rotating');
     renderClientes();
     renderRefacciones();
+    if (typeof renderTecnicos === 'function') renderTecnicos();
+  }
+}
+
+async function fetchTecnicosSAP() {
+  if (!API_CONFIG.USE_SAP_BACKEND) return tecnicosDb;
+  if (!configData || !configData.queryTecnicos) return tecnicosDb;
+  
+  try {
+    const queryCode = encodeURIComponent(configData.queryTecnicos);
+    const url = `${API_CONFIG.BASE_URL}/sap/queries/${queryCode}/execute?_t=${Date.now()}`;
+    const response = await fetch(url);
+    if (!response.ok) return tecnicosDb;
+    const sapData = await response.json();
+    
+    // Mapear la respuesta de SAP (Esperamos Memo, SlpCode, SlpName)
+    const tecnicosMapeados = sapData.map(t => ({
+      id: t.SlpCode || '',
+      nombre: t.SlpName || 'Sin Nombre',
+      memo: t.Memo || ''
+    }));
+    return tecnicosMapeados;
+  } catch (err) {
+    console.error("Error fetchTecnicosSAP:", err);
+    return tecnicosDb;
   }
 }
 
@@ -2664,11 +2697,12 @@ function renderTecnicos() {
   const grid = document.getElementById('tecnicos-grid');
   const tbody = document.getElementById('tecnicos-table-body');
   
-  // Combine legacy technitians from orders with actual registered user technitians
+  // Combine legacy technitians from orders with actual registered user technitians and SAP technitians
   const legacyTecs = ordenes.map(o => o.tecnico).filter(Boolean);
   const userTecs = usuarios.filter(u => u.rol === 'tecnico').map(u => u.nombre);
+  const sapTecs = tecnicosDb.map(t => t.nombre).filter(Boolean);
   
-  const tecs = [...new Set([...legacyTecs, ...userTecs])];
+  const tecs = [...new Set([...legacyTecs, ...userTecs, ...sapTecs])].sort();
   
   if (!tecs.length) {
     grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;padding:2rem;">Sin técnicos registrados aún.</div>`;
