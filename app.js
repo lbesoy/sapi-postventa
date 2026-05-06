@@ -3812,7 +3812,22 @@ function actualizarMapaMaquinaria(filteredData) {
     }
     
     if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
-      const marker = L.marker([lat, lng]).bindPopup(`
+      const logoPath = getLogoMarca(m.marca);
+      
+      const customIcon = L.divIcon({
+        className: 'custom-map-pin',
+        html: `
+          <div style="background:white; border-radius:50%; padding:3px; box-shadow:0 3px 6px rgba(0,0,0,0.3); width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:2px solid var(--accent); position:relative; z-index:2;">
+            <img src="${logoPath}" style="width:100%; height:100%; object-fit:contain; border-radius:50%;" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1000/1000109.png'"/>
+          </div>
+          <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid var(--accent); position:absolute; bottom:-7px; left:50%; transform:translateX(-50%); z-index:1;"></div>
+        `,
+        iconSize: [42, 50],
+        iconAnchor: [21, 50],
+        popupAnchor: [0, -50]
+      });
+
+      const marker = L.marker([lat, lng], { icon: customIcon }).bindPopup(`
         <div style="font-family:'Inter',sans-serif; text-align:center;">
           <div style="font-weight:600; font-size:0.9rem;">${m.modelo}</div>
           <div style="font-size:0.75rem; color:#666;">SN: ${m.serie}</div>
