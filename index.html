@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
@@ -322,6 +324,10 @@
       <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
         <h2>Catálogo de Maquinaria</h2>
         <div style="display:flex; gap:0.5rem; flex-wrap:nowrap; align-items:center; flex:1; justify-content:flex-end;">
+          <div class="view-toggle" style="display:flex; gap:0.5rem;">
+            <button class="btn-secondary active" id="btn-maq-lista" onclick="setMaqView('lista')" title="Vista Tabla" style="padding:0.4rem; background:var(--accent-light); border-color:var(--accent); color:var(--accent);"><i data-lucide="list" style="width:18px;height:18px;"></i></button>
+            <button class="btn-secondary" id="btn-maq-mapa" onclick="setMaqView('mapa')" title="Vista Mapa" style="padding:0.4rem;"><i data-lucide="map" style="width:18px;height:18px;"></i></button>
+          </div>
           <div class="search-bar" style="width:100%; max-width:400px; margin:0;">
             <input type="text" id="search-maquinaria" placeholder="Buscar máquina, serie o cliente..." oninput="renderMaquinaria()"/>
           </div>
@@ -350,7 +356,7 @@
           </button>
         </div>
       </div>
-      <div class="table-wrapper">
+      <div class="table-wrapper" id="maquinaria-list-wrapper">
         <table class="orders-table">
           <thead>
             <tr>
@@ -367,6 +373,9 @@
             <tr><td colspan="7" class="empty-state">Cargando maquinaria...</td></tr>
           </tbody>
         </table>
+      </div>
+      <div id="maquinaria-map-wrapper" style="display:none; width:100%; height:600px; border-radius:var(--radius-md); border:1px solid var(--border); overflow:hidden; margin-top:1rem; position:relative; z-index:1;">
+        <div id="maquinaria-map" style="width:100%; height:100%;"></div>
       </div>
     </div>
 
@@ -1157,6 +1166,7 @@
               <input type="text" id="am-ubicacion-otra" placeholder="Escriba la ubicación..." style="display:none; margin-top:0.5rem;"/>
             </div>
           </div>
+          <div id="am-custom-fields-container" style="display:none; margin-top:1rem; padding-top:1rem; border-top:1px dashed var(--border);"></div>
         </div>
         
         <div class="form-actions">

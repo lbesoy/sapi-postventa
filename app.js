@@ -3549,6 +3549,47 @@ function badgeTicketEstado(estado) {
 }
 
 // ===== MAQUINARIA VIEW =====
+let currentMaqView = 'lista';
+let maqMap = null;
+let maqMapMarkers = [];
+
+function setMaqView(view) {
+  currentMaqView = view;
+  const btnLista = document.getElementById('btn-maq-lista');
+  const btnMapa = document.getElementById('btn-maq-mapa');
+  
+  if (btnLista) {
+    btnLista.style.background = view === 'lista' ? 'var(--accent-light)' : 'transparent';
+    btnLista.style.color = view === 'lista' ? 'var(--accent)' : 'var(--text-muted)';
+    btnLista.style.borderColor = view === 'lista' ? 'var(--accent)' : 'transparent';
+  }
+  if (btnMapa) {
+    btnMapa.style.background = view === 'mapa' ? 'var(--accent-light)' : 'transparent';
+    btnMapa.style.color = view === 'mapa' ? 'var(--accent)' : 'var(--text-muted)';
+    btnMapa.style.borderColor = view === 'mapa' ? 'var(--accent)' : 'transparent';
+  }
+  
+  document.getElementById('maquinaria-list-wrapper').style.display = view === 'lista' ? 'block' : 'none';
+  const pagCtr = document.getElementById('maquinaria-pagination');
+  if (pagCtr) pagCtr.style.display = view === 'lista' ? 'flex' : 'none';
+  
+  document.getElementById('maquinaria-map-wrapper').style.display = view === 'mapa' ? 'block' : 'none';
+  
+  if (view === 'mapa') {
+    if (!maqMap) {
+      // Centro de México aproximado por defecto
+      maqMap = L.map('maquinaria-map').setView([23.6345, -102.5528], 5);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        maxZoom: 19
+      }).addTo(maqMap);
+    }
+    setTimeout(() => {
+      maqMap.invalidateSize();
+      renderMaquinaria(); // Forzar update de pines
+    }, 200);
+  }
+}
 
 function toggleSortMaquinaria(col) {
   if (currentMaqSortCol === col) {
@@ -3694,6 +3735,7 @@ function renderMaquinaria() {
   if (filtered.length === 0) {
     const colspan = (isEmpresa ? 6 : 7) + (configData.mappings?.maquinaria?.customCols?.length || 0);
     body.innerHTML = `<tr><td colspan="${colspan}" class="empty-state">No se encontró maquinaria.</td></tr>`;
+    actualizarMapaMaquinaria(filtered);
     return;
   }
 
@@ -3740,10 +3782,59 @@ function renderMaquinaria() {
     `;
   }).join('');
   
+  actualizarMapaMaquinaria(filtered);
   lucide.createIcons();
   
   // Inicializar resizers cada vez que se renderiza o se ordena, asegurando que estén activos
   setTimeout(initTableResizers, 100);
+}
+
+function actualizarMapaMaquinaria(filteredData) {
+  if (!maqMap || currentMaqView !== 'mapa') return;
+  
+  // Limpiar pines existentes
+  maqMapMarkers.forEach(m => maqMap.removeLayer(m));
+  maqMapMarkers = [];
+  
+  let bounds = [];
+  let plotted = 0;
+  
+  filteredData.forEach(m => {
+    // Buscar Latitud y Longitud en customData
+    let lat = null, lng = null;
+    if (m.customData) {
+      // Buscar llaves que digan latitud/longitud ignorando mayúsculas
+      const keys = Object.keys(m.customData);
+      const kLat = keys.find(k => k.toLowerCase() === 'latitud');
+      const kLng = keys.find(k => k.toLowerCase() === 'longitud');
+      if (kLat) lat = parseFloat(m.customData[kLat]);
+      if (kLng) lng = parseFloat(m.customData[kLng]);
+    }
+    
+    if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+      const marker = L.marker([lat, lng]).bindPopup(`
+        <div style="font-family:'Inter',sans-serif; text-align:center;">
+          <div style="font-weight:600; font-size:0.9rem;">${m.modelo}</div>
+          <div style="font-size:0.75rem; color:#666;">SN: ${m.serie}</div>
+          <div style="margin-top:0.4rem; padding-top:0.4rem; border-top:1px solid #ddd; font-size:0.8rem;">
+            <strong>${m.cliente}</strong><br>
+            ${m.ubicacion !== 'N/A' ? m.ubicacion : ''}
+          </div>
+        </div>
+      `);
+      marker.addTo(maqMap);
+      maqMapMarkers.push(marker);
+      bounds.push([lat, lng]);
+      plotted++;
+    }
+  });
+  
+  if (bounds.length > 0) {
+    maqMap.fitBounds(bounds, { padding: [30, 30] });
+  } else if (plotted === 0) {
+    // No hay datos, resetear al centro de México
+    maqMap.setView([23.6345, -102.5528], 5);
+  }
 }
 
 function renderRefacciones() {
