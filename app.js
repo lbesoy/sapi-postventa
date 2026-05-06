@@ -3847,6 +3847,11 @@ function actualizarMapaMaquinaria(filteredData) {
           </div>
         </div>
       `);
+      
+      marker.on('dblclick', function() {
+        maqMap.flyTo([lat, lng], 18, { animate: true, duration: 1.5 });
+      });
+
       marker.addTo(maqMap);
       maqMapMarkers.push(marker);
       bounds.push([lat, lng]);
