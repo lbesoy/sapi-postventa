@@ -2843,6 +2843,10 @@ function renderTecnicos() {
     const ticketsCerrados = tTickets.filter(tk => tk.estado === 'Resuelto' || tk.estado === 'Cerrado');
     const ultResuelto = ticketsCerrados.length > 0 ? ticketsCerrados[ticketsCerrados.length - 1] : null; // El más reciente cerrado
 
+    const tecObj = tecnicosDb.find(x => formatNombreCorto(x.nombre) === t);
+    const celular = tecObj?.celular || 'Sin celular';
+    const tipoUsuario = tecObj?.tipoUsuario || 'Técnico';
+
     const proxTxt = proxTicket ? `<span style="color:var(--text-primary);">${proxTicket.cliente}</span> <span style="color:var(--text-muted);">(${proxTicket.fecha})</span>` : '<span style="color:var(--text-muted);">Ninguno</span>';
     const ultTxt = ultResuelto ? `<span style="color:var(--text-primary);">${ultResuelto.cliente}</span> <span style="color:var(--text-muted);">(${ultResuelto.fecha})</span>` : '<span style="color:var(--text-muted);">Ninguno</span>';
 
@@ -2850,6 +2854,11 @@ function renderTecnicos() {
     <div class="card-person" onclick="verDetalleTecnico('${t.replace(/'/g, "\\'")}')" style="cursor:pointer; display:flex; flex-direction:column; gap:0.5rem; padding:1.25rem;">
       <div>
         <div class="card-person-name" style="margin-bottom:0.2rem;">${t}</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem; display:flex; align-items:center; gap:0.5rem;">
+          <span style="display:flex; align-items:center; gap:0.2rem;"><i data-lucide="briefcase" style="width:12px;height:12px;"></i> ${tipoUsuario}</span>
+          <span>&bull;</span>
+          <span style="display:flex; align-items:center; gap:0.2rem;"><i data-lucide="phone" style="width:12px;height:12px;"></i> ${celular}</span>
+        </div>
         <div class="card-person-sub" style="display:flex; justify-content:space-between;">
           <span>${total} servicio(s) históricos</span>
           <span style="color:var(--green); font-weight:500;">${comp} Completados</span>
@@ -2886,12 +2895,21 @@ function renderTecnicos() {
       const ticketsCerrados = tTickets.filter(tk => tk.estado === 'Resuelto' || tk.estado === 'Cerrado');
       const ultResuelto = ticketsCerrados.length > 0 ? ticketsCerrados[ticketsCerrados.length - 1] : null;
 
+      const tecObj = tecnicosDb.find(x => formatNombreCorto(x.nombre) === t);
+      const celular = tecObj?.celular || 'Sin celular';
+      const tipoUsuario = tecObj?.tipoUsuario || 'Técnico';
+
       const proxTxt = proxTicket ? `<div style="font-weight:500;">${proxTicket.cliente}</div><div style="font-size:0.75rem; color:var(--text-muted);">${proxTicket.fecha}</div>` : '<span style="color:var(--text-muted);">Ninguno</span>';
       const ultTxt = ultResuelto ? `<div style="font-weight:500;">${ultResuelto.cliente}</div><div style="font-size:0.75rem; color:var(--text-muted);">${ultResuelto.fecha}</div>` : '<span style="color:var(--text-muted);">Ninguno</span>';
 
       return `
         <tr onclick="verDetalleTecnico('${t.replace(/'/g, "\\'")}')" style="cursor:pointer;" class="hover-row">
-          <td style="font-weight:500;">${t}</td>
+          <td>
+            <div style="font-weight:500;">${t}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); display:flex; align-items:center; gap:0.4rem; margin-top:2px;">
+              <span>${tipoUsuario}</span> &bull; <span>${celular}</span>
+            </div>
+          </td>
           <td>${total}</td>
           <td><span class="badge badge-completado">${comp} completados</span></td>
           <td>${proxTxt}</td>
