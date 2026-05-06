@@ -1496,6 +1496,7 @@ async function forzarSincronizacionSAP() {
     if (typeof renderTecnicos === 'function') renderTecnicos();
     if (typeof renderSitios === 'function') renderSitios();
     if (typeof renderMaquinaria === 'function') renderMaquinaria();
+    if (typeof renderUsuariosList === 'function') renderUsuariosList();
   }
 }
 
