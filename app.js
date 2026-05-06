@@ -2891,8 +2891,14 @@ function renderTecnicos() {
   }
   
   // Filtrar explícitamente cualquier técnico que se llame "N/A" (proveniente de bases locales viejas)
+  // y también excluir a los usuarios que tengan el rol o tipo de usuario "consulta"
   const tecs = [...new Set(tecsArr)]
     .filter(t => !t.toUpperCase().includes('N/A') && t.trim() !== '')
+    .filter(t => {
+      const tecObj = tecnicosDb.find(x => formatNombreCorto(x.nombre) === t) || usuarios.find(u => formatNombreCorto(u.nombre) === t);
+      const tRol = (tecObj?.tipoUsuario || tecObj?.rol || '').toLowerCase();
+      return !tRol.includes('consulta');
+    })
     .sort();
   
   if (!tecs.length) {
