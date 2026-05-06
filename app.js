@@ -1494,27 +1494,34 @@ async function forzarSincronizacionSAP() {
       tecnicosDb.forEach(t => {
         if (!t.nombre || t.nombre === 'Sin Nombre') return;
         
-        // Formatear: Nombre y primer apellido (ej. "Adrian Franco")
-        const partes = t.nombre.trim().split(' ').filter(Boolean);
-        let nombreCorto = t.nombre;
-        if (partes.length >= 2) {
-          nombreCorto = `${partes[0]} ${partes[1]}`;
-        }
+        const nombreCompleto = t.nombre.trim();
         
-        // Verificar si ya existe (por nombre original o corto)
-        const existe = allUsers.find(u => u.nombre === nombreCorto || u.nombre === t.nombre || (u.email && u.email.includes(nombreCorto.toLowerCase().replace(/\s+/g, ''))));
+        // Mapear rol desde TipoUsuario (que viene del campo Fax en SAP)
+        const rawRole = (t.tipoUsuario || '').toLowerCase().trim();
+        let mappedRole = 'tecnico'; // default
+        if (rawRole.includes('consulta')) mappedRole = 'consulta';
+        else if (rawRole.includes('supervisor')) mappedRole = 'supervisor';
+        
+        // Verificar si ya existe
+        const existe = allUsers.find(u => u.nombre === nombreCompleto || (u.email && u.email.includes(nombreCompleto.toLowerCase().replace(/\s+/g, ''))));
         
         if (!existe) {
           allUsers.push({
             id: crypto.randomUUID(),
-            nombre: nombreCorto,
-            email: nombreCorto.toLowerCase().replace(/\s+/g, '') + '@tecnico.eurorep.com',
+            nombre: nombreCompleto,
+            email: nombreCompleto.toLowerCase().replace(/\s+/g, '') + '@eurorep.com',
             pin: '0000',
-            rol: 'tecnico',
+            rol: mappedRole,
             activo: true, // Auto-aprobado
             locked: false
           });
           usersChanged = true;
+        } else {
+          // Si existe pero su rol de SAP cambió (y no es un admin), actualizarlo
+          if (existe.rol !== mappedRole && ['tecnico', 'supervisor', 'consulta'].includes(existe.rol)) {
+            existe.rol = mappedRole;
+            usersChanged = true;
+          }
         }
       });
       
