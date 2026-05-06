@@ -15,6 +15,7 @@ let clientesDb = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
 let refaccionesDb = JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]');
 let tecnicosDb = JSON.parse(localStorage.getItem('sapi_tecnicos_db') || '[]');
 let sitiosDb = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+let maquinariaDb = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
 
 // Sincronización con Supabase (escuchar cuando los datos bajen a localStorage)
 window.addEventListener('supabase_datos_cargados', () => {
@@ -23,6 +24,7 @@ window.addEventListener('supabase_datos_cargados', () => {
   clientesDb = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
   tecnicosDb = JSON.parse(localStorage.getItem('sapi_tecnicos_db') || '[]');
   sitiosDb = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+  maquinariaDb = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
   usuarios = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
   
   // Re-render UI
@@ -1440,6 +1442,12 @@ async function forzarSincronizacionSAP() {
       localStorage.setItem('sapi_sitios_db', JSON.stringify(sitiosDb));
     }
     
+    const newDataMaquinaria = await fetchMaquinariaSAP();
+    if (newDataMaquinaria && newDataMaquinaria.length > 0) {
+      maquinariaDb = newDataMaquinaria;
+      localStorage.setItem('sapi_maquinaria_db', JSON.stringify(maquinariaDb));
+    }
+    
     mostrarNotificacion('Catálogos sincronizados con SAP exitosamente.', 'success');
   } catch (error) {
     console.error("Error SAP:", error);
@@ -1451,6 +1459,7 @@ async function forzarSincronizacionSAP() {
     renderRefacciones();
     if (typeof renderTecnicos === 'function') renderTecnicos();
     if (typeof renderSitios === 'function') renderSitios();
+    if (typeof renderMaquinaria === 'function') renderMaquinaria();
   }
 }
 
@@ -1501,6 +1510,37 @@ async function fetchSitiosSAP() {
   } catch (err) {
     console.error("Error fetchSitiosSAP:", err);
     return sitiosDb;
+  }
+}
+
+async function fetchMaquinariaSAP() {
+  if (!API_CONFIG.USE_SAP_BACKEND) return maquinariaDb;
+  if (!configData || !configData.queryMaquinaria) return maquinariaDb;
+  
+  try {
+    const queryCode = encodeURIComponent(configData.queryMaquinaria);
+    const url = `${API_CONFIG.BASE_URL}/sap/queries/${queryCode}/execute?_t=${Date.now()}`;
+    const response = await fetch(url);
+    if (!response.ok) return maquinariaDb;
+    const sapData = await response.json();
+    
+    const map = (configData.mappings && configData.mappings.maquinaria) ? configData.mappings.maquinaria : {
+      id: 'ManufacturerSerialNum', itemcode: 'ItemCode', desc: 'ItemDescription', cliente: 'CustomerCode'
+    };
+    
+    const maquinariaMapeada = sapData.map(m => ({
+      serie: m[map.id] || '',
+      marca: '', // SAP no suele tener un campo "Marca" directo en la tarjeta, o se mapea a otro
+      modelo: m[map.itemcode] || '',
+      anio: '',
+      cliente: m[map.cliente] || '',
+      idInterno: m[map.itemcode] || '',
+      descripcion: m[map.desc] || ''
+    }));
+    return maquinariaMapeada;
+  } catch (err) {
+    console.error("Error fetchMaquinariaSAP:", err);
+    return maquinariaDb;
   }
 }
 
@@ -3346,20 +3386,40 @@ function renderMaquinaria() {
   const nombreEmpresaLogged = isEmpresa && currentUser ? (currentUser.empresa || currentUser.nombre) : null;
 
   let allMachines = [];
+  
+  // Agregar máquinas de SAP
+  maquinariaDb.forEach(m => {
+    if (isEmpresa && m.cliente !== nombreEmpresaLogged) return;
+    allMachines.push({
+      cliente: m.cliente || 'N/A',
+      idInterno: m.idInterno || 'N/A',
+      marca: m.marca || '',
+      modelo: m.modelo || m.descripcion || 'Sin Modelo',
+      serie: m.serie || 'N/A',
+      anio: m.anio || 'N/A',
+      venta: m.venta || '',
+      ubicacion: m.ubicacion || m.cliente || 'N/A' // Si no hay ubicación en SAP, mostramos el cliente
+    });
+  });
+
+  // Combinar con máquinas creadas manualmente en clientesDb
   clientesDb.forEach(c => {
     if (isEmpresa && c.nombre !== nombreEmpresaLogged) return; // Filtro de seguridad
     if (c.maquinas) {
       c.maquinas.forEach(m => {
-        allMachines.push({
-          cliente: c.nombre,
-          idInterno: m.idInterno || 'N/A',
-          marca: m.marca || '',
-          modelo: m.modelo || 'Sin Modelo',
-          serie: m.serie || 'N/A',
-          anio: m.anio || 'N/A',
-          venta: m.venta || '',
-          ubicacion: m.ubicacion || 'N/A'
-        });
+        // Evitar duplicados por serie si ya vino de SAP
+        if (!allMachines.some(sm => sm.serie === m.serie && sm.serie !== 'N/A')) {
+          allMachines.push({
+            cliente: c.nombre,
+            idInterno: m.idInterno || 'N/A',
+            marca: m.marca || '',
+            modelo: m.modelo || 'Sin Modelo',
+            serie: m.serie || 'N/A',
+            anio: m.anio || 'N/A',
+            venta: m.venta || '',
+            ubicacion: m.ubicacion || 'N/A'
+          });
+        }
       });
     }
   });
