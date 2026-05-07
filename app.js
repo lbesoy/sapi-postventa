@@ -3762,27 +3762,10 @@ function abrirFormulario(id) {
     poblarSoportesPorCliente('');
   }
   
-  // Llenar checkboxes de técnicos
+  // Llenar checkboxes de técnicos (se hace en onSoporteChange)
   const containerTecnicos = document.getElementById('f-tecnicos-container');
   if (containerTecnicos) {
-    containerTecnicos.innerHTML = '';
-    let assigned = [];
-    if (id) {
-      const o = ordenes.find(x => x.id === id);
-      if (o) {
-        if (o.tecnicosAsignados) assigned = o.tecnicosAsignados;
-        else if (o.tecnico) assigned = o.tecnico.split(',').map(s => s.trim());
-      }
-    }
-    usuarios.filter(u => u.rol === 'tecnico' && u.activo !== false).forEach(u => {
-      const isChecked = assigned.includes(u.nombre);
-      containerTecnicos.innerHTML += `
-        <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; background: var(--bg-body); padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem; line-height: 1.2;">
-          <input type="checkbox" name="f-tecnicos" value="${u.nombre}" ${isChecked ? 'checked' : ''} style="width:16px; height:16px; margin:0; margin-top:1px; flex-shrink:0;"/>
-          <span style="flex:1; text-align:left; font-weight:normal; color:var(--text-primary);">${u.nombre}</span>
-        </label>
-      `;
-    });
+    containerTecnicos.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:0.5rem;">Seleccione un Ticket para ver los técnicos asignados...</div>';
   }
   
   poblarMaquinasCliente('f-equipo', '', id ? ordenes.find(x => x.id === id)?.cliente : '');
@@ -3810,21 +3793,40 @@ function onSoporteChange() {
       metaDiv.innerHTML = `<i data-lucide="info" style="width:12px;height:12px;vertical-align:middle;"></i> <strong>Ticket ${t.folio}</strong> ligado &bull; Cotización SAP: ${t.cotizacionSAP || 'N/A'}`;
       metaDiv.style.display = 'block';
       
-      const inTecnicoChecks = document.querySelectorAll('input[name="f-tecnicos"]');
-      if (inTecnicoChecks.length > 0) {
-        // Desmarcar todos primero
-        inTecnicoChecks.forEach(cb => cb.checked = false);
-        
-        let assigned = [];
+      const containerTecnicos = document.getElementById('f-tecnicos-container');
+      if (containerTecnicos) {
+        containerTecnicos.innerHTML = '';
+        let ticketAssigned = [];
         if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) {
-          assigned = t.tecnicosAsignados;
+          ticketAssigned = t.tecnicosAsignados;
         } else if (t.asignado && t.asignado !== 'Sin asignar') {
-          assigned = t.asignado.split(',').map(s => s.trim());
+          ticketAssigned = t.asignado.split(',').map(s => s.trim());
         }
         
-        inTecnicoChecks.forEach(cb => {
-          if (assigned.includes(cb.value)) cb.checked = true;
-        });
+        let orderAssigned = ticketAssigned; // Por defecto marcar todos los del ticket
+        if (editandoId) {
+          const o = ordenes.find(x => x.id === editandoId);
+          if (o) {
+            if (o.tecnicosAsignados) orderAssigned = o.tecnicosAsignados;
+            else if (o.tecnico) orderAssigned = o.tecnico.split(',').map(s => s.trim());
+            // Si el usuario cambia de ticket en modo edición, restableceremos a ticketAssigned
+            if (o.soporte !== t.id) orderAssigned = ticketAssigned;
+          }
+        }
+        
+        if (ticketAssigned.length === 0) {
+          containerTecnicos.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:0.5rem;">El ticket no tiene técnicos asignados.</div>';
+        } else {
+          ticketAssigned.forEach(name => {
+            const isChecked = orderAssigned.includes(name);
+            containerTecnicos.innerHTML += `
+              <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; background: var(--bg-body); padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem; line-height: 1.2;">
+                <input type="checkbox" name="f-tecnicos" value="${name}" ${isChecked ? 'checked' : ''} style="width:16px; height:16px; margin:0; margin-top:1px; flex-shrink:0;"/>
+                <span style="flex:1; text-align:left; font-weight:normal; color:var(--text-primary);">${name}</span>
+              </label>
+            `;
+          });
+        }
       }
       
       if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -3834,6 +3836,10 @@ function onSoporteChange() {
     inPedido.readOnly = false;
     inPedido.style.background = '';
     if (metaDiv) metaDiv.style.display = 'none';
+    const containerTecnicos = document.getElementById('f-tecnicos-container');
+    if (containerTecnicos) {
+      containerTecnicos.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:0.5rem;">Seleccione un Ticket para ver los técnicos asignados...</div>';
+    }
   }
 }
 
