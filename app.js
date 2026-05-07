@@ -4446,6 +4446,9 @@ function abrirTicket(id) {
       const elCotSap = document.getElementById('t-cotizacion-sap');
       if (elCotSap) elCotSap.value = t.cotizacionSAP || '';
       
+      const elPedidoSap = document.getElementById('t-pedido-sap');
+      if (elPedidoSap) elPedidoSap.value = t.pedidoSAP || '';
+      
       const rAceptada = document.querySelector(`input[name="t-cot-aceptada"][value="${t.cotAceptada}"]`);
       if (rAceptada) rAceptada.checked = true;
       else {
@@ -4483,8 +4486,14 @@ function toggleMotivoRechazo() {
   const aceptada = document.querySelector('input[name="t-cot-aceptada"]:checked')?.value;
   const groupMotivo = document.getElementById('group-t-motivo-rechazo');
   const txtMotivo = document.getElementById('t-motivo-rechazo');
+  const groupPedido = document.getElementById('group-t-pedido');
+  const inPedidoSap = document.getElementById('t-pedido-sap');
+  
   if (groupMotivo) groupMotivo.style.display = (aceptada === 'no') ? 'block' : 'none';
   if (txtMotivo) txtMotivo.required = (aceptada === 'no');
+  
+  if (groupPedido) groupPedido.style.display = (aceptada === 'si') ? 'block' : 'none';
+  if (inPedidoSap) inPedidoSap.required = (aceptada === 'si');
 }
 
 function editarTicket(id) { abrirTicket(id); }
@@ -4670,22 +4679,18 @@ function guardarTicket(e) {
   
   if (!isEmpresa && estado === 'Cotización') {
     const cotSAP = document.getElementById('t-cotizacion-sap')?.value.trim();
-    const pdfUpload = document.getElementById('t-cotizacion-pdf')?.files.length > 0;
     
     if (!cotSAP) {
       mostrarNotificacion('Debe ingresar el Número de Cotización SAP para pasar a Cotización.', 'error');
       return;
-    }
-    
-    if (!pdfUpload) { 
-      mostrarNotificacion('Debe subir el archivo PDF de la cotización para pasar a este estado.', 'error'); 
-      return; 
     }
   }
 
   if (!isEmpresa && estado === 'Cerrado') {
     const cotAceptada = document.querySelector('input[name="t-cot-aceptada"]:checked')?.value;
     const motivoRechazo = document.getElementById('t-motivo-rechazo')?.value.trim() || '';
+    const pedidoSAP = document.getElementById('t-pedido-sap')?.value.trim() || '';
+    const pedidoPdfUpload = document.getElementById('t-pedido-pdf')?.files.length > 0;
     
     if (!cotAceptada) {
       mostrarNotificacion('Debe indicar si la cotización fue aceptada o rechazada para cerrar el ticket.', 'error');
@@ -4695,6 +4700,17 @@ function guardarTicket(e) {
     if (cotAceptada === 'no' && !motivoRechazo) {
       mostrarNotificacion('Debe especificar el motivo del rechazo.', 'error');
       return;
+    }
+    
+    if (cotAceptada === 'si') {
+      if (!pedidoSAP) {
+        mostrarNotificacion('Debe ingresar el Número de Pedido SAP para cerrar una cotización aceptada.', 'error');
+        return;
+      }
+      if (!pedidoPdfUpload) {
+        mostrarNotificacion('Debe adjuntar el archivo PDF del pedido para cerrar la cotización aceptada.', 'error');
+        return;
+      }
     }
   }
 
@@ -4720,7 +4736,8 @@ function guardarTicket(e) {
     estado,
     cotizacionSAP: document.getElementById('t-cotizacion-sap')?.value.trim() || '',
     cotAceptada: document.querySelector('input[name="t-cot-aceptada"]:checked')?.value || '',
-    motivoRechazo: document.getElementById('t-motivo-rechazo')?.value.trim() || ''
+    motivoRechazo: document.getElementById('t-motivo-rechazo')?.value.trim() || '',
+    pedidoSAP: document.getElementById('t-pedido-sap')?.value.trim() || ''
   };
   
   if (isEmpresa && !editandoTicketId && !ticket.asignado) {
@@ -4798,6 +4815,7 @@ function verDetalleTicket(id) {
         ${t.cotizacionSAP ? field('Cotización SAP', t.cotizacionSAP) : ''}
         ${t.cotAceptada ? field('Resultado', t.cotAceptada === 'si' ? '<span style="color:var(--success); display:inline-flex; align-items:center; gap:4px;"><i data-lucide="check-circle" style="width:14px;height:14px;"></i> Aprobada</span>' : '<span style="color:var(--danger); display:inline-flex; align-items:center; gap:4px;"><i data-lucide="x-circle" style="width:14px;height:14px;"></i> Rechazada</span>') : ''}
         ${t.motivoRechazo ? field('Motivo Rechazo', t.motivoRechazo) : ''}
+        ${t.pedidoSAP ? field('Pedido SAP', t.pedidoSAP) : ''}
       </div>
     </div>
     ` : ''}
@@ -4822,16 +4840,30 @@ function verDetalleTicket(id) {
         <label>¿El cliente aceptó la cotización?</label>
         <div style="display:flex; gap:1rem; margin-top:0.5rem; margin-bottom: 0.75rem;">
           <label style="cursor:pointer; display:flex; align-items:center; gap:0.25rem;">
-            <input type="radio" name="quick-cot-acep-${t.id}" value="si" onchange="document.getElementById('quick-motivo-${t.id}').style.display='none'"> 
+            <input type="radio" name="quick-cot-acep-${t.id}" value="si" onchange="document.getElementById('quick-motivo-${t.id}').style.display='none'; document.getElementById('quick-pedido-${t.id}').style.display='block';"> 
             <i data-lucide="check-circle" style="width:16px;height:16px;color:var(--success);"></i> Sí, aprobada
           </label>
           <label style="cursor:pointer; display:flex; align-items:center; gap:0.25rem;">
-            <input type="radio" name="quick-cot-acep-${t.id}" value="no" onchange="document.getElementById('quick-motivo-${t.id}').style.display='block'"> 
+            <input type="radio" name="quick-cot-acep-${t.id}" value="no" onchange="document.getElementById('quick-motivo-${t.id}').style.display='block'; document.getElementById('quick-pedido-${t.id}').style.display='none';"> 
             <i data-lucide="x-circle" style="width:16px;height:16px;color:var(--danger);"></i> No, rechazada
           </label>
         </div>
         <div id="quick-motivo-${t.id}" style="display:none; margin-bottom:0.75rem;">
           <textarea id="quick-motivo-text-${t.id}" rows="2" placeholder="Especifica el motivo por el cual fue rechazada..."></textarea>
+        </div>
+        <div id="quick-pedido-${t.id}" style="display:none; margin-bottom:0.75rem;">
+          <div class="form-group full-width">
+            <label>No. Pedido SAP *</label>
+            <input type="text" id="quick-pedido-sap-${t.id}" placeholder="Ej. PED-200450" />
+          </div>
+          <div class="form-group full-width" style="margin-top:0.5rem;">
+            <label>Archivo Pedido (PDF) *</label>
+            <label class="custom-file-upload">
+              <input type="file" id="quick-pedido-pdf-${t.id}" accept="application/pdf" onchange="updateFileLabel(this)"/>
+              <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
+              <span class="file-label-text">Subir pedido en PDF</span>
+            </label>
+          </div>
         </div>
         <button class="btn-primary full-width" style="justify-content:center;" onclick="cerrarCotizacionTicket('${t.id}')">Finalizar y Cerrar Ticket</button>
       </div>
@@ -4874,15 +4906,29 @@ function cerrarCotizacionTicket(id) {
     return;
   }
   let motivo = '';
+  let pedidoSAP = '';
   if (aceptada === 'no') {
     motivo = document.getElementById(`quick-motivo-text-${id}`)?.value.trim();
     if (!motivo) {
       mostrarNotificacion('Debes especificar el motivo del rechazo.', 'warning');
       return;
     }
+  } else if (aceptada === 'si') {
+    pedidoSAP = document.getElementById(`quick-pedido-sap-${id}`)?.value.trim();
+    const pdfUpload = document.getElementById(`quick-pedido-pdf-${id}`)?.files.length > 0;
+    if (!pedidoSAP) {
+      mostrarNotificacion('Debes ingresar el Número de Pedido SAP.', 'warning');
+      return;
+    }
+    if (!pdfUpload) {
+      mostrarNotificacion('Debes adjuntar el archivo PDF del pedido.', 'warning');
+      return;
+    }
   }
+  
   t.cotAceptada = aceptada;
   t.motivoRechazo = motivo;
+  t.pedidoSAP = pedidoSAP;
   t.estado = 'Cerrado';
   localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
   mostrarNotificacion('Ticket cerrado con éxito.', 'success');

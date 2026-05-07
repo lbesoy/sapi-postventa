@@ -1488,14 +1488,6 @@
               <label>No. Cotización SAP *</label>
               <input type="text" id="t-cotizacion-sap" placeholder="Ej. COT-100230" />
             </div>
-            <div class="form-group full-width" style="margin-top:0.75rem;">
-              <label>Archivo Cotización (PDF) *</label>
-              <label class="custom-file-upload">
-                <input type="file" id="t-cotizacion-pdf" accept="application/pdf" onchange="updateFileLabel(this)"/>
-                <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
-                <span class="file-label-text">Subir cotización en PDF</span>
-              </label>
-            </div>
           </div>
           
           <div id="group-t-cierre" style="display:none; margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border);">
@@ -1506,9 +1498,27 @@
                 <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;"><input type="radio" name="t-cot-aceptada" value="no" onchange="toggleMotivoRechazo()"/> No, rechazada</label>
               </div>
             </div>
+            
+            <!-- Mostrado si NO aceptada -->
             <div class="form-group full-width" id="group-t-motivo-rechazo" style="display:none; margin-top:0.75rem;">
               <label>Motivo del rechazo *</label>
               <textarea id="t-motivo-rechazo" rows="2" placeholder="Especifique por qué no se aceptó la cotización..."></textarea>
+            </div>
+            
+            <!-- Mostrado si SI aceptada -->
+            <div id="group-t-pedido" style="display:none; margin-top:0.75rem;">
+              <div class="form-group full-width">
+                <label>No. Pedido SAP *</label>
+                <input type="text" id="t-pedido-sap" placeholder="Ej. PED-200450" />
+              </div>
+              <div class="form-group full-width" style="margin-top:0.75rem;">
+                <label>Archivo Pedido (PDF) *</label>
+                <label class="custom-file-upload">
+                  <input type="file" id="t-pedido-pdf" accept="application/pdf" onchange="updateFileLabel(this)"/>
+                  <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
+                  <span class="file-label-text">Subir pedido en PDF</span>
+                </label>
+              </div>
             </div>
           </div>
         </div>
