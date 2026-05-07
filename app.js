@@ -4793,6 +4793,7 @@ async function guardarTicket(e) {
       }
     }
   }
+  const t_existente = editandoTicketId ? tickets.find(x=>x.id===editandoTicketId) : null;
 
   let pdfPedidoBase64 = t_existente ? t_existente.pdfPedido : null;
   const pedidoPdfInput = document.getElementById('t-pedido-pdf');
