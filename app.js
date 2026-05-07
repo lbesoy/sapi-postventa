@@ -4505,10 +4505,15 @@ function filterCombo(id, query) {
   });
 
   const addTextSpan = document.getElementById(id + '-add-text');
-  if (q && !foundMatch) {
-    addTextSpan.textContent = `Crear empresa: "${query}"`;
-  } else {
-    addTextSpan.textContent = `Crear nueva empresa`;
+  if (addTextSpan) {
+    const isSitio = id.includes('sitio');
+    const entityName = isSitio ? 'sitio' : 'empresa';
+    
+    if (q && !foundMatch) {
+      addTextSpan.textContent = `Crear ${entityName}: "${query}"`;
+    } else {
+      addTextSpan.textContent = `Crear nuev${isSitio ? 'o' : 'a'} ${entityName}`;
+    }
   }
 }
 
