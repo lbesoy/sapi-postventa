@@ -1476,8 +1476,23 @@
         <div class="form-section" id="section-t-estado">
           <div class="form-section-title"><i data-lucide="circle-dot" class="section-icon"></i> Estado</div>
           <div class="tipo-chips">
-            <label class="chip"><input type="radio" name="t-estado" value="Abierto" checked/><span>Abierto</span></label>
-            <label class="chip"><input type="radio" name="t-estado" value="Cerrado"/><span>Cerrado</span></label>
+            <label class="chip"><input type="radio" name="t-estado" value="Abierto" checked onchange="toggleResolucionTicket()"/><span>Abierto</span></label>
+            <label class="chip"><input type="radio" name="t-estado" value="Cerrado" onchange="toggleResolucionTicket()"/><span>Cerrado</span></label>
+          </div>
+
+          <div id="group-t-resolucion" style="display:none; margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border);">
+            <div class="form-group full-width">
+              <label>No. Cotización SAP *</label>
+              <input type="text" id="t-cotizacion-sap" placeholder="Ej. COT-100230" />
+            </div>
+            <div class="form-group full-width" style="margin-top:0.75rem;">
+              <label>Archivo Cotización (PDF) *</label>
+              <label class="custom-file-upload">
+                <input type="file" id="t-cotizacion-pdf" accept="application/pdf" onchange="updateFileLabel(this)"/>
+                <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
+                <span class="file-label-text">Subir cotización en PDF</span>
+              </label>
+            </div>
           </div>
         </div>
 

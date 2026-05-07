@@ -4361,25 +4361,9 @@ function abrirTicket(id) {
 
   // Si es empresa y es un ticket nuevo, autocompletamos su perfil
   if (isEmpresa && !id) {
-    inputHidden.value = nombreEmpresaLogged || '';
     document.getElementById('t-solicitante').value = nombreEmpresaLogged || '';
-    
-    const c = clientesDb.find(x => x.nombre === nombreEmpresaLogged);
-    if (c) {
-      document.getElementById('group-t-sitio').style.display = 'block';
-      const datalistSitios = document.getElementById('t-sitio-list');
-      if (datalistSitios) {
-        datalistSitios.innerHTML = '';
-        let sitios = c.sitios || [];
-        if (c.ubicacion && !sitios.some(s => getSitioNombre(s) === c.ubicacion)) sitios = [c.ubicacion, ...sitios];
-        sitios.forEach(s => datalistSitios.innerHTML += `<option value="${getSitioNombre(s)}"></option>`);
-      }
-      if (equipoSelect && c.maquinas) {
-        c.maquinas.forEach(m => {
-          const mName = `${m.marca || ''} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
-          equipoSelect.innerHTML += `<option value="${mName}">${mName}</option>`;
-        });
-      }
+    if (nombreEmpresaLogged) {
+      selectComboOption('t-cliente', nombreEmpresaLogged, nombreEmpresaLogged);
     }
   }
 
@@ -4412,48 +4396,41 @@ function abrirTicket(id) {
       }
       
       if (t.cliente) {
-        document.getElementById('t-cliente-display').textContent = t.cliente;
-        document.getElementById('group-t-sitio').style.display = 'block';
-        const datalist = document.getElementById('t-sitio-list');
-        const equipoSelect = document.getElementById('t-equipo');
-        
-        if (datalist) datalist.innerHTML = '';
-        const c = clientesDb.find(x => x.nombre === t.cliente);
-        if (c) {
-          let sitios = c.sitios || [];
-          if (c.ubicacion && !sitios.some(s => getSitioNombre(s) === c.ubicacion)) sitios = [c.ubicacion, ...sitios];
-          if (datalist) {
-            sitios.forEach(s => {
-              const opt = document.createElement('option');
-              const sn = getSitioNombre(s);
-              opt.value = sn;
-              opt.textContent = sn;
-              datalist.appendChild(opt);
-            });
-          }
-          if (equipoSelect && c.maquinas) {
-            c.maquinas.forEach(m => {
-              const mName = `${m.marca || ''} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
-              equipoSelect.innerHTML += `<option value="${mName}">${mName}</option>`;
-            });
-          }
-        }
+        selectComboOption('t-cliente', t.cliente, t.cliente);
       } else {
-        document.getElementById('t-cliente-display').textContent = 'Ninguno / Uso Interno';
+        selectComboOption('t-cliente', 'Ninguno / Uso Interno', 'Ninguno / Uso Interno');
+      }
+      if (t.sitio) {
+        const escapedSitio = t.sitio.replace(/'/g, "\\'");
+        selectComboOption('t-sitio', escapedSitio, escapedSitio);
       }
 
-      const equipoSelect = document.getElementById('t-equipo');
-      if (t.equipo && equipoSelect) {
-        let optExists = Array.from(equipoSelect.options).some(o => o.value === t.equipo);
+      const equipoSelect2 = document.getElementById('t-equipo');
+      if (t.equipo && equipoSelect2) {
+        let optExists = Array.from(equipoSelect2.options).some(o => o.value === t.equipo);
         if (!optExists) {
-          equipoSelect.innerHTML += `<option value="${t.equipo}">${t.equipo} (Registrado previo)</option>`;
+          equipoSelect2.innerHTML += `<option value="${t.equipo}">${t.equipo} (Registrado previo)</option>`;
         }
-        equipoSelect.value = t.equipo;
+        equipoSelect2.value = t.equipo;
       }
+      
+      const elCotSap = document.getElementById('t-cotizacion-sap');
+      if (elCotSap) elCotSap.value = t.cotizacionSAP || '';
     }
   }
+
+  toggleResolucionTicket();
+
   document.getElementById('modal-ticket-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
+}
+
+function toggleResolucionTicket() {
+  const isCerrado = document.querySelector('input[name="t-estado"]:checked')?.value === 'Cerrado';
+  const group = document.getElementById('group-t-resolucion');
+  const inSap = document.getElementById('t-cotizacion-sap');
+  if (group) group.style.display = isCerrado ? 'block' : 'none';
+  if (inSap) inSap.required = isCerrado;
 }
 
 function editarTicket(id) { abrirTicket(id); }
@@ -4637,6 +4614,21 @@ function guardarTicket(e) {
     contacto = currentUser ? currentUser.email : '';
   }
   
+  if (!isEmpresa && estado === 'Cerrado') {
+    const cotSAP = document.getElementById('t-cotizacion-sap')?.value.trim();
+    const pdfUpload = document.getElementById('t-cotizacion-pdf')?.files.length > 0;
+    
+    if (!cotSAP) {
+      mostrarNotificacion('Debe ingresar el Número de Cotización SAP para cerrar el ticket.', 'error');
+      return;
+    }
+    
+    if (!pdfUpload) { 
+      mostrarNotificacion('Debe subir el archivo PDF de la cotización para cerrar el ticket.', 'error'); 
+      return; 
+    }
+  }
+  
   const t_existente = editandoTicketId ? tickets.find(x=>x.id===editandoTicketId) : null;
   const ticket = {
     id: editandoTicketId || crypto.randomUUID(),
@@ -4657,6 +4649,7 @@ function guardarTicket(e) {
     equipo: document.getElementById('t-equipo').value.trim(),
     notas: document.getElementById('t-notas').value.trim(),
     estado,
+    cotizacionSAP: document.getElementById('t-cotizacion-sap')?.value.trim() || ''
   };
   
   if (isEmpresa && !editandoTicketId && !ticket.asignado) {
