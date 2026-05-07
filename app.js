@@ -4032,10 +4032,17 @@ function onSoporteChange() {
            }
            opt.setAttribute('data-serie', parsedSerie);
            opt.setAttribute('data-modelo', t.equipo.split('(SN:')[0].trim());
+           opt.setAttribute('data-ubicacion', t.sitio || '');
            comboEquipo.appendChild(opt);
         }
         comboEquipo.value = t.equipo;
         if (typeof onEquipoOrdenChange === 'function') onEquipoOrdenChange();
+        
+        // Si f-ubicacion sigue vacío, llenarlo con el sitio del ticket si existe
+        const inUbicacion = document.getElementById('f-ubicacion');
+        if (inUbicacion && !inUbicacion.value && t.sitio) {
+          inUbicacion.value = t.sitio;
+        }
       }
       
       const containerTecnicos = document.getElementById('f-tecnicos-container');
@@ -5217,6 +5224,7 @@ function poblarMaquinasCliente(selectId, selectedValue = '', clienteNombre = nul
         opt.setAttribute('data-modelo', m.modelo || '');
         opt.setAttribute('data-serie', m.serie || '');
         opt.setAttribute('data-eco', m.no_economico || '');
+        opt.setAttribute('data-ubicacion', m.ubicacion || m.sitio || '');
         select.appendChild(opt);
       });
     }
@@ -5240,10 +5248,16 @@ function onEquipoOrdenChange() {
   const modelo = opt.getAttribute('data-modelo');
   const serie = opt.getAttribute('data-serie');
   const eco = opt.getAttribute('data-eco');
+  const ubicacion = opt.getAttribute('data-ubicacion');
   
   if (modelo) document.getElementById('f-modelo').value = modelo;
   if (serie) document.getElementById('f-serie').value = serie;
   if (eco) document.getElementById('f-eco').value = eco;
+  
+  const inUbicacion = document.getElementById('f-ubicacion');
+  if (inUbicacion && ubicacion && !inUbicacion.value) {
+    inUbicacion.value = ubicacion;
+  }
 }
 
 // ===== CUSTOM COMBOBOX LOGIC =====
