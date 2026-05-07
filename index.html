@@ -1157,9 +1157,13 @@
               <label>Año de Fabricación</label>
               <input type="number" id="am-anio" placeholder="Ej. 2018"/>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="display:flex; flex-direction:column; justify-content:flex-start;">
               <label>Fecha de Venta</label>
-              <input type="date" id="am-venta"/>
+              <input type="date" id="am-venta" style="margin-bottom:0.4rem;"/>
+              <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.75rem; color:var(--text-muted); cursor:pointer; font-weight:normal;">
+                <input type="checkbox" id="am-venta-tercero" onchange="toggleVentaTercero()"/>
+                Máquina de Tercero (No vendida por Eurorep)
+              </label>
             </div>
             <div class="form-group">
               <label>Ubicación / Sitio</label>

@@ -2495,6 +2495,7 @@ function abrirModalAgregarMaquina() {
   document.getElementById('form-agregar-maquina').reset();
   const select = document.getElementById('am-cliente');
   select.removeAttribute('disabled');
+  document.getElementById('am-venta').disabled = false;
   
   // Lógica del Select de Marca
   const selectMarca = document.getElementById('am-marca-select');
@@ -2601,6 +2602,17 @@ function cerrarModalAgregarMaquina(e) {
   editandoMaquinaCliente = null;
 }
 
+function toggleVentaTercero() {
+  const isTercero = document.getElementById('am-venta-tercero').checked;
+  const inputVenta = document.getElementById('am-venta');
+  if (isTercero) {
+    inputVenta.value = '';
+    inputVenta.disabled = true;
+  } else {
+    inputVenta.disabled = false;
+  }
+}
+
 function editarMaquina(clienteNombre, idInterno) {
   abrirModalAgregarMaquina();
   editandoMaquinaId = idInterno;
@@ -2669,7 +2681,19 @@ function editarMaquina(clienteNombre, idInterno) {
         document.getElementById('am-modelo').value = maquina.modelo || '';
         document.getElementById('am-serie').value = maquina.serie || '';
         document.getElementById('am-anio').value = maquina.anio || '';
-        document.getElementById('am-venta').value = maquina.venta || '';
+        
+        const inputVenta = document.getElementById('am-venta');
+        const checkTercero = document.getElementById('am-venta-tercero');
+        if (maquina.venta === 'TERCERO') {
+          checkTercero.checked = true;
+          inputVenta.value = '';
+          inputVenta.disabled = true;
+        } else {
+          checkTercero.checked = false;
+          inputVenta.value = maquina.venta || '';
+          inputVenta.disabled = false;
+        }
+
         document.getElementById('am-latitud').value = maquina.latitud || '';
         document.getElementById('am-longitud').value = maquina.longitud || '';
         
@@ -2726,7 +2750,7 @@ function guardarNuevaMaquina(e) {
   const modelo = document.getElementById('am-modelo').value.trim();
   const serie = document.getElementById('am-serie').value.trim();
   const anio = document.getElementById('am-anio').value.trim();
-  const venta = document.getElementById('am-venta').value;
+  const venta = document.getElementById('am-venta-tercero').checked ? 'TERCERO' : document.getElementById('am-venta').value;
   const selectUbicacion = document.getElementById('am-ubicacion-select');
   const inputOtraUbicacion = document.getElementById('am-ubicacion-otra');
   const ubicacion = selectUbicacion.value === 'otra' ? inputOtraUbicacion.value.trim() : selectUbicacion.value.trim();
