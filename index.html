@@ -364,6 +364,7 @@
           <thead>
             <tr>
               <th id="th-maquinaria-id">ID Interno </th>
+              <th id="th-maq-tipo" onclick="toggleSortMaquinaria('tipo')" style="cursor:pointer; user-select:none;">Tipo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-tipo"></i></th>
               <th id="th-maq-marca" onclick="toggleSortMaquinaria('marca')" style="cursor:pointer; user-select:none;">Marca <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-marca"></i></th>
               <th id="th-ord-modelo" onclick="toggleSortMaquinaria('modelo')" style="cursor:pointer; user-select:none;">Modelo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-modelo"></i></th>
               <th id="th-maq-serie" onclick="toggleSortMaquinaria('serie')" style="cursor:pointer; user-select:none;">Serie <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-serie"></i></th>
@@ -1137,6 +1138,18 @@
         <div class="form-section">
           <div class="form-section-title"><i data-lucide="settings-2" class="section-icon"></i> Datos de la Máquina</div>
           <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="form-group">
+              <label>Tipo de Máquina *</label>
+              <select id="am-tipo-maquina" required onchange="if(this.value==='Otra'){document.getElementById('am-tipo-otro').style.display='block';document.getElementById('am-tipo-otro').required=true;document.getElementById('am-tipo-otro').focus();}else{document.getElementById('am-tipo-otro').style.display='none';document.getElementById('am-tipo-otro').required=false;}">
+                <option value="" disabled selected>Seleccione el tipo...</option>
+                <option value="Concreto">Concreto</option>
+                <option value="Concreto CC">Concreto CC</option>
+                <option value="Trituración">Trituración</option>
+                <option value="Asfalto">Asfalto</option>
+                <option value="Otra">Otra...</option>
+              </select>
+              <input type="text" id="am-tipo-otro" placeholder="Escriba el tipo..." style="display:none; margin-top:0.5rem;"/>
+            </div>
             <div class="form-group">
               <label>Marca</label>
               <select id="am-marca-select" required>

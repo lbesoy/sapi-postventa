@@ -2844,6 +2844,26 @@ function editarMaquina(clienteNombre, idInterno) {
         document.getElementById('am-serie').value = maquina.serie || '';
         document.getElementById('am-anio').value = maquina.anio || '';
         
+        const selectTipo = document.getElementById('am-tipo-maquina');
+        const inputOtroTipo = document.getElementById('am-tipo-otro');
+        let tipoFound = false;
+        Array.from(selectTipo.options).forEach(opt => {
+          if (opt.value === maquina.tipo) tipoFound = true;
+        });
+        if (tipoFound) {
+          selectTipo.value = maquina.tipo;
+          inputOtroTipo.style.display = 'none';
+          inputOtroTipo.value = '';
+          inputOtroTipo.required = false;
+        } else if (maquina.tipo && maquina.tipo !== 'N/A') {
+          selectTipo.value = 'Otra';
+          inputOtroTipo.style.display = 'block';
+          inputOtroTipo.value = maquina.tipo;
+          inputOtroTipo.required = true;
+        } else {
+          selectTipo.value = '';
+        }
+        
         const inputVenta = document.getElementById('am-venta');
         const checkTercero = document.getElementById('am-venta-tercero');
         const slider = document.getElementById('am-venta-tercero-slider');
@@ -2916,6 +2936,11 @@ function guardarNuevaMaquina(e) {
   const selectMarca = document.getElementById('am-marca-select');
   const inputOtraMarca = document.getElementById('am-marca-otra');
   const marca = selectMarca.value === 'otra' ? inputOtraMarca.value.trim() : selectMarca.value.trim();
+  
+  const selectTipo = document.getElementById('am-tipo-maquina');
+  const inputOtroTipo = document.getElementById('am-tipo-otro');
+  const tipo = selectTipo.value === 'Otra' ? inputOtroTipo.value.trim() : selectTipo.value.trim();
+
   const modelo = document.getElementById('am-modelo').value.trim();
   const serie = document.getElementById('am-serie').value.trim();
   const anio = document.getElementById('am-anio').value.trim();
@@ -2951,12 +2976,12 @@ function guardarNuevaMaquina(e) {
     if (maquinaIdx >= 0) {
       clienteObj.maquinas[maquinaIdx] = {
         ...clienteObj.maquinas[maquinaIdx],
-        marca, modelo, serie, anio, venta, ubicacion, latitud, longitud
+        marca, modelo, serie, anio, venta, ubicacion, latitud, longitud, tipo
       };
     }
   } else {
     const idInterno = generarIdInternoMaquina(marca, venta || anio);
-    clienteObj.maquinas.push({ idInterno, marca, modelo, serie, anio, venta, ubicacion, latitud, longitud });
+    clienteObj.maquinas.push({ idInterno, marca, modelo, serie, anio, venta, ubicacion, latitud, longitud, tipo });
   }
   
   localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
@@ -3837,6 +3862,7 @@ function renderMaquinaria() {
     allMachines.push({
       cliente: m.cliente || 'N/A',
       idInterno: m.idInterno || 'N/A',
+      tipo: m.tipo || 'N/A',
       marca: m.marca || '',
       modelo: m.modelo || m.descripcion || 'Sin Modelo',
       serie: m.serie || 'N/A',
@@ -3856,6 +3882,7 @@ function renderMaquinaria() {
           allMachines.push({
             cliente: c.nombre,
             idInterno: m.idInterno || 'N/A',
+            tipo: m.tipo || 'N/A',
             marca: m.marca || '',
             modelo: m.modelo || 'Sin Modelo',
             serie: m.serie || 'N/A',
@@ -3924,7 +3951,7 @@ function renderMaquinaria() {
   }
 
   // Actualizar iconos rehaciendo las etiquetas <i>
-  ['marca', 'modelo', 'serie', 'anio', 'cliente'].forEach(col => {
+  ['tipo', 'marca', 'modelo', 'serie', 'anio', 'cliente'].forEach(col => {
     const icon = document.getElementById('sort-icon-' + col);
     if (icon) {
       const isCurrent = currentMaqSortCol === col;
@@ -3971,6 +3998,7 @@ function renderMaquinaria() {
     return `
     <tr onclick="verServiciosMaquina('${m.idInterno}', '${m.serie}', '${m.marca.replace(/'/g, "\\'")}', '${m.modelo.replace(/'/g, "\\'")}', '${m.cliente.replace(/'/g, "\\'")}', '${m.ubicacion.replace(/'/g, "\\'")}')" style="cursor:pointer;" class="table-row-hover">
       ${!isEmpresa ? `<td><span style="font-family:monospace; font-weight:500; color:var(--accent); background:var(--blue-light); padding:0.2rem 0.5rem; border-radius:4px;">${m.idInterno}</span></td>` : ''}
+      <td>${m.tipo && m.tipo !== 'N/A' ? `<span class="badge" style="background:var(--bg-hover); color:var(--text-primary); border:1px solid var(--border);">${m.tipo}</span>` : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}</td>
       <td>
         <div style="display:flex; align-items:center;">
           ${logoPath ? `<img src="${logoPath}" alt="${m.marca}" onerror="this.onerror=null; this.outerHTML='<span>${m.marca}</span>';" style="width:85px; height:32px; object-fit:contain; object-position:left center; margin-right:8px;"/>` : m.marca || '-'}
