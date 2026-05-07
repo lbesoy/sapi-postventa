@@ -2446,6 +2446,41 @@ function abrirDetalleSitio(sitioNombre) {
       </div>
     `;
     
+    let lat = sitioOb.latitud || sitioOb.lat || null;
+    let lon = sitioOb.longitud || sitioOb.lon || sitioOb.lng || null;
+    
+    if (sitioOb.customData) {
+      const keys = Object.keys(sitioOb.customData);
+      const kLat = keys.find(k => k.toLowerCase() === 'latitud' || k.toLowerCase() === 'lat' || k.toLowerCase() === 'u_latitud');
+      const kLon = keys.find(k => k.toLowerCase() === 'longitud' || k.toLowerCase() === 'lon' || k.toLowerCase() === 'lng' || k.toLowerCase() === 'u_longitud');
+      if (kLat && sitioOb.customData[kLat] && !lat) lat = sitioOb.customData[kLat];
+      if (kLon && sitioOb.customData[kLon] && !lon) lon = sitioOb.customData[kLon];
+    }
+    
+    if (lat && lon) {
+      html += `
+        <div style="margin-top: 1rem; display:flex; justify-content:space-between; align-items:center; background: var(--bg-hover); padding: 0.75rem 1rem; border-radius: var(--radius-md);">
+          <div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Coordenadas Geográficas</div>
+            <div style="font-weight: 500; color: var(--text-primary); font-family: monospace;">${lat}, ${lon}</div>
+          </div>
+          <a href="https://maps.google.com/?q=${lat},${lon}" target="_blank" style="display:flex; align-items:center; gap:0.4rem; background: var(--accent); color: white; padding: 0.4rem 0.75rem; border-radius: 4px; text-decoration: none; font-size: 0.85rem; font-weight: 500;">
+            <i data-lucide="map-pin" style="width:14px;height:14px;"></i> Google Maps
+          </a>
+        </div>
+      `;
+    } else {
+      html += `
+        <div style="margin-top: 1rem; display:flex; align-items:center; gap: 0.5rem; background: var(--bg-hover); padding: 0.75rem 1rem; border-radius: var(--radius-md);">
+          <i data-lucide="map-pin-off" style="width:16px;height:16px;color:var(--text-muted);"></i>
+          <div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Coordenadas Geográficas</div>
+            <div style="font-weight: 500; color: var(--text-muted); font-size: 0.9rem;">Sin coordenadas registradas</div>
+          </div>
+        </div>
+      `;
+    }
+    
     if (sitioOb.customData && Object.keys(sitioOb.customData).length > 0) {
       html += `
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; padding-left: 0.5rem; border-left: 2px solid var(--accent); margin-top:0.5rem;">
@@ -2478,11 +2513,18 @@ function abrirDetalleSitio(sitioNombre) {
         <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);"><i data-lucide="settings-2" style="width:18px;height:18px;color:var(--text-muted);"></i> Máquinas en este sitio (${maquinas.length})</h3>
         <div style="display:flex; flex-direction:column; gap:0.5rem; max-height:200px; overflow-y:auto; padding-right:0.5rem;">
           ${maquinas.map(m => `
-            <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
+            <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center; background: var(--bg-body);">
               <div>
                 <div style="font-weight:500; color:var(--accent);">${m.marca || ''} ${m.modelo || 'Sin Modelo'}</div>
                 <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.2rem;">Serie: ${m.serie || 'N/A'}</div>
               </div>
+              ${m.latitud && m.longitud ? `
+                <a href="https://maps.google.com/?q=${m.latitud},${m.longitud}" target="_blank" style="display:flex; align-items:center; gap:0.3rem; background: var(--bg-hover); color: var(--text-primary); padding: 0.3rem 0.5rem; border-radius: 4px; text-decoration: none; font-size: 0.75rem; font-weight: 500; border: 1px solid var(--border);">
+                  <i data-lucide="map-pin" style="width:12px;height:12px;color:var(--accent);"></i> Ver Mapa
+                </a>
+              ` : `
+                <span style="font-size:0.7rem; color:var(--text-muted); background:var(--bg-hover); padding:0.2rem 0.4rem; border-radius:3px;">Sin coords.</span>
+              `}
             </div>
           `).join('')}
         </div>
@@ -3906,7 +3948,13 @@ function guardarOrden(e) {
     const tIndex = tickets.findIndex(t => t.id === orden.soporte);
     if (tIndex >= 0 && tickets[tIndex].estado !== 'Cerrado') {
       tickets[tIndex].estado = 'Cerrado';
-      localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+      if (window.supabaseClient) {
+        window.pushToSupabase('tickets', tickets[tIndex]);
+      }
+      try {
+        const lightTickets = tickets.map(x => ({...x, pdfPedido: null, pdfCotizacion: null}));
+        localStorage.setItem('sapi_tickets', JSON.stringify(lightTickets));
+      } catch(e) {}
       updateTicketBadge();
       if (typeof renderTickets === 'function') renderTickets();
     }
@@ -5172,16 +5220,15 @@ async function guardarTicket(e) {
   } else {
     tickets.unshift(ticket);
   }
+  if (window.supabaseClient) {
+    await window.pushToSupabase('tickets', ticket);
+  }
+  
   try {
-    localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+    const lightTickets = tickets.map(x => ({...x, pdfPedido: null, pdfCotizacion: null}));
+    localStorage.setItem('sapi_tickets', JSON.stringify(lightTickets));
   } catch (e) {
-    if (e.name === 'QuotaExceededError' || e.message.includes('quota')) {
-      mostrarNotificacion('El archivo PDF es demasiado grande para guardar localmente.', 'error');
-      // Revert the ticket insertion/update if it fails
-      if (!editandoTicketId) tickets.shift();
-      else tickets = tickets.map(t_old => t_old.id === editandoTicketId ? t_existente : t_old);
-      return;
-    }
+    console.error("Error guardando caché local de tickets", e);
   }
   cerrarTicket();
   renderTickets();
@@ -5385,14 +5432,18 @@ async function cerrarCotizacionTicket(id) {
   t.tecnicosAsignados = tecnicosAsignados;
   t.pdfPedido = pdfPedidoBase64;
   t.estado = 'Cerrado';
+  
+  if (window.supabaseClient) {
+    await window.pushToSupabase('tickets', t);
+  }
+  
   try {
-    localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+    const lightTickets = tickets.map(x => ({...x, pdfPedido: null, pdfCotizacion: null}));
+    localStorage.setItem('sapi_tickets', JSON.stringify(lightTickets));
     mostrarNotificacion('Ticket cerrado con éxito.', 'success');
   } catch(e) {
-    if (e.name === 'QuotaExceededError' || e.message.includes('quota')) {
-      mostrarNotificacion('El archivo PDF es demasiado grande para guardar localmente.', 'error');
-      return;
-    }
+    console.error("Error guardando caché local:", e);
+    mostrarNotificacion('Ticket cerrado con éxito.', 'success');
   }
   verDetalleTicket(id);
   renderTickets();
