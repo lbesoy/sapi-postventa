@@ -777,8 +777,12 @@
               <input type="text" id="f-folio" placeholder="Ej. 1570-C" required/>
             </div>
             <div class="form-group">
-              <label>Pedido No.</label>
-              <input type="text" id="f-pedido" placeholder="Ej. 1200483"/>
+              <label>Ticket (Soporte) *</label>
+              <select id="f-soporte" onchange="onSoporteChange()" required>
+                <option value="">Ninguno</option>
+              </select>
+              <div id="soporte-meta" style="display:none; font-size:0.85rem; color:var(--text-muted); margin-top:0.4rem;"></div>
+              <input type="hidden" id="f-pedido"/>
             </div>
             <div class="form-group" style="position:relative;" id="group-f-cliente">
               <label>Cliente *</label>
@@ -832,13 +836,6 @@
             <div class="form-group">
               <label>Técnico *</label>
               <input type="text" id="f-tecnico" placeholder="Nombre del técnico" required/>
-            </div>
-            <div class="form-group">
-              <label>Ticket (Soporte)</label>
-              <select id="f-soporte" onchange="onSoporteChange()">
-                <option value="">Ninguno</option>
-              </select>
-              <div id="soporte-meta" style="display:none; font-size:0.85rem; color:var(--text-muted); margin-top:0.4rem;"></div>
             </div>
           </div>
         </div>
