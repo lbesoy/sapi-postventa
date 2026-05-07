@@ -3617,7 +3617,7 @@ function abrirFormulario(id) {
     setDiasData(o.dias);
   }
   
-  poblarTodasMaquinas('f-equipo', '');
+  poblarMaquinasCliente('f-equipo', '', id ? ordenes.find(x => x.id === id)?.cliente : '');
   
   onSoporteChange(); // Sincroniza el pedido y metadata
 
@@ -4465,7 +4465,7 @@ function abrirTicket(id) {
   document.getElementById('t-sitio').value = '';
   document.getElementById('group-t-sitio').style.display = 'none';
   
-  poblarTodasMaquinas('t-equipo', '');
+  poblarMaquinasCliente('t-equipo', '');
 
   const selectAsignado = document.getElementById('t-asignado');
   if (selectAsignado) {
@@ -4531,10 +4531,10 @@ function abrirTicket(id) {
       }
       if (t.sitio) {
         const escapedSitio = t.sitio.replace(/'/g, "\\'");
-        selectComboOption('t-sitio', escapedSitio, escapedSitio);
+        selectComboOption('t-sitio', escapedSitio, escapedSitio, true);
       }
 
-      poblarTodasMaquinas('t-equipo', t.equipo);
+      poblarMaquinasCliente('t-equipo', t.equipo, t.cliente);
       
       const elCotSap = document.getElementById('t-cotizacion-sap');
       if (elCotSap) elCotSap.value = t.cotizacionSAP || '';
@@ -4616,35 +4616,29 @@ function cerrarTicket(e) {
 }
 
 // ===== HELPER MAQUINARIA =====
-function poblarTodasMaquinas(selectId, selectedValue = '') {
+function poblarMaquinasCliente(selectId, selectedValue = '', clienteNombre = null) {
   const select = document.getElementById(selectId);
   if (!select) return;
   select.innerHTML = '<option value="">Seleccione una máquina registrada...</option><option value="Otra / No registrada">Otra / Captura manual</option>';
   
-  let allMaquinas = [];
-  clientesDb.forEach(c => {
-    if (c.maquinas) {
+  if (clienteNombre && clienteNombre !== 'Ninguno / Uso Interno' && clienteNombre !== 'Ninguno') {
+    const c = clientesDb.find(x => x.nombre === clienteNombre);
+    if (c && c.maquinas) {
       c.maquinas.forEach(m => {
-        allMaquinas.push({...m, clienteNombre: c.nombre});
+        const opt = document.createElement('option');
+        const mName = `${m.marca || ''} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+        opt.value = mName;
+        opt.textContent = mName;
+        if (mName === selectedValue) opt.selected = true;
+        opt.setAttribute('data-modelo', m.modelo || '');
+        opt.setAttribute('data-serie', m.serie || '');
+        opt.setAttribute('data-eco', m.no_economico || '');
+        select.appendChild(opt);
       });
     }
-  });
+  }
   
-  allMaquinas.sort((a,b) => a.clienteNombre.localeCompare(b.clienteNombre));
-  
-  allMaquinas.forEach(m => {
-    const opt = document.createElement('option');
-    const mName = `${m.marca || ''} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
-    opt.value = mName;
-    opt.textContent = `${mName} - ${m.clienteNombre}`;
-    if (mName === selectedValue) opt.selected = true;
-    opt.setAttribute('data-modelo', m.modelo || '');
-    opt.setAttribute('data-serie', m.serie || '');
-    opt.setAttribute('data-eco', m.no_economico || '');
-    select.appendChild(opt);
-  });
-  
-  if (selectedValue && !Array.from(select.options).some(o => o.value === selectedValue)) {
+  if (selectedValue && !Array.from(select.options).some(o => o.value === selectedValue) && selectedValue !== 'Otra / No registrada') {
     const opt = document.createElement('option');
     opt.value = selectedValue;
     opt.textContent = `${selectedValue} (Registrado previo)`;
@@ -4718,7 +4712,7 @@ function filterCombo(id, query) {
   }
 }
 
-function selectComboOption(id, value, label) {
+function selectComboOption(id, value, label, isInitial = false) {
   document.getElementById(id).value = value;
   const displayEl = document.getElementById(id + '-display');
   if (displayEl) displayEl.textContent = label;
@@ -4730,6 +4724,8 @@ function selectComboOption(id, value, label) {
     const sitInput = document.getElementById('t-sitio');
     const sitDisplay = document.getElementById('t-sitio-display');
     const sitOptions = document.getElementById('t-sitio-options');
+    
+    if (!isInitial) poblarMaquinasCliente('t-equipo', '', value);
     
     if (value && value !== 'Ninguno' && value !== 'Ninguno / Uso Interno') {
       if (sitGroup) sitGroup.style.display = 'block';
@@ -4754,6 +4750,8 @@ function selectComboOption(id, value, label) {
       if (sitInput) sitInput.value = '';
       if (sitDisplay) sitDisplay.textContent = 'Ninguno';
     }
+  } else if (id === 'f-cliente') {
+    if (!isInitial) poblarMaquinasCliente('f-equipo', '', value);
   }
 }
 
