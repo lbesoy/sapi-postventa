@@ -1348,6 +1348,19 @@
   </div>
 </div>
 
+<!-- MODAL DETALLE DE SITIO -->
+<div class="modal-overlay" id="modal-detalle-sitio-overlay" onclick="cerrarDetalleSitio(event)" style="z-index: 400;">
+  <div class="modal" id="modal-detalle-sitio" style="max-width:500px;">
+    <div class="modal-header">
+      <div id="detalle-sitio-title" style="flex:1;">Detalles del Sitio</div>
+      <button class="modal-close" onclick="cerrarDetalleSitio()">✕</button>
+    </div>
+    <div class="modal-body" id="detalle-sitio-body" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+      <!-- Llenado dinámicamente con JS -->
+    </div>
+  </div>
+</div>
+
 <!-- MODAL TICKET -->
 <div class="modal-overlay" id="modal-ticket-overlay" onclick="cerrarTicket(event)">
   <div class="modal ticket-receipt" id="modal-ticket" style="max-width:540px; border-radius: 0; background: var(--bg-card); position: relative; border: 1px solid var(--border); box-shadow: 0 20px 40px rgba(0,0,0,0.5);">

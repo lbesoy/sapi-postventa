@@ -2276,9 +2276,8 @@ function verDetalleCliente(nombre) {
         ${sitios.map((s, idx) => {
           const sNombre = getSitioNombre(s);
           return `
-          <span style="background:var(--bg-hover); padding:0.4rem 0.8rem; border-radius:1rem; border:1px solid var(--border); font-size:0.85rem; font-weight:500; color:var(--text-primary); display:inline-flex; align-items:center; gap:0.4rem;">
+          <span style="background:var(--bg-hover); padding:0.4rem 0.8rem; border-radius:1rem; border:1px solid var(--border); font-size:0.85rem; font-weight:500; color:var(--text-primary); display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;" onclick="abrirDetalleSitio('${sNombre.replace(/'/g, "\\'")}')" title="Ver detalle del sitio">
             ${sNombre}
-            ${isAdmin ? `<i data-lucide="x" style="width:14px;height:14px;cursor:pointer;color:var(--red);" onclick="eliminarSitioDeClienteAdmin('${nombre.replace(/'/g, "\\'")}', '${sNombre.replace(/'/g, "\\'")}')" title="Eliminar Sitio"></i>` : ''}
           </span>
           `;
         }).join('')}
@@ -2371,6 +2370,93 @@ function verDetalleCliente(nombre) {
 function cerrarDetalleMaquina(e) {
   if (e && e.target !== document.getElementById('modal-detalle-maquina-overlay')) return;
   document.getElementById('modal-detalle-maquina-overlay').classList.remove('open');
+}
+
+function abrirDetalleSitio(sitioNombre) {
+  const sitioOb = sitiosDb.find(s => s.nombre === sitioNombre);
+  const body = document.getElementById('detalle-sitio-body');
+  if (!body) return;
+  
+  let html = '';
+  
+  if (sitioOb) {
+    html += `
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; background: var(--bg-hover); padding: 1rem; border-radius: var(--radius-md);">
+        <div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Nombre del Sitio</div>
+          <div style="font-weight: 500; font-size: 1.1rem; color: var(--text-primary);">${sitioOb.nombre || 'N/A'}</div>
+        </div>
+        <div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">ID de Sitio</div>
+          <div style="font-weight: 500; color: var(--text-primary); font-family: monospace;">${sitioOb.id || 'N/A'}</div>
+        </div>
+        <div style="grid-column: span 2;">
+          <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Dirección Completa</div>
+          <div style="font-weight: 500; color: var(--text-primary);">${sitioOb.direccion || 'N/A'}</div>
+        </div>
+        <div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Ciudad / Estado</div>
+          <div style="font-weight: 500; color: var(--text-primary);">${sitioOb.ciudad || ''} ${sitioOb.estado ? ', ' + sitioOb.estado : ''}</div>
+        </div>
+        <div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Código Postal</div>
+          <div style="font-weight: 500; color: var(--text-primary);">${sitioOb.cp || 'N/A'}</div>
+        </div>
+      </div>
+    `;
+    
+    if (sitioOb.customData && Object.keys(sitioOb.customData).length > 0) {
+      html += `
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; padding-left: 0.5rem; border-left: 2px solid var(--accent); margin-top:0.5rem;">
+      `;
+      Object.entries(sitioOb.customData).forEach(([label, value]) => {
+        html += `
+          <div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">${label}</div>
+            <div style="font-weight: 600; color: var(--text-primary);">${value || 'N/A'}</div>
+          </div>
+        `;
+      });
+      html += `</div>`;
+    }
+  } else {
+    html += `
+      <div style="display:flex; flex-direction:column; gap:0.5rem; background: var(--bg-hover); padding: 1rem; border-radius: var(--radius-md);">
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Nombre del Sitio (Legacy)</div>
+        <div style="font-weight: 500; font-size: 1.1rem; color: var(--text-primary);">${sitioNombre}</div>
+        <div style="font-size:0.8rem; color:var(--text-muted);">Este sitio fue registrado localmente y no contiene más detalles estructurados.</div>
+      </div>
+    `;
+  }
+  
+  // Maquinaria en este sitio
+  const maquinas = maquinariaDb.filter(m => m.ubicacion === sitioNombre || m.sitio === sitioNombre);
+  if (maquinas.length > 0) {
+    html += `
+      <div style="margin-top: 1rem;">
+        <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);"><i data-lucide="settings-2" style="width:18px;height:18px;color:var(--text-muted);"></i> Máquinas en este sitio (${maquinas.length})</h3>
+        <div style="display:flex; flex-direction:column; gap:0.5rem; max-height:200px; overflow-y:auto; padding-right:0.5rem;">
+          ${maquinas.map(m => `
+            <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div style="font-weight:500; color:var(--accent);">${m.marca || ''} ${m.modelo || 'Sin Modelo'}</div>
+                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.2rem;">Serie: ${m.serie || 'N/A'}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  body.innerHTML = html;
+  document.getElementById('modal-detalle-sitio-overlay').classList.add('open');
+  lucide.createIcons();
+}
+
+function cerrarDetalleSitio(e) {
+  if (e && e.target !== document.getElementById('modal-detalle-sitio-overlay')) return;
+  document.getElementById('modal-detalle-sitio-overlay').classList.remove('open');
 }
 
 function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion) {
