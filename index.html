@@ -226,10 +226,18 @@
           </div>
         </div>
 
-        <div class="section-header">
+        <div class="section-header" style="flex-wrap: wrap; gap: 1rem;">
           <h2>Órdenes Recientes</h2>
-          <div class="search-bar">
-            <input type="text" id="search-input" placeholder="Buscar cliente, técnico, folio..." oninput="filtrarOrdenes()"/>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+            <select id="filter-ord-tecnico" onchange="filtrarOrdenes()" class="form-select" style="padding:0.4rem; border-radius:4px; border:1px solid var(--border);">
+               <option value="">Cualquier Técnico</option>
+            </select>
+            <select id="filter-ord-supervisor" onchange="filtrarOrdenes()" class="form-select" style="padding:0.4rem; border-radius:4px; border:1px solid var(--border);">
+               <option value="">Cualquier Supervisor</option>
+            </select>
+            <div class="search-bar" style="margin:0;">
+              <input type="text" id="search-input" placeholder="Buscar cliente, técnico, folio..." oninput="filtrarOrdenes()"/>
+            </div>
           </div>
         </div>
         <div class="table-wrapper">
@@ -289,10 +297,18 @@
           </div>
         </div>
 
-        <div class="section-header">
+        <div class="section-header" style="flex-wrap: wrap; gap: 1rem;">
           <h2>Tickets Recientes</h2>
-          <div class="search-bar">
-            <input type="text" id="search-dash-tickets" placeholder="Buscar ticket..." oninput="renderTickets('dash-tickets')"/>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+            <select id="filter-dash-tkt-tecnico" onchange="renderTickets('dash-tickets')" class="form-select" style="padding:0.4rem; border-radius:4px; border:1px solid var(--border);">
+               <option value="">Cualquier Técnico</option>
+            </select>
+            <select id="filter-dash-tkt-supervisor" onchange="renderTickets('dash-tickets')" class="form-select" style="padding:0.4rem; border-radius:4px; border:1px solid var(--border);">
+               <option value="">Cualquier Supervisor</option>
+            </select>
+            <div class="search-bar" style="margin:0;">
+              <input type="text" id="search-dash-tickets" placeholder="Buscar ticket..." oninput="renderTickets('dash-tickets')"/>
+            </div>
           </div>
         </div>
         <div class="table-wrapper">
@@ -803,8 +819,16 @@
           <button class="filter-btn" data-filter="Cotización" onclick="filtrarTickets(this)">Cotización</button>
           <button class="filter-btn" data-filter="Cerrado" onclick="filtrarTickets(this)">Cerrados</button>
         </div>
-        <div class="search-bar">
-          <input type="text" id="search-tickets" placeholder="Buscar ticket..." oninput="renderTickets()"/>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+          <select id="filter-tkt-tecnico" onchange="renderTickets()" class="form-select" style="padding:0.4rem; border-radius:4px; border:1px solid var(--border);">
+             <option value="">Cualquier Técnico</option>
+          </select>
+          <select id="filter-tkt-supervisor" onchange="renderTickets()" class="form-select" style="padding:0.4rem; border-radius:4px; border:1px solid var(--border);">
+             <option value="">Cualquier Supervisor</option>
+          </select>
+          <div class="search-bar" style="margin:0;">
+            <input type="text" id="search-tickets" placeholder="Buscar ticket..." oninput="renderTickets()"/>
+          </div>
         </div>
       </div>
       <div class="table-wrapper" style="margin-top:1rem;">

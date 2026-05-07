@@ -28,6 +28,7 @@ window.addEventListener('supabase_datos_cargados', () => {
   usuarios = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
   
   // Re-render UI
+  actualizarFiltrosPersonal();
   renderTabla();
   renderTabla('servicios');
   renderClientes();
@@ -1444,6 +1445,37 @@ function renderTabla(ctx) {
     (o.folio||'').toLowerCase().includes(q) ||
     (o.ubicacion||'').toLowerCase().includes(q)
   );
+
+  const tecFilter = document.getElementById('filter-ord-tecnico')?.value;
+  const supFilter = document.getElementById('filter-ord-supervisor')?.value;
+  
+  if (tecFilter || supFilter) {
+    const tecUser = usuarios.find(u => u.id === tecFilter);
+    const tecName = tecUser ? tecUser.nombre : '';
+    
+    filtradas = filtradas.filter(o => {
+      let passTec = true;
+      let passSup = true;
+      
+      if (tecFilter && tecName) {
+         let assigned = [];
+         if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados;
+         else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
+         passTec = assigned.includes(tecName);
+      }
+      
+      if (supFilter) {
+         const cli = clientesDb.find(c => c.nombre === o.cliente);
+         if (cli) {
+            passSup = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supFilter)) || (cli.supervisorAsignado === supFilter);
+         } else {
+            passSup = false;
+         }
+      }
+      
+      return passTec && passSup;
+    });
+  }
 
   // ORDENAMIENTO
   if (currentOrdSortCol !== 'reciente') {
@@ -4230,6 +4262,20 @@ function updateTicketBadge() {
   }
 }
 
+function actualizarFiltrosPersonal() {
+  const selectsTecnico = [document.getElementById('filter-ord-tecnico'), document.getElementById('filter-dash-tkt-tecnico'), document.getElementById('filter-tkt-tecnico')];
+  const selectsSupervisor = [document.getElementById('filter-ord-supervisor'), document.getElementById('filter-dash-tkt-supervisor'), document.getElementById('filter-tkt-supervisor')];
+  
+  const tecnicos = usuarios.filter(u => u.rol === 'tecnico' && u.activo !== false).sort((a,b) => a.nombre.localeCompare(b.nombre));
+  const supervisores = usuarios.filter(u => ['supervisor', 'admin', 'superadmin'].includes(u.rol) && u.activo !== false).sort((a,b) => a.nombre.localeCompare(b.nombre));
+  
+  const tecOptions = '<option value="">Cualquier Técnico</option>' + tecnicos.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
+  const supOptions = '<option value="">Cualquier Supervisor</option>' + supervisores.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
+  
+  selectsTecnico.forEach(sel => { if(sel) { const val = sel.value; sel.innerHTML = tecOptions; sel.value = val; } });
+  selectsSupervisor.forEach(sel => { if(sel) { const val = sel.value; sel.innerHTML = supOptions; sel.value = val; } });
+}
+
 // ===== RENDER TICKETS =====
 function renderTickets(ctx) {
   const isDashView = ctx === 'dash-tickets';
@@ -4248,6 +4294,37 @@ function renderTickets(ctx) {
     (t.asignado||'').toLowerCase().includes(q) ||
     (t.folio||'').toLowerCase().includes(q)
   );
+  
+  const tecFilter = document.getElementById(isDashView ? 'filter-dash-tkt-tecnico' : 'filter-tkt-tecnico')?.value;
+  const supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value;
+  
+  if (tecFilter || supFilter) {
+    const tecUser = usuarios.find(u => u.id === tecFilter);
+    const tecName = tecUser ? tecUser.nombre : '';
+    
+    filtered = filtered.filter(t => {
+      let passTec = true;
+      let passSup = true;
+      
+      if (tecFilter && tecName) {
+         let assigned = [];
+         if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+         else if (t.asignado && t.asignado !== 'Sin asignar') assigned = t.asignado.split(',').map(s=>s.trim());
+         passTec = assigned.includes(tecName);
+      }
+      
+      if (supFilter) {
+         const cli = clientesDb.find(c => c.nombre === t.cliente);
+         if (cli) {
+            passSup = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supFilter)) || (cli.supervisorAsignado === supFilter);
+         } else {
+            passSup = false;
+         }
+      }
+      
+      return passTec && passSup;
+    });
+  }
   
   if (!isDashView && ticketFiltroActivo !== 'todos') {
     filtered = filtered.filter(t => t.estado === ticketFiltroActivo);
