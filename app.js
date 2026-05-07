@@ -4370,6 +4370,23 @@ function abrirTicket(id) {
   editandoTicketId = id || null;
   document.getElementById('ticket-modal-title').textContent = id ? 'Editar Ticket' : 'Nuevo Ticket';
   document.getElementById('form-ticket').reset();
+
+  const t = id ? tickets.find(x => x.id === id) : null;
+
+  // Reset file labels
+  ['t-cotizacion-pdf', 't-pedido-pdf'].forEach(inputId => {
+    const el = document.getElementById(inputId);
+    if (el) {
+      const textSpan = el.parentElement.querySelector('.file-label-text');
+      const hasPdf = inputId === 't-cotizacion-pdf' ? t?.pdfCotizacion : t?.pdfPedido;
+      
+      if (textSpan) textSpan.textContent = hasPdf ? 'PDF guardado (Sube para reemplazar)' : (inputId === 't-cotizacion-pdf' ? 'Subir cotización en PDF' : 'Subir pedido en PDF');
+      
+      el.parentElement.style.borderColor = hasPdf ? 'var(--accent)' : 'var(--border)';
+      el.parentElement.style.color = hasPdf ? 'var(--accent)' : 'var(--text-muted)';
+      el.parentElement.style.background = hasPdf ? 'var(--accent-light)' : 'rgba(255,255,255,0.02)';
+    }
+  });
   
   // Llenar el combo de clientes
   const comboOptions = document.getElementById('t-cliente-options');
@@ -4738,6 +4755,7 @@ function readFileAsBase64(file) {
 
 async function guardarTicket(e) {
   e.preventDefault();
+  const t_existente = editandoTicketId ? tickets.find(x=>x.id===editandoTicketId) : null;
   const isEmpresa = currentSession.viewMode === 'empresa';
   const estado = (isEmpresa || !editandoTicketId) ? 'Abierto' : (document.querySelector('input[name="t-estado"]:checked')?.value || 'Abierto');
   const canal = isEmpresa ? 'portal' : (document.querySelector('input[name="t-canal"]:checked')?.value || '');
@@ -4783,7 +4801,7 @@ async function guardarTicket(e) {
         mostrarNotificacion('Debe ingresar el Número de Pedido SAP para cerrar una cotización aceptada.', 'error');
         return;
       }
-      if (!pedidoPdfUpload) {
+      if (!pedidoPdfUpload && !t_existente?.pdfPedido) {
         mostrarNotificacion('Debe adjuntar el archivo PDF del pedido para cerrar la cotización aceptada.', 'error');
         return;
       }
@@ -4793,7 +4811,6 @@ async function guardarTicket(e) {
       }
     }
   }
-  const t_existente = editandoTicketId ? tickets.find(x=>x.id===editandoTicketId) : null;
 
   let pdfPedidoBase64 = t_existente ? t_existente.pdfPedido : null;
   const pedidoPdfInput = document.getElementById('t-pedido-pdf');
