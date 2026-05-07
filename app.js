@@ -3543,11 +3543,14 @@ function abrirFormulario(id) {
   setRefacciones('utilizadas', []);
   setRefacciones('necesarias', []);
   
+  const usedSoportes = ordenes.filter(x => x.id !== editandoId).map(x => x.soporte).filter(Boolean);
+  const usedPedidos = ordenes.filter(x => x.id !== editandoId).map(x => x.pedido).filter(Boolean);
+  
   const elSoporte = document.getElementById('f-soporte');
   if (elSoporte) {
     elSoporte.innerHTML = '<option value="">Ninguno</option>';
-    tickets.filter(t => t.estado === 'Abierto').forEach(t => {
-      elSoporte.innerHTML += `<option value="${t.id}">${t.folio || t.id} - ${t.asunto}</option>`;
+    tickets.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'si' && !usedSoportes.includes(t.id) && !usedPedidos.includes(t.pedidoSAP)).forEach(t => {
+      elSoporte.innerHTML += `<option value="${t.id}">${t.folio || t.id} - Pedido: ${t.pedidoSAP || 'S/N'}</option>`;
     });
   }
   if (id) {
@@ -3568,14 +3571,13 @@ function abrirFormulario(id) {
     const sel = document.getElementById('f-estado');
     if (sel && o.estado) sel.value = o.estado;
     
-    // Poblar tickets abiertos en f-soporte
-    const elSoporte = document.getElementById('f-soporte');
-    if (elSoporte) {
-      elSoporte.innerHTML = '<option value="">Ninguno</option>';
-      tickets.filter(t => t.estado === 'Abierto' || (o && o.soporte === t.id)).forEach(t => {
-        elSoporte.innerHTML += `<option value="${t.id}">${t.folio || t.id} - ${t.asunto}</option>`;
-      });
-      if (o.soporte) elSoporte.value = o.soporte;
+    // Poblar tickets para la edición
+    if (elSoporte && o.soporte) {
+      const t = tickets.find(x => x.id === o.soporte);
+      if (t && !Array.from(elSoporte.options).some(opt => opt.value === t.id)) {
+        elSoporte.innerHTML += `<option value="${t.id}">${t.folio || t.id} - Pedido: ${t.pedidoSAP || 'S/N'}</option>`;
+      }
+      elSoporte.value = o.soporte;
     }
     
     // refacciones
@@ -3584,8 +3586,36 @@ function abrirFormulario(id) {
     // dias
     setDiasData(o.dias);
   }
+  
+  onSoporteChange(); // Sincroniza el pedido y metadata
+
   document.getElementById('modal-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
+}
+
+function onSoporteChange() {
+  const soporteId = document.getElementById('f-soporte').value;
+  const inPedido = document.getElementById('f-pedido');
+  const metaDiv = document.getElementById('soporte-meta');
+  
+  if (soporteId) {
+    const t = tickets.find(x => x.id === soporteId);
+    if (t) {
+      if (t.pedidoSAP) {
+        inPedido.value = t.pedidoSAP;
+        inPedido.readOnly = true;
+        inPedido.style.background = 'var(--bg-secondary)';
+      }
+      metaDiv.innerHTML = `<i data-lucide="info" style="width:12px;height:12px;vertical-align:middle;"></i> <strong>Ticket ${t.folio}</strong> ligado &bull; Cotización SAP: ${t.cotizacionSAP || 'N/A'}`;
+      metaDiv.style.display = 'block';
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+  } else {
+    inPedido.value = '';
+    inPedido.readOnly = false;
+    inPedido.style.background = '';
+    if (metaDiv) metaDiv.style.display = 'none';
+  }
 }
 
 function editarOrden(id) { abrirFormulario(id); }

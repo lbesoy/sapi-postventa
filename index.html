@@ -814,9 +814,10 @@
             </div>
             <div class="form-group">
               <label>Ticket (Soporte)</label>
-              <select id="f-soporte">
+              <select id="f-soporte" onchange="onSoporteChange()">
                 <option value="">Ninguno</option>
               </select>
+              <div id="soporte-meta" style="display:none; font-size:0.85rem; color:var(--text-muted); margin-top:0.4rem;"></div>
             </div>
           </div>
         </div>
@@ -1423,7 +1424,9 @@
             </div>
             <div class="form-group" id="group-t-asignado">
               <label>Asignado a</label>
-              <input type="text" id="t-asignado" placeholder="Técnico o responsable"/>
+              <select id="t-asignado">
+                <option value="">Sin asignar</option>
+              </select>
             </div>
           </div>
           <div class="form-group full-width" style="margin-top:0.5rem;">
