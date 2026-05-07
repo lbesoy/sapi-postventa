@@ -1362,10 +1362,27 @@
                 </div>
               </div>
             </div>
-            <div class="form-group" id="group-t-sitio" style="display:none;">
+            <div class="form-group" id="group-t-sitio" style="display:none; position:relative;">
               <label>Sitio / Sucursal</label>
-              <input type="text" id="t-sitio" list="t-sitio-list" placeholder="Seleccione o escriba..." />
-              <datalist id="t-sitio-list"></datalist>
+              <input type="hidden" id="t-sitio" value="" />
+              
+              <div class="combo-box" id="t-sitio-combo" onclick="toggleCombo('t-sitio')">
+                <span id="t-sitio-display">Ninguno</span>
+                <i data-lucide="chevron-down" style="width:16px;height:16px;color:var(--text-muted);"></i>
+              </div>
+              
+              <div class="combo-menu" id="t-sitio-menu">
+                <div class="combo-search">
+                  <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted);"></i>
+                  <input type="text" id="t-sitio-search" placeholder="Buscar o crear sitio..." onkeyup="filterCombo('t-sitio', this.value)" onclick="event.stopPropagation()"/>
+                </div>
+                <div class="combo-options" id="t-sitio-options">
+                  <!-- Llenado dinámicamente -->
+                </div>
+                <div class="combo-add" id="t-sitio-add" onclick="agregarSitioCombo('t-sitio')">
+                  <i data-lucide="plus-circle" style="width:16px;height:16px;"></i> <span id="t-sitio-add-text">Crear nuevo sitio</span>
+                </div>
+              </div>
             </div>
             <div class="form-group">
               <label>Solicitante *</label>

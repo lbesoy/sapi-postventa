@@ -4514,32 +4514,35 @@ function filterCombo(id, query) {
 
 function selectComboOption(id, value, label) {
   document.getElementById(id).value = value;
-  document.getElementById(id + '-display').textContent = label;
+  const displayEl = document.getElementById(id + '-display');
+  if (displayEl) displayEl.textContent = label;
   document.getElementById(id + '-menu').classList.remove('open');
   document.getElementById(id + '-combo').classList.remove('focus');
 
   if (id === 't-cliente') {
     const sitGroup = document.getElementById('group-t-sitio');
-    const sitSelect = document.getElementById('t-sitio');
-    const datalist = document.getElementById('t-sitio-list');
+    const sitInput = document.getElementById('t-sitio');
+    const sitDisplay = document.getElementById('t-sitio-display');
+    const sitOptions = document.getElementById('t-sitio-options');
     const equipoSelect = document.getElementById('t-equipo');
+    
     if (equipoSelect) equipoSelect.innerHTML = '<option value="">Seleccione una máquina registrada...</option><option value="Otra / No registrada">Otra / No registrada</option>';
     
-    if (value && value !== 'Ninguno') {
+    if (value && value !== 'Ninguno' && value !== 'Ninguno / Uso Interno') {
       if (sitGroup) sitGroup.style.display = 'block';
-      if (sitSelect) sitSelect.value = '';
-      if (datalist) {
-        datalist.innerHTML = '';
+      if (sitInput) sitInput.value = '';
+      if (sitDisplay) sitDisplay.textContent = 'Ninguno';
+      
+      if (sitOptions) {
+        sitOptions.innerHTML = '<div class="combo-option" onclick="selectComboOption(\'t-sitio\', \'\', \'Ninguno\')">Ninguno</div>';
         const c = clientesDb.find(x => x.nombre === value);
         if (c) {
           let sitios = c.sitios || [];
           if (c.ubicacion && !sitios.some(s => getSitioNombre(s) === c.ubicacion)) sitios = [c.ubicacion, ...sitios];
           sitios.forEach(s => {
-            const opt = document.createElement('option');
             const sn = getSitioNombre(s);
-            opt.value = sn;
-            opt.textContent = sn;
-            datalist.appendChild(opt);
+            const escapedSn = sn.replace(/'/g, "\\'");
+            sitOptions.innerHTML += `<div class="combo-option" onclick="selectComboOption('t-sitio', '${escapedSn}', '${escapedSn}')">${sn}</div>`;
           });
           
           if (equipoSelect && c.maquinas) {
@@ -4555,9 +4558,27 @@ function selectComboOption(id, value, label) {
       }
     } else {
       if (sitGroup) sitGroup.style.display = 'none';
-      if (sitSelect) sitSelect.value = '';
+      if (sitInput) sitInput.value = '';
+      if (sitDisplay) sitDisplay.textContent = 'Ninguno';
     }
   }
+}
+
+function agregarSitioCombo(id) {
+  const cName = document.getElementById('t-cliente')?.value;
+  if (!cName || cName === 'Ninguno' || cName === 'Ninguno / Uso Interno') {
+    mostrarNotificacion('Primero selecciona una Empresa (Cliente).', 'warning');
+    return;
+  }
+  const q = document.getElementById('t-sitio-search')?.value.trim() || '';
+  document.getElementById('s-cliente-nombre').value = cName;
+  document.getElementById('s-sitio-nombre').value = q;
+  document.getElementById('s-sitio-direccion').value = '';
+  document.getElementById('modal-sitio-title').textContent = 'Nuevo Sitio: ' + cName;
+  document.getElementById('modal-agregar-sitio-overlay').classList.add('open');
+  document.getElementById('t-sitio-menu').classList.remove('open');
+  document.getElementById('t-sitio-combo').classList.remove('focus');
+  window._addingSiteFromTicket = true;
 }
 
 function agregarEmpresaCombo(id) {
@@ -4811,8 +4832,12 @@ function guardarSitioCliente(e) {
   
   cerrarModalSitio();
   
-  // Si estamos en la vista de empresa, actualizamos sus sitios
-  if (currentSession.viewMode === 'empresa') {
+  if (window._addingSiteFromTicket) {
+    selectComboOption('t-cliente', nombre, document.getElementById('t-cliente-display').textContent);
+    const escapedSn = nuevoSitio.replace(/'/g, "\\'");
+    selectComboOption('t-sitio', escapedSn, escapedSn);
+    window._addingSiteFromTicket = false;
+  } else if (currentSession.viewMode === 'empresa') {
     renderSitios();
   } else {
     verDetalleCliente(nombre);
