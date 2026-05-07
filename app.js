@@ -4020,6 +4020,24 @@ function onSoporteChange() {
       metaDiv.innerHTML = `<i data-lucide="info" style="width:12px;height:12px;vertical-align:middle;"></i> <strong>Ticket ${t.folio}</strong> ligado &bull; Cotización SAP: ${t.cotizacionSAP || 'N/A'}`;
       metaDiv.style.display = 'block';
       
+      const comboEquipo = document.getElementById('f-equipo');
+      if (comboEquipo && t.equipo && (!editandoId || !comboEquipo.value)) {
+        if (!Array.from(comboEquipo.options).some(o => o.value === t.equipo)) {
+           const opt = document.createElement('option');
+           opt.value = t.equipo;
+           opt.textContent = `${t.equipo} (Del Ticket)`;
+           let parsedSerie = '';
+           if (t.equipo.includes('(SN: ')) {
+             parsedSerie = t.equipo.split('(SN: ')[1].replace(')', '').trim();
+           }
+           opt.setAttribute('data-serie', parsedSerie);
+           opt.setAttribute('data-modelo', t.equipo.split('(SN:')[0].trim());
+           comboEquipo.appendChild(opt);
+        }
+        comboEquipo.value = t.equipo;
+        if (typeof onEquipoOrdenChange === 'function') onEquipoOrdenChange();
+      }
+      
       const containerTecnicos = document.getElementById('f-tecnicos-container');
       if (containerTecnicos) {
         containerTecnicos.innerHTML = '';
