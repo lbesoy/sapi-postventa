@@ -4727,7 +4727,16 @@ document.addEventListener('click', function(e) {
   }
 });
 
-function guardarTicket(e) {
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function guardarTicket(e) {
   e.preventDefault();
   const isEmpresa = currentSession.viewMode === 'empresa';
   const estado = (isEmpresa || !editandoTicketId) ? 'Abierto' : (document.querySelector('input[name="t-estado"]:checked')?.value || 'Abierto');
@@ -4785,7 +4794,18 @@ function guardarTicket(e) {
     }
   }
 
-  const t_existente = editandoTicketId ? tickets.find(x=>x.id===editandoTicketId) : null;
+  let pdfPedidoBase64 = t_existente ? t_existente.pdfPedido : null;
+  const pedidoPdfInput = document.getElementById('t-pedido-pdf');
+  if (pedidoPdfInput && pedidoPdfInput.files.length > 0) {
+    try { pdfPedidoBase64 = await readFileAsBase64(pedidoPdfInput.files[0]); } catch(e){}
+  }
+
+  let pdfCotizacionBase64 = t_existente ? t_existente.pdfCotizacion : null;
+  const cotPdfInput = document.getElementById('t-cotizacion-pdf');
+  if (cotPdfInput && cotPdfInput.files.length > 0) {
+    try { pdfCotizacionBase64 = await readFileAsBase64(cotPdfInput.files[0]); } catch(e){}
+  }
+
   const ticket = {
     id: editandoTicketId || crypto.randomUUID(),
     folio: editandoTicketId ? t_existente?.folio : ('TKT-' + (tickets.length + 1).toString().padStart(4, '0')),
@@ -4809,7 +4829,9 @@ function guardarTicket(e) {
     cotAceptada: document.querySelector('input[name="t-cot-aceptada"]:checked')?.value || '',
     motivoRechazo: document.getElementById('t-motivo-rechazo')?.value.trim() || '',
     pedidoSAP: document.getElementById('t-pedido-sap')?.value.trim() || '',
-    tecnicosAsignados: Array.from(document.querySelectorAll('input[name="t-tecnicos"]:checked')).map(cb => cb.value)
+    tecnicosAsignados: Array.from(document.querySelectorAll('input[name="t-tecnicos"]:checked')).map(cb => cb.value),
+    pdfPedido: pdfPedidoBase64,
+    pdfCotizacion: pdfCotizacionBase64
   };
   
   if (isEmpresa && !editandoTicketId && !ticket.asignado) {
@@ -4828,7 +4850,17 @@ function guardarTicket(e) {
   } else {
     tickets.unshift(ticket);
   }
-  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  try {
+    localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  } catch (e) {
+    if (e.name === 'QuotaExceededError' || e.message.includes('quota')) {
+      mostrarNotificacion('El archivo PDF es demasiado grande para guardar localmente.', 'error');
+      // Revert the ticket insertion/update if it fails
+      if (!editandoTicketId) tickets.shift();
+      else tickets = tickets.map(t_old => t_old.id === editandoTicketId ? t_existente : t_old);
+      return;
+    }
+  }
   cerrarTicket();
   renderTickets();
   updateTicketBadge();
@@ -4885,9 +4917,11 @@ function verDetalleTicket(id) {
       <div class="detalle-section-title">Resolución Final</div>
       <div class="detalle-grid">
         ${t.cotizacionSAP ? field('Cotización SAP', t.cotizacionSAP) : ''}
+        ${t.pdfCotizacion ? field('PDF Cotización', `<a href="${t.pdfCotizacion}" download="Cotizacion_${t.folio}.pdf" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</a>`) : ''}
         ${t.cotAceptada ? field('Resultado', t.cotAceptada === 'si' ? '<span style="color:var(--success); display:inline-flex; align-items:center; gap:4px;"><i data-lucide="check-circle" style="width:14px;height:14px;"></i> Aprobada</span>' : '<span style="color:var(--danger); display:inline-flex; align-items:center; gap:4px;"><i data-lucide="x-circle" style="width:14px;height:14px;"></i> Rechazada</span>') : ''}
         ${t.motivoRechazo ? field('Motivo Rechazo', t.motivoRechazo) : ''}
         ${t.pedidoSAP ? field('Pedido SAP', t.pedidoSAP) : ''}
+        ${t.pdfPedido ? field('PDF Pedido', `<a href="${t.pdfPedido}" download="Pedido_${t.folio}.pdf" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</a>`) : ''}
         ${t.tecnicosAsignados && t.tecnicosAsignados.length > 0 ? field('Técnicos Asignados', t.tecnicosAsignados.join(', ')) : ''}
       </div>
     </div>
@@ -4981,7 +5015,7 @@ function avanzarCotizacionTicket(id) {
   updateTicketBadge();
 }
 
-function cerrarCotizacionTicket(id) {
+async function cerrarCotizacionTicket(id) {
   const t = tickets.find(x => x.id === id);
   if (!t) return;
   const aceptada = document.querySelector(`input[name="quick-cot-acep-${id}"]:checked`)?.value;
@@ -4991,6 +5025,8 @@ function cerrarCotizacionTicket(id) {
   }
   let motivo = '';
   let pedidoSAP = '';
+  let pdfPedidoBase64 = t.pdfPedido || null;
+  let tecnicosAsignados = t.tecnicosAsignados || [];
   if (aceptada === 'no') {
     motivo = document.getElementById(`quick-motivo-text-${id}`)?.value.trim();
     if (!motivo) {
@@ -5006,7 +5042,7 @@ function cerrarCotizacionTicket(id) {
       mostrarNotificacion('Debes ingresar el Número de Pedido SAP.', 'warning');
       return;
     }
-    if (!pdfUpload) {
+    if (!pdfUpload && !pdfPedidoBase64) {
       mostrarNotificacion('Debes adjuntar el archivo PDF del pedido.', 'warning');
       return;
     }
@@ -5015,15 +5051,27 @@ function cerrarCotizacionTicket(id) {
       return;
     }
     tecnicosAsignados = selectedT;
+    
+    if (pdfUpload) {
+      try { pdfPedidoBase64 = await readFileAsBase64(document.getElementById(`quick-pedido-pdf-${id}`).files[0]); } catch(e){}
+    }
   }
   
   t.cotAceptada = aceptada;
   t.motivoRechazo = motivo;
   t.pedidoSAP = pedidoSAP;
   t.tecnicosAsignados = tecnicosAsignados;
+  t.pdfPedido = pdfPedidoBase64;
   t.estado = 'Cerrado';
-  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
-  mostrarNotificacion('Ticket cerrado con éxito.', 'success');
+  try {
+    localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+    mostrarNotificacion('Ticket cerrado con éxito.', 'success');
+  } catch(e) {
+    if (e.name === 'QuotaExceededError' || e.message.includes('quota')) {
+      mostrarNotificacion('El archivo PDF es demasiado grande para guardar localmente.', 'error');
+      return;
+    }
+  }
   verDetalleTicket(id);
   renderTickets();
   updateTicketBadge();
