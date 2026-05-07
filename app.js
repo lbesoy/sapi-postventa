@@ -2242,10 +2242,14 @@ function verDetalleCliente(nombre) {
   `;
 
   // Sitios
+  let sitiosFromDb = sitiosDb.filter(s => s.cliente === clienteOb?.id || s.cliente === clienteOb?.idInterno || s.cliente === clienteOb?.rfc || s.cliente === clienteOb?.nombre).map(s => s.nombre);
   let sitios = clienteOb?.sitios || [];
   if (clienteOb?.ubicacion && !sitios.includes(clienteOb.ubicacion)) {
     sitios = [clienteOb.ubicacion, ...sitios];
   }
+  
+  sitios = [...new Set([...sitios, ...sitiosFromDb])];
+  
   if (sitios.length === 0) sitios = ['Sede Principal'];
 
   html += `
@@ -2255,12 +2259,15 @@ function verDetalleCliente(nombre) {
         <button class="btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; height: auto;" onclick="agregarSitioCliente('${nombre.replace(/'/g, "\\'")}')">+ Agregar Sitio</button>
       </div>
       <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
-        ${sitios.map((s, idx) => `
+        ${sitios.map((s, idx) => {
+          const sNombre = getSitioNombre(s);
+          return `
           <span style="background:var(--bg-hover); padding:0.4rem 0.8rem; border-radius:1rem; border:1px solid var(--border); font-size:0.85rem; font-weight:500; color:var(--text-primary); display:inline-flex; align-items:center; gap:0.4rem;">
-            ${getSitioNombre(s)}
-            ${isAdmin ? `<i data-lucide="x" style="width:14px;height:14px;cursor:pointer;color:var(--red);" onclick="eliminarSitioDeClienteAdmin('${nombre.replace(/'/g, "\\'")}', ${idx})" title="Eliminar Sitio"></i>` : ''}
+            ${sNombre}
+            ${isAdmin ? `<i data-lucide="x" style="width:14px;height:14px;cursor:pointer;color:var(--red);" onclick="eliminarSitioDeClienteAdmin('${nombre.replace(/'/g, "\\'")}', '${sNombre.replace(/'/g, "\\'")}')" title="Eliminar Sitio"></i>` : ''}
           </span>
-        `).join('')}
+          `;
+        }).join('')}
       </div>
     </div>
   `;
@@ -2498,13 +2505,18 @@ function guardarPersonalCliente(clienteNombre, rol, userId) {
   verDetalleCliente(clienteNombre); // Refrescar modal
 }
 
-function eliminarSitioDeClienteAdmin(clienteNombre, sitioIdx) {
-  if (!confirm('¿Estás seguro de eliminar este sitio del cliente?')) return;
+function eliminarSitioDeClienteAdmin(clienteNombre, sitioNombre) {
+  if (!confirm(`¿Estás seguro de eliminar el sitio "${sitioNombre}" de este cliente? (Los sitios de SAP no se pueden eliminar por aquí)`)) return;
   const cliente = clientesDb.find(c => c.nombre === clienteNombre);
-  if (cliente && cliente.sitios && cliente.sitios.length > sitioIdx) {
-    cliente.sitios.splice(sitioIdx, 1);
-    localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
-    verDetalleCliente(clienteNombre); // Refrescar modal
+  if (cliente && cliente.sitios) {
+    const idx = cliente.sitios.findIndex(s => getSitioNombre(s) === sitioNombre);
+    if (idx !== -1) {
+      cliente.sitios.splice(idx, 1);
+      localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+      verDetalleCliente(clienteNombre); // Refrescar modal
+    } else {
+      alert("Este sitio proviene de SAP y no puede ser eliminado desde aquí.");
+    }
   }
 }
 
