@@ -1540,6 +1540,11 @@ async function forzarSincronizacionSAP() {
             existe.rol = mappedRole;
             usersChanged = true;
           }
+          // Actualizar al nuevo dominio si tenía el viejo
+          if (existe.email && existe.email.includes('@eurorep.com')) {
+            existe.email = existe.email.replace('@eurorep.com', '@eurorep.mx');
+            usersChanged = true;
+          }
         }
       });
       
@@ -2330,7 +2335,19 @@ function cerrarDetalleMaquina(e) {
 }
 
 function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion) {
-  document.getElementById('detalle-maquina-title').textContent = `${marca} ${modelo} (${idInterno})`;
+  const logoPath = getLogoMarca(marca);
+  document.getElementById('detalle-maquina-title').innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; width:100%; padding-right:1rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <img src="logo_transparent.png" alt="Eurorep" style="height:32px; object-fit:contain; border-right:1px solid var(--border); padding-right:0.75rem;"/>
+        <div style="display:flex; flex-direction:column; justify-content:center;">
+          <span style="font-size:1.1rem; line-height:1.2;">${marca} ${modelo}</span>
+          <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">ID: ${idInterno}</span>
+        </div>
+      </div>
+      ${logoPath ? `<img src="${logoPath}" alt="${marca}" onerror="this.onerror=null; this.style.display='none';" style="height:28px; object-fit:contain; max-width:100px;"/>` : ''}
+    </div>
+  `;
   
   const maqTickets = tickets.filter(t => t.maquinaId === idInterno || (serie && serie !== 'N/A' && t.maquinaId === serie));
   const maqOrdenes = ordenes.filter(o => o.maquina === idInterno || (serie && serie !== 'N/A' && o.maquina === serie));
