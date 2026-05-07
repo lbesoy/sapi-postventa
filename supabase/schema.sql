@@ -83,11 +83,69 @@ CREATE TABLE public.tickets (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 6. RLS (Row Level Security) - Deshabilitado temporalmente para pruebas
+-- 6. TABLE: sitios
+CREATE TABLE public.sitios (
+    id TEXT PRIMARY KEY,
+    nombre TEXT NOT NULL,
+    cliente TEXT,
+    direccion TEXT,
+    cp TEXT,
+    ciudad TEXT,
+    estado TEXT,
+    custom_data JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 7. TABLE: maquinaria
+CREATE TABLE public.maquinaria (
+    id TEXT PRIMARY KEY,
+    serie TEXT,
+    marca TEXT,
+    modelo TEXT,
+    anio TEXT,
+    cliente TEXT,
+    id_interno TEXT,
+    descripcion TEXT,
+    custom_data JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 8. TABLE: refacciones
+CREATE TABLE public.refacciones (
+    id TEXT PRIMARY KEY,
+    codigo TEXT,
+    descripcion TEXT,
+    precio NUMERIC,
+    moneda TEXT,
+    stock INTEGER,
+    custom_data JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 9. TABLE: config
+CREATE TABLE public.config (
+    id TEXT PRIMARY KEY,
+    data JSONB NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 10. TABLE: roles
+CREATE TABLE public.roles (
+    id TEXT PRIMARY KEY,
+    data JSONB NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 11. RLS (Row Level Security) - Deshabilitado temporalmente para pruebas
 ALTER TABLE public.usuarios DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clientes DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ordenes DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tickets DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sitios DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.maquinaria DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.refacciones DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.config DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.roles DISABLE ROW LEVEL SECURITY;
 
 -- Insertar un SuperAdmin por defecto
 INSERT INTO public.usuarios (id, nombre, email, pin, rol, activo)

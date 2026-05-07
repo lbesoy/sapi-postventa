@@ -122,6 +122,51 @@ async function migrarDatosASupabase() {
       }
     }
 
+    const { data: dbSitios, error: errSit } = await sb.from('sitios').select('*');
+    if (!errSit && dbSitios.length === 0) {
+      const local = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+      if (local.length > 0) {
+        for (const i of local) await window.pushToSupabase('sitios', i);
+        hayCambios = true;
+      }
+    }
+
+    const { data: dbMaq, error: errMaq } = await sb.from('maquinaria').select('*');
+    if (!errMaq && dbMaq.length === 0) {
+      const local = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
+      if (local.length > 0) {
+        for (const i of local) await window.pushToSupabase('maquinaria', i);
+        hayCambios = true;
+      }
+    }
+
+    const { data: dbRef, error: errRef } = await sb.from('refacciones').select('*');
+    if (!errRef && dbRef.length === 0) {
+      const local = JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]');
+      if (local.length > 0) {
+        for (const i of local) await window.pushToSupabase('refacciones', i);
+        hayCambios = true;
+      }
+    }
+
+    const { data: dbConfig, error: errConf } = await sb.from('config').select('*');
+    if (!errConf && dbConfig.length === 0) {
+      const local = JSON.parse(localStorage.getItem('eurorep_config') || 'null');
+      if (local) {
+        await window.pushToSupabase('config', local);
+        hayCambios = true;
+      }
+    }
+
+    const { data: dbRoles, error: errRol } = await sb.from('roles').select('*');
+    if (!errRol && dbRoles.length === 0) {
+      const local = JSON.parse(localStorage.getItem('sapi_roles_config') || 'null');
+      if (local) {
+        await window.pushToSupabase('roles', local);
+        hayCambios = true;
+      }
+    }
+
     if (hayCambios) {
       console.log("✅ Migración inicial completada con éxito.");
     }
@@ -221,6 +266,40 @@ async function cargarDatosDeSupabase() {
       }));
       localStorage.setItem('sapi_tickets', JSON.stringify(tikMapped));
     }
+
+    const { data: sitiosDb } = await sb.from('sitios').select('*');
+    if (sitiosDb) {
+      const sitMapped = sitiosDb.map(s => ({
+        id: s.id, nombre: s.nombre, cliente: s.cliente, direccion: s.direccion, cp: s.cp, ciudad: s.ciudad, estado: s.estado, customData: s.custom_data
+      }));
+      localStorage.setItem('sapi_sitios_db', JSON.stringify(sitMapped));
+    }
+
+    const { data: maqDb } = await sb.from('maquinaria').select('*');
+    if (maqDb) {
+      const maqMapped = maqDb.map(m => ({
+        id: m.id, serie: m.serie, marca: m.marca, modelo: m.modelo, anio: m.anio, cliente: m.cliente, idInterno: m.id_interno, descripcion: m.descripcion, customData: m.custom_data
+      }));
+      localStorage.setItem('sapi_maquinaria_db', JSON.stringify(maqMapped));
+    }
+
+    const { data: refDb } = await sb.from('refacciones').select('*');
+    if (refDb) {
+      const refMapped = refDb.map(r => ({
+        id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, customData: r.custom_data
+      }));
+      localStorage.setItem('sapi_refacciones_db', JSON.stringify(refMapped));
+    }
+
+    const { data: configDb } = await sb.from('config').select('*');
+    if (configDb && configDb.length > 0) {
+      localStorage.setItem('eurorep_config', JSON.stringify(configDb[0].data));
+    }
+
+    const { data: rolesDb } = await sb.from('roles').select('*');
+    if (rolesDb && rolesDb.length > 0) {
+      localStorage.setItem('sapi_roles_config', JSON.stringify(rolesDb[0].data));
+    }
     
     // Disparar un evento para que app.js sepa que debe recargar variables de memoria
     window.dispatchEvent(new Event('supabase_datos_cargados'));
@@ -312,6 +391,23 @@ window.pushToSupabase = async function(tabla, item) {
         pdf_pedido: item.pdfPedido,
         pdf_cotizacion: item.pdfCotizacion
       };
+    } else if (tabla === 'sitios') {
+      payload = {
+        id: item.id, nombre: item.nombre, cliente: item.cliente, direccion: item.direccion, cp: item.cp, ciudad: item.ciudad, estado: item.estado, custom_data: item.customData || {}
+      };
+    } else if (tabla === 'maquinaria') {
+      payload = {
+        id: item.id, serie: item.serie, marca: item.marca, modelo: item.modelo, anio: item.anio, cliente: item.cliente, id_interno: item.idInterno, descripcion: item.descripcion, custom_data: item.customData || {}
+      };
+    } else if (tabla === 'refacciones') {
+      payload = {
+        id: item.id, codigo: item.codigo, descripcion: item.descripcion, precio: item.precio, moneda: item.moneda, stock: item.stock, custom_data: item.customData || {}
+      };
+    } else if (tabla === 'config' || tabla === 'roles') {
+      payload = {
+        id: 'main',
+        data: item
+      };
     }
 
     const { error } = await window.supabaseClient.from(tabla).upsert(payload);
@@ -344,6 +440,21 @@ localStorage.setItem = function(key, value) {
     }
     else if (key === 'sapi_tickets' && Array.isArray(data)) {
       data.forEach(t => window.pushToSupabase('tickets', t));
+    }
+    else if (key === 'sapi_sitios_db' && Array.isArray(data)) {
+      data.forEach(s => window.pushToSupabase('sitios', s));
+    }
+    else if (key === 'sapi_maquinaria_db' && Array.isArray(data)) {
+      data.forEach(m => window.pushToSupabase('maquinaria', m));
+    }
+    else if (key === 'sapi_refacciones_db' && Array.isArray(data)) {
+      data.forEach(r => window.pushToSupabase('refacciones', r));
+    }
+    else if (key === 'eurorep_config') {
+      window.pushToSupabase('config', data);
+    }
+    else if (key === 'sapi_roles_config') {
+      window.pushToSupabase('roles', data);
     }
   } catch(e) {
     // Ignorar si no es JSON o hay error
