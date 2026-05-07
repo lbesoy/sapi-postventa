@@ -17,7 +17,7 @@ async function migrarDatosASupabase() {
       if (localUsuarios.length > 0) {
         console.log("Migrando usuarios a Supabase...");
         for (const u of localUsuarios) {
-          if (u.email === 'admin@eurorep.com.mx') continue; // Evitar duplicar el default
+          if (u.email === 'admin@eurorep.mx') continue; // Evitar duplicar el default
           await sb.from('usuarios').insert({
             id: u.id,
             nombre: u.nombre,
@@ -203,7 +203,7 @@ window.pushToSupabase = async function(tabla, item) {
       };
     } else if (tabla === 'usuarios') {
       // Evitar guardar SuperAdmin en caso de error
-      if (item.email === 'admin@eurorep.com.mx') return;
+      if (item.email === 'admin@eurorep.mx') return;
       payload = {
         id: item.id,
         nombre: item.nombre,

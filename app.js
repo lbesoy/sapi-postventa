@@ -2047,25 +2047,25 @@ function renderClientes() {
       return `
         <tr onclick="verDetalleCliente('${(c.nombre || 'Sin nombre').replace(/'/g, "\\'")}')" style="cursor:pointer;" class="table-row-hover">
           <td>
-            <div style="font-family:monospace; font-weight:600; color:var(--accent); background:var(--bg-secondary); padding:0.2rem 0.5rem; border-radius:4px; display:inline-block; font-size:0.85rem;">${c.id && c.id !== 'Usuario registrado' ? c.id : 'N/A'}</div>
+            ${c.id && c.id !== 'Usuario registrado' && c.id !== 'N/A' ? `<div style="font-family:monospace; font-weight:600; color:var(--accent); background:var(--bg-secondary); padding:0.2rem 0.5rem; border-radius:4px; display:inline-block; font-size:0.85rem;">${c.id}</div>` : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}
           </td>
           <td style="font-weight:600; color:var(--text-primary);">${c.nombre || 'Sin nombre'}</td>
           <td style="font-size:0.8rem; color:var(--text-muted);">${c.rfc && c.rfc !== 'Genérico' ? c.rfc : 'N/A'}</td>
           <td style="font-size:0.85rem;">${c.contacto || 'N/A'}</td>
           <td>
-            <div style="display:flex; align-items:center; gap:0.4rem; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${c.email || ''}">
-              ${c.email && c.email !== 'N/A' ? `<i data-lucide="mail" style="width:14px;height:14px;color:var(--text-muted);"></i> <span style="font-size:0.85rem;">${c.email}</span>` : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}
+            <div style="max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${c.email || ''}">
+              ${c.email && c.email !== 'N/A' ? `<span style="font-size:0.85rem;">${c.email}</span>` : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}
             </div>
           </td>
           <td>
-            <div style="display:flex; align-items:center; gap:0.4rem; white-space:nowrap;">
-              ${c.telefono && c.telefono !== 'N/A' ? `<i data-lucide="phone" style="width:14px;height:14px;color:var(--text-muted);"></i> <span style="font-size:0.85rem;">${c.telefono}</span>` : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}
+            <div style="white-space:nowrap;">
+              ${c.telefono && c.telefono !== 'N/A' ? `<span style="font-size:0.85rem;">${c.telefono}</span>` : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}
             </div>
           </td>
-          <td><span class="badge" style="background:var(--bg-hover); color:var(--text-primary); border:1px solid var(--border);">${c.grupoSinergia || 'N/A'}</span></td>
-          <td style="font-weight:600; color:${c.saldoCuenta > 0 ? 'var(--red)' : 'var(--text-primary)'};">${API_CONFIG.USE_SAP_BACKEND ? formatMoney(c.saldoCuenta) : 'N/A'}</td>
-          <td style="font-weight:600; color:var(--accent);" onclick="event.stopPropagation(); abrirDesgloseSAP('${c.id}', '${(c.nombre || 'Sin nombre').replace(/'/g, "\\'")}')">
-            <span style="border-bottom: 1px dashed var(--accent); cursor:pointer;">${API_CONFIG.USE_SAP_BACKEND ? formatMoney(c.saldoOrdenes) : 'N/A'}</span>
+          <td>${c.grupoSinergia && c.grupoSinergia !== 'N/A' ? `<span class="badge" style="background:var(--bg-hover); color:var(--text-primary); border:1px solid var(--border);">${c.grupoSinergia}</span>` : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}</td>
+          <td style="font-weight:600; color:${c.saldoCuenta > 0 ? 'var(--red)' : 'var(--text-primary)'}; text-align:right;">${API_CONFIG.USE_SAP_BACKEND ? formatMoney(c.saldoCuenta) : '<span style="font-size:0.85rem; color:var(--text-muted); font-weight:normal;">N/A</span>'}</td>
+          <td style="font-weight:600; color:var(--accent); text-align:right;" onclick="event.stopPropagation(); abrirDesgloseSAP('${c.id}', '${(c.nombre || 'Sin nombre').replace(/'/g, "\\'")}')">
+            ${API_CONFIG.USE_SAP_BACKEND ? `<span style="border-bottom: 1px dashed var(--accent); cursor:pointer;">${formatMoney(c.saldoOrdenes)}</span>` : '<span style="font-size:0.85rem; color:var(--text-muted); font-weight:normal;">N/A</span>'}
           </td>
           ${customTds}
           <td style="text-align:center;"><span class="badge" style="background:var(--blue-light); color:var(--blue);">${(c.maquinas || []).length}</span></td>

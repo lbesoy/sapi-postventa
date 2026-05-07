@@ -60,5 +60,5 @@ ALTER TABLE public.ordenes DISABLE ROW LEVEL SECURITY;
 
 -- Insertar un SuperAdmin por defecto
 INSERT INTO public.usuarios (id, nombre, email, pin, rol, activo)
-VALUES ('admin-001', 'Administrador Master', 'admin@eurorep.com.mx', '1234', 'superadmin', true)
+VALUES ('admin-001', 'Administrador Master', 'admin@eurorep.mx', '1234', 'superadmin', true)
 ON CONFLICT (id) DO NOTHING;

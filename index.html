@@ -293,7 +293,7 @@
       </div>
       
       <div class="table-wrapper" id="clientes-list-wrapper" style="display:none; margin-top:1rem;">
-        <table class="data-table">
+        <table class="orders-table">
           <thead>
             <tr>
               <th id="th-cli-id" onclick="toggleSortClientes('id')" style="cursor:pointer; user-select:none;">ID SAP <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-id"></i></th>
@@ -303,9 +303,9 @@
               <th id="th-cli-email" onclick="toggleSortClientes('email')" style="cursor:pointer; user-select:none;">Correo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-email"></i></th>
               <th id="th-cli-telefono" onclick="toggleSortClientes('telefono')" style="cursor:pointer; user-select:none;">Teléfono <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-telefono"></i></th>
               <th id="th-cli-grupoSinergia" onclick="toggleSortClientes('grupoSinergia')" style="cursor:pointer; user-select:none;">Grupo SAP <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-grupoSinergia"></i></th>
-              <th id="th-cli-saldoCuenta" onclick="toggleSortClientes('saldoCuenta')" style="cursor:pointer; user-select:none;">Saldo SAP <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-saldoCuenta"></i></th>
-              <th id="th-cli-saldoOrdenes" onclick="toggleSortClientes('saldoOrdenes')" style="cursor:pointer; user-select:none;">Órdenes Abiertas <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-saldoOrdenes"></i></th>
-              <th>Máquinas</th>
+              <th id="th-cli-saldoCuenta" onclick="toggleSortClientes('saldoCuenta')" style="cursor:pointer; user-select:none; text-align:right;">Saldo SAP <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-saldoCuenta"></i></th>
+              <th id="th-cli-saldoOrdenes" onclick="toggleSortClientes('saldoOrdenes')" style="cursor:pointer; user-select:none; text-align:right;">Órdenes Abiertas <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-cli-saldoOrdenes"></i></th>
+              <th style="text-align:center;">Máquinas</th>
             </tr>
           </thead>
           <tbody id="clientes-table-body">
