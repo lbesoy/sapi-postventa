@@ -3725,7 +3725,7 @@ function abrirFormulario(id) {
     const o = ordenes.find(x => x.id === id);
     if (!o) return;
     const fields = ['folio','pedido','ubicacion','operador','eco','horometro',
-      'modelo','serie','tecnico','soporte','km-ida','km-vuelta','km-total',
+      'modelo','serie','soporte','km-ida','km-vuelta','km-total',
       'falla','trabajos','dictamen','condiciones','observaciones','pendientes',
       'factura-ref','factura-mo','noches','alimentacion','traslado-costo'];
     fields.forEach(f => {
@@ -3768,6 +3768,29 @@ function abrirFormulario(id) {
     poblarSoportesPorCliente('');
   }
   
+  // Llenar checkboxes de técnicos
+  const containerTecnicos = document.getElementById('f-tecnicos-container');
+  if (containerTecnicos) {
+    containerTecnicos.innerHTML = '';
+    let assigned = [];
+    if (id) {
+      const o = ordenes.find(x => x.id === id);
+      if (o) {
+        if (o.tecnicosAsignados) assigned = o.tecnicosAsignados;
+        else if (o.tecnico) assigned = o.tecnico.split(',').map(s => s.trim());
+      }
+    }
+    usuarios.filter(u => u.rol === 'tecnico' && u.activo !== false).forEach(u => {
+      const isChecked = assigned.includes(u.nombre);
+      containerTecnicos.innerHTML += `
+        <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; background: var(--bg-body); padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem; line-height: 1.2;">
+          <input type="checkbox" name="f-tecnicos" value="${u.nombre}" ${isChecked ? 'checked' : ''} style="width:16px; height:16px; margin:0; margin-top:1px; flex-shrink:0;"/>
+          <span style="flex:1; text-align:left; font-weight:normal; color:var(--text-primary);">${u.nombre}</span>
+        </label>
+      `;
+    });
+  }
+  
   poblarMaquinasCliente('f-equipo', '', id ? ordenes.find(x => x.id === id)?.cliente : '');
   
   onSoporteChange(); // Sincroniza el pedido y metadata
@@ -3793,12 +3816,21 @@ function onSoporteChange() {
       metaDiv.innerHTML = `<i data-lucide="info" style="width:12px;height:12px;vertical-align:middle;"></i> <strong>Ticket ${t.folio}</strong> ligado &bull; Cotización SAP: ${t.cotizacionSAP || 'N/A'}`;
       metaDiv.style.display = 'block';
       
-      if (inTecnico) {
+      const inTecnicoChecks = document.querySelectorAll('input[name="f-tecnicos"]');
+      if (inTecnicoChecks.length > 0) {
+        // Desmarcar todos primero
+        inTecnicoChecks.forEach(cb => cb.checked = false);
+        
+        let assigned = [];
         if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) {
-          inTecnico.value = t.tecnicosAsignados.join(', ');
+          assigned = t.tecnicosAsignados;
         } else if (t.asignado && t.asignado !== 'Sin asignar') {
-          inTecnico.value = t.asignado;
+          assigned = t.asignado.split(',').map(s => s.trim());
         }
+        
+        inTecnicoChecks.forEach(cb => {
+          if (assigned.includes(cb.value)) cb.checked = true;
+        });
       }
       
       if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -3827,6 +3859,7 @@ function guardarOrdenes() {
 function guardarOrden(e) {
   e.preventDefault();
   const tipo = document.querySelector('input[name="tipo"]:checked')?.value || 'Servicio';
+  const tecnicosSeleccionados = Array.from(document.querySelectorAll('input[name="f-tecnicos"]:checked')).map(cb => cb.value);
   const orden = {
     id: editandoId || crypto.randomUUID(),
     fecha: new Date().toLocaleDateString('es-MX'),
@@ -3839,7 +3872,8 @@ function guardarOrden(e) {
     horometro: document.getElementById('f-horometro').value.trim(),
     modelo: document.getElementById('f-modelo').value.trim(),
     serie: document.getElementById('f-serie').value.trim(),
-    tecnico: document.getElementById('f-tecnico').value.trim(),
+    tecnico: tecnicosSeleccionados.join(', '),
+    tecnicosAsignados: tecnicosSeleccionados,
     soporte: document.getElementById('f-soporte').value.trim(),
     km_ida: document.getElementById('f-km-ida').value,
     km_vuelta: document.getElementById('f-km-vuelta').value,
