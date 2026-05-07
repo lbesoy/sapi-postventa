@@ -1343,7 +1343,6 @@ function setupNav() {
         cargarListaQueriesSAP();
       }
       if (view === 'servicios') renderTabla('servicios');
-      if (view === 'dash-tickets') renderTickets('dash-tickets');
       if (view === 'tickets') renderTickets();
       if (view === 'tecnicos') {
         if (typeof renderTecnicos === 'function') renderTecnicos();
@@ -1374,6 +1373,48 @@ function renderStats() {
     document.getElementById('stat-t-abiertos').textContent = t_abiertos;
     document.getElementById('stat-t-cotizacion').textContent = t_cotizacion;
     document.getElementById('stat-t-cerrados').textContent = t_cerrados;
+  }
+}
+
+// ===== DASHBOARD TABS =====
+function setDashView(tab) {
+  const btnOrdenes = document.getElementById('btn-dash-ordenes');
+  const btnTickets = document.getElementById('btn-dash-tickets');
+  const contentOrdenes = document.getElementById('dash-content-ordenes');
+  const contentTickets = document.getElementById('dash-content-tickets');
+
+  if (tab === 'ordenes') {
+    btnOrdenes.classList.add('active');
+    btnOrdenes.style.background = 'var(--bg-card)';
+    btnOrdenes.style.color = 'var(--text-primary)';
+    btnOrdenes.style.fontWeight = '600';
+    btnOrdenes.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+
+    btnTickets.classList.remove('active');
+    btnTickets.style.background = 'transparent';
+    btnTickets.style.color = 'var(--text-muted)';
+    btnTickets.style.fontWeight = '500';
+    btnTickets.style.boxShadow = 'none';
+
+    contentOrdenes.style.display = 'block';
+    contentTickets.style.display = 'none';
+    renderTabla('');
+  } else {
+    btnTickets.classList.add('active');
+    btnTickets.style.background = 'var(--bg-card)';
+    btnTickets.style.color = 'var(--text-primary)';
+    btnTickets.style.fontWeight = '600';
+    btnTickets.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+
+    btnOrdenes.classList.remove('active');
+    btnOrdenes.style.background = 'transparent';
+    btnOrdenes.style.color = 'var(--text-muted)';
+    btnOrdenes.style.fontWeight = '500';
+    btnOrdenes.style.boxShadow = 'none';
+
+    contentOrdenes.style.display = 'none';
+    contentTickets.style.display = 'block';
+    renderTickets('dash-tickets');
   }
 }
 

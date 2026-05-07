@@ -99,11 +99,8 @@
     <img src="logo_transparent.png" alt="Eurorep" class="sidebar-logo-img"/>
   </div>
   <nav class="sidebar-nav">
-    <a href="#" class="nav-item active" data-view="dashboard" data-title="Dashboard Órdenes" id="nav-dashboard">
-      <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span><span>Dash. Órdenes</span>
-    </a>
-    <a href="#" class="nav-item" data-view="dash-tickets" data-title="Dashboard Tickets" id="nav-dash-tickets">
-      <span class="nav-icon"><i data-lucide="pie-chart"></i></span><span>Dash. Tickets</span>
+    <a href="#" class="nav-item active" data-view="dashboard" data-title="Dashboards" id="nav-dashboard">
+      <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span><span>Dashboards</span>
     </a>
     <a href="#" class="nav-item" data-view="servicios" data-title="Órdenes de Servicio" id="nav-servicios">
       <span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span>Órdenes de Servicio</span>
@@ -188,118 +185,129 @@
 
     <!-- DASHBOARD VIEW -->
     <div id="view-dashboard" class="view active">
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="file-text"></i></div>
-          <div>
-            <div class="stat-label">Total Órdenes</div>
-            <div class="stat-value" id="stat-total">0</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i data-lucide="clock"></i></div>
-          <div>
-            <div class="stat-label">En Proceso</div>
-            <div class="stat-value" id="stat-proceso">0</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-circle"></i></div>
-          <div>
-            <div class="stat-label">Pendientes</div>
-            <div class="stat-value" id="stat-pendientes">0</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle"></i></div>
-          <div>
-            <div class="stat-label">Completadas</div>
-            <div class="stat-value" id="stat-completas">0</div>
-          </div>
+      <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem;">
+        <h2 style="margin:0; font-size:1.4rem;">Panel Principal</h2>
+        <div class="view-toggle" style="display:flex; gap:0.5rem; background: var(--bg-hover); padding: 0.3rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+          <button class="btn-secondary active" id="btn-dash-ordenes" onclick="setDashView('ordenes')" style="padding:0.4rem 1rem; border:none; background:var(--bg-card); box-shadow:0 1px 3px rgba(0,0,0,0.1); color:var(--text-primary); font-weight:600;">Órdenes de Servicio</button>
+          <button class="btn-secondary" id="btn-dash-tickets" onclick="setDashView('tickets')" style="padding:0.4rem 1rem; border:none; background:transparent; color:var(--text-muted); font-weight:500;">Tickets de Soporte</button>
         </div>
       </div>
 
-      <div class="section-header">
-        <h2>Órdenes Recientes</h2>
-        <div class="search-bar">
-          <input type="text" id="search-input" placeholder="Buscar cliente, técnico, folio..." oninput="filtrarOrdenes()"/>
+      <!-- DASHBOARD CONTENIDO ÓRDENES -->
+      <div id="dash-content-ordenes">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="file-text"></i></div>
+            <div>
+              <div class="stat-label">Total Órdenes</div>
+              <div class="stat-value" id="stat-total">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i data-lucide="clock"></i></div>
+            <div>
+              <div class="stat-label">En Proceso</div>
+              <div class="stat-value" id="stat-proceso">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-circle"></i></div>
+            <div>
+              <div class="stat-label">Pendientes</div>
+              <div class="stat-value" id="stat-pendientes">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle"></i></div>
+            <div>
+              <div class="stat-label">Completadas</div>
+              <div class="stat-value" id="stat-completas">0</div>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="table-wrapper">
-        <table class="orders-table" id="orders-table">
-          <thead>
-            <tr>
-              <th id="th-ord-id" onclick="toggleSortOrdenes('id')" style="cursor:pointer; user-select:none;">Folio <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-id"></i></th>
-              <th id="th-ord-cliente" onclick="toggleSortOrdenes('cliente')" style="cursor:pointer; user-select:none;">Cliente <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-cliente"></i></th>
-              <th id="th-ord-ubicacion" onclick="toggleSortOrdenes('ubicacion')" style="cursor:pointer; user-select:none;">Ubicación <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-ubicacion"></i></th>
-              <th id="th-ord-modelo" onclick="toggleSortOrdenes('modelo')" style="cursor:pointer; user-select:none;">Modelo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-modelo"></i></th>
-              <th id="th-ord-tecnico" onclick="toggleSortOrdenes('tecnico')" style="cursor:pointer; user-select:none;">Técnico <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-tecnico"></i></th>
-              <th id="th-ord-tipo" onclick="toggleSortOrdenes('tipo')" style="cursor:pointer; user-select:none;">Tipo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-tipo"></i></th>
-              <th id="th-ord-estado" onclick="toggleSortOrdenes('estado')" style="cursor:pointer; user-select:none;">Estado <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-estado"></i></th>
-              <th id="th-ord-fecha" onclick="toggleSortOrdenes('fecha')" style="cursor:pointer; user-select:none;">Fecha <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-fecha"></i></th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="tabla-body">
-            <tr id="empty-row">
-              <td colspan="9" class="empty-state">No hay órdenes registradas. ¡Crea la primera!</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
 
-    <!-- DASHBOARD TICKETS VIEW -->
-    <div id="view-dash-tickets" class="view">
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="ticket"></i></div>
-          <div>
-            <div class="stat-label">Total Tickets</div>
-            <div class="stat-value" id="stat-t-total">0</div>
+        <div class="section-header">
+          <h2>Órdenes Recientes</h2>
+          <div class="search-bar">
+            <input type="text" id="search-input" placeholder="Buscar cliente, técnico, folio..." oninput="filtrarOrdenes()"/>
           </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-circle"></i></div>
-          <div>
-            <div class="stat-label">Abiertos</div>
-            <div class="stat-value" id="stat-t-abiertos">0</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i data-lucide="file-text"></i></div>
-          <div>
-            <div class="stat-label">Cotización</div>
-            <div class="stat-value" id="stat-t-cotizacion">0</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle"></i></div>
-          <div>
-            <div class="stat-label">Cerrados</div>
-            <div class="stat-value" id="stat-t-cerrados">0</div>
-          </div>
+        <div class="table-wrapper">
+          <table class="orders-table" id="orders-table">
+            <thead>
+              <tr>
+                <th id="th-ord-id" onclick="toggleSortOrdenes('id')" style="cursor:pointer; user-select:none;">Folio <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-id"></i></th>
+                <th id="th-ord-cliente" onclick="toggleSortOrdenes('cliente')" style="cursor:pointer; user-select:none;">Cliente <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-cliente"></i></th>
+                <th id="th-ord-ubicacion" onclick="toggleSortOrdenes('ubicacion')" style="cursor:pointer; user-select:none;">Ubicación <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-ubicacion"></i></th>
+                <th id="th-ord-modelo" onclick="toggleSortOrdenes('modelo')" style="cursor:pointer; user-select:none;">Modelo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-modelo"></i></th>
+                <th id="th-ord-tecnico" onclick="toggleSortOrdenes('tecnico')" style="cursor:pointer; user-select:none;">Técnico <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-tecnico"></i></th>
+                <th id="th-ord-tipo" onclick="toggleSortOrdenes('tipo')" style="cursor:pointer; user-select:none;">Tipo <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-tipo"></i></th>
+                <th id="th-ord-estado" onclick="toggleSortOrdenes('estado')" style="cursor:pointer; user-select:none;">Estado <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-estado"></i></th>
+                <th id="th-ord-fecha" onclick="toggleSortOrdenes('fecha')" style="cursor:pointer; user-select:none;">Fecha <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);" id="sort-icon-ord-fecha"></i></th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-body">
+              <tr id="empty-row">
+                <td colspan="9" class="empty-state">No hay órdenes registradas. ¡Crea la primera!</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
-      <div class="section-header">
-        <h2>Tickets Recientes</h2>
-        <div class="search-bar">
-          <input type="text" id="search-dash-tickets" placeholder="Buscar ticket..." oninput="renderTickets('dash-tickets')"/>
+      <!-- DASHBOARD CONTENIDO TICKETS -->
+      <div id="dash-content-tickets" style="display:none;">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="ticket"></i></div>
+            <div>
+              <div class="stat-label">Total Tickets</div>
+              <div class="stat-value" id="stat-t-total">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-circle"></i></div>
+            <div>
+              <div class="stat-label">Abiertos</div>
+              <div class="stat-value" id="stat-t-abiertos">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i data-lucide="file-text"></i></div>
+            <div>
+              <div class="stat-label">Cotización</div>
+              <div class="stat-value" id="stat-t-cotizacion">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle"></i></div>
+            <div>
+              <div class="stat-label">Cerrados</div>
+              <div class="stat-value" id="stat-t-cerrados">0</div>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="table-wrapper">
-        <table class="orders-table" id="orders-table-dash-tickets">
-          <thead>
-            <tr>
-              <th>#</th><th>Asunto</th><th>Solicitante / Empresa</th><th>Área</th>
-              <th>Prioridad</th><th id="th-ord-estado">Estado </th><th>Asignado</th><th id="th-ord-fecha">Fecha </th><th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="tabla-body-dash-tickets">
-            <tr><td colspan="9" class="empty-state">No hay tickets registrados. ¡Crea el primero!</td></tr>
-          </tbody>
-        </table>
+
+        <div class="section-header">
+          <h2>Tickets Recientes</h2>
+          <div class="search-bar">
+            <input type="text" id="search-dash-tickets" placeholder="Buscar ticket..." oninput="renderTickets('dash-tickets')"/>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="orders-table" id="orders-table-dash-tickets">
+            <thead>
+              <tr>
+                <th>#</th><th>Asunto</th><th>Solicitante / Empresa</th><th>Área</th>
+                <th>Prioridad</th><th id="th-ord-estado">Estado </th><th>Asignado</th><th id="th-ord-fecha">Fecha </th><th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-body-dash-tickets">
+              <tr><td colspan="9" class="empty-state">No hay tickets registrados. ¡Crea el primero!</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
