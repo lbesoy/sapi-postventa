@@ -1451,13 +1451,12 @@ function renderTabla(ctx) {
   
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   if (currentUser) {
-     if (currentUser.rol === 'tecnico') tecFilter = currentUser.id;
-     if (currentUser.rol === 'supervisor') supFilter = currentUser.id;
+     if (currentUser.rol === 'tecnico') tecFilter = currentUser.nombre;
+     if (currentUser.rol === 'supervisor') supFilter = currentUser.nombre;
   }
   
   if (tecFilter || supFilter) {
-    const tecUser = usuarios.find(u => u.id === tecFilter);
-    const tecName = tecUser ? tecUser.nombre : '';
+    const tecName = tecFilter;
     
     filtradas = filtradas.filter(o => {
       let passTec = true;
@@ -4275,28 +4274,37 @@ function actualizarFiltrosPersonal() {
   const userRole = currentUser ? currentUser.rol : '';
   const isTecnico = userRole === 'tecnico';
   const isSupervisor = userRole === 'supervisor';
+  const userName = currentUser ? currentUser.nombre : '';
 
   const selectsTecnico = [document.getElementById('filter-ord-tecnico'), document.getElementById('filter-dash-tkt-tecnico'), document.getElementById('filter-tkt-tecnico')];
   const selectsSupervisor = [document.getElementById('filter-ord-supervisor'), document.getElementById('filter-dash-tkt-supervisor'), document.getElementById('filter-tkt-supervisor')];
   
-  const tecnicos = usuarios.filter(u => u.rol === 'tecnico' && u.activo !== false).sort((a,b) => a.nombre.localeCompare(b.nombre));
-  const supervisores = usuarios.filter(u => ['supervisor', 'admin', 'superadmin'].includes(u.rol) && u.activo !== false).sort((a,b) => a.nombre.localeCompare(b.nombre));
+  const tecnicos = usuarios.filter(u => u.rol === 'tecnico' && u.activo !== false).sort((a,b) => (a.nombre||'').localeCompare(b.nombre||''));
+  const supervisores = usuarios.filter(u => ['supervisor', 'admin', 'superadmin'].includes(u.rol) && u.activo !== false).sort((a,b) => (a.nombre||'').localeCompare(b.nombre||''));
   
-  const tecOptions = '<option value="">Cualquier Técnico</option>' + tecnicos.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
-  const supOptions = '<option value="">Cualquier Supervisor</option>' + supervisores.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
+  // Si por alguna razón tecnicosDb tiene técnicos que no están en usuarios, los añadimos para que no queden opciones vacías
+  let tecOptionsHtml = '<option value="">Cualquier Técnico</option>';
+  if (tecnicos.length > 0) {
+    tecOptionsHtml += tecnicos.map(u => `<option value="${u.nombre}">${u.nombre}</option>`).join('');
+  } else {
+    // Fallback a tecnicosDb si usuarios aún no sincroniza
+    tecOptionsHtml += tecnicosDb.filter(t => t.nombre).map(t => `<option value="${t.nombre}">${t.nombre}</option>`).join('');
+  }
+
+  const supOptionsHtml = '<option value="">Cualquier Supervisor</option>' + supervisores.map(u => `<option value="${u.nombre}">${u.nombre}</option>`).join('');
   
   selectsTecnico.forEach(sel => { 
     if(sel) { 
-      const val = isTecnico ? currentSession.userId : sel.value; 
-      sel.innerHTML = tecOptions; 
+      const val = isTecnico ? userName : sel.value; 
+      sel.innerHTML = tecOptionsHtml; 
       sel.value = val; 
       sel.disabled = isTecnico;
     } 
   });
   selectsSupervisor.forEach(sel => { 
     if(sel) { 
-      const val = isSupervisor ? currentSession.userId : (isTecnico ? '' : sel.value); 
-      sel.innerHTML = supOptions; 
+      const val = isSupervisor ? userName : (isTecnico ? '' : sel.value); 
+      sel.innerHTML = supOptionsHtml; 
       sel.value = val; 
       sel.disabled = isSupervisor || isTecnico;
     } 
@@ -4327,13 +4335,12 @@ function renderTickets(ctx) {
   
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   if (currentUser) {
-     if (currentUser.rol === 'tecnico') tecFilter = currentUser.id;
-     if (currentUser.rol === 'supervisor') supFilter = currentUser.id;
+     if (currentUser.rol === 'tecnico') tecFilter = currentUser.nombre;
+     if (currentUser.rol === 'supervisor') supFilter = currentUser.nombre;
   }
   
   if (tecFilter || supFilter) {
-    const tecUser = usuarios.find(u => u.id === tecFilter);
-    const tecName = tecUser ? tecUser.nombre : '';
+    const tecName = tecFilter; // Ahora usamos el nombre directamente
     
     filtered = filtered.filter(t => {
       let passTec = true;
