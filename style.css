@@ -653,6 +653,66 @@ body {
 }
 
 /* ===== RECEIPT MODAL (TICKET) ===== */
+.modal-receipt {
+  background: var(--bg-card);
+  border-radius: 0 !important; /* Receipts are not rounded */
+  box-shadow: 0 10px 40px rgba(0,0,0,0.15), 0 0 0 1px var(--border);
+  position: relative;
+  border: none !important;
+}
+
+.modal-receipt .modal-header {
+  border-bottom: 2px dashed var(--border) !important;
+  text-align: center;
+  padding-bottom: 1.5rem;
+}
+
+.modal-receipt .modal-header h2 {
+  font-family: monospace;
+  font-size: 1.25rem;
+  letter-spacing: 1px;
+  width: 100%;
+}
+
+.modal-receipt .detalle-section {
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.modal-receipt .detalle-section:last-of-type {
+  border-bottom: none;
+}
+
+.modal-receipt .detalle-section-title {
+  font-family: monospace;
+  font-size: 0.85rem;
+  letter-spacing: 2px;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+
+/* Remove grey boxes from ticket fields so it looks printed on paper */
+.modal-receipt .detalle-field {
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  margin-bottom: 0.5rem;
+}
+
+.modal-receipt .detalle-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.25rem;
+}
+
+.modal-receipt .detalle-value {
+  font-family: monospace;
+  font-size: 0.95rem;
+}
+
 .receipt-edge-top, .receipt-edge-bottom {
   position: absolute;
   left: 0; right: 0;
