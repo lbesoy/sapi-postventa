@@ -734,8 +734,6 @@
         <div class="ticket-filters">
           <button class="filter-btn active" data-filter="todos" onclick="filtrarTickets(this)">Todos</button>
           <button class="filter-btn" data-filter="Abierto" onclick="filtrarTickets(this)">Abiertos</button>
-          <button class="filter-btn" data-filter="En Proceso" onclick="filtrarTickets(this)">En Proceso</button>
-          <button class="filter-btn" data-filter="Resuelto" onclick="filtrarTickets(this)">Resueltos</button>
           <button class="filter-btn" data-filter="Cerrado" onclick="filtrarTickets(this)">Cerrados</button>
         </div>
         <div class="search-bar">
@@ -813,8 +811,10 @@
               <input type="text" id="f-tecnico" placeholder="Nombre del técnico" required/>
             </div>
             <div class="form-group">
-              <label>Soporte</label>
-              <input type="text" id="f-soporte"/>
+              <label>Ticket (Soporte)</label>
+              <select id="f-soporte">
+                <option value="">Ninguno</option>
+              </select>
             </div>
           </div>
         </div>
@@ -1460,8 +1460,6 @@
           <div class="form-section-title"><i data-lucide="circle-dot" class="section-icon"></i> Estado</div>
           <div class="tipo-chips">
             <label class="chip"><input type="radio" name="t-estado" value="Abierto" checked/><span>Abierto</span></label>
-            <label class="chip"><input type="radio" name="t-estado" value="En Proceso"/><span>En Proceso</span></label>
-            <label class="chip"><input type="radio" name="t-estado" value="Resuelto"/><span>Resuelto</span></label>
             <label class="chip"><input type="radio" name="t-estado" value="Cerrado"/><span>Cerrado</span></label>
           </div>
         </div>

@@ -3536,6 +3536,14 @@ function abrirFormulario(id) {
   initDiasPanels();
   setRefacciones('utilizadas', []);
   setRefacciones('necesarias', []);
+  
+  const elSoporte = document.getElementById('f-soporte');
+  if (elSoporte) {
+    elSoporte.innerHTML = '<option value="">Ninguno</option>';
+    tickets.filter(t => t.estado === 'Abierto').forEach(t => {
+      elSoporte.innerHTML += `<option value="${t.id}">${t.folio || t.id} - ${t.asunto}</option>`;
+    });
+  }
   if (id) {
     const o = ordenes.find(x => x.id === id);
     if (!o) return;
@@ -3553,6 +3561,17 @@ function abrirFormulario(id) {
     // estado
     const sel = document.getElementById('f-estado');
     if (sel && o.estado) sel.value = o.estado;
+    
+    // Poblar tickets abiertos en f-soporte
+    const elSoporte = document.getElementById('f-soporte');
+    if (elSoporte) {
+      elSoporte.innerHTML = '<option value="">Ninguno</option>';
+      tickets.filter(t => t.estado === 'Abierto' || (o && o.soporte === t.id)).forEach(t => {
+        elSoporte.innerHTML += `<option value="${t.id}">${t.folio || t.id} - ${t.asunto}</option>`;
+      });
+      if (o.soporte) elSoporte.value = o.soporte;
+    }
+    
     // refacciones
     if (o.ref_utilizadas?.length) setRefacciones('utilizadas', o.ref_utilizadas);
     if (o.ref_necesarias?.length) setRefacciones('necesarias', o.ref_necesarias);
@@ -3618,6 +3637,18 @@ function guardarOrden(e) {
   } else {
     ordenes.unshift(orden);
   }
+  
+  // Auto-cerrar el ticket relacionado
+  if (orden.soporte) {
+    const tIndex = tickets.findIndex(t => t.id === orden.soporte);
+    if (tIndex >= 0 && tickets[tIndex].estado !== 'Cerrado') {
+      tickets[tIndex].estado = 'Cerrado';
+      localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+      updateTicketBadge();
+      if (typeof renderTickets === 'function') renderTickets();
+    }
+  }
+
   guardarOrdenes();
   cerrarFormulario();
   renderTabla();
@@ -3790,7 +3821,7 @@ function renderTickets() {
 }
 
 function badgeTicketEstado(estado) {
-  const map = { 'Abierto':'abierto', 'En Proceso':'en-proceso', 'Resuelto':'resuelto', 'Cerrado':'cerrado' };
+  const map = { 'Abierto':'abierto', 'Cerrado':'cerrado' };
   return map[estado] || 'abierto';
 }
 
