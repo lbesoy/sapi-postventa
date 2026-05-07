@@ -2045,18 +2045,30 @@ function renderClientes() {
       }
 
       return `
-        <tr onclick="verDetalleCliente('${(c.nombre || 'Sin nombre').replace(/'/g, "\\'")}')" style="cursor:pointer;">
-          <td><span class="badge" style="background:var(--accent-light); color:var(--accent);">${c.id && c.id !== 'Usuario registrado' ? c.id : 'N/A'}</span></td>
-          <td style="font-weight:600;">${c.nombre || 'Sin nombre'}</td>
+        <tr onclick="verDetalleCliente('${(c.nombre || 'Sin nombre').replace(/'/g, "\\'")}')" style="cursor:pointer;" class="table-row-hover">
+          <td>
+            <div style="font-family:monospace; font-weight:600; color:var(--accent); background:var(--bg-secondary); padding:0.2rem 0.5rem; border-radius:4px; display:inline-block; font-size:0.85rem;">${c.id && c.id !== 'Usuario registrado' ? c.id : 'N/A'}</div>
+          </td>
+          <td style="font-weight:600; color:var(--text-primary);">${c.nombre || 'Sin nombre'}</td>
           <td style="font-size:0.8rem; color:var(--text-muted);">${c.rfc && c.rfc !== 'Genérico' ? c.rfc : 'N/A'}</td>
-          <td>${c.contacto || 'N/A'}</td>
-          <td style="font-size:0.85rem; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${c.email || ''}">${c.email || 'N/A'}</td>
-          <td>${c.telefono || 'N/A'}</td>
-          <td>${c.grupoSinergia || 'N/A'}</td>
+          <td style="font-size:0.85rem;">${c.contacto || 'N/A'}</td>
+          <td>
+            <div style="display:flex; align-items:center; gap:0.4rem; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${c.email || ''}">
+              ${c.email && c.email !== 'N/A' ? `<i data-lucide="mail" style="width:14px;height:14px;color:var(--text-muted);"></i> <span style="font-size:0.85rem;">${c.email}</span>` : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}
+            </div>
+          </td>
+          <td>
+            <div style="display:flex; align-items:center; gap:0.4rem; white-space:nowrap;">
+              ${c.telefono && c.telefono !== 'N/A' ? `<i data-lucide="phone" style="width:14px;height:14px;color:var(--text-muted);"></i> <span style="font-size:0.85rem;">${c.telefono}</span>` : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}
+            </div>
+          </td>
+          <td><span class="badge" style="background:var(--bg-hover); color:var(--text-primary); border:1px solid var(--border);">${c.grupoSinergia || 'N/A'}</span></td>
           <td style="font-weight:600; color:${c.saldoCuenta > 0 ? 'var(--red)' : 'var(--text-primary)'};">${API_CONFIG.USE_SAP_BACKEND ? formatMoney(c.saldoCuenta) : 'N/A'}</td>
-          <td style="font-weight:600; color:var(--accent);" onclick="event.stopPropagation(); abrirDesgloseSAP('${c.id}', '${(c.nombre || 'Sin nombre').replace(/'/g, "\\'")}')"><span class="table-link">${API_CONFIG.USE_SAP_BACKEND ? formatMoney(c.saldoOrdenes) : 'N/A'}</span></td>
+          <td style="font-weight:600; color:var(--accent);" onclick="event.stopPropagation(); abrirDesgloseSAP('${c.id}', '${(c.nombre || 'Sin nombre').replace(/'/g, "\\'")}')">
+            <span style="border-bottom: 1px dashed var(--accent); cursor:pointer;">${API_CONFIG.USE_SAP_BACKEND ? formatMoney(c.saldoOrdenes) : 'N/A'}</span>
+          </td>
           ${customTds}
-          <td style="text-align:center;"><span class="badge" style="background:var(--bg-secondary);">${(c.maquinas || []).length}</span></td>
+          <td style="text-align:center;"><span class="badge" style="background:var(--blue-light); color:var(--blue);">${(c.maquinas || []).length}</span></td>
         </tr>
       `;
     }).join('');
@@ -2402,11 +2414,11 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
         <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Siguiente Servicio</div>
         <div style="font-weight:600; color:var(--orange);">${siguienteServicioStr}</div>
       </div>
-      <div style="grid-column:1/-1;">
+      <div>
         <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Sitio / Ubicación</div>
         <div style="font-weight:500;">${ubicacion || 'N/A'}</div>
       </div>
-      <div style="grid-column:1/-1;">
+      <div>
         <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Servicios Totales</div>
         <div style="font-weight:600; color:var(--accent); font-size:1.1rem;">${maqOrdenes.length + maqTickets.length}</div>
       </div>
