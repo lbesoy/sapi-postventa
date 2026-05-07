@@ -99,8 +99,11 @@
     <img src="logo_transparent.png" alt="Eurorep" class="sidebar-logo-img"/>
   </div>
   <nav class="sidebar-nav">
-    <a href="#" class="nav-item active" data-view="dashboard" data-title="Dashboard" id="nav-dashboard">
-      <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span><span>Dashboard</span>
+    <a href="#" class="nav-item active" data-view="dashboard" data-title="Dashboard Órdenes" id="nav-dashboard">
+      <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span><span>Dash. Órdenes</span>
+    </a>
+    <a href="#" class="nav-item" data-view="dash-tickets" data-title="Dashboard Tickets" id="nav-dash-tickets">
+      <span class="nav-icon"><i data-lucide="pie-chart"></i></span><span>Dash. Tickets</span>
     </a>
     <a href="#" class="nav-item" data-view="servicios" data-title="Órdenes de Servicio" id="nav-servicios">
       <span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span>Órdenes de Servicio</span>
@@ -148,7 +151,7 @@
   <!-- TOPBAR -->
   <header class="topbar">
     <div class="topbar-left">
-      <h1 id="page-title">Dashboard</h1>
+      <h1 id="page-title">Dashboard Órdenes</h1>
     </div>
     <!-- ROLE SWITCHER (visible solo para superadmin) -->
     <div class="role-switcher" id="role-switcher" style="display:none;">
@@ -241,6 +244,60 @@
             <tr id="empty-row">
               <td colspan="9" class="empty-state">No hay órdenes registradas. ¡Crea la primera!</td>
             </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DASHBOARD TICKETS VIEW -->
+    <div id="view-dash-tickets" class="view">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="ticket"></i></div>
+          <div>
+            <div class="stat-label">Total Tickets</div>
+            <div class="stat-value" id="stat-t-total">0</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-circle"></i></div>
+          <div>
+            <div class="stat-label">Abiertos</div>
+            <div class="stat-value" id="stat-t-abiertos">0</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i data-lucide="file-text"></i></div>
+          <div>
+            <div class="stat-label">Cotización</div>
+            <div class="stat-value" id="stat-t-cotizacion">0</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle"></i></div>
+          <div>
+            <div class="stat-label">Cerrados</div>
+            <div class="stat-value" id="stat-t-cerrados">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <h2>Tickets Recientes</h2>
+        <div class="search-bar">
+          <input type="text" id="search-dash-tickets" placeholder="Buscar ticket..." oninput="renderTickets('dash-tickets')"/>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="orders-table" id="orders-table-dash-tickets">
+          <thead>
+            <tr>
+              <th>#</th><th>Asunto</th><th>Solicitante / Empresa</th><th>Área</th>
+              <th>Prioridad</th><th id="th-ord-estado">Estado </th><th>Asignado</th><th id="th-ord-fecha">Fecha </th><th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-body-dash-tickets">
+            <tr><td colspan="9" class="empty-state">No hay tickets registrados. ¡Crea el primero!</td></tr>
           </tbody>
         </table>
       </div>

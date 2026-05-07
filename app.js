@@ -1343,6 +1343,7 @@ function setupNav() {
         cargarListaQueriesSAP();
       }
       if (view === 'servicios') renderTabla('servicios');
+      if (view === 'dash-tickets') renderTickets('dash-tickets');
       if (view === 'tickets') renderTickets();
       if (view === 'tecnicos') {
         if (typeof renderTecnicos === 'function') renderTecnicos();
@@ -1361,6 +1362,19 @@ function renderStats() {
   document.getElementById('stat-proceso').textContent = proceso;
   document.getElementById('stat-pendientes').textContent = pendientes;
   document.getElementById('stat-completas').textContent = completas;
+
+  // Stats Tickets
+  const t_total = tickets.length;
+  const t_abiertos = tickets.filter(t => t.estado === 'Abierto').length;
+  const t_cotizacion = tickets.filter(t => t.estado === 'Cotización').length;
+  const t_cerrados = tickets.filter(t => t.estado === 'Cerrado').length;
+  const elTotalT = document.getElementById('stat-t-total');
+  if (elTotalT) {
+    elTotalT.textContent = t_total;
+    document.getElementById('stat-t-abiertos').textContent = t_abiertos;
+    document.getElementById('stat-t-cotizacion').textContent = t_cotizacion;
+    document.getElementById('stat-t-cerrados').textContent = t_cerrados;
+  }
 }
 
 // ===== TABLE =====
@@ -3854,10 +3868,15 @@ function updateTicketBadge() {
 }
 
 // ===== RENDER TICKETS =====
-function renderTickets() {
-  const body = document.getElementById('tickets-body');
+function renderTickets(ctx) {
+  const isDashView = ctx === 'dash-tickets';
+  const bodyId = isDashView ? 'tabla-body-dash-tickets' : 'tickets-body';
+  const searchId = isDashView ? 'search-dash-tickets' : 'search-tickets';
+  
+  const body = document.getElementById(bodyId);
   if (!body) return;
-  const q = (document.getElementById('search-tickets')?.value || '').toLowerCase();
+  const q = (document.getElementById(searchId)?.value || '').toLowerCase();
+  
   let filtered = tickets.filter(t =>
     !q ||
     (t.asunto||'').toLowerCase().includes(q) ||
@@ -3866,11 +3885,18 @@ function renderTickets() {
     (t.asignado||'').toLowerCase().includes(q) ||
     (t.folio||'').toLowerCase().includes(q)
   );
-  if (ticketFiltroActivo !== 'todos') {
+  
+  if (!isDashView && ticketFiltroActivo !== 'todos') {
     filtered = filtered.filter(t => t.estado === ticketFiltroActivo);
   }
+  
+  if (isDashView && !q) {
+    // Si estamos en el dashboard y no hay búsqueda, mostramos los 8 más recientes
+    filtered = filtered.slice(0, 8);
+  }
+  
   if (!filtered.length) {
-    body.innerHTML = `<tr><td colspan="9" class="empty-state">No hay tickets${q||ticketFiltroActivo!=='todos'?' que coincidan':' registrados'}.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="9" class="empty-state">No hay tickets${q||(!isDashView && ticketFiltroActivo!=='todos')?' que coincidan':' registrados'}.</td></tr>`;
     return;
   }
   body.innerHTML = filtered.map((t, i) => `
