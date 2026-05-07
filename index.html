@@ -1160,8 +1160,13 @@
             <div class="form-group" style="display:flex; flex-direction:column; justify-content:flex-start;">
               <label>Fecha de Venta</label>
               <input type="date" id="am-venta" style="margin-bottom:0.4rem;"/>
-              <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.75rem; color:var(--text-muted); cursor:pointer; font-weight:normal;">
-                <input type="checkbox" id="am-venta-tercero" onchange="toggleVentaTercero()"/>
+              <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; color:var(--text-secondary); cursor:pointer; font-weight:500; margin-top:0.2rem;">
+                <div style="position:relative; display:inline-block; width:36px; height:20px; flex-shrink:0;">
+                  <input type="checkbox" id="am-venta-tercero" onchange="toggleVentaTercero()" style="opacity:0; width:0; height:0; position:absolute; margin:0; padding:0;"/>
+                  <span id="am-venta-tercero-slider" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.3s; border-radius:20px;">
+                    <span id="am-venta-tercero-knob" style="position:absolute; height:14px; width:14px; left:3px; bottom:3px; background-color:white; transition:.3s; border-radius:50%; box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>
+                  </span>
+                </div>
                 Máquina de Tercero (No vendida por Eurorep)
               </label>
             </div>

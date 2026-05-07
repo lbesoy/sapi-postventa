@@ -2497,6 +2497,11 @@ function abrirModalAgregarMaquina() {
   select.removeAttribute('disabled');
   document.getElementById('am-venta').disabled = false;
   
+  const slider = document.getElementById('am-venta-tercero-slider');
+  const knob = document.getElementById('am-venta-tercero-knob');
+  if (slider) slider.style.backgroundColor = '#ccc';
+  if (knob) knob.style.transform = 'translateX(0)';
+  
   // Lógica del Select de Marca
   const selectMarca = document.getElementById('am-marca-select');
   const inputOtraMarca = document.getElementById('am-marca-otra');
@@ -2605,11 +2610,18 @@ function cerrarModalAgregarMaquina(e) {
 function toggleVentaTercero() {
   const isTercero = document.getElementById('am-venta-tercero').checked;
   const inputVenta = document.getElementById('am-venta');
+  const slider = document.getElementById('am-venta-tercero-slider');
+  const knob = document.getElementById('am-venta-tercero-knob');
+  
   if (isTercero) {
     inputVenta.value = '';
     inputVenta.disabled = true;
+    if (slider) slider.style.backgroundColor = 'var(--accent)';
+    if (knob) knob.style.transform = 'translateX(16px)';
   } else {
     inputVenta.disabled = false;
+    if (slider) slider.style.backgroundColor = '#ccc';
+    if (knob) knob.style.transform = 'translateX(0)';
   }
 }
 
@@ -2684,14 +2696,21 @@ function editarMaquina(clienteNombre, idInterno) {
         
         const inputVenta = document.getElementById('am-venta');
         const checkTercero = document.getElementById('am-venta-tercero');
+        const slider = document.getElementById('am-venta-tercero-slider');
+        const knob = document.getElementById('am-venta-tercero-knob');
+        
         if (maquina.venta === 'TERCERO') {
           checkTercero.checked = true;
           inputVenta.value = '';
           inputVenta.disabled = true;
+          if (slider) slider.style.backgroundColor = 'var(--accent)';
+          if (knob) knob.style.transform = 'translateX(16px)';
         } else {
           checkTercero.checked = false;
           inputVenta.value = maquina.venta || '';
           inputVenta.disabled = false;
+          if (slider) slider.style.backgroundColor = '#ccc';
+          if (knob) knob.style.transform = 'translateX(0)';
         }
 
         document.getElementById('am-latitud').value = maquina.latitud || '';
