@@ -2876,12 +2876,8 @@ function abrirModalAgregarMaquina() {
       let optionsHtml = '<option value="" disabled selected>Seleccione una ubicación...</option>';
       
       if (clienteObj) {
-        let sitios = clienteObj.sitios || [];
-        if (clienteObj.ubicacion && !sitios.some(s => getSitioNombre(s) === clienteObj.ubicacion)) {
-          sitios = [clienteObj.ubicacion, ...sitios];
-        }
-        sitios.forEach(s => {
-          const sName = getSitioNombre(s);
+        const sitios = getNombresDeSitiosParaCliente(clienteObj);
+        sitios.forEach(sName => {
           optionsHtml += `<option value="${sName}">${sName}</option>`;
         });
       }
@@ -3168,11 +3164,9 @@ function abrirModalMoverMaquina(clienteNombre, idInterno) {
     selectUbi.innerHTML = '<option value="">Selecciona un sitio registrado...</option>';
     const clienteObj = clientesDb.find(c => c.nombre === clienteNombre);
     if (clienteObj) {
-      let sitios = clienteObj.sitios || [];
-      if (clienteObj.ubicacion && !sitios.some(s => getSitioNombre(s) === clienteObj.ubicacion)) sitios = [clienteObj.ubicacion, ...sitios];
-      sitios.forEach(s => {
+      const sitios = getNombresDeSitiosParaCliente(clienteObj);
+      sitios.forEach(sn => {
         const option = document.createElement('option');
-        const sn = getSitioNombre(s);
         option.value = sn;
         option.textContent = sn;
         selectUbi.appendChild(option);
@@ -4976,10 +4970,8 @@ function selectComboOption(id, value, label, isInitial = false) {
         sitOptions.innerHTML = '<div class="combo-option" onclick="selectComboOption(\'t-sitio\', \'\', \'Ninguno\')">Ninguno</div>';
         const c = clientesDb.find(x => x.nombre === value);
         if (c) {
-          let sitios = c.sitios || [];
-          if (c.ubicacion && !sitios.some(s => getSitioNombre(s) === c.ubicacion)) sitios = [c.ubicacion, ...sitios];
-          sitios.forEach(s => {
-            const sn = getSitioNombre(s);
+          const sitios = getNombresDeSitiosParaCliente(c);
+          sitios.forEach(sn => {
             const escapedSn = sn.replace(/'/g, "\\'");
             sitOptions.innerHTML += `<div class="combo-option" onclick="selectComboOption('t-sitio', '${escapedSn}', '${escapedSn}')">${sn}</div>`;
           });
@@ -5409,6 +5401,15 @@ function cerrarDetalleTicket(e) {
 
 // ===== HELPER: GENERAR ID INTERNO MÁQUINA =====
 function getSitioNombre(s) { return typeof s === 'string' ? s : (s?.nombre || ''); }
+function getNombresDeSitiosParaCliente(clienteObj) {
+  if (!clienteObj) return [];
+  let sitiosFromDb = sitiosDb.filter(s => s.cliente === clienteObj.id || s.cliente === clienteObj.idInterno || s.cliente === clienteObj.rfc || s.cliente === clienteObj.nombre).map(s => s.nombre);
+  let localSitios = clienteObj.sitios || [];
+  if (clienteObj.ubicacion && !localSitios.some(s => getSitioNombre(s) === clienteObj.ubicacion)) {
+    localSitios = [clienteObj.ubicacion, ...localSitios];
+  }
+  return [...new Set([...localSitios.map(getSitioNombre), ...sitiosFromDb])];
+}
 
 function generarIdInternoMaquina(marca, anioVenta) {
   const m = marca ? marca.trim().toUpperCase() : 'XX';
