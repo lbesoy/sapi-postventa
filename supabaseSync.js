@@ -182,6 +182,7 @@ async function migrarDatosASupabase() {
 async function cargarDatosDeSupabase() {
   const sb = window.supabaseClient;
   if (!sb) return;
+  window._isSyncingFromSupabase = true;
 
   try {
     const { data: usuarios } = await sb.from('usuarios').select('*');
@@ -232,7 +233,10 @@ async function cargarDatosDeSupabase() {
         notas: o.notas,
         evidenciaBase64: o.evidencia_base64
       }));
-      localStorage.setItem('sapi_ordenes', JSON.stringify(ordMapped));
+      window._supaOrdenes = ordMapped;
+      try {
+        localStorage.removeItem('sapi_ordenes');
+      } catch(e) {}
     }
 
     const { data: ticketsDb } = await sb.from('tickets').select('*');
@@ -264,7 +268,10 @@ async function cargarDatosDeSupabase() {
         pdfPedido: t.pdf_pedido,
         pdfCotizacion: t.pdf_cotizacion
       }));
-      localStorage.setItem('sapi_tickets', JSON.stringify(tikMapped));
+      window._supaTickets = tikMapped;
+      try {
+        localStorage.removeItem('sapi_tickets');
+      } catch(e) {}
     }
 
     const { data: sitiosDb } = await sb.from('sitios').select('*');
@@ -301,10 +308,12 @@ async function cargarDatosDeSupabase() {
       localStorage.setItem('sapi_roles_config', JSON.stringify(rolesDb[0].data));
     }
     
+    window._isSyncingFromSupabase = false;
     // Disparar un evento para que app.js sepa que debe recargar variables de memoria
     window.dispatchEvent(new Event('supabase_datos_cargados'));
 
   } catch (error) {
+    window._isSyncingFromSupabase = false;
     console.error("Error cargando datos de Supabase:", error);
   }
 }
@@ -420,8 +429,14 @@ window.pushToSupabase = async function(tabla, item) {
 // Interceptor mágico de LocalStorage: cuando app.js guarda algo local, también lo subimos a la nube
 const originalSetItem = localStorage.setItem;
 localStorage.setItem = function(key, value) {
+  if (window._isSyncingFromSupabase) {
+    try { originalSetItem.apply(this, arguments); } catch(e) {}
+    return;
+  }
   // Guardar localmente primero (mantiene UI rápida)
-  originalSetItem.apply(this, arguments);
+  try {
+    originalSetItem.apply(this, arguments);
+  } catch(e) {}
   
   if (!window.supabaseClient) return;
 
@@ -436,10 +451,10 @@ localStorage.setItem = function(key, value) {
       data.forEach(c => window.pushToSupabase('clientes', c));
     }
     else if (key === 'sapi_ordenes' && Array.isArray(data)) {
-      data.forEach(o => window.pushToSupabase('ordenes', o));
+      // Manejado directamente por app.js
     }
     else if (key === 'sapi_tickets' && Array.isArray(data)) {
-      data.forEach(t => window.pushToSupabase('tickets', t));
+      // Ahora se maneja directamente en app.js para evitar subir todos los tickets repetidamente
     }
     else if (key === 'sapi_sitios_db' && Array.isArray(data)) {
       data.forEach(s => window.pushToSupabase('sitios', s));

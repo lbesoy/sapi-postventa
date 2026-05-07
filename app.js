@@ -19,8 +19,8 @@ let maquinariaDb = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]'
 
 // Sincronización con Supabase (escuchar cuando los datos bajen a localStorage)
 window.addEventListener('supabase_datos_cargados', () => {
-  ordenes = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
-  tickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+  ordenes = window._supaOrdenes || JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+  tickets = window._supaTickets || JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
   clientesDb = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
   tecnicosDb = JSON.parse(localStorage.getItem('sapi_tecnicos_db') || '[]');
   sitiosDb = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
@@ -2933,11 +2933,50 @@ function abrirModalAgregarMaquina() {
       selectUbicacion.parentNode.replaceChild(newSelectUbicacion, selectUbicacion);
       
       newSelectUbicacion.addEventListener('change', function() {
+        const latInput = document.getElementById('am-latitud');
+        const lonInput = document.getElementById('am-longitud');
+        
         if (this.value === 'otra') {
           inputOtraUbicacion.style.display = 'block';
           inputOtraUbicacion.focus();
+          if (latInput) latInput.value = '';
+          if (lonInput) lonInput.value = '';
         } else {
           inputOtraUbicacion.style.display = 'none';
+          
+          if (latInput && lonInput) {
+            latInput.value = '';
+            lonInput.value = '';
+            
+            const sitioName = this.value;
+            const sitioDbOb = sitiosDb.find(s => s.nombre === sitioName);
+            let foundLat = null; let foundLon = null;
+            if (sitioDbOb) {
+              foundLat = sitioDbOb.latitud || sitioDbOb.lat;
+              foundLon = sitioDbOb.longitud || sitioDbOb.lon || sitioDbOb.lng;
+              if (sitioDbOb.customData) {
+                const keys = Object.keys(sitioDbOb.customData);
+                const kLat = keys.find(k => k.toLowerCase() === 'latitud' || k.toLowerCase() === 'lat' || k.toLowerCase() === 'u_latitud');
+                const kLon = keys.find(k => k.toLowerCase() === 'longitud' || k.toLowerCase() === 'lon' || k.toLowerCase() === 'lng' || k.toLowerCase() === 'u_longitud');
+                if (kLat && sitioDbOb.customData[kLat] && !foundLat) foundLat = sitioDbOb.customData[kLat];
+                if (kLon && sitioDbOb.customData[kLon] && !foundLon) foundLon = sitioDbOb.customData[kLon];
+              }
+            }
+            
+            if (!foundLat || !foundLon) {
+              const cliObj = clientesDb.find(c => c.nombre === document.getElementById('am-cliente').value);
+              if (cliObj && cliObj.sitios) {
+                const localSitio = cliObj.sitios.find(s => getSitioNombre(s) === sitioName);
+                if (localSitio && typeof localSitio === 'object') {
+                  if (localSitio.latitud) foundLat = localSitio.latitud;
+                  if (localSitio.longitud) foundLon = localSitio.longitud;
+                }
+              }
+            }
+            
+            if (foundLat) latInput.value = foundLat;
+            if (foundLon) lonInput.value = foundLon;
+          }
         }
       });
     }
@@ -3179,6 +3218,30 @@ function guardarNuevaMaquina(e) {
   } else {
     const idInterno = generarIdInternoMaquina(marca, venta || anio);
     clienteObj.maquinas.push({ idInterno, marca, modelo, serie, anio, venta, ubicacion, latitud, longitud, tipo });
+  }
+  
+  if (ubicacion) {
+    if (!clienteObj.sitios) clienteObj.sitios = [];
+    const isSapSite = sitiosDb.some(s => s.nombre === ubicacion);
+    if (!isSapSite) {
+      let sIdx = clienteObj.sitios.findIndex(s => getSitioNombre(s) === ubicacion);
+      if (sIdx === -1) {
+         clienteObj.sitios.push({ nombre: ubicacion, latitud, longitud });
+      } else {
+         if (typeof clienteObj.sitios[sIdx] === 'string') {
+           clienteObj.sitios[sIdx] = { nombre: ubicacion, latitud, longitud };
+         } else {
+           if (latitud) clienteObj.sitios[sIdx].latitud = latitud;
+           if (longitud) clienteObj.sitios[sIdx].longitud = longitud;
+         }
+      }
+    } else {
+      const sapSite = sitiosDb.find(s => s.nombre === ubicacion);
+      if (sapSite) {
+        if (latitud) sapSite.latitud = latitud;
+        if (longitud) sapSite.longitud = longitud;
+      }
+    }
   }
   
   localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
@@ -3895,7 +3958,7 @@ function cerrarFormulario(e) {
 }
 
 function guardarOrdenes() {
-  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  // Ya no se guardan en localStorage
 }
 
 function guardarOrden(e) {
@@ -3951,16 +4014,14 @@ function guardarOrden(e) {
       if (window.supabaseClient) {
         window.pushToSupabase('tickets', tickets[tIndex]);
       }
-      try {
-        const lightTickets = tickets.map(x => ({...x, pdfPedido: null, pdfCotizacion: null}));
-        localStorage.setItem('sapi_tickets', JSON.stringify(lightTickets));
-      } catch(e) {}
       updateTicketBadge();
       if (typeof renderTickets === 'function') renderTickets();
     }
   }
 
-  guardarOrdenes();
+  if (window.supabaseClient) {
+    window.pushToSupabase('ordenes', orden);
+  }
   cerrarFormulario();
   renderTabla();
   renderTabla('servicios');
@@ -3971,7 +4032,9 @@ function guardarOrden(e) {
 function eliminarOrden(id) {
   if (!confirm('¿Eliminar esta orden de servicio?')) return;
   ordenes = ordenes.filter(o => o.id !== id);
-  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  if (window.supabaseClient) {
+    window.supabaseClient.from('ordenes').delete().eq('id', id).then(() => {});
+  }
   renderTabla();
   renderTabla('servicios');
   renderStats();
@@ -5223,13 +5286,6 @@ async function guardarTicket(e) {
   if (window.supabaseClient) {
     await window.pushToSupabase('tickets', ticket);
   }
-  
-  try {
-    const lightTickets = tickets.map(x => ({...x, pdfPedido: null, pdfCotizacion: null}));
-    localStorage.setItem('sapi_tickets', JSON.stringify(lightTickets));
-  } catch (e) {
-    console.error("Error guardando caché local de tickets", e);
-  }
   cerrarTicket();
   renderTickets();
   updateTicketBadge();
@@ -5238,7 +5294,9 @@ async function guardarTicket(e) {
 function eliminarTicket(id) {
   if (!confirm('¿Eliminar este ticket?')) return;
   tickets = tickets.filter(t => t.id !== id);
-  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  if (window.supabaseClient) {
+    window.supabaseClient.from('tickets').delete().eq('id', id).then(() => {});
+  }
   renderTickets();
   updateTicketBadge();
 }
@@ -5377,7 +5435,9 @@ function avanzarCotizacionTicket(id) {
   }
   t.cotizacionSAP = sap;
   t.estado = 'Cotización';
-  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  if (window.supabaseClient) {
+    window.pushToSupabase('tickets', t);
+  }
   mostrarNotificacion('Ticket avanzado a Cotización.', 'success');
   verDetalleTicket(id);
   renderTickets();
@@ -5437,14 +5497,7 @@ async function cerrarCotizacionTicket(id) {
     await window.pushToSupabase('tickets', t);
   }
   
-  try {
-    const lightTickets = tickets.map(x => ({...x, pdfPedido: null, pdfCotizacion: null}));
-    localStorage.setItem('sapi_tickets', JSON.stringify(lightTickets));
-    mostrarNotificacion('Ticket cerrado con éxito.', 'success');
-  } catch(e) {
-    console.error("Error guardando caché local:", e);
-    mostrarNotificacion('Ticket cerrado con éxito.', 'success');
-  }
+  mostrarNotificacion('Ticket cerrado con éxito.', 'success');
   verDetalleTicket(id);
   renderTickets();
   updateTicketBadge();
