@@ -1630,7 +1630,7 @@ async function fetchSitiosSAP() {
       const sitioObj = {
         id: s[map.id] || '',
         nombre: s[map.nombre] || 'Sitio Desconocido',
-        cliente: s[map.cliente] || '',
+        cliente: s[map.clienteId || map.cliente] || '',
         direccion: s[map.direccion] || '',
         cp: s[map.cp] || '',
         ciudad: s[map.ciudad] || ''
@@ -4290,7 +4290,7 @@ function renderSitios() {
     
     let sClienteDisplay = sCliente;
     if (isAdmin && sCliente !== '-') {
-      const cliFound = clientesDb.find(c => c.idInterno === sCliente || c.rfc === sCliente);
+      const cliFound = clientesDb.find(c => c.id === sCliente || c.idInterno === sCliente || c.rfc === sCliente);
       if (cliFound) {
         sClienteDisplay = `<div style="font-weight:500;">${cliFound.nombre}</div><div style="font-size:0.75rem; color:var(--text-muted);">ID: ${sCliente}</div>`;
       } else {
