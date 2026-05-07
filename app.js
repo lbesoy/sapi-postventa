@@ -4518,9 +4518,9 @@ function abrirTicket(id) {
     usuarios.filter(u => u.rol === 'tecnico').forEach(u => {
       const isChecked = t_tec.tecnicosAsignados && t_tec.tecnicosAsignados.includes(u.nombre);
       containerTecnicos.innerHTML += `
-        <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer; background: var(--bg-body); padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem;">
-          <input type="checkbox" name="t-tecnicos" value="${u.nombre}" ${isChecked ? 'checked' : ''}/>
-          ${u.nombre}
+        <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; background: var(--bg-body); padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem; line-height: 1.2;">
+          <input type="checkbox" name="t-tecnicos" value="${u.nombre}" ${isChecked ? 'checked' : ''} style="margin-top:2px; flex-shrink:0;"/>
+          <span style="flex:1; text-align:left;">${u.nombre}</span>
         </label>
       `;
     });
@@ -4939,11 +4939,11 @@ function verDetalleTicket(id) {
           </div>
           <div class="form-group full-width" style="margin-top:0.75rem;">
             <label>Técnicos Asignados *</label>
-            <div id="quick-tecnicos-${t.id}" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.5rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: rgba(0,0,0,0.02); max-height: 120px; overflow-y: auto;">
+            <div id="quick-tecnicos-${t.id}" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:0.5rem; margin-top:0.5rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: rgba(0,0,0,0.02); max-height: 200px; overflow-y: auto;">
               ${usuarios.filter(u => u.rol === 'tecnico').map(u => `
-                <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer; background: var(--bg-body); padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
-                  <input type="checkbox" name="quick-tecnicos-${t.id}" value="${u.nombre}" ${t.tecnicosAsignados?.includes(u.nombre) ? 'checked' : ''}/>
-                  ${u.nombre}
+                <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; background: var(--bg-body); padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem; line-height: 1.2;">
+                  <input type="checkbox" name="quick-tecnicos-${t.id}" value="${u.nombre}" ${t.tecnicosAsignados?.includes(u.nombre) ? 'checked' : ''} style="margin-top:2px; flex-shrink:0;"/>
+                  <span style="flex:1; text-align:left;">${u.nombre}</span>
                 </label>
               `).join('')}
             </div>
