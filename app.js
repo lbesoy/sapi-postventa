@@ -4519,8 +4519,8 @@ function abrirTicket(id) {
       const isChecked = t_tec.tecnicosAsignados && t_tec.tecnicosAsignados.includes(u.nombre);
       containerTecnicos.innerHTML += `
         <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; background: var(--bg-body); padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem; line-height: 1.2;">
-          <input type="checkbox" name="t-tecnicos" value="${u.nombre}" ${isChecked ? 'checked' : ''} style="margin-top:2px; flex-shrink:0;"/>
-          <span style="flex:1; text-align:left;">${u.nombre}</span>
+          <input type="checkbox" name="t-tecnicos" value="${u.nombre}" ${isChecked ? 'checked' : ''} style="width:16px; height:16px; margin:0; margin-top:1px; flex-shrink:0;"/>
+          <span style="flex:1; text-align:left; font-weight:normal; color:var(--text-primary);">${u.nombre}</span>
         </label>
       `;
     });
@@ -4976,8 +4976,8 @@ function verDetalleTicket(id) {
             <div id="quick-tecnicos-${t.id}" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:0.5rem; margin-top:0.5rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: rgba(0,0,0,0.02); max-height: 200px; overflow-y: auto;">
               ${usuarios.filter(u => u.rol === 'tecnico').map(u => `
                 <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; background: var(--bg-body); padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem; line-height: 1.2;">
-                  <input type="checkbox" name="quick-tecnicos-${t.id}" value="${u.nombre}" ${t.tecnicosAsignados?.includes(u.nombre) ? 'checked' : ''} style="margin-top:2px; flex-shrink:0;"/>
-                  <span style="flex:1; text-align:left;">${u.nombre}</span>
+                  <input type="checkbox" name="quick-tecnicos-${t.id}" value="${u.nombre}" ${t.tecnicosAsignados?.includes(u.nombre) ? 'checked' : ''} style="width:16px; height:16px; margin:0; margin-top:1px; flex-shrink:0;"/>
+                  <span style="flex:1; text-align:left; font-weight:normal; color:var(--text-primary);">${u.nombre}</span>
                 </label>
               `).join('')}
             </div>
