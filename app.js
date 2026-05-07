@@ -4297,7 +4297,7 @@ function abrirTicket(id) {
   const elCliente = document.getElementById('group-t-cliente'); if (elCliente) elCliente.style.display = displayVal;
   const elAsignado = document.getElementById('group-t-asignado'); if (elAsignado) elAsignado.style.display = displayVal;
   const elNotas = document.getElementById('group-t-notas'); if (elNotas) elNotas.style.display = displayVal;
-  const elEstado = document.getElementById('section-t-estado'); if (elEstado) elEstado.style.display = displayVal;
+  const elEstado = document.getElementById('section-t-estado'); if (elEstado) elEstado.style.display = (isEmpresa || !id) ? 'none' : 'block';
   const elEvidencias = document.getElementById('group-t-evidencias'); if (elEvidencias) elEvidencias.style.display = isEmpresa ? 'block' : 'none';
 
   if (comboOptions && !isEmpresa) {
@@ -4567,7 +4567,7 @@ document.addEventListener('click', function(e) {
 function guardarTicket(e) {
   e.preventDefault();
   const isEmpresa = currentSession.viewMode === 'empresa';
-  const estado = isEmpresa ? 'Abierto' : (document.querySelector('input[name="t-estado"]:checked')?.value || 'Abierto');
+  const estado = (isEmpresa || !editandoTicketId) ? 'Abierto' : (document.querySelector('input[name="t-estado"]:checked')?.value || 'Abierto');
   const canal = isEmpresa ? 'portal' : (document.querySelector('input[name="t-canal"]:checked')?.value || '');
   let contacto = '';
   if (!isEmpresa) {
