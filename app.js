@@ -4788,10 +4788,10 @@ function poblarSoportesPorCliente(clienteNombre, selectedSoporte = '') {
   const usedSoportes = ordenes.filter(x => x.id !== editandoId).map(x => x.soporte).filter(Boolean);
   const usedPedidos = ordenes.filter(x => x.id !== editandoId).map(x => x.pedido).filter(Boolean);
   
-  let validTickets = tickets.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'si' && !usedSoportes.includes(t.id) && !usedPedidos.includes(t.pedidoSAP));
+  let validTickets = [];
   
   if (clienteNombre && clienteNombre !== 'Ninguno / Uso Interno') {
-    validTickets = validTickets.filter(t => t.cliente === clienteNombre);
+    validTickets = tickets.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'si' && !usedSoportes.includes(t.id) && !usedPedidos.includes(t.pedidoSAP) && t.cliente === clienteNombre);
   }
   
   validTickets.forEach(t => {
