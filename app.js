@@ -4418,6 +4418,17 @@ function abrirTicket(id) {
   const equipoSelect = document.getElementById('t-equipo');
   if (equipoSelect) equipoSelect.innerHTML = '<option value="">Seleccione una máquina registrada...</option><option value="Otra / No registrada">Otra / No registrada</option>';
 
+  const selectAsignado = document.getElementById('t-asignado');
+  if (selectAsignado) {
+    selectAsignado.innerHTML = '<option value="">Sin asignar</option>';
+    usuarios.filter(u => u.rol === 'supervisor').forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.nombre;
+      opt.textContent = u.nombre;
+      selectAsignado.appendChild(opt);
+    });
+  }
+
   // Si es empresa y es un ticket nuevo, autocompletamos su perfil
   if (isEmpresa && !id) {
     document.getElementById('t-solicitante').value = nombreEmpresaLogged || '';
@@ -4438,7 +4449,17 @@ function abrirTicket(id) {
       document.getElementById('t-sitio').value = t.sitio || '';
       document.getElementById('t-categoria').value = t.categoria || 'Refacción';
       document.getElementById('t-prioridad').value = t.prioridad || 'Media';
-      document.getElementById('t-asignado').value = t.asignado || '';
+      const selectAsignado = document.getElementById('t-asignado');
+      if (selectAsignado) {
+        let exists = Array.from(selectAsignado.options).some(o => o.value === t.asignado);
+        if (!exists && t.asignado) {
+          const opt = document.createElement('option');
+          opt.value = t.asignado;
+          opt.textContent = t.asignado + ' (No es supervisor)';
+          selectAsignado.appendChild(opt);
+        }
+        selectAsignado.value = t.asignado || '';
+      }
       document.getElementById('t-descripcion').value = t.descripcion || '';
       document.getElementById('t-notas').value = t.notas || '';
       
