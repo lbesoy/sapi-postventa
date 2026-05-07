@@ -798,6 +798,13 @@
               </div>
               <input type="hidden" id="f-cliente" required>
             </div>
+            <div class="form-group full-width">
+              <label>Equipo / Máquina (Autocompletar)</label>
+              <select id="f-equipo" onchange="onEquipoOrdenChange()">
+                <option value="">Seleccione una máquina registrada...</option>
+                <option value="Otra / No registrada">Otra / Captura manual</option>
+              </select>
+            </div>
             <div class="form-group">
               <label>Ubicación</label>
               <input type="text" id="f-ubicacion" placeholder="Ciudad, Estado"/>
@@ -805,13 +812,6 @@
             <div class="form-group">
               <label>Operador</label>
               <input type="text" id="f-operador"/>
-            </div>
-            <div class="form-group full-width">
-              <label>Equipo / Máquina (Autocompletar)</label>
-              <select id="f-equipo" onchange="onEquipoOrdenChange()">
-                <option value="">Seleccione una máquina registrada...</option>
-                <option value="Otra / No registrada">Otra / Captura manual</option>
-              </select>
             </div>
             <div class="form-group">
               <label>No. ECO</label>
@@ -1408,6 +1408,12 @@
                 </div>
               </div>
             </div>
+            <div class="form-group full-width">
+              <label>Equipo / Máquina afectada</label>
+              <select id="t-equipo">
+                <option value="">Seleccione una máquina registrada...</option>
+              </select>
+            </div>
             <div class="form-group">
               <label>Solicitante *</label>
               <input type="text" id="t-solicitante" placeholder="Nombre de quien solicita" required/>
@@ -1453,12 +1459,6 @@
           <div class="form-group full-width" style="margin-top:0.5rem;">
             <label>Descripción detallada *</label>
             <textarea id="t-descripcion" rows="4" placeholder="Explica el problema o solicitud con detalle..." required></textarea>
-          </div>
-          <div class="form-group full-width">
-            <label>Equipo / Máquina afectada</label>
-            <select id="t-equipo">
-              <option value="">Seleccione una máquina registrada...</option>
-            </select>
           </div>
           <div class="form-group full-width" id="group-t-notas">
             <label>Notas adicionales (Interno)</label>
