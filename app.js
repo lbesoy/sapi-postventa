@@ -1527,7 +1527,7 @@ async function forzarSincronizacionSAP() {
           allUsers.push({
             id: crypto.randomUUID(),
             nombre: nombreCompleto,
-            email: nombreCompleto.toLowerCase().replace(/\s+/g, '') + '@eurorep.com',
+            email: nombreCompleto.toLowerCase().replace(/\s+/g, '') + '@eurorep.mx',
             pin: '0000',
             rol: mappedRole,
             activo: true, // Auto-aprobado
@@ -2329,11 +2329,21 @@ function cerrarDetalleMaquina(e) {
   document.getElementById('modal-detalle-maquina-overlay').classList.remove('open');
 }
 
-function verServiciosMaquina(idInterno, serie, marca, modelo) {
+function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion) {
   document.getElementById('detalle-maquina-title').textContent = `${marca} ${modelo} (${idInterno})`;
   
   const maqTickets = tickets.filter(t => t.maquinaId === idInterno || (serie && serie !== 'N/A' && t.maquinaId === serie));
   const maqOrdenes = ordenes.filter(o => o.maquina === idInterno || (serie && serie !== 'N/A' && o.maquina === serie));
+  
+  let fechas = [];
+  maqOrdenes.forEach(o => { if(o.fecha) fechas.push(new Date(o.fecha)); });
+  maqTickets.forEach(t => { if(t.fechaCreacion) fechas.push(new Date(t.fechaCreacion)); });
+  
+  let ultimaFechaStr = 'Ninguno';
+  if (fechas.length > 0) {
+    const ultimaFecha = new Date(Math.max.apply(null, fechas));
+    ultimaFechaStr = ultimaFecha.toISOString().split('T')[0].split('-').reverse().join('/');
+  }
   
   let html = '';
   
@@ -2345,8 +2355,20 @@ function verServiciosMaquina(idInterno, serie, marca, modelo) {
         <div style="font-weight:500;">${serie || 'N/A'}</div>
       </div>
       <div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Último Servicio</div>
+        <div style="font-weight:500;">${ultimaFechaStr}</div>
+      </div>
+      <div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Cliente</div>
+        <div style="font-weight:500;">${cliente || 'N/A'}</div>
+      </div>
+      <div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Sitio / Ubicación</div>
+        <div style="font-weight:500;">${ubicacion || 'N/A'}</div>
+      </div>
+      <div style="grid-column:1/-1;">
         <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Servicios Totales</div>
-        <div style="font-weight:500; color:var(--accent);">${maqOrdenes.length + maqTickets.length}</div>
+        <div style="font-weight:600; color:var(--accent); font-size:1.1rem;">${maqOrdenes.length + maqTickets.length}</div>
       </div>
     </div>
   `;
@@ -3895,7 +3917,7 @@ function renderMaquinaria() {
     }
 
     return `
-    <tr onclick="verServiciosMaquina('${m.idInterno}', '${m.serie}', '${m.marca.replace(/'/g, "\\'")}', '${m.modelo.replace(/'/g, "\\'")}')" style="cursor:pointer;" class="table-row-hover">
+    <tr onclick="verServiciosMaquina('${m.idInterno}', '${m.serie}', '${m.marca.replace(/'/g, "\\'")}', '${m.modelo.replace(/'/g, "\\'")}', '${m.cliente.replace(/'/g, "\\'")}', '${m.ubicacion.replace(/'/g, "\\'")}')" style="cursor:pointer;" class="table-row-hover">
       ${!isEmpresa ? `<td><span style="font-family:monospace; font-weight:500; color:var(--accent); background:var(--blue-light); padding:0.2rem 0.5rem; border-radius:4px;">${m.idInterno}</span></td>` : ''}
       <td>
         <div style="display:flex; align-items:center;">
