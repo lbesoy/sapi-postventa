@@ -4297,19 +4297,32 @@ function actualizarFiltrosPersonal() {
   const selectsTecnico = [document.getElementById('filter-ord-tecnico'), document.getElementById('filter-dash-tkt-tecnico'), document.getElementById('filter-tkt-tecnico')];
   const selectsSupervisor = [document.getElementById('filter-ord-supervisor'), document.getElementById('filter-dash-tkt-supervisor'), document.getElementById('filter-tkt-supervisor')];
   
-  const tecnicos = usuarios.filter(u => u.rol === 'tecnico' && u.activo !== false).sort((a,b) => (a.nombre||'').localeCompare(b.nombre||''));
-  const supervisores = usuarios.filter(u => ['supervisor', 'admin', 'superadmin'].includes(u.rol) && u.activo !== false).sort((a,b) => (a.nombre||'').localeCompare(b.nombre||''));
+  // Extraer todos los técnicos posibles de usuarios, tecnicosDb, tickets y órdenes
+  let allTecnicos = new Set();
+  usuarios.filter(u => u.rol === 'tecnico' && u.activo !== false).forEach(u => { if (u.nombre) allTecnicos.add(u.nombre.trim()); });
+  tecnicosDb.forEach(t => { if (t.nombre) allTecnicos.add(t.nombre.trim()); });
+  tickets.forEach(t => {
+    if (t.asignado && t.asignado !== 'Sin asignar') t.asignado.split(',').forEach(n => allTecnicos.add(n.trim()));
+    if (t.tecnicosAsignados) t.tecnicosAsignados.forEach(n => allTecnicos.add(n.trim()));
+  });
+  ordenes.forEach(o => {
+    if (o.tecnico) o.tecnico.split(',').forEach(n => allTecnicos.add(n.trim()));
+    if (o.tecnicosAsignados) o.tecnicosAsignados.forEach(n => allTecnicos.add(n.trim()));
+  });
   
-  // Si por alguna razón tecnicosDb tiene técnicos que no están en usuarios, los añadimos para que no queden opciones vacías
-  let tecOptionsHtml = '<option value="">Cualquier Técnico</option>';
-  if (tecnicos.length > 0) {
-    tecOptionsHtml += tecnicos.map(u => `<option value="${u.nombre}">${u.nombre}</option>`).join('');
-  } else {
-    // Fallback a tecnicosDb si usuarios aún no sincroniza
-    tecOptionsHtml += tecnicosDb.filter(t => t.nombre).map(t => `<option value="${t.nombre}">${t.nombre}</option>`).join('');
-  }
+  // Extraer todos los supervisores posibles de usuarios y clientesDb
+  let allSupervisores = new Set();
+  usuarios.filter(u => ['supervisor', 'admin', 'superadmin'].includes(u.rol) && u.activo !== false).forEach(u => { if (u.nombre) allSupervisores.add(u.nombre.trim()); });
+  clientesDb.forEach(c => {
+    if (c.supervisorAsignado) allSupervisores.add(c.supervisorAsignado.trim());
+    if (c.supervisoresAsignados) c.supervisoresAsignados.forEach(s => allSupervisores.add(s.trim()));
+  });
 
-  const supOptionsHtml = '<option value="">Cualquier Supervisor</option>' + supervisores.map(u => `<option value="${u.nombre}">${u.nombre}</option>`).join('');
+  const uniqueTecs = Array.from(allTecnicos).filter(Boolean).sort((a,b) => a.localeCompare(b));
+  const uniqueSups = Array.from(allSupervisores).filter(Boolean).sort((a,b) => a.localeCompare(b));
+  
+  const tecOptionsHtml = '<option value="">Cualquier Técnico</option>' + uniqueTecs.map(n => `<option value="${n}">${n}</option>`).join('');
+  const supOptionsHtml = '<option value="">Cualquier Supervisor</option>' + uniqueSups.map(n => `<option value="${n}">${n}</option>`).join('');
   
   selectsTecnico.forEach(sel => { 
     if(sel) { 
