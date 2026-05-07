@@ -3780,6 +3780,7 @@ function onSoporteChange() {
   const soporteId = document.getElementById('f-soporte').value;
   const inPedido = document.getElementById('f-pedido');
   const metaDiv = document.getElementById('soporte-meta');
+  const inTecnico = document.getElementById('f-tecnico');
   
   if (soporteId) {
     const t = tickets.find(x => x.id === soporteId);
@@ -3791,6 +3792,15 @@ function onSoporteChange() {
       }
       metaDiv.innerHTML = `<i data-lucide="info" style="width:12px;height:12px;vertical-align:middle;"></i> <strong>Ticket ${t.folio}</strong> ligado &bull; Cotización SAP: ${t.cotizacionSAP || 'N/A'}`;
       metaDiv.style.display = 'block';
+      
+      if (inTecnico) {
+        if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) {
+          inTecnico.value = t.tecnicosAsignados.join(', ');
+        } else if (t.asignado && t.asignado !== 'Sin asignar') {
+          inTecnico.value = t.asignado;
+        }
+      }
+      
       if (typeof lucide !== 'undefined') lucide.createIcons();
     }
   } else {
