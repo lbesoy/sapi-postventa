@@ -1471,6 +1471,24 @@ async function forzarSincronizacionSAP() {
   try {
     const newDataCli = await fetchClientesSAP();
     if (newDataCli && newDataCli.length > 0) {
+      // Preservar datos locales de clientes que vienen de SAP
+      newDataCli.forEach(newCli => {
+        const oldCli = clientesDb.find(c => c.nombre === newCli.nombre || c.id === newCli.id);
+        if (oldCli) {
+          if (oldCli.maquinas) newCli.maquinas = oldCli.maquinas;
+          if (oldCli.sitios) newCli.sitios = oldCli.sitios;
+          if (oldCli.contactos) newCli.contactos = oldCli.contactos;
+          if (oldCli.logo) newCli.logo = oldCli.logo;
+        }
+      });
+      
+      // Preservar clientes que son PURAMENTE locales (no están en SAP)
+      clientesDb.forEach(oldCli => {
+        if (!newDataCli.some(nc => nc.nombre === oldCli.nombre || nc.id === oldCli.id)) {
+          newDataCli.push(oldCli);
+        }
+      });
+
       clientesDb = newDataCli;
       localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
       hasSyncedSAPThisSession = true;
