@@ -3800,7 +3800,7 @@ function renderTickets() {
     return;
   }
   body.innerHTML = filtered.map((t, i) => `
-    <tr>
+    <tr style="cursor:pointer; transition: background 0.2s;" onclick="if(!event.target.closest('.action-btn')){ verDetalleTicket('${t.id}'); }" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
       <td><strong>${t.folio||('#'+(i+1))}</strong></td>
       <td>
         <div style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.asunto || ''}">
@@ -4790,13 +4790,105 @@ function verDetalleTicket(id) {
       <div class="detalle-section-title">Notas</div>
       <div class="detalle-field"><div class="detalle-value" style="white-space:pre-wrap;">${t.notas}</div></div>
     </div>` : ''}
+
+    ${t.estado === 'Cerrado' ? `
+    <div class="detalle-section">
+      <div class="detalle-section-title">Resolución Final</div>
+      <div class="detalle-grid">
+        ${t.cotizacionSAP ? field('Cotización SAP', t.cotizacionSAP) : ''}
+        ${t.cotAceptada ? field('Resultado', t.cotAceptada === 'si' ? '<span style="color:var(--success);">Aprobada ✅</span>' : '<span style="color:var(--danger);">Rechazada ❌</span>') : ''}
+        ${t.motivoRechazo ? field('Motivo Rechazo', t.motivoRechazo) : ''}
+      </div>
+    </div>
+    ` : ''}
+
+    ${t.estado === 'Abierto' && currentSession.viewMode !== 'empresa' ? `
+    <div class="detalle-section" style="background: var(--bg-hover); padding: 1rem; border-radius: 8px;">
+      <div class="detalle-section-title" style="margin-bottom:0.5rem; color:var(--accent); display:flex; align-items:center; gap:0.5rem;"><i data-lucide="file-text"></i> Procesar Cotización</div>
+      <div class="form-group full-width" style="margin-bottom:0;">
+        <label>Ingresa el No. Cotización SAP para avanzar:</label>
+        <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+          <input type="text" id="quick-cot-sap-${t.id}" placeholder="COT-XXXXX" style="flex:1;">
+          <button class="btn-primary" onclick="avanzarCotizacionTicket('${t.id}')">Pasar a Cotización</button>
+        </div>
+      </div>
+    </div>
+    ` : ''}
+
+    ${t.estado === 'Cotización' && currentSession.viewMode !== 'empresa' ? `
+    <div class="detalle-section" style="background: var(--bg-hover); padding: 1rem; border-radius: 8px;">
+      <div class="detalle-section-title" style="margin-bottom:0.5rem; color:var(--accent); display:flex; align-items:center; gap:0.5rem;"><i data-lucide="check-square"></i> Cierre de Cotización (SAP: ${t.cotizacionSAP || 'N/A'})</div>
+      <div class="form-group full-width" style="margin-bottom:0;">
+        <label>¿El cliente aceptó la cotización?</label>
+        <div style="display:flex; gap:1rem; margin-top:0.5rem; margin-bottom: 0.75rem;">
+          <label style="cursor:pointer; display:flex; align-items:center; gap:0.25rem;">
+            <input type="radio" name="quick-cot-acep-${t.id}" value="si" onchange="document.getElementById('quick-motivo-${t.id}').style.display='none'"> 
+            Sí, aprobada ✅
+          </label>
+          <label style="cursor:pointer; display:flex; align-items:center; gap:0.25rem;">
+            <input type="radio" name="quick-cot-acep-${t.id}" value="no" onchange="document.getElementById('quick-motivo-${t.id}').style.display='block'"> 
+            No, rechazada ❌
+          </label>
+        </div>
+        <div id="quick-motivo-${t.id}" style="display:none; margin-bottom:0.75rem;">
+          <textarea id="quick-motivo-text-${t.id}" rows="2" placeholder="Especifica el motivo por el cual fue rechazada..."></textarea>
+        </div>
+        <button class="btn-primary full-width" style="justify-content:center;" onclick="cerrarCotizacionTicket('${t.id}')">Finalizar y Cerrar Ticket</button>
+      </div>
+    </div>
+    ` : ''}
+
     <div class="form-actions" style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.5rem;">
-      <button class="btn-secondary" onclick="cerrarDetalleTicket()">Cerrar</button>
-      <button class="btn-primary" onclick="cerrarDetalleTicket();editarTicket('${t.id}')">✏️ Editar</button>
+      <button class="btn-secondary" onclick="cerrarDetalleTicket()">Cerrar Vista</button>
+      <button class="btn-primary" onclick="cerrarDetalleTicket();editarTicket('${t.id}')">✏️ Editar Completo</button>
     </div>
   `;
   document.getElementById('modal-ticket-detalle-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
+  lucide.createIcons();
+}
+
+function avanzarCotizacionTicket(id) {
+  const t = tickets.find(x => x.id === id);
+  if (!t) return;
+  const sap = document.getElementById(`quick-cot-sap-${id}`)?.value.trim();
+  if (!sap) {
+    mostrarNotificacion('Ingresa el número de cotización SAP.', 'warning');
+    return;
+  }
+  t.cotizacionSAP = sap;
+  t.estado = 'Cotización';
+  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  mostrarNotificacion('Ticket avanzado a Cotización.', 'success');
+  verDetalleTicket(id);
+  renderTickets();
+  updateTicketBadge();
+}
+
+function cerrarCotizacionTicket(id) {
+  const t = tickets.find(x => x.id === id);
+  if (!t) return;
+  const aceptada = document.querySelector(`input[name="quick-cot-acep-${id}"]:checked`)?.value;
+  if (!aceptada) {
+    mostrarNotificacion('Debes indicar si fue aceptada o rechazada.', 'warning');
+    return;
+  }
+  let motivo = '';
+  if (aceptada === 'no') {
+    motivo = document.getElementById(`quick-motivo-text-${id}`)?.value.trim();
+    if (!motivo) {
+      mostrarNotificacion('Debes especificar el motivo del rechazo.', 'warning');
+      return;
+    }
+  }
+  t.cotAceptada = aceptada;
+  t.motivoRechazo = motivo;
+  t.estado = 'Cerrado';
+  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  mostrarNotificacion('Ticket cerrado con éxito.', 'success');
+  verDetalleTicket(id);
+  renderTickets();
+  updateTicketBadge();
 }
 
 function cerrarDetalleTicket(e) {
