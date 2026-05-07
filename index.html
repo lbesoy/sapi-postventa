@@ -806,6 +806,13 @@
               <label>Operador</label>
               <input type="text" id="f-operador"/>
             </div>
+            <div class="form-group full-width">
+              <label>Equipo / Máquina (Autocompletar)</label>
+              <select id="f-equipo" onchange="onEquipoOrdenChange()">
+                <option value="">Seleccione una máquina registrada...</option>
+                <option value="Otra / No registrada">Otra / Captura manual</option>
+              </select>
+            </div>
             <div class="form-group">
               <label>No. ECO</label>
               <input type="text" id="f-eco"/>

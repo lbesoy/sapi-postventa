@@ -3617,6 +3617,8 @@ function abrirFormulario(id) {
     setDiasData(o.dias);
   }
   
+  poblarTodasMaquinas('f-equipo', '');
+  
   onSoporteChange(); // Sincroniza el pedido y metadata
 
   document.getElementById('modal-overlay').classList.add('open');
@@ -4462,8 +4464,8 @@ function abrirTicket(id) {
   });
   document.getElementById('t-sitio').value = '';
   document.getElementById('group-t-sitio').style.display = 'none';
-  const equipoSelect = document.getElementById('t-equipo');
-  if (equipoSelect) equipoSelect.innerHTML = '<option value="">Seleccione una máquina registrada...</option><option value="Otra / No registrada">Otra / No registrada</option>';
+  
+  poblarTodasMaquinas('t-equipo', '');
 
   const selectAsignado = document.getElementById('t-asignado');
   if (selectAsignado) {
@@ -4532,14 +4534,7 @@ function abrirTicket(id) {
         selectComboOption('t-sitio', escapedSitio, escapedSitio);
       }
 
-      const equipoSelect2 = document.getElementById('t-equipo');
-      if (t.equipo && equipoSelect2) {
-        let optExists = Array.from(equipoSelect2.options).some(o => o.value === t.equipo);
-        if (!optExists) {
-          equipoSelect2.innerHTML += `<option value="${t.equipo}">${t.equipo} (Registrado previo)</option>`;
-        }
-        equipoSelect2.value = t.equipo;
-      }
+      poblarTodasMaquinas('t-equipo', t.equipo);
       
       const elCotSap = document.getElementById('t-cotizacion-sap');
       if (elCotSap) elCotSap.value = t.cotizacionSAP || '';
@@ -4620,6 +4615,59 @@ function cerrarTicket(e) {
   editandoTicketId = null;
 }
 
+// ===== HELPER MAQUINARIA =====
+function poblarTodasMaquinas(selectId, selectedValue = '') {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  select.innerHTML = '<option value="">Seleccione una máquina registrada...</option><option value="Otra / No registrada">Otra / Captura manual</option>';
+  
+  let allMaquinas = [];
+  clientesDb.forEach(c => {
+    if (c.maquinas) {
+      c.maquinas.forEach(m => {
+        allMaquinas.push({...m, clienteNombre: c.nombre});
+      });
+    }
+  });
+  
+  allMaquinas.sort((a,b) => a.clienteNombre.localeCompare(b.clienteNombre));
+  
+  allMaquinas.forEach(m => {
+    const opt = document.createElement('option');
+    const mName = `${m.marca || ''} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+    opt.value = mName;
+    opt.textContent = `${mName} - ${m.clienteNombre}`;
+    if (mName === selectedValue) opt.selected = true;
+    opt.setAttribute('data-modelo', m.modelo || '');
+    opt.setAttribute('data-serie', m.serie || '');
+    opt.setAttribute('data-eco', m.no_economico || '');
+    select.appendChild(opt);
+  });
+  
+  if (selectedValue && !Array.from(select.options).some(o => o.value === selectedValue)) {
+    const opt = document.createElement('option');
+    opt.value = selectedValue;
+    opt.textContent = `${selectedValue} (Registrado previo)`;
+    opt.selected = true;
+    select.appendChild(opt);
+  }
+}
+
+function onEquipoOrdenChange() {
+  const select = document.getElementById('f-equipo');
+  if (!select) return;
+  const opt = select.options[select.selectedIndex];
+  if (!opt || !opt.value || opt.value === 'Otra / No registrada') return;
+  
+  const modelo = opt.getAttribute('data-modelo');
+  const serie = opt.getAttribute('data-serie');
+  const eco = opt.getAttribute('data-eco');
+  
+  if (modelo) document.getElementById('f-modelo').value = modelo;
+  if (serie) document.getElementById('f-serie').value = serie;
+  if (eco) document.getElementById('f-eco').value = eco;
+}
+
 // ===== CUSTOM COMBOBOX LOGIC =====
 function toggleCombo(id) {
   const menu = document.getElementById(id + '-menu');
@@ -4682,9 +4730,6 @@ function selectComboOption(id, value, label) {
     const sitInput = document.getElementById('t-sitio');
     const sitDisplay = document.getElementById('t-sitio-display');
     const sitOptions = document.getElementById('t-sitio-options');
-    const equipoSelect = document.getElementById('t-equipo');
-    
-    if (equipoSelect) equipoSelect.innerHTML = '<option value="">Seleccione una máquina registrada...</option><option value="Otra / No registrada">Otra / No registrada</option>';
     
     if (value && value !== 'Ninguno' && value !== 'Ninguno / Uso Interno') {
       if (sitGroup) sitGroup.style.display = 'block';
@@ -4702,16 +4747,6 @@ function selectComboOption(id, value, label) {
             const escapedSn = sn.replace(/'/g, "\\'");
             sitOptions.innerHTML += `<div class="combo-option" onclick="selectComboOption('t-sitio', '${escapedSn}', '${escapedSn}')">${sn}</div>`;
           });
-          
-          if (equipoSelect && c.maquinas) {
-            c.maquinas.forEach(m => {
-              const opt = document.createElement('option');
-              const mName = `${m.marca || ''} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
-              opt.value = mName;
-              opt.textContent = mName;
-              equipoSelect.appendChild(opt);
-            });
-          }
         }
       }
     } else {
