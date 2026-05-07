@@ -431,13 +431,14 @@
           <thead>
             <tr>
               <th id="th-sit-nombre">Nombre del Sitio </th>
+              <th id="th-sit-cliente">Empresa / Cliente </th>
               <th id="th-sit-cp">Código Postal </th>
               <th id="th-sit-ciudad">Ciudad / Estado </th>
               <th style="width:100px;">Acciones</th>
             </tr>
           </thead>
           <tbody id="tabla-body-sitios">
-            <tr><td colspan="4" class="empty-state">No tienes sitios registrados.</td></tr>
+            <tr><td colspan="5" class="empty-state">No tienes sitios registrados.</td></tr>
           </tbody>
         </table>
       </div>
@@ -734,6 +735,7 @@
         <div class="ticket-filters">
           <button class="filter-btn active" data-filter="todos" onclick="filtrarTickets(this)">Todos</button>
           <button class="filter-btn" data-filter="Abierto" onclick="filtrarTickets(this)">Abiertos</button>
+          <button class="filter-btn" data-filter="Cotización" onclick="filtrarTickets(this)">Cotización</button>
           <button class="filter-btn" data-filter="Cerrado" onclick="filtrarTickets(this)">Cerrados</button>
         </div>
         <div class="search-bar">
@@ -1477,6 +1479,7 @@
           <div class="form-section-title"><i data-lucide="circle-dot" class="section-icon"></i> Estado</div>
           <div class="tipo-chips">
             <label class="chip"><input type="radio" name="t-estado" value="Abierto" checked onchange="toggleResolucionTicket()"/><span>Abierto</span></label>
+            <label class="chip"><input type="radio" name="t-estado" value="Cotización" onchange="toggleResolucionTicket()"/><span>Cotización</span></label>
             <label class="chip"><input type="radio" name="t-estado" value="Cerrado" onchange="toggleResolucionTicket()"/><span>Cerrado</span></label>
           </div>
 
@@ -1955,6 +1958,12 @@
                 <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
                   <input type="text" id="lbl-sit-cliente" class="map-label-edit" value="ID Cliente (CardCode)" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
                 </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-sit-cp" class="map-label-edit" value="Código Postal" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
+                <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 150px;">
+                  <input type="text" id="lbl-sit-ciudad" class="map-label-edit" value="Ciudad / Estado" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
+                </th>
                 <th style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); min-width: 200px;">
                   <input type="text" id="lbl-sit-direccion" class="map-label-edit" value="Dirección Completa" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:100%; outline:none;" title="Clic para editar el nombre de la columna en la tabla"/>
                 </th>
@@ -1980,6 +1989,18 @@
                     <input type="text" id="map-sit-cliente" placeholder="Ej. BPCode" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
                   </div>
                 </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-sit-cp" placeholder="Ej. ZipCode" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);">
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
+                    <input type="text" id="map-sit-ciudad" placeholder="Ej. City" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
+                  </div>
+                </td>
                 <td style="padding: 0.75rem; background: var(--bg-card);">
                   <div style="display:flex; flex-direction:column; gap:0.25rem;">
                     <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Columna SAP:</span>
@@ -1991,6 +2012,8 @@
                 <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. SIT-10)</i></td>
                 <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. Planta Norte)</i></td>
                 <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. C23910)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. 11000)</i></td>
+                <td style="padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. CDMX)</i></td>
                 <td style="padding: 0.75rem; color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border);"><i>(Ej. Av. Principal 100...)</i></td>
               </tr>
             </tbody>

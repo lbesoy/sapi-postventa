@@ -597,6 +597,8 @@ function abrirModalMapeo() {
     setMapVal('map-sit-id', mappings.sitios.id || 'Address');
     setMapVal('map-sit-nombre', mappings.sitios.nombre || 'Street');
     setMapVal('map-sit-cliente', mappings.sitios.clienteId || 'BPCode');
+    setMapVal('map-sit-cp', mappings.sitios.cp || 'ZipCode');
+    setMapVal('map-sit-ciudad', mappings.sitios.ciudad || 'City');
     setMapVal('map-sit-direccion', mappings.sitios.direccion || 'Block');
   }
 
@@ -799,6 +801,8 @@ function guardarMapeoColumnas() {
       id: getMapVal('map-sit-id', 'Address'),
       nombre: getMapVal('map-sit-nombre', 'Street'),
       clienteId: getMapVal('map-sit-cliente', 'BPCode'),
+      cp: getMapVal('map-sit-cp', 'ZipCode'),
+      ciudad: getMapVal('map-sit-ciudad', 'City'),
       direccion: getMapVal('map-sit-direccion', 'Block'),
       customCols: getCustomColumnsForModule('sitios'), labels: getLabelsForModule('sitios')
     },
@@ -1619,7 +1623,7 @@ async function fetchSitiosSAP() {
     const sapData = jsonRes.data || (Array.isArray(jsonRes) ? jsonRes : []);
     
     const map = (configData.mappings && configData.mappings.sitios) ? configData.mappings.sitios : {
-      id: 'Address', nombre: 'Street', cliente: 'BPCode', direccion: 'Block'
+      id: 'Address', nombre: 'Street', cliente: 'BPCode', direccion: 'Block', cp: 'ZipCode', ciudad: 'City'
     };
     
     const sitiosMapeados = sapData.map(s => {
@@ -1627,7 +1631,9 @@ async function fetchSitiosSAP() {
         id: s[map.id] || '',
         nombre: s[map.nombre] || 'Sitio Desconocido',
         cliente: s[map.cliente] || '',
-        direccion: s[map.direccion] || ''
+        direccion: s[map.direccion] || '',
+        cp: s[map.cp] || '',
+        ciudad: s[map.ciudad] || ''
       };
       if (map.customCols && map.customCols.length > 0) {
         sitioObj.customData = {};
@@ -3821,7 +3827,7 @@ function renderTickets() {
 }
 
 function badgeTicketEstado(estado) {
-  const map = { 'Abierto':'abierto', 'Cerrado':'cerrado' };
+  const map = { 'Abierto':'abierto', 'Cotización':'en-proceso', 'Cerrado':'cerrado' };
   return map[estado] || 'abierto';
 }
 
@@ -4186,7 +4192,7 @@ function renderSitios() {
   const isAdmin = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
   
   if (!isEmpresa && !isAdmin) {
-    body.innerHTML = `<tr><td colspan="4" class="empty-state">No tienes permisos para ver Sitios.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5" class="empty-state">No tienes permisos para ver Sitios.</td></tr>`;
     return;
   }
   
@@ -4204,7 +4210,7 @@ function renderSitios() {
   }
   
   if (!sitiosList || sitiosList.length === 0) {
-    body.innerHTML = `<tr><td colspan="4" class="empty-state">No se encontraron sitios registrados.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5" class="empty-state">No se encontraron sitios registrados.</td></tr>`;
     return;
   }
   
@@ -4218,9 +4224,31 @@ function renderSitios() {
     
     // Si es admin, mostramos el ID y el BPCode (cliente)
     const sId = isObj && s.id ? s.id : '-';
-    const sCliente = isObj && s.cliente ? s.cliente : '-';
+    let sCliente = isObj && s.cliente ? s.cliente : '-';
     
-    const sLoc = [sCiudad, sEstado].filter(Boolean).join(', ') || 'N/A';
+    let sClienteDisplay = sCliente;
+    if (isAdmin && sCliente !== '-') {
+      const cliFound = clientesDb.find(c => c.idInterno === sCliente || c.rfc === sCliente);
+      if (cliFound) {
+        sClienteDisplay = `<div style="font-weight:500;">${cliFound.nombre}</div><div style="font-size:0.75rem; color:var(--text-muted);">ID: ${sCliente}</div>`;
+      } else {
+        sClienteDisplay = `<div style="font-weight:500; color:var(--text-muted);">ID: ${sCliente}</div>`;
+      }
+    } else if (sCliente === '-') {
+      sClienteDisplay = `<span style="color:var(--text-muted);">N/A</span>`;
+    }
+
+    let cpFinal = sCp;
+    let ciudadFinal = sCiudad;
+    let estadoFinal = sEstado;
+
+    if (isObj && s.customData) {
+      if (s.customData['Código Postal']) cpFinal = s.customData['Código Postal'];
+      if (s.customData['Ciudad']) ciudadFinal = s.customData['Ciudad'];
+      if (s.customData['Estado']) estadoFinal = s.customData['Estado'];
+    }
+
+    const sLoc = [ciudadFinal, estadoFinal].filter(Boolean).join(', ') || 'N/A';
 
     return `
     <tr>
@@ -4230,11 +4258,12 @@ function renderSitios() {
           <div>
             <div>${sNombre}</div>
             ${sDireccion ? `<div style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">${sDireccion}</div>` : ''}
-            ${isAdmin && sCliente !== '-' ? `<div style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal; margin-top:2px;">Cliente: ${sCliente}</div>` : ''}
+            ${isAdmin ? `<div style="font-size:0.75rem; color:var(--text-muted); font-weight:normal; margin-top:2px;">Sitio ID: ${sId}</div>` : ''}
           </div>
         </div>
       </td>
-      <td><span class="badge" style="background:var(--bg-hover);color:var(--text-muted);">${isAdmin ? sId : sCp}</span></td>
+      <td>${sClienteDisplay}</td>
+      <td><span class="badge" style="background:var(--bg-hover);color:var(--text-muted);">${cpFinal}</span></td>
       <td><span style="font-size:0.9rem; color:var(--text-secondary);">${sLoc}</span></td>
       <td>
         ${!isAdmin ? `<button class="action-btn del" onclick="eliminarSitioEmpresa('${idx}')" title="Eliminar Sitio"><i data-lucide="trash-2"></i></button>` : `<button class="action-btn" onclick="mostrarNotificacion('Vista de detalle en construcción', 'info')" title="Ver detalles"><i data-lucide="eye"></i></button>`}
@@ -4426,11 +4455,12 @@ function abrirTicket(id) {
 }
 
 function toggleResolucionTicket() {
-  const isCerrado = document.querySelector('input[name="t-estado"]:checked')?.value === 'Cerrado';
+  const estado = document.querySelector('input[name="t-estado"]:checked')?.value;
+  const isCotizacion = estado === 'Cotización';
   const group = document.getElementById('group-t-resolucion');
   const inSap = document.getElementById('t-cotizacion-sap');
-  if (group) group.style.display = isCerrado ? 'block' : 'none';
-  if (inSap) inSap.required = isCerrado;
+  if (group) group.style.display = (isCotizacion || estado === 'Cerrado') ? 'block' : 'none';
+  if (inSap) inSap.required = isCotizacion;
 }
 
 function editarTicket(id) { abrirTicket(id); }
@@ -4614,17 +4644,17 @@ function guardarTicket(e) {
     contacto = currentUser ? currentUser.email : '';
   }
   
-  if (!isEmpresa && estado === 'Cerrado') {
+  if (!isEmpresa && estado === 'Cotización') {
     const cotSAP = document.getElementById('t-cotizacion-sap')?.value.trim();
     const pdfUpload = document.getElementById('t-cotizacion-pdf')?.files.length > 0;
     
     if (!cotSAP) {
-      mostrarNotificacion('Debe ingresar el Número de Cotización SAP para cerrar el ticket.', 'error');
+      mostrarNotificacion('Debe ingresar el Número de Cotización SAP para pasar a Cotización.', 'error');
       return;
     }
     
     if (!pdfUpload) { 
-      mostrarNotificacion('Debe subir el archivo PDF de la cotización para cerrar el ticket.', 'error'); 
+      mostrarNotificacion('Debe subir el archivo PDF de la cotización para pasar a este estado.', 'error'); 
       return; 
     }
   }
