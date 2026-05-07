@@ -53,10 +53,41 @@ CREATE TABLE public.ordenes (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 5. RLS (Row Level Security) - Deshabilitado temporalmente para pruebas
+-- 5. TABLE: tickets (Soporte)
+CREATE TABLE public.tickets (
+    id TEXT PRIMARY KEY,
+    folio TEXT NOT NULL,
+    fecha TEXT,
+    fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    canal TEXT,
+    contacto TEXT,
+    asunto TEXT,
+    cliente TEXT,
+    sitio TEXT,
+    solicitante TEXT,
+    area TEXT,
+    categoria TEXT,
+    prioridad TEXT,
+    asignado TEXT,
+    descripcion TEXT,
+    equipo TEXT,
+    notas TEXT,
+    estado TEXT,
+    cotizacion_sap TEXT,
+    cot_aceptada TEXT,
+    motivo_rechazo TEXT,
+    pedido_sap TEXT,
+    tecnicos_asignados JSONB DEFAULT '[]'::jsonb,
+    pdf_pedido TEXT,
+    pdf_cotizacion TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 6. RLS (Row Level Security) - Deshabilitado temporalmente para pruebas
 ALTER TABLE public.usuarios DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clientes DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ordenes DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tickets DISABLE ROW LEVEL SECURITY;
 
 -- Insertar un SuperAdmin por defecto
 INSERT INTO public.usuarios (id, nombre, email, pin, rol, activo)

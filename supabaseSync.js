@@ -83,6 +83,45 @@ async function migrarDatosASupabase() {
       }
     }
 
+    // 4. TICKETS (Soporte)
+    const { data: dbTickets, error: errTik } = await sb.from('tickets').select('*');
+    if (!errTik && dbTickets.length === 0) {
+      const localTickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+      if (localTickets.length > 0) {
+        console.log("Migrando tickets a Supabase...");
+        for (const t of localTickets) {
+          await sb.from('tickets').insert({
+            id: t.id || crypto.randomUUID(),
+            folio: t.folio,
+            fecha: t.fecha,
+            fecha_creacion: t.fechaCreacion,
+            canal: t.canal,
+            contacto: t.contacto,
+            asunto: t.asunto,
+            cliente: t.cliente,
+            sitio: t.sitio,
+            solicitante: t.solicitante,
+            area: t.area,
+            categoria: t.categoria,
+            prioridad: t.prioridad,
+            asignado: t.asignado,
+            descripcion: t.descripcion,
+            equipo: t.equipo,
+            notas: t.notas,
+            estado: t.estado,
+            cotizacion_sap: t.cotizacionSAP,
+            cot_aceptada: t.cotAceptada,
+            motivo_rechazo: t.motivoRechazo,
+            pedido_sap: t.pedidoSAP,
+            tecnicos_asignados: t.tecnicosAsignados || [],
+            pdf_pedido: t.pdfPedido,
+            pdf_cotizacion: t.pdfCotizacion
+          });
+        }
+        hayCambios = true;
+      }
+    }
+
     if (hayCambios) {
       console.log("✅ Migración inicial completada con éxito.");
     }
@@ -150,6 +189,38 @@ async function cargarDatosDeSupabase() {
       }));
       localStorage.setItem('sapi_ordenes', JSON.stringify(ordMapped));
     }
+
+    const { data: ticketsDb } = await sb.from('tickets').select('*');
+    if (ticketsDb) {
+      const tikMapped = ticketsDb.map(t => ({
+        id: t.id,
+        folio: t.folio,
+        fecha: t.fecha,
+        fechaCreacion: t.fecha_creacion,
+        canal: t.canal,
+        contacto: t.contacto,
+        asunto: t.asunto,
+        cliente: t.cliente,
+        sitio: t.sitio,
+        solicitante: t.solicitante,
+        area: t.area,
+        categoria: t.categoria,
+        prioridad: t.prioridad,
+        asignado: t.asignado,
+        descripcion: t.descripcion,
+        equipo: t.equipo,
+        notas: t.notas,
+        estado: t.estado,
+        cotizacionSAP: t.cotizacion_sap,
+        cotAceptada: t.cot_aceptada,
+        motivoRechazo: t.motivo_rechazo,
+        pedidoSAP: t.pedido_sap,
+        tecnicosAsignados: t.tecnicos_asignados,
+        pdfPedido: t.pdf_pedido,
+        pdfCotizacion: t.pdf_cotizacion
+      }));
+      localStorage.setItem('sapi_tickets', JSON.stringify(tikMapped));
+    }
     
     // Disparar un evento para que app.js sepa que debe recargar variables de memoria
     window.dispatchEvent(new Event('supabase_datos_cargados'));
@@ -213,6 +284,34 @@ window.pushToSupabase = async function(tabla, item) {
         activo: item.activo,
         empresa: item.empresa || null
       };
+    } else if (tabla === 'tickets') {
+      payload = {
+        id: item.id,
+        folio: item.folio,
+        fecha: item.fecha,
+        fecha_creacion: item.fechaCreacion,
+        canal: item.canal,
+        contacto: item.contacto,
+        asunto: item.asunto,
+        cliente: item.cliente,
+        sitio: item.sitio,
+        solicitante: item.solicitante,
+        area: item.area,
+        categoria: item.categoria,
+        prioridad: item.prioridad,
+        asignado: item.asignado,
+        descripcion: item.descripcion,
+        equipo: item.equipo,
+        notas: item.notas,
+        estado: item.estado,
+        cotizacion_sap: item.cotizacionSAP,
+        cot_aceptada: item.cotAceptada,
+        motivo_rechazo: item.motivoRechazo,
+        pedido_sap: item.pedidoSAP,
+        tecnicos_asignados: item.tecnicosAsignados || [],
+        pdf_pedido: item.pdfPedido,
+        pdf_cotizacion: item.pdfCotizacion
+      };
     }
 
     const { error } = await window.supabaseClient.from(tabla).upsert(payload);
@@ -242,6 +341,9 @@ localStorage.setItem = function(key, value) {
     }
     else if (key === 'sapi_ordenes' && Array.isArray(data)) {
       data.forEach(o => window.pushToSupabase('ordenes', o));
+    }
+    else if (key === 'sapi_tickets' && Array.isArray(data)) {
+      data.forEach(t => window.pushToSupabase('tickets', t));
     }
   } catch(e) {
     // Ignorar si no es JSON o hay error
