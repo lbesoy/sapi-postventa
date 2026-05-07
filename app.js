@@ -2362,6 +2362,25 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
     ultimaFechaStr = ultimaFecha.toISOString().split('T')[0].split('-').reverse().join('/');
   }
   
+  // Siguiente Servicio
+  let siguientes = [];
+  maqOrdenes.forEach(o => {
+    if (o.estado === 'Pendiente' || o.estado === 'En Proceso' || o.estado === 'Programado') {
+      if (o.fecha) siguientes.push(new Date(o.fecha));
+    }
+  });
+  
+  let siguienteServicioStr = 'No programado';
+  if (siguientes.length > 0) {
+    const siguienteFecha = new Date(Math.min.apply(null, siguientes));
+    siguienteServicioStr = siguienteFecha.toISOString().split('T')[0].split('-').reverse().join('/');
+  } else {
+    const hasPendingOrd = maqOrdenes.some(o => o.estado === 'Pendiente' || o.estado === 'En Proceso');
+    const hasPendingTkt = maqTickets.some(t => t.estado === 'Abierto' || t.estado === 'En Proceso');
+    if (hasPendingOrd) siguienteServicioStr = 'Por agendar (Orden)';
+    else if (hasPendingTkt) siguienteServicioStr = 'Ticket abierto';
+  }
+  
   let html = '';
   
   // Resumen
@@ -2380,6 +2399,10 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
         <div style="font-weight:500;">${cliente || 'N/A'}</div>
       </div>
       <div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Siguiente Servicio</div>
+        <div style="font-weight:600; color:var(--orange);">${siguienteServicioStr}</div>
+      </div>
+      <div style="grid-column:1/-1;">
         <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Sitio / Ubicación</div>
         <div style="font-weight:500;">${ubicacion || 'N/A'}</div>
       </div>
