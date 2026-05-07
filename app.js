@@ -4445,10 +4445,20 @@ function abrirTicket(id) {
       
       const elCotSap = document.getElementById('t-cotizacion-sap');
       if (elCotSap) elCotSap.value = t.cotizacionSAP || '';
+      
+      const rAceptada = document.querySelector(`input[name="t-cot-aceptada"][value="${t.cotAceptada}"]`);
+      if (rAceptada) rAceptada.checked = true;
+      else {
+        document.querySelectorAll('input[name="t-cot-aceptada"]').forEach(r => r.checked = false);
+      }
+      
+      const elMotivo = document.getElementById('t-motivo-rechazo');
+      if (elMotivo) elMotivo.value = t.motivoRechazo || '';
     }
   }
 
   toggleResolucionTicket();
+  toggleMotivoRechazo();
 
   document.getElementById('modal-ticket-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
@@ -4457,10 +4467,24 @@ function abrirTicket(id) {
 function toggleResolucionTicket() {
   const estado = document.querySelector('input[name="t-estado"]:checked')?.value;
   const isCotizacion = estado === 'Cotización';
+  const isCerrado = estado === 'Cerrado';
+  
   const group = document.getElementById('group-t-resolucion');
+  const groupCierre = document.getElementById('group-t-cierre');
   const inSap = document.getElementById('t-cotizacion-sap');
-  if (group) group.style.display = (isCotizacion || estado === 'Cerrado') ? 'block' : 'none';
+  
+  if (group) group.style.display = (isCotizacion || isCerrado) ? 'block' : 'none';
   if (inSap) inSap.required = isCotizacion;
+  
+  if (groupCierre) groupCierre.style.display = isCerrado ? 'block' : 'none';
+}
+
+function toggleMotivoRechazo() {
+  const aceptada = document.querySelector('input[name="t-cot-aceptada"]:checked')?.value;
+  const groupMotivo = document.getElementById('group-t-motivo-rechazo');
+  const txtMotivo = document.getElementById('t-motivo-rechazo');
+  if (groupMotivo) groupMotivo.style.display = (aceptada === 'no') ? 'block' : 'none';
+  if (txtMotivo) txtMotivo.required = (aceptada === 'no');
 }
 
 function editarTicket(id) { abrirTicket(id); }
@@ -4658,7 +4682,22 @@ function guardarTicket(e) {
       return; 
     }
   }
-  
+
+  if (!isEmpresa && estado === 'Cerrado') {
+    const cotAceptada = document.querySelector('input[name="t-cot-aceptada"]:checked')?.value;
+    const motivoRechazo = document.getElementById('t-motivo-rechazo')?.value.trim() || '';
+    
+    if (!cotAceptada) {
+      mostrarNotificacion('Debe indicar si la cotización fue aceptada o rechazada para cerrar el ticket.', 'error');
+      return;
+    }
+    
+    if (cotAceptada === 'no' && !motivoRechazo) {
+      mostrarNotificacion('Debe especificar el motivo del rechazo.', 'error');
+      return;
+    }
+  }
+
   const t_existente = editandoTicketId ? tickets.find(x=>x.id===editandoTicketId) : null;
   const ticket = {
     id: editandoTicketId || crypto.randomUUID(),
@@ -4679,7 +4718,9 @@ function guardarTicket(e) {
     equipo: document.getElementById('t-equipo').value.trim(),
     notas: document.getElementById('t-notas').value.trim(),
     estado,
-    cotizacionSAP: document.getElementById('t-cotizacion-sap')?.value.trim() || ''
+    cotizacionSAP: document.getElementById('t-cotizacion-sap')?.value.trim() || '',
+    cotAceptada: document.querySelector('input[name="t-cot-aceptada"]:checked')?.value || '',
+    motivoRechazo: document.getElementById('t-motivo-rechazo')?.value.trim() || ''
   };
   
   if (isEmpresa && !editandoTicketId && !ticket.asignado) {

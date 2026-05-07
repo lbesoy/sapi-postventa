@@ -1497,6 +1497,20 @@
               </label>
             </div>
           </div>
+          
+          <div id="group-t-cierre" style="display:none; margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border);">
+            <div class="form-group full-width">
+              <label>¿Cotización Aceptada? *</label>
+              <div style="display:flex; gap:1rem; margin-top:0.5rem;">
+                <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;"><input type="radio" name="t-cot-aceptada" value="si" onchange="toggleMotivoRechazo()"/> Sí, aprobada</label>
+                <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;"><input type="radio" name="t-cot-aceptada" value="no" onchange="toggleMotivoRechazo()"/> No, rechazada</label>
+              </div>
+            </div>
+            <div class="form-group full-width" id="group-t-motivo-rechazo" style="display:none; margin-top:0.75rem;">
+              <label>Motivo del rechazo *</label>
+              <textarea id="t-motivo-rechazo" rows="2" placeholder="Especifique por qué no se aceptó la cotización..."></textarea>
+            </div>
+          </div>
         </div>
 
         <div class="form-actions" style="margin-top:2rem; padding-top: 1rem; border-top: 2px dashed var(--border); justify-content: center; flex-direction: column; align-items: center; gap: 1rem;">
