@@ -3696,15 +3696,9 @@ function abrirFormulario(id) {
   setRefacciones('utilizadas', []);
   setRefacciones('necesarias', []);
   
-  const usedSoportes = ordenes.filter(x => x.id !== editandoId).map(x => x.soporte).filter(Boolean);
-  const usedPedidos = ordenes.filter(x => x.id !== editandoId).map(x => x.pedido).filter(Boolean);
-  
   const elSoporte = document.getElementById('f-soporte');
   if (elSoporte) {
     elSoporte.innerHTML = '<option value="">Ninguno</option>';
-    tickets.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'si' && !usedSoportes.includes(t.id) && !usedPedidos.includes(t.pedidoSAP)).forEach(t => {
-      elSoporte.innerHTML += `<option value="${t.id}">${t.folio || t.id} - Pedido: ${t.pedidoSAP || 'S/N'}</option>`;
-    });
   }
 
   // Llenar combo de clientes para Orden de Servicio
@@ -3741,12 +3735,13 @@ function abrirFormulario(id) {
     
     if (o.cliente) {
       if (fClienteOptions) {
-        selectComboOption('f-cliente', o.cliente, o.cliente);
+        selectComboOption('f-cliente', o.cliente, o.cliente, true); // true = isInitial
       } else {
         const elCliente = document.getElementById('f-cliente');
         if (elCliente) elCliente.value = o.cliente;
       }
     }
+    poblarSoportesPorCliente(o.cliente, o.soporte);
     // tipo radio
     const radio = document.querySelector(`input[name="tipo"][value="${o.tipo}"]`);
     if (radio) radio.checked = true;
@@ -3768,6 +3763,9 @@ function abrirFormulario(id) {
     if (o.ref_necesarias?.length) setRefacciones('necesarias', o.ref_necesarias);
     // dias
     setDiasData(o.dias);
+  } else {
+    // Nueva Orden
+    poblarSoportesPorCliente('');
   }
   
   poblarMaquinasCliente('f-equipo', '', id ? ordenes.find(x => x.id === id)?.cliente : '');
@@ -4780,7 +4778,40 @@ function cerrarTicket(e) {
   editandoTicketId = null;
 }
 
-// ===== HELPER MAQUINARIA =====
+// ===== HELPER MAQUINARIA Y TICKETS =====
+function poblarSoportesPorCliente(clienteNombre, selectedSoporte = '') {
+  const elSoporte = document.getElementById('f-soporte');
+  if (!elSoporte) return;
+  
+  elSoporte.innerHTML = '<option value="">Ninguno</option>';
+  
+  const usedSoportes = ordenes.filter(x => x.id !== editandoId).map(x => x.soporte).filter(Boolean);
+  const usedPedidos = ordenes.filter(x => x.id !== editandoId).map(x => x.pedido).filter(Boolean);
+  
+  let validTickets = tickets.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'si' && !usedSoportes.includes(t.id) && !usedPedidos.includes(t.pedidoSAP));
+  
+  if (clienteNombre && clienteNombre !== 'Ninguno / Uso Interno') {
+    validTickets = validTickets.filter(t => t.cliente === clienteNombre);
+  }
+  
+  validTickets.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = `${t.folio || t.id} - Pedido: ${t.pedidoSAP || 'S/N'}`;
+    if (t.id === selectedSoporte) opt.selected = true;
+    elSoporte.appendChild(opt);
+  });
+  
+  if (selectedSoporte && !Array.from(elSoporte.options).some(o => o.value === selectedSoporte)) {
+    const opt = document.createElement('option');
+    opt.value = selectedSoporte;
+    const t = tickets.find(x => x.id === selectedSoporte);
+    opt.textContent = t ? `${t.folio || t.id} - Pedido: ${t.pedidoSAP || 'S/N'}` : selectedSoporte;
+    opt.selected = true;
+    elSoporte.appendChild(opt);
+  }
+}
+
 function poblarMaquinasCliente(selectId, selectedValue = '', clienteNombre = null) {
   const select = document.getElementById(selectId);
   if (!select) return;
@@ -4916,7 +4947,10 @@ function selectComboOption(id, value, label, isInitial = false) {
       if (sitDisplay) sitDisplay.textContent = 'Ninguno';
     }
   } else if (id === 'f-cliente') {
-    if (!isInitial) poblarMaquinasCliente('f-equipo', '', value);
+    if (!isInitial) {
+      poblarMaquinasCliente('f-equipo', '', value);
+      poblarSoportesPorCliente(value, '');
+    }
   }
 }
 
