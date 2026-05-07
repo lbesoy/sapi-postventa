@@ -780,9 +780,23 @@
               <label>Pedido No.</label>
               <input type="text" id="f-pedido" placeholder="Ej. 1200483"/>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="position:relative;" id="group-f-cliente">
               <label>Cliente *</label>
-              <input type="text" id="f-cliente" placeholder="Nombre del cliente" required/>
+              <div class="combo-box" tabindex="0" id="f-cliente-combo" onclick="toggleCombo('f-cliente')">
+                <span id="f-cliente-display">Seleccionar cliente...</span>
+                <i data-lucide="chevron-down" style="width:16px;height:16px;"></i>
+              </div>
+              <div class="combo-menu" id="f-cliente-menu">
+                <div class="combo-search">
+                  <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted)"></i>
+                  <input type="text" id="f-cliente-search" placeholder="Buscar o agregar..." oninput="filterCombo('f-cliente')" onclick="event.stopPropagation()">
+                  <button type="button" onclick="agregarEmpresaCombo('f-cliente'); event.stopPropagation();" title="Agregar nueva empresa"><i data-lucide="plus"></i></button>
+                </div>
+                <div class="combo-options" id="f-cliente-options">
+                  <!-- Opciones dinámicas -->
+                </div>
+              </div>
+              <input type="hidden" id="f-cliente" required>
             </div>
             <div class="form-group">
               <label>Ubicación</label>

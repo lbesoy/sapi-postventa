@@ -3553,10 +3553,31 @@ function abrirFormulario(id) {
       elSoporte.innerHTML += `<option value="${t.id}">${t.folio || t.id} - Pedido: ${t.pedidoSAP || 'S/N'}</option>`;
     });
   }
+
+  // Llenar combo de clientes para Orden de Servicio
+  const fClienteOptions = document.getElementById('f-cliente-options');
+  const fClienteHidden = document.getElementById('f-cliente');
+  const fClienteDisplay = document.getElementById('f-cliente-display');
+  
+  if (fClienteOptions) {
+    fClienteHidden.value = '';
+    fClienteDisplay.textContent = 'Seleccionar cliente...';
+    fClienteOptions.innerHTML = `<div class="combo-option" onclick="selectComboOption('f-cliente', '', 'Ninguno / Uso Interno')">Ninguno / Uso Interno</div>`;
+    
+    const legacyMap = new Map();
+    ordenes.forEach(o => { if (o.cliente && !legacyMap.has(o.cliente)) legacyMap.set(o.cliente, o.cliente); });
+    const mergedNames = [...new Set([...clientesDb.map(c => c.nombre), ...legacyMap.values()])].sort();
+    
+    mergedNames.forEach(nombre => {
+      const escaped = nombre.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      fClienteOptions.innerHTML += `<div class="combo-option" onclick="selectComboOption('f-cliente', '${escaped}', '${escaped}')">${nombre}</div>`;
+    });
+  }
+
   if (id) {
     const o = ordenes.find(x => x.id === id);
     if (!o) return;
-    const fields = ['folio','pedido','cliente','ubicacion','operador','eco','horometro',
+    const fields = ['folio','pedido','ubicacion','operador','eco','horometro',
       'modelo','serie','tecnico','soporte','km-ida','km-vuelta','km-total',
       'falla','trabajos','dictamen','condiciones','observaciones','pendientes',
       'factura-ref','factura-mo','noches','alimentacion','traslado-costo'];
@@ -3564,6 +3585,15 @@ function abrirFormulario(id) {
       const el = document.getElementById('f-' + f);
       if (el && o[f.replace(/-/g,'_')] !== undefined) el.value = o[f.replace(/-/g,'_')];
     });
+    
+    if (o.cliente) {
+      if (fClienteOptions) {
+        selectComboOption('f-cliente', o.cliente, o.cliente);
+      } else {
+        const elCliente = document.getElementById('f-cliente');
+        if (elCliente) elCliente.value = o.cliente;
+      }
+    }
     // tipo radio
     const radio = document.querySelector(`input[name="tipo"][value="${o.tipo}"]`);
     if (radio) radio.checked = true;
