@@ -4511,6 +4511,21 @@ function abrirTicket(id) {
     }
   }
 
+  const t_tec = editandoTicketId ? tickets.find(x => x.id === editandoTicketId) : {};
+  const containerTecnicos = document.getElementById('t-tecnicos-container');
+  if (containerTecnicos) {
+    containerTecnicos.innerHTML = '';
+    usuarios.filter(u => u.rol === 'tecnico').forEach(u => {
+      const isChecked = t_tec.tecnicosAsignados && t_tec.tecnicosAsignados.includes(u.nombre);
+      containerTecnicos.innerHTML += `
+        <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer; background: var(--bg-body); padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem;">
+          <input type="checkbox" name="t-tecnicos" value="${u.nombre}" ${isChecked ? 'checked' : ''}/>
+          ${u.nombre}
+        </label>
+      `;
+    });
+  }
+
   toggleResolucionTicket();
   toggleMotivoRechazo();
 
@@ -4754,12 +4769,17 @@ function guardarTicket(e) {
     }
     
     if (cotAceptada === 'si') {
+      const selectedT = Array.from(document.querySelectorAll('input[name="t-tecnicos"]:checked')).map(cb => cb.value);
       if (!pedidoSAP) {
         mostrarNotificacion('Debe ingresar el Número de Pedido SAP para cerrar una cotización aceptada.', 'error');
         return;
       }
       if (!pedidoPdfUpload) {
         mostrarNotificacion('Debe adjuntar el archivo PDF del pedido para cerrar la cotización aceptada.', 'error');
+        return;
+      }
+      if (selectedT.length === 0) {
+        mostrarNotificacion('Debe asignar al menos un técnico responsable a la orden.', 'error');
         return;
       }
     }
@@ -4788,7 +4808,8 @@ function guardarTicket(e) {
     cotizacionSAP: document.getElementById('t-cotizacion-sap')?.value.trim() || '',
     cotAceptada: document.querySelector('input[name="t-cot-aceptada"]:checked')?.value || '',
     motivoRechazo: document.getElementById('t-motivo-rechazo')?.value.trim() || '',
-    pedidoSAP: document.getElementById('t-pedido-sap')?.value.trim() || ''
+    pedidoSAP: document.getElementById('t-pedido-sap')?.value.trim() || '',
+    tecnicosAsignados: Array.from(document.querySelectorAll('input[name="t-tecnicos"]:checked')).map(cb => cb.value)
   };
   
   if (isEmpresa && !editandoTicketId && !ticket.asignado) {
@@ -4867,6 +4888,7 @@ function verDetalleTicket(id) {
         ${t.cotAceptada ? field('Resultado', t.cotAceptada === 'si' ? '<span style="color:var(--success); display:inline-flex; align-items:center; gap:4px;"><i data-lucide="check-circle" style="width:14px;height:14px;"></i> Aprobada</span>' : '<span style="color:var(--danger); display:inline-flex; align-items:center; gap:4px;"><i data-lucide="x-circle" style="width:14px;height:14px;"></i> Rechazada</span>') : ''}
         ${t.motivoRechazo ? field('Motivo Rechazo', t.motivoRechazo) : ''}
         ${t.pedidoSAP ? field('Pedido SAP', t.pedidoSAP) : ''}
+        ${t.tecnicosAsignados && t.tecnicosAsignados.length > 0 ? field('Técnicos Asignados', t.tecnicosAsignados.join(', ')) : ''}
       </div>
     </div>
     ` : ''}
@@ -4914,6 +4936,17 @@ function verDetalleTicket(id) {
               <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
               <span class="file-label-text">Subir pedido en PDF</span>
             </label>
+          </div>
+          <div class="form-group full-width" style="margin-top:0.75rem;">
+            <label>Técnicos Asignados *</label>
+            <div id="quick-tecnicos-${t.id}" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.5rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: rgba(0,0,0,0.02); max-height: 120px; overflow-y: auto;">
+              ${usuarios.filter(u => u.rol === 'tecnico').map(u => `
+                <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer; background: var(--bg-body); padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
+                  <input type="checkbox" name="quick-tecnicos-${t.id}" value="${u.nombre}" ${t.tecnicosAsignados?.includes(u.nombre) ? 'checked' : ''}/>
+                  ${u.nombre}
+                </label>
+              `).join('')}
+            </div>
           </div>
         </div>
         <button class="btn-primary full-width" style="justify-content:center;" onclick="cerrarCotizacionTicket('${t.id}')">Finalizar y Cerrar Ticket</button>
@@ -4967,6 +5000,8 @@ function cerrarCotizacionTicket(id) {
   } else if (aceptada === 'si') {
     pedidoSAP = document.getElementById(`quick-pedido-sap-${id}`)?.value.trim();
     const pdfUpload = document.getElementById(`quick-pedido-pdf-${id}`)?.files.length > 0;
+    const selectedT = Array.from(document.querySelectorAll(`input[name="quick-tecnicos-${id}"]:checked`)).map(cb => cb.value);
+    
     if (!pedidoSAP) {
       mostrarNotificacion('Debes ingresar el Número de Pedido SAP.', 'warning');
       return;
@@ -4975,11 +5010,17 @@ function cerrarCotizacionTicket(id) {
       mostrarNotificacion('Debes adjuntar el archivo PDF del pedido.', 'warning');
       return;
     }
+    if (selectedT.length === 0) {
+      mostrarNotificacion('Debes asignar al menos un técnico responsable.', 'warning');
+      return;
+    }
+    tecnicosAsignados = selectedT;
   }
   
   t.cotAceptada = aceptada;
   t.motivoRechazo = motivo;
   t.pedidoSAP = pedidoSAP;
+  t.tecnicosAsignados = tecnicosAsignados;
   t.estado = 'Cerrado';
   localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
   mostrarNotificacion('Ticket cerrado con éxito.', 'success');
