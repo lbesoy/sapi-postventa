@@ -3765,16 +3765,20 @@ function renderTickets() {
   body.innerHTML = filtered.map((t, i) => `
     <tr>
       <td><strong>${t.folio||('#'+(i+1))}</strong></td>
-      <td>${t.asunto||'—'}</td>
       <td>
-        <div style="font-weight:500">${t.solicitante||'—'}</div>
-        ${t.cliente ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;"><i data-lucide="building-2" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}</div>` : ''}
+        <div style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.asunto || ''}">
+          ${t.asunto||'—'}
+        </div>
       </td>
-      <td>${t.area||'—'}</td>
-      <td><span class="badge badge-${(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
-      <td><span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'—'}</span></td>
-      <td>${t.asignado||'—'}</td>
-      <td>${t.fecha||'—'}</td>
+      <td>
+        <div style="font-weight:500; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.solicitante || ''}">${t.solicitante||'—'}</div>
+        ${t.cliente ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}"><i data-lucide="building-2" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}</div>` : ''}
+      </td>
+      <td style="white-space:nowrap;">${t.area||'—'}</td>
+      <td style="white-space:nowrap;"><span class="badge badge-${(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
+      <td style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'—'}</span></td>
+      <td style="white-space:nowrap;">${t.asignado||'—'}</td>
+      <td style="white-space:nowrap;">${t.fecha||'—'}</td>
       <td style="display:flex;gap:0.25rem;">
         <button class="action-btn" onclick="verDetalleTicket('${t.id}')" title="Ver"><i data-lucide="eye"></i></button>
         <button class="action-btn" onclick="editarTicket('${t.id}')" title="Editar"><i data-lucide="pencil"></i></button>
