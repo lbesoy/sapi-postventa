@@ -2519,9 +2519,12 @@ function abrirDetalleSitio(sitioNombre) {
           <input type="number" step="any" id="edit-sitio-lat" placeholder="Latitud" value="${lat || ''}" style="width:100%;"/>
           <input type="number" step="any" id="edit-sitio-lon" placeholder="Longitud" value="${lon || ''}" style="width:100%;"/>
         </div>
-        <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:0.5rem;">
-          <button onclick="document.getElementById('coordenadas-edit').style.display='none'; document.getElementById('coordenadas-display').style.display='flex';" class="btn-secondary" style="padding: 0.3rem 0.75rem;">Cancelar</button>
-          <button onclick="guardarCoordenadasSitio('${safeNombre}')" class="btn-primary" style="padding: 0.3rem 0.75rem;">Guardar Coordenadas</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem;">
+          <button type="button" onclick="const lt=document.getElementById('edit-sitio-lat').value; const ln=document.getElementById('edit-sitio-lon').value; if(lt&&ln) window.open('https://maps.google.com/?q='+lt+','+ln, '_blank'); else alert('Faltan coordenadas para probar el mapa.');" class="btn-secondary" style="padding: 0.3rem 0.75rem; display:flex; align-items:center; gap:0.3rem;"><i data-lucide="map" style="width:14px;height:14px;"></i> Probar Mapa</button>
+          <div style="display:flex; gap:0.5rem;">
+            <button onclick="document.getElementById('coordenadas-edit').style.display='none'; document.getElementById('coordenadas-display').style.display='flex';" class="btn-secondary" style="padding: 0.3rem 0.75rem;">Cancelar</button>
+            <button onclick="guardarCoordenadasSitio('${safeNombre}')" class="btn-primary" style="padding: 0.3rem 0.75rem;">Guardar</button>
+          </div>
         </div>
       </div>
     </div>
