@@ -1446,8 +1446,14 @@ function renderTabla(ctx) {
     (o.ubicacion||'').toLowerCase().includes(q)
   );
 
-  const tecFilter = document.getElementById('filter-ord-tecnico')?.value;
-  const supFilter = document.getElementById('filter-ord-supervisor')?.value;
+  let tecFilter = document.getElementById('filter-ord-tecnico')?.value;
+  let supFilter = document.getElementById('filter-ord-supervisor')?.value;
+  
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  if (currentUser) {
+     if (currentUser.rol === 'tecnico') tecFilter = currentUser.id;
+     if (currentUser.rol === 'supervisor') supFilter = currentUser.id;
+  }
   
   if (tecFilter || supFilter) {
     const tecUser = usuarios.find(u => u.id === tecFilter);
@@ -1530,10 +1536,12 @@ function renderTabla(ctx) {
       <td><span class="badge badge-${(o.tipo||'otro').toLowerCase().replace('é','e').replace('í','i')}">${o.tipo||'-'}</span></td>
       <td><span class="badge ${badgeEstado(o.estado)}">${o.estado||'-'}</span></td>
       <td>${o.fecha||'-'}</td>
-      <td style="display:flex;gap:0.25rem;">
-        <button class="action-btn" onclick="verDetalle('${o.id}')" title="Ver"><i data-lucide="eye"></i></button>
-        <button class="action-btn" onclick="editarOrden('${o.id}')" title="Editar"><i data-lucide="pencil"></i></button>
-        <button class="action-btn del" onclick="eliminarOrden('${o.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>
+      <td>
+        <div style="display:flex;gap:0.25rem;">
+          <button class="action-btn" onclick="verDetalle('${o.id}')" title="Ver"><i data-lucide="eye"></i></button>
+          <button class="action-btn" onclick="editarOrden('${o.id}')" title="Editar"><i data-lucide="pencil"></i></button>
+          <button class="action-btn del" onclick="eliminarOrden('${o.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>
+        </div>
       </td>
     </tr>
   `).join('');
@@ -4263,6 +4271,11 @@ function updateTicketBadge() {
 }
 
 function actualizarFiltrosPersonal() {
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const userRole = currentUser ? currentUser.rol : '';
+  const isTecnico = userRole === 'tecnico';
+  const isSupervisor = userRole === 'supervisor';
+
   const selectsTecnico = [document.getElementById('filter-ord-tecnico'), document.getElementById('filter-dash-tkt-tecnico'), document.getElementById('filter-tkt-tecnico')];
   const selectsSupervisor = [document.getElementById('filter-ord-supervisor'), document.getElementById('filter-dash-tkt-supervisor'), document.getElementById('filter-tkt-supervisor')];
   
@@ -4272,8 +4285,22 @@ function actualizarFiltrosPersonal() {
   const tecOptions = '<option value="">Cualquier Técnico</option>' + tecnicos.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
   const supOptions = '<option value="">Cualquier Supervisor</option>' + supervisores.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
   
-  selectsTecnico.forEach(sel => { if(sel) { const val = sel.value; sel.innerHTML = tecOptions; sel.value = val; } });
-  selectsSupervisor.forEach(sel => { if(sel) { const val = sel.value; sel.innerHTML = supOptions; sel.value = val; } });
+  selectsTecnico.forEach(sel => { 
+    if(sel) { 
+      const val = isTecnico ? currentSession.userId : sel.value; 
+      sel.innerHTML = tecOptions; 
+      sel.value = val; 
+      sel.disabled = isTecnico;
+    } 
+  });
+  selectsSupervisor.forEach(sel => { 
+    if(sel) { 
+      const val = isSupervisor ? currentSession.userId : (isTecnico ? '' : sel.value); 
+      sel.innerHTML = supOptions; 
+      sel.value = val; 
+      sel.disabled = isSupervisor || isTecnico;
+    } 
+  });
 }
 
 // ===== RENDER TICKETS =====
@@ -4295,8 +4322,14 @@ function renderTickets(ctx) {
     (t.folio||'').toLowerCase().includes(q)
   );
   
-  const tecFilter = document.getElementById(isDashView ? 'filter-dash-tkt-tecnico' : 'filter-tkt-tecnico')?.value;
-  const supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value;
+  let tecFilter = document.getElementById(isDashView ? 'filter-dash-tkt-tecnico' : 'filter-tkt-tecnico')?.value;
+  let supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value;
+  
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  if (currentUser) {
+     if (currentUser.rol === 'tecnico') tecFilter = currentUser.id;
+     if (currentUser.rol === 'supervisor') supFilter = currentUser.id;
+  }
   
   if (tecFilter || supFilter) {
     const tecUser = usuarios.find(u => u.id === tecFilter);
@@ -4356,10 +4389,12 @@ function renderTickets(ctx) {
       <td style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'—'}</span></td>
       <td style="white-space:nowrap;">${t.asignado||'—'}</td>
       <td style="white-space:nowrap;">${t.fecha||'—'}</td>
-      <td style="display:flex;gap:0.25rem;">
-        <button class="action-btn" onclick="verDetalleTicket('${t.id}')" title="Ver"><i data-lucide="eye"></i></button>
-        <button class="action-btn" onclick="editarTicket('${t.id}')" title="Editar"><i data-lucide="pencil"></i></button>
-        <button class="action-btn del" onclick="eliminarTicket('${t.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>
+      <td>
+        <div style="display:flex;gap:0.25rem;">
+          <button class="action-btn" onclick="verDetalleTicket('${t.id}')" title="Ver"><i data-lucide="eye"></i></button>
+          <button class="action-btn" onclick="editarTicket('${t.id}')" title="Editar"><i data-lucide="pencil"></i></button>
+          <button class="action-btn del" onclick="eliminarTicket('${t.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>
+        </div>
       </td>
     </tr>
   `).join('');
