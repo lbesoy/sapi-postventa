@@ -2446,41 +2446,6 @@ function abrirDetalleSitio(sitioNombre) {
       </div>
     `;
     
-    let lat = sitioOb.latitud || sitioOb.lat || null;
-    let lon = sitioOb.longitud || sitioOb.lon || sitioOb.lng || null;
-    
-    if (sitioOb.customData) {
-      const keys = Object.keys(sitioOb.customData);
-      const kLat = keys.find(k => k.toLowerCase() === 'latitud' || k.toLowerCase() === 'lat' || k.toLowerCase() === 'u_latitud');
-      const kLon = keys.find(k => k.toLowerCase() === 'longitud' || k.toLowerCase() === 'lon' || k.toLowerCase() === 'lng' || k.toLowerCase() === 'u_longitud');
-      if (kLat && sitioOb.customData[kLat] && !lat) lat = sitioOb.customData[kLat];
-      if (kLon && sitioOb.customData[kLon] && !lon) lon = sitioOb.customData[kLon];
-    }
-    
-    if (lat && lon) {
-      html += `
-        <div style="margin-top: 1rem; display:flex; justify-content:space-between; align-items:center; background: var(--bg-hover); padding: 0.75rem 1rem; border-radius: var(--radius-md);">
-          <div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Coordenadas Geográficas</div>
-            <div style="font-weight: 500; color: var(--text-primary); font-family: monospace;">${lat}, ${lon}</div>
-          </div>
-          <a href="https://maps.google.com/?q=${lat},${lon}" target="_blank" style="display:flex; align-items:center; gap:0.4rem; background: var(--accent); color: white; padding: 0.4rem 0.75rem; border-radius: 4px; text-decoration: none; font-size: 0.85rem; font-weight: 500;">
-            <i data-lucide="map-pin" style="width:14px;height:14px;"></i> Google Maps
-          </a>
-        </div>
-      `;
-    } else {
-      html += `
-        <div style="margin-top: 1rem; display:flex; align-items:center; gap: 0.5rem; background: var(--bg-hover); padding: 0.75rem 1rem; border-radius: var(--radius-md);">
-          <i data-lucide="map-pin-off" style="width:16px;height:16px;color:var(--text-muted);"></i>
-          <div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Coordenadas Geográficas</div>
-            <div style="font-weight: 500; color: var(--text-muted); font-size: 0.9rem;">Sin coordenadas registradas</div>
-          </div>
-        </div>
-      `;
-    }
-    
     if (sitioOb.customData && Object.keys(sitioOb.customData).length > 0) {
       html += `
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; padding-left: 0.5rem; border-left: 2px solid var(--accent); margin-top:0.5rem;">
@@ -2500,10 +2465,67 @@ function abrirDetalleSitio(sitioNombre) {
       <div style="display:flex; flex-direction:column; gap:0.5rem; background: var(--bg-hover); padding: 1rem; border-radius: var(--radius-md);">
         <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Nombre del Sitio (Legacy)</div>
         <div style="font-weight: 500; font-size: 1.1rem; color: var(--text-primary);">${sitioNombre}</div>
-        <div style="font-size:0.8rem; color:var(--text-muted);">Este sitio fue registrado localmente y no contiene más detalles estructurados.</div>
+        <div style="font-size:0.8rem; color:var(--text-muted);">Este sitio fue registrado localmente y no contiene más detalles estructurados de SAP.</div>
       </div>
     `;
   }
+  
+  // Extraer coordenadas
+  let lat = null; let lon = null;
+  if (sitioOb) {
+    lat = sitioOb.latitud || sitioOb.lat || null;
+    lon = sitioOb.longitud || sitioOb.lon || sitioOb.lng || null;
+    if (sitioOb.customData) {
+      const keys = Object.keys(sitioOb.customData);
+      const kLat = keys.find(k => k.toLowerCase() === 'latitud' || k.toLowerCase() === 'lat' || k.toLowerCase() === 'u_latitud');
+      const kLon = keys.find(k => k.toLowerCase() === 'longitud' || k.toLowerCase() === 'lon' || k.toLowerCase() === 'lng' || k.toLowerCase() === 'u_longitud');
+      if (kLat && sitioOb.customData[kLat] && !lat) lat = sitioOb.customData[kLat];
+      if (kLon && sitioOb.customData[kLon] && !lon) lon = sitioOb.customData[kLon];
+    }
+  } else {
+    for (const cli of clientesDb) {
+      if (cli.sitios) {
+        const localSitio = cli.sitios.find(s => getSitioNombre(s) === sitioNombre);
+        if (localSitio && typeof localSitio === 'object') {
+          lat = localSitio.latitud || null;
+          lon = localSitio.longitud || null;
+          break;
+        }
+      }
+    }
+  }
+
+  // Renderizar bloque de Coordenadas editable
+  const safeNombre = sitioNombre.replace(/'/g, "\\'");
+  html += `
+    <div style="margin-top: 1rem; background: var(--bg-hover); padding: 0.75rem 1rem; border-radius: var(--radius-md);">
+      <div id="coordenadas-display" style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; align-items:center; gap: 0.5rem;">
+          ${lat && lon ? '<i data-lucide="map-pin" style="width:16px;height:16px;color:var(--accent);"></i>' : '<i data-lucide="map-pin-off" style="width:16px;height:16px;color:var(--text-muted);"></i>'}
+          <div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Coordenadas Geográficas</div>
+            <div style="font-weight: 500; color: ${lat && lon ? 'var(--text-primary)' : 'var(--text-muted)'}; ${lat && lon ? 'font-family: monospace;' : 'font-size: 0.9rem;'}">${lat && lon ? `${lat}, ${lon}` : 'Sin coordenadas registradas'}</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          ${lat && lon ? `<a href="https://maps.google.com/?q=${lat},${lon}" target="_blank" style="display:flex; align-items:center; gap:0.4rem; background: var(--accent); color: white; padding: 0.4rem 0.75rem; border-radius: 4px; text-decoration: none; font-size: 0.85rem; font-weight: 500;"><i data-lucide="map-pin" style="width:14px;height:14px;"></i> Ver Mapa</a>` : ''}
+          <button onclick="document.getElementById('coordenadas-display').style.display='none'; document.getElementById('coordenadas-edit').style.display='flex';" class="btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.85rem; display:flex; align-items:center; gap:0.3rem;"><i data-lucide="edit-3" style="width:14px;height:14px;"></i> Editar</button>
+        </div>
+      </div>
+      
+      <div id="coordenadas-edit" style="display:none; flex-direction:column; gap:0.5rem; margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border);">
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">Edita las coordenadas para asociarlas a este sitio. Esto actualizará también las máquinas en este sitio.</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+          <input type="number" step="any" id="edit-sitio-lat" placeholder="Latitud" value="${lat || ''}" style="width:100%;"/>
+          <input type="number" step="any" id="edit-sitio-lon" placeholder="Longitud" value="${lon || ''}" style="width:100%;"/>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:0.5rem;">
+          <button onclick="document.getElementById('coordenadas-edit').style.display='none'; document.getElementById('coordenadas-display').style.display='flex';" class="btn-secondary" style="padding: 0.3rem 0.75rem;">Cancelar</button>
+          <button onclick="guardarCoordenadasSitio('${safeNombre}')" class="btn-primary" style="padding: 0.3rem 0.75rem;">Guardar Coordenadas</button>
+        </div>
+      </div>
+    </div>
+  `;
   
   // Maquinaria en este sitio
   const maquinas = maquinariaDb.filter(m => m.ubicacion === sitioNombre || m.sitio === sitioNombre);
@@ -2540,6 +2562,64 @@ function abrirDetalleSitio(sitioNombre) {
 function cerrarDetalleSitio(e) {
   if (e && e.target !== document.getElementById('modal-detalle-sitio-overlay')) return;
   document.getElementById('modal-detalle-sitio-overlay').classList.remove('open');
+}
+
+function guardarCoordenadasSitio(sitioNombre) {
+  const lat = document.getElementById('edit-sitio-lat').value.trim();
+  const lon = document.getElementById('edit-sitio-lon').value.trim();
+  
+  if (!lat || !lon) {
+    alert('Por favor ingresa latitud y longitud válidas.');
+    return;
+  }
+  
+  // 1. Actualizar en sitiosDb (si es de SAP)
+  const sitioDbOb = sitiosDb.find(s => s.nombre === sitioNombre);
+  if (sitioDbOb) {
+    sitioDbOb.latitud = lat;
+    sitioDbOb.longitud = lon;
+  }
+  
+  // 2. Actualizar en clientesDb (sitios locales)
+  clientesDb.forEach(c => {
+    if (c.sitios) {
+      let idx = c.sitios.findIndex(s => getSitioNombre(s) === sitioNombre);
+      if (idx >= 0) {
+        if (typeof c.sitios[idx] === 'string') {
+          c.sitios[idx] = { nombre: sitioNombre, latitud: lat, longitud: lon };
+        } else {
+          c.sitios[idx].latitud = lat;
+          c.sitios[idx].longitud = lon;
+        }
+      }
+    }
+  });
+  
+  // 3. Actualizar todas las máquinas en este sitio
+  let changedMachines = false;
+  maquinariaDb.forEach(m => {
+    if (m.ubicacion === sitioNombre || m.sitio === sitioNombre) {
+       m.latitud = lat;
+       m.longitud = lon;
+       changedMachines = true;
+    }
+  });
+  clientesDb.forEach(c => {
+    if (c.maquinas) {
+      c.maquinas.forEach(m => {
+        if (m.ubicacion === sitioNombre || m.sitio === sitioNombre) {
+           m.latitud = lat;
+           m.longitud = lon;
+           changedMachines = true;
+        }
+      });
+    }
+  });
+  
+  localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+  
+  abrirDetalleSitio(sitioNombre);
+  mostrarNotificacion('Coordenadas actualizadas exitosamente', 'success');
 }
 
 function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion) {
