@@ -5617,9 +5617,22 @@ function verDetalleTicket(id) {
     </div>
     ` : ''}
 
-    <div class="form-actions" style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.5rem;">
+    <div style="display:flex; justify-content:center; gap: 4px; height: 35px; width: 80%; margin: 2rem auto 0.5rem auto; opacity: 0.2; color: var(--text-primary);">
+      <div style="width:2px; background:currentColor;"></div><div style="width:4px; background:currentColor;"></div>
+      <div style="width:1px; background:currentColor;"></div><div style="width:3px; background:currentColor;"></div>
+      <div style="width:5px; background:currentColor;"></div><div style="width:2px; background:currentColor;"></div>
+      <div style="width:1px; background:currentColor;"></div><div style="width:4px; background:currentColor;"></div>
+      <div style="width:2px; background:currentColor;"></div><div style="width:2px; background:currentColor;"></div>
+      <div style="width:5px; background:currentColor;"></div><div style="width:1px; background:currentColor;"></div>
+      <div style="width:3px; background:currentColor;"></div><div style="width:2px; background:currentColor;"></div>
+      <div style="width:4px; background:currentColor;"></div><div style="width:1px; background:currentColor;"></div>
+      <div style="width:3px; background:currentColor;"></div><div style="width:2px; background:currentColor;"></div>
+    </div>
+    <div style="font-family: monospace; font-size: 0.6rem; color: var(--text-muted); letter-spacing: 5px; text-align: center; margin-bottom: 1rem;">* ${t.folio} *</div>
+
+    <div class="form-actions" style="border-top:2px dashed var(--border);padding-top:1rem;margin-top:0.5rem; justify-content:center;">
       <button class="btn-secondary" onclick="cerrarDetalleTicket()">Cerrar Vista</button>
-      <button class="btn-primary" onclick="cerrarDetalleTicket();editarTicket('${t.id}')"><i data-lucide="pencil" style="width:16px;height:16px;"></i> Editar Completo</button>
+      <button class="btn-primary" onclick="cerrarDetalleTicket();editarTicket('${t.id}')"><i data-lucide="pencil" style="width:16px;height:16px;"></i> Editar</button>
     </div>
   `;
   document.getElementById('modal-ticket-detalle-overlay').classList.add('open');
