@@ -4796,7 +4796,7 @@ function verDetalleTicket(id) {
       <div class="detalle-section-title">Resolución Final</div>
       <div class="detalle-grid">
         ${t.cotizacionSAP ? field('Cotización SAP', t.cotizacionSAP) : ''}
-        ${t.cotAceptada ? field('Resultado', t.cotAceptada === 'si' ? '<span style="color:var(--success);">Aprobada ✅</span>' : '<span style="color:var(--danger);">Rechazada ❌</span>') : ''}
+        ${t.cotAceptada ? field('Resultado', t.cotAceptada === 'si' ? '<span style="color:var(--success); display:inline-flex; align-items:center; gap:4px;"><i data-lucide="check-circle" style="width:14px;height:14px;"></i> Aprobada</span>' : '<span style="color:var(--danger); display:inline-flex; align-items:center; gap:4px;"><i data-lucide="x-circle" style="width:14px;height:14px;"></i> Rechazada</span>') : ''}
         ${t.motivoRechazo ? field('Motivo Rechazo', t.motivoRechazo) : ''}
       </div>
     </div>
@@ -4823,11 +4823,11 @@ function verDetalleTicket(id) {
         <div style="display:flex; gap:1rem; margin-top:0.5rem; margin-bottom: 0.75rem;">
           <label style="cursor:pointer; display:flex; align-items:center; gap:0.25rem;">
             <input type="radio" name="quick-cot-acep-${t.id}" value="si" onchange="document.getElementById('quick-motivo-${t.id}').style.display='none'"> 
-            Sí, aprobada ✅
+            <i data-lucide="check-circle" style="width:16px;height:16px;color:var(--success);"></i> Sí, aprobada
           </label>
           <label style="cursor:pointer; display:flex; align-items:center; gap:0.25rem;">
             <input type="radio" name="quick-cot-acep-${t.id}" value="no" onchange="document.getElementById('quick-motivo-${t.id}').style.display='block'"> 
-            No, rechazada ❌
+            <i data-lucide="x-circle" style="width:16px;height:16px;color:var(--danger);"></i> No, rechazada
           </label>
         </div>
         <div id="quick-motivo-${t.id}" style="display:none; margin-bottom:0.75rem;">
@@ -4840,7 +4840,7 @@ function verDetalleTicket(id) {
 
     <div class="form-actions" style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.5rem;">
       <button class="btn-secondary" onclick="cerrarDetalleTicket()">Cerrar Vista</button>
-      <button class="btn-primary" onclick="cerrarDetalleTicket();editarTicket('${t.id}')">✏️ Editar Completo</button>
+      <button class="btn-primary" onclick="cerrarDetalleTicket();editarTicket('${t.id}')"><i data-lucide="pencil" style="width:16px;height:16px;"></i> Editar Completo</button>
     </div>
   `;
   document.getElementById('modal-ticket-detalle-overlay').classList.add('open');
