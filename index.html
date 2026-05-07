@@ -793,7 +793,7 @@
               <div class="combo-menu" id="f-cliente-menu">
                 <div class="combo-search">
                   <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted)"></i>
-                  <input type="text" id="f-cliente-search" placeholder="Buscar o agregar..." oninput="filterCombo('f-cliente')" onclick="event.stopPropagation()">
+                  <input type="text" id="f-cliente-search" placeholder="Buscar o agregar..." oninput="filterCombo('f-cliente', this.value)" onclick="event.stopPropagation()">
                   <button type="button" onclick="agregarEmpresaCombo('f-cliente'); event.stopPropagation();" title="Agregar nueva empresa"><i data-lucide="plus"></i></button>
                 </div>
                 <div class="combo-options" id="f-cliente-options">
