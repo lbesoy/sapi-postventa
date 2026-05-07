@@ -1244,6 +1244,19 @@
   </div>
 </div>
 
+<!-- MODAL DETALLE DE MÁQUINA (SERVICIOS) -->
+<div class="modal-overlay" id="modal-detalle-maquina-overlay" onclick="cerrarDetalleMaquina(event)">
+  <div class="modal" id="modal-detalle-maquina" style="max-width:600px;">
+    <div class="modal-header">
+      <h2 id="detalle-maquina-title">Historial de Máquina</h2>
+      <button class="modal-close" onclick="cerrarDetalleMaquina()">✕</button>
+    </div>
+    <div class="modal-body" id="detalle-maquina-body" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
+      <!-- Llenado dinámicamente con JS -->
+    </div>
+  </div>
+</div>
+
 <!-- MODAL TICKET -->
 <div class="modal-overlay" id="modal-ticket-overlay" onclick="cerrarTicket(event)">
   <div class="modal ticket-receipt" id="modal-ticket" style="max-width:540px; border-radius: 0; background: var(--bg-card); position: relative; border: 1px solid var(--border); box-shadow: 0 20px 40px rgba(0,0,0,0.5);">

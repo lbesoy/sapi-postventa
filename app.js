@@ -2324,6 +2324,82 @@ function verDetalleCliente(nombre) {
   lucide.createIcons();
 }
 
+function cerrarDetalleMaquina(e) {
+  if (e && e.target !== document.getElementById('modal-detalle-maquina-overlay')) return;
+  document.getElementById('modal-detalle-maquina-overlay').classList.remove('open');
+}
+
+function verServiciosMaquina(idInterno, serie, marca, modelo) {
+  document.getElementById('detalle-maquina-title').textContent = `${marca} ${modelo} (${idInterno})`;
+  
+  const maqTickets = tickets.filter(t => t.maquinaId === idInterno || (serie && serie !== 'N/A' && t.maquinaId === serie));
+  const maqOrdenes = ordenes.filter(o => o.maquina === idInterno || (serie && serie !== 'N/A' && o.maquina === serie));
+  
+  let html = '';
+  
+  // Resumen
+  html += `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; background:var(--bg-hover); padding:1rem; border-radius:var(--radius-md);">
+      <div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Serie</div>
+        <div style="font-weight:500;">${serie || 'N/A'}</div>
+      </div>
+      <div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Servicios Totales</div>
+        <div style="font-weight:500; color:var(--accent);">${maqOrdenes.length + maqTickets.length}</div>
+      </div>
+    </div>
+  `;
+  
+  // Órdenes
+  if (maqOrdenes.length > 0) {
+    html += `
+      <div>
+        <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="clipboard-list" style="width:18px;height:18px;color:var(--text-muted);"></i> Órdenes de Servicio (${maqOrdenes.length})</h3>
+        <div style="display:flex; flex-direction:column; gap:0.5rem; max-height:200px; overflow-y:auto; padding-right:0.5rem;">
+          ${maqOrdenes.map(o => `
+            <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div style="font-weight:500; color:var(--accent);">Orden #${o.folio || '-'}</div>
+                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.2rem;">${o.fecha?.split('-').reverse().join('/') || 'Sin fecha'} - ${o.tecnico || 'Sin técnico'}</div>
+              </div>
+              <span class="badge badge-${o.estado==='Pendiente'?'pendiente':o.estado==='En Proceso'?'proceso':'completado'}">${o.estado||'Pendiente'}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+  
+  // Tickets
+  if (maqTickets.length > 0) {
+    html += `
+      <div>
+        <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="ticket" style="width:18px;height:18px;color:var(--text-muted);"></i> Tickets de Soporte (${maqTickets.length})</h3>
+        <div style="display:flex; flex-direction:column; gap:0.5rem; max-height:200px; overflow-y:auto; padding-right:0.5rem;">
+          ${maqTickets.map(t => `
+            <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div style="font-weight:500; color:var(--text-primary);">${t.titulo || 'Sin título'}</div>
+                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.2rem;">ID: #${t.id} - ${t.fechaCreacion.split('T')[0].split('-').reverse().join('/')}</div>
+              </div>
+              <span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'Abierto'}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+  
+  if (maqOrdenes.length === 0 && maqTickets.length === 0) {
+    html += `<div class="empty-state" style="padding:2rem;">Esta máquina no tiene servicios registrados.</div>`;
+  }
+  
+  document.getElementById('detalle-maquina-body').innerHTML = html;
+  document.getElementById('modal-detalle-maquina-overlay').classList.add('open');
+  lucide.createIcons();
+}
+
 function guardarPersonalCliente(clienteNombre, rol, userId) {
   let cliente = clientesDb.find(c => c.nombre === clienteNombre);
   if (!cliente) {
@@ -3819,7 +3895,7 @@ function renderMaquinaria() {
     }
 
     return `
-    <tr>
+    <tr onclick="verServiciosMaquina('${m.idInterno}', '${m.serie}', '${m.marca.replace(/'/g, "\\'")}', '${m.modelo.replace(/'/g, "\\'")}')" style="cursor:pointer;" class="table-row-hover">
       ${!isEmpresa ? `<td><span style="font-family:monospace; font-weight:500; color:var(--accent); background:var(--blue-light); padding:0.2rem 0.5rem; border-radius:4px;">${m.idInterno}</span></td>` : ''}
       <td>
         <div style="display:flex; align-items:center;">
@@ -3836,13 +3912,13 @@ function renderMaquinaria() {
       ${customTds}
       <td>
         <div style="display:flex; gap:0.25rem;">
-          <button class="action-btn" onclick="verDetalleCliente('${m.cliente.replace(/'/g, "\\'")}')" title="Ver Perfil de la Empresa">
+          <button class="action-btn" onclick="event.stopPropagation(); verDetalleCliente('${m.cliente.replace(/'/g, "\\'")}')" title="Ver Perfil de la Empresa">
             <i data-lucide="building-2"></i>
           </button>
-          <button class="action-btn" onclick="editarMaquina('${m.cliente.replace(/'/g, "\\'")}', '${m.idInterno}')" title="Editar Máquina">
+          <button class="action-btn" onclick="event.stopPropagation(); editarMaquina('${m.cliente.replace(/'/g, "\\'")}', '${m.idInterno}')" title="Editar Máquina">
             <i data-lucide="edit-2"></i>
           </button>
-          <button class="action-btn" onclick="abrirModalMoverMaquina('${m.cliente.replace(/'/g, "\\'")}', '${m.idInterno}')" title="Mover de Sitio">
+          <button class="action-btn" onclick="event.stopPropagation(); abrirModalMoverMaquina('${m.cliente.replace(/'/g, "\\'")}', '${m.idInterno}')" title="Mover de Sitio">
             <i data-lucide="map-pin"></i>
           </button>
         </div>
