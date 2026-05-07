@@ -4726,7 +4726,7 @@ function renderSitios() {
       <td><span class="badge" style="background:var(--bg-hover);color:var(--text-muted);">${cpFinal}</span></td>
       <td><span style="font-size:0.9rem; color:var(--text-secondary);">${sLoc}</span></td>
       <td>
-        ${!isAdmin ? `<button class="action-btn del" onclick="eliminarSitioEmpresa('${idx}')" title="Eliminar Sitio"><i data-lucide="trash-2"></i></button>` : `<button class="action-btn" onclick="mostrarNotificacion('Vista de detalle en construcción', 'info')" title="Ver detalles"><i data-lucide="eye"></i></button>`}
+        ${!isAdmin ? `<button class="action-btn del" onclick="eliminarSitioEmpresa('${idx}')" title="Eliminar Sitio"><i data-lucide="trash-2"></i></button>` : `<button class="action-btn" onclick="abrirDetalleSitio('${sNombre.replace(/'/g, "\\'")}')" title="Ver detalles"><i data-lucide="eye"></i></button>`}
       </td>
     </tr>
     `;
