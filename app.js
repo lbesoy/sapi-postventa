@@ -1606,7 +1606,6 @@ async function forzarSincronizacionSAP() {
   try {
     const newDataCli = await fetchClientesSAP();
     if (newDataCli && newDataCli.length > 0) {
-      // Preservar datos locales de clientes que vienen de SAP
       newDataCli.forEach(newCli => {
         const oldCli = clientesDb.find(c => c.nombre === newCli.nombre || c.id === newCli.id);
         if (oldCli) {
@@ -1616,16 +1615,17 @@ async function forzarSincronizacionSAP() {
           if (oldCli.logo) newCli.logo = oldCli.logo;
         }
       });
-      
-      // Preservar clientes que son PURAMENTE locales (no están en SAP)
       clientesDb.forEach(oldCli => {
         if (!newDataCli.some(nc => nc.nombre === oldCli.nombre || nc.id === oldCli.id)) {
           newDataCli.push(oldCli);
         }
       });
-
       clientesDb = newDataCli;
       localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+      // ── Guardar en Supabase como caché ──
+      if (window.pushToSupabase) {
+        for (const c of clientesDb) window.pushToSupabase('clientes', c);
+      }
       hasSyncedSAPThisSession = true;
     }
 
@@ -1633,59 +1633,40 @@ async function forzarSincronizacionSAP() {
     if (newDataRef && newDataRef.length > 0) {
       refaccionesDb = newDataRef;
       localStorage.setItem('sapi_refacciones_db', JSON.stringify(refaccionesDb));
+      // ── Guardar en Supabase como caché ──
+      if (window.pushToSupabase) {
+        for (const r of refaccionesDb) {
+          if (r.id) window.pushToSupabase('refacciones', r);
+        }
+      }
     }
     
     const newDataTec = await fetchTecnicosSAP();
     if (newDataTec && newDataTec.length > 0) {
       tecnicosDb = newDataTec;
       localStorage.setItem('sapi_tecnicos_db', JSON.stringify(tecnicosDb));
-      
-      // Auto-generar usuarios para técnicos de SAP
       let allUsers = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
       let usersChanged = false;
-      
       tecnicosDb.forEach(t => {
         if (!t.nombre || t.nombre === 'Sin Nombre') return;
-        
         const nombreCompleto = t.nombre.trim();
-        
-        // Mapear rol desde TipoUsuario (que viene del campo Fax en SAP)
         const rawRole = (t.tipoUsuario || '').toLowerCase().trim();
-        let mappedRole = 'tecnico'; // default
+        let mappedRole = 'tecnico';
         if (rawRole.includes('consulta')) mappedRole = 'consulta';
         else if (rawRole.includes('supervisor')) mappedRole = 'supervisor';
-        
-        // Verificar si ya existe
         const existe = allUsers.find(u => u.nombre === nombreCompleto || (u.email && u.email.includes(nombreCompleto.toLowerCase().replace(/\s+/g, ''))));
-        
         if (!existe) {
-          allUsers.push({
-            id: crypto.randomUUID(),
-            nombre: nombreCompleto,
-            email: nombreCompleto.toLowerCase().replace(/\s+/g, '') + '@eurorep.mx',
-            pin: '0000',
-            rol: mappedRole,
-            activo: true, // Auto-aprobado
-            locked: false
-          });
+          allUsers.push({ id: crypto.randomUUID(), nombre: nombreCompleto, email: nombreCompleto.toLowerCase().replace(/\s+/g, '') + '@eurorep.mx', pin: '0000', rol: mappedRole, activo: true, locked: false });
           usersChanged = true;
         } else {
-          // Si existe pero su rol de SAP cambió (y no es un admin), actualizarlo
-          if (existe.rol !== mappedRole && ['tecnico', 'supervisor', 'consulta'].includes(existe.rol)) {
-            existe.rol = mappedRole;
-            usersChanged = true;
-          }
-          // Actualizar al nuevo dominio si tenía el viejo
-          if (existe.email && existe.email.includes('@eurorep.com')) {
-            existe.email = existe.email.replace('@eurorep.com', '@eurorep.mx');
-            usersChanged = true;
-          }
+          if (existe.rol !== mappedRole && ['tecnico', 'supervisor', 'consulta'].includes(existe.rol)) { existe.rol = mappedRole; usersChanged = true; }
+          if (existe.email && existe.email.includes('@eurorep.com')) { existe.email = existe.email.replace('@eurorep.com', '@eurorep.mx'); usersChanged = true; }
         }
       });
-      
       if (usersChanged) {
         localStorage.setItem('eurorep_usuarios', JSON.stringify(allUsers));
         usuarios = allUsers;
+        if (window.pushToSupabase) allUsers.forEach(u => window.pushToSupabase('usuarios', u));
       }
     }
     
@@ -1693,18 +1674,24 @@ async function forzarSincronizacionSAP() {
     if (newDataSitios && newDataSitios.length > 0) {
       sitiosDb = newDataSitios;
       localStorage.setItem('sapi_sitios_db', JSON.stringify(sitiosDb));
+      if (window.pushToSupabase) {
+        for (const s of sitiosDb) if (s.id) window.pushToSupabase('sitios', s);
+      }
     }
     
     const newDataMaquinaria = await fetchMaquinariaSAP();
     if (newDataMaquinaria && newDataMaquinaria.length > 0) {
       maquinariaDb = newDataMaquinaria;
       localStorage.setItem('sapi_maquinaria_db', JSON.stringify(maquinariaDb));
+      if (window.pushToSupabase) {
+        for (const m of maquinariaDb) if (m.id) window.pushToSupabase('maquinaria', m);
+      }
     }
     
-    mostrarNotificacion('Catálogos sincronizados con SAP exitosamente.', 'success');
+    mostrarNotificacion('✅ Catálogos sincronizados con SAP y guardados en la nube.', 'success');
   } catch (error) {
     console.error("Error SAP:", error);
-    mostrarNotificacion('Error al conectar con SAP B1. Usando caché local.', 'error');
+    mostrarNotificacion('⚠️ Error al conectar con SAP B1. Usando caché de Supabase.', 'error');
   } finally {
     isSincronizandoSAP = false;
     icons.forEach(i => i.classList.remove('rotating'));
@@ -1716,6 +1703,75 @@ async function forzarSincronizacionSAP() {
     if (typeof renderUsuariosList === 'function') renderUsuariosList();
   }
 }
+
+// ── Sincronización individual por módulo ──────────────────────────────────────
+const _syncingModules = {};
+async function sincronizarModuloSAP(modulo, btnEl) {
+  if (_syncingModules[modulo]) return;
+  _syncingModules[modulo] = true;
+  const origHTML = btnEl ? btnEl.innerHTML : '';
+  if (btnEl) { btnEl.innerHTML = '<i data-lucide="loader" class="btn-icon rotating"></i> Actualizando...'; lucide.createIcons(); }
+
+  try {
+    if (modulo === 'clientes') {
+      const data = await fetchClientesSAP();
+      if (data && data.length > 0) {
+        data.forEach(nc => {
+          const old = clientesDb.find(c => c.id === nc.id || c.nombre === nc.nombre);
+          if (old) { if (old.maquinas) nc.maquinas = old.maquinas; if (old.logo) nc.logo = old.logo; }
+        });
+        clientesDb.forEach(old => { if (!data.some(nc => nc.id === old.id || nc.nombre === old.nombre)) data.push(old); });
+        clientesDb = data;
+        localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+        if (window.pushToSupabase) for (const c of clientesDb) window.pushToSupabase('clientes', c);
+        renderClientes();
+        mostrarNotificacion(`✅ Clientes actualizados (${data.length} registros) y guardados en la nube.`, 'success');
+      }
+    } else if (modulo === 'refacciones') {
+      const data = await fetchRefaccionesSAP();
+      if (data && data.length > 0) {
+        refaccionesDb = data;
+        localStorage.setItem('sapi_refacciones_db', JSON.stringify(refaccionesDb));
+        if (window.pushToSupabase) for (const r of refaccionesDb) if (r.id) window.pushToSupabase('refacciones', r);
+        renderRefacciones();
+        mostrarNotificacion(`✅ Refacciones actualizadas (${data.length} registros) y guardadas en la nube.`, 'success');
+      }
+    } else if (modulo === 'maquinaria') {
+      const data = await fetchMaquinariaSAP();
+      if (data && data.length > 0) {
+        maquinariaDb = data;
+        localStorage.setItem('sapi_maquinaria_db', JSON.stringify(maquinariaDb));
+        if (window.pushToSupabase) for (const m of maquinariaDb) if (m.id) window.pushToSupabase('maquinaria', m);
+        if (typeof renderMaquinaria === 'function') renderMaquinaria();
+        mostrarNotificacion(`✅ Maquinaria actualizada (${data.length} registros) y guardada en la nube.`, 'success');
+      }
+    } else if (modulo === 'sitios') {
+      const data = await fetchSitiosSAP();
+      if (data && data.length > 0) {
+        sitiosDb = data;
+        localStorage.setItem('sapi_sitios_db', JSON.stringify(sitiosDb));
+        if (window.pushToSupabase) for (const s of sitiosDb) if (s.id) window.pushToSupabase('sitios', s);
+        if (typeof renderSitios === 'function') renderSitios();
+        mostrarNotificacion(`✅ Sitios actualizados (${data.length} registros) y guardados en la nube.`, 'success');
+      }
+    } else if (modulo === 'tecnicos') {
+      const data = await fetchTecnicosSAP();
+      if (data && data.length > 0) {
+        tecnicosDb = data;
+        localStorage.setItem('sapi_tecnicos_db', JSON.stringify(tecnicosDb));
+        if (typeof renderUsuariosList === 'function') renderUsuariosList();
+        mostrarNotificacion(`✅ Técnicos actualizados (${data.length} registros).`, 'success');
+      }
+    }
+  } catch (err) {
+    mostrarNotificacion(`⚠️ No se pudo actualizar ${modulo} desde SAP. Usando caché de Supabase.`, 'error');
+  } finally {
+    _syncingModules[modulo] = false;
+    if (btnEl) { btnEl.innerHTML = origHTML; lucide.createIcons(); }
+  }
+}
+
+
 
 async function fetchTecnicosSAP() {
   if (!API_CONFIG.USE_SAP_BACKEND) return tecnicosDb;
