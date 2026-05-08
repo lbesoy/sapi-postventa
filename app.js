@@ -508,6 +508,30 @@ function switchMode(rolKey) {
 
 // ===== CONFIG =====
 let configData = JSON.parse(localStorage.getItem('eurorep_config') || '{}');
+
+// FALLBACK DE EMERGENCIA: Si se borró la caché, restaurar configuración por defecto de SAP
+if (!configData || !configData.queryClientes) {
+  configData = {
+    queryClientes: 'GET_CLIENTES',
+    querySitios: 'GET_SITIOS',
+    queryMaquinaria: 'GET_MAQUINARIA',
+    queryTecnicos: 'GET_TECNICOS',
+    queryRefacciones: 'GET_REFACCIONES',
+    mappings: {
+      clientes: { id: 'CardCode', nombre: 'CardName', grupoSinergia: 'U_GrupoSinergia', saldoCuenta: 'CurrentAccountBalance' },
+      sitios: { id: 'Address', nombre: 'Address', cliente: 'CardCode', direccion: 'Street', cp: 'ZipCode', ciudad: 'City', estado: 'State' },
+      maquinaria: { id: 'ManufacturerSerialNum', itemcode: 'ItemCode', desc: 'ItemDescription', cliente: 'CustomerCode' },
+      tecnicos: { id: 'SlpCode', nombre: 'SlpName', tipoUsuario: 'Fax' },
+      refacciones: { id: 'ItemCode', codigo: 'ItemCode', descripcion: 'ItemName', precio: 'Price', moneda: 'Currency' }
+    }
+  };
+  localStorage.setItem('eurorep_config', JSON.stringify(configData));
+  
+  if (window.supabaseClient) {
+    window.pushToSupabase('config', configData);
+  }
+}
+
 let tecnicosConfig = JSON.parse(localStorage.getItem('eurorep_tecnicos') || '[]');
 
 function cargarConfig() {
