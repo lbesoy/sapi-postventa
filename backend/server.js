@@ -250,6 +250,16 @@ app.get('/api/maquinaria', ensureSAPConnection, async (req, res) => {
     }
 });
 
+// Endpoint temporal para ver la IP pública del servidor (para whitelist en SAP)
+app.get('/api/myip', async (req, res) => {
+    try {
+        const r = await axios.get('https://api.ipify.org?format=json', { timeout: 10000 });
+        res.json({ ip: r.data.ip, mensaje: 'Esta es la IP de salida del servidor. Agrégala al firewall de SAP.' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // ==========================================
 // INICIAR SERVIDOR
 // ==========================================
