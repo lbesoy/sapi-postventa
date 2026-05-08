@@ -79,9 +79,11 @@ function mostrarNotificacion(mensaje, tipo = 'success') {
 // MÓDULO DE INTEGRACIÓN SAP (PRÓXIMAMENTE)
 // ==========================================
 const API_CONFIG = {
-  // Conexión activa a la API de SAP en la nube
   USE_SAP_BACKEND: true,
-  BASE_URL: 'https://eurorep-api.onrender.com/api'
+  BASE_URL: 'https://eurorep-api.onrender.com/api',
+  // URL del backend local expuesto via Cloudflare Tunnel (actualizar cuando se configure)
+  // Ejemplo: 'https://eurorep-local.trycloudflare.com/api'
+  LOCAL_URL: localStorage.getItem('eurorep_local_api_url') || null
 };
 
 async function fetchClientesSAP() {
@@ -1710,7 +1712,29 @@ async function sincronizarModuloSAP(modulo, btnEl) {
   if (_syncingModules[modulo]) return;
   _syncingModules[modulo] = true;
   const origHTML = btnEl ? btnEl.innerHTML : '';
-  if (btnEl) { btnEl.innerHTML = '<i data-lucide="loader" class="btn-icon rotating"></i> Actualizando...'; lucide.createIcons(); }
+  if (btnEl) { btnEl.innerHTML = '<i data-lucide="loader" class="btn-icon rotating"></i> Sincronizando SAP...'; lucide.createIcons(); }
+
+  // ── Intentar primero con el backend local (Cloudflare Tunnel) ────────────
+  // El backend local SÍ puede llegar a SAP; Render no puede por firewall.
+  const localUrl = API_CONFIG.LOCAL_URL;
+  if (localUrl) {
+    try {
+      mostrarNotificacion(`⏳ Conectando a SAP vía servidor local...`, 'info');
+      const resp = await fetch(`${localUrl}/sync-all?modulo=${modulo}`, { signal: AbortSignal.timeout(90000) });
+      if (resp.ok) {
+        const result = await resp.json();
+        // Recargar datos frescos desde Supabase (el servidor ya los guardó ahí)
+        if (window.cargarDatosDeSupabase) await window.cargarDatosDeSupabase();
+        const total = result[modulo] || 0;
+        mostrarNotificacion(`✅ ${modulo.charAt(0).toUpperCase() + modulo.slice(1)}: ${total} registros actualizados desde SAP.`, 'success');
+        _syncingModules[modulo] = false;
+        if (btnEl) { btnEl.innerHTML = origHTML; lucide.createIcons(); }
+        return;
+      }
+    } catch (localErr) {
+      console.warn('Backend local no disponible, usando método directo:', localErr.message);
+    }
+  }
 
   try {
     if (modulo === 'clientes') {

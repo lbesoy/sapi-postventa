@@ -250,11 +250,88 @@ app.get('/api/maquinaria', ensureSAPConnection, async (req, res) => {
     }
 });
 
-// Endpoint temporal para ver la IP pública del servidor (para whitelist en SAP)
+// ── /api/sync-all: Sincroniza todos los catálogos SAP → Supabase ────────────
+const SUPABASE_URL_SRV = 'https://mupevytlssqcbhlmzmcp.supabase.co';
+const SUPABASE_KEY_SRV = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11cGV2eXRsc3NxY2JobG16bWNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NjE0MzUsImV4cCI6MjA5MzMzNzQzNX0.sdAI9nJluJCP6skq0lfdj8CQvFEyqqV4z6ntbqvQdPY';
+
+async function upsertSupa(tabla, rows) {
+    if (!rows || rows.length === 0) return 0;
+    const BATCH = 500;
+    let n = 0;
+    for (let i = 0; i < rows.length; i += BATCH) {
+        const chunk = rows.slice(i, i + BATCH);
+        await axios.post(`${SUPABASE_URL_SRV}/rest/v1/${tabla}`, chunk, {
+            headers: {
+                'apikey': SUPABASE_KEY_SRV,
+                'Authorization': `Bearer ${SUPABASE_KEY_SRV}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'resolution=merge-duplicates,return=minimal'
+            }
+        });
+        n += chunk.length;
+    }
+    return n;
+}
+
+app.get('/api/sync-all', ensureSAPConnection, async (req, res) => {
+    const modulo = req.query.modulo || 'all';
+    const inicio = Date.now();
+    const resultado = {};
+
+    try {
+        if (modulo === 'all' || modulo === 'clientes') {
+            try {
+                const qc = process.env.QUERY_CLIENTES || 'eurorep_clientes';
+                const r = await sapApi.get(`${SAP_URL}/SQLQueries('${qc}')/List`, { headers: { 'B1S-PageSize': 5000 } });
+                const rows = (r.data.value || []).map(bp => ({
+                    id: bp.CardCode || null, nombre: bp.CardName || '', rfc: bp.LicTradNum || '',
+                    email: bp.E_Mail || '', telefono: '', id_fiscal: bp.LicTradNum || '',
+                    sitios: [], maquinas: [], supervisores_asignados: [], tecnicos_asignados: []
+                })).filter(x => x.id);
+                resultado.clientes = await upsertSupa('clientes', rows);
+            } catch(e) { resultado.clientes_error = e.message; }
+        }
+
+        if (modulo === 'all' || modulo === 'refacciones') {
+            try {
+                const qc = process.env.QUERY_REFACCIONES || 'CAT_REFACCIONES';
+                const r = await sapApi.get(`${SAP_URL}/SQLQueries('${qc}')/List`, { headers: { 'B1S-PageSize': 5000 } });
+                const rows = (r.data.value || []).map(x => ({
+                    id: x.ItemCode || null, codigo: x.ItemCode || '', descripcion: x.ItemName || x.Dscription || '',
+                    precio: parseFloat(x.Price) || 0, moneda: x.Currency || 'MXN',
+                    stock: parseInt(x.OnHand) || 0, custom_data: {}
+                })).filter(x => x.id);
+                resultado.refacciones = await upsertSupa('refacciones', rows);
+            } catch(e) { resultado.refacciones_error = e.message; }
+        }
+
+        if (modulo === 'all' || modulo === 'sitios') {
+            try {
+                const qc = process.env.QUERY_SITIOS || 'CAT_Sitos';
+                const r = await sapApi.get(`${SAP_URL}/SQLQueries('${qc}')/List`, { headers: { 'B1S-PageSize': 5000 } });
+                const rows = (r.data.value || []).map(x => ({
+                    id: x.Address || null, nombre: x.Street || x.Address || '', cliente: x.BPCode || '',
+                    direccion: x.Block || '', cp: x.ZipCode || '', ciudad: x.City || '',
+                    estado: x.State || '', custom_data: {}
+                })).filter(x => x.id);
+                resultado.sitios = await upsertSupa('sitios', rows);
+            } catch(e) { resultado.sitios_error = e.message; }
+        }
+
+        resultado.duracion_ms = Date.now() - inicio;
+        resultado.ok = true;
+        console.log(`✅ sync-all [${modulo}] en ${resultado.duracion_ms}ms`, resultado);
+        res.json(resultado);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Endpoint para ver la IP pública del servidor
 app.get('/api/myip', async (req, res) => {
     try {
         const r = await axios.get('https://api.ipify.org?format=json', { timeout: 10000 });
-        res.json({ ip: r.data.ip, mensaje: 'Esta es la IP de salida del servidor. Agrégala al firewall de SAP.' });
+        res.json({ ip: r.data.ip });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
