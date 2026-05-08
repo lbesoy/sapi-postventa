@@ -486,9 +486,13 @@ window.pushToSupabase = async function(tabla, item) {
     }
 
     const { error } = await window.supabaseClient.from(tabla).upsert(payload);
-    if (error) console.error(`Error guardando en ${tabla}:`, error);
+    if (error) {
+      console.error(`Error guardando en ${tabla}:`, error);
+      alert(`Error Supabase [${tabla}]: ` + JSON.stringify(error));
+    }
   } catch (e) {
     console.error(`Error de red al guardar en ${tabla}:`, e);
+    alert(`Error de Red [${tabla}]: ` + e.message);
   }
 };
 
