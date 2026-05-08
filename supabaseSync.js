@@ -157,14 +157,66 @@ async function migrarDatosASupabase() {
         hayCambios = true;
       }
     }
-
-    const { data: dbRoles, error: errRol } = await sb.from('roles').select('*');
-    if (!errRol && dbRoles.length === 0) {
-      const local = JSON.parse(localStorage.getItem('sapi_roles_config') || 'null');
-      if (local) {
-        await window.pushToSupabase('roles', local);
-        hayCambios = true;
+    // Migración individual por tabla para evitar perder datos si una tabla (como usuarios) ya tiene datos pero las demás están vacías.
+    
+    // 1. Usuarios
+    const { data: uSupa } = await sb.from('usuarios').select('id').limit(1);
+    const lUsu = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+    if ((!uSupa || uSupa.length === 0) && lUsu.length > 0) {
+      console.log("Migrando usuarios...");
+      for (const u of lUsu) {
+        if (u.id !== 'superadmin' || u.email !== '') await pushToSupabase('usuarios', u);
       }
+      hayCambios = true;
+    }
+
+    // 2. Clientes
+    const { data: cSupa } = await sb.from('clientes').select('id').limit(1);
+    const lCli = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+    if ((!cSupa || cSupa.length === 0) && lCli.length > 0) {
+      console.log("Migrando clientes...");
+      for (const c of lCli) await pushToSupabase('clientes', c);
+      hayCambios = true;
+    }
+
+    // 3. Ordenes
+    const { data: oSupa } = await sb.from('ordenes').select('id').limit(1);
+    const lOrd = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+    if ((!oSupa || oSupa.length === 0) && lOrd.length > 0) {
+      console.log("Migrando ordenes...");
+      for (const o of lOrd) await pushToSupabase('ordenes', o);
+      hayCambios = true;
+    }
+
+    // 4. Tickets
+    const { data: tSupa } = await sb.from('tickets').select('id').limit(1);
+    const lTik = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+    // Delete the test ticket I just made if it exists so we can actually see if it's empty
+    if ((!tSupa || tSupa.length === 0 || (tSupa.length === 1 && tSupa[0].id === 'test')) && lTik.length > 0) {
+      console.log("Migrando tickets...");
+      for (const t of lTik) await pushToSupabase('tickets', t);
+      hayCambios = true;
+    }
+
+    // 5. Sitios
+    const { data: sSupa } = await sb.from('sitios').select('id').limit(1);
+    const lSit = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+    if ((!sSupa || sSupa.length === 0) && lSit.length > 0) {
+      for (const s of lSit) await pushToSupabase('sitios', s);
+    }
+
+    // 6. Maquinaria
+    const { data: mSupa } = await sb.from('maquinaria').select('id').limit(1);
+    const lMaq = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
+    if ((!mSupa || mSupa.length === 0) && lMaq.length > 0) {
+      for (const m of lMaq) await pushToSupabase('maquinaria', m);
+    }
+
+    // 7. Refacciones
+    const { data: rSupa } = await sb.from('refacciones').select('id').limit(1);
+    const lRef = JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]');
+    if ((!rSupa || rSupa.length === 0) && lRef.length > 0) {
+      for (const r of lRef) await pushToSupabase('refacciones', r);
     }
 
     if (hayCambios) {
