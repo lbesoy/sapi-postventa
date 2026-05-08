@@ -539,11 +539,24 @@ if (!configData || !configData.queryClientes) {
     }
   };
   localStorage.setItem('eurorep_config', JSON.stringify(configData));
-  
-  if (window.supabaseClient) {
-    window.pushToSupabase('config', configData);
-  }
 }
+
+// Escuchar cuando Supabase termina de cargar datos para refrescar variables locales
+window.addEventListener('supabase_datos_cargados', () => {
+  console.log('[App] Refrescando configuración y catálogos desde Supabase...');
+  configData = JSON.parse(localStorage.getItem('eurorep_config') || '{}');
+  clientesDb = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+  refaccionesDb = JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]');
+  maquinariaDb = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
+  sitiosDb = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+  tecnicosDb = JSON.parse(localStorage.getItem('sapi_tecnicos_db') || '[]');
+  usuarios = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+  
+  // Si estamos en la vista de configuración, actualizar los campos
+  if (document.getElementById('view-configuracion').classList.contains('active')) {
+    cargarConfig();
+  }
+});
 
 // Eliminada versión duplicada de guardarConfig que estaba antes de cargarConfig
 

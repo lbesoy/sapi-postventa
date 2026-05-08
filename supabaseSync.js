@@ -160,7 +160,7 @@ window.pushToSupabase = async function(tabla, item) {
       payload = item;
     }
 
-    const { error } = await sb.from(tabla).upsert(payload);
+    const { error } = await sb.from(tabla).upsert(payload, { onConflict: 'id' });
     if (error) {
       console.error(`[Supabase] Error upsert en ${tabla}:`, error.message, error.details);
     } else {
