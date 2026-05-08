@@ -579,6 +579,7 @@ function guardarConfig() {
     queryRefacciones: document.getElementById('cfg-query-refacciones').value.trim()
   };
   localStorage.setItem('eurorep_config', JSON.stringify(configData));
+  if (window.pushToSupabase) window.pushToSupabase('config', configData);
   const btn = event.target;
   const orig = btn.innerHTML;
   btn.innerHTML = '<i data-lucide="check" class="btn-icon"></i> Guardado';
@@ -860,6 +861,7 @@ function guardarMapeoColumnas() {
   
   configData.mappings = mappings;
   localStorage.setItem('eurorep_config', JSON.stringify(configData));
+  if (window.pushToSupabase) window.pushToSupabase('config', configData);
   
   applyTableHeaders();
   cerrarModalMapeo();
