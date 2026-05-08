@@ -219,6 +219,20 @@ async function migrarDatosASupabase() {
       for (const r of lRef) await pushToSupabase('refacciones', r);
     }
 
+    // 8. Config
+    const { data: cfgSupa } = await sb.from('config').select('id').limit(1);
+    const lCfg = JSON.parse(localStorage.getItem('eurorep_config') || 'null');
+    if ((!cfgSupa || cfgSupa.length === 0) && lCfg) {
+      await pushToSupabase('config', lCfg);
+    }
+
+    // 9. Roles
+    const { data: rolSupa } = await sb.from('roles').select('id').limit(1);
+    const lRol = JSON.parse(localStorage.getItem('sapi_roles_config') || 'null');
+    if ((!rolSupa || rolSupa.length === 0) && lRol) {
+      await pushToSupabase('roles', lRol);
+    }
+
     if (hayCambios) {
       console.log("✅ Migración inicial completada con éxito.");
     }
