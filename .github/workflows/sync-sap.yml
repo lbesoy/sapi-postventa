@@ -1,0 +1,37 @@
+name: Sync SAP → Supabase
+
+on:
+  workflow_dispatch:
+    inputs:
+      modulo:
+        description: 'Módulo a sincronizar (all, clientes, refacciones, sitios)'
+        required: false
+        default: 'all'
+  schedule:
+    - cron: '0 13 * * 1-5'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias del backend
+        run: cd backend && npm install
+
+      - name: Ejecutar sincronización SAP → Supabase
+        env:
+          SAP_SL_URL: ${{ secrets.SAP_SL_URL }}
+          SAP_COMPANY_DB: ${{ secrets.SAP_COMPANY_DB }}
+          SAP_USER: ${{ secrets.SAP_USER }}
+          SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
+        run: |
+          cd backend && node sync-sap-supabase.js
