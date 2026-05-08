@@ -33,6 +33,10 @@ window.addEventListener('supabase_datos_cargados', () => {
   renderTabla('servicios');
   renderClientes();
   renderUsuariosList();
+  renderStats();
+  renderTickets();
+  renderTickets('dash-tickets');
+  updateTicketBadge();
 });
 let editandoId = null;
 let editandoTicketId = null;
