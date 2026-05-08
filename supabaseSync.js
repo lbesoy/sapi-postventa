@@ -211,26 +211,8 @@ async function migrarDatosASupabase() {
       for (const o of lOrd) await window.pushToSupabase('ordenes', o);
     }
 
-    // ── 5. SITIOS ────────────────────────────────────────────
-    const { data: sSupa } = await sb.from('sitios').select('id');
-    const lSit = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
-    if ((!sSupa || sSupa.length === 0) && lSit.length > 0) {
-      for (const s of lSit) await window.pushToSupabase('sitios', s);
-    }
-
-    // ── 6. MAQUINARIA ────────────────────────────────────────
-    const { data: mSupa } = await sb.from('maquinaria').select('id');
-    const lMaq = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
-    if ((!mSupa || mSupa.length === 0) && lMaq.length > 0) {
-      for (const m of lMaq) await window.pushToSupabase('maquinaria', m);
-    }
-
-    // ── 7. REFACCIONES ───────────────────────────────────────
-    const { data: rSupa } = await sb.from('refacciones').select('id');
-    const lRef = JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]');
-    if ((!rSupa || rSupa.length === 0) && lRef.length > 0) {
-      for (const r of lRef) await window.pushToSupabase('refacciones', r);
-    }
+    // NOTA: Sitios, Maquinaria y Refacciones se obtienen de SAP directamente.
+    // No se migran a Supabase para evitar conflictos con IDs nulos de SAP.
 
     // ── 8. CONFIG ────────────────────────────────────────────
     const { data: cfgSupa } = await sb.from('config').select('id');
