@@ -95,6 +95,12 @@ async function fetchClientesSAP() {
     const response = await fetch(url);
     const sapData = await response.json();
     
+    // Si el servidor responde con error, mostrar mensaje claro en lugar de crash
+    if (!response.ok || !Array.isArray(sapData)) {
+      const errMsg = sapData?.error || sapData?.message || `Error del servidor: ${response.status}`;
+      throw new Error(errMsg);
+    }
+    
     // Configuración de mapeo
     const map = (configData.mappings && configData.mappings.clientes) ? configData.mappings.clientes : {
       id: 'CardCode', nombre: 'CardName', rfc: 'LicTradNum', email: 'E_Mail', grupoSinergia: 'U_OK_Grupo', saldoCuenta: 'Balance'
@@ -133,6 +139,7 @@ async function fetchClientesSAP() {
     return clientesMapeados;
   } catch (error) {
     console.error('Error conectando al puente SAP:', error);
+    mostrarNotificacion(`⚠️ SAP: ${error.message}`, 'warning');
     return clientesDb; // Fallback a datos locales
   }
 }
@@ -516,15 +523,15 @@ let configData = JSON.parse(localStorage.getItem('eurorep_config') || '{}');
 // FALLBACK DE EMERGENCIA: Si se borró la caché, restaurar configuración por defecto de SAP
 if (!configData || !configData.queryClientes) {
   configData = {
-    queryClientes: 'GET_CLIENTES',
-    querySitios: 'GET_SITIOS',
-    queryMaquinaria: 'GET_MAQUINARIA',
-    queryTecnicos: 'GET_TECNICOS',
-    queryRefacciones: 'GET_REFACCIONES',
+    queryClientes: 'eurorep_clientes',
+    querySitios: 'CAT_Sitos',
+    queryMaquinaria: '',
+    queryOrdenes: '',
+    queryRefacciones: 'CAT_REFACCIONES',
     mappings: {
-      clientes: { id: 'CardCode', nombre: 'CardName', grupoSinergia: 'U_GrupoSinergia', saldoCuenta: 'CurrentAccountBalance' },
+      clientes: { id: 'CardCode', nombre: 'CardName', rfc: 'LicTradNum', email: 'E_Mail', grupoSinergia: 'U_OK_Grupo', saldoCuenta: 'Balance' },
       sitios: { id: 'Address', nombre: 'Address', cliente: 'CardCode', direccion: 'Street', cp: 'ZipCode', ciudad: 'City', estado: 'State' },
-      maquinaria: { id: 'ManufacturerSerialNum', itemcode: 'ItemCode', desc: 'ItemDescription', cliente: 'CustomerCode' },
+      maquinaria: { id: 'ManufacturerSerialNum', itemcode: 'ItemCode', desc: 'ItemDescription', clienteId: 'CustomerCode' },
       tecnicos: { id: 'SlpCode', nombre: 'SlpName', tipoUsuario: 'Fax' },
       refacciones: { id: 'ItemCode', codigo: 'ItemCode', descripcion: 'ItemName', precio: 'Price', moneda: 'Currency' }
     }
