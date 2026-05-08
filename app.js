@@ -4166,6 +4166,9 @@ function guardarOrden(e) {
     }
   }
 
+  // Guardar siempre en local como respaldo
+  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+
   if (window.supabaseClient) {
     window.pushToSupabase('ordenes', orden);
   }
@@ -4179,6 +4182,8 @@ function guardarOrden(e) {
 function eliminarOrden(id) {
   if (!confirm('¿Eliminar esta orden de servicio?')) return;
   ordenes = ordenes.filter(o => o.id !== id);
+  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  
   if (window.supabaseClient) {
     window.supabaseClient.from('ordenes').delete().eq('id', id).then(() => {});
   }
@@ -5567,6 +5572,10 @@ async function guardarTicket(e) {
   } else {
     tickets.unshift(ticket);
   }
+  
+  // Guardar SIEMPRE en local como respaldo
+  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  
   if (window.supabaseClient) {
     await window.pushToSupabase('tickets', ticket);
   }
@@ -5578,6 +5587,8 @@ async function guardarTicket(e) {
 function eliminarTicket(id) {
   if (!confirm('¿Eliminar este ticket?')) return;
   tickets = tickets.filter(t => t.id !== id);
+  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  
   if (window.supabaseClient) {
     window.supabaseClient.from('tickets').delete().eq('id', id).then(() => {});
   }
