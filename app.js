@@ -532,7 +532,7 @@ if (!configData || !configData.queryClientes) {
     queryRefacciones: 'CAT_REFACCIONES',
     mappings: {
       clientes: { id: 'CardCode', nombre: 'CardName', rfc: 'LicTradNum', email: 'E_Mail', grupoSinergia: 'U_OK_Grupo', saldoCuenta: 'Balance' },
-      sitios: { id: 'Address', nombre: 'Address', cliente: 'CardCode', direccion: 'Street', cp: 'ZipCode', ciudad: 'City', estado: 'State' },
+      sitios: { id: 'Address', nombre: 'AddressName', cliente: 'CardCode', direccion: 'Street', cp: 'ZipCode', ciudad: 'City', estado: 'State' },
       maquinaria: { id: 'ManufacturerSerialNum', itemcode: 'ItemCode', desc: 'ItemDescription', clienteId: 'CustomerCode' },
       tecnicos: { id: 'SlpCode', nombre: 'SlpName', tipoUsuario: 'Fax' },
       refacciones: { id: 'ItemCode', codigo: 'ItemCode', descripcion: 'ItemName', precio: 'Price', moneda: 'Currency' }
@@ -544,6 +544,9 @@ if (!configData || !configData.queryClientes) {
     window.pushToSupabase('config', configData);
   }
 }
+
+// Eliminada versión duplicada de guardarConfig que estaba antes de cargarConfig
+
 
 let tecnicosConfig = JSON.parse(localStorage.getItem('eurorep_tecnicos') || '[]');
 
@@ -562,6 +565,11 @@ function cargarConfig() {
 
   if (configData.queryRefacciones) document.getElementById('cfg-query-refacciones').value = configData.queryRefacciones;
   
+  if (configData.ghToken) {
+    const ghInput = document.getElementById('cfg-gh-token');
+    if (ghInput) ghInput.value = configData.ghToken;
+  }
+
   const dmToggle = document.getElementById('cfg-darkmode');
   if (dmToggle) {
     dmToggle.checked = localStorage.getItem('eurorep_darkmode') !== 'false';
@@ -639,6 +647,7 @@ function guardarConfig() {
     queryRefacciones: document.getElementById('cfg-query-refacciones').value.trim(),
     ghToken: document.getElementById('cfg-gh-token')?.value.trim() || configData.ghToken || ''
   };
+
   if (configData.ghToken) localStorage.setItem('eurorep_gh_token', configData.ghToken);
   localStorage.setItem('eurorep_config', JSON.stringify(configData));
   if (window.pushToSupabase) window.pushToSupabase('config', configData);

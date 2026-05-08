@@ -121,10 +121,10 @@ async function syncSitios() {
   log('Sincronizando Sitios...');
   const raw = await fetchQuery(QUERIES.sitios);
   const rows = raw.map(s => ({
-    id:       s.Address || null,
-    nombre:   s.Street || s.Address || '',
-    cliente:  s.BPCode || '',
-    direccion:s.Block || '',
+    id:       s.Address || s.AddressName || null,
+    nombre:   s.AddressName || s.Street || s.Address || 'Sitio Sin Nombre',
+    cliente:  s.BPCode || s.CardCode || '',
+    direccion:s.Block || s.Street || '',
     cp:       s.ZipCode || '',
     ciudad:   s.City || '',
     estado:   s.State || '',
