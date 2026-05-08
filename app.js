@@ -577,7 +577,55 @@ function cargarConfig() {
   }
 }
 
+// ── Sync SAP vía GitHub Actions (funciona desde cualquier dispositivo) ────────
+// El workflow corre en servidores de GitHub (Azure) que SÍ pueden llegar a SAP.
+// El token se guarda en localStorage del superadmin y se comparte en Supabase config.
+const GH_REPO = 'lbesoy/sapi-postventa';
+const GH_WORKFLOW = 'sync-sap.yml';
+
+async function sincronizarConGitHub(modulo = 'all', btnEl = null) {
+  const ghToken = configData.ghToken || localStorage.getItem('eurorep_gh_token');
+  if (!ghToken) {
+    mostrarNotificacion('⚠️ Se requiere un GitHub Token en la configuración para sincronizar con SAP.', 'warning');
+    return;
+  }
+
+  const origHTML = btnEl ? btnEl.innerHTML : '';
+  if (btnEl) { btnEl.innerHTML = '<i data-lucide="loader" class="btn-icon rotating"></i> Enviando a SAP...'; lucide.createIcons(); }
+
+  try {
+    const resp = await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/dispatches`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${ghToken}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ref: 'main', inputs: { modulo } })
+    });
+
+    if (resp.status === 204) {
+      mostrarNotificacion(`✅ Sincronización SAP iniciada. Los datos estarán listos en ~20 segundos.`, 'success');
+      // Esperar 25 segundos y recargar datos desde Supabase
+      setTimeout(async () => {
+        if (window.cargarDatosDeSupabase) {
+          await window.cargarDatosDeSupabase();
+          mostrarNotificacion('✅ Datos actualizados desde SAP.', 'success');
+        }
+      }, 25000);
+    } else {
+      const errData = await resp.json().catch(() => ({}));
+      throw new Error(errData.message || `Error ${resp.status}`);
+    }
+  } catch(e) {
+    mostrarNotificacion(`❌ Error al disparar sync: ${e.message}`, 'error');
+  } finally {
+    if (btnEl) { setTimeout(() => { btnEl.innerHTML = origHTML; lucide.createIcons(); }, 3000); }
+  }
+}
+
 function guardarConfig() {
+
   configData = {
     empresa: document.getElementById('cfg-empresa').value.trim(),
     rfc: document.getElementById('cfg-rfc').value.trim(),
@@ -588,9 +636,10 @@ function guardarConfig() {
     queryMaquinaria: document.getElementById('cfg-query-maquinaria').value.trim(),
     querySitios: document.getElementById('cfg-query-sitios').value.trim(),
     queryOrdenes: document.getElementById('cfg-query-ordenes').value.trim(),
-
-    queryRefacciones: document.getElementById('cfg-query-refacciones').value.trim()
+    queryRefacciones: document.getElementById('cfg-query-refacciones').value.trim(),
+    ghToken: document.getElementById('cfg-gh-token')?.value.trim() || configData.ghToken || ''
   };
+  if (configData.ghToken) localStorage.setItem('eurorep_gh_token', configData.ghToken);
   localStorage.setItem('eurorep_config', JSON.stringify(configData));
   if (window.pushToSupabase) window.pushToSupabase('config', configData);
   const btn = event.target;

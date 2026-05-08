@@ -363,7 +363,7 @@
             <button class="btn-secondary active" id="btn-cli-galeria" onclick="setCliView('galeria')" title="Vista Galería" style="padding:0.4rem; background:var(--accent-light); border-color:var(--accent); color:var(--accent);"><i data-lucide="layout-grid" style="width:18px;height:18px;"></i></button>
             <button class="btn-secondary" id="btn-cli-lista" onclick="setCliView('lista')" title="Vista Lista" style="padding:0.4rem;"><i data-lucide="list" style="width:18px;height:18px;"></i></button>
           </div>
-          <button class="action-btn" onclick="sincronizarModuloSAP('clientes', this)" title="Actualizar Clientes desde SAP" style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
+          <button class="action-btn" onclick="sincronizarConGitHub('clientes', this)" title="Actualizar Clientes desde SAP" style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
             <i data-lucide="refresh-cw" class="btn-icon" style="width:14px;height:14px;"></i> Actualizar SAP
           </button>
         </div>
@@ -435,7 +435,7 @@
           <button class="action-btn" onclick="abrirModalAgregarMaquina()" style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--accent); color:white; border-radius:var(--radius-sm); font-size:0.85rem; font-weight:500; border:none; cursor:pointer;">
             <i data-lucide="plus" style="width:16px;height:16px;"></i> Máquina
           </button>
-          <button class="action-btn" onclick="sincronizarModuloSAP('maquinaria', this)" title="Actualizar Maquinaria desde SAP" style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
+          <button class="action-btn" onclick="sincronizarConGitHub('maquinaria', this)" title="Actualizar Maquinaria desde SAP" style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
             <i data-lucide="refresh-cw" class="btn-icon" style="width:14px;height:14px;"></i> Actualizar SAP
           </button>
         </div>
@@ -472,7 +472,7 @@
           <div class="search-bar" style="width:100%; max-width:400px; margin:0;">
             <input type="text" id="search-refacciones" placeholder="Buscar refacción por código o nombre..." oninput="renderRefacciones()"/>
           </div>
-          <button class="action-btn" onclick="sincronizarModuloSAP('refacciones', this)" title="Actualizar Refacciones desde SAP" style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
+          <button class="action-btn" onclick="sincronizarConGitHub('refacciones', this)" title="Actualizar Refacciones desde SAP" style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
             <i data-lucide="refresh-cw" class="btn-icon" style="width:14px;height:14px;"></i> Actualizar SAP
           </button>
         </div>
@@ -596,6 +596,15 @@
             </div>
             
             <div class="form-group" style="grid-column:1/-1; padding-top: 1rem; border-top: 1px solid var(--border);">
+              <label style="display:flex; align-items:center; gap:0.5rem;">
+                <i data-lucide="github" style="width:16px;height:16px;"></i> GitHub Token (Sync SAP)
+              </label>
+              <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Token con permiso <code>workflow</code> para que cualquier usuario pueda actualizar SAP desde el CRM. <a href="https://github.com/settings/tokens/new?scopes=workflow" target="_blank" style="color:var(--accent);">Generar token aquí →</a></p>
+              <input type="password" id="cfg-gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" style="font-family:monospace;"/>
+            </div>
+
+            <div class="form-group" style="grid-column:1/-1; padding-top: 1rem; border-top: 1px solid var(--border);">
+
               <label>Mapeo de Queries SAP</label>
               <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Define qué código de Query se debe utilizar para cada módulo.</p>
               <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 0.75rem; align-items: center;">
