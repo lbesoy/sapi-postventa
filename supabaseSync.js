@@ -391,7 +391,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Exponer utilidad para guardar datos hacia Supabase desde app.js
 window.pushToSupabase = async function(tabla, item) {
-  if (!window.supabaseClient) return;
+  if (!window.supabaseClient) {
+    alert("CRITICAL ERROR: window.supabaseClient no está definido. La librería de Supabase no cargó o fue bloqueada por el navegador.");
+    return;
+  }
   try {
     // Convertir camelCase a snake_case para la base de datos
     let payload = { ...item };
