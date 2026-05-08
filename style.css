@@ -902,6 +902,9 @@ body {
   .modal { box-shadow: none; border: none; max-height: none; }
   .modal-overlay { position: static; background: transparent; backdrop-filter: none; }
   .print-only { display: block; }
+  /* Signature print handling */
+  #firma-canvas { display: none !important; }
+  .detalle-section button { display: none !important; }
 }
 
 /* Tooltip styles */
