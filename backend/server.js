@@ -26,9 +26,8 @@ async function loginToSAP() {
             UserName: SAP_USER,
             Password: SAP_PASS
         }, {
-            // Ignorar certificados autofirmados si SAP B1 está en red local sin HTTPS válido
             httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }),
-            timeout: 15000 // 15 segundos máximo para evitar que se cuelgue
+            timeout: 60000 // 60 segundos máximo
         });
         
         sessionId = response.data.SessionId;
@@ -55,7 +54,7 @@ async function ensureSAPConnection(req, res, next) {
 // Configuración de instancia de Axios para peticiones a SAP
 const sapApi = axios.create({
     httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }),
-    timeout: 15000 // Timeout de 15 segundos
+    timeout: 60000 // Timeout de 60 segundos
 });
 
 // Interceptor para inyectar la cookie de B1SESSION
