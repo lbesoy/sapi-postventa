@@ -4295,61 +4295,95 @@ function updateTicketBadge() {
 }
 
 function actualizarFiltrosPersonal() {
-  const currentUser = usuarios.find(u => u.id === currentSession.userId);
-  const userRole = currentUser ? currentUser.rol : '';
-  const isTecnico = userRole === 'tecnico';
-  const isSupervisor = userRole === 'supervisor';
-  const userName = currentUser ? currentUser.nombre : '';
+  try {
+    const currentUser = usuarios.find(u => u && u.id === currentSession.userId);
+    const userRole = currentUser ? currentUser.rol : '';
+    const isTecnico = userRole === 'tecnico';
+    const isSupervisor = userRole === 'supervisor';
+    const userName = currentUser ? currentUser.nombre : '';
 
-  const selectsTecnico = [document.getElementById('filter-ord-tecnico'), document.getElementById('filter-dash-tkt-tecnico'), document.getElementById('filter-tkt-tecnico')];
-  const selectsSupervisor = [document.getElementById('filter-ord-supervisor'), document.getElementById('filter-dash-tkt-supervisor'), document.getElementById('filter-tkt-supervisor')];
-  
-  // Combinar todos los roles operativos para que salgan en ambos filtros
-  let allStaff = new Set();
-  
-  // Agregar de usuarios (tecnicos, supervisores, admins)
-  usuarios.filter(u => ['tecnico', 'supervisor', 'admin', 'superadmin'].includes(u.rol) && u.activo !== false).forEach(u => { 
-    if (u.nombre) allStaff.add(u.nombre.trim()); 
-  });
-  
-  // Agregar de tecnicosDb
-  tecnicosDb.forEach(t => { if (t.nombre) allStaff.add(t.nombre.trim()); });
-  
-  // Agregar de tickets y ordenes por si hay historicos
-  tickets.forEach(t => {
-    if (t.asignado && t.asignado !== 'Sin asignar') t.asignado.split(',').forEach(n => allStaff.add(n.trim()));
-    if (t.tecnicosAsignados) t.tecnicosAsignados.forEach(n => allStaff.add(n.trim()));
-  });
-  ordenes.forEach(o => {
-    if (o.tecnico) o.tecnico.split(',').forEach(n => allStaff.add(n.trim()));
-    if (o.tecnicosAsignados) o.tecnicosAsignados.forEach(n => allStaff.add(n.trim()));
-  });
-  clientesDb.forEach(c => {
-    if (c.supervisorAsignado) allStaff.add(c.supervisorAsignado.trim());
-    if (c.supervisoresAsignados) c.supervisoresAsignados.forEach(s => allStaff.add(s.trim()));
-  });
+    const selectsTecnico = [document.getElementById('filter-ord-tecnico'), document.getElementById('filter-dash-tkt-tecnico'), document.getElementById('filter-tkt-tecnico')];
+    const selectsSupervisor = [document.getElementById('filter-ord-supervisor'), document.getElementById('filter-dash-tkt-supervisor'), document.getElementById('filter-tkt-supervisor')];
+    
+    // Combinar todos los roles operativos para que salgan en ambos filtros
+    let allStaff = new Set();
+    
+    // Agregar de usuarios (tecnicos, supervisores, admins)
+    if (Array.isArray(usuarios)) {
+      usuarios.forEach(u => { 
+        if (u && ['tecnico', 'supervisor', 'admin', 'superadmin'].includes(u.rol) && u.activo !== false && typeof u.nombre === 'string') {
+          allStaff.add(u.nombre.trim()); 
+        }
+      });
+    }
+    
+    // Agregar de tecnicosDb
+    if (Array.isArray(tecnicosDb)) {
+      tecnicosDb.forEach(t => { 
+        if (t && typeof t.nombre === 'string') allStaff.add(t.nombre.trim()); 
+      });
+    }
+    
+    // Agregar de tickets y ordenes por si hay historicos
+    if (Array.isArray(tickets)) {
+      tickets.forEach(t => {
+        if (!t) return;
+        if (typeof t.asignado === 'string' && t.asignado !== 'Sin asignar') {
+          t.asignado.split(',').forEach(n => allStaff.add(n.trim()));
+        }
+        if (Array.isArray(t.tecnicosAsignados)) {
+          t.tecnicosAsignados.forEach(n => { if (typeof n === 'string') allStaff.add(n.trim()); });
+        }
+      });
+    }
+    
+    if (Array.isArray(ordenes)) {
+      ordenes.forEach(o => {
+        if (!o) return;
+        if (typeof o.tecnico === 'string') {
+          o.tecnico.split(',').forEach(n => allStaff.add(n.trim()));
+        }
+        if (Array.isArray(o.tecnicosAsignados)) {
+          o.tecnicosAsignados.forEach(n => { if (typeof n === 'string') allStaff.add(n.trim()); });
+        }
+      });
+    }
+    
+    if (Array.isArray(clientesDb)) {
+      clientesDb.forEach(c => {
+        if (!c) return;
+        if (typeof c.supervisorAsignado === 'string') allStaff.add(c.supervisorAsignado.trim());
+        if (Array.isArray(c.supervisoresAsignados)) {
+          c.supervisoresAsignados.forEach(s => { if (typeof s === 'string') allStaff.add(s.trim()); });
+        }
+      });
+    }
 
-  const uniqueStaff = Array.from(allStaff).filter(Boolean).sort((a,b) => a.localeCompare(b));
-  
-  const tecOptionsHtml = '<option value="">Cualquier Técnico</option>' + uniqueStaff.map(n => `<option value="${n}">${n}</option>`).join('');
-  const supOptionsHtml = '<option value="">Cualquier Supervisor</option>' + uniqueStaff.map(n => `<option value="${n}">${n}</option>`).join('');
-  
-  selectsTecnico.forEach(sel => { 
-    if(sel) { 
-      const val = isTecnico ? userName : sel.value; 
-      sel.innerHTML = tecOptionsHtml; 
-      sel.value = val; 
-      sel.disabled = isTecnico;
-    } 
-  });
-  selectsSupervisor.forEach(sel => { 
-    if(sel) { 
-      const val = isSupervisor ? userName : (isTecnico ? '' : sel.value); 
-      sel.innerHTML = supOptionsHtml; 
-      sel.value = val; 
-      sel.disabled = isSupervisor || isTecnico;
-    } 
-  });
+    const uniqueStaff = Array.from(allStaff).filter(Boolean).sort((a,b) => a.localeCompare(b));
+    
+    const tecOptionsHtml = '<option value="">Cualquier Técnico</option>' + uniqueStaff.map(n => `<option value="${n}">${n}</option>`).join('');
+    const supOptionsHtml = '<option value="">Cualquier Supervisor</option>' + uniqueStaff.map(n => `<option value="${n}">${n}</option>`).join('');
+    
+    selectsTecnico.forEach(sel => { 
+      if(sel) { 
+        const val = isTecnico ? userName : sel.value; 
+        sel.innerHTML = tecOptionsHtml; 
+        sel.value = val; 
+        sel.disabled = isTecnico;
+      } 
+    });
+    
+    selectsSupervisor.forEach(sel => { 
+      if(sel) { 
+        const val = isSupervisor ? userName : (isTecnico ? '' : sel.value); 
+        sel.innerHTML = supOptionsHtml; 
+        sel.value = val; 
+        sel.disabled = isSupervisor || isTecnico;
+      } 
+    });
+  } catch (error) {
+    console.error('Error al actualizar filtros de personal:', error);
+  }
 }
 
 // ===== RENDER TICKETS =====
