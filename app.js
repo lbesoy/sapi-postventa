@@ -6178,7 +6178,7 @@ function avanzarCotizacionTicket(id) {
     window.pushToSupabase('tickets', t);
   }
   mostrarNotificacion('Ticket avanzado a Cotización.', 'success');
-  verDetalleTicket(id);
+  cerrarDetalleTicket();
   renderTickets();
   updateTicketBadge();
 }
