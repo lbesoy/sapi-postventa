@@ -3158,6 +3158,9 @@ function abrirModalAgregarMaquina() {
   select.removeAttribute('disabled');
   document.getElementById('am-venta').disabled = false;
   
+  const btnEliminar = document.getElementById('btn-eliminar-maquina');
+  if (btnEliminar) btnEliminar.style.display = 'none';
+  
   const slider = document.getElementById('am-venta-tercero-slider');
   const knob = document.getElementById('am-venta-tercero-knob');
   if (slider) slider.style.backgroundColor = '#ccc';
@@ -3471,6 +3474,13 @@ function editarMaquina(clienteNombre, idInterno) {
             customContainer.innerHTML = '';
           }
         }
+        
+        // Show delete button only if it's a manual machine
+        const isManual = clienteObj?.maquinas?.some(m => m.idInterno === idInterno);
+        const btnEliminar = document.getElementById('btn-eliminar-maquina');
+        if (btnEliminar) {
+          btnEliminar.style.display = isManual ? 'block' : 'none';
+        }
       }
     }
   }
@@ -3566,6 +3576,42 @@ function guardarNuevaMaquina(e) {
   }
   if (document.getElementById('modal-detalle-cliente').classList.contains('open')) {
     verDetalleCliente(clienteSeleccionado);
+  }
+}
+
+function eliminarMaquinaActual() {
+  if (!editandoMaquinaId || !editandoMaquinaCliente) return;
+
+  const confirmar = confirm(`¿Estás seguro de que deseas eliminar la máquina ${editandoMaquinaId}? Esta acción no se puede deshacer.`);
+  if (!confirmar) return;
+
+  const clienteObj = clientesDb.find(c => c.nombre === editandoMaquinaCliente);
+  if (!clienteObj || !clienteObj.maquinas) return;
+
+  const maquinaIdx = clienteObj.maquinas.findIndex(m => m.idInterno === editandoMaquinaId);
+  if (maquinaIdx >= 0) {
+    clienteObj.maquinas.splice(maquinaIdx, 1);
+    
+    // Guardar cambios
+    localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+    if (window.pushToSupabase) window.pushToSupabase('clientes', clienteObj);
+    
+    cerrarModalAgregarMaquina();
+    
+    // Renderizar vistas actualizadas
+    if (document.getElementById('view-clientes').classList.contains('active')) {
+      renderClientes();
+    }
+    if (document.getElementById('view-maquinaria').classList.contains('active')) {
+      renderMaquinaria();
+    }
+    if (document.getElementById('modal-detalle-cliente').classList.contains('open')) {
+      verDetalleCliente(editandoMaquinaCliente);
+    }
+    
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion(`Máquina ${editandoMaquinaId} eliminada correctamente.`, 'success');
+    }
   }
 }
 

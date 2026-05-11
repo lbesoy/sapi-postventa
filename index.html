@@ -1326,9 +1326,12 @@
           <div id="am-custom-fields-container" style="display:none; margin-top:1rem; padding-top:1rem; border-top:1px dashed var(--border);"></div>
         </div>
         
-        <div class="form-actions">
-          <button type="button" class="btn-secondary" onclick="cerrarModalAgregarMaquina()">Cancelar</button>
-          <button type="submit" class="btn-primary">Guardar Máquina</button>
+        <div class="form-actions" style="display:flex; justify-content:space-between; width:100%;">
+          <button type="button" class="btn-secondary" id="btn-eliminar-maquina" onclick="eliminarMaquinaActual()" style="display:none; color: var(--red); border-color: var(--red); background: transparent;">Eliminar Máquina</button>
+          <div style="display:flex; gap:0.5rem; margin-left:auto;">
+            <button type="button" class="btn-secondary" onclick="cerrarModalAgregarMaquina()">Cancelar</button>
+            <button type="submit" class="btn-primary">Guardar Máquina</button>
+          </div>
         </div>
       </form>
     </div>
