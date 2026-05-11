@@ -4892,8 +4892,12 @@ function renderMaquinaria() {
     if (isEmpresa && c.nombre !== nombreEmpresaLogged) return; // Filtro de seguridad
     if (c.maquinas) {
       c.maquinas.forEach(m => {
-        // Evitar duplicados por serie si ya vino de SAP
-        if (!allMachines.some(sm => sm.serie === m.serie && sm.serie !== 'N/A')) {
+        // Evitar duplicados por serie si ya vino de SAP o por ID interno
+        const isDuplicate = allMachines.some(sm => 
+          (sm.idInterno === m.idInterno) || 
+          (sm.serie === m.serie && sm.serie !== 'N/A' && sm.serie !== '')
+        );
+        if (!isDuplicate) {
           allMachines.push({
             cliente: c.nombre,
             idInterno: m.idInterno || 'N/A',
