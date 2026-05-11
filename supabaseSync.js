@@ -268,7 +268,17 @@ async function cargarDatosDeSupabase() {
     // Clientes
     const { data: clientes } = await sb.from('clientes').select('*');
     if (clientes && clientes.length > 0) {
-      localStorage.setItem('sapi_clientes_db', JSON.stringify(clientes.map(rowToCliente)));
+      const localClientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+      const mergedClientes = clientes.map(c => {
+        const row = rowToCliente(c);
+        const local = localClientes.find(lc => lc.id === row.id);
+        if (local) {
+          row.saldoCuenta = local.saldoCuenta || 0;
+          row.saldoOrdenes = local.saldoOrdenes || 0;
+        }
+        return row;
+      });
+      localStorage.setItem('sapi_clientes_db', JSON.stringify(mergedClientes));
     }
 
     // Tickets — SOLO sobreescribir local si la nube tiene tickets

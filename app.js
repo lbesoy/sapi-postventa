@@ -572,6 +572,29 @@ window.addEventListener('supabase_datos_cargados', () => {
   if (document.getElementById('view-refacciones').classList.contains('active')) {
     if (typeof renderRefacciones === 'function') renderRefacciones();
   }
+  
+  // Background SAP balance sync to ensure balances are never 0 natively
+  if (API_CONFIG.USE_SAP_BACKEND) {
+    fetchClientesSAP().then(sapData => {
+      if (sapData && sapData.length > 0) {
+        let changed = false;
+        sapData.forEach(sapCli => {
+          const localCli = clientesDb.find(c => c.id === sapCli.id || (c.nombre && sapCli.nombre && c.nombre.toLowerCase() === sapCli.nombre.toLowerCase()));
+          if (localCli) {
+            if (localCli.saldoCuenta !== sapCli.saldoCuenta || localCli.saldoOrdenes !== sapCli.saldoOrdenes) {
+              localCli.saldoCuenta = sapCli.saldoCuenta || 0;
+              localCli.saldoOrdenes = sapCli.saldoOrdenes || 0;
+              changed = true;
+            }
+          }
+        });
+        if (changed) {
+          localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+          if (document.getElementById('view-clientes').classList.contains('active')) renderClientes();
+        }
+      }
+    }).catch(e => console.error('Silent SAP balance sync failed:', e));
+  }
 });
 
 // Eliminada versión duplicada de guardarConfig que estaba antes de cargarConfig
