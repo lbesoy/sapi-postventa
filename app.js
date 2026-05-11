@@ -1674,6 +1674,10 @@ function renderTabla(ctx) {
     body.innerHTML = `<tr><td colspan="9" class="empty-state">No hay órdenes${q ? ' que coincidan' : ' registradas'}.</td></tr>`;
     return;
   }
+  const isConsulta = currentSession.viewMode === 'consulta';
+  const isTecnico = currentSession.viewMode === 'tecnico';
+  const canEdit = !isConsulta && !isTecnico;
+
   body.innerHTML = filtradas.map(o => `
     <tr>
       <td><strong>${o.folio||'-'}</strong></td>
@@ -1687,8 +1691,10 @@ function renderTabla(ctx) {
       <td>
         <div style="display:flex;gap:0.25rem;">
           <button class="action-btn" onclick="verDetalle('${o.id}')" title="Ver"><i data-lucide="eye"></i></button>
+          ${canEdit ? `
           <button class="action-btn" onclick="editarOrden('${o.id}')" title="Editar"><i data-lucide="pencil"></i></button>
           <button class="action-btn del" onclick="eliminarOrden('${o.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>
+          ` : ''}
         </div>
       </td>
     </tr>
@@ -4503,11 +4509,28 @@ function eliminarOrden(id) {
   renderStats();
 }
 
+function completarReporteDesdeDetalle(id) {
+  cerrarDetalle();
+  setTimeout(() => {
+    abrirFormulario(id);
+  }, 100);
+}
+
 // ===== DETALLE =====
 function verDetalle(id) {
   const o = ordenes.find(x => x.id === id);
   if (!o) return;
   document.getElementById('detalle-title').textContent = `Orden ${o.folio || o.id.slice(0,8)}`;
+  
+  const btnCompletar = document.getElementById('btn-completar-reporte');
+  if (btnCompletar) {
+    if (currentSession.viewMode !== 'consulta') {
+      btnCompletar.style.display = 'flex';
+      btnCompletar.setAttribute('onclick', `completarReporteDesdeDetalle('${id}')`);
+    } else {
+      btnCompletar.style.display = 'none';
+    }
+  }
 
   const field = (label, val) => `
     <div class="detalle-field">
@@ -4567,7 +4590,7 @@ function verDetalle(id) {
         ${field('Estado', `<span class="badge ${badgeEstado(o.estado)}">${o.estado}</span>`)}
       </div>`)}
     ${seccion('Diagnóstico y Trabajos', `
-      ${field('Falla informada', o.falla)}
+      ${field('Falla reportada', o.falla)}
       <div style="margin-top:0.5rem">${field('Trabajos realizados', o.trabajos)}</div>
       <div style="margin-top:0.5rem">${field('Dictamen', o.dictamen)}</div>
       <div style="margin-top:0.5rem">${field('Condiciones del equipo', o.condiciones)}</div>
@@ -6308,9 +6331,9 @@ async function cerrarCotizacionTicket(id) {
         km_ida: '', km_vuelta: '', km_total: '',
         tipo: 'Servicio',
         estado: 'Pendiente',
-        falla: t.asunto || '',
+        falla: (t.asunto ? t.asunto + '\n' : '') + (t.descripcion || ''),
         trabajos: '', dictamen: '', condiciones: '',
-        observaciones: t.descripcion || '', pendientes: '',
+        observaciones: '', pendientes: '',
         ref_utilizadas: [], ref_necesarias: [],
         factura_ref: '', factura_mo: '',
         noches: '', alimentacion: '', traslado_costo: '',
