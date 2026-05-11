@@ -4892,11 +4892,11 @@ function renderMaquinaria() {
     if (isEmpresa && c.nombre !== nombreEmpresaLogged) return; // Filtro de seguridad
     if (c.maquinas) {
       c.maquinas.forEach(m => {
-        // Evitar duplicados por serie si ya vino de SAP o por ID interno
-        const isDuplicate = allMachines.some(sm => 
-          (sm.idInterno === m.idInterno) || 
-          (sm.serie === m.serie && sm.serie !== 'N/A' && sm.serie !== '')
-        );
+        // En base a que la maquinaria es 100% manual y no viene de SAP,
+        // no ocultamos por serie duplicada para evitar que pruebas o errores de capa 8
+        // hagan pensar al usuario que la máquina se borró.
+        // Solo evitamos duplicados si por algún milagro tienen el mismo ID interno exacto ya en la lista.
+        const isDuplicate = allMachines.some(sm => sm.idInterno === m.idInterno);
         if (!isDuplicate) {
           allMachines.push({
             cliente: c.nombre,

@@ -105,6 +105,9 @@ function rowToOrden(o) {
 }
 
 function clienteToRow(c) {
+  if (!c.id) {
+    c.id = crypto.randomUUID();
+  }
   return {
     id: c.id,
     nombre: c.nombre,
