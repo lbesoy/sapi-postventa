@@ -5833,9 +5833,23 @@ async function guardarTicket(e) {
     try { pdfCotizacionBase64 = await readFileAsBase64(cotPdfInput.files[0]); } catch(e){}
   }
 
+  let newFolio = '';
+  if (!editandoTicketId) {
+    const yearStr = new Date().getFullYear().toString().slice(-2);
+    const prefix = `TKT-${yearStr}`;
+    const ticketsDelAnio = tickets.filter(t => t.folio && t.folio.startsWith(prefix));
+    let maxConsecutivo = 0;
+    ticketsDelAnio.forEach(t => {
+      const numStr = t.folio.replace(prefix, '');
+      const num = parseInt(numStr, 10);
+      if (!isNaN(num) && num > maxConsecutivo) maxConsecutivo = num;
+    });
+    newFolio = `${prefix}${(maxConsecutivo + 1).toString().padStart(3, '0')}`;
+  }
+
   const ticket = {
     id: editandoTicketId || crypto.randomUUID(),
-    folio: editandoTicketId ? t_existente?.folio : ('TKT-' + (tickets.length + 1).toString().padStart(4, '0')),
+    folio: editandoTicketId ? t_existente?.folio : newFolio,
     fecha: t_existente ? t_existente.fecha : new Date().toLocaleDateString('es-MX'),
     fechaCreacion: t_existente ? t_existente.fechaCreacion : new Date().toISOString(),
     canal,
