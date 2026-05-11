@@ -26,7 +26,6 @@ let QUERIES = {
   clientes:    'eurorep_clientes',
   refacciones: 'CAT_REFACCIONES',
   sitios:      'CAT_Sitos',
-  maquinaria:  'CAT_MAQUINARIA',
   tecnicos:    'eurorep_tecnicos'
 };
 
@@ -140,31 +139,7 @@ async function syncSitios() {
   }).filter(r => r.id);
   
   const n = await upsertSupabase('sitios', rows);
-  log(`✅ Sitios: ${n} registros sincronizados a Supabase.`);
-}
 
-async function syncMaquinaria() {
-  log('Sincronizando Maquinaria...');
-  const raw = await fetchQuery(QUERIES.maquinaria);
-  const m = MAPPINGS.maquinaria || {};
-  
-  const rows = raw.map(maq => {
-    return {
-      id:          maq[m.id] || maq.ManufacturerSerialNum || maq.InternalSN || null,
-      serie:       maq[m.id] || maq.ManufacturerSerialNum || maq.InternalSN || '',
-      marca:       '',
-      modelo:      maq[m.itemcode] || maq.ItemCode || '',
-      anio:        maq.MnfDate || '',
-      cliente:     maq[m.cliente] || maq.CustomerCode || maq.CardCode || '',
-      id_interno:  maq[m.itemcode] || maq.ItemCode || '',
-      descripcion: maq[m.desc] || maq.ItemDescription || maq.ItemName || '',
-      custom_data: {}
-    };
-  }).filter(r => r.id);
-  
-  const n = await upsertSupabase('maquinaria', rows);
-  log(`✅ Maquinaria: ${n} registros sincronizados a Supabase.`);
-}
 
 async function syncTecnicos() {
   log('Sincronizando Técnicos...');
@@ -198,7 +173,6 @@ async function loadConfigFromSupabase() {
       if (config.queryClientes) QUERIES.clientes = config.queryClientes;
       if (config.queryRefacciones) QUERIES.refacciones = config.queryRefacciones;
       if (config.querySitios) QUERIES.sitios = config.querySitios;
-      if (config.queryMaquinaria) QUERIES.maquinaria = config.queryMaquinaria;
       if (config.queryTecnicos) QUERIES.tecnicos = config.queryTecnicos;
       // if (config.mappings && config.mappings.sitios) MAPPINGS.sitios = config.mappings.sitios; // DESHABILITADO temporalmente
       // if (config.mappings && config.mappings.maquinaria) MAPPINGS.maquinaria = config.mappings.maquinaria; // DESHABILITADO temporalmente
@@ -225,7 +199,6 @@ async function main() {
       syncClientes(),
       syncRefacciones(),
       syncSitios(),
-      syncMaquinaria(),
       syncTecnicos()
     ]);
 
