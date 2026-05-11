@@ -4561,7 +4561,7 @@ function verDetalle(id) {
   
   const btnCompletar = document.getElementById('btn-completar-reporte');
   if (btnCompletar) {
-    if (currentSession.viewMode !== 'consulta') {
+    if (currentSession.viewMode !== 'consulta' && !o.firma_tecnico_base64) {
       btnCompletar.style.display = 'flex';
       btnCompletar.setAttribute('onclick', `completarReporteDesdeDetalle('${id}')`);
     } else {
@@ -4653,23 +4653,49 @@ function verDetalle(id) {
         ${field('No. Noches', o.noches)} ${field('Alimentación', o.alimentacion ? '$'+o.alimentacion : '')} ${field('Traslado', o.traslado_costo ? '$'+o.traslado_costo : '')}
       </div>`) : ''}
     
-    ${seccion('Firma del Cliente', `
-      <div style="display:flex; flex-direction:column; gap:1rem; align-items:center; margin-top:1rem;">
-        ${o.firma_cliente_base64 
-          ? `<div style="border:1px solid var(--border); border-radius:8px; padding:1rem; background:white;">
-               <img src="${o.firma_cliente_base64}" alt="Firma del cliente" style="max-width:100%; max-height:150px; display:block; margin:0 auto;"/>
-               <p style="text-align:center; color:var(--text-muted); font-size:0.8rem; margin-top:0.5rem; margin-bottom:0;">Firma registrada</p>
-             </div>
-             <button class="btn-secondary" onclick="limpiarFirma('${o.id}')" style="font-size:0.8rem;"><i data-lucide="eraser" style="width:14px;height:14px;"></i> Volver a firmar</button>` 
-          : `<div style="width:100%; max-width:400px;">
-               <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.5rem;">Firme en el recuadro blanco usando el dedo o mouse:</p>
-               <canvas id="firma-canvas" width="400" height="150" style="width:100%; height:150px; background:white; border:2px dashed var(--border); border-radius:8px; cursor:crosshair; touch-action:none;"></canvas>
-               <div style="display:flex; gap:0.5rem; margin-top:0.5rem; justify-content:space-between;">
-                 <button class="btn-secondary" onclick="borrarCanvasFirma()" style="flex:1;">Borrar</button>
-                 <button class="btn-primary" onclick="guardarFirmaCanvas('${o.id}')" style="flex:2;">Guardar Firma</button>
+    ${seccion('Firmas de Conformidad', `
+      <div style="display:flex; flex-wrap:wrap; gap:2rem; margin-top:1rem; justify-content:center;">
+        
+        <!-- TECNICO -->
+        <div style="flex:1; min-width:300px; max-width:400px; display:flex; flex-direction:column; align-items:center;">
+          <h4 style="margin-bottom:1rem; color:var(--text-primary); font-size:1rem;">Firma del Técnico</h4>
+          ${o.firma_tecnico_base64 
+            ? `<div style="border:1px solid var(--border); border-radius:8px; padding:1rem; background:white; width:100%;">
+                 <img src="${o.firma_tecnico_base64}" alt="Firma del técnico" style="max-width:100%; max-height:150px; display:block; margin:0 auto;"/>
+                 <p style="text-align:center; color:var(--text-muted); font-size:0.8rem; margin-top:0.5rem; margin-bottom:0;">Técnico: ${o.tecnico || '—'}</p>
                </div>
-             </div>`
-        }
+               ${currentSession.viewMode === 'admin' || currentSession.viewMode === 'superadmin' ? `<button class="btn-secondary" onclick="limpiarFirma('${o.id}', 'tecnico')" style="font-size:0.8rem; margin-top:1rem;"><i data-lucide="eraser" style="width:14px;height:14px;"></i> Borrar firma (Admin)</button>` : ''}` 
+            : `<div style="width:100%;">
+                 <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.5rem;">Firme en el recuadro blanco usando el dedo o mouse:</p>
+                 <canvas id="firma-tecnico-canvas" width="400" height="150" style="width:100%; height:150px; background:white; border:2px dashed var(--border); border-radius:8px; cursor:crosshair; touch-action:none;"></canvas>
+                 <div style="display:flex; gap:0.5rem; margin-top:0.5rem; justify-content:space-between;">
+                   <button class="btn-secondary" onclick="borrarCanvasFirma('tecnico')" style="flex:1;">Borrar</button>
+                   <button class="btn-primary" onclick="guardarFirmaCanvas('${o.id}', 'tecnico')" style="flex:2;">Guardar Firma Técnico</button>
+                 </div>
+               </div>`
+          }
+        </div>
+
+        <!-- CLIENTE -->
+        <div style="flex:1; min-width:300px; max-width:400px; display:flex; flex-direction:column; align-items:center;">
+          <h4 style="margin-bottom:1rem; color:var(--text-primary); font-size:1rem;">Firma del Cliente</h4>
+          ${o.firma_cliente_base64 
+            ? `<div style="border:1px solid var(--border); border-radius:8px; padding:1rem; background:white; width:100%;">
+                 <img src="${o.firma_cliente_base64}" alt="Firma del cliente" style="max-width:100%; max-height:150px; display:block; margin:0 auto;"/>
+                 <p style="text-align:center; color:var(--text-muted); font-size:0.8rem; margin-top:0.5rem; margin-bottom:0;">Cliente: ${o.cliente || '—'}</p>
+               </div>
+               <button class="btn-secondary" onclick="limpiarFirma('${o.id}', 'cliente')" style="font-size:0.8rem; margin-top:1rem;"><i data-lucide="eraser" style="width:14px;height:14px;"></i> Volver a firmar</button>` 
+            : `<div style="width:100%;">
+                 <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.5rem;">Firme en el recuadro blanco usando el dedo o mouse:</p>
+                 <canvas id="firma-cliente-canvas" width="400" height="150" style="width:100%; height:150px; background:white; border:2px dashed var(--border); border-radius:8px; cursor:crosshair; touch-action:none;"></canvas>
+                 <div style="display:flex; gap:0.5rem; margin-top:0.5rem; justify-content:space-between;">
+                   <button class="btn-secondary" onclick="borrarCanvasFirma('cliente')" style="flex:1;">Borrar</button>
+                   <button class="btn-primary" onclick="guardarFirmaCanvas('${o.id}', 'cliente')" style="flex:2;">Guardar Firma Cliente</button>
+                 </div>
+               </div>`
+          }
+        </div>
+        
       </div>
     `)}
   `;
@@ -4678,99 +4704,98 @@ function verDetalle(id) {
   document.body.style.overflow = 'hidden';
   lucide.createIcons();
   
-  if (!o.firma_cliente_base64) {
-    setTimeout(inicializarCanvasFirma, 100);
-  }
+  setTimeout(() => {
+    if (!o.firma_tecnico_base64) inicializarCanvasFirma('tecnico');
+    if (!o.firma_cliente_base64) inicializarCanvasFirma('cliente');
+  }, 100);
 }
 
 // ===== LOGICA DEL CANVAS DE FIRMA =====
-let canvasFirma, ctxFirma, dibujandoFirma = false;
+let canvasesFirma = {
+  tecnico: { canvas: null, ctx: null, dibujando: false },
+  cliente: { canvas: null, ctx: null, dibujando: false }
+};
 
-function inicializarCanvasFirma() {
-  canvasFirma = document.getElementById('firma-canvas');
-  if (!canvasFirma) return;
-  ctxFirma = canvasFirma.getContext('2d');
+function inicializarCanvasFirma(tipo) {
+  const c = document.getElementById(`firma-${tipo}-canvas`);
+  if (!c) return;
+  const ctx = c.getContext('2d');
   
-  // Ajustar resolución del canvas
-  const rect = canvasFirma.getBoundingClientRect();
-  canvasFirma.width = rect.width;
-  canvasFirma.height = rect.height;
+  canvasesFirma[tipo].canvas = c;
+  canvasesFirma[tipo].ctx = ctx;
   
-  ctxFirma.lineWidth = 3;
-  ctxFirma.lineCap = 'round';
-  ctxFirma.strokeStyle = '#000';
-
-  const startDraw = (e) => {
-    dibujandoFirma = true;
-    ctxFirma.beginPath();
-    ctxFirma.moveTo(getX(e), getY(e));
-    e.preventDefault();
-  };
-
-  const draw = (e) => {
-    if (!dibujandoFirma) return;
-    ctxFirma.lineTo(getX(e), getY(e));
-    ctxFirma.stroke();
-    e.preventDefault();
-  };
-
-  const stopDraw = () => { dibujandoFirma = false; ctxFirma.closePath(); };
-
-  const getX = (e) => e.touches ? e.touches[0].clientX - canvasFirma.getBoundingClientRect().left : e.clientX - canvasFirma.getBoundingClientRect().left;
-  const getY = (e) => e.touches ? e.touches[0].clientY - canvasFirma.getBoundingClientRect().top : e.clientY - canvasFirma.getBoundingClientRect().top;
-
-  canvasFirma.addEventListener('mousedown', startDraw);
-  canvasFirma.addEventListener('mousemove', draw);
-  canvasFirma.addEventListener('mouseup', stopDraw);
-  canvasFirma.addEventListener('mouseout', stopDraw);
+  const rect = c.getBoundingClientRect();
+  c.width = rect.width;
+  c.height = rect.height;
   
-  canvasFirma.addEventListener('touchstart', startDraw, {passive: false});
-  canvasFirma.addEventListener('touchmove', draw, {passive: false});
-  canvasFirma.addEventListener('touchend', stopDraw);
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#000000';
+
+  const startDraw = (e) => { canvasesFirma[tipo].dibujando = true; ctx.beginPath(); ctx.moveTo(getX(e, c), getY(e, c)); e.preventDefault(); };
+  const draw = (e) => { if(!canvasesFirma[tipo].dibujando) return; ctx.lineTo(getX(e, c), getY(e, c)); ctx.stroke(); e.preventDefault(); };
+  const stopDraw = () => { canvasesFirma[tipo].dibujando = false; ctx.closePath(); };
+
+  const getX = (e, canvas) => e.touches ? e.touches[0].clientX - canvas.getBoundingClientRect().left : e.clientX - canvas.getBoundingClientRect().left;
+  const getY = (e, canvas) => e.touches ? e.touches[0].clientY - canvas.getBoundingClientRect().top : e.clientY - canvas.getBoundingClientRect().top;
+
+  c.addEventListener('mousedown', startDraw);
+  c.addEventListener('mousemove', draw);
+  c.addEventListener('mouseup', stopDraw);
+  c.addEventListener('mouseout', stopDraw);
+  
+  c.addEventListener('touchstart', startDraw, {passive: false});
+  c.addEventListener('touchmove', draw, {passive: false});
+  c.addEventListener('touchend', stopDraw);
 }
 
-function borrarCanvasFirma() {
-  if (ctxFirma && canvasFirma) {
-    ctxFirma.clearRect(0, 0, canvasFirma.width, canvasFirma.height);
+function borrarCanvasFirma(tipo) {
+  const c = canvasesFirma[tipo].canvas;
+  const ctx = canvasesFirma[tipo].ctx;
+  if (ctx && c) {
+    ctx.clearRect(0, 0, c.width, c.height);
   }
 }
 
-function guardarFirmaCanvas(ordenId) {
-  if (!canvasFirma) return;
+function guardarFirmaCanvas(ordenId, tipo) {
+  const c = canvasesFirma[tipo].canvas;
+  const ctx = canvasesFirma[tipo].ctx;
+  if (!c) return;
   
-  // Verificar si está en blanco (opcional pero recomendado)
-  const isBlank = !ctxFirma.getImageData(0, 0, canvasFirma.width, canvasFirma.height).data.some(channel => channel !== 0);
+  const isBlank = !ctx.getImageData(0, 0, c.width, c.height).data.some(channel => channel !== 0);
   if (isBlank) {
-    mostrarNotificacion('Por favor firme antes de guardar.', 'warning');
+    mostrarNotificacion(`Por favor firme como ${tipo} antes de guardar.`, 'warning');
     return;
   }
 
-  const base64Firma = canvasFirma.toDataURL('image/png');
+  const base64Firma = c.toDataURL('image/png');
   
-  // Guardar en la orden
   const idx = ordenes.findIndex(o => o.id === ordenId);
   if (idx !== -1) {
-    ordenes[idx].firma_cliente_base64 = base64Firma;
+    if (tipo === 'tecnico') ordenes[idx].firma_tecnico_base64 = base64Firma;
+    else ordenes[idx].firma_cliente_base64 = base64Firma;
+    
     localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
     
-    // Subir a Supabase
     if (window.pushToSupabase) {
       window.pushToSupabase('ordenes', ordenes[idx]);
     }
     
-    mostrarNotificacion('Firma guardada correctamente', 'success');
-    verDetalle(ordenId); // Recargar modal
+    mostrarNotificacion(`Firma del ${tipo} guardada`, 'success');
+    verDetalle(ordenId); 
   }
 }
 
-function limpiarFirma(ordenId) {
-  if (!confirm('¿Borrar la firma actual? Esto no se puede deshacer.')) return;
+function limpiarFirma(ordenId, tipo) {
+  if (!confirm(`¿Borrar la firma del ${tipo}?`)) return;
   const idx = ordenes.findIndex(o => o.id === ordenId);
   if (idx !== -1) {
-    ordenes[idx].firma_cliente_base64 = null;
+    if (tipo === 'tecnico') ordenes[idx].firma_tecnico_base64 = null;
+    else ordenes[idx].firma_cliente_base64 = null;
+    
     localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
     if (window.pushToSupabase) window.pushToSupabase('ordenes', ordenes[idx]);
-    verDetalle(ordenId); // Recargar modal para que muestre el canvas de nuevo
+    verDetalle(ordenId); 
   }
 }
 
