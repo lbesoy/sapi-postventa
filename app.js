@@ -4307,8 +4307,16 @@ function abrirFormulario(id) {
     containerTecnicos.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:0.5rem;">Seleccione un Ticket para ver los técnicos asignados...</div>';
   }
   
-  poblarMaquinasCliente('f-equipo', '', id ? ordenes.find(x => x.id === id)?.cliente : '');
+  poblarMaquinasCliente('f-equipo', id ? ordenes.find(x => x.id === id)?.equipo : '', id ? ordenes.find(x => x.id === id)?.cliente : '');
   
+  if (id) {
+    const o = ordenes.find(x => x.id === id);
+    if (o && o.soporte) {
+      const elSoporte = document.getElementById('f-soporte');
+      if (elSoporte) elSoporte.value = o.soporte;
+    }
+  }
+
   onSoporteChange(); // Sincroniza el pedido y metadata
 
   // Bloquear campos base si la orden viene de un ticket o si es técnico
@@ -6342,6 +6350,7 @@ async function cerrarCotizacionTicket(id) {
   if (window.supabaseClient) {
     await window.pushToSupabase('tickets', t);
   }
+  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
   
   if (aceptada === 'si') {
     const ordenExistente = ordenes.find(o => o.soporte === t.id);
