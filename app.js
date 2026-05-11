@@ -6297,7 +6297,7 @@ async function cerrarCotizacionTicket(id) {
         pedido: pedidoSAP || '',
         cliente: t.cliente || '',
         ubicacion: t.sitio || '',
-        operador: t.contacto || '',
+        operador: '', // Se preguntará en sitio
         eco: '',
         horometro: '',
         modelo: modeloStr,
