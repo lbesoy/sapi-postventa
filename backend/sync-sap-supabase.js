@@ -98,11 +98,7 @@ async function syncClientes() {
     rfc:         bp.LicTradNum || '',
     email:       bp.E_Mail || '',
     telefono:    '',
-    id_fiscal:   bp.LicTradNum || '',
-    sitios:      [],
-    maquinas:    [],
-    supervisores_asignados: [],
-    tecnicos_asignados: []
+    id_fiscal:   bp.LicTradNum || ''
   })).filter(r => r.id);  // Solo los que tienen ID válido
   const n = await upsertSupabase('clientes', rows);
   log(`✅ Clientes: ${n} registros sincronizados a Supabase.`);
