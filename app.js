@@ -6236,8 +6236,68 @@ async function cerrarCotizacionTicket(id) {
     await window.pushToSupabase('tickets', t);
   }
   
+  if (aceptada === 'si') {
+    const ordenExistente = ordenes.find(o => o.soporte === t.id);
+    if (!ordenExistente) {
+      let modeloStr = '';
+      let serieStr = '';
+      if (t.equipo) {
+        let maq = null;
+        clientesDb.forEach(c => {
+          if (c.maquinas) {
+            const found = c.maquinas.find(m => m.idInterno === t.equipo);
+            if (found) maq = found;
+          }
+        });
+        if (!maq) maq = maquinariaDb.find(m => m.idInterno === t.equipo);
+        
+        if (maq) {
+          modeloStr = maq.modelo || '';
+          serieStr = maq.serie || '';
+        } else {
+          modeloStr = t.equipo;
+        }
+      }
+
+      const nuevaOrden = {
+        id: crypto.randomUUID(),
+        fecha: new Date().toLocaleDateString('es-MX'),
+        folio: '',
+        pedido: pedidoSAP || '',
+        cliente: t.cliente || '',
+        ubicacion: t.sitio || '',
+        operador: t.contacto || '',
+        eco: '',
+        horometro: '',
+        modelo: modeloStr,
+        serie: serieStr,
+        tecnico: tecnicosAsignados.join(', '),
+        tecnicosAsignados: tecnicosAsignados,
+        soporte: t.id,
+        km_ida: '', km_vuelta: '', km_total: '',
+        tipo: 'Servicio',
+        estado: 'Pendiente',
+        falla: t.asunto || '',
+        trabajos: '', dictamen: '', condiciones: '',
+        observaciones: t.descripcion || '', pendientes: '',
+        ref_utilizadas: [], ref_necesarias: [],
+        factura_ref: '', factura_mo: '',
+        noches: '', alimentacion: '', traslado_costo: '',
+        dias: [],
+      };
+
+      ordenes.unshift(nuevaOrden);
+      localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+      if (window.supabaseClient) {
+        window.pushToSupabase('ordenes', nuevaOrden);
+      }
+      mostrarNotificacion('Orden de servicio pre-cargada y generada.', 'success');
+      if (typeof renderTabla === 'function') renderTabla('servicios');
+    }
+  }
+  
   mostrarNotificacion('Ticket cerrado con éxito.', 'success');
-  verDetalleTicket(id);
+  cerrarDetalleTicket();
   renderTickets();
   updateTicketBadge();
 }
