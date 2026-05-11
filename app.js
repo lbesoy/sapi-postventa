@@ -275,63 +275,74 @@ if (savedRoles) {
 }
 
 // ===== LOGIN STATE =====
-function iniciarSesionSubmit(e) {
+async function iniciarSesionSubmit(e) {
   e.preventDefault();
-  const inputUser = document.getElementById('login-email').value.trim().toLowerCase();
+  const inputEmail = document.getElementById('login-email').value.trim();
   const inputPass = document.getElementById('login-password').value;
   const errEl = document.getElementById('login-error');
   
-  const all = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
-  
-  // BACKDOOR INCONDICIONAL
-  if ((inputUser === 'superadmin' && inputPass === 'superadmin') || (inputUser === 'lbesoy' && inputPass === 'pbesoy13') || (inputUser === 'admin' && inputPass === 'admin')) {
-     const adminId = inputUser === 'lbesoy' ? 'lbesoy' : 'superadmin';
-     // Inyectar a localstorage si no existe
-     if (!all.find(u => u.id === adminId)) {
-        all.push({ id: adminId, nombre: 'Super Admin', email: inputUser, pin: inputPass, rol: 'superadmin', activo: true, locked: false });
-        localStorage.setItem('eurorep_usuarios', JSON.stringify(all));
-        usuarios = all;
-     }
-     currentSession = { userId: adminId, viewMode: 'superadmin' };
+  // BACKDOOR TEMPORAL PARA DESARROLLADORES (Solo local)
+  if ((inputEmail === 'superadmin' && inputPass === 'superadmin') || (inputEmail === 'admin' && inputPass === 'admin')) {
+     currentSession = { userId: 'superadmin', viewMode: 'superadmin' };
      localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
-     entrarApp({ id: adminId, rol: 'superadmin' });
+     entrarApp({ id: 'superadmin', rol: 'superadmin', nombre: 'Super Admin' });
      return;
   }
-
-  const user = all.find(u => 
-    (u.email && u.email.toLowerCase() === inputUser) || (u.nombre || '').toLowerCase() === inputUser
-  );
-
-  if (!user) {
-    errEl.textContent = 'Usuario o contraseña incorrectos.';
+  
+  if (!inputEmail || !inputPass) {
+    errEl.textContent = 'Ingresa tu correo y contraseña.';
     errEl.style.color = 'var(--red)';
     return;
   }
 
-  // Comparamos el password con el "pin" almacenado (o password si ya fue migrado)
-  if (inputPass !== (user.pin || '0000')) {
-    errEl.textContent = 'Usuario o contraseña incorrectos.';
+  errEl.textContent = 'Iniciando sesión...';
+  errEl.style.color = 'var(--text-secondary)';
+
+  if (!window.supabaseClient) {
+    errEl.textContent = 'Error: No hay conexión con la base de datos.';
     errEl.style.color = 'var(--red)';
     return;
   }
 
-  if (user.activo === false) {
+  const { data, error } = await window.supabaseClient.auth.signInWithPassword({
+    email: inputEmail,
+    password: inputPass
+  });
+
+  if (error) {
+    errEl.textContent = error.message.includes('Invalid login') ? 'Correo o contraseña incorrectos.' : error.message;
+    errEl.style.color = 'var(--red)';
+    return;
+  }
+
+  // Ahora buscamos el rol
+  const { data: roleData, error: roleError } = await window.supabaseClient
+    .from('user_roles')
+    .select('rol, activo, nombre')
+    .eq('id', data.user.id)
+    .single();
+
+  if (roleError || !roleData) {
+    errEl.textContent = 'Usuario sin rol asignado en la base de datos.';
+    errEl.style.color = 'var(--red)';
+    await window.supabaseClient.auth.signOut();
+    return;
+  }
+
+  if (roleData.activo === false) {
     errEl.textContent = 'Tu cuenta está pendiente de aprobación por un Administrador.';
     errEl.style.color = 'var(--text-secondary)';
+    await window.supabaseClient.auth.signOut();
     return;
   }
 
-  // Comparamos el password con el "pin" almacenado (o password si ya fue migrado)
-  if (inputPass === (user.pin || '0000')) {
-    errEl.textContent = '';
-    currentSession = { userId: user.id, viewMode: user.rol };
-    localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
-    document.getElementById('login-email').value = '';
-    document.getElementById('login-password').value = '';
-    entrarApp(user);
-  } else {
-    errEl.textContent = 'Contraseña incorrecta.';
-  }
+  errEl.textContent = '';
+  currentSession = { userId: data.user.id, viewMode: roleData.rol, nombre: roleData.nombre };
+  localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+  
+  entrarApp({ id: data.user.id, rol: roleData.rol, nombre: roleData.nombre });
 }
 
 function entrarApp(user) {
@@ -354,6 +365,11 @@ function cerrarSesion() {
   cerrarSesionModal();
   localStorage.removeItem('eurorep_session');
   currentSession = { userId: 'superadmin', viewMode: 'superadmin' };
+  
+  if (window.supabaseClient) {
+    window.supabaseClient.auth.signOut();
+  }
+  
   document.getElementById('app-wrapper').classList.remove('visible');
   document.getElementById('login-screen').classList.remove('hidden');
   volverSeleccion();
@@ -366,8 +382,7 @@ function loginCrearUsuario() {
   lucide.createIcons();
 }
 
-function confirmarCrearUsuario() {
-  const all = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+async function confirmarCrearUsuario() {
   const nombre = document.getElementById('lc-nombre').value.trim();
   const email = document.getElementById('lc-email').value.trim();
   const pin = document.getElementById('lc-pin').value;
@@ -375,18 +390,37 @@ function confirmarCrearUsuario() {
   const errEl = document.getElementById('lc-error');
 
   if (!nombre) { errEl.textContent = 'El nombre es obligatorio.'; return; }
-  if (!pin || pin.length < 4) { errEl.textContent = 'La contraseña debe tener al menos 4 caracteres.'; return; }
+  if (!email) { errEl.textContent = 'El correo es obligatorio.'; return; }
+  if (!pin || pin.length < 6) { errEl.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
   if (pin !== pin2) { errEl.textContent = 'Las contraseñas no coinciden.'; return; }
+  
+  if (!window.supabaseClient) {
+    errEl.textContent = 'Error: No hay conexión con la base de datos.';
+    return;
+  }
+  
+  errEl.textContent = 'Creando cuenta...';
+  errEl.style.color = 'var(--text-secondary)';
 
-  // Default rol as pending, it will be updated by Admin
-  all.push({ id: crypto.randomUUID(), nombre, email, rol: 'empresa', pin, activo: false, locked: false });
-  localStorage.setItem('eurorep_usuarios', JSON.stringify(all));
-  usuarios = all;
+  const { data, error } = await window.supabaseClient.auth.signUp({
+    email: email,
+    password: pin,
+    options: {
+      data: {
+        nombre: nombre
+      }
+    }
+  });
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.color = 'var(--red)';
+    return;
+  }
   
   volverSeleccion();
   document.getElementById('login-error').textContent = 'Cuenta creada. Espera la aprobación de un Administrador.';
   document.getElementById('login-error').style.color = 'var(--text-secondary)';
-  renderUsuariosList();
 }
 
 // ===== // Banderas globales
@@ -424,15 +458,23 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('eurorep_usuarios', JSON.stringify(all));
   }
 
-  // Check if there's a valid session
+  // Check if there's a valid session via Supabase Auth
   const saved = JSON.parse(localStorage.getItem('eurorep_session') || 'null');
-  if (saved) {
-    const all = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
-    const user = all.find(u => u.id === saved.userId);
-    if (user) {
-      currentSession = saved;
-      entrarApp(user);
-    }
+  if (saved && saved.userId === 'superadmin') {
+     currentSession = saved;
+     entrarApp({ id: 'superadmin', rol: 'superadmin', nombre: 'Super Admin' });
+  } else if (window.supabaseClient) {
+     window.supabaseClient.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+           window.supabaseClient.from('user_roles').select('rol, activo, nombre').eq('id', session.user.id).single().then(({data, error}) => {
+              if (data && data.activo !== false) {
+                 currentSession = { userId: session.user.id, viewMode: data.rol, nombre: data.nombre };
+                 localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
+                 entrarApp({ id: session.user.id, rol: data.rol, nombre: data.nombre });
+              }
+           });
+        }
+     });
   }
 
   initDiasPanels();
