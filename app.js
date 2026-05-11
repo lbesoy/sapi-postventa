@@ -4311,6 +4311,34 @@ function abrirFormulario(id) {
   
   onSoporteChange(); // Sincroniza el pedido y metadata
 
+  // Bloquear campos base si la orden viene de un ticket o si es técnico
+  const isTecnico = currentSession.viewMode === 'tecnico';
+  const soporteActual = document.getElementById('f-soporte').value;
+  const lockFields = (isTecnico || soporteActual);
+
+  const camposBloqueados = ['f-folio', 'f-pedido', 'f-ubicacion', 'f-modelo', 'f-serie', 'f-soporte', 'f-equipo'];
+  camposBloqueados.forEach(f => {
+    const el = document.getElementById(f);
+    if (el) {
+      if (el.tagName === 'SELECT') {
+        el.disabled = !!lockFields;
+      } else {
+        el.readOnly = !!lockFields;
+      }
+      el.style.background = lockFields ? 'var(--bg-secondary)' : '';
+    }
+  });
+
+  const fClienteCombo = document.getElementById('f-cliente-combo');
+  if (fClienteCombo) {
+    fClienteCombo.style.pointerEvents = lockFields ? 'none' : 'auto';
+    fClienteCombo.style.background = lockFields ? 'var(--bg-secondary)' : '';
+  }
+  
+  document.querySelectorAll('input[name="tipo"]').forEach(radio => {
+    radio.disabled = !!lockFields;
+  });
+
   document.getElementById('modal-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -4386,11 +4414,12 @@ function onSoporteChange() {
         if (ticketAssigned.length === 0) {
           containerTecnicos.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:0.5rem;">El ticket no tiene técnicos asignados.</div>';
         } else {
+          const isTecnico = currentSession.viewMode === 'tecnico';
           ticketAssigned.forEach(name => {
             const isChecked = orderAssigned.includes(name);
             containerTecnicos.innerHTML += `
-              <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; background: var(--bg-body); padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem; line-height: 1.2;">
-                <input type="checkbox" name="f-tecnicos" value="${name}" ${isChecked ? 'checked' : ''} style="width:16px; height:16px; margin:0; margin-top:1px; flex-shrink:0;"/>
+              <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:${isTecnico ? 'not-allowed' : 'pointer'}; background: var(--bg-body); padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem; line-height: 1.2; opacity: ${isTecnico ? '0.7' : '1'};">
+                <input type="checkbox" name="f-tecnicos" value="${name}" ${isChecked ? 'checked' : ''} ${isTecnico ? 'disabled' : ''} style="width:16px; height:16px; margin:0; margin-top:1px; flex-shrink:0; pointer-events:${isTecnico ? 'none' : 'auto'};"/>
                 <span style="flex:1; text-align:left; font-weight:normal; color:var(--text-primary);">${name}</span>
               </label>
             `;
