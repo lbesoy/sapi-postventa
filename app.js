@@ -4055,7 +4055,7 @@ function initDiasPanels() {
     <div class="dia-panel ${i===0?'active':''}" id="panel-${dia}">
       <div class="form-group">
         <label>Fecha</label>
-        <input type="date" id="${dia}-fecha"/>
+        <input type="date" id="${dia}-fecha" onchange="autoCompletarFechas('${dia}', this.value)"/>
       </div>
       <div class="form-group">
         <label>Origen → Trabajo (hrs)</label>
@@ -4067,11 +4067,11 @@ function initDiasPanels() {
       </div>
       <div class="form-group">
         <label>Entrada</label>
-        <input type="time" id="${dia}-entrada"/>
+        <input type="time" id="${dia}-entrada" oninput="calcularHorasDia('${dia}')"/>
       </div>
       <div class="form-group">
         <label>Salida</label>
-        <input type="time" id="${dia}-salida"/>
+        <input type="time" id="${dia}-salida" oninput="calcularHorasDia('${dia}')"/>
       </div>
       <div class="form-group">
         <label>Horas Normales</label>
@@ -4083,6 +4083,50 @@ function initDiasPanels() {
       </div>
     </div>
   `).join('');
+}
+
+function calcularHorasDia(dia) {
+  const entrada = document.getElementById(`${dia}-entrada`).value;
+  const salida = document.getElementById(`${dia}-salida`).value;
+  if (!entrada || !salida) return;
+  
+  const [eh, em] = entrada.split(':').map(Number);
+  const [sh, sm] = salida.split(':').map(Number);
+  
+  let totalMinutos = (sh * 60 + sm) - (eh * 60 + em);
+  if (totalMinutos < 0) totalMinutos += 24 * 60;
+  
+  let totalHoras = totalMinutos / 60;
+  let normales = Math.min(totalHoras, 8);
+  let extras = totalHoras > 8 ? totalHoras - 8 : 0;
+  
+  document.getElementById(`${dia}-normales`).value = normales > 0 ? parseFloat(normales.toFixed(2)) : '';
+  document.getElementById(`${dia}-extras`).value = extras > 0 ? parseFloat(extras.toFixed(2)) : '';
+}
+
+function autoCompletarFechas(diaOrigen, fechaStr) {
+  if (!fechaStr) return;
+  const origenIndex = DIAS.indexOf(diaOrigen);
+  if (origenIndex === -1) return;
+  
+  const [year, month, day] = fechaStr.split('-').map(Number);
+  const baseDate = new Date(year, month - 1, day);
+  
+  DIAS.forEach((dia, i) => {
+    if (i === origenIndex) return;
+    const diff = i - origenIndex;
+    const newDate = new Date(baseDate);
+    newDate.setDate(baseDate.getDate() + diff);
+    
+    const y = newDate.getFullYear();
+    const m = String(newDate.getMonth() + 1).padStart(2, '0');
+    const d = String(newDate.getDate()).padStart(2, '0');
+    
+    const el = document.getElementById(`${dia}-fecha`);
+    if (el && !el.value) { // Solo si está vacío
+      el.value = `${y}-${m}-${d}`;
+    }
+  });
 }
 
 function selDia(btn, dia) {
