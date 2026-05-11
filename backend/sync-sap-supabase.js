@@ -88,18 +88,39 @@ async function upsertSupabase(tabla, rows) {
   return inserted;
 }
 
-// ── 4. Mapear y sincronizar cada módulo ───────────────────────────
 async function syncClientes() {
   log('Sincronizando Clientes...');
+  
+  // 1. Obtener clientes actuales de Supabase para preservar sus arrays manuales (maquinas, sitios, etc)
+  let dbClientes = [];
+  try {
+    const res = await axios.get(`${SUPABASE_URL}/rest/v1/clientes?select=id,maquinas,sitios,supervisores_asignados,tecnicos_asignados`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    dbClientes = res.data || [];
+  } catch (e) {
+    log(`⚠️ Advertencia: No se pudieron obtener clientes previos (${e.message}). Se usaran arrays vacios para nuevos.`);
+  }
+
   const raw = await fetchQuery(QUERIES.clientes);
-  const rows = raw.map(bp => ({
-    id:          bp.CardCode || null,
-    nombre:      bp.CardName || 'Sin Nombre',
-    rfc:         bp.LicTradNum || '',
-    email:       bp.E_Mail || '',
-    telefono:    '',
-    id_fiscal:   bp.LicTradNum || ''
-  })).filter(r => r.id);  // Solo los que tienen ID válido
+  const rows = raw.map(bp => {
+    const idVal = bp.CardCode || null;
+    const existing = dbClientes.find(c => c.id === idVal) || {};
+    
+    return {
+      id:          idVal,
+      nombre:      bp.CardName || 'Sin Nombre',
+      rfc:         bp.LicTradNum || '',
+      email:       bp.E_Mail || '',
+      telefono:    '',
+      id_fiscal:   bp.LicTradNum || '',
+      sitios:      existing.sitios || [],
+      maquinas:    existing.maquinas || [],
+      supervisores_asignados: existing.supervisores_asignados || [],
+      tecnicos_asignados: existing.tecnicos_asignados || []
+    };
+  }).filter(r => r.id);  // Solo los que tienen ID válido
+  
   const n = await upsertSupabase('clientes', rows);
   log(`✅ Clientes: ${n} registros sincronizados a Supabase.`);
 }
@@ -107,15 +128,18 @@ async function syncClientes() {
 async function syncRefacciones() {
   log('Sincronizando Refacciones...');
   const raw = await fetchQuery(QUERIES.refacciones);
-  const rows = raw.map(r => ({
-    id:          r.ItemCode || null,
-    codigo:      r.ItemCode || '',
-    descripcion: r.ItemName || r.Dscription || '',
-    precio:      parseFloat(r.Price) || 0,
-    moneda:      r.Currency || 'MXN',
-    stock:       parseInt(r.OnHand) || 0,
-    custom_data: {}
-  })).filter(r => r.id);
+  const rows = raw.map(r => {
+    const idVal = r.ItemCode || r.CodigoArticulo || r.Codigo || r.ItemNum || r.ID || null;
+    return {
+      id:          idVal,
+      codigo:      idVal || '',
+      descripcion: r.ItemName || r.NombreArticulo || r.Dscription || r.Nombre || r.Descripcion || r.Desc || '',
+      precio:      parseFloat(r.Price || r.Precio || r.PriceList || 0) || 0,
+      moneda:      r.Currency || r.Moneda || 'MXN',
+      stock:       parseInt(r.OnHand || r.Stock || r.EnAlmacen || r.Cantidad || 0) || 0,
+      custom_data: {}
+    };
+  }).filter(r => r.id);
   const n = await upsertSupabase('refacciones', rows);
   log(`✅ Refacciones: ${n} registros sincronizados a Supabase.`);
 }
