@@ -4610,10 +4610,19 @@ function verDetalle(id) {
     </tr>`;
   }).join('');
 
+  const formatFecha = (fStr) => {
+    if (!fStr) return '—';
+    if (fStr.includes('T')) {
+      const parts = fStr.split('T')[0].split('-');
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return fStr;
+  };
+
   document.getElementById('detalle-body').innerHTML = `
     ${seccion('Información General', `
       <div class="detalle-grid">
-        ${field('Folio', o.folio)} ${field('Pedido', o.pedido)} ${field('Fecha', o.fecha)}
+        ${field('Folio', o.folio)} ${field('Pedido', o.pedido)} ${field('Fecha', formatFecha(o.fecha))}
         ${field('Cliente', o.cliente)} ${field('Ubicación', o.ubicacion)} ${field('Operador', o.operador)}
         ${field('No. ECO', o.eco)} ${field('Horómetro', o.horometro)} ${field('Modelo', o.modelo)}
         ${field('Serie', o.serie)} ${field('Técnico', o.tecnico)} ${field('Soporte', o.soporte)}
