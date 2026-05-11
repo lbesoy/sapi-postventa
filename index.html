@@ -702,7 +702,7 @@
               <button class="btn-primary" style="display:flex;align-items:center;gap:0.4rem;" onclick="abrirModalUsuario()">
                 <i data-lucide="user-plus" class="btn-icon"></i> Agregar Usuario
               </button>
-              <button class="action-btn btn-sync-sap" onclick="forzarSincronizacionSAP()" title="Sincronizar con SAP" style="height: 38px; width: 38px; display:flex; align-items:center; justify-content:center; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; transition:var(--transition);">
+              <button class="action-btn btn-sync-sap" onclick="sincronizarConGitHub('all', this)" title="Sincronizar con SAP" style="height: 38px; width: 38px; display:flex; align-items:center; justify-content:center; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; transition:var(--transition);">
                 <i data-lucide="refresh-cw" class="icon-sync-sap" style="width:16px; height:16px;"></i>
               </button>
             </div>
@@ -1524,6 +1524,10 @@
               <select id="t-equipo">
                 <option value="">Seleccione una máquina registrada...</option>
               </select>
+            </div>
+            <div class="form-group">
+              <label>Horómetro <span style="font-size:0.7rem; color:var(--text-muted); font-weight:normal;">(Opcional)</span></label>
+              <input type="number" id="t-horometro" placeholder="Ej. 1250" step="any"/>
             </div>
             <div class="form-group">
               <label>Solicitante *</label>

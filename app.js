@@ -4235,6 +4235,11 @@ function onSoporteChange() {
         }
       }
       
+      const inHorometro = document.getElementById('f-horometro');
+      if (inHorometro && t.horometro && (!editandoId || !inHorometro.value)) {
+        inHorometro.value = t.horometro;
+      }
+      
       const containerTecnicos = document.getElementById('f-tecnicos-container');
       if (containerTecnicos) {
         containerTecnicos.innerHTML = '';
@@ -5431,6 +5436,9 @@ function abrirTicket(id) {
       document.getElementById('t-descripcion').value = t.descripcion || '';
       document.getElementById('t-notas').value = t.notas || '';
       
+      const horometroEl = document.getElementById('t-horometro');
+      if (horometroEl) horometroEl.value = t.horometro || '';
+      
       const rEstado = document.querySelector(`input[name="t-estado"][value="${t.estado}"]`);
       if (rEstado) rEstado.checked = true;
 
@@ -5878,6 +5886,7 @@ async function guardarTicket(e) {
     asignado: document.getElementById('t-asignado').value.trim(),
     descripcion: document.getElementById('t-descripcion').value.trim(),
     equipo: document.getElementById('t-equipo').value.trim(),
+    horometro: document.getElementById('t-horometro')?.value.trim() || '',
     notas: document.getElementById('t-notas').value.trim(),
     estado,
     cotizacionSAP: document.getElementById('t-cotizacion-sap')?.value.trim() || '',

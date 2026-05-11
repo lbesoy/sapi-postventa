@@ -23,7 +23,7 @@ function ticketToRow(t) {
     asignado: t.asignado || null,
     descripcion: t.descripcion || null,
     equipo: t.equipo || null,
-    notas: t.notas || null,
+    notas: (t.horometro ? `[H:${t.horometro}]\n` : '') + (t.notas || ''),
     estado: t.estado || null,
     cotizacion_sap: t.cotizacionSAP || null,
     cot_aceptada: t.cotAceptada || null,
@@ -36,7 +36,7 @@ function ticketToRow(t) {
 }
 
 function rowToTicket(t) {
-  return {
+  const obj = {
     id: t.id,
     folio: t.folio,
     fecha: t.fecha,
@@ -63,6 +63,15 @@ function rowToTicket(t) {
     pdfPedido: t.pdf_pedido,
     pdfCotizacion: t.pdf_cotizacion
   };
+  
+  if (obj.notas && obj.notas.startsWith('[H:')) {
+    const endIdx = obj.notas.indexOf(']\n');
+    if (endIdx > -1) {
+      obj.horometro = obj.notas.substring(3, endIdx);
+      obj.notas = obj.notas.substring(endIdx + 2);
+    }
+  }
+  return obj;
 }
 
 function ordenToRow(o) {
