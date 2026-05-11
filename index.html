@@ -1790,18 +1790,18 @@
           </div>
         </div>
         <div class="form-section">
-          <div class="form-section-title"><i data-lucide="lock" class="section-icon"></i> PIN de Acceso</div>
-          <div class="form-grid" style="grid-template-columns:1fr 1fr;">
-            <div class="form-group">
-              <label>PIN (4 dígitos)</label>
-              <input type="password" id="u-pin" placeholder="••••" maxlength="4" pattern="[0-9]{4}"/>
+          <div class="form-section-title"><i data-lucide="power" class="section-icon"></i> Estatus del Usuario</div>
+          <div class="toggle-row" style="margin-top: 1rem; border: 1px solid var(--border); padding: 1rem; border-radius: var(--radius-md); background: var(--bg-card);">
+            <div>
+              <div class="toggle-label" style="font-weight: 600;">Cuenta Activa</div>
+              <div class="toggle-sub">Permite que el usuario inicie sesión.</div>
             </div>
-            <div class="form-group">
-              <label>Confirmar PIN</label>
-              <input type="password" id="u-pin2" placeholder="••••" maxlength="4"/>
-            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="u-activo" checked/>
+              <span class="toggle-track"></span>
+            </label>
           </div>
-          <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.4rem;">El PIN se usa para cambiar de usuario en la sesión activa.</p>
+          <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.4rem;">Las contraseñas ahora son gestionadas por cada usuario desde el inicio de sesión oficial.</p>
         </div>
         <div class="form-actions">
           <button type="button" class="btn-secondary" onclick="cerrarModalUsuario()">Cancelar</button>

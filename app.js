@@ -1300,14 +1300,27 @@ function eliminarTecnicoConfig(i) {
 }
 
 // ===== USUARIOS CRUD =====
-function renderUsuariosList() {
+async function renderUsuariosList() {
   const list = document.getElementById('usuarios-list');
   if (!list) return;
 
   const searchText = (document.getElementById('busqueda-usuario')?.value || '').toLowerCase().trim();
   const filterRole = document.getElementById('filtro-rol-usuario')?.value || 'todos';
 
-  let filtered = usuarios;
+  if (!window.supabaseClient) {
+    list.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">Conectando a Supabase...</div>';
+    return;
+  }
+  
+  const { data: supaUsers, error } = await window.supabaseClient.from('user_roles').select('*');
+  if (error || !supaUsers) {
+    list.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--red); font-size: 0.85rem;">Error al cargar usuarios de Supabase.</div>';
+    return;
+  }
+  
+  usuarios = supaUsers;
+
+  let filtered = supaUsers;
   
   if (filterRole !== 'todos') {
     filtered = filtered.filter(u => u.rol === filterRole);
@@ -1315,13 +1328,13 @@ function renderUsuariosList() {
   
   if (searchText) {
     filtered = filtered.filter(u => 
-      u.nombre.toLowerCase().includes(searchText) || 
+      (u.nombre && u.nombre.toLowerCase().includes(searchText)) || 
       (u.email && u.email.toLowerCase().includes(searchText)) ||
       (u.empresa && u.empresa.toLowerCase().includes(searchText))
     );
   }
 
-  const ROLE_COLORS = { superadmin:'#E8820C', admin:'#4f8ef7', supervisor:'#eab308', tecnico:'#10b981', empresa:'#8b5cf6' };
+  const ROLE_COLORS = { superadmin:'#E8820C', admin:'#4f8ef7', supervisor:'#eab308', tecnico:'#10b981', empresa:'#8b5cf6', consulta: '#64748b' };
   
   if (filtered.length === 0) {
     list.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No se encontraron usuarios que coincidan con la búsqueda.</div>';
@@ -1329,16 +1342,16 @@ function renderUsuariosList() {
   }
 
   list.innerHTML = filtered.map(u => `
-    <div class="usuario-row-full">
-      <div class="usuario-avatar" style="background:${ROLE_COLORS[u.rol]||'var(--accent)'};">${u.nombre[0].toUpperCase()}</div>
+    <div class="usuario-row-full" style="${u.activo === false ? 'opacity: 0.6;' : ''}">
+      <div class="usuario-avatar" style="background:${ROLE_COLORS[u.rol]||'var(--accent)'};">${(u.nombre||'?')[0].toUpperCase()}</div>
       <div class="usuario-info">
-        <div class="usuario-name">${u.nombre} ${u.locked ? '<span style="font-size:0.68rem;color:var(--text-muted);">(sistema)</span>' : ''}</div>
-        <div class="usuario-email">${u.email || ''}</div>
+        <div class="usuario-name">${u.nombre} ${u.activo === false ? '<span style="color:var(--red); font-size:0.7rem;">(Inactivo / Pendiente)</span>' : ''}</div>
+        <div class="usuario-email">${u.email || ''} ${u.empresa ? `| ${u.empresa}` : ''}</div>
       </div>
       <span class="badge" style="background:${ROLE_COLORS[u.rol]}22;color:${ROLE_COLORS[u.rol]};border-radius:99px;padding:0.2rem 0.6rem;font-size:0.72rem;font-weight:600;">${ROLES[u.rol]?.label || u.rol}</span>
-      ${!u.locked ? `
+      ${u.rol !== 'superadmin' ? `
         <button class="action-btn" onclick="editarUsuario('${u.id}')" title="Editar"><i data-lucide="pencil"></i></button>
-        <button class="action-btn del" onclick="eliminarUsuario('${u.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>
+        <button class="action-btn del" onclick="eliminarUsuario('${u.id}')" title="Desactivar / Borrar"><i data-lucide="trash-2"></i></button>
       ` : ''}
     </div>
   `).join('');
@@ -1363,16 +1376,18 @@ function abrirModalUsuario(id) {
   if (id) {
     const u = usuarios.find(x => x.id === id);
     if (!u) return;
-    document.getElementById('u-nombre').value = u.nombre;
+    document.getElementById('u-nombre').value = u.nombre || '';
     document.getElementById('u-email').value = u.email || '';
     document.getElementById('u-telefono').value = u.telefono || '';
+    if (document.getElementById('u-activo')) document.getElementById('u-activo').checked = u.activo !== false;
+    
     const radio = document.querySelector(`input[name="u-rol"][value="${u.rol}"]`);
     if (radio) {
       radio.checked = true;
       if (u.rol === 'empresa' || u.rol === 'cliente') {
         document.getElementById('u-empresa-container').style.display = 'block';
         document.getElementById('u-empresa').setAttribute('required', 'true');
-        document.getElementById('u-empresa').value = u.empresa || u.nombre; // fallback for legacy
+        document.getElementById('u-empresa').value = u.empresa || '';
       }
     }
   }
@@ -1401,43 +1416,49 @@ function cerrarModalUsuario(e) {
   editandoUserId = null;
 }
 
-function guardarUsuario(e) {
+async function guardarUsuario(e) {
   e.preventDefault();
   const nombre = document.getElementById('u-nombre').value.trim();
   const email = document.getElementById('u-email').value.trim();
   const rol = document.querySelector('input[name="u-rol"]:checked')?.value;
-  const pin = document.getElementById('u-pin').value;
-  const pin2 = document.getElementById('u-pin2').value;
   const empresa = document.getElementById('u-empresa').value.trim();
-
-  const telefono = document.getElementById('u-telefono').value.trim();
+  const activo = document.getElementById('u-activo')?.checked;
 
   if (!rol) { alert('Selecciona un rol para el usuario.'); return; }
-  if (pin && pin !== pin2) { alert('Las contraseñas no coinciden.'); return; }
+  if (!window.supabaseClient) { alert('Error: no hay conexión con Supabase.'); return; }
 
-  const userData = { nombre, email, telefono, rol, ...(pin ? { pin } : {}) };
+  const updateData = { nombre, email, rol, activo: activo === true };
   if (rol === 'empresa' || rol === 'cliente') {
     if (!empresa) { alert('La empresa asociada es obligatoria.'); return; }
-    userData.empresa = empresa;
+    updateData.empresa = empresa;
+  } else {
+    updateData.empresa = null;
   }
 
   if (editandoUserId) {
-    usuarios = usuarios.map(u => u.id === editandoUserId ? { ...u, ...userData } : u);
+    const { error } = await window.supabaseClient.from('user_roles').update(updateData).eq('id', editandoUserId);
+    if (error) { alert('Error al actualizar en la nube: ' + error.message); return; }
   } else {
-    usuarios.push({ id: crypto.randomUUID(), ...userData, pin: pin || '0000', activo: true, locked: false });
+    alert('Para crear un usuario nuevo, la persona debe registrarse primero desde la pantalla principal de Login usando "Registrar nuevo usuario". Una vez creado, aparecerá aquí para que lo apruebes.');
+    return;
   }
-  localStorage.setItem('eurorep_usuarios', JSON.stringify(usuarios));
+  
   cerrarModalUsuario();
-  renderUsuariosList();
+  await renderUsuariosList();
 }
 
 function editarUsuario(id) { abrirModalUsuario(id); }
 
-function eliminarUsuario(id) {
-  if (!confirm('¿Eliminar este usuario?')) return;
-  usuarios = usuarios.filter(u => u.id !== id);
-  localStorage.setItem('eurorep_usuarios', JSON.stringify(usuarios));
-  renderUsuariosList();
+async function eliminarUsuario(id) {
+  if (!confirm('¿Estás seguro de que deseas eliminar a este usuario? Ya no podrá acceder al sistema.')) return;
+  if (!window.supabaseClient) return;
+  
+  const { error } = await window.supabaseClient.from('user_roles').delete().eq('id', id);
+  if (error) {
+    alert('Error al eliminar: ' + error.message);
+  } else {
+    await renderUsuariosList();
+  }
 }
 
 // ===== SESSION MODAL =====
