@@ -4112,6 +4112,15 @@ function autoCompletarFechas(diaOrigen, fechaStr) {
   const [year, month, day] = fechaStr.split('-').map(Number);
   const baseDate = new Date(year, month - 1, day);
   
+  const dayOfWeek = baseDate.getDay();
+  const expectedDayOfWeek = origenIndex === 6 ? 0 : origenIndex + 1;
+  
+  if (dayOfWeek !== expectedDayOfWeek) {
+    mostrarNotificacion(`La fecha seleccionada no corresponde al día ${diaOrigen.toUpperCase()}.`, 'warning');
+    document.getElementById(`${diaOrigen}-fecha`).value = '';
+    return;
+  }
+  
   DIAS.forEach((dia, i) => {
     if (i === origenIndex) return;
     const diff = i - origenIndex;
