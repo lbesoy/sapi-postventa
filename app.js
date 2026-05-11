@@ -4186,6 +4186,26 @@ function setDiasData(data) {
 }
 
 // ===== FORM =====
+function generarFolioConsecutivo() {
+  const currentYear = new Date().getFullYear().toString().slice(-2);
+  const prefix = `OS-${currentYear}`;
+  let maxConsecutivo = 0;
+  
+  ordenes.forEach(o => {
+    if (o.folio && typeof o.folio === 'string' && o.folio.startsWith(prefix)) {
+      const numStr = o.folio.substring(prefix.length);
+      const num = parseInt(numStr, 10);
+      if (!isNaN(num) && num > maxConsecutivo) {
+        maxConsecutivo = num;
+      }
+    }
+  });
+  
+  maxConsecutivo++;
+  const padded = maxConsecutivo.toString().padStart(3, '0');
+  return `${prefix}${padded}`;
+}
+
 function abrirFormulario(id) {
   if (!id && currentSession.viewMode === 'consulta') {
     mostrarNotificacion('El rol Consulta no puede generar órdenes.', 'error');
@@ -4194,6 +4214,11 @@ function abrirFormulario(id) {
   editandoId = id || null;
   document.getElementById('modal-title').textContent = id ? 'Editar Orden' : 'Nueva Orden de Servicio';
   document.getElementById('form-orden').reset();
+  
+  if (!id) {
+    document.getElementById('f-folio').value = generarFolioConsecutivo();
+  }
+  
   initDiasPanels();
   setRefacciones('utilizadas', []);
   setRefacciones('necesarias', []);
@@ -6268,7 +6293,7 @@ async function cerrarCotizacionTicket(id) {
       const nuevaOrden = {
         id: crypto.randomUUID(),
         fecha: new Date().toLocaleDateString('es-MX'),
-        folio: '',
+        folio: generarFolioConsecutivo(),
         pedido: pedidoSAP || '',
         cliente: t.cliente || '',
         ubicacion: t.sitio || '',
