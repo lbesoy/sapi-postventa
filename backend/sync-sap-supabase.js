@@ -26,11 +26,13 @@ let QUERIES = {
   clientes:    'eurorep_clientes',
   refacciones: 'CAT_REFACCIONES',
   sitios:      'CAT_Sitos',
+  maquinaria:  'CAT_MAQUINARIA'
 };
 
 // Mapeos configurados (se sobreescriben con la config de Supabase)
 let MAPPINGS = {
-  sitios: null
+  sitios: null,
+  maquinaria: null
 };
 
 const agent = new https.Agent({ rejectUnauthorized: false });
@@ -144,6 +146,29 @@ async function syncSitios() {
   log(`✅ Sitios: ${n} registros sincronizados a Supabase.`);
 }
 
+async function syncMaquinaria() {
+  log('Sincronizando Maquinaria...');
+  const raw = await fetchQuery(QUERIES.maquinaria);
+  const m = MAPPINGS.maquinaria || {};
+  
+  const rows = raw.map(maq => {
+    return {
+      id:          maq[m.id] || maq.ManufacturerSerialNum || maq.InternalSN || null,
+      serie:       maq[m.id] || maq.ManufacturerSerialNum || maq.InternalSN || '',
+      marca:       '',
+      modelo:      maq[m.itemcode] || maq.ItemCode || '',
+      anio:        maq.MnfDate || '',
+      cliente:     maq[m.cliente] || maq.CustomerCode || maq.CardCode || '',
+      id_interno:  maq[m.itemcode] || maq.ItemCode || '',
+      descripcion: maq[m.desc] || maq.ItemDescription || maq.ItemName || '',
+      custom_data: {}
+    };
+  }).filter(r => r.id);
+  
+  const n = await upsertSupabase('maquinaria', rows);
+  log(`✅ Maquinaria: ${n} registros sincronizados a Supabase.`);
+}
+
 async function loadConfigFromSupabase() {
   try {
     const res = await axios.get(
@@ -155,7 +180,9 @@ async function loadConfigFromSupabase() {
       if (config.queryClientes) QUERIES.clientes = config.queryClientes;
       if (config.queryRefacciones) QUERIES.refacciones = config.queryRefacciones;
       if (config.querySitios) QUERIES.sitios = config.querySitios;
+      if (config.queryMaquinaria) QUERIES.maquinaria = config.queryMaquinaria;
       // if (config.mappings && config.mappings.sitios) MAPPINGS.sitios = config.mappings.sitios; // DESHABILITADO temporalmente
+      // if (config.mappings && config.mappings.maquinaria) MAPPINGS.maquinaria = config.mappings.maquinaria; // DESHABILITADO temporalmente
       log('⚙️ Configuración de queries cargada desde la nube.');
     }
   } catch (err) {
@@ -179,6 +206,7 @@ async function main() {
       syncClientes(),
       syncRefacciones(),
       syncSitios(),
+      syncMaquinaria()
     ]);
 
     resultados.forEach((r, i) => {
