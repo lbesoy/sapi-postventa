@@ -6179,6 +6179,16 @@ function verDetalleTicket(id) {
             </label>
           </div>
           <div class="form-group full-width" style="margin-top:0.75rem;">
+            <label>Tipo de Visita *</label>
+            <select id="quick-tipo-${t.id}" onchange="if(this.value==='Otro') document.getElementById('quick-tipo-otro-${t.id}').style.display='block'; else document.getElementById('quick-tipo-otro-${t.id}').style.display='none';">
+              <option value="Servicio">Servicio</option>
+              <option value="Garantía">Garantía</option>
+              <option value="Inspección">Inspección</option>
+              <option value="Otro">Otro...</option>
+            </select>
+            <input type="text" id="quick-tipo-otro-${t.id}" placeholder="Especifica el tipo de visita..." style="display:none; margin-top:0.5rem;" />
+          </div>
+          <div class="form-group full-width" style="margin-top:0.75rem;">
             <label>Técnicos Asignados *</label>
             <div id="quick-tecnicos-${t.id}" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:0.5rem; margin-top:0.5rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: rgba(0,0,0,0.02); max-height: 200px; overflow-y: auto;">
               ${usuarios.filter(u => u.rol === 'tecnico').map(u => `
@@ -6249,6 +6259,8 @@ async function cerrarCotizacionTicket(id) {
   let pedidoSAP = '';
   let pdfPedidoBase64 = t.pdfPedido || null;
   let tecnicosAsignados = t.tecnicosAsignados || [];
+  let tipoVisitaSeleccionado = 'Servicio';
+  
   if (aceptada === 'no') {
     motivo = document.getElementById(`quick-motivo-text-${id}`)?.value.trim();
     if (!motivo) {
@@ -6259,6 +6271,18 @@ async function cerrarCotizacionTicket(id) {
     pedidoSAP = document.getElementById(`quick-pedido-sap-${id}`)?.value.trim();
     const pdfUpload = document.getElementById(`quick-pedido-pdf-${id}`)?.files.length > 0;
     const selectedT = Array.from(document.querySelectorAll(`input[name="quick-tecnicos-${id}"]:checked`)).map(cb => cb.value);
+    
+    const selTipo = document.getElementById(`quick-tipo-${id}`)?.value;
+    const txtTipoOtro = document.getElementById(`quick-tipo-otro-${id}`)?.value.trim();
+    if (selTipo === 'Otro') {
+      if (!txtTipoOtro) {
+        mostrarNotificacion('Debes especificar el tipo de visita.', 'warning');
+        return;
+      }
+      tipoVisitaSeleccionado = txtTipoOtro;
+    } else if (selTipo) {
+      tipoVisitaSeleccionado = selTipo;
+    }
     
     if (!pedidoSAP) {
       mostrarNotificacion('Debes ingresar el Número de Pedido SAP.', 'warning');
@@ -6329,7 +6353,7 @@ async function cerrarCotizacionTicket(id) {
         tecnicosAsignados: tecnicosAsignados,
         soporte: t.id,
         km_ida: '', km_vuelta: '', km_total: '',
-        tipo: 'Servicio',
+        tipo: tipoVisitaSeleccionado,
         estado: 'Pendiente',
         falla: (t.asunto ? t.asunto + '\n' : '') + (t.descripcion || ''),
         trabajos: '', dictamen: '', condiciones: '',
