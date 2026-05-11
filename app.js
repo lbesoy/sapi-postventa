@@ -5124,21 +5124,33 @@ function renderRefacciones() {
   
   let html = '';
   refaccionesDb.forEach(r => {
+    let itemId = r.idInterno || r.codigo || r.id || 'N/A';
+    let itemName = r.nombre || r.descripcion || 'undefined';
+    let itemGrupo = r.grupo || r.ItmsGrpNam || 'N/A';
+    let itemStock = r.stock || 0;
+    
+    let itemOrigen = r.origen;
+    if (!itemOrigen && itemId !== 'N/A') {
+      itemOrigen = itemId.toUpperCase().endsWith('N') ? 'Nacional' : 'Importado';
+    } else if (!itemOrigen) {
+      itemOrigen = 'N/A';
+    }
+
     if (q) {
-      const match = (r.idInterno || '').toLowerCase().includes(q) || 
-                    (r.nombre || '').toLowerCase().includes(q) ||
-                    (r.grupo || '').toLowerCase().includes(q);
+      const match = itemId.toLowerCase().includes(q) || 
+                    itemName.toLowerCase().includes(q) ||
+                    itemGrupo.toLowerCase().includes(q);
       if (!match) return;
     }
     
     html += `
       <tr>
-        <td style="font-family: monospace; font-weight: 500;">${r.idInterno || 'N/A'}</td>
-        <td style="font-weight: 500; color: var(--text-primary); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${r.nombre}">${r.nombre}</td>
-        <td><span class="status-badge status-open" style="background:var(--bg-secondary); color:var(--text-secondary);">${r.grupo || 'N/A'}</span></td>
+        <td style="font-family: monospace; font-weight: 500;">${itemId}</td>
+        <td style="font-weight: 500; color: var(--text-primary); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${itemName}">${itemName}</td>
+        <td><span class="status-badge status-open" style="background:var(--bg-secondary); color:var(--text-secondary);">${itemGrupo}</span></td>
         <td style="font-family: monospace; font-weight: 500;">$${Number(r.precio||0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2})}</td>
-        <td style="font-weight: 500; color: ${r.stock > 0 ? 'var(--green)' : 'var(--red)'};">${r.stock}</td>
-        <td><span class="badge ${r.origen === 'Nacional' ? 'badge-completado' : (r.origen === 'Importado' ? 'badge-proceso' : 'badge-pendiente')}">${r.origen || 'N/A'}</span></td>
+        <td style="font-weight: 500; color: ${itemStock > 0 ? 'var(--green)' : 'var(--red)'};">${itemStock}</td>
+        <td><span class="badge ${itemOrigen === 'Nacional' ? 'badge-completado' : (itemOrigen === 'Importado' ? 'badge-proceso' : 'badge-pendiente')}">${itemOrigen}</span></td>
         <td>
            <button class="action-btn" onclick="mostrarNotificacion('Vista de detalle en construcción', 'info')" title="Ver detalles"><i data-lucide="eye"></i></button>
         </td>
