@@ -21,11 +21,16 @@ const SAP_PASS     = process.env.SAP_PASSWORD;
 const SUPABASE_URL = 'https://mupevytlssqcbhlmzmcp.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11cGV2eXRsc3NxY2JobG16bWNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NjE0MzUsImV4cCI6MjA5MzMzNzQzNX0.sdAI9nJluJCP6skq0lfdj8CQvFEyqqV4z6ntbqvQdPY';
 
-// Queries configurados (deben coincidir con los del CRM)
-const QUERIES = {
+// Queries configurados (se sobreescriben con la config de Supabase)
+let QUERIES = {
   clientes:    'eurorep_clientes',
   refacciones: 'CAT_REFACCIONES',
   sitios:      'CAT_Sitos',
+};
+
+// Mapeos configurados (se sobreescriben con la config de Supabase)
+let MAPPINGS = {
+  sitios: null
 };
 
 const agent = new https.Agent({ rejectUnauthorized: false });
@@ -120,18 +125,42 @@ async function syncRefacciones() {
 async function syncSitios() {
   log('Sincronizando Sitios...');
   const raw = await fetchQuery(QUERIES.sitios);
-  const rows = raw.map(s => ({
-    id:       s.Address || s.AddressName || null,
-    nombre:   s.AddressName || s.Street || s.Address || 'Sitio Sin Nombre',
-    cliente:  s.BPCode || s.CardCode || '',
-    direccion:s.Block || s.Street || '',
-    cp:       s.ZipCode || '',
-    ciudad:   s.City || '',
-    estado:   s.State || '',
-    custom_data: {}
-  })).filter(r => r.id);
+  const m = MAPPINGS.sitios || {};
+  
+  const rows = raw.map(s => {
+    return {
+      id:       s[m.id] || s.Address || s.AddressName || null,
+      nombre:   s[m.nombre] || s.AddressName || s.Street || s.Address || 'Sitio Sin Nombre',
+      cliente:  s[m.cliente] || s.BPCode || s.CardCode || s.Cliente || '',
+      direccion:s[m.direccion] || s.Block || s.Street || '',
+      cp:       s[m.cp] || s.ZipCode || '',
+      ciudad:   s[m.ciudad] || s.City || '',
+      estado:   s[m.estado] || s.State || '',
+      custom_data: {}
+    };
+  }).filter(r => r.id);
+  
   const n = await upsertSupabase('sitios', rows);
   log(`✅ Sitios: ${n} registros sincronizados a Supabase.`);
+}
+
+async function loadConfigFromSupabase() {
+  try {
+    const res = await axios.get(
+      `${SUPABASE_URL}/rest/v1/config?id=eq.main&select=data`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    if (res.data && res.data.length > 0 && res.data[0].data) {
+      const config = res.data[0].data;
+      if (config.queryClientes) QUERIES.clientes = config.queryClientes;
+      if (config.queryRefacciones) QUERIES.refacciones = config.queryRefacciones;
+      if (config.querySitios) QUERIES.sitios = config.querySitios;
+      if (config.mappings && config.mappings.sitios) MAPPINGS.sitios = config.mappings.sitios;
+      log('⚙️ Configuración de queries y mapeos cargada desde la nube.');
+    }
+  } catch (err) {
+    log(`⚠️ Advertencia: No se pudo cargar config de la nube (${err.message}). Usando defaults.`);
+  }
 }
 
 // ── 5. Main ───────────────────────────────────────────────────────
@@ -143,6 +172,7 @@ async function main() {
   log('═══════════════════════════════════════════');
 
   try {
+    await loadConfigFromSupabase();
     await loginSAP();
 
     const resultados = await Promise.allSettled([
