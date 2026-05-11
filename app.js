@@ -1910,12 +1910,12 @@ async function fetchSitiosSAP() {
     
     const sitiosMapeados = sapData.map(s => {
       const sitioObj = {
-        id: s[map.id] || '',
-        nombre: s[map.nombre] || 'Sitio Desconocido',
-        cliente: s[map.clienteId || map.cliente] || '',
-        direccion: s[map.direccion] || '',
-        cp: s[map.cp] || '',
-        ciudad: s[map.ciudad] || ''
+        id: s[map.id] || s.Address || s.AddressName || '',
+        nombre: s[map.nombre] || s.AddressName || s.Street || s.Address || 'Sitio Sin Nombre',
+        cliente: s[map.clienteId || map.cliente] || s.BPCode || s.CardCode || s.Cliente || s.CardName || '',
+        direccion: s[map.direccion] || s.Block || s.Street || '',
+        cp: s[map.cp] || s.ZipCode || '',
+        ciudad: s[map.ciudad] || s.City || ''
       };
       if (map.customCols && map.customCols.length > 0) {
         sitioObj.customData = {};
