@@ -26,7 +26,8 @@ let QUERIES = {
   clientes:    'eurorep_clientes',
   refacciones: 'CAT_REFACCIONES',
   sitios:      'CAT_Sitos',
-  maquinaria:  'CAT_MAQUINARIA'
+  maquinaria:  'CAT_MAQUINARIA',
+  tecnicos:    'eurorep_tecnicos'
 };
 
 // Mapeos configurados (se sobreescriben con la config de Supabase)
@@ -165,6 +166,27 @@ async function syncMaquinaria() {
   log(`✅ Maquinaria: ${n} registros sincronizados a Supabase.`);
 }
 
+async function syncTecnicos() {
+  log('Sincronizando Técnicos...');
+  const raw = await fetchQuery(QUERIES.tecnicos);
+  
+  const rows = raw.map(t => {
+    return {
+      id:          t.empID || t.EmployeeID || t.firstName || null,
+      nombre:      t.firstName ? `${t.firstName} ${t.lastName || ''}`.trim() : t.Name || 'Sin Nombre',
+      tipoUsuario: t.jobTitle || t.Position || 'tecnico',
+      departamento: t.dept || t.Department || '',
+      email:       t.email || '',
+      telefono:    t.mobile || t.officeExt || '',
+      activo:      true,
+      custom_data: {}
+    };
+  }).filter(r => r.id);
+  
+  const n = await upsertSupabase('tecnicos', rows);
+  log(`✅ Técnicos: ${n} registros sincronizados a Supabase.`);
+}
+
 async function loadConfigFromSupabase() {
   try {
     const res = await axios.get(
@@ -177,6 +199,7 @@ async function loadConfigFromSupabase() {
       if (config.queryRefacciones) QUERIES.refacciones = config.queryRefacciones;
       if (config.querySitios) QUERIES.sitios = config.querySitios;
       if (config.queryMaquinaria) QUERIES.maquinaria = config.queryMaquinaria;
+      if (config.queryTecnicos) QUERIES.tecnicos = config.queryTecnicos;
       // if (config.mappings && config.mappings.sitios) MAPPINGS.sitios = config.mappings.sitios; // DESHABILITADO temporalmente
       // if (config.mappings && config.mappings.maquinaria) MAPPINGS.maquinaria = config.mappings.maquinaria; // DESHABILITADO temporalmente
       log('⚙️ Configuración de queries cargada desde la nube.');
@@ -202,7 +225,8 @@ async function main() {
       syncClientes(),
       syncRefacciones(),
       syncSitios(),
-      syncMaquinaria()
+      syncMaquinaria(),
+      syncTecnicos()
     ]);
 
     resultados.forEach((r, i) => {
