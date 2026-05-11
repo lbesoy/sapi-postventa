@@ -175,10 +175,14 @@ async function fetchRefaccionesSAP() {
       }
 
       const refObj = {
+        id: idInternoVal, // Required for Supabase UPSERT
+        codigo: idInternoVal, // Mapped for Supabase
         idInterno: idInternoVal,
         nombre: item[map.nombre] || 'Sin Nombre',
+        descripcion: item[map.nombre] || 'Sin Nombre', // Mapped for Supabase
         grupo: item[map.grupo] || '',
         precio: item[map.precio] || 0,
+        moneda: item[map.moneda] || 'MXN', // Mapped for Supabase
         stock: item[map.stock] || 0,
         origen: origenCalculado
       };
@@ -555,6 +559,18 @@ window.addEventListener('supabase_datos_cargados', () => {
   // Si estamos en la vista de configuración, actualizar los campos
   if (document.getElementById('view-configuracion').classList.contains('active')) {
     cargarConfig();
+  }
+  
+  // Refrescar vistas activas para mostrar los datos recién bajados de la nube
+  if (document.getElementById('view-clientes').classList.contains('active')) renderClientes();
+  if (document.getElementById('view-maquinaria').classList.contains('active')) {
+    if (typeof renderMaquinaria === 'function') renderMaquinaria();
+  }
+  if (document.getElementById('view-sitios').classList.contains('active')) {
+    if (typeof renderSitios === 'function') renderSitios();
+  }
+  if (document.getElementById('view-refacciones').classList.contains('active')) {
+    if (typeof renderRefacciones === 'function') renderRefacciones();
   }
 });
 
