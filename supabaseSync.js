@@ -265,6 +265,20 @@ async function cargarDatosDeSupabase() {
       localStorage.setItem('eurorep_usuarios', JSON.stringify(usuarios));
     }
 
+    // Config y Saldos
+    const { data: configDb } = await sb.from('config').select('*');
+    let saldosSap = {};
+    if (configDb && configDb.length > 0) {
+      const mainCfg = configDb.find(c => c.id === 'main');
+      if (mainCfg && mainCfg.data) {
+        localStorage.setItem('eurorep_config', JSON.stringify(mainCfg.data));
+      }
+      const saldosCfg = configDb.find(c => c.id === 'saldos_sap');
+      if (saldosCfg && saldosCfg.data) {
+        saldosSap = saldosCfg.data;
+      }
+    }
+
     // Clientes
     const { data: clientes } = await sb.from('clientes').select('*');
     if (clientes && clientes.length > 0) {
@@ -272,9 +286,17 @@ async function cargarDatosDeSupabase() {
       const mergedClientes = clientes.map(c => {
         const row = rowToCliente(c);
         const local = localClientes.find(lc => lc.id === row.id);
-        if (local) {
+        
+        // Priorizar saldos_sap provenientes del backend background sync
+        if (saldosSap[row.id]) {
+          row.saldoCuenta = saldosSap[row.id].saldoCuenta || 0;
+          row.saldoOrdenes = saldosSap[row.id].saldoOrdenes || 0;
+        } else if (local) {
           row.saldoCuenta = local.saldoCuenta || 0;
           row.saldoOrdenes = local.saldoOrdenes || 0;
+        } else {
+          row.saldoCuenta = 0;
+          row.saldoOrdenes = 0;
         }
         return row;
       });
@@ -322,11 +344,7 @@ async function cargarDatosDeSupabase() {
       localStorage.setItem('sapi_refacciones_db', JSON.stringify(mapped));
     }
 
-    // Config
-    const { data: configDb } = await sb.from('config').select('*');
-    if (configDb && configDb.length > 0 && configDb[0].data) {
-      localStorage.setItem('eurorep_config', JSON.stringify(configDb[0].data));
-    }
+    // La tabla config ahora se procesa arriba antes que clientes.
 
     // Roles
     const { data: rolesDb } = await sb.from('roles').select('*');

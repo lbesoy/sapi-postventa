@@ -123,6 +123,36 @@ async function syncClientes() {
   
   const n = await upsertSupabase('clientes', rows);
   log(`✅ Clientes: ${n} registros sincronizados a Supabase.`);
+
+  // Guardar saldos en la tabla config (id: 'saldos_sap') para evitar problemas de schema
+  try {
+    const saldosData = {};
+    raw.forEach(bp => {
+      const idVal = bp.CardCode;
+      if (idVal) {
+        saldosData[idVal] = {
+          saldoCuenta: bp.Balance || 0,
+          saldoOrdenes: bp.OrdersBal || 0
+        };
+      }
+    });
+    
+    await axios.post(
+      `${SUPABASE_URL}/rest/v1/config`,
+      { id: 'saldos_sap', data: saldosData },
+      {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates,return=minimal'
+        }
+      }
+    );
+    log(`✅ Saldos de clientes guardados en config ('saldos_sap').`);
+  } catch (e) {
+    err(`Error al guardar saldos en config: ${e.message}`);
+  }
 }
 
 async function syncRefacciones() {
@@ -163,7 +193,8 @@ async function syncSitios() {
   }).filter(r => r.id);
   
   const n = await upsertSupabase('sitios', rows);
-
+  log(`✅ Sitios: ${n} registros sincronizados a Supabase.`);
+}
 
 async function syncTecnicos() {
   log('Sincronizando Técnicos...');
