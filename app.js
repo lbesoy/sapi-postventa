@@ -142,7 +142,7 @@ async function fetchClientesSAP() {
   } catch (error) {
     console.error('Error conectando al puente SAP:', error);
     mostrarNotificacion(`⚠️ SAP: ${error.message}`, 'warning');
-    return clientesDb; // Fallback a datos locales
+    return null; // Do NOT fallback to local data, otherwise caller assumes success
   }
 }
 
@@ -1717,7 +1717,7 @@ async function forzarSincronizacionSAP() {
   
   try {
     const newDataCli = await fetchClientesSAP();
-    if (newDataCli && newDataCli.length > 0) {
+    if (newDataCli) {
       newDataCli.forEach(newCli => {
         const oldCli = clientesDb.find(c => c.nombre === newCli.nombre || c.id === newCli.id);
         if (oldCli) {
@@ -1739,6 +1739,8 @@ async function forzarSincronizacionSAP() {
         for (const c of clientesDb) window.pushToSupabase('clientes', c);
       }
       hasSyncedSAPThisSession = true;
+    } else {
+        mostrarNotificacion('⚠️ Fallo al sincronizar clientes con SAP.', 'error');
     }
 
     const newDataRef = await fetchRefaccionesSAP();
@@ -1860,6 +1862,8 @@ async function sincronizarModuloSAP(modulo, btnEl) {
         if (window.pushToSupabase) for (const c of clientesDb) window.pushToSupabase('clientes', c);
         renderClientes();
         mostrarNotificacion(`✅ Clientes actualizados (${data.length} registros) y guardados en la nube.`, 'success');
+      } else if (data === null) {
+        // fetchClientesSAP returned null due to an error, UI already showed warning.
       }
     } else if (modulo === 'refacciones') {
       const data = await fetchRefaccionesSAP();
@@ -2027,6 +2031,8 @@ async function sincronizarUnCliente() {
       mostrarNotificacion('Datos del cliente actualizados desde SAP.', 'success');
       verDetalleCliente(currentViewClientName); // Refrescar el modal
       renderClientes(); // Refrescar grid de fondo
+    } else if (newData === null) {
+      // Failed. Warning is already displayed by fetchClientesSAP.
     }
   } catch (error) {
     console.error("Error SAP single:", error);
