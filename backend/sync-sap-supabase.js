@@ -155,8 +155,8 @@ async function loadConfigFromSupabase() {
       if (config.queryClientes) QUERIES.clientes = config.queryClientes;
       if (config.queryRefacciones) QUERIES.refacciones = config.queryRefacciones;
       if (config.querySitios) QUERIES.sitios = config.querySitios;
-      if (config.mappings && config.mappings.sitios) MAPPINGS.sitios = config.mappings.sitios;
-      log('⚙️ Configuración de queries y mapeos cargada desde la nube.');
+      // if (config.mappings && config.mappings.sitios) MAPPINGS.sitios = config.mappings.sitios; // DESHABILITADO temporalmente
+      log('⚙️ Configuración de queries cargada desde la nube.');
     }
   } catch (err) {
     log(`⚠️ Advertencia: No se pudo cargar config de la nube (${err.message}). Usando defaults.`);
