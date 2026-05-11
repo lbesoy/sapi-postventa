@@ -3555,6 +3555,7 @@ function guardarNuevaMaquina(e) {
   }
   
   localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+  if (window.pushToSupabase) window.pushToSupabase('clientes', clienteObj);
   
   cerrarModalAgregarMaquina();
   if (document.getElementById('view-clientes').classList.contains('active')) {
@@ -3617,6 +3618,7 @@ function guardarMoverMaquina(e) {
       }
       
       localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+      if (window.pushToSupabase) window.pushToSupabase('clientes', clienteObj);
       
       cerrarModalMoverMaquina();
       
@@ -6249,6 +6251,7 @@ function guardarSitioCliente(e) {
       direccion, cp, ciudad, estado
     });
     localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+    if (window.pushToSupabase) window.pushToSupabase('clientes', clienteObj);
   }
   
   cerrarModalSitio();
