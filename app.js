@@ -4685,14 +4685,19 @@ function verDetalle(id) {
                  <p style="text-align:center; color:var(--text-muted); font-size:0.8rem; margin-top:0.5rem; margin-bottom:0;">Cliente: ${o.cliente || '—'}</p>
                </div>
                <button class="btn-secondary" onclick="limpiarFirma('${o.id}', 'cliente')" style="font-size:0.8rem; margin-top:1rem;"><i data-lucide="eraser" style="width:14px;height:14px;"></i> Volver a firmar</button>` 
-            : `<div style="width:100%;">
+            : (!o.firma_tecnico_base64 
+               ? `<div style="width:100%; text-align:center; padding: 2rem 1rem; border: 1px dashed var(--border); border-radius: 8px; color: var(--text-muted); font-size: 0.9rem;">
+                    <i data-lucide="lock" style="width:24px;height:24px;margin-bottom:0.5rem;"></i><br>
+                    El técnico debe firmar primero para habilitar la firma del cliente.
+                  </div>`
+               : `<div style="width:100%;">
                  <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.5rem;">Firme en el recuadro blanco usando el dedo o mouse:</p>
                  <canvas id="firma-cliente-canvas" width="400" height="150" style="width:100%; height:150px; background:white; border:2px dashed var(--border); border-radius:8px; cursor:crosshair; touch-action:none;"></canvas>
                  <div style="display:flex; gap:0.5rem; margin-top:0.5rem; justify-content:space-between;">
                    <button class="btn-secondary" onclick="borrarCanvasFirma('cliente')" style="flex:1;">Borrar</button>
                    <button class="btn-primary" onclick="guardarFirmaCanvas('${o.id}', 'cliente')" style="flex:2;">Guardar Firma Cliente</button>
                  </div>
-               </div>`
+               </div>`)
           }
         </div>
         
@@ -4706,7 +4711,7 @@ function verDetalle(id) {
   
   setTimeout(() => {
     if (!o.firma_tecnico_base64) inicializarCanvasFirma('tecnico');
-    if (!o.firma_cliente_base64) inicializarCanvasFirma('cliente');
+    if (o.firma_tecnico_base64 && !o.firma_cliente_base64) inicializarCanvasFirma('cliente');
   }, 100);
 }
 
