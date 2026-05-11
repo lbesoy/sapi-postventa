@@ -6199,6 +6199,8 @@ function generarIdInternoMaquina(marca, anioVenta) {
   const prefix = iniciales + yy;
   
   let max = 0;
+  
+  // Revisar en clientesDb (manuales)
   clientesDb.forEach(c => {
     if (c.maquinas) {
       c.maquinas.forEach(maq => {
@@ -6209,8 +6211,16 @@ function generarIdInternoMaquina(marca, anioVenta) {
       });
     }
   });
+
+  // Revisar también en maquinariaDb (SAP)
+  maquinariaDb.forEach(maq => {
+    if (maq.idInterno && maq.idInterno.startsWith(prefix)) {
+      const num = parseInt(maq.idInterno.substring(prefix.length), 10);
+      if (!isNaN(num) && num > max) max = num;
+    }
+  });
   
-  return prefix + (max + 1).toString().padStart(2, '0');
+  return prefix + (max + 1).toString().padStart(3, '0');
 }
 
 function agregarSitioClienteDesdeEmpresa() {
