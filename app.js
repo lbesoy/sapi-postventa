@@ -592,12 +592,11 @@ function applyRole(rolKey) {
   });
 
   // Update session badge
-  if (user) {
-    document.getElementById('session-avatar').textContent = user.nombre[0].toUpperCase();
-    document.getElementById('session-name').textContent = user.nombre;
-    document.getElementById('session-role').textContent = ROLES[currentSession.viewMode]?.label || '';
-    document.getElementById('session-avatar').style.background = ROLES[currentSession.viewMode]?.color || 'var(--accent)';
-  }
+  const sessionName = user?.nombre || currentSession.nombre || 'Usuario';
+  document.getElementById('session-avatar').textContent = sessionName[0].toUpperCase();
+  document.getElementById('session-name').textContent = sessionName;
+  document.getElementById('session-role').textContent = ROLES[currentSession.viewMode]?.label || '';
+  document.getElementById('session-avatar').style.background = ROLES[currentSession.viewMode]?.color || 'var(--accent)';
 
   // Rename Maquinaria text if Empresa
   const isEmpresa = rolKey === 'empresa';
