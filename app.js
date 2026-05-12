@@ -155,13 +155,31 @@ async function fetchRefaccionesSAP() {
     }
 
     // 1. Fetch brand catalog from @OK_MARCA UDO table
-    let marcaMap = {};
+    // Fallback hardcoded from known SAP @OK_MARCA data
+    const MARCAS_FALLBACK = {
+      'ETP': 'ESSER TWIN PIPES', 'BCR': 'BCR', 'PTZ': 'PUTZMEISTER', 'SCH': 'SCHWING',
+      'CIF': 'CIFA', 'MTM': 'MTM', 'MCN': 'MCNELIUS', 'LON': 'LONDON', 'CAS': 'CASAGRANDE',
+      'OTM': 'OTRAS MARCAS', 'CNF': 'CONFORMS', 'TFB': 'TEUFELBERGER', 'RBC': 'REBEL CRUSHER',
+      'RBM': 'RUBBLE MASTER', 'FIO': 'FIORI', 'EVE': 'EVERDIGM', 'POR': 'PORTAFILL',
+      'SIM': 'SIMEM', 'TUR': 'TURBOSOL', 'MBC': 'MB CUCHARAS', 'DOR': 'DORNER',
+      'KNK': 'KINGKONG', 'HYU': 'HYUNDAI EVERDIGM', 'HER': 'HERRAMIENTA',
+      'EBS': 'EBOSS', 'RCR': 'RUBBLE CRUSHER'
+    };
+    let marcaMap = { ...MARCAS_FALLBACK };
     try {
       const marcaRes = await fetch(`${API_CONFIG.BASE_URL}/sap/udo/OK_MARCA`);
       const marcaJson = await marcaRes.json();
-      (marcaJson.data || []).forEach(m => { marcaMap[m.Code] = m.Name; });
+      const udoItems = marcaJson.data || [];
+      if (udoItems.length > 0) {
+        udoItems.forEach(m => {
+          const code = (m.Code || m.code || '').trim().toUpperCase();
+          const name = m.Name || m.name || '';
+          if (code && name) marcaMap[code] = name;
+        });
+        console.log(`✅ UDO @OK_MARCA cargado: ${udoItems.length} marcas`);
+      }
     } catch(e) {
-      console.warn('No se pudo cargar catálogo de marcas:', e.message);
+      console.warn('UDO no disponible, usando mapa de marcas de respaldo:', e.message);
     }
 
     // 2. Fetch refacciones
@@ -177,8 +195,8 @@ async function fetchRefaccionesSAP() {
     const refaccionesMapeadas = sapData.map(item => {
       const idInternoVal = item[map.id] || item.ItemCode || '';
       
-      // Resolve marca: try Name field first (if query returns it), then code lookup, then raw code
-      const marcaCodigo = item.U_MARCA || item.MarcaCode || '';
+      // Resolve marca: normalize code then lookup full name from map
+      const marcaCodigo = (item.U_MARCA || item.MarcaCode || '').trim().toUpperCase();
       const marcaNombre = item.Name || marcaMap[marcaCodigo] || (marcaCodigo || 'N/A');
 
       // Calculate origen from ItemCode suffix
