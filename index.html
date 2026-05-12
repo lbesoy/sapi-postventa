@@ -468,9 +468,9 @@
     <div id="view-refacciones" class="view">
       
       <!-- TABS -->
-      <div class="dash-tabs" style="margin-bottom: 1.5rem;">
-        <button class="dash-tab active" id="btn-tab-ref-catalogo" onclick="switchRefTab('catalogo')"><i data-lucide="book"></i> Catálogo SAP</button>
-        <button class="dash-tab" id="btn-tab-ref-pendientes" onclick="switchRefTab('pendientes')"><i data-lucide="clock"></i> Piezas Pendientes (Órdenes)</button>
+      <div class="view-toggle" style="display:flex; gap:0.5rem; background: var(--bg-hover); padding: 0.3rem; border-radius: var(--radius-md); border: 1px solid var(--border); width: fit-content; margin-bottom: 1.5rem;">
+        <button class="btn-secondary active" id="btn-tab-ref-catalogo" onclick="switchRefTab('catalogo')" style="padding:0.4rem 1rem; border:none; background:var(--bg-card); box-shadow:0 1px 3px rgba(0,0,0,0.1); color:var(--text-primary); font-weight:600;"><i data-lucide="book" style="width:16px;height:16px;margin-right:6px;vertical-align:text-bottom;"></i> Catálogo SAP</button>
+        <button class="btn-secondary" id="btn-tab-ref-pendientes" onclick="switchRefTab('pendientes')" style="padding:0.4rem 1rem; border:none; background:transparent; color:var(--text-muted); font-weight:500;"><i data-lucide="clock" style="width:16px;height:16px;margin-right:6px;vertical-align:text-bottom;"></i> Piezas Pendientes (Órdenes)</button>
       </div>
 
       <div id="ref-tab-catalogo">

@@ -5710,13 +5710,37 @@ function switchRefTab(tab) {
   const pen = document.getElementById('ref-tab-pendientes');
   
   if (tab === 'catalogo') {
-    if (btnCat) btnCat.classList.add('active');
-    if (btnPen) btnPen.classList.remove('active');
+    if (btnCat) {
+      btnCat.classList.add('active');
+      btnCat.style.background = 'var(--bg-card)';
+      btnCat.style.color = 'var(--text-primary)';
+      btnCat.style.fontWeight = '600';
+      btnCat.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+    }
+    if (btnPen) {
+      btnPen.classList.remove('active');
+      btnPen.style.background = 'transparent';
+      btnPen.style.color = 'var(--text-muted)';
+      btnPen.style.fontWeight = '500';
+      btnPen.style.boxShadow = 'none';
+    }
     if (cat) cat.style.display = 'block';
     if (pen) pen.style.display = 'none';
   } else {
-    if (btnCat) btnCat.classList.remove('active');
-    if (btnPen) btnPen.classList.add('active');
+    if (btnCat) {
+      btnCat.classList.remove('active');
+      btnCat.style.background = 'transparent';
+      btnCat.style.color = 'var(--text-muted)';
+      btnCat.style.fontWeight = '500';
+      btnCat.style.boxShadow = 'none';
+    }
+    if (btnPen) {
+      btnPen.classList.add('active');
+      btnPen.style.background = 'var(--bg-card)';
+      btnPen.style.color = 'var(--text-primary)';
+      btnPen.style.fontWeight = '600';
+      btnPen.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+    }
     if (cat) cat.style.display = 'none';
     if (pen) pen.style.display = 'block';
     renderRefaccionesPendientes();
