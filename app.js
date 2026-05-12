@@ -646,7 +646,7 @@ window.addEventListener('supabase_datos_cargados', () => {
   usuarios = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
   
   // Si estamos en la vista de configuración, actualizar los campos
-  if (document.getElementById('view-configuracion').classList.contains('active')) {
+  if (document.getElementById('view-config')?.classList.contains('active')) {
     cargarConfig();
   }
   
