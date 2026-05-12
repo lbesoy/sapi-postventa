@@ -3492,6 +3492,18 @@ function editarMaquina(clienteNombre, idInterno) {
   document.getElementById('agregar-maquina-title').textContent = 'Editar Máquina';
   
   const select = document.getElementById('am-cliente');
+  
+  let optionExists = false;
+  for (let i = 0; i < select.options.length; i++) {
+    if (select.options[i].value === clienteNombre) { optionExists = true; break; }
+  }
+  if (!optionExists && clienteNombre) {
+    const opt = document.createElement('option');
+    opt.value = clienteNombre;
+    opt.textContent = clienteNombre;
+    select.appendChild(opt);
+  }
+  
   select.value = clienteNombre;
   if (currentSession.viewMode === 'superadmin') {
     select.removeAttribute('disabled');
@@ -3513,25 +3525,26 @@ function editarMaquina(clienteNombre, idInterno) {
         const sName = getSitioNombre(s);
         optionsHtml += `<option value="${sName}">${sName}</option>`;
       });
-      optionsHtml += '<option value="otra">Otra...</option>';
-      selectUbicacion.innerHTML = optionsHtml;
-      
-      const newSelectUbicacion = selectUbicacion.cloneNode(true);
-      selectUbicacion.parentNode.replaceChild(newSelectUbicacion, selectUbicacion);
-      
-      newSelectUbicacion.addEventListener('change', function() {
-        if (this.value === 'otra') {
-          inputOtraUbicacion.style.display = 'block';
-          inputOtraUbicacion.focus();
-        } else {
-          inputOtraUbicacion.style.display = 'none';
-        }
-      });
-      
-      let maquina = clienteObj?.maquinas?.find(m => m.idInterno === idInterno);
-      if (!maquina) maquina = maquinariaDb.find(m => m.idInterno === idInterno);
-      
-      if (maquina) {
+    }
+    optionsHtml += '<option value="otra">Otra...</option>';
+    selectUbicacion.innerHTML = optionsHtml;
+    
+    const newSelectUbicacion = selectUbicacion.cloneNode(true);
+    selectUbicacion.parentNode.replaceChild(newSelectUbicacion, selectUbicacion);
+    
+    newSelectUbicacion.addEventListener('change', function() {
+      if (this.value === 'otra') {
+        inputOtraUbicacion.style.display = 'block';
+        inputOtraUbicacion.focus();
+      } else {
+        inputOtraUbicacion.style.display = 'none';
+      }
+    });
+    
+    let maquina = clienteObj?.maquinas?.find(m => m.idInterno === idInterno || m.id === idInterno || m.serie === idInterno);
+    if (!maquina) maquina = maquinariaDb.find(m => m.idInterno === idInterno || m.id === idInterno || m.serie === idInterno);
+    
+    if (maquina) {
         const selectMarca = document.getElementById('am-marca-select');
         const inputOtraMarca = document.getElementById('am-marca-otra');
         
@@ -3647,7 +3660,6 @@ function editarMaquina(clienteNombre, idInterno) {
           btnEliminar.style.display = isManual ? 'block' : 'none';
         }
       }
-    }
   }
 }
 
@@ -3697,7 +3709,7 @@ function guardarNuevaMaquina(e) {
       const clienteAntiguo = clientesDb.find(c => c.nombre === editandoMaquinaCliente);
       let maquinaDatos = { idInterno: editandoMaquinaId, marca, modelo, serie, anio, venta, ubicacion, latitud, longitud, tipo };
       if (clienteAntiguo && clienteAntiguo.maquinas) {
-        const oldIdx = clienteAntiguo.maquinas.findIndex(m => m.idInterno === editandoMaquinaId);
+        const oldIdx = clienteAntiguo.maquinas.findIndex(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
         if (oldIdx >= 0) {
            maquinaDatos = { ...clienteAntiguo.maquinas[oldIdx], ...maquinaDatos };
            clienteAntiguo.maquinas.splice(oldIdx, 1);
@@ -3706,7 +3718,7 @@ function guardarNuevaMaquina(e) {
       }
       clienteObj.maquinas.push(maquinaDatos);
     } else {
-      const maquinaIdx = clienteObj.maquinas.findIndex(m => m.idInterno === editandoMaquinaId);
+      const maquinaIdx = clienteObj.maquinas.findIndex(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
       if (maquinaIdx >= 0) {
         clienteObj.maquinas[maquinaIdx] = {
           ...clienteObj.maquinas[maquinaIdx],
@@ -5470,7 +5482,7 @@ function renderMaquinaria() {
     if (isEmpresa && m.cliente !== nombreEmpresaLogged) return;
     allMachines.push({
       cliente: m.cliente || 'N/A',
-      idInterno: m.idInterno || 'N/A',
+      idInterno: m.idInterno || m.id || m.serie || 'N/A',
       tipo: m.tipo || 'N/A',
       marca: m.marca || '',
       modelo: m.modelo || m.descripcion || 'Sin Modelo',
@@ -5492,12 +5504,12 @@ function renderMaquinaria() {
         // Solo evitamos duplicados si por algún milagro tienen el mismo ID interno exacto ya en la lista.
         const isDuplicate = allMachines.some(sm => sm.idInterno === m.idInterno);
         if (!isDuplicate) {
-          allMachines.push({
-            cliente: c.nombre,
-            idInterno: m.idInterno || 'N/A',
-            tipo: m.tipo || 'N/A',
-            marca: m.marca || '',
-            modelo: m.modelo || 'Sin Modelo',
+            allMachines.push({
+              cliente: c.nombre,
+              idInterno: m.idInterno || m.id || m.serie || 'N/A',
+              tipo: m.tipo || 'N/A',
+              marca: m.marca || '',
+              modelo: m.modelo || 'Sin Modelo',
             serie: m.serie || 'N/A',
             anio: m.anio || 'N/A',
             venta: m.venta || '',
