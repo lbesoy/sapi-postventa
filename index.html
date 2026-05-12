@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <link rel="stylesheet" href="style.css"/>
@@ -108,6 +109,9 @@
     </a>
     <a href="#" class="nav-item" data-view="servicios" data-title="Órdenes de Servicio" id="nav-servicios">
       <span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span>Órdenes de Servicio</span>
+    </a>
+    <a href="#" class="nav-item" data-view="calendario" data-title="Calendario" id="nav-calendario">
+      <span class="nav-icon"><i data-lucide="calendar"></i></span><span>Calendario</span>
     </a>
     <a href="#" class="nav-item" data-view="clientes" data-title="Clientes" id="nav-clientes">
       <span class="nav-icon"><i data-lucide="users"></i></span><span>Clientes</span>
@@ -351,6 +355,12 @@
     </div>
 
     <!-- CLIENTES VIEW -->
+    <div id="view-calendario" class="view">
+      <div id="calendar-container" style="background:var(--bg-card); padding:1rem; border-radius:var(--radius-lg); border:1px solid var(--border); box-shadow:var(--shadow-sm); min-height:600px;">
+        <!-- The calendar will be injected here -->
+      </div>
+    </div>
+    
     <div id="view-clientes" class="view">
       <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
         <h2>Catálogo de Clientes</h2>

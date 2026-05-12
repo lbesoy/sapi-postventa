@@ -1596,6 +1596,7 @@ function setupNav() {
 
       if (view === 'clientes') renderClientes();
       if (view === 'maquinaria') renderMaquinaria();
+      if (view === 'calendario') renderCalendario();
       if (view === 'sitios') renderSitios();
       if (view === 'config') {
         renderUsuariosList();
