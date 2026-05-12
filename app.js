@@ -5525,12 +5525,18 @@ function renderRefacciones(resetPage = false) {
     'KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA',
     'EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
   };
-  // Mapa de código numérico de grupo → nombre
+  // Mapa de código numérico de grupo → nombre (exacto de SAP)
   const GRUPOS_RENDER = {
-    101:'Refacciones', 102:'Refacciones Hidráulico', 103:'Refacciones Eléctrico',
-    104:'Refacciones Motor', 105:'Refacciones Transmisión', 106:'Refacciones Estructura',
-    107:'Gastos Operativos', 108:'Herramientas', 109:'Consumibles', 110:'Servicios',
-    111:'Anticipos'
+    101: 'Refacciones Cimentación',
+    102: 'Refacciones Plantas Concreto',
+    103: 'Refacciones Trituracion SAPI',
+    104: 'Refacciones Concreto',
+    105: 'Refacciones Ollas Revolvedoras',
+    106: 'Refacciones Bombas Concreto',
+    108: 'Herramienta',
+    109: 'Tubería',
+    110: 'Refacciones King Kong',
+    111: 'Anticipo'
   };
 
   // Filtrar: sin marca → excluir; busqueda
