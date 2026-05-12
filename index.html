@@ -702,8 +702,8 @@
               <button class="btn-primary" style="display:flex;align-items:center;gap:0.4rem;" onclick="abrirModalUsuario()">
                 <i data-lucide="user-plus" class="btn-icon"></i> Agregar Usuario
               </button>
-              <button class="action-btn btn-sync-sap" onclick="sincronizarConGitHub('all', this)" title="Sincronizar con SAP" style="height: 38px; width: 38px; display:flex; align-items:center; justify-content:center; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; transition:var(--transition);">
-                <i data-lucide="refresh-cw" class="icon-sync-sap" style="width:16px; height:16px;"></i>
+              <button class="action-btn" onclick="renderUsuariosList()" title="Actualizar lista de usuarios" style="height: 38px; width: 38px; display:flex; align-items:center; justify-content:center; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; transition:var(--transition);">
+                <i data-lucide="refresh-cw" style="width:16px; height:16px;"></i>
               </button>
             </div>
           </div>
