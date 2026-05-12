@@ -5534,10 +5534,13 @@ function renderRefacciones(resetPage = false) {
       });
     }
     
+    const itemMarcaCodigo = r.marcaCodigo || '';
+    
     html += `
       <tr>
-        <td style="font-weight: 500; color: var(--text-primary); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${itemName}">${itemName}</td>
-        <td><span style="color:var(--text-secondary); font-size: 0.85rem;">${itemMarca}</span></td>
+        <td style="font-weight: 500; color: var(--text-primary); max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${itemName}">${itemName}</td>
+        <td><span style="font-family:monospace; font-size:0.82rem; font-weight:600; color:var(--accent); background:var(--bg-body); border:1px solid var(--border); padding:2px 6px; border-radius:4px;">${itemMarcaCodigo || itemMarca}</span></td>
+        <td style="font-weight: 500; color: var(--text-primary);">${itemMarca}</td>
         <td><span class="status-badge status-open" style="background:var(--bg-secondary); color:var(--text-secondary);">${itemGrupo}</span></td>
         <td style="font-family: monospace; font-weight: 500;">$${Number(r.precio||0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2})}</td>
         <td style="font-weight: 500; color: ${itemStock > 0 ? 'var(--green)' : 'var(--red)'}">${itemStock}</td>
