@@ -5464,6 +5464,20 @@ function renderRefacciones() {
 
   const q = (document.getElementById('search-refacciones')?.value || '').toLowerCase();
   
+  // RENDERIZAR CABECERAS PERSONALIZADAS
+  const trHeader = document.querySelector('#view-refacciones .orders-table thead tr');
+  if (trHeader) {
+    trHeader.querySelectorAll('.custom-th-ref').forEach(el => el.remove());
+    if (configData?.mappings?.refacciones?.customCols) {
+      configData.mappings.refacciones.customCols.forEach(col => {
+        const th = document.createElement('th');
+        th.className = 'custom-th-ref';
+        th.textContent = col.label;
+        trHeader.insertBefore(th, trHeader.lastElementChild);
+      });
+    }
+  }
+
   let html = '';
   refaccionesDb.forEach(r => {
     let itemId = r.idInterno || r.codigo || r.id || 'N/A';
@@ -5485,6 +5499,13 @@ function renderRefacciones() {
       if (!match) return;
     }
     
+    let customTds = '';
+    if (configData?.mappings?.refacciones?.customCols) {
+      configData.mappings.refacciones.customCols.forEach(col => {
+        customTds += `<td style="font-size:0.85rem; color:var(--text-secondary);">${r.customData && r.customData[col.label] ? r.customData[col.label] : 'N/A'}</td>`;
+      });
+    }
+    
     html += `
       <tr>
         <td style="font-family: monospace; font-weight: 500;">${itemId}</td>
@@ -5493,6 +5514,7 @@ function renderRefacciones() {
         <td style="font-family: monospace; font-weight: 500;">$${Number(r.precio||0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2})}</td>
         <td style="font-weight: 500; color: ${itemStock > 0 ? 'var(--green)' : 'var(--red)'};">${itemStock}</td>
         <td><span class="badge ${itemOrigen === 'Nacional' ? 'badge-completado' : (itemOrigen === 'Importado' ? 'badge-proceso' : 'badge-pendiente')}">${itemOrigen}</span></td>
+        ${customTds}
         <td>
            <button class="action-btn" onclick="mostrarNotificacion('Vista de detalle en construcción', 'info')" title="Ver detalles"><i data-lucide="eye"></i></button>
         </td>
