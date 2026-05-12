@@ -37,6 +37,7 @@ window.addEventListener('supabase_datos_cargados', () => {
   renderTickets();
   renderTickets('dash-tickets');
   updateTicketBadge();
+  if (typeof renderMaquinaria === 'function') renderMaquinaria();
 });
 let editandoId = null;
 let editandoTicketId = null;
@@ -2715,21 +2716,36 @@ function verDetalleCliente(nombre) {
   `;
 
   // Máquinas
-  let allClientMachines = [...(clienteOb?.maquinas || [])];
+  let allClientMachines = [];
   
+  // 1. Agregar de maquinariaDb (SAP/Supabase)
   const maqClient = maquinariaDb.filter(m => m.cliente === nombre || m.cliente === clienteOb?.id || m.cliente === clienteOb?.rfc);
   maqClient.forEach(m => {
-      const isDuplicate = allClientMachines.some(sm => sm.idInterno === m.idInterno || sm.idInterno === m.id || sm.idInterno === m.serie);
+      allClientMachines.push({
+          idInterno: m.idInterno || m.id || m.serie || 'N/A',
+          uniqueId: m.id || m.idInterno,
+          marca: m.marca || '',
+          modelo: m.modelo || m.descripcion || 'Sin Modelo',
+          serie: m.serie || 'N/A',
+          anio: m.anio || 'N/A',
+          venta: m.venta || m.customData?.venta || '',
+          ubicacion: m.ubicacion || m.customData?.ubicacion || m.cliente || 'N/A'
+      });
+  });
+
+  // 2. Combinar con máquinas manuales (clientesDb)
+  (clienteOb?.maquinas || []).forEach(m => {
+      const isDuplicate = maqClient.some(sap => sap.id === m.idInterno || sap.serie === m.serie || sap.idInterno === m.idInterno);
       if (!isDuplicate) {
           allClientMachines.push({
-              idInterno: m.idInterno || m.id || m.serie || 'N/A',
-              uniqueId: m.id || m.idInterno,
+              idInterno: m.idInterno || 'N/A',
+              uniqueId: m.idInterno,
               marca: m.marca || '',
               modelo: m.modelo || m.descripcion || 'Sin Modelo',
               serie: m.serie || 'N/A',
               anio: m.anio || 'N/A',
               venta: m.venta || m.customData?.venta || '',
-              ubicacion: m.ubicacion || m.customData?.ubicacion || m.cliente || 'N/A'
+              ubicacion: m.ubicacion || m.customData?.ubicacion || nombre || 'N/A'
           });
       }
   });
