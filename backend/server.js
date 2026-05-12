@@ -219,7 +219,12 @@ app.post('/api/sap/queries', ensureSAPConnection, async (req, res) => {
 app.get('/api/sap/queries/:id/execute', ensureSAPConnection, async (req, res) => {
     try {
         const sqlCode = req.params.id;
-        const response = await sapApi.get(`${SAP_URL}/SQLQueries('${sqlCode}')/List`);
+        const response = await sapApi.get(`${SAP_URL}/SQLQueries('${sqlCode}')/List`, {
+            headers: {
+                'B1S-PageSize': 5000,
+                'Prefer': 'odata.maxpagesize=5000'
+            }
+        });
         res.json({ success: true, data: response.data.value || [] });
     } catch (error) {
         console.error(`Error ejecutando query ${req.params.id}:`, error.response?.data || error.message);
