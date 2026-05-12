@@ -210,7 +210,7 @@ async function fetchRefaccionesSAP() {
 const DIAS = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
 const DIAS_LABEL = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
-const MARCAS_OFICIALES = ['Fiori', 'Rubble Master', 'Hyundai', 'CIFA', 'SIMEM'];
+const MARCAS_OFICIALES = ['Fiori', 'Rubble Master', 'Hyundai', 'CIFA', 'SIMEM', 'Casa Grande'];
 
 function getLogoMarca(marca) {
   if (!marca) return null;
@@ -220,6 +220,7 @@ function getLogoMarca(marca) {
   if (m.includes('hyundai')) return 'logo_hyundai.png?v=2';
   if (m.includes('cifa')) return 'logo_cifa.png?v=1';
   if (m.includes('simem')) return 'logo_simem.png?v=1';
+  if (m.includes('casa grande') || m.includes('casagrande')) return 'logo_casagrande.png?v=1';
   return null;
 }
 
