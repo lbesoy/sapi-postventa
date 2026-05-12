@@ -4262,27 +4262,75 @@ function calcKmTotal() {
   document.getElementById('f-km-total').value = ida + vuelta;
 }
 
-// ===== REFACCIONES =====
+// ===== REFACCIONES (ORDEN SERVICIO) =====
+window.popularSelectMarcas = function(selectEl) {
+  if (!selectEl) return;
+  // Extraer marcas unicas validas
+  const marcas = [...new Set(refaccionesDb.map(r => r.marca))].filter(m => m && m !== 'N/A').sort();
+  let html = '<option value="">Marca...</option>';
+  marcas.forEach(m => { html += `<option value="${m}">${m}</option>`; });
+  selectEl.innerHTML = html;
+};
+
+window.actualizarDescripcionesRef = function(selectMarcaEl) {
+  const row = selectMarcaEl.closest('.ref-row');
+  const selectDesc = row.querySelector('.ref-desc');
+  const inputClave = row.querySelector('.ref-clave');
+  const inputPrecio = row.querySelector('.ref-precio');
+  
+  if (inputClave) inputClave.value = '';
+  if (inputPrecio) inputPrecio.value = '';
+  
+  const marcaSel = selectMarcaEl.value;
+  let html = '<option value="">Descripción...</option>';
+  
+  if (marcaSel) {
+    const refsPorMarca = refaccionesDb.filter(r => r.marca === marcaSel).sort((a,b) => (a.descripcion||'').localeCompare(b.descripcion||''));
+    refsPorMarca.forEach(r => {
+      // Guardar el id/clave y el precio en atributos data
+      html += `<option value="${r.descripcion}" data-clave="${r.id}" data-precio="${r.precio || 0}">${r.descripcion}</option>`;
+    });
+  }
+  selectDesc.innerHTML = html;
+};
+
+window.actualizarClaveRef = function(selectDescEl) {
+  const row = selectDescEl.closest('.ref-row');
+  const inputClave = row.querySelector('.ref-clave');
+  const inputPrecio = row.querySelector('.ref-precio');
+  const option = selectDescEl.options[selectDescEl.selectedIndex];
+  
+  if (inputClave && option) inputClave.value = option.getAttribute('data-clave') || '';
+  if (inputPrecio && option) inputPrecio.value = option.getAttribute('data-precio') || '';
+};
+
 function agregarRef(section) {
   const list = document.getElementById(`ref-${section}-list`);
   const row = document.createElement('div');
   row.className = 'ref-row';
   row.dataset.section = section;
+  
+  let html = `
+    <select class="ref-marca" style="width:110px" onchange="window.actualizarDescripcionesRef(this)">
+      <option value="">Marca...</option>
+    </select>
+    <select class="ref-desc" style="flex:1" onchange="window.actualizarClaveRef(this)">
+      <option value="">Descripción...</option>
+    </select>
+    <input type="hidden" class="ref-clave" />
+    <input type="number" placeholder="Cant." class="ref-cant" style="width:60px" min="1" value="1"/>`;
+    
   if (section === 'utilizadas') {
-    row.innerHTML = `
-      <input type="text" placeholder="Descripción" class="ref-desc"/>
-      <input type="text" placeholder="Clave" class="ref-clave" style="width:80px"/>
-      <input type="number" placeholder="Cant." class="ref-cant" style="width:60px" min="1"/>
-      <input type="number" placeholder="Precio" class="ref-precio" style="width:80px" step="0.01"/>
-      <button type="button" class="btn-del-ref" onclick="eliminarRef(this)">✕</button>`;
-  } else {
-    row.innerHTML = `
-      <input type="text" placeholder="Descripción" class="ref-desc"/>
-      <input type="text" placeholder="Clave" class="ref-clave" style="width:80px"/>
-      <input type="number" placeholder="Cant." class="ref-cant" style="width:60px" min="1"/>
-      <button type="button" class="btn-del-ref" onclick="eliminarRef(this)">✕</button>`;
+    html += `<input type="number" placeholder="Precio" class="ref-precio" style="width:80px; display:none;" step="0.01"/>`;
   }
+  
+  html += `<button type="button" class="btn-del-ref" onclick="eliminarRef(this)">✕</button>`;
+  
+  row.innerHTML = html;
   list.appendChild(row);
+  
+  // Popular el select de marca en esta nueva fila
+  window.popularSelectMarcas(row.querySelector('.ref-marca'));
 }
 
 function eliminarRef(btn) {
@@ -4315,7 +4363,36 @@ function setRefacciones(section, items) {
   toSet.forEach(item => {
     agregarRef(section);
     const row = list.lastElementChild;
-    if (item.descripcion) row.querySelector('.ref-desc').value = item.descripcion;
+    if (item.descripcion) {
+      // Find marca from refaccionesDb
+      let foundMarca = '';
+      if (item.clave) {
+        const match = refaccionesDb.find(r => r.id === item.clave || r.codigo === item.clave);
+        if (match) foundMarca = match.marca;
+      }
+      if (!foundMarca) {
+        const match = refaccionesDb.find(r => r.descripcion === item.descripcion);
+        if (match) foundMarca = match.marca;
+      }
+      
+      const selectMarca = row.querySelector('.ref-marca');
+      const selectDesc = row.querySelector('.ref-desc');
+      
+      if (foundMarca && selectMarca.querySelector(`option[value="${foundMarca}"]`)) {
+        selectMarca.value = foundMarca;
+      }
+      
+      // Update descripciones based on the marca (whether it was found or just empty)
+      window.actualizarDescripcionesRef(selectMarca);
+      
+      // If the description is not in the options, add it as a legacy option
+      if (![...selectDesc.options].some(o => o.value === item.descripcion)) {
+        selectDesc.innerHTML += `<option value="${item.descripcion}" data-clave="${item.clave || ''}">${item.descripcion}</option>`;
+      }
+      
+      selectDesc.value = item.descripcion;
+    }
+    
     if (item.clave) row.querySelector('.ref-clave').value = item.clave;
     if (item.cantidad) row.querySelector('.ref-cant').value = item.cantidad;
     if (section === 'utilizadas' && item.precio) row.querySelector('.ref-precio').value = item.precio;
