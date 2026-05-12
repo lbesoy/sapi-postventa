@@ -7343,3 +7343,78 @@ function initTableResizers() {
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(initTableResizers, 500);
 });
+
+// ─── CALENDARIO ────────────────────────────────────────────────────────────────
+let calendarInstance = null;
+
+function renderCalendario() {
+  const container = document.getElementById('calendar-container');
+  if (!container) return;
+
+  if (typeof FullCalendar === 'undefined') {
+    console.error("FullCalendar no está cargado.");
+    return;
+  }
+
+  if (calendarInstance) {
+    calendarInstance.destroy();
+  }
+
+  // Filtrar seguridad (rol empresa)
+  const isEmpresa = currentSession.viewMode === 'empresa';
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const miEmpresa = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+
+  const eventos = ordenes.filter(o => {
+    if (isEmpresa && o.cliente !== miEmpresa) return false;
+    return true;
+  }).map(o => {
+    let bgColor = '#3b82f6'; // Azul - Servicio
+    if (o.tipo === 'Mantenimiento') bgColor = '#10b981'; // Verde
+    if (o.tipo === 'Reparación') bgColor = '#f59e0b'; // Naranja
+    if (o.tipo === 'Garantía') bgColor = '#ef4444'; // Rojo
+    if (o.estado === 'Finalizado') bgColor = '#6b7280'; // Gris
+
+    return {
+      id: o.id,
+      title: `${o.folio || 'S/N'} - ${o.cliente}`,
+      start: o.fechaInicio || o.fecha,
+      end: o.fechaFin || o.fechaInicio || o.fecha,
+      backgroundColor: bgColor,
+      borderColor: bgColor,
+      extendedProps: {
+        tecnico: o.tecnico,
+        estado: o.estado
+      }
+    };
+  });
+
+  calendarInstance = new FullCalendar.Calendar(container, {
+    initialView: 'dayGridMonth',
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,timeGridDay'
+    },
+    buttonText: {
+      today: 'Hoy',
+      month: 'Mes',
+      week: 'Semana',
+      day: 'Día'
+    },
+    events: eventos,
+    eventClick: function(info) {
+      verDetalle(info.event.id);
+    },
+    eventContent: function(arg) {
+      return {
+        html: `<div style="font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:2px; color:white;" title="${arg.event.title}">
+                 <b>${arg.event.title}</b><br/>
+                 <span style="font-size:0.7rem; opacity:0.9;">${arg.event.extendedProps.tecnico || 'Sin asignar'}</span>
+               </div>`
+      };
+    }
+  });
+
+  calendarInstance.render();
+}
