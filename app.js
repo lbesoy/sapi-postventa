@@ -3739,6 +3739,11 @@ function guardarNuevaMaquina(e) {
         maquinariaDb[maqDbIdx].serie = serie;
         maquinariaDb[maqDbIdx].anio = anio;
         maquinariaDb[maqDbIdx].tipo = tipo;
+        
+        if (!maquinariaDb[maqDbIdx].idInterno || maquinariaDb[maqDbIdx].idInterno === 'NA' || maquinariaDb[maqDbIdx].idInterno === 'N/A') {
+            maquinariaDb[maqDbIdx].idInterno = generarIdInternoMaquina(marca, venta || anio);
+        }
+
         if (!maquinariaDb[maqDbIdx].customData) maquinariaDb[maqDbIdx].customData = {};
         maquinariaDb[maqDbIdx].customData.tipo = tipo;
         maquinariaDb[maqDbIdx].customData.venta = venta;
