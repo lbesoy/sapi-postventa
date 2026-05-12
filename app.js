@@ -5536,7 +5536,6 @@ function renderRefacciones(resetPage = false) {
     
     html += `
       <tr>
-        <td style="font-family: monospace; font-weight: 500;">${itemId}</td>
         <td style="font-weight: 500; color: var(--text-primary); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${itemName}">${itemName}</td>
         <td><span style="color:var(--text-secondary); font-size: 0.85rem;">${itemMarca}</span></td>
         <td><span class="status-badge status-open" style="background:var(--bg-secondary); color:var(--text-secondary);">${itemGrupo}</span></td>
