@@ -2715,12 +2715,31 @@ function verDetalleCliente(nombre) {
   `;
 
   // Máquinas
-  if (clienteOb?.maquinas && clienteOb.maquinas.length > 0) {
+  let allClientMachines = [...(clienteOb?.maquinas || [])];
+  
+  const maqClient = maquinariaDb.filter(m => m.cliente === nombre || m.cliente === clienteOb?.id || m.cliente === clienteOb?.rfc);
+  maqClient.forEach(m => {
+      const isDuplicate = allClientMachines.some(sm => sm.idInterno === m.idInterno || sm.idInterno === m.id || sm.idInterno === m.serie);
+      if (!isDuplicate) {
+          allClientMachines.push({
+              idInterno: m.idInterno || m.id || m.serie || 'N/A',
+              uniqueId: m.id || m.idInterno,
+              marca: m.marca || '',
+              modelo: m.modelo || m.descripcion || 'Sin Modelo',
+              serie: m.serie || 'N/A',
+              anio: m.anio || 'N/A',
+              venta: m.venta || m.customData?.venta || '',
+              ubicacion: m.ubicacion || m.customData?.ubicacion || m.cliente || 'N/A'
+          });
+      }
+  });
+
+  if (allClientMachines.length > 0) {
     html += `
       <div style="margin-top: 1.5rem;">
         <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);"><i data-lucide="settings-2" style="width:18px;height:18px;color:var(--text-muted);"></i> Maquinaria Registrada</h3>
         <div style="display:flex; flex-direction:column; gap:0.75rem;">
-          ${clienteOb.maquinas.map(m => {
+          ${allClientMachines.map(m => {
             const logoPath = getLogoMarca(m.marca);
             return `
             <div style="background: var(--bg-hover); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem;">
@@ -2729,10 +2748,10 @@ function verDetalleCliente(nombre) {
                 ${m.modelo || 'Sin Modelo'}
                 ${currentSession.viewMode !== 'empresa' ? `<span style="font-size:0.75rem; background:var(--bg-body); padding:0.15rem 0.4rem; border-radius:4px; border:1px solid var(--border); margin-left:0.5rem; color:var(--text-muted); font-family:monospace; font-weight:normal;">ID: ${m.idInterno || 'N/A'}</span>` : ''}
                 <div style="margin-left:auto; display:flex; gap:0.25rem;">
-                  <button class="action-btn" onclick="editarMaquina('${nombre.replace(/'/g, "\\'")}', '${m.idInterno}')" title="Editar Máquina" style="padding:0.25rem; width:auto; height:auto;">
+                  <button class="action-btn" onclick="editarMaquina('${nombre.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Editar Máquina" style="padding:0.25rem; width:auto; height:auto;">
                     <i data-lucide="edit-2" style="width:16px;height:16px;"></i>
                   </button>
-                  <button class="action-btn" onclick="abrirModalMoverMaquina('${nombre.replace(/'/g, "\\'")}', '${m.idInterno}')" title="Cambiar Sitio" style="padding:0.25rem; width:auto; height:auto;">
+                  <button class="action-btn" onclick="abrirModalMoverMaquina('${nombre.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Cambiar Sitio" style="padding:0.25rem; width:auto; height:auto;">
                     <i data-lucide="map-pin" style="width:16px;height:16px;"></i>
                   </button>
                 </div>
@@ -3574,18 +3593,19 @@ function editarMaquina(clienteNombre, idInterno) {
         const selectTipo = document.getElementById('am-tipo-maquina');
         const inputOtroTipo = document.getElementById('am-tipo-otro');
         let tipoFound = false;
+        const mTipo = maquina.tipo || maquina.customData?.tipo;
         Array.from(selectTipo.options).forEach(opt => {
-          if (opt.value === maquina.tipo) tipoFound = true;
+          if (opt.value === mTipo) tipoFound = true;
         });
         if (tipoFound) {
-          selectTipo.value = maquina.tipo;
+          selectTipo.value = mTipo;
           inputOtroTipo.style.display = 'none';
           inputOtroTipo.value = '';
           inputOtroTipo.required = false;
-        } else if (maquina.tipo && maquina.tipo !== 'N/A') {
+        } else if (mTipo && mTipo !== 'N/A') {
           selectTipo.value = 'Otra';
           inputOtroTipo.style.display = 'block';
-          inputOtroTipo.value = maquina.tipo;
+          inputOtroTipo.value = mTipo;
           inputOtroTipo.required = true;
         } else {
           selectTipo.value = '';
@@ -3596,7 +3616,8 @@ function editarMaquina(clienteNombre, idInterno) {
         const slider = document.getElementById('am-venta-tercero-slider');
         const knob = document.getElementById('am-venta-tercero-knob');
         
-        if (maquina.venta === 'TERCERO') {
+        const mVenta = maquina.venta || maquina.customData?.venta;
+        if (mVenta === 'TERCERO') {
           checkTercero.checked = true;
           inputVenta.value = '';
           inputVenta.disabled = true;
@@ -3604,29 +3625,32 @@ function editarMaquina(clienteNombre, idInterno) {
           if (knob) knob.style.transform = 'translateX(16px)';
         } else {
           checkTercero.checked = false;
-          inputVenta.value = maquina.venta || '';
+          inputVenta.value = mVenta || '';
           inputVenta.disabled = false;
           if (slider) slider.style.backgroundColor = '#ccc';
           if (knob) knob.style.transform = 'translateX(0)';
         }
 
-        document.getElementById('am-latitud').value = maquina.latitud || '';
-        document.getElementById('am-longitud').value = maquina.longitud || '';
+        const mLatitud = maquina.latitud || maquina.customData?.latitud || '';
+        const mLongitud = maquina.longitud || maquina.customData?.longitud || '';
+        document.getElementById('am-latitud').value = mLatitud;
+        document.getElementById('am-longitud').value = mLongitud;
         
         const currentSelectUbicacion = document.getElementById('am-ubicacion-select');
         let ubiFound = false;
+        const mUbicacion = maquina.ubicacion || maquina.customData?.ubicacion;
         Array.from(currentSelectUbicacion.options).forEach(opt => {
-          if (opt.value === maquina.ubicacion) ubiFound = true;
+          if (opt.value === mUbicacion) ubiFound = true;
         });
         
         if (ubiFound) {
-          currentSelectUbicacion.value = maquina.ubicacion;
+          currentSelectUbicacion.value = mUbicacion;
           inputOtraUbicacion.style.display = 'none';
           inputOtraUbicacion.value = '';
-        } else if (maquina.ubicacion) {
+        } else if (mUbicacion) {
           currentSelectUbicacion.value = 'otra';
           inputOtraUbicacion.style.display = 'block';
-          inputOtraUbicacion.value = maquina.ubicacion;
+          inputOtraUbicacion.value = mUbicacion;
         } else {
           currentSelectUbicacion.value = '';
         }
@@ -3705,26 +3729,47 @@ function guardarNuevaMaquina(e) {
   }
 
   if (editandoMaquinaId && editandoMaquinaCliente) {
-    if (clienteSeleccionado !== editandoMaquinaCliente) {
-      const clienteAntiguo = clientesDb.find(c => c.nombre === editandoMaquinaCliente);
-      let maquinaDatos = { idInterno: editandoMaquinaId, marca, modelo, serie, anio, venta, ubicacion, latitud, longitud, tipo };
-      if (clienteAntiguo && clienteAntiguo.maquinas) {
-        const oldIdx = clienteAntiguo.maquinas.findIndex(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
-        if (oldIdx >= 0) {
-           maquinaDatos = { ...clienteAntiguo.maquinas[oldIdx], ...maquinaDatos };
-           clienteAntiguo.maquinas.splice(oldIdx, 1);
-           if (window.pushToSupabase) window.pushToSupabase('clientes', clienteAntiguo);
-        }
-      }
-      clienteObj.maquinas.push(maquinaDatos);
+    const maqDbIdx = maquinariaDb.findIndex(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
+    
+    if (maqDbIdx >= 0) {
+        // MÁQUINA DE SAP / SUPABASE
+        maquinariaDb[maqDbIdx].cliente = clienteSeleccionado;
+        maquinariaDb[maqDbIdx].marca = marca;
+        maquinariaDb[maqDbIdx].modelo = modelo;
+        maquinariaDb[maqDbIdx].serie = serie;
+        maquinariaDb[maqDbIdx].anio = anio;
+        maquinariaDb[maqDbIdx].tipo = tipo;
+        if (!maquinariaDb[maqDbIdx].customData) maquinariaDb[maqDbIdx].customData = {};
+        maquinariaDb[maqDbIdx].customData.venta = venta;
+        maquinariaDb[maqDbIdx].customData.ubicacion = ubicacion;
+        maquinariaDb[maqDbIdx].customData.latitud = latitud;
+        maquinariaDb[maqDbIdx].customData.longitud = longitud;
+        
+        localStorage.setItem('sapi_maquinaria_db', JSON.stringify(maquinariaDb));
+        if (window.pushToSupabase) window.pushToSupabase('maquinaria', maquinariaDb[maqDbIdx]);
     } else {
-      const maquinaIdx = clienteObj.maquinas.findIndex(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
-      if (maquinaIdx >= 0) {
-        clienteObj.maquinas[maquinaIdx] = {
-          ...clienteObj.maquinas[maquinaIdx],
-          marca, modelo, serie, anio, venta, ubicacion, latitud, longitud, tipo
-        };
-      }
+        // MÁQUINA MANUAL (En clientesDb)
+        if (clienteSeleccionado !== editandoMaquinaCliente) {
+          const clienteAntiguo = clientesDb.find(c => c.nombre === editandoMaquinaCliente);
+          let maquinaDatos = { idInterno: editandoMaquinaId, marca, modelo, serie, anio, venta, ubicacion, latitud, longitud, tipo };
+          if (clienteAntiguo && clienteAntiguo.maquinas) {
+            const oldIdx = clienteAntiguo.maquinas.findIndex(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
+            if (oldIdx >= 0) {
+               maquinaDatos = { ...clienteAntiguo.maquinas[oldIdx], ...maquinaDatos };
+               clienteAntiguo.maquinas.splice(oldIdx, 1);
+               if (window.pushToSupabase) window.pushToSupabase('clientes', clienteAntiguo);
+            }
+          }
+          clienteObj.maquinas.push(maquinaDatos);
+        } else {
+          const maquinaIdx = clienteObj.maquinas.findIndex(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
+          if (maquinaIdx >= 0) {
+            clienteObj.maquinas[maquinaIdx] = {
+              ...clienteObj.maquinas[maquinaIdx],
+              marca, modelo, serie, anio, venta, ubicacion, latitud, longitud, tipo
+            };
+          }
+        }
     }
   } else {
     const idInterno = generarIdInternoMaquina(marca, venta || anio);
@@ -5483,13 +5528,16 @@ function renderMaquinaria() {
     allMachines.push({
       cliente: m.cliente || 'N/A',
       idInterno: m.idInterno || m.id || m.serie || 'N/A',
-      tipo: m.tipo || 'N/A',
+      uniqueId: m.id || m.idInterno,
+      tipo: m.tipo || m.customData?.tipo || 'N/A',
       marca: m.marca || '',
       modelo: m.modelo || m.descripcion || 'Sin Modelo',
       serie: m.serie || 'N/A',
       anio: m.anio || 'N/A',
-      venta: m.venta || '',
-      ubicacion: m.ubicacion || m.cliente || 'N/A' // Si no hay ubicación en SAP, mostramos el cliente
+      venta: m.venta || m.customData?.venta || '',
+      ubicacion: m.ubicacion || m.customData?.ubicacion || m.cliente || 'N/A',
+      latitud: m.latitud || m.customData?.latitud,
+      longitud: m.longitud || m.customData?.longitud
     });
   });
 
@@ -5507,6 +5555,7 @@ function renderMaquinaria() {
             allMachines.push({
               cliente: c.nombre,
               idInterno: m.idInterno || m.id || m.serie || 'N/A',
+              uniqueId: m.id || m.idInterno,
               tipo: m.tipo || 'N/A',
               marca: m.marca || '',
               modelo: m.modelo || 'Sin Modelo',
@@ -5642,10 +5691,10 @@ function renderMaquinaria() {
           <button class="action-btn" onclick="event.stopPropagation(); verDetalleCliente('${m.cliente.replace(/'/g, "\\'")}')" title="Ver Perfil de la Empresa">
             <i data-lucide="building-2"></i>
           </button>
-          <button class="action-btn" onclick="event.stopPropagation(); editarMaquina('${m.cliente.replace(/'/g, "\\'")}', '${m.idInterno}')" title="Editar Máquina">
+          <button class="action-btn" onclick="event.stopPropagation(); editarMaquina('${m.cliente.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Editar Máquina">
             <i data-lucide="edit-2"></i>
           </button>
-          <button class="action-btn" onclick="event.stopPropagation(); abrirModalMoverMaquina('${m.cliente.replace(/'/g, "\\'")}', '${m.idInterno}')" title="Mover de Sitio">
+          <button class="action-btn" onclick="event.stopPropagation(); abrirModalMoverMaquina('${m.cliente.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Mover de Sitio">
             <i data-lucide="map-pin"></i>
           </button>
         </div>
