@@ -3591,7 +3591,8 @@ function editarMaquina(clienteNombre, idInterno) {
         document.getElementById('am-anio').value = maquina.anio || '';
         const idIntInput = document.getElementById('am-id-interno');
         if (idIntInput) {
-            idIntInput.value = (maquina.idInterno && maquina.idInterno !== 'NA' && maquina.idInterno !== 'N/A' && maquina.idInterno !== maquina.id) ? maquina.idInterno : '';
+            const isUUID = maquina.idInterno && maquina.idInterno.length > 30 && maquina.idInterno.includes('-');
+            idIntInput.value = (maquina.idInterno && maquina.idInterno !== 'NA' && maquina.idInterno !== 'N/A' && maquina.idInterno !== maquina.id && !isUUID) ? maquina.idInterno : '';
         }
         
         const selectTipo = document.getElementById('am-tipo-maquina');
@@ -3712,6 +3713,7 @@ function guardarNuevaMaquina(e) {
   const latitud = document.getElementById('am-latitud').value.trim();
   const longitud = document.getElementById('am-longitud').value.trim();
   const inputIdInterno = document.getElementById('am-id-interno') ? document.getElementById('am-id-interno').value.trim() : '';
+  const finalIdInterno = inputIdInterno || generarIdInternoMaquina(marca, venta || anio);
 
   if (!clienteSeleccionado || !modelo) return;
 
@@ -3745,11 +3747,7 @@ function guardarNuevaMaquina(e) {
         maquinariaDb[maqDbIdx].anio = anio;
         maquinariaDb[maqDbIdx].tipo = tipo;
         
-        if (inputIdInterno) {
-            maquinariaDb[maqDbIdx].idInterno = inputIdInterno;
-        } else if (!maquinariaDb[maqDbIdx].idInterno || maquinariaDb[maqDbIdx].idInterno === 'NA' || maquinariaDb[maqDbIdx].idInterno === 'N/A' || maquinariaDb[maqDbIdx].idInterno === maquinariaDb[maqDbIdx].id) {
-            maquinariaDb[maqDbIdx].idInterno = generarIdInternoMaquina(marca, venta || anio);
-        }
+        maquinariaDb[maqDbIdx].idInterno = finalIdInterno;
 
         if (!maquinariaDb[maqDbIdx].customData) maquinariaDb[maqDbIdx].customData = {};
         maquinariaDb[maqDbIdx].customData.tipo = tipo;
@@ -3764,12 +3762,11 @@ function guardarNuevaMaquina(e) {
         // MÁQUINA MANUAL (En clientesDb)
         if (clienteSeleccionado !== editandoMaquinaCliente) {
           const clienteAntiguo = clientesDb.find(c => c.nombre === editandoMaquinaCliente);
-          const finalIdInterno = inputIdInterno || editandoMaquinaId;
           let maquinaDatos = { idInterno: finalIdInterno, marca, modelo, serie, anio, venta, ubicacion, latitud, longitud, tipo };
           if (clienteAntiguo && clienteAntiguo.maquinas) {
             const oldIdx = clienteAntiguo.maquinas.findIndex(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
             if (oldIdx >= 0) {
-               maquinaDatos = { ...clienteAntiguo.maquinas[oldIdx], ...maquinaDatos };
+               maquinaDatos = { ...clienteAntiguo.maquinas[oldIdx], ...maquinaDatos, idInterno: finalIdInterno };
                clienteAntiguo.maquinas.splice(oldIdx, 1);
                if (window.pushToSupabase) window.pushToSupabase('clientes', clienteAntiguo);
             }
@@ -3780,7 +3777,7 @@ function guardarNuevaMaquina(e) {
           if (maquinaIdx >= 0) {
             clienteObj.maquinas[maquinaIdx] = {
               ...clienteObj.maquinas[maquinaIdx],
-              idInterno: inputIdInterno || clienteObj.maquinas[maquinaIdx].idInterno,
+              idInterno: finalIdInterno,
               marca, modelo, serie, anio, venta, ubicacion, latitud, longitud, tipo
             };
           }
