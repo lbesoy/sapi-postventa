@@ -276,23 +276,23 @@ let ROLES = {
   superadmin: {
     label: 'Super Administrador',
     color: '#E8820C',
-    views: ['dashboard','servicios','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias'],
+    views: ['dashboard','servicios','calendario','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias'],
     canSwitchRoles: true,
   },
   admin: {
     label: 'Administrador',
     color: '#4f8ef7',
-    views: ['dashboard','servicios','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias'],
+    views: ['dashboard','servicios','calendario','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias'],
   },
   supervisor: {
     label: 'Supervisor',
     color: '#eab308',
-    views: ['dashboard','servicios','tickets','clientes','maquinaria','refacciones','tecnicos','preferencias'],
+    views: ['dashboard','servicios','calendario','tickets','clientes','maquinaria','refacciones','tecnicos','preferencias'],
   },
   tecnico: {
     label: 'Técnico / Instalador',
     color: '#10b981',
-    views: ['dashboard','servicios','tickets','preferencias'],
+    views: ['dashboard','servicios','calendario','tickets','preferencias'],
   },
   empresa: {
     label: 'Empresa / Cliente',
@@ -302,13 +302,13 @@ let ROLES = {
   consulta: {
     label: 'Consulta',
     color: '#64748b',
-    views: ['dashboard','servicios','tickets','maquinaria','preferencias'],
+    views: ['dashboard','servicios','calendario','tickets','maquinaria','preferencias'],
   },
 };
 
 const ROLES_LABELS = {
-  dashboard: 'Dashboard', servicios: 'Órdenes de Servicio',
-  tickets: 'Tickets', clientes: 'Clientes', maquinaria: 'Maquinaria',
+  dashboard: 'Dashboard', servicios: 'Órdenes de Servicio', calendario: 'Calendario',
+  tickets: 'Tickets', clientes: 'Clientes', maquinaria: 'Maquinaria', refacciones: 'Refacciones',
   sitios: 'Mis Sitios', tecnicos: 'Técnicos', config: 'Configuración',
   preferencias: 'Preferencias'
 };
@@ -318,6 +318,10 @@ if (savedRoles) {
   for (const r in savedRoles) {
     if (ROLES[r] && savedRoles[r].views) {
       ROLES[r].views = savedRoles[r].views;
+      // Inyección automática del calendario si no existe y es un rol que debe tenerlo
+      if (!ROLES[r].views.includes('calendario') && ['superadmin', 'admin', 'supervisor', 'tecnico', 'consulta'].includes(r)) {
+        ROLES[r].views.push('calendario');
+      }
     }
   }
 }
