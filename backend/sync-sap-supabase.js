@@ -216,6 +216,7 @@ async function syncRefacciones() {
       custom_data: {
         marca: marcaName,
         grupo: itmsGrpNam,
+        ItmsGrpCod: r.ItmsGrpCod,
         origen: origen,
         nombre: r.ItemName || r.Descripcion || ''
       }
