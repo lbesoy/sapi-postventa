@@ -120,8 +120,8 @@ async function fetchClientesSAP() {
         telefono: '',
         email: bp[map.email] || '', 
         grupoSinergia: bp[map.grupoSinergia] || 'N/A', 
-        saldoCuenta: bp[map.saldoCuenta] || 0,
-        saldoOrdenes: bp.OrdersBal || 0,
+        saldoCuenta: parseFloat(bp.Balance) || parseFloat(bp[map.saldoCuenta]) || 0,
+        saldoOrdenes: parseFloat(bp.OrdersBal) || 0,
         maquinas: [], // Esto se llenaría con otro endpoint (CustomerEquipmentCards)
         supervisoresAsignados: [],
         tecnicosAsignados: []
