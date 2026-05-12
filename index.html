@@ -466,18 +466,26 @@
 
     <!-- REFACCIONES VIEW -->
     <div id="view-refacciones" class="view">
-      <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
-        <h2>Catálogo de Refacciones</h2>
-        <div style="display:flex; gap:0.5rem; flex-wrap:nowrap; align-items:center; flex:1; justify-content:flex-end;">
-          <div class="search-bar" style="width:100%; max-width:400px; margin:0;">
-            <input type="text" id="search-refacciones" placeholder="Buscar refacción por código o nombre..." oninput="renderRefacciones()"/>
-          </div>
-          <button class="action-btn" onclick="sincronizarConGitHub('refacciones', this)" title="Actualizar Refacciones desde SAP" style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
-            <i data-lucide="refresh-cw" class="btn-icon" style="width:14px;height:14px;"></i> Actualizar SAP
-          </button>
-        </div>
+      
+      <!-- TABS -->
+      <div class="dash-tabs" style="margin-bottom: 1.5rem;">
+        <button class="dash-tab active" id="btn-tab-ref-catalogo" onclick="switchRefTab('catalogo')"><i data-lucide="book"></i> Catálogo SAP</button>
+        <button class="dash-tab" id="btn-tab-ref-pendientes" onclick="switchRefTab('pendientes')"><i data-lucide="clock"></i> Piezas Pendientes (Órdenes)</button>
       </div>
-      <div class="table-wrapper">
+
+      <div id="ref-tab-catalogo">
+        <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+          <h2>Catálogo de Refacciones</h2>
+          <div style="display:flex; gap:0.5rem; flex-wrap:nowrap; align-items:center; flex:1; justify-content:flex-end;">
+            <div class="search-bar" style="width:100%; max-width:400px; margin:0;">
+              <input type="text" id="search-refacciones" placeholder="Buscar refacción por código o nombre..." oninput="renderRefacciones()"/>
+            </div>
+            <button class="action-btn" onclick="sincronizarConGitHub('refacciones', this)" title="Actualizar Refacciones desde SAP" style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
+              <i data-lucide="refresh-cw" class="btn-icon" style="width:14px;height:14px;"></i> Actualizar SAP
+            </button>
+          </div>
+        </div>
+        <div class="table-wrapper">
         <table class="orders-table">
           <thead>
             <tr>
@@ -495,8 +503,19 @@
             <tr><td colspan="6" class="empty-state">Cargando refacciones...</td></tr>
           </tbody>
         </table>
+        </div> <!-- End table-wrapper -->
+      </div> <!-- End ref-tab-catalogo -->
+
+      <div id="ref-tab-pendientes" style="display:none;">
+        <div class="section-header" style="margin-bottom: 1.5rem;">
+          <h2>Piezas por Pedir (Necesarias)</h2>
+          <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Aquí se muestran todas las refacciones marcadas como "Necesarias" en las Órdenes de Servicio.</p>
+        </div>
+        <div id="ref-pendientes-grid" class="stat-grid" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
+          <!-- Fichas insertadas dinamicamente -->
+        </div>
       </div>
-    </div>
+    </div> <!-- End view-refacciones -->
 
     <div id="view-sitios" class="view">
       <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">

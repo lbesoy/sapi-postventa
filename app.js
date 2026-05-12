@@ -5703,6 +5703,108 @@ function actualizarMapaMaquinaria(filteredData) {
   }
 }
 
+function switchRefTab(tab) {
+  const btnCat = document.getElementById('btn-tab-ref-catalogo');
+  const btnPen = document.getElementById('btn-tab-ref-pendientes');
+  const cat = document.getElementById('ref-tab-catalogo');
+  const pen = document.getElementById('ref-tab-pendientes');
+  
+  if (tab === 'catalogo') {
+    if (btnCat) btnCat.classList.add('active');
+    if (btnPen) btnPen.classList.remove('active');
+    if (cat) cat.style.display = 'block';
+    if (pen) pen.style.display = 'none';
+  } else {
+    if (btnCat) btnCat.classList.remove('active');
+    if (btnPen) btnPen.classList.add('active');
+    if (cat) cat.style.display = 'none';
+    if (pen) pen.style.display = 'block';
+    renderRefaccionesPendientes();
+  }
+}
+
+function renderRefaccionesPendientes() {
+  const grid = document.getElementById('ref-pendientes-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  
+  const pendientes = [];
+  ordenes.forEach(o => {
+    if (o.refaccionesNecesarias && o.refaccionesNecesarias.length > 0) {
+      o.refaccionesNecesarias.forEach(ref => {
+        // Encontrar marca
+        let foundMarca = '';
+        if (ref.clave) {
+          const match = refaccionesDb.find(r => r.id === ref.clave || r.codigo === ref.clave);
+          if (match) foundMarca = match.marca;
+        }
+        if (!foundMarca && ref.descripcion) {
+          const match = refaccionesDb.find(r => r.descripcion === ref.descripcion);
+          if (match) foundMarca = match.marca;
+        }
+        
+        pendientes.push({
+          ordenId: o.id,
+          ordenFolio: o.folio,
+          tecnico: o.tecnicoResponsable || o.tecnico || 'Desconocido',
+          maquina: o.maquina || 'Sin Asignar',
+          sitio: o.sitio || o.ubicacion || 'Desconocido',
+          marca: foundMarca || 'S/M',
+          descripcion: ref.descripcion || 'Sin Descripción',
+          cantidad: ref.cantidad || 1,
+          clave: ref.clave || 'S/C',
+          fecha: o.fecha || null
+        });
+      });
+    }
+  });
+  
+  pendientes.sort((a,b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+  
+  if (pendientes.length === 0) {
+    grid.innerHTML = '<div style="color:var(--text-muted); padding:1rem; grid-column: 1/-1;">No hay refacciones pendientes solicitadas en las Órdenes de Servicio actuales.</div>';
+    return;
+  }
+  
+  pendientes.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'stat-card';
+    card.style.display = 'flex';
+    card.style.flexDirection = 'column';
+    card.style.alignItems = 'flex-start';
+    card.style.padding = '1.25rem';
+    card.style.position = 'relative';
+    
+    card.innerHTML = `
+      <div style="width:100%; display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem;">
+        <span style="font-weight:800; font-size:1.15rem; color:var(--text-primary); display:flex; align-items:center; gap:0.4rem;">
+          <span style="background:var(--accent-light); color:var(--accent); padding:0.1rem 0.4rem; border-radius:4px; font-size:0.9rem;">${p.cantidad}x</span> 
+          ${p.marca}
+        </span>
+        <span class="status-badge status-open" style="font-size:0.75rem; cursor:pointer;" onclick="editarOrden('${p.ordenId}')" title="Ver/Editar Orden">Orden #${p.ordenFolio || 'S/N'}</span>
+      </div>
+      <div style="font-weight:600; font-size:0.95rem; color:var(--accent); margin-bottom:0.25rem;">${p.descripcion}</div>
+      <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:1rem; font-family:monospace;">Clave: ${p.clave}</div>
+      <div style="display:flex; flex-direction:column; gap:0.4rem; font-size:0.85rem; color:var(--text-secondary); width:100%; border-top: 1px dashed var(--border); padding-top: 0.75rem;">
+        <div style="display:flex; align-items:flex-start; gap:0.5rem;">
+          <i data-lucide="settings-2" style="width:14px;height:14px; margin-top:2px; color:var(--text-muted)"></i> 
+          <span style="line-height:1.3">${p.maquina}</span>
+        </div>
+        <div style="display:flex; align-items:flex-start; gap:0.5rem;">
+          <i data-lucide="map-pin" style="width:14px;height:14px; margin-top:2px; color:var(--text-muted)"></i> 
+          <span style="line-height:1.3">${p.sitio}</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <i data-lucide="user" style="width:14px;height:14px; color:var(--text-muted)"></i> 
+          <span>${p.tecnico}</span>
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+  if (window.lucide) window.lucide.createIcons({ root: grid });
+}
+
 let refaccionesCurrentPage = 1;
 const REFACCIONES_PAGE_SIZE = 50;
 
