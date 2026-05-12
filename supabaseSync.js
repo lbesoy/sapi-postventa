@@ -337,10 +337,26 @@ async function cargarDatosDeSupabase() {
       localStorage.setItem('sapi_maquinaria_db', JSON.stringify(mapped));
     }
 
-    // Refacciones
-    const { data: refDb } = await sb.from('refacciones').select('*');
-    if (refDb && refDb.length > 0) {
-      const mapped = refDb.map(r => ({ id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, customData: r.custom_data, marca: r.custom_data?.marca || 'N/A', grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion }));
+    // Refacciones (con paginación para traer más de 1000 items)
+    let allRefacciones = [];
+    let fetchMore = true;
+    let page = 0;
+    while (fetchMore) {
+      const { data: refDbChunk } = await sb.from('refacciones').select('*').range(page * 1000, (page + 1) * 1000 - 1);
+      if (refDbChunk && refDbChunk.length > 0) {
+        allRefacciones = allRefacciones.concat(refDbChunk);
+        if (refDbChunk.length < 1000) fetchMore = false;
+        else page++;
+      } else {
+        fetchMore = false;
+      }
+    }
+    if (allRefacciones.length > 0) {
+      const mapped = allRefacciones.map(r => ({
+        id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, 
+        customData: r.custom_data, marca: r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.custom_data?.marca || '', 
+        grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion
+      }));
       localStorage.setItem('sapi_refacciones_db', JSON.stringify(mapped));
     }
 
