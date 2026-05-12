@@ -7394,6 +7394,7 @@ function renderCalendario() {
 
   calendarInstance = new FullCalendar.Calendar(container, {
     initialView: 'dayGridMonth',
+    firstDay: 1, // Start on Monday
     headerToolbar: {
       left: 'prev,next today',
       center: 'title',
