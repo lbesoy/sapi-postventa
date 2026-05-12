@@ -896,15 +896,18 @@ body {
 
 /* ===== PRINT ===== */
 @media print {
-  .sidebar, .topbar, .btn-primary, .btn-secondary,
-  .modal-header button, .form-actions { display: none !important; }
+  .sidebar, .topbar, .content, .btn-primary, .btn-secondary,
+  .modal-header button, .form-actions, #detalle-header-actions { display: none !important; }
   .main-wrapper { margin-left: 0; }
-  .modal { box-shadow: none; border: none; max-height: none; }
-  .modal-overlay { position: static; background: transparent; backdrop-filter: none; }
+  .modal { box-shadow: none !important; border: none !important; max-height: none !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; }
+  .modal-overlay { position: static !important; background: transparent !important; backdrop-filter: none !important; padding: 0 !important; display: block !important; }
+  .modal-body { padding: 0 !important; overflow: visible !important; }
   .print-only { display: block; }
   /* Signature print handling */
-  #firma-canvas { display: none !important; }
+  #firma-canvas, canvas { display: none !important; }
   .detalle-section button { display: none !important; }
+  body { background: white !important; margin: 0; padding: 0; }
+  @page { margin: 0.5cm; }
 }
 
 /* Tooltip styles */
