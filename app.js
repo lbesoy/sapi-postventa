@@ -3493,7 +3493,11 @@ function editarMaquina(clienteNombre, idInterno) {
   
   const select = document.getElementById('am-cliente');
   select.value = clienteNombre;
-  select.setAttribute('disabled', 'true');
+  if (currentSession.viewMode === 'superadmin') {
+    select.removeAttribute('disabled');
+  } else {
+    select.setAttribute('disabled', 'true');
+  }
   
   const selectUbicacion = document.getElementById('am-ubicacion-select');
   const inputOtraUbicacion = document.getElementById('am-ubicacion-otra');
@@ -3689,12 +3693,26 @@ function guardarNuevaMaquina(e) {
   }
 
   if (editandoMaquinaId && editandoMaquinaCliente) {
-    const maquinaIdx = clienteObj.maquinas.findIndex(m => m.idInterno === editandoMaquinaId);
-    if (maquinaIdx >= 0) {
-      clienteObj.maquinas[maquinaIdx] = {
-        ...clienteObj.maquinas[maquinaIdx],
-        marca, modelo, serie, anio, venta, ubicacion, latitud, longitud, tipo
-      };
+    if (clienteSeleccionado !== editandoMaquinaCliente) {
+      const clienteAntiguo = clientesDb.find(c => c.nombre === editandoMaquinaCliente);
+      let maquinaDatos = { idInterno: editandoMaquinaId, marca, modelo, serie, anio, venta, ubicacion, latitud, longitud, tipo };
+      if (clienteAntiguo && clienteAntiguo.maquinas) {
+        const oldIdx = clienteAntiguo.maquinas.findIndex(m => m.idInterno === editandoMaquinaId);
+        if (oldIdx >= 0) {
+           maquinaDatos = { ...clienteAntiguo.maquinas[oldIdx], ...maquinaDatos };
+           clienteAntiguo.maquinas.splice(oldIdx, 1);
+           if (window.pushToSupabase) window.pushToSupabase('clientes', clienteAntiguo);
+        }
+      }
+      clienteObj.maquinas.push(maquinaDatos);
+    } else {
+      const maquinaIdx = clienteObj.maquinas.findIndex(m => m.idInterno === editandoMaquinaId);
+      if (maquinaIdx >= 0) {
+        clienteObj.maquinas[maquinaIdx] = {
+          ...clienteObj.maquinas[maquinaIdx],
+          marca, modelo, serie, anio, venta, ubicacion, latitud, longitud, tipo
+        };
+      }
     }
   } else {
     const idInterno = generarIdInternoMaquina(marca, venta || anio);
@@ -5874,7 +5892,7 @@ function renderRefacciones(resetPage = false) {
     const itemId = (r.idInterno || r.codigo || r.id || '').toLowerCase();
     const itemName = (r.nombre || r.descripcion || '').toLowerCase();
     const itemGrupo = (r.grupo || '').toLowerCase();
-    return itemId.includes(q) || itemName.includes(q) || marca.toLowerCase().includes(q) || itemGrupo.includes(q);
+    return itemId.includes(q) || itemName.includes(q) || marcaFull.toLowerCase().includes(q) || itemGrupo.includes(q);
   });
 
   const total = filtered.length;
