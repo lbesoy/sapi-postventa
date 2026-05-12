@@ -224,6 +224,16 @@ function getLogoMarca(marca) {
   return null;
 }
 
+// Overrides de tamaño por marca (para logos con distinto aspect ratio)
+function getLogoStyle(marca) {
+  if (!marca) return 'width:85px; height:32px; object-fit:contain; object-position:left center; margin-right:8px;';
+  const m = marca.toLowerCase().trim();
+  if (m.includes('casa grande') || m.includes('casagrande')) {
+    return 'width:120px; height:38px; object-fit:contain; object-position:left center; margin-right:8px;';
+  }
+  return 'width:85px; height:32px; object-fit:contain; object-position:left center; margin-right:8px;';
+}
+
 // ===== INIT =====
 // ===== ROLES SYSTEM =====
 let ROLES = {
@@ -5353,7 +5363,7 @@ function renderMaquinaria() {
       <td>${m.tipo && m.tipo !== 'N/A' ? `<span class="badge" style="background:var(--bg-hover); color:var(--text-primary); border:1px solid var(--border);">${m.tipo}</span>` : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}</td>
       <td>
         <div style="display:flex; align-items:center;">
-          ${logoPath ? `<img src="${logoPath}" alt="${m.marca}" onerror="this.onerror=null; this.outerHTML='<span>${m.marca}</span>';" style="width:85px; height:32px; object-fit:contain; object-position:left center; margin-right:8px;"/>` : m.marca || '-'}
+          ${logoPath ? `<img src="${logoPath}" alt="${m.marca}" onerror="this.onerror=null; this.outerHTML='<span>${m.marca}</span>';" style="${getLogoStyle(m.marca)}"/>` : m.marca || '-'}
         </div>
       </td>
       <td style="font-weight:500;">${m.modelo}</td>
