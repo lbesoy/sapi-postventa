@@ -171,17 +171,31 @@ async function syncRefacciones() {
     log(`⚠️ Advertencia: No se pudieron obtener los grupos de SAP (${err.message})`);
   }
 
-  // Intentar obtener las marcas de la UDT
+  // Obtener marcas vía UserTableRows (endpoint correcto para UDTs en SAP Service Layer)
   let marcaMap = {};
   try {
-    const marcaRes = await sapApi.get(`${SAP_URL}/U_OK_MARCA`, { headers: { 'Cookie': sessionId } });
+    const marcaRes = await sapApi.get(`${SAP_URL}/UserTableRows('OK_MARCA')?$select=Code,Name&$top=500`);
     if (marcaRes.data && marcaRes.data.value) {
       marcaRes.data.value.forEach(m => {
-        marcaMap[m.Code] = m.Name;
+        if (m.Code) marcaMap[m.Code] = m.Name;
       });
+      log(`✅ Marcas cargadas: ${Object.keys(marcaMap).length} registros.`);
     }
-  } catch (err) {
-    // Si falla (por falta de permisos o endpoint), no pasa nada, usaremos el Code
+  } catch (e1) {
+    log(`⚠️ UserTableRows falló: ${e1.message}. Intentando via query SAP...`);
+    // Fallback: intentar un query SAP dedicado solo para marcas
+    try {
+      await sapApi.post(`${SAP_URL}/SQLQueries`, { SqlCode: 'TMP_MARCAS', SqlName: 'TMP_MARCAS', SqlText: 'SELECT "Code", "Name" FROM "SBO_SAPI"."@OK_MARCA"' });
+    } catch (_) {}
+    try {
+      const r2 = await sapApi.get(`${SAP_URL}/SQLQueries('TMP_MARCAS')/List`);
+      if (r2.data && r2.data.value) {
+        r2.data.value.forEach(m => { if (m.Code) marcaMap[m.Code] = m.Name; });
+        log(`✅ Marcas cargadas (fallback query): ${Object.keys(marcaMap).length} registros.`);
+      }
+    } catch (e2) {
+      log(`⚠️ No se pudieron obtener marcas (${e2.message}). Usando código como nombre.`);
+    }
   }
 
   const raw = await fetchQuery(QUERIES.refacciones);
