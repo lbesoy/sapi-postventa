@@ -4274,35 +4274,53 @@ window.popularSelectMarcas = function(selectEl) {
 
 window.actualizarDescripcionesRef = function(selectMarcaEl) {
   const row = selectMarcaEl.closest('.ref-row');
-  const selectDesc = row.querySelector('.ref-desc');
+  const optionsDiv = row.querySelector('.combo-options');
   const inputClave = row.querySelector('.ref-clave');
   const inputPrecio = row.querySelector('.ref-precio');
+  const hiddenDesc = row.querySelector('.ref-desc-hidden');
+  const displaySpan = row.querySelector('.combo-box span');
   
   if (inputClave) inputClave.value = '';
   if (inputPrecio) inputPrecio.value = '';
+  if (hiddenDesc) hiddenDesc.value = '';
+  if (displaySpan) displaySpan.textContent = 'Descripción...';
   
   const marcaSel = selectMarcaEl.value;
-  let html = '<option value="">Descripción...</option>';
+  let html = '';
   
   if (marcaSel) {
     const refsPorMarca = refaccionesDb.filter(r => r.marca === marcaSel).sort((a,b) => (a.descripcion||'').localeCompare(b.descripcion||''));
     refsPorMarca.forEach(r => {
-      // Guardar el id/clave y el precio en atributos data
-      html += `<option value="${r.descripcion}" data-clave="${r.id}" data-precio="${r.precio || 0}">${r.descripcion}</option>`;
+      html += `<div class="combo-option" onclick="window.seleccionarRefaccion(this, '${r.id || r.codigo}', ${r.precio || 0})">${r.descripcion}</div>`;
     });
+  } else {
+    html = `<div class="combo-option" style="color:var(--text-muted)">Seleccione una marca primero</div>`;
   }
-  selectDesc.innerHTML = html;
+  optionsDiv.innerHTML = html;
 };
 
-window.actualizarClaveRef = function(selectDescEl) {
-  const row = selectDescEl.closest('.ref-row');
+window.seleccionarRefaccion = function(optionEl, clave, precio) {
+  const text = optionEl.textContent;
+  const comboMenu = optionEl.closest('.combo-menu');
+  const comboId = comboMenu.id.replace('-menu', '');
+  
+  // Close the menu
+  comboMenu.classList.remove('open');
+  document.getElementById(comboId + '-combo').classList.remove('focus');
+  
+  // Update hidden input and display text
+  document.getElementById(comboId).value = text;
+  document.getElementById(comboId + '-display').textContent = text;
+  
+  // Update Clave and Precio
+  const row = optionEl.closest('.ref-row');
   const inputClave = row.querySelector('.ref-clave');
   const inputPrecio = row.querySelector('.ref-precio');
-  const option = selectDescEl.options[selectDescEl.selectedIndex];
-  
-  if (inputClave && option) inputClave.value = option.getAttribute('data-clave') || '';
-  if (inputPrecio && option) inputPrecio.value = option.getAttribute('data-precio') || '';
+  if (inputClave) inputClave.value = clave || '';
+  if (inputPrecio) inputPrecio.value = precio || '';
 };
+
+let refComboCounter = 0;
 
 function agregarRef(section) {
   const list = document.getElementById(`ref-${section}-list`);
@@ -4310,14 +4328,32 @@ function agregarRef(section) {
   row.className = 'ref-row';
   row.dataset.section = section;
   
+  refComboCounter++;
+  const idCombo = `ref-desc-combo-${refComboCounter}`;
+  
   let html = `
     <select class="ref-marca" style="width:110px" onchange="window.actualizarDescripcionesRef(this)">
       <option value="">Marca...</option>
     </select>
-    <select class="ref-desc" style="flex:1" onchange="window.actualizarClaveRef(this)">
-      <option value="">Descripción...</option>
-    </select>
-    <input type="hidden" class="ref-clave" />
+    
+    <div style="flex:1; position:relative; min-width: 200px;" class="group-ref-desc">
+      <div class="combo-box" tabindex="0" id="${idCombo}-combo" onclick="toggleCombo('${idCombo}')" style="padding: 0.45rem 0.6rem;">
+        <span id="${idCombo}-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px;">Descripción...</span>
+        <i data-lucide="chevron-down" style="width:14px;height:14px; flex-shrink:0;"></i>
+      </div>
+      <div class="combo-menu" id="${idCombo}-menu" style="width: 100%; min-width: 300px;">
+        <div class="combo-search">
+          <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted)"></i>
+          <input type="text" id="${idCombo}-search" placeholder="Buscar..." oninput="filterCombo('${idCombo}', this.value)" onclick="event.stopPropagation()">
+        </div>
+        <div class="combo-options" id="${idCombo}-options">
+          <div class="combo-option" style="color:var(--text-muted)">Seleccione una marca primero</div>
+        </div>
+      </div>
+      <input type="hidden" class="ref-desc-hidden ref-desc" id="${idCombo}" />
+    </div>
+
+    <input type="text" placeholder="Clave" class="ref-clave" style="width:90px" readonly />
     <input type="number" placeholder="Cant." class="ref-cant" style="width:60px" min="1" value="1"/>`;
     
   if (section === 'utilizadas') {
@@ -4328,6 +4364,8 @@ function agregarRef(section) {
   
   row.innerHTML = html;
   list.appendChild(row);
+  
+  if (window.lucide) window.lucide.createIcons({ root: row });
   
   // Popular el select de marca en esta nueva fila
   window.popularSelectMarcas(row.querySelector('.ref-marca'));
@@ -4376,7 +4414,9 @@ function setRefacciones(section, items) {
       }
       
       const selectMarca = row.querySelector('.ref-marca');
-      const selectDesc = row.querySelector('.ref-desc');
+      const hiddenDesc = row.querySelector('.ref-desc-hidden');
+      const comboOptions = row.querySelector('.combo-options');
+      const comboSpan = row.querySelector('.combo-box span');
       
       if (foundMarca && selectMarca.querySelector(`option[value="${foundMarca}"]`)) {
         selectMarca.value = foundMarca;
@@ -4385,12 +4425,24 @@ function setRefacciones(section, items) {
       // Update descripciones based on the marca (whether it was found or just empty)
       window.actualizarDescripcionesRef(selectMarca);
       
+      // Check if description exists in options
+      let optExists = false;
+      comboOptions.querySelectorAll('.combo-option').forEach(opt => {
+        if (opt.textContent === item.descripcion) optExists = true;
+      });
+      
       // If the description is not in the options, add it as a legacy option
-      if (![...selectDesc.options].some(o => o.value === item.descripcion)) {
-        selectDesc.innerHTML += `<option value="${item.descripcion}" data-clave="${item.clave || ''}">${item.descripcion}</option>`;
+      if (!optExists && item.descripcion) {
+        const legacyHtml = `<div class="combo-option" onclick="window.seleccionarRefaccion(this, '${item.clave || ''}', ${item.precio || 0})">${item.descripcion}</div>`;
+        if (comboOptions.innerHTML.includes('Seleccione una marca')) {
+          comboOptions.innerHTML = legacyHtml;
+        } else {
+          comboOptions.innerHTML += legacyHtml;
+        }
       }
       
-      selectDesc.value = item.descripcion;
+      hiddenDesc.value = item.descripcion;
+      if (comboSpan) comboSpan.textContent = item.descripcion;
     }
     
     if (item.clave) row.querySelector('.ref-clave').value = item.clave;

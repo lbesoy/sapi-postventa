@@ -1012,18 +1012,7 @@
             <div>
               <div class="ref-subtitle">Utilizadas</div>
               <div id="ref-utilizadas-list">
-                <div class="ref-row" data-section="utilizadas">
-                  <select class="ref-marca" style="width:110px" onchange="window.actualizarDescripcionesRef(this)">
-                    <option value="">Marca...</option>
-                  </select>
-                  <select class="ref-desc" style="flex:1" onchange="window.actualizarClaveRef(this)">
-                    <option value="">Descripción...</option>
-                  </select>
-                  <input type="hidden" class="ref-clave" />
-                  <input type="number" placeholder="Cant." class="ref-cant" style="width:60px" min="1" value="1"/>
-                  <input type="number" placeholder="Precio" class="ref-precio" style="width:80px" step="0.01" style="display:none;"/>
-                  <button type="button" class="btn-del-ref" onclick="eliminarRef(this)">✕</button>
-                </div>
+                <!-- Las filas se insertan dinámicamente con agregarRef -->
               </div>
               <button type="button" class="btn-add-ref" onclick="agregarRef('utilizadas')">+ Agregar</button>
               <div class="form-group" style="margin-top:0.75rem">
@@ -1034,17 +1023,7 @@
             <div>
               <div class="ref-subtitle">Necesarias</div>
               <div id="ref-necesarias-list">
-                <div class="ref-row" data-section="necesarias">
-                  <select class="ref-marca" style="width:110px" onchange="window.actualizarDescripcionesRef(this)">
-                    <option value="">Marca...</option>
-                  </select>
-                  <select class="ref-desc" style="flex:1" onchange="window.actualizarClaveRef(this)">
-                    <option value="">Descripción...</option>
-                  </select>
-                  <input type="hidden" class="ref-clave" />
-                  <input type="number" placeholder="Cant." class="ref-cant" style="width:60px" min="1" value="1"/>
-                  <button type="button" class="btn-del-ref" onclick="eliminarRef(this)">✕</button>
-                </div>
+                <!-- Las filas se insertan dinámicamente con agregarRef -->
               </div>
               <button type="button" class="btn-add-ref" onclick="agregarRef('necesarias')">+ Agregar</button>
               <div class="form-group" style="margin-top:0.75rem">
