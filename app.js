@@ -38,6 +38,11 @@ window.addEventListener('supabase_datos_cargados', () => {
   renderTickets('dash-tickets');
   updateTicketBadge();
   if (typeof renderMaquinaria === 'function') renderMaquinaria();
+  
+  // Re-aplicar rol para asegurar que el role-switcher se muestre si el usuario recién se descargó
+  if (currentSession && currentSession.viewMode) {
+    applyRole(currentSession.viewMode);
+  }
 });
 let editandoId = null;
 let editandoTicketId = null;
