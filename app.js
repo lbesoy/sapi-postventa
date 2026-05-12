@@ -180,7 +180,7 @@ async function fetchRefaccionesSAP() {
         idInterno: idInternoVal,
         nombre: item[map.nombre] || 'Sin Nombre',
         descripcion: item[map.nombre] || 'Sin Nombre', // Mapped for Supabase
-        marca: item.FirmName || item.Marca || item.U_Marca || 'N/A',
+        marca: item.FirmName || item.Marca || item.U_MARCA || 'N/A',
         grupo: item[map.grupo] || '',
         precio: item[map.precio] || 0,
         moneda: item[map.moneda] || 'MXN', // Mapped for Supabase
