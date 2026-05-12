@@ -151,13 +151,23 @@ async function fetchRefaccionesSAP() {
   
   try {
     if (!configData || !configData.queryRefacciones) {
-      return refaccionesDb; // Si no hay query de refacciones, devolvemos cache
+      return refaccionesDb;
     }
+
+    // 1. Fetch brand catalog from @OK_MARCA UDO table
+    let marcaMap = {};
+    try {
+      const marcaRes = await fetch(`${API_CONFIG.BASE_URL}/sap/udo/OK_MARCA`);
+      const marcaJson = await marcaRes.json();
+      (marcaJson.data || []).forEach(m => { marcaMap[m.Code] = m.Name; });
+    } catch(e) {
+      console.warn('No se pudo cargar catálogo de marcas:', e.message);
+    }
+
+    // 2. Fetch refacciones
     const url = `${API_CONFIG.BASE_URL}/sap/queries/${encodeURIComponent(configData.queryRefacciones)}/execute?_t=${Date.now()}`;
-    
     const response = await fetch(url);
     const jsonRes = await response.json();
-    
     const sapData = jsonRes.data || [];
     
     const map = (configData.mappings && configData.mappings.refacciones) ? configData.mappings.refacciones : {
@@ -165,26 +175,31 @@ async function fetchRefaccionesSAP() {
     };
 
     const refaccionesMapeadas = sapData.map(item => {
-      const idInternoVal = item[map.id] || '';
-      let origenCalculado = 'N/A';
+      const idInternoVal = item[map.id] || item.ItemCode || '';
       
-      if (item[map.origen]) {
-        origenCalculado = item[map.origen];
-      } else if (idInternoVal) {
+      // Resolve marca: try Name field first (if query returns it), then code lookup, then raw code
+      const marcaCodigo = item.U_MARCA || item.MarcaCode || '';
+      const marcaNombre = item.Name || marcaMap[marcaCodigo] || (marcaCodigo || 'N/A');
+
+      // Calculate origen from ItemCode suffix
+      let origenCalculado = item[map.origen] || item.Origen || '';
+      if (!origenCalculado && idInternoVal) {
         origenCalculado = idInternoVal.toUpperCase().endsWith('N') ? 'Nacional' : 'Importado';
       }
+      origenCalculado = origenCalculado || 'N/A';
 
       const refObj = {
-        id: idInternoVal, // Required for Supabase UPSERT
-        codigo: idInternoVal, // Mapped for Supabase
+        id: idInternoVal,
+        codigo: idInternoVal,
         idInterno: idInternoVal,
-        nombre: item[map.nombre] || 'Sin Nombre',
-        descripcion: item[map.nombre] || 'Sin Nombre', // Mapped for Supabase
-        marca: item.FirmName || item.Marca || item.U_MARCA || 'N/A',
-        grupo: item[map.grupo] || '',
-        precio: item[map.precio] || 0,
-        moneda: item[map.moneda] || 'MXN', // Mapped for Supabase
-        stock: item[map.stock] || 0,
+        nombre: item[map.nombre] || item.ItemName || 'Sin Nombre',
+        descripcion: item[map.nombre] || item.ItemName || 'Sin Nombre',
+        marca: marcaNombre,
+        marcaCodigo: marcaCodigo,
+        grupo: item[map.grupo] || item.ItmsGrpNam || item.Grupo || '',
+        precio: item[map.precio] || item.Price || 0,
+        moneda: item[map.moneda] || 'MXN',
+        stock: item[map.stock] || item.OnHand || 0,
         origen: origenCalculado
       };
 
@@ -206,6 +221,7 @@ async function fetchRefaccionesSAP() {
 }
 
 // ==========================================
+
 
 const DIAS = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
 const DIAS_LABEL = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
