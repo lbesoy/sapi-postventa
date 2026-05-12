@@ -157,9 +157,41 @@ async function syncClientes() {
 
 async function syncRefacciones() {
   log('Sincronizando Refacciones...');
+  
+  // Como OITB está bloqueado en SQLQueries, obtenemos los grupos vía OData estándar
+  let groupMap = {};
+  try {
+    const grpRes = await sapApi.get(`${SAP_URL}/ItemGroups`, { headers: { 'Cookie': sessionId } });
+    if (grpRes.data && grpRes.data.value) {
+      grpRes.data.value.forEach(g => {
+        groupMap[g.Number] = g.GroupName;
+      });
+    }
+  } catch (err) {
+    log(`⚠️ Advertencia: No se pudieron obtener los grupos de SAP (${err.message})`);
+  }
+
+  // Intentar obtener las marcas de la UDT
+  let marcaMap = {};
+  try {
+    const marcaRes = await sapApi.get(`${SAP_URL}/U_OK_MARCA`, { headers: { 'Cookie': sessionId } });
+    if (marcaRes.data && marcaRes.data.value) {
+      marcaRes.data.value.forEach(m => {
+        marcaMap[m.Code] = m.Name;
+      });
+    }
+  } catch (err) {
+    // Si falla (por falta de permisos o endpoint), no pasa nada, usaremos el Code
+  }
+
   const raw = await fetchQuery(QUERIES.refacciones);
   const rows = raw.map(r => {
     const idVal = r.ItemCode || r.CodigoArticulo || r.Codigo || r.ItemNum || r.ID || null;
+    const origen = (idVal && (idVal.endsWith('N') || idVal.endsWith('n'))) ? 'Nacional' : 'Importado';
+    const itmsGrpNam = groupMap[r.ItmsGrpCod] || r.ItmsGrpNam || '';
+    const marcaCode = r.MarcaCode || r.U_MARCA || '';
+    const marcaName = marcaMap[marcaCode] || marcaCode || 'N/A';
+    
     return {
       id:          idVal,
       codigo:      idVal || '',
@@ -167,7 +199,12 @@ async function syncRefacciones() {
       precio:      parseFloat(r.Price || r.Precio || r.PriceList || 0) || 0,
       moneda:      r.Currency || r.Moneda || 'MXN',
       stock:       parseInt(r.OnHand || r.Stock || r.EnAlmacen || r.Cantidad || 0) || 0,
-      custom_data: {}
+      custom_data: {
+        marca: marcaName,
+        grupo: itmsGrpNam,
+        origen: origen,
+        nombre: r.ItemName || r.Descripcion || ''
+      }
     };
   }).filter(r => r.id);
   const n = await upsertSupabase('refacciones', rows);
@@ -250,15 +287,18 @@ async function main() {
     await loadConfigFromSupabase();
     await loginSAP();
 
-    const resultados = await Promise.allSettled([
-      syncClientes(),
-      syncRefacciones(),
-      syncSitios(),
-      syncTecnicos()
-    ]);
+    const argModulo = process.argv[2] || 'all';
+    const tasks = [];
+    
+    if (argModulo === 'all' || argModulo === 'clientes') tasks.push(syncClientes());
+    if (argModulo === 'all' || argModulo === 'refacciones') tasks.push(syncRefacciones());
+    if (argModulo === 'all' || argModulo === 'sitios') tasks.push(syncSitios());
+    if (argModulo === 'all' || argModulo === 'tecnicos') tasks.push(syncTecnicos());
+
+    const resultados = await Promise.allSettled(tasks);
 
     resultados.forEach((r, i) => {
-      if (r.status === 'rejected') err(`Módulo ${i}: ${r.reason?.message}`);
+      if (r.status === 'rejected') err(`Tarea fallida: ${r.reason?.message}`);
     });
 
     const seg = ((Date.now() - inicio) / 1000).toFixed(1);
