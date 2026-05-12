@@ -4359,12 +4359,12 @@ function agregarRef(section) {
   
   let html = `
     <!-- MARCA COMBO -->
-    <div style="width:125px; position:relative;" class="group-ref-marca">
-      <div class="combo-box" tabindex="0" id="${idComboMarca}-combo" onclick="toggleCombo('${idComboMarca}')" style="padding: 0.45rem 0.6rem;">
-        <span id="${idComboMarca}-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px;">Marca...</span>
+    <div style="width:105px; position:relative;" class="group-ref-marca">
+      <div class="combo-box" tabindex="0" id="${idComboMarca}-combo" style="padding: 0.45rem 0.4rem;">
+        <span id="${idComboMarca}-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70px; font-size:0.8rem;">Marca...</span>
         <i data-lucide="chevron-down" style="width:14px;height:14px; flex-shrink:0;"></i>
       </div>
-      <div class="combo-menu" id="${idComboMarca}-menu" style="width: 250px;">
+      <div class="combo-menu" id="${idComboMarca}-menu" style="width: 250px; z-index: 9999;">
         <div class="combo-search">
           <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted)"></i>
           <input type="text" id="${idComboMarca}-search" placeholder="Buscar..." oninput="filterCombo('${idComboMarca}', this.value)" onclick="event.stopPropagation()">
@@ -4377,12 +4377,12 @@ function agregarRef(section) {
     </div>
     
     <!-- DESC COMBO -->
-    <div style="flex:1; position:relative; min-width: 180px;" class="group-ref-desc">
-      <div class="combo-box" tabindex="0" id="${idComboDesc}-combo" onclick="toggleCombo('${idComboDesc}')" style="padding: 0.45rem 0.6rem;">
-        <span id="${idComboDesc}-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px;">Descripción...</span>
+    <div style="flex:1; position:relative; min-width: 140px;" class="group-ref-desc">
+      <div class="combo-box" tabindex="0" id="${idComboDesc}-combo" style="padding: 0.45rem 0.4rem;">
+        <span id="${idComboDesc}-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; font-size:0.8rem;">Descripción...</span>
         <i data-lucide="chevron-down" style="width:14px;height:14px; flex-shrink:0;"></i>
       </div>
-      <div class="combo-menu" id="${idComboDesc}-menu" style="width: 100%; min-width: 300px;">
+      <div class="combo-menu" id="${idComboDesc}-menu" style="width: 100%; min-width: 300px; z-index: 9999;">
         <div class="combo-search">
           <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted)"></i>
           <input type="text" id="${idComboDesc}-search" placeholder="Buscar..." oninput="filterCombo('${idComboDesc}', this.value)" onclick="event.stopPropagation()">
@@ -4394,11 +4394,11 @@ function agregarRef(section) {
       <input type="hidden" class="ref-desc-hidden ref-desc" id="${idComboDesc}" />
     </div>
 
-    <input type="text" placeholder="Clave" class="ref-clave" style="width:80px" readonly />
-    <input type="number" placeholder="Cant." class="ref-cant" style="width:55px" min="1" value="1"/>`;
+    <input type="text" placeholder="Clave" class="ref-clave" style="width:70px; padding: 0.45rem 0.4rem; font-size:0.8rem;" readonly />
+    <input type="number" placeholder="Cant." class="ref-cant" style="width:50px; padding: 0.45rem 0.4rem; font-size:0.8rem;" min="1" value="1"/>`;
     
   if (section === 'utilizadas') {
-    html += `<input type="number" placeholder="Precio" class="ref-precio" style="width:80px; display:none;" step="0.01"/>`;
+    html += `<input type="number" placeholder="Precio" class="ref-precio" style="width:70px; display:none; padding: 0.45rem 0.4rem; font-size:0.8rem;" step="0.01"/>`;
   }
   
   html += `<button type="button" class="btn-del-ref" onclick="eliminarRef(this)">✕</button>`;
@@ -4407,6 +4407,30 @@ function agregarRef(section) {
   list.appendChild(row);
   
   if (window.lucide) window.lucide.createIcons({ root: row });
+  
+  // Attach Event Listeners dynamically
+  const comboMarca = document.getElementById(`${idComboMarca}-combo`);
+  if (comboMarca) {
+    comboMarca.addEventListener('click', (e) => {
+      e.stopPropagation();
+      window.toggleCombo(idComboMarca);
+    });
+  }
+  
+  const comboDesc = document.getElementById(`${idComboDesc}-combo`);
+  if (comboDesc) {
+    comboDesc.addEventListener('click', (e) => {
+      e.stopPropagation();
+      window.toggleCombo(idComboDesc);
+    });
+  }
+  
+  // Prevent menu clicks from bubbling
+  const menuMarca = document.getElementById(`${idComboMarca}-menu`);
+  if (menuMarca) menuMarca.addEventListener('click', e => e.stopPropagation());
+  
+  const menuDesc = document.getElementById(`${idComboDesc}-menu`);
+  if (menuDesc) menuDesc.addEventListener('click', e => e.stopPropagation());
   
   // Popular el select de marca en esta nueva fila
   window.popularSelectMarcas(idComboMarca, idComboDesc);
