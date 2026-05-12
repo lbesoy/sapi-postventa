@@ -180,6 +180,7 @@ async function fetchRefaccionesSAP() {
         idInterno: idInternoVal,
         nombre: item[map.nombre] || 'Sin Nombre',
         descripcion: item[map.nombre] || 'Sin Nombre', // Mapped for Supabase
+        marca: item.FirmName || item.Marca || item.U_Marca || 'N/A',
         grupo: item[map.grupo] || '',
         precio: item[map.precio] || 0,
         moneda: item[map.moneda] || 'MXN', // Mapped for Supabase
@@ -5483,6 +5484,7 @@ function renderRefacciones() {
     let itemId = r.idInterno || r.codigo || r.id || 'N/A';
     let itemName = r.nombre || r.descripcion || 'undefined';
     let itemGrupo = r.grupo || r.ItmsGrpNam || 'N/A';
+    let itemMarca = r.marca || 'N/A';
     let itemStock = r.stock || 0;
     
     let itemOrigen = r.origen;
@@ -5495,6 +5497,7 @@ function renderRefacciones() {
     if (q) {
       const match = itemId.toLowerCase().includes(q) || 
                     itemName.toLowerCase().includes(q) ||
+                    itemMarca.toLowerCase().includes(q) ||
                     itemGrupo.toLowerCase().includes(q);
       if (!match) return;
     }
@@ -5510,6 +5513,7 @@ function renderRefacciones() {
       <tr>
         <td style="font-family: monospace; font-weight: 500;">${itemId}</td>
         <td style="font-weight: 500; color: var(--text-primary); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${itemName}">${itemName}</td>
+        <td><span style="color:var(--text-secondary); font-size: 0.85rem;">${itemMarca}</span></td>
         <td><span class="status-badge status-open" style="background:var(--bg-secondary); color:var(--text-secondary);">${itemGrupo}</span></td>
         <td style="font-family: monospace; font-weight: 500;">$${Number(r.precio||0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2})}</td>
         <td style="font-weight: 500; color: ${itemStock > 0 ? 'var(--green)' : 'var(--red)'};">${itemStock}</td>
