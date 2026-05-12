@@ -3740,6 +3740,7 @@ function guardarNuevaMaquina(e) {
         maquinariaDb[maqDbIdx].anio = anio;
         maquinariaDb[maqDbIdx].tipo = tipo;
         if (!maquinariaDb[maqDbIdx].customData) maquinariaDb[maqDbIdx].customData = {};
+        maquinariaDb[maqDbIdx].customData.tipo = tipo;
         maquinariaDb[maqDbIdx].customData.venta = venta;
         maquinariaDb[maqDbIdx].customData.ubicacion = ubicacion;
         maquinariaDb[maqDbIdx].customData.latitud = latitud;
