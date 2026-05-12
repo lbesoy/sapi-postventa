@@ -165,7 +165,7 @@ window.pushToSupabase = async function(tabla, item) {
     } else if (tabla === 'maquinaria') {
       payload = { id: item.id, serie: item.serie, marca: item.marca, modelo: item.modelo, anio: item.anio, cliente: item.cliente, id_interno: item.idInterno, descripcion: item.descripcion, custom_data: item.customData || {} };
     } else if (tabla === 'refacciones') {
-      payload = { id: item.id, codigo: item.codigo, descripcion: item.descripcion, precio: item.precio, moneda: item.moneda, stock: item.stock, custom_data: item.customData || {} };
+      payload = { id: item.id, codigo: item.codigo, descripcion: item.descripcion, precio: item.precio, moneda: item.moneda, stock: item.stock, custom_data: { ...(item.customData || {}), marca: item.marca, grupo: item.grupo, origen: item.origen, nombre: item.nombre } };
     } else if (tabla === 'config' || tabla === 'roles') {
       payload = { id: 'main', data: item };
     } else {
@@ -340,7 +340,7 @@ async function cargarDatosDeSupabase() {
     // Refacciones
     const { data: refDb } = await sb.from('refacciones').select('*');
     if (refDb && refDb.length > 0) {
-      const mapped = refDb.map(r => ({ id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, customData: r.custom_data }));
+      const mapped = refDb.map(r => ({ id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, customData: r.custom_data, marca: r.custom_data?.marca || 'N/A', grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion }));
       localStorage.setItem('sapi_refacciones_db', JSON.stringify(mapped));
     }
 
