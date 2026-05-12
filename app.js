@@ -229,7 +229,7 @@ function getLogoStyle(marca) {
   if (!marca) return 'width:85px; height:32px; object-fit:contain; object-position:left center; margin-right:8px;';
   const m = marca.toLowerCase().trim();
   if (m.includes('casa grande') || m.includes('casagrande')) {
-    return 'width:120px; height:38px; object-fit:contain; object-position:left center; margin-right:8px;';
+    return 'width:160px; height:50px; object-fit:contain; object-position:left center; margin-right:8px;';
   }
   return 'width:85px; height:32px; object-fit:contain; object-position:left center; margin-right:8px;';
 }
