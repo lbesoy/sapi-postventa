@@ -1269,6 +1269,10 @@
         <div class="form-section">
           <div class="form-section-title"><i data-lucide="settings-2" class="section-icon"></i> Datos de la Máquina</div>
           <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="form-group" style="grid-column: 1/-1;">
+              <label>ID Interno (Dejar en blanco para auto-generar)</label>
+              <input type="text" id="am-id-interno" placeholder="Ej. PHCG-250-023"/>
+            </div>
             <div class="form-group">
               <label>Tipo de Máquina *</label>
               <select id="am-tipo-maquina" required onchange="if(this.value==='Otra'){document.getElementById('am-tipo-otro').style.display='block';document.getElementById('am-tipo-otro').required=true;document.getElementById('am-tipo-otro').focus();}else{document.getElementById('am-tipo-otro').style.display='none';document.getElementById('am-tipo-otro').required=false;}">
