@@ -5403,11 +5403,11 @@ function renderTickets(ctx) {
   
   let filtered = tickets.filter(t =>
     !q ||
-    (t.asunto||'').toLowerCase().includes(q) ||
-    (t.solicitante||'').toLowerCase().includes(q) ||
-    (t.cliente||'').toLowerCase().includes(q) ||
-    (t.asignado||'').toLowerCase().includes(q) ||
-    (t.folio||'').toLowerCase().includes(q)
+    String(t.asunto||'').toLowerCase().includes(q) ||
+    String(t.solicitante||'').toLowerCase().includes(q) ||
+    String(t.cliente||'').toLowerCase().includes(q) ||
+    String(t.asignado||'').toLowerCase().includes(q) ||
+    String(t.folio||'').toLowerCase().includes(q)
   );
   
   let tecFilter = document.getElementById(isDashView ? 'filter-dash-tkt-tecnico' : 'filter-tkt-tecnico')?.value;
@@ -5429,7 +5429,7 @@ function renderTickets(ctx) {
       if (tecFilter && tecName) {
          let assigned = [];
          if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
-         else if (t.asignado && t.asignado !== 'Sin asignar') assigned = t.asignado.split(',').map(s=>s.trim());
+         else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
          passTec = assigned.includes(tecName);
       }
       
@@ -5472,7 +5472,7 @@ function renderTickets(ctx) {
         ${t.cliente ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}"><i data-lucide="building-2" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}</div>` : ''}
       </td>
       <td style="white-space:nowrap;">${t.area||'—'}</td>
-      <td style="white-space:nowrap;"><span class="badge badge-${(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
+      <td style="white-space:nowrap;"><span class="badge badge-${String(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
       <td style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'—'}</span></td>
       <td style="white-space:nowrap;">${t.asignado||'—'}</td>
       <td style="white-space:nowrap;">${t.fecha||'—'}</td>
