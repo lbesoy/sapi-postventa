@@ -215,6 +215,7 @@ async function fetchRefaccionesSAP() {
         marca: marcaNombre,
         marcaCodigo: marcaCodigo,
         grupo: item[map.grupo] || item.ItmsGrpNam || item.Grupo || '',
+        ItmsGrpCod: item.ItmsGrpCod || item.GrupoCode || null,
         precio: item[map.precio] || item.Price || 0,
         moneda: item[map.moneda] || 'MXN',
         stock: item[map.stock] || item.OnHand || 0,
@@ -5513,12 +5514,32 @@ function renderRefacciones(resetPage = false) {
   if (!body) return;
 
   const q = (document.getElementById('search-refacciones')?.value || '').toLowerCase();
-  
-  // RENDERIZAR CABECERAS PERSONALIZADAS
-  const trHeader = document.quer  // Filtrar: sin marca → excluir; busqueda
+
+  // Mapa de códigos → nombre completo (para resolver datos del caché de Supabase)
+  const MARCAS_RENDER = {
+    'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING',
+    'CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE',
+    'OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER',
+    'RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL',
+    'SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER',
+    'KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA',
+    'EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
+  };
+  // Mapa de código numérico de grupo → nombre
+  const GRUPOS_RENDER = {
+    101:'Refacciones', 102:'Refacciones Hidráulico', 103:'Refacciones Eléctrico',
+    104:'Refacciones Motor', 105:'Refacciones Transmisión', 106:'Refacciones Estructura',
+    107:'Gastos Operativos', 108:'Herramientas', 109:'Consumibles', 110:'Servicios',
+    111:'Anticipos'
+  };
+
+  // Filtrar: sin marca → excluir; busqueda
   const filtered = refaccionesDb.filter(r => {
-    const marca = (r.marca || '').trim();
-    if (!marca || marca === 'N/A') return false; // excluir sin marca
+    // Resolve marca for filtering (may be code or full name in cache)
+    const marcaRaw = (r.marca || r.marcaCodigo || '').trim();
+    const marcaCode = marcaRaw.toUpperCase();
+    const marcaFull = MARCAS_RENDER[marcaCode] || (marcaRaw.length > 4 ? marcaRaw : '');
+    if (!marcaFull) return false; // exclude items with no resolvable brand
     if (!q) return true;
     const itemId = (r.idInterno || r.codigo || r.id || '').toLowerCase();
     const itemName = (r.nombre || r.descripcion || '').toLowerCase();
@@ -5536,8 +5557,20 @@ function renderRefacciones(resetPage = false) {
   pageItems.forEach(r => {
     const itemId = r.idInterno || r.codigo || r.id || 'N/A';
     const itemName = r.nombre || r.descripcion || 'Sin Nombre';
-    const itemGrupo = r.grupo || r.ItmsGrpNam || 'N/A';
-    const itemMarca = r.marca || 'N/A';
+
+    // Resolve marca code and full name from maps (handles both cached codes and fresh names)
+    const rawMarca = (r.marca || r.marcaCodigo || '').trim();
+    const isCode = rawMarca.length <= 4 && rawMarca === rawMarca.toUpperCase();
+    const itemMarcaCodigo = isCode ? rawMarca : (r.marcaCodigo || '');
+    const marcaKey = (itemMarcaCodigo || rawMarca).toUpperCase();
+    const itemMarcaNombre = MARCAS_RENDER[marcaKey] || rawMarca || 'N/A';
+
+    // Resolve group: could be a name string or numeric code
+    const grupoRaw = r.grupo || r.ItmsGrpNam || r.GrupoCode || r.ItmsGrpCod || '';
+    const itemGrupo = (typeof grupoRaw === 'number')
+      ? (GRUPOS_RENDER[grupoRaw] || `Grupo ${grupoRaw}`)
+      : (grupoRaw || GRUPOS_RENDER[r.ItmsGrpCod] || 'N/A');
+
     const itemStock = r.stock || 0;
     let itemOrigen = r.origen || '';
     if (!itemOrigen && itemId !== 'N/A') {
@@ -5552,13 +5585,11 @@ function renderRefacciones(resetPage = false) {
       });
     }
     
-    const itemMarcaCodigo = r.marcaCodigo || '';
-    
     html += `
       <tr>
         <td style="font-weight: 500; color: var(--text-primary); max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${itemName}">${itemName}</td>
-        <td><span style="font-family:monospace; font-size:0.82rem; font-weight:600; color:var(--accent); background:var(--bg-body); border:1px solid var(--border); padding:2px 6px; border-radius:4px;">${itemMarcaCodigo || itemMarca}</span></td>
-        <td style="font-weight: 500; color: var(--text-primary);">${itemMarca}</td>
+        <td><span style="font-family:monospace; font-size:0.82rem; font-weight:600; color:var(--accent); background:var(--bg-body); border:1px solid var(--border); padding:2px 6px; border-radius:4px;">${itemMarcaCodigo || marcaKey}</span></td>
+        <td style="font-weight: 500; color: var(--text-primary);">${itemMarcaNombre}</td>
         <td><span class="status-badge status-open" style="background:var(--bg-secondary); color:var(--text-secondary);">${itemGrupo}</span></td>
         <td style="font-family: monospace; font-weight: 500;">$${Number(r.precio||0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2})}</td>
         <td style="font-weight: 500; color: ${itemStock > 0 ? 'var(--green)' : 'var(--red)'}">${itemStock}</td>
