@@ -239,6 +239,20 @@ app.delete('/api/sap/queries/:id', ensureSAPConnection, async (req, res) => {
     }
 });
 
+// Acceder a tablas de usuario UDO de SAP (ej. @OK_MARCA → /api/sap/udo/OK_MARCA)
+app.get('/api/sap/udo/:tableName', ensureSAPConnection, async (req, res) => {
+    try {
+        const tableName = req.params.tableName; // sin el "@"
+        const response = await sapApi.get(`${SAP_URL}/U_${tableName}`, {
+            headers: { 'B1S-PageSize': 5000, 'Prefer': 'odata.maxpagesize=5000' }
+        });
+        res.json({ success: true, data: response.data.value || [] });
+    } catch (error) {
+        console.error(`Error accediendo UDO ${req.params.tableName}:`, error.response?.data || error.message);
+        res.status(500).json({ error: 'Error accediendo tabla UDO de SAP', details: error.response?.data || error.message });
+    }
+});
+
 // Obtener Máquinas (Equipments / Activos Fijos)
 // Nota: En SAP B1 la maquinaria de servicio usualmente está en "CustomerEquipmentCards"
 app.get('/api/maquinaria', ensureSAPConnection, async (req, res) => {
