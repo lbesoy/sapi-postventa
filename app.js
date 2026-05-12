@@ -5486,49 +5486,47 @@ function actualizarMapaMaquinaria(filteredData) {
   }
 }
 
-function renderRefacciones() {
+let refaccionesCurrentPage = 1;
+const REFACCIONES_PAGE_SIZE = 50;
+
+function renderRefacciones(resetPage = false) {
+  if (resetPage) refaccionesCurrentPage = 1;
   const body = document.getElementById('tabla-body-refacciones');
   if (!body) return;
 
   const q = (document.getElementById('search-refacciones')?.value || '').toLowerCase();
   
   // RENDERIZAR CABECERAS PERSONALIZADAS
-  const trHeader = document.querySelector('#view-refacciones .orders-table thead tr');
-  if (trHeader) {
-    trHeader.querySelectorAll('.custom-th-ref').forEach(el => el.remove());
-    if (configData?.mappings?.refacciones?.customCols) {
-      configData.mappings.refacciones.customCols.forEach(col => {
-        const th = document.createElement('th');
-        th.className = 'custom-th-ref';
-        th.textContent = col.label;
-        trHeader.insertBefore(th, trHeader.lastElementChild);
-      });
-    }
-  }
+  const trHeader = document.quer  // Filtrar: sin marca → excluir; busqueda
+  const filtered = refaccionesDb.filter(r => {
+    const marca = (r.marca || '').trim();
+    if (!marca || marca === 'N/A') return false; // excluir sin marca
+    if (!q) return true;
+    const itemId = (r.idInterno || r.codigo || r.id || '').toLowerCase();
+    const itemName = (r.nombre || r.descripcion || '').toLowerCase();
+    const itemGrupo = (r.grupo || '').toLowerCase();
+    return itemId.includes(q) || itemName.includes(q) || marca.toLowerCase().includes(q) || itemGrupo.includes(q);
+  });
+
+  const total = filtered.length;
+  const totalPages = Math.ceil(total / REFACCIONES_PAGE_SIZE) || 1;
+  if (refaccionesCurrentPage > totalPages) refaccionesCurrentPage = totalPages;
+  const start = (refaccionesCurrentPage - 1) * REFACCIONES_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + REFACCIONES_PAGE_SIZE);
 
   let html = '';
-  refaccionesDb.forEach(r => {
-    let itemId = r.idInterno || r.codigo || r.id || 'N/A';
-    let itemName = r.nombre || r.descripcion || 'undefined';
-    let itemGrupo = r.grupo || r.ItmsGrpNam || 'N/A';
-    let itemMarca = r.marca || 'N/A';
-    let itemStock = r.stock || 0;
-    
-    let itemOrigen = r.origen;
+  pageItems.forEach(r => {
+    const itemId = r.idInterno || r.codigo || r.id || 'N/A';
+    const itemName = r.nombre || r.descripcion || 'Sin Nombre';
+    const itemGrupo = r.grupo || r.ItmsGrpNam || 'N/A';
+    const itemMarca = r.marca || 'N/A';
+    const itemStock = r.stock || 0;
+    let itemOrigen = r.origen || '';
     if (!itemOrigen && itemId !== 'N/A') {
       itemOrigen = itemId.toUpperCase().endsWith('N') ? 'Nacional' : 'Importado';
-    } else if (!itemOrigen) {
-      itemOrigen = 'N/A';
     }
+    itemOrigen = itemOrigen || 'N/A';
 
-    if (q) {
-      const match = itemId.toLowerCase().includes(q) || 
-                    itemName.toLowerCase().includes(q) ||
-                    itemMarca.toLowerCase().includes(q) ||
-                    itemGrupo.toLowerCase().includes(q);
-      if (!match) return;
-    }
-    
     let customTds = '';
     if (configData?.mappings?.refacciones?.customCols) {
       configData.mappings.refacciones.customCols.forEach(col => {
@@ -5543,19 +5541,36 @@ function renderRefacciones() {
         <td><span style="color:var(--text-secondary); font-size: 0.85rem;">${itemMarca}</span></td>
         <td><span class="status-badge status-open" style="background:var(--bg-secondary); color:var(--text-secondary);">${itemGrupo}</span></td>
         <td style="font-family: monospace; font-weight: 500;">$${Number(r.precio||0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2})}</td>
-        <td style="font-weight: 500; color: ${itemStock > 0 ? 'var(--green)' : 'var(--red)'};">${itemStock}</td>
+        <td style="font-weight: 500; color: ${itemStock > 0 ? 'var(--green)' : 'var(--red)'}">${itemStock}</td>
         <td><span class="badge ${itemOrigen === 'Nacional' ? 'badge-completado' : (itemOrigen === 'Importado' ? 'badge-proceso' : 'badge-pendiente')}">${itemOrigen}</span></td>
         ${customTds}
-        <td>
-           <button class="action-btn" onclick="mostrarNotificacion('Vista de detalle en construcción', 'info')" title="Ver detalles"><i data-lucide="eye"></i></button>
-        </td>
+        <td><button class="action-btn" onclick="mostrarNotificacion('Vista de detalle en construcción', 'info')" title="Ver detalles"><i data-lucide="eye"></i></button></td>
       </tr>
     `;
   });
-  
-  body.innerHTML = html || '<tr><td colspan="6" class="empty-state">No se encontraron refacciones.</td></tr>';
+
+  body.innerHTML = html || '<tr><td colspan="8" class="empty-state">No se encontraron refacciones.</td></tr>';
+
+  // Pagination + total footer
+  let footer = document.getElementById('refacciones-footer');
+  if (!footer) {
+    footer = document.createElement('div');
+    footer.id = 'refacciones-footer';
+    footer.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:0.75rem 1rem; font-size:0.82rem; color:var(--text-muted); border-top:1px solid var(--border); flex-wrap:wrap; gap:0.5rem;';
+    body.closest('.table-wrapper')?.after(footer);
+  }
+  footer.innerHTML = `
+    <span>Mostrando <strong>${start + 1}–${Math.min(start + REFACCIONES_PAGE_SIZE, total)}</strong> de <strong>${total}</strong> refacciones</span>
+    <div style="display:flex; gap:0.5rem; align-items:center;">
+      <button onclick="refaccionesCurrentPage--; renderRefacciones()" ${refaccionesCurrentPage <= 1 ? 'disabled' : ''} style="padding:0.3rem 0.7rem; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-card); color:var(--text-primary); cursor:pointer; font-size:0.8rem;">← Anterior</button>
+      <span>Pág. ${refaccionesCurrentPage} / ${totalPages}</span>
+      <button onclick="refaccionesCurrentPage++; renderRefacciones()" ${refaccionesCurrentPage >= totalPages ? 'disabled' : ''} style="padding:0.3rem 0.7rem; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-card); color:var(--text-primary); cursor:pointer; font-size:0.8rem;">Siguiente →</button>
+    </div>
+  `;
+
   lucide.createIcons();
 }
+
 
 function renderSitios() {
   const body = document.getElementById('tabla-body-sitios');
