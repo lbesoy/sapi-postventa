@@ -175,6 +175,9 @@ window.pushToSupabase = async function(tabla, item) {
     const { error } = await sb.from(tabla).upsert(payload, { onConflict: 'id' });
     if (error) {
       console.error(`[Supabase] Error upsert en ${tabla}:`, error.message, error.details);
+      if (window.mostrarNotificacion) {
+        window.mostrarNotificacion(`Error en la nube (${tabla}): ${error.message}`, 'error');
+      }
     } else {
       console.log(`[Supabase] ✅ ${tabla} guardado correctamente.`);
     }

@@ -6815,8 +6815,13 @@ async function guardarTicket(e) {
     tickets.unshift(ticket);
   }
   
-  // Guardar SIEMPRE en local como respaldo
-  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  // Guardar SIEMPRE en local como respaldo (con try-catch para evitar que un PDF gigante rompa la subida a la nube)
+  try {
+    localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  } catch (err) {
+    console.error('Error al guardar en localStorage (¿exceso de cuota por PDF?):', err);
+    mostrarNotificacion('El archivo adjunto es muy pesado para la memoria local, pero intentaremos subirlo a la nube.', 'error');
+  }
   
   if (window.supabaseClient) {
     await window.pushToSupabase('tickets', ticket);
