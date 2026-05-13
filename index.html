@@ -267,12 +267,10 @@
             <div class="section-header" style="flex-wrap: wrap; gap: 1rem;">
               <h2>Órdenes Recientes</h2>
               <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
-                <select id="filter-ord-tecnico" onchange="filtrarOrdenes()" class="form-select"
-                  style="padding:0.4rem; border-radius:4px; border:1px solid var(--border);">
+                <select id="filter-ord-tecnico" onchange="filtrarOrdenes()" class="form-select">
                   <option value="">Cualquier Técnico</option>
                 </select>
-                <select id="filter-ord-supervisor" onchange="filtrarOrdenes()" class="form-select"
-                  style="padding:0.4rem; border-radius:4px; border:1px solid var(--border);">
+                <select id="filter-ord-supervisor" onchange="filtrarOrdenes()" class="form-select">
                   <option value="">Cualquier Supervisor</option>
                 </select>
                 <div class="search-bar" style="margin:0;">
@@ -369,12 +367,10 @@
             <div class="section-header" style="flex-wrap: wrap; gap: 1rem;">
               <h2>Tickets Recientes</h2>
               <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
-                <select id="filter-dash-tkt-tecnico" onchange="renderTickets('dash-tickets')" class="form-select"
-                  style="padding:0.4rem; border-radius:4px; border:1px solid var(--border);">
+                <select id="filter-dash-tkt-tecnico" onchange="renderTickets('dash-tickets')" class="form-select">
                   <option value="">Cualquier Técnico</option>
                 </select>
-                <select id="filter-dash-tkt-supervisor" onchange="renderTickets('dash-tickets')" class="form-select"
-                  style="padding:0.4rem; border-radius:4px; border:1px solid var(--border);">
+                <select id="filter-dash-tkt-supervisor" onchange="renderTickets('dash-tickets')" class="form-select">
                   <option value="">Cualquier Supervisor</option>
                 </select>
                 <div class="search-bar" style="margin:0;">
@@ -471,10 +467,10 @@
           <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
             <h2>Calendario de Servicios</h2>
             <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; flex:1; justify-content:flex-end;">
-              <select id="filter-cal-cliente" class="form-select" onchange="renderCalendario()" style="max-width:200px;">
+              <select id="filter-cal-cliente" class="form-select" onchange="renderCalendario()">
                 <option value="">Todos los Clientes</option>
               </select>
-              <select id="filter-cal-tecnico" class="form-select" onchange="renderCalendario()" style="max-width:200px;">
+              <select id="filter-cal-tecnico" class="form-select" onchange="renderCalendario()">
                 <option value="">Todos los Técnicos</option>
               </select>
               <button class="btn-primary" id="btn-programar-tecnico" style="display:none;" onclick="abrirProgramarTecnico()">
@@ -1150,12 +1146,10 @@
               <button class="filter-btn" data-filter="Cerrado" onclick="filtrarTickets(this)">Cerrados</button>
             </div>
             <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
-              <select id="filter-tkt-tecnico" onchange="renderTickets()" class="form-select"
-                style="padding:0.4rem; border-radius:4px; border:1px solid var(--border);">
+              <select id="filter-tkt-tecnico" onchange="renderTickets()" class="form-select">
                 <option value="">Cualquier Técnico</option>
               </select>
-              <select id="filter-tkt-supervisor" onchange="renderTickets()" class="form-select"
-                style="padding:0.4rem; border-radius:4px; border:1px solid var(--border);">
+              <select id="filter-tkt-supervisor" onchange="renderTickets()" class="form-select">
                 <option value="">Cualquier Supervisor</option>
               </select>
               <div class="search-bar" style="margin:0;">
