@@ -4646,9 +4646,9 @@ function agregarRef(section) {
   
   let html = `
     <!-- MARCA COMBO -->
-    <div style="width:105px; position:relative;" class="group-ref-marca">
+    <div style="flex: 1.2; min-width: 100px; position:relative;" class="group-ref-marca">
       <div class="combo-box" tabindex="0" id="${idComboMarca}-combo" style="padding: 0.45rem 0.4rem;">
-        <span id="${idComboMarca}-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70px; font-size:0.8rem;">Marca...</span>
+        <span id="${idComboMarca}-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 20px); font-size:0.8rem;">Marca...</span>
         <i data-lucide="chevron-down" style="width:14px;height:14px; flex-shrink:0;"></i>
       </div>
       <div class="combo-menu" id="${idComboMarca}-menu" style="width: 250px; z-index: 9999;">
@@ -4664,9 +4664,9 @@ function agregarRef(section) {
     </div>
     
     <!-- DESC COMBO -->
-    <div style="flex:1; position:relative; min-width: 80px;" class="group-ref-desc">
+    <div style="flex: 2; position:relative; min-width: 120px;" class="group-ref-desc">
       <div class="combo-box" tabindex="0" id="${idComboDesc}-combo" style="padding: 0.45rem 0.4rem;">
-        <span id="${idComboDesc}-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; font-size:0.8rem;">Descripción...</span>
+        <span id="${idComboDesc}-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 20px); font-size:0.8rem;">Descripción...</span>
         <i data-lucide="chevron-down" style="width:14px;height:14px; flex-shrink:0;"></i>
       </div>
       <div class="combo-menu" id="${idComboDesc}-menu" style="width: 100%; min-width: 300px; z-index: 9999;">
