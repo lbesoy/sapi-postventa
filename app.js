@@ -638,7 +638,7 @@ function applyRole(rolKey) {
 
   // Show/hide role switcher
   const user = usuarios.find(u => u.id === currentSession.userId);
-  document.getElementById('role-switcher').style.display = (user?.rol === 'superadmin') ? 'flex' : 'none';
+  document.getElementById('role-switcher').style.display = (user?.rol === 'superadmin' || user?.rol === 'admin') ? 'flex' : 'none';
 
   // Mostrar botón de programar técnico en calendario solo a roles autorizados
   const btnProgramar = document.getElementById('btn-programar-tecnico');
