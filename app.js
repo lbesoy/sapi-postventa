@@ -377,7 +377,7 @@ async function iniciarSesionSubmit(e) {
 
   // Ahora buscamos el rol
   const { data: roleData, error: roleError } = await window.supabaseClient
-    .from('user_roles')
+    .from('usuarios')
     .select('rol, activo, nombre')
     .eq('id', data.user.id)
     .single();
