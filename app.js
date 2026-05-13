@@ -5340,6 +5340,7 @@ function verDetalle(id) {
                     ${(b.tecnico || 'U').charAt(0).toUpperCase()}
                   </div>
                   <span style="font-size:0.85rem; font-weight:600; color:var(--text-primary);">${b.tecnico || 'Desconocido'}</span>
+                  ${['superadmin', 'admin'].includes(currentSession.viewMode) ? `<button class="action-btn" onclick="editarBitacora('${o.id}', '${b.id}')" title="Editar Bitácora" style="padding:0.15rem; margin-left:0.5rem;"><i data-lucide="pencil" style="width:12px;height:12px;"></i></button>` : ''}
                 </div>
                 ${horasHtml}
               </div>
@@ -5781,6 +5782,7 @@ function calcularRangoFechasLaboral(diasHabilAtras) {
 
 function abrirBitacora(id) {
   window.currentBitacoraOrdenId = id;
+  window.currentBitacoraEntryId = null;
   const rango = calcularRangoFechasLaboral(2);
 
   const fechaInput = document.getElementById('bitacora-fecha');
@@ -5791,6 +5793,30 @@ function abrirBitacora(id) {
   document.getElementById('bitacora-nota').value = '';
   document.getElementById('bitacora-entrada').value = '';
   document.getElementById('bitacora-salida').value = '';
+  document.getElementById('modal-bitacora-overlay').classList.add('open');
+}
+
+function editarBitacora(ordenId, bitacoraId) {
+  const o = ordenes.find(x => x.id === ordenId);
+  if (!o) return;
+  const b = o.bitacora?.find(x => x.id === bitacoraId);
+  if (!b) return;
+
+  window.currentBitacoraOrdenId = ordenId;
+  window.currentBitacoraEntryId = bitacoraId;
+
+  const fechaInput = document.getElementById('bitacora-fecha');
+  const dObj = new Date(b.fecha);
+  const dateStr = !isNaN(dObj) ? dObj.toISOString().split('T')[0] : '';
+  fechaInput.value = dateStr;
+  
+  // Como admin, quitamos las restricciones de fecha para poder editar fechas pasadas
+  fechaInput.min = '';
+  fechaInput.max = '';
+
+  document.getElementById('bitacora-nota').value = b.nota || '';
+  document.getElementById('bitacora-entrada').value = b.entrada || '';
+  document.getElementById('bitacora-salida').value = b.salida || '';
   document.getElementById('modal-bitacora-overlay').classList.add('open');
 }
 
@@ -5813,41 +5839,60 @@ function guardarNotaBitacora() {
     return;
   }
 
-  // Validar que la fecha seleccionada no sea fin de semana
-  const fechaObj = new Date(fecha + 'T12:00:00'); // mediodía para evitar desfases de timezone
-  const diaSemana = fechaObj.getDay();
-  if (diaSemana === 0 || diaSemana === 6) {
-    mostrarNotificacion('No se pueden registrar entradas en fin de semana.', 'error');
-    return;
-  }
+  const isAdmin = ['superadmin', 'admin'].includes(currentSession.viewMode);
 
-  // Validar que esté dentro del rango hábil permitido
-  const rango = calcularRangoFechasLaboral(2);
-  if (fecha < rango.min || fecha > rango.max) {
-    mostrarNotificacion('La fecha seleccionada está fuera del rango permitido.', 'error');
-    return;
+  if (!isAdmin) {
+    // Validar que la fecha seleccionada no sea fin de semana
+    const fechaObj = new Date(fecha + 'T12:00:00'); // mediodía para evitar desfases de timezone
+    const diaSemana = fechaObj.getDay();
+    if (diaSemana === 0 || diaSemana === 6) {
+      mostrarNotificacion('No se pueden registrar entradas en fin de semana.', 'error');
+      return;
+    }
+
+    // Validar que esté dentro del rango hábil permitido
+    const rango = calcularRangoFechasLaboral(2);
+    if (fecha < rango.min || fecha > rango.max) {
+      mostrarNotificacion('La fecha seleccionada está fuera del rango permitido.', 'error');
+      return;
+    }
   }
   
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   const nombreTecnico = currentUser ? currentUser.nombre : 'Usuario';
   
   if (!o.bitacora) o.bitacora = [];
-  o.bitacora.push({
-    id: crypto.randomUUID(),
-    fecha: new Date(fecha).toISOString(),
-    nota: nota,
-    entrada: entrada,
-    salida: salida,
-    tecnico: nombreTecnico
-  });
+
+  if (window.currentBitacoraEntryId) {
+    // Modo Edición
+    const bIndex = o.bitacora.findIndex(x => x.id === window.currentBitacoraEntryId);
+    if (bIndex >= 0) {
+      o.bitacora[bIndex].fecha = new Date(fecha).toISOString();
+      o.bitacora[bIndex].nota = nota;
+      o.bitacora[bIndex].entrada = entrada;
+      o.bitacora[bIndex].salida = salida;
+    }
+  } else {
+    // Modo Creación
+    o.bitacora.push({
+      id: crypto.randomUUID(),
+      fecha: new Date(fecha).toISOString(),
+      nota: nota,
+      entrada: entrada,
+      salida: salida,
+      tecnico: nombreTecnico
+    });
+  }
   
   localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
   if (window.pushToSupabase) {
     window.pushToSupabase('ordenes', o);
   }
   
-  mostrarNotificacion('Entrada de bitácora guardada.', 'success');
+  mostrarNotificacion(window.currentBitacoraEntryId ? 'Bitácora actualizada.' : 'Entrada de bitácora guardada.', 'success');
   cerrarBitacora();
+  verDetalle(o.id); // Recargar modal
+}
   verDetalle(o.id);
 }
 
