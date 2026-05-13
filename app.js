@@ -4980,7 +4980,11 @@ function abrirFormulario(id, modoReporte = false) {
     if (!isAdmin) {
       lockCliente = true; // Solo admins pueden editar la empresa
     } else {
-      lockCliente = isCerrado; // Admin se bloquea solo si el ticket asociado ya está cerrado
+      if (currentSession.viewMode === 'superadmin') {
+        lockCliente = false; // Superadmin nunca se bloquea
+      } else {
+        lockCliente = isCerrado; // Admin se bloquea solo si el ticket asociado ya está cerrado
+      }
     }
 
     fClienteCombo.style.pointerEvents = lockCliente ? 'none' : 'auto';
@@ -7221,7 +7225,7 @@ function toggleCombo(id) {
       mostrarNotificacion('Solo administradores pueden editar la empresa de la orden.', 'warning');
       return;
     }
-    if (isCerrado) {
+    if (isCerrado && currentSession.viewMode !== 'superadmin') {
       mostrarNotificacion('No se puede modificar la empresa porque el ticket asociado ya está cerrado.', 'warning');
       return;
     }
