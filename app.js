@@ -1964,6 +1964,12 @@ function renderTabla(ctx) {
 
   body.innerHTML = filtradas.map(o => `
     <tr>
+      <td style="white-space:nowrap; width:60px;">
+        <div style="display:flex;gap:0.25rem;">
+          <button class="action-btn" onclick="verDetalle('${o.id}')" title="Ver"><i data-lucide="eye"></i></button>
+          ${canEdit ? `<button class="action-btn" onclick="editarOrden('${o.id}')" title="Editar"><i data-lucide="pencil"></i></button>` : ''}
+        </div>
+      </td>
       <td><strong>${o.folio||'-'}</strong></td>
       <td>${o.cliente||'-'}</td>
       <td>${o.ubicacion||'-'}</td>
@@ -1972,14 +1978,8 @@ function renderTabla(ctx) {
       <td><span class="badge badge-${(o.tipo||'otro').toLowerCase().replace('é','e').replace('í','i')}">${o.tipo||'-'}</span></td>
       <td><span class="badge ${badgeEstado(o.estado)}">${o.estado||'-'}</span></td>
       <td>${o.fecha||'-'}</td>
-      <td>
-        <div style="display:flex;gap:0.25rem;">
-          <button class="action-btn" onclick="verDetalle('${o.id}')" title="Ver"><i data-lucide="eye"></i></button>
-          ${canEdit ? `
-          <button class="action-btn" onclick="editarOrden('${o.id}')" title="Editar"><i data-lucide="pencil"></i></button>
-          ` : ''}
-          ${canDelete ? `<button class="action-btn del" onclick="eliminarOrden('${o.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
-        </div>
+      <td style="width:40px; text-align:center;">
+        ${canDelete ? `<button class="action-btn del" onclick="eliminarOrden('${o.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
       </td>
     </tr>
   `).join('');
@@ -6136,6 +6136,12 @@ function renderTickets(ctx) {
 
   body.innerHTML = filtered.map((t, i) => `
     <tr style="cursor:pointer; transition: background 0.2s;" onclick="if(!event.target.closest('.action-btn')){ verDetalleTicket('${t.id}'); }" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
+      <td style="white-space:nowrap; width:60px;">
+        <div style="display:flex;gap:0.25rem;">
+          <button class="action-btn" onclick="verDetalleTicket('${t.id}')" title="Ver"><i data-lucide="eye"></i></button>
+          <button class="action-btn" onclick="editarTicket('${t.id}')" title="Editar"><i data-lucide="pencil"></i></button>
+        </div>
+      </td>
       <td><strong>${t.folio||('#'+(i+1))}</strong></td>
       <td>
         <div style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.asunto || ''}">
@@ -6151,12 +6157,8 @@ function renderTickets(ctx) {
       <td style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'—'}</span></td>
       <td style="white-space:nowrap;">${t.asignado||'—'}</td>
       <td style="white-space:nowrap;">${t.fecha||'—'}</td>
-      <td>
-        <div style="display:flex;gap:0.25rem;">
-          <button class="action-btn" onclick="verDetalleTicket('${t.id}')" title="Ver"><i data-lucide="eye"></i></button>
-          <button class="action-btn" onclick="editarTicket('${t.id}')" title="Editar"><i data-lucide="pencil"></i></button>
-          ${canDelete ? `<button class="action-btn del" onclick="eliminarTicket('${t.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
-        </div>
+      <td style="width:40px; text-align:center;">
+        ${canDelete ? `<button class="action-btn del" onclick="eliminarTicket('${t.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
       </td>
     </tr>
   `).join('');
