@@ -4914,7 +4914,7 @@ function abrirFormulario(id, modoReporte = false) {
   if (id) {
     const o = ordenes.find(x => x.id === id);
     if (!o) return;
-    const fields = ['folio','pedido','ubicacion','operador','eco','horometro',
+    const fields = ['folio','pedido','ubicacion','operador','eco','horometro','horometro-real',
       'modelo','serie','soporte','km-ida','km-vuelta','km-total',
       'falla','trabajos','dictamen','condiciones','observaciones','pendientes',
       'noches','alimentacion','traslado-costo'];
@@ -5185,6 +5185,7 @@ function guardarOrden(e) {
     operador: document.getElementById('f-operador').value.trim(),
     eco: document.getElementById('f-eco').value.trim(),
     horometro: document.getElementById('f-horometro').value.trim(),
+    horometro_real: document.getElementById('f-horometro-real').value.trim(),
     modelo: document.getElementById('f-modelo').value.trim(),
     serie: document.getElementById('f-serie').value.trim(),
     tecnico: tecnicosSeleccionados.join(', '),
@@ -5458,8 +5459,9 @@ function verDetalle(id) {
       <div class="detalle-grid">
         ${field('Folio', o.folio)} ${field('Pedido', o.pedido)} ${field('Fecha', formatFecha(o.fecha))}
         ${field('Cliente', o.cliente)} ${field('Ubicación', o.ubicacion)} ${field('Operador', o.operador)}
-        ${field('No. ECO', o.eco)} ${field('Horómetro', o.horometro)} ${field('Modelo', o.modelo)}
-        ${field('Serie', o.serie)} ${field('Técnico', o.tecnico)} ${field('Ticket Soporte', (() => { const t = tickets.find(x => x.id === o.soporte); return t ? (t.folio || t.id.slice(0,8)) : o.soporte || null; })())}
+        ${field('No. ECO', o.eco)} ${field('Horómetro (Ticket)', o.horometro)} ${field('Horómetro Real', o.horometro_real)}
+        ${field('Modelo', o.modelo)} ${field('Serie', o.serie)} ${field('Técnico', o.tecnico)} 
+        ${field('Ticket Soporte', (() => { const t = tickets.find(x => x.id === o.soporte); return t ? (t.folio || t.id.slice(0,8)) : o.soporte || null; })())}
       </div>`)}
     ${seccion('Kilómetros / Tipo', `
       <div class="detalle-grid">
