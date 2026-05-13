@@ -5186,6 +5186,8 @@ function guardarOrden(e) {
     eco: document.getElementById('f-eco').value.trim(),
     horometro: document.getElementById('f-horometro').value.trim(),
     horometro_real: document.getElementById('f-horometro-real').value.trim(),
+    equipo: document.getElementById('f-equipo')?.value || '',
+    marca: document.getElementById('f-equipo')?.options[document.getElementById('f-equipo')?.selectedIndex]?.text.split(' ')[0] || '',
     modelo: document.getElementById('f-modelo').value.trim(),
     serie: document.getElementById('f-serie').value.trim(),
     tecnico: tecnicosSeleccionados.join(', '),
@@ -5460,8 +5462,12 @@ function verDetalle(id) {
         ${field('Folio', o.folio)} ${field('Pedido', o.pedido)} ${field('Fecha', formatFecha(o.fecha))}
         ${field('Cliente', o.cliente)} ${field('Ubicación', o.ubicacion)} ${field('Operador', o.operador)}
         ${field('No. ECO', o.eco)} ${field('Horómetro (Ticket)', o.horometro)} ${field('Horómetro Real', o.horometro_real)}
-        ${field('Modelo', o.modelo)} ${field('Serie', o.serie)} ${field('Técnico', o.tecnico)} 
-        ${field('Ticket Soporte', (() => { const t = tickets.find(x => x.id === o.soporte); return t ? (t.folio || t.id.slice(0,8)) : o.soporte || null; })())}
+        ${field('Marca', (() => { 
+          const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+          let m = o.marca || (o.equipo ? o.equipo.split(' ')[0] : '');
+          return MARCAS_RENDER[m.toUpperCase()] || m || '—';
+        })())} ${field('Modelo', o.modelo)} ${field('Serie', o.serie)}
+        ${field('Técnico', o.tecnico)} ${field('Ticket Soporte', (() => { const t = tickets.find(x => x.id === o.soporte); return t ? (t.folio || t.id.slice(0,8)) : o.soporte || null; })())}
       </div>`)}
     ${seccion('Kilómetros / Tipo', `
       <div class="detalle-grid">
