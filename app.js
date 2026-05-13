@@ -4714,7 +4714,7 @@ function abrirFormulario(id, modoReporte = false) {
     return;
   }
   editandoId = id || null;
-  document.getElementById('modal-title').textContent = modoReporte ? '📋 Llenar Reporte Técnico' : (id ? 'Editar Orden' : 'Nueva Orden de Servicio');
+  document.getElementById('modal-title').textContent = modoReporte ? 'Llenar Reporte Técnico' : (id ? 'Editar Orden' : 'Nueva Orden de Servicio');
   document.getElementById('form-orden').reset();
   
   if (!id) {
@@ -4889,8 +4889,8 @@ function abrirFormulario(id, modoReporte = false) {
     if (!existingBanner) {
       const banner = document.createElement('div');
       banner.id = 'reporte-modo-banner';
-      banner.style.cssText = 'background: linear-gradient(135deg, #1e3a5f, #0d47a1); color:#fff; padding:0.6rem 1rem; font-size:0.82rem; display:flex; align-items:center; gap:0.5rem; border-bottom: 1px solid rgba(255,255,255,0.15);';
-      banner.innerHTML = '<i data-lucide="info" style="width:16px;height:16px;flex-shrink:0;"></i><span><strong>Modo Reporte Técnico:</strong> Solo puedes editar el diagnóstico, trabajos, refacciones y bitácora. Para modificar los datos generales, usa el botón <strong>Editar (✏️)</strong>.</span>';
+      banner.style.cssText = 'border-left: 3px solid var(--accent, #e8850a); background: var(--bg-card); color: var(--text-secondary); padding: 0.55rem 0.9rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem; border-radius: 0 4px 4px 0;';
+      banner.innerHTML = '<i data-lucide="lock" style="width:14px;height:14px;flex-shrink:0;color:var(--accent,#e8850a);"></i><span>Solo puedes editar el diagnostico y trabajos. Para modificar los datos generales usa el boton <strong>Editar</strong> (lapiz).</span>';
       const modalBody = document.querySelector('#modal-form .modal-body');
       if (modalBody) modalBody.insertBefore(banner, modalBody.firstChild);
       if (window.lucide) window.lucide.createIcons({ root: banner });
