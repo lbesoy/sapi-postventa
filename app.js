@@ -7927,6 +7927,49 @@ document.addEventListener('DOMContentLoaded', () => {
 // ─── CALENDARIO ────────────────────────────────────────────────────────────────
 let calendarInstance = null;
 
+function actualizarFiltrosCalendario() {
+  const selCli = document.getElementById('filter-cal-cliente');
+  const selTec = document.getElementById('filter-cal-tecnico');
+  if (!selCli || !selTec) return;
+
+  const currentCli = selCli.value;
+  const currentTec = selTec.value;
+
+  const isEmpresa = currentSession.viewMode === 'empresa';
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const miEmpresa = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+
+  let clientesDisponibles = ordenes;
+  if (isEmpresa) clientesDisponibles = clientesDisponibles.filter(o => o.cliente === miEmpresa);
+
+  const clientesUnicos = [...new Set(clientesDisponibles.map(o => o.cliente).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+  let htmlCli = '<option value="">Todos los Clientes</option>';
+  clientesUnicos.forEach(c => htmlCli += `<option value="${c}">${c}</option>`);
+  
+  if (selCli.innerHTML !== htmlCli) {
+    selCli.innerHTML = htmlCli;
+    selCli.value = currentCli;
+    if (!selCli.value && currentCli) selCli.value = ''; 
+  }
+
+  const tecnicosUnicos = new Set();
+  clientesDisponibles.forEach(o => {
+    if (o.tecnico) o.tecnico.split(',').forEach(t => tecnicosUnicos.add(t.trim()));
+    if (o.tecnicosAsignados) o.tecnicosAsignados.forEach(t => tecnicosUnicos.add(t));
+    if (o.bitacora) o.bitacora.forEach(b => { if(b.tecnico) tecnicosUnicos.add(b.tecnico) });
+  });
+  
+  const tArr = [...tecnicosUnicos].filter(Boolean).sort((a,b) => a.localeCompare(b));
+  let htmlTec = '<option value="">Todos los Técnicos</option>';
+  tArr.forEach(t => htmlTec += `<option value="${t}">${t}</option>`);
+  
+  if (selTec.innerHTML !== htmlTec) {
+    selTec.innerHTML = htmlTec;
+    selTec.value = currentTec;
+    if (!selTec.value && currentTec) selTec.value = ''; 
+  }
+}
+
 function renderCalendario() {
   const container = document.getElementById('calendar-container');
   if (!container) return;
@@ -7940,6 +7983,11 @@ function renderCalendario() {
     calendarInstance.destroy();
   }
 
+  actualizarFiltrosCalendario();
+
+  const filtroCliente = document.getElementById('filter-cal-cliente')?.value || '';
+  const filtroTecnico = document.getElementById('filter-cal-tecnico')?.value || '';
+
   // Filtrar seguridad (rol empresa)
   const isEmpresa = currentSession.viewMode === 'empresa';
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
@@ -7949,6 +7997,7 @@ function renderCalendario() {
   
   ordenes.filter(o => {
     if (isEmpresa && o.cliente !== miEmpresa) return false;
+    if (filtroCliente && o.cliente !== filtroCliente) return false;
     return true;
   }).forEach(o => {
     let bgColor = '#3b82f6'; // Azul - Servicio
@@ -7959,6 +8008,8 @@ function renderCalendario() {
 
     if (o.bitacora && o.bitacora.length > 0) {
       o.bitacora.forEach(b => {
+        if (filtroTecnico && b.tecnico !== filtroTecnico) return;
+
         let dateStr = b.fecha;
         if (dateStr.includes('T')) dateStr = dateStr.split('T')[0];
         
@@ -8004,19 +8055,26 @@ function renderCalendario() {
         eventos.push(ev);
       });
     } else {
-      eventos.push({
-        id: o.id,
-        title: `${o.folio || 'S/N'} - ${o.cliente}`,
-        start: o.fechaInicio || o.fecha,
-        end: o.fechaFin || o.fechaInicio || o.fecha,
-        backgroundColor: bgColor,
-        borderColor: bgColor,
-        extendedProps: {
-          isBitacora: false,
-          tecnico: o.tecnico,
-          estado: o.estado
-        }
-      });
+      let isMatch = false;
+      if (!filtroTecnico) isMatch = true;
+      else if (o.tecnicosAsignados && o.tecnicosAsignados.includes(filtroTecnico)) isMatch = true;
+      else if (o.tecnico && o.tecnico.includes(filtroTecnico)) isMatch = true;
+
+      if (isMatch) {
+        eventos.push({
+          id: o.id,
+          title: `${o.folio || 'S/N'} - ${o.cliente}`,
+          start: o.fechaInicio || o.fecha,
+          end: o.fechaFin || o.fechaInicio || o.fecha,
+          backgroundColor: bgColor,
+          borderColor: bgColor,
+          extendedProps: {
+            isBitacora: false,
+            tecnico: o.tecnico,
+            estado: o.estado
+          }
+        });
+      }
     }
   });
 

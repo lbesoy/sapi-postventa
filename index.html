@@ -470,9 +470,17 @@
         <div id="view-calendario" class="view">
           <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
             <h2>Calendario de Servicios</h2>
-            <button class="btn-primary" id="btn-programar-tecnico" style="display:none;" onclick="abrirProgramarTecnico()">
-              <i data-lucide="calendar-plus" class="btn-icon"></i> Programar Asignación
-            </button>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; flex:1; justify-content:flex-end;">
+              <select id="filter-cal-cliente" class="form-select" onchange="renderCalendario()" style="max-width:200px;">
+                <option value="">Todos los Clientes</option>
+              </select>
+              <select id="filter-cal-tecnico" class="form-select" onchange="renderCalendario()" style="max-width:200px;">
+                <option value="">Todos los Técnicos</option>
+              </select>
+              <button class="btn-primary" id="btn-programar-tecnico" style="display:none;" onclick="abrirProgramarTecnico()">
+                <i data-lucide="calendar-plus" class="btn-icon"></i> Programar Asignación
+              </button>
+            </div>
           </div>
           <div id="calendar-container"
             style="background:var(--bg-card); padding:1rem; border-radius:var(--radius-lg); border:1px solid var(--border); box-shadow:var(--shadow-sm); min-height:600px;">
