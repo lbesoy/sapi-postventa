@@ -5144,21 +5144,89 @@ function verDetalle(id) {
   const renderBitacora = (o) => {
     let html = '';
     if (!o.bitacora || o.bitacora.length === 0) {
-      html += '<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">Aún no hay entradas en la bitácora para esta orden.</p>';
+      html += '<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;text-align:center;padding:1.5rem;background:var(--bg-body);border-radius:6px;border:1px dashed var(--border);">Aún no hay entradas en la bitácora para esta orden.</p>';
     } else {
-      html += '<div style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1rem;">';
-      const entradas = [...o.bitacora].sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
-      entradas.forEach(b => {
-        const d = new Date(b.fecha);
-        const fechaStr = d.toLocaleDateString('es-MX') + ' ' + d.toLocaleTimeString('es-MX', {hour: '2-digit', minute:'2-digit'});
-        html += `
-          <div style="background:var(--bg-body); border:1px solid var(--border); border-radius:6px; padding:0.75rem;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
-              <span style="font-size:0.75rem; font-weight:600; color:var(--text-primary);">${b.tecnico || 'Desconocido'}</span>
-              <span style="font-size:0.75rem; color:var(--text-muted);">${fechaStr}</span>
+      // Agrupar por día
+      const agrupado = {};
+      o.bitacora.forEach(b => {
+        let fechaDia = 'Fecha Desconocida';
+        let fechaDObj = null;
+        try {
+          fechaDObj = new Date(b.fecha);
+          if (!isNaN(fechaDObj)) {
+            // Se asume timezone local por seguridad del parseo de toLocaleDateString
+            const partes = fechaDObj.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' }).split('/');
+            fechaDia = `${partes[2]}-${partes[1]}-${partes[0]}`; // YYYY-MM-DD
+          }
+        } catch(e){}
+        if (!agrupado[fechaDia]) agrupado[fechaDia] = { objDate: fechaDObj, entries: [] };
+        agrupado[fechaDia].entries.push(b);
+      });
+
+      // Ordenar días del más reciente al más antiguo
+      const diasSorted = Object.keys(agrupado).sort((a, b) => b.localeCompare(a));
+
+      html += '<div style="display:flex; flex-direction:column; gap:1.25rem; margin-bottom:1.5rem;">';
+      
+      diasSorted.forEach(diaKey => {
+        const diaData = agrupado[diaKey];
+        let displayDia = diaKey;
+        let mesAbrev = '';
+        let numDia = '';
+        if (diaData.objDate && !isNaN(diaData.objDate)) {
+          const dObj = diaData.objDate;
+          displayDia = dObj.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+          displayDia = displayDia.charAt(0).toUpperCase() + displayDia.slice(1);
+          mesAbrev = dObj.toLocaleDateString('es-MX', { month: 'short' }).toUpperCase().replace('.', '');
+          numDia = dObj.getDate();
+        }
+
+        // Ordenar entradas dentro del día (por hora de entrada si existe)
+        diaData.entries.sort((a,b) => (a.entrada || '').localeCompare(b.entrada || ''));
+
+        let entriesHtml = diaData.entries.map(b => {
+          let horasHtml = '';
+          if (b.entrada && b.salida) {
+            const [hE, mE] = b.entrada.split(':').map(Number);
+            const [hS, mS] = b.salida.split(':').map(Number);
+            let diff = (hS * 60 + mS) - (hE * 60 + mE);
+            if (diff < 0) diff += 24 * 60; // Si pasa de medianoche
+            const hrs = Math.floor(diff / 60);
+            const mns = diff % 60;
+            const durStr = `${hrs}h ${mns > 0 ? mns + 'm' : ''}`.trim();
+            horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(232, 133, 10, 0.1); color:var(--accent); padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="clock" style="width:12px;height:12px;"></i> ${b.entrada} - ${b.salida} (${durStr})</span>`;
+          } else if (b.entrada || b.salida) {
+            horasHtml = `<span style="font-size:0.7rem; color:var(--text-muted);"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:middle;"></i> ${b.entrada || '--:--'} a ${b.salida || '--:--'}</span>`;
+          }
+
+          return `
+            <div style="background:var(--bg-body); border-left: 3px solid var(--border); border-radius:4px; padding:0.75rem 1rem; margin-top:0.6rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; flex-wrap:wrap; gap:0.5rem;">
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                  <div style="width:24px; height:24px; border-radius:50%; background:var(--accent); color:white; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold;">
+                    ${(b.tecnico || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <span style="font-size:0.85rem; font-weight:600; color:var(--text-primary);">${b.tecnico || 'Desconocido'}</span>
+                </div>
+                ${horasHtml}
+              </div>
+              <div style="font-size:0.85rem; color:var(--text-secondary); white-space:pre-wrap; padding-left:2.2rem; line-height:1.4;">${b.nota}</div>
             </div>
-            <div style="font-size:0.85rem; color:var(--text); white-space:pre-wrap;">${b.nota}</div>
-            ${(b.entrada || b.salida) ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Horario: ${b.entrada || '--:--'} a ${b.salida || '--:--'}</div>` : ''}
+          `;
+        }).join('');
+
+        html += `
+          <div style="display:flex; gap:1rem; align-items:flex-start;">
+            <!-- Calendario Icono -->
+            <div style="flex-shrink:0; display:flex; flex-direction:column; align-items:center; width:50px; background:var(--bg-body); border:1px solid var(--border); border-radius:6px; overflow:hidden; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+              <div style="background:var(--accent); color:white; width:100%; text-align:center; font-size:0.65rem; font-weight:bold; padding:0.25rem 0; letter-spacing:0.5px;">${mesAbrev}</div>
+              <div style="font-size:1.3rem; font-weight:700; color:var(--text-primary); padding:0.3rem 0;">${numDia}</div>
+            </div>
+            <!-- Contenido del día -->
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:0.8rem; font-weight:600; color:var(--text-muted); margin-bottom:0.2rem; margin-top:0.2rem; border-bottom:1px solid var(--border); padding-bottom:0.3rem;">${displayDia}</div>
+              ${entriesHtml}
+            </div>
           </div>
         `;
       });
@@ -5166,7 +5234,7 @@ function verDetalle(id) {
     }
     
     if (o.estado !== 'Finalizado' && currentSession.viewMode !== 'consulta') {
-      html += `<button class="btn-primary" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="abrirBitacora('${o.id}')"><i data-lucide="plus" style="width:14px;height:14px;"></i> Agregar Entrada</button>`;
+      html += `<div style="text-align:right;"><button class="btn-primary" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="abrirBitacora('${o.id}')"><i data-lucide="plus" style="width:14px;height:14px;"></i> Registrar Avance Diario</button></div>`;
     }
     return html;
   };
