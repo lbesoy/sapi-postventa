@@ -260,18 +260,18 @@ async function migrarDatosASupabase() {
     }
 
     console.log('[Supabase] Migración completada. Descargando datos actuales...');
-    await cargarDatosDeSupabase();
+    await window.cargarDatosDeSupabase();
 
   } catch (err) {
     console.error('[Supabase] Error durante la migración:', err.message);
     // Aún así intentamos cargar lo que hay en la nube
-    try { await cargarDatosDeSupabase(); } catch(e2) {}
+    try { await window.cargarDatosDeSupabase(); } catch(e2) {}
   }
 }
 
 // ─── cargarDatosDeSupabase: Descarga la nube a localStorage / variables ─────
 
-async function cargarDatosDeSupabase() {
+window.cargarDatosDeSupabase = async function() {
   const sb = window.supabaseClient;
   if (!sb) return;
 

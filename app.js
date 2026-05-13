@@ -436,7 +436,23 @@ function entrarApp(user) {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app-wrapper').classList.add('visible');
   applyRole(user.rol);
-  renderUsuariosList();
+  
+  if (window.cargarDatosDeSupabase) {
+     // Mostrar notificacion de carga al usuario
+     const btnLogin = document.querySelector('.btn-primary[type="submit"]');
+     if (btnLogin) btnLogin.innerHTML = '<i data-lucide="loader" class="spin"></i> Sincronizando...';
+     
+     window.cargarDatosDeSupabase().then(() => {
+        renderUsuariosList();
+        renderTabla();
+        if (typeof renderTickets === 'function') renderTickets();
+        renderStats();
+        if (btnLogin) btnLogin.innerHTML = '<i data-lucide="log-in" class="btn-icon"></i> Iniciar Sesión';
+     });
+  } else {
+     renderUsuariosList();
+  }
+  
   lucide.createIcons();
 }
 
