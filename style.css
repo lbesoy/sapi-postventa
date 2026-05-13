@@ -566,7 +566,7 @@ body {
 .refacciones-cols { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
 .ref-subtitle { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem; }
 .ref-row {
-  display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.4rem; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px;
+  display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; padding-bottom: 2px;
 }
 .ref-row input {
   background: var(--bg-card); border: 1px solid var(--border);
