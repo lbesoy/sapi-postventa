@@ -4579,15 +4579,16 @@ window.popularSelectMarcas = function(comboIdMarca, comboIdDesc) {
   const optionsDiv = document.getElementById(comboIdMarca + '-options');
   if (!optionsDiv) return;
   const marcas = [...new Set(refaccionesDb.map(r => r.marca))].filter(m => m && m !== 'N/A').sort();
+  const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
   let html = '';
   marcas.forEach(m => {
-    html += `<div class="combo-option" onclick="window.seleccionarMarcaRefaccion(this, '${comboIdMarca}', '${comboIdDesc}')">${m}</div>`;
+    const mFull = MARCAS_RENDER[m.toUpperCase()] || m;
+    html += `<div class="combo-option" onclick="window.seleccionarMarcaRefaccion(this, '${m}', '${mFull}', '${comboIdMarca}', '${comboIdDesc}')">${mFull}</div>`;
   });
   optionsDiv.innerHTML = html;
 };
 
-window.seleccionarMarcaRefaccion = function(optionEl, comboIdMarca, comboIdDesc) {
-  const text = optionEl.textContent;
+window.seleccionarMarcaRefaccion = function(optionEl, marcaCode, marcaFull, comboIdMarca, comboIdDesc) {
   const comboMenu = optionEl.closest('.combo-menu');
   
   // Close the menu
@@ -4595,8 +4596,8 @@ window.seleccionarMarcaRefaccion = function(optionEl, comboIdMarca, comboIdDesc)
   document.getElementById(comboIdMarca + '-combo').classList.remove('focus');
   
   // Update hidden input and display text
-  document.getElementById(comboIdMarca).value = text;
-  document.getElementById(comboIdMarca + '-display').textContent = text;
+  document.getElementById(comboIdMarca).value = marcaCode;
+  document.getElementById(comboIdMarca + '-display').textContent = marcaFull;
   
   // Trigger update descripciones
   window.actualizarDescripcionesCombo(comboIdMarca, comboIdDesc);
@@ -4789,7 +4790,8 @@ function setRefacciones(section, items) {
       
       if (foundMarca) {
         hiddenMarca.value = foundMarca;
-        if (comboSpanMarca) comboSpanMarca.textContent = foundMarca;
+        const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+        if (comboSpanMarca) comboSpanMarca.textContent = MARCAS_RENDER[foundMarca.toUpperCase()] || foundMarca;
       }
       
       // Update descripciones based on the marca
