@@ -5490,7 +5490,7 @@ function verDetalle(id) {
         ${field('Origen → Trabajo', (o.km_ida != null && o.km_ida !== '') ? o.km_ida + ' km' : null)}
         ${field('Trabajo → Origen', (o.km_vuelta != null && o.km_vuelta !== '') ? o.km_vuelta + ' km' : null)}
         ${field('Total Km', (o.km_total != null && o.km_total !== '') ? o.km_total + ' km' : null)}
-        ${field('Tipo de Visita', `<span class="badge badge-${(o.tipo||'otro').toLowerCase().replace('é','e').replace('í','i')}">${o.tipo}</span>`)}
+        ${field('Tipo de Visita', `<span class="badge badge-${(o.tipo||'otro').toLowerCase().replace(/ /g, '-').replace('é','e').replace('í','i')}">${o.tipo}</span>`)}
         ${field('Estado', `<span class="badge ${badgeEstado(o.estado)}">${o.estado}</span>`)}
       </div>`)}
     ${seccion('Diagnóstico y Trabajos', `
@@ -7793,13 +7793,14 @@ function verDetalleTicket(id) {
           </div>
           <div class="form-group full-width" style="margin-top:0.75rem;">
             <label>Tipo de Visita *</label>
-            <select id="quick-tipo-${t.id}" onchange="if(this.value==='Otro') document.getElementById('quick-tipo-otro-${t.id}').style.display='block'; else document.getElementById('quick-tipo-otro-${t.id}').style.display='none';">
-              <option value="Servicio">Servicio</option>
+            <select id="quick-tipo-${t.id}">
+              <option value="Servicio preventivo">Servicio preventivo</option>
               <option value="Garantía">Garantía</option>
               <option value="Inspección">Inspección</option>
-              <option value="Otro">Otro...</option>
+              <option value="Entrega y puesta en marcha">Entrega y puesta en marcha</option>
+              <option value="Pre-entrega">Pre-entrega</option>
+              <option value="Entrega Refacciones">Entrega Refacciones</option>
             </select>
-            <input type="text" id="quick-tipo-otro-${t.id}" placeholder="Especifica el tipo de visita..." style="display:none; margin-top:0.5rem;" />
           </div>
           </div>
         </div>
@@ -7875,14 +7876,7 @@ async function cerrarCotizacionTicket(id) {
     const pdfUpload = document.getElementById(`quick-pedido-pdf-${id}`)?.files.length > 0;
     
     const selTipo = document.getElementById(`quick-tipo-${id}`)?.value;
-    const txtTipoOtro = document.getElementById(`quick-tipo-otro-${id}`)?.value.trim();
-    if (selTipo === 'Otro') {
-      if (!txtTipoOtro) {
-        mostrarNotificacion('Debes especificar el tipo de visita.', 'warning');
-        return;
-      }
-      tipoVisitaSeleccionado = txtTipoOtro;
-    } else if (selTipo) {
+    if (selTipo) {
       tipoVisitaSeleccionado = selTipo;
     }
     

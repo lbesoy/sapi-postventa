@@ -424,9 +424,12 @@ body {
   display: inline-block; padding: 0.25rem 0.6rem;
   border-radius: 99px; font-size: 0.72rem; font-weight: 600;
 }
-.badge-servicio { background: var(--accent-light); color: var(--accent); }
+.badge-servicio-preventivo { background: var(--accent-light); color: var(--accent); }
 .badge-garantia { background: var(--purple-light); color: var(--purple); }
-.badge-correctivo { background: var(--orange-light); color: var(--orange); }
+.badge-inspeccion { background: rgba(14, 165, 233, 0.12); color: #0ea5e9; }
+.badge-entrega-y-puesta-en-marcha { background: var(--green-light); color: var(--green); }
+.badge-pre-entrega { background: var(--orange-light); color: var(--orange); }
+.badge-entrega-refacciones { background: rgba(244, 63, 94, 0.12); color: #f43f5e; }
 .badge-otro { background: var(--bg-hover); color: var(--text-secondary); }
 .badge-pendiente { background: var(--orange-light); color: var(--orange); }
 .badge-proceso { background: var(--accent-light); color: var(--accent); }
