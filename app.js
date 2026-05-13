@@ -1785,22 +1785,22 @@ function renderDashboardTecnicos() {
   const totalHoras = list.reduce((sum, s) => sum + s.minReportados, 0);
   const topTech = list.length > 0 ? list[0].nombre : 'N/A';
 
-  const kpisHtml = \`
+  const kpisHtml = `
     <div class="stat-card">
       <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="award"></i></div>
       <div>
         <div class="stat-label">Técnico Destacado</div>
-        <div class="stat-value" style="font-size:1.2rem;">\${topTech}</div>
+        <div class="stat-value" style="font-size:1.2rem;">${topTech}</div>
       </div>
     </div>
     <div class="stat-card">
       <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="clock"></i></div>
       <div>
         <div class="stat-label">Total Horas Reportadas (Global)</div>
-        <div class="stat-value">\${Math.floor(totalHoras / 60)}h \${totalHoras % 60}m</div>
+        <div class="stat-value">${Math.floor(totalHoras / 60)}h ${totalHoras % 60}m</div>
       </div>
     </div>
-  \`;
+  `;
   document.getElementById('tecnicos-kpis-grid').innerHTML = kpisHtml;
 
   const tbody = document.getElementById('tecnicos-stats-body');
@@ -1810,14 +1810,14 @@ function renderDashboardTecnicos() {
     tbody.innerHTML = list.map(s => {
       const hrs = Math.floor(s.minReportados / 60);
       const mns = s.minReportados % 60;
-      return \`
+      return `
         <tr>
-          <td><div style="display:flex;align-items:center;gap:0.75rem;"><div style="width:32px;height:32px;border-radius:50%;background:var(--accent);color:white;display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:bold;">\${s.nombre.charAt(0).toUpperCase()}</div><span style="font-weight:600;color:var(--text-primary);">\${s.nombre}</span></div></td>
-          <td style="text-align:center;"><span class="badge badge-pendiente" style="padding:0.3rem 0.6rem;">\${s.proceso}</span></td>
-          <td style="text-align:center;"><span class="badge badge-finalizado" style="padding:0.3rem 0.6rem;">\${s.finalizadas}</span></td>
-          <td style="text-align:center;font-weight:700;color:var(--accent); font-size:1.05rem;">\${hrs}h \${mns > 0 ? mns + 'm' : ''}</td>
+          <td><div style="display:flex;align-items:center;gap:0.75rem;"><div style="width:32px;height:32px;border-radius:50%;background:var(--accent);color:white;display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:bold;">${s.nombre.charAt(0).toUpperCase()}</div><span style="font-weight:600;color:var(--text-primary);">${s.nombre}</span></div></td>
+          <td style="text-align:center;"><span class="badge badge-pendiente" style="padding:0.3rem 0.6rem;">${s.proceso}</span></td>
+          <td style="text-align:center;"><span class="badge badge-finalizado" style="padding:0.3rem 0.6rem;">${s.finalizadas}</span></td>
+          <td style="text-align:center;font-weight:700;color:var(--accent); font-size:1.05rem;">${hrs}h ${mns > 0 ? mns + 'm' : ''}</td>
         </tr>
-      \`;
+      `;
     }).join('');
   }
   if (window.lucide) window.lucide.createIcons();
