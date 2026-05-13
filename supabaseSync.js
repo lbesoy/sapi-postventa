@@ -75,6 +75,12 @@ function rowToTicket(t) {
 }
 
 function ordenToRow(o) {
+  const customData = { ...o };
+  const knownKeys = ['id', 'folio', 'cliente', 'ubicacion', 'tecnico', 'modelo', 'tipo', 'estado', 'fecha', 'fechaInicio', 'fechaFin', 'duracion', 'duracion_minutos', 'evidenciaBase64', 'evidencia_base64'];
+  knownKeys.forEach(k => delete customData[k]);
+  
+  const notasJSON = JSON.stringify(customData);
+
   return {
     id: o.id,
     folio: o.folio,
@@ -88,19 +94,29 @@ function ordenToRow(o) {
     fecha_inicio: o.fechaInicio || null,
     fecha_fin: o.fechaFin || null,
     duracion_minutos: o.duracion || null,
-    notas: o.notas || null,
+    notas: notasJSON,
     evidencia_base64: o.evidenciaBase64 || null
   };
 }
 
 function rowToOrden(o) {
+  let extraData = {};
+  if (o.notas && o.notas.startsWith('{')) {
+    try {
+      extraData = JSON.parse(o.notas);
+    } catch(e) {}
+  } else if (o.notas) {
+    extraData.observaciones = o.notas; // Fallback por si hay texto legacy
+  }
+
   return {
     id: o.id, folio: o.folio, cliente: o.cliente,
     ubicacion: o.ubicacion, tecnico: o.tecnico, modelo: o.modelo,
     tipo: o.tipo, estado: o.estado, fecha: o.fecha,
     fechaInicio: o.fecha_inicio, fechaFin: o.fecha_fin,
-    duracion: o.duracion_minutos, notas: o.notas,
-    evidenciaBase64: o.evidencia_base64
+    duracion: o.duracion_minutos,
+    evidenciaBase64: o.evidencia_base64,
+    ...extraData
   };
 }
 

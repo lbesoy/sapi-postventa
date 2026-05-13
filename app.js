@@ -5059,6 +5059,11 @@ function guardarOrden(e) {
     dias: getDiasData(),
   };
   if (editandoId) {
+    const oVieja = ordenes.find(x => x.id === editandoId) || {};
+    orden.bitacora = oVieja.bitacora;
+    orden.firma_tecnico_base64 = oVieja.firma_tecnico_base64;
+    orden.firma_cliente_base64 = oVieja.firma_cliente_base64;
+    orden.evidenciaBase64 = oVieja.evidenciaBase64 || oVieja.evidencia_base64;
     ordenes = ordenes.map(o => o.id === editandoId ? orden : o);
   } else {
     ordenes.unshift(orden);
