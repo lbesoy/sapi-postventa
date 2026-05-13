@@ -478,6 +478,11 @@ function cerrarSesion() {
   volverSeleccion();
 }
 
+// ===== MOBILE SIDEBAR TOGGLE =====
+function toggleSidebar() {
+  document.querySelector('.sidebar').classList.toggle('open');
+}
+
 function loginCrearUsuario() {
   document.getElementById('login-step-form').style.display = 'none';
   document.getElementById('login-step-crear').style.display = 'block';
@@ -1636,14 +1641,20 @@ function agregarUsuario() { abrirModalUsuario(); }
 
 function setupNav() {
   document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', e => {
+    item.addEventListener('click', (e) => {
       e.preventDefault();
-      const view = item.dataset.view;
-      const viewEl = document.getElementById('view-' + view);
-      if (!viewEl) return;
-
       document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
       item.classList.add('active');
+      const view = item.dataset.view;
+      const viewEl = document.getElementById('view-' + view);
+      
+      // Cerrar sidebar en móvil
+      if (window.innerWidth <= 640) {
+        document.querySelector('.sidebar').classList.remove('open');
+      }
+
+      if (!viewEl) return;
+
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       viewEl.classList.add('active');
 
