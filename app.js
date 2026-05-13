@@ -4866,6 +4866,15 @@ function abrirFormulario(id, modoReporte = false) {
   document.getElementById('modal-title').textContent = modoReporte ? 'Llenar Reporte Técnico' : (id ? 'Editar Orden' : 'Nueva Orden de Servicio');
   document.getElementById('form-orden').reset();
   
+  const sectionEstado = document.getElementById('section-estado-orden');
+  if (sectionEstado) {
+    if (currentSession.viewMode === 'superadmin') {
+      sectionEstado.style.display = 'block';
+    } else {
+      sectionEstado.style.display = 'none';
+    }
+  }
+  
   if (!id) {
     document.getElementById('f-folio').value = generarFolioConsecutivo();
   }
@@ -5206,9 +5215,13 @@ function guardarOrden(e) {
     orden.evidenciaBase64 = oVieja.evidenciaBase64 || oVieja.evidencia_base64;
   }
   
-  // Computar estado automático
-  orden.estado = calcularEstadoOrden(orden);
-  document.getElementById('f-estado').value = orden.estado; // update UI state
+  // Computar estado automático o manual si es superadmin
+  if (currentSession.viewMode === 'superadmin') {
+    orden.estado = document.getElementById('f-estado').value;
+  } else {
+    orden.estado = calcularEstadoOrden(orden);
+    document.getElementById('f-estado').value = orden.estado; // update UI state
+  }
 
   if (oVieja) {
     ordenes = ordenes.map(o => o.id === editandoId ? orden : o);
