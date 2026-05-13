@@ -7962,13 +7962,31 @@ function renderCalendario() {
         let dateStr = b.fecha;
         if (dateStr.includes('T')) dateStr = dateStr.split('T')[0];
         
-        eventos.push({
+        let eventColor = bgColor;
+        if (b.nota && b.nota.includes('Programado por supervisor')) {
+          eventColor = '#8b5cf6'; // Morado para los programados
+        }
+
+        let isAllDay = true;
+        let startVal = dateStr;
+        let endVal = null;
+
+        if (b.entrada && b.salida) {
+          isAllDay = false;
+          startVal = `${dateStr}T${b.entrada}:00`;
+          endVal = `${dateStr}T${b.salida}:00`;
+        } else if (b.entrada) {
+          isAllDay = false;
+          startVal = `${dateStr}T${b.entrada}:00`;
+        }
+
+        const ev = {
           id: `bit-${b.id || Math.random()}`,
           title: `${(b.tecnico || 'Téc').split(' ')[0]} | ${o.cliente}`,
-          start: dateStr,
-          allDay: true,
-          backgroundColor: bgColor,
-          borderColor: bgColor,
+          start: startVal,
+          allDay: isAllDay,
+          backgroundColor: eventColor,
+          borderColor: eventColor,
           extendedProps: {
             isBitacora: true,
             ordenId: o.id,
@@ -7979,7 +7997,11 @@ function renderCalendario() {
             entrada: b.entrada,
             salida: b.salida
           }
-        });
+        };
+
+        if (endVal) ev.end = endVal;
+
+        eventos.push(ev);
       });
     } else {
       eventos.push({
