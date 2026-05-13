@@ -5455,7 +5455,18 @@ function abrirBitacora(id) {
   window.currentBitacoraOrdenId = id;
   const now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  document.getElementById('bitacora-fecha').value = now.toISOString().slice(0,10);
+  const hoy = now.toISOString().slice(0, 10);
+
+  // Límite mínimo: 2 días antes de hoy
+  const minDate = new Date(now);
+  minDate.setDate(minDate.getDate() - 2);
+  const min = minDate.toISOString().slice(0, 10);
+
+  const fechaInput = document.getElementById('bitacora-fecha');
+  fechaInput.value = hoy;
+  fechaInput.min = min;
+  fechaInput.max = hoy;
+
   document.getElementById('bitacora-nota').value = '';
   document.getElementById('bitacora-entrada').value = '';
   document.getElementById('bitacora-salida').value = '';
