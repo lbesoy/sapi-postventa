@@ -4889,7 +4889,7 @@ function abrirFormulario(id, modoReporte = false) {
     const fields = ['folio','pedido','ubicacion','operador','eco','horometro',
       'modelo','serie','soporte','km-ida','km-vuelta','km-total',
       'falla','trabajos','dictamen','condiciones','observaciones','pendientes',
-      'factura-ref','factura-mo','noches','alimentacion','traslado-costo'];
+      'noches','alimentacion','traslado-costo'];
     fields.forEach(f => {
       const el = document.getElementById('f-' + f);
       if (el && o[f.replace(/-/g,'_')] !== undefined) el.value = o[f.replace(/-/g,'_')];
@@ -5185,8 +5185,8 @@ function guardarOrden(e) {
     pendientes: document.getElementById('f-pendientes').value.trim(),
     ref_utilizadas: getRefacciones('utilizadas'),
     ref_necesarias: getRefacciones('necesarias'),
-    factura_ref: document.getElementById('f-factura-ref').value.trim(),
-    factura_mo: document.getElementById('f-factura-mo').value.trim(),
+    factura_ref: '',
+    factura_mo: '',
     noches: document.getElementById('f-noches').value,
     alimentacion: document.getElementById('f-alimentacion').value,
     traslado_costo: document.getElementById('f-traslado-costo').value,
