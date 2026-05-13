@@ -1882,10 +1882,11 @@ function renderTabla(ctx) {
          else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
          let isCreator = false;
          let isTkAssigned = false;
+         if (o.creadoPor === tecName) isCreator = true;
          if (o.soporte) {
             const tk = tickets.find(x => x.id === o.soporte);
             if (tk) {
-               if (tk.solicitante === tecName) isCreator = true;
+               if (tk.solicitante === tecName || tk.creadoPor === tecName) isCreator = true;
                let tkAssigned = [];
                if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados;
                else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
@@ -1910,10 +1911,11 @@ function renderTabla(ctx) {
          
          let passSupTicket = assigned.includes(supFilter);
          let isCreator = false;
+         if (o.creadoPor === supFilter) isCreator = true;
          if (o.soporte) {
             const tk = tickets.find(x => x.id === o.soporte);
             if (tk) {
-               if (tk.solicitante === supFilter) isCreator = true;
+               if (tk.solicitante === supFilter || tk.creadoPor === supFilter) isCreator = true;
                let tkAssigned = [];
                if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados;
                else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
@@ -5223,6 +5225,7 @@ function guardarOrden(e) {
     serie: document.getElementById('f-serie').value.trim(),
     tecnico: tecnicosSeleccionados.join(', '),
     tecnicosAsignados: tecnicosSeleccionados,
+    creadoPor: oVieja ? (oVieja.creadoPor || oVieja.tecnico) : (usuarios.find(u => u.id === currentSession.userId)?.nombre || ''),
     soporte: document.getElementById('f-soporte').value.trim(),
     km_ida: document.getElementById('f-km-ida').value,
     km_vuelta: document.getElementById('f-km-vuelta').value,
@@ -6236,7 +6239,7 @@ function renderTickets(ctx) {
          let assigned = [];
          if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
          else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
-         passTec = assigned.includes(tecName) || t.solicitante === tecName;
+         passTec = assigned.includes(tecName) || t.solicitante === tecName || t.creadoPor === tecName;
       }
       
       if (supFilter) {
@@ -6252,7 +6255,7 @@ function renderTickets(ctx) {
          if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
          else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
          
-         let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter;
+         let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
          
          passSup = passSupClient || passSupTicket;
       }
@@ -7574,6 +7577,14 @@ async function guardarTicket(e) {
     contacto = currentUser ? currentUser.email : '';
   }
   
+  if (!isEmpresa) {
+    const asignadoVal = document.getElementById('t-asignado').value.trim();
+    if (!asignadoVal) {
+      mostrarNotificacion('Debe seleccionar a quién va asignado el ticket.', 'error');
+      return;
+    }
+  }
+  
   if (!isEmpresa && estado === 'Cotización') {
     const cotSAP = document.getElementById('t-cotizacion-sap')?.value.trim();
     
@@ -7648,6 +7659,7 @@ async function guardarTicket(e) {
     cliente: document.getElementById('t-cliente')?.value || '',
     sitio: document.getElementById('t-sitio')?.value || '',
     solicitante: document.getElementById('t-solicitante').value.trim(),
+    creadoPor: t_existente ? (t_existente.creadoPor || t_existente.solicitante) : (usuarios.find(u => u.id === currentSession.userId)?.nombre || ''),
     area: document.getElementById('t-area').value,
     categoria: document.getElementById('t-categoria').value,
     prioridad: document.getElementById('t-prioridad').value,
