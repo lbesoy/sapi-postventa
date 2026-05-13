@@ -8043,9 +8043,11 @@ function renderCalendario() {
       }
     },
     eventContent: function(arg) {
+      const bgColor = arg.event.backgroundColor || 'var(--accent)';
+      const timeHtml = arg.timeText ? `<span style="font-weight:bold; margin-right:4px;">${arg.timeText}</span>` : '';
       return {
-        html: `<div style="font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:2px; color:white;" title="${arg.event.title}">
-                 <b>${arg.event.title}</b><br/>
+        html: `<div style="background-color:${bgColor}; border-radius:3px; font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:3px; color:white; width:100%; box-sizing:border-box;" title="${arg.event.title}">
+                 ${timeHtml}<b>${arg.event.title}</b><br/>
                  <span style="font-size:0.7rem; opacity:0.9;">${arg.event.extendedProps.tecnico || 'Sin asignar'}</span>
                </div>`
       };

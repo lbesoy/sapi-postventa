@@ -97,32 +97,27 @@ app.get('/api/clientes', ensureSAPConnection, async (req, res) => {
         
         res.json(response.data.value || []);
     } catch (error) {
-        if (error.response && error.response.status === 404) {
-            console.log(`Query no encontrado. Usando Fallback a BusinessPartners...`);
-            try {
-                // Intento 2: Fallback a la tabla estándar si el query no se ha programado
-                const fallbackResponse = await sapApi.get(`${SAP_URL}/BusinessPartners?$select=CardCode,CardName,LicTradNum,E_Mail,CurrentAccountBalance&$filter=CardType eq 'cCustomer'`, {
-                    headers: { 'B1S-PageSize': 5000, 'Prefer': 'odata.maxpagesize=5000' }
-                });
-                
-                // Mapear los campos del fallback para que coincidan con la estructura que espera app.js
-                const fallbackData = fallbackResponse.data.value.map(bp => ({
-                    CardCode: bp.CardCode,
-                    CardName: bp.CardName,
-                    LicTradNum: bp.LicTradNum,
-                    E_Mail: bp.E_Mail,
-                    Balance: bp.CurrentAccountBalance,
-                    U_OK_Grupo: 'N/A' // Como es fallback, no exigimos el UDF
-                }));
-                
-                return res.json(fallbackData);
-            } catch (fallbackError) {
-                console.error('Error en fallback de BusinessPartners:', fallbackError.response?.data || fallbackError.message);
-                res.status(500).json({ error: 'Error obteniendo clientes de SAP (Fallback falló)', details: fallbackError.message });
-            }
-        } else {
-            console.error('Error en /api/clientes:', error.response?.data || error.message);
-            res.status(500).json({ error: 'Error ejecutando Query de clientes en SAP', details: error.message });
+        console.log(`Query ${req.query.queryCode || 'eurorep_clientes'} falló. Status: ${error.response?.status}. Usando Fallback a BusinessPartners...`);
+        try {
+            // Fallback a la tabla estándar si el query falla por cualquier razón
+            const fallbackResponse = await sapApi.get(`${SAP_URL}/BusinessPartners?$select=CardCode,CardName,LicTradNum,E_Mail,CurrentAccountBalance&$filter=CardType eq 'cCustomer'`, {
+                headers: { 'B1S-PageSize': 5000, 'Prefer': 'odata.maxpagesize=5000' }
+            });
+            
+            // Mapear los campos del fallback
+            const fallbackData = fallbackResponse.data.value.map(bp => ({
+                CardCode: bp.CardCode,
+                CardName: bp.CardName,
+                LicTradNum: bp.LicTradNum,
+                E_Mail: bp.E_Mail,
+                Balance: bp.CurrentAccountBalance,
+                U_OK_Grupo: 'N/A' // Como es fallback, no exigimos el UDF
+            }));
+            
+            return res.json(fallbackData);
+        } catch (fallbackError) {
+            console.error('Error en fallback de BusinessPartners:', fallbackError.response?.data || fallbackError.message);
+            res.status(500).json({ error: 'Error obteniendo clientes de SAP (Fallback falló)', details: fallbackError.message });
         }
     }
 });
