@@ -1964,21 +1964,21 @@ function renderTabla(ctx) {
 
   body.innerHTML = filtradas.map(o => `
     <tr>
-      <td style="white-space:nowrap; width:60px;">
+      <td data-label="Acciones" style="white-space:nowrap; width:60px;">
         <div style="display:flex;gap:0.25rem;">
           <button class="action-btn" onclick="verDetalle('${o.id}')" title="Ver"><i data-lucide="eye"></i></button>
           ${canEdit ? `<button class="action-btn" onclick="editarOrden('${o.id}')" title="Editar"><i data-lucide="pencil"></i></button>` : ''}
         </div>
       </td>
-      <td><strong>${o.folio||'-'}</strong></td>
-      <td>${o.cliente||'-'}</td>
-      <td>${o.ubicacion||'-'}</td>
-      <td>${o.modelo||'-'}</td>
-      <td>${o.tecnico||'-'}</td>
-      <td><span class="badge badge-${(o.tipo||'otro').toLowerCase().replace('é','e').replace('í','i')}">${o.tipo||'-'}</span></td>
-      <td><span class="badge ${badgeEstado(o.estado)}">${o.estado||'-'}</span></td>
-      <td>${o.fecha||'-'}</td>
-      <td style="width:40px; text-align:center;">
+      <td data-label="Folio"><strong>${o.folio||'-'}</strong></td>
+      <td data-label="Cliente">${o.cliente||'-'}</td>
+      <td data-label="Ubicación">${o.ubicacion||'-'}</td>
+      <td data-label="Modelo">${o.modelo||'-'}</td>
+      <td data-label="Técnico">${o.tecnico||'-'}</td>
+      <td data-label="Tipo"><span class="badge badge-${(o.tipo||'otro').toLowerCase().replace('é','e').replace('í','i')}">${o.tipo||'-'}</span></td>
+      <td data-label="Estado"><span class="badge ${badgeEstado(o.estado)}">${o.estado||'-'}</span></td>
+      <td data-label="Fecha">${o.fecha||'-'}</td>
+      <td data-label="" style="width:40px; text-align:center;">
         ${canDelete ? `<button class="action-btn del" onclick="eliminarOrden('${o.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
       </td>
     </tr>
@@ -6234,28 +6234,28 @@ function renderTickets(ctx) {
 
   body.innerHTML = filtered.map((t, i) => `
     <tr style="cursor:pointer; transition: background 0.2s;" onclick="if(!event.target.closest('.action-btn')){ verDetalleTicket('${t.id}'); }" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
-      <td style="white-space:nowrap; width:60px;">
+      <td data-label="Acciones" style="white-space:nowrap; width:60px;">
         <div style="display:flex;gap:0.25rem;">
           <button class="action-btn" onclick="verDetalleTicket('${t.id}')" title="Ver"><i data-lucide="eye"></i></button>
           <button class="action-btn" onclick="editarTicket('${t.id}')" title="Editar"><i data-lucide="pencil"></i></button>
         </div>
       </td>
-      <td><strong>${t.folio||('#'+(i+1))}</strong></td>
-      <td>
+      <td data-label="Folio"><strong>${t.folio||('#'+(i+1))}</strong></td>
+      <td data-label="Asunto">
         <div style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.asunto || ''}">
           ${t.asunto||'—'}
         </div>
       </td>
-      <td>
+      <td data-label="Solicitante">
         <div style="font-weight:500; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.solicitante || ''}">${t.solicitante||'—'}</div>
         ${t.cliente ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}"><i data-lucide="building-2" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}</div>` : ''}
       </td>
-      <td style="white-space:nowrap;">${t.area||'—'}</td>
-      <td style="white-space:nowrap;"><span class="badge badge-${String(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
-      <td style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'—'}</span></td>
-      <td style="white-space:nowrap;">${t.asignado||'—'}</td>
-      <td style="white-space:nowrap;">${t.fecha||'—'}</td>
-      <td style="width:40px; text-align:center;">
+      <td data-label="Área" style="white-space:nowrap;">${t.area||'—'}</td>
+      <td data-label="Prioridad" style="white-space:nowrap;"><span class="badge badge-${String(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
+      <td data-label="Estado" style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'—'}</span></td>
+      <td data-label="Asignado" style="white-space:nowrap;">${t.asignado||'—'}</td>
+      <td data-label="Fecha" style="white-space:nowrap;">${t.fecha||'—'}</td>
+      <td data-label="" style="width:40px; text-align:center;">
         ${canDelete ? `<button class="action-btn del" onclick="eliminarTicket('${t.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
       </td>
     </tr>
@@ -6481,30 +6481,30 @@ function renderMaquinaria() {
     let customTds = '';
     if (configData.mappings?.maquinaria?.customCols) {
       configData.mappings.maquinaria.customCols.forEach(col => {
-        customTds += `<td style="font-size:0.85rem;">${m.customData && m.customData[col.label] ? m.customData[col.label] : 'N/A'}</td>`;
+        customTds += `<td data-label="${col.label}" style="font-size:0.85rem;">${m.customData && m.customData[col.label] ? m.customData[col.label] : 'N/A'}</td>`;
       });
     }
 
     return `
     <tr onclick="verServiciosMaquina('${m.idInterno}', '${m.serie}', '${m.marca.replace(/'/g, "\\'")}', '${m.modelo.replace(/'/g, "\\'")}', '${m.cliente.replace(/'/g, "\\'")}', '${m.ubicacion.replace(/'/g, "\\'")}')" style="cursor:pointer;" class="table-row-hover">
-      ${!isEmpresa ? `<td><span style="font-family:monospace; font-weight:500; color:var(--accent); background:var(--blue-light); padding:0.2rem 0.5rem; border-radius:4px;">${m.idInterno}</span></td>` : ''}
-      <td>${m.tipo && m.tipo !== 'N/A' ? `<span class="badge" style="background:var(--bg-hover); color:var(--text-primary); border:1px solid var(--border);">${m.tipo}</span>` : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}</td>
-      <td>
+      ${!isEmpresa ? `<td data-label="ID Interno"><span style="font-family:monospace; font-weight:500; color:var(--accent); background:var(--blue-light); padding:0.2rem 0.5rem; border-radius:4px;">${m.idInterno}</span></td>` : ''}
+      <td data-label="Tipo">${m.tipo && m.tipo !== 'N/A' ? `<span class="badge" style="background:var(--bg-hover); color:var(--text-primary); border:1px solid var(--border);">${m.tipo}</span>` : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}</td>
+      <td data-label="Marca">
         <div style="display:flex; align-items:center;">
           ${logoPath ? `<img src="${logoPath}" alt="${m.marca}" onerror="this.onerror=null; this.outerHTML='<span>${m.marca}</span>';" style="${getLogoStyle(m.marca)}"/>` : m.marca || '-'}
         </div>
       </td>
-      <td style="font-weight:500;">${m.modelo}</td>
-      <td>${m.serie}</td>
-      <td>${m.numeroEconomico && m.numeroEconomico !== 'N/A' ? m.numeroEconomico : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}</td>
-      <td>${m.numeroMotor && m.numeroMotor !== 'N/A' ? m.numeroMotor : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}</td>
-      <td>${m.anio}</td>
-      <td>
+      <td data-label="Modelo" style="font-weight:500;">${m.modelo}</td>
+      <td data-label="Serie">${m.serie}</td>
+      <td data-label="No. Económico">${m.numeroEconomico && m.numeroEconomico !== 'N/A' ? m.numeroEconomico : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}</td>
+      <td data-label="No. Motor">${m.numeroMotor && m.numeroMotor !== 'N/A' ? m.numeroMotor : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}</td>
+      <td data-label="Año">${m.anio}</td>
+      <td data-label="Cliente / Ubicación">
         <div style="font-weight:500;">${m.cliente}</div>
         ${m.ubicacion !== 'N/A' ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">${m.ubicacion}</div>` : ''}
       </td>
       ${customTds}
-      <td>
+      <td data-label="">
         <div style="display:flex; gap:0.25rem;">
           <button class="action-btn" onclick="event.stopPropagation(); verDetalleCliente('${m.cliente.replace(/'/g, "\\'")}')" title="Ver Perfil de la Empresa">
             <i data-lucide="building-2"></i>
