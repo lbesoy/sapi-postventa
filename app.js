@@ -5455,7 +5455,7 @@ function abrirBitacora(id) {
   window.currentBitacoraOrdenId = id;
   const now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  document.getElementById('bitacora-fecha').value = now.toISOString().slice(0,16);
+  document.getElementById('bitacora-fecha').value = now.toISOString().slice(0,10);
   document.getElementById('bitacora-nota').value = '';
   document.getElementById('bitacora-entrada').value = '';
   document.getElementById('bitacora-salida').value = '';
