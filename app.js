@@ -5092,7 +5092,7 @@ function verDetalle(id) {
               <span style="font-size:0.75rem; color:var(--text-muted);">${fechaStr}</span>
             </div>
             <div style="font-size:0.85rem; color:var(--text); white-space:pre-wrap;">${b.nota}</div>
-            ${b.horas ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Horas reportadas: ${b.horas} hrs</div>` : ''}
+            ${(b.entrada || b.salida) ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Horario: ${b.entrada || '--:--'} a ${b.salida || '--:--'}</div>` : ''}
           </div>
         `;
       });
@@ -5377,7 +5377,7 @@ function guardarAsignacionTecnicos() {
   
   localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
   if (window.pushToSupabase) {
-    window.pushToSupabase('ordenes_servicio', o);
+    window.pushToSupabase('ordenes', o);
   }
   
   mostrarNotificacion('Técnicos asignados correctamente.', 'success');
@@ -5396,7 +5396,8 @@ function abrirBitacora(id) {
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
   document.getElementById('bitacora-fecha').value = now.toISOString().slice(0,16);
   document.getElementById('bitacora-nota').value = '';
-  document.getElementById('bitacora-horas').value = '';
+  document.getElementById('bitacora-entrada').value = '';
+  document.getElementById('bitacora-salida').value = '';
   document.getElementById('modal-bitacora-overlay').classList.add('open');
 }
 
@@ -5411,7 +5412,8 @@ function guardarNotaBitacora() {
   
   const fecha = document.getElementById('bitacora-fecha').value;
   const nota = document.getElementById('bitacora-nota').value.trim();
-  const horas = document.getElementById('bitacora-horas').value.trim();
+  const entrada = document.getElementById('bitacora-entrada').value;
+  const salida = document.getElementById('bitacora-salida').value;
   
   if (!fecha || !nota) {
     mostrarNotificacion('La fecha y la nota son obligatorias.', 'warning');
@@ -5426,13 +5428,14 @@ function guardarNotaBitacora() {
     id: crypto.randomUUID(),
     fecha: new Date(fecha).toISOString(),
     nota: nota,
-    horas: horas,
+    entrada: entrada,
+    salida: salida,
     tecnico: nombreTecnico
   });
   
   localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
   if (window.pushToSupabase) {
-    window.pushToSupabase('ordenes_servicio', o);
+    window.pushToSupabase('ordenes', o);
   }
   
   mostrarNotificacion('Entrada de bitácora guardada.', 'success');
