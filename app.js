@@ -6682,8 +6682,8 @@ function renderRefaccionesPendientes() {
   
   const pendientes = [];
   ordenes.forEach(o => {
-    if (o.refaccionesNecesarias && o.refaccionesNecesarias.length > 0) {
-      o.refaccionesNecesarias.forEach(ref => {
+    if (o.ref_necesarias && o.ref_necesarias.length > 0) {
+      o.ref_necesarias.forEach(ref => {
         // Encontrar marca
         let foundMarca = '';
         if (ref.clave) {
@@ -6695,13 +6695,15 @@ function renderRefaccionesPendientes() {
           if (match) foundMarca = match.marca;
         }
         
+        const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+        
         pendientes.push({
           ordenId: o.id,
           ordenFolio: o.folio,
           tecnico: o.tecnicoResponsable || o.tecnico || 'Desconocido',
           maquina: o.maquina || 'Sin Asignar',
           sitio: o.sitio || o.ubicacion || 'Desconocido',
-          marca: foundMarca || 'S/M',
+          marca: MARCAS_RENDER[(foundMarca || '').toUpperCase()] || foundMarca || 'S/M',
           descripcion: ref.descripcion || 'Sin Descripción',
           cantidad: ref.cantidad || 1,
           clave: ref.clave || 'S/C',
