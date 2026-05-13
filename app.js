@@ -5156,9 +5156,10 @@ function guardarOrden(e) {
   e.preventDefault();
   const tipo = document.querySelector('input[name="tipo"]:checked')?.value || 'Servicio';
   const tecnicosSeleccionados = Array.from(document.querySelectorAll('input[name="f-tecnicos"]:checked')).map(cb => cb.value);
+  const oVieja = editandoId ? (ordenes.find(x => x.id === editandoId) || {}) : null;
   const orden = {
     id: editandoId || crypto.randomUUID(),
-    fecha: new Date().toLocaleDateString('es-MX'),
+    fecha: oVieja ? oVieja.fecha : new Date().toISOString().split('T')[0],
     folio: document.getElementById('f-folio').value.trim(),
     pedido: document.getElementById('f-pedido').value.trim(),
     cliente: document.getElementById('f-cliente').value.trim(),
@@ -5191,8 +5192,7 @@ function guardarOrden(e) {
     traslado_costo: document.getElementById('f-traslado-costo').value,
     dias: getDiasData(),
   };
-  if (editandoId) {
-    const oVieja = ordenes.find(x => x.id === editandoId) || {};
+  if (oVieja) {
     orden.bitacora = oVieja.bitacora;
     orden.firma_tecnico_base64 = oVieja.firma_tecnico_base64;
     orden.firma_cliente_base64 = oVieja.firma_cliente_base64;
@@ -7342,7 +7342,7 @@ async function guardarTicket(e) {
   const ticket = {
     id: editandoTicketId || crypto.randomUUID(),
     folio: editandoTicketId ? t_existente?.folio : newFolio,
-    fecha: t_existente ? t_existente.fecha : new Date().toLocaleDateString('es-MX'),
+    fecha: t_existente ? t_existente.fecha : new Date().toISOString().split('T')[0],
     fechaCreacion: t_existente ? t_existente.fechaCreacion : new Date().toISOString(),
     canal,
     contacto,
@@ -7672,7 +7672,7 @@ async function cerrarCotizacionTicket(id) {
 
       const nuevaOrden = {
         id: crypto.randomUUID(),
-        fecha: new Date().toLocaleDateString('es-MX'),
+        fecha: new Date().toISOString().split('T')[0],
         folio: generarFolioConsecutivo(),
         pedido: pedidoSAP || '',
         cliente: t.cliente || '',
