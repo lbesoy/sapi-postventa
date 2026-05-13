@@ -376,13 +376,32 @@ async function iniciarSesionSubmit(e) {
     return;
   }
 
-  // Ahora buscamos el rol
-  // Usamos 'user_roles' si es que la seguridad está ligada a auth.users, o 'usuarios'
-  const { data: roleData, error: roleError } = await window.supabaseClient
-    .from('usuarios')
+  // Ahora buscamos el rol en la tabla oficial del trigger
+  let roleData = null;
+  let roleError = null;
+
+  const resRoles = await window.supabaseClient
+    .from('user_roles')
     .select('rol, activo, nombre')
     .eq('id', data.user.id)
     .single();
+    
+  if (resRoles.data) {
+    roleData = resRoles.data;
+  } else {
+    // Fallback: buscamos en la tabla de usuarios local migrada
+    const resUsuarios = await window.supabaseClient
+      .from('usuarios')
+      .select('rol, activo, nombre')
+      .eq('id', data.user.id)
+      .single();
+      
+    if (resUsuarios.data) {
+      roleData = resUsuarios.data;
+    } else {
+      roleError = resUsuarios.error || resRoles.error;
+    }
+  }
 
   if (roleError || !roleData) {
     errEl.textContent = 'Usuario sin rol asignado en la base de datos. Detalle: ' + (roleError ? roleError.message : 'No data');
