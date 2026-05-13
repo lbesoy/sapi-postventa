@@ -406,6 +406,32 @@
               </table>
             </div>
           </div>
+          
+          <!-- DASHBOARD CONTENIDO TÉCNICOS -->
+          <div id="dash-content-tecnicos" style="display:none;">
+            <div class="stats-grid" id="tecnicos-kpis-grid">
+              <!-- Rendered via JS -->
+            </div>
+            
+            <div style="display:flex; gap:1.5rem; margin-top:2rem; flex-wrap:wrap;">
+              <div class="table-wrapper" style="flex:1; min-width:300px;">
+                <h3 style="margin-bottom:1rem; font-size:1.1rem; color:var(--text-primary);"><i data-lucide="bar-chart" style="width:18px;height:18px;vertical-align:middle;margin-right:0.5rem;color:var(--accent);"></i> Rendimiento por Técnico</h3>
+                <table class="orders-table">
+                  <thead>
+                    <tr>
+                      <th>Técnico</th>
+                      <th style="text-align:center;">Órdenes (En Proceso)</th>
+                      <th style="text-align:center;">Órdenes (Finalizadas)</th>
+                      <th style="text-align:center;">Horas Reportadas</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tecnicos-stats-body">
+                    <!-- Rendered via JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- SERVICIOS VIEW -->
