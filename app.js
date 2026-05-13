@@ -5893,8 +5893,6 @@ function guardarNotaBitacora() {
   cerrarBitacora();
   verDetalle(o.id); // Recargar modal
 }
-  verDetalle(o.id);
-}
 
 function cerrarDetalle(e) {
   if (e && e.target !== document.getElementById('modal-detalle-overlay')) return;
