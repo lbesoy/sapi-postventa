@@ -4010,6 +4010,21 @@ function guardarNuevaMaquina(e) {
   if (document.getElementById('modal-detalle-cliente').classList.contains('open')) {
     verDetalleCliente(clienteSeleccionado);
   }
+  
+  // Actualizar dropdowns si estamos en medio de crear un ticket o servicio
+  const mName = `${marca || ''} ${modelo || ''} (SN: ${serie || ''})`.trim();
+  if (document.getElementById('modal-ticket')?.classList.contains('open')) {
+    const tCli = document.getElementById('t-cliente').value;
+    if (tCli === clienteSeleccionado) {
+      poblarMaquinasCliente('t-equipo', mName, tCli);
+    }
+  }
+  if (document.getElementById('view-servicios')?.classList.contains('active')) {
+    const fCli = document.getElementById('f-cliente').value;
+    if (fCli === clienteSeleccionado) {
+      poblarMaquinasCliente('f-equipo', mName, fCli);
+    }
+  }
 }
 
 function eliminarMaquinaActual() {
@@ -7268,7 +7283,24 @@ function onEquipoOrdenChange() {
   const select = document.getElementById('f-equipo');
   if (!select) return;
   const opt = select.options[select.selectedIndex];
-  if (!opt || !opt.value || opt.value === 'Otra / No registrada') return;
+  if (!opt || !opt.value) return;
+  
+  if (opt.value === 'Otra / No registrada') {
+      const cliente = document.getElementById('f-cliente').value;
+      if (!cliente || cliente === 'Ninguno / Uso Interno') {
+          mostrarNotificacion('Seleccione primero una empresa para asociar la máquina.', 'warning');
+          select.value = '';
+          return;
+      }
+      abrirModalAgregarMaquina();
+      setTimeout(() => {
+          const amCliente = document.getElementById('am-cliente');
+          if (amCliente) {
+              amCliente.value = cliente;
+          }
+      }, 100);
+      return;
+  }
   
   const modelo = opt.getAttribute('data-modelo');
   const serie = opt.getAttribute('data-serie');
@@ -7282,6 +7314,26 @@ function onEquipoOrdenChange() {
   const inUbicacion = document.getElementById('f-ubicacion');
   if (inUbicacion && ubicacion && !inUbicacion.value) {
     inUbicacion.value = ubicacion;
+  }
+}
+
+function onEquipoTicketChange() {
+  const select = document.getElementById('t-equipo');
+  if (!select) return;
+  if (select.value === 'Otra / No registrada') {
+      const cliente = document.getElementById('t-cliente').value;
+      if (!cliente || cliente === 'Ninguno / Uso Interno') {
+          mostrarNotificacion('Seleccione primero una empresa para asociar la máquina.', 'warning');
+          select.value = '';
+          return;
+      }
+      abrirModalAgregarMaquina();
+      setTimeout(() => {
+          const amCliente = document.getElementById('am-cliente');
+          if (amCliente) {
+              amCliente.value = cliente;
+          }
+      }, 100);
   }
 }
 
