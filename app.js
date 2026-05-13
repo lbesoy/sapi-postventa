@@ -1880,7 +1880,12 @@ function renderTabla(ctx) {
          let assigned = [];
          if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados;
          else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
-         passTec = assigned.includes(tecName);
+         let isCreator = false;
+         if (o.soporte) {
+            const tk = tickets.find(x => x.id === o.soporte);
+            if (tk && tk.solicitante === tecName) isCreator = true;
+         }
+         passTec = assigned.includes(tecName) || isCreator;
       }
       
       if (supFilter) {
@@ -1897,7 +1902,12 @@ function renderTabla(ctx) {
          else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
          
          let passSupTicket = assigned.includes(supFilter);
-         passSup = passSupClient || passSupTicket;
+         let isCreator = false;
+         if (o.soporte) {
+            const tk = tickets.find(x => x.id === o.soporte);
+            if (tk && tk.solicitante === supFilter) isCreator = true;
+         }
+         passSup = passSupClient || passSupTicket || isCreator;
       }
       
       return passTec && passSup;
@@ -6211,7 +6221,7 @@ function renderTickets(ctx) {
          let assigned = [];
          if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
          else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
-         passTec = assigned.includes(tecName);
+         passTec = assigned.includes(tecName) || t.solicitante === tecName;
       }
       
       if (supFilter) {
@@ -6227,7 +6237,7 @@ function renderTickets(ctx) {
          if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
          else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
          
-         let passSupTicket = assigned.includes(supFilter);
+         let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter;
          
          passSup = passSupClient || passSupTicket;
       }
