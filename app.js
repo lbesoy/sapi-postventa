@@ -4708,13 +4708,13 @@ function generarFolioConsecutivo() {
   return `${prefix}${padded}`;
 }
 
-function abrirFormulario(id) {
+function abrirFormulario(id, modoReporte = false) {
   if (!id && currentSession.viewMode === 'consulta') {
     mostrarNotificacion('El rol Consulta no puede generar órdenes.', 'error');
     return;
   }
   editandoId = id || null;
-  document.getElementById('modal-title').textContent = id ? 'Editar Orden' : 'Nueva Orden de Servicio';
+  document.getElementById('modal-title').textContent = modoReporte ? '📋 Llenar Reporte Técnico' : (id ? 'Editar Orden' : 'Nueva Orden de Servicio');
   document.getElementById('form-orden').reset();
   
   if (!id) {
@@ -4843,6 +4843,64 @@ function abrirFormulario(id) {
     radio.disabled = !!lockFields;
   });
 
+  // ===== MODO REPORTE: bloquear campos de información general =====
+  if (modoReporte) {
+    // Campos de texto/number bloqueados (info general + km)
+    const camposInfoGeneral = [
+      'f-folio', 'f-pedido', 'f-ubicacion', 'f-operador', 'f-eco',
+      'f-horometro', 'f-modelo', 'f-serie',
+      'f-km-ida', 'f-km-vuelta', 'f-km-total'
+    ];
+    camposInfoGeneral.forEach(f => {
+      const el = document.getElementById(f);
+      if (el) {
+        el.readOnly = true;
+        el.style.background = 'var(--bg-secondary)';
+        el.style.cursor = 'not-allowed';
+        el.style.opacity = '0.7';
+      }
+    });
+    // Selects bloqueados
+    ['f-soporte', 'f-equipo', 'f-estado'].forEach(f => {
+      const el = document.getElementById(f);
+      if (el) {
+        el.disabled = true;
+        el.style.background = 'var(--bg-secondary)';
+        el.style.opacity = '0.7';
+      }
+    });
+    // Combo cliente bloqueado
+    const fClienteComboReporte = document.getElementById('f-cliente-combo');
+    if (fClienteComboReporte) {
+      fClienteComboReporte.style.pointerEvents = 'none';
+      fClienteComboReporte.style.background = 'var(--bg-secondary)';
+      fClienteComboReporte.style.opacity = '0.7';
+    }
+    // Radios de tipo bloqueados
+    document.querySelectorAll('input[name="tipo"]').forEach(radio => {
+      radio.disabled = true;
+    });
+    // Checkboxes de técnicos bloqueados
+    document.querySelectorAll('input[name="f-tecnicos"]').forEach(cb => {
+      cb.disabled = true;
+    });
+    // Banner visual en el header del modal
+    const existingBanner = document.getElementById('reporte-modo-banner');
+    if (!existingBanner) {
+      const banner = document.createElement('div');
+      banner.id = 'reporte-modo-banner';
+      banner.style.cssText = 'background: linear-gradient(135deg, #1e3a5f, #0d47a1); color:#fff; padding:0.6rem 1rem; font-size:0.82rem; display:flex; align-items:center; gap:0.5rem; border-bottom: 1px solid rgba(255,255,255,0.15);';
+      banner.innerHTML = '<i data-lucide="info" style="width:16px;height:16px;flex-shrink:0;"></i><span><strong>Modo Reporte Técnico:</strong> Solo puedes editar el diagnóstico, trabajos, refacciones y bitácora. Para modificar los datos generales, usa el botón <strong>Editar (✏️)</strong>.</span>';
+      const modalBody = document.querySelector('#modal-form .modal-body');
+      if (modalBody) modalBody.insertBefore(banner, modalBody.firstChild);
+      if (window.lucide) window.lucide.createIcons({ root: banner });
+    }
+  } else {
+    // Asegurarse de remover el banner si existe (al abrir en modo edición normal)
+    const existingBanner = document.getElementById('reporte-modo-banner');
+    if (existingBanner) existingBanner.remove();
+  }
+
   document.getElementById('modal-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -4952,6 +5010,9 @@ function cerrarFormulario(e) {
   document.getElementById('modal-overlay').classList.remove('open');
   document.body.style.overflow = '';
   editandoId = null;
+  // Limpiar banner de modo reporte si existe
+  const banner = document.getElementById('reporte-modo-banner');
+  if (banner) banner.remove();
 }
 
 function guardarOrdenes() {
@@ -5045,7 +5106,7 @@ function eliminarOrden(id) {
 function completarReporteDesdeDetalle(id) {
   cerrarDetalle();
   setTimeout(() => {
-    abrirFormulario(id);
+    abrirFormulario(id, true); // true = modoReporte: solo permite editar el reporte técnico
   }, 100);
 }
 
