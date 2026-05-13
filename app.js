@@ -7717,28 +7717,57 @@ function renderCalendario() {
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   const miEmpresa = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
 
-  const eventos = ordenes.filter(o => {
+  const eventos = [];
+  
+  ordenes.filter(o => {
     if (isEmpresa && o.cliente !== miEmpresa) return false;
     return true;
-  }).map(o => {
+  }).forEach(o => {
     let bgColor = '#3b82f6'; // Azul - Servicio
     if (o.tipo === 'Mantenimiento') bgColor = '#10b981'; // Verde
     if (o.tipo === 'Reparación') bgColor = '#f59e0b'; // Naranja
     if (o.tipo === 'Garantía') bgColor = '#ef4444'; // Rojo
     if (o.estado === 'Finalizado') bgColor = '#6b7280'; // Gris
 
-    return {
-      id: o.id,
-      title: `${o.folio || 'S/N'} - ${o.cliente}`,
-      start: o.fechaInicio || o.fecha,
-      end: o.fechaFin || o.fechaInicio || o.fecha,
-      backgroundColor: bgColor,
-      borderColor: bgColor,
-      extendedProps: {
-        tecnico: o.tecnico,
-        estado: o.estado
-      }
-    };
+    if (o.bitacora && o.bitacora.length > 0) {
+      o.bitacora.forEach(b => {
+        let dateStr = b.fecha;
+        if (dateStr.includes('T')) dateStr = dateStr.split('T')[0];
+        
+        eventos.push({
+          id: `bit-${b.id || Math.random()}`,
+          title: `${(b.tecnico || 'Téc').split(' ')[0]} | ${o.cliente}`,
+          start: dateStr,
+          allDay: true,
+          backgroundColor: bgColor,
+          borderColor: bgColor,
+          extendedProps: {
+            isBitacora: true,
+            ordenId: o.id,
+            tecnico: b.tecnico || 'Desconocido',
+            cliente: o.cliente,
+            ubicacion: o.ubicacion || 'Sin ubicación',
+            nota: b.nota,
+            entrada: b.entrada,
+            salida: b.salida
+          }
+        });
+      });
+    } else {
+      eventos.push({
+        id: o.id,
+        title: `${o.folio || 'S/N'} - ${o.cliente}`,
+        start: o.fechaInicio || o.fecha,
+        end: o.fechaFin || o.fechaInicio || o.fecha,
+        backgroundColor: bgColor,
+        borderColor: bgColor,
+        extendedProps: {
+          isBitacora: false,
+          tecnico: o.tecnico,
+          estado: o.estado
+        }
+      });
+    }
   });
 
   calendarInstance = new FullCalendar.Calendar(container, {
@@ -7757,7 +7786,11 @@ function renderCalendario() {
     },
     events: eventos,
     eventClick: function(info) {
-      verDetalle(info.event.id);
+      if (info.event.extendedProps.isBitacora) {
+        mostrarPopupBitacora(info);
+      } else {
+        verDetalle(info.event.id);
+      }
     },
     eventContent: function(arg) {
       return {
@@ -7768,6 +7801,42 @@ function renderCalendario() {
       };
     }
   });
-
+  
   calendarInstance.render();
+}
+
+function mostrarPopupBitacora(info) {
+  const dObj = info.event.start;
+  const fechaStr = dObj.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const p = info.event.extendedProps;
+  
+  let horasStr = '';
+  if (p.entrada || p.salida) {
+    horasStr = `<p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Horario:</strong> ${p.entrada || '--:--'} a ${p.salida || '--:--'}</p>`;
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.style.zIndex = '9999';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:450px; background:var(--bg-card); border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.15);">
+      <div class="modal-header" style="border-bottom: 1px solid var(--border); padding: 1rem 1.5rem;">
+        <h3 id="modal-title" style="margin:0; font-size:1.1rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="calendar-check" style="color:var(--accent);"></i> Avance Diario</h3>
+        <button class="close-btn" onclick="this.closest('.modal-overlay').remove()" style="background:none; border:none; cursor:pointer; color:var(--text-muted);"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body" style="padding:1.5rem;">
+        <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:1rem; text-transform:capitalize; font-weight:500;">${fechaStr}</div>
+        <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Técnico:</strong> ${p.tecnico}</p>
+        <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Cliente:</strong> ${p.cliente}</p>
+        <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Ubicación:</strong> ${p.ubicacion}</p>
+        ${horasStr}
+        <div style="margin-top:1rem; padding:1rem; background:var(--bg-body); border-radius:6px; font-size:0.85rem; border:1px solid var(--border); white-space:pre-wrap; line-height:1.5; color:var(--text-secondary); max-height:250px; overflow-y:auto;">${p.nota}</div>
+        <div style="margin-top:1.5rem; text-align:right;">
+          <button class="btn-primary" onclick="this.closest('.modal-overlay').remove(); verDetalle('${p.ordenId}')">Ver Orden Completa</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) window.lucide.createIcons({ root: overlay });
 }
