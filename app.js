@@ -334,96 +334,102 @@ if (savedRoles) {
 // ===== LOGIN STATE =====
 async function iniciarSesionSubmit(e) {
   e.preventDefault();
-  let inputEmail = document.getElementById('login-email').value.trim();
-  if (inputEmail && !inputEmail.includes('@')) {
-    inputEmail = inputEmail.replace(/\s+/g, '') + '@eurorep.mx';
-  }
-  const inputPass = document.getElementById('login-password').value;
   const errEl = document.getElementById('login-error');
-  
-  // BACKDOOR TEMPORAL PARA DESARROLLADORES (Solo local)
-  const rawEmail = document.getElementById('login-email').value.trim();
-  if ((rawEmail === 'superadmin' && inputPass === 'superadmin') || (rawEmail === 'admin' && inputPass === 'admin')) {
-     currentSession = { userId: 'superadmin', viewMode: 'superadmin' };
-     localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
-     entrarApp({ id: 'superadmin', rol: 'superadmin', nombre: 'Super Admin' });
-     return;
-  }
-  
-  if (!inputEmail || !inputPass) {
-    errEl.textContent = 'Ingresa tu correo y contraseña.';
-    errEl.style.color = 'var(--red)';
-    return;
-  }
-
-  errEl.textContent = 'Iniciando sesión...';
-  errEl.style.color = 'var(--text-secondary)';
-
-  if (!window.supabaseClient) {
-    errEl.textContent = 'Error: No hay conexión con la base de datos.';
-    errEl.style.color = 'var(--red)';
-    return;
-  }
-
-  const { data, error } = await window.supabaseClient.auth.signInWithPassword({
-    email: inputEmail,
-    password: inputPass
-  });
-
-  if (error) {
-    errEl.textContent = error.message.includes('Invalid login') ? 'Correo o contraseña incorrectos.' : error.message;
-    errEl.style.color = 'var(--red)';
-    return;
-  }
-
-  // Ahora buscamos el rol en la tabla oficial del trigger
-  let roleData = null;
-  let roleError = null;
-
-  const resRoles = await window.supabaseClient
-    .from('user_roles')
-    .select('rol, activo, nombre')
-    .eq('id', data.user.id)
-    .single();
+  try {
+    let inputEmail = document.getElementById('login-email').value.trim();
+    if (inputEmail && !inputEmail.includes('@')) {
+      inputEmail = inputEmail.replace(/\s+/g, '') + '@eurorep.mx';
+    }
+    const inputPass = document.getElementById('login-password').value;
     
-  if (resRoles.data) {
-    roleData = resRoles.data;
-  } else {
-    // Fallback: buscamos en la tabla de usuarios local migrada
-    const resUsuarios = await window.supabaseClient
-      .from('usuarios')
+    // BACKDOOR TEMPORAL PARA DESARROLLADORES (Solo local)
+    const rawEmail = document.getElementById('login-email').value.trim();
+    if ((rawEmail === 'superadmin' && inputPass === 'superadmin') || (rawEmail === 'admin' && inputPass === 'admin')) {
+       currentSession = { userId: 'superadmin', viewMode: 'superadmin' };
+       localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
+       entrarApp({ id: 'superadmin', rol: 'superadmin', nombre: 'Super Admin' });
+       return;
+    }
+    
+    if (!inputEmail || !inputPass) {
+      errEl.textContent = 'Ingresa tu correo y contraseña.';
+      errEl.style.color = 'var(--red)';
+      return;
+    }
+
+    errEl.textContent = 'Iniciando sesión...';
+    errEl.style.color = 'var(--text-secondary)';
+
+    if (!window.supabaseClient) {
+      errEl.textContent = 'Error: No hay conexión con la base de datos.';
+      errEl.style.color = 'var(--red)';
+      return;
+    }
+
+    const { data, error } = await window.supabaseClient.auth.signInWithPassword({
+      email: inputEmail,
+      password: inputPass
+    });
+
+    if (error) {
+      errEl.textContent = error.message.includes('Invalid login') ? 'Correo o contraseña incorrectos.' : error.message;
+      errEl.style.color = 'var(--red)';
+      return;
+    }
+
+    // Ahora buscamos el rol en la tabla oficial del trigger
+    let roleData = null;
+    let roleError = null;
+
+    const resRoles = await window.supabaseClient
+      .from('user_roles')
       .select('rol, activo, nombre')
       .eq('id', data.user.id)
       .single();
       
-    if (resUsuarios.data) {
-      roleData = resUsuarios.data;
+    if (resRoles.data) {
+      roleData = resRoles.data;
     } else {
-      roleError = resUsuarios.error || resRoles.error;
+      // Fallback: buscamos en la tabla de usuarios local migrada
+      const resUsuarios = await window.supabaseClient
+        .from('usuarios')
+        .select('rol, activo, nombre')
+        .eq('id', data.user.id)
+        .single();
+        
+      if (resUsuarios.data) {
+        roleData = resUsuarios.data;
+      } else {
+        roleError = resUsuarios.error || resRoles.error;
+      }
     }
-  }
 
-  if (roleError || !roleData) {
-    errEl.textContent = 'Usuario sin rol asignado en la base de datos. Detalle: ' + (roleError ? roleError.message : 'No data');
-    errEl.style.color = 'var(--red)';
-    await window.supabaseClient.auth.signOut();
-    return;
-  }
+    if (roleError || !roleData) {
+      errEl.textContent = 'Usuario sin rol asignado en la base de datos. Detalle: ' + (roleError ? roleError.message : 'No data');
+      errEl.style.color = 'var(--red)';
+      await window.supabaseClient.auth.signOut();
+      return;
+    }
 
-  if (roleData.activo === false) {
-    errEl.textContent = 'Tu cuenta está pendiente de aprobación por un Administrador.';
-    errEl.style.color = 'var(--text-secondary)';
-    await window.supabaseClient.auth.signOut();
-    return;
-  }
+    if (roleData.activo === false) {
+      errEl.textContent = 'Tu cuenta está pendiente de aprobación por un Administrador.';
+      errEl.style.color = 'var(--text-secondary)';
+      await window.supabaseClient.auth.signOut();
+      return;
+    }
 
-  errEl.textContent = '';
-  currentSession = { userId: data.user.id, viewMode: roleData.rol, nombre: roleData.nombre };
-  localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
-  document.getElementById('login-email').value = '';
-  document.getElementById('login-password').value = '';
-  
-  entrarApp({ id: data.user.id, rol: roleData.rol, nombre: roleData.nombre });
+    errEl.textContent = '';
+    currentSession = { userId: data.user.id, viewMode: roleData.rol, nombre: roleData.nombre };
+    localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
+    document.getElementById('login-email').value = '';
+    document.getElementById('login-password').value = '';
+    
+    entrarApp({ id: data.user.id, rol: roleData.rol, nombre: roleData.nombre });
+  } catch (err) {
+    console.error("Login exception:", err);
+    errEl.textContent = "Error fatal: " + err.message;
+    errEl.style.color = "var(--red)";
+  }
 }
 
 function entrarApp(user) {
@@ -500,6 +506,18 @@ async function confirmarCrearUsuario() {
     errEl.textContent = error.message;
     errEl.style.color = 'var(--red)';
     return;
+  }
+  
+  if (data?.user) {
+    // Sincronizar también en la tabla local 'usuarios' para que el admin pueda ver y aprobar al usuario
+    await window.supabaseClient.from('usuarios').insert({
+      id: data.user.id,
+      nombre: nombre,
+      email: email,
+      pin: '0000',
+      rol: 'consulta',
+      activo: false
+    });
   }
   
   volverSeleccion();
