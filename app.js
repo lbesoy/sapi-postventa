@@ -1881,11 +1881,18 @@ function renderTabla(ctx) {
          if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados;
          else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
          let isCreator = false;
+         let isTkAssigned = false;
          if (o.soporte) {
             const tk = tickets.find(x => x.id === o.soporte);
-            if (tk && tk.solicitante === tecName) isCreator = true;
+            if (tk) {
+               if (tk.solicitante === tecName) isCreator = true;
+               let tkAssigned = [];
+               if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados;
+               else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
+               if (tkAssigned.includes(tecName)) isTkAssigned = true;
+            }
          }
-         passTec = assigned.includes(tecName) || isCreator;
+         passTec = assigned.includes(tecName) || isCreator || isTkAssigned;
       }
       
       if (supFilter) {
@@ -1905,7 +1912,13 @@ function renderTabla(ctx) {
          let isCreator = false;
          if (o.soporte) {
             const tk = tickets.find(x => x.id === o.soporte);
-            if (tk && tk.solicitante === supFilter) isCreator = true;
+            if (tk) {
+               if (tk.solicitante === supFilter) isCreator = true;
+               let tkAssigned = [];
+               if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados;
+               else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
+               if (tkAssigned.includes(supFilter)) passSupTicket = true;
+            }
          }
          passSup = passSupClient || passSupTicket || isCreator;
       }
