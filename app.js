@@ -5860,6 +5860,50 @@ function guardarNotaBitacora() {
   
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   const nombreTecnico = currentUser ? currentUser.nombre : 'Usuario';
+  const tecnicoDestino = window.currentBitacoraEntryId && o.bitacora ? 
+      (o.bitacora.find(x => x.id === window.currentBitacoraEntryId)?.tecnico || nombreTecnico) : 
+      nombreTecnico;
+
+  // Validación de empalme de horarios (no permitir que el técnico repita horario)
+  if (entrada && salida) {
+    const doOverlap = (e1, s1, e2, s2) => {
+      if (!e1 || !s1 || !e2 || !s2) return false;
+      const toMin = (t) => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+      let mE1 = toMin(e1), mS1 = toMin(s1);
+      let mE2 = toMin(e2), mS2 = toMin(s2);
+      if (mS1 <= mE1) mS1 += 24*60;
+      if (mS2 <= mE2) mS2 += 24*60;
+      return (mE1 < mS2 && mE2 < mS1);
+    };
+
+    let empalme = null;
+    for (const ord of ordenes) {
+      if (!ord.bitacora) continue;
+      for (const bit of ord.bitacora) {
+        if (bit.id === window.currentBitacoraEntryId) continue; // Ignorar el mismo registro si estamos editando
+        if (bit.tecnico !== tecnicoDestino) continue; // Solo validar registros del mismo técnico
+        
+        try {
+          const bitDateObj = new Date(bit.fecha);
+          if (isNaN(bitDateObj)) continue;
+          const bitDate = bitDateObj.toISOString().split('T')[0];
+          
+          if (bitDate === fecha) { // Si están en la misma fecha
+            if (doOverlap(entrada, salida, bit.entrada, bit.salida)) {
+              empalme = { ordenFolio: ord.folio || ord.id, entrada: bit.entrada, salida: bit.salida };
+              break;
+            }
+          }
+        } catch(e){}
+      }
+      if (empalme) break;
+    }
+
+    if (empalme) {
+      mostrarNotificacion(`Horario empalmado con otro registro tuyo de ${empalme.entrada} a ${empalme.salida} (Orden: ${empalme.ordenFolio}).`, 'error');
+      return;
+    }
+  }
   
   if (!o.bitacora) o.bitacora = [];
 
