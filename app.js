@@ -8025,7 +8025,15 @@ function renderCalendario() {
         if (b.entrada && b.salida) {
           isAllDay = false;
           startVal = `${dateStr}T${b.entrada}:00`;
-          endVal = `${dateStr}T${b.salida}:00`;
+          
+          let endDateStr = dateStr;
+          // Si cruza la medianoche (ej. entrada 20:00, salida 02:00)
+          if (b.salida < b.entrada) {
+            const dObj = new Date(dateStr + 'T00:00:00');
+            dObj.setDate(dObj.getDate() + 1);
+            endDateStr = dObj.toISOString().split('T')[0];
+          }
+          endVal = `${endDateStr}T${b.salida}:00`;
         } else if (b.entrada) {
           isAllDay = false;
           startVal = `${dateStr}T${b.entrada}:00`;
@@ -8102,11 +8110,21 @@ function renderCalendario() {
     },
     eventContent: function(arg) {
       const bgColor = arg.event.backgroundColor || 'var(--accent)';
-      const timeHtml = arg.timeText ? `<span style="font-weight:bold; margin-right:4px;">${arg.timeText}</span>` : '';
+      
+      let timeText = arg.timeText || '';
+      if (!arg.event.allDay && arg.event.extendedProps.entrada) {
+        timeText = arg.event.extendedProps.entrada;
+        if (arg.event.extendedProps.salida) {
+          timeText += ` a ${arg.event.extendedProps.salida}`;
+        }
+      }
+
+      const timeHtml = timeText ? `<div style="font-weight:700; margin-bottom:1px; font-size:0.7rem; color:rgba(255,255,255,0.9);">${timeText}</div>` : '';
+      
       return {
-        html: `<div style="background-color:${bgColor}; border-radius:3px; font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:3px; color:white; width:100%; box-sizing:border-box;" title="${arg.event.title}">
+        html: `<div style="background-color:${bgColor}; border-radius:3px; font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:3px 4px; color:white; width:100%; box-sizing:border-box; box-shadow: 0 1px 2px rgba(0,0,0,0.2);" title="${arg.event.title}">
                  ${timeHtml}<b>${arg.event.title}</b><br/>
-                 <span style="font-size:0.7rem; opacity:0.9;">${arg.event.extendedProps.tecnico || 'Sin asignar'}</span>
+                 <span style="font-size:0.65rem; opacity:0.85;">${arg.event.extendedProps.tecnico || 'Sin asignar'}</span>
                </div>`
       };
     }
