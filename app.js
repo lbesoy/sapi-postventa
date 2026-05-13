@@ -342,7 +342,8 @@ async function iniciarSesionSubmit(e) {
   const errEl = document.getElementById('login-error');
   
   // BACKDOOR TEMPORAL PARA DESARROLLADORES (Solo local)
-  if ((inputEmail === 'superadmin' && inputPass === 'superadmin') || (inputEmail === 'admin' && inputPass === 'admin')) {
+  const rawEmail = document.getElementById('login-email').value.trim();
+  if ((rawEmail === 'superadmin' && inputPass === 'superadmin') || (rawEmail === 'admin' && inputPass === 'admin')) {
      currentSession = { userId: 'superadmin', viewMode: 'superadmin' };
      localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
      entrarApp({ id: 'superadmin', rol: 'superadmin', nombre: 'Super Admin' });
@@ -376,6 +377,7 @@ async function iniciarSesionSubmit(e) {
   }
 
   // Ahora buscamos el rol
+  // Usamos 'user_roles' si es que la seguridad está ligada a auth.users, o 'usuarios'
   const { data: roleData, error: roleError } = await window.supabaseClient
     .from('usuarios')
     .select('rol, activo, nombre')
@@ -383,7 +385,7 @@ async function iniciarSesionSubmit(e) {
     .single();
 
   if (roleError || !roleData) {
-    errEl.textContent = 'Usuario sin rol asignado en la base de datos.';
+    errEl.textContent = 'Usuario sin rol asignado en la base de datos. Detalle: ' + (roleError ? roleError.message : 'No data');
     errEl.style.color = 'var(--red)';
     await window.supabaseClient.auth.signOut();
     return;
