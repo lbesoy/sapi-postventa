@@ -5222,13 +5222,13 @@ function verDetalle(id) {
         ${field('Folio', o.folio)} ${field('Pedido', o.pedido)} ${field('Fecha', formatFecha(o.fecha))}
         ${field('Cliente', o.cliente)} ${field('Ubicación', o.ubicacion)} ${field('Operador', o.operador)}
         ${field('No. ECO', o.eco)} ${field('Horómetro', o.horometro)} ${field('Modelo', o.modelo)}
-        ${field('Serie', o.serie)} ${field('Técnico', o.tecnico)} ${field('Soporte', o.soporte)}
+        ${field('Serie', o.serie)} ${field('Técnico', o.tecnico)} ${field('Ticket Soporte', (() => { const t = tickets.find(x => x.id === o.soporte); return t ? (t.folio || t.id.slice(0,8)) : o.soporte || null; })())}
       </div>`)}
     ${seccion('Kilómetros / Tipo', `
       <div class="detalle-grid">
-        ${field('Origen → Trabajo', o.km_ida + ' km')}
-        ${field('Trabajo → Origen', o.km_vuelta + ' km')}
-        ${field('Total Km', o.km_total + ' km')}
+        ${field('Origen → Trabajo', (o.km_ida != null && o.km_ida !== '') ? o.km_ida + ' km' : null)}
+        ${field('Trabajo → Origen', (o.km_vuelta != null && o.km_vuelta !== '') ? o.km_vuelta + ' km' : null)}
+        ${field('Total Km', (o.km_total != null && o.km_total !== '') ? o.km_total + ' km' : null)}
         ${field('Tipo de Visita', `<span class="badge badge-${(o.tipo||'otro').toLowerCase().replace('é','e').replace('í','i')}">${o.tipo}</span>`)}
         ${field('Estado', `<span class="badge ${badgeEstado(o.estado)}">${o.estado}</span>`)}
       </div>`)}
