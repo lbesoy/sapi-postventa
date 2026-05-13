@@ -4968,8 +4968,23 @@ function abrirFormulario(id, modoReporte = false) {
 
   const fClienteCombo = document.getElementById('f-cliente-combo');
   if (fClienteCombo) {
-    fClienteCombo.style.pointerEvents = lockFields ? 'none' : 'auto';
-    fClienteCombo.style.background = lockFields ? 'var(--bg-secondary)' : '';
+    const isAdmin = ['superadmin', 'admin'].includes(currentSession.viewMode);
+    let lockCliente = false;
+    let isCerrado = false;
+
+    if (soporteActual) {
+      const t = tickets.find(x => x.id === soporteActual);
+      if (t && t.estado === 'Cerrado') isCerrado = true;
+    }
+
+    if (!isAdmin) {
+      lockCliente = true; // Solo admins pueden editar la empresa
+    } else {
+      lockCliente = isCerrado; // Admin se bloquea solo si el ticket asociado ya está cerrado
+    }
+
+    fClienteCombo.style.pointerEvents = lockCliente ? 'none' : 'auto';
+    fClienteCombo.style.background = lockCliente ? 'var(--bg-secondary)' : '';
   }
   
   document.querySelectorAll('input[name="tipo"]').forEach(radio => {
@@ -7193,6 +7208,25 @@ function onEquipoOrdenChange() {
 
 // ===== CUSTOM COMBOBOX LOGIC =====
 function toggleCombo(id) {
+  if (id === 'f-cliente') {
+    const isAdmin = ['superadmin', 'admin'].includes(currentSession.viewMode);
+    const soporteId = document.getElementById('f-soporte')?.value;
+    let isCerrado = false;
+    if (soporteId) {
+      const t = tickets.find(x => x.id === soporteId);
+      if (t && t.estado === 'Cerrado') isCerrado = true;
+    }
+
+    if (!isAdmin) {
+      mostrarNotificacion('Solo administradores pueden editar la empresa de la orden.', 'warning');
+      return;
+    }
+    if (isCerrado) {
+      mostrarNotificacion('No se puede modificar la empresa porque el ticket asociado ya está cerrado.', 'warning');
+      return;
+    }
+  }
+
   const menu = document.getElementById(id + '-menu');
   const combo = document.getElementById(id + '-combo');
   const search = document.getElementById(id + '-search');
