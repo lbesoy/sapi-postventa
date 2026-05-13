@@ -334,7 +334,10 @@ if (savedRoles) {
 // ===== LOGIN STATE =====
 async function iniciarSesionSubmit(e) {
   e.preventDefault();
-  const inputEmail = document.getElementById('login-email').value.trim();
+  let inputEmail = document.getElementById('login-email').value.trim();
+  if (inputEmail && !inputEmail.includes('@')) {
+    inputEmail = inputEmail.replace(/\s+/g, '') + '@eurorep.mx';
+  }
   const inputPass = document.getElementById('login-password').value;
   const errEl = document.getElementById('login-error');
   
@@ -441,7 +444,10 @@ function loginCrearUsuario() {
 
 async function confirmarCrearUsuario() {
   const nombre = document.getElementById('lc-nombre').value.trim();
-  const email = document.getElementById('lc-email').value.trim();
+  let email = document.getElementById('lc-email').value.trim();
+  if (email && !email.includes('@')) {
+    email = email.replace(/\s+/g, '') + '@eurorep.mx';
+  }
   const pin = document.getElementById('lc-pin').value;
   const pin2 = document.getElementById('lc-pin2').value;
   const errEl = document.getElementById('lc-error');
@@ -1475,7 +1481,10 @@ function cerrarModalUsuario(e) {
 async function guardarUsuario(e) {
   e.preventDefault();
   const nombre = document.getElementById('u-nombre').value.trim();
-  const email = document.getElementById('u-email').value.trim();
+  let email = document.getElementById('u-email').value.trim();
+  if (email && !email.includes('@')) {
+    email = email.replace(/\s+/g, '') + '@eurorep.mx';
+  }
   const rol = document.querySelector('input[name="u-rol"]:checked')?.value;
   const empresa = document.getElementById('u-empresa').value.trim();
   const activo = document.getElementById('u-activo')?.checked;
@@ -1739,12 +1748,18 @@ function renderTabla(ctx) {
       }
       
       if (supFilter) {
+         let passSupClient = false;
          const cli = clientesDb.find(c => c.nombre === o.cliente);
          if (cli) {
-            passSup = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supFilter)) || (cli.supervisorAsignado === supFilter);
-         } else {
-            passSup = false;
+            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supFilter)) || (cli.supervisorAsignado === supFilter);
          }
+         
+         let assigned = [];
+         if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados;
+         else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
+         
+         let passSupTicket = assigned.includes(supFilter);
+         passSup = passSupClient || passSupTicket;
       }
       
       return passTec && passSup;
@@ -3613,6 +3628,8 @@ function editarMaquina(clienteNombre, idInterno) {
 
         document.getElementById('am-modelo').value = maquina.modelo || '';
         document.getElementById('am-serie').value = maquina.serie || '';
+        if(document.getElementById('am-numeco')) document.getElementById('am-numeco').value = maquina.numeroEconomico || maquina.customData?.numeroEconomico || '';
+        if(document.getElementById('am-nummotor')) document.getElementById('am-nummotor').value = maquina.numeroMotor || maquina.customData?.numeroMotor || '';
         document.getElementById('am-anio').value = maquina.anio || '';
         const idIntInput = document.getElementById('am-id-interno');
         if (idIntInput) {
@@ -3730,6 +3747,8 @@ function guardarNuevaMaquina(e) {
 
   const modelo = document.getElementById('am-modelo').value.trim();
   const serie = document.getElementById('am-serie').value.trim();
+  const numeroEconomico = document.getElementById('am-numeco') ? document.getElementById('am-numeco').value.trim() : '';
+  const numeroMotor = document.getElementById('am-nummotor') ? document.getElementById('am-nummotor').value.trim() : '';
   const anio = document.getElementById('am-anio').value.trim();
   const venta = document.getElementById('am-venta-tercero').checked ? 'TERCERO' : document.getElementById('am-venta').value;
   const selectUbicacion = document.getElementById('am-ubicacion-select');
@@ -3769,6 +3788,8 @@ function guardarNuevaMaquina(e) {
         maquinariaDb[maqDbIdx].marca = marca;
         maquinariaDb[maqDbIdx].modelo = modelo;
         maquinariaDb[maqDbIdx].serie = serie;
+        maquinariaDb[maqDbIdx].numeroEconomico = numeroEconomico;
+        maquinariaDb[maqDbIdx].numeroMotor = numeroMotor;
         maquinariaDb[maqDbIdx].anio = anio;
         maquinariaDb[maqDbIdx].tipo = tipo;
         
@@ -3776,6 +3797,8 @@ function guardarNuevaMaquina(e) {
 
         if (!maquinariaDb[maqDbIdx].customData) maquinariaDb[maqDbIdx].customData = {};
         maquinariaDb[maqDbIdx].customData.tipo = tipo;
+        maquinariaDb[maqDbIdx].customData.numeroEconomico = numeroEconomico;
+        maquinariaDb[maqDbIdx].customData.numeroMotor = numeroMotor;
         maquinariaDb[maqDbIdx].customData.venta = venta;
         maquinariaDb[maqDbIdx].customData.ubicacion = ubicacion;
         maquinariaDb[maqDbIdx].customData.latitud = latitud;
@@ -3787,7 +3810,7 @@ function guardarNuevaMaquina(e) {
         // MÁQUINA MANUAL (En clientesDb)
         if (clienteSeleccionado !== editandoMaquinaCliente) {
           const clienteAntiguo = clientesDb.find(c => c.nombre === editandoMaquinaCliente);
-          let maquinaDatos = { idInterno: finalIdInterno, marca, modelo, serie, anio, venta, ubicacion, latitud, longitud, tipo };
+          let maquinaDatos = { idInterno: finalIdInterno, marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, latitud, longitud, tipo };
           if (clienteAntiguo && clienteAntiguo.maquinas) {
             const oldIdx = clienteAntiguo.maquinas.findIndex(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
             if (oldIdx >= 0) {
@@ -3803,14 +3826,14 @@ function guardarNuevaMaquina(e) {
             clienteObj.maquinas[maquinaIdx] = {
               ...clienteObj.maquinas[maquinaIdx],
               idInterno: finalIdInterno,
-              marca, modelo, serie, anio, venta, ubicacion, latitud, longitud, tipo
+              marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, latitud, longitud, tipo
             };
           }
         }
     }
   } else {
     const idInterno = generarIdInternoMaquina(marca, venta || anio);
-    clienteObj.maquinas.push({ idInterno, marca, modelo, serie, anio, venta, ubicacion, latitud, longitud, tipo });
+    clienteObj.maquinas.push({ idInterno, marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, latitud, longitud, tipo });
   }
   
   if (ubicacion) {
@@ -5042,6 +5065,46 @@ function verDetalle(id) {
     }
   }
 
+  const btnAsignarTecs = document.getElementById('btn-asignar-tecnicos');
+  if (btnAsignarTecs) {
+    if (['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode) && o.estado !== 'Finalizado') {
+      btnAsignarTecs.style.display = 'flex';
+    } else {
+      btnAsignarTecs.style.display = 'none';
+    }
+  }
+  window.currentDetalleOrdenId = id;
+
+  const renderBitacora = (o) => {
+    let html = '';
+    if (!o.bitacora || o.bitacora.length === 0) {
+      html += '<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">Aún no hay entradas en la bitácora para esta orden.</p>';
+    } else {
+      html += '<div style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1rem;">';
+      const entradas = [...o.bitacora].sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
+      entradas.forEach(b => {
+        const d = new Date(b.fecha);
+        const fechaStr = d.toLocaleDateString('es-MX') + ' ' + d.toLocaleTimeString('es-MX', {hour: '2-digit', minute:'2-digit'});
+        html += `
+          <div style="background:var(--bg-body); border:1px solid var(--border); border-radius:6px; padding:0.75rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
+              <span style="font-size:0.75rem; font-weight:600; color:var(--text-primary);">${b.tecnico || 'Desconocido'}</span>
+              <span style="font-size:0.75rem; color:var(--text-muted);">${fechaStr}</span>
+            </div>
+            <div style="font-size:0.85rem; color:var(--text); white-space:pre-wrap;">${b.nota}</div>
+            ${b.horas ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Horas reportadas: ${b.horas} hrs</div>` : ''}
+          </div>
+        `;
+      });
+      html += '</div>';
+    }
+    
+    if (o.estado !== 'Finalizado' && currentSession.viewMode !== 'consulta') {
+      html += `<button class="btn-primary" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="abrirBitacora('${o.id}')"><i data-lucide="plus" style="width:14px;height:14px;"></i> Agregar Entrada</button>`;
+    }
+    return html;
+  };
+
   const field = (label, val) => `
     <div class="detalle-field">
       <div class="detalle-label">${label}</div>
@@ -5125,6 +5188,7 @@ function verDetalle(id) {
       <div class="detalle-grid" style="margin-top:0.75rem">
         ${field('No. Noches', o.noches)} ${field('Alimentación', o.alimentacion ? '$'+o.alimentacion : '')} ${field('Traslado', o.traslado_costo ? '$'+o.traslado_costo : '')}
       </div>`) : ''}
+    ${seccion('Bitácora Diaria', renderBitacora(o))}
     
     ${seccion('Firmas de Conformidad', `
       <div style="display:flex; flex-wrap:wrap; gap:2rem; margin-top:1rem; justify-content:center;">
@@ -5277,6 +5341,104 @@ function limpiarFirma(ordenId, tipo) {
   }
 }
 
+
+function abrirAsignarTecnicos() {
+  const o = ordenes.find(x => x.id === window.currentDetalleOrdenId);
+  if (!o) return;
+  const container = document.getElementById('at-tecnicos-container');
+  if (container) {
+    container.innerHTML = '';
+    const assigned = o.tecnicosAsignados || [];
+    usuarios.filter(u => u.rol === 'tecnico').forEach(u => {
+      const isChecked = assigned.includes(u.nombre);
+      container.innerHTML += `
+        <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; background: var(--bg-body); padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem;">
+          <input type="checkbox" name="at-tecnicos" value="${u.nombre}" ${isChecked ? 'checked' : ''} style="width:16px; height:16px; margin:0; margin-top:1px; flex-shrink:0;"/>
+          <span style="flex:1; text-align:left; font-weight:normal; color:var(--text-primary);">${u.nombre}</span>
+        </label>
+      `;
+    });
+  }
+  document.getElementById('modal-asignar-tecnicos-overlay').classList.add('open');
+}
+
+function cerrarAsignarTecnicos(e) {
+  if (e && e.target !== document.getElementById('modal-asignar-tecnicos-overlay')) return;
+  document.getElementById('modal-asignar-tecnicos-overlay').classList.remove('open');
+}
+
+function guardarAsignacionTecnicos() {
+  const o = ordenes.find(x => x.id === window.currentDetalleOrdenId);
+  if (!o) return;
+  
+  const selectedT = Array.from(document.querySelectorAll('input[name="at-tecnicos"]:checked')).map(cb => cb.value);
+  o.tecnicosAsignados = selectedT;
+  o.tecnico = selectedT.join(', ');
+  
+  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  if (window.pushToSupabase) {
+    window.pushToSupabase('ordenes_servicio', o);
+  }
+  
+  mostrarNotificacion('Técnicos asignados correctamente.', 'success');
+  cerrarAsignarTecnicos();
+  verDetalle(o.id);
+  if (typeof renderCalendario === 'function' && document.getElementById('view-calendario')?.classList.contains('active')) {
+    renderCalendario();
+  } else {
+    filtrarOrdenes();
+  }
+}
+
+function abrirBitacora(id) {
+  window.currentBitacoraOrdenId = id;
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('bitacora-fecha').value = now.toISOString().slice(0,16);
+  document.getElementById('bitacora-nota').value = '';
+  document.getElementById('bitacora-horas').value = '';
+  document.getElementById('modal-bitacora-overlay').classList.add('open');
+}
+
+function cerrarBitacora(e) {
+  if (e && e.target !== document.getElementById('modal-bitacora-overlay')) return;
+  document.getElementById('modal-bitacora-overlay').classList.remove('open');
+}
+
+function guardarNotaBitacora() {
+  const o = ordenes.find(x => x.id === window.currentBitacoraOrdenId);
+  if (!o) return;
+  
+  const fecha = document.getElementById('bitacora-fecha').value;
+  const nota = document.getElementById('bitacora-nota').value.trim();
+  const horas = document.getElementById('bitacora-horas').value.trim();
+  
+  if (!fecha || !nota) {
+    mostrarNotificacion('La fecha y la nota son obligatorias.', 'warning');
+    return;
+  }
+  
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const nombreTecnico = currentUser ? currentUser.nombre : 'Usuario';
+  
+  if (!o.bitacora) o.bitacora = [];
+  o.bitacora.push({
+    id: crypto.randomUUID(),
+    fecha: new Date(fecha).toISOString(),
+    nota: nota,
+    horas: horas,
+    tecnico: nombreTecnico
+  });
+  
+  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  if (window.pushToSupabase) {
+    window.pushToSupabase('ordenes_servicio', o);
+  }
+  
+  mostrarNotificacion('Entrada de bitácora guardada.', 'success');
+  cerrarBitacora();
+  verDetalle(o.id);
+}
 
 function cerrarDetalle(e) {
   if (e && e.target !== document.getElementById('modal-detalle-overlay')) return;
@@ -5434,12 +5596,19 @@ function renderTickets(ctx) {
       }
       
       if (supFilter) {
+         let passSupClient = false;
          const cli = clientesDb.find(c => c.nombre === t.cliente);
          if (cli) {
-            passSup = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supFilter)) || (cli.supervisorAsignado === supFilter);
-         } else {
-            passSup = false;
+            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supFilter)) || (cli.supervisorAsignado === supFilter);
          }
+         
+         let assigned = [];
+         if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+         else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+         
+         let passSupTicket = assigned.includes(supFilter);
+         
+         passSup = passSupClient || passSupTicket;
       }
       
       return passTec && passSup;
@@ -5570,6 +5739,8 @@ function renderMaquinaria() {
       marca: m.marca || '',
       modelo: m.modelo || m.descripcion || 'Sin Modelo',
       serie: m.serie || 'N/A',
+      numeroEconomico: m.numeroEconomico || m.customData?.numeroEconomico || 'N/A',
+      numeroMotor: m.numeroMotor || m.customData?.numeroMotor || 'N/A',
       anio: m.anio || 'N/A',
       venta: m.venta || m.customData?.venta || '',
       ubicacion: m.ubicacion || m.customData?.ubicacion || m.cliente || 'N/A',
@@ -5597,6 +5768,8 @@ function renderMaquinaria() {
               marca: m.marca || '',
               modelo: m.modelo || 'Sin Modelo',
             serie: m.serie || 'N/A',
+            numeroEconomico: m.numeroEconomico || 'N/A',
+            numeroMotor: m.numeroMotor || 'N/A',
             anio: m.anio || 'N/A',
             venta: m.venta || '',
             ubicacion: m.ubicacion || 'N/A',
@@ -5662,7 +5835,7 @@ function renderMaquinaria() {
   }
 
   // Actualizar iconos rehaciendo las etiquetas <i>
-  ['tipo', 'marca', 'modelo', 'serie', 'anio', 'cliente'].forEach(col => {
+  ['tipo', 'marca', 'modelo', 'serie', 'numeroEconomico', 'numeroMotor', 'anio', 'cliente'].forEach(col => {
     const icon = document.getElementById('sort-icon-' + col);
     if (icon) {
       const isCurrent = currentMaqSortCol === col;
@@ -5690,7 +5863,7 @@ function renderMaquinaria() {
   }
 
   if (filtered.length === 0) {
-    const colspan = (isEmpresa ? 6 : 7) + (configData.mappings?.maquinaria?.customCols?.length || 0);
+    const colspan = (isEmpresa ? 8 : 9) + (configData.mappings?.maquinaria?.customCols?.length || 0);
     body.innerHTML = `<tr><td colspan="${colspan}" class="empty-state">No se encontró maquinaria.</td></tr>`;
     actualizarMapaMaquinaria(filtered);
     return;
@@ -5717,6 +5890,8 @@ function renderMaquinaria() {
       </td>
       <td style="font-weight:500;">${m.modelo}</td>
       <td>${m.serie}</td>
+      <td>${m.numeroEconomico && m.numeroEconomico !== 'N/A' ? m.numeroEconomico : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}</td>
+      <td>${m.numeroMotor && m.numeroMotor !== 'N/A' ? m.numeroMotor : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}</td>
       <td>${m.anio}</td>
       <td>
         <div style="font-weight:500;">${m.cliente}</div>
@@ -6380,20 +6555,7 @@ function abrirTicket(id) {
     }
   }
 
-  const t_tec = editandoTicketId ? tickets.find(x => x.id === editandoTicketId) : {};
-  const containerTecnicos = document.getElementById('t-tecnicos-container');
-  if (containerTecnicos) {
-    containerTecnicos.innerHTML = '';
-    usuarios.filter(u => u.rol === 'tecnico').forEach(u => {
-      const isChecked = t_tec.tecnicosAsignados && t_tec.tecnicosAsignados.includes(u.nombre);
-      containerTecnicos.innerHTML += `
-        <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; background: var(--bg-body); padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem; line-height: 1.2;">
-          <input type="checkbox" name="t-tecnicos" value="${u.nombre}" ${isChecked ? 'checked' : ''} style="width:16px; height:16px; margin:0; margin-top:1px; flex-shrink:0;"/>
-          <span style="flex:1; text-align:left; font-weight:normal; color:var(--text-primary);">${u.nombre}</span>
-        </label>
-      `;
-    });
-  }
+
 
   toggleResolucionTicket();
   toggleMotivoRechazo();
@@ -6727,17 +6889,12 @@ async function guardarTicket(e) {
     }
     
     if (cotAceptada === 'si') {
-      const selectedT = Array.from(document.querySelectorAll('input[name="t-tecnicos"]:checked')).map(cb => cb.value);
       if (!pedidoSAP) {
         mostrarNotificacion('Debe ingresar el Número de Pedido SAP para cerrar una cotización aceptada.', 'error');
         return;
       }
       if (!pedidoPdfUpload && !t_existente?.pdfPedido) {
         mostrarNotificacion('Debe adjuntar el archivo PDF del pedido para cerrar la cotización aceptada.', 'error');
-        return;
-      }
-      if (selectedT.length === 0) {
-        mostrarNotificacion('Debe asignar al menos un técnico responsable a la orden.', 'error');
         return;
       }
     }
@@ -6793,7 +6950,7 @@ async function guardarTicket(e) {
     cotAceptada: document.querySelector('input[name="t-cot-aceptada"]:checked')?.value || '',
     motivoRechazo: document.getElementById('t-motivo-rechazo')?.value.trim() || '',
     pedidoSAP: document.getElementById('t-pedido-sap')?.value.trim() || '',
-    tecnicosAsignados: Array.from(document.querySelectorAll('input[name="t-tecnicos"]:checked')).map(cb => cb.value),
+    tecnicosAsignados: t_existente ? (t_existente.tecnicosAsignados || []) : [],
     pdfPedido: pdfPedidoBase64,
     pdfCotizacion: pdfCotizacionBase64
   };
