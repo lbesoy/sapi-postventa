@@ -7743,16 +7743,6 @@ function verDetalleTicket(id) {
             </select>
             <input type="text" id="quick-tipo-otro-${t.id}" placeholder="Especifica el tipo de visita..." style="display:none; margin-top:0.5rem;" />
           </div>
-          <div class="form-group full-width" style="margin-top:0.75rem;">
-            <label>Técnicos Asignados *</label>
-            <div id="quick-tecnicos-${t.id}" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:0.5rem; margin-top:0.5rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: rgba(0,0,0,0.02); max-height: 200px; overflow-y: auto;">
-              ${usuarios.filter(u => u.rol === 'tecnico').map(u => `
-                <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; background: var(--bg-body); padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem; line-height: 1.2;">
-                  <input type="checkbox" name="quick-tecnicos-${t.id}" value="${u.nombre}" ${t.tecnicosAsignados?.includes(u.nombre) ? 'checked' : ''} style="width:16px; height:16px; margin:0; margin-top:1px; flex-shrink:0;"/>
-                  <span style="flex:1; text-align:left; font-weight:normal; color:var(--text-primary);">${u.nombre}</span>
-                </label>
-              `).join('')}
-            </div>
           </div>
         </div>
         <button class="btn-primary full-width" style="justify-content:center;" onclick="cerrarCotizacionTicket('${t.id}')">Finalizar y Cerrar Ticket</button>
@@ -7825,7 +7815,6 @@ async function cerrarCotizacionTicket(id) {
   } else if (aceptada === 'si') {
     pedidoSAP = document.getElementById(`quick-pedido-sap-${id}`)?.value.trim();
     const pdfUpload = document.getElementById(`quick-pedido-pdf-${id}`)?.files.length > 0;
-    const selectedT = Array.from(document.querySelectorAll(`input[name="quick-tecnicos-${id}"]:checked`)).map(cb => cb.value);
     
     const selTipo = document.getElementById(`quick-tipo-${id}`)?.value;
     const txtTipoOtro = document.getElementById(`quick-tipo-otro-${id}`)?.value.trim();
@@ -7847,11 +7836,6 @@ async function cerrarCotizacionTicket(id) {
       mostrarNotificacion('Debes adjuntar el archivo PDF del pedido.', 'warning');
       return;
     }
-    if (selectedT.length === 0) {
-      mostrarNotificacion('Debes asignar al menos un técnico responsable.', 'warning');
-      return;
-    }
-    tecnicosAsignados = selectedT;
     
     if (pdfUpload) {
       try { pdfPedidoBase64 = await readFileAsBase64(document.getElementById(`quick-pedido-pdf-${id}`).files[0]); } catch(e){}
