@@ -468,6 +468,12 @@
 
         <!-- CLIENTES VIEW -->
         <div id="view-calendario" class="view">
+          <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+            <h2>Calendario de Servicios</h2>
+            <button class="btn-primary" id="btn-programar-tecnico" style="display:none;" onclick="abrirProgramarTecnico()">
+              <i data-lucide="calendar-plus" class="btn-icon"></i> Programar Asignación
+            </button>
+          </div>
           <div id="calendar-container"
             style="background:var(--bg-card); padding:1rem; border-radius:var(--radius-lg); border:1px solid var(--border); box-shadow:var(--shadow-sm); min-height:600px;">
             <!-- The calendar will be injected here -->
@@ -1434,6 +1440,50 @@
           </div>
         </div>
         <div class="modal-body" id="detalle-body"></div>
+      </div>
+    </div>
+
+    <!-- MODAL PROGRAMAR TECNICO (CALENDARIO) -->
+    <div class="modal-overlay" id="modal-programar-tecnico-overlay" onclick="if(event.target===this) this.classList.remove('open')">
+      <div class="modal" id="modal-programar-tecnico" style="max-width:500px;">
+        <div class="modal-header">
+          <h2>Programar Asignación</h2>
+          <button class="modal-close" onclick="document.getElementById('modal-programar-tecnico-overlay').classList.remove('open')">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Fecha de Programación</label>
+            <input type="date" id="pt-fecha" onchange="actualizarTecnicosDisponibles()" required />
+          </div>
+          <div class="form-group">
+            <label>Técnico Disponible</label>
+            <select id="pt-tecnico" class="form-select" required disabled>
+              <option value="">Selecciona una fecha primero...</option>
+            </select>
+            <small style="color:var(--text-muted);font-size:0.75rem;">Solo muestra técnicos sin bitácoras en esta fecha.</small>
+          </div>
+          <div class="form-group">
+            <label>Orden de Servicio (Abierta)</label>
+            <select id="pt-orden" class="form-select" required>
+              <option value="">Selecciona una orden...</option>
+            </select>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+            <div class="form-group">
+              <label>Hora Inicio Estimada</label>
+              <input type="time" id="pt-entrada" />
+            </div>
+            <div class="form-group">
+              <label>Hora Fin Estimada</label>
+              <input type="time" id="pt-salida" />
+            </div>
+          </div>
+          <div style="margin-top:1.5rem; text-align:right;">
+            <button class="btn-primary" onclick="guardarProgramacionTecnico()">
+              <i data-lucide="save" class="btn-icon"></i> Programar
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 

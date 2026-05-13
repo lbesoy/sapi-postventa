@@ -640,6 +640,12 @@ function applyRole(rolKey) {
   const user = usuarios.find(u => u.id === currentSession.userId);
   document.getElementById('role-switcher').style.display = (user?.rol === 'superadmin') ? 'flex' : 'none';
 
+  // Mostrar botón de programar técnico en calendario solo a roles autorizados
+  const btnProgramar = document.getElementById('btn-programar-tecnico');
+  if (btnProgramar) {
+    btnProgramar.style.display = ['superadmin', 'admin', 'supervisor'].includes(rolKey) ? 'flex' : 'none';
+  }
+
   // Update role mode buttons
   document.querySelectorAll('.role-mode-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.role === rolKey);
@@ -5650,6 +5656,102 @@ function guardarAsignacionTecnicos() {
   }
 }
 
+// ===== PROGRAMAR TÉCNICOS DESDE CALENDARIO =====
+function abrirProgramarTecnico() {
+  document.getElementById('pt-fecha').value = '';
+  document.getElementById('pt-entrada').value = '';
+  document.getElementById('pt-salida').value = '';
+  document.getElementById('pt-tecnico').innerHTML = '<option value="">Selecciona una fecha primero...</option>';
+  document.getElementById('pt-tecnico').disabled = true;
+
+  // Llenar dropdown de órdenes
+  const selectOrden = document.getElementById('pt-orden');
+  const openOrds = ordenes.filter(o => o.estado !== 'Finalizado');
+  selectOrden.innerHTML = '<option value="">Selecciona una orden...</option>' + openOrds.map(o => `<option value="${o.id}">[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}</option>`).join('');
+
+  document.getElementById('modal-programar-tecnico-overlay').classList.add('open');
+}
+
+function actualizarTecnicosDisponibles() {
+  const fecha = document.getElementById('pt-fecha').value;
+  const selectTec = document.getElementById('pt-tecnico');
+  if (!fecha) {
+    selectTec.innerHTML = '<option value="">Selecciona una fecha primero...</option>';
+    selectTec.disabled = true;
+    return;
+  }
+
+  // Filtrar técnicos ocupados en esa fecha
+  const tecnicosOcupados = new Set();
+  ordenes.forEach(o => {
+    if (o.bitacora && o.bitacora.length > 0) {
+      o.bitacora.forEach(b => {
+        if (b.fecha && b.fecha.startsWith(fecha) && b.tecnico) {
+          tecnicosOcupados.add(b.tecnico);
+        }
+      });
+    }
+  });
+
+  const disponibles = usuarios.filter(u => u.rol === 'tecnico' && !tecnicosOcupados.has(u.nombre) && u.activo !== false);
+  
+  if (disponibles.length === 0) {
+    selectTec.innerHTML = '<option value="">Sin técnicos disponibles esta fecha</option>';
+    selectTec.disabled = true;
+  } else {
+    selectTec.innerHTML = '<option value="">Selecciona un técnico disponible...</option>' + disponibles.map(u => `<option value="${u.nombre}">${u.nombre}</option>`).join('');
+    selectTec.disabled = false;
+  }
+}
+
+async function guardarProgramacionTecnico() {
+  const fecha = document.getElementById('pt-fecha').value;
+  const tecnico = document.getElementById('pt-tecnico').value;
+  const ordenId = document.getElementById('pt-orden').value;
+  const entrada = document.getElementById('pt-entrada').value;
+  const salida = document.getElementById('pt-salida').value;
+
+  if (!fecha || !tecnico || !ordenId) {
+    alert("Por favor completa los campos requeridos (Fecha, Técnico, Orden).");
+    return;
+  }
+
+  const oIndex = ordenes.findIndex(o => o.id === ordenId);
+  if (oIndex === -1) return;
+  const o = ordenes[oIndex];
+
+  if (!o.bitacora) o.bitacora = [];
+  
+  const nuevaEntrada = {
+    id: crypto.randomUUID(),
+    fecha: fecha,
+    tecnico: tecnico,
+    nota: "Programado por supervisor. Pendiente de llenado por el técnico.",
+    entrada: entrada,
+    salida: salida
+  };
+  
+  o.bitacora.push(nuevaEntrada);
+
+  // Asegurar que el técnico está en la lista de asignados globalmente
+  if (!o.tecnicosAsignados) o.tecnicosAsignados = [];
+  if (!o.tecnicosAsignados.includes(tecnico)) {
+    o.tecnicosAsignados.push(tecnico);
+    o.tecnico = o.tecnicosAsignados.join(', ');
+  }
+
+  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  if (window.pushToSupabase) {
+    await window.pushToSupabase('ordenes', o);
+  }
+
+  mostrarNotificacion('Asignación programada con éxito', 'success');
+  document.getElementById('modal-programar-tecnico-overlay').classList.remove('open');
+  if (typeof renderCalendario === 'function' && document.getElementById('view-calendario')?.classList.contains('active')) {
+    renderCalendario();
+  }
+}
+
 // Calcula el rango de fechas hábiles permitido para la bitácora
 function calcularRangoFechasLaboral(diasHabilAtras) {
   const ahora = new Date();
@@ -7957,10 +8059,7 @@ function mostrarPopupBitacora(info) {
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Ubicación:</strong> ${p.ubicacion}</p>
         ${horasStr}
         <div style="margin-top:1rem; padding:1rem; background:var(--bg-body); border-radius:6px; font-size:0.85rem; border:1px solid var(--border); white-space:pre-wrap; line-height:1.5; color:var(--text-secondary); max-height:250px; overflow-y:auto;">${p.nota}</div>
-        <div style="margin-top:1.5rem; text-align:right; display:flex; gap:0.5rem; justify-content:flex-end;">
-          ${['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode) && ordenes.find(x => x.id === p.ordenId)?.estado !== 'Finalizado' ? 
-            `<button class="btn-primary" style="background:var(--accent); border-color:var(--accent);" onclick="this.closest('.modal-overlay').remove(); window.currentDetalleOrdenId='${p.ordenId}'; abrirAsignarTecnicos();"><i data-lucide="users" style="width:16px;height:16px;margin-right:0.35rem;"></i> Asignar Técnicos</button>` 
-            : ''}
+        <div style="margin-top:1.5rem; text-align:right;">
           <button class="btn-primary" onclick="this.closest('.modal-overlay').remove(); verDetalle('${p.ordenId}')">Ver Orden Completa</button>
         </div>
       </div>
