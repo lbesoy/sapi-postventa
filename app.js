@@ -1887,7 +1887,9 @@ function renderTabla(ctx) {
          let passSupClient = false;
          const cli = clientesDb.find(c => c.nombre === o.cliente);
          if (cli) {
-            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supFilter)) || (cli.supervisorAsignado === supFilter);
+            const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
+            const supId = supUser ? supUser.id : supFilter;
+            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
          }
          
          let assigned = [];
@@ -6216,7 +6218,9 @@ function renderTickets(ctx) {
          let passSupClient = false;
          const cli = clientesDb.find(c => c.nombre === t.cliente);
          if (cli) {
-            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supFilter)) || (cli.supervisorAsignado === supFilter);
+            const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
+            const supId = supUser ? supUser.id : supFilter;
+            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
          }
          
          let assigned = [];
