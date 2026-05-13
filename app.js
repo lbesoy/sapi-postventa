@@ -5187,7 +5187,7 @@ function guardarOrden(e) {
     horometro: document.getElementById('f-horometro').value.trim(),
     horometro_real: document.getElementById('f-horometro-real').value.trim(),
     equipo: document.getElementById('f-equipo')?.value || '',
-    marca: document.getElementById('f-equipo')?.options[document.getElementById('f-equipo')?.selectedIndex]?.text.split(' ')[0] || '',
+    marca: document.getElementById('f-equipo')?.options[document.getElementById('f-equipo')?.selectedIndex]?.getAttribute('data-marca') || '',
     modelo: document.getElementById('f-modelo').value.trim(),
     serie: document.getElementById('f-serie').value.trim(),
     tecnico: tecnicosSeleccionados.join(', '),
@@ -7264,11 +7264,14 @@ function poblarMaquinasCliente(selectId, selectedValue = '', clienteNombre = nul
     const c = clientesDb.find(x => x.nombre === clienteNombre);
     if (c && c.maquinas) {
       c.maquinas.forEach(m => {
+        const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+        const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
         const opt = document.createElement('option');
-        const mName = `${m.marca || ''} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+        const mName = `${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
         opt.value = mName;
         opt.textContent = mName;
         if (mName === selectedValue) opt.selected = true;
+        opt.setAttribute('data-marca', mFullName);
         opt.setAttribute('data-modelo', m.modelo || '');
         opt.setAttribute('data-serie', m.serie || '');
         opt.setAttribute('data-eco', m.no_economico || '');
