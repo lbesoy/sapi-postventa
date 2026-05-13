@@ -1944,6 +1944,7 @@ function renderTabla(ctx) {
   const isConsulta = currentSession.viewMode === 'consulta';
   const isTecnico = currentSession.viewMode === 'tecnico';
   const canEdit = !isConsulta && !isTecnico;
+  const canDelete = ['superadmin', 'admin'].includes(currentSession.viewMode);
 
   body.innerHTML = filtradas.map(o => `
     <tr>
@@ -1960,8 +1961,8 @@ function renderTabla(ctx) {
           <button class="action-btn" onclick="verDetalle('${o.id}')" title="Ver"><i data-lucide="eye"></i></button>
           ${canEdit ? `
           <button class="action-btn" onclick="editarOrden('${o.id}')" title="Editar"><i data-lucide="pencil"></i></button>
-          <button class="action-btn del" onclick="eliminarOrden('${o.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>
           ` : ''}
+          ${canDelete ? `<button class="action-btn del" onclick="eliminarOrden('${o.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
         </div>
       </td>
     </tr>
@@ -6038,6 +6039,8 @@ function renderTickets(ctx) {
     body.innerHTML = `<tr><td colspan="9" class="empty-state">No hay tickets${q||(!isDashView && ticketFiltroActivo!=='todos')?' que coincidan':' registrados'}.</td></tr>`;
     return;
   }
+  const canDelete = ['superadmin', 'admin'].includes(currentSession.viewMode);
+
   body.innerHTML = filtered.map((t, i) => `
     <tr style="cursor:pointer; transition: background 0.2s;" onclick="if(!event.target.closest('.action-btn')){ verDetalleTicket('${t.id}'); }" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
       <td><strong>${t.folio||('#'+(i+1))}</strong></td>
@@ -6059,7 +6062,7 @@ function renderTickets(ctx) {
         <div style="display:flex;gap:0.25rem;">
           <button class="action-btn" onclick="verDetalleTicket('${t.id}')" title="Ver"><i data-lucide="eye"></i></button>
           <button class="action-btn" onclick="editarTicket('${t.id}')" title="Editar"><i data-lucide="pencil"></i></button>
-          <button class="action-btn del" onclick="eliminarTicket('${t.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>
+          ${canDelete ? `<button class="action-btn del" onclick="eliminarTicket('${t.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
         </div>
       </td>
     </tr>
