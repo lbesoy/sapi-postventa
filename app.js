@@ -5198,11 +5198,19 @@ function guardarOrden(e) {
     traslado_costo: document.getElementById('f-traslado-costo').value,
     dias: getDiasData(),
   };
+  
   if (oVieja) {
     orden.bitacora = oVieja.bitacora;
     orden.firma_tecnico_base64 = oVieja.firma_tecnico_base64;
     orden.firma_cliente_base64 = oVieja.firma_cliente_base64;
     orden.evidenciaBase64 = oVieja.evidenciaBase64 || oVieja.evidencia_base64;
+  }
+  
+  // Computar estado automático
+  orden.estado = calcularEstadoOrden(orden);
+  document.getElementById('f-estado').value = orden.estado; // update UI state
+
+  if (oVieja) {
     ordenes = ordenes.map(o => o.id === editandoId ? orden : o);
   } else {
     ordenes.unshift(orden);
@@ -5591,6 +5599,8 @@ function guardarFirmaCanvas(ordenId, tipo) {
     if (tipo === 'tecnico') ordenes[idx].firma_tecnico_base64 = base64Firma;
     else ordenes[idx].firma_cliente_base64 = base64Firma;
     
+    ordenes[idx].estado = calcularEstadoOrden(ordenes[idx]);
+    
     localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
     
     if (window.pushToSupabase) {
@@ -5599,6 +5609,8 @@ function guardarFirmaCanvas(ordenId, tipo) {
     
     mostrarNotificacion(`Firma del ${tipo} guardada`, 'success');
     verDetalle(ordenId); 
+    renderTabla();
+    renderTabla('servicios');
   }
 }
 
@@ -5609,12 +5621,47 @@ function limpiarFirma(ordenId, tipo) {
     if (tipo === 'tecnico') ordenes[idx].firma_tecnico_base64 = null;
     else ordenes[idx].firma_cliente_base64 = null;
     
+    ordenes[idx].estado = calcularEstadoOrden(ordenes[idx]);
+    
     localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
     if (window.pushToSupabase) window.pushToSupabase('ordenes', ordenes[idx]);
     verDetalle(ordenId); 
   }
 }
 
+// ==========================
+// AUTOMATIZACIÓN DE ESTADOS
+// ==========================
+function calcularEstadoOrden(o) {
+  const isSignedByClient = !!o.firma_cliente_base64;
+  const refNecesarias = o.ref_necesarias || [];
+  const hasPendingParts = refNecesarias.length > 0;
+  
+  if (isSignedByClient) {
+    if (hasPendingParts) {
+      return 'Refacciones pendientes';
+    } else {
+      return 'Cerrada';
+    }
+  } else {
+    const hasBitacora = o.bitacora && o.bitacora.length > 0;
+    const hasFalla = (o.falla || '').trim();
+    const hasTrabajos = (o.trabajos || '').trim();
+    const hasDictamen = (o.dictamen || '').trim();
+    const hasCondiciones = (o.condiciones || '').trim();
+    const hasObservaciones = (o.observaciones || '').trim();
+    const hasPendientes = (o.pendientes || '').trim();
+    const hasRefUtilizadas = o.ref_utilizadas && o.ref_utilizadas.length > 0;
+    
+    const hasData = hasFalla || hasTrabajos || hasDictamen || hasCondiciones || hasObservaciones || hasPendientes || hasRefUtilizadas || hasPendingParts;
+    
+    if (hasBitacora || hasData || o.firma_tecnico_base64) {
+      return 'En proceso';
+    } else {
+      return 'Pendiente';
+    }
+  }
+}
 
 function abrirAsignarTecnicos() {
   const o = ordenes.find(x => x.id === window.currentDetalleOrdenId);
@@ -5934,6 +5981,8 @@ function guardarNotaBitacora() {
     });
   }
   
+  o.estado = calcularEstadoOrden(o);
+  
   localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
   if (window.pushToSupabase) {
     window.pushToSupabase('ordenes', o);
@@ -5942,6 +5991,42 @@ function guardarNotaBitacora() {
   mostrarNotificacion(window.currentBitacoraEntryId ? 'Bitácora actualizada.' : 'Entrada de bitácora guardada.', 'success');
   cerrarBitacora();
   verDetalle(o.id); // Recargar modal
+  renderTabla();
+  renderTabla('servicios');
+}
+
+// ==========================
+// AUTOMATIZACIÓN DE ESTADOS
+// ==========================
+function calcularEstadoOrden(o) {
+  const isSignedByClient = !!o.firma_cliente_base64;
+  const refNecesarias = o.ref_necesarias || [];
+  const hasPendingParts = refNecesarias.length > 0;
+  
+  if (isSignedByClient) {
+    if (hasPendingParts) {
+      return 'Refacciones pendientes';
+    } else {
+      return 'Cerrada';
+    }
+  } else {
+    const hasBitacora = o.bitacora && o.bitacora.length > 0;
+    const hasFalla = (o.falla || '').trim();
+    const hasTrabajos = (o.trabajos || '').trim();
+    const hasDictamen = (o.dictamen || '').trim();
+    const hasCondiciones = (o.condiciones || '').trim();
+    const hasObservaciones = (o.observaciones || '').trim();
+    const hasPendientes = (o.pendientes || '').trim();
+    const hasRefUtilizadas = o.ref_utilizadas && o.ref_utilizadas.length > 0;
+    
+    const hasData = hasFalla || hasTrabajos || hasDictamen || hasCondiciones || hasObservaciones || hasPendientes || hasRefUtilizadas || hasPendingParts;
+    
+    if (hasBitacora || hasData || o.firma_tecnico_base64) {
+      return 'En proceso';
+    } else {
+      return 'Pendiente';
+    }
+  }
 }
 
 function cerrarDetalle(e) {
