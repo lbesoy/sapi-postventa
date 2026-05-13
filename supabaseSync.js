@@ -397,11 +397,37 @@ window.cargarDatosDeSupabase = async function() {
   }
 }
 
-// ─── Arrancar cuando el DOM esté listo ───────────────────────────────────────
+// ─── Realtime Subscriptions ──────────────────────────────────────────────────
+function setupRealtime() {
+  if (!window.supabaseClient) return;
 
+  const handleUpdate = async (tableName) => {
+    console.log(`[Supabase Realtime] Cambio detectado en la tabla: ${tableName}. Actualizando...`);
+    const { data, error } = await window.supabaseClient.from(tableName).select('*');
+    if (!error && data) {
+      if (tableName === 'tickets') {
+        const mapped = data.map(rowToTicket);
+        localStorage.setItem('sapi_tickets', JSON.stringify(mapped));
+        window._supaTickets = mapped;
+      } else if (tableName === 'ordenes') {
+        const mapped = data.map(rowToOrden);
+        localStorage.setItem('sapi_ordenes', JSON.stringify(mapped));
+        window._supaOrdenes = mapped;
+      }
+      window.dispatchEvent(new Event('supabase_datos_cargados'));
+    }
+  };
+
+  window.supabaseClient.channel('custom-all-channel')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => handleUpdate('tickets'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes' }, () => handleUpdate('ordenes'))
+    .subscribe();
+}
+
+// ─── Arrancar cuando el DOM esté listo ───────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  // Esperar brevemente para asegurar que supabaseClient.js ya inicializó window.supabaseClient
   setTimeout(() => {
     migrarDatosASupabase();
+    setupRealtime();
   }, 300);
 });
