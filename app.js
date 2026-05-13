@@ -7957,7 +7957,10 @@ function mostrarPopupBitacora(info) {
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Ubicación:</strong> ${p.ubicacion}</p>
         ${horasStr}
         <div style="margin-top:1rem; padding:1rem; background:var(--bg-body); border-radius:6px; font-size:0.85rem; border:1px solid var(--border); white-space:pre-wrap; line-height:1.5; color:var(--text-secondary); max-height:250px; overflow-y:auto;">${p.nota}</div>
-        <div style="margin-top:1.5rem; text-align:right;">
+        <div style="margin-top:1.5rem; text-align:right; display:flex; gap:0.5rem; justify-content:flex-end;">
+          ${['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode) && ordenes.find(x => x.id === p.ordenId)?.estado !== 'Finalizado' ? 
+            `<button class="btn-primary" style="background:var(--accent); border-color:var(--accent);" onclick="this.closest('.modal-overlay').remove(); window.currentDetalleOrdenId='${p.ordenId}'; abrirAsignarTecnicos();"><i data-lucide="users" style="width:16px;height:16px;margin-right:0.35rem;"></i> Asignar Técnicos</button>` 
+            : ''}
           <button class="btn-primary" onclick="this.closest('.modal-overlay').remove(); verDetalle('${p.ordenId}')">Ver Orden Completa</button>
         </div>
       </div>
