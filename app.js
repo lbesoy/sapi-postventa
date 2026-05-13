@@ -4012,17 +4012,21 @@ function guardarNuevaMaquina(e) {
   }
   
   // Actualizar dropdowns si estamos en medio de crear un ticket o servicio
-  const mName = `${marca || ''} ${modelo || ''} (SN: ${serie || ''})`.trim();
+  const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+  const mFullName = MARCAS_RENDER[(marca || '').toUpperCase()] || marca || '';
+  const mName = `${mFullName} ${modelo || ''} (SN: ${serie || ''})`.trim();
   if (document.getElementById('modal-ticket')?.classList.contains('open')) {
     const tCli = document.getElementById('t-cliente').value;
     if (tCli === clienteSeleccionado) {
       poblarMaquinasCliente('t-equipo', mName, tCli);
+      if (typeof onEquipoTicketChange === 'function') onEquipoTicketChange();
     }
   }
   if (document.getElementById('view-servicios')?.classList.contains('active')) {
     const fCli = document.getElementById('f-cliente').value;
     if (fCli === clienteSeleccionado) {
       poblarMaquinasCliente('f-equipo', mName, fCli);
+      if (typeof onEquipoOrdenChange === 'function') onEquipoOrdenChange();
     }
   }
 }
