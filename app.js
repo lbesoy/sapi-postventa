@@ -1659,42 +1659,129 @@ function renderStats() {
 function setDashView(tab) {
   const btnOrdenes = document.getElementById('btn-dash-ordenes');
   const btnTickets = document.getElementById('btn-dash-tickets');
+  const btnTecnicos = document.getElementById('btn-dash-tecnicos');
   const contentOrdenes = document.getElementById('dash-content-ordenes');
   const contentTickets = document.getElementById('dash-content-tickets');
+  const contentTecnicos = document.getElementById('dash-content-tecnicos');
 
+  // Reset styles
+  [btnOrdenes, btnTickets, btnTecnicos].forEach(btn => {
+    if(!btn) return;
+    btn.classList.remove('active');
+    btn.style.background = 'transparent';
+    btn.style.color = 'var(--text-muted)';
+    btn.style.fontWeight = '500';
+    btn.style.boxShadow = 'none';
+  });
+
+  // Hide all contents
+  [contentOrdenes, contentTickets, contentTecnicos].forEach(c => {
+    if(c) c.style.display = 'none';
+  });
+
+  // Activate selected
+  let activeBtn;
   if (tab === 'ordenes') {
-    btnOrdenes.classList.add('active');
-    btnOrdenes.style.background = 'var(--bg-card)';
-    btnOrdenes.style.color = 'var(--text-primary)';
-    btnOrdenes.style.fontWeight = '600';
-    btnOrdenes.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-
-    btnTickets.classList.remove('active');
-    btnTickets.style.background = 'transparent';
-    btnTickets.style.color = 'var(--text-muted)';
-    btnTickets.style.fontWeight = '500';
-    btnTickets.style.boxShadow = 'none';
-
-    contentOrdenes.style.display = 'block';
-    contentTickets.style.display = 'none';
+    activeBtn = btnOrdenes;
+    if(contentOrdenes) contentOrdenes.style.display = 'block';
     renderTabla('');
-  } else {
-    btnTickets.classList.add('active');
-    btnTickets.style.background = 'var(--bg-card)';
-    btnTickets.style.color = 'var(--text-primary)';
-    btnTickets.style.fontWeight = '600';
-    btnTickets.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-
-    btnOrdenes.classList.remove('active');
-    btnOrdenes.style.background = 'transparent';
-    btnOrdenes.style.color = 'var(--text-muted)';
-    btnOrdenes.style.fontWeight = '500';
-    btnOrdenes.style.boxShadow = 'none';
-
-    contentOrdenes.style.display = 'none';
-    contentTickets.style.display = 'block';
+  } else if (tab === 'tickets') {
+    activeBtn = btnTickets;
+    if(contentTickets) contentTickets.style.display = 'block';
     renderTickets('dash-tickets');
+  } else if (tab === 'tecnicos') {
+    activeBtn = btnTecnicos;
+    if(contentTecnicos) contentTecnicos.style.display = 'block';
+    renderDashboardTecnicos();
   }
+
+  if(activeBtn) {
+    activeBtn.classList.add('active');
+    activeBtn.style.background = 'var(--bg-card)';
+    activeBtn.style.color = 'var(--text-primary)';
+    activeBtn.style.fontWeight = '600';
+    activeBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+  }
+}
+
+function renderDashboardTecnicos() {
+  const stats = {};
+  
+  // Inicializar con todos los técnicos activos
+  usuarios.filter(u => u.rol === 'tecnico' || u.rol === 'admin' || u.rol === 'superadmin').forEach(u => {
+    stats[u.nombre] = { nombre: u.nombre, proceso: 0, finalizadas: 0, minReportados: 0 };
+  });
+
+  // Calcular métricas desde órdenes y bitácoras
+  ordenes.forEach(o => {
+    let techNames = [];
+    if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) techNames = o.tecnicosAsignados;
+    else if (o.tecnico) techNames = o.tecnico.split(',').map(s => s.trim());
+
+    techNames.forEach(tName => {
+      if (!stats[tName]) stats[tName] = { nombre: tName, proceso: 0, finalizadas: 0, minReportados: 0 };
+      if (o.estado === 'Finalizado') stats[tName].finalizadas++;
+      else stats[tName].proceso++;
+    });
+
+    if (o.bitacora && o.bitacora.length > 0) {
+      o.bitacora.forEach(b => {
+        const tName = b.tecnico;
+        if (tName && b.entrada && b.salida) {
+          if (!stats[tName]) stats[tName] = { nombre: tName, proceso: 0, finalizadas: 0, minReportados: 0 };
+          const [hE, mE] = b.entrada.split(':').map(Number);
+          const [hS, mS] = b.salida.split(':').map(Number);
+          let diff = (hS * 60 + mS) - (hE * 60 + mE);
+          if (diff < 0) diff += 24 * 60;
+          stats[tName].minReportados += diff;
+        }
+      });
+    }
+  });
+
+  const list = Object.values(stats)
+    .filter(s => s.proceso > 0 || s.finalizadas > 0 || s.minReportados > 0)
+    .sort((a,b) => b.minReportados - a.minReportados || b.finalizadas - a.finalizadas);
+
+  const totalHoras = list.reduce((sum, s) => sum + s.minReportados, 0);
+  const topTech = list.length > 0 ? list[0].nombre : 'N/A';
+
+  const kpisHtml = \`
+    <div class="stat-card">
+      <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="award"></i></div>
+      <div>
+        <div class="stat-label">Técnico Destacado</div>
+        <div class="stat-value" style="font-size:1.2rem;">\${topTech}</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="clock"></i></div>
+      <div>
+        <div class="stat-label">Total Horas Reportadas (Global)</div>
+        <div class="stat-value">\${Math.floor(totalHoras / 60)}h \${totalHoras % 60}m</div>
+      </div>
+    </div>
+  \`;
+  document.getElementById('tecnicos-kpis-grid').innerHTML = kpisHtml;
+
+  const tbody = document.getElementById('tecnicos-stats-body');
+  if (list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:2rem;">No hay datos registrados aún</td></tr>';
+  } else {
+    tbody.innerHTML = list.map(s => {
+      const hrs = Math.floor(s.minReportados / 60);
+      const mns = s.minReportados % 60;
+      return \`
+        <tr>
+          <td><div style="display:flex;align-items:center;gap:0.75rem;"><div style="width:32px;height:32px;border-radius:50%;background:var(--accent);color:white;display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:bold;">\${s.nombre.charAt(0).toUpperCase()}</div><span style="font-weight:600;color:var(--text-primary);">\${s.nombre}</span></div></td>
+          <td style="text-align:center;"><span class="badge badge-pendiente" style="padding:0.3rem 0.6rem;">\${s.proceso}</span></td>
+          <td style="text-align:center;"><span class="badge badge-finalizado" style="padding:0.3rem 0.6rem;">\${s.finalizadas}</span></td>
+          <td style="text-align:center;font-weight:700;color:var(--accent); font-size:1.05rem;">\${hrs}h \${mns > 0 ? mns + 'm' : ''}</td>
+        </tr>
+      \`;
+    }).join('');
+  }
+  if (window.lucide) window.lucide.createIcons();
 }
 
 // ===== TABLE =====
