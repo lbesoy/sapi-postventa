@@ -5451,21 +5451,40 @@ function guardarAsignacionTecnicos() {
   }
 }
 
+// Calcula el rango de fechas hábiles permitido para la bitácora
+function calcularRangoFechasLaboral(diasHabilAtras) {
+  const ahora = new Date();
+  ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset()); // ajuste zona horaria local
+
+  // Si hoy es fin de semana, el máximo permitido es el viernes anterior
+  const maxDate = new Date(ahora);
+  const dow = maxDate.getDay(); // 0=Dom, 1=Lun, ..., 6=Sáb
+  if (dow === 6) maxDate.setDate(maxDate.getDate() - 1); // Sábado → Viernes
+  if (dow === 0) maxDate.setDate(maxDate.getDate() - 2); // Domingo → Viernes
+
+  // Retroceder N días hábiles desde el máximo
+  const minDate = new Date(maxDate);
+  let retrocedidos = 0;
+  while (retrocedidos < diasHabilAtras) {
+    minDate.setDate(minDate.getDate() - 1);
+    const d = minDate.getDay();
+    if (d !== 0 && d !== 6) retrocedidos++; // Solo cuenta lunes-viernes
+  }
+
+  return {
+    min: minDate.toISOString().slice(0, 10),
+    max: maxDate.toISOString().slice(0, 10),
+  };
+}
+
 function abrirBitacora(id) {
   window.currentBitacoraOrdenId = id;
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  const hoy = now.toISOString().slice(0, 10);
-
-  // Límite mínimo: 2 días antes de hoy
-  const minDate = new Date(now);
-  minDate.setDate(minDate.getDate() - 2);
-  const min = minDate.toISOString().slice(0, 10);
+  const rango = calcularRangoFechasLaboral(2);
 
   const fechaInput = document.getElementById('bitacora-fecha');
-  fechaInput.value = hoy;
-  fechaInput.min = min;
-  fechaInput.max = hoy;
+  fechaInput.value = rango.max; // pre-selecciona el último día hábil (hoy o viernes si es fin de semana)
+  fechaInput.min = rango.min;
+  fechaInput.max = rango.max;
 
   document.getElementById('bitacora-nota').value = '';
   document.getElementById('bitacora-entrada').value = '';
@@ -5489,6 +5508,21 @@ function guardarNotaBitacora() {
   
   if (!fecha || !nota) {
     mostrarNotificacion('La fecha y la nota son obligatorias.', 'warning');
+    return;
+  }
+
+  // Validar que la fecha seleccionada no sea fin de semana
+  const fechaObj = new Date(fecha + 'T12:00:00'); // mediodía para evitar desfases de timezone
+  const diaSemana = fechaObj.getDay();
+  if (diaSemana === 0 || diaSemana === 6) {
+    mostrarNotificacion('No se pueden registrar entradas en fin de semana.', 'error');
+    return;
+  }
+
+  // Validar que esté dentro del rango hábil permitido
+  const rango = calcularRangoFechasLaboral(2);
+  if (fecha < rango.min || fecha > rango.max) {
+    mostrarNotificacion('La fecha seleccionada está fuera del rango permitido.', 'error');
     return;
   }
   
