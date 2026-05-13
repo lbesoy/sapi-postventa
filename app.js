@@ -8296,11 +8296,14 @@ function renderCalendario() {
     if (filtroCliente && o.cliente !== filtroCliente) return false;
     return true;
   }).forEach(o => {
-    let bgColor = '#3b82f6'; // Azul - Servicio
-    if (o.tipo === 'Mantenimiento') bgColor = '#10b981'; // Verde
-    if (o.tipo === 'Reparación') bgColor = '#f59e0b'; // Naranja
+    let bgColor = '#3b82f6'; // Azul
+    if (o.tipo === 'Mantenimiento' || o.tipo === 'Servicio preventivo') bgColor = '#10b981'; // Verde
+    if (o.tipo === 'Reparación' || o.tipo === 'Inspección') bgColor = '#f59e0b'; // Naranja
     if (o.tipo === 'Garantía') bgColor = '#ef4444'; // Rojo
-    if (o.estado === 'Finalizado') bgColor = '#6b7280'; // Gris
+    if (o.tipo === 'Entrega y puesta en marcha') bgColor = '#8b5cf6'; // Morado
+    if (o.tipo === 'Pre-entrega') bgColor = '#06b6d4'; // Cyan
+    if (o.tipo === 'Entrega Refacciones') bgColor = '#ec4899'; // Rosa
+    if (o.estado === 'Finalizado' || o.estado === 'Cerrada') bgColor = '#6b7280'; // Gris
 
     if (o.bitacora && o.bitacora.length > 0) {
       o.bitacora.forEach(b => {
