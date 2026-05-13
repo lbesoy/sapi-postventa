@@ -4930,11 +4930,7 @@ function abrirFormulario(id, modoReporte = false) {
     poblarSoportesPorCliente('');
   }
   
-  // Llenar checkboxes de técnicos (se hace en onSoporteChange)
-  const containerTecnicos = document.getElementById('f-tecnicos-container');
-  if (containerTecnicos) {
-    containerTecnicos.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:0.5rem;">Seleccione un Ticket para ver los técnicos asignados...</div>';
-  }
+  // Los técnicos se extraen automáticamente del ticket al guardar
   
   poblarMaquinasCliente('f-equipo', id ? ordenes.find(x => x.id === id)?.equipo : '', id ? ordenes.find(x => x.id === id)?.cliente : '');
   
@@ -5104,42 +5100,7 @@ function onSoporteChange() {
         inHorometro.value = t.horometro;
       }
       
-      const containerTecnicos = document.getElementById('f-tecnicos-container');
-      if (containerTecnicos) {
-        containerTecnicos.innerHTML = '';
-        let ticketAssigned = [];
-        if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) {
-          ticketAssigned = t.tecnicosAsignados;
-        } else if (t.asignado && t.asignado !== 'Sin asignar') {
-          ticketAssigned = t.asignado.split(',').map(s => s.trim());
-        }
-        
-        let orderAssigned = ticketAssigned; // Por defecto marcar todos los del ticket
-        if (editandoId) {
-          const o = ordenes.find(x => x.id === editandoId);
-          if (o) {
-            if (o.tecnicosAsignados) orderAssigned = o.tecnicosAsignados;
-            else if (o.tecnico) orderAssigned = o.tecnico.split(',').map(s => s.trim());
-            // Si el usuario cambia de ticket en modo edición, restableceremos a ticketAssigned
-            if (o.soporte !== t.id) orderAssigned = ticketAssigned;
-          }
-        }
-        
-        if (ticketAssigned.length === 0) {
-          containerTecnicos.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:0.5rem;">El ticket no tiene técnicos asignados.</div>';
-        } else {
-          const isTecnico = currentSession.viewMode === 'tecnico';
-          ticketAssigned.forEach(name => {
-            const isChecked = orderAssigned.includes(name);
-            containerTecnicos.innerHTML += `
-              <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:${isTecnico ? 'not-allowed' : 'pointer'}; background: var(--bg-body); padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem; line-height: 1.2; opacity: ${isTecnico ? '0.7' : '1'};">
-                <input type="checkbox" name="f-tecnicos" value="${name}" ${isChecked ? 'checked' : ''} ${isTecnico ? 'disabled' : ''} style="width:16px; height:16px; margin:0; margin-top:1px; flex-shrink:0; pointer-events:${isTecnico ? 'none' : 'auto'};"/>
-                <span style="flex:1; text-align:left; font-weight:normal; color:var(--text-primary);">${name}</span>
-              </label>
-            `;
-          });
-        }
-      }
+      // Técnicos se extraen en background durante el guardado
       
       if (typeof lucide !== 'undefined') lucide.createIcons();
     }
@@ -5148,10 +5109,6 @@ function onSoporteChange() {
     inPedido.readOnly = false;
     inPedido.style.background = '';
     if (metaDiv) metaDiv.style.display = 'none';
-    const containerTecnicos = document.getElementById('f-tecnicos-container');
-    if (containerTecnicos) {
-      containerTecnicos.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:0.5rem;">Seleccione un Ticket para ver los técnicos asignados...</div>';
-    }
   }
 }
 
@@ -5174,8 +5131,22 @@ function guardarOrdenes() {
 function guardarOrden(e) {
   e.preventDefault();
   const tipo = document.querySelector('input[name="tipo"]:checked')?.value || 'Servicio';
-  const tecnicosSeleccionados = Array.from(document.querySelectorAll('input[name="f-tecnicos"]:checked')).map(cb => cb.value);
+  let tecnicosSeleccionados = [];
+  const soporteIdGuardar = document.getElementById('f-soporte').value.trim();
   const oVieja = editandoId ? (ordenes.find(x => x.id === editandoId) || {}) : null;
+  
+  if (soporteIdGuardar) {
+    const t = tickets.find(x => x.id === soporteIdGuardar);
+    if (t) {
+      if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) {
+        tecnicosSeleccionados = t.tecnicosAsignados;
+      } else if (t.asignado && t.asignado !== 'Sin asignar') {
+        tecnicosSeleccionados = t.asignado.split(',').map(s => s.trim());
+      }
+    }
+  } else if (oVieja) {
+    tecnicosSeleccionados = oVieja.tecnicosAsignados || (oVieja.tecnico ? oVieja.tecnico.split(',').map(s => s.trim()) : []);
+  }
   const orden = {
     id: editandoId || crypto.randomUUID(),
     fecha: oVieja ? oVieja.fecha : new Date().toISOString().split('T')[0],
