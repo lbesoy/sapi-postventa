@@ -7583,6 +7583,11 @@ async function guardarTicket(e) {
       mostrarNotificacion('Debe seleccionar a quién va asignado el ticket.', 'error');
       return;
     }
+    const clienteVal = document.getElementById('t-cliente').value.trim();
+    if (!clienteVal) {
+      mostrarNotificacion('Debe seleccionar la Empresa / Cliente afectada.', 'error');
+      return;
+    }
   }
   
   if (!isEmpresa && estado === 'Cotización') {
