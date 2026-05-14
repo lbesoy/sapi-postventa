@@ -2945,17 +2945,18 @@ function verDetalleCliente(nombre) {
         <div style="display:flex; flex-direction:column; gap:0.75rem;">
           ${allClientMachines.map(m => {
             const logoPath = getLogoMarca(m.marca);
+            const callArgs = `'${(m.idInterno && m.idInterno !== 'N/A') ? m.idInterno : (m.uniqueId || '')}', '${m.serie || ''}', '${m.marca || ''}', '${m.modelo || ''}', '${nombre || ''}', '${m.ubicacion || ''}'`;
             return `
-            <div style="background: var(--bg-hover); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem;">
+            <div onclick="verServiciosMaquina(${callArgs.replace(/"/g, '&quot;')})" style="background: var(--bg-hover); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s;" onmouseover="this.style.borderColor='var(--accent)';" onmouseout="this.style.borderColor='var(--border)';">
               <div style="font-weight:600; font-size:1.05rem; color:var(--text-primary); display:flex; align-items:center;">
                 ${logoPath ? `<img src="${logoPath}" alt="${m.marca}" onerror="this.onerror=null; this.outerHTML='<span>${m.marca} </span>';" style="height:24px; object-fit:contain; margin-right:8px;"/>` : `${m.marca || ''} `}
                 ${m.modelo || 'Sin Modelo'}
                 ${currentSession.viewMode !== 'empresa' ? `<span style="font-size:0.75rem; background:var(--bg-body); padding:0.15rem 0.4rem; border-radius:4px; border:1px solid var(--border); margin-left:0.5rem; color:var(--text-muted); font-family:monospace; font-weight:normal;">ID: ${m.idInterno || 'N/A'}</span>` : ''}
                 <div style="margin-left:auto; display:flex; gap:0.25rem;">
-                  <button class="action-btn" onclick="editarMaquina('${nombre.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Editar Máquina" style="padding:0.25rem; width:auto; height:auto;">
+                  <button class="action-btn" onclick="event.stopPropagation(); editarMaquina('${nombre.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Editar Máquina" style="padding:0.25rem; width:auto; height:auto;">
                     <i data-lucide="edit-2" style="width:16px;height:16px;"></i>
                   </button>
-                  <button class="action-btn" onclick="abrirModalMoverMaquina('${nombre.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Cambiar Sitio" style="padding:0.25rem; width:auto; height:auto;">
+                  <button class="action-btn" onclick="event.stopPropagation(); abrirModalMoverMaquina('${nombre.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Cambiar Sitio" style="padding:0.25rem; width:auto; height:auto;">
                     <i data-lucide="map-pin" style="width:16px;height:16px;"></i>
                   </button>
                 </div>
