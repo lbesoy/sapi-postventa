@@ -3332,47 +3332,103 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
     </div>
   `;
   
-  // Órdenes
-  if (maqOrdenes.length > 0) {
+  // Historial fusionado
+  let historial = [];
+
+  const formatDateOnly = (dateStr) => {
+    if (!dateStr) return 'Sin fecha';
+    return dateStr.split('T')[0].split('-').reverse().join('/');
+  };
+
+  maqTickets.forEach(t => {
+     let ordenesDelTicket = maqOrdenes.filter(o => o.soporte === t.id);
+     historial.push({
+        tipo: 'ticket',
+        fechaStr: t.fechaCreacion,
+        obj: t,
+        ordenesLigadas: ordenesDelTicket
+     });
+  });
+
+  maqOrdenes.forEach(o => {
+     if (!maqTickets.some(t => t.id === o.soporte)) {
+        historial.push({
+           tipo: 'orden_independiente',
+           fechaStr: o.fecha,
+           obj: o
+        });
+     }
+  });
+
+  historial.sort((a, b) => {
+     let d1 = a.fechaStr ? new Date(a.fechaStr) : new Date(0);
+     let d2 = b.fechaStr ? new Date(b.fechaStr) : new Date(0);
+     return d2 - d1;
+  });
+
+  if (historial.length > 0) {
     html += `
       <div>
-        <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="clipboard-list" style="width:18px;height:18px;color:var(--text-muted);"></i> Órdenes de Servicio (${maqOrdenes.length})</h3>
-        <div style="display:flex; flex-direction:column; gap:0.5rem; max-height:200px; overflow-y:auto; padding-right:0.5rem;">
-          ${maqOrdenes.map(o => `
-            <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
-              <div>
-                <div style="font-weight:500; color:var(--accent);">Orden #${o.folio || '-'}</div>
-                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.2rem;">${o.fecha?.split('-').reverse().join('/') || 'Sin fecha'} - ${o.tecnico || 'Sin técnico'}</div>
-              </div>
-              <span class="badge badge-${o.estado==='Pendiente'?'pendiente':o.estado==='En Proceso'?'proceso':'completado'}">${o.estado||'Pendiente'}</span>
-            </div>
-          `).join('')}
+        <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="layers" style="width:18px;height:18px;color:var(--text-muted);"></i> Historial de Servicios (${historial.length})</h3>
+        <div style="display:flex; flex-direction:column; max-height:280px; overflow-y:auto; padding-right:0.5rem;">
+          ${historial.map(item => {
+             if (item.tipo === 'ticket') {
+               const t = item.obj;
+               const ordenes = item.ordenesLigadas;
+               return `
+                 <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:var(--bg-card);">
+                   <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                     <div>
+                       <div style="display:flex; align-items:center; gap:0.4rem;">
+                         <i data-lucide="ticket" style="width:14px;height:14px;color:var(--text-muted);"></i>
+                         <span style="font-weight:600; color:var(--text-primary);">${t.asunto || 'Sin título'}</span>
+                       </div>
+                       <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.3rem;">
+                         # ${t.folio || t.id.substring(0,8)} - ${formatDateOnly(t.fechaCreacion)}
+                       </div>
+                     </div>
+                     <span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'Abierto'}</span>
+                   </div>
+                   ${ordenes.map(o => `
+                     <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px dashed var(--border); display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                          <div style="display:flex; align-items:center; gap:0.4rem;">
+                            <i data-lucide="clipboard-list" style="width:14px;height:14px;color:var(--accent);"></i>
+                            <span style="font-weight:500; color:var(--accent); font-size:0.9rem;">Orden #${o.folio || '-'}</span>
+                          </div>
+                          <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">
+                             ${formatDateOnly(o.fecha)}
+                          </div>
+                        </div>
+                        <span class="badge badge-${o.estado==='Pendiente'?'pendiente':o.estado==='En Proceso'?'proceso':'completado'}" style="font-size:0.7rem; padding:0.2rem 0.4rem;">${o.estado||'Pendiente'}</span>
+                     </div>
+                   `).join('')}
+                 </div>
+               `;
+             } else {
+               const o = item.obj;
+               return `
+                 <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:var(--bg-card); display:flex; justify-content:space-between; align-items:center;">
+                   <div>
+                     <div style="display:flex; align-items:center; gap:0.4rem;">
+                       <i data-lucide="clipboard-list" style="width:14px;height:14px;color:var(--accent);"></i>
+                       <span style="font-weight:500; color:var(--accent);">Orden #${o.folio || '-'}</span>
+                     </div>
+                     <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.3rem;">
+                       ${formatDateOnly(o.fecha)}
+                     </div>
+                   </div>
+                   <span class="badge badge-${o.estado==='Pendiente'?'pendiente':o.estado==='En Proceso'?'proceso':'completado'}">${o.estado||'Pendiente'}</span>
+                 </div>
+               `;
+             }
+          }).join('')}
         </div>
       </div>
     `;
   }
   
-  // Tickets
-  if (maqTickets.length > 0) {
-    html += `
-      <div>
-        <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="ticket" style="width:18px;height:18px;color:var(--text-muted);"></i> Tickets de Soporte (${maqTickets.length})</h3>
-        <div style="display:flex; flex-direction:column; gap:0.5rem; max-height:200px; overflow-y:auto; padding-right:0.5rem;">
-          ${maqTickets.map(t => `
-            <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
-              <div>
-                <div style="font-weight:500; color:var(--text-primary);">${t.asunto || 'Sin título'}</div>
-                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.2rem;"># ${t.folio || t.id.substring(0,8)} - ${t.fechaCreacion ? t.fechaCreacion.split('T')[0].split('-').reverse().join('/') : (t.fecha || '')}</div>
-              </div>
-              <span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'Abierto'}</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-  }
-  
-  if (maqOrdenes.length === 0 && maqTickets.length === 0) {
+  if (historial.length === 0) {
     html += `<div class="empty-state" style="padding:2rem;">Esta máquina no tiene servicios registrados.</div>`;
   }
   
