@@ -5852,7 +5852,15 @@ function guardarFirmaCanvas(ordenId, tipo) {
     return;
   }
 
-  const base64Firma = c.toDataURL('image/png');
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = c.width;
+  tempCanvas.height = c.height;
+  const tCtx = tempCanvas.getContext('2d');
+  tCtx.fillStyle = '#FFFFFF';
+  tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+  tCtx.drawImage(c, 0, 0);
+  
+  const base64Firma = tempCanvas.toDataURL('image/jpeg', 0.5);
   
   const idx = ordenes.findIndex(o => o.id === ordenId);
   if (idx !== -1) {
@@ -5861,10 +5869,18 @@ function guardarFirmaCanvas(ordenId, tipo) {
     
     ordenes[idx].estado = calcularEstadoOrden(ordenes[idx]);
     
-    localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+    try {
+      localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+    } catch (err) {
+      console.error(err);
+      mostrarNotificacion('Error de almacenamiento local. La firma puede no guardarse si no hay espacio.', 'error');
+    }
     
     if (window.pushToSupabase) {
-      window.pushToSupabase('ordenes', ordenes[idx]);
+      window.pushToSupabase('ordenes', ordenes[idx]).catch(err => {
+         console.error('Error supabase:', err);
+         mostrarNotificacion('Error guardando en la nube', 'error');
+      });
     }
     
     mostrarNotificacion(`Firma del ${tipo} guardada`, 'success');
@@ -8472,6 +8488,40 @@ function actualizarFiltrosCalendario() {
   }
 }
 
+function getNthDayOfMonth(year, month, dayOfWeek, n) {
+  const date = new Date(year, month, 1);
+  let count = 0;
+  for (let d = 1; d <= 31; d++) {
+    date.setDate(d);
+    if (date.getMonth() !== month) break;
+    if (date.getDay() === dayOfWeek) {
+      count++;
+      if (count === n) {
+        const m = String(month + 1).padStart(2, '0');
+        const day = String(d).padStart(2, '0');
+        return `${year}-${m}-${day}`;
+      }
+    }
+  }
+  return null;
+}
+
+function getFestivosMexico(year) {
+  const festivos = [
+    { title: '🎉 Año Nuevo', start: `${year}-01-01`, allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true } },
+    { title: '📜 Día de la Constitución', start: getNthDayOfMonth(year, 1, 1, 1), allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true } },
+    { title: '🦅 Natalicio B. Juárez', start: getNthDayOfMonth(year, 2, 1, 3), allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true } },
+    { title: '👷 Día del Trabajo', start: `${year}-05-01`, allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true } },
+    { title: '🇲🇽 Independencia', start: `${year}-09-16`, allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true } },
+    { title: '🚂 Revolución Mex.', start: getNthDayOfMonth(year, 10, 1, 3), allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true } },
+    { title: '🎅 Navidad', start: `${year}-12-25`, allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true } }
+  ];
+  if (year === 2024 || year === 2030 || year === 2036) {
+    festivos.push({ title: '🏛️ Transmisión de Poder', start: `${year}-10-01`, allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true } });
+  }
+  return festivos;
+}
+
 function renderCalendario() {
   const container = document.getElementById('calendar-container');
   if (!container) return;
@@ -8496,6 +8546,11 @@ function renderCalendario() {
   const miEmpresa = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
 
   const eventos = [];
+  
+  const currentYear = new Date().getFullYear();
+  eventos.push(...getFestivosMexico(currentYear - 1));
+  eventos.push(...getFestivosMexico(currentYear));
+  eventos.push(...getFestivosMexico(currentYear + 1));
   
   ordenes.filter(o => {
     if (isEmpresa && o.cliente !== miEmpresa) return false;
@@ -8586,6 +8641,7 @@ function renderCalendario() {
     },
     events: eventos,
     eventClick: function(info) {
+      if (info.event.extendedProps.isFestivo) return; // No hacer nada al hacer clic en días festivos
       if (info.event.extendedProps.isBitacora) {
         mostrarPopupBitacora(info);
       } else {
@@ -8595,6 +8651,14 @@ function renderCalendario() {
     eventContent: function(arg) {
       const bgColor = arg.event.backgroundColor || 'var(--accent)';
       
+      if (arg.event.extendedProps.isFestivo) {
+        return {
+          html: `<div style="background-color:${bgColor}; border:1px solid ${arg.event.borderColor}; border-radius:3px; font-size:0.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:2px 4px; color:${arg.event.textColor}; width:100%; box-sizing:border-box;" title="${arg.event.title}">
+                   <b>${arg.event.title}</b>
+                 </div>`
+        };
+      }
+
       let timeText = arg.timeText || '';
       if (!arg.event.allDay && arg.event.extendedProps.entrada) {
         timeText = arg.event.extendedProps.entrada;
