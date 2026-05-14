@@ -2870,22 +2870,13 @@ function verDetalleCliente(nombre) {
   const tecOptions = `<option value="">-- Sin Asignar --</option>` + usuarios.filter(u=>u.rol==='tecnico').map(u=>`<option value="${u.id}" ${clienteOb?.tecnicosAsignados?.includes(u.id)?'selected':''}>${u.nombre}</option>`).join('');
 
   html += `
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top:1rem; background: var(--bg-card); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+    <div style="margin-top:1rem; background: var(--bg-card); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
       <div>
         <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; display:flex; align-items:center;"><i data-lucide="user-check" style="width:12px;height:12px;vertical-align:middle;margin-right:4px;"></i> Supervisor Asignado ${editSupHtml}</div>
         <div style="font-weight: 500; color: var(--text-primary); margin-top:0.25rem;" id="disp-sup">${supNombre}</div>
         <div id="edit-sup" style="display:none; margin-top:0.5rem;">
           <select style="width:100%; padding:0.4rem; border-radius:4px; border:1px solid var(--border); font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);" onchange="guardarPersonalCliente('${nombre.replace(/'/g, "\\'")}', 'supervisor', this.value)">
             ${supOptions}
-          </select>
-        </div>
-      </div>
-      <div>
-        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; display:flex; align-items:center;"><i data-lucide="wrench" style="width:12px;height:12px;vertical-align:middle;margin-right:4px;"></i> Técnico de Base ${editTecHtml}</div>
-        <div style="font-weight: 500; color: var(--text-primary); margin-top:0.25rem;" id="disp-tec">${tecNombre}</div>
-        <div id="edit-tec" style="display:none; margin-top:0.5rem;">
-          <select style="width:100%; padding:0.4rem; border-radius:4px; border:1px solid var(--border); font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);" onchange="guardarPersonalCliente('${nombre.replace(/'/g, "\\'")}', 'tecnico', this.value)">
-            ${tecOptions}
           </select>
         </div>
       </div>
