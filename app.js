@@ -1989,10 +1989,10 @@ function renderTabla(ctx) {
       <td data-label="Cliente">${o.cliente||'-'}</td>
       <td data-label="Ubicación">${o.ubicacion||'-'}</td>
       <td data-label="Modelo">${o.modelo||'-'}</td>
-      <td data-label="Técnico">${o.tecnico||'-'}</td>
+
       <td data-label="Tipo"><span class="badge badge-${(o.tipo||'otro').toLowerCase().replace('é','e').replace('í','i')}">${o.tipo||'-'}</span></td>
       <td data-label="Estado"><span class="badge ${badgeEstado(o.estado)}">${o.estado||'-'}</span></td>
-      <td data-label="Fecha">${o.fecha||'-'}</td>
+      <td data-label="Fecha">${o.fecha ? o.fecha.split('T')[0] : '-'}</td>
       <td data-label="" style="width:40px; text-align:center;">
         ${canDelete ? `<button class="action-btn del" onclick="eliminarOrden('${o.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
       </td>
@@ -3251,8 +3251,23 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
     </div>
   `;
   
-  const maqTickets = tickets.filter(t => t.maquinaId === idInterno || (serie && serie !== 'N/A' && t.maquinaId === serie));
-  const maqOrdenes = ordenes.filter(o => o.maquina === idInterno || (serie && serie !== 'N/A' && o.maquina === serie));
+  const snMatch = serie && serie !== 'N/A' ? `(SN: ${serie})` : null;
+  const maqTickets = tickets.filter(t => 
+    t.maquinaId === idInterno || 
+    (serie && serie !== 'N/A' && t.maquinaId === serie) || 
+    (snMatch && t.equipo && t.equipo.includes(snMatch)) || 
+    (t.equipo && t.equipo.includes(idInterno)) ||
+    (t.equipo && t.equipo === idInterno)
+  );
+  const maqOrdenes = ordenes.filter(o => 
+    o.maquina === idInterno || 
+    (serie && serie !== 'N/A' && o.maquina === serie) || 
+    o.serie === idInterno || 
+    (serie && serie !== 'N/A' && o.serie === serie) || 
+    (snMatch && o.equipo && o.equipo.includes(snMatch)) || 
+    (o.equipo && o.equipo.includes(idInterno)) ||
+    (o.equipo && o.equipo === idInterno)
+  );
   
   let fechas = [];
   maqOrdenes.forEach(o => { if(o.fecha) fechas.push(new Date(o.fecha)); });
