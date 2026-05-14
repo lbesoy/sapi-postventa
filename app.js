@@ -3047,7 +3047,7 @@ function verDetalleCliente(nombre) {
        const t = item.obj;
        const ordenes = item.ordenesLigadas;
        return `
-         <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:var(--bg-card);">
+         <div onclick="verDetalleTicket('${t.id}')" style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:var(--bg-card); cursor:pointer; transition: border-color 0.2s, box-shadow 0.2s;" onmouseover="this.style.borderColor='var(--accent)';" onmouseout="this.style.borderColor='var(--border)';">
            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
              <div>
                <div style="display:flex; align-items:center; gap:0.4rem;">
@@ -3061,7 +3061,7 @@ function verDetalleCliente(nombre) {
              <span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'Abierto'}</span>
            </div>
            ${ordenes.map(o => `
-             <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px dashed var(--border); display:flex; justify-content:space-between; align-items:center;">
+             <div onclick="event.stopPropagation(); verDetalleOrden('${o.id}')" style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px dashed var(--border); display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.6';" onmouseout="this.style.opacity='1';">
                 <div>
                   <div style="display:flex; align-items:center; gap:0.4rem;">
                     <i data-lucide="clipboard-list" style="width:14px;height:14px;color:var(--accent);"></i>
@@ -3079,7 +3079,7 @@ function verDetalleCliente(nombre) {
      } else {
        const o = item.obj;
        return `
-         <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:var(--bg-card); display:flex; justify-content:space-between; align-items:center;">
+         <div onclick="verDetalleOrden('${o.id}')" style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:var(--bg-card); display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition: border-color 0.2s, box-shadow 0.2s;" onmouseover="this.style.borderColor='var(--accent)';" onmouseout="this.style.borderColor='var(--border)';">
            <div>
              <div style="display:flex; align-items:center; gap:0.4rem;">
                <i data-lucide="clipboard-list" style="width:14px;height:14px;color:var(--accent);"></i>
@@ -3490,7 +3490,7 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
        const t = item.obj;
        const ordenes = item.ordenesLigadas;
        return `
-         <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:var(--bg-card);">
+         <div onclick="verDetalleTicket('${t.id}')" style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:var(--bg-card); cursor:pointer; transition: border-color 0.2s, box-shadow 0.2s;" onmouseover="this.style.borderColor='var(--accent)';" onmouseout="this.style.borderColor='var(--border)';">
            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
              <div>
                <div style="display:flex; align-items:center; gap:0.4rem;">
@@ -3504,7 +3504,7 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
              <span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'Abierto'}</span>
            </div>
            ${ordenes.map(o => `
-             <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px dashed var(--border); display:flex; justify-content:space-between; align-items:center;">
+             <div onclick="event.stopPropagation(); verDetalleOrden('${o.id}')" style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px dashed var(--border); display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.6';" onmouseout="this.style.opacity='1';">
                 <div>
                   <div style="display:flex; align-items:center; gap:0.4rem;">
                     <i data-lucide="clipboard-list" style="width:14px;height:14px;color:var(--accent);"></i>
@@ -3522,7 +3522,7 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
      } else {
        const o = item.obj;
        return `
-         <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:var(--bg-card); display:flex; justify-content:space-between; align-items:center;">
+         <div onclick="verDetalleOrden('${o.id}')" style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:var(--bg-card); display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition: border-color 0.2s, box-shadow 0.2s;" onmouseover="this.style.borderColor='var(--accent)';" onmouseout="this.style.borderColor='var(--border)';">
            <div>
              <div style="display:flex; align-items:center; gap:0.4rem;">
                <i data-lucide="clipboard-list" style="width:14px;height:14px;color:var(--accent);"></i>
