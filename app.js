@@ -6277,6 +6277,7 @@ function renderTickets(ctx) {
     body.innerHTML = `<tr><td colspan="9" class="empty-state">No hay tickets${q||(!isDashView && ticketFiltroActivo!=='todos')?' que coincidan':' registrados'}.</td></tr>`;
     return;
   }
+  const canEdit = currentSession.viewMode !== 'consulta';
   const canDelete = ['superadmin', 'admin'].includes(currentSession.viewMode);
 
   body.innerHTML = filtered.map((t, i) => `
@@ -6284,7 +6285,7 @@ function renderTickets(ctx) {
       <td data-label="Acciones" style="white-space:nowrap; width:60px;">
         <div style="display:flex;gap:0.25rem;">
           <button class="action-btn" onclick="verDetalleTicket('${t.id}')" title="Ver"><i data-lucide="eye"></i></button>
-          <button class="action-btn" onclick="editarTicket('${t.id}')" title="Editar"><i data-lucide="pencil"></i></button>
+          ${canEdit ? `<button class="action-btn" onclick="editarTicket('${t.id}')" title="Editar"><i data-lucide="pencil"></i></button>` : ''}
         </div>
       </td>
       <td data-label="Folio"><strong>${t.folio||('#'+(i+1))}</strong></td>
@@ -6378,6 +6379,7 @@ function renderMaquinaria() {
   const isEmpresa = currentSession.viewMode === 'empresa';
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   const nombreEmpresaLogged = isEmpresa && currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+  const canEdit = currentSession.viewMode !== 'consulta';
 
   let allMachines = [];
   
@@ -6556,12 +6558,14 @@ function renderMaquinaria() {
           <button class="action-btn" onclick="event.stopPropagation(); verDetalleCliente('${m.cliente.replace(/'/g, "\\'")}')" title="Ver Perfil de la Empresa">
             <i data-lucide="building-2"></i>
           </button>
+          ${canEdit ? `
           <button class="action-btn" onclick="event.stopPropagation(); editarMaquina('${m.cliente.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Editar Máquina">
             <i data-lucide="edit-2"></i>
           </button>
           <button class="action-btn" onclick="event.stopPropagation(); abrirModalMoverMaquina('${m.cliente.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Mover de Sitio">
             <i data-lucide="map-pin"></i>
           </button>
+          ` : ''}
         </div>
       </td>
     </tr>
