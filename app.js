@@ -3359,8 +3359,8 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
           ${maqTickets.map(t => `
             <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
               <div>
-                <div style="font-weight:500; color:var(--text-primary);">${t.titulo || 'Sin título'}</div>
-                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.2rem;">ID: #${t.id} - ${t.fechaCreacion.split('T')[0].split('-').reverse().join('/')}</div>
+                <div style="font-weight:500; color:var(--text-primary);">${t.asunto || 'Sin título'}</div>
+                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.2rem;"># ${t.folio || t.id.substring(0,8)} - ${t.fechaCreacion ? t.fechaCreacion.split('T')[0].split('-').reverse().join('/') : (t.fecha || '')}</div>
               </div>
               <span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'Abierto'}</span>
             </div>
