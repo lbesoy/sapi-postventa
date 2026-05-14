@@ -3299,39 +3299,6 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
     if (hasPendingOrd) siguienteServicioStr = 'Por agendar (Orden)';
     else if (hasPendingTkt) siguienteServicioStr = 'Ticket abierto';
   }
-  
-  let html = '';
-  
-  // Resumen
-  html += `
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; background:var(--bg-hover); padding:1rem; border-radius:var(--radius-md);">
-      <div>
-        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Serie</div>
-        <div style="font-weight:500;">${serie || 'N/A'}</div>
-      </div>
-      <div>
-        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Último Servicio</div>
-        <div style="font-weight:500;">${ultimaFechaStr}</div>
-      </div>
-      <div>
-        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Cliente</div>
-        <div style="font-weight:500;">${cliente || 'N/A'}</div>
-      </div>
-      <div>
-        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Siguiente Servicio</div>
-        <div style="font-weight:600; color:var(--orange);">${siguienteServicioStr}</div>
-      </div>
-      <div>
-        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Sitio / Ubicación</div>
-        <div style="font-weight:500;">${ubicacion || 'N/A'}</div>
-      </div>
-      <div>
-        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Servicios Totales</div>
-        <div style="font-weight:600; color:var(--accent); font-size:1.1rem;">${maqOrdenes.length + maqTickets.length}</div>
-      </div>
-    </div>
-  `;
-  
   // Historial fusionado
   let historial = [];
 
@@ -3385,6 +3352,38 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
      if (isClosed) cerrados.push(item);
      else activos.push(item);
   });
+
+  let html = '';
+  
+  // Resumen
+  html += `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; background:var(--bg-hover); padding:1rem; border-radius:var(--radius-md);">
+      <div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Serie</div>
+        <div style="font-weight:500;">${serie || 'N/A'}</div>
+      </div>
+      <div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Último Servicio</div>
+        <div style="font-weight:500;">${ultimaFechaStr}</div>
+      </div>
+      <div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Cliente</div>
+        <div style="font-weight:500;">${cliente || 'N/A'}</div>
+      </div>
+      <div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Siguiente Servicio</div>
+        <div style="font-weight:600; color:var(--orange);">${siguienteServicioStr}</div>
+      </div>
+      <div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Sitio / Ubicación</div>
+        <div style="font-weight:500;">${ubicacion || 'N/A'}</div>
+      </div>
+      <div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Servicios Totales</div>
+        <div style="font-weight:600; color:var(--accent); font-size:1.1rem;">${historial.length}</div>
+      </div>
+    </div>
+  `;
 
   const renderItem = (item) => {
      if (item.tipo === 'ticket') {
@@ -3445,16 +3444,14 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
         <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="layers" style="width:18px;height:18px;color:var(--text-muted);"></i> Historial de Servicios (${historial.length})</h3>
         <div style="display:flex; flex-direction:column; max-height:300px; overflow-y:auto; padding-right:0.5rem;">
           ${activos.map(renderItem).join('')}
-          ${cerrados.length > 0 ? `
-             <div style="margin-top: 0.2rem; margin-bottom: 0.5rem; text-align: center;">
-                <button type="button" onclick="const div = document.getElementById('historial-cerrados'); div.style.display = div.style.display === 'none' ? 'block' : 'none'; const icon = this.querySelector('i'); if(div.style.display==='none'){ icon.setAttribute('data-lucide', 'chevron-down'); } else { icon.setAttribute('data-lucide', 'chevron-up'); } lucide.createIcons();" style="background: none; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-muted); font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.8rem; font-weight: 500; transition: background 0.2s;">
-                   Ver completados (${cerrados.length}) <i data-lucide="chevron-down" style="width:14px;height:14px;"></i>
-                </button>
-             </div>
-             <div id="historial-cerrados" style="display:none;">
-                ${cerrados.map(renderItem).join('')}
-             </div>
-          ` : ''}
+          <div style="margin-top: 0.2rem; margin-bottom: 0.5rem; text-align: center;">
+             <button type="button" onclick="const div = document.getElementById('historial-cerrados'); div.style.display = div.style.display === 'none' ? 'block' : 'none'; const icon = this.querySelector('i'); if(div.style.display==='none'){ icon.setAttribute('data-lucide', 'chevron-down'); } else { icon.setAttribute('data-lucide', 'chevron-up'); } lucide.createIcons();" style="background: none; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-muted); font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.8rem; font-weight: 500; transition: background 0.2s;">
+                Ver completados (${cerrados.length}) <i data-lucide="chevron-down" style="width:14px;height:14px;"></i>
+             </button>
+          </div>
+          <div id="historial-cerrados" style="display:none;">
+             ${cerrados.length > 0 ? cerrados.map(renderItem).join('') : '<div style="text-align:center; padding:1rem; color:var(--text-muted); font-size:0.8rem;">No hay servicios completados aún.</div>'}
+          </div>
         </div>
       </div>
     `;
