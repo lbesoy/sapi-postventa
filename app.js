@@ -3366,63 +3366,95 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
      return d2 - d1;
   });
 
+  let activos = [];
+  let cerrados = [];
+
+  historial.forEach(item => {
+     let isClosed = false;
+     if (item.tipo === 'ticket') {
+        const t = item.obj;
+        const ordenes = item.ordenesLigadas;
+        const tClosed = t.estado === 'Cerrado';
+        const allOrdersClosed = ordenes.every(o => o.estado === 'Completado' || o.estado === 'Cerrado');
+        if (tClosed && allOrdersClosed) isClosed = true;
+     } else {
+        const o = item.obj;
+        if (o.estado === 'Completado' || o.estado === 'Cerrado') isClosed = true;
+     }
+     
+     if (isClosed) cerrados.push(item);
+     else activos.push(item);
+  });
+
+  const renderItem = (item) => {
+     if (item.tipo === 'ticket') {
+       const t = item.obj;
+       const ordenes = item.ordenesLigadas;
+       return `
+         <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:var(--bg-card);">
+           <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+             <div>
+               <div style="display:flex; align-items:center; gap:0.4rem;">
+                 <i data-lucide="ticket" style="width:14px;height:14px;color:var(--text-muted);"></i>
+                 <span style="font-weight:600; color:var(--text-primary);">${t.asunto || 'Sin título'}</span>
+               </div>
+               <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.3rem;">
+                 # ${t.folio || t.id.substring(0,8)} - ${formatDateOnly(t.fechaCreacion)}
+               </div>
+             </div>
+             <span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'Abierto'}</span>
+           </div>
+           ${ordenes.map(o => `
+             <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px dashed var(--border); display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <div style="display:flex; align-items:center; gap:0.4rem;">
+                    <i data-lucide="clipboard-list" style="width:14px;height:14px;color:var(--accent);"></i>
+                    <span style="font-weight:500; color:var(--accent); font-size:0.9rem;">Orden #${o.folio || '-'}</span>
+                  </div>
+                  <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">
+                     ${formatDateOnly(o.fecha)}
+                  </div>
+                </div>
+                <span class="badge badge-${o.estado==='Pendiente'?'pendiente':o.estado==='En Proceso'?'proceso':'completado'}" style="font-size:0.7rem; padding:0.2rem 0.4rem;">${o.estado||'Pendiente'}</span>
+             </div>
+           `).join('')}
+         </div>
+       `;
+     } else {
+       const o = item.obj;
+       return `
+         <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:var(--bg-card); display:flex; justify-content:space-between; align-items:center;">
+           <div>
+             <div style="display:flex; align-items:center; gap:0.4rem;">
+               <i data-lucide="clipboard-list" style="width:14px;height:14px;color:var(--accent);"></i>
+               <span style="font-weight:500; color:var(--accent);">Orden #${o.folio || '-'}</span>
+             </div>
+             <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.3rem;">
+               ${formatDateOnly(o.fecha)}
+             </div>
+           </div>
+           <span class="badge badge-${o.estado==='Pendiente'?'pendiente':o.estado==='En Proceso'?'proceso':'completado'}">${o.estado||'Pendiente'}</span>
+         </div>
+       `;
+     }
+  };
+
   if (historial.length > 0) {
     html += `
       <div>
         <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="layers" style="width:18px;height:18px;color:var(--text-muted);"></i> Historial de Servicios (${historial.length})</h3>
-        <div style="display:flex; flex-direction:column; max-height:280px; overflow-y:auto; padding-right:0.5rem;">
-          ${historial.map(item => {
-             if (item.tipo === 'ticket') {
-               const t = item.obj;
-               const ordenes = item.ordenesLigadas;
-               return `
-                 <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:var(--bg-card);">
-                   <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                     <div>
-                       <div style="display:flex; align-items:center; gap:0.4rem;">
-                         <i data-lucide="ticket" style="width:14px;height:14px;color:var(--text-muted);"></i>
-                         <span style="font-weight:600; color:var(--text-primary);">${t.asunto || 'Sin título'}</span>
-                       </div>
-                       <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.3rem;">
-                         # ${t.folio || t.id.substring(0,8)} - ${formatDateOnly(t.fechaCreacion)}
-                       </div>
-                     </div>
-                     <span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'Abierto'}</span>
-                   </div>
-                   ${ordenes.map(o => `
-                     <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px dashed var(--border); display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                          <div style="display:flex; align-items:center; gap:0.4rem;">
-                            <i data-lucide="clipboard-list" style="width:14px;height:14px;color:var(--accent);"></i>
-                            <span style="font-weight:500; color:var(--accent); font-size:0.9rem;">Orden #${o.folio || '-'}</span>
-                          </div>
-                          <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">
-                             ${formatDateOnly(o.fecha)}
-                          </div>
-                        </div>
-                        <span class="badge badge-${o.estado==='Pendiente'?'pendiente':o.estado==='En Proceso'?'proceso':'completado'}" style="font-size:0.7rem; padding:0.2rem 0.4rem;">${o.estado||'Pendiente'}</span>
-                     </div>
-                   `).join('')}
-                 </div>
-               `;
-             } else {
-               const o = item.obj;
-               return `
-                 <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:var(--bg-card); display:flex; justify-content:space-between; align-items:center;">
-                   <div>
-                     <div style="display:flex; align-items:center; gap:0.4rem;">
-                       <i data-lucide="clipboard-list" style="width:14px;height:14px;color:var(--accent);"></i>
-                       <span style="font-weight:500; color:var(--accent);">Orden #${o.folio || '-'}</span>
-                     </div>
-                     <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.3rem;">
-                       ${formatDateOnly(o.fecha)}
-                     </div>
-                   </div>
-                   <span class="badge badge-${o.estado==='Pendiente'?'pendiente':o.estado==='En Proceso'?'proceso':'completado'}">${o.estado||'Pendiente'}</span>
-                 </div>
-               `;
-             }
-          }).join('')}
+        <div style="display:flex; flex-direction:column; max-height:300px; overflow-y:auto; padding-right:0.5rem;">
+          ${activos.map(renderItem).join('')}
+          ${cerrados.length > 0 ? `
+             <div style="margin-top: 0.2rem; margin-bottom: 0.5rem; text-align: center;">
+                <button type="button" onclick="const div = document.getElementById('historial-cerrados'); div.style.display = div.style.display === 'none' ? 'block' : 'none'; const icon = this.querySelector('i'); if(div.style.display==='none'){ icon.setAttribute('data-lucide', 'chevron-down'); } else { icon.setAttribute('data-lucide', 'chevron-up'); } lucide.createIcons();" style="background: none; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-muted); font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.8rem; font-weight: 500; transition: background 0.2s;">
+                   Ver completados (${cerrados.length}) <i data-lucide="chevron-down" style="width:14px;height:14px;"></i>
+                </button>
+             </div>
+             <div id="historial-cerrados" style="display:none;">
+                ${cerrados.map(renderItem).join('')}
+             </div>
+          ` : ''}
         </div>
       </div>
     `;
