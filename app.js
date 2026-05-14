@@ -2632,9 +2632,19 @@ function renderClientes() {
   // RENDERIZAR CUADRÍCULA
   grid.innerHTML = paginatedClientes.map(c => {
     const qtyOrdenes = ordenes.filter(x => x.cliente === c.nombre).length;
+    
+    // Contar máquinas combinadas (SAP + manuales)
+    const maqClient = maquinariaDb.filter(m => m.cliente === c.nombre || m.cliente === c.id || m.cliente === c.rfc);
+    let totalMaquinas = maqClient.length;
+    (c.maquinas || []).forEach(m => {
+       if (!maqClient.some(sap => sap.id === m.idInterno || sap.serie === m.serie || sap.idInterno === m.idInterno)) {
+           totalMaquinas++;
+       }
+    });
+
     let maquinasText = '';
-    if (c.maquinas && c.maquinas.length > 0) {
-      maquinasText = `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.4rem;"><i data-lucide="settings-2" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:0.2rem;"></i> ${c.maquinas.length} máquina(s)</div>`;
+    if (totalMaquinas > 0) {
+      maquinasText = `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.4rem;"><i data-lucide="settings-2" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:0.2rem;"></i> ${totalMaquinas} máquina(s)</div>`;
     }
     
     // Formatear moneda (SAP)
@@ -2672,6 +2682,15 @@ function renderClientes() {
   
   if (tbody) {
     tbody.innerHTML = paginatedClientes.map(c => {
+      // Re-contar para la tabla (ya que el map es independiente)
+      const maqClient = maquinariaDb.filter(m => m.cliente === c.nombre || m.cliente === c.id || m.cliente === c.rfc);
+      let totalMaquinas = maqClient.length;
+      (c.maquinas || []).forEach(m => {
+         if (!maqClient.some(sap => sap.id === m.idInterno || sap.serie === m.serie || sap.idInterno === m.idInterno)) {
+             totalMaquinas++;
+         }
+      });
+
       const qtyOrdenes = ordenes.filter(x => x.cliente === c.nombre).length;
       const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
       
@@ -2706,7 +2725,7 @@ function renderClientes() {
             ${API_CONFIG.USE_SAP_BACKEND ? `<span style="border-bottom: 1px dashed var(--accent); cursor:pointer;">${formatMoney(c.saldoOrdenes)}</span>` : '<span style="font-size:0.85rem; color:var(--text-muted); font-weight:normal;">N/A</span>'}
           </td>
           ${customTds}
-          <td style="text-align:center;"><span class="badge" style="background:var(--blue-light); color:var(--blue);">${(c.maquinas || []).length}</span></td>
+          <td style="text-align:center;"><span class="badge" style="background:var(--blue-light); color:var(--blue);">${totalMaquinas}</span></td>
         </tr>
       `;
     }).join('');
