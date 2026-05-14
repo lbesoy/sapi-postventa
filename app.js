@@ -3088,7 +3088,7 @@ function verDetalleCliente(nombre) {
     html += `
       <div style="margin-top: 1.5rem;">
         <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="layers" style="width:18px;height:18px;color:var(--text-muted);"></i> Historial de Servicios (${historial.length})</h3>
-        <div style="display:flex; flex-direction:column; max-height:300px; overflow-y:auto; padding-right:0.5rem;">
+        <div style="display:flex; flex-direction:column;">
           ${activos.map(renderItem).join('')}
           <div style="margin-top: 0.2rem; margin-bottom: 0.5rem; text-align: center;">
              <button type="button" onclick="const div = document.getElementById('cliente-historial-cerrados'); div.style.display = div.style.display === 'none' ? 'block' : 'none'; const icon = this.querySelector('i'); if(div.style.display==='none'){ icon.setAttribute('data-lucide', 'chevron-down'); } else { icon.setAttribute('data-lucide', 'chevron-up'); } lucide.createIcons();" style="background: none; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-muted); font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.8rem; font-weight: 500; transition: background 0.2s;">
@@ -3531,7 +3531,7 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
     html += `
       <div>
         <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="layers" style="width:18px;height:18px;color:var(--text-muted);"></i> Historial de Servicios (${historial.length})</h3>
-        <div style="display:flex; flex-direction:column; max-height:300px; overflow-y:auto; padding-right:0.5rem;">
+        <div style="display:flex; flex-direction:column;">
           ${activos.map(renderItem).join('')}
           <div style="margin-top: 0.2rem; margin-bottom: 0.5rem; text-align: center;">
              <button type="button" onclick="const div = document.getElementById('historial-cerrados'); div.style.display = div.style.display === 'none' ? 'block' : 'none'; const icon = this.querySelector('i'); if(div.style.display==='none'){ icon.setAttribute('data-lucide', 'chevron-down'); } else { icon.setAttribute('data-lucide', 'chevron-up'); } lucide.createIcons();" style="background: none; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-muted); font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.8rem; font-weight: 500; transition: background 0.2s;">
