@@ -8508,16 +8508,16 @@ function getNthDayOfMonth(year, month, dayOfWeek, n) {
 
 function getFestivosMexico(year) {
   const festivos = [
-    { title: '🎉 Año Nuevo', start: `${year}-01-01`, allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true } },
-    { title: '📜 Día de la Constitución', start: getNthDayOfMonth(year, 1, 1, 1), allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true } },
-    { title: '🦅 Natalicio B. Juárez', start: getNthDayOfMonth(year, 2, 1, 3), allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true } },
-    { title: '👷 Día del Trabajo', start: `${year}-05-01`, allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true } },
-    { title: '🇲🇽 Independencia', start: `${year}-09-16`, allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true } },
-    { title: '🚂 Revolución Mex.', start: getNthDayOfMonth(year, 10, 1, 3), allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true } },
-    { title: '🎅 Navidad', start: `${year}-12-25`, allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true } }
+    { title: 'Año Nuevo', start: `${year}-01-01`, allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true, icon: 'party-popper' } },
+    { title: 'Día de la Constitución', start: getNthDayOfMonth(year, 1, 1, 1), allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true, icon: 'scroll' } },
+    { title: 'Natalicio B. Juárez', start: getNthDayOfMonth(year, 2, 1, 3), allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true, icon: 'user' } },
+    { title: 'Día del Trabajo', start: `${year}-05-01`, allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true, icon: 'hard-hat' } },
+    { title: 'Independencia', start: `${year}-09-16`, allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true, icon: 'flag' } },
+    { title: 'Revolución Mex.', start: getNthDayOfMonth(year, 10, 1, 3), allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true, icon: 'swords' } },
+    { title: 'Navidad', start: `${year}-12-25`, allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true, icon: 'gift' } }
   ];
   if (year === 2024 || year === 2030 || year === 2036) {
-    festivos.push({ title: '🏛️ Transmisión de Poder', start: `${year}-10-01`, allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true } });
+    festivos.push({ title: 'Transmisión de Poder', start: `${year}-10-01`, allDay: true, backgroundColor: '#f3f4f6', borderColor: '#d1d5db', textColor: '#4b5563', extendedProps: { isFestivo: true, icon: 'landmark' } });
   }
   return festivos;
 }
@@ -8652,8 +8652,10 @@ function renderCalendario() {
       const bgColor = arg.event.backgroundColor || 'var(--accent)';
       
       if (arg.event.extendedProps.isFestivo) {
+        const iconName = arg.event.extendedProps.icon || 'calendar';
         return {
-          html: `<div style="background-color:${bgColor}; border:1px solid ${arg.event.borderColor}; border-radius:3px; font-size:0.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:2px 4px; color:${arg.event.textColor}; width:100%; box-sizing:border-box;" title="${arg.event.title}">
+          html: `<div style="background-color:${bgColor}; border:1px solid ${arg.event.borderColor}; border-radius:3px; font-size:0.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:2px 4px; color:${arg.event.textColor}; width:100%; box-sizing:border-box; display:flex; align-items:center; gap:0.25rem;" title="${arg.event.title}">
+                   <i data-lucide="${iconName}" style="width:12px; height:12px;"></i>
                    <b>${arg.event.title}</b>
                  </div>`
         };
@@ -8675,6 +8677,11 @@ function renderCalendario() {
                  <span style="font-size:0.65rem; opacity:0.85;">${arg.event.extendedProps.tecnico || 'Sin asignar'}</span>
                </div>`
       };
+    },
+    eventDidMount: function(info) {
+      if (window.lucide) {
+        window.lucide.createIcons({ root: info.el });
+      }
     }
   });
   
