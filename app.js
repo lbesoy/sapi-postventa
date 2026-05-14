@@ -3259,6 +3259,7 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
     (t.equipo && t.equipo.includes(idInterno)) ||
     (t.equipo && t.equipo === idInterno)
   );
+  const maqTicketIds = maqTickets.map(t => t.id);
   const maqOrdenes = ordenes.filter(o => 
     o.maquina === idInterno || 
     (serie && serie !== 'N/A' && o.maquina === serie) || 
@@ -3266,7 +3267,8 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
     (serie && serie !== 'N/A' && o.serie === serie) || 
     (snMatch && o.equipo && o.equipo.includes(snMatch)) || 
     (o.equipo && o.equipo.includes(idInterno)) ||
-    (o.equipo && o.equipo === idInterno)
+    (o.equipo && o.equipo === idInterno) ||
+    (o.soporte && maqTicketIds.includes(o.soporte))
   );
   
   let fechas = [];
