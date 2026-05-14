@@ -8361,27 +8361,6 @@ function renderCalendario() {
 
         eventos.push(ev);
       });
-    } else {
-      let isMatch = false;
-      if (!filtroTecnico) isMatch = true;
-      else if (o.tecnicosAsignados && o.tecnicosAsignados.includes(filtroTecnico)) isMatch = true;
-      else if (o.tecnico && o.tecnico.includes(filtroTecnico)) isMatch = true;
-
-      if (isMatch) {
-        eventos.push({
-          id: o.id,
-          title: `${o.folio || 'S/N'} - ${o.cliente}`,
-          start: o.fechaInicio || o.fecha,
-          end: o.fechaFin || o.fechaInicio || o.fecha,
-          backgroundColor: bgColor,
-          borderColor: bgColor,
-          extendedProps: {
-            isBitacora: false,
-            tecnico: o.tecnico,
-            estado: o.estado
-          }
-        });
-      }
     }
   });
 
