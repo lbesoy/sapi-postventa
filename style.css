@@ -1023,8 +1023,26 @@ body {
   /* Signature print handling */
   #firma-canvas, canvas { display: none !important; }
   .detalle-section button { display: none !important; }
-  body { background: white !important; margin: 0; padding: 0; }
-  @page { margin: 0.5cm; }
+  
+  /* Fix Grid Page Breaks */
+  .detalle-grid {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 1rem !important;
+  }
+  .detalle-grid > * {
+    flex: 1 1 180px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  .detalle-section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    display: block !important;
+  }
+  
+  body { background: white !important; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  @page { margin: 1cm; }
 }
 
 /* Tooltip styles */
