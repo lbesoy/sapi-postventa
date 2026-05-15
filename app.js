@@ -5741,7 +5741,8 @@ function verDetalle(id) {
           ${o.firma_tecnico_base64 
             ? `<div style="border:1px solid var(--border); border-radius:8px; padding:1rem; background:white; width:100%;">
                  <img src="${o.firma_tecnico_base64}" alt="Firma del técnico" style="max-width:100%; max-height:150px; display:block; margin:0 auto;"/>
-                 <p style="text-align:center; color:var(--text-muted); font-size:0.8rem; margin-top:0.5rem; margin-bottom:0;">Técnico: ${o.tecnico || '—'}</p>
+                 <p style="text-align:center; color:var(--text-primary); font-weight:600; font-size:0.85rem; margin-top:0.5rem; margin-bottom:0;">${o.firma_tecnico_nombre || o.tecnico || 'Técnico'}</p>
+                 ${o.firma_tecnico_fecha ? `<p style="text-align:center; color:var(--text-muted); font-size:0.75rem; margin-top:0.25rem; margin-bottom:0;">${new Date(o.firma_tecnico_fecha).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'})}</p>` : ''}
                </div>
                ${currentSession.viewMode === 'admin' || currentSession.viewMode === 'superadmin' ? `<button class="btn-secondary" onclick="limpiarFirma('${o.id}', 'tecnico')" style="font-size:0.8rem; margin-top:1rem;"><i data-lucide="eraser" style="width:14px;height:14px;"></i> Borrar firma (Admin)</button>` : ''}` 
             : `<div style="width:100%;">
@@ -5761,7 +5762,8 @@ function verDetalle(id) {
           ${o.firma_cliente_base64 
             ? `<div style="border:1px solid var(--border); border-radius:8px; padding:1rem; background:white; width:100%;">
                  <img src="${o.firma_cliente_base64}" alt="Firma del cliente" style="max-width:100%; max-height:150px; display:block; margin:0 auto;"/>
-                 <p style="text-align:center; color:var(--text-muted); font-size:0.8rem; margin-top:0.5rem; margin-bottom:0;">Cliente: ${o.cliente || '—'}</p>
+                 <p style="text-align:center; color:var(--text-primary); font-weight:600; font-size:0.85rem; margin-top:0.5rem; margin-bottom:0;">${o.firma_cliente_nombre || o.cliente || 'Cliente'}</p>
+                 ${o.firma_cliente_fecha ? `<p style="text-align:center; color:var(--text-muted); font-size:0.75rem; margin-top:0.25rem; margin-bottom:0;">${new Date(o.firma_cliente_fecha).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'})}</p>` : ''}
                </div>
                <button class="btn-secondary" onclick="limpiarFirma('${o.id}', 'cliente')" style="font-size:0.8rem; margin-top:1rem;"><i data-lucide="eraser" style="width:14px;height:14px;"></i> Volver a firmar</button>` 
             : (!o.firma_tecnico_base64 
@@ -5771,6 +5773,7 @@ function verDetalle(id) {
                   </div>`
                : `<div style="width:100%;">
                  <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.5rem;">Firme en el recuadro blanco usando el dedo o mouse:</p>
+                 <input type="text" id="nombre-firma-cliente" class="form-control" placeholder="Nombre completo de quien firma" style="margin-bottom:0.5rem; font-size:0.85rem; padding:0.4rem;"/>
                  <canvas id="firma-cliente-canvas" width="400" height="150" style="width:100%; height:150px; background:white; border:2px dashed var(--border); border-radius:8px; cursor:crosshair; touch-action:none;"></canvas>
                  <div style="display:flex; gap:0.5rem; margin-top:0.5rem; justify-content:space-between;">
                    <button class="btn-secondary" onclick="borrarCanvasFirma('cliente')" style="flex:1;">Borrar</button>
@@ -5864,8 +5867,18 @@ function guardarFirmaCanvas(ordenId, tipo) {
   
   const idx = ordenes.findIndex(o => o.id === ordenId);
   if (idx !== -1) {
-    if (tipo === 'tecnico') ordenes[idx].firma_tecnico_base64 = base64Firma;
-    else ordenes[idx].firma_cliente_base64 = base64Firma;
+    const fechaFirma = new Date().toISOString();
+    
+    if (tipo === 'tecnico') {
+      const currentUser = usuarios.find(u => u.id === currentSession.userId);
+      ordenes[idx].firma_tecnico_base64 = base64Firma;
+      ordenes[idx].firma_tecnico_nombre = currentUser ? currentUser.nombre : (currentSession.nombre || ordenes[idx].tecnico || 'Técnico');
+      ordenes[idx].firma_tecnico_fecha = fechaFirma;
+    } else {
+      ordenes[idx].firma_cliente_base64 = base64Firma;
+      ordenes[idx].firma_cliente_nombre = document.getElementById('nombre-firma-cliente')?.value || ordenes[idx].cliente || 'Cliente';
+      ordenes[idx].firma_cliente_fecha = fechaFirma;
+    }
     
     ordenes[idx].estado = calcularEstadoOrden(ordenes[idx]);
     
