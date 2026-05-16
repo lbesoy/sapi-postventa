@@ -5541,6 +5541,12 @@ function verDetalle(id) {
       btnAsignarTecs.style.display = 'none';
     }
   }
+
+  const btnEnviarCorreo = document.getElementById('btn-enviar-correo');
+  if (btnEnviarCorreo) {
+    btnEnviarCorreo.setAttribute('onclick', `enviarCorreoOrden('${id}')`);
+  }
+
   window.currentDetalleOrdenId = id;
 
   const renderBitacora = (o) => {
@@ -6330,6 +6336,56 @@ function cerrarDetalle(e) {
 }
 
 function imprimirOrden() { window.print(); }
+
+async function enviarCorreoOrden(ordenId) {
+  const o = ordenes.find(x => x.id === ordenId);
+  if (!o) return;
+  
+  const destinatario = prompt("¿A qué correo deseas enviar esta orden de servicio?", "cliente@ejemplo.com");
+  if (!destinatario) return;
+  
+  mostrarNotificacion("Enviando correo, por favor espera...", "info");
+  
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+      <h2 style="color: #e8820c; text-align: center;">Orden de Servicio: ${o.folio || 'N/A'}</h2>
+      <p><strong>Cliente:</strong> ${o.cliente || '—'}</p>
+      <p><strong>Fecha:</strong> ${o.fecha || '—'}</p>
+      <p><strong>Equipo/Modelo:</strong> ${o.modelo || '—'} (Serie: ${o.serie || '—'})</p>
+      <p><strong>Técnico Asignado:</strong> ${o.tecnico || '—'}</p>
+      <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
+      <h3 style="color: #444;">Trabajos Realizados</h3>
+      <p>${(o.trabajos || 'Sin descripción').replace(/\\n/g, '<br>')}</p>
+      <h3 style="color: #444;">Observaciones</h3>
+      <p>${(o.observaciones || '—').replace(/\\n/g, '<br>')}</p>
+      <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
+      <p style="text-align: center; color: #777; font-size: 12px;">Para ver el reporte completo, consulte el portal de Eurorep.</p>
+    </div>
+  `;
+
+  try {
+    const response = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: destinatario,
+        subject: \`Reporte de Servicio \${o.folio || ''} - \${o.cliente || ''}\`,
+        htmlBody: htmlBody
+      })
+    });
+    
+    const result = await response.json();
+    if (response.ok) {
+      mostrarNotificacion("¡Correo enviado exitosamente!", "success");
+    } else {
+      mostrarNotificacion("Error al enviar: " + (result.error || "Revisa las credenciales SMTP en Vercel"), "error");
+      console.error(result);
+    }
+  } catch (err) {
+    console.error(err);
+    mostrarNotificacion("Error de red al intentar enviar el correo.", "error");
+  }
+}
 
 // ===== TICKETS DATA =====
 function updateTicketBadge() {
