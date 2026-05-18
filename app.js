@@ -4470,6 +4470,7 @@ function guardarPermisosRoles() {
   });
   
   localStorage.setItem('sapi_roles_config', JSON.stringify(ROLES));
+  if (window.pushToSupabase) window.pushToSupabase('roles', ROLES);
   
   // Recargar la UI
   setupNav();
