@@ -281,6 +281,24 @@
                 style="padding:0.4rem 1rem; border:none; background:transparent; color:var(--text-muted); font-weight:500;">Técnicos</button>
             </div>
           </div>
+          
+          <!-- KPIs CLIENTE (Siempre visibles en el Dashboard para el rol de Empresa/Cliente) -->
+          <div class="stats-grid" id="dash-kpis-cliente" style="display:none; margin-bottom: 1.5rem;">
+            <div class="stat-card">
+              <div class="stat-icon" style="background:rgba(139,92,246,0.12);color:#8b5cf6;"><i data-lucide="settings-2"></i></div>
+              <div>
+                <div class="stat-label">Mis Máquinas</div>
+                <div class="stat-value" id="stat-cli-maquinas">0</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="map-pin"></i></div>
+              <div>
+                <div class="stat-label">Mis Sitios</div>
+                <div class="stat-value" id="stat-cli-sitios">0</div>
+              </div>
+            </div>
+          </div>
 
           <!-- DASHBOARD CONTENIDO ÓRDENES -->
           <div id="dash-content-ordenes">

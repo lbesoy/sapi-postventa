@@ -1725,10 +1725,47 @@ function renderStats() {
         const tsol = String(t.solicitante || '').toLowerCase().trim();
         return tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged;
       });
+      
+      let countMaquinas = 0;
+      maquinariaDb.forEach(m => {
+        const mcli = String(m.cliente || '').toLowerCase().trim();
+        if (mcli === nombreEmpresaLogged) countMaquinas++;
+      });
+      clientesDb.forEach(c => {
+        if (c.nombre && String(c.nombre).toLowerCase().trim() === nombreEmpresaLogged) {
+          if (c.maquinas) countMaquinas += c.maquinas.length;
+        }
+      });
+      
+      let countSitios = 0;
+      sitiosDb.forEach(s => {
+        const scli = String(s.cliente || '').toLowerCase().trim();
+        if (scli === nombreEmpresaLogged) countSitios++;
+      });
+      clientesDb.forEach(c => {
+        if (c.nombre && String(c.nombre).toLowerCase().trim() === nombreEmpresaLogged) {
+          if (c.sitios) countSitios += c.sitios.length;
+        }
+      });
+      
+      const elDashKpis = document.getElementById('dash-kpis-cliente');
+      if (elDashKpis) elDashKpis.style.display = 'grid';
+      
+      const elMaquinas = document.getElementById('stat-cli-maquinas');
+      if (elMaquinas) elMaquinas.textContent = countMaquinas;
+      
+      const elSitios = document.getElementById('stat-cli-sitios');
+      if (elSitios) elSitios.textContent = countSitios;
+
     } else {
       ordenesFilter = [];
       ticketsFilter = [];
+      const elDashKpis = document.getElementById('dash-kpis-cliente');
+      if (elDashKpis) elDashKpis.style.display = 'none';
     }
+  } else {
+      const elDashKpis = document.getElementById('dash-kpis-cliente');
+      if (elDashKpis) elDashKpis.style.display = 'none';
   }
 
   const total = ordenesFilter.length;
