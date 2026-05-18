@@ -1681,20 +1681,54 @@ function setupNav() {
 
 // ===== STATS =====
 function renderStats() {
-  const total = ordenes.length;
-  const proceso = ordenes.filter(o => o.estado === 'En Proceso').length;
-  const pendientes = ordenes.filter(o => o.estado === 'Pendiente').length;
-  const completas = ordenes.filter(o => o.estado === 'Completado').length;
+  let ordenesFilter = ordenes;
+  let ticketsFilter = tickets;
+
+  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+
+  if (isEmpresa) {
+    let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+    if (nombreEmpresaLogged) {
+      nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
+      ordenesFilter = ordenes.filter(o => {
+        const ocli = String(o.cliente || '').toLowerCase().trim();
+        let fromTicket = false;
+        if (o.soporte) {
+          const tick = tickets.find(t => t.id === o.soporte);
+          if (tick) {
+            const tcli = String(tick.cliente || '').toLowerCase().trim();
+            const tsol = String(tick.solicitante || '').toLowerCase().trim();
+            if (tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged) fromTicket = true;
+          }
+        }
+        return ocli === nombreEmpresaLogged || fromTicket;
+      });
+      ticketsFilter = tickets.filter(t => {
+        const tcli = String(t.cliente || '').toLowerCase().trim();
+        const tsol = String(t.solicitante || '').toLowerCase().trim();
+        return tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged;
+      });
+    } else {
+      ordenesFilter = [];
+      ticketsFilter = [];
+    }
+  }
+
+  const total = ordenesFilter.length;
+  const proceso = ordenesFilter.filter(o => o.estado === 'En Proceso').length;
+  const pendientes = ordenesFilter.filter(o => o.estado === 'Pendiente').length;
+  const completas = ordenesFilter.filter(o => o.estado === 'Completado').length;
   document.getElementById('stat-total').textContent = total;
   document.getElementById('stat-proceso').textContent = proceso;
   document.getElementById('stat-pendientes').textContent = pendientes;
   document.getElementById('stat-completas').textContent = completas;
 
   // Stats Tickets
-  const t_total = tickets.length;
-  const t_abiertos = tickets.filter(t => t.estado === 'Abierto').length;
-  const t_cotizacion = tickets.filter(t => t.estado === 'Cotización').length;
-  const t_cerrados = tickets.filter(t => t.estado === 'Cerrado').length;
+  const t_total = ticketsFilter.length;
+  const t_abiertos = ticketsFilter.filter(t => t.estado === 'Abierto').length;
+  const t_cotizacion = ticketsFilter.filter(t => t.estado === 'Cotización').length;
+  const t_cerrados = ticketsFilter.filter(t => t.estado === 'Cerrado').length;
   const elTotalT = document.getElementById('stat-t-total');
   if (elTotalT) {
     elTotalT.textContent = t_total;
@@ -1864,6 +1898,30 @@ function renderTabla(ctx) {
   let supFilter = document.getElementById('filter-ord-supervisor')?.value;
   
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  
+  if (isEmpresa) {
+    let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+    if (nombreEmpresaLogged) {
+      nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
+      filtradas = filtradas.filter(o => {
+        const ocli = String(o.cliente || '').toLowerCase().trim();
+        let fromTicket = false;
+        if (o.soporte) {
+          const tick = tickets.find(t => t.id === o.soporte);
+          if (tick) {
+            const tcli = String(tick.cliente || '').toLowerCase().trim();
+            const tsol = String(tick.solicitante || '').toLowerCase().trim();
+            if (tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged) fromTicket = true;
+          }
+        }
+        return ocli === nombreEmpresaLogged || fromTicket;
+      });
+    } else {
+      filtradas = [];
+    }
+  }
+
   if (currentUser) {
      if (currentUser.rol === 'tecnico') tecFilter = currentUser.nombre;
      if (currentUser.rol === 'supervisor') supFilter = currentUser.nombre;
@@ -6515,6 +6573,22 @@ function renderTickets(ctx) {
   let supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value;
   
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  
+  if (isEmpresa) {
+    let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+    if (nombreEmpresaLogged) {
+      nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
+      filtered = filtered.filter(t => {
+        const tcli = String(t.cliente || '').toLowerCase().trim();
+        const tsol = String(t.solicitante || '').toLowerCase().trim();
+        return tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged;
+      });
+    } else {
+      filtered = [];
+    }
+  }
+
   if (currentUser) {
      if (currentUser.rol === 'tecnico') tecFilter = currentUser.nombre;
      if (currentUser.rol === 'supervisor') supFilter = currentUser.nombre;
@@ -6668,16 +6742,21 @@ function renderMaquinaria() {
   const q = (document.getElementById('search-maquinaria')?.value || '').toLowerCase();
   
   // Si es rol empresa, solo vemos las suyas (usando el nombre del user logueado)
-  const isEmpresa = currentSession.viewMode === 'empresa';
+  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
-  const nombreEmpresaLogged = isEmpresa && currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+  let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+  if (nombreEmpresaLogged) nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
   const canEdit = currentSession.viewMode !== 'consulta';
 
   let allMachines = [];
   
   // Agregar máquinas de SAP
   maquinariaDb.forEach(m => {
-    if (isEmpresa && m.cliente !== nombreEmpresaLogged) return;
+    if (isEmpresa) {
+      if (!nombreEmpresaLogged) return;
+      const mcli = String(m.cliente || '').toLowerCase().trim();
+      if (mcli !== nombreEmpresaLogged) return;
+    }
     allMachines.push({
       cliente: m.cliente || 'N/A',
       idInterno: m.idInterno || m.id || m.serie || 'N/A',
