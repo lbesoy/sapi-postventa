@@ -445,12 +445,23 @@ function entrarApp(user) {
      window.cargarDatosDeSupabase().then(() => {
         renderUsuariosList();
         renderTabla();
-        if (typeof renderTickets === 'function') renderTickets();
+        renderTabla('servicios');
+        if (typeof renderTickets === 'function') {
+           renderTickets();
+           renderTickets('dash-tickets');
+        }
         renderStats();
         if (btnLogin) btnLogin.innerHTML = '<i data-lucide="log-in" class="btn-icon"></i> Iniciar Sesión';
      });
   } else {
      renderUsuariosList();
+     renderTabla();
+     renderTabla('servicios');
+     if (typeof renderTickets === 'function') {
+        renderTickets();
+        renderTickets('dash-tickets');
+     }
+     renderStats();
   }
   
   lucide.createIcons();
@@ -1674,6 +1685,11 @@ function setupNav() {
       if (view === 'tickets') renderTickets();
       if (view === 'tecnicos') {
         if (typeof renderTecnicos === 'function') renderTecnicos();
+      }
+      if (view === 'dashboard') {
+        renderStats();
+        renderTabla('');
+        renderTickets('dash-tickets');
       }
     });
   });
