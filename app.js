@@ -7436,6 +7436,19 @@ function abrirTicket(id) {
     }
   }
 
+  // Ocultar campos internos si es Empresa
+  const displayInternal = isEmpresa ? 'none' : '';
+  ['section-t-origen', 'group-t-cliente', 'group-t-asignado', 'group-t-notas', 'section-t-estado', 'group-t-resolucion', 'group-t-cierre'].forEach(elId => {
+    const el = document.getElementById(elId);
+    if (el) {
+      if (!isEmpresa && elId === 'group-t-cliente') {
+        el.style.display = 'block'; // Ensure block for combo box wrapper
+      } else {
+        el.style.display = displayInternal;
+      }
+    }
+  });
+
   if (id) {
     const t = tickets.find(x => x.id === id);
     if (t) {
@@ -8056,9 +8069,9 @@ function verDetalleTicket(id) {
       <div class="detalle-section-title">Descripción</div>
       <div class="detalle-field"><div class="detalle-value" style="white-space:pre-wrap;">${t.descripcion||'—'}</div></div>
     </div>
-    ${t.notas ? `
+    ${(t.notas && currentSession.viewMode !== 'empresa') ? `
     <div class="detalle-section">
-      <div class="detalle-section-title">Notas</div>
+      <div class="detalle-section-title">Notas Internas</div>
       <div class="detalle-field"><div class="detalle-value" style="white-space:pre-wrap;">${t.notas}</div></div>
     </div>` : ''}
 
