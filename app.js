@@ -6355,9 +6355,9 @@ async function enviarCorreoOrden(ordenId) {
       <p><strong>Técnico Asignado:</strong> ${o.tecnico || '—'}</p>
       <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
       <h3 style="color: #444;">Trabajos Realizados</h3>
-      <p>${(o.trabajos || 'Sin descripción').replace(/\\n/g, '<br>')}</p>
+      <p>${(o.trabajos || 'Sin descripción').replace(/\n/g, '<br>')}</p>
       <h3 style="color: #444;">Observaciones</h3>
-      <p>${(o.observaciones || '—').replace(/\\n/g, '<br>')}</p>
+      <p>${(o.observaciones || '—').replace(/\n/g, '<br>')}</p>
       <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
       <p style="text-align: center; color: #777; font-size: 12px;">Para ver el reporte completo, consulte el portal de Eurorep.</p>
     </div>
@@ -6369,7 +6369,7 @@ async function enviarCorreoOrden(ordenId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         to: destinatario,
-        subject: \`Reporte de Servicio \${o.folio || ''} - \${o.cliente || ''}\`,
+        subject: `Reporte de Servicio ${o.folio || ''} - ${o.cliente || ''}`,
         htmlBody: htmlBody
       })
     });
