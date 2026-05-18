@@ -8843,3 +8843,97 @@ function mostrarPopupBitacora(info) {
   document.body.appendChild(overlay);
   if (window.lucide) window.lucide.createIcons({ root: overlay });
 }
+
+// ===== PASSWORD RECOVERY FLOW =====
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.supabaseClient) {
+    window.supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // Mostrar la pantalla de actualización de contraseña
+        document.getElementById('login-screen').style.display = 'flex';
+        document.getElementById('login-step-form').style.display = 'none';
+        document.getElementById('login-step-recovery').style.display = 'none';
+        document.getElementById('login-step-crear').style.display = 'none';
+        document.getElementById('login-step-update-password').style.display = 'block';
+        
+        mostrarNotificacion('Sesión verificada. Ya puedes cambiar tu contraseña.', 'success');
+      }
+    });
+  }
+});
+
+function abrirRecuperarPassword(e) {
+  e.preventDefault();
+  document.getElementById('login-step-form').style.display = 'none';
+  document.getElementById('login-step-recovery').style.display = 'block';
+  document.getElementById('recovery-email').value = document.getElementById('login-email').value || '';
+}
+
+function volverLoginDesdeRecovery() {
+  document.getElementById('login-step-recovery').style.display = 'none';
+  document.getElementById('login-step-form').style.display = 'block';
+  document.getElementById('recovery-error').textContent = '';
+}
+
+async function enviarRecoveryLink(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('recovery-error');
+  const email = document.getElementById('recovery-email').value.trim();
+  
+  if (!email) return;
+  
+  errEl.textContent = 'Enviando enlace...';
+  errEl.style.color = 'var(--text-secondary)';
+  
+  try {
+    const { data, error } = await window.supabaseClient.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname
+    });
+    
+    if (error) {
+      errEl.textContent = 'Error: ' + error.message;
+      errEl.style.color = 'var(--red)';
+    } else {
+      errEl.textContent = '¡Enlace enviado! Revisa tu bandeja de entrada o spam. Ya puedes cerrar esta ventana.';
+      errEl.style.color = 'var(--success)';
+    }
+  } catch (error) {
+    errEl.textContent = 'Error de red. Intenta de nuevo.';
+    errEl.style.color = 'var(--red)';
+  }
+}
+
+async function guardarNuevaPassword(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('update-pass-error');
+  const newPass = document.getElementById('new-password').value;
+  
+  if (newPass.length < 6) {
+    errEl.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+    errEl.style.color = 'var(--red)';
+    return;
+  }
+  
+  errEl.textContent = 'Actualizando contraseña...';
+  errEl.style.color = 'var(--text-secondary)';
+  
+  try {
+    const { data, error } = await window.supabaseClient.auth.updateUser({
+      password: newPass
+    });
+    
+    if (error) {
+      errEl.textContent = 'Error al actualizar: ' + error.message;
+      errEl.style.color = 'var(--red)';
+    } else {
+      mostrarNotificacion('¡Contraseña actualizada exitosamente!', 'success');
+      document.getElementById('login-step-update-password').style.display = 'none';
+      document.getElementById('login-step-form').style.display = 'block';
+      document.getElementById('login-password').value = '';
+    }
+  } catch (error) {
+    errEl.textContent = 'Error de red. Intenta de nuevo.';
+    errEl.style.color = 'var(--red)';
+  }
+}

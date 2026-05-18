@@ -58,11 +58,63 @@
             <i data-lucide="log-in" class="btn-icon"></i> Iniciar Sesión
           </button>
         </form>
+        
+        <div style="text-align:center; margin-top:1rem;">
+          <a href="#" onclick="abrirRecuperarPassword(event)" style="color:var(--accent); font-size:0.85rem; text-decoration:none;">¿Olvidaste tu contraseña?</a>
+        </div>
 
         <div class="login-divider" style="margin-top:1.5rem;"><span>Opciones</span></div>
         <button class="login-setup-btn" onclick="loginCrearUsuario()">
           <i data-lucide="user-plus"></i> Registrar nuevo usuario
         </button>
+      </div>
+
+      <!-- RECUPERAR CONTRASEÑA -->
+      <div id="login-step-recovery" style="display:none;">
+        <button class="btn-secondary" style="margin-bottom:1.5rem;padding:0.4rem;border:none;"
+          onclick="volverLoginDesdeRecovery()"><i data-lucide="arrow-left"></i> Volver</button>
+        <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:0.5rem;color:var(--text-primary);">Recuperar
+          Contraseña</h2>
+        <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1.5rem;line-height:1.4;">Ingresa el correo asociado a tu cuenta para enviarte un enlace seguro.</p>
+        <form onsubmit="enviarRecoveryLink(event)">
+          <div class="form-group">
+            <label>Correo Electrónico</label>
+            <div style="position:relative;">
+              <i data-lucide="mail"
+                style="position:absolute;left:12px;top:10px;width:1rem;height:1rem;color:var(--text-muted);"></i>
+              <input type="email" id="recovery-email" placeholder="usuario@eurorep.mx" style="padding-left:2.5rem;"
+                required />
+            </div>
+          </div>
+          <div id="recovery-error" class="pin-error" style="text-align:left;margin-top:0.25rem;"></div>
+          <button type="submit" class="btn-primary"
+            style="width:100%;margin-top:0.5rem;justify-content:center;padding:0.75rem;">
+            <i data-lucide="send" class="btn-icon"></i> Enviar Enlace
+          </button>
+        </form>
+      </div>
+
+      <!-- ACTUALIZAR CONTRASEÑA (DESDE ENLACE) -->
+      <div id="login-step-update-password" style="display:none;">
+        <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:0.5rem;color:var(--text-primary);">Crear Nueva
+          Contraseña</h2>
+        <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1.5rem;line-height:1.4;">Tu sesión ha sido verificada. Ingresa tu nueva contraseña.</p>
+        <form onsubmit="guardarNuevaPassword(event)">
+          <div class="form-group">
+            <label>Nueva Contraseña</label>
+            <div style="position:relative;">
+              <i data-lucide="lock"
+                style="position:absolute;left:12px;top:10px;width:1rem;height:1rem;color:var(--text-muted);"></i>
+              <input type="password" id="new-password" placeholder="••••••••" style="padding-left:2.5rem;"
+                required minlength="6"/>
+            </div>
+          </div>
+          <div id="update-pass-error" class="pin-error" style="text-align:left;margin-top:0.25rem;"></div>
+          <button type="submit" class="btn-primary"
+            style="width:100%;margin-top:0.5rem;justify-content:center;padding:0.75rem;">
+            <i data-lucide="save" class="btn-icon"></i> Guardar y Entrar
+          </button>
+        </form>
       </div>
 
       <!-- PASO 2: Crear usuario (setup) -->
