@@ -678,6 +678,12 @@ function applyRole(rolKey) {
     btnProgramar.style.display = ['superadmin', 'admin', 'supervisor'].includes(rolKey) ? 'flex' : 'none';
   }
 
+  // Ocultar pestaña de Técnicos en el Dashboard para empresas/clientes
+  const btnDashTecnicos = document.getElementById('btn-dash-tecnicos');
+  if (btnDashTecnicos) {
+    btnDashTecnicos.style.display = ['empresa', 'cliente'].includes(rolKey) ? 'none' : 'inline-block';
+  }
+
   // Update role mode buttons
   document.querySelectorAll('.role-mode-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.role === rolKey);
