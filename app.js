@@ -2013,9 +2013,9 @@ function renderDashboardV2() {
   let totalDiasTickets = 0;
   let countTicketsCerrados = 0;
   tickets.forEach(t => {
-    if ((t.estado || '').toLowerCase() === 'cerrado' && t.fechaCierre && t.fechaCreacion) {
-      let fCreacion = new Date(t.fechaCreacion);
-      let fCierre = new Date(t.fechaCierre);
+    if ((t.estado || '').toLowerCase() === 'cerrado') {
+      let fCreacion = new Date(t.fechaCreacion || t.created_at || new Date());
+      let fCierre = new Date(t.fechaCierre || t.updated_at || t.fechaCreacion || t.created_at || new Date());
       let diff = fCierre.getTime() - fCreacion.getTime();
       let dias = Math.ceil(diff / (1000 * 3600 * 24));
       if (dias < 0) dias = 0;
