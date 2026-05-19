@@ -462,7 +462,7 @@
                     <th>Asunto</th>
                     <th>Solicitante / Empresa</th>
                     <th>Área</th>
-                    <th>Prioridad</th>
+                    <th class="col-prioridad">Prioridad</th>
                     <th id="th-ord-estado">Estado </th>
                     <th>Asignado</th>
                     <th id="th-ord-fecha">Fecha </th>
@@ -1242,7 +1242,7 @@
                   <th>Asunto</th>
                   <th>Solicitante / Empresa</th>
                   <th>Área</th>
-                  <th>Prioridad</th>
+                  <th class="col-prioridad">Prioridad</th>
                   <th id="th-ord-estado">Estado </th>
                   <th>Asignado</th>
                   <th id="th-ord-fecha">Fecha </th>
@@ -2120,9 +2120,9 @@
                     <option>Otro</option>
                   </select>
                 </div>
-                <div class="form-group">
-                  <label>Prioridad *</label>
-                  <select id="t-prioridad" required>
+                <div class="form-group" id="group-t-prioridad">
+                  <label>Prioridad</label>
+                  <select id="t-prioridad">
                     <option value="Baja">Baja</option>
                     <option value="Media" selected>Media</option>
                     <option value="Alta">Alta</option>

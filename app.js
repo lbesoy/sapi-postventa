@@ -684,6 +684,14 @@ function applyRole(rolKey) {
     btnDashTecnicos.style.display = ['empresa', 'cliente'].includes(rolKey) ? 'none' : 'inline-block';
   }
 
+  // Ocultar campo y columna de Prioridad para empresas/clientes
+  const isCliente = ['empresa', 'cliente'].includes(rolKey);
+  document.querySelectorAll('.col-prioridad').forEach(el => el.style.display = isCliente ? 'none' : '');
+  const groupPrioridad = document.getElementById('group-t-prioridad');
+  if (groupPrioridad) {
+    groupPrioridad.style.display = isCliente ? 'none' : '';
+  }
+
   // Update role mode buttons
   document.querySelectorAll('.role-mode-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.role === rolKey);
@@ -1808,7 +1816,7 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
   
   else if (tipo === 'tickets') {
     title.textContent = filtro ? `Desglose: Tickets - ${filtro}` : `Desglose: Total Tickets`;
-    thead.innerHTML = `<tr><th>#</th><th>Asunto</th><th>Empresa</th><th>Estado</th><th>Prioridad</th></tr>`;
+    thead.innerHTML = `<tr><th>#</th><th>Asunto</th><th>Empresa</th><th>Estado</th>${!isEmpresa ? '<th>Prioridad</th>' : ''}</tr>`;
     
     let ticketsFiltrados = tickets;
     if (isEmpresa && nombreEmpresaLogged) {
@@ -1825,7 +1833,7 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     
     ticketsFiltrados.forEach(d => {
       const badgeClass = `badge-${(d.estado||'').toLowerCase()}`;
-      tbody.innerHTML += `<tr><td>${d.numeroTicket || d.id.split('-')[0]}</td><td>${d.asunto || 'N/A'}</td><td>${d.cliente || d.solicitante || 'N/A'}</td><td><span class="badge ${badgeClass}">${d.estado}</span></td><td>${d.prioridad || 'Media'}</td></tr>`;
+      tbody.innerHTML += `<tr><td>${d.numeroTicket || d.id.split('-')[0]}</td><td>${d.asunto || 'N/A'}</td><td>${d.cliente || d.solicitante || 'N/A'}</td><td><span class="badge ${badgeClass}">${d.estado}</span></td>${!isEmpresa ? `<td>${d.prioridad || 'Media'}</td>` : ''}</tr>`;
     });
   }
   
@@ -6860,7 +6868,7 @@ function renderTickets(ctx) {
         ${t.cliente ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}"><i data-lucide="building-2" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}</div>` : ''}
       </td>
       <td data-label="Área" style="white-space:nowrap;">${t.area||'—'}</td>
-      <td data-label="Prioridad" style="white-space:nowrap;"><span class="badge badge-${String(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
+      <td data-label="Prioridad" class="col-prioridad" style="white-space:nowrap;"><span class="badge badge-${String(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
       <td data-label="Estado" style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'—'}</span></td>
       <td data-label="Asignado" style="white-space:nowrap;">${t.asignado||'—'}</td>
       <td data-label="Fecha" style="white-space:nowrap;">${t.fecha||'—'}</td>
@@ -8331,7 +8339,7 @@ function verDetalleTicket(id) {
         ${field('Canal', t.canal ? ({correo:'Correo',whatsapp:'WhatsApp',telefono:'Llamada Tel.'}[t.canal]||t.canal) : '—')}
         ${field('Contacto', t.contacto)}
         ${field('Estado', `<span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado}</span>`)}
-        ${field('Prioridad', `<span class="badge badge-${(t.prioridad||'media').toLowerCase()}">${t.prioridad}</span>`)}
+        ${!['empresa', 'cliente'].includes(currentSession.viewMode) ? field('Prioridad', `<span class="badge badge-${(t.prioridad||'media').toLowerCase()}">${t.prioridad}</span>`) : ''}
         ${field('Solicitante', t.solicitante)}
         ${field('Área', t.area)}
         ${field('Categoría', t.categoria)}
