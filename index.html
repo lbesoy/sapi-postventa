@@ -266,6 +266,9 @@
 
         <!-- DASHBOARD VIEW -->
         <div id="view-dashboard" class="view active">
+
+          <!-- ===== DASHBOARD V1 (todos los roles excepto superadmin) ===== -->
+          <div id="dash-v1">
           <div class="section-header"
             style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem;">
             <h2 style="margin:0; font-size:1.4rem;">Panel Principal</h2>
@@ -503,6 +506,92 @@
               </div>
             </div>
           </div>
+          </div><!-- /dash-v1 -->
+
+          <!-- ===== DASHBOARD V2 (solo superadmin - en prueba) ===== -->
+          <div id="dash-v2" style="display:none;">
+            <!-- Fila 1: KPIs Órdenes -->
+            <h3 style="margin:0 0 0.75rem; font-size:1rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Órdenes de Servicio</h3>
+            <div class="stats-grid" style="margin-bottom:1.5rem;">
+              <div class="stat-card" style="cursor:pointer;" onclick="setFiltroEstadoServicios('')">
+                <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="file-text"></i></div>
+                <div><div class="stat-label">Total Órdenes</div><div class="stat-value" id="v2-stat-total">0</div></div>
+              </div>
+              <div class="stat-card" style="cursor:pointer;" onclick="setFiltroEstadoServicios('Pendiente')">
+                <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-circle"></i></div>
+                <div><div class="stat-label">Pendientes</div><div class="stat-value" id="v2-stat-pendientes">0</div></div>
+              </div>
+              <div class="stat-card" style="cursor:pointer;" onclick="setFiltroEstadoServicios('En proceso')">
+                <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i data-lucide="clock"></i></div>
+                <div><div class="stat-label">En Proceso</div><div class="stat-value" id="v2-stat-proceso">0</div></div>
+              </div>
+              <div class="stat-card" style="cursor:pointer;" onclick="setFiltroEstadoServicios('Completado')">
+                <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle"></i></div>
+                <div><div class="stat-label">Completadas</div><div class="stat-value" id="v2-stat-completas">0</div></div>
+              </div>
+            </div>
+
+            <!-- Tabla Órdenes v2 -->
+            <div class="section-header" style="flex-wrap:wrap; gap:1rem;">
+              <h2>Órdenes Recientes</h2>
+              <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+                <select id="v2-filter-ord-tecnico" onchange="filtrarOrdenes()" class="form-select"><option value="">Cualquier Técnico</option></select>
+                <select id="v2-filter-ord-supervisor" onchange="filtrarOrdenes()" class="form-select"><option value="">Cualquier Supervisor</option></select>
+                <div class="search-bar" style="margin:0;"><input type="text" id="v2-search-ordenes" placeholder="Buscar..." oninput="renderTabla('v2')"/></div>
+              </div>
+            </div>
+            <div class="table-wrapper" style="margin-bottom:2.5rem;">
+              <table class="orders-table" id="v2-orders-table">
+                <thead><tr>
+                  <th style="width:60px;">Acciones</th>
+                  <th>Folio</th><th>Cliente</th><th>Ubicación</th><th>Modelo</th><th>Tipo</th><th>Estado</th><th>Fecha</th>
+                  <th style="width:40px;"></th>
+                </tr></thead>
+                <tbody id="v2-tabla-body"><tr><td colspan="9" class="empty-state">Cargando...</td></tr></tbody>
+              </table>
+            </div>
+
+            <!-- Fila 2: KPIs Tickets -->
+            <h3 style="margin:0 0 0.75rem; font-size:1rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Tickets de Soporte</h3>
+            <div class="stats-grid" style="margin-bottom:1.5rem;">
+              <div class="stat-card" style="cursor:pointer;" onclick="setFiltroTicketsV2('todos')">
+                <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="ticket"></i></div>
+                <div><div class="stat-label">Total Tickets</div><div class="stat-value" id="v2-stat-t-total">0</div></div>
+              </div>
+              <div class="stat-card" style="cursor:pointer;" onclick="setFiltroTicketsV2('Abierto')">
+                <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-circle"></i></div>
+                <div><div class="stat-label">Abiertos</div><div class="stat-value" id="v2-stat-t-abiertos">0</div></div>
+              </div>
+              <div class="stat-card" style="cursor:pointer;" onclick="setFiltroTicketsV2('Cotización')">
+                <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i data-lucide="file-text"></i></div>
+                <div><div class="stat-label">Cotización</div><div class="stat-value" id="v2-stat-t-cotizacion">0</div></div>
+              </div>
+              <div class="stat-card" style="cursor:pointer;" onclick="setFiltroTicketsV2('Cerrado')">
+                <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle"></i></div>
+                <div><div class="stat-label">Cerrados</div><div class="stat-value" id="v2-stat-t-cerrados">0</div></div>
+              </div>
+            </div>
+
+            <!-- Tabla Tickets v2 -->
+            <div class="section-header" style="flex-wrap:wrap; gap:1rem;">
+              <h2>Tickets Recientes</h2>
+              <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+                <div class="search-bar" style="margin:0;"><input type="text" id="v2-search-tickets" placeholder="Buscar ticket..." oninput="renderTickets('v2')"/></div>
+              </div>
+            </div>
+            <div class="table-wrapper">
+              <table class="orders-table" id="v2-orders-table-tickets">
+                <thead><tr>
+                  <th style="width:60px;">Acciones</th>
+                  <th>#</th><th>Asunto</th><th>Solicitante / Empresa</th><th>Área</th>
+                  <th class="col-prioridad">Prioridad</th><th>Estado</th><th>Asignado</th><th>Fecha</th>
+                  <th style="width:40px;"></th>
+                </tr></thead>
+                <tbody id="v2-tickets-body"><tr><td colspan="9" class="empty-state">Cargando...</td></tr></tbody>
+              </table>
+            </div>
+          </div><!-- /dash-v2 -->
+
         </div>
 
         <!-- SERVICIOS VIEW -->

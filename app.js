@@ -709,6 +709,15 @@ function applyRole(rolKey) {
   const navMaquinariaText = document.getElementById('nav-maquinaria-text');
   if (navMaquinariaText) navMaquinariaText.textContent = isEmpresa ? 'Mis máquinas' : 'Maquinaria';
 
+  // Dashboard V1 / V2 toggle — solo superadmin ve el nuevo diseño
+  const dashV1 = document.getElementById('dash-v1');
+  const dashV2 = document.getElementById('dash-v2');
+  if (dashV1 && dashV2) {
+    const showV2 = rolKey === 'superadmin';
+    dashV1.style.display = showV2 ? 'none' : '';
+    dashV2.style.display = showV2 ? '' : 'none';
+  }
+
   lucide.createIcons();
 }
 
@@ -1703,7 +1712,9 @@ function setupNav() {
       if (view === 'dashboard') {
         renderStats();
         renderTabla('');
+        renderTabla('v2');
         renderTickets('dash-tickets');
+        renderTickets('v2');
       }
     });
   });
@@ -1951,6 +1962,12 @@ function renderStats() {
     document.getElementById('stat-tkt-cotizacion').textContent = t_cotizacion;
     document.getElementById('stat-tkt-cerrados').textContent = t_cerrados;
   }
+  // V2 dashboard stats
+  const setV2 = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setV2('v2-stat-total', total); setV2('v2-stat-pendientes', pendientes);
+  setV2('v2-stat-proceso', proceso); setV2('v2-stat-completas', completas);
+  setV2('v2-stat-t-total', t_total); setV2('v2-stat-t-abiertos', t_abiertos);
+  setV2('v2-stat-t-cotizacion', t_cotizacion); setV2('v2-stat-t-cerrados', t_cerrados);
 }
 
 // ===== DASHBOARD TABS =====
@@ -2088,6 +2105,13 @@ let filtroEstadoServicios = '';
 function setFiltroEstadoServicios(estado) {
   filtroEstadoServicios = estado;
   filtrarOrdenes('servicios');
+  renderTabla('v2');
+}
+
+let filtroTicketsV2 = 'todos';
+function setFiltroTicketsV2(estado) {
+  filtroTicketsV2 = estado;
+  renderTickets('v2');
 }
 
 function toggleSortOrdenes(col) {
@@ -2103,8 +2127,9 @@ function toggleSortOrdenes(col) {
 
 function renderTabla(ctx) {
   const isServiciosView = ctx === 'servicios';
-  const bodyId = isServiciosView ? 'tabla-body-servicios' : 'tabla-body';
-  const searchId = isServiciosView ? 'search-servicios' : 'search-input';
+  const isV2 = ctx === 'v2';
+  const bodyId = isServiciosView ? 'tabla-body-servicios' : (isV2 ? 'v2-tabla-body' : 'tabla-body');
+  const searchId = isServiciosView ? 'search-servicios' : (isV2 ? 'v2-search-ordenes' : 'search-input');
   const q = (document.getElementById(searchId)?.value || '').toLowerCase();
   
   let filtradas = ordenes.filter(o =>
@@ -6792,8 +6817,9 @@ function actualizarFiltrosPersonal() {
 // ===== RENDER TICKETS =====
 function renderTickets(ctx) {
   const isDashView = ctx === 'dash-tickets';
-  const bodyId = isDashView ? 'tabla-body-dash-tickets' : 'tickets-body';
-  const searchId = isDashView ? 'search-dash-tickets' : 'search-tickets';
+  const isV2 = ctx === 'v2';
+  const bodyId = isDashView ? 'tabla-body-dash-tickets' : (isV2 ? 'v2-tickets-body' : 'tickets-body');
+  const searchId = isDashView ? 'search-dash-tickets' : (isV2 ? 'v2-search-tickets' : 'search-tickets');
   
   const body = document.getElementById(bodyId);
   if (!body) return;
@@ -6869,8 +6895,11 @@ function renderTickets(ctx) {
     });
   }
   
-  if (!isDashView && ticketFiltroActivo !== 'todos') {
+  if (!isDashView && !isV2 && ticketFiltroActivo !== 'todos') {
     filtered = filtered.filter(t => t.estado === ticketFiltroActivo);
+  }
+  if (isV2 && filtroTicketsV2 !== 'todos') {
+    filtered = filtered.filter(t => (t.estado || '').toLowerCase() === filtroTicketsV2.toLowerCase());
   }
   
   if (isDashView && !q) {
