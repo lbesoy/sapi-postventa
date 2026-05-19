@@ -1945,6 +1945,12 @@ function renderStats() {
     document.getElementById('stat-t-cotizacion').textContent = t_cotizacion;
     document.getElementById('stat-t-cerrados').textContent = t_cerrados;
   }
+  if (document.getElementById('stat-tkt-total')) {
+    document.getElementById('stat-tkt-total').textContent = t_total;
+    document.getElementById('stat-tkt-abiertos').textContent = t_abiertos;
+    document.getElementById('stat-tkt-cotizacion').textContent = t_cotizacion;
+    document.getElementById('stat-tkt-cerrados').textContent = t_cerrados;
+  }
 }
 
 // ===== DASHBOARD TABS =====
@@ -7621,6 +7627,15 @@ function filtrarTickets(btn) {
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   ticketFiltroActivo = btn.dataset.filter;
+  renderTickets();
+}
+
+function setFiltroTickets(estado) {
+  ticketFiltroActivo = estado;
+  // Sync the existing filter buttons
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.filter === estado);
+  });
   renderTickets();
 }
 

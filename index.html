@@ -1244,6 +1244,36 @@
 
         <!-- TICKETS VIEW -->
         <div id="view-tickets" class="view">
+          <div class="stats-grid" style="margin-bottom: 1.5rem;">
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('todos')">
+              <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="ticket"></i></div>
+              <div>
+                <div class="stat-label">Total Tickets</div>
+                <div class="stat-value" id="stat-tkt-total">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('Abierto')">
+              <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-circle"></i></div>
+              <div>
+                <div class="stat-label">Abiertos</div>
+                <div class="stat-value" id="stat-tkt-abiertos">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('Cotización')">
+              <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i data-lucide="file-text"></i></div>
+              <div>
+                <div class="stat-label">Cotización</div>
+                <div class="stat-value" id="stat-tkt-cotizacion">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('Cerrado')">
+              <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle"></i></div>
+              <div>
+                <div class="stat-label">Cerrados</div>
+                <div class="stat-value" id="stat-tkt-cerrados">0</div>
+              </div>
+            </div>
+          </div>
           <div class="tickets-kanban-header">
             <div class="ticket-filters">
               <button class="filter-btn active" data-filter="todos" onclick="filtrarTickets(this)">Todos</button>
