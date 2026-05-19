@@ -523,6 +523,31 @@
               </button>
             </div>
 
+            <!-- RENDIMIENTO Y TIEMPOS -->
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-bottom:1.5rem;">
+              <div class="stat-card" style="position:relative; overflow:hidden; background:linear-gradient(135deg, rgba(239,68,68,0.05) 0%, rgba(239,68,68,0) 100%);">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%;">
+                  <div><div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;">Refacciones Faltantes</div><div class="stat-value" id="v2-stat-ref-faltantes" style="font-size:2rem;margin:0.25rem 0;color:#ef4444;">0</div></div>
+                  <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;flex-shrink:0;"><i data-lucide="package-minus"></i></div>
+                </div>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">En órdenes activas</div>
+              </div>
+              <div class="stat-card" style="position:relative; overflow:hidden; background:linear-gradient(135deg, rgba(79,142,247,0.05) 0%, rgba(79,142,247,0) 100%);">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%;">
+                  <div><div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;">Resolución Órdenes</div><div class="stat-value" id="v2-stat-avg-ordenes" style="font-size:2rem;margin:0.25rem 0;color:#4f8ef7;">0d</div></div>
+                  <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;flex-shrink:0;"><i data-lucide="timer"></i></div>
+                </div>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">Tiempo promedio (Histórico)</div>
+              </div>
+              <div class="stat-card" style="position:relative; overflow:hidden; background:linear-gradient(135deg, rgba(139,92,246,0.05) 0%, rgba(139,92,246,0) 100%);">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%;">
+                  <div><div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;">Resolución Tickets</div><div class="stat-value" id="v2-stat-avg-tickets" style="font-size:2rem;margin:0.25rem 0;color:#8b5cf6;">0d</div></div>
+                  <div class="stat-icon" style="background:rgba(139,92,246,0.12);color:#8b5cf6;flex-shrink:0;"><i data-lucide="hourglass"></i></div>
+                </div>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">Tiempo promedio (Cerrados)</div>
+              </div>
+            </div>
+
             <!-- KPIs ORDENES -->
             <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.5rem;">
               <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden;" onclick="setFiltroEstadoServicios('')">

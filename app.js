@@ -1983,6 +1983,59 @@ function renderDashboardV2() {
   const el = document.getElementById('v2-fecha-hoy');
   if (el) el.textContent = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
+  // --- Rendimiento Global ---
+  let refFaltantes = 0;
+  let totalDiasOrdenes = 0;
+  let countOrdenesCerradas = 0;
+
+  ordenes.forEach(o => {
+    const estado = (o.estado || '').toLowerCase();
+    
+    if (estado !== 'completado') {
+      if (o.ref_necesarias && Array.isArray(o.ref_necesarias)) {
+        refFaltantes += o.ref_necesarias.length;
+      }
+    } else {
+      let fCreacion = new Date(o.fecha || 0);
+      let fCierre = fCreacion;
+      if (o.bitacora && o.bitacora.length > 0) {
+        let maxB = Math.max(...o.bitacora.map(b => new Date(b.fecha).getTime()));
+        if (!isNaN(maxB)) fCierre = new Date(maxB);
+      }
+      let diff = fCierre.getTime() - fCreacion.getTime();
+      let dias = Math.ceil(diff / (1000 * 3600 * 24));
+      if (dias < 0) dias = 0;
+      totalDiasOrdenes += dias;
+      countOrdenesCerradas++;
+    }
+  });
+
+  let totalDiasTickets = 0;
+  let countTicketsCerrados = 0;
+  tickets.forEach(t => {
+    if ((t.estado || '').toLowerCase() === 'cerrado' && t.fechaCierre && t.fechaCreacion) {
+      let fCreacion = new Date(t.fechaCreacion);
+      let fCierre = new Date(t.fechaCierre);
+      let diff = fCierre.getTime() - fCreacion.getTime();
+      let dias = Math.ceil(diff / (1000 * 3600 * 24));
+      if (dias < 0) dias = 0;
+      totalDiasTickets += dias;
+      countTicketsCerrados++;
+    }
+  });
+
+  const avgDiasOrdenes = countOrdenesCerradas > 0 ? Math.round(totalDiasOrdenes / countOrdenesCerradas) : 0;
+  const avgDiasTickets = countTicketsCerrados > 0 ? Math.round(totalDiasTickets / countTicketsCerrados) : 0;
+
+  const elRef = document.getElementById('v2-stat-ref-faltantes');
+  if (elRef) elRef.textContent = refFaltantes;
+  
+  const elOrd = document.getElementById('v2-stat-avg-ordenes');
+  if (elOrd) elOrd.textContent = avgDiasOrdenes + ' d';
+  
+  const elTkt = document.getElementById('v2-stat-avg-tickets');
+  if (elTkt) elTkt.textContent = countTicketsCerrados > 0 ? (avgDiasTickets + ' d') : 'N/D';
+
   // --- Mini tabla Órdenes (últimas 6) ---
   const miniOrd = document.getElementById('v2-mini-ordenes');
   if (miniOrd) {
@@ -8449,6 +8502,7 @@ async function guardarTicket(e) {
     folio: editandoTicketId ? t_existente?.folio : newFolio,
     fecha: t_existente ? t_existente.fecha : new Date().toISOString().split('T')[0],
     fechaCreacion: t_existente ? t_existente.fechaCreacion : new Date().toISOString(),
+    fechaCierre: estado === 'Cerrado' ? (t_existente?.fechaCierre || new Date().toISOString()) : null,
     canal,
     contacto,
     asunto: document.getElementById('t-asunto').value.trim(),
