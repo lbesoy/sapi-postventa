@@ -284,14 +284,14 @@
           
           <!-- KPIs CLIENTE (Siempre visibles en el Dashboard para el rol de Empresa/Cliente) -->
           <div class="stats-grid" id="dash-kpis-cliente" style="display:none; margin-bottom: 1.5rem;">
-            <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('nav-maquinaria').click()">
+            <div class="stat-card" style="cursor: pointer;" onclick="abrirDesgloseDashboard('maquinas')">
               <div class="stat-icon" style="background:rgba(139,92,246,0.12);color:#8b5cf6;"><i data-lucide="settings-2"></i></div>
               <div>
                 <div class="stat-label">Mis Máquinas</div>
                 <div class="stat-value" id="stat-cli-maquinas">0</div>
               </div>
             </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('nav-sitios').click()">
+            <div class="stat-card" style="cursor: pointer;" onclick="abrirDesgloseDashboard('sitios')">
               <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="map-pin"></i></div>
               <div>
                 <div class="stat-label">Mis Sitios</div>
@@ -306,7 +306,7 @@
           <!-- DASHBOARD CONTENIDO ÓRDENES -->
           <div id="dash-content-ordenes">
             <div class="stats-grid">
-              <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('nav-servicios').click()">
+              <div class="stat-card" style="cursor: pointer;" onclick="abrirDesgloseDashboard('ordenes')">
                 <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i
                     data-lucide="file-text"></i></div>
                 <div>
@@ -314,7 +314,7 @@
                   <div class="stat-value" id="stat-total">0</div>
                 </div>
               </div>
-              <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('nav-servicios').click()">
+              <div class="stat-card" style="cursor: pointer;" onclick="abrirDesgloseDashboard('ordenes', 'En Proceso')">
                 <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i
                     data-lucide="clock"></i></div>
                 <div>
@@ -322,7 +322,7 @@
                   <div class="stat-value" id="stat-proceso">0</div>
                 </div>
               </div>
-              <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('nav-servicios').click()">
+              <div class="stat-card" style="cursor: pointer;" onclick="abrirDesgloseDashboard('ordenes', 'Pendiente')">
                 <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i
                     data-lucide="alert-circle"></i></div>
                 <div>
@@ -330,7 +330,7 @@
                   <div class="stat-value" id="stat-pendientes">0</div>
                 </div>
               </div>
-              <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('nav-servicios').click()">
+              <div class="stat-card" style="cursor: pointer;" onclick="abrirDesgloseDashboard('ordenes', 'Completado')">
                 <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i
                     data-lucide="check-circle"></i></div>
                 <div>
@@ -404,7 +404,7 @@
           <!-- DASHBOARD CONTENIDO TICKETS -->
           <div id="dash-content-tickets" style="display:none;">
             <div class="stats-grid">
-              <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('nav-tickets').click()">
+              <div class="stat-card" style="cursor: pointer;" onclick="abrirDesgloseDashboard('tickets')">
                 <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i
                     data-lucide="ticket"></i></div>
                 <div>
@@ -412,7 +412,7 @@
                   <div class="stat-value" id="stat-t-total">0</div>
                 </div>
               </div>
-              <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('nav-tickets').click()">
+              <div class="stat-card" style="cursor: pointer;" onclick="abrirDesgloseDashboard('tickets', 'Abierto')">
                 <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i
                     data-lucide="alert-circle"></i></div>
                 <div>
@@ -420,7 +420,7 @@
                   <div class="stat-value" id="stat-t-abiertos">0</div>
                 </div>
               </div>
-              <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('nav-tickets').click()">
+              <div class="stat-card" style="cursor: pointer;" onclick="abrirDesgloseDashboard('tickets', 'Cotización')">
                 <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i
                     data-lucide="file-text"></i></div>
                 <div>
@@ -428,7 +428,7 @@
                   <div class="stat-value" id="stat-t-cotizacion">0</div>
                 </div>
               </div>
-              <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('nav-tickets').click()">
+              <div class="stat-card" style="cursor: pointer;" onclick="abrirDesgloseDashboard('tickets', 'Cerrado')">
                 <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i
                     data-lucide="check-circle"></i></div>
                 <div>
@@ -3311,6 +3311,28 @@
         <button class="btn-secondary" onclick="cerrarModalMapeo()">Cancelar</button>
         <button class="btn-primary" onclick="guardarMapeoColumnas()"><i data-lucide="save" class="btn-icon"></i> Guardar
           Mapeo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DESGLOSE DASHBOARD -->
+  <div class="modal-overlay" id="modal-dashboard-desglose" onclick="if(event.target===this) this.classList.remove('open')">
+    <div class="modal" style="max-width: 900px;">
+      <div class="modal-header">
+        <h2 id="modal-dashboard-desglose-title">Desglose</h2>
+        <button class="modal-close" onclick="document.getElementById('modal-dashboard-desglose').classList.remove('open')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="table-wrapper">
+          <table class="orders-table" id="tabla-dashboard-desglose" style="width: 100%;">
+            <thead id="tabla-dashboard-desglose-head">
+            </thead>
+            <tbody id="tabla-dashboard-desglose-body">
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>

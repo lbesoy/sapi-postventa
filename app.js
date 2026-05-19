@@ -1701,6 +1701,141 @@ function setupNav() {
   });
 }
 
+// ===== DESGLOSE DASHBOARD =====
+window.abrirDesgloseDashboard = function(tipo, filtro) {
+  const modal = document.getElementById('modal-dashboard-desglose');
+  const title = document.getElementById('modal-dashboard-desglose-title');
+  const thead = document.getElementById('tabla-dashboard-desglose-head');
+  const tbody = document.getElementById('tabla-dashboard-desglose-body');
+  
+  if (!modal || !title || !thead || !tbody) return;
+  
+  thead.innerHTML = '';
+  tbody.innerHTML = '';
+  
+  // Obtenemos los filtros base (si es cliente)
+  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  let nombreEmpresaLogged = null;
+  if (isEmpresa && currentUser) {
+    nombreEmpresaLogged = String(currentUser.empresa || currentUser.nombre).toLowerCase().trim();
+  }
+  
+  let data = [];
+  
+  if (tipo === 'maquinas') {
+    title.textContent = "Desglose: Mis Máquinas";
+    thead.innerHTML = `<tr><th>Cliente</th><th>ID / Serie</th><th>Tipo / Modelo</th><th>Ubicación</th></tr>`;
+    
+    // Obtener máquinas
+    maquinariaDb.forEach(m => {
+      const mcli = String(m.cliente || '').toLowerCase().trim();
+      if (!isEmpresa || mcli === nombreEmpresaLogged) {
+        data.push({ cliente: m.cliente || 'N/A', id: m.idInterno || m.serie || 'N/A', modelo: m.modelo || m.tipo || 'N/A', ubicacion: m.ubicacion || m.cliente || 'N/A' });
+      }
+    });
+    clientesDb.forEach(c => {
+      if (!isEmpresa || (c.nombre && String(c.nombre).toLowerCase().trim() === nombreEmpresaLogged)) {
+        if (c.maquinas) {
+          c.maquinas.forEach(m => {
+            data.push({ cliente: c.nombre, id: m.idInterno || m.serie || 'N/A', modelo: m.modelo || m.tipo || 'N/A', ubicacion: m.ubicacion || c.nombre || 'N/A' });
+          });
+        }
+      }
+    });
+    
+    data.forEach(d => {
+      tbody.innerHTML += `<tr><td>${d.cliente}</td><td>${d.id}</td><td>${d.modelo}</td><td>${d.ubicacion}</td></tr>`;
+    });
+  }
+  
+  else if (tipo === 'sitios') {
+    title.textContent = "Desglose: Mis Sitios";
+    thead.innerHTML = `<tr><th>Cliente</th><th>Nombre del Sitio</th><th>Estado</th><th>Dirección</th></tr>`;
+    
+    // Obtener sitios
+    sitiosDb.forEach(s => {
+      const scli = String(s.cliente || '').toLowerCase().trim();
+      if (!isEmpresa || scli === nombreEmpresaLogged) {
+        data.push({ cliente: s.cliente || 'N/A', nombre: s.nombre || 'N/A', estado: s.estado || 'N/A', direccion: s.direccion || 'N/A' });
+      }
+    });
+    clientesDb.forEach(c => {
+      if (!isEmpresa || (c.nombre && String(c.nombre).toLowerCase().trim() === nombreEmpresaLogged)) {
+        if (c.sitios) {
+          c.sitios.forEach(s => {
+            data.push({ cliente: c.nombre, nombre: s.nombre || 'N/A', estado: s.estado || 'N/A', direccion: s.direccion || 'N/A' });
+          });
+        }
+      }
+    });
+    
+    data.forEach(d => {
+      tbody.innerHTML += `<tr><td>${d.cliente}</td><td>${d.nombre}</td><td><span class="badge ${d.estado === 'Activo' ? 'badge-completado' : 'badge-pendiente'}">${d.estado}</span></td><td>${d.direccion}</td></tr>`;
+    });
+  }
+  
+  else if (tipo === 'ordenes') {
+    title.textContent = filtro ? `Desglose: Órdenes - ${filtro}` : `Desglose: Total Órdenes`;
+    thead.innerHTML = `<tr><th>Folio</th><th>Cliente</th><th>Estado</th><th>Técnico</th><th>Fecha</th></tr>`;
+    
+    let ordenesFiltradas = ordenes;
+    if (isEmpresa && nombreEmpresaLogged) {
+      ordenesFiltradas = ordenes.filter(o => {
+        const ocli = String(o.cliente || '').toLowerCase().trim();
+        let fromTicket = false;
+        if (o.soporte) {
+          const tick = tickets.find(t => t.id === o.soporte);
+          if (tick) {
+            const tcli = String(tick.cliente || '').toLowerCase().trim();
+            const tsol = String(tick.solicitante || '').toLowerCase().trim();
+            if (tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged) fromTicket = true;
+          }
+        }
+        return ocli === nombreEmpresaLogged || fromTicket;
+      });
+    }
+    
+    if (filtro) {
+      ordenesFiltradas = ordenesFiltradas.filter(o => o.estado === filtro);
+    }
+    
+    ordenesFiltradas.forEach(d => {
+      const badgeClass = `badge-${(d.estado||'').toLowerCase().replace(/\s+/g,'-')}`;
+      tbody.innerHTML += `<tr><td>${d.folio || 'N/A'}</td><td>${d.cliente || 'N/A'}</td><td><span class="badge ${badgeClass}">${d.estado}</span></td><td>${d.tecnico || 'Sin asignar'}</td><td>${d.fecha ? new Date(d.fecha).toLocaleDateString() : 'N/A'}</td></tr>`;
+    });
+  }
+  
+  else if (tipo === 'tickets') {
+    title.textContent = filtro ? `Desglose: Tickets - ${filtro}` : `Desglose: Total Tickets`;
+    thead.innerHTML = `<tr><th>#</th><th>Asunto</th><th>Empresa</th><th>Estado</th><th>Prioridad</th></tr>`;
+    
+    let ticketsFiltrados = tickets;
+    if (isEmpresa && nombreEmpresaLogged) {
+      ticketsFiltrados = tickets.filter(t => {
+        const tcli = String(t.cliente || '').toLowerCase().trim();
+        const tsol = String(t.solicitante || '').toLowerCase().trim();
+        return tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged;
+      });
+    }
+    
+    if (filtro) {
+      ticketsFiltrados = ticketsFiltrados.filter(t => t.estado === filtro);
+    }
+    
+    ticketsFiltrados.forEach(d => {
+      const badgeClass = `badge-${(d.estado||'').toLowerCase()}`;
+      tbody.innerHTML += `<tr><td>${d.numeroTicket || d.id.split('-')[0]}</td><td>${d.asunto || 'N/A'}</td><td>${d.cliente || d.solicitante || 'N/A'}</td><td><span class="badge ${badgeClass}">${d.estado}</span></td><td>${d.prioridad || 'Media'}</td></tr>`;
+    });
+  }
+  
+  if (tbody.innerHTML === '') {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state" style="text-align: center;">No hay registros para este desglose.</td></tr>`;
+  }
+  
+  modal.classList.add('open');
+};
+
 // ===== STATS =====
 function renderStats() {
   let ordenesFilter = ordenes;
