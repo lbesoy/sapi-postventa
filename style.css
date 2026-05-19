@@ -404,6 +404,13 @@ body {
 .stat-label { font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.2rem; }
 .stat-value { font-size: 2rem; font-weight: 700; color: var(--text-primary); }
 
+#dash-v2 .stat-card {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0;
+}
+
 /* ===== SECTION HEADER ===== */
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
 .section-header h2 { font-size: 1rem; font-weight: 600; }
