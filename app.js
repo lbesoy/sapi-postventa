@@ -1715,6 +1715,7 @@ function setupNav() {
         renderTabla('v2');
         renderTickets('dash-tickets');
         renderTickets('v2');
+        renderDashboardV2();
       }
     });
   });
@@ -1968,6 +1969,116 @@ function renderStats() {
   setV2('v2-stat-proceso', proceso); setV2('v2-stat-completas', completas);
   setV2('v2-stat-t-total', t_total); setV2('v2-stat-t-abiertos', t_abiertos);
   setV2('v2-stat-t-cotizacion', t_cotizacion); setV2('v2-stat-t-cerrados', t_cerrados);
+}
+
+// ===== DASHBOARD V2 ANALYTICS =====
+let _v2Charts = {};
+
+function renderDashboardV2() {
+  // Fecha
+  const el = document.getElementById('v2-fecha-hoy');
+  if (el) el.textContent = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  const isDark = !document.body.classList.contains('light-mode');
+  const textColor = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)';
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+
+  Chart.defaults.color = textColor;
+  Chart.defaults.font.family = 'Inter, sans-serif';
+  Chart.defaults.font.size = 11;
+
+  const destroyChart = (id) => { if (_v2Charts[id]) { _v2Charts[id].destroy(); delete _v2Charts[id]; } };
+
+  // --- Donut: Estado de Órdenes ---
+  destroyChart('ord-estado');
+  const ordPend = ordenes.filter(o => (o.estado||'').toLowerCase() === 'pendiente').length;
+  const ordProc = ordenes.filter(o => (o.estado||'').toLowerCase() === 'en proceso').length;
+  const ordComp = ordenes.filter(o => (o.estado||'').toLowerCase() === 'completado').length;
+  const ordOtro = ordenes.length - ordPend - ordProc - ordComp;
+  const ctxOE = document.getElementById('chart-ordenes-estado');
+  if (ctxOE) _v2Charts['ord-estado'] = new Chart(ctxOE, {
+    type: 'doughnut',
+    data: { labels: ['Pendiente','En Proceso','Completado','Otro'], datasets: [{ data: [ordPend, ordProc, ordComp, ordOtro], backgroundColor: ['#ef4444','#E8820C','#10b981','#6b7280'], borderWidth: 0 }] },
+    options: { cutout: '65%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8 } } } }
+  });
+
+  // --- Barras: Órdenes por Tipo ---
+  destroyChart('ord-tipo');
+  const tipoCount = {};
+  ordenes.forEach(o => { const t = o.tipo || 'Otro'; tipoCount[t] = (tipoCount[t]||0) + 1; });
+  const ctxOT = document.getElementById('chart-ordenes-tipo');
+  if (ctxOT) _v2Charts['ord-tipo'] = new Chart(ctxOT, {
+    type: 'bar',
+    data: { labels: Object.keys(tipoCount), datasets: [{ data: Object.values(tipoCount), backgroundColor: '#4f8ef7', borderRadius: 6, borderSkipped: false }] },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: gridColor }, ticks: {} }, y: { grid: { display: false } } } }
+  });
+
+  // --- Barras: Top 5 Clientes por Órdenes ---
+  destroyChart('ord-cliente');
+  const cliCount = {};
+  ordenes.forEach(o => { if (o.cliente) cliCount[o.cliente] = (cliCount[o.cliente]||0) + 1; });
+  const topCli = Object.entries(cliCount).sort((a,b) => b[1]-a[1]).slice(0,5);
+  const ctxOC = document.getElementById('chart-ordenes-cliente');
+  if (ctxOC) _v2Charts['ord-cliente'] = new Chart(ctxOC, {
+    type: 'bar',
+    data: { labels: topCli.map(c => c[0].length > 18 ? c[0].slice(0,16)+'…' : c[0]), datasets: [{ data: topCli.map(c => c[1]), backgroundColor: ['#8b5cf6','#4f8ef7','#10b981','#E8820C','#ef4444'], borderRadius: 6, borderSkipped: false }] },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: gridColor } }, y: { grid: { display: false } } } }
+  });
+
+  // --- Barras: Tickets por Área ---
+  destroyChart('tkt-area');
+  const areaCount = {};
+  tickets.forEach(t => { const a = t.area || 'Sin área'; areaCount[a] = (areaCount[a]||0) + 1; });
+  const ctxTA = document.getElementById('chart-tickets-area');
+  if (ctxTA) _v2Charts['tkt-area'] = new Chart(ctxTA, {
+    type: 'bar',
+    data: { labels: Object.keys(areaCount), datasets: [{ data: Object.values(areaCount), backgroundColor: '#8b5cf6', borderRadius: 6, borderSkipped: false }] },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: gridColor } }, y: { grid: { display: false } } } }
+  });
+
+  // --- Donut: Estado de Tickets ---
+  destroyChart('tkt-estado');
+  const tktAb = tickets.filter(t => (t.estado||'').toLowerCase() === 'abierto').length;
+  const tktCot = tickets.filter(t => (t.estado||'').toLowerCase() === 'cotización' || (t.estado||'').toLowerCase() === 'cotizacion').length;
+  const tktCer = tickets.filter(t => (t.estado||'').toLowerCase() === 'cerrado').length;
+  const ctxTE = document.getElementById('chart-tickets-estado');
+  if (ctxTE) _v2Charts['tkt-estado'] = new Chart(ctxTE, {
+    type: 'doughnut',
+    data: { labels: ['Abierto','Cotización','Cerrado'], datasets: [{ data: [tktAb, tktCot, tktCer], backgroundColor: ['#ef4444','#E8820C','#10b981'], borderWidth: 0 }] },
+    options: { cutout: '65%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8 } } } }
+  });
+
+  // --- Mini tabla Órdenes (últimas 6) ---
+  const miniOrd = document.getElementById('v2-mini-ordenes');
+  if (miniOrd) {
+    const recientes = [...ordenes].sort((a,b) => new Date(b.fecha||0) - new Date(a.fecha||0)).slice(0,6);
+    miniOrd.innerHTML = recientes.map(o => {
+      const est = (o.estado||'').toLowerCase();
+      const col = est==='pendiente'?'#ef4444':est==='en proceso'?'#E8820C':'#10b981';
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.5rem;font-weight:600;color:var(--text-primary);">${o.folio||'-'}</td>
+        <td style="padding:0.5rem;color:var(--text-muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${o.cliente||'-'}</td>
+        <td style="padding:0.5rem;"><span style="font-size:0.72rem;font-weight:600;color:${col};background:${col}22;padding:0.2rem 0.5rem;border-radius:999px;">${o.estado||'-'}</span></td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="3" style="padding:1rem;text-align:center;color:var(--text-muted);">Sin órdenes</td></tr>';
+  }
+
+  // --- Mini tabla Tickets (últimos 6) ---
+  const miniTkt = document.getElementById('v2-mini-tickets');
+  if (miniTkt) {
+    const recientes = [...tickets].sort((a,b) => new Date(b.fecha||0) - new Date(a.fecha||0)).slice(0,6);
+    miniTkt.innerHTML = recientes.map(t => {
+      const est = (t.estado||'').toLowerCase();
+      const col = est==='abierto'?'#ef4444':est==='cerrado'?'#10b981':'#E8820C';
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.5rem;font-weight:600;color:var(--text-primary);white-space:nowrap;">${t.folio||'#'}</td>
+        <td style="padding:0.5rem;color:var(--text-muted);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.asunto||'-'}</td>
+        <td style="padding:0.5rem;"><span style="font-size:0.72rem;font-weight:600;color:${col};background:${col}22;padding:0.2rem 0.5rem;border-radius:999px;">${t.estado||'-'}</span></td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="3" style="padding:1rem;text-align:center;color:var(--text-muted);">Sin tickets</td></tr>';
+  }
+
+  if (window.lucide) lucide.createIcons();
 }
 
 // ===== DASHBOARD TABS =====
