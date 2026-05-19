@@ -1695,8 +1695,8 @@ function setupNav() {
         renderPermisosRoles();
         cargarListaQueriesSAP();
       }
-      if (view === 'servicios') renderTabla('servicios');
-      if (view === 'tickets') renderTickets();
+      if (view === 'servicios') { renderTabla('servicios'); renderStats(); }
+      if (view === 'tickets') { renderTickets(); renderStats(); }
       if (view === 'tecnicos') {
         if (typeof renderTecnicos === 'function') renderTecnicos();
       }
