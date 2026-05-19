@@ -2027,6 +2027,7 @@ function renderDashboardV2() {
     Chart.defaults.color = textColor;
     Chart.defaults.font.family = 'Inter, sans-serif';
     Chart.defaults.font.size = 11;
+    Chart.defaults.maintainAspectRatio = false;
 
     const destroyChart = (id) => { if (_v2Charts[id]) { _v2Charts[id].destroy(); delete _v2Charts[id]; } };
 

@@ -561,17 +561,17 @@
 
             <!-- GRAFICAS ORDENES -->
             <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-bottom:1.5rem;">
-              <div class="stat-card" style="flex-direction:column; align-items:flex-start;">
+              <div class="stat-card" style="flex-direction:column; align-items:flex-start; height:100%;">
                 <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1rem;">Estado de Ordenes</div>
-                <div style="width:100%;max-width:200px;margin:0 auto;"><canvas id="chart-ordenes-estado" height="200"></canvas></div>
+                <div style="position:relative;width:100%;flex:1;min-height:240px;display:flex;justify-content:center;align-items:center;"><canvas id="chart-ordenes-estado"></canvas></div>
               </div>
-              <div class="stat-card" style="flex-direction:column; align-items:flex-start;">
+              <div class="stat-card" style="flex-direction:column; align-items:flex-start; height:100%;">
                 <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1rem;">Ordenes por Tipo</div>
-                <canvas id="chart-ordenes-tipo" height="200"></canvas>
+                <div style="position:relative;width:100%;flex:1;min-height:240px;"><canvas id="chart-ordenes-tipo"></canvas></div>
               </div>
-              <div class="stat-card" style="flex-direction:column; align-items:flex-start;">
+              <div class="stat-card" style="flex-direction:column; align-items:flex-start; height:100%;">
                 <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1rem;">Top Clientes (Ordenes)</div>
-                <canvas id="chart-ordenes-cliente" height="200"></canvas>
+                <div style="position:relative;width:100%;flex:1;min-height:240px;"><canvas id="chart-ordenes-cliente"></canvas></div>
               </div>
             </div>
 
@@ -613,13 +613,13 @@
 
             <!-- GRAFICAS TICKETS -->
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.5rem;">
-              <div class="stat-card" style="flex-direction:column; align-items:flex-start;">
+              <div class="stat-card" style="flex-direction:column; align-items:flex-start; height:100%;">
                 <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1rem;">Tickets por Area</div>
-                <canvas id="chart-tickets-area" height="180"></canvas>
+                <div style="position:relative;width:100%;flex:1;min-height:260px;"><canvas id="chart-tickets-area"></canvas></div>
               </div>
-              <div class="stat-card" style="flex-direction:column; align-items:flex-start;">
+              <div class="stat-card" style="flex-direction:column; align-items:flex-start; height:100%;">
                 <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1rem;">Estado de Tickets</div>
-                <div style="width:100%;max-width:200px;margin:0 auto;"><canvas id="chart-tickets-estado" height="200"></canvas></div>
+                <div style="position:relative;width:100%;flex:1;min-height:260px;display:flex;justify-content:center;align-items:center;"><canvas id="chart-tickets-estado"></canvas></div>
               </div>
             </div>
 
