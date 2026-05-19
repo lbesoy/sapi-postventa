@@ -122,7 +122,27 @@ body {
 .logo-icon { font-size: 1.8rem; }
 .logo-name { font-size: 1.2rem; font-weight: 700; color: var(--accent); }
 .logo-sub { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-.sidebar-nav { flex: 1; padding: 1rem 0.75rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.sidebar-nav { 
+  flex: 1; 
+  padding: 1rem 0.75rem; 
+  display: flex; 
+  flex-direction: column; 
+  gap: 0.25rem; 
+  overflow-y: auto;
+}
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
 .nav-item {
   display: flex; align-items: center; gap: 0.75rem;
   padding: 0.65rem 0.85rem; border-radius: var(--radius-sm);
