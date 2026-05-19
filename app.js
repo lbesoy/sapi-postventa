@@ -2237,12 +2237,17 @@ function renderTabla(ctx) {
   const canEdit = !isConsulta && !isTecnico;
   const canDelete = ['superadmin', 'admin'].includes(currentSession.viewMode);
 
-  body.innerHTML = filtradas.map(o => `
+  body.innerHTML = filtradas.map(o => {
+    let orderCanEdit = canEdit;
+    if (o.firma_tecnico_base64 && !['superadmin', 'admin'].includes(currentSession.viewMode)) {
+      orderCanEdit = false;
+    }
+    return `
     <tr>
       <td data-label="Acciones" style="white-space:nowrap; width:60px;">
         <div style="display:flex;gap:0.25rem;">
           <button class="action-btn" onclick="verDetalle('${o.id}')" title="Ver"><i data-lucide="eye"></i></button>
-          ${canEdit ? `<button class="action-btn" onclick="editarOrden('${o.id}')" title="Editar"><i data-lucide="pencil"></i></button>` : ''}
+          ${orderCanEdit ? `<button class="action-btn" onclick="editarOrden('${o.id}')" title="Editar"><i data-lucide="pencil"></i></button>` : ''}
         </div>
       </td>
       <td data-label="Folio"><strong>${o.folio||'-'}</strong></td>
@@ -2257,7 +2262,8 @@ function renderTabla(ctx) {
         ${canDelete ? `<button class="action-btn del" onclick="eliminarOrden('${o.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
       </td>
     </tr>
-  `).join('');
+    `;
+  }).join('');
   if (!ctx) renderStats();
   lucide.createIcons();
 }
@@ -5636,7 +5642,14 @@ function onSoporteChange() {
   }
 }
 
-function editarOrden(id) { abrirFormulario(id); }
+function editarOrden(id) {
+  const o = ordenes.find(x => x.id === id);
+  if (o && o.firma_tecnico_base64 && !['superadmin', 'admin'].includes(currentSession.viewMode)) {
+    mostrarNotificacion('Esta orden ya fue firmada. Solo administradores pueden editarla.', 'error');
+    return;
+  }
+  abrirFormulario(id);
+}
 
 function cerrarFormulario(e) {
   if (e && e.target !== document.getElementById('modal-overlay')) return;
