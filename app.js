@@ -2078,6 +2078,12 @@ function renderDashboardTecnicos() {
 
 // ===== TABLE =====
 
+let filtroEstadoServicios = '';
+function setFiltroEstadoServicios(estado) {
+  filtroEstadoServicios = estado;
+  filtrarOrdenes('servicios');
+}
+
 function toggleSortOrdenes(col) {
   if (currentOrdSortCol === col) {
     currentOrdSortDir = currentOrdSortDir === 'asc' ? 'desc' : 'asc';
@@ -2102,6 +2108,10 @@ function renderTabla(ctx) {
     (o.folio||'').toLowerCase().includes(q) ||
     (o.ubicacion||'').toLowerCase().includes(q)
   );
+
+  if (isServiciosView && filtroEstadoServicios) {
+    filtradas = filtradas.filter(o => o.estado === filtroEstadoServicios);
+  }
 
   let tecFilter = document.getElementById('filter-ord-tecnico')?.value;
   let supFilter = document.getElementById('filter-ord-supervisor')?.value;

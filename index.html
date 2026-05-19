@@ -508,28 +508,28 @@
         <!-- SERVICIOS VIEW -->
         <div id="view-servicios" class="view">
           <div class="stats-grid" style="margin-bottom: 1.5rem;">
-            <div class="stat-card" style="cursor: pointer;" onclick="abrirDesgloseDashboard('ordenes')">
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('')">
               <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="file-text"></i></div>
               <div>
                 <div class="stat-label">Total Órdenes</div>
                 <div class="stat-value" id="stat-serv-total">0</div>
               </div>
             </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="abrirDesgloseDashboard('ordenes', 'En Proceso')">
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('En Proceso')">
               <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i data-lucide="clock"></i></div>
               <div>
                 <div class="stat-label">En Proceso</div>
                 <div class="stat-value" id="stat-serv-proceso">0</div>
               </div>
             </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="abrirDesgloseDashboard('ordenes', 'Pendiente')">
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('Pendiente')">
               <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-circle"></i></div>
               <div>
                 <div class="stat-label">Pendientes</div>
                 <div class="stat-value" id="stat-serv-pendientes">0</div>
               </div>
             </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="abrirDesgloseDashboard('ordenes', 'Completado')">
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('Completado')">
               <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle"></i></div>
               <div>
                 <div class="stat-label">Completadas</div>
