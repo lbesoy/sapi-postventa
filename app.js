@@ -1918,9 +1918,9 @@ function renderStats() {
   }
 
   const total = ordenesFilter.length;
-  const proceso = ordenesFilter.filter(o => o.estado === 'En Proceso').length;
-  const pendientes = ordenesFilter.filter(o => o.estado === 'Pendiente').length;
-  const completas = ordenesFilter.filter(o => o.estado === 'Completado').length;
+  const proceso = ordenesFilter.filter(o => (o.estado || '').toLowerCase() === 'en proceso').length;
+  const pendientes = ordenesFilter.filter(o => (o.estado || '').toLowerCase() === 'pendiente').length;
+  const completas = ordenesFilter.filter(o => (o.estado || '').toLowerCase() === 'completado').length;
   document.getElementById('stat-total').textContent = total;
   document.getElementById('stat-proceso').textContent = proceso;
   document.getElementById('stat-pendientes').textContent = pendientes;
@@ -2110,7 +2110,7 @@ function renderTabla(ctx) {
   );
 
   if (isServiciosView && filtroEstadoServicios) {
-    filtradas = filtradas.filter(o => o.estado === filtroEstadoServicios);
+    filtradas = filtradas.filter(o => (o.estado || '').toLowerCase() === filtroEstadoServicios.toLowerCase());
   }
 
   let tecFilter = document.getElementById('filter-ord-tecnico')?.value;
