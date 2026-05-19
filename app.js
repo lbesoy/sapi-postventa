@@ -1926,6 +1926,13 @@ function renderStats() {
   document.getElementById('stat-pendientes').textContent = pendientes;
   document.getElementById('stat-completas').textContent = completas;
 
+  if (document.getElementById('stat-serv-total')) {
+    document.getElementById('stat-serv-total').textContent = total;
+    document.getElementById('stat-serv-proceso').textContent = proceso;
+    document.getElementById('stat-serv-pendientes').textContent = pendientes;
+    document.getElementById('stat-serv-completas').textContent = completas;
+  }
+
   // Stats Tickets
   const t_total = ticketsFilter.length;
   const t_abiertos = ticketsFilter.filter(t => t.estado === 'Abierto').length;
