@@ -1797,7 +1797,7 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
   
   else if (tipo === 'ordenes') {
     title.textContent = filtro ? `Desglose: Órdenes - ${filtro}` : `Desglose: Total Órdenes`;
-    thead.innerHTML = `<tr><th>Folio</th><th>Cliente</th><th>Estado</th><th>Técnico</th><th>Fecha</th></tr>`;
+    thead.innerHTML = `<tr><th>Folio</th><th>Cliente</th><th>Estado</th><th>Fecha</th></tr>`;
     
     let ordenesFiltradas = ordenes;
     if (isEmpresa && nombreEmpresaLogged) {
@@ -1822,7 +1822,7 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     
     ordenesFiltradas.forEach(d => {
       const badgeClass = `badge-${(d.estado||'').toLowerCase().replace(/\s+/g,'-')}`;
-      tbody.innerHTML += `<tr><td>${d.folio || 'N/A'}</td><td>${d.cliente || 'N/A'}</td><td><span class="badge ${badgeClass}">${d.estado}</span></td><td>${d.tecnico || 'Sin asignar'}</td><td>${d.fecha ? new Date(d.fecha).toLocaleDateString() : 'N/A'}</td></tr>`;
+      tbody.innerHTML += `<tr><td>${d.folio || 'N/A'}</td><td>${d.cliente || 'N/A'}</td><td><span class="badge ${badgeClass}">${d.estado}</span></td><td>${d.fecha ? new Date(d.fecha).toLocaleDateString() : 'N/A'}</td></tr>`;
     });
   }
   
