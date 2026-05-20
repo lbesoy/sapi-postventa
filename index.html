@@ -2185,6 +2185,29 @@
       </div>
     </div>
 
+    <!-- MODAL RENOMBRAR SITIO EMPRESA -->
+    <div class="modal-overlay" id="modal-renombrar-sitio-overlay" onclick="cerrarModalRenombrarSitio(event)" style="z-index: 400;">
+      <div class="modal" id="modal-renombrar-sitio" style="max-width:400px;">
+        <div class="modal-header">
+          <div>Renombrar Sitio</div>
+          <button class="modal-close" onclick="cerrarModalRenombrarSitio()">✕</button>
+        </div>
+        <div class="modal-body">
+          <form id="form-renombrar-sitio" onsubmit="guardarRenombreSitio(event)" style="display:flex; flex-direction:column; gap:1rem;">
+            <input type="hidden" id="rs-idx">
+            <div class="form-group">
+              <label>Ingresa el nuevo nombre para este sitio:</label>
+              <input type="text" id="rs-nombre" required class="form-control">
+            </div>
+            <div style="display:flex; gap:1rem; justify-content:flex-end; margin-top:1rem;">
+              <button type="button" class="btn-secondary" onclick="cerrarModalRenombrarSitio()">Cancelar</button>
+              <button type="submit" class="btn-primary">Aceptar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <!-- MODAL DETALLE DE SITIO -->
     <div class="modal-overlay" id="modal-detalle-sitio-overlay" onclick="cerrarDetalleSitio(event)"
       style="z-index: 400;">

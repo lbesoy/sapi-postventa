@@ -7995,6 +7995,11 @@ function renderSitios() {
   lucide.createIcons();
 }
 
+function cerrarModalRenombrarSitio(e) {
+  if (e && e.target !== document.getElementById('modal-renombrar-sitio-overlay')) return;
+  document.getElementById('modal-renombrar-sitio-overlay').classList.remove('open');
+}
+
 function renombrarSitioEmpresa(idx) {
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   const clienteObj = clientesDb.find(c => c.nombre === (currentUser.empresa || currentUser.nombre));
@@ -8006,8 +8011,32 @@ function renombrarSitioEmpresa(idx) {
     const sitioActual = sitios[idx];
     const nombreActual = getSitioNombre(sitioActual);
     
-    const nuevoNombre = prompt('Ingresa el nuevo nombre para este sitio:', nombreActual);
-    if (!nuevoNombre || nuevoNombre.trim() === '' || nuevoNombre.trim() === nombreActual) return;
+    document.getElementById('rs-idx').value = idx;
+    document.getElementById('rs-nombre').value = nombreActual;
+    document.getElementById('modal-renombrar-sitio-overlay').classList.add('open');
+  }
+}
+
+function guardarRenombreSitio(e) {
+  e.preventDefault();
+  const idx = document.getElementById('rs-idx').value;
+  const nuevoNombre = document.getElementById('rs-nombre').value;
+  
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const clienteObj = clientesDb.find(c => c.nombre === (currentUser.empresa || currentUser.nombre));
+  
+  if (clienteObj && clienteObj.sitios) {
+    let sitios = clienteObj.sitios;
+    if (clienteObj.ubicacion && !sitios.some(s => getSitioNombre(s) === clienteObj.ubicacion)) {
+      sitios = [clienteObj.ubicacion, ...sitios];
+    }
+    const sitioActual = sitios[idx];
+    const nombreActual = getSitioNombre(sitioActual);
+    
+    if (!nuevoNombre || nuevoNombre.trim() === '' || nuevoNombre.trim() === nombreActual) {
+      cerrarModalRenombrarSitio();
+      return;
+    }
     
     if (typeof sitioActual === 'object') {
       sitioActual.nombre = nuevoNombre.trim();
@@ -8027,6 +8056,7 @@ function renombrarSitioEmpresa(idx) {
     localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
     if (window.pushToSupabase) window.pushToSupabase('clientes', clienteObj);
     renderSitios();
+    cerrarModalRenombrarSitio();
   }
 }
 
