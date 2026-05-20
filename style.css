@@ -426,18 +426,27 @@ body {
 /* ===== TABLE ===== */
 .table-wrapper {
   background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); overflow-x: auto;
+  border-radius: var(--radius); overflow: auto;
+}
+@media (min-width: 769px) {
+  .table-wrapper {
+    max-height: calc(100vh - 280px);
+  }
 }
 .orders-table, .data-table { width: 100%; border-collapse: collapse; min-width: max-content; }
-.orders-table thead { background: var(--bg-secondary); }
-.orders-table th {
+.orders-table thead, .data-table thead { background: var(--bg-secondary); }
+.orders-table th, .data-table th {
   padding: 0.75rem 1rem; text-align: left;
   font-size: 0.75rem; font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.05em;
   color: var(--text-secondary); border-bottom: 1px solid var(--border);
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg-secondary);
 }
-.orders-table tr { border-bottom: 1px solid var(--border); }
+.orders-table tr, .data-table tr { border-bottom: 1px solid var(--border); }
 .orders-table td {
   padding: 0.85rem 1rem;
   font-size: 0.875rem; vertical-align: middle;
