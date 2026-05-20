@@ -1987,10 +1987,11 @@ function renderStats() {
   const proceso = ordenesFilter.filter(o => (o.estado || '').toLowerCase() === 'en proceso').length;
   const pendientes = ordenesFilter.filter(o => (o.estado || '').toLowerCase() === 'pendiente').length;
   const completas = ordenesFilter.filter(o => (o.estado || '').toLowerCase() === 'completado').length;
-  document.getElementById('stat-total').textContent = total;
-  document.getElementById('stat-proceso').textContent = proceso;
-  document.getElementById('stat-pendientes').textContent = pendientes;
-  document.getElementById('stat-completas').textContent = completas;
+  const setStat = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+  setStat('stat-total', total);
+  setStat('stat-proceso', proceso);
+  setStat('stat-pendientes', pendientes);
+  setStat('stat-completas', completas);
 
   if (document.getElementById('stat-serv-total')) {
     document.getElementById('stat-serv-total').textContent = total;
