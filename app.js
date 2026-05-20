@@ -1660,8 +1660,10 @@ function setupNav() {
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       viewEl.classList.add('active');
 
-      // Resetear scroll al tope al cambiar de vista
-      window.scrollTo(0, 0);
+      // Resetear scroll al tope al cambiar de vista (después del reflow del DOM)
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      });
 
       // Page title via data-title attribute
       document.getElementById('page-title').textContent = item.dataset.title || view;
