@@ -1795,8 +1795,11 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     });
   }
   
-  else if (tipo === 'ordenes') {
-    title.textContent = filtro ? `Desglose: Órdenes - ${filtro}` : `Desglose: Total Órdenes`;
+  else if (tipo === 'ordenes' || tipo === 'chart_ord_tipo' || tipo === 'chart_ord_cliente') {
+    if (tipo === 'ordenes') title.textContent = filtro ? `Desglose: Órdenes - ${filtro}` : `Desglose: Total Órdenes`;
+    if (tipo === 'chart_ord_tipo') title.textContent = `Desglose: Órdenes - Tipo: ${filtro}`;
+    if (tipo === 'chart_ord_cliente') title.textContent = `Desglose: Órdenes - Cliente: ${filtro}`;
+    
     thead.innerHTML = `<tr><th>Folio</th><th>Cliente</th><th>Estado</th><th>Fecha</th></tr>`;
     
     let ordenesFiltradas = ordenes;
@@ -1816,8 +1819,12 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
       });
     }
     
-    if (filtro) {
+    if (tipo === 'ordenes' && filtro) {
       ordenesFiltradas = ordenesFiltradas.filter(o => o.estado === filtro);
+    } else if (tipo === 'chart_ord_tipo') {
+      ordenesFiltradas = ordenesFiltradas.filter(o => (o.tipo || 'Otro') === filtro);
+    } else if (tipo === 'chart_ord_cliente') {
+      ordenesFiltradas = ordenesFiltradas.filter(o => (o.cliente || '') === filtro);
     }
     
     ordenesFiltradas.forEach(d => {
@@ -1826,8 +1833,10 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     });
   }
   
-  else if (tipo === 'tickets') {
-    title.textContent = filtro ? `Desglose: Tickets - ${filtro}` : `Desglose: Total Tickets`;
+  else if (tipo === 'tickets' || tipo === 'chart_tkt_area') {
+    if (tipo === 'tickets') title.textContent = filtro ? `Desglose: Tickets - ${filtro}` : `Desglose: Total Tickets`;
+    if (tipo === 'chart_tkt_area') title.textContent = `Desglose: Tickets - Área: ${filtro}`;
+    
     thead.innerHTML = `<tr><th>#</th><th>Asunto</th><th>Empresa</th><th>Estado</th>${!isEmpresa ? '<th>Prioridad</th>' : ''}</tr>`;
     
     let ticketsFiltrados = tickets;
@@ -1839,8 +1848,10 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
       });
     }
     
-    if (filtro) {
+    if (tipo === 'tickets' && filtro) {
       ticketsFiltrados = ticketsFiltrados.filter(t => t.estado === filtro);
+    } else if (tipo === 'chart_tkt_area') {
+      ticketsFiltrados = ticketsFiltrados.filter(t => (t.area || 'Sin área') === filtro);
     }
     
     ticketsFiltrados.forEach(d => {
@@ -2136,7 +2147,11 @@ function renderDashboardV2() {
     if (ctxOE) _v2Charts['ord-estado'] = new Chart(ctxOE, {
       type: 'doughnut',
       data: { labels: ['Pendiente','En Proceso','Completado','Otro'], datasets: [{ data: [ordPend, ordProc, ordComp, ordOtro], backgroundColor: ['#ef4444','#E8820C','#10b981','#6b7280'], borderWidth: 0 }] },
-      options: { cutout: '65%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8 } } } }
+      options: {
+        cutout: '65%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8 } } },
+        onClick: (e, els) => { if(els.length) { const l = e.chart.data.labels[els[0].index]; if(l!=='Otro') abrirDesgloseDashboard('ordenes', l); } },
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
+      }
     });
 
     // Barras: Órdenes por Tipo
@@ -2147,7 +2162,11 @@ function renderDashboardV2() {
     if (ctxOT) _v2Charts['ord-tipo'] = new Chart(ctxOT, {
       type: 'bar',
       data: { labels: Object.keys(tipoCount), datasets: [{ data: Object.values(tipoCount), backgroundColor: '#4f8ef7', borderRadius: 6, borderSkipped: false }] },
-      options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: gridColor }, ticks: {} }, y: { grid: { display: false } } } }
+      options: {
+        indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: gridColor }, ticks: {} }, y: { grid: { display: false } } },
+        onClick: (e, els) => { if(els.length) { abrirDesgloseDashboard('chart_ord_tipo', e.chart.data.labels[els[0].index]); } },
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
+      }
     });
 
     // Barras: Top 5 Clientes por Órdenes
@@ -2159,7 +2178,11 @@ function renderDashboardV2() {
     if (ctxOC) _v2Charts['ord-cliente'] = new Chart(ctxOC, {
       type: 'bar',
       data: { labels: topCli.map(c => c[0].length > 18 ? c[0].slice(0,16)+'…' : c[0]), datasets: [{ data: topCli.map(c => c[1]), backgroundColor: ['#8b5cf6','#4f8ef7','#10b981','#E8820C','#ef4444'], borderRadius: 6, borderSkipped: false }] },
-      options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: gridColor } }, y: { grid: { display: false } } } }
+      options: {
+        indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: gridColor } }, y: { grid: { display: false } } },
+        onClick: (e, els) => { if(els.length) { abrirDesgloseDashboard('chart_ord_cliente', topCli[els[0].index][0]); } },
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
+      }
     });
 
     // Barras: Tickets por Área
@@ -2170,7 +2193,11 @@ function renderDashboardV2() {
     if (ctxTA) _v2Charts['tkt-area'] = new Chart(ctxTA, {
       type: 'bar',
       data: { labels: Object.keys(areaCount), datasets: [{ data: Object.values(areaCount), backgroundColor: '#8b5cf6', borderRadius: 6, borderSkipped: false }] },
-      options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: gridColor } }, y: { grid: { display: false } } } }
+      options: {
+        indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: gridColor } }, y: { grid: { display: false } } },
+        onClick: (e, els) => { if(els.length) { abrirDesgloseDashboard('chart_tkt_area', e.chart.data.labels[els[0].index]); } },
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
+      }
     });
 
     // Donut: Estado de Tickets
@@ -2182,7 +2209,11 @@ function renderDashboardV2() {
     if (ctxTE) _v2Charts['tkt-estado'] = new Chart(ctxTE, {
       type: 'doughnut',
       data: { labels: ['Abierto','Cotización','Cerrado'], datasets: [{ data: [tktAb, tktCot, tktCer], backgroundColor: ['#ef4444','#E8820C','#10b981'], borderWidth: 0 }] },
-      options: { cutout: '65%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8 } } } }
+      options: {
+        cutout: '65%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8 } } },
+        onClick: (e, els) => { if(els.length) { abrirDesgloseDashboard('tickets', e.chart.data.labels[els[0].index]); } },
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
+      }
     });
   } catch(e) {
     console.error("Error al renderizar gráficas V2:", e);
