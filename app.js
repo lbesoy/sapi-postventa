@@ -1708,16 +1708,19 @@ function setupNav() {
         // renderStats() ya invoca internamente a renderDashboardV2() si existe
       }
 
-      // Reset scroll DESPUÉS de todos los renders — las funciones de render mutan el DOM
-      // y Chrome puede ajustar scrollTop durante esas mutaciones. Reseteamos al final
-      // con rAF + setTimeout para capturar cualquier ajuste del rendering cycle.
+      // Reset scroll DESPUÉS de todos los renders — usa MutationObserver para interceptar
+      // cualquier mutación DOM (render sincrónico, Supabase real-time, etc.) en los
+      // primeros 500ms y forzar scrollTop=0 cada vez que el DOM cambie.
       const contentEl = document.querySelector('.content');
       if (contentEl) {
         contentEl.scrollTop = 0;
-        requestAnimationFrame(() => {
-          contentEl.scrollTop = 0;
-          setTimeout(() => { contentEl.scrollTop = 0; }, 0);
-        });
+        const scrollGuard = new MutationObserver(() => { contentEl.scrollTop = 0; });
+        scrollGuard.observe(contentEl, { childList: true, subtree: true });
+        // Desconectar después de 500ms para permitir scroll normal del usuario
+        setTimeout(() => {
+          scrollGuard.disconnect();
+          contentEl.scrollTop = 0; // Un último reset al final
+        }, 500);
       }
     });
   });
