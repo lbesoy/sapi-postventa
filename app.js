@@ -713,7 +713,7 @@ function applyRole(rolKey) {
   const dashV1 = document.getElementById('dash-v1');
   const dashV2 = document.getElementById('dash-v2');
   if (dashV1 && dashV2) {
-    const showV2 = rolKey === 'superadmin';
+    const showV2 = ['superadmin', 'empresa', 'cliente', 'admin', 'supervisor'].includes(rolKey);
     dashV1.style.display = showV2 ? 'none' : '';
     dashV2.style.display = showV2 ? '' : 'none';
   }
