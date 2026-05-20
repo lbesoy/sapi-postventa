@@ -458,7 +458,7 @@ body {
 .badge-pre-entrega { background: var(--orange-light); color: var(--orange); }
 .badge-entrega-refacciones { background: rgba(244, 63, 94, 0.12); color: #f43f5e; }
 .badge-otro { background: var(--bg-hover); color: var(--text-secondary); }
-.badge-pendiente { background: var(--orange-light); color: var(--orange); }
+.badge-pendiente { background: var(--red-light); color: var(--red); }
 .badge-proceso { background: var(--accent-light); color: var(--accent); }
 .badge-completado { background: var(--green-light); color: var(--green); }
 
