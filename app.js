@@ -2145,8 +2145,8 @@ function renderDashboardV2() {
   const labelTkt = document.getElementById('v2-label-rend-3');
   const iconDivOrd = cardOrd ? cardOrd.querySelector('.stat-icon') : null;
   const iconDivTkt = cardTkt ? cardTkt.querySelector('.stat-icon') : null;
-  const textOrd = cardOrd ? cardOrd.querySelector('div:last-child') : null;
-  const textTkt = cardTkt ? cardTkt.querySelector('div:last-child') : null;
+  const textOrd = cardOrd ? cardOrd.lastElementChild : null;
+  const textTkt = cardTkt ? cardTkt.lastElementChild : null;
   
   if (isEmpresa && nombreEmpresaLogged) {
     const clienteObj = clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === nombreEmpresaLogged);
@@ -2154,28 +2154,28 @@ function renderDashboardV2() {
     const equiposCount = maquinariaDash.length;
     
     if (labelOrd) labelOrd.textContent = 'Sitios Activos';
+    if (textOrd) textOrd.textContent = 'Registrados en el sistema';
     if (elOrd) { elOrd.textContent = sitiosCount; elOrd.style.color = '#4f8ef7'; }
     if (cardOrd) cardOrd.setAttribute('onclick', "abrirDesgloseDashboard('sitios', '')");
     if (iconDivOrd) iconDivOrd.innerHTML = '<i data-lucide="map-pin"></i>';
-    if (textOrd) textOrd.textContent = 'Registrados en el sistema';
 
     if (labelTkt) labelTkt.textContent = 'Equipos Instalados';
+    if (textTkt) textTkt.textContent = 'Maquinaria vinculada';
     if (elTkt) { elTkt.textContent = equiposCount; elTkt.style.color = '#8b5cf6'; }
     if (cardTkt) cardTkt.setAttribute('onclick', "abrirDesgloseDashboard('maquinas', '')");
     if (iconDivTkt) iconDivTkt.innerHTML = '<i data-lucide="settings"></i>';
-    if (textTkt) textTkt.textContent = 'Maquinaria vinculada';
   } else {
     if (labelOrd) labelOrd.textContent = 'Resolución Órdenes';
+    if (textOrd) textOrd.textContent = 'Tiempo promedio (Histórico)';
     if (elOrd) { elOrd.textContent = avgDiasOrdenes + ' d'; elOrd.style.color = '#4f8ef7'; }
     if (cardOrd) cardOrd.setAttribute('onclick', "abrirDesgloseDashboard('rendimiento', 'ordenes')");
     if (iconDivOrd) iconDivOrd.innerHTML = '<i data-lucide="timer"></i>';
-    if (textOrd) textOrd.textContent = 'Tiempo promedio (Histórico)';
 
     if (labelTkt) labelTkt.textContent = 'Resolución Tickets';
+    if (textTkt) textTkt.textContent = 'Tiempo promedio (Cerrados)';
     if (elTkt) { elTkt.textContent = countTicketsCerrados > 0 ? (avgDiasTickets + ' d') : 'N/D'; elTkt.style.color = '#8b5cf6'; }
     if (cardTkt) cardTkt.setAttribute('onclick', "abrirDesgloseDashboard('rendimiento', 'tickets')");
     if (iconDivTkt) iconDivTkt.innerHTML = '<i data-lucide="hourglass"></i>';
-    if (textTkt) textTkt.textContent = 'Tiempo promedio (Cerrados)';
   }
   lucide.createIcons();
 
