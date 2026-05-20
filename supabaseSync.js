@@ -182,8 +182,11 @@ window.pushToSupabase = async function(tabla, item) {
       payload = { id: item.id, serie: item.serie, marca: item.marca, modelo: item.modelo, anio: item.anio, cliente: item.cliente, id_interno: item.idInterno, descripcion: item.descripcion, custom_data: item.customData || {} };
     } else if (tabla === 'refacciones') {
       payload = { id: item.id, codigo: item.codigo, descripcion: item.descripcion, precio: item.precio, moneda: item.moneda, stock: item.stock, custom_data: { ...(item.customData || {}), marca: item.marca, grupo: item.grupo, origen: item.origen, nombre: item.nombre } };
-    } else if (tabla === 'config' || tabla === 'roles') {
+    } else if (tabla === 'config') {
       payload = { id: 'main', data: item };
+    } else if (tabla === 'roles') {
+      tabla = 'config';
+      payload = { id: 'roles', data: item };
     } else {
       payload = item;
     }
@@ -383,7 +386,7 @@ window.cargarDatosDeSupabase = async function() {
     // La tabla config ahora se procesa arriba antes que clientes.
 
     // Roles
-    const { data: rolesDb } = await sb.from('roles').select('*');
+    const { data: rolesDb } = await sb.from('config').select('*').eq('id', 'roles');
     if (rolesDb && rolesDb.length > 0 && rolesDb[0].data) {
       localStorage.setItem('sapi_roles_config', JSON.stringify(rolesDb[0].data));
     }
