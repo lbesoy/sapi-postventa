@@ -2644,7 +2644,8 @@ function renderTabla(ctx) {
   }
   const isConsulta = currentSession.viewMode === 'consulta';
   const isTecnico = currentSession.viewMode === 'tecnico';
-  const canEdit = !isConsulta && !isTecnico;
+  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  const canEdit = !isConsulta && !isTecnico && !isEmpresa;
   const canDelete = ['superadmin', 'admin'].includes(currentSession.viewMode);
 
   body.innerHTML = filtradas.map(o => {
@@ -7376,7 +7377,7 @@ function renderMaquinaria() {
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
   if (nombreEmpresaLogged) nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
-  const canEdit = currentSession.viewMode !== 'consulta';
+  const canEdit = currentSession.viewMode !== 'consulta' && !isEmpresa;
 
   let allMachines = [];
   
@@ -7987,7 +7988,7 @@ function renderSitios() {
       <td><span class="badge" style="background:var(--bg-hover);color:var(--text-muted);">${cpFinal}</span></td>
       <td><span style="font-size:0.9rem; color:var(--text-secondary);">${sLoc}</span></td>
       <td>
-        ${!isAdmin ? `<button class="action-btn del" onclick="eliminarSitioEmpresa('${idx}')" title="Eliminar Sitio"><i data-lucide="trash-2"></i></button>` : `<button class="action-btn" onclick="abrirDetalleSitio('${sNombre.replace(/'/g, "\\'")}')" title="Ver detalles"><i data-lucide="eye"></i></button>`}
+        ${!isAdmin ? `<button class="action-btn" onclick="renombrarSitioEmpresa('${idx}')" title="Renombrar Sitio"><i data-lucide="pencil"></i></button>` : `<button class="action-btn" onclick="abrirDetalleSitio('${sNombre.replace(/'/g, "\\'")}')" title="Ver detalles"><i data-lucide="eye"></i></button>`}
       </td>
     </tr>
     `;
@@ -7995,8 +7996,7 @@ function renderSitios() {
   lucide.createIcons();
 }
 
-function eliminarSitioEmpresa(idx) {
-  if (!confirm('¿Seguro que deseas eliminar este sitio de tu lista?')) return;
+function renombrarSitioEmpresa(idx) {
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   const clienteObj = clientesDb.find(c => c.nombre === (currentUser.empresa || currentUser.nombre));
   if (clienteObj && clienteObj.sitios) {
@@ -8004,12 +8004,29 @@ function eliminarSitioEmpresa(idx) {
     if (clienteObj.ubicacion && !sitios.some(s => getSitioNombre(s) === clienteObj.ubicacion)) {
       sitios = [clienteObj.ubicacion, ...sitios];
     }
-    const sitioAEliminar = sitios[idx];
+    const sitioActual = sitios[idx];
+    const nombreActual = getSitioNombre(sitioActual);
     
-    clienteObj.sitios = clienteObj.sitios.filter(s => s !== sitioAEliminar);
-    if (clienteObj.ubicacion === sitioAEliminar) clienteObj.ubicacion = '';
+    const nuevoNombre = prompt('Ingresa el nuevo nombre para este sitio:', nombreActual);
+    if (!nuevoNombre || nuevoNombre.trim() === '' || nuevoNombre.trim() === nombreActual) return;
+    
+    if (typeof sitioActual === 'object') {
+      sitioActual.nombre = nuevoNombre.trim();
+    } else {
+      const originalIdx = clienteObj.sitios.findIndex(s => s === sitioActual);
+      if (originalIdx !== -1) {
+        clienteObj.sitios[originalIdx] = nuevoNombre.trim();
+      } else {
+        clienteObj.sitios.push(nuevoNombre.trim());
+      }
+    }
+    
+    if (clienteObj.ubicacion === nombreActual) {
+      clienteObj.ubicacion = nuevoNombre.trim();
+    }
     
     localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+    if (window.pushToSupabase) window.pushToSupabase('clientes', clienteObj);
     renderSitios();
   }
 }
