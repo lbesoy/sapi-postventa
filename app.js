@@ -1849,6 +1849,48 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     });
   }
   
+  else if (tipo === 'rendimiento') {
+    if (filtro === 'refacciones') {
+      title.textContent = `Desglose: Refacciones Faltantes`;
+      thead.innerHTML = `<tr><th>Folio Orden</th><th>Cliente</th><th>Técnico</th><th>Refacciones</th></tr>`;
+      ordenes.forEach(o => {
+        if ((o.estado || '').toLowerCase() !== 'completado' && o.ref_necesarias && o.ref_necesarias.length > 0) {
+          const refsStr = o.ref_necesarias.map(r => r.descripcion || r.clave || '').filter(Boolean).join(', ');
+          tbody.innerHTML += `<tr><td>${o.folio || 'N/A'}</td><td>${o.cliente || 'N/A'}</td><td>${o.tecnico || 'N/A'}</td><td>${refsStr}</td></tr>`;
+        }
+      });
+    } else if (filtro === 'ordenes') {
+      title.textContent = `Desglose: Resolución de Órdenes`;
+      thead.innerHTML = `<tr><th>Folio</th><th>Cliente</th><th>Estado</th><th>Días de Resolución</th></tr>`;
+      ordenes.forEach(o => {
+        if ((o.estado || '').toLowerCase() === 'completado') {
+          let fCreacion = new Date(o.fecha || 0);
+          let fCierre = fCreacion;
+          if (o.bitacora && o.bitacora.length > 0) {
+            let maxB = Math.max(...o.bitacora.map(b => new Date(b.fecha).getTime()));
+            if (!isNaN(maxB)) fCierre = new Date(maxB);
+          }
+          let diff = fCierre.getTime() - fCreacion.getTime();
+          let dias = Math.ceil(diff / (1000 * 3600 * 24));
+          if (dias < 0) dias = 0;
+          tbody.innerHTML += `<tr><td>${o.folio || 'N/A'}</td><td>${o.cliente || 'N/A'}</td><td><span class="badge badge-completado">Completado</span></td><td style="font-weight:600; color:var(--text-primary);">${dias} días</td></tr>`;
+        }
+      });
+    } else if (filtro === 'tickets') {
+      title.textContent = `Desglose: Resolución de Tickets`;
+      thead.innerHTML = `<tr><th>#</th><th>Asunto</th><th>Estado</th><th>Días de Resolución</th></tr>`;
+      tickets.forEach(t => {
+        if ((t.estado || '').toLowerCase() === 'cerrado') {
+          let fCreacion = new Date(t.fechaCreacion || t.created_at || new Date());
+          let fCierre = new Date(t.fechaCierre || t.updated_at || t.fechaCreacion || t.created_at || new Date());
+          let diff = fCierre.getTime() - fCreacion.getTime();
+          let dias = Math.ceil(diff / (1000 * 3600 * 24));
+          if (dias < 0) dias = 0;
+          tbody.innerHTML += `<tr><td>${t.numeroTicket || t.id.split('-')[0]}</td><td>${t.asunto || 'N/A'}</td><td><span class="badge badge-cerrado">Cerrado</span></td><td style="font-weight:600; color:var(--text-primary);">${dias} días</td></tr>`;
+        }
+      });
+    }
+  }
   if (tbody.innerHTML === '') {
     tbody.innerHTML = `<tr><td colspan="5" class="empty-state" style="text-align: center;">No hay registros para este desglose.</td></tr>`;
   }
