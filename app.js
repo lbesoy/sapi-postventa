@@ -1804,19 +1804,23 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     thead.innerHTML = `<tr><th>Folio</th><th>Cliente</th><th>Estado</th><th>Fecha</th></tr>`;
     
     let ordenesFiltradas = ordenes;
-    if (isEmpresa && nombreEmpresaLogged) {
+    if (isEmpresa && currentUser) {
+      const hasEmpresa = !!(currentUser.empresa && String(currentUser.empresa).trim() !== '');
+      const nombreFiltro = String(currentUser.empresa || currentUser.nombre).toLowerCase().trim();
+      
       ordenesFiltradas = ordenes.filter(o => {
         const ocli = String(o.cliente || '').toLowerCase().trim();
         let fromTicket = false;
-        if (o.soporte) {
+        if (!hasEmpresa && o.soporte) {
           const tick = tickets.find(t => t.id === o.soporte);
           if (tick) {
             const tcli = String(tick.cliente || '').toLowerCase().trim();
             const tsol = String(tick.solicitante || '').toLowerCase().trim();
-            if (tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged) fromTicket = true;
+            if (tcli === nombreFiltro || tsol === nombreFiltro) fromTicket = true;
           }
         }
-        return ocli === nombreEmpresaLogged || fromTicket;
+        if (hasEmpresa) return ocli === nombreFiltro;
+        return ocli === nombreFiltro || fromTicket;
       });
     }
     
@@ -1919,6 +1923,7 @@ function renderStats() {
 
   const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const hasEmpresa = currentUser ? !!(currentUser.empresa && String(currentUser.empresa).trim() !== '') : false;
 
   if (isEmpresa) {
     let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
@@ -1927,7 +1932,7 @@ function renderStats() {
       ordenesFilter = ordenes.filter(o => {
         const ocli = String(o.cliente || '').toLowerCase().trim();
         let fromTicket = false;
-        if (o.soporte) {
+        if (!hasEmpresa && o.soporte) {
           const tick = tickets.find(t => t.id === o.soporte);
           if (tick) {
             const tcli = String(tick.cliente || '').toLowerCase().trim();
@@ -1935,10 +1940,12 @@ function renderStats() {
             if (tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged) fromTicket = true;
           }
         }
+        if (hasEmpresa) return ocli === nombreEmpresaLogged;
         return ocli === nombreEmpresaLogged || fromTicket;
       });
       ticketsFilter = tickets.filter(t => {
         const tcli = String(t.cliente || '').toLowerCase().trim();
+        if (hasEmpresa) return tcli === nombreEmpresaLogged;
         const tsol = String(t.solicitante || '').toLowerCase().trim();
         return tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged;
       });
