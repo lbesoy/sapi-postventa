@@ -1819,13 +1819,13 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     }
     
     if (tipo === 'ordenes' && filtro) {
-      ordenesFiltradas = ordenesFiltradas.filter(o => o.estado === filtro);
+      ordenesFiltradas = ordenesFiltradas.filter(o => (o.estado || '').toLowerCase().trim() === filtro.toLowerCase().trim());
     } else if (tipo === 'chart_ord_tipo') {
-      ordenesFiltradas = ordenesFiltradas.filter(o => (o.tipo || 'Otro') === filtro);
+      ordenesFiltradas = ordenesFiltradas.filter(o => (o.tipo || 'Otro').toLowerCase().trim() === filtro.toLowerCase().trim());
     } else if (tipo === 'chart_ord_cliente') {
-      ordenesFiltradas = ordenesFiltradas.filter(o => (o.cliente || '') === filtro);
+      ordenesFiltradas = ordenesFiltradas.filter(o => (o.cliente || '').toLowerCase().trim() === filtro.toLowerCase().trim());
     } else if (tipo === 'chart_ord_equipo') {
-      ordenesFiltradas = ordenesFiltradas.filter(o => (o.modelo || '') === filtro);
+      ordenesFiltradas = ordenesFiltradas.filter(o => (o.modelo || '').toLowerCase().trim() === filtro.toLowerCase().trim());
     }
     
     ordenesFiltradas.forEach(d => {
@@ -1850,9 +1850,9 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     }
     
     if (tipo === 'tickets' && filtro) {
-      ticketsFiltrados = ticketsFiltrados.filter(t => t.estado === filtro);
+      ticketsFiltrados = ticketsFiltrados.filter(t => (t.estado || '').toLowerCase().trim() === filtro.toLowerCase().trim());
     } else if (tipo === 'chart_tkt_area') {
-      ticketsFiltrados = ticketsFiltrados.filter(t => (t.area || 'Sin área') === filtro);
+      ticketsFiltrados = ticketsFiltrados.filter(t => (t.area || 'Sin área').toLowerCase().trim() === filtro.toLowerCase().trim());
     }
     
     ticketsFiltrados.forEach(d => {
