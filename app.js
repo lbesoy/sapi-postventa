@@ -1845,7 +1845,7 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     
     ticketsFiltrados.forEach(d => {
       const badgeClass = `badge-${(d.estado||'').toLowerCase()}`;
-      tbody.innerHTML += `<tr><td>${d.numeroTicket || d.id.split('-')[0]}</td><td>${d.asunto || 'N/A'}</td><td>${d.cliente || d.solicitante || 'N/A'}</td><td><span class="badge ${badgeClass}">${d.estado}</span></td>${!isEmpresa ? `<td>${d.prioridad || 'Media'}</td>` : ''}</tr>`;
+      tbody.innerHTML += `<tr><td>${d.folio || d.id.split('-')[0]}</td><td>${d.asunto || 'N/A'}</td><td>${d.cliente || d.solicitante || 'N/A'}</td><td><span class="badge ${badgeClass}">${d.estado}</span></td>${!isEmpresa ? `<td>${d.prioridad || 'Media'}</td>` : ''}</tr>`;
     });
   }
   
@@ -1886,7 +1886,7 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
           let diff = fCierre.getTime() - fCreacion.getTime();
           let dias = Math.ceil(diff / (1000 * 3600 * 24));
           if (dias < 0) dias = 0;
-          tbody.innerHTML += `<tr><td>${t.numeroTicket || t.id.split('-')[0]}</td><td>${t.asunto || 'N/A'}</td><td><span class="badge badge-cerrado">Cerrado</span></td><td style="font-weight:600; color:var(--text-primary);">${dias} días</td></tr>`;
+          tbody.innerHTML += `<tr><td>${t.folio || t.id.split('-')[0]}</td><td>${t.asunto || 'N/A'}</td><td><span class="badge badge-cerrado">Cerrado</span></td><td style="font-weight:600; color:var(--text-primary);">${dias} días</td></tr>`;
         }
       });
     }
