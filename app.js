@@ -1795,10 +1795,11 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     });
   }
   
-  else if (tipo === 'ordenes' || tipo === 'chart_ord_tipo' || tipo === 'chart_ord_cliente') {
+  else if (tipo === 'ordenes' || tipo === 'chart_ord_tipo' || tipo === 'chart_ord_cliente' || tipo === 'chart_ord_equipo') {
     if (tipo === 'ordenes') title.textContent = filtro ? `Desglose: Órdenes - ${filtro}` : `Desglose: Total Órdenes`;
     if (tipo === 'chart_ord_tipo') title.textContent = `Desglose: Órdenes - Tipo: ${filtro}`;
     if (tipo === 'chart_ord_cliente') title.textContent = `Desglose: Órdenes - Cliente: ${filtro}`;
+    if (tipo === 'chart_ord_equipo') title.textContent = `Desglose: Órdenes - Equipo: ${filtro}`;
     
     thead.innerHTML = `<tr><th>Folio</th><th>Cliente</th><th>Estado</th><th>Fecha</th></tr>`;
     
@@ -1825,6 +1826,8 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
       ordenesFiltradas = ordenesFiltradas.filter(o => (o.tipo || 'Otro') === filtro);
     } else if (tipo === 'chart_ord_cliente') {
       ordenesFiltradas = ordenesFiltradas.filter(o => (o.cliente || '') === filtro);
+    } else if (tipo === 'chart_ord_equipo') {
+      ordenesFiltradas = ordenesFiltradas.filter(o => (o.modelo || '') === filtro);
     }
     
     ordenesFiltradas.forEach(d => {
@@ -2036,12 +2039,55 @@ function renderDashboardV2() {
   const el = document.getElementById('v2-fecha-hoy');
   if (el) el.textContent = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
+  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  let nombreEmpresaLogged = null;
+  if (isEmpresa && currentUser) {
+    nombreEmpresaLogged = String(currentUser.empresa || currentUser.nombre).toLowerCase().trim();
+  }
+
+  let ordenesDash = ordenes;
+  let ticketsDash = tickets;
+  let maquinariaDash = maquinariaDb;
+
+  if (isEmpresa && nombreEmpresaLogged) {
+    ordenesDash = ordenes.filter(o => {
+      const ocli = String(o.cliente || '').toLowerCase().trim();
+      let fromTicket = false;
+      if (o.soporte) {
+        const tick = tickets.find(t => t.id === o.soporte);
+        if (tick) {
+          const tcli = String(tick.cliente || '').toLowerCase().trim();
+          const tsol = String(tick.solicitante || '').toLowerCase().trim();
+          if (tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged) fromTicket = true;
+        }
+      }
+      return ocli === nombreEmpresaLogged || fromTicket;
+    });
+    ticketsDash = tickets.filter(t => {
+      const tcli = String(t.cliente || '').toLowerCase().trim();
+      const tsol = String(t.solicitante || '').toLowerCase().trim();
+      return tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged;
+    });
+    maquinariaDash = maquinariaDb.filter(m => String(m.cliente || '').toLowerCase().trim() === nombreEmpresaLogged);
+
+    const rend1 = document.getElementById('v2-label-rend-1'); if (rend1) rend1.textContent = 'Refacciones Faltantes';
+    const rend2 = document.getElementById('v2-label-rend-2'); if (rend2) rend2.textContent = 'Sitios Activos';
+    const rend3 = document.getElementById('v2-label-rend-3'); if (rend3) rend3.textContent = 'Equipos Instalados';
+    const chart3 = document.getElementById('v2-title-chart-3'); if (chart3) chart3.textContent = 'Top Equipos (Mantenimientos)';
+  } else {
+    const rend1 = document.getElementById('v2-label-rend-1'); if (rend1) rend1.textContent = 'Refacciones Faltantes';
+    const rend2 = document.getElementById('v2-label-rend-2'); if (rend2) rend2.textContent = 'Resolución Órdenes';
+    const rend3 = document.getElementById('v2-label-rend-3'); if (rend3) rend3.textContent = 'Resolución Tickets';
+    const chart3 = document.getElementById('v2-title-chart-3'); if (chart3) chart3.textContent = 'Top Clientes (Ordenes)';
+  }
+
   // --- Rendimiento Global ---
   let refFaltantes = 0;
   let totalDiasOrdenes = 0;
   let countOrdenesCerradas = 0;
 
-  ordenes.forEach(o => {
+  ordenesDash.forEach(o => {
     const estado = (o.estado || '').toLowerCase();
     
     if (estado !== 'completado') {
@@ -2065,7 +2111,7 @@ function renderDashboardV2() {
 
   let totalDiasTickets = 0;
   let countTicketsCerrados = 0;
-  tickets.forEach(t => {
+  ticketsDash.forEach(t => {
     if ((t.estado || '').toLowerCase() === 'cerrado') {
       let fCreacion = new Date(t.fechaCreacion || t.created_at || new Date());
       let fCierre = new Date(t.fechaCierre || t.updated_at || t.fechaCreacion || t.created_at || new Date());
@@ -2084,15 +2130,28 @@ function renderDashboardV2() {
   if (elRef) elRef.textContent = refFaltantes;
   
   const elOrd = document.getElementById('v2-stat-avg-ordenes');
-  if (elOrd) elOrd.textContent = avgDiasOrdenes + ' d';
-  
   const elTkt = document.getElementById('v2-stat-avg-tickets');
-  if (elTkt) elTkt.textContent = countTicketsCerrados > 0 ? (avgDiasTickets + ' d') : 'N/D';
+  
+  if (isEmpresa && nombreEmpresaLogged) {
+    const clienteObj = clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === nombreEmpresaLogged);
+    const sitiosCount = clienteObj && clienteObj.sitios ? clienteObj.sitios.length : 0;
+    const equiposCount = maquinariaDash.length;
+    
+    if (elOrd) elOrd.textContent = sitiosCount;
+    if (elOrd) elOrd.style.color = '#4f8ef7';
+    if (elTkt) elTkt.textContent = equiposCount;
+    if (elTkt) elTkt.style.color = '#8b5cf6';
+  } else {
+    if (elOrd) elOrd.textContent = avgDiasOrdenes + ' d';
+    if (elOrd) elOrd.style.color = '#4f8ef7';
+    if (elTkt) elTkt.textContent = countTicketsCerrados > 0 ? (avgDiasTickets + ' d') : 'N/D';
+    if (elTkt) elTkt.style.color = '#8b5cf6';
+  }
 
   // --- Mini tabla Órdenes (últimas 6) ---
   const miniOrd = document.getElementById('v2-mini-ordenes');
   if (miniOrd) {
-    const recientes = [...ordenes].sort((a,b) => new Date(b.fecha||0) - new Date(a.fecha||0)).slice(0,6);
+    const recientes = [...ordenesDash].sort((a,b) => new Date(b.fecha||0) - new Date(a.fecha||0)).slice(0,6);
     miniOrd.innerHTML = recientes.map(o => {
       const est = (o.estado||'').toLowerCase();
       const col = est==='pendiente'?'#ef4444':est==='en proceso'?'#E8820C':'#10b981';
@@ -2139,10 +2198,10 @@ function renderDashboardV2() {
 
     // Donut: Estado de Órdenes
     destroyChart('ord-estado');
-    const ordPend = ordenes.filter(o => (o.estado||'').toLowerCase() === 'pendiente').length;
-    const ordProc = ordenes.filter(o => (o.estado||'').toLowerCase() === 'en proceso').length;
-    const ordComp = ordenes.filter(o => (o.estado||'').toLowerCase() === 'completado').length;
-    const ordOtro = ordenes.length - ordPend - ordProc - ordComp;
+    const ordPend = ordenesDash.filter(o => (o.estado||'').toLowerCase() === 'pendiente').length;
+    const ordProc = ordenesDash.filter(o => (o.estado||'').toLowerCase() === 'en proceso').length;
+    const ordComp = ordenesDash.filter(o => (o.estado||'').toLowerCase() === 'completado').length;
+    const ordOtro = ordenesDash.length - ordPend - ordProc - ordComp;
     const ctxOE = document.getElementById('chart-ordenes-estado');
     if (ctxOE) _v2Charts['ord-estado'] = new Chart(ctxOE, {
       type: 'doughnut',
@@ -2157,7 +2216,7 @@ function renderDashboardV2() {
     // Barras: Órdenes por Tipo
     destroyChart('ord-tipo');
     const tipoCount = {};
-    ordenes.forEach(o => { const t = o.tipo || 'Otro'; tipoCount[t] = (tipoCount[t]||0) + 1; });
+    ordenesDash.forEach(o => { const t = o.tipo || 'Otro'; tipoCount[t] = (tipoCount[t]||0) + 1; });
     const ctxOT = document.getElementById('chart-ordenes-tipo');
     if (ctxOT) _v2Charts['ord-tipo'] = new Chart(ctxOT, {
       type: 'bar',
@@ -2169,18 +2228,38 @@ function renderDashboardV2() {
       }
     });
 
-    // Barras: Top 5 Clientes por Órdenes
+    // Barras: Top 5 Clientes/Equipos por Órdenes
     destroyChart('ord-cliente');
-    const cliCount = {};
-    ordenes.forEach(o => { if (o.cliente) cliCount[o.cliente] = (cliCount[o.cliente]||0) + 1; });
-    const topCli = Object.entries(cliCount).sort((a,b) => b[1]-a[1]).slice(0,5);
+    
+    let labels3 = [];
+    let data3 = [];
+    let onClick3 = null;
+
+    if (isEmpresa && nombreEmpresaLogged) {
+      const maqCount = {};
+      ordenesDash.forEach(o => {
+        if (o.modelo) maqCount[o.modelo] = (maqCount[o.modelo]||0) + 1;
+      });
+      const topMaq = Object.entries(maqCount).sort((a,b) => b[1] - a[1]).slice(0,5);
+      labels3 = topMaq.map(m => m[0].length > 18 ? m[0].slice(0,16)+'…' : m[0]);
+      data3 = topMaq.map(m => m[1]);
+      onClick3 = (e, els) => { if(els.length) { abrirDesgloseDashboard('chart_ord_equipo', topMaq[els[0].index][0]); } };
+    } else {
+      const cliCount = {};
+      ordenesDash.forEach(o => { if (o.cliente) cliCount[o.cliente] = (cliCount[o.cliente]||0) + 1; });
+      const topCli = Object.entries(cliCount).sort((a,b) => b[1]-a[1]).slice(0,5);
+      labels3 = topCli.map(c => c[0].length > 18 ? c[0].slice(0,16)+'…' : c[0]);
+      data3 = topCli.map(c => c[1]);
+      onClick3 = (e, els) => { if(els.length) { abrirDesgloseDashboard('chart_ord_cliente', topCli[els[0].index][0]); } };
+    }
+
     const ctxOC = document.getElementById('chart-ordenes-cliente');
     if (ctxOC) _v2Charts['ord-cliente'] = new Chart(ctxOC, {
       type: 'bar',
-      data: { labels: topCli.map(c => c[0].length > 18 ? c[0].slice(0,16)+'…' : c[0]), datasets: [{ data: topCli.map(c => c[1]), backgroundColor: ['#8b5cf6','#4f8ef7','#10b981','#E8820C','#ef4444'], borderRadius: 6, borderSkipped: false }] },
+      data: { labels: labels3, datasets: [{ data: data3, backgroundColor: ['#8b5cf6','#4f8ef7','#10b981','#E8820C','#ef4444'], borderRadius: 6, borderSkipped: false }] },
       options: {
         indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: gridColor } }, y: { grid: { display: false } } },
-        onClick: (e, els) => { if(els.length) { abrirDesgloseDashboard('chart_ord_cliente', topCli[els[0].index][0]); } },
+        onClick: onClick3,
         onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
       }
     });
@@ -2188,7 +2267,7 @@ function renderDashboardV2() {
     // Barras: Tickets por Área
     destroyChart('tkt-area');
     const areaCount = {};
-    tickets.forEach(t => { const a = t.area || 'Sin área'; areaCount[a] = (areaCount[a]||0) + 1; });
+    ticketsDash.forEach(t => { const a = t.area || 'Sin área'; areaCount[a] = (areaCount[a]||0) + 1; });
     const ctxTA = document.getElementById('chart-tickets-area');
     if (ctxTA) _v2Charts['tkt-area'] = new Chart(ctxTA, {
       type: 'bar',
@@ -2202,9 +2281,9 @@ function renderDashboardV2() {
 
     // Donut: Estado de Tickets
     destroyChart('tkt-estado');
-    const tktAb = tickets.filter(t => (t.estado||'').toLowerCase() === 'abierto').length;
-    const tktCot = tickets.filter(t => (t.estado||'').toLowerCase() === 'cotización' || (t.estado||'').toLowerCase() === 'cotizacion').length;
-    const tktCer = tickets.filter(t => (t.estado||'').toLowerCase() === 'cerrado').length;
+    const tktAb = ticketsDash.filter(t => (t.estado||'').toLowerCase() === 'abierto').length;
+    const tktCot = ticketsDash.filter(t => (t.estado||'').toLowerCase() === 'cotización' || (t.estado||'').toLowerCase() === 'cotizacion').length;
+    const tktCer = ticketsDash.filter(t => (t.estado||'').toLowerCase() === 'cerrado').length;
     const ctxTE = document.getElementById('chart-tickets-estado');
     if (ctxTE) _v2Charts['tkt-estado'] = new Chart(ctxTE, {
       type: 'doughnut',
