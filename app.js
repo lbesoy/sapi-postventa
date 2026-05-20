@@ -709,15 +709,6 @@ function applyRole(rolKey) {
   const navMaquinariaText = document.getElementById('nav-maquinaria-text');
   if (navMaquinariaText) navMaquinariaText.textContent = isEmpresa ? 'Mis máquinas' : 'Maquinaria';
 
-  // Dashboard V1 / V2 toggle — solo superadmin ve el nuevo diseño
-  const dashV1 = document.getElementById('dash-v1');
-  const dashV2 = document.getElementById('dash-v2');
-  if (dashV1 && dashV2) {
-    const showV2 = ['superadmin', 'empresa', 'cliente', 'admin', 'supervisor'].includes(rolKey);
-    dashV1.style.display = showV2 ? 'none' : '';
-    dashV2.style.display = showV2 ? '' : 'none';
-  }
-
   lucide.createIcons();
 }
 
@@ -2334,15 +2325,13 @@ function renderDashboardV2() {
 
 // ===== DASHBOARD TABS =====
 function setDashView(tab) {
-  const btnOrdenes = document.getElementById('btn-dash-ordenes');
-  const btnTickets = document.getElementById('btn-dash-tickets');
+  const btnV2 = document.getElementById('btn-dash-v2');
   const btnTecnicos = document.getElementById('btn-dash-tecnicos');
-  const contentOrdenes = document.getElementById('dash-content-ordenes');
-  const contentTickets = document.getElementById('dash-content-tickets');
+  const contentV2 = document.getElementById('dash-content-v2');
   const contentTecnicos = document.getElementById('dash-content-tecnicos');
 
   // Reset styles
-  [btnOrdenes, btnTickets, btnTecnicos].forEach(btn => {
+  [btnV2, btnTecnicos].forEach(btn => {
     if(!btn) return;
     btn.classList.remove('active');
     btn.style.background = 'transparent';
@@ -2352,27 +2341,23 @@ function setDashView(tab) {
   });
 
   // Hide all contents
-  [contentOrdenes, contentTickets, contentTecnicos].forEach(c => {
+  [contentV2, contentTecnicos].forEach(c => {
     if(c) c.style.display = 'none';
   });
 
   // Activate selected
   let activeBtn;
-  if (tab === 'ordenes') {
-    activeBtn = btnOrdenes;
-    if(contentOrdenes) contentOrdenes.style.display = 'block';
-    renderTabla('');
-  } else if (tab === 'tickets') {
-    activeBtn = btnTickets;
-    if(contentTickets) contentTickets.style.display = 'block';
-    renderTickets('dash-tickets');
+  if (tab === 'v2') {
+    activeBtn = btnV2;
+    if(contentV2) contentV2.style.display = 'block';
+    renderDashboardV2();
   } else if (tab === 'tecnicos') {
     activeBtn = btnTecnicos;
     if(contentTecnicos) contentTecnicos.style.display = 'block';
     renderDashboardTecnicos();
   }
 
-  if(activeBtn) {
+  if (activeBtn) {
     activeBtn.classList.add('active');
     activeBtn.style.background = 'var(--bg-card)';
     activeBtn.style.color = 'var(--text-primary)';
