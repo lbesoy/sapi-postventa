@@ -1657,22 +1657,22 @@ function setupNav() {
 
       if (!viewEl) return;
 
-      // Resetear scroll ANTES del cambio de vista (mientras el DOM todavía es el anterior)
+      // Resetear scroll ANTES del cambio de vista
       window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
 
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       viewEl.classList.add('active');
 
-      // Resetear scroll también después del cambio de vista (doble seguridad)
-      // Bloqueamos overflow temporalmente para impedir que Chrome ajuste el scroll
-      document.documentElement.style.overflow = 'hidden';
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-      requestAnimationFrame(() => {
+      // Resetear scroll DESPUÉS del cambio de vista con setTimeout(0):
+      // Chrome aplica "scroll anchoring" durante el rendering cycle, DESPUÉS de rAF.
+      // setTimeout(0) ejecuta en la siguiente tarea del event loop, DESPUÉS del render completo.
+      setTimeout(() => {
         window.scrollTo(0, 0);
-        document.documentElement.style.overflow = '';
-      });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }, 0);
 
       // Page title via data-title attribute
       document.getElementById('page-title').textContent = item.dataset.title || view;
