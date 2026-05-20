@@ -2173,7 +2173,7 @@ function renderDashboardV2() {
   // --- Mini tabla Tickets (últimos 6) ---
   const miniTkt = document.getElementById('v2-mini-tickets');
   if (miniTkt) {
-    const recientes = [...tickets].sort((a,b) => new Date(b.fecha||0) - new Date(a.fecha||0)).slice(0,6);
+    const recientes = [...ticketsDash].sort((a,b) => new Date(b.fecha||0) - new Date(a.fecha||0)).slice(0,6);
     miniTkt.innerHTML = recientes.map(t => {
       const est = (t.estado||'').toLowerCase();
       const col = est==='abierto'?'#ef4444':est==='cerrado'?'#10b981':'#E8820C';
@@ -7271,7 +7271,7 @@ function renderTickets(ctx) {
         ${t.cliente ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}"><i data-lucide="building-2" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}</div>` : ''}
       </td>
       <td data-label="Área" style="white-space:nowrap;">${t.area||'—'}</td>
-      <td data-label="Prioridad" class="col-prioridad" style="white-space:nowrap;"><span class="badge badge-${String(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
+      <td data-label="Prioridad" class="col-prioridad" style="white-space:nowrap; display: ${isEmpresa ? 'none' : ''};"><span class="badge badge-${String(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
       <td data-label="Estado" style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'—'}</span></td>
       <td data-label="Asignado" style="white-space:nowrap;">${t.asignado||'—'}</td>
       <td data-label="Fecha" style="white-space:nowrap;">${t.fecha||'—'}</td>
