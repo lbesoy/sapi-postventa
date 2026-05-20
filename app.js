@@ -1661,13 +1661,7 @@ function setupNav() {
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       viewEl.classList.add('active');
 
-      // Con app-wrapper en height:100vh, el scroll está en .content, no en window
-      const contentEl = document.querySelector('.content');
-      if (contentEl) {
-        contentEl.scrollTop = 0;
-        // Backup: Chrome puede ajustar scrollTop durante el rendering cycle
-        setTimeout(() => { contentEl.scrollTop = 0; }, 0);
-      }
+      // Se resetea el scroll DESPUÉS de todos los renders (ver abajo)
 
       // Page title via data-title attribute
       document.getElementById('page-title').textContent = item.dataset.title || view;
@@ -1712,6 +1706,18 @@ function setupNav() {
       if (view === 'dashboard') {
         renderStats();
         // renderStats() ya invoca internamente a renderDashboardV2() si existe
+      }
+
+      // Reset scroll DESPUÉS de todos los renders — las funciones de render mutan el DOM
+      // y Chrome puede ajustar scrollTop durante esas mutaciones. Reseteamos al final
+      // con rAF + setTimeout para capturar cualquier ajuste del rendering cycle.
+      const contentEl = document.querySelector('.content');
+      if (contentEl) {
+        contentEl.scrollTop = 0;
+        requestAnimationFrame(() => {
+          contentEl.scrollTop = 0;
+          setTimeout(() => { contentEl.scrollTop = 0; }, 0);
+        });
       }
     });
   });
