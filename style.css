@@ -387,7 +387,8 @@ body {
 
 /* ===== CONTENT ===== */
 .content { flex: 1; padding: 1.75rem; padding-top: 1rem; overflow-y: auto; min-height: 0; overflow-anchor: none; }
-.view { display: none; }
+.view { display: none; overflow-anchor: none; }
+.view * { overflow-anchor: none; }
 .view.active { display: block; }
 
 /* ===== STATS ===== */
