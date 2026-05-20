@@ -389,6 +389,7 @@ body {
 .content { flex: 1; overflow: hidden; min-height: 0; }
 .view { display: none; }
 .view.active { display: block; height: 100%; overflow-y: auto; padding: 5.25rem 1.75rem 1.75rem 1.75rem; overflow-anchor: none; }
+#view-dashboard.view.active { padding-top: 1.75rem; }
 
 /* ===== STATS ===== */
 .stats-grid {
