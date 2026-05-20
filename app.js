@@ -2139,21 +2139,45 @@ function renderDashboardV2() {
   const elOrd = document.getElementById('v2-stat-avg-ordenes');
   const elTkt = document.getElementById('v2-stat-avg-tickets');
   
+  const cardOrd = elOrd ? elOrd.closest('.stat-card') : null;
+  const cardTkt = elTkt ? elTkt.closest('.stat-card') : null;
+  const labelOrd = document.getElementById('v2-label-rend-2');
+  const labelTkt = document.getElementById('v2-label-rend-3');
+  const iconDivOrd = cardOrd ? cardOrd.querySelector('.stat-icon') : null;
+  const iconDivTkt = cardTkt ? cardTkt.querySelector('.stat-icon') : null;
+  const textOrd = cardOrd ? cardOrd.querySelector('div:last-child') : null;
+  const textTkt = cardTkt ? cardTkt.querySelector('div:last-child') : null;
+  
   if (isEmpresa && nombreEmpresaLogged) {
     const clienteObj = clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === nombreEmpresaLogged);
     const sitiosCount = clienteObj && clienteObj.sitios ? clienteObj.sitios.length : 0;
     const equiposCount = maquinariaDash.length;
     
-    if (elOrd) elOrd.textContent = sitiosCount;
-    if (elOrd) elOrd.style.color = '#4f8ef7';
-    if (elTkt) elTkt.textContent = equiposCount;
-    if (elTkt) elTkt.style.color = '#8b5cf6';
+    if (labelOrd) labelOrd.textContent = 'Sitios Activos';
+    if (elOrd) { elOrd.textContent = sitiosCount; elOrd.style.color = '#4f8ef7'; }
+    if (cardOrd) cardOrd.setAttribute('onclick', "abrirDesgloseDashboard('sitios', '')");
+    if (iconDivOrd) iconDivOrd.innerHTML = '<i data-lucide="map-pin"></i>';
+    if (textOrd) textOrd.textContent = 'Registrados en el sistema';
+
+    if (labelTkt) labelTkt.textContent = 'Equipos Instalados';
+    if (elTkt) { elTkt.textContent = equiposCount; elTkt.style.color = '#8b5cf6'; }
+    if (cardTkt) cardTkt.setAttribute('onclick', "abrirDesgloseDashboard('maquinas', '')");
+    if (iconDivTkt) iconDivTkt.innerHTML = '<i data-lucide="settings"></i>';
+    if (textTkt) textTkt.textContent = 'Maquinaria vinculada';
   } else {
-    if (elOrd) elOrd.textContent = avgDiasOrdenes + ' d';
-    if (elOrd) elOrd.style.color = '#4f8ef7';
-    if (elTkt) elTkt.textContent = countTicketsCerrados > 0 ? (avgDiasTickets + ' d') : 'N/D';
-    if (elTkt) elTkt.style.color = '#8b5cf6';
+    if (labelOrd) labelOrd.textContent = 'Resolución Órdenes';
+    if (elOrd) { elOrd.textContent = avgDiasOrdenes + ' d'; elOrd.style.color = '#4f8ef7'; }
+    if (cardOrd) cardOrd.setAttribute('onclick', "abrirDesgloseDashboard('rendimiento', 'ordenes')");
+    if (iconDivOrd) iconDivOrd.innerHTML = '<i data-lucide="timer"></i>';
+    if (textOrd) textOrd.textContent = 'Tiempo promedio (Histórico)';
+
+    if (labelTkt) labelTkt.textContent = 'Resolución Tickets';
+    if (elTkt) { elTkt.textContent = countTicketsCerrados > 0 ? (avgDiasTickets + ' d') : 'N/D'; elTkt.style.color = '#8b5cf6'; }
+    if (cardTkt) cardTkt.setAttribute('onclick', "abrirDesgloseDashboard('rendimiento', 'tickets')");
+    if (iconDivTkt) iconDivTkt.innerHTML = '<i data-lucide="hourglass"></i>';
+    if (textTkt) textTkt.textContent = 'Tiempo promedio (Cerrados)';
   }
+  lucide.createIcons();
 
   // --- Mini tabla Órdenes (últimas 6) ---
   const miniOrd = document.getElementById('v2-mini-ordenes');
