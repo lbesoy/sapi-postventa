@@ -1709,18 +1709,21 @@ function setupNav() {
       }
 
       // Reset scroll DESPUÉS de todos los renders — usa MutationObserver para interceptar
-      // cualquier mutación DOM (render sincrónico, Supabase real-time, etc.) en los
-      // primeros 500ms y forzar scrollTop=0 cada vez que el DOM cambie.
+      // cualquier mutación DOM (renders, Supabase real-time, cambios en contadores/texto).
       const contentEl = document.querySelector('.content');
       if (contentEl) {
         contentEl.scrollTop = 0;
         const scrollGuard = new MutationObserver(() => { contentEl.scrollTop = 0; });
-        scrollGuard.observe(contentEl, { childList: true, subtree: true });
-        // Desconectar después de 500ms para permitir scroll normal del usuario
+        scrollGuard.observe(contentEl, {
+          childList: true,
+          subtree: true,
+          characterData: true  // Captura cuando los valores de stats cambian de texto
+        });
+        // Desconectar después de 1000ms para permitir scroll normal del usuario
         setTimeout(() => {
           scrollGuard.disconnect();
-          contentEl.scrollTop = 0; // Un último reset al final
-        }, 500);
+          contentEl.scrollTop = 0;
+        }, 1000);
       }
     });
   });
