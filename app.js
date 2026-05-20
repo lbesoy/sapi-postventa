@@ -1708,23 +1708,9 @@ function setupNav() {
         // renderStats() ya invoca internamente a renderDashboardV2() si existe
       }
 
-      // Reset scroll DESPUÉS de todos los renders — usa MutationObserver para interceptar
-      // cualquier mutación DOM (renders, Supabase real-time, cambios en contadores/texto).
-      const contentEl = document.querySelector('.content');
-      if (contentEl) {
-        contentEl.scrollTop = 0;
-        const scrollGuard = new MutationObserver(() => { contentEl.scrollTop = 0; });
-        scrollGuard.observe(contentEl, {
-          childList: true,
-          subtree: true,
-          characterData: true  // Captura cuando los valores de stats cambian de texto
-        });
-        // Desconectar después de 1000ms para permitir scroll normal del usuario
-        setTimeout(() => {
-          scrollGuard.disconnect();
-          contentEl.scrollTop = 0;
-        }, 1000);
-      }
+      // Cada .view.active es su propio scroll container — reset simple y garantizado
+      viewEl.scrollTop = 0;
+
     });
   });
 }
