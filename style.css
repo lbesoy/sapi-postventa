@@ -85,13 +85,14 @@ body.light-mode {
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html { overflow-anchor: none; }
+html { overflow-anchor: none; height: 100%; }
 body {
   font-family: 'Inter', sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   display: flex;
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
   font-size: 14px;
 }
 
@@ -268,7 +269,7 @@ body {
 }
 
 /* ===== MAIN ===== */
-.main-wrapper { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+.main-wrapper { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; height: 100%; }
 
 /* ===== TOPBAR ===== */
 .topbar {
@@ -386,7 +387,7 @@ body {
 .btn-secondary.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
 
 /* ===== CONTENT ===== */
-.content { flex: 1; padding: 1.75rem; overflow-y: auto; overflow-anchor: none; }
+.content { flex: 1; padding: 1.75rem; overflow-y: auto; overflow-anchor: none; min-height: 0; }
 .view { display: none; }
 .view.active { display: block; }
 
@@ -999,7 +1000,7 @@ body {
 
 /* App wrapper visibility */
 #app-wrapper { display: none; }
-#app-wrapper.visible { display: flex; flex-direction: column; min-height: 100vh; width: 100%; }
+#app-wrapper.visible { display: flex; flex-direction: column; height: 100%; width: 100%; }
 
 /* ===== CUSTOM COMBOBOX ===== */
 .combo-box {
