@@ -1663,7 +1663,11 @@ function setupNav() {
 
       // Con app-wrapper en height:100vh, el scroll está en .content, no en window
       const contentEl = document.querySelector('.content');
-      if (contentEl) contentEl.scrollTop = 0;
+      if (contentEl) {
+        contentEl.scrollTop = 0;
+        // Backup: Chrome puede ajustar scrollTop durante el rendering cycle
+        setTimeout(() => { contentEl.scrollTop = 0; }, 0);
+      }
 
       // Page title via data-title attribute
       document.getElementById('page-title').textContent = item.dataset.title || view;
