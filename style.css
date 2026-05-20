@@ -388,7 +388,7 @@ body {
 /* ===== CONTENT ===== */
 .content { flex: 1; overflow: hidden; min-height: 0; }
 .view { display: none; }
-.view.active { display: block; height: 100%; overflow-y: auto; padding: 2.5rem 1.75rem 1.75rem 1.75rem; overflow-anchor: none; }
+.view.active { display: block; height: 100%; overflow-y: auto; padding: 4.5rem 1.75rem 1.75rem 1.75rem; overflow-anchor: none; }
 
 /* ===== STATS ===== */
 .stats-grid {
