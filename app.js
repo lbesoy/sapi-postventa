@@ -1661,8 +1661,15 @@ function setupNav() {
       viewEl.classList.add('active');
 
       // Resetear scroll al tope al cambiar de vista
-      const contentEl = document.querySelector('.content');
-      if (contentEl) contentEl.scrollTop = 0;
+      // Bloqueamos overflow temporalmente para impedir que Chrome ajuste el scroll
+      document.documentElement.style.overflow = 'hidden';
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      requestAnimationFrame(() => {
+        window.scrollTo(0, 0);
+        document.documentElement.style.overflow = '';
+      });
 
       // Page title via data-title attribute
       document.getElementById('page-title').textContent = item.dataset.title || view;
