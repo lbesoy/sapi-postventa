@@ -2644,7 +2644,6 @@ function renderTabla(ctx) {
   }
   const isConsulta = currentSession.viewMode === 'consulta';
   const isTecnico = currentSession.viewMode === 'tecnico';
-  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
   const canEdit = !isConsulta && !isTecnico && !isEmpresa;
   const canDelete = ['superadmin', 'admin'].includes(currentSession.viewMode);
 
