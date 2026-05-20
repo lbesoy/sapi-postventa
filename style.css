@@ -999,7 +999,7 @@ body {
 
 /* App wrapper visibility */
 #app-wrapper { display: none; }
-#app-wrapper.visible { display: flex; flex-direction: column; height: 100vh; width: 100%; padding-left: var(--sidebar-w); overflow: hidden; }
+#app-wrapper.visible { display: flex; flex-direction: column; height: 100vh; width: 100%; padding-left: var(--sidebar-w); }
 
 /* ===== CUSTOM COMBOBOX ===== */
 .combo-box {
