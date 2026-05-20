@@ -1702,11 +1702,7 @@ function setupNav() {
       }
       if (view === 'dashboard') {
         renderStats();
-        renderTabla('');
-        renderTabla('v2');
-        renderTickets('dash-tickets');
-        renderTickets('v2');
-        renderDashboardV2();
+        // renderStats() ya invoca internamente a renderDashboardV2() si existe
       }
     });
   });
@@ -2624,6 +2620,7 @@ function renderTabla(ctx) {
   });
 
   const body = document.getElementById(bodyId);
+  if (!body) return;
   if (!filtradas.length) {
     body.innerHTML = `<tr><td colspan="9" class="empty-state">No hay órdenes${q ? ' que coincidan' : ' registradas'}.</td></tr>`;
     return;
