@@ -1657,10 +1657,13 @@ function setupNav() {
 
       if (!viewEl) return;
 
+      // Resetear scroll ANTES del cambio de vista (mientras el DOM todavía es el anterior)
+      window.scrollTo(0, 0);
+
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       viewEl.classList.add('active');
 
-      // Resetear scroll al tope al cambiar de vista
+      // Resetear scroll también después del cambio de vista (doble seguridad)
       // Bloqueamos overflow temporalmente para impedir que Chrome ajuste el scroll
       document.documentElement.style.overflow = 'hidden';
       window.scrollTo(0, 0);
