@@ -268,7 +268,7 @@ body {
 }
 
 /* ===== MAIN ===== */
-.main-wrapper { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+.main-wrapper { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
 /* ===== TOPBAR ===== */
 .topbar {
@@ -386,7 +386,7 @@ body {
 .btn-secondary.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
 
 /* ===== CONTENT ===== */
-.content { flex: 1; padding: 1.75rem; overflow-y: auto; }
+.content { flex: 1; padding: 1.75rem; overflow-y: auto; min-height: 0; }
 .view { display: none; }
 .view.active { display: block; }
 
@@ -673,7 +673,7 @@ body {
   .sidebar.open {
     transform: translateX(0);
   }
-  .main-wrapper { margin-left: 0; }
+  #app-wrapper.visible { padding-left: 0; }
   .stats-grid { grid-template-columns: repeat(2,1fr); }
   .form-grid { grid-template-columns: 1fr; }
   .search-bar input { width: 100%; }
@@ -999,7 +999,7 @@ body {
 
 /* App wrapper visibility */
 #app-wrapper { display: none; }
-#app-wrapper.visible { display: flex; flex-direction: column; min-height: 100vh; width: 100%; }
+#app-wrapper.visible { display: flex; flex-direction: column; height: 100vh; width: 100%; padding-left: var(--sidebar-w); overflow: hidden; }
 
 /* ===== CUSTOM COMBOBOX ===== */
 .combo-box {

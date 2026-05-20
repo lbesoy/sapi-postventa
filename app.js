@@ -1657,25 +1657,13 @@ function setupNav() {
 
       if (!viewEl) return;
 
-      // Quitar todas las vistas activas
+      // Cambiar de vista
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-
-      // Activar la nueva vista pero OCULTARLA temporalmente vía inline style
-      // (Chrome no puede hacer scroll anchoring cuando no hay nada visible)
       viewEl.classList.add('active');
-      viewEl.style.display = 'none';
 
-      // Scroll a 0 mientras la página está "vacía" — funciona garantizado
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-
-      // Mostrar la vista en el siguiente frame de renderizado
-      requestAnimationFrame(() => {
-        viewEl.style.display = '';
-        // Un segundo scroll de seguridad
-        window.scrollTo(0, 0);
-      });
+      // Con app-wrapper en height:100vh, el scroll está en .content, no en window
+      const contentEl = document.querySelector('.content');
+      if (contentEl) contentEl.scrollTop = 0;
 
       // Page title via data-title attribute
       document.getElementById('page-title').textContent = item.dataset.title || view;
