@@ -1751,14 +1751,14 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     maquinariaDb.forEach(m => {
       const mcli = String(m.cliente || '').toLowerCase().trim();
       if (!isEmpresa || mcli === nombreEmpresaLogged) {
-        data.push({ cliente: m.cliente || 'N/A', id: m.idInterno || m.serie || 'N/A', modelo: m.modelo || m.tipo || 'N/A', ubicacion: m.ubicacion || m.cliente || 'N/A' });
+        data.push({ cliente: m.cliente || 'N/A', id: m.idInterno || m.serie || 'N/A', modelo: m.modelo || m.tipo || 'N/A', ubicacion: m.ubicacion || m.sitio || m.cliente || 'N/A' });
       }
     });
     clientesDb.forEach(c => {
       if (!isEmpresa || (c.nombre && String(c.nombre).toLowerCase().trim() === nombreEmpresaLogged)) {
         if (c.maquinas) {
           c.maquinas.forEach(m => {
-            data.push({ cliente: c.nombre, id: m.idInterno || m.serie || 'N/A', modelo: m.modelo || m.tipo || 'N/A', ubicacion: m.ubicacion || c.nombre || 'N/A' });
+            data.push({ cliente: c.nombre, id: m.idInterno || m.serie || 'N/A', modelo: m.modelo || m.tipo || 'N/A', ubicacion: m.ubicacion || m.sitio || c.nombre || 'N/A' });
           });
         }
       }
