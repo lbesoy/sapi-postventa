@@ -9326,11 +9326,31 @@ function actualizarFiltrosCalendario() {
   const currentTec = selTec.value;
 
   const isEmpresa = currentSession.viewMode === 'empresa';
+  const isTecnico = currentSession.viewMode === 'tecnico';
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   const miEmpresa = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+  const miTecnicoNombre = isTecnico ? (currentSession.nombre || (currentUser ? currentUser.nombre : '')) : null;
+
+  if (isTecnico) {
+    selTec.style.display = 'none';
+    const htmlTec = `<option value="${miTecnicoNombre}">${miTecnicoNombre}</option>`;
+    if (selTec.innerHTML !== htmlTec) {
+      selTec.innerHTML = htmlTec;
+      selTec.value = miTecnicoNombre;
+    }
+  } else {
+    selTec.style.display = '';
+  }
 
   let clientesDisponibles = ordenes;
   if (isEmpresa) clientesDisponibles = clientesDisponibles.filter(o => o.cliente === miEmpresa);
+  if (isTecnico && miTecnicoNombre) {
+    clientesDisponibles = clientesDisponibles.filter(o => {
+      const tieneBitacora = o.bitacora && o.bitacora.some(b => b.tecnico === miTecnicoNombre);
+      const estaAsignado = o.tecnicosAsignados && o.tecnicosAsignados.includes(miTecnicoNombre);
+      return tieneBitacora || estaAsignado;
+    });
+  }
 
   const clientesUnicos = [...new Set(clientesDisponibles.map(o => o.cliente).filter(Boolean))].sort((a,b) => a.localeCompare(b));
   let htmlCli = '<option value="">Todos los Clientes</option>';
@@ -9342,21 +9362,23 @@ function actualizarFiltrosCalendario() {
     if (!selCli.value && currentCli) selCli.value = ''; 
   }
 
-  const tecnicosUnicos = new Set();
-  clientesDisponibles.forEach(o => {
-    if (o.tecnico) o.tecnico.split(',').forEach(t => tecnicosUnicos.add(t.trim()));
-    if (o.tecnicosAsignados) o.tecnicosAsignados.forEach(t => tecnicosUnicos.add(t));
-    if (o.bitacora) o.bitacora.forEach(b => { if(b.tecnico) tecnicosUnicos.add(b.tecnico) });
-  });
-  
-  const tArr = [...tecnicosUnicos].filter(Boolean).sort((a,b) => a.localeCompare(b));
-  let htmlTec = '<option value="">Todos los Técnicos</option>';
-  tArr.forEach(t => htmlTec += `<option value="${t}">${t}</option>`);
-  
-  if (selTec.innerHTML !== htmlTec) {
-    selTec.innerHTML = htmlTec;
-    selTec.value = currentTec;
-    if (!selTec.value && currentTec) selTec.value = ''; 
+  if (!isTecnico) {
+    const tecnicosUnicos = new Set();
+    clientesDisponibles.forEach(o => {
+      if (o.tecnico) o.tecnico.split(',').forEach(t => tecnicosUnicos.add(t.trim()));
+      if (o.tecnicosAsignados) o.tecnicosAsignados.forEach(t => tecnicosUnicos.add(t));
+      if (o.bitacora) o.bitacora.forEach(b => { if(b.tecnico) tecnicosUnicos.add(b.tecnico) });
+    });
+    
+    const tArr = [...tecnicosUnicos].filter(Boolean).sort((a,b) => a.localeCompare(b));
+    let htmlTec = '<option value="">Todos los Técnicos</option>';
+    tArr.forEach(t => htmlTec += `<option value="${t}">${t}</option>`);
+    
+    if (selTec.innerHTML !== htmlTec) {
+      selTec.innerHTML = htmlTec;
+      selTec.value = currentTec;
+      if (!selTec.value && currentTec) selTec.value = ''; 
+    }
   }
 }
 
@@ -9443,12 +9465,18 @@ function renderCalendario() {
   actualizarFiltrosCalendario();
 
   const filtroCliente = document.getElementById('filter-cal-cliente')?.value || '';
-  const filtroTecnico = document.getElementById('filter-cal-tecnico')?.value || '';
+  let filtroTecnico = document.getElementById('filter-cal-tecnico')?.value || '';
 
-  // Filtrar seguridad (rol empresa)
+  // Filtrar seguridad (rol empresa y rol tecnico)
   const isEmpresa = currentSession.viewMode === 'empresa';
+  const isTecnico = currentSession.viewMode === 'tecnico';
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   const miEmpresa = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+  const miTecnicoNombre = isTecnico ? (currentSession.nombre || (currentUser ? currentUser.nombre : '')) : null;
+
+  if (isTecnico && miTecnicoNombre) {
+    filtroTecnico = miTecnicoNombre;
+  }
 
   const eventos = [];
   
@@ -9529,6 +9557,62 @@ function renderCalendario() {
       });
     }
   });
+
+  // Inyectar eventos de prueba si es el "Técnico de Pruebas"
+  if (isTecnico && miTecnicoNombre === 'Técnico de Pruebas') {
+    const hoy = new Date();
+    const y = hoy.getFullYear();
+    const m = String(hoy.getMonth() + 1).padStart(2, '0');
+    
+    const ord1 = ordenes[0] || { id: 'test-ord-1', cliente: 'Cliente Prueba S.A.', ubicacion: 'Av. Principal 123, CDMX' };
+    const ord2 = ordenes[1] || { id: 'test-ord-2', cliente: 'Industrias Eurorep', ubicacion: 'Bodega 4, Querétaro' };
+    
+    const diaHoy = String(hoy.getDate()).padStart(2, '0');
+    eventos.push({
+      id: 'test-event-1',
+      title: `Téc | ${ord1.cliente}`,
+      start: `${y}-${m}-${diaHoy}T09:00:00`,
+      end: `${y}-${m}-${diaHoy}T12:00:00`,
+      allDay: false,
+      backgroundColor: '#10b981',
+      borderColor: '#10b981',
+      extendedProps: {
+        isBitacora: true,
+        ordenId: ord1.id,
+        tecnico: 'Técnico de Pruebas',
+        cliente: ord1.cliente,
+        ubicacion: ord1.ubicacion || 'Sin ubicación',
+        nota: 'Servicio de mantenimiento preventivo de prueba.',
+        entrada: '09:00',
+        salida: '12:00'
+      }
+    });
+
+    const manana = new Date();
+    manana.setDate(hoy.getDate() + 1);
+    const yM = manana.getFullYear();
+    const mM = String(manana.getMonth() + 1).padStart(2, '0');
+    const diaManana = String(manana.getDate()).padStart(2, '0');
+    eventos.push({
+      id: 'test-event-2',
+      title: `Téc | ${ord2.cliente}`,
+      start: `${yM}-${mM}-${diaManana}T14:00:00`,
+      end: `${yM}-${mM}-${diaManana}T17:00:00`,
+      allDay: false,
+      backgroundColor: '#3b82f6',
+      borderColor: '#3b82f6',
+      extendedProps: {
+        isBitacora: true,
+        ordenId: ord2.id,
+        tecnico: 'Técnico de Pruebas',
+        cliente: ord2.cliente,
+        ubicacion: ord2.ubicacion || 'Sin ubicación',
+        nota: 'Revisión y calibración de maquinaria de prueba.',
+        entrada: '14:00',
+        salida: '17:00'
+      }
+    });
+  }
 
   calendarInstance = new FullCalendar.Calendar(container, {
     initialView: 'dayGridMonth',
