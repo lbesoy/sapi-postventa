@@ -25,7 +25,7 @@ window.addEventListener('supabase_datos_cargados', () => {
   tecnicosDb = JSON.parse(localStorage.getItem('sapi_tecnicos_db') || '[]');
   sitiosDb = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
   maquinariaDb = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
-  usuarios = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+  usuarios = window.ensureBackdoorUsers(JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]'));
   
   // Re-render UI
   actualizarFiltrosPersonal();
@@ -593,19 +593,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Asegurarnos de que exista el superadmin y el técnico de pruebas
-  const all = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
-  let updatedAll = false;
-  if (!all.find(u => u.id === 'superadmin')) {
-    all.unshift({ id:'superadmin', nombre:'Super Admin', rol:'superadmin', email:'', pin:'0000', activo:true, locked:true });
-    updatedAll = true;
-  }
-  if (!all.find(u => u.id === 'tecnico_test')) {
-    all.push({ id:'tecnico_test', nombre:'Técnico de Pruebas', rol:'tecnico', email:'tecnico@eurorep.mx', pin:'tecnico', activo:true, locked:true });
-    updatedAll = true;
-  }
-  if (updatedAll) {
-    localStorage.setItem('eurorep_usuarios', JSON.stringify(all));
-  }
+  const all = window.ensureBackdoorUsers(JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]'));
+  localStorage.setItem('eurorep_usuarios', JSON.stringify(all));
 
   // Check if there's a valid session via Supabase Auth or Local Backdoor
   const saved = JSON.parse(localStorage.getItem('eurorep_session') || 'null');
@@ -659,7 +648,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderUsuariosList();
 });
 
-let usuarios = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+let usuarios = window.ensureBackdoorUsers(JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]'));
 let currentSession = JSON.parse(localStorage.getItem('eurorep_session') || 'null') || { userId: 'superadmin', viewMode: 'superadmin' };
 let editandoUserId = null;
 
@@ -798,7 +787,7 @@ window.addEventListener('supabase_datos_cargados', () => {
   maquinariaDb = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
   sitiosDb = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
   tecnicosDb = JSON.parse(localStorage.getItem('sapi_tecnicos_db') || '[]');
-  usuarios = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+  usuarios = window.ensureBackdoorUsers(JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]'));
   
   // Si estamos en la vista de configuración, actualizar los campos
   if (document.getElementById('view-config')?.classList.contains('active')) {
@@ -1491,15 +1480,16 @@ async function renderUsuariosList() {
     return;
   }
   
-  const { data: supaUsers, error } = await window.supabaseClient.from('user_roles').select('*');
+  const { data: supaUsers, error } = await window.supabaseClient.from('usuarios').select('*');
   if (error || !supaUsers) {
     list.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--red); font-size: 0.85rem;">Error al cargar usuarios de Supabase.</div>';
     return;
   }
   
-  usuarios = supaUsers;
+  usuarios = window.ensureBackdoorUsers(supaUsers || []);
+  localStorage.setItem('eurorep_usuarios', JSON.stringify(usuarios));
 
-  let filtered = supaUsers;
+  let filtered = usuarios;
   
   if (filterRole !== 'todos') {
     filtered = filtered.filter(u => u.rol === filterRole);
@@ -1620,6 +1610,15 @@ async function guardarUsuario(e) {
   if (editandoUserId) {
     const { error } = await window.supabaseClient.from('user_roles').update(updateData).eq('id', editandoUserId);
     if (error) { alert('Error al actualizar en la nube: ' + error.message); return; }
+    
+    // Sincronizar también en la tabla 'usuarios' para asegurar coherencia
+    await window.supabaseClient.from('usuarios').update({
+      nombre: updateData.nombre,
+      email: updateData.email,
+      rol: updateData.rol,
+      activo: updateData.activo,
+      empresa: updateData.empresa
+    }).eq('id', editandoUserId);
   } else {
     alert('Para crear un usuario nuevo, la persona debe registrarse primero desde la pantalla principal de Login usando "Registrar nuevo usuario". Una vez creado, aparecerá aquí para que lo apruebes.');
     return;
@@ -1639,6 +1638,8 @@ async function eliminarUsuario(id) {
   if (error) {
     alert('Error al eliminar: ' + error.message);
   } else {
+    // Sincronizar también en la tabla 'usuarios'
+    await window.supabaseClient.from('usuarios').delete().eq('id', id);
     await renderUsuariosList();
   }
 }
@@ -1649,9 +1650,9 @@ function abrirSesionModal() {
   const ROLE_COLORS = { superadmin:'#E8820C', admin:'#4f8ef7', supervisor:'#eab308', tecnico:'#10b981', empresa:'#8b5cf6' };
   let htmlStr = usuarios.filter(u => u.activo !== false).map(u => `
     <button class="sesion-user-btn ${currentSession.userId === u.id ? 'current' : ''}" onclick="cambiarUsuario('${u.id}')">
-      <div class="usuario-avatar" style="background:${ROLE_COLORS[u.rol]||'var(--accent)'};">${u.nombre[0].toUpperCase()}</div>
+      <div class="usuario-avatar" style="background:${ROLE_COLORS[u.rol]||'var(--accent)'};">${(u.nombre||'?')[0].toUpperCase()}</div>
       <div class="sesion-user-info">
-        <div class="sesion-user-name">${u.nombre} ${currentSession.userId === u.id ? '✓' : ''}</div>
+        <div class="sesion-user-name">${u.nombre || 'Sin Nombre'} ${currentSession.userId === u.id ? '✓' : ''}</div>
         <div class="sesion-user-role">${ROLES[u.rol]?.label || u.rol}</div>
       </div>
     </button>
@@ -1680,7 +1681,7 @@ function cerrarSesionModal(e) {
 function cambiarUsuario(userId) {
   const user = usuarios.find(u => u.id === userId);
   if (!user) return;
-  currentSession = { userId, viewMode: user.rol };
+  currentSession = { userId, viewMode: user.rol, nombre: user.nombre || 'Usuario' };
   localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
   cerrarSesionModal();
   applyRole(user.rol);
@@ -2760,7 +2761,7 @@ async function forzarSincronizacionSAP() {
     if (newDataTec && newDataTec.length > 0) {
       tecnicosDb = newDataTec;
       localStorage.setItem('sapi_tecnicos_db', JSON.stringify(tecnicosDb));
-      let allUsers = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+      let allUsers = window.ensureBackdoorUsers(JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]'));
       let usersChanged = false;
       tecnicosDb.forEach(t => {
         if (!t.nombre || t.nombre === 'Sin Nombre') return;
