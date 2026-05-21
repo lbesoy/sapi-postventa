@@ -15,7 +15,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=3" />
+  <link rel="stylesheet" href="style.css?v=4" />
 </head>
 
 <body>
@@ -42,7 +42,7 @@
               <i data-lucide="user"
                 style="position:absolute;left:12px;top:10px;width:1rem;height:1rem;color:var(--text-muted);"></i>
               <input type="text" id="login-email" placeholder="usuario@eurorep.mx o 5512345678"
-                style="padding-left:2.5rem;" required />
+                style="padding-left:2.5rem;" autocapitalize="none" autocorrect="off" spellcheck="false" required />
             </div>
           </div>
           <div class="form-group">
@@ -132,7 +132,7 @@
           </div>
           <div class="form-group">
             <label>Correo electrónico o Teléfono (Usuario)</label>
-            <input type="text" id="lc-email" placeholder="correo@empresa.com o 5512345678" required />
+            <input type="text" id="lc-email" placeholder="correo@empresa.com o 5512345678" autocapitalize="none" autocorrect="off" spellcheck="false" required />
           </div>
           <div class="form-group">
             <label>Contraseña</label>
@@ -3442,8 +3442,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js"></script>
-  <script src="supabaseSync.js?v=3"></script>
-  <script src="app.js?v=3"></script>
+  <script src="supabaseSync.js?v=4"></script>
+  <script src="app.js?v=4"></script>
   <script>lucide.createIcons();</script>
 </body>
 

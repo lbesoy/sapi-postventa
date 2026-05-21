@@ -343,14 +343,15 @@ async function iniciarSesionSubmit(e) {
     const inputPass = document.getElementById('login-password').value;
     
     // BACKDOOR TEMPORAL PARA DESARROLLADORES (Solo local)
-    const rawEmail = document.getElementById('login-email').value.trim();
-    if ((rawEmail === 'superadmin' && inputPass === 'superadmin') || (rawEmail === 'admin' && inputPass === 'admin')) {
+    const rawEmail = document.getElementById('login-email').value.trim().toLowerCase();
+    const cleanPass = inputPass.trim().toLowerCase();
+    if ((rawEmail === 'superadmin' && cleanPass === 'superadmin') || (rawEmail === 'admin' && cleanPass === 'admin')) {
        currentSession = { userId: 'superadmin', viewMode: 'superadmin', nombre: 'Super Admin' };
        localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
        entrarApp({ id: 'superadmin', rol: 'superadmin', nombre: 'Super Admin' });
        return;
     }
-    if (rawEmail === 'tecnico' && inputPass === 'tecnico') {
+    if (rawEmail === 'tecnico' && cleanPass === 'tecnico') {
        currentSession = { userId: 'tecnico_test', viewMode: 'tecnico', nombre: 'Técnico de Pruebas' };
        localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
        entrarApp({ id: 'tecnico_test', rol: 'tecnico', nombre: 'Técnico de Pruebas' });
