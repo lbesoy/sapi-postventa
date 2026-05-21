@@ -9567,6 +9567,16 @@ function renderCalendario() {
       }
 
       let timeText = arg.timeText || '';
+      if (arg.view.type === 'dayGridMonth') {
+        const startHour = arg.event.extendedProps.entrada || arg.timeText || '';
+        const timeHtml = startHour ? `<b>${startHour}</b> ` : '';
+        return {
+          html: `<div style="background-color:${bgColor}; border-radius:3px; font-size:0.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:2px 4px; color:white; width:100%; box-sizing:border-box; box-shadow: 0 1px 2px rgba(0,0,0,0.15);" title="${arg.event.title}">
+                   ${timeHtml}${arg.event.title}
+                 </div>`
+        };
+      }
+
       if (!arg.event.allDay && arg.event.extendedProps.entrada) {
         timeText = arg.event.extendedProps.entrada;
         if (arg.event.extendedProps.salida) {
