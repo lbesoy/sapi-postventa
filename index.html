@@ -15,7 +15,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=4" />
+  <link rel="stylesheet" href="style.css?v=5" />
 </head>
 
 <body>
@@ -258,12 +258,12 @@
           </div>
           <div id="topbar-actions" style="display:flex;gap:0.5rem;">
             <button class="btn-primary" id="btn-nueva-orden" onclick="abrirFormulario()"><i data-lucide="plus"
-                class="btn-icon"></i> Nueva Orden</button>
+                class="btn-icon"></i> <span class="btn-text">Nueva Orden</span></button>
             <button class="btn-primary btn-ticket-action" id="btn-nuevo-ticket" onclick="abrirTicket()"
-              style="display:none;"><i data-lucide="plus" class="btn-icon"></i> Nuevo Ticket</button>
+              style="display:none;"><i data-lucide="plus" class="btn-icon"></i> <span class="btn-text">Nuevo Ticket</span></button>
             <button class="btn-secondary btn-cliente-action" id="btn-agregar-maquina"
               onclick="abrirModalAgregarMaquina()" style="display:none;"><i data-lucide="settings-2"
-                class="btn-icon"></i> Agregar Máquina</button>
+                class="btn-icon"></i> <span class="btn-text">Agregar Máquina</span></button>
 
           </div>
         </div>

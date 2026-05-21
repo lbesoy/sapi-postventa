@@ -1427,15 +1427,130 @@ body {
   .topbar {
     padding: 0.5rem 1rem !important;
     gap: 0.5rem !important;
-    flex-wrap: wrap;
-    height: auto !important;
+    flex-wrap: nowrap !important;
+    height: 56px !important;
+    align-items: center !important;
+    justify-content: space-between !important;
   }
   
   .topbar-right {
-    gap: 0.5rem !important;
-    width: 100%;
-    justify-content: flex-end;
+    gap: 0.4rem !important;
+    width: auto !important;
+    margin-left: auto !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
   }
+
+  .topbar-left {
+    display: flex !important;
+    align-items: center !important;
+    min-width: 0 !important;
+    flex: 1 !important;
+    margin-right: 0.5rem !important;
+  }
+
+  .topbar-left h1 {
+    font-size: 1rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    flex: 1 !important;
+  }
+
+  /* Hide texts and details on mobile */
+  #sync-status-indicator #sync-status-text {
+    display: none !important;
+  }
+  .session-badge .session-info,
+  .session-badge i[data-lucide="chevron-down"] {
+    display: none !important;
+  }
+  .topbar-right .btn-text {
+    display: none !important;
+  }
+  .role-switcher {
+    display: none !important;
+  }
+
+  /* Make indicators/badges/buttons circular and compact */
+  #sync-status-indicator {
+    width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    justify-content: center !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    position: relative !important;
+  }
+  #sync-status-indicator .sync-pending-badge {
+    position: absolute !important;
+    top: -3px !important;
+    right: -3px !important;
+    margin: 0 !important;
+    padding: 2px 5px !important;
+    font-size: 0.65rem !important;
+    line-height: 1 !important;
+    border-radius: 999px !important;
+  }
+  .session-badge {
+    width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    justify-content: center !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: 1px solid var(--border) !important;
+  }
+  .session-badge .session-avatar {
+    margin: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 0.85rem !important;
+    border-radius: 50% !important;
+  }
+  #topbar-actions {
+    display: flex !important;
+    gap: 0.4rem !important;
+  }
+  #topbar-actions button {
+    width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: auto !important;
+  }
+  #topbar-actions button .btn-icon {
+    margin: 0 !important;
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  /* Force view padding adjustment for 56px topbar */
+  .view.active {
+    padding: 4.5rem 1rem 1.5rem 1rem !important;
+  }
+  #view-dashboard.view.active {
+    padding-top: 1.5rem !important;
+  }
+
+  /* Stack form actions on smaller mobile screens */
+  .form-actions {
+    flex-direction: column-reverse !important;
+    gap: 0.5rem !important;
+  }
+  .form-actions button {
+    width: 100% !important;
+  }
+
 
   /* Make signature canvas responsive on mobile screens */
   canvas[id$="-canvas"] {
