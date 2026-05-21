@@ -728,7 +728,37 @@ function applyRole(rolKey) {
   const navMaquinariaText = document.getElementById('nav-maquinaria-text');
   if (navMaquinariaText) navMaquinariaText.textContent = isEmpresa ? 'Mis máquinas' : 'Maquinaria';
 
+  // Update topbar buttons visibility according to role and view
+  const currentActiveView = document.querySelector('.view.active');
+  if (currentActiveView) {
+    const activeViewId = currentActiveView.id.replace('view-', '');
+    updateTopbarButtons(activeViewId, rolKey);
+  }
+
   lucide.createIcons();
+}
+
+function updateTopbarButtons(view, role) {
+  const btnOrden = document.getElementById('btn-nueva-orden');
+  const btnTicket = document.getElementById('btn-nuevo-ticket');
+  const btnCliente = document.getElementById('btn-nuevo-cliente');
+  const btnMaquina = document.getElementById('btn-agregar-maquina');
+
+  if (btnOrden) btnOrden.style.display = 'none';
+  if (btnTicket) btnTicket.style.display = 'none';
+  if (btnCliente) btnCliente.style.display = 'none';
+  if (btnMaquina) btnMaquina.style.display = 'none';
+
+  const allowedToCreateClientsAndMachines = ['superadmin', 'admin', 'supervisor'].includes(role);
+
+  if (view === 'tickets') {
+    if (btnTicket && !['consulta', 'tecnico'].includes(role)) btnTicket.style.display = '';
+  } else if (view === 'clientes') {
+    if (btnCliente && allowedToCreateClientsAndMachines) btnCliente.style.display = '';
+    if (btnMaquina && allowedToCreateClientsAndMachines) btnMaquina.style.display = '';
+  } else if (view === 'servicios') {
+    if (btnOrden && ['superadmin', 'admin', 'supervisor'].includes(role)) btnOrden.style.display = '';
+  }
 }
 
 function switchMode(rolKey) {
@@ -1686,26 +1716,7 @@ function setupNav() {
       document.getElementById('page-title').textContent = item.dataset.title || view;
 
       // Toggle action buttons
-      const btnOrden = document.getElementById('btn-nueva-orden');
-      const btnTicket = document.getElementById('btn-nuevo-ticket');
-      const btnCliente = document.getElementById('btn-nuevo-cliente');
-      const btnMaquina = document.getElementById('btn-agregar-maquina');
-      
-      if (btnOrden) btnOrden.style.display = 'none';
-      if (btnTicket) btnTicket.style.display = 'none';
-      if (btnCliente) btnCliente.style.display = 'none';
-      if (btnMaquina) btnMaquina.style.display = 'none';
-
-      const allowedToCreateClientsAndMachines = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
-
-      if (view === 'tickets') {
-        if (btnTicket && currentSession.viewMode !== 'consulta') btnTicket.style.display = '';
-      } else if (view === 'clientes') {
-        if (btnCliente && allowedToCreateClientsAndMachines) btnCliente.style.display = '';
-        if (btnMaquina && allowedToCreateClientsAndMachines) btnMaquina.style.display = '';
-      } else if (view === 'servicios') {
-        if (btnOrden && currentSession.viewMode !== 'consulta') btnOrden.style.display = '';
-      }
+      updateTopbarButtons(view, currentSession.viewMode);
 
       if (view === 'clientes') renderClientes();
       if (view === 'maquinaria') renderMaquinaria();
