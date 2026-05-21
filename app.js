@@ -8,24 +8,53 @@ let currentDesgSortCol = 'fecha';
 let currentDesgSortDir = 'asc';
 let currentDesgloseData = [];
 
+// ===== HELPERS =====
+function safeGetJSON(key, defaultVal) {
+  try {
+    const val = localStorage.getItem(key);
+    return val && val !== 'undefined' ? JSON.parse(val) : defaultVal;
+  } catch (e) {
+    console.error(`Error parsing localStorage key "${key}":`, e);
+    return defaultVal;
+  }
+}
+
+function ensureBackdoorUsersFallback(users) {
+  if (typeof window.ensureBackdoorUsers === 'function') {
+    return window.ensureBackdoorUsers(users);
+  }
+  if (!Array.isArray(users)) users = [];
+  const hasSuperadmin = users.some(u => u.id === 'superadmin');
+  const hasTecnicoTest = users.some(u => u.id === 'tecnico_test');
+  if (!hasSuperadmin) {
+    users.unshift({ id: 'superadmin', nombre: 'Super Admin', rol: 'superadmin', email: '', pin: '0000', activo: true, locked: true });
+  }
+  if (!hasTecnicoTest) {
+    users.push({ id: 'tecnico_test', nombre: 'Técnico de Pruebas', rol: 'tecnico', email: 'tecnico@eurorep.mx', pin: 'tecnico', activo: true, locked: true });
+  }
+  return users;
+}
+
 // ===== DATA =====
-let ordenes = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
-let tickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
-let clientesDb = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
-let refaccionesDb = JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]');
-let tecnicosDb = JSON.parse(localStorage.getItem('sapi_tecnicos_db') || '[]');
-let sitiosDb = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
-let maquinariaDb = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
+let ordenes = safeGetJSON('sapi_ordenes', []);
+let tickets = safeGetJSON('sapi_tickets', []);
+let clientesDb = safeGetJSON('sapi_clientes_db', []);
+let refaccionesDb = safeGetJSON('sapi_refacciones_db', []);
+let tecnicosDb = safeGetJSON('sapi_tecnicos_db', []);
+let sitiosDb = safeGetJSON('sapi_sitios_db', []);
+let maquinariaDb = safeGetJSON('sapi_maquinaria_db', []);
+let usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
+let currentSession = safeGetJSON('eurorep_session', null) || { userId: 'superadmin', viewMode: 'superadmin' };
 
 // Sincronización con Supabase (escuchar cuando los datos bajen a localStorage)
 window.addEventListener('supabase_datos_cargados', () => {
-  ordenes = window._supaOrdenes || JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
-  tickets = window._supaTickets || JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
-  clientesDb = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
-  tecnicosDb = JSON.parse(localStorage.getItem('sapi_tecnicos_db') || '[]');
-  sitiosDb = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
-  maquinariaDb = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
-  usuarios = window.ensureBackdoorUsers(JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]'));
+  ordenes = window._supaOrdenes || safeGetJSON('sapi_ordenes', []);
+  tickets = window._supaTickets || safeGetJSON('sapi_tickets', []);
+  clientesDb = safeGetJSON('sapi_clientes_db', []);
+  tecnicosDb = safeGetJSON('sapi_tecnicos_db', []);
+  sitiosDb = safeGetJSON('sapi_sitios_db', []);
+  maquinariaDb = safeGetJSON('sapi_maquinaria_db', []);
+  usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
   
   // Re-render UI
   actualizarFiltrosPersonal();
@@ -318,10 +347,10 @@ const ROLES_LABELS = {
   preferencias: 'Preferencias'
 };
 
-const savedRoles = JSON.parse(localStorage.getItem('sapi_roles_config'));
+const savedRoles = safeGetJSON('sapi_roles_config', null);
 if (savedRoles) {
   for (const r in savedRoles) {
-    if (ROLES[r] && savedRoles[r].views) {
+    if (ROLES[r] && savedRoles[r] && Array.isArray(savedRoles[r].views)) {
       ROLES[r].views = savedRoles[r].views;
       // Inyección automática del calendario si no existe y es un rol que debe tenerlo
       if (!ROLES[r].views.includes('calendario') && ['superadmin', 'admin', 'supervisor', 'tecnico', 'consulta'].includes(r)) {
@@ -648,8 +677,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderUsuariosList();
 });
 
-let usuarios = window.ensureBackdoorUsers(JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]'));
-let currentSession = JSON.parse(localStorage.getItem('eurorep_session') || 'null') || { userId: 'superadmin', viewMode: 'superadmin' };
+usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
+currentSession = safeGetJSON('eurorep_session', null) || { userId: 'superadmin', viewMode: 'superadmin' };
 let editandoUserId = null;
 
 function applyRole(rolKey) {
@@ -757,7 +786,7 @@ function switchMode(rolKey) {
 }
 
 // ===== CONFIG =====
-let configData = JSON.parse(localStorage.getItem('eurorep_config') || '{}');
+let configData = safeGetJSON('eurorep_config', {});
 
 // FALLBACK DE EMERGENCIA: Si se borró la caché, restaurar configuración por defecto de SAP
 if (!configData || !configData.queryClientes) {
@@ -810,7 +839,7 @@ window.addEventListener('supabase_datos_cargados', () => {
 // Eliminada versión duplicada de guardarConfig que estaba antes de cargarConfig
 
 
-let tecnicosConfig = JSON.parse(localStorage.getItem('eurorep_tecnicos') || '[]');
+let tecnicosConfig = safeGetJSON('eurorep_tecnicos', []);
 
 function cargarConfig() {
   // Las opciones de query se cargarán de forma asíncrona pero las pedimos primero si estamos en configuración.
