@@ -1293,3 +1293,190 @@ body {
 .fc .fc-day-other .fc-daygrid-day-top {
   opacity: 0.3;
 }
+
+/* ===== SYNC STATUS INDICATOR ===== */
+.sync-status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-card, #141722);
+  border: 1px solid var(--border, #2d3142);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  user-select: none;
+  height: 36px;
+  color: var(--text-secondary);
+}
+
+.sync-status-indicator:hover {
+  background: var(--bg-hover, #1b1f2f);
+  border-color: var(--border-hover, #3d435f);
+}
+
+.sync-status-indicator.status-online {
+  color: #10b981 !important; /* Premium green */
+  border-color: rgba(16, 185, 129, 0.2) !important;
+  background: rgba(16, 185, 129, 0.05) !important;
+}
+.sync-status-indicator.status-online:hover {
+  background: rgba(16, 185, 129, 0.1) !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+.sync-status-indicator.status-syncing {
+  color: #f59e0b !important; /* Warm orange */
+  border-color: rgba(245, 158, 11, 0.2) !important;
+  background: rgba(245, 158, 11, 0.05) !important;
+}
+.sync-status-indicator.status-syncing:hover {
+  background: rgba(245, 158, 11, 0.1) !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+.sync-status-indicator.status-offline {
+  color: #ef4444 !important; /* Alert red */
+  border-color: rgba(239, 68, 68, 0.2) !important;
+  background: rgba(239, 68, 68, 0.05) !important;
+}
+.sync-status-indicator.status-offline:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+.sync-pending-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 9px;
+  background: var(--accent, #e8820c);
+  color: #ffffff !important;
+  margin-left: 2px;
+  animation: pulseBadge 2s infinite;
+}
+
+@keyframes pulseBadge {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(232, 130, 12, 0.4); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 5px rgba(232, 130, 12, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(232, 130, 12, 0); }
+}
+
+/* Mobile Optimizations for Forms, Layout & Dashboard Grids */
+.dashboard-grid {
+  display: grid;
+  gap: 1.25rem;
+  margin-bottom: 1.75rem;
+}
+.dashboard-grid.grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+.dashboard-grid.grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+.dashboard-grid.grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media screen and (max-width: 1024px) {
+  .dashboard-grid.grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media screen and (max-width: 768px) {
+  /* Collapse sidebar and reset padding at 768px for a better tablet/mobile experience */
+  .sidebar { 
+    transform: translateX(-100%) !important;
+    position: fixed !important;
+    z-index: 9999 !important;
+    height: 100vh !important;
+    transition: transform 0.3s ease !important;
+  }
+  .sidebar.open {
+    transform: translateX(0) !important;
+  }
+  #app-wrapper.visible {
+    padding-left: 0 !important;
+  }
+  
+  .mobile-menu-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+  .topbar-left {
+    display: flex;
+    align-items: center;
+  }
+
+  .dashboard-grid.grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dashboard-grid.grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .topbar {
+    padding: 0.5rem 1rem !important;
+    gap: 0.5rem !important;
+    flex-wrap: wrap;
+    height: auto !important;
+  }
+  
+  .topbar-right {
+    gap: 0.5rem !important;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  /* Make signature canvas responsive on mobile screens */
+  canvas[id$="-canvas"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 160px !important;
+    touch-action: none; /* Crucial to prevent page scrolling while signing */
+  }
+
+  /* Improve form margins and touch target sizes for technician's thumb */
+  .form-control, select, .combo-box, button {
+    min-height: 44px; /* Standard mobile touch-target minimum */
+    font-size: 16px !important; /* Prevents auto-zoom on iOS Safari */
+  }
+  
+  .modal-body {
+    padding: 1rem !important;
+  }
+
+  /* Tab scrolling and selections */
+  .dia-tabs-scroller {
+    display: flex;
+    overflow-x: auto;
+    gap: 0.35rem;
+    padding-bottom: 0.5rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dia-tab {
+    flex: 0 0 auto;
+    padding: 0.6rem 1rem !important;
+    font-size: 0.9rem !important;
+  }
+}
+
+@media screen and (max-width: 576px) {
+  .dashboard-grid.grid-2,
+  .dashboard-grid.grid-3,
+  .dashboard-grid.grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+

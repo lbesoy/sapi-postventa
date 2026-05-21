@@ -148,62 +148,247 @@ function rowToCliente(c) {
   };
 }
 
-// ─── pushToSupabase: Función central de escritura a la nube ─────────────────
+// ─── Cola de Sincronización Offline ──────────────────────────
+
+function getSyncQueue() {
+  return JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+}
+
+function saveSyncQueue(queue) {
+  localStorage.setItem('sapi_sync_queue', JSON.stringify(queue));
+  updateSyncStatusUI();
+}
+
+function addToSyncQueue(table, action, data) {
+  const queue = getSyncQueue();
+  const existingIdx = queue.findIndex(item => item.table === table && item.data.id === data.id);
+  if (existingIdx > -1) {
+    if (queue[existingIdx].action === 'delete' && action === 'upsert') {
+      // mantener el delete pendiente si ya está ahí
+    } else {
+      queue[existingIdx] = { table, action, data, timestamp: Date.now() };
+    }
+  } else {
+    queue.push({ table, action, data, timestamp: Date.now() });
+  }
+  saveSyncQueue(queue);
+}
 
 window.pushToSupabase = async function(tabla, item) {
+  // Añadir a la cola local para estrategia offline-first
+  addToSyncQueue(tabla, 'upsert', item);
+  
+  // Intentar sincronizar inmediatamente en segundo plano
+  processSyncQueue();
+};
+
+window.deleteFromSupabase = async function(tabla, id) {
+  // Añadir borrado a la cola
+  addToSyncQueue(tabla, 'delete', { id });
+  
+  // Intentar sincronizar
+  processSyncQueue();
+};
+
+let _isProcessingQueue = false;
+
+async function processSyncQueue() {
+  if (_isProcessingQueue) return;
   const sb = window.supabaseClient;
   if (!sb) {
-    console.warn('[Supabase] Cliente no disponible aún. El dato se guardó localmente.');
+    console.warn('[Sync] SupabaseClient no disponible. Sincronización en espera.');
+    updateSyncStatusUI();
     return;
   }
 
-  let payload;
-  try {
-    if (tabla === 'tickets') {
-      payload = ticketToRow(item);
-    } else if (tabla === 'ordenes') {
-      payload = ordenToRow(item);
-    } else if (tabla === 'clientes') {
-      payload = clienteToRow(item);
-    } else if (tabla === 'usuarios') {
-      if (item.email === 'admin@eurorep.mx') return;
-      payload = {
-        id: item.id,
-        nombre: item.nombre,
-        email: item.email || `${item.id}@temp.com`,
-        pin: item.pin || '0000',
-        rol: item.rol || 'tecnico',
-        activo: item.activo !== false,
-        empresa: item.empresa || null
-      };
-    } else if (tabla === 'sitios') {
-      payload = { id: item.id, nombre: item.nombre, cliente: item.cliente, direccion: item.direccion, cp: item.cp, ciudad: item.ciudad, estado: item.estado, custom_data: item.customData || {} };
-    } else if (tabla === 'maquinaria') {
-      payload = { id: item.id, serie: item.serie, marca: item.marca, modelo: item.modelo, anio: item.anio, cliente: item.cliente, id_interno: item.idInterno, descripcion: item.descripcion, custom_data: item.customData || {} };
-    } else if (tabla === 'refacciones') {
-      payload = { id: item.id, codigo: item.codigo, descripcion: item.descripcion, precio: item.precio, moneda: item.moneda, stock: item.stock, custom_data: { ...(item.customData || {}), marca: item.marca, grupo: item.grupo, origen: item.origen, nombre: item.nombre } };
-    } else if (tabla === 'config') {
-      payload = { id: 'main', data: item };
-    } else if (tabla === 'roles') {
-      tabla = 'config';
-      payload = { id: 'roles', data: item };
-    } else {
-      payload = item;
-    }
-
-    const { error } = await sb.from(tabla).upsert(payload, { onConflict: 'id' });
-    if (error) {
-      console.error(`[Supabase] Error upsert en ${tabla}:`, error.message, error.details);
-      if (window.mostrarNotificacion) {
-        window.mostrarNotificacion(`Error en la nube (${tabla}): ${error.message}`, 'error');
-      }
-    } else {
-      console.log(`[Supabase] ✅ ${tabla} guardado correctamente.`);
-    }
-  } catch (e) {
-    console.error(`[Supabase] Excepción al guardar en ${tabla}:`, e.message);
+  const queue = getSyncQueue();
+  if (queue.length === 0) {
+    updateSyncStatusUI();
+    return;
   }
+
+  if (!navigator.onLine) {
+    console.log('[Sync] Dispositivo sin conexión. Sincronización en pausa.');
+    updateSyncStatusUI();
+    return;
+  }
+
+  _isProcessingQueue = true;
+  updateSyncStatusUI();
+
+  console.log(`[Sync] Iniciando envío de ${queue.length} operaciones pendientes...`);
+  
+  let successCount = 0;
+  
+  while (queue.length > 0) {
+    const item = queue[0];
+    let payload;
+    let error = null;
+    let resTabla = item.table;
+
+    try {
+      if (item.action === 'upsert') {
+        if (item.table === 'tickets') {
+          payload = ticketToRow(item.data);
+        } else if (item.table === 'ordenes') {
+          payload = ordenToRow(item.data);
+        } else if (item.table === 'clientes') {
+          payload = clienteToRow(item.data);
+        } else if (item.table === 'usuarios') {
+          if (item.data.email === 'admin@eurorep.mx') {
+            queue.shift();
+            saveSyncQueue(queue);
+            continue;
+          }
+          payload = {
+            id: item.data.id,
+            nombre: item.data.nombre,
+            email: item.data.email || `${item.data.id}@temp.com`,
+            pin: item.data.pin || '0000',
+            rol: item.data.rol || 'tecnico',
+            activo: item.data.activo !== false,
+            empresa: item.data.empresa || null
+          };
+        } else if (item.table === 'sitios') {
+          payload = { id: item.data.id, nombre: item.data.nombre, cliente: item.data.cliente, direccion: item.data.direccion, cp: item.data.cp, ciudad: item.data.ciudad, estado: item.data.estado, custom_data: item.data.customData || {} };
+        } else if (item.table === 'maquinaria') {
+          payload = { id: item.data.id, serie: item.data.serie, marca: item.data.marca, modelo: item.data.modelo, anio: item.data.anio, cliente: item.data.cliente, id_interno: item.data.idInterno, descripcion: item.data.descripcion, custom_data: item.data.customData || {} };
+        } else if (item.table === 'refacciones') {
+          payload = { id: item.data.id, codigo: item.data.codigo, descripcion: item.data.descripcion, precio: item.data.precio, moneda: item.data.moneda, stock: item.data.stock, custom_data: { ...(item.data.customData || {}), marca: item.data.marca, grupo: item.data.grupo, origen: item.data.origen, nombre: item.data.nombre } };
+        } else if (item.table === 'config') {
+          payload = { id: 'main', data: item.data };
+        } else if (item.table === 'roles') {
+          resTabla = 'config';
+          payload = { id: 'roles', data: item.data };
+        } else {
+          payload = item.data;
+        }
+
+        const { error: upsertErr } = await sb.from(resTabla).upsert(payload, { onConflict: 'id' });
+        error = upsertErr;
+      } else if (item.action === 'delete') {
+        const { error: deleteErr } = await sb.from(resTabla).delete().eq('id', item.data.id);
+        error = deleteErr;
+      }
+
+      if (error) {
+        console.error(`[Sync] Error en operación (${item.table} - ${item.action}):`, error.message);
+        if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('network') || error.message.includes('timeout') || error.message.includes('connection') || error.message.includes('TypeError: Failed to fetch'))) {
+          break; // Error de red temporal, pausar procesamiento
+        } else {
+          console.warn(`[Sync] Error permanente de BD. Saltando elemento.`);
+          queue.shift();
+          saveSyncQueue(queue);
+        }
+      } else {
+        queue.shift();
+        saveSyncQueue(queue);
+        successCount++;
+      }
+    } catch (e) {
+      console.error(`[Sync] Excepción en processSyncQueue:`, e.message);
+      if (e.message && (e.message.includes('Failed to fetch') || e.message.includes('network') || e.message.includes('fetch'))) {
+        break;
+      } else {
+        queue.shift();
+        saveSyncQueue(queue);
+      }
+    }
+  }
+
+  _isProcessingQueue = false;
+  updateSyncStatusUI();
+
+  if (successCount > 0 && window.mostrarNotificacion) {
+    window.mostrarNotificacion(`Sincronización completa: ${successCount} cambios enviados.`, 'success');
+    window.dispatchEvent(new Event('supabase_datos_cargados'));
+  }
+}
+
+function updateSyncStatusUI() {
+  const container = document.getElementById('sync-status-indicator');
+  if (!container) return;
+
+  const iconEl = document.getElementById('sync-status-icon');
+  const textEl = document.getElementById('sync-status-text');
+  const badgeEl = document.getElementById('sync-pending-badge');
+  const queue = getSyncQueue();
+  const pendingCount = queue.length;
+
+  container.classList.remove('status-online', 'status-syncing', 'status-offline');
+
+  if (!navigator.onLine) {
+    container.classList.add('status-offline');
+    if (iconEl) {
+      iconEl.setAttribute('data-lucide', 'wifi-off');
+      iconEl.style.animation = 'none';
+    }
+    if (textEl) textEl.textContent = 'Sin conexión';
+    if (badgeEl) {
+      if (pendingCount > 0) {
+        badgeEl.textContent = pendingCount;
+        badgeEl.style.display = 'inline-block';
+      } else {
+        badgeEl.style.display = 'none';
+      }
+    }
+  } else if (pendingCount > 0) {
+    container.classList.add('status-syncing');
+    if (iconEl) {
+      iconEl.setAttribute('data-lucide', 'refresh-cw');
+      iconEl.style.animation = 'spin 2s linear infinite';
+    }
+    if (textEl) textEl.textContent = _isProcessingQueue ? 'Sincronizando...' : 'Cambios pendientes';
+    if (badgeEl) {
+      badgeEl.textContent = pendingCount;
+      badgeEl.style.display = 'inline-block';
+    }
+  } else {
+    container.classList.add('status-online');
+    if (iconEl) {
+      iconEl.setAttribute('data-lucide', 'wifi');
+      iconEl.style.animation = 'none';
+    }
+    if (textEl) textEl.textContent = 'Conectado';
+    if (badgeEl) {
+      badgeEl.style.display = 'none';
+    }
+  }
+
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
+}
+
+window.forzarSincronizacionManual = function() {
+  if (!navigator.onLine) {
+    if (window.mostrarNotificacion) {
+      window.mostrarNotificacion('No se puede sincronizar sin conexión a internet.', 'warning');
+    }
+    return;
+  }
+  if (window.mostrarNotificacion) {
+    window.mostrarNotificacion('Iniciando sincronización...', 'info');
+  }
+  processSyncQueue();
 };
+
+window.addEventListener('online', () => {
+  console.log('[Network] Conexión detectada. Iniciando sincronización...');
+  updateSyncStatusUI();
+  processSyncQueue();
+});
+
+window.addEventListener('offline', () => {
+  console.log('[Network] Conexión perdida. Modo local activado.');
+  updateSyncStatusUI();
+});
+
+setInterval(() => {
+  if (navigator.onLine && getSyncQueue().length > 0 && !_isProcessingQueue) {
+    processSyncQueue();
+  }
+}, 30000);
 
 // ─── migrarDatosASupabase: Al iniciar, sube datos locales si la nube está vacía ─
 
@@ -328,7 +513,24 @@ window.cargarDatosDeSupabase = async function() {
     // Tickets — SOLO sobreescribir local si la nube tiene tickets
     const { data: ticketsDb } = await sb.from('tickets').select('*');
     if (ticketsDb && ticketsDb.length > 0) {
-      const mapped = ticketsDb.map(rowToTicket);
+      let mapped = ticketsDb.map(rowToTicket);
+      
+      // FUSIONAR CON CAMBIOS LOCALES PENDIENTES DE SINCRONIZAR
+      const queue = getSyncQueue();
+      const pendingTickets = queue.filter(item => item.table === 'tickets');
+      pendingTickets.forEach(item => {
+        if (item.action === 'upsert') {
+          const idx = mapped.findIndex(t => t.id === item.data.id);
+          if (idx > -1) {
+            mapped[idx] = item.data;
+          } else {
+            mapped.unshift(item.data);
+          }
+        } else if (item.action === 'delete') {
+          mapped = mapped.filter(t => t.id !== item.data.id);
+        }
+      });
+
       window._supaTickets = mapped;
       localStorage.setItem('sapi_tickets', JSON.stringify(mapped));
     } else {
@@ -339,7 +541,25 @@ window.cargarDatosDeSupabase = async function() {
     // Órdenes — mismo principio
     const { data: ordenes } = await sb.from('ordenes').select('*');
     if (ordenes && ordenes.length > 0) {
-      window._supaOrdenes = ordenes.map(rowToOrden);
+      let mapped = ordenes.map(rowToOrden);
+      
+      // FUSIONAR CON CAMBIOS LOCALES PENDIENTES DE SINCRONIZAR
+      const queue = getSyncQueue();
+      const pendingOrdenes = queue.filter(item => item.table === 'ordenes');
+      pendingOrdenes.forEach(item => {
+        if (item.action === 'upsert') {
+          const idx = mapped.findIndex(o => o.id === item.data.id);
+          if (idx > -1) {
+            mapped[idx] = item.data;
+          } else {
+            mapped.unshift(item.data);
+          }
+        } else if (item.action === 'delete') {
+          mapped = mapped.filter(o => o.id !== item.data.id);
+        }
+      });
+
+      window._supaOrdenes = mapped;
       localStorage.setItem('sapi_ordenes', JSON.stringify(window._supaOrdenes));
     } else {
       window._supaOrdenes = null;
@@ -432,5 +652,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => {
     migrarDatosASupabase();
     setupRealtime();
+    updateSyncStatusUI();
+    processSyncQueue();
   }, 300);
 });

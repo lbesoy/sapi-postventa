@@ -345,9 +345,15 @@ async function iniciarSesionSubmit(e) {
     // BACKDOOR TEMPORAL PARA DESARROLLADORES (Solo local)
     const rawEmail = document.getElementById('login-email').value.trim();
     if ((rawEmail === 'superadmin' && inputPass === 'superadmin') || (rawEmail === 'admin' && inputPass === 'admin')) {
-       currentSession = { userId: 'superadmin', viewMode: 'superadmin' };
+       currentSession = { userId: 'superadmin', viewMode: 'superadmin', nombre: 'Super Admin' };
        localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
        entrarApp({ id: 'superadmin', rol: 'superadmin', nombre: 'Super Admin' });
+       return;
+    }
+    if (rawEmail === 'tecnico' && inputPass === 'tecnico') {
+       currentSession = { userId: 'tecnico_test', viewMode: 'tecnico', nombre: 'Técnico de Pruebas' };
+       localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
+       entrarApp({ id: 'tecnico_test', rol: 'tecnico', nombre: 'Técnico de Pruebas' });
        return;
     }
     
@@ -585,18 +591,30 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.add('light-mode');
   }
 
-  // Asegurarnos de que exista el superadmin
+  // Asegurarnos de que exista el superadmin y el técnico de pruebas
   const all = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+  let updatedAll = false;
   if (!all.find(u => u.id === 'superadmin')) {
     all.unshift({ id:'superadmin', nombre:'Super Admin', rol:'superadmin', email:'', pin:'0000', activo:true, locked:true });
+    updatedAll = true;
+  }
+  if (!all.find(u => u.id === 'tecnico_test')) {
+    all.push({ id:'tecnico_test', nombre:'Técnico de Pruebas', rol:'tecnico', email:'tecnico@eurorep.mx', pin:'tecnico', activo:true, locked:true });
+    updatedAll = true;
+  }
+  if (updatedAll) {
     localStorage.setItem('eurorep_usuarios', JSON.stringify(all));
   }
 
-  // Check if there's a valid session via Supabase Auth
+  // Check if there's a valid session via Supabase Auth or Local Backdoor
   const saved = JSON.parse(localStorage.getItem('eurorep_session') || 'null');
-  if (saved && saved.userId === 'superadmin') {
+  if (saved && (saved.userId === 'superadmin' || saved.userId === 'tecnico_test')) {
      currentSession = saved;
-     entrarApp({ id: 'superadmin', rol: 'superadmin', nombre: 'Super Admin' });
+     entrarApp({ id: saved.userId, rol: saved.viewMode, nombre: saved.nombre });
+  } else if (saved && saved.userId) {
+     // Para otros roles que ya iniciaron sesión anteriormente, mantenemos la sesión para soporte offline al recargar
+     currentSession = saved;
+     entrarApp({ id: saved.userId, rol: saved.viewMode, nombre: saved.nombre });
   } else if (window.supabaseClient) {
      window.supabaseClient.auth.getSession().then(({ data: { session } }) => {
         if (session) {
@@ -607,8 +625,8 @@ document.addEventListener('DOMContentLoaded', () => {
                  entrarApp({ id: session.user.id, rol: data.rol, nombre: data.nombre });
               }
            });
-        }
-     });
+         }
+      });
   }
 
   initDiasPanels();
@@ -6176,8 +6194,8 @@ function eliminarOrden(id) {
   ordenes = ordenes.filter(o => o.id !== id);
   localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
   
-  if (window.supabaseClient) {
-    window.supabaseClient.from('ordenes').delete().eq('id', id).then(() => {});
+  if (window.deleteFromSupabase) {
+    window.deleteFromSupabase('ordenes', id);
   }
   renderTabla();
   renderTabla('servicios');
@@ -8785,8 +8803,8 @@ function eliminarTicket(id) {
   tickets = tickets.filter(t => t.id !== id);
   localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
   
-  if (window.supabaseClient) {
-    window.supabaseClient.from('tickets').delete().eq('id', id).then(() => {});
+  if (window.deleteFromSupabase) {
+    window.deleteFromSupabase('tickets', id);
   }
   renderTickets();
   updateTicketBadge();
