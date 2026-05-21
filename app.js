@@ -24,13 +24,24 @@ function ensureBackdoorUsersFallback(users) {
     return window.ensureBackdoorUsers(users);
   }
   if (!Array.isArray(users)) users = [];
-  const hasSuperadmin = users.some(u => u.id === 'superadmin');
-  const hasTecnicoTest = users.some(u => u.id === 'tecnico_test');
-  if (!hasSuperadmin) {
-    users.unshift({ id: 'superadmin', nombre: 'Super Admin', rol: 'superadmin', email: '', pin: '0000', activo: true, locked: true });
+  
+  let activeSessionId = null;
+  try {
+    const session = safeGetJSON('eurorep_session', null);
+    if (session) activeSessionId = session.userId;
+  } catch (e) {}
+
+  if (activeSessionId === 'superadmin') {
+    const hasSuperadmin = users.some(u => u.id === 'superadmin');
+    if (!hasSuperadmin) {
+      users.unshift({ id: 'superadmin', nombre: 'Super Admin', rol: 'superadmin', email: '', pin: '0000', activo: true, locked: true });
+    }
   }
-  if (!hasTecnicoTest) {
-    users.push({ id: 'tecnico_test', nombre: 'Técnico de Pruebas', rol: 'tecnico', email: 'tecnico@eurorep.mx', pin: 'tecnico', activo: true, locked: true });
+  if (activeSessionId === 'tecnico_test') {
+    const hasTecnicoTest = users.some(u => u.id === 'tecnico_test');
+    if (!hasTecnicoTest) {
+      users.push({ id: 'tecnico_test', nombre: 'Técnico de Pruebas', rol: 'tecnico', email: 'tecnico@eurorep.mx', pin: 'tecnico', activo: true, locked: true });
+    }
   }
   return users;
 }
@@ -48,29 +59,51 @@ let currentSession = safeGetJSON('eurorep_session', null) || { userId: 'superadm
 
 // Sincronización con Supabase (escuchar cuando los datos bajen a localStorage)
 window.addEventListener('supabase_datos_cargados', () => {
+  console.log('[App] Refrescando configuración, catálogos y re-renderizando UI desde Supabase...');
+  
   ordenes = window._supaOrdenes || safeGetJSON('sapi_ordenes', []);
   tickets = window._supaTickets || safeGetJSON('sapi_tickets', []);
   clientesDb = safeGetJSON('sapi_clientes_db', []);
-  tecnicosDb = safeGetJSON('sapi_tecnicos_db', []);
-  sitiosDb = safeGetJSON('sapi_sitios_db', []);
+  refaccionesDb = safeGetJSON('sapi_refacciones_db', []);
   maquinariaDb = safeGetJSON('sapi_maquinaria_db', []);
+  sitiosDb = safeGetJSON('sapi_sitios_db', []);
+  tecnicosDb = safeGetJSON('sapi_tecnicos_db', []);
   usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
+  configData = safeGetJSON('eurorep_config', {});
+  
+  // Si estamos en la vista de configuración, actualizar los campos
+  if (document.getElementById('view-config')?.classList.contains('active')) {
+    if (typeof cargarConfig === 'function') cargarConfig();
+  }
   
   // Re-render UI
   actualizarFiltrosPersonal();
   renderTabla();
   renderTabla('servicios');
-  renderClientes();
-  renderUsuariosList();
-  renderStats();
-  renderTickets();
-  renderTickets('dash-tickets');
-  updateTicketBadge();
-  if (typeof renderMaquinaria === 'function') renderMaquinaria();
+  
+  if (typeof renderClientes === 'function') renderClientes();
+  if (typeof renderUsuariosList === 'function') renderUsuariosList();
+  if (typeof renderStats === 'function') renderStats();
+  
+  if (typeof renderTickets === 'function') {
+    renderTickets();
+    renderTickets('dash-tickets');
+  }
+  if (typeof updateTicketBadge === 'function') updateTicketBadge();
+  
+  if (typeof renderMaquinaria === 'function' && document.getElementById('view-maquinaria')?.classList.contains('active')) {
+    renderMaquinaria();
+  }
+  if (typeof renderSitios === 'function' && document.getElementById('view-sitios')?.classList.contains('active')) {
+    renderSitios();
+  }
+  if (typeof renderRefacciones === 'function' && document.getElementById('view-refacciones')?.classList.contains('active')) {
+    renderRefacciones();
+  }
   
   // Re-aplicar rol para asegurar que el role-switcher se muestre si el usuario recién se descargó
   if (currentSession && currentSession.viewMode) {
-    applyRole(currentSession.viewMode);
+    if (typeof applyRole === 'function') applyRole(currentSession.viewMode);
   }
 });
 let editandoId = null;
@@ -414,31 +447,14 @@ async function iniciarSesionSubmit(e) {
     }
 
     // Ahora buscamos el rol en la tabla oficial del trigger
-    let roleData = null;
-    let roleError = null;
-
     const resRoles = await window.supabaseClient
       .from('user_roles')
       .select('rol, activo, nombre')
       .eq('id', data.user.id)
       .single();
       
-    if (resRoles.data) {
-      roleData = resRoles.data;
-    } else {
-      // Fallback: buscamos en la tabla de usuarios local migrada
-      const resUsuarios = await window.supabaseClient
-        .from('usuarios')
-        .select('rol, activo, nombre')
-        .eq('id', data.user.id)
-        .single();
-        
-      if (resUsuarios.data) {
-        roleData = resUsuarios.data;
-      } else {
-        roleError = resUsuarios.error || resRoles.error;
-      }
-    }
+    const roleData = resRoles.data;
+    const roleError = resRoles.error;
 
     if (roleError || !roleData) {
       errEl.textContent = 'Usuario sin rol asignado en la base de datos. Detalle: ' + (roleError ? roleError.message : 'No data');
@@ -577,15 +593,17 @@ async function confirmarCrearUsuario() {
   }
   
   if (data?.user) {
-    // Sincronizar también en la tabla local 'usuarios' para que el admin pueda ver y aprobar al usuario
-    await window.supabaseClient.from('usuarios').insert({
+    // Asegurar que el registro de rol existe en user_roles en la nube
+    const { error: roleErr } = await window.supabaseClient.from('user_roles').insert({
       id: data.user.id,
       nombre: nombre,
       email: email,
-      pin: '0000',
       rol: 'consulta',
       activo: false
     });
+    if (roleErr) {
+      console.warn('[SignUp] No se pudo asegurar el rol del usuario en user_roles:', roleErr.message);
+    }
   }
   
   volverSeleccion();
@@ -622,11 +640,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Asegurarnos de que exista el superadmin y el técnico de pruebas
-  const all = window.ensureBackdoorUsers(JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]'));
+  const all = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
   localStorage.setItem('eurorep_usuarios', JSON.stringify(all));
 
   // Check if there's a valid session via Supabase Auth or Local Backdoor
-  const saved = JSON.parse(localStorage.getItem('eurorep_session') || 'null');
+  const saved = safeGetJSON('eurorep_session', null);
   if (saved && (saved.userId === 'superadmin' || saved.userId === 'tecnico_test')) {
      currentSession = saved;
      entrarApp({ id: saved.userId, rol: saved.viewMode, nombre: saved.nombre });
@@ -808,33 +826,7 @@ if (!configData || !configData.queryClientes) {
 }
 
 // Escuchar cuando Supabase termina de cargar datos para refrescar variables locales
-window.addEventListener('supabase_datos_cargados', () => {
-  console.log('[App] Refrescando configuración y catálogos desde Supabase...');
-  configData = JSON.parse(localStorage.getItem('eurorep_config') || '{}');
-  clientesDb = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
-  refaccionesDb = JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]');
-  maquinariaDb = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
-  sitiosDb = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
-  tecnicosDb = JSON.parse(localStorage.getItem('sapi_tecnicos_db') || '[]');
-  usuarios = window.ensureBackdoorUsers(JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]'));
-  
-  // Si estamos en la vista de configuración, actualizar los campos
-  if (document.getElementById('view-config')?.classList.contains('active')) {
-    cargarConfig();
-  }
-  
-  // Refrescar vistas activas para mostrar los datos recién bajados de la nube
-  if (document.getElementById('view-clientes').classList.contains('active')) renderClientes();
-  if (document.getElementById('view-maquinaria').classList.contains('active')) {
-    if (typeof renderMaquinaria === 'function') renderMaquinaria();
-  }
-  if (document.getElementById('view-sitios').classList.contains('active')) {
-    if (typeof renderSitios === 'function') renderSitios();
-  }
-  if (document.getElementById('view-refacciones').classList.contains('active')) {
-    if (typeof renderRefacciones === 'function') renderRefacciones();
-  }
-});
+// Listener de supabase_datos_cargados duplicado eliminado y consolidado al inicio
 
 // Eliminada versión duplicada de guardarConfig que estaba antes de cargarConfig
 
@@ -1497,63 +1489,86 @@ function eliminarTecnicoConfig(i) {
 }
 
 // ===== USUARIOS CRUD =====
-async function renderUsuariosList() {
+function renderUsuariosList() {
   const list = document.getElementById('usuarios-list');
   if (!list) return;
 
   const searchText = (document.getElementById('busqueda-usuario')?.value || '').toLowerCase().trim();
   const filterRole = document.getElementById('filtro-rol-usuario')?.value || 'todos';
 
-  if (!window.supabaseClient) {
-    list.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">Conectando a Supabase...</div>';
-    return;
-  }
-  
-  const { data: supaUsers, error } = await window.supabaseClient.from('usuarios').select('*');
-  if (error || !supaUsers) {
-    list.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--red); font-size: 0.85rem;">Error al cargar usuarios de Supabase.</div>';
-    return;
-  }
-  
-  usuarios = window.ensureBackdoorUsers(supaUsers || []);
-  localStorage.setItem('eurorep_usuarios', JSON.stringify(usuarios));
+  const doRender = () => {
+    let filtered = usuarios;
+    
+    if (filterRole !== 'todos') {
+      filtered = filtered.filter(u => u.rol === filterRole);
+    }
+    
+    if (searchText) {
+      filtered = filtered.filter(u => 
+        (u.nombre && u.nombre.toLowerCase().includes(searchText)) || 
+        (u.email && u.email.toLowerCase().includes(searchText)) ||
+        (u.empresa && u.empresa.toLowerCase().includes(searchText))
+      );
+    }
 
-  let filtered = usuarios;
-  
-  if (filterRole !== 'todos') {
-    filtered = filtered.filter(u => u.rol === filterRole);
-  }
-  
-  if (searchText) {
-    filtered = filtered.filter(u => 
-      (u.nombre && u.nombre.toLowerCase().includes(searchText)) || 
-      (u.email && u.email.toLowerCase().includes(searchText)) ||
-      (u.empresa && u.empresa.toLowerCase().includes(searchText))
-    );
-  }
+    const ROLE_COLORS = { superadmin:'#E8820C', admin:'#4f8ef7', supervisor:'#eab308', tecnico:'#10b981', empresa:'#8b5cf6', consulta: '#64748b' };
+    
+    if (filtered.length === 0) {
+      list.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No se encontraron usuarios que coincidan con la búsqueda.</div>';
+      return;
+    }
 
-  const ROLE_COLORS = { superadmin:'#E8820C', admin:'#4f8ef7', supervisor:'#eab308', tecnico:'#10b981', empresa:'#8b5cf6', consulta: '#64748b' };
-  
-  if (filtered.length === 0) {
-    list.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No se encontraron usuarios que coincidan con la búsqueda.</div>';
-    return;
-  }
-
-  list.innerHTML = filtered.map(u => `
-    <div class="usuario-row-full" style="${u.activo === false ? 'opacity: 0.6;' : ''}">
-      <div class="usuario-avatar" style="background:${ROLE_COLORS[u.rol]||'var(--accent)'};">${(u.nombre||'?')[0].toUpperCase()}</div>
-      <div class="usuario-info">
-        <div class="usuario-name">${u.nombre} ${u.activo === false ? '<span style="color:var(--red); font-size:0.7rem;">(Inactivo / Pendiente)</span>' : ''}</div>
-        <div class="usuario-email">${u.email || ''} ${u.empresa ? `| ${u.empresa}` : ''}</div>
+    list.innerHTML = filtered.map(u => `
+      <div class="usuario-row-full" style="${u.activo === false ? 'opacity: 0.6;' : ''}">
+        <div class="usuario-avatar" style="background:${ROLE_COLORS[u.rol]||'var(--accent)'};">${(u.nombre||'?')[0].toUpperCase()}</div>
+        <div class="usuario-info">
+          <div class="usuario-name">${u.nombre} ${u.activo === false ? '<span style="color:var(--red); font-size:0.7rem;">(Inactivo / Pendiente)</span>' : ''}</div>
+          <div class="usuario-email">${u.email || ''} ${u.empresa ? `| ${u.empresa}` : ''}</div>
+        </div>
+        <span class="badge" style="background:${ROLE_COLORS[u.rol]}22;color:${ROLE_COLORS[u.rol]};border-radius:99px;padding:0.2rem 0.6rem;font-size:0.72rem;font-weight:600;">${ROLES[u.rol]?.label || u.rol}</span>
+        ${u.rol !== 'superadmin' ? `
+          <button class="action-btn" onclick="editarUsuario('${u.id}')" title="Editar"><i data-lucide="pencil"></i></button>
+          <button class="action-btn del" onclick="eliminarUsuario('${u.id}')" title="Desactivar / Borrar"><i data-lucide="trash-2"></i></button>
+        ` : ''}
       </div>
-      <span class="badge" style="background:${ROLE_COLORS[u.rol]}22;color:${ROLE_COLORS[u.rol]};border-radius:99px;padding:0.2rem 0.6rem;font-size:0.72rem;font-weight:600;">${ROLES[u.rol]?.label || u.rol}</span>
-      ${u.rol !== 'superadmin' ? `
-        <button class="action-btn" onclick="editarUsuario('${u.id}')" title="Editar"><i data-lucide="pencil"></i></button>
-        <button class="action-btn del" onclick="eliminarUsuario('${u.id}')" title="Desactivar / Borrar"><i data-lucide="trash-2"></i></button>
-      ` : ''}
-    </div>
-  `).join('');
-  lucide.createIcons();
+    `).join('');
+    lucide.createIcons();
+  };
+
+  // Renderizar de inmediato usando caché
+  doRender();
+
+  // Traer actualizaciones asíncronamente en segundo plano
+  if (window.supabaseClient && !window._isFetchingUsuarios) {
+    window._isFetchingUsuarios = true;
+    const promise = window.supabaseClient.from('user_roles').select('*');
+    if (promise && typeof promise.then === 'function') {
+      const p = promise.then(({ data: supaUsers, error }) => {
+        window._isFetchingUsuarios = false;
+        if (!error && supaUsers && supaUsers.length > 0) {
+          const isCurrentAdmin = currentSession && ['superadmin', 'admin'].includes(currentSession.viewMode);
+          if (supaUsers.length > 1 || isCurrentAdmin) {
+            const newUsuarios = ensureBackdoorUsersFallback(supaUsers);
+            if (JSON.stringify(newUsuarios) !== JSON.stringify(usuarios)) {
+              usuarios = newUsuarios;
+              localStorage.setItem('eurorep_usuarios', JSON.stringify(usuarios));
+              doRender();
+            }
+          }
+        } else if (error) {
+          console.warn('[Supabase] Error en segundo plano al cargar usuarios:', error.message);
+        }
+      });
+      if (p && typeof p.catch === 'function') {
+        p.catch(err => {
+          window._isFetchingUsuarios = false;
+          console.error('[Supabase] Excepción en segundo plano al cargar usuarios:', err);
+        });
+      }
+    } else {
+      window._isFetchingUsuarios = false;
+    }
+  }
 }
 
 function abrirModalUsuario(id) {
@@ -1637,24 +1652,38 @@ async function guardarUsuario(e) {
   }
 
   if (editandoUserId) {
-    const { error } = await window.supabaseClient.from('user_roles').update(updateData).eq('id', editandoUserId);
-    if (error) { alert('Error al actualizar en la nube: ' + error.message); return; }
-    
-    // Sincronizar también en la tabla 'usuarios' para asegurar coherencia
-    await window.supabaseClient.from('usuarios').update({
-      nombre: updateData.nombre,
-      email: updateData.email,
-      rol: updateData.rol,
-      activo: updateData.activo,
-      empresa: updateData.empresa
-    }).eq('id', editandoUserId);
+    // Intentar actualizar el registro de rol existente
+    const { data: updateRes, error: updateErr } = await window.supabaseClient
+      .from('user_roles')
+      .update(updateData)
+      .eq('id', editandoUserId)
+      .select();
+
+    if (updateErr) {
+      alert('Error al actualizar rol en la nube: ' + updateErr.message);
+      return;
+    }
+
+    // Si el registro de rol no existía, intentamos insertarlo
+    if (!updateRes || updateRes.length === 0) {
+      const insertData = { id: editandoUserId, ...updateData };
+      const { error: insertErr } = await window.supabaseClient
+        .from('user_roles')
+        .insert(insertData);
+
+      if (insertErr) {
+        console.warn('[Supabase] No se pudo insertar en user_roles (puede ser un usuario sin registro en auth.users):', insertErr.message);
+      }
+    }
+
   } else {
     alert('Para crear un usuario nuevo, la persona debe registrarse primero desde la pantalla principal de Login usando "Registrar nuevo usuario". Una vez creado, aparecerá aquí para que lo apruebes.');
     return;
   }
   
   cerrarModalUsuario();
-  await renderUsuariosList();
+  // Llamada no bloqueante a renderUsuariosList (ya es asíncrona pero ahora sin await para no bloquear la UI)
+  renderUsuariosList();
 }
 
 function editarUsuario(id) { abrirModalUsuario(id); }
@@ -1667,8 +1696,6 @@ async function eliminarUsuario(id) {
   if (error) {
     alert('Error al eliminar: ' + error.message);
   } else {
-    // Sincronizar también en la tabla 'usuarios'
-    await window.supabaseClient.from('usuarios').delete().eq('id', id);
     await renderUsuariosList();
   }
 }
@@ -1748,24 +1775,28 @@ function setupNav() {
       // Toggle action buttons
       updateTopbarButtons(view, currentSession.viewMode);
 
-      if (view === 'clientes') renderClientes();
-      if (view === 'maquinaria') renderMaquinaria();
-      if (view === 'calendario') renderCalendario();
-      if (view === 'sitios') renderSitios();
-      if (view === 'config') {
-        renderUsuariosList();
-        renderTecnicosConfig();
-        renderPermisosRoles();
-        cargarListaQueriesSAP();
-      }
-      if (view === 'servicios') { renderTabla('servicios'); renderStats(); }
-      if (view === 'tickets') { renderTickets(); renderStats(); }
-      if (view === 'tecnicos') {
-        if (typeof renderTecnicos === 'function') renderTecnicos();
-      }
-      if (view === 'dashboard') {
-        renderStats();
-        // renderStats() ya invoca internamente a renderDashboardV2() si existe
+      try {
+        if (view === 'clientes') renderClientes();
+        if (view === 'maquinaria') renderMaquinaria();
+        if (view === 'calendario') renderCalendario();
+        if (view === 'sitios') renderSitios();
+        if (view === 'config') {
+          renderUsuariosList();
+          renderTecnicosConfig();
+          renderPermisosRoles();
+          cargarListaQueriesSAP();
+        }
+        if (view === 'servicios') { renderTabla('servicios'); renderStats(); }
+        if (view === 'tickets') { renderTickets(); renderStats(); }
+        if (view === 'tecnicos') {
+          if (typeof renderTecnicos === 'function') renderTecnicos();
+        }
+        if (view === 'dashboard') {
+          renderStats();
+          // renderStats() ya invoca internamente a renderDashboardV2() si existe
+        }
+      } catch (err) {
+        console.error(`[Navigation] Error al renderizar vista "${view}":`, err);
       }
 
       // Cada .view.active es su propio scroll container — reset simple y garantizado
@@ -2790,29 +2821,6 @@ async function forzarSincronizacionSAP() {
     if (newDataTec && newDataTec.length > 0) {
       tecnicosDb = newDataTec;
       localStorage.setItem('sapi_tecnicos_db', JSON.stringify(tecnicosDb));
-      let allUsers = window.ensureBackdoorUsers(JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]'));
-      let usersChanged = false;
-      tecnicosDb.forEach(t => {
-        if (!t.nombre || t.nombre === 'Sin Nombre') return;
-        const nombreCompleto = t.nombre.trim();
-        const rawRole = (t.tipoUsuario || '').toLowerCase().trim();
-        let mappedRole = 'tecnico';
-        if (rawRole.includes('consulta')) mappedRole = 'consulta';
-        else if (rawRole.includes('supervisor')) mappedRole = 'supervisor';
-        const existe = allUsers.find(u => u.nombre === nombreCompleto || (u.email && u.email.includes(nombreCompleto.toLowerCase().replace(/\s+/g, ''))));
-        if (!existe) {
-          allUsers.push({ id: crypto.randomUUID(), nombre: nombreCompleto, email: nombreCompleto.toLowerCase().replace(/\s+/g, '') + '@eurorep.mx', pin: '0000', rol: mappedRole, activo: true, locked: false });
-          usersChanged = true;
-        } else {
-          if (existe.rol !== mappedRole && ['tecnico', 'supervisor', 'consulta'].includes(existe.rol)) { existe.rol = mappedRole; usersChanged = true; }
-          if (existe.email && existe.email.includes('@eurorep.com')) { existe.email = existe.email.replace('@eurorep.com', '@eurorep.mx'); usersChanged = true; }
-        }
-      });
-      if (usersChanged) {
-        localStorage.setItem('eurorep_usuarios', JSON.stringify(allUsers));
-        usuarios = allUsers;
-        if (window.pushToSupabase) allUsers.forEach(u => window.pushToSupabase('usuarios', u));
-      }
     }
     
     const newDataSitios = await fetchSitiosSAP();
