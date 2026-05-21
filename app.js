@@ -5922,6 +5922,14 @@ function abrirFormulario(id, modoReporte = false) {
     }
   });
 
+  // Bloquear falla reportada si es técnico
+  const elFalla = document.getElementById('f-falla');
+  if (elFalla) {
+    elFalla.readOnly = !!isTecnico;
+    elFalla.style.background = isTecnico ? 'var(--bg-secondary)' : '';
+    elFalla.style.cursor = isTecnico ? 'not-allowed' : '';
+  }
+
   const fClienteCombo = document.getElementById('f-cliente-combo');
   if (fClienteCombo) {
     const isAdmin = ['superadmin', 'admin'].includes(currentSession.viewMode);
