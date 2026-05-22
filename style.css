@@ -1729,10 +1729,15 @@ body {
 
   .modal-overlay {
     padding: 0.5rem !important;
+    align-items: flex-start !important;
+    overflow-y: auto !important;
   }
   
   .modal {
-    max-height: 94vh !important;
+    max-height: calc(100vh - 3rem) !important;
+    max-height: calc(100svh - 3rem) !important;
+    margin-top: 1.5rem !important;
+    margin-bottom: 1.5rem !important;
   }
 
   /* Prevent modal header from shrinking on compressed screens */
