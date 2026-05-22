@@ -910,6 +910,18 @@ function applyRole(rolKey) {
     const roleSwitcher = document.getElementById('role-switcher');
     if (roleSwitcher) roleSwitcher.style.display = (user?.rol === 'superadmin') ? 'flex' : 'none';
 
+    // Show/hide mobile role switcher (in sidebar)
+    const roleSwitcherMobile = document.getElementById('role-switcher-mobile');
+    if (roleSwitcherMobile) {
+      if (user?.rol === 'superadmin') {
+        roleSwitcherMobile.classList.add('visible-superadmin');
+      } else {
+        roleSwitcherMobile.classList.remove('visible-superadmin');
+      }
+    }
+    const roleSelectMobile = document.getElementById('role-select-mobile');
+    if (roleSelectMobile) roleSelectMobile.value = rolKey;
+
     // Show/hide Sandbox switch (ONLY superadmin or test users can access)
     const testModeContainer = document.getElementById('test-mode-container');
     if (testModeContainer) {

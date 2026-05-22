@@ -162,6 +162,21 @@
       <div class="sidebar-logo">
         <img src="logo_transparent.png" alt="Eurorep" class="sidebar-logo-img" />
       </div>
+      <!-- ROLE SWITCHER PARA MÓVIL (visible solo para superadmin) -->
+      <div class="role-switcher-mobile" id="role-switcher-mobile">
+        <span class="role-label" style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 0.5rem; letter-spacing: 0.5px; padding: 0 1rem;">Vista como:</span>
+        <div style="position: relative; margin: 0 1rem 0.75rem 1rem;">
+          <select id="role-select-mobile" onchange="switchMode(this.value)" style="width: 100%; padding: 0.55rem 2rem 0.55rem 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.82rem; font-weight: 600; appearance: none; -webkit-appearance: none; cursor: pointer;">
+            <option value="superadmin">SuperAdmin</option>
+            <option value="admin">Admin</option>
+            <option value="supervisor">Supervisor</option>
+            <option value="tecnico">Técnico</option>
+            <option value="empresa">Empresa</option>
+            <option value="consulta">Consulta</option>
+          </select>
+          <div style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-muted); font-size: 0.8rem;">▼</div>
+        </div>
+      </div>
       <nav class="sidebar-nav">
         <a href="#" class="nav-item active" data-view="dashboard" data-title="Dashboards" id="nav-dashboard">
           <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span><span>Dashboards</span>
@@ -3467,7 +3482,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js"></script>
   <script src="supabaseSync.js?v=11"></script>
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
   <script>lucide.createIcons();</script>
 </body>
 
