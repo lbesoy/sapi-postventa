@@ -788,6 +788,10 @@ let editandoUserId = null;
 // ===== SANDBOX / MODO PRUEBAS =====
 function isTestData(item) {
   if (!item) return false;
+  
+  // Caso específico para la orden de prueba legacy OS-26004
+  if (item.folio === 'OS-26004') return true;
+  
   if (item.esPrueba === true || item.isTest === true) return true;
   
   if (item.notas) {
@@ -799,21 +803,15 @@ function isTestData(item) {
     } catch (e) {}
   }
   
-  const fieldsToCheck = [
-    item.cliente,
-    item.tecnico,
-    item.tecnico_nombre,
-    item.asunto,
-    item.descripcion,
+  // Comprobar si el folio o asunto comienzan con [PRUEBA] o [TEST]
+  const fieldsToCheckPrefix = [
     item.folio,
-    item.creador,
-    item.nombre
+    item.asunto
   ];
-  
-  for (const field of fieldsToCheck) {
+  for (const field of fieldsToCheckPrefix) {
     if (field && typeof field === 'string') {
-      const lower = field.toLowerCase();
-      if (lower.includes('prueba') || lower.includes('test')) {
+      const trimmed = field.trim().toUpperCase();
+      if (trimmed.startsWith('[PRUEBA]') || trimmed.startsWith('[TEST]')) {
         return true;
       }
     }
