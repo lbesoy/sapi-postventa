@@ -8,6 +8,17 @@ let currentDesgSortCol = 'fecha';
 let currentDesgSortDir = 'asc';
 let currentDesgloseData = [];
 
+// Proteger contra la ausencia de Lucide (por ejemplo, por fallas de carga de CDN)
+if (typeof window !== 'undefined') {
+  if (typeof window.lucide === 'undefined' || typeof window.lucide.createIcons !== 'function') {
+    window.lucide = window.lucide || {};
+    window.lucide.createIcons = function() {
+      console.warn('[Lucide] Biblioteca no cargada o createIcons no disponible. Omitiendo renderizado de iconos.');
+    };
+  }
+}
+
+
 // ===== HELPERS =====
 function safeGetJSON(key, defaultVal) {
   try {
@@ -485,9 +496,15 @@ async function iniciarSesionSubmit(e) {
 }
 
 function entrarApp(user) {
-  document.getElementById('login-screen').classList.add('hidden');
-  document.getElementById('app-wrapper').classList.add('visible');
-  applyRole(user.rol);
+  try {
+    const loginScreen = document.getElementById('login-screen');
+    if (loginScreen) loginScreen.classList.add('hidden');
+    const appWrapper = document.getElementById('app-wrapper');
+    if (appWrapper) appWrapper.classList.add('visible');
+    applyRole(user.rol);
+  } catch (err) {
+    console.error('Error during app layout transition:', err);
+  }
   
   if (window.cargarDatosDeSupabase) {
      // Mostrar notificacion de carga al usuario
@@ -495,28 +512,35 @@ function entrarApp(user) {
      if (btnLogin) btnLogin.innerHTML = '<i data-lucide="loader" class="spin"></i> Sincronizando...';
      
      window.cargarDatosDeSupabase().then(() => {
-        renderUsuariosList();
-        renderTabla();
-        renderTabla('servicios');
+        try { renderUsuariosList(); } catch (e) { console.error('Error rendering user list:', e); }
+        try { renderTabla(); } catch (e) { console.error('Error rendering table:', e); }
+        try { renderTabla('servicios'); } catch (e) { console.error('Error rendering services table:', e); }
         if (typeof renderTickets === 'function') {
-           renderTickets();
-           renderTickets('dash-tickets');
+           try { renderTickets(); } catch (e) { console.error('Error rendering tickets:', e); }
+           try { renderTickets('dash-tickets'); } catch (e) { console.error('Error rendering dash tickets:', e); }
         }
-        renderStats();
+        try { renderStats(); } catch (e) { console.error('Error rendering stats:', e); }
+        if (btnLogin) btnLogin.innerHTML = '<i data-lucide="log-in" class="btn-icon"></i> Iniciar Sesión';
+     }).catch(err => {
+        console.error('Error in cargarDatosDeSupabase:', err);
         if (btnLogin) btnLogin.innerHTML = '<i data-lucide="log-in" class="btn-icon"></i> Iniciar Sesión';
      });
   } else {
-     renderUsuariosList();
-     renderTabla();
-     renderTabla('servicios');
+     try { renderUsuariosList(); } catch (e) { console.error('Error rendering user list:', e); }
+     try { renderTabla(); } catch (e) { console.error('Error rendering table:', e); }
+     try { renderTabla('servicios'); } catch (e) { console.error('Error rendering services table:', e); }
      if (typeof renderTickets === 'function') {
-        renderTickets();
-        renderTickets('dash-tickets');
+        try { renderTickets(); } catch (e) { console.error('Error rendering tickets:', e); }
+        try { renderTickets('dash-tickets'); } catch (e) { console.error('Error rendering dash tickets:', e); }
      }
-     renderStats();
+     try { renderStats(); } catch (e) { console.error('Error rendering stats:', e); }
   }
   
-  lucide.createIcons();
+  try {
+    lucide.createIcons();
+  } catch (err) {
+    console.error('Error rendering icons:', err);
+  }
 }
 
 function volverSeleccion() {
@@ -623,76 +647,150 @@ let isSincronizandoSAP = false;
 // Helpers: Inicializar fecha límite por defecto a +3 días
 document.addEventListener('DOMContentLoaded', () => {
   // Cerrar popup de filtros al hacer click afuera
-  document.addEventListener('click', (e) => {
-    const container = document.getElementById('maq-filters-container');
-    const popup = document.getElementById('maq-filters-popup');
-    if (container && popup && popup.classList.contains('show-filters')) {
-      if (!container.contains(e.target)) {
-        popup.classList.remove('show-filters');
+  try {
+    document.addEventListener('click', (e) => {
+      const container = document.getElementById('maq-filters-container');
+      const popup = document.getElementById('maq-filters-popup');
+      if (container && popup && popup.classList.contains('show-filters')) {
+        if (!container.contains(e.target)) {
+          popup.classList.remove('show-filters');
+        }
       }
-    }
-  });
-  lucide.createIcons();
+    });
+  } catch (err) {
+    console.error('Error setting up filter popup click listener:', err);
+  }
+
+  try {
+    lucide.createIcons();
+  } catch (err) {
+    console.error('Error rendering Lucide icons:', err);
+  }
   
   // Theme check
-  if (localStorage.getItem('eurorep_darkmode') === 'false') {
-    document.body.classList.add('light-mode');
+  try {
+    if (localStorage.getItem('eurorep_darkmode') === 'false') {
+      document.body.classList.add('light-mode');
+    }
+  } catch (err) {
+    console.error('Error applying theme:', err);
   }
 
   // Asegurarnos de que exista el superadmin y el técnico de pruebas
-  const all = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
-  localStorage.setItem('eurorep_usuarios', JSON.stringify(all));
-
-  // Check if there's a valid session via Supabase Auth or Local Backdoor
-  const saved = safeGetJSON('eurorep_session', null);
-  if (saved && (saved.userId === 'superadmin' || saved.userId === 'tecnico_test')) {
-     currentSession = saved;
-     entrarApp({ id: saved.userId, rol: saved.viewMode, nombre: saved.nombre });
-  } else if (saved && saved.userId) {
-     // Para otros roles que ya iniciaron sesión anteriormente, mantenemos la sesión para soporte offline al recargar
-     currentSession = saved;
-     entrarApp({ id: saved.userId, rol: saved.viewMode, nombre: saved.nombre });
-  } else if (window.supabaseClient) {
-     window.supabaseClient.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-           window.supabaseClient.from('user_roles').select('rol, activo, nombre').eq('id', session.user.id).single().then(({data, error}) => {
-              if (data && data.activo !== false) {
-                 currentSession = { userId: session.user.id, viewMode: data.rol, nombre: data.nombre };
-                 localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
-                 entrarApp({ id: session.user.id, rol: data.rol, nombre: data.nombre });
-              }
-           });
-         }
-      });
+  try {
+    const all = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
+    localStorage.setItem('eurorep_usuarios', JSON.stringify(all));
+  } catch (err) {
+    console.error('Error ensuring backdoor users:', err);
   }
 
-  initDiasPanels();
-  renderTabla();
-  renderStats();
+  // Check if there's a valid session via Supabase Auth or Local Backdoor
+  try {
+    const saved = safeGetJSON('eurorep_session', null);
+    if (saved && (saved.userId === 'superadmin' || saved.userId === 'tecnico_test')) {
+       currentSession = saved;
+       entrarApp({ id: saved.userId, rol: saved.viewMode, nombre: saved.nombre });
+    } else if (saved && saved.userId) {
+       // Para otros roles que ya iniciaron sesión anteriormente, mantenemos la sesión para soporte offline al recargar
+       currentSession = saved;
+       entrarApp({ id: saved.userId, rol: saved.viewMode, nombre: saved.nombre });
+    } else if (window.supabaseClient) {
+       window.supabaseClient.auth.getSession().then(({ data: { session } }) => {
+          if (session) {
+             window.supabaseClient.from('user_roles').select('rol, activo, nombre').eq('id', session.user.id).single().then(({data, error}) => {
+                if (data && data.activo !== false) {
+                   currentSession = { userId: session.user.id, viewMode: data.rol, nombre: data.nombre };
+                   localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
+                   entrarApp({ id: session.user.id, rol: data.rol, nombre: data.nombre });
+                }
+             }).catch(err => console.error('Error getting user role:', err));
+           }
+        }).catch(err => console.error('Error getting session:', err));
+    }
+  } catch (err) {
+    console.error('Error restoring session:', err);
+  }
+
+  try {
+    initDiasPanels();
+  } catch (err) {
+    console.error('Error calling initDiasPanels:', err);
+  }
+  
+  try {
+    renderTabla();
+  } catch (err) {
+    console.error('Error calling renderTabla:', err);
+  }
+  
+  try {
+    renderStats();
+  } catch (err) {
+    console.error('Error calling renderStats:', err);
+  }
 
   // Agregar botones de eliminar a los campos de mapeo por defecto
-  document.querySelectorAll('.mapeo-tab-content .form-group').forEach(group => {
-    if (group.querySelector('.map-label-edit') && !group.querySelector('.del-map-btn')) {
-      group.style.position = 'relative';
-      const btn = document.createElement('button');
-      btn.className = 'del-map-btn';
-      btn.innerHTML = '✕';
-      btn.title = "Eliminar esta columna";
-      btn.style = "position:absolute; right:0px; top:5px; background:none; border:none; color:var(--red); cursor:pointer; font-size:0.9rem; padding: 0.2rem;";
-      btn.onclick = (e) => {
-        e.preventDefault();
-        group.remove();
-      };
-      group.appendChild(btn);
-    }
-  });
-  renderTickets();
-  renderRefacciones();
-  updateTicketBadge();
-  setupNav();
-  cargarConfig();
-  renderTecnicosConfig();
-  renderUsuariosList();
+  try {
+    document.querySelectorAll('.mapeo-tab-content .form-group').forEach(group => {
+      if (group.querySelector('.map-label-edit') && !group.querySelector('.del-map-btn')) {
+        group.style.position = 'relative';
+        const btn = document.createElement('button');
+        btn.className = 'del-map-btn';
+        btn.innerHTML = '✕';
+        btn.title = "Eliminar esta columna";
+        btn.style = "position:absolute; right:0px; top:5px; background:none; border:none; color:var(--red); cursor:pointer; font-size:0.9rem; padding: 0.2rem;";
+        btn.onclick = (e) => {
+          e.preventDefault();
+          group.remove();
+        };
+        group.appendChild(btn);
+      }
+    });
+  } catch (err) {
+    console.error('Error appending delete mapping buttons:', err);
+  }
+  
+  try {
+    renderTickets();
+  } catch (err) {
+    console.error('Error calling renderTickets:', err);
+  }
+  
+  try {
+    renderRefacciones();
+  } catch (err) {
+    console.error('Error calling renderRefacciones:', err);
+  }
+  
+  try {
+    updateTicketBadge();
+  } catch (err) {
+    console.error('Error calling updateTicketBadge:', err);
+  }
+  
+  try {
+    setupNav();
+  } catch (err) {
+    console.error('Error calling setupNav:', err);
+  }
+  
+  try {
+    cargarConfig();
+  } catch (err) {
+    console.error('Error calling cargarConfig:', err);
+  }
+  
+  try {
+    renderTecnicosConfig();
+  } catch (err) {
+    console.error('Error calling renderTecnicosConfig:', err);
+  }
+  
+  try {
+    renderUsuariosList();
+  } catch (err) {
+    console.error('Error calling renderUsuariosList:', err);
+  }
 });
 
 usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
@@ -700,78 +798,96 @@ currentSession = safeGetJSON('eurorep_session', null) || { userId: 'superadmin',
 let editandoUserId = null;
 
 function applyRole(rolKey) {
-  const rol = ROLES[rolKey] || ROLES.superadmin;
-  const navViews = rol.views;
+  try {
+    const rol = ROLES[rolKey] || ROLES.superadmin;
+    const navViews = rol.views;
 
-  // Show/hide nav items
-  document.querySelectorAll('.nav-item[data-view]').forEach(item => {
-    const v = item.dataset.view;
-    item.style.display = navViews.includes(v) ? '' : 'none';
-  });
+    // Show/hide nav items
+    document.querySelectorAll('.nav-item[data-view]').forEach(item => {
+      const v = item.dataset.view;
+      item.style.display = navViews.includes(v) ? '' : 'none';
+    });
 
-  // If current active view is not allowed, redirect to first allowed
-  const activeView = document.querySelector('.view.active');
-  if (activeView) {
-    const vid = activeView.id.replace('view-','');
-    if (!navViews.includes(vid)) {
-      const firstAllowed = navViews[0];
-      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-      document.getElementById('view-' + firstAllowed)?.classList.add('active');
-      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-      document.querySelector(`.nav-item[data-view="${firstAllowed}"]`)?.classList.add('active');
-      document.getElementById('page-title').textContent = ROLES_LABELS[firstAllowed] || firstAllowed;
+    // If current active view is not allowed, redirect to first allowed
+    const activeView = document.querySelector('.view.active');
+    if (activeView) {
+      const vid = activeView.id.replace('view-','');
+      if (!navViews.includes(vid)) {
+        const firstAllowed = navViews[0];
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById('view-' + firstAllowed)?.classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.querySelector(`.nav-item[data-view="${firstAllowed}"]`)?.classList.add('active');
+        const pageTitle = document.getElementById('page-title');
+        if (pageTitle) {
+          let label = ROLES_LABELS[firstAllowed] || firstAllowed;
+          if (firstAllowed === 'preferencias' && window.innerWidth <= 768) {
+            label = 'Perfil';
+          }
+          pageTitle.textContent = label;
+        }
+      }
     }
+
+    // Show/hide role switcher
+    const user = usuarios.find(u => u.id === currentSession.userId);
+    const roleSwitcher = document.getElementById('role-switcher');
+    if (roleSwitcher) roleSwitcher.style.display = (user?.rol === 'superadmin') ? 'flex' : 'none';
+
+    // Mostrar botón de programar técnico en calendario solo a roles autorizados
+    const btnProgramar = document.getElementById('btn-programar-tecnico');
+    if (btnProgramar) {
+      btnProgramar.style.display = ['superadmin', 'admin', 'supervisor'].includes(rolKey) ? 'flex' : 'none';
+    }
+
+    // Ocultar pestaña de Técnicos en el Dashboard para empresas/clientes
+    const btnDashTecnicos = document.getElementById('btn-dash-tecnicos');
+    if (btnDashTecnicos) {
+      btnDashTecnicos.style.display = ['empresa', 'cliente'].includes(rolKey) ? 'none' : 'inline-block';
+    }
+
+    // Ocultar campo y columna de Prioridad para empresas/clientes
+    const isCliente = ['empresa', 'cliente'].includes(rolKey);
+    document.querySelectorAll('.col-prioridad').forEach(el => el.style.display = isCliente ? 'none' : '');
+    const groupPrioridad = document.getElementById('group-t-prioridad');
+    if (groupPrioridad) {
+      groupPrioridad.style.display = isCliente ? 'none' : '';
+    }
+
+    // Update role mode buttons
+    document.querySelectorAll('.role-mode-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.role === rolKey);
+    });
+
+    // Update session badge
+    const sessionName = user?.nombre || currentSession.nombre || 'Usuario';
+    const sessionAvatar = document.getElementById('session-avatar');
+    if (sessionAvatar) {
+      sessionAvatar.textContent = sessionName[0].toUpperCase();
+      sessionAvatar.style.background = ROLES[currentSession.viewMode]?.color || 'var(--accent)';
+    }
+    const sessionNameEl = document.getElementById('session-name');
+    if (sessionNameEl) sessionNameEl.textContent = sessionName;
+    
+    const sessionRole = document.getElementById('session-role');
+    if (sessionRole) sessionRole.textContent = ROLES[currentSession.viewMode]?.label || '';
+
+    // Rename Maquinaria text if Empresa
+    const isEmpresa = rolKey === 'empresa';
+    const navMaquinariaText = document.getElementById('nav-maquinaria-text');
+    if (navMaquinariaText) navMaquinariaText.textContent = isEmpresa ? 'Mis máquinas' : 'Maquinaria';
+
+    // Update topbar buttons visibility according to role and view
+    const currentActiveView = document.querySelector('.view.active');
+    if (currentActiveView) {
+      const activeViewId = currentActiveView.id.replace('view-', '');
+      updateTopbarButtons(activeViewId, rolKey);
+    }
+
+    lucide.createIcons();
+  } catch (err) {
+    console.error('Error applying role:', err);
   }
-
-  // Show/hide role switcher
-  const user = usuarios.find(u => u.id === currentSession.userId);
-  document.getElementById('role-switcher').style.display = (user?.rol === 'superadmin') ? 'flex' : 'none';
-
-  // Mostrar botón de programar técnico en calendario solo a roles autorizados
-  const btnProgramar = document.getElementById('btn-programar-tecnico');
-  if (btnProgramar) {
-    btnProgramar.style.display = ['superadmin', 'admin', 'supervisor'].includes(rolKey) ? 'flex' : 'none';
-  }
-
-  // Ocultar pestaña de Técnicos en el Dashboard para empresas/clientes
-  const btnDashTecnicos = document.getElementById('btn-dash-tecnicos');
-  if (btnDashTecnicos) {
-    btnDashTecnicos.style.display = ['empresa', 'cliente'].includes(rolKey) ? 'none' : 'inline-block';
-  }
-
-  // Ocultar campo y columna de Prioridad para empresas/clientes
-  const isCliente = ['empresa', 'cliente'].includes(rolKey);
-  document.querySelectorAll('.col-prioridad').forEach(el => el.style.display = isCliente ? 'none' : '');
-  const groupPrioridad = document.getElementById('group-t-prioridad');
-  if (groupPrioridad) {
-    groupPrioridad.style.display = isCliente ? 'none' : '';
-  }
-
-  // Update role mode buttons
-  document.querySelectorAll('.role-mode-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.role === rolKey);
-  });
-
-  // Update session badge
-  const sessionName = user?.nombre || currentSession.nombre || 'Usuario';
-  document.getElementById('session-avatar').textContent = sessionName[0].toUpperCase();
-  document.getElementById('session-name').textContent = sessionName;
-  document.getElementById('session-role').textContent = ROLES[currentSession.viewMode]?.label || '';
-  document.getElementById('session-avatar').style.background = ROLES[currentSession.viewMode]?.color || 'var(--accent)';
-
-  // Rename Maquinaria text if Empresa
-  const isEmpresa = rolKey === 'empresa';
-  const navMaquinariaText = document.getElementById('nav-maquinaria-text');
-  if (navMaquinariaText) navMaquinariaText.textContent = isEmpresa ? 'Mis máquinas' : 'Maquinaria';
-
-  // Update topbar buttons visibility according to role and view
-  const currentActiveView = document.querySelector('.view.active');
-  if (currentActiveView) {
-    const activeViewId = currentActiveView.id.replace('view-', '');
-    updateTopbarButtons(activeViewId, rolKey);
-  }
-
-  lucide.createIcons();
 }
 
 function updateTopbarButtons(view, role) {
@@ -797,10 +913,42 @@ function updateTopbarButtons(view, role) {
   }
 }
 
+function reRenderActiveView() {
+  const activeView = document.querySelector('.view.active');
+  if (!activeView) return;
+  const view = activeView.id.replace('view-', '');
+  
+  try { actualizarFiltrosPersonal(); } catch (e) { console.error('Error updating personal filters:', e); }
+
+  try {
+    if (view === 'clientes') renderClientes();
+    if (view === 'maquinaria') renderMaquinaria();
+    if (view === 'calendario') renderCalendario();
+    if (view === 'sitios') renderSitios();
+    if (view === 'config') {
+      renderUsuariosList();
+      renderTecnicosConfig();
+      renderPermisosRoles();
+      cargarListaQueriesSAP();
+    }
+    if (view === 'servicios') { renderTabla('servicios'); renderStats(); }
+    if (view === 'tickets') { renderTickets(); renderStats(); }
+    if (view === 'tecnicos') {
+      if (typeof renderTecnicos === 'function') renderTecnicos();
+    }
+    if (view === 'dashboard') {
+      renderStats();
+    }
+  } catch (err) {
+    console.error(`Error re-rendering active view "${view}" after role switch:`, err);
+  }
+}
+
 function switchMode(rolKey) {
   currentSession.viewMode = rolKey;
   localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
   applyRole(rolKey);
+  reRenderActiveView();
 }
 
 // ===== CONFIG =====
@@ -1770,7 +1918,11 @@ function setupNav() {
       // Se resetea el scroll DESPUÉS de todos los renders (ver abajo)
 
       // Page title via data-title attribute
-      document.getElementById('page-title').textContent = item.dataset.title || view;
+      let pageTitleText = item.dataset.title || view;
+      if (view === 'preferencias' && window.innerWidth <= 768) {
+        pageTitleText = 'Perfil';
+      }
+      document.getElementById('page-title').textContent = pageTitleText;
 
       // Toggle action buttons
       updateTopbarButtons(view, currentSession.viewMode);
@@ -2075,6 +2227,85 @@ function renderStats() {
   } else {
       const elDashKpis = document.getElementById('dash-kpis-cliente');
       if (elDashKpis) elDashKpis.style.display = 'none';
+      
+      const userRole = currentSession.viewMode || '';
+      if (userRole === 'tecnico') {
+        const tecName = currentUser ? currentUser.nombre : '';
+        ordenesFilter = ordenes.filter(o => {
+          let assigned = [];
+          if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados;
+          else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
+          let isCreator = false;
+          let isTkAssigned = false;
+          if (o.creadoPor === tecName) isCreator = true;
+          if (o.soporte) {
+            const tk = tickets.find(x => x.id === o.soporte);
+            if (tk) {
+              if (tk.solicitante === tecName || tk.creadoPor === tecName) isCreator = true;
+              let tkAssigned = [];
+              if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados;
+              else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
+              if (tkAssigned.includes(tecName)) isTkAssigned = true;
+            }
+          }
+          return assigned.includes(tecName) || isCreator || isTkAssigned;
+        });
+
+        ticketsFilter = tickets.filter(t => {
+          let assigned = [];
+          if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+          else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+          return assigned.includes(tecName) || t.solicitante === tecName || t.creadoPor === tecName;
+        });
+      } else if (userRole === 'supervisor') {
+        const supFilter = currentUser ? currentUser.nombre : '';
+        ordenesFilter = ordenes.filter(o => {
+          let passSupClient = false;
+          const cli = clientesDb.find(c => c.nombre === o.cliente);
+          if (cli) {
+            const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
+            const supId = supUser ? supUser.id : supFilter;
+            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
+          }
+          
+          let assigned = [];
+          if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados;
+          else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
+          
+          let passSupTicket = assigned.includes(supFilter);
+          let isCreator = false;
+          if (o.creadoPor === supFilter) isCreator = true;
+          if (o.soporte) {
+            const tk = tickets.find(x => x.id === o.soporte);
+            if (tk) {
+              if (tk.solicitante === supFilter || tk.creadoPor === supFilter) isCreator = true;
+              let tkAssigned = [];
+              if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados;
+              else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
+              if (tkAssigned.includes(supFilter)) passSupTicket = true;
+            }
+          }
+          return passSupClient || passSupTicket || isCreator;
+        });
+
+        ticketsFilter = tickets.filter(t => {
+          let passSupClient = false;
+          const cli = clientesDb.find(c => c.nombre === t.cliente);
+          if (cli) {
+            const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
+            const supId = supUser ? supUser.id : supFilter;
+            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
+          }
+          
+          let assigned = [];
+          if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+          else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+          
+          let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
+          
+          return passSupClient || passSupTicket;
+        });
+      }
   }
 
   const total = ordenesFilter.length;
@@ -2168,6 +2399,92 @@ function renderDashboardV2() {
     const rend2 = document.getElementById('v2-label-rend-2'); if (rend2) rend2.textContent = 'Sitios Activos';
     const rend3 = document.getElementById('v2-label-rend-3'); if (rend3) rend3.textContent = 'Equipos Instalados';
     const chart3 = document.getElementById('v2-title-chart-3'); if (chart3) chart3.textContent = 'Top Equipos (Mantenimientos)';
+  } else if ((currentSession.viewMode || '') === 'tecnico') {
+    const tecName = currentUser ? currentUser.nombre : '';
+    ordenesDash = ordenes.filter(o => {
+      let assigned = [];
+      if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados;
+      else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
+      let isCreator = false;
+      let isTkAssigned = false;
+      if (o.creadoPor === tecName) isCreator = true;
+      if (o.soporte) {
+        const tk = tickets.find(x => x.id === o.soporte);
+        if (tk) {
+          if (tk.solicitante === tecName || tk.creadoPor === tecName) isCreator = true;
+          let tkAssigned = [];
+          if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados;
+          else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
+          if (tkAssigned.includes(tecName)) isTkAssigned = true;
+        }
+      }
+      return assigned.includes(tecName) || isCreator || isTkAssigned;
+    });
+
+    ticketsDash = tickets.filter(t => {
+      let assigned = [];
+      if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+      else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+      return assigned.includes(tecName) || t.solicitante === tecName || t.creadoPor === tecName;
+    });
+
+    const rend1 = document.getElementById('v2-label-rend-1'); if (rend1) rend1.textContent = 'Refacciones Faltantes';
+    const rend2 = document.getElementById('v2-label-rend-2'); if (rend2) rend2.textContent = 'Resolución Órdenes';
+    const rend3 = document.getElementById('v2-label-rend-3'); if (rend3) rend3.textContent = 'Resolución Tickets';
+    const chart3 = document.getElementById('v2-title-chart-3'); if (chart3) chart3.textContent = 'Top Clientes (Ordenes)';
+  } else if ((currentSession.viewMode || '') === 'supervisor') {
+    const supFilter = currentUser ? currentUser.nombre : '';
+    ordenesDash = ordenes.filter(o => {
+      let passSupClient = false;
+      const cli = clientesDb.find(c => c.nombre === o.cliente);
+      if (cli) {
+        const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
+        const supId = supUser ? supUser.id : supFilter;
+        passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
+      }
+      
+      let assigned = [];
+      if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados;
+      else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
+      
+      let passSupTicket = assigned.includes(supFilter);
+      let isCreator = false;
+      if (o.creadoPor === supFilter) isCreator = true;
+      if (o.soporte) {
+        const tk = tickets.find(x => x.id === o.soporte);
+        if (tk) {
+          if (tk.solicitante === supFilter || tk.creadoPor === supFilter) isCreator = true;
+          let tkAssigned = [];
+          if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados;
+          else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
+          if (tkAssigned.includes(supFilter)) passSupTicket = true;
+        }
+      }
+      return passSupClient || passSupTicket || isCreator;
+    });
+
+    ticketsDash = tickets.filter(t => {
+      let passSupClient = false;
+      const cli = clientesDb.find(c => c.nombre === t.cliente);
+      if (cli) {
+        const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
+        const supId = supUser ? supUser.id : supFilter;
+        passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
+      }
+      
+      let assigned = [];
+      if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+      else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+      
+      let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
+      
+      return passSupClient || passSupTicket;
+    });
+
+    const rend1 = document.getElementById('v2-label-rend-1'); if (rend1) rend1.textContent = 'Refacciones Faltantes';
+    const rend2 = document.getElementById('v2-label-rend-2'); if (rend2) rend2.textContent = 'Resolución Órdenes';
+    const rend3 = document.getElementById('v2-label-rend-3'); if (rend3) rend3.textContent = 'Resolución Tickets';
+    const chart3 = document.getElementById('v2-title-chart-3'); if (chart3) chart3.textContent = 'Top Clientes (Ordenes)';
   } else {
     const rend1 = document.getElementById('v2-label-rend-1'); if (rend1) rend1.textContent = 'Refacciones Faltantes';
     const rend2 = document.getElementById('v2-label-rend-2'); if (rend2) rend2.textContent = 'Resolución Órdenes';
@@ -2306,10 +2623,14 @@ function renderDashboardV2() {
     const textColor = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)';
     const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
 
-    Chart.defaults.color = textColor;
-    Chart.defaults.font.family = 'Inter, sans-serif';
-    Chart.defaults.font.size = 11;
-    Chart.defaults.maintainAspectRatio = false;
+    if (Chart.defaults) {
+      Chart.defaults.color = textColor;
+      if (Chart.defaults.font) {
+        Chart.defaults.font.family = 'Inter, sans-serif';
+        Chart.defaults.font.size = 11;
+      }
+      Chart.defaults.maintainAspectRatio = false;
+    }
 
     const destroyChart = (id) => { if (_v2Charts[id]) { _v2Charts[id].destroy(); delete _v2Charts[id]; } };
 
@@ -2614,10 +2935,9 @@ function renderTabla(ctx) {
     }
   }
 
-  if (currentUser) {
-     if (currentUser.rol === 'tecnico') tecFilter = currentUser.nombre;
-     if (currentUser.rol === 'supervisor') supFilter = currentUser.nombre;
-  }
+  const userRole = currentSession.viewMode || '';
+  if (userRole === 'tecnico') tecFilter = currentUser ? currentUser.nombre : '';
+  if (userRole === 'supervisor') supFilter = currentUser ? currentUser.nombre : '';
   
   if (tecFilter || supFilter) {
     const tecName = tecFilter;
@@ -5200,8 +5520,8 @@ function renderTecnicos() {
   
   let tecsArr = [];
   if (API_CONFIG.USE_SAP_BACKEND && sapTecs.length > 0) {
-    // Si SAP está activo, usar ESTRICTAMENTE los técnicos activos de SAP para evitar revivir inactivos del historial
-    tecsArr = [...sapTecs];
+    // Si SAP está activo, usar los técnicos activos de SAP y también los usuarios locales con rol de técnico
+    tecsArr = [...sapTecs, ...userTecs];
   } else {
     tecsArr = [...legacyTecs, ...userTecs, ...sapTecs];
   }
@@ -5224,23 +5544,37 @@ function renderTecnicos() {
   }
   
   grid.innerHTML = tecs.map(t => {
-    const total = ordenes.filter(o => formatNombreCorto(o.tecnico) === t).length;
-    const comp = ordenes.filter(o => formatNombreCorto(o.tecnico) === t && o.estado === 'Completado').length;
-    
-    // Calcular Siguiente Ticket y Último Resuelto usando el sistema de tickets
-    const tTickets = tickets.filter(tk => formatNombreCorto(tk.asignado) === t);
-    const ticketsAbiertos = tTickets.filter(tk => tk.estado !== 'Resuelto' && tk.estado !== 'Cerrado');
-    const proxTicket = ticketsAbiertos.length > 0 ? ticketsAbiertos[0] : null; // El más antiguo abierto
-    
-    const ticketsCerrados = tTickets.filter(tk => tk.estado === 'Resuelto' || tk.estado === 'Cerrado');
-    const ultResuelto = ticketsCerrados.length > 0 ? ticketsCerrados[ticketsCerrados.length - 1] : null; // El más reciente cerrado
+    // Calcular órdenes del técnico
+    const tOrdenes = ordenes.filter(o => {
+      let assigned = [];
+      if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) {
+        assigned = o.tecnicosAsignados.map(formatNombreCorto);
+      } else if (o.tecnico) {
+        assigned = o.tecnico.split(',').map(s => formatNombreCorto(s.trim()));
+      }
+      return assigned.includes(t);
+    });
 
-    const tecObj = tecnicosDb.find(x => formatNombreCorto(x.nombre) === t);
+    const total = tOrdenes.length;
+    const comp = tOrdenes.filter(o => (o.estado || '').toLowerCase() === 'completado').length;
+    
+    // Calcular Siguiente Orden y Último Completado usando el sistema de órdenes
+    const ordenesAbiertas = tOrdenes
+      .filter(o => (o.estado || '').toLowerCase() !== 'completado')
+      .sort((a, b) => new Date(a.fecha) - new Date(b.fecha)); // la más antigua abierta primero
+    const proxOrden = ordenesAbiertas.length > 0 ? ordenesAbiertas[0] : null;
+    
+    const ordenesCompletadas = tOrdenes
+      .filter(o => (o.estado || '').toLowerCase() === 'completado')
+      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha)); // la más reciente completada primero
+    const ultCompletada = ordenesCompletadas.length > 0 ? ordenesCompletadas[0] : null;
+
+    const tecObj = tecnicosDb.find(x => formatNombreCorto(x.nombre) === t) || usuarios.find(u => formatNombreCorto(u.nombre) === t);
     const celular = tecObj?.celular || 'Sin celular';
     const tipoUsuario = tecObj?.tipoUsuario || 'Técnico';
 
-    const proxTxt = proxTicket ? `<span style="color:var(--text-primary);">${proxTicket.cliente}</span> <span style="color:var(--text-muted);">(${proxTicket.fecha})</span>` : '<span style="color:var(--text-muted);">Ninguno</span>';
-    const ultTxt = ultResuelto ? `<span style="color:var(--text-primary);">${ultResuelto.cliente}</span> <span style="color:var(--text-muted);">(${ultResuelto.fecha})</span>` : '<span style="color:var(--text-muted);">Ninguno</span>';
+    const proxTxt = proxOrden ? `<span style="color:var(--text-primary);">${proxOrden.cliente}</span> <span style="color:var(--text-muted);">(${proxOrden.fecha})</span>` : '<span style="color:var(--text-muted);">Ninguna</span>';
+    const ultTxt = ultCompletada ? `<span style="color:var(--text-primary);">${ultCompletada.cliente}</span> <span style="color:var(--text-muted);">(${ultCompletada.fecha})</span>` : '<span style="color:var(--text-muted);">Ninguna</span>';
 
     return `
     <div class="card-person" onclick="verDetalleTecnico('${t.replace(/'/g, "\\'")}')" style="cursor:pointer; display:flex; flex-direction:column; gap:0.5rem; padding:1.25rem;">
@@ -5260,14 +5594,14 @@ function renderTecnicos() {
         <div style="display:flex; align-items:flex-start; gap:0.4rem;">
           <i data-lucide="calendar-clock" style="width:14px;height:14px;color:var(--accent);margin-top:2px;flex-shrink:0;"></i>
           <div style="line-height:1.2;">
-            <div style="font-weight:600; color:var(--text-secondary); font-size:0.7rem; text-transform:uppercase; margin-bottom:2px;">Siguiente Ticket</div>
+            <div style="font-weight:600; color:var(--text-secondary); font-size:0.7rem; text-transform:uppercase; margin-bottom:2px;">Siguiente Orden</div>
             ${proxTxt}
           </div>
         </div>
         <div style="display:flex; align-items:flex-start; gap:0.4rem;">
           <i data-lucide="check-circle-2" style="width:14px;height:14px;color:var(--green);margin-top:2px;flex-shrink:0;"></i>
           <div style="line-height:1.2;">
-            <div style="font-weight:600; color:var(--text-secondary); font-size:0.7rem; text-transform:uppercase; margin-bottom:2px;">Último Resuelto</div>
+            <div style="font-weight:600; color:var(--text-secondary); font-size:0.7rem; text-transform:uppercase; margin-bottom:2px;">Último Completado</div>
             ${ultTxt}
           </div>
         </div>
@@ -5277,22 +5611,37 @@ function renderTecnicos() {
   
   if (tbody) {
     tbody.innerHTML = tecs.map(t => {
-      const total = ordenes.filter(o => formatNombreCorto(o.tecnico) === t).length;
-      const comp = ordenes.filter(o => formatNombreCorto(o.tecnico) === t && o.estado === 'Completado').length;
+      // Calcular órdenes del técnico
+      const tOrdenes = ordenes.filter(o => {
+        let assigned = [];
+        if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) {
+          assigned = o.tecnicosAsignados.map(formatNombreCorto);
+        } else if (o.tecnico) {
+          assigned = o.tecnico.split(',').map(s => formatNombreCorto(s.trim()));
+        }
+        return assigned.includes(t);
+      });
 
-      const tTickets = tickets.filter(tk => formatNombreCorto(tk.asignado) === t);
-      const ticketsAbiertos = tTickets.filter(tk => tk.estado !== 'Resuelto' && tk.estado !== 'Cerrado');
-      const proxTicket = ticketsAbiertos.length > 0 ? ticketsAbiertos[0] : null; 
+      const total = tOrdenes.length;
+      const comp = tOrdenes.filter(o => (o.estado || '').toLowerCase() === 'completado').length;
+
+      // Calcular Siguiente Orden y Último Completado usando el sistema de órdenes
+      const ordenesAbiertas = tOrdenes
+        .filter(o => (o.estado || '').toLowerCase() !== 'completado')
+        .sort((a, b) => new Date(a.fecha) - new Date(b.fecha)); // la más antigua abierta primero
+      const proxOrden = ordenesAbiertas.length > 0 ? ordenesAbiertas[0] : null;
       
-      const ticketsCerrados = tTickets.filter(tk => tk.estado === 'Resuelto' || tk.estado === 'Cerrado');
-      const ultResuelto = ticketsCerrados.length > 0 ? ticketsCerrados[ticketsCerrados.length - 1] : null;
+      const ordenesCompletadas = tOrdenes
+        .filter(o => (o.estado || '').toLowerCase() === 'completado')
+        .sort((a, b) => new Date(b.fecha) - new Date(a.fecha)); // la más reciente completada primero
+      const ultCompletada = ordenesCompletadas.length > 0 ? ordenesCompletadas[0] : null;
 
-      const tecObj = tecnicosDb.find(x => formatNombreCorto(x.nombre) === t);
+      const tecObj = tecnicosDb.find(x => formatNombreCorto(x.nombre) === t) || usuarios.find(u => formatNombreCorto(u.nombre) === t);
       const celular = tecObj?.celular || 'Sin celular';
       const tipoUsuario = tecObj?.tipoUsuario || 'Técnico';
 
-      const proxTxt = proxTicket ? `<div style="font-weight:500;">${proxTicket.cliente}</div><div style="font-size:0.75rem; color:var(--text-muted);">${proxTicket.fecha}</div>` : '<span style="color:var(--text-muted);">Ninguno</span>';
-      const ultTxt = ultResuelto ? `<div style="font-weight:500;">${ultResuelto.cliente}</div><div style="font-size:0.75rem; color:var(--text-muted);">${ultResuelto.fecha}</div>` : '<span style="color:var(--text-muted);">Ninguno</span>';
+      const proxTxt = proxOrden ? `<div style="font-weight:500;">${proxOrden.cliente}</div><div style="font-size:0.75rem; color:var(--text-muted);">${proxOrden.fecha}</div>` : '<span style="color:var(--text-muted);">Ninguna</span>';
+      const ultTxt = ultCompletada ? `<div style="font-weight:500;">${ultCompletada.cliente}</div><div style="font-size:0.75rem; color:var(--text-muted);">${ultCompletada.fecha}</div>` : '<span style="color:var(--text-muted);">Ninguna</span>';
 
       return `
         <tr onclick="verDetalleTecnico('${t.replace(/'/g, "\\'")}')" style="cursor:pointer;" class="hover-row">
@@ -5317,7 +5666,14 @@ function renderTecnicos() {
 function verDetalleTecnico(nombre) {
   document.getElementById('tecnico-detalle-title').innerHTML = `<i data-lucide="user" style="color:var(--accent);"></i> Perfil: ${nombre}`;
   
-  const tUser = usuarios.find(u => u.nombre === nombre);
+  const formatNombreCorto = (nombre) => {
+    if (!nombre) return '';
+    const partes = nombre.trim().split(' ').filter(Boolean);
+    if (partes.length >= 2) return `${partes[0]} ${partes[1]}`;
+    return nombre.trim();
+  };
+  const tUser = usuarios.find(u => u.nombre === nombre || formatNombreCorto(u.nombre) === nombre) || 
+                tecnicosDb.find(t => t.nombre === nombre || formatNombreCorto(t.nombre) === nombre);
   
   // Find assigned clients
   let assignedClients = [];
@@ -5348,7 +5704,7 @@ function verDetalleTecnico(nombre) {
       </div>
       <div>
         <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Celular</div>
-        <div style="font-weight: 500; color: var(--text-primary); font-size: 1.1rem;">${tUser?.telefono || 'N/A'}</div>
+        <div style="font-weight: 500; color: var(--text-primary); font-size: 1.1rem;">${tUser?.celular || tUser?.telefono || 'N/A'}</div>
       </div>
       <div>
         <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Clientes Asignados</div>
@@ -7153,7 +7509,7 @@ function updateTicketBadge() {
 function actualizarFiltrosPersonal() {
   try {
     const currentUser = usuarios.find(u => u && u.id === currentSession.userId);
-    const userRole = currentUser ? currentUser.rol : '';
+    const userRole = currentSession.viewMode || '';
     const isTecnico = userRole === 'tecnico';
     const isSupervisor = userRole === 'supervisor';
     const userName = currentUser ? currentUser.nombre : '';
@@ -7282,10 +7638,9 @@ function renderTickets(ctx) {
     }
   }
 
-  if (currentUser) {
-     if (currentUser.rol === 'tecnico') tecFilter = currentUser.nombre;
-     if (currentUser.rol === 'supervisor') supFilter = currentUser.nombre;
-  }
+  const userRole = currentSession.viewMode || '';
+  if (userRole === 'tecnico') tecFilter = currentUser ? currentUser.nombre : '';
+  if (userRole === 'supervisor') supFilter = currentUser ? currentUser.nombre : '';
   
   if (tecFilter || supFilter) {
     const tecName = tecFilter; // Ahora usamos el nombre directamente

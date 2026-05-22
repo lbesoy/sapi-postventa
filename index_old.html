@@ -14,8 +14,7 @@
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=9" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
@@ -42,7 +41,7 @@
               <i data-lucide="user"
                 style="position:absolute;left:12px;top:10px;width:1rem;height:1rem;color:var(--text-muted);"></i>
               <input type="text" id="login-email" placeholder="usuario@eurorep.mx o 5512345678"
-                style="padding-left:2.5rem;" autocapitalize="none" autocorrect="off" spellcheck="false" required />
+                style="padding-left:2.5rem;" required />
             </div>
           </div>
           <div class="form-group">
@@ -59,63 +58,11 @@
             <i data-lucide="log-in" class="btn-icon"></i> Iniciar Sesión
           </button>
         </form>
-        
-        <div style="text-align:center; margin-top:1rem;">
-          <a href="#" onclick="abrirRecuperarPassword(event)" style="color:var(--accent); font-size:0.85rem; text-decoration:none;">¿Olvidaste tu contraseña?</a>
-        </div>
 
         <div class="login-divider" style="margin-top:1.5rem;"><span>Opciones</span></div>
         <button class="login-setup-btn" onclick="loginCrearUsuario()">
           <i data-lucide="user-plus"></i> Registrar nuevo usuario
         </button>
-      </div>
-
-      <!-- RECUPERAR CONTRASEÑA -->
-      <div id="login-step-recovery" style="display:none;">
-        <button class="btn-secondary" style="margin-bottom:1.5rem;padding:0.4rem;border:none;"
-          onclick="volverLoginDesdeRecovery()"><i data-lucide="arrow-left"></i> Volver</button>
-        <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:0.5rem;color:var(--text-primary);">Recuperar
-          Contraseña</h2>
-        <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1.5rem;line-height:1.4;">Ingresa el correo asociado a tu cuenta para enviarte un enlace seguro.</p>
-        <form onsubmit="enviarRecoveryLink(event)">
-          <div class="form-group">
-            <label>Correo Electrónico</label>
-            <div style="position:relative;">
-              <i data-lucide="mail"
-                style="position:absolute;left:12px;top:10px;width:1rem;height:1rem;color:var(--text-muted);"></i>
-              <input type="email" id="recovery-email" placeholder="usuario@eurorep.mx" style="padding-left:2.5rem;"
-                required />
-            </div>
-          </div>
-          <div id="recovery-error" class="pin-error" style="text-align:left;margin-top:0.25rem;"></div>
-          <button type="submit" class="btn-primary"
-            style="width:100%;margin-top:0.5rem;justify-content:center;padding:0.75rem;">
-            <i data-lucide="send" class="btn-icon"></i> Enviar Enlace
-          </button>
-        </form>
-      </div>
-
-      <!-- ACTUALIZAR CONTRASEÑA (DESDE ENLACE) -->
-      <div id="login-step-update-password" style="display:none;">
-        <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:0.5rem;color:var(--text-primary);">Crear Nueva
-          Contraseña</h2>
-        <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1.5rem;line-height:1.4;">Tu sesión ha sido verificada. Ingresa tu nueva contraseña.</p>
-        <form onsubmit="guardarNuevaPassword(event)">
-          <div class="form-group">
-            <label>Nueva Contraseña</label>
-            <div style="position:relative;">
-              <i data-lucide="lock"
-                style="position:absolute;left:12px;top:10px;width:1rem;height:1rem;color:var(--text-muted);"></i>
-              <input type="password" id="new-password" placeholder="••••••••" style="padding-left:2.5rem;"
-                required minlength="6"/>
-            </div>
-          </div>
-          <div id="update-pass-error" class="pin-error" style="text-align:left;margin-top:0.25rem;"></div>
-          <button type="submit" class="btn-primary"
-            style="width:100%;margin-top:0.5rem;justify-content:center;padding:0.75rem;">
-            <i data-lucide="save" class="btn-icon"></i> Guardar y Entrar
-          </button>
-        </form>
       </div>
 
       <!-- PASO 2: Crear usuario (setup) -->
@@ -132,7 +79,7 @@
           </div>
           <div class="form-group">
             <label>Correo electrónico o Teléfono (Usuario)</label>
-            <input type="text" id="lc-email" placeholder="correo@empresa.com o 5512345678" autocapitalize="none" autocorrect="off" spellcheck="false" required />
+            <input type="text" id="lc-email" placeholder="correo@empresa.com o 5512345678" required />
           </div>
           <div class="form-group">
             <label>Contraseña</label>
@@ -196,12 +143,7 @@
       <div class="sidebar-bottom">
         <a href="#" class="nav-item nav-preferencias" data-view="preferencias" data-title="Preferencias"
           id="nav-preferencias">
-          <span class="nav-icon">
-            <i data-lucide="sliders" class="icon-desktop"></i>
-            <i data-lucide="user" class="icon-mobile"></i>
-          </span>
-          <span class="label-desktop">Preferencias</span>
-          <span class="label-mobile">Perfil</span>
+          <span class="nav-icon"><i data-lucide="sliders"></i></span><span>Preferencias</span>
         </a>
         <a href="#" class="nav-item nav-config" data-view="config" data-title="Configuración" id="nav-config">
           <span class="nav-icon"><i data-lucide="settings"></i></span><span>Configuración</span>
@@ -246,13 +188,6 @@
           </div>
         </div>
         <div class="topbar-right" id="topbar-right">
-          <!-- Indicador de Sincronización / Red -->
-          <div id="sync-status-indicator" class="sync-status-indicator" onclick="forzarSincronizacionManual()" title="Sincronización con Supabase. Clic para forzar.">
-            <i id="sync-status-icon" data-lucide="wifi" style="width: 16px; height: 16px;"></i>
-            <span id="sync-status-text">Conectado</span>
-            <span id="sync-pending-badge" class="sync-pending-badge" style="display: none;">0</span>
-          </div>
-
           <div class="session-badge" id="session-badge" onclick="abrirSesionModal()">
             <div class="session-avatar" id="session-avatar">S</div>
             <div class="session-info">
@@ -263,12 +198,12 @@
           </div>
           <div id="topbar-actions" style="display:flex;gap:0.5rem;">
             <button class="btn-primary" id="btn-nueva-orden" onclick="abrirFormulario()"><i data-lucide="plus"
-                class="btn-icon"></i> <span class="btn-text">Nueva Orden</span></button>
+                class="btn-icon"></i> Nueva Orden</button>
             <button class="btn-primary btn-ticket-action" id="btn-nuevo-ticket" onclick="abrirTicket()"
-              style="display:none;"><i data-lucide="plus" class="btn-icon"></i> <span class="btn-text">Nuevo Ticket</span></button>
+              style="display:none;"><i data-lucide="plus" class="btn-icon"></i> Nuevo Ticket</button>
             <button class="btn-secondary btn-cliente-action" id="btn-agregar-maquina"
               onclick="abrirModalAgregarMaquina()" style="display:none;"><i data-lucide="settings-2"
-                class="btn-icon"></i> <span class="btn-text">Agregar Máquina</span></button>
+                class="btn-icon"></i> Agregar Máquina</button>
 
           </div>
         </div>
@@ -279,42 +214,197 @@
 
         <!-- DASHBOARD VIEW -->
         <div id="view-dashboard" class="view active">
-
-          <!-- ===== DASHBOARD V1 (todos los roles excepto superadmin) ===== -->
-          <div id="dash-v1">
           <div class="section-header"
             style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem;">
             <h2 style="margin:0; font-size:1.4rem;">Panel Principal</h2>
             <div class="view-toggle"
               style="display:flex; gap:0.5rem; background: var(--bg-hover); padding: 0.3rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
-              <button class="btn-secondary active" id="btn-dash-v2" onclick="setDashView('v2')"
-                style="padding:0.4rem 1rem; border:none; background:var(--bg-card); box-shadow:0 1px 3px rgba(0,0,0,0.1); color:var(--text-primary); font-weight:600;">Resumen General</button>
+              <button class="btn-secondary active" id="btn-dash-ordenes" onclick="setDashView('ordenes')"
+                style="padding:0.4rem 1rem; border:none; background:var(--bg-card); box-shadow:0 1px 3px rgba(0,0,0,0.1); color:var(--text-primary); font-weight:600;">Órdenes
+                de Servicio</button>
+              <button class="btn-secondary" id="btn-dash-tickets" onclick="setDashView('tickets')"
+                style="padding:0.4rem 1rem; border:none; background:transparent; color:var(--text-muted); font-weight:500;">Tickets
+                de Soporte</button>
               <button class="btn-secondary" id="btn-dash-tecnicos" onclick="setDashView('tecnicos')"
                 style="padding:0.4rem 1rem; border:none; background:transparent; color:var(--text-muted); font-weight:500;">Técnicos</button>
             </div>
           </div>
-          
-          <!-- KPIs CLIENTE (Siempre visibles en el Dashboard para el rol de Empresa/Cliente) -->
-          <div class="stats-grid" id="dash-kpis-cliente" style="display:none; margin-bottom: 1.5rem;">
-            <div class="stat-card" style="cursor: pointer;" onclick="abrirDesgloseDashboard('maquinas')">
-              <div class="stat-icon" style="background:rgba(139,92,246,0.12);color:#8b5cf6;"><i data-lucide="settings-2"></i></div>
-              <div>
-                <div class="stat-label">Mis Máquinas</div>
-                <div class="stat-value" id="stat-cli-maquinas">0</div>
+
+          <!-- DASHBOARD CONTENIDO ÓRDENES -->
+          <div id="dash-content-ordenes">
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i
+                    data-lucide="file-text"></i></div>
+                <div>
+                  <div class="stat-label">Total Órdenes</div>
+                  <div class="stat-value" id="stat-total">0</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i
+                    data-lucide="clock"></i></div>
+                <div>
+                  <div class="stat-label">En Proceso</div>
+                  <div class="stat-value" id="stat-proceso">0</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i
+                    data-lucide="alert-circle"></i></div>
+                <div>
+                  <div class="stat-label">Pendientes</div>
+                  <div class="stat-value" id="stat-pendientes">0</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i
+                    data-lucide="check-circle"></i></div>
+                <div>
+                  <div class="stat-label">Completadas</div>
+                  <div class="stat-value" id="stat-completas">0</div>
+                </div>
               </div>
             </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="abrirDesgloseDashboard('sitios')">
-              <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="map-pin"></i></div>
-              <div>
-                <div class="stat-label">Mis Sitios</div>
-                <div class="stat-value" id="stat-cli-sitios">0</div>
+
+            <div class="section-header" style="flex-wrap: wrap; gap: 1rem;">
+              <h2>Órdenes Recientes</h2>
+              <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+                <select id="filter-ord-tecnico" onchange="filtrarOrdenes()" class="form-select">
+                  <option value="">Cualquier Técnico</option>
+                </select>
+                <select id="filter-ord-supervisor" onchange="filtrarOrdenes()" class="form-select">
+                  <option value="">Cualquier Supervisor</option>
+                </select>
+                <div class="search-bar" style="margin:0;">
+                  <input type="text" id="search-input" placeholder="Buscar cliente, técnico, folio..."
+                    oninput="filtrarOrdenes()" />
+                </div>
               </div>
             </div>
-            <!-- Elementos invisibles para forzar la cuadrícula de 4 columnas (alinea con las 4 tarjetas de abajo) -->
-            <div style="visibility:hidden;"></div>
-            <div style="visibility:hidden;"></div>
+            <div class="table-wrapper">
+              <table class="orders-table" id="orders-table">
+                <thead>
+                  <tr>
+                    <th style="width: 60px;">Acciones</th>
+                    <th id="th-ord-id" onclick="toggleSortOrdenes('id')" style="cursor:pointer; user-select:none;">Folio
+                      <i data-lucide="arrow-up-down"
+                        style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                        id="sort-icon-ord-id"></i></th>
+                    <th id="th-ord-cliente" onclick="toggleSortOrdenes('cliente')"
+                      style="cursor:pointer; user-select:none;">Cliente <i data-lucide="arrow-up-down"
+                        style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                        id="sort-icon-ord-cliente"></i></th>
+                    <th id="th-ord-ubicacion" onclick="toggleSortOrdenes('ubicacion')"
+                      style="cursor:pointer; user-select:none;">Ubicación <i data-lucide="arrow-up-down"
+                        style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                        id="sort-icon-ord-ubicacion"></i></th>
+                    <th id="th-ord-modelo" onclick="toggleSortOrdenes('modelo')"
+                      style="cursor:pointer; user-select:none;">Modelo <i data-lucide="arrow-up-down"
+                        style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                        id="sort-icon-ord-modelo"></i></th>
+
+                    <th id="th-ord-tipo" onclick="toggleSortOrdenes('tipo')" style="cursor:pointer; user-select:none;">
+                      Tipo <i data-lucide="arrow-up-down"
+                        style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                        id="sort-icon-ord-tipo"></i></th>
+                    <th id="th-ord-estado" onclick="toggleSortOrdenes('estado')"
+                      style="cursor:pointer; user-select:none;">Estado <i data-lucide="arrow-up-down"
+                        style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                        id="sort-icon-ord-estado"></i></th>
+                    <th id="th-ord-fecha" onclick="toggleSortOrdenes('fecha')"
+                      style="cursor:pointer; user-select:none;">Fecha <i data-lucide="arrow-up-down"
+                        style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                        id="sort-icon-ord-fecha"></i></th>
+                    <th style="width: 40px; text-align:center;"></th>
+                  </tr>
+                </thead>
+                <tbody id="tabla-body">
+                  <tr id="empty-row">
+                    <td colspan="9" class="empty-state">No hay órdenes registradas. ¡Crea la primera!</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
+          <!-- DASHBOARD CONTENIDO TICKETS -->
+          <div id="dash-content-tickets" style="display:none;">
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i
+                    data-lucide="ticket"></i></div>
+                <div>
+                  <div class="stat-label">Total Tickets</div>
+                  <div class="stat-value" id="stat-t-total">0</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i
+                    data-lucide="alert-circle"></i></div>
+                <div>
+                  <div class="stat-label">Abiertos</div>
+                  <div class="stat-value" id="stat-t-abiertos">0</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i
+                    data-lucide="file-text"></i></div>
+                <div>
+                  <div class="stat-label">Cotización</div>
+                  <div class="stat-value" id="stat-t-cotizacion">0</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i
+                    data-lucide="check-circle"></i></div>
+                <div>
+                  <div class="stat-label">Cerrados</div>
+                  <div class="stat-value" id="stat-t-cerrados">0</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-header" style="flex-wrap: wrap; gap: 1rem;">
+              <h2>Tickets Recientes</h2>
+              <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+                <select id="filter-dash-tkt-tecnico" onchange="renderTickets('dash-tickets')" class="form-select">
+                  <option value="">Cualquier Técnico</option>
+                </select>
+                <select id="filter-dash-tkt-supervisor" onchange="renderTickets('dash-tickets')" class="form-select">
+                  <option value="">Cualquier Supervisor</option>
+                </select>
+                <div class="search-bar" style="margin:0;">
+                  <input type="text" id="search-dash-tickets" placeholder="Buscar ticket..."
+                    oninput="renderTickets('dash-tickets')" />
+                </div>
+              </div>
+            </div>
+            <div class="table-wrapper">
+              <table class="orders-table" id="orders-table-dash-tickets">
+                <thead>
+                  <tr>
+                    <th style="width: 60px;">Acciones</th>
+                    <th>#</th>
+                    <th>Asunto</th>
+                    <th>Solicitante / Empresa</th>
+                    <th>Área</th>
+                    <th>Prioridad</th>
+                    <th id="th-ord-estado">Estado </th>
+                    <th>Asignado</th>
+                    <th id="th-ord-fecha">Fecha </th>
+                    <th style="width: 40px; text-align:center;"></th>
+                  </tr>
+                </thead>
+                <tbody id="tabla-body-dash-tickets">
+                  <tr>
+                    <td colspan="9" class="empty-state">No hay tickets registrados. ¡Crea el primero!</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
           <!-- DASHBOARD CONTENIDO TÉCNICOS -->
           <div id="dash-content-tecnicos" style="display:none;">
             <div class="stats-grid" id="tecnicos-kpis-grid">
@@ -340,227 +430,10 @@
               </div>
             </div>
           </div>
-          </div>
-
-<!-- ===== DASHBOARD V2 CONTENT ===== -->
-          <div id="dash-content-v2">
-
-            <!-- BIENVENIDA -->
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.75rem; flex-wrap:wrap; gap:1rem;">
-              <div>
-                <p style="margin:0; color:var(--text-secondary); font-size:1.05rem; font-weight:500;" id="v2-fecha-hoy"></p>
-              </div>
-              <div style="display:flex; gap:0.5rem;">
-                <button class="btn-secondary" onclick="renderDashboardV2()" style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; padding:0.4rem 0.8rem;"><i data-lucide="refresh-cw" style="width:16px;height:16px;"></i> Actualizar</button>
-              </div>
-            </div>
-
-            <!-- RENDIMIENTO Y TIEMPOS -->
-            <div class="dashboard-grid grid-3">
-              <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; background:linear-gradient(135deg, rgba(239,68,68,0.05) 0%, rgba(239,68,68,0) 100%); display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('rendimiento', 'refacciones')">
-                <div style="display:flex; flex-direction:column; flex:1;">
-                  <div class="stat-label" id="v2-label-rend-1" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Refacciones Faltantes</div>
-                  <div class="stat-value" id="v2-stat-ref-faltantes" style="font-size:2rem;margin:0;color:#ef4444;line-height:1;">0</div>
-                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">En órdenes activas</div>
-                </div>
-                <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="package-minus"></i></div>
-              </div>
-              <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; background:linear-gradient(135deg, rgba(79,142,247,0.05) 0%, rgba(79,142,247,0) 100%); display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('rendimiento', 'ordenes')">
-                <div style="display:flex; flex-direction:column; flex:1;">
-                  <div class="stat-label" id="v2-label-rend-2" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Resolución Órdenes</div>
-                  <div class="stat-value" id="v2-stat-avg-ordenes" style="font-size:2rem;margin:0;color:#4f8ef7;line-height:1;">0d</div>
-                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">Tiempo promedio (Histórico)</div>
-                </div>
-                <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="timer"></i></div>
-              </div>
-              <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; background:linear-gradient(135deg, rgba(139,92,246,0.05) 0%, rgba(139,92,246,0) 100%); display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('rendimiento', 'tickets')">
-                <div style="display:flex; flex-direction:column; flex:1;">
-                  <div class="stat-label" id="v2-label-rend-3" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Resolución Tickets</div>
-                  <div class="stat-value" id="v2-stat-avg-tickets" style="font-size:2rem;margin:0;color:#8b5cf6;line-height:1;">0d</div>
-                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">Tiempo promedio (Cerrados)</div>
-                </div>
-                <div class="stat-icon" style="background:rgba(139,92,246,0.12);color:#8b5cf6;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="hourglass"></i></div>
-              </div>
-            </div>
-
-            <!-- KPIs ORDENES -->
-            <div class="dashboard-grid grid-4">
-              <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('ordenes', '')">
-                <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:#4f8ef7;border-radius:4px 0 0 4px;"></div>
-                <div style="display:flex; flex-direction:column; flex:1;">
-                  <div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Total Ordenes</div>
-                  <div class="stat-value" id="v2-stat-total" style="font-size:2rem;margin:0;line-height:1;">0</div>
-                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">Este periodo</div>
-                </div>
-                <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="file-text"></i></div>
-              </div>
-              <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('ordenes', 'Pendiente')">
-                <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:#ef4444;border-radius:4px 0 0 4px;"></div>
-                <div style="display:flex; flex-direction:column; flex:1;">
-                  <div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Pendientes</div>
-                  <div class="stat-value" id="v2-stat-pendientes" style="font-size:2rem;margin:0;color:#ef4444;line-height:1;">0</div>
-                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">Requieren atencion</div>
-                </div>
-                <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="alert-circle"></i></div>
-              </div>
-              <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('ordenes', 'En proceso')">
-                <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:#E8820C;border-radius:4px 0 0 4px;"></div>
-                <div style="display:flex; flex-direction:column; flex:1;">
-                  <div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">En Proceso</div>
-                  <div class="stat-value" id="v2-stat-proceso" style="font-size:2rem;margin:0;color:#E8820C;line-height:1;">0</div>
-                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">En ejecucion</div>
-                </div>
-                <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="clock"></i></div>
-              </div>
-              <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('ordenes', 'Completado')">
-                <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:#10b981;border-radius:4px 0 0 4px;"></div>
-                <div style="display:flex; flex-direction:column; flex:1;">
-                  <div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Completadas</div>
-                  <div class="stat-value" id="v2-stat-completas" style="font-size:2rem;margin:0;color:#10b981;line-height:1;">0</div>
-                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">Finalizadas</div>
-                </div>
-                <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="check-circle"></i></div>
-              </div>
-            </div>
-
-            <!-- GRAFICAS ORDENES -->
-            <div class="dashboard-grid grid-3">
-              <div class="stat-card" style="flex-direction:column; align-items:flex-start; height:100%;">
-                <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1rem;">Estado de Ordenes</div>
-                <div style="position:relative;width:100%;flex:1;min-height:240px;display:flex;justify-content:center;align-items:center;"><canvas id="chart-ordenes-estado"></canvas></div>
-              </div>
-              <div class="stat-card" style="flex-direction:column; align-items:flex-start; height:100%;">
-                <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1rem;">Ordenes por Tipo</div>
-                <div style="position:relative;width:100%;flex:1;min-height:240px;"><canvas id="chart-ordenes-tipo"></canvas></div>
-              </div>
-              <div class="stat-card" style="flex-direction:column; align-items:flex-start; height:100%;">
-                <div id="v2-title-chart-3" style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1rem;">Top Clientes (Ordenes)</div>
-                <div style="position:relative;width:100%;flex:1;min-height:240px;"><canvas id="chart-ordenes-cliente"></canvas></div>
-              </div>
-            </div>
-
-            <!-- KPIs TICKETS -->
-            <div class="dashboard-grid grid-4">
-              <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('tickets', '')">
-                <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:#8b5cf6;border-radius:4px 0 0 4px;"></div>
-                <div style="display:flex; flex-direction:column; flex:1;">
-                  <div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Total Tickets</div>
-                  <div class="stat-value" id="v2-stat-t-total" style="font-size:2rem;margin:0;line-height:1;">0</div>
-                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">Registrados</div>
-                </div>
-                <div class="stat-icon" style="background:rgba(139,92,246,0.12);color:#8b5cf6;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="ticket"></i></div>
-              </div>
-              <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('tickets', 'Abierto')">
-                <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:#ef4444;border-radius:4px 0 0 4px;"></div>
-                <div style="display:flex; flex-direction:column; flex:1;">
-                  <div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Abiertos</div>
-                  <div class="stat-value" id="v2-stat-t-abiertos" style="font-size:2rem;margin:0;color:#ef4444;line-height:1;">0</div>
-                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">Sin resolver</div>
-                </div>
-                <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="alert-circle"></i></div>
-              </div>
-              <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('tickets', 'Cotización')">
-                <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:#E8820C;border-radius:4px 0 0 4px;"></div>
-                <div style="display:flex; flex-direction:column; flex:1;">
-                  <div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Cotizacion</div>
-                  <div class="stat-value" id="v2-stat-t-cotizacion" style="font-size:2rem;margin:0;color:#E8820C;line-height:1;">0</div>
-                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">En aprobacion</div>
-                </div>
-                <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="file-text"></i></div>
-              </div>
-              <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('tickets', 'Cerrado')">
-                <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:#10b981;border-radius:4px 0 0 4px;"></div>
-                <div style="display:flex; flex-direction:column; flex:1;">
-                  <div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Cerrados</div>
-                  <div class="stat-value" id="v2-stat-t-cerrados" style="font-size:2rem;margin:0;color:#10b981;line-height:1;">0</div>
-                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">Resueltos</div>
-                </div>
-                <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="check-circle"></i></div>
-              </div>
-            </div>
-
-            <!-- GRAFICAS TICKETS -->
-            <div class="dashboard-grid grid-2">
-              <div class="stat-card" style="flex-direction:column; align-items:flex-start; height:100%;">
-                <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1rem;">Tickets por Area</div>
-                <div style="position:relative;width:100%;flex:1;min-height:260px;"><canvas id="chart-tickets-area"></canvas></div>
-              </div>
-              <div class="stat-card" style="flex-direction:column; align-items:flex-start; height:100%;">
-                <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1rem;">Estado de Tickets</div>
-                <div style="position:relative;width:100%;flex:1;min-height:260px;display:flex;justify-content:center;align-items:center;"><canvas id="chart-tickets-estado"></canvas></div>
-              </div>
-            </div>
-
-            <!-- TABLAS MINI LADO A LADO -->
-            <div class="dashboard-grid grid-2">
-              <div class="stat-card" style="flex-direction:column; align-items:flex-start; padding:1.25rem;">
-                <div style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:1rem;">
-                  <span style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Ultimas Ordenes</span>
-                  <span style="font-size:0.75rem;color:var(--accent);cursor:pointer;" onclick="document.querySelector('[data-view=servicios]').click()">Ver todas</span>
-                </div>
-                <table style="width:100%;border-collapse:collapse;font-size:0.825rem;">
-                  <thead><tr style="border-bottom:1px solid var(--border);">
-                    <th style="text-align:left;padding:0.4rem 0.5rem;color:var(--text-muted);font-weight:500;">Folio</th>
-                    <th style="text-align:left;padding:0.4rem 0.5rem;color:var(--text-muted);font-weight:500;">Cliente</th>
-                    <th style="text-align:left;padding:0.4rem 0.5rem;color:var(--text-muted);font-weight:500;">Estado</th>
-                  </tr></thead>
-                  <tbody id="v2-mini-ordenes"></tbody>
-                </table>
-              </div>
-              <div class="stat-card" style="flex-direction:column; align-items:flex-start; padding:1.25rem;">
-                <div style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:1rem;">
-                  <span style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Ultimos Tickets</span>
-                  <span style="font-size:0.75rem;color:var(--accent);cursor:pointer;" onclick="document.querySelector('[data-view=tickets]').click()">Ver todos</span>
-                </div>
-                <table style="width:100%;border-collapse:collapse;font-size:0.825rem;">
-                  <thead><tr style="border-bottom:1px solid var(--border);">
-                    <th style="text-align:left;padding:0.4rem 0.5rem;color:var(--text-muted);font-weight:500;">#</th>
-                    <th style="text-align:left;padding:0.4rem 0.5rem;color:var(--text-muted);font-weight:500;">Asunto</th>
-                    <th style="text-align:left;padding:0.4rem 0.5rem;color:var(--text-muted);font-weight:500;">Estado</th>
-                  </tr></thead>
-                  <tbody id="v2-mini-tickets"></tbody>
-                </table>
-              </div>
-            </div>
-
-          </div><!-- /dash-content-v2 -->
-          
-          </div><!-- /dash-v1 -->
-
         </div>
 
         <!-- SERVICIOS VIEW -->
         <div id="view-servicios" class="view">
-          <div class="stats-grid" style="margin-bottom: 1.5rem;">
-            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('')">
-              <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="file-text"></i></div>
-              <div>
-                <div class="stat-label">Total Órdenes</div>
-                <div class="stat-value" id="stat-serv-total">0</div>
-              </div>
-            </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('Pendiente')">
-              <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-circle"></i></div>
-              <div>
-                <div class="stat-label">Pendientes</div>
-                <div class="stat-value" id="stat-serv-pendientes">0</div>
-              </div>
-            </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('En proceso')">
-              <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i data-lucide="clock"></i></div>
-              <div>
-                <div class="stat-label">En Proceso</div>
-                <div class="stat-value" id="stat-serv-proceso">0</div>
-              </div>
-            </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('Completado')">
-              <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle"></i></div>
-              <div>
-                <div class="stat-label">Completadas</div>
-                <div class="stat-value" id="stat-serv-completas">0</div>
-              </div>
-            </div>
-          </div>
           <div class="section-header">
             <h2>Todas las Órdenes</h2>
             <div class="search-bar">
@@ -952,8 +825,8 @@
                   <th id="th-tec-nombre">Nombre del Técnico </th>
                   <th id="th-tec-total">Total Servicios </th>
                   <th id="th-tec-completados">Completados </th>
-                  <th id="th-tec-siguiente">Siguiente Orden </th>
-                  <th id="th-tec-ultimo">Último Completado </th>
+                  <th id="th-tec-siguiente">Siguiente Ticket </th>
+                  <th id="th-tec-ultimo">Último Resuelto </th>
                 </tr>
               </thead>
               <tbody id="tecnicos-table-body">
@@ -1222,19 +1095,11 @@
 
             <div class="config-card">
               <div class="config-card-header">
-                <div class="config-card-icon" style="background:var(--green-light);color:var(--green);">
-                  <i data-lucide="sliders" class="icon-desktop"></i>
-                  <i data-lucide="user" class="icon-mobile"></i>
-                </div>
+                <div class="config-card-icon" style="background:var(--green-light);color:var(--green);"><i
+                    data-lucide="sliders"></i></div>
                 <div>
-                  <div class="config-card-title">
-                    <span class="label-desktop">Preferencias Personales</span>
-                    <span class="label-mobile">Mi Perfil</span>
-                  </div>
-                  <div class="config-card-sub">
-                    <span class="label-desktop">Ajustes para tu cuenta</span>
-                    <span class="label-mobile">Información y ajustes de tu cuenta</span>
-                  </div>
+                  <div class="config-card-title">Preferencias Personales</div>
+                  <div class="config-card-sub">Ajustes para tu cuenta</div>
                 </div>
               </div>
               <div style="margin-top:1rem;display:flex;flex-direction:column;gap:0.85rem;">
@@ -1276,36 +1141,6 @@
 
         <!-- TICKETS VIEW -->
         <div id="view-tickets" class="view">
-          <div class="stats-grid" style="margin-bottom: 1.5rem;">
-            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('todos')">
-              <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="ticket"></i></div>
-              <div>
-                <div class="stat-label">Total Tickets</div>
-                <div class="stat-value" id="stat-tkt-total">0</div>
-              </div>
-            </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('Abierto')">
-              <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-circle"></i></div>
-              <div>
-                <div class="stat-label">Abiertos</div>
-                <div class="stat-value" id="stat-tkt-abiertos">0</div>
-              </div>
-            </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('Cotización')">
-              <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i data-lucide="file-text"></i></div>
-              <div>
-                <div class="stat-label">Cotización</div>
-                <div class="stat-value" id="stat-tkt-cotizacion">0</div>
-              </div>
-            </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('Cerrado')">
-              <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle"></i></div>
-              <div>
-                <div class="stat-label">Cerrados</div>
-                <div class="stat-value" id="stat-tkt-cerrados">0</div>
-              </div>
-            </div>
-          </div>
           <div class="tickets-kanban-header">
             <div class="ticket-filters">
               <button class="filter-btn active" data-filter="todos" onclick="filtrarTickets(this)">Todos</button>
@@ -1334,7 +1169,7 @@
                   <th>Asunto</th>
                   <th>Solicitante / Empresa</th>
                   <th>Área</th>
-                  <th class="col-prioridad">Prioridad</th>
+                  <th>Prioridad</th>
                   <th id="th-ord-estado">Estado </th>
                   <th>Asignado</th>
                   <th id="th-ord-fecha">Fecha </th>
@@ -1585,7 +1420,7 @@
     </div>
 
     <!-- MODAL DETALLE -->
-    <div class="modal-overlay" id="modal-detalle-overlay" onclick="cerrarDetalle(event)" style="z-index: 250;">
+    <div class="modal-overlay" id="modal-detalle-overlay" onclick="cerrarDetalle(event)">
       <div class="modal" id="modal-detalle">
         <div class="modal-header">
           <h2 id="detalle-title">Orden de Servicio</h2>
@@ -1597,9 +1432,6 @@
             <button class="btn-primary" id="btn-asignar-tecnicos"
               style="display:none; font-size:0.8rem;padding:0.4rem 0.8rem;align-items:center;gap:0.35rem;background:var(--accent);border-color:var(--accent);color:#fff;"
               onclick="abrirAsignarTecnicos()"><i data-lucide="users" class="btn-icon"></i> Asignar Técnicos</button>
-            <button class="btn-secondary" id="btn-enviar-correo"
-              style="font-size:0.8rem;padding:0.4rem 0.8rem;display:flex;align-items:center;gap:0.35rem;color:#10b981;border-color:#10b981;"
-              onclick="enviarCorreoOrden()"><i data-lucide="mail" class="btn-icon"></i> Enviar</button>
             <button class="btn-secondary"
               style="font-size:0.8rem;padding:0.4rem 0.8rem;display:flex;align-items:center;gap:0.35rem;"
               onclick="imprimirOrden()"><i data-lucide="printer" class="btn-icon"></i> Imprimir</button>
@@ -1880,7 +1712,6 @@
                     <option value="Concreto CC">Concreto CC</option>
                     <option value="Trituración">Trituración</option>
                     <option value="Asfalto">Asfalto</option>
-                    <option value="Cimentación">Cimentación</option>
                     <option value="Otra">Otra...</option>
                   </select>
                   <input type="text" id="am-tipo-otro" placeholder="Escriba el tipo..."
@@ -2034,29 +1865,6 @@
         <div class="modal-body" id="detalle-maquina-body"
           style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
           <!-- Llenado dinámicamente con JS -->
-        </div>
-      </div>
-    </div>
-
-    <!-- MODAL RENOMBRAR SITIO EMPRESA -->
-    <div class="modal-overlay" id="modal-renombrar-sitio-overlay" onclick="cerrarModalRenombrarSitio(event)" style="z-index: 400;">
-      <div class="modal" id="modal-renombrar-sitio" style="max-width:400px;">
-        <div class="modal-header">
-          <div>Renombrar Sitio</div>
-          <button class="modal-close" onclick="cerrarModalRenombrarSitio()">✕</button>
-        </div>
-        <div class="modal-body">
-          <form id="form-renombrar-sitio" onsubmit="guardarRenombreSitio(event)" style="display:flex; flex-direction:column; gap:1rem;">
-            <input type="hidden" id="rs-idx">
-            <div class="form-group">
-              <label>Ingresa el nuevo nombre para este sitio:</label>
-              <input type="text" id="rs-nombre" required class="form-control">
-            </div>
-            <div style="display:flex; gap:1rem; justify-content:flex-end; margin-top:1rem;">
-              <button type="button" class="btn-secondary" onclick="cerrarModalRenombrarSitio()">Cancelar</button>
-              <button type="submit" class="btn-primary">Aceptar</button>
-            </div>
-          </form>
         </div>
       </div>
     </div>
@@ -2236,9 +2044,9 @@
                     <option>Otro</option>
                   </select>
                 </div>
-                <div class="form-group" id="group-t-prioridad">
-                  <label>Prioridad</label>
-                  <select id="t-prioridad">
+                <div class="form-group">
+                  <label>Prioridad *</label>
+                  <select id="t-prioridad" required>
                     <option value="Baja">Baja</option>
                     <option value="Media" selected>Media</option>
                     <option value="Alta">Alta</option>
@@ -2404,7 +2212,7 @@
     </div>
 
     <!-- MODAL DETALLE TICKET -->
-    <div class="modal-overlay" id="modal-ticket-detalle-overlay" onclick="cerrarDetalleTicket(event)" style="z-index: 250;">
+    <div class="modal-overlay" id="modal-ticket-detalle-overlay" onclick="cerrarDetalleTicket(event)">
       <div class="modal modal-receipt" id="modal-ticket-detalle" style="max-width:640px; padding-bottom: 3rem;">
         <div class="receipt-edge-top"></div>
         <div class="modal-header">
@@ -3431,32 +3239,10 @@
     </div>
   </div>
 
-  <!-- MODAL DESGLOSE DASHBOARD -->
-  <div class="modal-overlay" id="modal-dashboard-desglose" onclick="if(event.target===this) this.classList.remove('open')">
-    <div class="modal" style="max-width: 900px;">
-      <div class="modal-header">
-        <h2 id="modal-dashboard-desglose-title">Desglose</h2>
-        <button class="modal-close" onclick="document.getElementById('modal-dashboard-desglose').classList.remove('open')">
-          <i data-lucide="x"></i>
-        </button>
-      </div>
-      <div class="modal-body">
-        <div class="table-wrapper">
-          <table class="orders-table" id="tabla-dashboard-desglose" style="width: 100%;">
-            <thead id="tabla-dashboard-desglose-head">
-            </thead>
-            <tbody id="tabla-dashboard-desglose-body">
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js"></script>
-  <script src="supabaseSync.js?v=10"></script>
-  <script src="app.js?v=14"></script>
+  <script src="supabaseSync.js"></script>
+  <script src="app.js"></script>
   <script>lucide.createIcons();</script>
 </body>
 
