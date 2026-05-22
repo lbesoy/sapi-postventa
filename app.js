@@ -910,17 +910,9 @@ function applyRole(rolKey) {
     const roleSwitcher = document.getElementById('role-switcher');
     if (roleSwitcher) roleSwitcher.style.display = (user?.rol === 'superadmin') ? 'flex' : 'none';
 
-    // Show/hide mobile role switcher (in sidebar)
-    const roleSwitcherMobile = document.getElementById('role-switcher-mobile');
-    if (roleSwitcherMobile) {
-      if (user?.rol === 'superadmin') {
-        roleSwitcherMobile.classList.add('visible-superadmin');
-      } else {
-        roleSwitcherMobile.classList.remove('visible-superadmin');
-      }
-    }
-    const roleSelectMobile = document.getElementById('role-select-mobile');
-    if (roleSelectMobile) roleSelectMobile.value = rolKey;
+    // Sync role selector in modal if present
+    const roleSelectModal = document.getElementById('role-select-modal');
+    if (roleSelectModal) roleSelectModal.value = rolKey;
 
     // Show/hide Sandbox switch (ONLY superadmin or test users can access)
     const testModeContainer = document.getElementById('test-mode-container');
@@ -1959,8 +1951,33 @@ async function eliminarUsuario(id) {
 // ===== SESSION MODAL =====
 function abrirSesionModal() {
   const body = document.getElementById('sesion-usuarios-list');
+  const loggedInUser = usuarios.find(u => u.id === currentSession.userId);
+  
+  let htmlStr = '';
+  
+  // Si el usuario logueado real es superadmin, mostramos el simulador de vistas de rol
+  if (loggedInUser && loggedInUser.rol === 'superadmin') {
+    htmlStr += `
+      <div class="simulador-vistas-mobile-container" style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 1.25rem;">
+        <span style="font-size: 0.72rem; text-transform: uppercase; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 0.5rem; letter-spacing: 0.5px;">Simular vista como:</span>
+        <div style="position: relative;">
+          <select id="role-select-modal" onchange="switchMode(this.value); cerrarSesionModal();" style="width: 100%; padding: 0.6rem 2rem 0.6rem 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.875rem; font-weight: 600; appearance: none; -webkit-appearance: none; cursor: pointer;">
+            <option value="superadmin">SuperAdmin</option>
+            <option value="admin">Admin</option>
+            <option value="supervisor">Supervisor</option>
+            <option value="tecnico">Técnico</option>
+            <option value="empresa">Empresa</option>
+            <option value="consulta">Consulta</option>
+          </select>
+          <div style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-muted); font-size: 0.85rem;">▼</div>
+        </div>
+      </div>
+      <div style="font-size: 0.72rem; text-transform: uppercase; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 0.5rem; letter-spacing: 0.5px; padding-left: 0.2rem;">O cambiar de usuario:</div>
+    `;
+  }
+  
   const ROLE_COLORS = { superadmin:'#E8820C', admin:'#4f8ef7', supervisor:'#eab308', tecnico:'#10b981', empresa:'#8b5cf6' };
-  let htmlStr = usuarios.filter(u => u.activo !== false).map(u => `
+  htmlStr += usuarios.filter(u => u.activo !== false).map(u => `
     <button class="sesion-user-btn ${currentSession.userId === u.id ? 'current' : ''}" onclick="cambiarUsuario('${u.id}')">
       <div class="usuario-avatar" style="background:${ROLE_COLORS[u.rol]||'var(--accent)'};">${(u.nombre||'?')[0].toUpperCase()}</div>
       <div class="sesion-user-info">
@@ -1979,6 +1996,11 @@ function abrirSesionModal() {
     </div>
   `;
   body.innerHTML = htmlStr;
+  
+  // Sincronizar el select del modal con el viewMode actual
+  const roleSelectModal = document.getElementById('role-select-modal');
+  if (roleSelectModal) roleSelectModal.value = currentSession.viewMode;
+  
   document.getElementById('modal-sesion-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
   lucide.createIcons();

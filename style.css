@@ -1726,16 +1726,3 @@ body {
     grid-template-columns: 1fr;
   }
 }
-
-/* Role Switcher for Mobile */
-.role-switcher-mobile {
-  display: none !important;
-}
-
-@media screen and (max-width: 768px) {
-  .role-switcher-mobile.visible-superadmin {
-    display: block !important;
-  }
-}
-
-
