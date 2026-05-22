@@ -6795,7 +6795,21 @@ function verDetalle(id) {
 
   const btnEnviarCorreo = document.getElementById('btn-enviar-correo');
   if (btnEnviarCorreo) {
-    btnEnviarCorreo.setAttribute('onclick', `enviarCorreoOrden('${id}')`);
+    if (currentSession.viewMode === 'tecnico') {
+      btnEnviarCorreo.style.display = 'none';
+    } else {
+      btnEnviarCorreo.style.display = 'flex';
+      btnEnviarCorreo.setAttribute('onclick', `enviarCorreoOrden('${id}')`);
+    }
+  }
+
+  const btnImprimir = document.getElementById('btn-imprimir-orden');
+  if (btnImprimir) {
+    if (currentSession.viewMode === 'tecnico') {
+      btnImprimir.style.display = 'none';
+    } else {
+      btnImprimir.style.display = 'flex';
+    }
   }
 
   window.currentDetalleOrdenId = id;
