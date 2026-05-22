@@ -6998,12 +6998,8 @@ function verDetalle(id) {
       <div style="margin-top:0.5rem">${field('Pendientes', o.pendientes)}</div>`)}
     ${seccion('Refacciones Utilizadas', refTable(o.ref_utilizadas, true))}
     ${seccion('Refacciones Necesarias', refTable(o.ref_necesarias, false))}
-    ${diasRows ? seccion('Fechas de Servicio', `
-      <table class="detalle-ref-table">
-        <thead><tr><th>Día</th><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Normales</th><th>Extras</th></tr></thead>
-        <tbody>${diasRows}</tbody>
-      </table>
-      <div class="detalle-grid" style="margin-top:0.75rem">
+    ${(o.noches || o.alimentacion || o.traslado_costo) ? seccion('Fecha de Servicio', `
+      <div class="detalle-grid">
         ${field('No. Noches', o.noches)} ${field('Alimentación', o.alimentacion ? '$'+o.alimentacion : '')} ${field('Traslado', o.traslado_costo ? '$'+o.traslado_costo : '')}
       </div>`) : ''}
     ${seccion('Bitácora Diaria', renderBitacora(o))}
