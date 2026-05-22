@@ -820,12 +820,20 @@ function isTestData(item) {
   return false;
 }
 
+function isTestUser(user) {
+  if (!user) return false;
+  const name = (user.nombre || '').toLowerCase();
+  const email = (user.email || '').toLowerCase();
+  return name.includes('prueba') || name.includes('test') || email.includes('prueba') || email.includes('test');
+}
+
 function isTestModeActive() {
-  const isSuperadmin = (usuarios.find(u => u.id === currentSession.userId)?.rol === 'superadmin');
-  if (isSuperadmin) {
+  const user = usuarios.find(u => u.id === currentSession.userId);
+  if (!user) return false;
+  if (user.rol === 'superadmin') {
     return localStorage.getItem('eurorep_test_mode') === 'true';
   }
-  return false;
+  return isTestUser(user);
 }
 
 function getFilteredOrders() {
@@ -861,6 +869,7 @@ function actualizarVistaActual() {
 
 window.toggleTestMode = toggleTestMode;
 window.isTestModeActive = isTestModeActive;
+window.isTestUser = isTestUser;
 window.getFilteredOrders = getFilteredOrders;
 window.getFilteredTickets = getFilteredTickets;
 
@@ -901,14 +910,23 @@ function applyRole(rolKey) {
     const roleSwitcher = document.getElementById('role-switcher');
     if (roleSwitcher) roleSwitcher.style.display = (user?.rol === 'superadmin') ? 'flex' : 'none';
 
-    // Show/hide Sandbox switch (ONLY superadmin role can access)
+    // Show/hide Sandbox switch (ONLY superadmin or test users can access)
     const testModeContainer = document.getElementById('test-mode-container');
     if (testModeContainer) {
       const isSuperadmin = (user?.rol === 'superadmin');
-      testModeContainer.style.display = isSuperadmin ? 'flex' : 'none';
+      const isTest = isTestUser(user);
+      testModeContainer.style.display = (isSuperadmin || isTest) ? 'flex' : 'none';
       const checkbox = document.getElementById('test-mode-checkbox');
       if (checkbox) {
-        checkbox.checked = localStorage.getItem('eurorep_test_mode') === 'true';
+        if (isTest) {
+          checkbox.checked = true;
+          checkbox.disabled = true;
+          checkbox.title = "Los usuarios de prueba están fijos en el Sandbox";
+        } else {
+          checkbox.checked = localStorage.getItem('eurorep_test_mode') === 'true';
+          checkbox.disabled = false;
+          checkbox.title = "";
+        }
       }
     }
 
