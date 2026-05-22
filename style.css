@@ -521,6 +521,7 @@ body {
 .modal-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .modal-header h2 { font-size: 1.1rem; font-weight: 600; }
 .modal-close {
@@ -1724,5 +1725,80 @@ body {
   .dashboard-grid.grid-3,
   .dashboard-grid.grid-4 {
     grid-template-columns: 1fr;
+  }
+
+  .modal-overlay {
+    padding: 0.5rem !important;
+  }
+  
+  .modal {
+    max-height: 94vh !important;
+  }
+
+  /* Prevent modal header from shrinking on compressed screens */
+  .modal-header {
+    flex-shrink: 0 !important;
+  }
+
+  /* Improve detail modal header layout on small mobile screens */
+  #modal-detalle .modal-header {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+    padding: 1rem !important;
+  }
+  
+  #modal-detalle #detalle-title {
+    font-size: 1.15rem !important;
+    line-height: 1.2 !important;
+    padding-right: 2.5rem !important; /* Leave space for the close button */
+    word-break: break-word !important;
+    margin: 0 !important;
+  }
+  
+  #modal-detalle #detalle-header-actions {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+    align-items: center !important;
+  }
+
+  /* Position close button absolutely in the top-right corner */
+  #modal-detalle #detalle-header-actions .modal-close {
+    position: absolute !important;
+    top: 0.85rem !important;
+    right: 1rem !important;
+    width: 36px !important;
+    height: 36px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    font-size: 1.25rem !important;
+    background: none !important;
+    border: none !important;
+    color: var(--text-secondary) !important;
+    border-radius: var(--radius-sm) !important;
+    transition: var(--transition) !important;
+  }
+  
+  #modal-detalle #detalle-header-actions .modal-close:hover {
+    color: var(--red) !important;
+    background: var(--red-light) !important;
+  }
+
+  /* Make header action buttons expand and fit comfortably */
+  #modal-detalle #detalle-header-actions button:not(.modal-close) {
+    flex: 1 1 auto !important;
+    font-size: 0.8rem !important;
+    min-height: 38px !important; /* Slightly more compact but highly touchable */
+    padding: 0.4rem 0.8rem !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
   }
 }
