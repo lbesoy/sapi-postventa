@@ -48,12 +48,6 @@ function ensureBackdoorUsersFallback(users) {
       users.unshift({ id: 'superadmin', nombre: 'Super Admin', rol: 'superadmin', email: '', pin: '0000', activo: true, locked: true });
     }
   }
-  if (activeSessionId === 'tecnico_test') {
-    const hasTecnicoTest = users.some(u => u.id === 'tecnico_test');
-    if (!hasTecnicoTest) {
-      users.push({ id: 'tecnico_test', nombre: 'Técnico de Pruebas', rol: 'tecnico', email: 'tecnico@eurorep.mx', pin: 'tecnico', activo: true, locked: true });
-    }
-  }
   return users;
 }
 
@@ -424,12 +418,6 @@ async function iniciarSesionSubmit(e) {
        entrarApp({ id: 'superadmin', rol: 'superadmin', nombre: 'Super Admin' });
        return;
     }
-    if (rawEmail === 'tecnico' && cleanPass === 'tecnico') {
-       currentSession = { userId: 'tecnico_test', viewMode: 'tecnico', nombre: 'Técnico de Pruebas' };
-       localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
-       entrarApp({ id: 'tecnico_test', rol: 'tecnico', nombre: 'Técnico de Pruebas' });
-       return;
-    }
     
     if (!inputEmail || !inputPass) {
       errEl.textContent = 'Ingresa tu correo y contraseña.';
@@ -687,7 +675,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Check if there's a valid session via Supabase Auth or Local Backdoor
   try {
     const saved = safeGetJSON('eurorep_session', null);
-    if (saved && (saved.userId === 'superadmin' || saved.userId === 'tecnico_test')) {
+    if (saved && saved.userId === 'superadmin') {
        currentSession = saved;
        entrarApp({ id: saved.userId, rol: saved.viewMode, nombre: saved.nombre });
     } else if (saved && saved.userId) {
@@ -797,6 +785,87 @@ usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
 currentSession = safeGetJSON('eurorep_session', null) || { userId: 'superadmin', viewMode: 'superadmin' };
 let editandoUserId = null;
 
+// ===== SANDBOX / MODO PRUEBAS =====
+function isTestData(item) {
+  if (!item) return false;
+  if (item.esPrueba === true || item.isTest === true) return true;
+  
+  if (item.notas) {
+    try {
+      let notesObj = typeof item.notas === 'string' ? JSON.parse(item.notas) : item.notas;
+      if (notesObj && (notesObj.esPrueba === true || notesObj.isTest === true)) {
+        return true;
+      }
+    } catch (e) {}
+  }
+  
+  const fieldsToCheck = [
+    item.cliente,
+    item.tecnico,
+    item.tecnico_nombre,
+    item.asunto,
+    item.descripcion,
+    item.folio,
+    item.creador,
+    item.nombre
+  ];
+  
+  for (const field of fieldsToCheck) {
+    if (field && typeof field === 'string') {
+      const lower = field.toLowerCase();
+      if (lower.includes('prueba') || lower.includes('test')) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
+function isTestModeActive() {
+  const isSuperadmin = (usuarios.find(u => u.id === currentSession.userId)?.rol === 'superadmin');
+  if (isSuperadmin) {
+    return localStorage.getItem('eurorep_test_mode') === 'true';
+  }
+  return false;
+}
+
+function getFilteredOrders() {
+  const active = isTestModeActive();
+  return ordenes.filter(o => isTestData(o) === active);
+}
+
+function getFilteredTickets() {
+  const active = isTestModeActive();
+  return tickets.filter(t => isTestData(t) === active);
+}
+
+function toggleTestMode(isActive) {
+  localStorage.setItem('eurorep_test_mode', isActive ? 'true' : 'false');
+  actualizarVistaActual();
+}
+
+function actualizarVistaActual() {
+  try { applyRole(currentSession.viewMode); } catch(e){}
+  try { renderTabla(); } catch(e){}
+  try { renderTabla('servicios'); } catch(e){}
+  if (typeof renderTickets === 'function') {
+    try { renderTickets(); } catch(e){}
+    try { renderTickets('dash-tickets'); } catch(e){}
+  }
+  try { renderStats(); } catch(e){}
+  try { renderDashboardV2(); } catch(e){}
+  try { renderDashboardTecnicos(); } catch(e){}
+  try { renderTecnicos(); } catch(e){}
+  try { renderCalendario(); } catch(e){}
+  try { updateTicketBadge(); } catch(e){}
+}
+
+window.toggleTestMode = toggleTestMode;
+window.isTestModeActive = isTestModeActive;
+window.getFilteredOrders = getFilteredOrders;
+window.getFilteredTickets = getFilteredTickets;
+
 function applyRole(rolKey) {
   try {
     const rol = ROLES[rolKey] || ROLES.superadmin;
@@ -833,6 +902,17 @@ function applyRole(rolKey) {
     const user = usuarios.find(u => u.id === currentSession.userId);
     const roleSwitcher = document.getElementById('role-switcher');
     if (roleSwitcher) roleSwitcher.style.display = (user?.rol === 'superadmin') ? 'flex' : 'none';
+
+    // Show/hide Sandbox switch (ONLY superadmin role can access)
+    const testModeContainer = document.getElementById('test-mode-container');
+    if (testModeContainer) {
+      const isSuperadmin = (user?.rol === 'superadmin');
+      testModeContainer.style.display = isSuperadmin ? 'flex' : 'none';
+      const checkbox = document.getElementById('test-mode-checkbox');
+      if (checkbox) {
+        checkbox.checked = localStorage.getItem('eurorep_test_mode') === 'true';
+      }
+    }
 
     // Mostrar botón de programar técnico en calendario solo a roles autorizados
     const btnProgramar = document.getElementById('btn-programar-tecnico');
@@ -2155,8 +2235,8 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
 
 // ===== STATS =====
 function renderStats() {
-  let ordenesFilter = ordenes;
-  let ticketsFilter = tickets;
+  let ordenesFilter = getFilteredOrders();
+  let ticketsFilter = getFilteredTickets();
 
   const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
@@ -2370,8 +2450,8 @@ function renderDashboardV2() {
     nombreEmpresaLogged = String(currentUser.empresa || currentUser.nombre).toLowerCase().trim();
   }
 
-  let ordenesDash = ordenes;
-  let ticketsDash = tickets;
+  let ordenesDash = getFilteredOrders();
+  let ticketsDash = getFilteredTickets();
   let maquinariaDash = maquinariaDb;
 
   if (isEmpresa && nombreEmpresaLogged) {
@@ -2791,7 +2871,7 @@ function renderDashboardTecnicos() {
   });
 
   // Calcular métricas desde órdenes y bitácoras
-  ordenes.forEach(o => {
+  getFilteredOrders().forEach(o => {
     let techNames = [];
     if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) techNames = o.tecnicosAsignados;
     else if (o.tecnico) techNames = o.tecnico.split(',').map(s => s.trim());
@@ -2895,7 +2975,7 @@ function renderTabla(ctx) {
   const searchId = isServiciosView ? 'search-servicios' : (isV2 ? 'v2-search-ordenes' : 'search-input');
   const q = (document.getElementById(searchId)?.value || '').toLowerCase();
   
-  let filtradas = ordenes.filter(o =>
+  let filtradas = getFilteredOrders().filter(o =>
     !q ||
     (o.cliente||'').toLowerCase().includes(q) ||
     (o.tecnico||'').toLowerCase().includes(q) ||
@@ -2936,7 +3016,14 @@ function renderTabla(ctx) {
   }
 
   const userRole = currentSession.viewMode || '';
-  if (userRole === 'tecnico') tecFilter = currentUser ? currentUser.nombre : '';
+  if (userRole === 'tecnico') {
+    const isSuperadmin = (usuarios.find(u => u.id === currentSession.userId)?.rol === 'superadmin');
+    if (isSuperadmin && isTestModeActive()) {
+      tecFilter = '';
+    } else {
+      tecFilter = currentUser ? currentUser.nombre : '';
+    }
+  }
   if (userRole === 'supervisor') supFilter = currentUser ? currentUser.nombre : '';
   
   if (tecFilter || supFilter) {
@@ -5514,7 +5601,7 @@ function renderTecnicos() {
   };
   
   // Combine legacy technitians from orders with actual registered user technitians and SAP technitians
-  const legacyTecs = ordenes.map(o => o.tecnico).filter(Boolean).map(formatNombreCorto);
+  const legacyTecs = getFilteredOrders().map(o => o.tecnico).filter(Boolean).map(formatNombreCorto);
   const userTecs = usuarios.filter(u => u.rol === 'tecnico').map(u => formatNombreCorto(u.nombre));
   const sapTecs = tecnicosDb.map(t => formatNombreCorto(t.nombre)).filter(Boolean);
   
@@ -5545,7 +5632,7 @@ function renderTecnicos() {
   
   grid.innerHTML = tecs.map(t => {
     // Calcular órdenes del técnico
-    const tOrdenes = ordenes.filter(o => {
+    const tOrdenes = getFilteredOrders().filter(o => {
       let assigned = [];
       if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) {
         assigned = o.tecnicosAsignados.map(formatNombreCorto);
@@ -5612,7 +5699,7 @@ function renderTecnicos() {
   if (tbody) {
     tbody.innerHTML = tecs.map(t => {
       // Calcular órdenes del técnico
-      const tOrdenes = ordenes.filter(o => {
+      const tOrdenes = getFilteredOrders().filter(o => {
         let assigned = [];
         if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) {
           assigned = o.tecnicosAsignados.map(formatNombreCorto);
@@ -6516,10 +6603,17 @@ function guardarOrden(e) {
   } else if (oVieja) {
     tecnicosSeleccionados = oVieja.tecnicosAsignados || (oVieja.tecnico ? oVieja.tecnico.split(',').map(s => s.trim()) : []);
   }
+  let folioVal = document.getElementById('f-folio').value.trim();
+  if (!editandoId && isTestModeActive()) {
+    if (folioVal && !folioVal.startsWith('[PRUEBA]')) {
+      folioVal = `[PRUEBA] ${folioVal}`;
+    }
+  }
+
   const orden = {
     id: editandoId || crypto.randomUUID(),
     fecha: oVieja ? oVieja.fecha : new Date().toISOString().split('T')[0],
-    folio: document.getElementById('f-folio').value.trim(),
+    folio: folioVal,
     pedido: document.getElementById('f-pedido').value.trim(),
     cliente: document.getElementById('f-cliente').value.trim(),
     ubicacion: document.getElementById('f-ubicacion').value.trim(),
@@ -6554,6 +6648,7 @@ function guardarOrden(e) {
     alimentacion: document.getElementById('f-alimentacion').value,
     traslado_costo: document.getElementById('f-traslado-costo').value,
     dias: getDiasData(),
+    esPrueba: oVieja ? (oVieja.esPrueba || false) : isTestModeActive(),
   };
   
   if (oVieja) {
@@ -7495,7 +7590,7 @@ async function enviarCorreoOrden(ordenId) {
 
 // ===== TICKETS DATA =====
 function updateTicketBadge() {
-  const abiertos = tickets.filter(t => t.estado === 'Abierto' || t.estado === 'En Proceso').length;
+  const abiertos = getFilteredTickets().filter(t => t.estado === 'Abierto' || t.estado === 'En Proceso').length;
   const badge = document.getElementById('nav-badge-tickets');
   if (!badge) return;
   if (abiertos > 0) {
@@ -7609,7 +7704,7 @@ function renderTickets(ctx) {
   if (!body) return;
   const q = (document.getElementById(searchId)?.value || '').toLowerCase();
   
-  let filtered = tickets.filter(t =>
+  let filtered = getFilteredTickets().filter(t =>
     !q ||
     String(t.asunto||'').toLowerCase().includes(q) ||
     String(t.solicitante||'').toLowerCase().includes(q) ||
@@ -7639,7 +7734,14 @@ function renderTickets(ctx) {
   }
 
   const userRole = currentSession.viewMode || '';
-  if (userRole === 'tecnico') tecFilter = currentUser ? currentUser.nombre : '';
+  if (userRole === 'tecnico') {
+    const isSuperadmin = (usuarios.find(u => u.id === currentSession.userId)?.rol === 'superadmin');
+    if (isSuperadmin && isTestModeActive()) {
+      tecFilter = '';
+    } else {
+      tecFilter = currentUser ? currentUser.nombre : '';
+    }
+  }
   if (userRole === 'supervisor') supFilter = currentUser ? currentUser.nombre : '';
   
   if (tecFilter || supFilter) {
@@ -9147,6 +9249,13 @@ async function guardarTicket(e) {
     newFolio = `${prefix}${(maxConsecutivo + 1).toString().padStart(3, '0')}`;
   }
 
+  let asuntoVal = document.getElementById('t-asunto').value.trim();
+  if (!editandoTicketId && isTestModeActive()) {
+    if (asuntoVal && !asuntoVal.startsWith('[PRUEBA]')) {
+      asuntoVal = `[PRUEBA] ${asuntoVal}`;
+    }
+  }
+
   const ticket = {
     id: editandoTicketId || crypto.randomUUID(),
     folio: editandoTicketId ? t_existente?.folio : newFolio,
@@ -9155,7 +9264,7 @@ async function guardarTicket(e) {
     fechaCierre: estado === 'Cerrado' ? (t_existente?.fechaCierre || new Date().toISOString()) : null,
     canal,
     contacto,
-    asunto: document.getElementById('t-asunto').value.trim(),
+    asunto: asuntoVal,
     cliente: document.getElementById('t-cliente')?.value || '',
     sitio: document.getElementById('t-sitio')?.value || '',
     solicitante: document.getElementById('t-solicitante').value.trim(),
@@ -9175,7 +9284,8 @@ async function guardarTicket(e) {
     pedidoSAP: document.getElementById('t-pedido-sap')?.value.trim() || '',
     tecnicosAsignados: t_existente ? (t_existente.tecnicosAsignados || []) : [],
     pdfPedido: pdfPedidoBase64,
-    pdfCotizacion: pdfCotizacionBase64
+    pdfCotizacion: pdfCotizacionBase64,
+    esPrueba: t_existente ? (t_existente.esPrueba || false) : isTestModeActive()
   };
   
   if (isEmpresa && !editandoTicketId && !ticket.asignado) {
@@ -9458,10 +9568,16 @@ async function cerrarCotizacionTicket(id) {
         }
       }
 
+      let newFolio = generarFolioConsecutivo();
+      const isTest = isTestData(t) || isTestModeActive();
+      if (isTest && newFolio && !newFolio.startsWith('[PRUEBA]')) {
+        newFolio = `[PRUEBA] ${newFolio}`;
+      }
+
       const nuevaOrden = {
         id: crypto.randomUUID(),
         fecha: new Date().toISOString().split('T')[0],
-        folio: generarFolioConsecutivo(),
+        folio: newFolio,
         pedido: pedidoSAP || '',
         cliente: t.cliente || '',
         ubicacion: t.sitio || '',
@@ -9483,6 +9599,7 @@ async function cerrarCotizacionTicket(id) {
         factura_ref: '', factura_mo: '',
         noches: '', alimentacion: '', traslado_costo: '',
         dias: [],
+        esPrueba: isTest,
       };
 
       ordenes.unshift(nuevaOrden);
@@ -9876,7 +9993,12 @@ function renderCalendario() {
   const miTecnicoNombre = isTecnico ? (currentSession.nombre || (currentUser ? currentUser.nombre : '')) : null;
 
   if (isTecnico && miTecnicoNombre) {
-    filtroTecnico = miTecnicoNombre;
+    const isSuperadmin = (usuarios.find(u => u.id === currentSession.userId)?.rol === 'superadmin');
+    if (isSuperadmin && isTestModeActive()) {
+      filtroTecnico = '';
+    } else {
+      filtroTecnico = miTecnicoNombre;
+    }
   }
 
   const eventos = [];
@@ -9886,7 +10008,7 @@ function renderCalendario() {
   eventos.push(...getFestivosMexico(currentYear));
   eventos.push(...getFestivosMexico(currentYear + 1));
   
-  ordenes.filter(o => {
+  getFilteredOrders().filter(o => {
     if (isEmpresa && o.cliente !== miEmpresa) return false;
     if (filtroCliente && o.cliente !== filtroCliente) return false;
     return true;
@@ -9965,8 +10087,8 @@ function renderCalendario() {
     const y = hoy.getFullYear();
     const m = String(hoy.getMonth() + 1).padStart(2, '0');
     
-    const ord1 = ordenes[0] || { id: 'test-ord-1', cliente: 'Cliente Prueba S.A.', ubicacion: 'Av. Principal 123, CDMX' };
-    const ord2 = ordenes[1] || { id: 'test-ord-2', cliente: 'Industrias Eurorep', ubicacion: 'Bodega 4, Querétaro' };
+    const ord1 = getFilteredOrders()[0] || { id: 'test-ord-1', cliente: 'Cliente Prueba S.A.', ubicacion: 'Av. Principal 123, CDMX' };
+    const ord2 = getFilteredOrders()[1] || { id: 'test-ord-2', cliente: 'Industrias Eurorep', ubicacion: 'Bodega 4, Querétaro' };
     
     const diaHoy = String(hoy.getDate()).padStart(2, '0');
     eventos.push({

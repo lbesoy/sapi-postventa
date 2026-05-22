@@ -246,6 +246,17 @@
           </div>
         </div>
         <div class="topbar-right" id="topbar-right">
+          <!-- MODO PRUEBAS (visible solo para superadmin) -->
+          <div id="test-mode-container" style="display: none; align-items: center; gap: 0.5rem; margin-right: 1rem; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 999px; padding: 0.25rem 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+            <label class="toggle-switch">
+              <input type="checkbox" id="test-mode-checkbox" onchange="toggleTestMode(this.checked)">
+              <span class="toggle-track"></span>
+            </label>
+            <span style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 4px; user-select: none;">
+              <i data-lucide="beaker" style="width: 13px; height: 13px; color: var(--accent);"></i> Sandbox
+            </span>
+          </div>
+
           <!-- Indicador de Sincronización / Red -->
           <div id="sync-status-indicator" class="sync-status-indicator" onclick="forzarSincronizacionManual()" title="Sincronización con Supabase. Clic para forzar.">
             <i id="sync-status-icon" data-lucide="wifi" style="width: 16px; height: 16px;"></i>
