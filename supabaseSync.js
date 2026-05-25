@@ -144,6 +144,59 @@ function rowToOrden(o) {
   };
 }
 
+function gastoToRow(g) {
+  return {
+    id: g.id,
+    usuario_id: g.usuarioId || null,
+    nombre_usuario: g.nombreUsuario || null,
+    fecha: g.fecha || null,
+    categoria: g.categoria || null,
+    descripcion: g.descripcion || null,
+    monto: Number(g.monto) || 0,
+    metodo_pago: g.metodoPago || null,
+    clara_tx_id: g.claraTxId || null,
+    clara_merchant: g.claraMerchant || null,
+    clara_card_last4: g.claraCardLast4 || null,
+    orden_folio: g.ordenFolio || null,
+    uuid_fiscal: g.uuidFiscal || null,
+    rfc_emisor: g.rfcEmisor || null,
+    pdf_factura: g.pdfFactura || null,
+    xml_factura: g.xmlFactura || null,
+    evidencia: g.evidencia || null,
+    estado: g.estado || 'Pendiente',
+    comentarios_aprobacion: g.comentariosAprobacion || null,
+    es_prueba: g.esPrueba || false,
+    fecha_creacion: g.fechaCreacion || new Date().toISOString()
+  };
+}
+
+function rowToGasto(g) {
+  return {
+    id: g.id,
+    usuarioId: g.usuario_id,
+    nombreUsuario: g.nombre_usuario,
+    fecha: g.fecha,
+    categoria: g.categoria,
+    descripcion: g.descripcion,
+    monto: g.monto,
+    metodoPago: g.metodo_pago,
+    claraTxId: g.clara_tx_id,
+    claraMerchant: g.clara_merchant,
+    claraCardLast4: g.clara_card_last4,
+    ordenFolio: g.orden_folio,
+    uuidFiscal: g.uuid_fiscal,
+    rfcEmisor: g.rfc_emisor,
+    pdfFactura: g.pdf_factura,
+    xmlFactura: g.xml_factura,
+    evidencia: g.evidencia,
+    estado: g.estado,
+    comentariosAprobacion: g.comentarios_aprobacion,
+    esPrueba: g.es_prueba,
+    fechaCreacion: g.fecha_creacion
+  };
+}
+
+
 function clienteToRow(c) {
   if (!c.id) {
     c.id = crypto.randomUUID();
@@ -278,6 +331,8 @@ async function processSyncQueue() {
           payload = { id: item.data.id, serie: item.data.serie, marca: item.data.marca, modelo: item.data.modelo, anio: item.data.anio, cliente: item.data.cliente, id_interno: item.data.idInterno, descripcion: item.data.descripcion, custom_data: item.data.customData || {} };
         } else if (item.table === 'refacciones') {
           payload = { id: item.data.id, codigo: item.data.codigo, descripcion: item.data.descripcion, precio: item.data.precio, moneda: item.data.moneda, stock: item.data.stock, custom_data: { ...(item.data.customData || {}), marca: item.data.marca, grupo: item.data.grupo, origen: item.data.origen, nombre: item.data.nombre } };
+        } else if (item.table === 'gastos') {
+          payload = gastoToRow(item.data);
         } else if (item.table === 'config') {
           payload = { id: 'main', data: item.data };
         } else if (item.table === 'roles') {
@@ -652,6 +707,57 @@ window.cargarDatosDeSupabase = async function() {
     if (rolesDb && rolesDb.length > 0 && rolesDb[0].data) {
       localStorage.setItem('sapi_roles_config', JSON.stringify(rolesDb[0].data));
     }
+    // Clara Transactions
+    try {
+      const { data: claraDb, error: claraErr } = await sb.from('clara_transactions').select('*');
+      if (!claraErr && claraDb) {
+        const mappedClara = claraDb.map(row => ({
+          id: row.id,
+          fecha: row.fecha ? row.fecha.split('T')[0] : '',
+          merchant: row.merchant,
+          monto: Number(row.monto),
+          cardLast4: row.card_last_4
+        }));
+        window._supaClaraTxs = mappedClara;
+        localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(mappedClara));
+      }
+    } catch (errC) {
+      console.warn('[Sync] Tabla clara_transactions no disponible en Supabase. Se usarán datos locales/mock.', errC.message);
+    }
+
+    // Gastos
+    let mappedGastos = [];
+
+    try {
+      const { data: gastosDb, error: gastosErr } = await sb.from('gastos').select('*');
+      if (!gastosErr && gastosDb && gastosDb.length > 0) {
+        mappedGastos = gastosDb.map(rowToGasto);
+      }
+    } catch (errG) {
+      console.warn('[Sync] Tabla de gastos no disponible en Supabase (o RLS activa). Cargando local.', errG.message);
+    }
+    
+    // FUSIONAR CON CAMBIOS LOCALES PENDIENTES DE SINCRONIZAR
+    const localGastos = JSON.parse(localStorage.getItem('sapi_gastos') || '[]');
+    let mergedGastos = mappedGastos.length > 0 ? mappedGastos : localGastos;
+    
+    const queueForGastos = getSyncQueue();
+    const pendingGastos = queueForGastos.filter(item => item.table === 'gastos');
+    pendingGastos.forEach(item => {
+      if (item.action === 'upsert') {
+        const idx = mergedGastos.findIndex(g => g.id === item.data.id);
+        if (idx > -1) {
+          mergedGastos[idx] = item.data;
+        } else {
+          mergedGastos.unshift(item.data);
+        }
+      } else if (item.action === 'delete') {
+        mergedGastos = mergedGastos.filter(g => g.id !== item.data.id);
+      }
+    });
+
+    window._supaGastos = mergedGastos;
+    localStorage.setItem('sapi_gastos', JSON.stringify(mergedGastos));
 
   } catch (error) {
     console.error('[Supabase] Error cargando datos:', error.message);
@@ -678,15 +784,28 @@ function setupRealtime() {
         const mapped = data.map(rowToOrden);
         localStorage.setItem('sapi_ordenes', JSON.stringify(mapped));
         window._supaOrdenes = mapped;
+      } else if (tableName === 'clara_transactions') {
+        const mappedClara = data.map(row => ({
+          id: row.id,
+          fecha: row.fecha ? row.fecha.split('T')[0] : '',
+          merchant: row.merchant,
+          monto: Number(row.monto),
+          cardLast4: row.card_last_4
+        }));
+        localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(mappedClara));
+        window._supaClaraTxs = mappedClara;
       }
       window.dispatchEvent(new Event('supabase_datos_cargados'));
     }
   };
 
+
   window.supabaseClient.channel('custom-all-channel')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => handleUpdate('tickets'))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes' }, () => handleUpdate('ordenes'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'clara_transactions' }, () => handleUpdate('clara_transactions'))
     .subscribe();
+
 }
 
 // ─── Arrancar cuando el DOM esté listo ───────────────────────────────────────

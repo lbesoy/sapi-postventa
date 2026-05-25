@@ -33,6 +33,7 @@ th {
 
 /* ===== DESIGN TOKENS ===== */
 :root {
+  --bg-body: var(--bg-primary);
   --bg-primary: #0f1117;
   --bg-secondary: #1a1d27;
   --bg-card: #1e2130;
@@ -61,6 +62,7 @@ th {
 }
 
 body.light-mode {
+  --bg-body: var(--bg-primary);
   --bg-primary: #f8fafc;
   --bg-secondary: #ffffff;
   --bg-card: #ffffff;
@@ -556,6 +558,39 @@ body {
 }
 .form-group textarea { resize: vertical; }
 .form-group select { cursor: pointer; }
+
+/* Custom form classes for Gastos modal */
+.form-input {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: var(--transition);
+  width: 100%;
+}
+.form-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+.form-label {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-bottom: 0.35rem;
+  display: block;
+}
+
+@media (max-width: 768px) {
+  #modal-gasto-overlay .modal-body {
+    grid-template-columns: 1fr !important;
+    gap: 1.25rem !important;
+  }
+}
+
 
 /* Custom elegant select (used outside form-groups like in headers) */
 .form-select {
@@ -1807,3 +1842,147 @@ body {
     white-space: nowrap !important;
   }
 }
+
+/* ===== CONTROL DE GASTOS & CLARA STYLES ===== */
+.badge-g-pendiente { background: var(--orange-light); color: var(--orange); }
+.badge-g-aprobado { background: var(--green-light); color: var(--green); }
+.badge-g-rechazado { background: var(--red-light); color: var(--red); }
+
+.badge-metodo-clara { background: rgba(139, 92, 246, 0.12); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.2); }
+.badge-metodo-reembolso { background: rgba(100, 116, 139, 0.15); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.2); }
+
+body.light-mode .badge-metodo-clara { background: rgba(124, 58, 237, 0.08); color: #6d28d9; border: 1px solid rgba(124, 58, 237, 0.15); }
+body.light-mode .badge-metodo-reembolso { background: rgba(100, 116, 139, 0.08); color: #475569; border: 1px solid rgba(100, 116, 139, 0.15); }
+
+/* Clara transactions cards layout */
+.clara-txs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.clara-tx-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  position: relative;
+  overflow: hidden;
+  transition: var(--transition);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.clara-tx-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: #a78bfa; /* Clara purple */
+}
+
+.clara-tx-card:hover {
+  transform: translateY(-2px);
+  border-color: #a78bfa;
+  box-shadow: var(--shadow);
+}
+
+.clara-tx-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.clara-tx-merchant {
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.clara-tx-amount {
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: var(--text-primary);
+}
+
+.clara-tx-meta {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.clara-tx-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+/* Responsive expenses card layout (used on mobile instead of table) */
+.gastos-mobile-cards {
+  display: none;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.gasto-mobile-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.gasto-mobile-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gasto-mobile-card-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.gasto-mobile-card-value {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.gasto-mobile-card-desc {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  margin-top: 0.25rem;
+  border: 1px solid var(--border);
+}
+
+/* Media query to switch table/cards */
+@media screen and (max-width: 768px) {
+  .gastos-desktop-table {
+    display: none !important;
+  }
+  .gastos-mobile-cards {
+    display: flex !important;
+  }
+}
+

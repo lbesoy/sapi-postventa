@@ -15,6 +15,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://js.live.net/v7.2/OneDrive.js"></script>
   <link rel="stylesheet" href="style.css?v=15" />
 </head>
 
@@ -176,6 +177,11 @@
         <a href="#" class="nav-item" data-view="calendario" data-title="Calendario" id="nav-calendario">
           <span class="nav-icon"><i data-lucide="calendar"></i></span><span>Calendario</span>
         </a>
+        <a href="#" class="nav-item" data-view="gastos" data-title="Control de Gastos" id="nav-gastos">
+          <span class="nav-icon"><i data-lucide="receipt"></i></span><span>Control de Gastos</span>
+        </a>
+
+
         <a href="#" class="nav-item" data-view="clientes" data-title="Clientes" id="nav-clientes">
           <span class="nav-icon"><i data-lucide="users"></i></span><span>Clientes</span>
         </a>
@@ -625,6 +631,246 @@
           </div>
         </div>
 
+        <!-- GASTOS VIEW -->
+        <div id="view-gastos" class="view">
+          <!-- TABS -->
+          <div class="view-toggle"
+            style="display:flex; gap:0.5rem; background: var(--bg-hover); padding: 0.3rem; border-radius: var(--radius-md); border: 1px solid var(--border); width: fit-content; margin-bottom: 1.5rem;">
+            <button class="btn-secondary active" id="btn-tab-gastos-historial" onclick="switchGastosTab('historial')"
+              style="padding:0.4rem 1rem; border:none; background:var(--bg-card); box-shadow:0 1px 3px rgba(0,0,0,0.1); color:var(--text-primary); font-weight:600;">
+              <i data-lucide="history" style="width:16px;height:16px;margin-right:6px;vertical-align:text-bottom;"></i>
+              Mis Gastos / Comprobaciones
+            </button>
+            <button class="btn-secondary" id="btn-tab-gastos-clara" onclick="switchGastosTab('clara')"
+              style="padding:0.4rem 1rem; border:none; background:transparent; color:var(--text-muted); font-weight:500; display:inline-flex; align-items:center; gap:0.25rem;">
+              <span style="display:inline-flex; align-items:center; justify-content:center; margin-right:4px;">
+                <img src="Logo_de_Clara.svg" alt="Clara" style="height: 12px; width: auto; vertical-align: middle; filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.15));" />
+              </span>
+              Conciliación Clara <span class="nav-badge" id="badge-clara-txs" style="margin-left: 5px; background: var(--purple); color: #fff;">0</span>
+            </button>
+
+
+
+          </div>
+
+          <!-- TAB 1: HISTORIAL DE GASTOS -->
+          <div id="gastos-tab-historial">
+            <div class="section-header"
+              style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom: 1.5rem;">
+              <h2>Control de Gastos</h2>
+              <button class="btn-primary" onclick="abrirModalGasto()" id="btn-registrar-gasto">
+                <i data-lucide="plus-circle" class="btn-icon"></i> Registrar Gasto
+              </button>
+            </div>
+
+            <!-- KPIs -->
+            <div class="stats-grid" style="margin-bottom: 1.5rem;">
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:var(--orange);"><i data-lucide="clock"></i></div>
+                <div>
+                  <div class="stat-label">Pendientes de Revisión</div>
+                  <div class="stat-value" id="kpi-gastos-pendiente">$0.00</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:var(--green);"><i data-lucide="check-circle-2"></i></div>
+                <div>
+                  <div class="stat-label">Comprobados / Aprobados</div>
+                  <div class="stat-value" id="kpi-gastos-aprobado">$0.00</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(139,92,246,0.12);color:#8b5cf6;"><i data-lucide="wallet"></i></div>
+                <div>
+                  <div class="stat-label">Reembolsos Aprobados</div>
+                  <div class="stat-value" id="kpi-gastos-reembolso">$0.00</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- FILTERS BAR -->
+            <div class="search-bar-container" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem; align-items:center; background:var(--bg-card); padding:1rem; border-radius:var(--radius-lg); border:1px solid var(--border);">
+              <div class="search-bar" style="flex:1; min-width:200px; margin:0;">
+                <input type="text" id="search-gastos" placeholder="Buscar por concepto o técnico..." oninput="renderGastos()" />
+              </div>
+              <select id="filter-gasto-estado" class="form-select" onchange="renderGastos()" style="min-width:120px;">
+                <option value="">Todos los Estados</option>
+                <option value="Pendiente">Pendientes</option>
+                <option value="Aprobado">Aprobados</option>
+                <option value="Rechazado">Rechazados</option>
+              </select>
+              <select id="filter-gasto-categoria" class="form-select" onchange="renderGastos()" style="min-width:120px;">
+                <option value="">Todas las Categorías</option>
+                <option value="Combustible">Combustible</option>
+                <option value="Alimentación">Alimentación</option>
+                <option value="Hospedaje">Hospedaje</option>
+                <option value="Casetas / Peajes">Casetas / Peajes</option>
+                <option value="Otros">Otros</option>
+              </select>
+              <select id="filter-gasto-metodo" class="form-select" onchange="renderGastos()" style="min-width:140px;">
+                <option value="">Todos los Métodos</option>
+                <option value="Tarjeta Clara">Tarjeta Clara</option>
+                <option value="Reembolso (Efectivo/Personal)">Reembolsos</option>
+              </select>
+              <select id="filter-gasto-tecnico" class="form-select" onchange="renderGastos()" style="min-width:150px; display:none;">
+                <option value="">Todos los Técnicos</option>
+              </select>
+            </div>
+
+            <!-- DESKTOP TABLE -->
+            <div class="table-wrapper gastos-desktop-table">
+              <table class="orders-table" style="width:100%;">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th class="col-tecnico-header">Técnico</th>
+                    <th>Método</th>
+                    <th>Categoría</th>
+                    <th>Descripción</th>
+                    <th style="text-align:right;">Monto</th>
+                    <th>Orden</th>
+                    <th>Factura (SAT)</th>
+                    <th style="text-align:center;">Estado</th>
+                    <th style="text-align:center;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tabla-gastos-body">
+                </tbody>
+              </table>
+            </div>
+
+            <!-- MOBILE CARDS LIST -->
+            <div class="gastos-mobile-cards" id="gastos-mobile-cards-list">
+            </div>
+          </div>
+
+          <!-- TAB 2: CONCILIACION CLARA (ESTILO MOVIMIENTOS CLARA) -->
+          <div id="gastos-tab-clara" style="display:none;">
+            <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom: 1.25rem;">
+              <div>
+                <h2 style="font-size:1.8rem; font-weight:700; margin:0; color:var(--text-primary); letter-spacing:-0.02em;">Movimientos</h2>
+                <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:0.25rem;">Visualiza y concilia los cargos automáticos de tus tarjetas Clara corporativas.</p>
+              </div>
+            </div>
+
+            <!-- FILTERS BAR ESTILO CLARA -->
+            <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; margin-bottom:0.75rem;">
+              <div class="search-bar" style="flex:1; max-width:360px; margin:0; position:relative; display:flex; align-items:center;">
+                <i data-lucide="search" style="position:absolute; left:0.75rem; width:1rem; height:1rem; color:var(--text-muted);"></i>
+                <input type="text" id="search-clara-txs" placeholder="Buscar por movimiento o comercio" oninput="window.aplicarFiltrosClara ? window.aplicarFiltrosClara() : renderClaraTxs()" style="padding-left:2.25rem; width:100%; border-radius:8px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); height:38px; font-family:inherit; font-size:0.88rem;" />
+              </div>
+              <div style="position:relative;">
+                <button class="btn-secondary" id="btn-clara-add-filter" type="button" onclick="window.toggleClaraFiltersDropdown(event)" style="display:flex; align-items:center; gap:0.5rem; border-radius:8px; height:38px; padding:0 1rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; color:var(--text-primary); font-weight:500; font-size:0.85rem; transition:var(--transition); position:relative; font-family:inherit;">
+                  <i data-lucide="filter" style="width:14px; height:14px;"></i> Añadir filtro
+                  <span id="badge-clara-active-filters-count" style="background:var(--accent); color:white; font-size:0.65rem; font-weight:700; border-radius:99px; width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; position:absolute; top:-6px; right:-6px; box-shadow:0 2px 4px rgba(0,0,0,0.2);">1</span>
+                </button>
+                
+                <!-- DROPDOWN DE FILTROS -->
+                <div id="clara-filters-dropdown" style="display:none; position:absolute; top:44px; right:0; background:var(--bg-card); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid var(--border); border-radius:12px; padding:1.25rem; width:280px; box-shadow:var(--shadow); z-index:1000; flex-direction:column; gap:1rem;">
+                  <div style="font-weight:600; font-size:0.85rem; color:var(--text-primary); border-bottom:1px solid var(--border); padding-bottom:0.5rem; display:flex; justify-content:space-between; align-items:center;">
+                    <span>Filtros de Movimientos</span>
+                    <button type="button" onclick="window.resetearFiltrosClara(event)" style="background:none; border:none; color:var(--accent); cursor:pointer; font-size:0.75rem; font-weight:600; font-family:inherit;">Limpiar</button>
+                  </div>
+                  
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <label style="display:block; font-size:0.72rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">Categoría</label>
+                    <select id="filter-clara-category" onchange="window.aplicarFiltrosClara()" style="width:100%; height:36px; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.8rem; padding:0 0.5rem; font-family:inherit; cursor:pointer;">
+                      <option value="">Todas</option>
+                      <option value="Combustibles">Combustibles</option>
+                      <option value="Transporte">Transporte</option>
+                      <option value="Venta Minorista">Venta Minorista</option>
+                      <option value="Servicios Profesionales">Servicios Profesionales</option>
+                    </select>
+                  </div>
+                  
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <label style="display:block; font-size:0.72rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">Revisión de Gastos</label>
+                    <select id="filter-clara-status" onchange="window.aplicarFiltrosClara()" style="width:100%; height:36px; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.8rem; padding:0 0.5rem; font-family:inherit; cursor:pointer;">
+                      <option value="">Todos</option>
+                      <option value="Sin Justificar">Sin Justificar (Pendiente)</option>
+                      <option value="En revisión">En revisión</option>
+                      <option value="Aprobada">Aprobada</option>
+                      <option value="Rechazada">Rechazada</option>
+                    </select>
+                  </div>
+                  
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <label style="display:block; font-size:0.72rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">Tarjetahabiente</label>
+                    <select id="filter-clara-user" onchange="window.aplicarFiltrosClara()" style="width:100%; height:36px; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.8rem; padding:0 0.5rem; font-family:inherit; cursor:pointer;">
+                      <option value="">Todos</option>
+                      <option value="Victor Gonzalez Zamora">Victor Gonzalez Zamora</option>
+                      <option value="Roque Falcon Chavez">Roque Falcon Chavez</option>
+                      <option value="Octavio Rivero">Octavio Rivero</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ACTIVE FILTERS ESTILO CLARA -->
+            <div id="clara-active-filters-tags" style="display:flex; gap:0.75rem; align-items:center; margin-bottom:1.5rem; font-size:0.85rem; flex-wrap:wrap;">
+              <div style="background:rgba(79,142,247,0.1); color:var(--accent); border:1px solid rgba(79,142,247,0.2); border-radius:99px; padding:0.2rem 0.75rem; display:inline-flex; align-items:center; gap:0.35rem; font-weight:500;">
+                <span>Fechas <strong>Estado de cuenta actual</strong></span>
+                <i data-lucide="x" style="width:12px; height:12px; cursor:pointer;" onclick="mostrarNotificacion('Filtro de fechas fijo')"></i>
+              </div>
+            </div>
+
+            <!-- KPIs ESTILO CLARA -->
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.25rem 1.5rem; margin-bottom:1.5rem; box-shadow:var(--shadow-sm);">
+              <div style="display:flex; gap:3rem; flex-wrap:wrap; align-items:center;">
+                <div>
+                  <div style="font-size:0.78rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.25rem;">Gasto total</div>
+                  <div style="font-size:1.8rem; font-weight:800; color:var(--text-primary); letter-spacing:-0.02em;" id="clara-kpi-gasto-total">$0.00</div>
+                </div>
+                <div>
+                  <div style="font-size:0.78rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.25rem;">Realizados</div>
+                  <div style="font-size:1.8rem; font-weight:800; color:var(--text-primary); letter-spacing:-0.02em;" id="clara-kpi-realizados">0</div>
+                </div>
+                <div>
+                  <div style="font-size:0.78rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.25rem;">Sin factura</div>
+                  <div style="font-size:1.8rem; font-weight:800; color:var(--red); letter-spacing:-0.02em;" id="clara-kpi-sin-factura">0</div>
+                </div>
+                <div>
+                  <div style="font-size:0.78rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.25rem; display:inline-flex; align-items:center; gap:4px;">Sin evidencia <i data-lucide="info" style="width:12px; height:12px; opacity:0.6;"></i></div>
+                  <div style="font-size:1.8rem; font-weight:800; color:var(--text-primary); letter-spacing:-0.02em;" id="clara-kpi-sin-evidencia">0</div>
+                </div>
+              </div>
+              
+              <div style="display:flex; gap:0.5rem; align-items:center;">
+                <button class="btn-secondary" style="width:38px; height:38px; border-radius:8px; border:1px solid var(--border); background:var(--bg-card); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-primary) !important; transition:var(--transition);" title="Enviar estado de cuenta por correo" onclick="mostrarNotificacion('Estado de cuenta enviado por correo electrónico')">
+                  <i data-lucide="mail" style="width:16px; height:16px; color:var(--text-primary) !important;"></i>
+                </button>
+                <button class="btn-primary" style="display:inline-flex; align-items:center; gap:0.4rem; height:38px; border-radius:8px; padding:0 1rem; cursor:pointer; font-weight:600; font-size:0.85rem;" onclick="mostrarNotificacion('Descargando reporte de movimientos...')">
+                  <i data-lucide="download" style="width:14px; height:14px;"></i> Descargar
+                </button>
+              </div>
+            </div>
+
+            <!-- TABLA DE MOVIMIENTOS ESTILO CLARA -->
+            <div class="table-wrapper" style="border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--bg-card); box-shadow:var(--shadow-sm); margin-bottom:2rem;">
+              <table class="orders-table" style="width:100%; border-collapse:collapse; text-align:left;">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--border); background:var(--bg-hover);">
+                    <th style="padding:0.75rem 1rem; width:40px; vertical-align:middle;"><input type="checkbox" style="cursor:pointer;" /></th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Movimiento</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:right; vertical-align:middle;">Monto</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Fecha</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Usuario</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Tarjeta</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:center; vertical-align:middle;">Evidencia</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:center; vertical-align:middle;">Revisión de gastos</th>
+                  </tr>
+                </thead>
+                <tbody id="clara-movimientos-table-body">
+                  <!-- Injected via renderClaraTxs() -->
+                </tbody>
+              </table>
+            </div>
+            <!-- HIDDEN TEST CONTAINER FOR JSDOM TESTS COMPATIBILITY -->
+            <div id="clara-txs-list" style="display:none;"></div>
+          </div>
+        </div>
+
         <div id="view-clientes" class="view">
           <div class="section-header"
             style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
@@ -1068,6 +1314,56 @@
                     data-lucide="layout-template" class="btn-icon"></i> Mapear Columnas SAP</button>
                 <button class="btn-primary" onclick="guardarConfig()"><i data-lucide="save" class="btn-icon"></i>
                   Guardar</button>
+              </div>
+            </div>
+
+            <!-- Microsoft OneDrive Integration -->
+            <div class="config-card" style="grid-column: 1 / -1;">
+              <div class="config-card-header">
+                <div class="config-card-icon" style="background:rgba(0,120,212,0.12); color:#0078d4;"><i data-lucide="cloud"></i></div>
+                <div>
+                  <div class="config-card-title" style="font-weight:700;">Integración con Microsoft OneDrive</div>
+                  <div class="config-card-sub">Conecta tus facturas y comprobantes en la nube de Microsoft OneDrive para vincularlas a tus gastos</div>
+                </div>
+              </div>
+              <div class="form-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin-top:1rem;">
+                <div class="form-group" style="grid-column: 1 / -1;">
+                  <label style="display:flex; align-items:center; gap:0.5rem; font-weight:600;">
+                    <i data-lucide="key" style="width:16px;height:16px;color:#0078d4;"></i> Client ID de Microsoft Azure (OneDrive)
+                  </label>
+                  <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                    El ID de cliente de la aplicación registrada en el portal de Azure AD. Si se deja en blanco o "MOCK", se utilizará el **Explorador OneDrive en Modo Demostración**.
+                  </p>
+                  <input type="text" id="cfg-onedrive-client-id" placeholder="MOCK" value="MOCK" style="font-family:monospace;" />
+                </div>
+
+                <div class="form-group" style="grid-column: 1 / -1; padding-top: 1rem; border-top: 1px solid var(--border);">
+                  <div class="toggle-row" style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,120,212,0.02); padding:0.75rem 1rem; border-radius:8px; border:1px solid rgba(0,120,212,0.1);">
+                    <div>
+                      <div class="toggle-label" style="font-weight:600; font-size:0.9rem; color:var(--text-primary);">Forzar Modo Demostración</div>
+                      <div class="toggle-sub" style="font-size:0.8rem; color:var(--text-muted); margin-top:0.15rem;">Utiliza carpetas y facturas simuladas de prueba sin requerir credenciales reales de Microsoft.</div>
+                    </div>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="cfg-onedrive-force-mock" checked onchange="toggleOneDriveDemoMode()" />
+                      <span class="toggle-track"></span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="form-group" id="onedrive-redirect-uri-container" style="grid-column: 1 / -1; display:none; padding-top: 0.5rem;">
+                  <label style="font-weight:600; font-size:0.82rem; color:var(--text-secondary);">URI de Redirección Registrada (Redirect URI):</label>
+                  <p style="font-size: 0.78rem; color: var(--text-muted); margin-top:0.25rem;">
+                    Configura la siguiente dirección como "Web Redirect URI" en tu registro de aplicación de Azure Portal:
+                  </p>
+                  <div style="background:var(--bg-body); border:1px solid var(--border); border-radius:6px; padding:0.5rem 0.75rem; font-family:monospace; font-size:0.8rem; color:var(--accent); display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem;">
+                    <span id="onedrive-redirect-uri-text">http://localhost:3000</span>
+                    <button type="button" class="btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('onedrive-redirect-uri-text').textContent); mostrarNotificacion('Copiado al portapapeles');" style="padding:0.2rem 0.5rem; font-size:0.7rem; min-height:auto; border-radius:4px;">Copiar</button>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem; border-top:1px solid var(--border); padding-top:1rem;">
+                <button class="btn-primary" onclick="guardarOneDriveConfig()"><i data-lucide="save" class="btn-icon"></i> Guardar OneDrive</button>
               </div>
             </div>
 
@@ -3460,6 +3756,375 @@
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL REGISTRAR/EDITAR GASTO -->
+  <div class="modal-overlay" id="modal-gasto-overlay" onclick="if(event.target===this) cerrarModalGasto()">
+    <div class="modal" style="max-width: 900px; width: 95%; overflow:hidden;">
+      <div class="modal-header" style="border-bottom:1px solid var(--border); padding: 1.25rem 1.5rem; display:flex; align-items:center; justify-content:space-between;">
+        <h2 id="modal-gasto-titulo" style="font-size:1.05rem; display:flex; align-items:center; gap:0.5rem; margin:0;"><i data-lucide="receipt-text" style="color:var(--accent);"></i> Detalle de la transacción</h2>
+        <button class="modal-close" onclick="cerrarModalGasto()" style="background:none; border:none; color:var(--text-secondary); cursor:pointer;">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="form-gasto" onsubmit="guardarGasto(event)">
+        <div class="modal-body" style="display:grid; grid-template-columns: 1.1fr 1fr; gap:1.75rem; max-height:75vh; overflow-y:auto; padding: 1.5rem; box-sizing:border-box;">
+          
+          <input type="hidden" id="gasto-id" />
+          <input type="hidden" id="gasto-clara-tx-id" />
+          <input type="hidden" id="gasto-rfc-emisor" />
+          <input type="hidden" id="gasto-uuid-fiscal" />
+
+          <!-- COLUMNA IZQUIERDA: DETALLES GENERALES / FORMULARIO -->
+          <div style="display:flex; flex-direction:column; gap:0.5rem;">
+            <!-- Cabecera de Transacción Estilo Clara -->
+            <div>
+              <span id="gasto-estado-badge" class="badge" style="font-size:0.68rem; padding:0.15rem 0.45rem; border-radius:4px; font-weight:700; text-transform:uppercase; background:rgba(79,142,247,0.12); color:var(--accent); display:inline-block; margin-bottom:0.4rem;">En revisión</span>
+              <h2 id="gasto-header-establecimiento" style="font-size:1.4rem; font-weight:700; color:var(--text-primary); margin:0 0 0.2rem 0; line-height:1.2; word-break:break-word;">REGISTRO MANUAL</h2>
+              <div id="gasto-header-monto" style="font-size:2.1rem; font-weight:800; color:var(--text-primary); margin-bottom:0.25rem;">$0.00</div>
+              <div id="gasto-header-meta" style="font-size:0.78rem; color:var(--text-muted); margin-bottom:1.25rem; font-weight:500;">-</div>
+            </div>
+
+            <!-- Navegación de Pestañas Gasto -->
+            <div class="gasto-tabs-nav" style="display:flex; border-bottom:1px solid var(--border); margin-bottom:1.25rem; gap:1rem;">
+              <button type="button" class="gasto-tab-btn active" id="btn-gasto-tab-requisitos" onclick="cambiarPestañaGasto('requisitos')" style="background:none; border:none; border-bottom:2px solid var(--accent); color:var(--text-primary); padding: 0.5rem 0.25rem; font-size: 0.85rem; font-weight:600; cursor:pointer; font-family:inherit; transition:var(--transition);">Requisitos</button>
+              <button type="button" class="gasto-tab-btn" id="btn-gasto-tab-revisar" onclick="cambiarPestañaGasto('revisar')" style="background:none; border:none; border-bottom:2px solid transparent; color:var(--text-muted); padding: 0.5rem 0.25rem; font-size: 0.85rem; font-weight:500; cursor:pointer; font-family:inherit; transition:var(--transition);">Revisar</button>
+              <button type="button" class="gasto-tab-btn" id="btn-gasto-tab-actividad" onclick="cambiarPestañaGasto('actividad')" style="background:none; border:none; border-bottom:2px solid transparent; color:var(--text-muted); padding: 0.5rem 0.25rem; font-size: 0.85rem; font-weight:500; cursor:pointer; font-family:inherit; transition:var(--transition);">Actividad</button>
+            </div>
+
+            <!-- PANEL 1: REQUISITOS (Inputs del formulario) -->
+            <div id="panel-gasto-requisitos" style="display:flex; flex-direction:column; gap:1.15rem;">
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.85rem;">
+                <div>
+                  <label class="form-label" for="gasto-fecha">Fecha *</label>
+                  <input type="date" id="gasto-fecha" class="form-input" required />
+                </div>
+                <div>
+                  <label class="form-label" for="gasto-metodo">Método de Pago *</label>
+                  <select id="gasto-metodo" class="form-select" required onchange="onMetodoPagoChange()" style="width: 100%;">
+                    <option value="Reembolso (Efectivo/Personal)">Reembolso (Efectivo/Personal)</option>
+                    <option value="Tarjeta Clara">Tarjeta Clara</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.85rem;">
+                <div>
+                  <label class="form-label" for="gasto-categoria">Categoría (Etiquetas) *</label>
+                  <select id="gasto-categoria" class="form-select" required style="width: 100%;">
+                    <option value="Combustible">Combustible</option>
+                    <option value="Alimentación">Alimentación</option>
+                    <option value="Hospedaje">Hospedaje</option>
+                    <option value="Casetas / Peajes">Casetas / Peajes</option>
+                    <option value="Otros">Otros</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label" for="gasto-monto">Monto Total *</label>
+                  <input type="number" id="gasto-monto" class="form-input" placeholder="0.00" step="0.01" min="0.01" required oninput="actualizarMontoCabeceraGasto(this.value)" />
+                </div>
+              </div>
+
+              <div>
+                <label class="form-label" for="gasto-orden">Orden de Servicio Relacionada (Vinculación)</label>
+                <select id="gasto-orden" class="form-select" style="width: 100%;" onchange="actualizarDetalleVinculacionOrden(this.value)">
+                  <option value="">General (Sin Orden específica)</option>
+                </select>
+
+                <!-- DETALLE DE VINCULACIÓN OPERATIVA DINÁMICO -->
+                <div id="gasto-vinculacion-orden-container" style="display:none; background: var(--bg-hover); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem; margin-top: 0.65rem;">
+                  <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); font-weight:600; margin-bottom:0.4rem; letter-spacing:0.05em; display:flex; align-items:center; gap:0.25rem;">
+                    <i data-lucide="link-2" style="width:12px;height:12px;color:var(--accent);"></i> Vinculación Operativa
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:0.3rem; font-size:0.8rem; line-height:1.35;">
+                    <div>Cliente: <strong id="gasto-vinc-cliente" style="color:var(--text-primary);">-</strong></div>
+                    <div>Ubicación: <span id="gasto-vinc-ubicacion" style="color:var(--text-secondary);">-</span></div>
+                    <div style="margin-top:0.25rem; border-top:1px dashed var(--border); padding-top:0.25rem;">
+                      Ticket Vinculado: <strong id="gasto-vinc-ticket" style="color:var(--accent); font-family:monospace;">-</strong>
+                    </div>
+                    <div style="font-size:0.72rem; color:var(--text-muted);" id="gasto-vinc-ticket-asunto">Sin Asunto</div>
+                    <div style="margin-top:0.25rem; border-top:1px dashed var(--border); padding-top:0.25rem; font-size:0.72rem; color:var(--text-muted);">
+                      Tipo: <span id="gasto-vinc-tipo" style="font-weight:600; color:var(--text-secondary);">-</span> • Máquina: <span id="gasto-vinc-maquina" style="color:var(--text-secondary);">-</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- DATOS FISCALES DEL XML VINCULADOS -->
+                <div id="gasto-sat-datos-vinculados" style="display:none; margin-top: 0.5rem; background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.18); border-radius: var(--radius-sm); padding: 0.65rem;">
+                  <div style="font-size:0.7rem; text-transform:uppercase; color:var(--green); font-weight:600; margin-bottom:0.25rem; letter-spacing:0.05em; display:flex; align-items:center; gap:0.25rem;">
+                    <i data-lucide="check-circle" style="width:12px;height:12px;"></i> Datos Fiscales Vinculados
+                  </div>
+                  <div style="font-size:0.75rem; display:flex; flex-direction:column; gap:0.15rem; color:var(--text-secondary);">
+                    <div>RFC Emisor: <strong id="lbl-gasto-rfc" style="color:var(--text-primary); font-family:monospace;">-</strong></div>
+                    <div>UUID Fiscal: <span id="lbl-gasto-uuid" style="font-family:monospace; word-break:break-all;">-</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label class="form-label" for="gasto-descripcion">Descripción / Justificación *</label>
+                <textarea id="gasto-descripcion" class="form-input" rows="4" placeholder="Escribe el motivo detallado de este gasto..." required style="resize:vertical; font-size:0.82rem;"></textarea>
+              </div>
+            </div>
+
+            <!-- PANEL 2: REVISAR / AUDITORÍA -->
+            <div id="panel-gasto-revisar" style="display:none; flex-direction:column; gap:0.75rem;">
+              <div style="font-weight:600; font-size:0.875rem; color:var(--text-primary); margin-bottom:0.4rem;">Auditoría de Cumplimiento de Políticas</div>
+              <div style="display:flex; flex-direction:column; gap:0.65rem;" id="gasto-audit-checklist">
+                <!-- Se poblará dinámicamente -->
+              </div>
+            </div>
+
+            <!-- PANEL 3: ACTIVIDAD / TIMELINE -->
+            <div id="panel-gasto-actividad" style="display:none; flex-direction:column; gap:0.75rem;">
+              <div style="font-weight:600; font-size:0.875rem; color:var(--text-primary); margin-bottom:0.4rem;">Historial de Movimientos</div>
+              <div style="display:flex; flex-direction:column; gap:0.85rem; padding-left:0.5rem; border-left:2px solid var(--border);" id="gasto-timeline-container">
+                <!-- Se poblará dinámicamente -->
+              </div>
+            </div>
+
+          </div>
+
+          <!-- COLUMNA DERECHA: SUBE TU EVIDENCIA / FACTURACIÓN -->
+          <div style="display:flex; flex-direction:column; gap:1.25rem; border-left: 1px solid var(--border); padding-left: 1.5rem;">
+            
+            <!-- Inputs nativos de archivos ocultos -->
+            <input type="file" id="gasto-evidencia-file" accept="image/*" style="display:none;" onchange="procesarEvidenciaGasto(event)" />
+            <input type="file" id="gasto-pdf-file" accept="application/pdf" style="display:none;" onchange="procesarArchivoFactura(event, 'pdf')" />
+            <input type="file" id="gasto-xml-file" accept="text/xml,application/xml" style="display:none;" onchange="procesarArchivoFactura(event, 'xml')" />
+
+            <!-- Uploader Dashboard Grid Clara -->
+            <div style="display:flex; flex-direction:column; gap:0.6rem;">
+              <div style="font-size:0.82rem; font-weight:600; color:var(--text-primary); display:flex; align-items:center; gap:0.4rem;">
+                <i data-lucide="upload-cloud" style="color:var(--accent); width:16px; height:16px;"></i> Sube tu evidencia
+              </div>
+              <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                <button type="button" onclick="document.getElementById('gasto-evidencia-file').click()" class="btn-secondary" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.35rem; padding:0.65rem 0.25rem; font-size:0.65rem; font-weight:600; min-height:auto; border-style:dashed; border-radius:6px; width:100%; border-color:var(--border);">
+                  <i data-lucide="camera" style="width:15px;height:15px;color:var(--text-muted);"></i> Ticket / Recibo
+                </button>
+                <button type="button" onclick="document.getElementById('gasto-pdf-file').click()" class="btn-secondary" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.35rem; padding:0.65rem 0.25rem; font-size:0.65rem; font-weight:600; min-height:auto; border-style:dashed; border-radius:6px; width:100%; border-color:var(--border);">
+                  <i data-lucide="file-text" style="width:15px;height:15px;color:var(--text-muted);"></i> Factura PDF
+                </button>
+                <button type="button" onclick="document.getElementById('gasto-xml-file').click()" class="btn-secondary" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.35rem; padding:0.65rem 0.25rem; font-size:0.65rem; font-weight:600; min-height:auto; border-style:dashed; border-radius:6px; width:100%; border-color:var(--border);">
+                  <i data-lucide="file-code" style="width:15px;height:15px;color:var(--text-muted);"></i> XML Digital
+                </button>
+              </div>
+              <button type="button" onclick="abrirOneDrivePicker()" class="btn-secondary" style="display:flex; align-items:center; justify-content:center; gap:0.5rem; padding:0.5rem 0.75rem; font-size:0.75rem; font-weight:600; min-height:auto; border-radius:6px; width:100%; margin-top:0.4rem; background:rgba(0,120,212,0.06); border:1px solid rgba(0,120,212,0.25); color:#0078d4; transition:var(--transition); font-family:inherit;" onmouseover="this.style.background='rgba(0,120,212,0.12)'" onmouseout="this.style.background='rgba(0,120,212,0.06)'">
+                <i data-lucide="cloud" style="width:16px;height:16px;color:#0078d4;"></i> Importar de OneDrive
+              </button>
+            </div>
+
+            <!-- Listado Lateral de Evidencias / Comprobantes -->
+            <div style="display:flex; flex-direction:column; gap:0.6rem; flex:1; min-height:180px;">
+              <div style="font-size: 0.8rem; font-weight:600; color: var(--text-primary); display:flex; align-items:center; gap:0.4rem; justify-content:space-between;">
+                <span>Documentación y Archivos</span>
+                <span style="font-size:0.7rem; font-weight:500; color:var(--text-muted);" id="evidence-count-badge">0 cargados</span>
+              </div>
+              <div id="gasto-sidebar-evidence-list" style="display:flex; flex-direction:column; gap:0.65rem; overflow-y:auto; max-height:42vh; padding-right:0.25rem;">
+                <!-- Cargado dinámicamente -->
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+        <div class="modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem; background: var(--bg-hover);">
+          <button type="button" class="btn-secondary" onclick="cerrarModalGasto()">Cancelar</button>
+          <button type="submit" class="btn-primary"><i data-lucide="save" class="btn-icon"></i> Registrar Movimiento</button>
+        </div>
+      </form>
+  </div>
+
+
+  <!-- MODAL ONEDRIVE FILE EXPLORER PICKER -->
+  <div class="modal-overlay" id="modal-onedrive-picker-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:2100; align-items:center; justify-content:center; padding:1rem; box-sizing:border-box;" onclick="if(event.target===this) cerrarOneDrivePicker()">
+    <div class="modal" style="max-width:800px; width:100%; max-height:85vh; padding:0; border-radius:12px; overflow:hidden; background:#f3f3f3; color:#242424; box-shadow:0 8px 32px rgba(0,0,0,0.3); display:flex; flex-direction:column; border:1px solid #d2d2d2; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+      
+      <!-- HEADER ESTILO OFFICE 365 -->
+      <div style="background:#0078d4; padding:0.85rem 1.25rem; display:flex; align-items:center; justify-content:space-between; color:white; flex-shrink:0;">
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <i data-lucide="cloud" style="width:20px; height:20px; stroke:currentColor; stroke-width:2.5;"></i>
+          <span style="font-weight:600; font-size:0.95rem; letter-spacing:-0.01em;">Microsoft OneDrive</span>
+        </div>
+        <button type="button" onclick="cerrarOneDrivePicker()" style="background:none; border:none; color:rgba(255,255,255,0.85); cursor:pointer; padding:4px; display:flex; align-items:center; justify-content:center;" onmouseover="this.style.color='white'" onmouseout="this.style.color='rgba(255,255,255,0.85)'">
+          <i data-lucide="x" style="width:18px; height:18px;"></i>
+        </button>
+      </div>
+
+      <!-- MAIN AREA: SIDEBAR + FILE EXPLORER -->
+      <div style="display:flex; flex:1; overflow:hidden; min-height:400px; background:white;">
+        
+        <!-- SIDEBAR DE NAVEGACIÓN -->
+        <div style="width:180px; background:#f3f3f3; border-right:1px solid #e0e0e0; display:flex; flex-direction:column; padding:0.75rem 0.5rem; gap:0.25rem; box-sizing:border-box; flex-shrink:0;">
+          <button type="button" class="onedrive-nav-item active" style="background:#e0e0e0; border:none; color:#242424; font-weight:600; text-align:left; padding:0.5rem 0.75rem; font-size:0.8rem; border-radius:4px; cursor:pointer; display:flex; align-items:center; gap:0.5rem; width:100%; font-family:inherit;">
+            <i data-lucide="folder" style="width:14px; height:14px; color:#0078d4;"></i> Mis archivos
+          </button>
+          <button type="button" class="onedrive-nav-item" style="background:none; border:none; color:#605e5c; text-align:left; padding:0.5rem 0.75rem; font-size:0.8rem; border-radius:4px; cursor:pointer; display:flex; align-items:center; gap:0.5rem; width:100%; font-family:inherit;">
+            <i data-lucide="clock" style="width:14px; height:14px;"></i> Recientes
+          </button>
+          <button type="button" class="onedrive-nav-item" style="background:none; border:none; color:#605e5c; text-align:left; padding:0.5rem 0.75rem; font-size:0.8rem; border-radius:4px; cursor:pointer; display:flex; align-items:center; gap:0.5rem; width:100%; font-family:inherit;">
+            <i data-lucide="users" style="width:14px; height:14px;"></i> Compartidos
+          </button>
+          <button type="button" class="onedrive-nav-item" style="background:none; border:none; color:#605e5c; text-align:left; padding:0.5rem 0.75rem; font-size:0.8rem; border-radius:4px; cursor:pointer; display:flex; align-items:center; gap:0.5rem; width:100%; font-family:inherit;">
+            <i data-lucide="trash" style="width:14px; height:14px;"></i> Papelera
+          </button>
+        </div>
+
+        <!-- CONTENEDOR DE ARCHIVOS -->
+        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+          
+          <!-- BREADCRUMBS Y BÚSQUEDA -->
+          <div style="padding:0.75rem 1rem; border-bottom:1px solid #e0e0e0; display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-shrink:0;">
+            <!-- Breadcrumbs -->
+            <div style="display:flex; align-items:center; gap:0.4rem; font-size:0.8rem; color:#605e5c; font-weight:500;" id="onedrive-breadcrumbs">
+              <span style="color:#0078d4; cursor:pointer; font-weight:600;" onclick="navegarOneDriveSimulado('/')">Mis archivos</span>
+              <i data-lucide="chevron-right" style="width:12px; height:12px; opacity:0.6;"></i>
+              <span id="onedrive-current-folder-label">Facturas de gastos</span>
+            </div>
+            <!-- Búsqueda en OneDrive -->
+            <div style="position:relative; display:flex; align-items:center; width:100%; max-width:200px;">
+              <i data-lucide="search" style="position:absolute; left:0.5rem; width:12px; height:12px; color:#605e5c;"></i>
+              <input type="text" id="onedrive-search-input" placeholder="Buscar en OneDrive" oninput="filtrarOneDriveSimulado()" style="padding:0.25rem 0.4rem 0.25rem 1.6rem; border-radius:4px; border:1px solid #d2d2d2; font-size:0.75rem; width:100%; outline:none; background:#faf9f8; font-family:inherit; color:#242424;" />
+            </div>
+          </div>
+
+          <!-- LISTA DE ARCHIVOS -->
+          <div style="flex:1; overflow-y:auto; padding:0 0.5rem;">
+            <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.78rem;">
+              <thead>
+                <tr style="border-bottom:1px solid #e0e0e0; color:#605e5c;">
+                  <th style="padding:0.5rem; width:30px;"></th>
+                  <th style="padding:0.5rem; font-weight:600;">Nombre</th>
+                  <th style="padding:0.5rem; font-weight:600;">Fecha de modificación</th>
+                  <th style="padding:0.5rem; font-weight:600;">Tamaño</th>
+                </tr>
+              </thead>
+              <tbody id="onedrive-picker-files-body">
+                <!-- Se poblará dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- FOOTER -->
+      <div style="background:#faf9f8; padding:0.85rem 1.25rem; border-top:1px solid #e0e0e0; display:flex; justify-content:flex-end; gap:0.5rem; flex-shrink:0;">
+        <button type="button" class="btn-secondary" onclick="cerrarOneDrivePicker()" style="border:1px solid #8a8886; color:#323130; background:white; font-family:inherit; font-size:0.8rem; padding:0.4rem 1rem; border-radius:4px; font-weight:600; cursor:pointer;" onmouseover="this.style.background='#f3f2f1'" onmouseout="this.style.background='white'">Cancelar</button>
+        <button type="button" id="btn-onedrive-import-confirm" disabled onclick="confirmarImportacionOneDrive()" style="border:none; color:white; background:#0078d4; font-family:inherit; font-size:0.8rem; padding:0.4rem 1rem; border-radius:4px; font-weight:600; cursor:pointer; opacity:0.6;" onmouseover="if(!this.disabled) this.style.background='#005a9e'" onmouseout="if(!this.disabled) this.style.background='#0078d4'">Importar</button>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- MODAL DETALLE / APROBACIÓN GASTO -->
+  <div class="modal-overlay" id="modal-gasto-detalle-overlay" onclick="if(event.target===this) cerrarDetalleGasto()">
+    <div class="modal" style="max-width: 700px; padding:0;">
+      <div class="modal-header" style="padding:1.25rem 1.5rem; border-bottom:1px solid var(--border);">
+        <h2>Detalle del Gasto</h2>
+        <button class="modal-close" onclick="cerrarDetalleGasto()">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem; max-height:80vh; overflow-y:auto;">
+        
+        <!-- Estado y Datos Generales -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; background:var(--bg-hover); padding:1rem; border-radius:var(--radius); border:1px solid var(--border);">
+          <div>
+            <div style="font-size:0.75rem; color:var(--text-secondary); font-weight:500;">ESTADO</div>
+            <div id="gd-estado-badge" style="margin-top:0.25rem;">-</div>
+          </div>
+          <div>
+            <div style="font-size:0.75rem; color:var(--text-secondary); font-weight:500;">MONTO TOTAL</div>
+            <div id="gd-monto" style="font-size:1.4rem; font-weight:700; color:var(--text-primary); margin-top:0.1rem;">$0.00</div>
+          </div>
+          <div>
+            <div style="font-size:0.75rem; color:var(--text-secondary); font-weight:500;">MÉTODO</div>
+            <div id="gd-metodo" style="margin-top:0.25rem;">-</div>
+          </div>
+        </div>
+
+        <!-- Info Grid -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div>
+            <label class="form-label" style="font-size:0.75rem; color:var(--text-secondary);">TÉCNICO / REGISTRADO POR</label>
+            <div id="gd-tecnico" style="font-weight:600; font-size:0.9rem;">-</div>
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.75rem; color:var(--text-secondary);">FECHA DEL GASTO</label>
+            <div id="gd-fecha" style="font-weight:600; font-size:0.9rem;">-</div>
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.75rem; color:var(--text-secondary);">CATEGORÍA</label>
+            <div id="gd-categoria" style="font-weight:600; font-size:0.9rem;">-</div>
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.75rem; color:var(--text-secondary);">ORDEN RELACIONADA</label>
+            <div id="gd-orden" style="font-weight:600; font-size:0.9rem;">-</div>
+          </div>
+        </div>
+
+        <div>
+          <label class="form-label" style="font-size:0.75rem; color:var(--text-secondary);">DESCRIPCIÓN / CONCEPTO</label>
+          <div id="gd-descripcion" style="font-size:0.9rem; background:var(--bg-primary); padding:0.75rem; border-radius:var(--radius-sm); border:1px solid var(--border); line-height:1.4; word-break:break-word;">-</div>
+        </div>
+
+        <!-- Clara Detail Block if applicable -->
+        <div id="gd-clara-block" style="display:none; background:rgba(139, 92, 246, 0.08); border:1px solid rgba(139, 92, 246, 0.15); padding:0.75rem; border-radius:var(--radius-sm); font-size:0.8rem; color:var(--text-primary);">
+          <div style="font-weight:600; color:#a78bfa; margin-bottom:0.25rem; display:flex; align-items:center; gap:0.3rem;"><i data-lucide="credit-card" style="width:14px;height:14px;"></i> Detalle Transacción Clara</div>
+          <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; margin-top:0.25rem;">
+            <span>ID Cargo: <strong id="gd-clara-tx-id">-</strong></span>
+            <span>Comercio original: <strong id="gd-clara-merchant">-</strong></span>
+            <span>Tarjeta: <strong id="gd-clara-card">-</strong></span>
+          </div>
+        </div>
+
+        <!-- SAT Billing details -->
+        <div style="border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; background: var(--bg-hover);">
+          <div style="font-weight:600; font-size:0.85rem; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.3rem; color:var(--text-primary);">
+            <i data-lucide="receipt-text" style="width:16px;height:16px;color:var(--accent);"></i> Comprobante Fiscal SAT
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; font-size:0.8rem; margin-bottom:0.75rem;">
+            <div>RFC Emisor: <strong id="gd-rfc-emisor">-</strong></div>
+            <div>Folio Fiscal UUID: <strong id="gd-uuid-fiscal" style="word-break:break-all;">-</strong></div>
+          </div>
+          <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+            <a id="gd-btn-pdf" href="#" target="_blank" class="btn-secondary" style="min-height:30px; font-size:0.75rem; padding:0.2rem 0.6rem; display:none; align-items:center; gap:0.3rem;"><i data-lucide="file-text" style="width:14px;height:14px;"></i> Ver PDF Factura</a>
+            <a id="gd-btn-xml" href="#" target="_blank" class="btn-secondary" style="min-height:30px; font-size:0.75rem; padding:0.2rem 0.6rem; display:none; align-items:center; gap:0.3rem;"><i data-lucide="code" style="width:14px;height:14px;"></i> Descargar XML</a>
+            <span id="gd-no-factura-msg" style="color:var(--text-muted); font-size:0.75rem;">No se adjuntaron archivos XML/PDF de factura fiscal.</span>
+          </div>
+        </div>
+
+        <!-- Evidencia / Ticket Image Preview -->
+        <div style="border:1px solid var(--border); border-radius:var(--radius); padding:1rem; text-align:center; background:var(--bg-primary);">
+          <div style="font-weight:500; font-size:0.8rem; text-align:left; color:var(--text-secondary); margin-bottom:0.5rem;">FOTO DEL TICKET DE EVIDENCIA</div>
+          <img id="gd-evidencia-img" style="max-width:100%; max-height:350px; border-radius:var(--radius-sm); border:1px solid var(--border); object-fit:contain; background:#12141c;" src="" alt="Sin evidencia" />
+          <div id="gd-no-evidencia" style="display:none; padding:2rem; color:var(--text-secondary); font-size:0.85rem;"><i data-lucide="image-off" style="width:24px;height:24px;display:block;margin:0 auto 0.5rem;opacity:0.5;"></i> No se adjuntó foto de ticket.</div>
+        </div>
+
+        <!-- Comentarios de Aprobacion -->
+        <div id="gd-comentarios-container" style="display:none;">
+          <label class="form-label" style="font-size:0.75rem; color:var(--text-secondary);">OBSERVACIONES / COMENTARIOS DE APROBACIÓN</label>
+          <div id="gd-comentarios" style="font-size:0.85rem; padding:0.75rem; background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.15); border-radius:var(--radius-sm); color:var(--text-primary); line-height:1.4;">-</div>
+        </div>
+
+        <!-- Admin / Supervisor Approval panel -->
+        <div id="gd-aprobacion-panel" style="display:none; border-top:1px solid var(--border); padding-top:1.25rem;">
+          <label class="form-label" for="gd-comentario-input">Comentarios para el técnico (Obligatorio si se rechaza)</label>
+          <textarea id="gd-comentario-input" class="form-input" rows="2" placeholder="Comentarios sobre la aprobación o motivo de rechazo..." style="margin-bottom:0.75rem; resize:vertical;"></textarea>
+          <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
+            <button type="button" class="btn-secondary" style="color:var(--red); border-color:var(--border);" onclick="procesarAprobacionGasto(false)"><i data-lucide="x-circle" style="width:14px;height:14px;margin-right:4px;vertical-align:text-bottom;"></i> Rechazar Gasto</button>
+            <button type="button" class="btn-primary" style="background:var(--green); border-color:var(--green);" onclick="procesarAprobacionGasto(true)"><i data-lucide="check-circle-2" style="width:14px;height:14px;margin-right:4px;vertical-align:text-bottom;"></i> Aprobar Gasto</button>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer" style="padding:1.25rem 1.5rem; border-top:1px solid var(--border); display:flex; justify-content:flex-end; background:var(--bg-hover); border-radius:0 0 12px 12px;">
+        <button class="btn-secondary" onclick="cerrarDetalleGasto()">Cerrar</button>
       </div>
     </div>
   </div>
