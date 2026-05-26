@@ -18,6 +18,10 @@ global.configData = {
 
 global.lucide = { createIcons: () => {} };
 global.mostrarNotificacion = () => {};
+global.localStorage = {
+  getItem: () => '[]',
+  setItem: () => {}
+};
 
 const appCode = fs.readFileSync('app.js', 'utf8');
 eval(appCode);
