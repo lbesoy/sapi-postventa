@@ -584,7 +584,7 @@ body {
   display: block;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 600px) {
   #modal-gasto-overlay .modal-body {
     grid-template-columns: 1fr !important;
     gap: 1.25rem !important;

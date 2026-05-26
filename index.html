@@ -3773,7 +3773,7 @@
 
   <!-- MODAL REGISTRAR/EDITAR GASTO -->
   <div class="modal-overlay" id="modal-gasto-overlay" onclick="if(event.target===this) cerrarModalGasto()">
-    <div class="modal" style="max-width: 900px; width: 95%; overflow:hidden;">
+    <div class="modal" style="max-width: 1000px; width: 95%; overflow:hidden;">
       <div class="modal-header" style="border-bottom:1px solid var(--border); padding: 1.25rem 1.5rem; display:flex; align-items:center; justify-content:space-between;">
         <h2 id="modal-gasto-titulo" style="font-size:1.05rem; display:flex; align-items:center; gap:0.5rem; margin:0;"><i data-lucide="receipt-text" style="color:var(--accent);"></i> Detalle de la transacción</h2>
         <button class="modal-close" onclick="cerrarModalGasto()" style="background:none; border:none; color:var(--text-secondary); cursor:pointer;">
@@ -3781,7 +3781,7 @@
         </button>
       </div>
       <form id="form-gasto" onsubmit="guardarGasto(event)">
-        <div class="modal-body" style="display:grid; grid-template-columns: 1.1fr 1fr; gap:1.75rem; max-height:75vh; overflow-y:auto; padding: 1.5rem; box-sizing:border-box;">
+        <div class="modal-body" style="display:grid; grid-template-columns: 1.15fr 1fr; gap:1.75rem; max-height:75vh; overflow-y:auto; padding: 1.5rem; box-sizing:border-box;">
           
           <input type="hidden" id="gasto-id" />
           <input type="hidden" id="gasto-clara-tx-id" />
@@ -3969,7 +3969,7 @@
           </div>
 
         </div>
-        <div class="modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem; background: var(--bg-hover);">
+        <div class="modal-footer" style="padding: 1.25rem 2rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem; background: var(--bg-hover); box-sizing: border-box;">
           <button type="button" class="btn-secondary" onclick="cerrarModalGasto()">Cancelar</button>
           <button type="submit" class="btn-primary"><i data-lucide="save" class="btn-icon"></i> Registrar Movimiento</button>
         </div>
