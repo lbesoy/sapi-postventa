@@ -1,47 +1,74 @@
-const { JSDOM } = require('jsdom');
 const fs = require('fs');
 
-const mockHtml = `
-<!DOCTYPE html>
-<html>
-<body>
-  <div id="modal-gasto-overlay"></div>
-  <div id="gasto-sat-details-accordion"></div>
-  <div id="gasto-sat-accordion-body"></div>
-  <div id="gasto-sat-suggested-matches-container"></div>
-  <div id="gasto-sat-suggested-matches-list"></div>
-  <div id="gasto-sat-datos-vinculados"></div>
-  <input id="gasto-monto" value="1174.79" />
-  <input id="gasto-fecha" value="2026-05-22" />
-  <input id="gasto-rfc-emisor" />
-  <input id="gasto-uuid-fiscal" />
-  <select id="gasto-orden"><option value="">General</option></select>
-  <div id="gasto-header-monto"></div>
-</body>
-</html>
-`;
-const dom = new JSDOM(mockHtml, { url: 'http://localhost' });
-const { window } = dom;
-const { document } = window;
+// Lightweight self-contained DOM Mock to prevent JSDOM conflicts in Node v24+
+const globalMock = {
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  dispatchEvent: () => {},
+  document: {
+    addEventListener: () => {},
+    getElementById: (id) => {
+      return {
+        addEventListener: () => {},
+        style: {},
+        classList: { add: () => {}, remove: () => {}, contains: () => false },
+        value: '',
+        innerHTML: '',
+        appendChild: () => {},
+        setAttribute: () => {},
+        getAttribute: () => '',
+        focus: () => {}
+      };
+    },
+    createElement: () => ({ style: {}, classList: { add: () => {} } }),
+    body: { style: {} }
+  },
+  location: { href: 'http://localhost', origin: 'http://localhost', pathname: '/' },
+  sessionStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+  localStorage: { getItem: () => '[]', setItem: () => {}, removeItem: () => {} },
+  navigator: { onLine: true, userAgent: 'Node' },
+  DOMParser: class {
+    parseFromString(xmlText) {
+      return {
+        getElementsByTagName: (tagName) => {
+          const cleanTag = tagName.replace('cfdi:', '').replace('tfd:', '');
+          const tagRegex = new RegExp(`<[^>]*:?${cleanTag}\\b([^>]*)/?>`, 'gi');
+          const nodes = [];
+          let match;
+          while ((match = tagRegex.exec(xmlText)) !== null) {
+            const attrsText = match[1];
+            const attrs = {};
+            const attrRegex = /([a-zA-Z0-9:]+)\s*=\s*(["'])(.*?)\2/gi;
+            let attrMatch;
+            while ((attrMatch = attrRegex.exec(attrsText)) !== null) {
+              attrs[attrMatch[1]] = attrMatch[3];
+            }
+            nodes.push({
+              getAttribute: (name) => attrs[name] || attrs[name.toLowerCase()] || ''
+            });
+          }
+          return nodes;
+        }
+      };
+    }
+  }
+};
 
-global.window = window;
-global.document = document;
-global.navigator = window.navigator;
+global.window = globalMock;
+global.document = globalMock.document;
+global.DOMParser = globalMock.DOMParser;
+global.navigator = globalMock.navigator;
+global.sessionStorage = globalMock.sessionStorage;
+global.localStorage = globalMock.localStorage;
+global.location = globalMock.location;
 
-// Assign global configData mockup
 global.configData = {
   rfc: 'ERE140718NY8'
 };
 
-// Mock other globals
 global.lucide = { createIcons: () => {} };
 global.mostrarNotificacion = () => {};
-global.localStorage = {
-  getItem: () => '[]',
-  setItem: () => {}
-};
 
-// Read app.js
 const appCode = fs.readFileSync('app.js', 'utf8');
 eval(appCode);
 
@@ -86,5 +113,5 @@ if (result.date !== '2026-05-22') {
   process.exit(1);
 }
 
-console.log('✅ PDF regex auto-parsing test passed successfully!');
+console.log('✅ PDF parser regex tests passed successfully!');
 process.exit(0);
