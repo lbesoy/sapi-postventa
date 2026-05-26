@@ -11680,6 +11680,17 @@ window.vincularFacturaSugerida = function(type, uuid) {
   if (type === 'xml') {
     window.adjuntarXmlFactura(file.uuid || uuid);
     mostrarNotificacion('Comprobante XML vinculado automáticamente', 'success');
+
+    // Auto-link matching PDF sharing same base filename
+    if (file.name) {
+      const baseName = file.name.substring(0, file.name.lastIndexOf('.'));
+      const matchingPdf = window._gastoUploadedFiles.find(x => x.type === 'pdf' && x.isOneDriveVirtual && x.name.startsWith(baseName));
+      if (matchingPdf) {
+        matchingPdf.isOneDriveVirtual = false;
+        window.procesarPdfFacturaExtraida(matchingPdf.name, matchingPdf.base64);
+        mostrarNotificacion('Factura PDF vinculada automáticamente', 'success');
+      }
+    }
   } else if (type === 'pdf') {
     window.procesarPdfFacturaExtraida(file.name, file.base64);
     
@@ -11690,6 +11701,17 @@ window.vincularFacturaSugerida = function(type, uuid) {
     }
     
     mostrarNotificacion('Factura PDF vinculada automáticamente', 'success');
+
+    // Auto-link matching XML sharing same base filename
+    if (file.name) {
+      const baseName = file.name.substring(0, file.name.lastIndexOf('.'));
+      const matchingXml = window._gastoUploadedFiles.find(x => x.type === 'xml' && x.isOneDriveVirtual && x.name.startsWith(baseName));
+      if (matchingXml) {
+        matchingXml.isOneDriveVirtual = false;
+        window.adjuntarXmlFactura(matchingXml.uuid);
+        mostrarNotificacion('Comprobante XML vinculado automáticamente', 'success');
+      }
+    }
   }
 };
 
@@ -12016,7 +12038,14 @@ window.renderUploaderSidebar = function() {
     if (file.type === 'xml') {
       const isAttached = document.getElementById('gasto-uuid-fiscal').value === file.uuid || 
                          (file.satData && document.getElementById('gasto-uuid-fiscal').value === file.satData.uuid);
-      const isBestOption = Math.abs((file.monto || 0) - currentMonto) < 0.05;
+      
+      const realMonto = file.monto || (file.satData && (file.satData.total || file.satData.monto)) || 0;
+      const realEmisor = file.emisor || (file.satData && file.satData.nombreEmisor) || 'Factura XML';
+      const realDate = file.date || (file.satData && (file.satData.fechaEmision || file.satData.date || '')).split('T')[0] || '';
+      const realUuid = (file.satData && file.satData.uuid) || file.uuid || '';
+
+      const isBestOption = Math.abs(realMonto - currentMonto) < 0.05;
+      const formattedMonto = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(realMonto);
 
       return `
         <div style="background:var(--bg-card); border:1px solid ${isAttached ? 'rgba(16,185,129,0.35)' : 'var(--border)'}; border-radius:8px; padding:0.75rem; display:flex; flex-direction:column; gap:0.5rem; transition:var(--transition); box-shadow:${isAttached ? '0 0 10px rgba(16,185,129,0.04)' : 'none'};">
@@ -12026,8 +12055,8 @@ window.renderUploaderSidebar = function() {
                 <i data-lucide="file-code" style="width:18px;height:18px;"></i>
               </div>
               <div style="min-width:0;">
-                <div style="font-weight:600; font-size:0.78rem; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${file.emisor || 'Factura XML'}</div>
-                <div style="font-size:0.68rem; color:var(--text-muted);">${file.date || ''} • $${file.monto || '0.00'}</div>
+                <div style="font-weight:600; font-size:0.78rem; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${realEmisor}</div>
+                <div style="font-size:0.68rem; color:var(--text-muted);">${realDate} • ${formattedMonto}</div>
               </div>
             </div>
             <div style="display:flex; flex-direction:column; align-items:flex-end; gap:0.25rem;">
@@ -12036,10 +12065,10 @@ window.renderUploaderSidebar = function() {
             </div>
           </div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.25rem; border-top:1px dashed var(--border); padding-top:0.4rem;">
-            <button type="button" onclick="window.quitarSidebarFile('xml', '${file.uuid}')" style="background:none; border:none; color:var(--red); font-size:0.72rem; font-weight:600; cursor:pointer;">Quitar</button>
+            <button type="button" onclick="window.quitarSidebarFile('xml', '${realUuid}')" style="background:none; border:none; color:var(--red); font-size:0.72rem; font-weight:600; cursor:pointer;">Quitar</button>
             ${isAttached 
               ? `<button type="button" onclick="window.desadjuntarXmlFactura()" style="background:none; border:none; color:var(--accent); font-size:0.72rem; font-weight:600; cursor:pointer;">Desvincular</button>`
-              : `<button type="button" class="btn-primary" onclick="window.adjuntarXmlFactura('${file.uuid}')" style="padding:0.25rem 0.6rem; font-size:0.7rem; min-height:auto; font-weight:700; border-radius:4px; line-height:1; display:flex; align-items:center; gap:2px;"><i data-lucide="link" style="width:10px;height:10px;"></i> Adjuntar</button>`
+              : `<button type="button" class="btn-primary" onclick="window.adjuntarXmlFactura('${realUuid}')" style="padding:0.25rem 0.6rem; font-size:0.7rem; min-height:auto; font-weight:700; border-radius:4px; line-height:1; display:flex; align-items:center; gap:2px;"><i data-lucide="link" style="width:10px;height:10px;"></i> Adjuntar</button>`
             }
           </div>
         </div>
