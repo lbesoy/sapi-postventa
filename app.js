@@ -14189,29 +14189,29 @@ window.analizarFacturaPdfTexto = function(text) {
     else if (t.includes('nómina') || t.includes('nomina')) data.tipoComprobante = 'N - Nómina';
   }
 
-  // 13. Moneda & Tipo Cambio
-  const monedaRegex = /(?:moneda|currency)\s*(?::)?\s*([A-Z]{3}|[a-zA-Z\s]+)/i;
-  const monedaMatch = text.match(monedaRegex);
-  if (monedaMatch) {
-    const m = monedaMatch[1].trim().toUpperCase();
-    if (m.includes('MXN') || m.includes('PESO') || m.includes('M.N')) {
-      data.moneda = 'MXN';
-    } else if (m.includes('USD') || m.includes('DOLAR') || m.includes('DOLLAR')) {
-      data.moneda = 'USD';
-    } else if (m.includes('EUR') || m.includes('EURO')) {
-      data.moneda = 'EUR';
-    } else if (m.length === 3) {
-      data.moneda = m;
+  // 13. Moneda
+  let currency = 'MXN'; // default fallback
+  const lowerText = text.toLowerCase();
+  
+  // Try to find a standalone 3-letter currency code near the word "moneda" or "currency"
+  const currencyRegex = /(?:moneda|currency)\s*(?::)?\s*\b([A-Z]{3})\b/i;
+  const currencyMatch = text.match(currencyRegex);
+  if (currencyMatch) {
+    const m = currencyMatch[1].toUpperCase();
+    if (m === 'MXN' || m === 'USD' || m === 'EUR') {
+      currency = m;
     }
   } else {
-    // Fallback: search anywhere in document
-    const lowerText = text.toLowerCase();
-    if (lowerText.includes('mxn') || lowerText.includes('peso mexicano') || lowerText.includes('pesos') || lowerText.includes('m.n.')) {
-      data.moneda = 'MXN';
-    } else if (lowerText.includes('usd') || lowerText.includes('dólar') || lowerText.includes('dolar')) {
-      data.moneda = 'USD';
+    // If not found, let's scan the whole text for known currencies using strict word boundaries/patterns
+    if (/\b(?:usd|dolar|dólar|dollar|dollars)\b/i.test(text)) {
+      currency = 'USD';
+    } else if (/\b(?:eur|euro|euros)\b/i.test(text)) {
+      currency = 'EUR';
+    } else if (/\b(?:mxn|peso|pesos|m\.n\.)\b/i.test(text)) {
+      currency = 'MXN';
     }
   }
+  data.moneda = currency;
   
   const tcRegex = /(?:tipo\s*(?:de)?\s*cambio)\s*(?::)?\s*([0-9\.]+)/i;
   const tcMatch = text.match(tcRegex);
