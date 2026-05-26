@@ -11675,11 +11675,20 @@ window.vincularFacturaSugerida = function(type, uuid) {
   const file = window._gastoUploadedFiles.find(x => x.type === type && (uuid ? (x.uuid === uuid || x.satData?.uuid === uuid) : true));
   if (!file) return;
 
+  file.isOneDriveVirtual = false; // Mark as officially linked!
+
   if (type === 'xml') {
     window.adjuntarXmlFactura(file.uuid || uuid);
     mostrarNotificacion('Comprobante XML vinculado automáticamente', 'success');
   } else if (type === 'pdf') {
     window.procesarPdfFacturaExtraida(file.name, file.base64);
+    
+    // Ensure the newly created PDF in cache is marked non-virtual
+    const pdfReal = window._gastoUploadedFiles.find(x => x.type === 'pdf' && x.name === file.name);
+    if (pdfReal) {
+      pdfReal.isOneDriveVirtual = false;
+    }
+    
     mostrarNotificacion('Factura PDF vinculada automáticamente', 'success');
   }
 };
@@ -11842,8 +11851,14 @@ window.adjuntarXmlFactura = function(uuid) {
   const xml = window._gastoUploadedFiles.find(x => x.type === 'xml' && x.uuid === uuid);
   if (!xml) return;
 
-  document.getElementById('gasto-rfc-emisor').value = xml.rfc || '';
-  document.getElementById('gasto-uuid-fiscal').value = xml.uuid || '';
+  // Mark as officially linked (non-virtual)
+  xml.isOneDriveVirtual = false;
+
+  const realRfc = xml.rfc || (xml.satData && xml.satData.rfcEmisor) || '';
+  const realUuid = (xml.satData && xml.satData.uuid) || xml.uuid || '';
+
+  document.getElementById('gasto-rfc-emisor').value = realRfc;
+  document.getElementById('gasto-uuid-fiscal').value = realUuid;
   
   // Set window global base64
   window._gastoXmlBase64 = xml.base64;
@@ -11851,8 +11866,8 @@ window.adjuntarXmlFactura = function(uuid) {
   const datBox = document.getElementById('gasto-sat-datos-vinculados');
   if (datBox) {
     datBox.style.display = 'block';
-    document.getElementById('lbl-gasto-rfc').textContent = xml.rfc || '-';
-    document.getElementById('lbl-gasto-uuid').textContent = xml.uuid || '-';
+    document.getElementById('lbl-gasto-rfc').textContent = realRfc || '-';
+    document.getElementById('lbl-gasto-uuid').textContent = realUuid || '-';
   }
 
   // Parse and display the collapsible SAT table in the cloud
@@ -11999,7 +12014,8 @@ window.renderUploaderSidebar = function() {
     }
 
     if (file.type === 'xml') {
-      const isAttached = document.getElementById('gasto-uuid-fiscal').value === file.uuid;
+      const isAttached = document.getElementById('gasto-uuid-fiscal').value === file.uuid || 
+                         (file.satData && document.getElementById('gasto-uuid-fiscal').value === file.satData.uuid);
       const isBestOption = Math.abs((file.monto || 0) - currentMonto) < 0.05;
 
       return `
