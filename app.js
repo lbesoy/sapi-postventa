@@ -11487,6 +11487,30 @@ window.actualizarDetalleVinculacionOrden = function(folio) {
   document.getElementById('gasto-vinc-tipo').textContent = o.tipo || 'N/A';
   document.getElementById('gasto-vinc-maquina').textContent = o.modelo || o.maquina || 'N/A';
 
+  // Populating Service Order Folio and dates
+  const elFolio = document.getElementById('gasto-vinc-orden-folio');
+  if (elFolio) elFolio.textContent = o.folio || 'Sin folio';
+
+  const elCreada = document.getElementById('gasto-vinc-fecha-creacion');
+  if (elCreada) elCreada.textContent = o.fecha ? new Date(o.fecha).toLocaleDateString('es-MX', { timeZone: 'UTC' }) : 'N/A';
+
+  const elCerrada = document.getElementById('gasto-vinc-fecha-cierre');
+  if (elCerrada) {
+    const stateLower = (o.estado || '').toLowerCase();
+    if (stateLower === 'cerrada' || stateLower === 'completado') {
+      let fCierre = new Date(o.fecha || 0);
+      if (o.bitacora && o.bitacora.length > 0) {
+        const maxB = Math.max(...o.bitacora.map(b => new Date(b.fecha).getTime()));
+        if (!isNaN(maxB)) fCierre = new Date(maxB);
+      }
+      elCerrada.textContent = fCierre.toLocaleDateString('es-MX', { timeZone: 'UTC' });
+      elCerrada.style.color = 'var(--green)';
+    } else {
+      elCerrada.textContent = o.estado || 'Abierta';
+      elCerrada.style.color = 'var(--accent)';
+    }
+  }
+
   lucide.createIcons();
 };
 
