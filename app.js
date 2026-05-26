@@ -13547,7 +13547,8 @@ window.extraerDatosCompletosXml = function(xmlText) {
     descuento: 0,
     total: 0,
     isrRetenido: 0,
-    ivaRetenido: 0
+    ivaRetenido: 0,
+    ivaTrasladado: 0
   };
 
   try {
@@ -13662,10 +13663,13 @@ window.extraerDatosCompletosXml = function(xmlText) {
       data.fechaTimbrado = getAttr(timbreNode, "FechaTimbrado") || '';
     }
 
-    // Taxes retenciones
+    // Taxes retenciones y traslados
     let isrRet = 0;
     let ivaRet = 0;
+    let ivaTras = 0;
     const nsList = ["cfdi:", ""];
+
+    // 1. Retenciones
     for (const ns of nsList) {
       const retencionNodes = xmlDoc.getElementsByTagName(ns + "Retencion");
       if (retencionNodes && retencionNodes.length > 0) {
@@ -13679,11 +13683,29 @@ window.extraerDatosCompletosXml = function(xmlText) {
             ivaRet += impVal;
           }
         }
-        break; // found and processed
+        break;
       }
     }
+
+    // 2. Traslados (IVA 16% o 8%)
+    for (const ns of nsList) {
+      const trasladoNodes = xmlDoc.getElementsByTagName(ns + "Traslado");
+      if (trasladoNodes && trasladoNodes.length > 0) {
+        for (let i = 0; i < trasladoNodes.length; i++) {
+          const node = trasladoNodes[i];
+          const imp = node.getAttribute("Impuesto") || node.getAttribute("impuesto");
+          const impVal = parseFloat(node.getAttribute("Importe") || node.getAttribute("importe") || 0);
+          if (imp === "002") {
+            ivaTras += impVal;
+          }
+        }
+        break;
+      }
+    }
+
     data.isrRetenido = isrRet;
     data.ivaRetenido = ivaRet;
+    data.ivaTrasladado = ivaTras;
 
   } catch (err) {
     console.error('Error parsing XML in extraerDatosCompletosXml:', err);
@@ -13735,9 +13757,10 @@ window.renderSatDetailsTable = function(satData, containerId) {
     tipoCambio: "Tipo Cambio",
     subtotal: "SubTotal",
     descuento: "Descuento",
-    total: "Total",
+    ivaTrasladado: "IVA Trasladado",
     isrRetenido: "ISR Retenido",
-    ivaRetenido: "IVA Retenido"
+    ivaRetenido: "IVA Retenido",
+    total: "Total"
   };
 
   const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
@@ -13750,7 +13773,7 @@ window.renderSatDetailsTable = function(satData, containerId) {
   let idx = 0;
   for (const [key, label] of Object.entries(satLabels)) {
     let val = satData[key];
-    if (["subtotal", "descuento", "total", "isrRetenido", "ivaRetenido"].includes(key)) {
+    if (["subtotal", "descuento", "total", "isrRetenido", "ivaRetenido", "ivaTrasladado"].includes(key)) {
       val = formatMoney(parseFloat(val || 0));
     } else if (!val) {
       val = 'N/A';
@@ -13804,7 +13827,8 @@ window.analizarFacturaPdfTexto = function(text) {
     descuento: 0,
     total: 0,
     isrRetenido: 0,
-    ivaRetenido: 0
+    ivaRetenido: 0,
+    ivaTrasladado: 0
   };
   
   if (!text) return data;
@@ -13863,13 +13887,32 @@ window.analizarFacturaPdfTexto = function(text) {
   }
 
   // 5. Total
-  const totalRegex = /(?<!sub)(?:total|neto|pagar|importe|monto|total\s*factura)[^0-9$]{0,30}(?:\$)?\s*([0-9,]+(?:\.\d{2})?)/i;
-  const totalMatch = text.match(totalRegex);
-  if (totalMatch) {
-    const cleanNum = totalMatch[1].replace(/,/g, '');
-    const val = parseFloat(cleanNum);
-    if (!isNaN(val)) {
-      data.total = val;
+  let detectedTotal = 0;
+  const lines = text.split('\n');
+  for (const line of lines) {
+    const lowerLine = line.toLowerCase();
+    // Skip lines containing "impuesto", "retenido", "trasladado", "letra", "letras", "ahorro"
+    if (lowerLine.includes('impuesto') || lowerLine.includes('retenido') || lowerLine.includes('trasladado') || lowerLine.includes('letra') || lowerLine.includes('letras') || lowerLine.includes('ahorro')) {
+      continue;
+    }
+    // Priority 1: Match "Total" or "Total a Pagar" or "Total del Comprobante" (avoiding Subtotal)
+    const totalLineRegex = /(?<!sub)\b(?:total|neto|pagar|importe|monto|total\s*factura)\b[^0-9$]{0,35}(?:\$)?\s*([0-9,]+\.\d{2})\b/i;
+    const match = line.match(totalLineRegex);
+    if (match) {
+      const cleanNum = match[1].replace(/,/g, '');
+      const val = parseFloat(cleanNum);
+      if (!isNaN(val) && val > detectedTotal) {
+        detectedTotal = val; // We want the largest non-tax total line
+      }
+    }
+  }
+  if (detectedTotal > 0) {
+    data.total = detectedTotal;
+  } else {
+    // Fallback to simple regex if not found by lines
+    const fallbackMatch = text.match(/(?<!sub)(?<!impuesto\s)(?<!impuestos\s)total\s*(?::)?\s*(?:\$)?\s*([0-9,]+\.\d{2})\b/i);
+    if (fallbackMatch) {
+      data.total = parseFloat(fallbackMatch[1].replace(/,/g, ''));
     }
   }
 
@@ -13897,7 +13940,7 @@ window.analizarFacturaPdfTexto = function(text) {
     }
   }
 
-  // 8. Retenciones
+  // 8. Retenciones e IVA Trasladado
   const isrRegex = /(?:retención\s*isr|retencion\s*isr|isr\s*ret|isr\s*retenido)\s*(?::)?\s*(?:\$)?\s*([0-9,]+(?:\.\d{2})?)/i;
   const isrMatch = text.match(isrRegex);
   if (isrMatch) {
@@ -13917,6 +13960,31 @@ window.analizarFacturaPdfTexto = function(text) {
       data.ivaRetenido = val;
     }
   }
+
+  // 8b. IVA Trasladado (16% estándar o detectado por regex)
+  const ivaRegexes = [
+    /(?:iva\s*16%|iva\s*trasladado|impuesto\s*iva|i\.v\.a\.)\s*(?::)?\s*(?:\$)?\s*([0-9,]+\.\d{2})\b/i,
+    /IVA\s*(?::)?\s*(?:\$)?\s*([0-9,]+\.\d{2})\b/i
+  ];
+  let ivaTrasFound = 0;
+  for (const regex of ivaRegexes) {
+    // Avoid matching retained/retencion lines
+    const matches = text.match(new RegExp(regex.source, 'gi')) || [];
+    for (const m of matches) {
+      if (m.toLowerCase().includes('retencion') || m.toLowerCase().includes('retenido')) continue;
+      const singleMatch = m.match(regex);
+      if (singleMatch) {
+        const cleanNum = singleMatch[1].replace(/,/g, '');
+        const val = parseFloat(cleanNum);
+        if (!isNaN(val) && val > 0) {
+          ivaTrasFound = val;
+          break;
+        }
+      }
+    }
+    if (ivaTrasFound > 0) break;
+  }
+  data.ivaTrasladado = ivaTrasFound || parseFloat((data.subtotal * 0.16).toFixed(2));
 
   // 9. Fecha Emision
   const dateRegex = /\b(\d{4}-\d{2}-\d{2})|(\d{2}\/\d{2}\/\d{4})\b/;
@@ -13985,10 +14053,27 @@ window.analizarFacturaPdfTexto = function(text) {
   }
 
   // 13. Moneda & Tipo Cambio
-  const monedaRegex = /(?:moneda)\s*(?::)?\s*([A-Z]{3})/i;
+  const monedaRegex = /(?:moneda|currency)\s*(?::)?\s*([A-Z]{3}|[a-zA-Z\s]+)/i;
   const monedaMatch = text.match(monedaRegex);
   if (monedaMatch) {
-    data.moneda = monedaMatch[1].toUpperCase();
+    const m = monedaMatch[1].trim().toUpperCase();
+    if (m.includes('MXN') || m.includes('PESO') || m.includes('M.N')) {
+      data.moneda = 'MXN';
+    } else if (m.includes('USD') || m.includes('DOLAR') || m.includes('DOLLAR')) {
+      data.moneda = 'USD';
+    } else if (m.includes('EUR') || m.includes('EURO')) {
+      data.moneda = 'EUR';
+    } else if (m.length === 3) {
+      data.moneda = m;
+    }
+  } else {
+    // Fallback: search anywhere in document
+    const lowerText = text.toLowerCase();
+    if (lowerText.includes('mxn') || lowerText.includes('peso mexicano') || lowerText.includes('pesos') || lowerText.includes('m.n.')) {
+      data.moneda = 'MXN';
+    } else if (lowerText.includes('usd') || lowerText.includes('dólar') || lowerText.includes('dolar')) {
+      data.moneda = 'USD';
+    }
   }
   
   const tcRegex = /(?:tipo\s*(?:de)?\s*cambio)\s*(?::)?\s*([0-9\.]+)/i;
