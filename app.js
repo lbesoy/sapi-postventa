@@ -13774,7 +13774,7 @@ window.analizarFacturaPdfTexto = function(text) {
   }
 
   // 5. Total
-  const totalRegex = /(?<!sub)(?:total|neto|pagar|importe|monto|total\s*factura)\s*(?::)?\s*(?:\$)?\s*([0-9,]+(?:\.\d{2})?)/i;
+  const totalRegex = /(?<!sub)(?:total|neto|pagar|importe|monto|total\s*factura)[^0-9$]{0,30}(?:\$)?\s*([0-9,]+(?:\.\d{2})?)/i;
   const totalMatch = text.match(totalRegex);
   if (totalMatch) {
     const cleanNum = totalMatch[1].replace(/,/g, '');
