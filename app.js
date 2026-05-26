@@ -11528,7 +11528,27 @@ window.actualizarFacturasSugeridas = function() {
 
   const files = window._gastoUploadedFiles || [];
   if (files.length === 0) {
-    container.style.display = 'none';
+    const forceMock = configData.onedriveForceMock !== false;
+    if (!forceMock && !onedriveRealToken) {
+      container.style.display = 'block';
+      listEl.innerHTML = `
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.5rem; text-align: center;">
+          <div style="display:flex; align-items:center; justify-content:center; gap:0.4rem; color:var(--text-secondary); font-size:0.78rem;">
+            <i data-lucide="cloud-lightning" style="width:16px; height:16px; color:#0078d4;"></i>
+            <span>Conciliación Automatizada Desconectada</span>
+          </div>
+          <div style="font-size:0.75rem; color:var(--text-muted); line-height:1.35; margin-bottom: 0.2rem;">
+            Conecta tu OneDrive en un clic para escanear y sugerir facturas automáticamente desde tu carpeta configurada.
+          </div>
+          <button type="button" onclick="abrirOneDrivePicker()" class="btn-secondary" style="display:flex; align-items:center; justify-content:center; gap:0.35rem; padding:0.45rem 0.65rem; font-size:0.75rem; font-weight:600; min-height:auto; border-radius:6px; background:rgba(0,120,212,0.06); border:1px solid rgba(0,120,212,0.25); color:#0078d4; font-family:inherit; transition:var(--transition); width:100%;" onmouseover="this.style.background='rgba(0,120,212,0.12)'" onmouseout="this.style.background='rgba(0,120,212,0.06)'">
+            <i data-lucide="cloud" style="width:14px; height:14px;"></i> Conectar Microsoft OneDrive
+          </button>
+        </div>
+      `;
+      if (window.lucide) lucide.createIcons();
+    } else {
+      container.style.display = 'none';
+    }
     return;
   }
 
@@ -11703,7 +11723,7 @@ window.silentPreloadOneDriveFiles = function() {
   if (odForceMock) {
     // Demo/Mock mode: load mock files from onedriveMockDb into a special onedrive cache
     const targetFolder = lockedFolder || 'folder_mayo';
-    const mockFiles = onedriveMockDb[targetFolder] || onedriveMockDb['/'] || [];
+    const mockFiles = onedriveMockDb[targetFolder] || onedriveMockDb['folder_mayo'] || onedriveMockDb['/'] || [];
     
     // Add to window._gastoUploadedFiles if not already loaded
     if (!window._gastoUploadedFiles) window._gastoUploadedFiles = [];
