@@ -3862,19 +3862,7 @@
                   </div>
                 </div>
 
-                <!-- SUGGESTED MATCHES AUTO-DETECTION ENGINE -->
-                <div id="gasto-sat-suggested-matches-container" style="display:none; margin-top:0.65rem; background:rgba(168,85,247,0.06); border:1px dashed rgba(168,85,247,0.25); padding:0.85rem; border-radius:var(--radius-sm);">
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
-                    <div style="display:flex; align-items:center; gap:0.35rem;">
-                      <i data-lucide="sparkles" style="width:14px; height:14px; color:#c084fc;"></i>
-                      <h4 style="margin:0; font-size:0.75rem; font-weight:700; color:var(--text-primary);">Facturas sugeridas (OneDrive / Subidas)</h4>
-                    </div>
-                    <span style="font-size:0.6rem; background:rgba(168,85,247,0.12); color:#c084fc; padding:0.1rem 0.35rem; border-radius:4px; font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">IA MATCH</span>
-                  </div>
-                  <div id="gasto-sat-suggested-matches-list" style="display:flex; flex-direction:column; gap:0.4rem; max-height:150px; overflow-y:auto; padding-right:2px;">
-                    <!-- Suggested matches rendered here dynamically -->
-                  </div>
-                </div>
+
 
                 <!-- DATOS FISCALES DEL XML VINCULADOS -->
                 <div id="gasto-sat-datos-vinculados" style="display:none; margin-top: 0.5rem; background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.18); border-radius: var(--radius-sm); padding: 0.65rem;">
@@ -3953,6 +3941,20 @@
               <button type="button" onclick="abrirOneDrivePicker()" class="btn-secondary" style="display:flex; align-items:center; justify-content:center; gap:0.5rem; padding:0.5rem 0.75rem; font-size:0.75rem; font-weight:600; min-height:auto; border-radius:6px; width:100%; margin-top:0.4rem; background:rgba(0,120,212,0.06); border:1px solid rgba(0,120,212,0.25); color:#0078d4; transition:var(--transition); font-family:inherit;" onmouseover="this.style.background='rgba(0,120,212,0.12)'" onmouseout="this.style.background='rgba(0,120,212,0.06)'">
                 <i data-lucide="cloud" style="width:16px;height:16px;color:#0078d4;"></i> Importar de OneDrive
               </button>
+            </div>
+
+            <!-- SUGGESTED MATCHES AUTO-DETECTION ENGINE (Evidencias/OneDrive) -->
+            <div id="gasto-sat-suggested-matches-container" style="display:none; margin-top:0.25rem; background:rgba(168,85,247,0.06); border:1px dashed rgba(168,85,247,0.25); padding:0.85rem; border-radius:var(--radius-sm);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                <div style="display:flex; align-items:center; gap:0.35rem;">
+                  <i data-lucide="sparkles" style="width:14px; height:14px; color:#c084fc;"></i>
+                  <h4 style="margin:0; font-size:0.75rem; font-weight:700; color:var(--text-primary);">Facturas sugeridas (OneDrive / Subidas)</h4>
+                </div>
+                <span style="font-size:0.6rem; background:rgba(168,85,247,0.12); color:#c084fc; padding:0.1rem 0.35rem; border-radius:4px; font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">IA MATCH</span>
+              </div>
+              <div id="gasto-sat-suggested-matches-list" style="display:flex; flex-direction:column; gap:0.4rem; max-height:150px; overflow-y:auto; padding-right:2px;">
+                <!-- Suggested matches rendered here dynamically -->
+              </div>
             </div>
 
             <!-- Listado Lateral de Evidencias / Comprobantes -->
