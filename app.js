@@ -12021,16 +12021,21 @@ window.renderUploaderSidebar = function() {
     if (file.type === 'pdf') {
       return `
         <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:0.75rem; display:flex; align-items:center; gap:0.75rem; justify-content:space-between;">
-          <div style="display:flex; align-items:center; gap:0.5rem; min-width:0;">
+          <div style="display:flex; align-items:center; gap:0.5rem; min-width:0; flex:1;">
             <div style="width:36px; height:36px; border-radius:4px; border:1px solid var(--border); display:flex; justify-content:center; align-items:center; background:rgba(239,68,68,0.1); color:var(--red); flex-shrink:0;">
               <i data-lucide="file-text" style="width:18px;height:18px;"></i>
             </div>
-            <div style="min-width:0;">
+            <div style="min-width:0; flex:1;">
               <div style="font-weight:600; font-size:0.78rem; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">Comprobante PDF</div>
               <div style="font-size:0.68rem; color:var(--text-muted); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${file.name || 'factura.pdf'}</div>
             </div>
           </div>
-          <button type="button" onclick="window.quitarSidebarFile('pdf')" style="background:none; border:none; color:var(--red); font-size:0.72rem; font-weight:600; cursor:pointer;">Quitar</button>
+          <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
+            <button type="button" onclick="window.abrirPdfVisor('${file.name}')" class="btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.68rem; min-height:auto; border-radius:4px; display:inline-flex; align-items:center; gap:2px; font-family:inherit; color:var(--accent); border-color:rgba(168,85,247,0.2);">
+              <i data-lucide="eye" style="width:10px;height:10px;"></i> Ver
+            </button>
+            <button type="button" onclick="window.quitarSidebarFile('pdf')" style="background:none; border:none; color:var(--red); font-size:0.72rem; font-weight:600; cursor:pointer;">Quitar</button>
+          </div>
         </div>
       `;
     }
@@ -14113,4 +14118,72 @@ window.procesarPdfFacturaExtraida = function(name, base64Data) {
     mostrarNotificacion('Factura PDF importada exitosamente', 'success');
   }
 };
+
+// ── VISOR DE PDF Y FICHA SAT 26 CAMPOS ────────────────────────────────────
+// =========================================================================
+
+window.abrirPdfVisor = function(name) {
+  if (!window._gastoUploadedFiles) return;
+  const file = window._gastoUploadedFiles.find(x => x.type === 'pdf' && x.name === name);
+  if (!file) {
+    mostrarNotificacion('Archivo PDF no encontrado en caché', 'error');
+    return;
+  }
+
+  const modal = document.getElementById('modal-pdf-visor');
+  const title = document.getElementById('pdf-visor-title');
+  const frame = document.getElementById('pdf-visor-frame');
+  const downloadLink = document.getElementById('pdf-visor-download-link');
+  const errorBox = document.getElementById('pdf-visor-error');
+  const satBody = document.getElementById('pdf-visor-sat-body');
+
+  if (!modal) return;
+
+  title.textContent = file.name || 'Visor de PDF';
+  frame.src = file.base64;
+  downloadLink.href = file.base64;
+  downloadLink.download = file.name || 'documento.pdf';
+  
+  modal.style.display = 'flex';
+  errorBox.style.display = 'none';
+  frame.style.display = 'block';
+
+  // Load and render the 26 SAT fields
+  satBody.innerHTML = `
+    <div style="text-align:center; padding:3rem 1.5rem; color:var(--text-muted); display:flex; flex-direction:column; align-items:center; gap:0.5rem; justify-content:center;">
+      <i data-lucide="loader" class="animate-spin" style="width:24px; height:24px; color:var(--accent);"></i>
+      <span>Analizando contenido del PDF y extrayendo Ficha SAT...</span>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+
+  // If the file already has satData, render it instantly
+  if (file.satData) {
+    window.renderSatDetailsTable(file.satData, 'pdf-visor-sat-body');
+  } else {
+    window.extraerFacturaSatNube('pdf', file.base64)
+      .then(satData => {
+        file.satData = satData;
+        window.renderSatDetailsTable(satData, 'pdf-visor-sat-body');
+      })
+      .catch(err => {
+        satBody.innerHTML = `
+          <div style="background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.15); padding:1.25rem; border-radius:8px; color:var(--red); text-align:center; display:flex; flex-direction:column; align-items:center; gap:0.4rem; justify-content:center;">
+            <i data-lucide="alert-triangle" style="width:24px; height:24px;"></i>
+            <strong style="font-size:0.8rem;">Ficha SAT no disponible</strong>
+            <div style="font-size:0.68rem; opacity:0.8; max-width:250px;">El PDF no contiene texto legible (imagen escaneada o formato no compatible).</div>
+          </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+      });
+  }
+};
+
+window.cerrarPdfVisor = function() {
+  const modal = document.getElementById('modal-pdf-visor');
+  const frame = document.getElementById('pdf-visor-frame');
+  if (modal) modal.style.display = 'none';
+  if (frame) frame.src = '';
+};
+
 
