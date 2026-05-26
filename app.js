@@ -11499,6 +11499,289 @@ window.actualizarMontoCabeceraGasto = function(monto) {
 
   // Re-render uploader sidebar so "Mejor opción" updates live
   window.renderUploaderSidebar();
+  
+  // Trigger suggested matches auto-detection
+  if (window.actualizarFacturasSugeridas) {
+    window.actualizarFacturasSugeridas();
+  }
+};
+
+window.actualizarFacturasSugeridas = function() {
+  const container = document.getElementById('gasto-sat-suggested-matches-container');
+  const listEl = document.getElementById('gasto-sat-suggested-matches-list');
+  if (!container || !listEl) return;
+
+  const inputMonto = document.getElementById('gasto-monto');
+  const inputFecha = document.getElementById('gasto-fecha');
+  if (!inputMonto || !inputFecha) {
+    container.style.display = 'none';
+    return;
+  }
+
+  const gastoMonto = parseFloat(inputMonto.value) || 0;
+  const gastoFecha = inputFecha.value;
+
+  if (gastoMonto <= 0 || !gastoFecha) {
+    container.style.display = 'none';
+    return;
+  }
+
+  const files = window._gastoUploadedFiles || [];
+  if (files.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+
+  // Pre-process each file's SAT data as promises to fetch in parallel if needed
+  const promises = files.map(file => {
+    if (file.satData) return Promise.resolve({ file, satData: file.satData });
+    
+    // If XML has keys mapped locally in sidebar
+    if (file.type === 'xml' && file.rfc && file.uuid) {
+      const mockData = {
+        rfcEmisor: file.rfc,
+        uuid: file.uuid,
+        total: file.monto || 0,
+        fechaEmision: file.date || '',
+        nombreEmisor: file.emisor || file.name
+      };
+      file.satData = mockData;
+      return Promise.resolve({ file, satData: mockData });
+    }
+
+    // Extract on the fly
+    return window.extraerFacturaSatNube(file.type, file.base64)
+      .then(satData => {
+        file.satData = satData;
+        return { file, satData };
+      })
+      .catch(err => {
+        console.warn(`Error extracting cloud SAT data for file ${file.name}:`, err.message);
+        return { file, satData: null };
+      });
+  });
+
+  Promise.all(promises).then(results => {
+    const matches = [];
+
+    results.forEach(({ file, satData }) => {
+      if (!satData) return;
+
+      let score = 0;
+      const invoiceTotal = parseFloat(satData.total || satData.monto || 0);
+      const invoiceFecha = satData.fechaEmision || satData.date || '';
+
+      // Amount matching
+      if (Math.abs(gastoMonto - invoiceTotal) < 0.02) {
+        score += 50; // exact match
+      } else if (gastoMonto > 0 && Math.abs(gastoMonto - invoiceTotal) / gastoMonto <= 0.05) {
+        score += 30; // close match (5% tolerance)
+      }
+
+      // Date matching
+      if (gastoFecha && invoiceFecha) {
+        if (invoiceFecha.startsWith(gastoFecha)) {
+          score += 30; // exact match
+        } else {
+          // Check if within 3 days
+          const t1 = new Date(gastoFecha).getTime();
+          const t2 = new Date(invoiceFecha.split('T')[0]).getTime();
+          if (!isNaN(t1) && !isNaN(t2) && Math.abs(t1 - t2) <= 3 * 24 * 60 * 60 * 1000) {
+            score += 15;
+          }
+        }
+      }
+
+      // Emisor RFC Match
+      const rfcVal = satData.rfcEmisor || satData.rfc;
+      if (rfcVal) {
+        score += 10;
+      }
+
+      if (score >= 30) {
+        matches.push({ file, satData, score });
+      }
+    });
+
+    // Sort by score descending
+    matches.sort((a, b) => b.score - a.score);
+
+    if (matches.length === 0) {
+      container.style.display = 'none';
+      return;
+    }
+
+    container.style.display = 'block';
+    const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
+
+    listEl.innerHTML = matches.map(({ file, satData, score }) => {
+      const matchPct = Math.min(score + 20, 100); // map to visual percentage
+      const badgeColor = matchPct >= 80 ? 'var(--green)' : 'var(--accent)';
+      const badgeBg = matchPct >= 80 ? 'rgba(16,185,129,0.12)' : 'rgba(168,85,247,0.12)';
+      const emisor = satData.nombreEmisor || file.name;
+      const rfc = satData.rfcEmisor || satData.rfc || 'N/A';
+      const uuid = satData.uuid || 'N/A';
+      const total = parseFloat(satData.total || satData.monto || 0);
+      const fecha = (satData.fechaEmision || satData.date || '').split('T')[0];
+      const uuidKey = file.uuid || satData.uuid || 'gasto';
+
+      return `
+        <div style="background:var(--bg-card); border:1px solid var(--border); padding:0.6rem; border-radius:6px; display:flex; flex-direction:column; gap:0.35rem; margin-bottom: 0.35rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:700; font-size:0.75rem; color:var(--text-primary); max-width:70%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${emisor}</div>
+            <span style="font-size:0.6rem; font-weight:700; color:${badgeColor}; background:${badgeBg}; border:1px solid rgba(168,85,247,0.15); padding:0.05rem 0.3rem; border-radius:4px;">${matchPct}% MATCH</span>
+          </div>
+          <div style="font-size:0.7rem; color:var(--text-muted); display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <span>Monto: <strong style="color:var(--text-secondary);">${formatMoney(total)}</strong></span>
+            <span>Fecha: <strong style="color:var(--text-secondary);">${fecha}</strong></span>
+            <span>RFC: <strong style="color:var(--text-secondary); font-family:monospace;">${rfc}</strong></span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed var(--border); padding-top:0.35rem; margin-top:0.15rem;">
+            <span style="font-size:0.65rem; color:var(--text-muted); font-family:monospace; max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">UUID: ${uuid.substring(0, 8)}...</span>
+            <button type="button" onclick="window.vincularFacturaSugerida('${file.type}', '${uuidKey}')" style="background:none; border:none; color:var(--accent); font-size:0.7rem; font-weight:700; cursor:pointer; padding:0; display:inline-flex; align-items:center; gap:2px; font-family:inherit;">
+              <i data-lucide="link" style="width:10px; height:10px;"></i> Auto-vincular
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    lucide.createIcons();
+  });
+};
+
+window.vincularFacturaSugerida = function(type, uuid) {
+  if (!window._gastoUploadedFiles) return;
+  const file = window._gastoUploadedFiles.find(x => x.type === type && (uuid ? (x.uuid === uuid || x.satData?.uuid === uuid) : true));
+  if (!file) return;
+
+  if (type === 'xml') {
+    window.adjuntarXmlFactura(file.uuid || uuid);
+    mostrarNotificacion('Comprobante XML vinculado automáticamente', 'success');
+  } else if (type === 'pdf') {
+    window.procesarPdfFacturaExtraida(file.name, file.base64);
+    mostrarNotificacion('Factura PDF vinculada automáticamente', 'success');
+  }
+};
+
+window.silentPreloadOneDriveFiles = function() {
+  const odForceMock = configData.onedriveForceMock !== false;
+  const lockedFolder = configData.onedriveFolderId || '';
+
+  if (odForceMock) {
+    // Demo/Mock mode: load mock files from onedriveMockDb into a special onedrive cache
+    const targetFolder = lockedFolder || 'folder_mayo';
+    const mockFiles = onedriveMockDb[targetFolder] || onedriveMockDb['/'] || [];
+    
+    // Add to window._gastoUploadedFiles if not already loaded
+    if (!window._gastoUploadedFiles) window._gastoUploadedFiles = [];
+    
+    mockFiles.forEach(m => {
+      if (m.type === 'file' && (m.ext === 'xml' || m.ext === 'pdf')) {
+        const alreadyExists = window._gastoUploadedFiles.some(x => x.name === m.name);
+        if (!alreadyExists) {
+          let base64 = m.content;
+          if (m.ext === 'xml' && !base64.startsWith('data:')) {
+            base64 = 'data:text/xml;base64,' + btoa(unescape(encodeURIComponent(m.content)));
+          }
+          window._gastoUploadedFiles.push({
+            type: m.ext,
+            base64: base64,
+            name: m.name,
+            uuid: m.id,
+            isOneDriveVirtual: true // mark as virtual OneDrive suggestion
+          });
+        }
+      }
+    });
+    
+    if (window.actualizarFacturasSugeridas) {
+      window.actualizarFacturasSugeridas();
+    }
+  } else if (onedriveRealToken) {
+    // Real OneDrive mode: silent fetch children of lockedFolder
+    const folderId = lockedFolder || 'root';
+    let folderUrl = '';
+    if (folderId === 'root') {
+      folderUrl = 'https://graph.microsoft.com/v1.0/me/drive/root';
+    } else if (folderId.startsWith('/') || folderId.includes('/')) {
+      let relativePath = folderId;
+      const docIndex = folderId.indexOf('/Documents/');
+      if (docIndex > -1) relativePath = folderId.substring(docIndex + 11);
+      else if (folderId.startsWith('/')) relativePath = folderId.substring(1);
+      const encodedSegments = relativePath.split('/').map(segment => encodeURIComponent(decodeURIComponent(segment))).join('/');
+      folderUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/${encodedSegments}`;
+    } else {
+      folderUrl = `https://graph.microsoft.com/v1.0/me/drive/items/${folderId}`;
+    }
+
+    fetch(folderUrl, { headers: { 'Authorization': `Bearer ${onedriveRealToken}` } })
+      .then(res => {
+        if (!res.ok) throw new Error('Error al obtener carpeta');
+        return res.json();
+      })
+      .then(folderMeta => {
+        const childrenUrl = `https://graph.microsoft.com/v1.0/me/drive/items/${folderMeta.id}/children`;
+        return fetch(childrenUrl, { headers: { 'Authorization': `Bearer ${onedriveRealToken}` } });
+      })
+      .then(res => {
+        if (!res.ok) throw new Error('Error al obtener hijos');
+        return res.json();
+      })
+      .then(data => {
+        const children = data.value || [];
+        const promises = children.map(item => {
+          if (item.folder) return Promise.resolve(null);
+          const ext = (item.name.split('.').pop() || '').toLowerCase();
+          if (ext !== 'xml' && ext !== 'pdf') return Promise.resolve(null);
+
+          // Fetch the file download URL to load base64 content
+          const downloadUrl = item['@microsoft.graph.downloadUrl'];
+          if (!downloadUrl) return Promise.resolve(null);
+
+          return fetch(downloadUrl)
+            .then(res => {
+              if (ext === 'xml') return res.text();
+              else return res.blob();
+            })
+            .then(content => {
+              let base64 = '';
+              if (ext === 'xml') {
+                base64 = 'data:text/xml;base64,' + btoa(unescape(encodeURIComponent(content)));
+                return { item, base64, ext };
+              } else {
+                return new Promise((resolve) => {
+                  const reader = new FileReader();
+                  reader.onload = (e) => resolve({ item, base64: e.target.result, ext });
+                  reader.readAsDataURL(content);
+                });
+              }
+            })
+            .catch(() => null);
+        });
+
+        Promise.all(promises).then(loadedFiles => {
+          if (!window._gastoUploadedFiles) window._gastoUploadedFiles = [];
+          loadedFiles.forEach(f => {
+            if (!f) return;
+            const alreadyExists = window._gastoUploadedFiles.some(x => x.name === f.item.name);
+            if (!alreadyExists) {
+              window._gastoUploadedFiles.push({
+                type: f.ext,
+                base64: f.base64,
+                name: f.item.name,
+                uuid: f.item.id,
+                isOneDriveVirtual: true
+              });
+            }
+          });
+          if (window.actualizarFacturasSugeridas) {
+            window.actualizarFacturasSugeridas();
+          }
+        });
+      })
+      .catch(err => console.warn('Error in silent OneDrive folder pre-load:', err));
+  }
 };
 
 window.adjuntarXmlFactura = function(uuid) {
@@ -11724,6 +12007,17 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
     document.getElementById('gasto-sat-accordion-body').innerHTML = '';
   }
 
+  const sugMatches = document.getElementById('gasto-sat-suggested-matches-container');
+  if (sugMatches) {
+    sugMatches.style.display = 'none';
+    document.getElementById('gasto-sat-suggested-matches-list').innerHTML = '';
+  }
+
+  // Pre-load locked OneDrive folder files silently in background
+  if (window.silentPreloadOneDriveFiles) {
+    window.silentPreloadOneDriveFiles();
+  }
+
   // Poblar listado de órdenes
   const selectOrden = document.getElementById('gasto-orden');
   if (selectOrden) {
@@ -11941,6 +12235,11 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
   // Render evidences list in sidebar
   window.renderUploaderSidebar();
 
+  // Trigger suggested matches auto-detection
+  if (window.actualizarFacturasSugeridas) {
+    window.actualizarFacturasSugeridas();
+  }
+
   lucide.createIcons();
 };
 
@@ -12044,6 +12343,10 @@ window.procesarArchivoFactura = function(e, type) {
           });
 
           window.renderUploaderSidebar();
+
+          if (window.actualizarFacturasSugeridas) {
+            window.actualizarFacturasSugeridas();
+          }
 
           // Auto-attach if a valid UUID is parsed to keep the flow super fast
           if (uuidVal) {
@@ -12994,6 +13297,10 @@ window.procesarArchivoImportadoOneDrive = function(name, ext, dataContent) {
       });
 
       window.renderUploaderSidebar();
+      
+      if (window.actualizarFacturasSugeridas) {
+        window.actualizarFacturasSugeridas();
+      }
 
       // Vincular automáticamente el XML importado para máxima rapidez
       if (uuidVal) {

@@ -3810,7 +3810,7 @@
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.85rem;">
                 <div>
                   <label class="form-label" for="gasto-fecha">Fecha *</label>
-                  <input type="date" id="gasto-fecha" class="form-input" required />
+                  <input type="date" id="gasto-fecha" class="form-input" required onchange="if(window.actualizarFacturasSugeridas) window.actualizarFacturasSugeridas()" />
                 </div>
                 <div>
                   <label class="form-label" for="gasto-metodo">Método de Pago *</label>
@@ -3859,6 +3859,20 @@
                     <div style="margin-top:0.25rem; border-top:1px dashed var(--border); padding-top:0.25rem; font-size:0.72rem; color:var(--text-muted);">
                       Tipo: <span id="gasto-vinc-tipo" style="font-weight:600; color:var(--text-secondary);">-</span> • Máquina: <span id="gasto-vinc-maquina" style="color:var(--text-secondary);">-</span>
                     </div>
+                  </div>
+                </div>
+
+                <!-- SUGGESTED MATCHES AUTO-DETECTION ENGINE -->
+                <div id="gasto-sat-suggested-matches-container" style="display:none; margin-top:0.65rem; background:rgba(168,85,247,0.06); border:1px dashed rgba(168,85,247,0.25); padding:0.85rem; border-radius:var(--radius-sm);">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                    <div style="display:flex; align-items:center; gap:0.35rem;">
+                      <i data-lucide="sparkles" style="width:14px; height:14px; color:#c084fc;"></i>
+                      <h4 style="margin:0; font-size:0.75rem; font-weight:700; color:var(--text-primary);">Facturas sugeridas (OneDrive / Subidas)</h4>
+                    </div>
+                    <span style="font-size:0.6rem; background:rgba(168,85,247,0.12); color:#c084fc; padding:0.1rem 0.35rem; border-radius:4px; font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">IA MATCH</span>
+                  </div>
+                  <div id="gasto-sat-suggested-matches-list" style="display:flex; flex-direction:column; gap:0.4rem; max-height:150px; overflow-y:auto; padding-right:2px;">
+                    <!-- Suggested matches rendered here dynamically -->
                   </div>
                 </div>
 
