@@ -1,9 +1,26 @@
 const { JSDOM } = require('jsdom');
 const fs = require('fs');
 
-// Read index.html and app.js
-const html = fs.readFileSync('index.html', 'utf8');
-const dom = new JSDOM(html, { url: 'http://localhost' });
+const mockHtml = `
+<!DOCTYPE html>
+<html>
+<body>
+  <div id="modal-gasto-overlay"></div>
+  <div id="gasto-sat-details-accordion"></div>
+  <div id="gasto-sat-accordion-body"></div>
+  <div id="gasto-sat-suggested-matches-container"></div>
+  <div id="gasto-sat-suggested-matches-list"></div>
+  <div id="gasto-sat-datos-vinculados"></div>
+  <input id="gasto-monto" value="1174.79" />
+  <input id="gasto-fecha" value="2026-05-22" />
+  <input id="gasto-rfc-emisor" />
+  <input id="gasto-uuid-fiscal" />
+  <select id="gasto-orden"><option value="">General</option></select>
+  <div id="gasto-header-monto"></div>
+</body>
+</html>
+`;
+const dom = new JSDOM(mockHtml, { url: 'http://localhost' });
 const { window } = dom;
 const { document } = window;
 
