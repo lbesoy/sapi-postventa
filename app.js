@@ -11672,9 +11672,27 @@ window.actualizarFacturasSugeridas = function() {
     });
 
     // Sort by score descending
-    matches.sort((a, b) => b.score - a.score);
+    // De-duplicate by UUID (preferring XML type over PDF)
+    const seenUuids = new Set();
+    const dedupedMatches = [];
+    
+    matches.sort((a, b) => {
+      if (a.satData.uuid && b.satData.uuid && a.satData.uuid === b.satData.uuid) {
+        if (a.file.type === 'xml' && b.file.type !== 'xml') return -1;
+        if (b.file.type === 'xml' && a.file.type !== 'xml') return 1;
+      }
+      return b.score - a.score;
+    });
 
-    if (matches.length === 0) {
+    matches.forEach(m => {
+      const uuid = m.satData.uuid || `${m.satData.rfcEmisor}_${m.satData.total}_${m.satData.fechaEmision}`;
+      if (!seenUuids.has(uuid)) {
+        seenUuids.add(uuid);
+        dedupedMatches.push(m);
+      }
+    });
+
+    if (dedupedMatches.length === 0) {
       container.style.display = 'none';
       return;
     }
@@ -11682,24 +11700,32 @@ window.actualizarFacturasSugeridas = function() {
     container.style.display = 'block';
     const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
 
-    listEl.innerHTML = matches.map(({ file, satData, score }) => {
+    listEl.innerHTML = dedupedMatches.map(({ file, satData, score }) => {
       const matchPct = Math.min(score + 20, 100); // map to visual percentage
       const badgeColor = matchPct >= 80 ? 'var(--green)' : 'var(--accent)';
       const badgeBg = matchPct >= 80 ? 'rgba(16,185,129,0.12)' : 'rgba(168,85,247,0.12)';
-      let emisor = satData.nombreEmisor || file.name || 'N/A';
-      // Clean up RFC if present in name
-      emisor = emisor.replace(/\b[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}\b/i, '').trim();
-      // Clean up Régimen Fiscal details
-      emisor = emisor.replace(/(?:Régimen|Regimen)\s*(?:Fiscal)?\s*(?::)?\s*\d{3}\s*-\s*[^\n\r]+/i, '').trim();
-      emisor = emisor.replace(/(?:Régimen|Regimen)\s*(?:Fiscal)?\s*(?::)?\s*[^\n\r]+/i, '').trim();
-      // Clean up other trailing noise
-      emisor = emisor.replace(/\b(?:Régimen|Regimen|Fiscal|RFC|C\.P\.|Lugar\s*de)\b.*/i, '').trim();
-      // Clean trailing/leading spaces, colons, hyphens
-      emisor = emisor.replace(/^[\s-:,]+|[\s-:,]+$/g, '').replace(/\s+/g, ' ').trim();
-      
-      const emisorShort = emisor.length > 38 ? emisor.substring(0, 35) + '...' : emisor;
-
       const rfc = satData.rfcEmisor || satData.rfc || 'N/A';
+      
+      let emisor = satData.nombreEmisor || file.name || 'N/A';
+      let cleanedEmisor = emisor;
+      
+      // Clean up RFC if present in name
+      cleanedEmisor = cleanedEmisor.replace(/\b[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}\b/i, '').trim();
+      // Clean up Régimen Fiscal details
+      cleanedEmisor = cleanedEmisor.replace(/(?:Régimen|Regimen)\s*(?:Fiscal)?\s*(?::)?\s*\d{3}\s*-\s*[^\n\r]+/i, '').trim();
+      cleanedEmisor = cleanedEmisor.replace(/(?:Régimen|Regimen)\s*(?:Fiscal)?\s*(?::)?\s*[^\n\r]+/i, '').trim();
+      // Clean up other trailing noise
+      cleanedEmisor = cleanedEmisor.replace(/\b(?:Régimen|Regimen|Fiscal|RFC|C\.P\.|Lugar\s*de)\b.*/i, '').trim();
+      // Clean trailing/leading spaces, colons, hyphens
+      cleanedEmisor = cleanedEmisor.replace(/^[\s-:,]+|[\s-:,]+$/g, '').replace(/\s+/g, ' ').trim();
+      
+      // Fallback if cleaning leaves it empty (e.g. filename was just the RFC)
+      if (!cleanedEmisor) {
+        cleanedEmisor = satData.nombreEmisor || file.name || `PROVEEDOR: ${rfc}`;
+      }
+      
+      const emisorShort = cleanedEmisor.length > 38 ? cleanedEmisor.substring(0, 35) + '...' : cleanedEmisor;
+
       const uuid = satData.uuid || 'N/A';
       const total = parseFloat(satData.total || satData.monto || 0);
       const fecha = (satData.fechaEmision || satData.date || '').split('T')[0];
