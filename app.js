@@ -11664,8 +11664,40 @@ window.vincularFacturaSugerida = function(type, uuid) {
   }
 };
 
+window.extraerPathOneDrive = function(folderId) {
+  if (!folderId) return '';
+  let path = folderId;
+  
+  if (folderId.includes('onedrive.aspx') || folderId.includes('sharepoint.com')) {
+    try {
+      const url = new URL(folderId);
+      const idParam = url.searchParams.get('id');
+      if (idParam) {
+        path = idParam;
+      }
+    } catch (e) {
+      const match = folderId.match(/[?&]id=([^&]+)/);
+      if (match) {
+        path = decodeURIComponent(match[1]);
+      }
+    }
+  }
+  
+  return path;
+};
+
 window.silentPreloadOneDriveFiles = function() {
-  const odForceMock = configData.onedriveForceMock !== false;
+  // Restore Microsoft Graph token from sessionStorage if present and valid
+  if (!onedriveRealToken) {
+    const sessionToken = sessionStorage.getItem('ms_access_token');
+    const sessionExpiry = sessionStorage.getItem('ms_access_token_expiry');
+    if (sessionToken && sessionExpiry && Date.now() < parseInt(sessionExpiry)) {
+      onedriveRealToken = sessionToken;
+      onedriveRealMode = true;
+    }
+  }
+
+  const odForceMock = configData.onedriveForceMock !== false && !onedriveRealToken;
   const lockedFolder = configData.onedriveFolderId || '';
 
   if (odForceMock) {
@@ -11704,11 +11736,11 @@ window.silentPreloadOneDriveFiles = function() {
     let folderUrl = '';
     if (folderId === 'root') {
       folderUrl = 'https://graph.microsoft.com/v1.0/me/drive/root';
-    } else if (folderId.startsWith('/') || folderId.includes('/')) {
-      let relativePath = folderId;
-      const docIndex = folderId.indexOf('/Documents/');
-      if (docIndex > -1) relativePath = folderId.substring(docIndex + 11);
-      else if (folderId.startsWith('/')) relativePath = folderId.substring(1);
+    } else if (folderId.startsWith('/') || folderId.includes('/') || folderId.includes('sharepoint.com')) {
+      let relativePath = window.extraerPathOneDrive(folderId);
+      const docIndex = relativePath.indexOf('/Documents/');
+      if (docIndex > -1) relativePath = relativePath.substring(docIndex + 11);
+      else if (relativePath.startsWith('/')) relativePath = relativePath.substring(1);
       const encodedSegments = relativePath.split('/').map(segment => encodeURIComponent(decodeURIComponent(segment))).join('/');
       folderUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/${encodedSegments}`;
     } else {
@@ -12932,13 +12964,13 @@ window.navegarOneDriveReal = function(folderId) {
   let folderUrl = '';
   if (folderId === 'root') {
     folderUrl = 'https://graph.microsoft.com/v1.0/me/drive/root';
-  } else if (folderId.startsWith('/') || folderId.includes('/')) {
-    let relativePath = folderId;
-    const docIndex = folderId.indexOf('/Documents/');
+  } else if (folderId.startsWith('/') || folderId.includes('/') || folderId.includes('sharepoint.com')) {
+    let relativePath = window.extraerPathOneDrive(folderId);
+    const docIndex = relativePath.indexOf('/Documents/');
     if (docIndex > -1) {
-      relativePath = folderId.substring(docIndex + 11);
-    } else if (folderId.startsWith('/')) {
-      relativePath = folderId.substring(1);
+      relativePath = relativePath.substring(docIndex + 11);
+    } else if (relativePath.startsWith('/')) {
+      relativePath = relativePath.substring(1);
     }
     const encodedSegments = relativePath.split('/').map(segment => encodeURIComponent(decodeURIComponent(segment))).join('/');
     folderUrl = `https://graph.microsoft.com/v1.0/me/drive/root:/${encodedSegments}`;
