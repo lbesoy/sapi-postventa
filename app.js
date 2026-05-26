@@ -11906,17 +11906,33 @@ window.quitarSidebarFile = function(type, uuid = null) {
     if (evFile) evFile.value = '';
   } else if (type === 'pdf') {
     window._gastoPdfBase64 = null;
-    window._gastoUploadedFiles = window._gastoUploadedFiles.filter(x => x.type !== 'pdf');
+    // Filter out only the real attached PDF, keeping the virtual OneDrive suggestions in cache
+    window._gastoUploadedFiles = window._gastoUploadedFiles.filter(x => !(x.type === 'pdf' && !x.isOneDriveVirtual));
     const pdfFile = document.getElementById('gasto-pdf-file');
     if (pdfFile) pdfFile.value = '';
+
+    if (window.actualizarFacturasSugeridas) {
+      window.actualizarFacturasSugeridas();
+    }
   } else if (type === 'xml') {
     const isCurrentlyAttached = document.getElementById('gasto-uuid-fiscal').value === uuid;
     if (isCurrentlyAttached) {
       window.desadjuntarXmlFactura();
     }
-    window._gastoUploadedFiles = window._gastoUploadedFiles.filter(x => !(x.type === 'xml' && x.uuid === uuid));
+    
+    // Restore virtual state if it was a OneDrive file so it returns to suggestions list
+    const fileObj = window._gastoUploadedFiles.find(x => x.type === 'xml' && x.uuid === uuid);
+    if (fileObj && fileObj.uuid) {
+      fileObj.isOneDriveVirtual = true;
+    } else {
+      window._gastoUploadedFiles = window._gastoUploadedFiles.filter(x => !(x.type === 'xml' && x.uuid === uuid));
+    }
     const xmlFile = document.getElementById('gasto-xml-file');
     if (xmlFile) xmlFile.value = '';
+
+    if (window.actualizarFacturasSugeridas) {
+      window.actualizarFacturasSugeridas();
+    }
   }
 
   window.renderUploaderSidebar();
@@ -11929,9 +11945,12 @@ window.renderUploaderSidebar = function() {
 
   if (!window._gastoUploadedFiles) window._gastoUploadedFiles = [];
   
-  countBadge.textContent = `${window._gastoUploadedFiles.length} cargados`;
+  // Filter out virtual OneDrive preloaded files (cache suggestions) from the sidebar list/count
+  const realFiles = window._gastoUploadedFiles.filter(x => !x.isOneDriveVirtual);
+  
+  countBadge.textContent = `${realFiles.length} cargados`;
 
-  if (window._gastoUploadedFiles.length === 0) {
+  if (realFiles.length === 0) {
     container.innerHTML = `
       <div style="text-align:center; padding:2rem 1rem; border:1px dashed var(--border); border-radius:8px; color:var(--text-muted); font-size:0.78rem; display:flex; flex-direction:column; gap:0.4rem; justify-content:center; align-items:center;">
         <i data-lucide="folder-open" style="width:24px;height:24px;color:var(--text-muted);opacity:0.6;"></i>
@@ -11944,7 +11963,7 @@ window.renderUploaderSidebar = function() {
 
   const currentMonto = parseFloat(document.getElementById('gasto-monto').value || 0);
 
-  container.innerHTML = window._gastoUploadedFiles.map(file => {
+  container.innerHTML = realFiles.map(file => {
     if (file.type === 'ticket') {
       return `
         <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:0.75rem; display:flex; align-items:center; gap:0.75rem; justify-content:space-between;">
