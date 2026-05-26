@@ -11526,29 +11526,77 @@ window.actualizarFacturasSugeridas = function() {
     return;
   }
 
+  container.style.display = 'block';
+
   const files = window._gastoUploadedFiles || [];
-  if (files.length === 0) {
-    const forceMock = configData.onedriveForceMock !== false;
-    if (!forceMock && !onedriveRealToken) {
-      container.style.display = 'block';
-      listEl.innerHTML = `
-        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.5rem; text-align: center;">
-          <div style="display:flex; align-items:center; justify-content:center; gap:0.4rem; color:var(--text-secondary); font-size:0.78rem;">
-            <i data-lucide="cloud-lightning" style="width:16px; height:16px; color:#0078d4;"></i>
-            <span>Conciliación Automatizada Desconectada</span>
-          </div>
-          <div style="font-size:0.75rem; color:var(--text-muted); line-height:1.35; margin-bottom: 0.2rem;">
-            Conecta tu OneDrive en un clic para escanear y sugerir facturas automáticamente desde tu carpeta configurada.
-          </div>
-          <button type="button" onclick="abrirOneDrivePicker()" class="btn-secondary" style="display:flex; align-items:center; justify-content:center; gap:0.35rem; padding:0.45rem 0.65rem; font-size:0.75rem; font-weight:600; min-height:auto; border-radius:6px; background:rgba(0,120,212,0.06); border:1px solid rgba(0,120,212,0.25); color:#0078d4; font-family:inherit; transition:var(--transition); width:100%;" onmouseover="this.style.background='rgba(0,120,212,0.12)'" onmouseout="this.style.background='rgba(0,120,212,0.06)'">
-            <i data-lucide="cloud" style="width:14px; height:14px;"></i> Conectar Microsoft OneDrive
-          </button>
+  const forceMock = configData.onedriveForceMock !== false;
+  const isConnected = !!onedriveRealToken;
+
+  // 1. If currently preloading files asynchronously
+  if (window._isPreloadingOneDrive) {
+    listEl.innerHTML = `
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:1.25rem; text-align:center; display:flex; flex-direction:column; align-items:center; gap:0.5rem; justify-content:center;">
+        <div style="width:24px; height:24px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite;"></div>
+        <div style="font-weight:600; font-size:0.78rem; color:var(--text-primary); margin-top:0.25rem;">Escaneando OneDrive...</div>
+        <div style="font-size:0.68rem; color:var(--text-muted); max-width:260px;">Buscando facturas XML y PDF en tu carpeta de OneDrive configurada.</div>
+      </div>
+    `;
+    return;
+  }
+
+  // 2. If preloading failed
+  if (window._preloadOneDriveError) {
+    listEl.innerHTML = `
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:1rem; text-align:center; display:flex; flex-direction:column; align-items:center; gap:0.5rem; justify-content:center;">
+        <i data-lucide="alert-triangle" style="width:22px; height:22px; color:var(--red);"></i>
+        <div style="font-weight:600; font-size:0.78rem; color:var(--text-primary);">Error de Conexión OneDrive</div>
+        <div style="font-size:0.68rem; color:var(--red); opacity:0.9; max-width:260px; word-break:break-word;">
+          ${window._preloadOneDriveError}
         </div>
-      `;
-      if (window.lucide) lucide.createIcons();
-    } else {
-      container.style.display = 'none';
-    }
+        <button type="button" onclick="window.reintentarConexionOneDrive()" class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.7rem; min-height:auto; display:inline-flex; align-items:center; gap:4px; margin-top:0.25rem; font-family:inherit;">
+          <i data-lucide="rotate-cw" style="width:12px; height:12px;"></i> Reintentar Conexión
+        </button>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  // 3. If disconnected (Real mode active but no token yet)
+  if (!forceMock && !isConnected) {
+    listEl.innerHTML = `
+      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.5rem; text-align: center;">
+        <div style="display:flex; align-items:center; justify-content:center; gap:0.4rem; color:var(--text-secondary); font-size:0.78rem;">
+          <i data-lucide="cloud-lightning" style="width:16px; height:16px; color:#0078d4;"></i>
+          <span>Conciliación Automatizada Desconectada</span>
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-muted); line-height:1.35; margin-bottom: 0.2rem;">
+          Conecta tu OneDrive en un clic para escanear y sugerir facturas automáticamente desde tu carpeta configurada.
+        </div>
+        <button type="button" onclick="abrirOneDrivePicker()" class="btn-secondary" style="display:flex; align-items:center; justify-content:center; gap:0.35rem; padding:0.45rem 0.65rem; font-size:0.75rem; font-weight:600; min-height:auto; border-radius:6px; background:rgba(0,120,212,0.06); border:1px solid rgba(0,120,212,0.25); color:#0078d4; font-family:inherit; transition:var(--transition); width:100%;" onmouseover="this.style.background='rgba(0,120,212,0.12)'" onmouseout="this.style.background='rgba(0,120,212,0.06)'">
+          <i data-lucide="cloud" style="width:14px; height:14px;"></i> Conectar Microsoft OneDrive
+        </button>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  // 4. If connected but no files found in folder
+  if (files.length === 0) {
+    listEl.innerHTML = `
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:1.25rem; text-align:center; display:flex; flex-direction:column; align-items:center; gap:0.4rem; justify-content:center;">
+        <i data-lucide="folder-open" style="width:24px; height:24px; color:var(--text-muted);"></i>
+        <div style="font-weight:600; font-size:0.78rem; color:var(--text-primary);">Conectado a OneDrive</div>
+        <div style="font-size:0.68rem; color:var(--text-muted); max-width:240px; margin-bottom:0.25rem;">
+          No se encontraron archivos XML ni PDF en la carpeta de OneDrive configurada.
+        </div>
+        <button type="button" onclick="window.silentPreloadOneDriveFiles()" class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.7rem; min-height:auto; display:inline-flex; align-items:center; gap:4px; font-family:inherit;">
+          <i data-lucide="refresh-cw" style="width:12px; height:12px;"></i> Sincronizar Carpeta
+        </button>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
     return;
   }
 
@@ -11751,6 +11799,12 @@ window.silentPreloadOneDriveFiles = function() {
   const odForceMock = configData.onedriveForceMock !== false && !onedriveRealToken;
   const lockedFolder = configData.onedriveFolderId || '';
 
+  window._isPreloadingOneDrive = true;
+  window._preloadOneDriveError = null;
+  if (window.actualizarFacturasSugeridas) {
+    window.actualizarFacturasSugeridas();
+  }
+
   if (odForceMock) {
     // Demo/Mock mode: load mock files from onedriveMockDb into a special onedrive cache
     const targetFolder = lockedFolder || 'folder_mayo';
@@ -11778,6 +11832,7 @@ window.silentPreloadOneDriveFiles = function() {
       }
     });
     
+    window._isPreloadingOneDrive = false;
     if (window.actualizarFacturasSugeridas) {
       window.actualizarFacturasSugeridas();
     }
@@ -11800,7 +11855,15 @@ window.silentPreloadOneDriveFiles = function() {
 
     fetch(folderUrl, { headers: { 'Authorization': `Bearer ${onedriveRealToken}` } })
       .then(res => {
-        if (!res.ok) throw new Error('Error al obtener carpeta');
+        if (!res.ok) {
+          if (res.status === 401) {
+            throw new Error('La sesión de Microsoft ha expirado. Por favor, reautentícate presionando el botón de abajo.');
+          } else if (res.status === 404 || res.status === 400) {
+            throw new Error('No se pudo acceder a la carpeta configurada. Revisa que el ID o enlace de la carpeta configurada en Panel de Control -> Configuración General -> ID Carpeta OneDrive sea válido y que tu cuenta tenga permisos.');
+          } else {
+            throw new Error(`Error en Microsoft Graph API (Código ${res.status}).`);
+          }
+        }
         return res.json();
       })
       .then(folderMeta => {
@@ -11808,7 +11871,7 @@ window.silentPreloadOneDriveFiles = function() {
         return fetch(childrenUrl, { headers: { 'Authorization': `Bearer ${onedriveRealToken}` } });
       })
       .then(res => {
-        if (!res.ok) throw new Error('Error al obtener hijos');
+        if (!res.ok) throw new Error('Error al listar archivos de la carpeta OneDrive.');
         return res.json();
       })
       .then(data => {
@@ -11858,13 +11921,34 @@ window.silentPreloadOneDriveFiles = function() {
               });
             }
           });
+          window._isPreloadingOneDrive = false;
           if (window.actualizarFacturasSugeridas) {
             window.actualizarFacturasSugeridas();
           }
         });
       })
-      .catch(err => console.warn('Error in silent OneDrive folder pre-load:', err));
+      .catch(err => {
+        console.warn('Error in silent OneDrive folder pre-load:', err);
+        window._isPreloadingOneDrive = false;
+        window._preloadOneDriveError = err.message || 'Error al conectar con la carpeta de OneDrive.';
+        if (window.actualizarFacturasSugeridas) {
+          window.actualizarFacturasSugeridas();
+        }
+      });
+  } else {
+    window._isPreloadingOneDrive = false;
+    if (window.actualizarFacturasSugeridas) {
+      window.actualizarFacturasSugeridas();
+    }
   }
+};
+
+window.reintentarConexionOneDrive = function() {
+  window._preloadOneDriveError = null;
+  sessionStorage.removeItem('ms_access_token');
+  sessionStorage.removeItem('ms_access_token_expiry');
+  onedriveRealToken = null;
+  window.abrirOneDrivePicker();
 };
 
 window.adjuntarXmlFactura = function(uuid) {
@@ -13016,6 +13100,11 @@ window.abrirOneDrivePickerConToken = function(token) {
   
   onedriveFolderParents = {};
   window.navegarOneDriveReal(onedriveCurrentFolder);
+
+  // Auto-trigger background folder scanning for transaction suggested matches
+  if (window.silentPreloadOneDriveFiles) {
+    window.silentPreloadOneDriveFiles();
+  }
 };
 
 // Cierra el explorador OneDrive
