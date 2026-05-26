@@ -1337,6 +1337,16 @@
                   <input type="text" id="cfg-onedrive-client-id" placeholder="MOCK" value="MOCK" style="font-family:monospace;" />
                 </div>
 
+                <div class="form-group" style="grid-column: 1 / -1; display:none;" id="onedrive-folder-id-container">
+                  <label style="display:flex; align-items:center; gap:0.5rem; font-weight:600;">
+                    <i data-lucide="folder-lock" style="width:16px;height:16px;color:#0078d4;"></i> ID de la Carpeta OneDrive Restringida (Opcional)
+                  </label>
+                  <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                    El ID único de la carpeta de OneDrive en donde se encuentran tus comprobantes de Eurorep. Si se especifica, el técnico **solo** podrá ver y seleccionar archivos que se encuentren dentro de esta carpeta (bloqueando cualquier acceso al resto de su cuenta personal). Si se deja vacío, podrá ver todo su OneDrive.
+                  </p>
+                  <input type="text" id="cfg-onedrive-folder-id" placeholder="Escribe el ID de la carpeta en Microsoft OneDrive" value="" style="font-family:monospace;" />
+                </div>
+
                 <div class="form-group" style="grid-column: 1 / -1; padding-top: 1rem; border-top: 1px solid var(--border);">
                   <div class="toggle-row" style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,120,212,0.02); padding:0.75rem 1rem; border-radius:8px; border:1px solid rgba(0,120,212,0.1);">
                     <div>
