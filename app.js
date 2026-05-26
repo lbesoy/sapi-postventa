@@ -11942,15 +11942,7 @@ window.procesarArchivoFactura = function(e, type) {
     if (!window._gastoUploadedFiles) window._gastoUploadedFiles = [];
 
     if (type === 'pdf') {
-      window._gastoPdfBase64 = base64Data;
-      window._gastoUploadedFiles = window._gastoUploadedFiles.filter(x => x.type !== 'pdf');
-      window._gastoUploadedFiles.push({
-        type: 'pdf',
-        base64: base64Data,
-        name: file.name
-      });
-      window.renderUploaderSidebar();
-      mostrarNotificacion('Factura PDF cargada en el sidebar', 'success');
+      window.procesarPdfFacturaExtraida(file.name, base64Data);
     } else if (type === 'xml') {
       window._gastoXmlBase64 = base64Data;
 
@@ -12849,15 +12841,7 @@ window.procesarArchivoImportadoOneDrive = function(name, ext, dataContent) {
   if (!window._gastoUploadedFiles) window._gastoUploadedFiles = [];
 
   if (ext === 'pdf') {
-    window._gastoPdfBase64 = dataContent;
-    window._gastoUploadedFiles = window._gastoUploadedFiles.filter(x => x.type !== 'pdf');
-    window._gastoUploadedFiles.push({
-      type: 'pdf',
-      base64: dataContent,
-      name: name
-    });
-    window.renderUploaderSidebar();
-    mostrarNotificacion('Factura PDF importada exitosamente desde OneDrive', 'success');
+    window.procesarPdfFacturaExtraida(name, dataContent);
   } 
   
   else if (ext === 'xml') {
@@ -12920,6 +12904,178 @@ window.procesarArchivoImportadoOneDrive = function(name, ext, dataContent) {
       console.error('Error parsing imported XML:', err);
       mostrarNotificacion('Error al analizar XML importado', 'error');
     }
+  }
+};
+
+// ── INTEGRACIÓN MOZILLA PDF.JS Y AUTO-EXTRACCIÓN SAT ─────────────────────
+// =========================================================================
+
+if (typeof window !== 'undefined' && window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+// Función central para extraer texto de un archivo PDF usando PDF.js
+window.extraerTextoPdf = async function(base64Data) {
+  if (!window.pdfjsLib) {
+    throw new Error('Librería PDF.js no cargada');
+  }
+  
+  try {
+    const base64Clean = base64Data.split(',')[1] || base64Data;
+    const binaryString = atob(base64Clean);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+    
+    const loadingTask = pdfjsLib.getDocument({ data: bytes.buffer });
+    const pdf = await loadingTask.promise;
+    let fullText = '';
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map(item => item.str).join(' ');
+      fullText += pageText + '\n';
+    }
+    
+    return fullText;
+  } catch (err) {
+    console.error('Error al extraer texto del PDF:', err);
+    throw err;
+  }
+};
+
+// Analiza el texto extraído de un PDF para buscar datos del SAT (RFC, UUID, Monto, Fecha)
+window.analizarFacturaPdfTexto = function(text) {
+  const data = {
+    rfc: '',
+    uuid: '',
+    monto: 0,
+    date: ''
+  };
+  
+  if (!text) return data;
+  
+  // 1. EXTRAER UUID (FOLIO FISCAL)
+  const uuidRegex = /\b([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\b/;
+  const uuidMatch = text.match(uuidRegex);
+  if (uuidMatch) {
+    data.uuid = uuidMatch[1].toUpperCase();
+  }
+  
+  // 2. EXTRAER RFCs (EMISOR)
+  const rfcRegex = /\b([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})\b/gi;
+  const rfcMatches = text.match(rfcRegex) || [];
+  const uniqueRfcs = [...new Set(rfcMatches.map(r => r.toUpperCase()))];
+  
+  // Filtrar nuestro propio RFC de receptor para deducir el del Emisor
+  const receptorRfc = (configData.rfc || 'ERE140718NY8').toUpperCase().trim();
+  const emisorRfc = uniqueRfcs.find(rfc => rfc !== receptorRfc);
+  if (emisorRfc) {
+    data.rfc = emisorRfc;
+  } else if (uniqueRfcs.length > 0) {
+    data.rfc = uniqueRfcs[0];
+  }
+  
+  // 3. EXTRAER MONTO TOTAL
+  const totalRegex = /(?:total|neto|pagar|importe|monto)\s*(?::)?\s*(?:\$)?\s*([0-9,]+(?:\.\d{2})?)/i;
+  const totalMatch = text.match(totalRegex);
+  if (totalMatch) {
+    const cleanNum = totalMatch[1].replace(/,/g, '');
+    const val = parseFloat(cleanNum);
+    if (!isNaN(val)) {
+      data.monto = val;
+    }
+  }
+  
+  // 4. EXTRAER FECHA
+  const dateRegex = /\b(\d{4}-\d{2}-\d{2})|(\d{2}\/\d{2}\/\d{4})\b/;
+  const dateMatch = text.match(dateRegex);
+  if (dateMatch) {
+    let rawDate = dateMatch[0];
+    if (rawDate.includes('/')) {
+      const parts = rawDate.split('/');
+      if (parts.length === 3) {
+        rawDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
+    }
+    data.date = rawDate;
+  }
+  
+  return data;
+};
+
+// Helper central de procesamiento de PDF
+window.procesarPdfFacturaExtraida = function(name, base64Data) {
+  window._gastoPdfBase64 = base64Data;
+  if (!window._gastoUploadedFiles) window._gastoUploadedFiles = [];
+  
+  window._gastoUploadedFiles = window._gastoUploadedFiles.filter(x => x.type !== 'pdf');
+  window._gastoUploadedFiles.push({
+    type: 'pdf',
+    base64: base64Data,
+    name: name
+  });
+  window.renderUploaderSidebar();
+  
+  if (window.pdfjsLib) {
+    mostrarNotificacion('Analizando factura PDF y extrayendo datos...', 'info');
+    window.extraerTextoPdf(base64Data)
+      .then(text => {
+        const satData = window.analizarFacturaPdfTexto(text);
+        let dataFound = false;
+        
+        if (satData.rfc) {
+          const rfcInput = document.getElementById('gasto-rfc-emisor');
+          if (rfcInput) {
+            rfcInput.value = satData.rfc;
+            dataFound = true;
+          }
+        }
+        if (satData.uuid) {
+          const uuidInput = document.getElementById('gasto-uuid-fiscal');
+          if (uuidInput) {
+            uuidInput.value = satData.uuid;
+            dataFound = true;
+          }
+        }
+        if (satData.date) {
+          const fechaInput = document.getElementById('gasto-fecha');
+          if (fechaInput) {
+            fechaInput.value = satData.date;
+            dataFound = true;
+          }
+        }
+        if (satData.monto > 0) {
+          const montoInput = document.getElementById('gasto-monto');
+          if (montoInput && (!montoInput.value || parseFloat(montoInput.value) === 0)) {
+            montoInput.value = satData.monto;
+            dataFound = true;
+          }
+        }
+        
+        if (dataFound) {
+          mostrarNotificacion('Datos fiscales extraídos exitosamente del PDF', 'success');
+        } else {
+          mostrarNotificacion('Factura PDF cargada (no se encontraron campos SAT legibles)', 'info');
+        }
+        
+        if (window.actualizarChecklistRevisar) {
+          window.actualizarChecklistRevisar();
+        }
+      })
+      .catch(err => {
+        console.error('Error al parsear el PDF:', err);
+        mostrarNotificacion('PDF cargado, pero no se pudo extraer el texto', 'warning');
+      });
+  } else {
+    mostrarNotificacion('Factura PDF importada exitosamente', 'success');
   }
 };
 
