@@ -3872,7 +3872,21 @@
                     <div>UUID Fiscal: <span id="lbl-gasto-uuid" style="font-family:monospace; word-break:break-all;">-</span></div>
                   </div>
                 </div>
+
+                <!-- FICHA SAT DETALLADA ACCORDION (26 CAMPOS) -->
+                <div id="gasto-sat-details-accordion" style="display:none; margin-top: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-hover);">
+                  <button type="button" onclick="window.toggleSatAccordion('gasto-sat-accordion-body')" style="width:100%; display:flex; align-items:center; justify-content:space-between; padding:0.65rem 0.85rem; background:var(--bg-card); border:none; text-align:left; cursor:pointer; color:var(--text-primary); font-family:inherit; font-size:0.8rem; font-weight:600;">
+                    <span style="display:flex; align-items:center; gap:0.35rem;">
+                      <i data-lucide="shield-check" style="width:16px; height:16px; color:var(--accent);"></i> Ficha SAT Detallada (26 Campos)
+                    </span>
+                    <i id="gasto-sat-accordion-icon" data-lucide="chevron-down" style="width:14px; height:14px; transition: transform var(--transition);"></i>
+                  </button>
+                  <div id="gasto-sat-accordion-body" style="display:none; padding:0.75rem; border-top:1px solid var(--border); max-height:250px; overflow-y:auto; font-size:0.75rem;">
+                    <!-- Table with the 26 fields will be rendered here -->
+                  </div>
+                </div>
               </div>
+
 
               <div>
                 <label class="form-label" for="gasto-descripcion">Descripción / Justificación *</label>
@@ -4103,6 +4117,20 @@
             <div>RFC Emisor: <strong id="gd-rfc-emisor">-</strong></div>
             <div>Folio Fiscal UUID: <strong id="gd-uuid-fiscal" style="word-break:break-all;">-</strong></div>
           </div>
+
+          <!-- FICHA SAT DETALLADA ACCORDION (26 CAMPOS) -->
+          <div id="gd-sat-details-accordion" style="display:none; margin-top: 0.75rem; margin-bottom: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-card);">
+            <button type="button" onclick="window.toggleSatAccordion('gd-sat-accordion-body')" style="width:100%; display:flex; align-items:center; justify-content:space-between; padding:0.55rem 0.75rem; background:var(--bg-hover); border:none; text-align:left; cursor:pointer; color:var(--text-primary); font-family:inherit; font-size:0.75rem; font-weight:600;">
+              <span style="display:flex; align-items:center; gap:0.3rem;">
+                <i data-lucide="shield-check" style="width:14px; height:14px; color:var(--accent);"></i> Ficha SAT Detallada (26 Campos)
+              </span>
+              <i id="gd-sat-accordion-icon" data-lucide="chevron-down" style="width:12px; height:12px; transition: transform var(--transition);"></i>
+            </button>
+            <div id="gd-sat-accordion-body" style="display:none; padding:0.65rem; border-top:1px solid var(--border); max-height:220px; overflow-y:auto; font-size:0.72rem;">
+              <!-- Table with the 26 fields will be rendered here -->
+            </div>
+          </div>
+
           <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
             <a id="gd-btn-pdf" href="#" target="_blank" class="btn-secondary" style="min-height:30px; font-size:0.75rem; padding:0.2rem 0.6rem; display:none; align-items:center; gap:0.3rem;"><i data-lucide="file-text" style="width:14px;height:14px;"></i> Ver PDF Factura</a>
             <a id="gd-btn-xml" href="#" target="_blank" class="btn-secondary" style="min-height:30px; font-size:0.75rem; padding:0.2rem 0.6rem; display:none; align-items:center; gap:0.3rem;"><i data-lucide="code" style="width:14px;height:14px;"></i> Descargar XML</a>

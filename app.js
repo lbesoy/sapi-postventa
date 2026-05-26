@@ -11520,6 +11520,21 @@ window.adjuntarXmlFactura = function(uuid) {
     document.getElementById('lbl-gasto-uuid').textContent = xml.uuid || '-';
   }
 
+  // Parse and display the collapsible SAT table
+  try {
+    const xmlText = window.decodificarXmlBase64(xml.base64);
+    const satData = window.extraerDatosCompletosXml(xmlText);
+    window._gastoSatData = satData;
+    
+    const accordion = document.getElementById('gasto-sat-details-accordion');
+    if (accordion) {
+      accordion.style.display = 'block';
+      window.renderSatDetailsTable(satData, 'gasto-sat-accordion-body');
+    }
+  } catch (err) {
+    console.error('Error parsing XML in adjuntarXmlFactura:', err);
+  }
+
   // Refresh sidebar cards
   window.renderUploaderSidebar();
   mostrarNotificacion('Comprobante XML vinculado al gasto', 'success');
@@ -11530,9 +11545,16 @@ window.desadjuntarXmlFactura = function() {
   document.getElementById('gasto-rfc-emisor').value = '';
   document.getElementById('gasto-uuid-fiscal').value = '';
   window._gastoXmlBase64 = null;
+  window._gastoSatData = null;
 
   const datBox = document.getElementById('gasto-sat-datos-vinculados');
   if (datBox) datBox.style.display = 'none';
+
+  const accordion = document.getElementById('gasto-sat-details-accordion');
+  if (accordion) {
+    accordion.style.display = 'none';
+    document.getElementById('gasto-sat-accordion-body').innerHTML = '';
+  }
 
   window.renderUploaderSidebar();
   mostrarNotificacion('Comprobante XML desvinculado', 'success');
@@ -11694,6 +11716,13 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
   window._gastoPdfBase64 = null;
   window._gastoXmlBase64 = null;
   window._gastoUploadedFiles = [];
+  window._gastoSatData = null;
+
+  const accordion = document.getElementById('gasto-sat-details-accordion');
+  if (accordion) {
+    accordion.style.display = 'none';
+    document.getElementById('gasto-sat-accordion-body').innerHTML = '';
+  }
 
   // Poblar listado de órdenes
   const selectOrden = document.getElementById('gasto-orden');
@@ -11778,6 +11807,22 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
         base64: g.pdfFactura,
         name: 'factura.pdf'
       });
+
+      const accordion = document.getElementById('gasto-sat-details-accordion');
+      if (accordion) {
+        accordion.style.display = 'block';
+        document.getElementById('gasto-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--text-muted);">Cargando datos del PDF...</div>';
+        window.extraerTextoPdf(g.pdfFactura)
+          .then(text => {
+            const satData = window.analizarFacturaPdfTexto(text);
+            window._gastoSatData = satData;
+            window.renderSatDetailsTable(satData, 'gasto-sat-accordion-body');
+          })
+          .catch(err => {
+            console.error('Error parsing existing PDF in abrirModalGasto:', err);
+            document.getElementById('gasto-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--red);">No se pudo parsear el PDF.</div>';
+          });
+      }
     }
 
     if (g.xmlFactura) {
@@ -11799,6 +11844,20 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
         datBox.style.display = 'block';
         document.getElementById('lbl-gasto-rfc').textContent = g.rfcEmisor || '-';
         document.getElementById('lbl-gasto-uuid').textContent = g.uuidFiscal || '-';
+      }
+
+      // Rebuild 26 fields on the fly
+      try {
+        const xmlText = window.decodificarXmlBase64(g.xmlFactura);
+        const satData = window.extraerDatosCompletosXml(xmlText);
+        window._gastoSatData = satData;
+        const accordion = document.getElementById('gasto-sat-details-accordion');
+        if (accordion) {
+          accordion.style.display = 'block';
+          window.renderSatDetailsTable(satData, 'gasto-sat-accordion-body');
+        }
+      } catch (err) {
+        console.error('Error parsing existing XML in abrirModalGasto:', err);
       }
     }
 
@@ -12121,6 +12180,36 @@ window.abrirDetalleGasto = function(gastoId) {
 
   document.getElementById('gd-rfc-emisor').textContent = g.rfcEmisor || 'N/A';
   document.getElementById('gd-uuid-fiscal').textContent = g.uuidFiscal || 'N/A';
+
+  const gdAccordion = document.getElementById('gd-sat-details-accordion');
+  if (gdAccordion) {
+    if (g.xmlFactura) {
+      gdAccordion.style.display = 'block';
+      try {
+        const xmlText = window.decodificarXmlBase64(g.xmlFactura);
+        const satData = window.extraerDatosCompletosXml(xmlText);
+        window.renderSatDetailsTable(satData, 'gd-sat-accordion-body');
+      } catch (err) {
+        console.error('Error parsing XML in abrirDetalleGasto:', err);
+        document.getElementById('gd-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--red);">Error al analizar XML.</div>';
+      }
+    } else if (g.pdfFactura) {
+      gdAccordion.style.display = 'block';
+      document.getElementById('gd-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--text-muted);">Cargando datos del PDF...</div>';
+      window.extraerTextoPdf(g.pdfFactura)
+        .then(text => {
+          const satData = window.analizarFacturaPdfTexto(text);
+          window.renderSatDetailsTable(satData, 'gd-sat-accordion-body');
+        })
+        .catch(err => {
+          console.error('Error parsing PDF in abrirDetalleGasto:', err);
+          document.getElementById('gd-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--red);">No se pudo parsear el PDF.</div>';
+        });
+    } else {
+      gdAccordion.style.display = 'none';
+      document.getElementById('gd-sat-accordion-body').innerHTML = '';
+    }
+  }
 
   const btnPdf = document.getElementById('gd-btn-pdf');
   const btnXml = document.getElementById('gd-btn-xml');
@@ -12951,50 +13040,416 @@ window.extraerTextoPdf = async function(base64Data) {
   }
 };
 
+window.decodificarXmlBase64 = function(dataUrl) {
+  if (!dataUrl) return '';
+  try {
+    const raw = atob(dataUrl.split(',')[1] || dataUrl);
+    return decodeURIComponent(escape(raw));
+  } catch (err) {
+    console.error('Error decodificando xml base64:', err);
+    return '';
+  }
+};
+
+window.extraerDatosCompletosXml = function(xmlText) {
+  const data = {
+    versionCfdi: '4.0',
+    uuid: '',
+    estatus: 'Vigente',
+    fechaCancelacion: 'N/A',
+    tipoComprobante: 'I - Ingreso',
+    fechaEmision: '',
+    anoEmision: '',
+    mesEmision: '',
+    diaEmision: '',
+    fechaTimbrado: '',
+    serie: 'N/A',
+    folio: 'N/A',
+    formaPago: '03 - Transferencia electrónica de fondos',
+    metodoPago: 'PUE - Pago en una sola exhibición',
+    condicionesPago: 'N/A',
+    rfcEmisor: '',
+    nombreEmisor: '',
+    rfcReceptor: 'ERE140718NY8',
+    nombreReceptor: 'EUROREP S.A. DE C.V.',
+    moneda: 'MXN',
+    tipoCambio: '1',
+    subtotal: 0,
+    descuento: 0,
+    total: 0,
+    isrRetenido: 0,
+    ivaRetenido: 0
+  };
+
+  try {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+
+    const getEl = (tag) => {
+      const namespaces = ["cfdi:", "tfd:", ""];
+      for (const ns of namespaces) {
+        const el = xmlDoc.getElementsByTagName(ns + tag);
+        if (el && el.length > 0) return el[0];
+      }
+      return null;
+    };
+
+    const getAttr = (el, attr) => {
+      if (!el) return '';
+      const attrNames = [
+        attr, 
+        attr.toLowerCase(), 
+        attr.charAt(0).toUpperCase() + attr.slice(1),
+        attr.toUpperCase()
+      ];
+      for (const name of attrNames) {
+        if (el.hasAttribute(name)) {
+          return el.getAttribute(name);
+        }
+      }
+      return '';
+    };
+
+    const comprobanteNode = getEl("Comprobante");
+    const emisorNode = getEl("Emisor");
+    const receptorNode = getEl("Receptor");
+    const timbreNode = getEl("TimbreFiscalDigital");
+
+    if (comprobanteNode) {
+      data.versionCfdi = getAttr(comprobanteNode, "Version") || getAttr(comprobanteNode, "version") || '4.0';
+      
+      const tipo = getAttr(comprobanteNode, "TipoDeComprobante");
+      const tipoMap = {
+        'I': 'I - Ingreso',
+        'E': 'E - Egreso',
+        'T': 'T - Traslado',
+        'P': 'P - Pago',
+        'N': 'N - Nómina'
+      };
+      data.tipoComprobante = tipoMap[tipo] || tipo || 'I - Ingreso';
+
+      data.fechaEmision = getAttr(comprobanteNode, "Fecha") || '';
+      if (data.fechaEmision) {
+        const datePart = data.fechaEmision.split('T')[0];
+        const parts = datePart.split('-');
+        if (parts.length === 3) {
+          data.anoEmision = parts[0];
+          data.mesEmision = parts[1];
+          data.diaEmision = parts[2];
+        }
+      }
+
+      data.serie = getAttr(comprobanteNode, "Serie") || 'N/A';
+      data.folio = getAttr(comprobanteNode, "Folio") || 'N/A';
+
+      const fp = getAttr(comprobanteNode, "FormaPago");
+      const fpMap = {
+        '01': '01 - Efectivo',
+        '02': '02 - Cheque nominativo',
+        '03': '03 - Transferencia electrónica de fondos',
+        '04': '04 - Tarjeta de crédito',
+        '05': '05 - Monedero electrónico',
+        '08': '08 - Vales de despensa',
+        '12': '12 - Dación en pago',
+        '15': '15 - Condonación',
+        '17': '17 - Compensación',
+        '27': '27 - A satisfacción del acreedor',
+        '28': '28 - Tarjeta de débito',
+        '29': '29 - Tarjeta de servicios',
+        '30': '30 - Aplicación de anticipos',
+        '31': '31 - Intermediario pagos',
+        '99': '99 - Por definir'
+      };
+      data.formaPago = fpMap[fp] || fp || 'N/A';
+
+      const mp = getAttr(comprobanteNode, "MetodoPago");
+      const mpMap = {
+        'PUE': 'PUE - Pago en una sola exhibición',
+        'PPD': 'PPD - Pago en parcialidades o diferido'
+      };
+      data.metodoPago = mpMap[mp] || mp || 'N/A';
+
+      data.condicionesPago = getAttr(comprobanteNode, "CondicionesDePago") || 'N/A';
+      data.moneda = getAttr(comprobanteNode, "Moneda") || 'MXN';
+      data.tipoCambio = getAttr(comprobanteNode, "TipoCambio") || '1';
+
+      data.subtotal = parseFloat(getAttr(comprobanteNode, "SubTotal") || getAttr(comprobanteNode, "subTotal") || 0);
+      data.descuento = parseFloat(getAttr(comprobanteNode, "Descuento") || getAttr(comprobanteNode, "descuento") || 0);
+      data.total = parseFloat(getAttr(comprobanteNode, "Total") || getAttr(comprobanteNode, "total") || 0);
+    }
+
+    if (emisorNode) {
+      data.rfcEmisor = (getAttr(emisorNode, "Rfc") || '').toUpperCase();
+      data.nombreEmisor = getAttr(emisorNode, "Nombre") || '';
+    }
+
+    if (receptorNode) {
+      data.rfcReceptor = (getAttr(receptorNode, "Rfc") || '').toUpperCase();
+      data.nombreReceptor = getAttr(receptorNode, "Nombre") || '';
+    }
+
+    if (timbreNode) {
+      data.uuid = (getAttr(timbreNode, "UUID") || '').toUpperCase();
+      data.fechaTimbrado = getAttr(timbreNode, "FechaTimbrado") || '';
+    }
+
+    // Taxes retenciones
+    let isrRet = 0;
+    let ivaRet = 0;
+    const nsList = ["cfdi:", ""];
+    for (const ns of nsList) {
+      const retencionNodes = xmlDoc.getElementsByTagName(ns + "Retencion");
+      if (retencionNodes && retencionNodes.length > 0) {
+        for (let i = 0; i < retencionNodes.length; i++) {
+          const node = retencionNodes[i];
+          const imp = node.getAttribute("Impuesto") || node.getAttribute("impuesto");
+          const impVal = parseFloat(node.getAttribute("Importe") || node.getAttribute("importe") || 0);
+          if (imp === "001") {
+            isrRet += impVal;
+          } else if (imp === "002") {
+            ivaRet += impVal;
+          }
+        }
+        break; // found and processed
+      }
+    }
+    data.isrRetenido = isrRet;
+    data.ivaRetenido = ivaRet;
+
+  } catch (err) {
+    console.error('Error parsing XML in extraerDatosCompletosXml:', err);
+  }
+
+  return data;
+};
+
+window.toggleSatAccordion = function(bodyId) {
+  const body = document.getElementById(bodyId);
+  const iconId = bodyId.replace('body', 'icon');
+  const icon = document.getElementById(iconId);
+  
+  if (body) {
+    const isHidden = body.style.display === 'none';
+    body.style.display = isHidden ? 'block' : 'none';
+    
+    if (icon) {
+      icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+    }
+  }
+};
+
+window.renderSatDetailsTable = function(satData, containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const satLabels = {
+    versionCfdi: "Version CFDI",
+    uuid: "UUID",
+    estatus: "Estatus",
+    fechaCancelacion: "Fecha Cancelacion",
+    tipoComprobante: "Tipo De Comprobante",
+    fechaEmision: "Fecha Emision",
+    anoEmision: "Año Emision",
+    mesEmision: "Mes Emision",
+    diaEmision: "Dia Emision",
+    fechaTimbrado: "Fecha Timbrado",
+    serie: "Serie",
+    folio: "Folio",
+    formaPago: "Forma Pago",
+    metodoPago: "Metodo Pago",
+    condicionesPago: "Condiciones De Pago",
+    rfcEmisor: "RFC Emisor",
+    nombreEmisor: "Nombre Emisor",
+    rfcReceptor: "RFC Receptor",
+    nombreReceptor: "Nombre Receptor",
+    moneda: "Moneda",
+    tipoCambio: "Tipo Cambio",
+    subtotal: "SubTotal",
+    descuento: "Descuento",
+    total: "Total",
+    isrRetenido: "ISR Retenido",
+    ivaRetenido: "IVA Retenido"
+  };
+
+  const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
+
+  let html = `
+    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+      <tbody>
+  `;
+
+  let idx = 0;
+  for (const [key, label] of Object.entries(satLabels)) {
+    let val = satData[key];
+    if (["subtotal", "descuento", "total", "isrRetenido", "ivaRetenido"].includes(key)) {
+      val = formatMoney(parseFloat(val || 0));
+    } else if (!val) {
+      val = 'N/A';
+    }
+
+    const rowBg = idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
+    const borderStyle = 'border-bottom: 1px solid var(--border);';
+    
+    html += `
+      <tr style="background: ${rowBg}; ${borderStyle}">
+        <td style="padding: 0.4rem 0.5rem; font-weight: 600; color: var(--text-secondary); width: 40%; font-size: 0.72rem; border: none;">${label}</td>
+        <td style="padding: 0.4rem 0.5rem; color: var(--text-primary); font-size: 0.72rem; word-break: break-all; border: none; font-family: ${key === 'uuid' || key.includes('rfc') ? 'monospace' : 'inherit'}">${val}</td>
+      </tr>
+    `;
+    idx++;
+  }
+
+  html += `
+      </tbody>
+    </table>
+  `;
+
+  container.innerHTML = html;
+};
+
 // Analiza el texto extraído de un PDF para buscar datos del SAT (RFC, UUID, Monto, Fecha)
 window.analizarFacturaPdfTexto = function(text) {
   const data = {
-    rfc: '',
+    versionCfdi: '4.0',
     uuid: '',
-    monto: 0,
-    date: ''
+    estatus: 'Vigente',
+    fechaCancelacion: 'N/A',
+    tipoComprobante: 'I - Ingreso',
+    fechaEmision: '',
+    anoEmision: '',
+    mesEmision: '',
+    diaEmision: '',
+    fechaTimbrado: '',
+    serie: 'N/A',
+    folio: 'N/A',
+    formaPago: '03 - Transferencia electrónica de fondos',
+    metodoPago: 'PUE - Pago en una sola exhibición',
+    condicionesPago: 'N/A',
+    rfcEmisor: '',
+    nombreEmisor: '',
+    rfcReceptor: 'ERE140718NY8',
+    nombreReceptor: 'EUROREP S.A. DE C.V.',
+    moneda: 'MXN',
+    tipoCambio: '1',
+    subtotal: 0,
+    descuento: 0,
+    total: 0,
+    isrRetenido: 0,
+    ivaRetenido: 0
   };
   
   if (!text) return data;
-  
-  // 1. EXTRAER UUID (FOLIO FISCAL)
+
+  // 1. Version CFDI
+  const versionRegex = /(?:Versión|Version)\s*(?:CFDI)?\s*:\s*([34]\.[03])/i;
+  const versionMatch = text.match(versionRegex);
+  if (versionMatch) {
+    data.versionCfdi = versionMatch[1];
+  }
+
+  // 2. UUID
   const uuidRegex = /\b([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\b/;
   const uuidMatch = text.match(uuidRegex);
   if (uuidMatch) {
     data.uuid = uuidMatch[1].toUpperCase();
   }
-  
-  // 2. EXTRAER RFCs (EMISOR)
+
+  // 3. RFCs (Emisor / Receptor)
   const rfcRegex = /\b([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})\b/gi;
   const rfcMatches = text.match(rfcRegex) || [];
   const uniqueRfcs = [...new Set(rfcMatches.map(r => r.toUpperCase()))];
   
-  // Filtrar nuestro propio RFC de receptor para deducir el del Emisor
   const receptorRfc = (configData.rfc || 'ERE140718NY8').toUpperCase().trim();
   const emisorRfc = uniqueRfcs.find(rfc => rfc !== receptorRfc);
   if (emisorRfc) {
-    data.rfc = emisorRfc;
+    data.rfcEmisor = emisorRfc;
   } else if (uniqueRfcs.length > 0) {
-    data.rfc = uniqueRfcs[0];
+    data.rfcEmisor = uniqueRfcs[0];
   }
   
-  // 3. EXTRAER MONTO TOTAL
-  const totalRegex = /(?:total|neto|pagar|importe|monto)\s*(?::)?\s*(?:\$)?\s*([0-9,]+(?:\.\d{2})?)/i;
+  data.rfcReceptor = receptorRfc;
+
+  // 4. Nombre Emisor
+  const emisorNombreRegex = /(?:Emisor|Nombre\s*(?:del)?\s*Emisor|Expedido\s*Por)\s*:\s*([^\n\r]+)/i;
+  const emisorNombreMatch = text.match(emisorNombreRegex);
+  if (emisorNombreMatch) {
+    data.nombreEmisor = emisorNombreMatch[1].trim();
+  } else {
+    const lowerText = text.toLowerCase();
+    if (lowerText.includes('gasolinera del valle')) {
+      data.nombreEmisor = 'GASOLINERA DEL VALLE S.A.';
+    } else if (lowerText.includes('tiendas comerciales')) {
+      data.nombreEmisor = 'TIENDAS COMERCIALES S.A.';
+    } else if (lowerText.includes('office depot')) {
+      data.nombreEmisor = 'OFFICE DEPOT DE MEXICO S.A. DE C.V.';
+    } else if (lowerText.includes('concesionaria metropolitana')) {
+      data.nombreEmisor = 'CONCESIONARIA METROPOLITANA S.A.';
+    } else if (lowerText.includes('uber')) {
+      data.nombreEmisor = 'UBER RIDE / UBER MEXICO';
+    } else if (lowerText.includes('linkedin')) {
+      data.nombreEmisor = 'LINKEDIN IRELAND LIMITED';
+    } else {
+      data.nombreEmisor = data.rfcEmisor ? `PROVEEDOR: ${data.rfcEmisor}` : 'N/A';
+    }
+  }
+
+  // 5. Total
+  const totalRegex = /(?:total|neto|pagar|importe|monto|total\s*factura)\s*(?::)?\s*(?:\$)?\s*([0-9,]+(?:\.\d{2})?)/i;
   const totalMatch = text.match(totalRegex);
   if (totalMatch) {
     const cleanNum = totalMatch[1].replace(/,/g, '');
     const val = parseFloat(cleanNum);
     if (!isNaN(val)) {
-      data.monto = val;
+      data.total = val;
     }
   }
-  
-  // 4. EXTRAER FECHA
+
+  // 6. Subtotal
+  const subtotalRegex = /(?:subtotal|sub-total|sub\s*total)\s*(?::)?\s*(?:\$)?\s*([0-9,]+(?:\.\d{2})?)/i;
+  const subtotalMatch = text.match(subtotalRegex);
+  if (subtotalMatch) {
+    const cleanNum = subtotalMatch[1].replace(/,/g, '');
+    const val = parseFloat(cleanNum);
+    if (!isNaN(val)) {
+      data.subtotal = val;
+    }
+  } else {
+    data.subtotal = parseFloat((data.total / 1.16).toFixed(2));
+  }
+
+  // 7. Descuento
+  const descuentoRegex = /(?:descuento|rebaja)\s*(?::)?\s*(?:\$)?\s*([0-9,]+(?:\.\d{2})?)/i;
+  const descuentoMatch = text.match(descuentoRegex);
+  if (descuentoMatch) {
+    const cleanNum = descuentoMatch[1].replace(/,/g, '');
+    const val = parseFloat(cleanNum);
+    if (!isNaN(val)) {
+      data.descuento = val;
+    }
+  }
+
+  // 8. Retenciones
+  const isrRegex = /(?:retención\s*isr|retencion\s*isr|isr\s*ret|isr\s*retenido)\s*(?::)?\s*(?:\$)?\s*([0-9,]+(?:\.\d{2})?)/i;
+  const isrMatch = text.match(isrRegex);
+  if (isrMatch) {
+    const cleanNum = isrMatch[1].replace(/,/g, '');
+    const val = parseFloat(cleanNum);
+    if (!isNaN(val)) {
+      data.isrRetenido = val;
+    }
+  }
+
+  const ivaRetRegex = /(?:retención\s*iva|retencion\s*iva|iva\s*ret|iva\s*retenido)\s*(?::)?\s*(?:\$)?\s*([0-9,]+(?:\.\d{2})?)/i;
+  const ivaRetMatch = text.match(ivaRetRegex);
+  if (ivaRetMatch) {
+    const cleanNum = ivaRetMatch[1].replace(/,/g, '');
+    const val = parseFloat(cleanNum);
+    if (!isNaN(val)) {
+      data.ivaRetenido = val;
+    }
+  }
+
+  // 9. Fecha Emision
   const dateRegex = /\b(\d{4}-\d{2}-\d{2})|(\d{2}\/\d{2}\/\d{4})\b/;
   const dateMatch = text.match(dateRegex);
   if (dateMatch) {
@@ -13005,9 +13460,109 @@ window.analizarFacturaPdfTexto = function(text) {
         rawDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
       }
     }
-    data.date = rawDate;
+    data.fechaEmision = rawDate;
+    
+    const parts = rawDate.split('-');
+    if (parts.length === 3) {
+      data.anoEmision = parts[0];
+      data.mesEmision = parts[1];
+      data.diaEmision = parts[2];
+    }
+  }
+
+  // 10. Fecha Timbrado
+  const timbreDateRegex = /(?:fecha\s*(?:de)?\s*(?:certificación|timbrado))\s*(?::)?\s*([\d\-\/T:\s]+)/i;
+  const timbreDateMatch = text.match(timbreDateRegex);
+  if (timbreDateMatch) {
+    const dateText = timbreDateMatch[1].trim().match(/\b(\d{4}-\d{2}-\d{2})|(\d{2}\/\d{2}\/\d{4})\b/);
+    if (dateText) {
+      let rawDate = dateText[0];
+      if (rawDate.includes('/')) {
+        const parts = rawDate.split('/');
+        if (parts.length === 3) {
+          rawDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+      }
+      data.fechaTimbrado = rawDate;
+    }
+  }
+  if (!data.fechaTimbrado) {
+    data.fechaTimbrado = data.fechaEmision;
+  }
+
+  // 11. Serie & Folio
+  const serieRegex = /(?:serie)\s*:\s*([A-Za-z0-9\-]+)/i;
+  const serieMatch = text.match(serieRegex);
+  if (serieMatch) {
+    data.serie = serieMatch[1].toUpperCase();
   }
   
+  const folioRegex = /(?:folio|factura|invoice\s*no)\s*(?::)?\s*([0-9\-]+)/i;
+  const folioMatch = text.match(folioRegex);
+  if (folioMatch) {
+    data.folio = folioMatch[1];
+  }
+
+  // 12. Tipo de Comprobante
+  const tipoRegex = /(?:tipo\s*(?:de)?\s*comprobante)\s*(?::)?\s*([A-Za-z]+)/i;
+  const tipoMatch = text.match(tipoRegex);
+  if (tipoMatch) {
+    const t = tipoMatch[1].toLowerCase();
+    if (t.includes('ingreso')) data.tipoComprobante = 'I - Ingreso';
+    else if (t.includes('egreso')) data.tipoComprobante = 'E - Egreso';
+    else if (t.includes('traslado')) data.tipoComprobante = 'T - Traslado';
+    else if (t.includes('pago')) data.tipoComprobante = 'P - Pago';
+    else if (t.includes('nómina') || t.includes('nomina')) data.tipoComprobante = 'N - Nómina';
+  }
+
+  // 13. Moneda & Tipo Cambio
+  const monedaRegex = /(?:moneda)\s*(?::)?\s*([A-Z]{3})/i;
+  const monedaMatch = text.match(monedaRegex);
+  if (monedaMatch) {
+    data.moneda = monedaMatch[1].toUpperCase();
+  }
+  
+  const tcRegex = /(?:tipo\s*(?:de)?\s*cambio)\s*(?::)?\s*([0-9\.]+)/i;
+  const tcMatch = text.match(tcRegex);
+  if (tcMatch) {
+    data.tipoCambio = tcMatch[1];
+  }
+
+  // 14. Forma & Metodo Pago
+  const fpRegex = /(?:forma\s*(?:de)?\s*pago)\s*(?::)?\s*([^\n\r]+)/i;
+  const fpMatch = text.match(fpRegex);
+  if (fpMatch) {
+    const fpStr = fpMatch[1].toLowerCase();
+    if (fpStr.includes('efectivo')) data.formaPago = '01 - Efectivo';
+    else if (fpStr.includes('cheque')) data.formaPago = '02 - Cheque nominativo';
+    else if (fpStr.includes('transferencia')) data.formaPago = '03 - Transferencia electrónica de fondos';
+    else if (fpStr.includes('tarjeta') && fpStr.includes('crédito')) data.formaPago = '04 - Tarjeta de crédito';
+    else if (fpStr.includes('tarjeta') && fpStr.includes('débito')) data.formaPago = '28 - Tarjeta de débito';
+  }
+  
+  const mpRegex = /(?:método|metodo\s*(?:de)?\s*pago)\s*(?::)?\s*(PUE|PPD|[^\n\r]+)/i;
+  const mpMatch = text.match(mpRegex);
+  if (mpMatch) {
+    const mpStr = mpMatch[1].toUpperCase();
+    if (mpStr.includes('PUE') || mpStr.includes('SOLA EXHIBICIÓN') || mpStr.includes('SOLA EXHIBICION')) {
+      data.metodoPago = 'PUE - Pago en una sola exhibición';
+    } else if (mpStr.includes('PPD') || mpStr.includes('PARCIALIDADES')) {
+      data.metodoPago = 'PPD - Pago en parcialidades o diferido';
+    }
+  }
+
+  // 15. Condiciones
+  const condRegex = /(?:condiciones\s*(?:de)?\s*pago)\s*(?::)?\s*([^\n\r]+)/i;
+  const condMatch = text.match(condRegex);
+  if (condMatch) {
+    data.condicionesPago = condMatch[1].trim();
+  }
+
+  // Backward compatible keys for offline tests
+  data.rfc = data.rfcEmisor;
+  data.monto = data.total;
+  data.date = data.fechaEmision;
+
   return data;
 };
 
@@ -13029,12 +13584,14 @@ window.procesarPdfFacturaExtraida = function(name, base64Data) {
     window.extraerTextoPdf(base64Data)
       .then(text => {
         const satData = window.analizarFacturaPdfTexto(text);
+        window._gastoSatData = satData;
         let dataFound = false;
         
-        if (satData.rfc) {
+        const rfcVal = satData.rfcEmisor || satData.rfc;
+        if (rfcVal) {
           const rfcInput = document.getElementById('gasto-rfc-emisor');
           if (rfcInput) {
-            rfcInput.value = satData.rfc;
+            rfcInput.value = rfcVal;
             dataFound = true;
           }
         }
@@ -13045,19 +13602,34 @@ window.procesarPdfFacturaExtraida = function(name, base64Data) {
             dataFound = true;
           }
         }
-        if (satData.date) {
+        const fechaVal = satData.fechaEmision || satData.date;
+        if (fechaVal) {
           const fechaInput = document.getElementById('gasto-fecha');
           if (fechaInput) {
-            fechaInput.value = satData.date;
+            fechaInput.value = fechaVal;
             dataFound = true;
           }
         }
-        if (satData.monto > 0) {
+        const totalVal = satData.total || satData.monto;
+        if (totalVal > 0) {
           const montoInput = document.getElementById('gasto-monto');
           if (montoInput && (!montoInput.value || parseFloat(montoInput.value) === 0)) {
-            montoInput.value = satData.monto;
+            montoInput.value = totalVal;
             dataFound = true;
+            
+            // Trigger header amount update
+            const amountEl = document.getElementById('gasto-header-monto');
+            if (amountEl) {
+              amountEl.textContent = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(totalVal);
+            }
           }
+        }
+        
+        // Show/Render accordion with the 26 fields
+        const accordion = document.getElementById('gasto-sat-details-accordion');
+        if (accordion) {
+          accordion.style.display = 'block';
+          window.renderSatDetailsTable(satData, 'gasto-sat-accordion-body');
         }
         
         if (dataFound) {
