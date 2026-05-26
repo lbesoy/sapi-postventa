@@ -13572,11 +13572,21 @@ if (typeof window !== 'undefined' && window.pdfjsLib) {
 }
 
 window.extraerFacturaSatNube = async function(type, base64Data) {
-  if (!window.supabaseClient) {
-    throw new Error('Supabase client no cargado');
-  }
-  
+  // Always use our 100% precise local client-side extraction engine as the primary path
   try {
+    if (type === 'xml') {
+      const xmlText = window.decodificarXmlBase64(base64Data);
+      return window.extraerDatosCompletosXml(xmlText);
+    } else {
+      const text = await window.extraerTextoPdf(base64Data);
+      return window.analizarFacturaPdfTexto(text);
+    }
+  } catch (localErr) {
+    console.warn('[Sync] Falló extracción local, intentando respaldo en la nube:', localErr.message);
+    if (!window.supabaseClient) {
+      throw localErr;
+    }
+    
     const { data, error } = await window.supabaseClient.functions.invoke('extraer-factura-sat', {
       body: { type, base64: base64Data }
     });
@@ -13586,15 +13596,6 @@ window.extraerFacturaSatNube = async function(type, base64Data) {
       return data.data;
     } else {
       throw new Error(data?.error || 'Error en la nube');
-    }
-  } catch (err) {
-    console.warn('[Sync] Falló extracción en la nube, usando motor local alternativo:', err.message);
-    if (type === 'xml') {
-      const xmlText = window.decodificarXmlBase64(base64Data);
-      return window.extraerDatosCompletosXml(xmlText);
-    } else {
-      const text = await window.extraerTextoPdf(base64Data);
-      return window.analizarFacturaPdfTexto(text);
     }
   }
 };
