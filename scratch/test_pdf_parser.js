@@ -32,20 +32,31 @@ const globalMock = {
       return {
         getElementsByTagName: (tagName) => {
           const cleanTag = tagName.replace('cfdi:', '').replace('tfd:', '');
-          const tagRegex = new RegExp(`<[^>]*:?${cleanTag}\\b([^>]*)/?>`, 'gi');
           const nodes = [];
-          let match;
-          while ((match = tagRegex.exec(xmlText)) !== null) {
-            const attrsText = match[1];
-            const attrs = {};
-            const attrRegex = /([a-zA-Z0-9:]+)\s*=\s*(["'])(.*?)\2/gi;
-            let attrMatch;
-            while ((attrMatch = attrRegex.exec(attrsText)) !== null) {
-              attrs[attrMatch[1]] = attrMatch[3];
+          
+          let index = 0;
+          while (true) {
+            const tagOpenIndex = xmlText.indexOf('<', index);
+            if (tagOpenIndex === -1) break;
+            
+            const tagCloseIndex = xmlText.indexOf('>', tagOpenIndex);
+            if (tagCloseIndex === -1) break;
+            
+            const tagContent = xmlText.substring(tagOpenIndex, tagCloseIndex + 1);
+            const tagMatch = new RegExp(`^<\\s*(?:[a-zA-Z0-9_-]+:)?${cleanTag}\\b`, 'i').test(tagContent);
+            if (tagMatch) {
+              const attrs = {};
+              const attrRegex = /([a-zA-Z0-9:]+)\s*=\s*(["'])(.*?)\2/gi;
+              let attrMatch;
+              while ((attrMatch = attrRegex.exec(tagContent)) !== null) {
+                attrs[attrMatch[1]] = attrMatch[3];
+              }
+              nodes.push({
+                getAttribute: (name) => attrs[name] || attrs[name.toLowerCase()] || '',
+                hasAttribute: (name) => attrs[name] !== undefined || attrs[name.toLowerCase()] !== undefined
+              });
             }
-            nodes.push({
-              getAttribute: (name) => attrs[name] || attrs[name.toLowerCase()] || ''
-            });
+            index = tagCloseIndex + 1;
           }
           return nodes;
         }
