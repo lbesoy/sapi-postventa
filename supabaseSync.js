@@ -166,7 +166,8 @@ function gastoToRow(g) {
     estado: g.estado || 'Pendiente',
     comentarios_aprobacion: g.comentariosAprobacion || null,
     es_prueba: g.esPrueba || false,
-    fecha_creacion: g.fechaCreacion || new Date().toISOString()
+    fecha_creacion: g.fechaCreacion || new Date().toISOString(),
+    sat_data: g.satData || null
   };
 }
 
@@ -192,7 +193,8 @@ function rowToGasto(g) {
     estado: g.estado,
     comentariosAprobacion: g.comentarios_aprobacion,
     esPrueba: g.es_prueba,
-    fechaCreacion: g.fecha_creacion
+    fechaCreacion: g.fecha_creacion,
+    satData: g.sat_data || null
   };
 }
 

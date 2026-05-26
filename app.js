@@ -11520,20 +11520,20 @@ window.adjuntarXmlFactura = function(uuid) {
     document.getElementById('lbl-gasto-uuid').textContent = xml.uuid || '-';
   }
 
-  // Parse and display the collapsible SAT table
-  try {
-    const xmlText = window.decodificarXmlBase64(xml.base64);
-    const satData = window.extraerDatosCompletosXml(xmlText);
-    window._gastoSatData = satData;
-    
-    const accordion = document.getElementById('gasto-sat-details-accordion');
-    if (accordion) {
-      accordion.style.display = 'block';
-      window.renderSatDetailsTable(satData, 'gasto-sat-accordion-body');
-    }
-  } catch (err) {
-    console.error('Error parsing XML in adjuntarXmlFactura:', err);
-  }
+  // Parse and display the collapsible SAT table in the cloud
+  window.extraerFacturaSatNube('xml', xml.base64)
+    .then(satData => {
+      window._gastoSatData = satData;
+      
+      const accordion = document.getElementById('gasto-sat-details-accordion');
+      if (accordion) {
+        accordion.style.display = 'block';
+        window.renderSatDetailsTable(satData, 'gasto-sat-accordion-body');
+      }
+    })
+    .catch(err => {
+      console.error('Error parsing XML in adjuntarXmlFactura:', err);
+    });
 
   // Refresh sidebar cards
   window.renderUploaderSidebar();
@@ -11807,22 +11807,6 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
         base64: g.pdfFactura,
         name: 'factura.pdf'
       });
-
-      const accordion = document.getElementById('gasto-sat-details-accordion');
-      if (accordion) {
-        accordion.style.display = 'block';
-        document.getElementById('gasto-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--text-muted);">Cargando datos del PDF...</div>';
-        window.extraerTextoPdf(g.pdfFactura)
-          .then(text => {
-            const satData = window.analizarFacturaPdfTexto(text);
-            window._gastoSatData = satData;
-            window.renderSatDetailsTable(satData, 'gasto-sat-accordion-body');
-          })
-          .catch(err => {
-            console.error('Error parsing existing PDF in abrirModalGasto:', err);
-            document.getElementById('gasto-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--red);">No se pudo parsear el PDF.</div>';
-          });
-      }
     }
 
     if (g.xmlFactura) {
@@ -11845,8 +11829,17 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
         document.getElementById('lbl-gasto-rfc').textContent = g.rfcEmisor || '-';
         document.getElementById('lbl-gasto-uuid').textContent = g.uuidFiscal || '-';
       }
+    }
 
-      // Rebuild 26 fields on the fly
+    // Load satData directly from cloud if available, otherwise fallback to on-the-fly extraction
+    if (g.satData) {
+      window._gastoSatData = g.satData;
+      const accordion = document.getElementById('gasto-sat-details-accordion');
+      if (accordion) {
+        accordion.style.display = 'block';
+        window.renderSatDetailsTable(g.satData, 'gasto-sat-accordion-body');
+      }
+    } else if (g.xmlFactura) {
       try {
         const xmlText = window.decodificarXmlBase64(g.xmlFactura);
         const satData = window.extraerDatosCompletosXml(xmlText);
@@ -11858,6 +11851,22 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
         }
       } catch (err) {
         console.error('Error parsing existing XML in abrirModalGasto:', err);
+      }
+    } else if (g.pdfFactura) {
+      const accordion = document.getElementById('gasto-sat-details-accordion');
+      if (accordion) {
+        accordion.style.display = 'block';
+        document.getElementById('gasto-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--text-muted);">Cargando datos del PDF...</div>';
+        window.extraerTextoPdf(g.pdfFactura)
+          .then(text => {
+            const satData = window.analizarFacturaPdfTexto(text);
+            window._gastoSatData = satData;
+            window.renderSatDetailsTable(satData, 'gasto-sat-accordion-body');
+          })
+          .catch(err => {
+            console.error('Error parsing existing PDF in abrirModalGasto:', err);
+            document.getElementById('gasto-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--red);">No se pudo parsear el PDF.</div>';
+          });
       }
     }
 
@@ -12107,6 +12116,7 @@ window.guardarGasto = function(e) {
     evidencia: window._gastoEvidenciaBase64 || null,
     pdfFactura: window._gastoPdfBase64 || null,
     xmlFactura: window._gastoXmlBase64 || null,
+    satData: window._gastoSatData || null,
     estado: 'Pendiente',
     comentariosAprobacion: null,
     esPrueba: isTestModeActive(),
@@ -12183,7 +12193,10 @@ window.abrirDetalleGasto = function(gastoId) {
 
   const gdAccordion = document.getElementById('gd-sat-details-accordion');
   if (gdAccordion) {
-    if (g.xmlFactura) {
+    if (g.satData) {
+      gdAccordion.style.display = 'block';
+      window.renderSatDetailsTable(g.satData, 'gd-sat-accordion-body');
+    } else if (g.xmlFactura) {
       gdAccordion.style.display = 'block';
       try {
         const xmlText = window.decodificarXmlBase64(g.xmlFactura);
@@ -13003,6 +13016,34 @@ if (typeof window !== 'undefined' && window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
+window.extraerFacturaSatNube = async function(type, base64Data) {
+  if (!window.supabaseClient) {
+    throw new Error('Supabase client no cargado');
+  }
+  
+  try {
+    const { data, error } = await window.supabaseClient.functions.invoke('extraer-factura-sat', {
+      body: { type, base64: base64Data }
+    });
+    
+    if (error) throw error;
+    if (data && data.status === 'success') {
+      return data.data;
+    } else {
+      throw new Error(data?.error || 'Error en la nube');
+    }
+  } catch (err) {
+    console.warn('[Sync] Falló extracción en la nube, usando motor local alternativo:', err.message);
+    if (type === 'xml') {
+      const xmlText = window.decodificarXmlBase64(base64Data);
+      return window.extraerDatosCompletosXml(xmlText);
+    } else {
+      const text = await window.extraerTextoPdf(base64Data);
+      return window.analizarFacturaPdfTexto(text);
+    }
+  }
+};
+
 // Función central para extraer texto de un archivo PDF usando PDF.js
 window.extraerTextoPdf = async function(base64Data) {
   if (!window.pdfjsLib) {
@@ -13581,9 +13622,8 @@ window.procesarPdfFacturaExtraida = function(name, base64Data) {
   
   if (window.pdfjsLib) {
     mostrarNotificacion('Analizando factura PDF y extrayendo datos...', 'info');
-    window.extraerTextoPdf(base64Data)
-      .then(text => {
-        const satData = window.analizarFacturaPdfTexto(text);
+    window.extraerFacturaSatNube('pdf', base64Data)
+      .then(satData => {
         window._gastoSatData = satData;
         let dataFound = false;
         
