@@ -11686,7 +11686,19 @@ window.actualizarFacturasSugeridas = function() {
       const matchPct = Math.min(score + 20, 100); // map to visual percentage
       const badgeColor = matchPct >= 80 ? 'var(--green)' : 'var(--accent)';
       const badgeBg = matchPct >= 80 ? 'rgba(16,185,129,0.12)' : 'rgba(168,85,247,0.12)';
-      const emisor = satData.nombreEmisor || file.name;
+      let emisor = satData.nombreEmisor || file.name || 'N/A';
+      // Clean up RFC if present in name
+      emisor = emisor.replace(/\b[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}\b/i, '').trim();
+      // Clean up Régimen Fiscal details
+      emisor = emisor.replace(/(?:Régimen|Regimen)\s*(?:Fiscal)?\s*(?::)?\s*\d{3}\s*-\s*[^\n\r]+/i, '').trim();
+      emisor = emisor.replace(/(?:Régimen|Regimen)\s*(?:Fiscal)?\s*(?::)?\s*[^\n\r]+/i, '').trim();
+      // Clean up other trailing noise
+      emisor = emisor.replace(/\b(?:Régimen|Regimen|Fiscal|RFC|C\.P\.|Lugar\s*de)\b.*/i, '').trim();
+      // Clean trailing/leading spaces, colons, hyphens
+      emisor = emisor.replace(/^[\s-:,]+|[\s-:,]+$/g, '').replace(/\s+/g, ' ').trim();
+      
+      const emisorShort = emisor.length > 38 ? emisor.substring(0, 35) + '...' : emisor;
+
       const rfc = satData.rfcEmisor || satData.rfc || 'N/A';
       const uuid = satData.uuid || 'N/A';
       const total = parseFloat(satData.total || satData.monto || 0);
@@ -11696,7 +11708,7 @@ window.actualizarFacturasSugeridas = function() {
       return `
         <div style="background:var(--bg-card); border:1px solid var(--border); padding:0.6rem; border-radius:6px; display:flex; flex-direction:column; gap:0.35rem; margin-bottom: 0.35rem;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div style="font-weight:700; font-size:0.75rem; color:var(--text-primary); max-width:70%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${emisor}</div>
+            <div style="font-weight:700; font-size:0.75rem; color:var(--text-primary); max-width:70%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${emisor}">${emisorShort}</div>
             <span style="font-size:0.6rem; font-weight:700; color:${badgeColor}; background:${badgeBg}; border:1px solid rgba(168,85,247,0.15); padding:0.05rem 0.3rem; border-radius:4px;">${matchPct}% MATCH</span>
           </div>
           <div style="font-size:0.7rem; color:var(--text-muted); display:flex; gap:0.5rem; flex-wrap:wrap;">
@@ -13955,7 +13967,17 @@ window.analizarFacturaPdfTexto = function(text) {
   const emisorNombreRegex = /(?:Emisor|Nombre\s*(?:del)?\s*Emisor|Expedido\s*Por)\s*:\s*([^\n\r]+)/i;
   const emisorNombreMatch = text.match(emisorNombreRegex);
   if (emisorNombreMatch) {
-    data.nombreEmisor = emisorNombreMatch[1].trim();
+    let name = emisorNombreMatch[1].trim();
+    // Remove RFC if present in name
+    name = name.replace(/\b[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}\b/i, '').trim();
+    // Remove Régimen Fiscal details
+    name = name.replace(/(?:Régimen|Regimen)\s*(?:Fiscal)?\s*(?::)?\s*\d{3}\s*-\s*[^\n\r]+/i, '').trim();
+    name = name.replace(/(?:Régimen|Regimen)\s*(?:Fiscal)?\s*(?::)?\s*[^\n\r]+/i, '').trim();
+    // Remove other trailing noise
+    name = name.replace(/\b(?:Régimen|Regimen|Fiscal|RFC|C\.P\.|Lugar\s*de)\b.*/i, '').trim();
+    // Clean trailing/leading spaces, colons, hyphens
+    name = name.replace(/^[\s-:,]+|[\s-:,]+$/g, '').replace(/\s+/g, ' ').trim();
+    data.nombreEmisor = name || emisorNombreMatch[1].trim();
   } else {
     const lowerText = text.toLowerCase();
     if (lowerText.includes('gasolinera del valle')) {
