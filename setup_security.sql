@@ -13,31 +13,63 @@ ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.maquinaria ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 
--- 3. Crear Políticas (Policies) para Administradores (Pueden ver y hacer todo)
-CREATE POLICY "Admins full access ordenes" ON public.ordenes FOR ALL USING (
-  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin')
+-- 3. Crear Políticas (Policies) para Administradores y Supervisores (Acceso Completo)
+CREATE POLICY "Admins y Supervisores full access ordenes" ON public.ordenes FOR ALL TO authenticated USING (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
+) WITH CHECK (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
 );
-CREATE POLICY "Admins full access tickets" ON public.tickets FOR ALL USING (
-  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin')
+
+CREATE POLICY "Admins y Supervisores full access tickets" ON public.tickets FOR ALL TO authenticated USING (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
+) WITH CHECK (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
 );
-CREATE POLICY "Admins full access clientes" ON public.clientes FOR ALL USING (
-  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin')
+
+CREATE POLICY "Admins y Supervisores full access clientes" ON public.clientes FOR ALL TO authenticated USING (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
+) WITH CHECK (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
 );
-CREATE POLICY "Admins full access maquinaria" ON public.maquinaria FOR ALL USING (
-  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin')
+
+CREATE POLICY "Admins y Supervisores full access maquinaria" ON public.maquinaria FOR ALL TO authenticated USING (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
+) WITH CHECK (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
 );
-CREATE POLICY "Admins full access user_roles" ON public.user_roles FOR ALL USING (
+
+CREATE POLICY "Admins full access user_roles" ON public.user_roles FOR ALL TO authenticated USING (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin')
+) WITH CHECK (
   (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin')
 );
 
--- 4. Crear Políticas para Técnicos (Solo pueden ver y modificar SUS órdenes)
-CREATE POLICY "Técnicos pueden ver sus órdenes" ON public.ordenes FOR SELECT USING (
+-- 4. Crear Políticas de Lectura (SELECT) para Roles de Consulta y Técnicos sobre Catálogos
+CREATE POLICY "Consulta y Tecnicos read access clientes" ON public.clientes FOR SELECT TO authenticated USING (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('tecnico', 'consulta', 'empresa')
+);
+
+CREATE POLICY "Consulta y Tecnicos read access maquinaria" ON public.maquinaria FOR SELECT TO authenticated USING (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('tecnico', 'consulta', 'empresa')
+);
+
+CREATE POLICY "Consulta y Tecnicos read access tickets" ON public.tickets FOR SELECT TO authenticated USING (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('tecnico', 'consulta', 'empresa')
+);
+
+-- 5. Crear Políticas para Técnicos y Consulta sobre Órdenes de Servicio
+CREATE POLICY "Técnicos pueden ver sus órdenes" ON public.ordenes FOR SELECT TO authenticated USING (
   (SELECT rol FROM public.user_roles WHERE id = auth.uid()) = 'tecnico' AND
   tecnico = (SELECT nombre FROM public.user_roles WHERE id = auth.uid())
 );
-CREATE POLICY "Técnicos pueden editar sus órdenes" ON public.ordenes FOR UPDATE USING (
+
+CREATE POLICY "Técnicos pueden editar sus órdenes" ON public.ordenes FOR UPDATE TO authenticated USING (
   (SELECT rol FROM public.user_roles WHERE id = auth.uid()) = 'tecnico' AND
   tecnico = (SELECT nombre FROM public.user_roles WHERE id = auth.uid())
+);
+
+CREATE POLICY "Consulta read access ordenes" ON public.ordenes FOR SELECT TO authenticated USING (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) = 'consulta'
 );
 
 -- 5. Crear Trigger para añadir automáticamente los usuarios nuevos a la tabla de roles
@@ -55,7 +87,7 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
--- Permitir a los usuarios leer su propio rol
-CREATE POLICY "Usuarios pueden leer su propio rol" ON public.user_roles FOR SELECT USING (
-  id = auth.uid()
+-- Permitir a todos los usuarios autenticados consultar la lista de roles para el modal selector de usuario
+CREATE POLICY "Allow select on user_roles to authenticated" ON public.user_roles FOR SELECT TO authenticated USING (
+  true
 );
