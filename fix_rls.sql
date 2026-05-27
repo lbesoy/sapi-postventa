@@ -1,39 +1,29 @@
 -- =========================================================================
--- SOLUCIÓN DE SEGURIDAD / RLS PARA LA TABLA USER_ROLES EN SUPABASE
--- Ejecuta una de las siguientes opciones en el SQL Editor de tu consola Supabase.
+-- CONFIGURACIÓN DE SEGURIDAD SECURE RLS PARA LA TABLA USER_ROLES EN SUPABASE
+-- Ejecuta este script en el SQL Editor de tu consola de Supabase para establecer
+-- un control de acceso robusto basado en roles.
 -- =========================================================================
 
--- OPCIÓN 1 (Recomendada y más sencilla): 
--- Desactiva el Row Level Security (RLS) en la tabla user_roles.
--- Dado que esta tabla no contiene contraseñas ni PINs, y solo sirve para saber 
--- el rol de cada usuario y listarlos en la aplicación, desactivar RLS es seguro 
--- y permite al selector de usuarios ("Cambiar Usuario") funcionar sin problemas para todos.
+-- 1. Garantizar que Row Level Security (RLS) esté activo en la tabla user_roles
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE public.user_roles DISABLE ROW LEVEL SECURITY;
-
-
--- ─────────────────────────────────────────────────────────────────────────
-
-
--- OPCIÓN 2 (Si prefieres mantener RLS activado en user_roles):
--- Si quieres conservar RLS, ejecuta las siguientes sentencias para eliminar 
--- las políticas anteriores con recursividad infinita y configurar accesos correctos.
-
-/*
--- 1. Limpiar políticas anteriores en user_roles
+-- 2. Limpiar políticas previas en user_roles para evitar duplicados o conflictos
 DROP POLICY IF EXISTS "Admins full access user_roles" ON public.user_roles;
 DROP POLICY IF EXISTS "Usuarios pueden leer su propio rol" ON public.user_roles;
 DROP POLICY IF EXISTS "Allow public select on user_roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Admins write access user_roles" ON public.user_roles;
 
--- 2. Crear una política para lectura pública (SELECT)
--- Esto permite que cualquier usuario pueda ver la lista de nombres y roles para el modal "Cambiar Usuario"
-CREATE POLICY "Allow public select on user_roles" 
+-- 3. Crear una política que permite a cualquier usuario autenticado consultar la lista de roles
+-- Esto es necesario para que el selector de la interfaz ("Cambiar Usuario") pueda cargar los perfiles
+CREATE POLICY "Allow select on user_roles to authenticated" 
   ON public.user_roles 
   FOR SELECT 
+  TO authenticated
   USING (true);
 
--- 3. Crear una función auxiliar SECURITY DEFINER para verificar si el usuario es administrador
--- Esto evita la recursividad infinita (stack overflow) al evaluar la política de escritura
+-- 4. Crear una función auxiliar SECURITY DEFINER para comprobar privilegios de administrador
+-- Al ejecutarse con privilegios del creador (SECURITY DEFINER), evita problemas de recursividad
+-- infinita (infinite stack depth) al verificar políticas sobre la misma tabla
 CREATE OR REPLACE FUNCTION public.is_admin_check(user_id uuid)
 RETURNS boolean AS $$
 BEGIN
@@ -43,10 +33,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 4. Crear política para escritura/administración completa en user_roles
-CREATE POLICY "Admins write access user_roles" 
+-- 5. Crear la política de acceso completo (escritura/administración) para superadmins y admins
+CREATE POLICY "Admins full access user_roles" 
   ON public.user_roles 
   FOR ALL 
+  TO authenticated
   USING (public.is_admin_check(auth.uid()))
   WITH CHECK (public.is_admin_check(auth.uid()));
-*/
