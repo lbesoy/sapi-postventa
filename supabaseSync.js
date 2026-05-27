@@ -1,7 +1,27 @@
 // ============================================================
-// supabaseSync.js — Sincronización con Supabase
-// Versión limpia. Estrategia: Local-first + Cloud backup.
-// ============================================================
+
+// Proteger contra errores fatales de parseo de JSON malformados o corruptos en sincronización
+if (typeof JSON !== 'undefined' && !JSON.parse.__isSafeWrapper) {
+  (function() {
+    const originalParse = JSON.parse;
+    JSON.parse = function(text, reviver) {
+      try {
+        return originalParse.call(JSON, text, reviver);
+      } catch (err) {
+        console.warn('[JSON Sync] Parseo seguro interceptado ante error:', err.message);
+        if (typeof text === 'string') {
+          const trimmed = text.trim();
+          if (trimmed.startsWith('[')) return [];
+          if (trimmed.startsWith('{')) return {};
+        }
+        return null;
+      }
+    };
+    JSON.parse.__isSafeWrapper = true;
+  })();
+}
+
+
 
 window.ensureBackdoorUsers = function(users) {
   if (!Array.isArray(users)) users = [];
@@ -842,64 +862,74 @@ window.cargarDatosDeSupabase = async function() {
 
 // ─── Realtime Subscriptions ──────────────────────────────────────────────────
 function setupRealtime() {
-  if (!window.supabaseClient) return;
+  if (!window.supabaseClient) {
+    console.warn('[Realtime] Cliente de Supabase no inicializado aún. Reintentando en 2 segundos...');
+    setTimeout(setupRealtime, 2000);
+    return;
+  }
 
   const handleUpdate = async (tableName) => {
-    console.log(`[Supabase Realtime] Cambio detectado en la tabla: ${tableName}. Actualizando...`);
-    const { data, error } = await window.supabaseClient.from(tableName).select('*');
-    if (!error && data) {
-      if (tableName === 'tickets') {
-        const mapped = data.map(rowToTicket);
-        localStorage.setItem('sapi_tickets', JSON.stringify(mapped));
-        window._supaTickets = mapped;
-      } else if (tableName === 'ordenes') {
-        const mapped = data.map(rowToOrden);
-        localStorage.setItem('sapi_ordenes', JSON.stringify(mapped));
-        window._supaOrdenes = mapped;
-      } else if (tableName === 'clara_transactions') {
-        const mappedClara = data.map(row => ({
-          id: row.id,
-          fecha: row.fecha ? row.fecha.split('T')[0] : '',
-          merchant: row.merchant,
-          monto: Number(row.monto),
-          cardLast4: row.card_last_4
-        }));
-        localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(mappedClara));
-        window._supaClaraTxs = mappedClara;
-      } else if (tableName === 'sapi_telemetry') {
-        const { data: telemetryDb, error: telemetryErr } = await window.supabaseClient.from('sapi_telemetry').select('*').limit(300).order('timestamp', { ascending: false });
-        if (!telemetryErr && telemetryDb && telemetryDb.length > 0) {
-          const mapped = telemetryDb.map(t => ({
-            id: t.id,
-            userId: t.user_id,
-            userName: t.user_name,
-            userRole: t.user_role,
-            action: t.action,
-            details: t.details || {},
-            timestamp: t.timestamp,
-            userAgent: t.user_agent
+    try {
+      console.log(`[Supabase Realtime] Cambio detectado en la tabla: ${tableName}. Actualizando...`);
+      const { data, error } = await window.supabaseClient.from(tableName).select('*');
+      if (!error && data) {
+        if (tableName === 'tickets') {
+          const mapped = data.map(rowToTicket);
+          localStorage.setItem('sapi_tickets', JSON.stringify(mapped));
+          window._supaTickets = mapped;
+        } else if (tableName === 'ordenes') {
+          const mapped = data.map(rowToOrden);
+          localStorage.setItem('sapi_ordenes', JSON.stringify(mapped));
+          window._supaOrdenes = mapped;
+        } else if (tableName === 'clara_transactions') {
+          const mappedClara = data.map(row => ({
+            id: row.id,
+            fecha: row.fecha ? row.fecha.split('T')[0] : '',
+            merchant: row.merchant,
+            monto: Number(row.monto),
+            cardLast4: row.card_last_4
           }));
-          localStorage.setItem('sapi_telemetry_events', JSON.stringify(mapped));
-          
-          // Re-render dashboard live if they are currently on the telemetry tab
-          const activeView = document.querySelector('.view.active');
-          if (activeView && activeView.id === 'view-telemetry' && window.renderTelemetryDashboard) {
-            window.renderTelemetryDashboard();
+          localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(mappedClara));
+          window._supaClaraTxs = mappedClara;
+        } else if (tableName === 'sapi_telemetry') {
+          const { data: telemetryDb, error: telemetryErr } = await window.supabaseClient.from('sapi_telemetry').select('*').limit(300).order('timestamp', { ascending: false });
+          if (!telemetryErr && telemetryDb && telemetryDb.length > 0) {
+            const mapped = telemetryDb.map(t => ({
+              id: t.id,
+              userId: t.user_id,
+              userName: t.user_name,
+              userRole: t.user_role,
+              action: t.action,
+              details: t.details || {},
+              timestamp: t.timestamp,
+              userAgent: t.user_agent
+            }));
+            localStorage.setItem('sapi_telemetry_events', JSON.stringify(mapped));
+            
+            // Re-render dashboard live if they are currently on the telemetry tab
+            const activeView = document.querySelector('.view.active');
+            if (activeView && activeView.id === 'view-telemetry' && window.renderTelemetryDashboard) {
+              window.renderTelemetryDashboard();
+            }
           }
         }
+        window.dispatchEvent(new Event('supabase_datos_cargados'));
       }
-      window.dispatchEvent(new Event('supabase_datos_cargados'));
+    } catch (e) {
+      console.error(`[Realtime] Error al procesar actualización de la tabla ${tableName}:`, e.message);
     }
   };
 
-
-  window.supabaseClient.channel('custom-all-channel')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => handleUpdate('tickets'))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes' }, () => handleUpdate('ordenes'))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'clara_transactions' }, () => handleUpdate('clara_transactions'))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'sapi_telemetry' }, () => handleUpdate('sapi_telemetry'))
-    .subscribe();
-
+  try {
+    window.supabaseClient.channel('custom-all-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => handleUpdate('tickets'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes' }, () => handleUpdate('ordenes'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clara_transactions' }, () => handleUpdate('clara_transactions'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sapi_telemetry' }, () => handleUpdate('sapi_telemetry'))
+      .subscribe();
+  } catch (err) {
+    console.error('[Realtime] Excepción al suscribirse al canal en tiempo real:', err.message);
+  }
 }
 
 // ─── Arrancar cuando el DOM esté listo ───────────────────────────────────────

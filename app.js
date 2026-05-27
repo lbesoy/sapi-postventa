@@ -18,6 +18,48 @@ if (typeof window !== 'undefined') {
   }
 }
 
+// Proteger contra errores de cuota de almacenamiento (QuotaExceededError) de localStorage.setItem
+if (typeof window !== 'undefined' && window.localStorage) {
+  (function() {
+    const originalSetItem = window.localStorage.setItem;
+    window.localStorage.setItem = function(key, value) {
+      try {
+        originalSetItem.call(window.localStorage, key, value);
+      } catch (err) {
+        console.warn('[LocalStorage] Capturado error al guardar clave:', key, err.message);
+        if (err.name === 'QuotaExceededError' || err.message.toLowerCase().includes('quota')) {
+          try {
+            // Intenta liberar espacio removiendo telemetría no crítica
+            window.localStorage.removeItem('sapi_telemetry_events');
+            originalSetItem.call(window.localStorage, key, value);
+            console.warn('[LocalStorage] Elemento guardado tras purgar telemetría de depuración.');
+          } catch (innerErr) {
+            console.error('[LocalStorage] Fallo crítico de espacio tras purga:', innerErr.message);
+          }
+        }
+      }
+    };
+  })();
+}
+
+// Proteger contra errores fatales de parseo de JSON malformados o corruptos en cliente
+(function() {
+  const originalParse = JSON.parse;
+  JSON.parse = function(text, reviver) {
+    try {
+      return originalParse.call(JSON, text, reviver);
+    } catch (err) {
+      console.warn('[JSON] Parseo seguro interceptado ante error:', err.message);
+      if (typeof text === 'string') {
+        const trimmed = text.trim();
+        if (trimmed.startsWith('[')) return [];
+        if (trimmed.startsWith('{')) return {};
+      }
+      return null;
+    }
+  };
+})();
+
 
 // ===== HELPERS =====
 function safeGetJSON(key, defaultVal) {
@@ -10797,14 +10839,15 @@ window.renderClaraTxs = function() {
   // RELLENAR CONTENEDOR OCULTO PARA COMPATIBILIDAD CON TESTS AUTOMATIZADOS (JSDOM)
   const testContainer = document.getElementById('clara-txs-list');
   if (testContainer) {
-    testContainer.innerHTML = '';
+    let accumulatedCards = '';
     pendingTxs.forEach(tx => {
-      testContainer.insertAdjacentHTML('beforeend', `
+      accumulatedCards += `
         <div class="clara-tx-card" id="clara-card-${tx.id}">
           <button onclick="abrirModalGasto(null, '${tx.id}')">Conciliar</button>
         </div>
-      `);
+      `;
     });
+    testContainer.innerHTML = accumulatedCards;
   }
 
   if (filteredTxs.length === 0) {
@@ -10827,6 +10870,7 @@ window.renderClaraTxs = function() {
     return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
   };
 
+  let accumulatedRows = '';
   filteredTxs.forEach(tx => {
     // Buscar si hay gasto vinculado a este cargo
     const g = getFilteredGastos().find(x => x.claraTxId === tx.id && x.estado !== 'Rechazado');
@@ -10920,8 +10964,9 @@ window.renderClaraTxs = function() {
         </td>
       </tr>
     `;
-    container.insertAdjacentHTML('beforeend', rowHtml);
+    accumulatedRows += rowHtml;
   });
+  container.innerHTML = accumulatedRows;
 
   lucide.createIcons();
 };
@@ -11146,6 +11191,7 @@ window.renderGastos = function() {
       const colSpanVal = isTecnico ? 9 : 10;
       tbody.innerHTML = `<tr><td colspan="${colSpanVal}" style="text-align:center; padding:2rem; color:var(--text-muted);">No se encontraron gastos registrados.</td></tr>`;
     } else {
+      let accumulatedRows = '';
       filtered.forEach(g => {
         let badgeClass = 'badge-g-pendiente';
         if (g.estado === 'Aprobado') badgeClass = 'badge-g-aprobado';
@@ -11197,8 +11243,9 @@ window.renderGastos = function() {
             </td>
           </tr>
         `;
-        tbody.insertAdjacentHTML('beforeend', rowHtml);
+        accumulatedRows += rowHtml;
       });
+      tbody.innerHTML = accumulatedRows;
     }
   }
 
@@ -11210,6 +11257,7 @@ window.renderGastos = function() {
     if (filtered.length === 0) {
       mobileContainer.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--text-muted); font-size:0.9rem;">No se encontraron gastos registrados.</div>`;
     } else {
+      let accumulatedCards = '';
       filtered.forEach(g => {
         let badgeClass = 'badge-g-pendiente';
         if (g.estado === 'Aprobado') badgeClass = 'badge-g-aprobado';
@@ -11255,8 +11303,9 @@ window.renderGastos = function() {
             </div>
           </div>
         `;
-        mobileContainer.insertAdjacentHTML('beforeend', cardHtml);
+        accumulatedCards += cardHtml;
       });
+      mobileContainer.innerHTML = accumulatedCards;
     }
   }
 
@@ -11967,57 +12016,70 @@ window.silentPreloadOneDriveFiles = function() {
         return res.json();
       })
       .then(data => {
-        const children = data.value || [];
-        const promises = children.map(item => {
-          if (item.folder) return Promise.resolve(null);
-          const ext = (item.name.split('.').pop() || '').toLowerCase();
-          if (ext !== 'xml' && ext !== 'pdf') return Promise.resolve(null);
+        try {
+          const children = (data && Array.isArray(data.value)) ? data.value : [];
+          const promises = children.map(item => {
+            if (!item) return Promise.resolve(null);
+            if (item.folder) return Promise.resolve(null);
+            const ext = (item.name.split('.').pop() || '').toLowerCase();
+            if (ext !== 'xml' && ext !== 'pdf') return Promise.resolve(null);
 
-          // Fetch the file download URL to load base64 content
-          const downloadUrl = item['@microsoft.graph.downloadUrl'];
-          if (!downloadUrl) return Promise.resolve(null);
+            // Fetch the file download URL to load base64 content
+            const downloadUrl = item['@microsoft.graph.downloadUrl'];
+            if (!downloadUrl) return Promise.resolve(null);
 
-          return fetch(downloadUrl)
-            .then(res => {
-              if (ext === 'xml') return res.text();
-              else return res.blob();
-            })
-            .then(content => {
-              let base64 = '';
-              if (ext === 'xml') {
-                base64 = 'data:text/xml;base64,' + btoa(unescape(encodeURIComponent(content)));
-                return { item, base64, ext };
-              } else {
-                return new Promise((resolve) => {
-                  const reader = new FileReader();
-                  reader.onload = (e) => resolve({ item, base64: e.target.result, ext });
-                  reader.readAsDataURL(content);
+            return fetch(downloadUrl)
+              .then(res => {
+                if (ext === 'xml') return res.text();
+                else return res.blob();
+              })
+              .then(content => {
+                let base64 = '';
+                if (ext === 'xml') {
+                  base64 = 'data:text/xml;base64,' + btoa(unescape(encodeURIComponent(content)));
+                  return { item, base64, ext };
+                } else {
+                  return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve({ item, base64: e.target.result, ext });
+                    reader.readAsDataURL(content);
+                  });
+                }
+              })
+              .catch(() => null);
+          });
+
+          Promise.all(promises).then(loadedFiles => {
+            if (!window._gastoUploadedFiles) window._gastoUploadedFiles = [];
+            loadedFiles.forEach(f => {
+              if (!f || !f.item) return;
+              const alreadyExists = window._gastoUploadedFiles.some(x => x.name === f.item.name);
+              if (!alreadyExists) {
+                window._gastoUploadedFiles.push({
+                  type: f.ext,
+                  base64: f.base64,
+                  name: f.item.name,
+                  uuid: f.item.id,
+                  isOneDriveVirtual: true
                 });
               }
-            })
-            .catch(() => null);
-        });
-
-        Promise.all(promises).then(loadedFiles => {
-          if (!window._gastoUploadedFiles) window._gastoUploadedFiles = [];
-          loadedFiles.forEach(f => {
-            if (!f) return;
-            const alreadyExists = window._gastoUploadedFiles.some(x => x.name === f.item.name);
-            if (!alreadyExists) {
-              window._gastoUploadedFiles.push({
-                type: f.ext,
-                base64: f.base64,
-                name: f.item.name,
-                uuid: f.item.id,
-                isOneDriveVirtual: true
-              });
+            });
+            window._isPreloadingOneDrive = false;
+            if (window.actualizarFacturasSugeridas) {
+              window.actualizarFacturasSugeridas();
             }
+          }).catch(err => {
+            console.error('[OneDrive] Promise.all processing failed:', err);
+            window._isPreloadingOneDrive = false;
           });
+        } catch (e) {
+          console.error('[OneDrive] Exception processing children list:', e);
           window._isPreloadingOneDrive = false;
+          window._preloadOneDriveError = 'Error al procesar la lista de archivos de OneDrive.';
           if (window.actualizarFacturasSugeridas) {
             window.actualizarFacturasSugeridas();
           }
-        });
+        }
       })
       .catch(err => {
         console.warn('Error in silent OneDrive folder pre-load:', err);

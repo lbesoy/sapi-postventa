@@ -18,8 +18,8 @@ const SAP_URL      = process.env.SAP_SL_URL;
 const SAP_DB       = process.env.SAP_COMPANY_DB;
 const SAP_USER     = process.env.SAP_USER;
 const SAP_PASS     = process.env.SAP_PASSWORD;
-const SUPABASE_URL = 'https://mupevytlssqcbhlmzmcp.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11cGV2eXRsc3NxY2JobG16bWNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NjE0MzUsImV4cCI6MjA5MzMzNzQzNX0.sdAI9nJluJCP6skq0lfdj8CQvFEyqqV4z6ntbqvQdPY';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://mupevytlssqcbhlmzmcp.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11cGV2eXRsc3NxY2JobG16bWNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NjE0MzUsImV4cCI6MjA5MzMzNzQzNX0.sdAI9nJluJCP6skq0lfdj8CQvFEyqqV4z6ntbqvQdPY';
 
 // Queries configurados (se sobreescriben con la config de Supabase)
 let QUERIES = {

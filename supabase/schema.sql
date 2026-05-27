@@ -123,12 +123,22 @@ CREATE TABLE public.roles (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 11. RLS (Row Level Security) - Deshabilitado temporalmente para pruebas
-ALTER TABLE public.clientes DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.ordenes DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tickets DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sitios DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.maquinaria DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.refacciones DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.config DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.roles DISABLE ROW LEVEL SECURITY;
+-- 11. RLS (Row Level Security) - Habilitado por defecto para máxima seguridad
+ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ordenes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tickets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sitios ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.maquinaria ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.refacciones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;
+
+-- 12. Políticas de seguridad para permitir operaciones exclusivamente a usuarios autenticados
+CREATE POLICY "Permitir todo a autenticados" ON public.clientes FOR ALL TO authenticated USING (true);
+CREATE POLICY "Permitir todo a autenticados" ON public.ordenes FOR ALL TO authenticated USING (true);
+CREATE POLICY "Permitir todo a autenticados" ON public.tickets FOR ALL TO authenticated USING (true);
+CREATE POLICY "Permitir todo a autenticados" ON public.sitios FOR ALL TO authenticated USING (true);
+CREATE POLICY "Permitir todo a autenticados" ON public.maquinaria FOR ALL TO authenticated USING (true);
+CREATE POLICY "Permitir todo a autenticados" ON public.refacciones FOR ALL TO authenticated USING (true);
+CREATE POLICY "Permitir todo a autenticados" ON public.config FOR ALL TO authenticated USING (true);
+CREATE POLICY "Permitir todo a autenticados" ON public.roles FOR ALL TO authenticated USING (true);

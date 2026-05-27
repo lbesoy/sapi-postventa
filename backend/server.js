@@ -265,8 +265,8 @@ app.get('/api/maquinaria', ensureSAPConnection, async (req, res) => {
 });
 
 // ── /api/sync-all: Sincroniza todos los catálogos SAP → Supabase ────────────
-const SUPABASE_URL_SRV = 'https://mupevytlssqcbhlmzmcp.supabase.co';
-const SUPABASE_KEY_SRV = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11cGV2eXRsc3NxY2JobG16bWNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NjE0MzUsImV4cCI6MjA5MzMzNzQzNX0.sdAI9nJluJCP6skq0lfdj8CQvFEyqqV4z6ntbqvQdPY';
+const SUPABASE_URL_SRV = process.env.SUPABASE_URL || 'https://mupevytlssqcbhlmzmcp.supabase.co';
+const SUPABASE_KEY_SRV = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11cGV2eXRsc3NxY2JobG16bWNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NjE0MzUsImV4cCI6MjA5MzMzNzQzNX0.sdAI9nJluJCP6skq0lfdj8CQvFEyqqV4z6ntbqvQdPY';
 
 async function upsertSupa(tabla, rows) {
     if (!rows || rows.length === 0) return 0;
