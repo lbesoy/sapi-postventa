@@ -1,5 +1,0 @@
-{
-  "sqlCode": "Cat_refacciones",
-  "sqlName": "Catálogo productos Tickets",
-  "sqlText": "SELECT CASE WHEN RIGHT(T0.\"ItemCode\", 1) = 'N' THEN 'Nacional' ELSE 'Importado' END AS \"Origen\" FROM OITM T0 INNER JOIN \"SBO_SAPI\".\"@OK_MARCA\" T1 ON T0.\"U_MARCA\" = T1.\"Code\" INNER JOIN OITB T2 ON T0.\"ItmsGrpCod\" = T2.\"ItmsGrpCod\" order by T0.\"U_MARCA\", T0.\"ItemName\""
-}
