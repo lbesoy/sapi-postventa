@@ -148,7 +148,6 @@ function gastoToRow(g) {
   return {
     id: g.id,
     usuario_id: g.usuarioId || null,
-    nombre_usuario: g.nombreUsuario || null,
     fecha: g.fecha || null,
     categoria: g.categoria || null,
     descripcion: g.descripcion || null,
@@ -172,10 +171,14 @@ function gastoToRow(g) {
 }
 
 function rowToGasto(g) {
+  const userList = window.usuarios || (typeof usuarios !== 'undefined' ? usuarios : []);
+  const u = userList.find(x => x.id === g.usuario_id);
+  const nombreUsr = u ? u.nombre : 'Técnico';
+
   return {
     id: g.id,
     usuarioId: g.usuario_id,
-    nombreUsuario: g.nombre_usuario,
+    nombreUsuario: nombreUsr,
     fecha: g.fecha,
     categoria: g.categoria,
     descripcion: g.descripcion,
@@ -307,6 +310,43 @@ async function processSyncQueue() {
 
     try {
       if (item.action === 'upsert') {
+        // Pipeline de subida automática a Supabase Storage para archivos binarios (evita guardar base64 en la base de datos)
+        if (item.table === 'ordenes' && item.data.evidenciaBase64 && item.data.evidenciaBase64.startsWith('data:')) {
+          try {
+            const fileName = `orden_${item.data.id}_${Date.now()}.png`;
+            const publicUrl = await window.uploadBase64ToStorage(item.data.evidenciaBase64, 'evidencias', `ordenes/${fileName}`);
+            if (publicUrl) {
+              item.data.evidenciaBase64 = publicUrl;
+              // Actualizar también en el almacenamiento local de órdenes
+              const localOrd = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+              const idx = localOrd.findIndex(o => o.id === item.data.id);
+              if (idx > -1) {
+                localOrd[idx].evidenciaBase64 = publicUrl;
+                localStorage.setItem('sapi_ordenes', JSON.stringify(localOrd));
+              }
+            }
+          } catch (stErr) {
+            console.error('[Storage] Error en la subida automática de evidencia de orden:', stErr);
+          }
+        } else if (item.table === 'gastos' && item.data.evidencia && item.data.evidencia.startsWith('data:')) {
+          try {
+            const fileName = `gasto_${item.data.id}_${Date.now()}.png`;
+            const publicUrl = await window.uploadBase64ToStorage(item.data.evidencia, 'evidencias', `gastos/${fileName}`);
+            if (publicUrl) {
+              item.data.evidencia = publicUrl;
+              // Actualizar también en el almacenamiento local de gastos
+              const localGast = JSON.parse(localStorage.getItem('sapi_gastos') || '[]');
+              const idx = localGast.findIndex(g => g.id === item.data.id);
+              if (idx > -1) {
+                localGast[idx].evidencia = publicUrl;
+                localStorage.setItem('sapi_gastos', JSON.stringify(localGast));
+              }
+            }
+          } catch (stErr) {
+            console.error('[Storage] Error en la subida automática de evidencia de gasto:', stErr);
+          }
+        }
+
         if (item.table === 'tickets') {
           payload = ticketToRow(item.data);
         } else if (item.table === 'ordenes') {
@@ -335,6 +375,17 @@ async function processSyncQueue() {
           payload = { id: item.data.id, codigo: item.data.codigo, descripcion: item.data.descripcion, precio: item.data.precio, moneda: item.data.moneda, stock: item.data.stock, custom_data: { ...(item.data.customData || {}), marca: item.data.marca, grupo: item.data.grupo, origen: item.data.origen, nombre: item.data.nombre } };
         } else if (item.table === 'gastos') {
           payload = gastoToRow(item.data);
+        } else if (item.table === 'sapi_telemetry') {
+          payload = {
+            id: item.data.id,
+            user_id: item.data.userId,
+            user_name: item.data.userName,
+            user_role: item.data.userRole,
+            action: item.data.action,
+            details: item.data.details || {},
+            timestamp: item.data.timestamp,
+            user_agent: item.data.userAgent
+          };
         } else if (item.table === 'config') {
           payload = { id: 'main', data: item.data };
         } else if (item.table === 'roles') {
@@ -379,8 +430,7 @@ async function processSyncQueue() {
   _isProcessingQueue = false;
   updateSyncStatusUI();
 
-  if (successCount > 0 && window.mostrarNotificacion) {
-    window.mostrarNotificacion(`Sincronización completa: ${successCount} cambios enviados.`, 'success');
+  if (successCount > 0) {
     window.dispatchEvent(new Event('supabase_datos_cargados'));
   }
 }
@@ -761,6 +811,26 @@ window.cargarDatosDeSupabase = async function() {
     window._supaGastos = mergedGastos;
     localStorage.setItem('sapi_gastos', JSON.stringify(mergedGastos));
 
+    // Telemetry events
+    try {
+      const { data: telemetryDb, error: telemetryErr } = await sb.from('sapi_telemetry').select('*').limit(300).order('timestamp', { ascending: false });
+      if (!telemetryErr && telemetryDb && telemetryDb.length > 0) {
+        const mapped = telemetryDb.map(t => ({
+          id: t.id,
+          userId: t.user_id,
+          userName: t.user_name,
+          userRole: t.user_role,
+          action: t.action,
+          details: t.details || {},
+          timestamp: t.timestamp,
+          userAgent: t.user_agent
+        }));
+        localStorage.setItem('sapi_telemetry_events', JSON.stringify(mapped));
+      }
+    } catch (errT) {
+      console.warn('[Sync] Tabla sapi_telemetry no disponible en Supabase (o RLS activa).', errT.message);
+    }
+
   } catch (error) {
     console.error('[Supabase] Error cargando datos:', error.message);
   } finally {
@@ -796,6 +866,27 @@ function setupRealtime() {
         }));
         localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(mappedClara));
         window._supaClaraTxs = mappedClara;
+      } else if (tableName === 'sapi_telemetry') {
+        const { data: telemetryDb, error: telemetryErr } = await window.supabaseClient.from('sapi_telemetry').select('*').limit(300).order('timestamp', { ascending: false });
+        if (!telemetryErr && telemetryDb && telemetryDb.length > 0) {
+          const mapped = telemetryDb.map(t => ({
+            id: t.id,
+            userId: t.user_id,
+            userName: t.user_name,
+            userRole: t.user_role,
+            action: t.action,
+            details: t.details || {},
+            timestamp: t.timestamp,
+            userAgent: t.user_agent
+          }));
+          localStorage.setItem('sapi_telemetry_events', JSON.stringify(mapped));
+          
+          // Re-render dashboard live if they are currently on the telemetry tab
+          const activeView = document.querySelector('.view.active');
+          if (activeView && activeView.id === 'view-telemetry' && window.renderTelemetryDashboard) {
+            window.renderTelemetryDashboard();
+          }
+        }
       }
       window.dispatchEvent(new Event('supabase_datos_cargados'));
     }
@@ -806,6 +897,7 @@ function setupRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => handleUpdate('tickets'))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes' }, () => handleUpdate('ordenes'))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'clara_transactions' }, () => handleUpdate('clara_transactions'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'sapi_telemetry' }, () => handleUpdate('sapi_telemetry'))
     .subscribe();
 
 }
@@ -819,3 +911,46 @@ document.addEventListener('DOMContentLoaded', () => {
     processSyncQueue();
   }, 300);
 });
+
+// Convert base64 data URL to Blob for binary storage upload
+window.base64ToBlob = async function(base64Data) {
+  try {
+    const res = await fetch(base64Data);
+    return await res.blob();
+  } catch (err) {
+    console.error('[Storage] Error converting base64 to blob:', err);
+    return null;
+  }
+};
+
+// Uploads a base64 file to Supabase Storage and returns the public URL
+window.uploadBase64ToStorage = async function(base64Data, bucketName, filePath) {
+  const sb = window.supabaseClient;
+  if (!sb) {
+    console.warn('[Storage] SupabaseClient not available.');
+    return null;
+  }
+
+  try {
+    const blob = await window.base64ToBlob(base64Data);
+    if (!blob) return null;
+
+    // Upload blob to Supabase Storage bucket
+    const { data, error } = await sb.storage.from(bucketName).upload(filePath, blob, {
+      cacheControl: '3600',
+      upsert: true
+    });
+
+    if (error) {
+      console.warn('[Storage] Error uploading to bucket:', error.message);
+      return null;
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = sb.storage.from(bucketName).getPublicUrl(filePath);
+    return publicUrl;
+  } catch (err) {
+    console.error('[Storage] Exception during upload:', err);
+    return null;
+  }
+};

@@ -1,12 +1,10 @@
 -- ========================================================
--- CREAR TABLA DE GASTOS Y COLUMNA SAT_DATA EN SUPABASE
+-- MIGRATION 0001: CREAR TABLA DE GASTOS CON COLUMNA SAT_DATA
 -- ========================================================
 
--- 1. Crear la tabla public.gastos con todas sus columnas y tipos correspondientes
 CREATE TABLE IF NOT EXISTS public.gastos (
     id TEXT PRIMARY KEY,
     usuario_id TEXT,
-    nombre_usuario TEXT,
     fecha TEXT,
     categoria TEXT,
     descripcion TEXT,
@@ -29,5 +27,5 @@ CREATE TABLE IF NOT EXISTS public.gastos (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 2. Deshabilitar RLS temporalmente para pruebas y sincronización (coherente con las demás tablas del CRM)
+-- Disable RLS initially (will be enabled in step 0004)
 ALTER TABLE public.gastos DISABLE ROW LEVEL SECURITY;

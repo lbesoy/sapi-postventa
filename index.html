@@ -199,6 +199,9 @@
           <span class="nav-icon"><i data-lucide="user-cog"></i></span><span
             style="font-size: 0.82rem; white-space: nowrap; letter-spacing: -0.2px;">Técnico / Supervisor</span>
         </a>
+        <a href="#" class="nav-item" data-view="telemetry" data-title="Monitoreo Telemetría" id="nav-telemetry" style="display:none;">
+          <span class="nav-icon"><i data-lucide="activity" style="color:var(--accent);"></i></span><span>Monitoreo (Super)</span>
+        </a>
       </nav>
       <div class="sidebar-bottom">
         <a href="#" class="nav-item nav-preferencias" data-view="preferencias" data-title="Preferencias"
@@ -1586,6 +1589,117 @@
                     <span class="toggle-track"></span>
                   </label>
                 </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+        
+        <!-- TELEMETRY / SUPERADMIN MONITORING VIEW -->
+        <div id="view-telemetry" class="view">
+          <!-- Stats Cards Grid -->
+          <div class="stats-grid" style="margin-bottom: 1.5rem;">
+            <div class="stat-card" style="background: linear-gradient(135deg, rgba(79, 142, 247, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%); border:1px solid var(--border);">
+              <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="log-in"></i></div>
+              <div>
+                <div class="stat-label">Inicios de Sesión</div>
+                <div class="stat-value" id="telemetry-stat-logins">0</div>
+                <div style="font-size:0.68rem; color:var(--text-muted); margin-top:2px;">Últimos 7 días</div>
+              </div>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.08) 0%, rgba(236, 72, 153, 0.08) 100%); border:1px solid var(--border);">
+              <div class="stat-icon" style="background:rgba(168,85,247,0.12);color:#a855f7;"><i data-lucide="eye"></i></div>
+              <div>
+                <div class="stat-label">Visualizaciones</div>
+                <div class="stat-value" id="telemetry-stat-views">0</div>
+                <div style="font-size:0.68rem; color:var(--text-muted); margin-top:2px;">Interacciones de módulos</div>
+              </div>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(79, 142, 247, 0.08) 100%); border:1px solid var(--border);">
+              <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="clock"></i></div>
+              <div>
+                <div class="stat-label">Tiempo de Uso</div>
+                <div class="stat-value" id="telemetry-stat-time">0m</div>
+                <div style="font-size:0.68rem; color:var(--text-muted); margin-top:2px;">Estimado de sesión activo</div>
+              </div>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(239, 68, 68, 0.08) 100%); border:1px solid var(--border);">
+              <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:#f59e0b;"><i data-lucide="activity"></i></div>
+              <div>
+                <div class="stat-label">Eventos Totales</div>
+                <div class="stat-value" id="telemetry-stat-events">0</div>
+                <div style="font-size:0.68rem; color:var(--text-muted); margin-top:2px;">Logs en el sistema</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Split Layout: Left (Users + Modules Ranking), Right (Chronological timeline) -->
+          <div style="display:grid; grid-template-columns: 1.15fr 1fr; gap:1.5rem; margin-bottom: 2rem; align-items: start;">
+            
+            <!-- Left Side -->
+            <div style="display:flex; flex-direction:column; gap:1.5rem;">
+              <!-- TOP ACTIVE USERS CARD -->
+              <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.5rem; display:flex; flex-direction:column; gap:1rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <h3 style="margin:0; font-size:1rem; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:0.5rem;">
+                    <i data-lucide="users" style="color:var(--accent); width:18px; height:18px;"></i> Usuarios más Activos
+                  </h3>
+                  <select id="telemetry-time-range" onchange="window.renderTelemetryDashboard()" style="background:var(--bg-body); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); padding:0.25rem 0.5rem; font-size:0.75rem; cursor:pointer; font-family:inherit;">
+                    <option value="7">Últimos 7 días</option>
+                    <option value="30">Últimos 30 días</option>
+                    <option value="1">Hoy</option>
+                  </select>
+                </div>
+                <div style="overflow-x:auto;">
+                  <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.82rem;">
+                    <thead>
+                      <tr style="border-bottom:1px solid var(--border); color:var(--text-muted); font-size:0.7rem; text-transform:uppercase;">
+                        <th style="padding:0.5rem 0.75rem;">Usuario</th>
+                        <th style="padding:0.5rem 0.75rem; text-align:center;">Logins</th>
+                        <th style="padding:0.5rem 0.75rem; text-align:center;">Vistas</th>
+                        <th style="padding:0.5rem 0.75rem; text-align:right;">Uso Est.</th>
+                      </tr>
+                    </thead>
+                    <tbody id="telemetry-users-table">
+                      <!-- Rendered dynamically -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- MOST VIEWED MODULES CARD -->
+              <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.5rem; display:flex; flex-direction:column; gap:1rem;">
+                <h3 style="margin:0; font-size:1rem; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:0.5rem;">
+                  <i data-lucide="bar-chart-3" style="color:var(--accent); width:18px; height:18px;"></i> Módulos Más Visitados
+                </h3>
+                <div style="display:flex; flex-direction:column; gap:0.85rem;" id="telemetry-modules-list">
+                  <!-- Rendered dynamically as progress bars -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Side: Real-time Timeline Logs -->
+            <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.5rem; display:flex; flex-direction:column; gap:1rem; min-height: 480px; max-height: 600px; overflow: hidden;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; font-size:1rem; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:0.5rem;">
+                  <i data-lucide="history" style="color:var(--accent); width:18px; height:18px;"></i> Bitácora de Actividad
+                </h3>
+                <button type="button" onclick="window.clearTelemetryLogs()" class="btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.7rem; min-height:auto; display:flex; align-items:center; gap:2px; font-family:inherit;">
+                  <i data-lucide="trash-2" style="width:10px; height:10px;"></i> Limpiar
+                </button>
+              </div>
+              
+              <!-- Filter tabs for logs -->
+              <div style="display:flex; gap:0.35rem; border-bottom:1px solid var(--border); padding-bottom:0.5rem;">
+                <button type="button" class="telemetry-log-filter active" id="btn-tlog-all" onclick="window.filterTelemetryLogs('all')" style="background:none; border:none; padding:0.25rem 0.5rem; font-size:0.72rem; color:var(--text-primary); cursor:pointer; font-weight:600; border-bottom:2px solid var(--accent); font-family:inherit;">Todos</button>
+                <button type="button" class="telemetry-log-filter" id="btn-tlog-logins" onclick="window.filterTelemetryLogs('logins')" style="background:none; border:none; padding:0.25rem 0.5rem; font-size:0.72rem; color:var(--text-muted); cursor:pointer; font-weight:500; border-bottom:2px solid transparent; font-family:inherit;">Sesiones</button>
+                <button type="button" class="telemetry-log-filter" id="btn-tlog-views" onclick="window.filterTelemetryLogs('views')" style="background:none; border:none; padding:0.25rem 0.5rem; font-size:0.72rem; color:var(--text-muted); cursor:pointer; font-weight:500; border-bottom:2px solid transparent; font-family:inherit;">Navegación</button>
+                <button type="button" class="telemetry-log-filter" id="btn-tlog-actions" onclick="window.filterTelemetryLogs('actions')" style="background:none; border:none; padding:0.25rem 0.5rem; font-size:0.72rem; color:var(--text-muted); cursor:pointer; font-weight:500; border-bottom:2px solid transparent; font-family:inherit;">OneDrive/SAT</button>
+              </div>
+
+              <!-- Event Feed container -->
+              <div id="telemetry-events-feed" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:0.75rem; padding-right:4px;">
+                <!-- Chronological feed entries -->
               </div>
             </div>
 

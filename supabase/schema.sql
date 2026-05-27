@@ -3,21 +3,8 @@
 -- ==========================================
 
 -- 1. DROP EXISTING TABLES IF MIGRATION FAILED DUE TO UUID TYPE
-DROP TABLE IF EXISTS public.usuarios;
 DROP TABLE IF EXISTS public.clientes;
 DROP TABLE IF EXISTS public.ordenes;
-
--- 2. TABLE: usuarios
-CREATE TABLE public.usuarios (
-    id TEXT PRIMARY KEY,
-    nombre TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    pin TEXT NOT NULL,
-    rol TEXT NOT NULL DEFAULT 'tecnico',
-    activo BOOLEAN DEFAULT false,
-    empresa TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
 
 -- 3. TABLE: clientes
 CREATE TABLE public.clientes (
@@ -137,7 +124,6 @@ CREATE TABLE public.roles (
 );
 
 -- 11. RLS (Row Level Security) - Deshabilitado temporalmente para pruebas
-ALTER TABLE public.usuarios DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clientes DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ordenes DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tickets DISABLE ROW LEVEL SECURITY;
@@ -146,8 +132,3 @@ ALTER TABLE public.maquinaria DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.refacciones DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.config DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.roles DISABLE ROW LEVEL SECURITY;
-
--- Insertar un SuperAdmin por defecto
-INSERT INTO public.usuarios (id, nombre, email, pin, rol, activo)
-VALUES ('admin-001', 'Administrador Master', 'admin@eurorep.mx', '1234', 'superadmin', true)
-ON CONFLICT (id) DO NOTHING;

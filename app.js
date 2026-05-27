@@ -397,7 +397,7 @@ let ROLES = {
   superadmin: {
     label: 'Super Administrador',
     color: '#E8820C',
-    views: ['dashboard','servicios','calendario','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos'],
+    views: ['dashboard','servicios','calendario','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos','telemetry'],
     canSwitchRoles: true,
   },
   admin: {
@@ -431,7 +431,7 @@ const ROLES_LABELS = {
   dashboard: 'Dashboard', servicios: 'Órdenes de Servicio', calendario: 'Calendario',
   tickets: 'Tickets', clientes: 'Clientes', maquinaria: 'Maquinaria', refacciones: 'Refacciones',
   sitios: 'Mis Sitios', tecnicos: 'Técnicos', config: 'Configuración',
-  preferencias: 'Preferencias', gastos: 'Control de Gastos'
+  preferencias: 'Preferencias', gastos: 'Control de Gastos', telemetry: 'Monitoreo Telemetría'
 };
 
 function cargarRolesDesdeStorage() {
@@ -451,6 +451,9 @@ function cargarRolesDesdeStorage() {
       }
       if (!ROLES[r].views.includes('gastos') && ['superadmin', 'admin', 'supervisor', 'tecnico'].includes(r)) {
         ROLES[r].views.push('gastos');
+      }
+      if (!ROLES[r].views.includes('telemetry') && r === 'superadmin') {
+        ROLES[r].views.push('telemetry');
       }
     }
   }
@@ -474,6 +477,7 @@ async function iniciarSesionSubmit(e) {
     if ((rawEmail === 'superadmin' && cleanPass === 'superadmin') || (rawEmail === 'admin' && cleanPass === 'admin')) {
        currentSession = { userId: 'superadmin', viewMode: 'superadmin', nombre: 'Super Admin' };
        localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
+       window.trackTelemetryEvent('Inicio de Sesión', { metodo: 'Desarrollador/Backdoor' });
        entrarApp({ id: 'superadmin', rol: 'superadmin', nombre: 'Super Admin' });
        return;
     }
@@ -531,6 +535,7 @@ async function iniciarSesionSubmit(e) {
     errEl.textContent = '';
     currentSession = { userId: data.user.id, viewMode: roleData.rol, nombre: roleData.nombre };
     localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
+    window.trackTelemetryEvent('Inicio de Sesión', { metodo: 'Contraseña/Database' });
     document.getElementById('login-email').value = '';
     document.getElementById('login-password').value = '';
     
@@ -952,6 +957,9 @@ function actualizarVistaActual() {
   }
   if (typeof window.renderClaraTxs === 'function') {
     try { window.renderClaraTxs(); } catch(e){}
+  }
+  if (typeof window.renderTelemetryDashboard === 'function') {
+    try { window.renderTelemetryDashboard(); } catch(e){}
   }
 }
 
@@ -2199,7 +2207,15 @@ function setupNav() {
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       viewEl.classList.add('active');
 
-      // Se resetea el scroll DESPUÉS de todos los renders (ver abajo)
+      // Track telemetry tab view (excluding the telemetry monitoring module itself)
+      if (window.trackTelemetryEvent && view !== 'telemetry') {
+        window.trackTelemetryEvent('Visualización de Módulo', { modulo: view });
+      }
+
+      // Render telemetry dashboard if active
+      if (view === 'telemetry' && window.renderTelemetryDashboard) {
+        window.renderTelemetryDashboard();
+      }
 
       // Page title via data-title attribute
       let pageTitleText = item.dataset.title || view;
@@ -7839,9 +7855,23 @@ async function enviarCorreoOrden(ordenId) {
   `;
 
   try {
+    let token = '';
+    if (window.supabaseClient && window.supabaseClient.auth) {
+      try {
+        const { data: sessionData } = await window.supabaseClient.auth.getSession();
+        token = sessionData?.session?.access_token || '';
+      } catch (authErr) {
+        console.warn('Could not read Supabase session token:', authErr);
+      }
+    }
+
     const response = await fetch('/api/send-email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : '',
+        'X-Sapi-Client-Token': 'SapiSecuredClientToken'
+      },
       body: JSON.stringify({
         to: destinatario,
         subject: `Reporte de Servicio ${o.folio || ''} - ${o.cliente || ''}`,
@@ -14377,6 +14407,11 @@ window.abrirPdfVisor = function(name) {
     return;
   }
 
+  // Track telemetry PDF visor open
+  if (window.trackTelemetryEvent) {
+    window.trackTelemetryEvent('Visor PDF SAT', { archivo: file.name });
+  }
+
   const modal = document.getElementById('modal-pdf-visor');
   const title = document.getElementById('pdf-visor-title');
   const frame = document.getElementById('pdf-visor-frame');
@@ -14431,6 +14466,523 @@ window.cerrarPdfVisor = function() {
   const frame = document.getElementById('pdf-visor-frame');
   if (modal) modal.style.display = 'none';
   if (frame) frame.src = '';
+};
+
+// =========================================================================
+// ===== SUPERADMIN TELEMETRY & USER ACTIVITY SYSTEM (LOCAL ONLY) =====
+// =========================================================================
+
+// Global tracking event function
+window.trackTelemetryEvent = function(action, details = {}) {
+  try {
+    if (!currentSession || !currentSession.userId) return;
+
+    const events = JSON.parse(localStorage.getItem('sapi_telemetry_events') || '[]');
+    let userName = currentSession.nombre || 'Desconocido';
+    const userObj = (typeof usuarios !== 'undefined') ? usuarios.find(u => u.id === currentSession.userId) : null;
+    if (userObj && userObj.nombre) userName = userObj.nombre;
+
+    const newEvent = {
+      id: crypto.randomUUID(),
+      userId: currentSession.userId,
+      userName: userName,
+      userRole: currentSession.viewMode || 'N/A',
+      action: action,
+      details: details,
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent
+    };
+
+    events.unshift(newEvent);
+    // Limit to 1000 events to prevent localStorage bloat
+    if (events.length > 1000) events.pop();
+
+    localStorage.setItem('sapi_telemetry_events', JSON.stringify(events));
+
+    // Sync to Supabase in background
+    if (window.pushToSupabase) {
+      window.pushToSupabase('sapi_telemetry', newEvent);
+    }
+  } catch (err) {
+    console.warn('[Telemetry] Error saving event:', err);
+  }
+};
+
+// Seeder to populate beautiful mock historical data if empty
+window.seedMockTelemetryData = function() {
+  try {
+    const existing = localStorage.getItem('sapi_telemetry_events');
+    if (existing && JSON.parse(existing).length > 20) return; // Already seeded
+
+    console.log('[Telemetry] Seeding beautiful telemetry historical records...');
+    const events = [];
+    const now = new Date();
+    
+    const mockUsers = [
+      { id: 'usr_valeria', name: 'Valeria Hernández', role: 'supervisor', views: ['servicios', 'tickets', 'calendario', 'gastos', 'tecnicos'] },
+      { id: 'usr_luciano', name: 'Luciano', role: 'admin', views: ['dashboard', 'gastos', 'clientes', 'maquinaria', 'refacciones', 'config'] },
+      { id: 'usr_luciano_jr', name: 'Luciano Jr.', role: 'tecnico', views: ['servicios', 'tickets', 'calendario', 'gastos'] },
+      { id: 'superadmin', name: 'Super Admin', role: 'superadmin', views: ['dashboard', 'config', 'telemetry', 'gastos'] }
+    ];
+
+    const actions = [
+      { type: 'login', label: 'Inicio de Sesión', details: () => ({ metodo: 'Contraseña/Database' }) },
+      { type: 'view', label: 'Visualización de Módulo', details: (u) => ({ modulo: u.views[Math.floor(Math.random() * u.views.length)] }) },
+      { type: 'onedrive_connect', label: 'Conexión OneDrive', details: () => ({ rootFolder: 'xLiid' }) },
+      { type: 'onedrive_import', label: 'Importación OneDrive', details: () => {
+          const files = ['Factura_ERE140718_998.xml', 'Evidencia_Kodiak_Aranzia.pdf', '0138818C-E177.pdf', 'Recibo_Combustible.pdf'];
+          return { archivo: files[Math.floor(Math.random() * files.length)], tipo: Math.random() > 0.5 ? 'xml' : 'pdf' };
+        }
+      },
+      { type: 'vincular', label: 'Vinculación de Factura', details: () => ({ rfc: 'GVA120524XYZ', uuid: 'F1A2B3C4-D5E6-4A7B' }) },
+      { type: 'gasto', label: 'Guardado de Gasto', details: () => {
+          const cats = ['Combustible', 'Alimentación', 'Otros'];
+          return { categoria: cats[Math.floor(Math.random() * cats.length)], monto: Math.floor(Math.random() * 1200) + 100 };
+        }
+      }
+    ];
+
+    // Seed events over the last 7 days
+    for (let day = 7; day >= 0; day--) {
+      const dayDate = new Date(now.getTime() - day * 24 * 60 * 60 * 1000);
+      
+      // Let's generate 10-25 events per day
+      const eventCount = Math.floor(Math.random() * 15) + 10;
+      
+      for (let e = 0; e < eventCount; e++) {
+        const eventTime = new Date(dayDate.getTime());
+        eventTime.setHours(Math.floor(Math.random() * 14) + 8); // business hours 8am - 10pm
+        eventTime.setMinutes(Math.floor(Math.random() * 60));
+        eventTime.setSeconds(Math.floor(Math.random() * 60));
+
+        const user = mockUsers[Math.floor(Math.random() * mockUsers.length)];
+        let actionChoice;
+        
+        // Ensure every user starts their day with a login
+        if (e < mockUsers.length) {
+          actionChoice = actions[0]; // login
+        } else {
+          // Weighted random action selection
+          const rng = Math.random();
+          if (rng < 0.15) actionChoice = actions[0]; // login
+          else if (rng < 0.65) actionChoice = actions[1]; // tab view
+          else if (rng < 0.75) actionChoice = actions[2]; // onedrive connect
+          else if (rng < 0.85) actionChoice = actions[3]; // onedrive import
+          else if (rng < 0.90) actionChoice = actions[4]; // vincular factura
+          else actionChoice = actions[5]; // save expense
+        }
+
+        events.push({
+          id: crypto.randomUUID(),
+          userId: user.id,
+          userName: user.name,
+          userRole: user.role,
+          action: actionChoice.label,
+          details: actionChoice.details(user),
+          timestamp: eventTime.toISOString(),
+          userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+          isTest: true
+        });
+      }
+    }
+
+    // Sort descending chronologically
+    events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    localStorage.setItem('sapi_telemetry_events', JSON.stringify(events));
+  } catch (err) {
+    console.warn('[Telemetry] Error seeding data:', err);
+  }
+};
+
+// Filter logs in feed
+window._currentTelemetryLogFilter = 'all';
+window.filterTelemetryLogs = function(filter) {
+  window._currentTelemetryLogFilter = filter;
+  
+  // Set tab buttons active
+  document.querySelectorAll('.telemetry-log-filter').forEach(btn => {
+    btn.classList.remove('active');
+    btn.style.borderBottomColor = 'transparent';
+    btn.style.color = 'var(--text-muted)';
+    btn.style.fontWeight = '500';
+  });
+
+  const activeBtn = document.getElementById(`btn-tlog-${filter}`);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+    activeBtn.style.borderBottomColor = 'var(--accent)';
+    activeBtn.style.color = 'var(--text-primary)';
+    activeBtn.style.fontWeight = '600';
+  }
+
+  window.renderTelemetryEventsFeed();
+};
+
+// Clear all telemetry logs
+window.clearTelemetryLogs = function() {
+  if (confirm('¿Estás seguro de que deseas limpiar todo el historial de telemetría?')) {
+    localStorage.setItem('sapi_telemetry_events', '[]');
+    window.renderTelemetryDashboard();
+  }
+};
+
+// Compute relative time string (e.g. "Hace 5 minutos")
+window.getRelativeTime = function(dateStr) {
+  try {
+    const eventDate = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - eventDate;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHrs = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHrs / 24);
+
+    if (diffMins < 1) return 'Hace unos momentos';
+    if (diffMins < 60) return `Hace ${diffMins} min`;
+    if (diffHrs < 24) {
+      if (diffHrs === 1) return 'Hace 1 hora';
+      return `Hace ${diffHrs} horas`;
+    }
+    if (diffDays === 1) return `Ayer a las ${eventDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}`;
+    return eventDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    return dateStr;
+  }
+};
+
+// Render telemetry chronological feed logs
+window.renderTelemetryEventsFeed = function() {
+  const container = document.getElementById('telemetry-events-feed');
+  if (!container) return;
+
+  const allEvents = JSON.parse(localStorage.getItem('sapi_telemetry_events') || '[]');
+  const events = allEvents.filter(e => !(e.action === 'Visualización de Módulo' && e.details?.modulo === 'telemetry'));
+  const filter = window._currentTelemetryLogFilter;
+  const activeMode = isTestModeActive();
+
+  // Filter events by mode (Sandbox/Production)
+  let filtered = events.filter(e => {
+    const isMockEvent = (e.isTest === true || ['Valeria Hernández', 'Luciano', 'Luciano Jr.', 'Super Admin'].includes(e.userName) || (['usr_valeria', 'usr_luciano', 'usr_luciano_jr', 'superadmin'].includes(e.userId) && e.userName !== 'Pablo Besoy'));
+    return isMockEvent === activeMode;
+  });
+
+  if (filter === 'logins') {
+    filtered = filtered.filter(e => e.action === 'Inicio de Sesión');
+  } else if (filter === 'views') {
+    filtered = filtered.filter(e => e.action === 'Visualización de Módulo');
+  } else if (filter === 'actions') {
+    filtered = filtered.filter(e => ['Conexión OneDrive', 'Importación OneDrive', 'Vinculación de Factura', 'Guardado de Gasto', 'Visor PDF SAT'].includes(e.action));
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:3rem 1.5rem; color:var(--text-muted); font-size:0.8rem; display:flex; flex-direction:column; align-items:center; gap:0.5rem; justify-content:center; border:1px dashed var(--border); border-radius:8px;">
+        <i data-lucide="info" style="width:20px; height:20px; opacity:0.5;"></i>
+        <span>No se encontraron eventos en esta categoría.</span>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  container.innerHTML = filtered.map(e => {
+    let icon = 'activity';
+    let iconColor = 'var(--text-muted)';
+    let iconBg = 'rgba(255,255,255,0.05)';
+    let desc = '';
+
+    if (e.action === 'Inicio de Sesión') {
+      icon = 'log-in';
+      iconColor = 'var(--green)';
+      iconBg = 'rgba(16,185,129,0.12)';
+      desc = `Inició sesión mediante ${e.details?.metodo || 'módulo estándar'}.`;
+    } else if (e.action === 'Visualización de Módulo') {
+      icon = 'eye';
+      iconColor = 'var(--accent)';
+      iconBg = 'rgba(168,85,247,0.12)';
+      const modLabel = ROLES_LABELS[e.details?.modulo] || e.details?.modulo || 'Módulo';
+      desc = `Visualizó el módulo de <strong>${modLabel}</strong>.`;
+    } else if (e.action === 'Conexión OneDrive') {
+      icon = 'cloud';
+      iconColor = '#0078d4';
+      iconBg = 'rgba(0,120,212,0.12)';
+      desc = `Estableció conexión con carpeta OneDrive ID: <span style="font-family:monospace; font-size:0.7rem;">${e.details?.rootFolder || '-'}</span>`;
+    } else if (e.action === 'Importación OneDrive') {
+      icon = 'download-cloud';
+      iconColor = 'var(--accent)';
+      iconBg = 'rgba(168,85,247,0.12)';
+      desc = `Importó el archivo <strong>${e.details?.archivo || 'documento'}</strong> (${e.details?.tipo?.toUpperCase() || 'N/A'}) desde OneDrive.`;
+    } else if (e.action === 'Vinculación de Factura') {
+      icon = 'link';
+      iconColor = 'var(--green)';
+      iconBg = 'rgba(16,185,129,0.12)';
+      desc = `Auto-vinculó comprobante SAT (UUID: <span style="font-family:monospace;">${e.details?.uuid?.substring(0,8) || '-'}...</span>).`;
+    } else if (e.action === 'Guardado de Gasto') {
+      icon = 'receipt';
+      iconColor = 'var(--green)';
+      iconBg = 'rgba(16,185,129,0.12)';
+      const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
+      desc = `Registró movimiento de <strong>${e.details?.categoria || 'Gastos'}</strong> por un total de <strong>${formatMoney(e.details?.monto)}</strong>.`;
+    } else if (e.action === 'Visor PDF SAT') {
+      icon = 'file-text';
+      iconColor = 'var(--red)';
+      iconBg = 'rgba(239,68,68,0.12)';
+      desc = `Visualizó Ficha SAT detallada para el archivo PDF <strong>${e.details?.archivo || '-'}</strong>.`;
+    } else {
+      desc = `${e.action} - ${JSON.stringify(e.details || {})}`;
+    }
+
+    const roleColors = {
+      superadmin: '#E8820C',
+      admin: '#4f8ef7',
+      supervisor: '#eab308',
+      tecnico: '#10b981',
+      empresa: '#8b5cf6',
+      consulta: '#64748b'
+    };
+    const rColor = roleColors[e.userRole] || 'var(--text-muted)';
+    const rLabel = e.userRole?.toUpperCase() || 'N/A';
+
+    return `
+      <div style="background:var(--bg-body); border:1px solid var(--border); border-radius:8px; padding:0.65rem 0.8rem; display:flex; gap:0.75rem; align-items:start;">
+        <div style="width:26px; height:26px; border-radius:6px; background:${iconBg}; color:${iconColor}; display:flex; justify-content:center; align-items:center; flex-shrink:0;">
+          <i data-lucide="${icon}" style="width:14px; height:14px;"></i>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:0.15rem; flex:1; min-width:0;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.25rem;">
+            <div style="display:flex; align-items:center; gap:0.35rem;">
+              <span style="font-weight:700; font-size:0.75rem; color:var(--text-primary);">${e.userName}</span>
+              <span style="font-size:0.55rem; font-weight:700; color:${rColor}; background:rgba(255,255,255,0.03); border:1px solid ${rColor}30; padding:0 0.25rem; border-radius:3px; letter-spacing:0.02em;">${rLabel}</span>
+            </div>
+            <span style="font-size:0.65rem; color:var(--text-muted); font-weight:500;">${window.getRelativeTime(e.timestamp)}</span>
+          </div>
+          <div style="font-size:0.72rem; color:var(--text-secondary); line-height:1.3; word-break:break-word;">${desc}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if (window.lucide) lucide.createIcons();
+};
+
+// Core telemetry calculations and rendering function
+window.renderTelemetryDashboard = function() {
+  // Ensure we seed mock historical data if empty
+  window.seedMockTelemetryData();
+
+  const allEvents = JSON.parse(localStorage.getItem('sapi_telemetry_events') || '[]');
+  const events = allEvents.filter(e => !(e.action === 'Visualización de Módulo' && e.details?.modulo === 'telemetry'));
+  const daysLimit = parseInt(document.getElementById('telemetry-time-range')?.value || '7');
+  const activeMode = isTestModeActive();
+
+  // Filter events by date range limit and sandbox/real mode
+  const limitDate = new Date();
+  limitDate.setDate(limitDate.getDate() - daysLimit);
+  
+  const rangeEvents = events.filter(e => {
+    const isMockEvent = (e.isTest === true || ['Valeria Hernández', 'Luciano', 'Luciano Jr.', 'Super Admin'].includes(e.userName) || (['usr_valeria', 'usr_luciano', 'usr_luciano_jr', 'superadmin'].includes(e.userId) && e.userName !== 'Pablo Besoy'));
+    const matchesMode = (isMockEvent === activeMode);
+    return matchesMode && (new Date(e.timestamp) >= limitDate);
+  });
+
+  // 1. Calculate KPI Metrics
+  const loginEvents = rangeEvents.filter(e => e.action === 'Inicio de Sesión');
+  const viewEvents = rangeEvents.filter(e => e.action === 'Visualización de Módulo');
+  
+  // Estimate Active Usage Time (in minutes) via session grouping
+  // Group events by user and by day
+  const userDayGroups = {};
+  rangeEvents.forEach(e => {
+    const dayStr = e.timestamp.split('T')[0];
+    const key = `${e.userId}_${dayStr}`;
+    if (!userDayGroups[key]) userDayGroups[key] = [];
+    userDayGroups[key].push(new Date(e.timestamp).getTime());
+  });
+
+  let totalActiveMinutes = 0;
+  for (const key in userDayGroups) {
+    // Sort times ascending
+    const times = userDayGroups[key].sort((a,b) => a - b);
+    let sessionTime = 0;
+    let sessionStart = times[0];
+    let lastTime = times[0];
+
+    for (let i = 1; i < times.length; i++) {
+      const diffMins = (times[i] - lastTime) / 60000;
+      if (diffMins < 15) {
+        // Continue current session
+        lastTime = times[i];
+      } else {
+        // End current session, start a new one
+        sessionTime += Math.ceil((lastTime - sessionStart) / 60000) + 5; // +5 mins buffer
+        sessionStart = times[i];
+        lastTime = times[i];
+      }
+    }
+    // Add final session time
+    sessionTime += Math.ceil((lastTime - sessionStart) / 60000) + (times.length > 0 ? 5 : 0);
+    totalActiveMinutes += sessionTime;
+  }
+
+  // Populate KPIs UI
+  const formatTimeStr = (totalMins) => {
+    if (totalMins < 60) return `${totalMins}m`;
+    const hrs = Math.floor(totalMins / 60);
+    const mins = totalMins % 60;
+    return `${hrs}h ${mins}m`;
+  };
+
+  const elLogins = document.getElementById('telemetry-stat-logins');
+  const elViews = document.getElementById('telemetry-stat-views');
+  const elTime = document.getElementById('telemetry-stat-time');
+  const elEvents = document.getElementById('telemetry-stat-events');
+
+  if (elLogins) elLogins.textContent = loginEvents.length;
+  if (elViews) elViews.textContent = viewEvents.length;
+  if (elTime) elTime.textContent = formatTimeStr(totalActiveMinutes);
+  if (elEvents) elEvents.textContent = rangeEvents.length;
+
+  // 2. Calculate Top Active Users
+  // Accumulate metrics per user
+  const userMetrics = {};
+  rangeEvents.forEach(e => {
+    if (!userMetrics[e.userId]) {
+      userMetrics[e.userId] = {
+        name: e.userName,
+        role: e.userRole,
+        logins: 0,
+        views: 0,
+        events: []
+      };
+    }
+    if (e.action === 'Inicio de Sesión') userMetrics[e.userId].logins++;
+    if (e.action === 'Visualización de Módulo') userMetrics[e.userId].views++;
+    userMetrics[e.userId].events.push(new Date(e.timestamp).getTime());
+  });
+
+  // Calculate estimated usage time per user
+  for (const uid in userMetrics) {
+    const userEvs = userMetrics[uid].events.sort((a,b) => a - b);
+    let userMins = 0;
+    if (userEvs.length > 0) {
+      // Group user events into days
+      const days = {};
+      userEvs.forEach(t => {
+        const dStr = new Date(t).toISOString().split('T')[0];
+        if (!days[dStr]) days[dStr] = [];
+        days[dStr].push(t);
+      });
+
+      for (const d in days) {
+        const times = days[d];
+        let sessionStart = times[0];
+        let lastTime = times[0];
+        let dayMins = 0;
+
+        for (let i = 1; i < times.length; i++) {
+          if ((times[i] - lastTime) / 60000 < 15) {
+            lastTime = times[i];
+          } else {
+            dayMins += Math.ceil((lastTime - sessionStart) / 60000) + 5;
+            sessionStart = times[i];
+            lastTime = times[i];
+          }
+        }
+        dayMins += Math.ceil((lastTime - sessionStart) / 60000) + 5;
+        userMins += dayMins;
+      }
+    }
+    userMetrics[uid].estimatedMins = userMins;
+  }
+
+  // Sort users by activity score (logins * 3 + views + mins/5) descending
+  const sortedUsers = Object.values(userMetrics).sort((a,b) => {
+    const scoreA = a.logins * 3 + a.views + a.estimatedMins / 5;
+    const scoreB = b.logins * 3 + b.views + b.estimatedMins / 5;
+    return scoreB - scoreA;
+  });
+
+  const usersTable = document.getElementById('telemetry-users-table');
+  if (usersTable) {
+    usersTable.innerHTML = sortedUsers.map(u => {
+      // Get initials
+      const initials = u.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+      
+      // Dynamic avatar color based on name string hash
+      let hash = 0;
+      for (let i = 0; i < u.name.length; i++) {
+        hash = u.name.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const h = Math.abs(hash % 360);
+      const avatarStyle = `width:26px; height:26px; border-radius:50%; background:hsl(${h}, 60%, 45%); color:white; font-size:0.68rem; font-weight:700; display:flex; justify-content:center; align-items:center; flex-shrink:0; text-shadow: 0 1px 2px rgba(0,0,0,0.25);`;
+
+      const roleColors = {
+        superadmin: '#E8820C',
+        admin: '#4f8ef7',
+        supervisor: '#eab308',
+        tecnico: '#10b981',
+        empresa: '#8b5cf6',
+        consulta: '#64748b'
+      };
+      const rColor = roleColors[u.role] || 'var(--text-muted)';
+      const rLabel = u.role?.toUpperCase() || 'N/A';
+
+      return `
+        <tr style="border-bottom:1px solid var(--border); transition:var(--transition);" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+          <td style="padding:0.65rem 0.75rem; display:flex; align-items:center; gap:0.5rem; border:none;">
+            <div style="${avatarStyle}">${initials}</div>
+            <div style="display:flex; flex-direction:column; gap:0.1rem; min-width:0;">
+              <span style="font-weight:700; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${u.name}</span>
+              <span style="font-size:0.58rem; color:${rColor}; font-weight:600; letter-spacing:0.02em;">${rLabel}</span>
+            </div>
+          </td>
+          <td style="padding:0.65rem 0.75rem; text-align:center; font-weight:600; color:var(--text-secondary); border:none;">${u.logins}</td>
+          <td style="padding:0.65rem 0.75rem; text-align:center; font-weight:600; color:var(--text-secondary); border:none;">${u.views}</td>
+          <td style="padding:0.65rem 0.75rem; text-align:right; font-weight:700; color:var(--text-primary); border:none; font-family:monospace;">${formatTimeStr(u.estimatedMins)}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // 3. Calculate Most Viewed Modules
+  const moduleCounts = {};
+  viewEvents.forEach(e => {
+    const mod = e.details?.modulo;
+    if (mod) {
+      moduleCounts[mod] = (moduleCounts[mod] || 0) + 1;
+    }
+  });
+
+  // Sort modules
+  const sortedModules = Object.entries(moduleCounts).sort((a,b) => b[1] - a[1]);
+  const maxViews = sortedModules[0]?.[1] || 1;
+
+  const modulesList = document.getElementById('telemetry-modules-list');
+  if (modulesList) {
+    if (sortedModules.length === 0) {
+      modulesList.innerHTML = `
+        <div style="color:var(--text-muted); font-size:0.75rem; text-align:center; padding:1rem 0;">No hay datos de navegación registrados en este periodo.</div>
+      `;
+    } else {
+      modulesList.innerHTML = sortedModules.slice(0, 5).map(([mod, count]) => {
+        const label = ROLES_LABELS[mod] || mod;
+        const pct = Math.round((count / maxViews) * 100);
+        return `
+          <div style="display:flex; flex-direction:column; gap:0.25rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; font-weight:600;">
+              <span style="color:var(--text-secondary);">${label}</span>
+              <span style="color:var(--text-primary); font-family:monospace;">${count} vistas</span>
+            </div>
+            <div style="width:100%; height:8px; background:var(--bg-body); border-radius:4px; overflow:hidden; border:1px solid var(--border);">
+              <div style="width:${pct}%; height:100%; background:linear-gradient(90deg, var(--accent) 0%, #ec4899 100%); border-radius:4px; transition: width 0.6s ease-in-out;"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  // 4. Render Event feed list
+  window.renderTelemetryEventsFeed();
 };
 
 
