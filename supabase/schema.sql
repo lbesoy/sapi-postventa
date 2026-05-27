@@ -134,11 +134,7 @@ ALTER TABLE public.config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;
 
 -- 12. Políticas de seguridad para permitir operaciones exclusivamente a usuarios autenticados
-CREATE POLICY "Permitir todo a autenticados" ON public.clientes FOR ALL TO authenticated USING (true);
-CREATE POLICY "Permitir todo a autenticados" ON public.ordenes FOR ALL TO authenticated USING (true);
-CREATE POLICY "Permitir todo a autenticados" ON public.tickets FOR ALL TO authenticated USING (true);
 CREATE POLICY "Permitir todo a autenticados" ON public.sitios FOR ALL TO authenticated USING (true);
-CREATE POLICY "Permitir todo a autenticados" ON public.maquinaria FOR ALL TO authenticated USING (true);
 CREATE POLICY "Permitir todo a autenticados" ON public.refacciones FOR ALL TO authenticated USING (true);
 CREATE POLICY "Permitir todo a autenticados" ON public.config FOR ALL TO authenticated USING (true);
 CREATE POLICY "Permitir todo a autenticados" ON public.roles FOR ALL TO authenticated USING (true);

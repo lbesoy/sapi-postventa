@@ -17,11 +17,7 @@ ALTER TABLE public.sapi_telemetry ENABLE ROW LEVEL SECURITY;
 
 -- 2. CREAR POLÍTICAS PARA PERMITIR OPERACIONES EXCLUSIVAMENTE A USUARIOS AUTENTICADOS (CONECTADOS)
 CREATE POLICY "Permitir todo a autenticados" ON public.usuarios FOR ALL TO authenticated USING (true);
-CREATE POLICY "Permitir todo a autenticados" ON public.clientes FOR ALL TO authenticated USING (true);
-CREATE POLICY "Permitir todo a autenticados" ON public.ordenes FOR ALL TO authenticated USING (true);
-CREATE POLICY "Permitir todo a autenticados" ON public.tickets FOR ALL TO authenticated USING (true);
 CREATE POLICY "Permitir todo a autenticados" ON public.sitios FOR ALL TO authenticated USING (true);
-CREATE POLICY "Permitir todo a autenticados" ON public.maquinaria FOR ALL TO authenticated USING (true);
 CREATE POLICY "Permitir todo a autenticados" ON public.refacciones FOR ALL TO authenticated USING (true);
 CREATE POLICY "Permitir todo a autenticados" ON public.config FOR ALL TO authenticated USING (true);
 CREATE POLICY "Permitir todo a autenticados" ON public.roles FOR ALL TO authenticated USING (true);
