@@ -13,6 +13,29 @@ ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.maquinaria ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 
+-- 2.5 Limpiar políticas previas para evitar conflictos de duplicación al re-ejecutar el script
+DROP POLICY IF EXISTS "Admins full access ordenes" ON public.ordenes;
+DROP POLICY IF EXISTS "Admins y Supervisores full access ordenes" ON public.ordenes;
+DROP POLICY IF EXISTS "Técnicos pueden ver sus órdenes" ON public.ordenes;
+DROP POLICY IF EXISTS "Técnicos pueden editar sus órdenes" ON public.ordenes;
+DROP POLICY IF EXISTS "Consulta read access ordenes" ON public.ordenes;
+
+DROP POLICY IF EXISTS "Admins full access tickets" ON public.tickets;
+DROP POLICY IF EXISTS "Admins y Supervisores full access tickets" ON public.tickets;
+DROP POLICY IF EXISTS "Consulta y Tecnicos read access tickets" ON public.tickets;
+
+DROP POLICY IF EXISTS "Admins full access clientes" ON public.clientes;
+DROP POLICY IF EXISTS "Admins y Supervisores full access clientes" ON public.clientes;
+DROP POLICY IF EXISTS "Consulta y Tecnicos read access clientes" ON public.clientes;
+
+DROP POLICY IF EXISTS "Admins full access maquinaria" ON public.maquinaria;
+DROP POLICY IF EXISTS "Admins y Supervisores full access maquinaria" ON public.maquinaria;
+DROP POLICY IF EXISTS "Consulta y Tecnicos read access maquinaria" ON public.maquinaria;
+
+DROP POLICY IF EXISTS "Admins full access user_roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Usuarios pueden leer su propio rol" ON public.user_roles;
+DROP POLICY IF EXISTS "Allow select on user_roles to authenticated" ON public.user_roles;
+
 -- 3. Crear Políticas (Policies) para Administradores y Supervisores (Acceso Completo)
 CREATE POLICY "Admins y Supervisores full access ordenes" ON public.ordenes FOR ALL TO authenticated USING (
   (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
