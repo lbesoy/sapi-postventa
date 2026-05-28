@@ -72,6 +72,12 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing required fields: to, subject, htmlBody' });
   }
 
+  // B2: Validar destinatario con una regex robusta para evitar email header injection y spamming
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRegex.test(to)) {
+    return res.status(400).json({ error: 'Invalid email address format for field: to' });
+  }
+
   try {
     // Configuración para Outlook / Office 365
     // Estas variables deben configurarse en el panel de Vercel (Settings -> Environment Variables)
@@ -82,10 +88,8 @@ export default async function handler(req, res) {
       auth: {
         user: process.env.SMTP_EMAIL,     // ej: avisos@eurorep.mx
         pass: process.env.SMTP_PASSWORD,  // contraseña de aplicación (App Password)
-      },
-      tls: {
-        ciphers: 'SSLv3'
       }
+      // B1: Se eliminó ciphers: 'SSLv3' por ser obsoleto y vulnerable, permitiendo negociación TLS segura estándar
     });
 
     const mailOptions = {
@@ -103,6 +107,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true, messageId: info.messageId });
   } catch (error) {
     console.error('Error sending email:', error);
-    return res.status(500).json({ error: 'Failed to send email', details: error.message });
+    // B3: Se eliminó details: error.message para evitar la exposición de versiones y configuraciones internas del SMTP
+    return res.status(500).json({ error: 'Failed to send email' });
   }
 }
