@@ -1223,11 +1223,7 @@ function cargarConfig() {
   if (configData.queryOrdenes) document.getElementById('cfg-query-ordenes').value = configData.queryOrdenes;
 
   if (configData.queryRefacciones) document.getElementById('cfg-query-refacciones').value = configData.queryRefacciones;
-  
-  if (configData.ghToken) {
-    const ghInput = document.getElementById('cfg-gh-token');
-    if (ghInput) ghInput.value = configData.ghToken;
-  }
+
 
   const dmToggle = document.getElementById('cfg-darkmode');
   if (dmToggle) {
@@ -1267,27 +1263,29 @@ const GH_REPO = 'lbesoy/sapi-postventa';
 const GH_WORKFLOW = 'sync-sap.yml';
 
 async function sincronizarConGitHub(modulo = 'all', btnEl = null) {
-  const ghToken = configData.ghToken || localStorage.getItem('eurorep_gh_token');
-  if (!ghToken) {
-    mostrarNotificacion('⚠️ Se requiere un GitHub Token en la configuración para sincronizar con SAP.', 'warning');
-    return;
-  }
-
   const origHTML = btnEl ? btnEl.innerHTML : '';
   if (btnEl) { btnEl.innerHTML = '<i data-lucide="loader" class="btn-icon rotating"></i> Enviando a SAP...'; lucide.createIcons(); }
 
   try {
-    const resp = await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/dispatches`, {
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Sapi-Client-Token': 'SapiSecuredClientToken'
+    };
+    
+    if (window.supabaseClient) {
+      const { data: { session } } = await window.supabaseClient.auth.getSession();
+      if (session) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+    }
+
+    const resp = await fetch('/api/trigger-sync', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${ghToken}`,
-        'Accept': 'application/vnd.github+json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ ref: 'main', inputs: { modulo } })
+      headers,
+      body: JSON.stringify({ modulo })
     });
 
-    if (resp.status === 204) {
+    if (resp.ok) {
       mostrarNotificacion(`✅ Sincronización SAP iniciada. Los datos estarán listos en ~20 segundos.`, 'success');
       // Esperar 25 segundos y recargar datos desde Supabase
       setTimeout(async () => {
@@ -1298,7 +1296,7 @@ async function sincronizarConGitHub(modulo = 'all', btnEl = null) {
       }, 25000);
     } else {
       const errData = await resp.json().catch(() => ({}));
-      throw new Error(errData.message || `Error ${resp.status}`);
+      throw new Error(errData.error || `Error ${resp.status}`);
     }
   } catch(e) {
     mostrarNotificacion(`❌ Error al disparar sync: ${e.message}`, 'error');
@@ -1319,11 +1317,9 @@ function guardarConfig() {
     queryMaquinaria: document.getElementById('cfg-query-maquinaria').value.trim(),
     querySitios: document.getElementById('cfg-query-sitios').value.trim(),
     queryOrdenes: document.getElementById('cfg-query-ordenes').value.trim(),
-    queryRefacciones: document.getElementById('cfg-query-refacciones').value.trim(),
-    ghToken: document.getElementById('cfg-gh-token')?.value.trim() || configData.ghToken || ''
+    queryRefacciones: document.getElementById('cfg-query-refacciones').value.trim()
   };
 
-  if (configData.ghToken) localStorage.setItem('eurorep_gh_token', configData.ghToken);
   localStorage.setItem('eurorep_config', JSON.stringify(configData));
   if (window.pushToSupabase) window.pushToSupabase('config', configData);
   const btn = event.target;
