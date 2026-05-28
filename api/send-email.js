@@ -32,12 +32,19 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  // 1. Validar autenticación de Supabase (Bearer Token) o Fallback Token
+  // 1. Validar autenticación de Supabase (Bearer Token) o Token del Cliente Seguro
   const authHeader = req.headers.authorization || '';
   const clientToken = req.headers['x-sapi-client-token'];
   
-  if (!authHeader.startsWith('Bearer ') && clientToken !== 'SapiSecuredClientToken') {
-    return res.status(401).json({ error: 'Unauthorized: Missing Security Token' });
+  // En producción se requiere estrictamente definir SAPI_CLIENT_TOKEN en el panel de Vercel.
+  // En desarrollo se permite el token por defecto para facilitar pruebas.
+  const expectedToken = process.env.SAPI_CLIENT_TOKEN || (process.env.NODE_ENV !== 'production' ? 'SapiSecuredClientToken' : undefined);
+
+  const isSupabaseAuth = authHeader.startsWith('Bearer ');
+  const isTokenAuth = expectedToken && clientToken === expectedToken;
+
+  if (!isSupabaseAuth && !isTokenAuth) {
+    return res.status(401).json({ error: 'Unauthorized: Missing or Invalid Security Token' });
   }
 
   if (authHeader.startsWith('Bearer ')) {
