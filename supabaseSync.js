@@ -528,7 +528,10 @@ window.addEventListener('offline', () => {
   updateSyncStatusUI();
 });
 
-setInterval(() => {
+if (window.syncQueueInterval) {
+  clearInterval(window.syncQueueInterval);
+}
+window.syncQueueInterval = setInterval(() => {
   if (navigator.onLine && getSyncQueue().length > 0 && !_isProcessingQueue) {
     processSyncQueue();
   }
@@ -915,12 +918,16 @@ function setupRealtime() {
   };
 
   try {
-    window.supabaseClient.channel('custom-all-channel')
+    if (window.supabaseRealtimeChannel) {
+      window.supabaseClient.removeChannel(window.supabaseRealtimeChannel);
+    }
+    window.supabaseRealtimeChannel = window.supabaseClient.channel('custom-all-channel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => handleUpdate('tickets'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes' }, () => handleUpdate('ordenes'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clara_transactions' }, () => handleUpdate('clara_transactions'))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sapi_telemetry' }, () => handleUpdate('sapi_telemetry'))
-      .subscribe();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sapi_telemetry' }, () => handleUpdate('sapi_telemetry'));
+      
+    window.supabaseRealtimeChannel.subscribe();
   } catch (err) {
     console.error('[Realtime] Excepción al suscribirse al canal en tiempo real:', err.message);
   }
