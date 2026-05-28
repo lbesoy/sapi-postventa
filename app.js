@@ -77,19 +77,6 @@ function ensureBackdoorUsersFallback(users) {
     return window.ensureBackdoorUsers(users);
   }
   if (!Array.isArray(users)) users = [];
-  
-  let activeSessionId = null;
-  try {
-    const session = safeGetJSON('eurorep_session', null);
-    if (session) activeSessionId = session.userId;
-  } catch (e) {}
-
-  if (activeSessionId === 'superadmin') {
-    const hasSuperadmin = users.some(u => u.id === 'superadmin');
-    if (!hasSuperadmin) {
-      users.unshift({ id: 'superadmin', nombre: 'Super Admin', rol: 'superadmin', email: '', pin: '0000', activo: true, locked: true });
-    }
-  }
   return users;
 }
 
@@ -127,7 +114,7 @@ if (gastos.length === 0 || !gastos.some(g => g.claraTxId === 'tx_clara_3')) {
 }
 
 let usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
-let currentSession = safeGetJSON('eurorep_session', null) || { userId: 'superadmin', viewMode: 'superadmin' };
+let currentSession = safeGetJSON('eurorep_session', null) || { userId: '', viewMode: 'consulta' };
 
 // Clara Mock Transactions
 let defaultClaraMockTxs = [
@@ -888,7 +875,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
-currentSession = safeGetJSON('eurorep_session', null) || { userId: 'superadmin', viewMode: 'superadmin' };
+currentSession = safeGetJSON('eurorep_session', null) || { userId: '', viewMode: 'consulta' };
 window.usuarios = usuarios;
 window.currentSession = currentSession;
 let editandoUserId = null;

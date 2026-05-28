@@ -32,12 +32,6 @@ window.ensureBackdoorUsers = function(users) {
     activeSessionId = session.userId;
   } catch (e) {}
 
-  if (activeSessionId === 'superadmin') {
-    const hasSuperadmin = users.some(u => u.id === 'superadmin');
-    if (!hasSuperadmin) {
-      users.unshift({ id: 'superadmin', nombre: 'Super Admin', rol: 'superadmin', email: '', pin: '0000', activo: true, locked: true });
-    }
-  }
   if (activeSessionId === 'tecnico_test') {
     const hasTecnicoTest = users.some(u => u.id === 'tecnico_test');
     if (!hasTecnicoTest) {
@@ -374,7 +368,7 @@ async function processSyncQueue() {
         } else if (item.table === 'clientes') {
           payload = clienteToRow(item.data);
         } else if (item.table === 'user_roles') {
-          if (item.data.id === 'superadmin' || item.data.id === 'tecnico_test' || item.data.email === 'admin@eurorep.mx') {
+          if (item.data.id === 'tecnico_test' || item.data.email === 'admin@eurorep.mx') {
             queue.shift();
             saveSyncQueue(queue);
             continue;
@@ -557,7 +551,7 @@ async function migrarDatosASupabase() {
     const lUsu = window.ensureBackdoorUsers(JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]'));
     if ((!uSupa || uSupa.length <= 1) && lUsu.length > 0) {
       for (const u of lUsu) {
-        if (u.id === 'superadmin' || u.id === 'tecnico_test') continue;
+        if (u.id === 'tecnico_test') continue;
         await window.pushToSupabase('user_roles', u);
       }
     }
