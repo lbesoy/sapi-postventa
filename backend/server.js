@@ -35,6 +35,28 @@ const SAP_DB = process.env.SAP_COMPANY_DB;
 const SAP_USER = process.env.SAP_USER;
 const SAP_PASS = process.env.SAP_PASSWORD;
 
+const fs = require('fs');
+const https = require('https');
+
+// Configuración segura del HTTPS Agent para conectar con SAP Business One (Service Layer)
+// En producción valida los certificados estrictamente (rejectUnauthorized: true) por defecto.
+// Permite deshabilitarlo localmente mediante la variable SAP_REJECT_UNAUTHORIZED=false en el archivo .env privado.
+const agentOptions = {
+    rejectUnauthorized: process.env.SAP_REJECT_UNAUTHORIZED !== 'false'
+};
+
+// Carga segura del certificado CA en caso de usar un certificado SAP autofirmado
+if (process.env.SAP_CA_CERT_PATH) {
+    try {
+        agentOptions.ca = fs.readFileSync(process.env.SAP_CA_CERT_PATH);
+        console.log('🔒 Certificado CA cargado exitosamente para la conexión segura con SAP.');
+    } catch (err) {
+        console.error('❌ Error al cargar el certificado CA de SAP desde la ruta:', process.env.SAP_CA_CERT_PATH, err.message);
+    }
+}
+
+const sapHttpsAgent = new https.Agent(agentOptions);
+
 // Almacenar el sessionId en memoria (en produccion se debe manejar mejor, e.g. redis o base de datos)
 let sessionId = null;
 
@@ -48,7 +70,7 @@ async function loginToSAP() {
             UserName: SAP_USER,
             Password: SAP_PASS
         }, {
-            httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }),
+            httpsAgent: sapHttpsAgent,
             timeout: 60000 // 60 segundos máximo
         });
         
@@ -75,7 +97,7 @@ async function ensureSAPConnection(req, res, next) {
 
 // Configuración de instancia de Axios para peticiones a SAP
 const sapApi = axios.create({
-    httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }),
+    httpsAgent: sapHttpsAgent,
     timeout: 60000 // Timeout de 60 segundos
 });
 

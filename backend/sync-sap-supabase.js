@@ -12,6 +12,7 @@
 require('dotenv').config();
 const axios = require('axios');
 const https = require('https');
+const fs = require('fs');
 
 // ── Configuración ─────────────────────────────────────────────────
 const SAP_URL      = process.env.SAP_SL_URL;
@@ -39,7 +40,23 @@ let MAPPINGS = {
   maquinaria: null
 };
 
-const agent = new https.Agent({ rejectUnauthorized: false });
+// Configuración segura del HTTPS Agent para conectar con SAP Business One (Service Layer)
+// En producción valida los certificados estrictamente (rejectUnauthorized: true) por defecto.
+// Permite deshabilitarlo localmente mediante la variable SAP_REJECT_UNAUTHORIZED=false en el archivo .env privado.
+const agentOptions = {
+  rejectUnauthorized: process.env.SAP_REJECT_UNAUTHORIZED !== 'false'
+};
+
+// Carga segura del certificado CA en caso de usar un certificado SAP autofirmado
+if (process.env.SAP_CA_CERT_PATH) {
+  try {
+    agentOptions.ca = fs.readFileSync(process.env.SAP_CA_CERT_PATH);
+  } catch (err) {
+    console.error('❌ Error al cargar el certificado CA de SAP desde la ruta:', process.env.SAP_CA_CERT_PATH, err.message);
+  }
+}
+
+const agent = new https.Agent(agentOptions);
 const sapApi = axios.create({ httpsAgent: agent, timeout: 60000 });
 let sessionId = null;
 
