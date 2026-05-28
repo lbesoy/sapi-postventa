@@ -1704,28 +1704,44 @@ function cargarDetalleQuery(sqlCode) {
   }
   const q = listaQueriesCargada.find(x => x.SqlCode === sqlCode);
   if (q) {
-    document.getElementById('query-code').value = q.SqlCode;
-    document.getElementById('query-name').value = q.SqlName || '';
-    document.getElementById('query-sql').value = q.SqlText || '';
-    // Deshabilitar el código del query para que no lo cambien, ya que es el ID en SAP
-    document.getElementById('query-code').readOnly = true;
-    document.getElementById('query-results-container').style.display = 'none';
+    const qCode = document.getElementById('query-code');
+    const qName = document.getElementById('query-name');
+    const qSql = document.getElementById('query-sql');
+    const qResults = document.getElementById('query-results-container');
+    
+    if (qCode) qCode.value = q.SqlCode;
+    if (qName) qName.value = q.SqlName || '';
+    if (qSql) qSql.value = q.SqlText || '';
+    if (qCode) qCode.readOnly = true;
+    if (qResults) qResults.style.display = 'none';
   }
 }
 
 function limpiarFormularioQuery() {
-  document.getElementById('query-selector').value = '';
-  document.getElementById('query-code').value = '';
-  document.getElementById('query-code').readOnly = false;
-  document.getElementById('query-name').value = '';
-  document.getElementById('query-sql').value = '';
-  document.getElementById('query-results-container').style.display = 'none';
+  const qSelector = document.getElementById('query-selector');
+  const qCode = document.getElementById('query-code');
+  const qName = document.getElementById('query-name');
+  const qSql = document.getElementById('query-sql');
+  const qResults = document.getElementById('query-results-container');
+
+  if (qSelector) qSelector.value = '';
+  if (qCode) {
+    qCode.value = '';
+    qCode.readOnly = false;
+  }
+  if (qName) qName.value = '';
+  if (qSql) qSql.value = '';
+  if (qResults) qResults.style.display = 'none';
 }
 
 async function programarQuerySAP() {
-  let sqlCode = document.getElementById('query-code').value.trim();
-  let sqlName = document.getElementById('query-name').value.trim();
-  let rawSqlText = document.getElementById('query-sql').value.trim();
+  const qCode = document.getElementById('query-code');
+  const qName = document.getElementById('query-name');
+  const qSql = document.getElementById('query-sql');
+  
+  let sqlCode = qCode ? qCode.value.trim() : '';
+  let sqlName = qName ? qName.value.trim() : '';
+  let rawSqlText = qSql ? qSql.value.trim() : '';
 
   if (!sqlCode || !rawSqlText) {
     mostrarNotificacion('El Código del Query y la Sentencia SQL son obligatorios.', 'error');
@@ -1773,9 +1789,9 @@ async function programarQuerySAP() {
     }
     
     mostrarNotificacion('Query programado correctamente en SAP.', 'success');
-    document.getElementById('query-code').value = '';
-    document.getElementById('query-name').value = '';
-    document.getElementById('query-sql').value = '';
+    if (qCode) qCode.value = '';
+    if (qName) qName.value = '';
+    if (qSql) qSql.value = '';
     
     // Auto-refresh the lists to show the new query
     cargarListaQueriesSAP();
@@ -1790,7 +1806,8 @@ async function programarQuerySAP() {
 }
 
 async function probarQuerySAP() {
-  const sqlCode = document.getElementById('query-code').value.trim();
+  const qCode = document.getElementById('query-code');
+  const sqlCode = qCode ? qCode.value.trim() : '';
   if (!sqlCode) {
     mostrarNotificacion('Ingresa el Código del Query para ejecutarlo.', 'error');
     return;
@@ -1803,7 +1820,7 @@ async function probarQuerySAP() {
   
   const resultsContainer = document.getElementById('query-results-container');
   const resultsOutput = document.getElementById('query-results-output');
-  resultsContainer.style.display = 'none';
+  if (resultsContainer) resultsContainer.style.display = 'none';
 
   try {
     const res = await fetch(`${API_CONFIG.BASE_URL}/sap/queries/${encodeURIComponent(sqlCode)}/execute?_t=${Date.now()}`, {
@@ -1823,8 +1840,8 @@ async function probarQuerySAP() {
       throw new Error(errMsg);
     }
     
-    resultsOutput.textContent = JSON.stringify(data.data, null, 2);
-    resultsContainer.style.display = 'block';
+    if (resultsOutput) resultsOutput.textContent = JSON.stringify(data.data, null, 2);
+    if (resultsContainer) resultsContainer.style.display = 'block';
     mostrarNotificacion('Query ejecutado correctamente.', 'success');
   } catch (err) {
     console.error(err);
@@ -1833,8 +1850,8 @@ async function probarQuerySAP() {
     if (userMsg.includes('does not exist') || userMsg.includes('Not Found') || userMsg.includes('-2028')) {
       userMsg = 'Este query NO existe en SAP. Asegúrate de presionar "Guardar y Enviar a SAP" primero y que se haya guardado con éxito (alerta verde en la esquina).';
     }
-    resultsOutput.textContent = `Fallo al Ejecutar:\n${userMsg}`;
-    resultsContainer.style.display = 'block';
+    if (resultsOutput) resultsOutput.textContent = `Fallo al Ejecutar:\n${userMsg}`;
+    if (resultsContainer) resultsContainer.style.display = 'block';
     mostrarNotificacion('Error al ejecutar el query.', 'error');
   } finally {
     btn.innerHTML = orig;
@@ -1844,7 +1861,8 @@ async function probarQuerySAP() {
 }
 
 async function eliminarQuerySAP() {
-  const sqlCode = document.getElementById('query-code').value.trim();
+  const qCode = document.getElementById('query-code');
+  const sqlCode = qCode ? qCode.value.trim() : '';
   if (!sqlCode) {
     mostrarNotificacion('Selecciona un Query para eliminar.', 'error');
     return;
@@ -2008,38 +2026,51 @@ function renderUsuariosList() {
 
 function abrirModalUsuario(id) {
   editandoUserId = id || null;
-  document.getElementById('usuario-modal-title').textContent = id ? 'Editar Usuario' : 'Nuevo Usuario';
-  document.getElementById('form-usuario').reset();
+  const titleEl = document.getElementById('usuario-modal-title');
+  if (titleEl) titleEl.textContent = id ? 'Editar Usuario' : 'Nuevo Usuario';
+  
+  const formEl = document.getElementById('form-usuario');
+  if (formEl) formEl.reset();
   
   // Rellenar datalist de empresas (clientesLegacy + clientesDb)
   const legacyMap = new Map();
   ordenes.forEach(o => { if (o.cliente) legacyMap.set(o.cliente, true); });
   const datalist = document.getElementById('u-empresa-list');
   const allEmps = [...new Set([...clientesDb.map(c=>c.nombre), ...Array.from(legacyMap.keys())])].sort();
-  if(datalist) datalist.innerHTML = allEmps.map(e => `<option value="${e}">`).join('');
+  if (datalist) datalist.innerHTML = allEmps.map(e => `<option value="${e}">`).join('');
 
-  document.getElementById('u-empresa-container').style.display = 'none';
-  document.getElementById('u-empresa').removeAttribute('required');
+  const uEmpresaContainer = document.getElementById('u-empresa-container');
+  const uEmpresa = document.getElementById('u-empresa');
+  const uNombre = document.getElementById('u-nombre');
+  const uEmail = document.getElementById('u-email');
+  const uTelefono = document.getElementById('u-telefono');
+  const uActivo = document.getElementById('u-activo');
+  const uModalOverlay = document.getElementById('modal-usuario-overlay');
+
+  if (uEmpresaContainer) uEmpresaContainer.style.display = 'none';
+  if (uEmpresa) uEmpresa.removeAttribute('required');
 
   if (id) {
     const u = usuarios.find(x => x.id === id);
     if (!u) return;
-    document.getElementById('u-nombre').value = u.nombre || '';
-    document.getElementById('u-email').value = u.email || '';
-    document.getElementById('u-telefono').value = u.telefono || '';
-    if (document.getElementById('u-activo')) document.getElementById('u-activo').checked = u.activo !== false;
+    if (uNombre) uNombre.value = u.nombre || '';
+    if (uEmail) uEmail.value = u.email || '';
+    if (uTelefono) uTelefono.value = u.telefono || '';
+    if (uActivo) uActivo.checked = u.activo !== false;
     
     const radio = document.querySelector(`input[name="u-rol"][value="${u.rol}"]`);
     if (radio) {
       radio.checked = true;
       if (u.rol === 'empresa' || u.rol === 'cliente') {
-        document.getElementById('u-empresa-container').style.display = 'block';
-        document.getElementById('u-empresa').setAttribute('required', 'true');
-        document.getElementById('u-empresa').value = u.empresa || '';
+        if (uEmpresaContainer) uEmpresaContainer.style.display = 'block';
+        if (uEmpresa) {
+          uEmpresa.setAttribute('required', 'true');
+          uEmpresa.value = u.empresa || '';
+        }
       }
     }
   }
-  document.getElementById('modal-usuario-overlay').classList.add('open');
+  if (uModalOverlay) uModalOverlay.classList.add('open');
   document.body.style.overflow = 'hidden';
   lucide.createIcons();
 }
@@ -2047,6 +2078,7 @@ function abrirModalUsuario(id) {
 function toggleEmpresaField(radio) {
   const container = document.getElementById('u-empresa-container');
   const input = document.getElementById('u-empresa');
+  if (!container || !input) return;
   if (radio.value === 'empresa' || radio.value === 'cliente') {
     container.style.display = 'block';
     input.setAttribute('required', 'true');
@@ -2058,21 +2090,26 @@ function toggleEmpresaField(radio) {
 }
 
 function cerrarModalUsuario(e) {
-  if (e && e.target !== document.getElementById('modal-usuario-overlay')) return;
-  document.getElementById('modal-usuario-overlay').classList.remove('open');
+  const uModalOverlay = document.getElementById('modal-usuario-overlay');
+  if (e && e.target !== uModalOverlay) return;
+  if (uModalOverlay) uModalOverlay.classList.remove('open');
   document.body.style.overflow = '';
   editandoUserId = null;
 }
 
 async function guardarUsuario(e) {
   e.preventDefault();
-  const nombre = document.getElementById('u-nombre').value.trim();
-  let email = document.getElementById('u-email').value.trim();
+  const uNombre = document.getElementById('u-nombre');
+  const uEmail = document.getElementById('u-email');
+  const uEmpresa = document.getElementById('u-empresa');
+
+  const nombre = uNombre ? uNombre.value.trim() : '';
+  let email = uEmail ? uEmail.value.trim() : '';
   if (email && !email.includes('@')) {
     email = email.replace(/\s+/g, '') + '@eurorep.mx';
   }
   const rol = document.querySelector('input[name="u-rol"]:checked')?.value;
-  const empresa = document.getElementById('u-empresa').value.trim();
+  const empresa = uEmpresa ? uEmpresa.value.trim() : '';
   const activo = document.getElementById('u-activo')?.checked;
 
   if (!rol) { alert('Selecciona un rol para el usuario.'); return; }
