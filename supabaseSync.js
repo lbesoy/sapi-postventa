@@ -287,8 +287,23 @@ window.deleteFromSupabase = async function(tabla, id) {
 };
 
 let _isProcessingQueue = false;
+let syncMutexPromise = null;
 
-async function processSyncQueue() {
+function processSyncQueue() {
+  if (syncMutexPromise) return syncMutexPromise;
+  
+  syncMutexPromise = (async () => {
+    try {
+      await _processSyncQueueInternal();
+    } finally {
+      syncMutexPromise = null;
+    }
+  })();
+  
+  return syncMutexPromise;
+}
+
+async function _processSyncQueueInternal() {
   if (_isProcessingQueue) return;
   const sb = window.supabaseClient;
   if (!sb) {
