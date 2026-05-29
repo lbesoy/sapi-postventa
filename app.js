@@ -7132,18 +7132,94 @@ function verDetalle(id) {
 
   const renderBitacora = (o) => {
     let html = '';
-    if (!o.bitacora || o.bitacora.length === 0) {
-      html += '<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;text-align:center;padding:1.5rem;background:var(--bg-body);border-radius:6px;border:1px dashed var(--border);">Aún no hay entradas en la bitácora para esta orden.</p>';
+    const items = o.bitacora || [];
+
+    // Separar pendientes de realizados
+    const pendientes = items.filter(b => b.realizado === false || (b.nota && b.nota.includes('Programado por supervisor') && b.realizado !== true));
+    const realizados = items.filter(b => b.realizado === true || (!pendientes.some(p => p.id === b.id)));
+
+    // 1. Renderizar Asignaciones Programadas (Pendientes)
+    if (pendientes.length > 0) {
+      html += `
+        <div style="margin-bottom:1.5rem; background:rgba(139, 92, 246, 0.02); border: 1px solid rgba(139, 92, 246, 0.1); border-radius:10px; padding:1.25rem;">
+          <h4 style="font-size:0.82rem; font-weight:700; color:#8b5cf6; text-transform:uppercase; margin-bottom:0.85rem; display:flex; align-items:center; gap:0.4rem; letter-spacing:0.5px; border-bottom:1px solid rgba(139, 92, 246, 0.15); padding-bottom:0.5rem; margin-top:0;">
+            <i data-lucide="calendar" style="width:16px; height:16px;"></i> Asignaciones Programadas (Pendientes)
+          </h4>
+          <div style="display:flex; flex-direction:column; gap:0.85rem;">
+      `;
+      
+      pendientes.forEach(b => {
+        let horasHtml = '';
+        if (b.entrada && b.salida) {
+          horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(139, 92, 246, 0.1); color:#8b5cf6; padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="clock" style="width:12px;height:12px;"></i> ${b.entrada} - ${b.salida}</span>`;
+        }
+        
+        const isMiAsignacion = currentSession.viewMode === 'tecnico' && (b.tecnico === currentSession.nombre || b.tecnico === (usuarios.find(u => u.id === currentSession.userId)?.nombre));
+        const btnReportar = isMiAsignacion ? `
+          <div style="margin-top:0.6rem; text-align:right;">
+            <button class="btn-primary" onclick="iniciarReporteDesdeAsignacion('${o.id}', '${b.id}')" style="font-size:0.75rem; padding:0.3rem 0.6rem; display:inline-flex; align-items:center; gap:0.3rem; background:#8b5cf6; border-color:#8b5cf6; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);">
+              <i data-lucide="file-signature" style="width:12px; height:12px;"></i> Reportar Trabajo Realizado
+            </button>
+          </div>
+        ` : '';
+
+        // Formatear fecha legible
+        let fechaFormateada = b.fecha;
+        try {
+          const dObj = new Date(b.fecha);
+          if (!isNaN(dObj)) {
+            fechaFormateada = dObj.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+            fechaFormateada = fechaFormateada.charAt(0).toUpperCase() + fechaFormateada.slice(1);
+          }
+        } catch(e){}
+
+        html += `
+          <div style="background:var(--bg-body); border: 1px solid var(--border); border-left: 4px solid #8b5cf6; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; flex-wrap:wrap; gap:0.5rem;">
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <div style="width:24px; height:24px; border-radius:50%; background:#8b5cf6; color:white; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold;">
+                  ${(b.tecnico || 'T').charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <span style="font-size:0.85rem; font-weight:600; color:var(--text-primary);">${b.tecnico || 'Sin asignar'}</span>
+                  <div style="font-size:0.72rem; color:var(--text-muted);">${fechaFormateada}</div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:0.4rem;">
+                <span class="badge" style="background:rgba(139, 92, 246, 0.1); color:#8b5cf6; border-radius:99px; padding:0.15rem 0.45rem; font-size:0.65rem; font-weight:700;">PROGRAMADO</span>
+                ${horasHtml}
+              </div>
+            </div>
+            <div style="font-size:0.85rem; color:var(--text-secondary); white-space:pre-wrap; padding-left:2.2rem; line-height:1.4; font-style:italic;">${b.nota}</div>
+            ${btnReportar}
+          </div>
+        `;
+      });
+      
+      html += `
+          </div>
+        </div>
+      `;
+    }
+
+    // 2. Renderizar Historial de Trabajo (Realizados)
+    html += `
+      <h4 style="font-size:0.82rem; font-weight:700; color:#10b981; text-transform:uppercase; margin-bottom:0.85rem; display:flex; align-items:center; gap:0.4rem; letter-spacing:0.5px; margin-top: 1rem; border-bottom:1px solid var(--border); padding-bottom:0.5rem;">
+        <i data-lucide="clipboard-check" style="width:16px; height:16px;"></i> Historial de Trabajo (Realizado)
+      </h4>
+    `;
+
+    if (realizados.length === 0) {
+      html += '<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1.5rem;text-align:center;padding:1.5rem;background:var(--bg-body);border-radius:6px;border:1px dashed var(--border);">Aún no hay reportes de trabajo diarios realizados.</p>';
     } else {
       // Agrupar por día
       const agrupado = {};
-      o.bitacora.forEach(b => {
+      realizados.forEach(b => {
         let fechaDia = 'Fecha Desconocida';
         let fechaDObj = null;
         try {
           fechaDObj = new Date(b.fecha);
           if (!isNaN(fechaDObj)) {
-            // Se asume timezone local por seguridad del parseo de toLocaleDateString
             const partes = fechaDObj.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' }).split('/');
             fechaDia = `${partes[2]}-${partes[1]}-${partes[0]}`; // YYYY-MM-DD
           }
@@ -7183,22 +7259,25 @@ function verDetalle(id) {
             const hrs = Math.floor(diff / 60);
             const mns = diff % 60;
             const durStr = `${hrs}h ${mns > 0 ? mns + 'm' : ''}`.trim();
-            horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(232, 133, 10, 0.1); color:var(--accent); padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="clock" style="width:12px;height:12px;"></i> ${b.entrada} - ${b.salida} (${durStr})</span>`;
+            horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(16, 185, 129, 0.1); color:#10b981; padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="clock" style="width:12px;height:12px;"></i> ${b.entrada} - ${b.salida} (${durStr})</span>`;
           } else if (b.entrada || b.salida) {
             horasHtml = `<span style="font-size:0.7rem; color:var(--text-muted);"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:middle;"></i> ${b.entrada || '--:--'} a ${b.salida || '--:--'}</span>`;
           }
 
           return `
-            <div style="background:var(--bg-body); border-left: 3px solid var(--border); border-radius:4px; padding:0.75rem 1rem; margin-top:0.6rem;">
+            <div style="background:var(--bg-body); border-left: 3px solid #10b981; border-radius:4px; padding:0.75rem 1rem; margin-top:0.6rem;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; flex-wrap:wrap; gap:0.5rem;">
                 <div style="display:flex; align-items:center; gap:0.5rem;">
-                  <div style="width:24px; height:24px; border-radius:50%; background:var(--accent); color:white; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold;">
+                  <div style="width:24px; height:24px; border-radius:50%; background:#10b981; color:white; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold;">
                     ${(b.tecnico || 'U').charAt(0).toUpperCase()}
                   </div>
                   <span style="font-size:0.85rem; font-weight:600; color:var(--text-primary);">${b.tecnico || 'Desconocido'}</span>
                   ${['superadmin', 'admin'].includes(currentSession.viewMode) ? `<button class="action-btn" onclick="editarBitacora('${o.id}', '${b.id}')" title="Editar Bitácora" style="padding:0.15rem; margin-left:0.5rem;"><i data-lucide="pencil" style="width:12px;height:12px;"></i></button>` : ''}
                 </div>
-                ${horasHtml}
+                <div style="display:flex; align-items:center; gap:0.4rem;">
+                  <span class="badge" style="background:rgba(16, 185, 129, 0.1); color:#10b981; border-radius:99px; padding:0.15rem 0.45rem; font-size:0.65rem; font-weight:700;">REPORTADO</span>
+                  ${horasHtml}
+                </div>
               </div>
               <div style="font-size:0.85rem; color:var(--text-secondary); white-space:pre-wrap; padding-left:2.2rem; line-height:1.4;">${b.nota}</div>
             </div>
@@ -7209,7 +7288,7 @@ function verDetalle(id) {
           <div style="display:flex; gap:1rem; align-items:flex-start;">
             <!-- Calendario Icono -->
             <div style="flex-shrink:0; display:flex; flex-direction:column; align-items:center; width:50px; background:var(--bg-body); border:1px solid var(--border); border-radius:6px; overflow:hidden; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
-              <div style="background:var(--accent); color:white; width:100%; text-align:center; font-size:0.65rem; font-weight:bold; padding:0.25rem 0; letter-spacing:0.5px;">${mesAbrev}</div>
+              <div style="background:#10b981; color:white; width:100%; text-align:center; font-size:0.65rem; font-weight:bold; padding:0.25rem 0; letter-spacing:0.5px;">${mesAbrev}</div>
               <div style="font-size:1.3rem; font-weight:700; color:var(--text-primary); padding:0.3rem 0;">${numDia}</div>
             </div>
             <!-- Contenido del día -->
@@ -7222,9 +7301,9 @@ function verDetalle(id) {
       });
       html += '</div>';
     }
-    
+
     if (o.estado !== 'Finalizado' && currentSession.viewMode !== 'consulta') {
-      html += `<div style="text-align:right;"><button class="btn-primary" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="abrirBitacora('${o.id}')"><i data-lucide="plus" style="width:14px;height:14px;"></i> Registrar Avance Diario</button></div>`;
+      html += `<div style="text-align:right; margin-top: 1rem;"><button class="btn-primary" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="abrirBitacora('${o.id}')"><i data-lucide="plus" style="width:14px;height:14px;"></i> Registrar Avance Diario</button></div>`;
     }
     return html;
   };
@@ -7696,7 +7775,8 @@ async function guardarProgramacionTecnico() {
     tecnico: tecnico,
     nota: "Programado por supervisor. Pendiente de llenado por el técnico.",
     entrada: entrada,
-    salida: salida
+    salida: salida,
+    realizado: false
   };
   
   o.bitacora.push(nuevaEntrada);
@@ -7751,6 +7831,10 @@ function abrirBitacora(id) {
   window.currentBitacoraEntryId = null;
   const rango = calcularRangoFechasLaboral(2);
 
+  // Restaurar título por defecto del modal
+  const modalTitle = document.getElementById('modal-bitacora-title');
+  if (modalTitle) modalTitle.textContent = 'Registrar Avance Diario';
+
   const fechaInput = document.getElementById('bitacora-fecha');
   fechaInput.value = rango.max; // pre-selecciona el último día hábil (hoy o viernes si es fin de semana)
   fechaInput.min = rango.min;
@@ -7762,6 +7846,38 @@ function abrirBitacora(id) {
   document.getElementById('modal-bitacora-overlay').classList.add('open');
 }
 
+function iniciarReporteDesdeAsignacion(ordenId, bitacoraId) {
+  const o = ordenes.find(x => x.id === ordenId);
+  if (!o) return;
+  const b = o.bitacora?.find(x => x.id === bitacoraId);
+  if (!b) return;
+
+  window.currentBitacoraOrdenId = ordenId;
+  window.currentBitacoraEntryId = bitacoraId;
+
+  // Modificar título del modal para contextualizar
+  const modalTitle = document.getElementById('modal-bitacora-title');
+  if (modalTitle) modalTitle.textContent = 'Reportar Trabajo de Asignación';
+
+  const fechaInput = document.getElementById('bitacora-fecha');
+  if (fechaInput) {
+    let dateStr = b.fecha;
+    if (dateStr.includes('T')) dateStr = dateStr.split('T')[0];
+    fechaInput.value = dateStr;
+    // Permitir al técnico registrar la fecha programada
+    fechaInput.min = '';
+    fechaInput.max = '';
+  }
+
+  // Pre-rellenar horas de la asignación y limpiar la nota por defecto del supervisor
+  document.getElementById('bitacora-nota').value = '';
+  document.getElementById('bitacora-entrada').value = b.entrada || '';
+  document.getElementById('bitacora-salida').value = b.salida || '';
+  
+  document.getElementById('modal-bitacora-overlay').classList.add('open');
+}
+window.iniciarReporteDesdeAsignacion = iniciarReporteDesdeAsignacion;
+
 function editarBitacora(ordenId, bitacoraId) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
@@ -7770,6 +7886,10 @@ function editarBitacora(ordenId, bitacoraId) {
 
   window.currentBitacoraOrdenId = ordenId;
   window.currentBitacoraEntryId = bitacoraId;
+
+  // Establecer título del modal
+  const modalTitle = document.getElementById('modal-bitacora-title');
+  if (modalTitle) modalTitle.textContent = 'Editar Entrada de Bitácora';
 
   const fechaInput = document.getElementById('bitacora-fecha');
   const dObj = new Date(b.fecha);
@@ -7881,6 +8001,7 @@ function guardarNotaBitacora() {
       o.bitacora[bIndex].nota = nota;
       o.bitacora[bIndex].entrada = entrada;
       o.bitacora[bIndex].salida = salida;
+      o.bitacora[bIndex].realizado = true; // Al guardar pasa a estar completada
     }
   } else {
     // Modo Creación
@@ -7890,7 +8011,8 @@ function guardarNotaBitacora() {
       nota: nota,
       entrada: entrada,
       salida: salida,
-      tecnico: nombreTecnico
+      tecnico: nombreTecnico,
+      realizado: true
     });
   }
   
@@ -10459,7 +10581,8 @@ function renderCalendario() {
         if (dateStr.includes('T')) dateStr = dateStr.split('T')[0];
         
         let eventColor = bgColor;
-        if (b.nota && b.nota.includes('Programado por supervisor')) {
+        const esAsignacionPendiente = b.realizado === false || (b.nota && b.nota.includes('Programado por supervisor') && b.realizado !== true);
+        if (esAsignacionPendiente) {
           eventColor = '#8b5cf6'; // Morado para los programados
         }
 
