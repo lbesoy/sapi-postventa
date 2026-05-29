@@ -8,6 +8,15 @@ let currentDesgSortCol = 'fecha';
 let currentDesgSortDir = 'asc';
 let currentDesgloseData = [];
 
+// Registrar Service Worker para soporte PWA (Acceso Rápido instalable en celulares)
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('[PWA] Service Worker registrado con éxito:', reg.scope))
+      .catch(err => console.error('[PWA] Error al registrar Service Worker:', err));
+  });
+}
+
 // Proteger contra la ausencia de Lucide (por ejemplo, por fallas de carga de CDN)
 if (typeof window !== 'undefined') {
   if (typeof window.lucide === 'undefined' || typeof window.lucide.createIcons !== 'function') {

@@ -1,0 +1,24 @@
+{
+  "name": "Eurorep Postventa",
+  "short_name": "Eurorep",
+  "description": "Sistema de gestión de órdenes de servicio, bitácoras y gastos de postventa de Eurorep.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#12141c",
+  "theme_color": "#e8820c",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "Logo_de_Clara.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "Logo_de_Clara.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
