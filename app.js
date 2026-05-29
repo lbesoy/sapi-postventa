@@ -7993,18 +7993,35 @@ function guardarNotaBitacora() {
   
   if (!o.bitacora) o.bitacora = [];
 
+  let esAsignacionPendiente = false;
   if (window.currentBitacoraEntryId) {
-    // Modo Edición
+    const bIndex = o.bitacora.findIndex(x => x.id === window.currentBitacoraEntryId);
+    if (bIndex >= 0) {
+      const bObj = o.bitacora[bIndex];
+      if (bObj.realizado === false || (bObj.nota && bObj.nota.includes('Programado por supervisor') && bObj.realizado !== true)) {
+        esAsignacionPendiente = true;
+      }
+    }
+  }
+
+  if (window.currentBitacoraEntryId && !esAsignacionPendiente) {
+    // MODO EDICIÓN REAL (de una bitácora ya reportada previamente)
     const bIndex = o.bitacora.findIndex(x => x.id === window.currentBitacoraEntryId);
     if (bIndex >= 0) {
       o.bitacora[bIndex].fecha = new Date(fecha).toISOString();
       o.bitacora[bIndex].nota = nota;
       o.bitacora[bIndex].entrada = entrada;
       o.bitacora[bIndex].salida = salida;
-      o.bitacora[bIndex].realizado = true; // Al guardar pasa a estar completada
+      o.bitacora[bIndex].realizado = true;
     }
   } else {
-    // Modo Creación
+    // MODO CREACIÓN NUEVA (o reporte de asignación pendiente)
+    if (esAsignacionPendiente) {
+      // Eliminar el pendiente programado original
+      o.bitacora = o.bitacora.filter(x => x.id !== window.currentBitacoraEntryId);
+    }
+
+    // Insertar reporte de trabajo limpio y realizado
     o.bitacora.push({
       id: crypto.randomUUID(),
       fecha: new Date(fecha).toISOString(),
