@@ -1334,6 +1334,62 @@ body {
   opacity: 0.3;
 }
 
+/* ===== FULLCALENDAR LIST VIEW PREMIUM STYLES ===== */
+.fc-list {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  overflow: hidden !important;
+}
+
+.fc-list-empty {
+  background: var(--bg-card) !important;
+  padding: 3rem 1rem !important;
+  text-align: center !important;
+}
+
+.fc-list-empty-cushion {
+  color: var(--text-secondary) !important;
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 0.95rem !important;
+  font-weight: 500 !important;
+}
+
+.fc-list-day-cushion {
+  background: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+  padding: 0.6rem 1rem !important;
+}
+
+.fc-list-event {
+  background: var(--bg-card) !important;
+  transition: background 0.15s ease !important;
+}
+
+.fc-list-event:hover {
+  background: var(--bg-hover) !important;
+}
+
+.fc-list-event-title a {
+  color: var(--text-primary) !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+}
+
+.fc-list-event-time {
+  color: var(--text-secondary) !important;
+  font-weight: 600 !important;
+}
+
+.fc-list-table {
+  border-color: var(--border) !important;
+}
+
+.fc-list-day {
+  border-color: var(--border) !important;
+}
+
 /* ===== SYNC STATUS INDICATOR ===== */
 .sync-status-indicator {
   display: inline-flex;
