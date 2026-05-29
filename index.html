@@ -627,6 +627,9 @@
               <button class="btn-primary" id="btn-programar-tecnico" style="display:none;" onclick="abrirProgramarTecnico()">
                 <i data-lucide="calendar-plus" class="btn-icon"></i> Programar Asignación
               </button>
+              <button class="btn-primary" id="btn-registrar-actividad" style="display:none; background:var(--purple); border-color:var(--purple);" onclick="abrirRegistrarActividad()">
+                <i data-lucide="calendar-plus" class="btn-icon"></i> Registrar Actividad
+              </button>
             </div>
           </div>
           <div id="calendar-container"
@@ -2054,6 +2057,71 @@
         </div>
       </div>
     </div>
+
+    <!-- MODAL REGISTRAR ACTIVIDAD (CALENDARIO FASE 9) -->
+    <div class="modal-overlay" id="modal-registrar-actividad-overlay" onclick="if(event.target===this) this.classList.remove('open')">
+      <div class="modal" id="modal-registrar-actividad" style="max-width:500px;">
+        <div class="modal-header">
+          <h2 id="mra-titulo-modal">Registrar Actividad</h2>
+          <button class="modal-close" onclick="document.getElementById('modal-registrar-actividad-overlay').classList.remove('open')">✕</button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="mra-id" />
+          <div class="form-group">
+            <label>Título de la Actividad</label>
+            <input type="text" id="mra-titulo" placeholder="Ej. Junta Mensual, Capacitación de Seguridad" required />
+          </div>
+          <div class="form-group">
+            <label>Tipo de Actividad</label>
+            <select id="mra-tipo" class="form-select" required>
+              <option value="Junta">Junta</option>
+              <option value="Capacitación">Capacitación</option>
+              <option value="Vacaciones">Vacaciones</option>
+              <option value="Descanso">Descanso</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Técnico Relacionado (Opcional)</label>
+            <select id="mra-tecnico" class="form-select">
+              <option value="">Ninguno / Todos</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Orden de Servicio Relacionada (Opcional)</label>
+            <select id="mra-orden" class="form-select">
+              <option value="">Ninguna</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Fecha y Hora de Inicio</label>
+            <input type="datetime-local" id="mra-inicio" required />
+          </div>
+          <div class="form-group">
+            <label>Fecha y Hora de Fin (Opcional)</label>
+            <input type="datetime-local" id="mra-fin" />
+          </div>
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="mra-todo-el-dia" /> Todo el día
+            </label>
+          </div>
+          <div class="form-group">
+            <label>Descripción / Notas</label>
+            <textarea id="mra-descripcion" rows="3" placeholder="Detalles de la reunión o capacitación..." class="form-control" style="width: 100%; border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem; background: var(--bg-card); color: var(--text-primary); font-family: inherit; box-sizing: border-box;"></textarea>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:1.5rem; align-items:center;">
+            <button class="btn-secondary" id="mra-btn-eliminar" onclick="eliminarActividadCalendario()" style="background:#ef4444; color:white; border-color:#ef4444; display:none;">
+              <i data-lucide="trash" class="btn-icon"></i> Eliminar
+            </button>
+            <div style="flex:1; text-align:right;">
+              <button class="btn-primary" onclick="guardarActividadCalendario()">
+                <i data-lucide="save" class="btn-icon"></i> Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div></div>
 
     <!-- MODAL ASIGNAR TECNICOS (CALENDARIO) -->
     <div class="modal-overlay" id="modal-asignar-tecnicos-overlay" onclick="cerrarAsignarTecnicos(event)"

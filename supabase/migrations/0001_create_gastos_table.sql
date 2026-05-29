@@ -4,8 +4,8 @@
 
 CREATE TABLE IF NOT EXISTS public.gastos (
     id TEXT PRIMARY KEY,
-    usuario_id TEXT,
-    fecha TEXT,
+    usuario_id UUID REFERENCES public.user_roles(id) ON DELETE CASCADE,
+    fecha TIMESTAMP WITH TIME ZONE,
     categoria TEXT,
     descripcion TEXT,
     monto NUMERIC NOT NULL DEFAULT 0,
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.gastos (
     clara_tx_id TEXT,
     clara_merchant TEXT,
     clara_card_last4 TEXT,
-    orden_folio TEXT,
+    orden_id TEXT REFERENCES public.ordenes(id) ON DELETE SET NULL,
     uuid_fiscal TEXT,
     rfc_emisor TEXT,
     pdf_factura TEXT,

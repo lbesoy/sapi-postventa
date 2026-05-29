@@ -67,7 +67,6 @@ function ticketToRow(t) {
     cot_aceptada: t.cotAceptada || null,
     motivo_rechazo: t.motivoRechazo || null,
     pedido_sap: t.pedidoSAP || null,
-    tecnicos_asignados: t.tecnicosAsignados || [],
     pdf_pedido: t.pdfPedido || null,
     pdf_cotizacion: t.pdfCotizacion || null
   };
@@ -97,7 +96,7 @@ function rowToTicket(t) {
     cotAceptada: t.cot_aceptada,
     motivoRechazo: t.motivo_rechazo,
     pedidoSAP: t.pedido_sap,
-    tecnicosAsignados: t.tecnicos_asignados || [],
+    tecnicosAsignados: [], // Siempre vacío por diseño relacional de negocio
     pdfPedido: t.pdf_pedido,
     pdfCotizacion: t.pdf_cotizacion
   };
@@ -114,18 +113,39 @@ function rowToTicket(t) {
 
 function ordenToRow(o) {
   const customData = { ...o };
-  const knownKeys = ['id', 'folio', 'cliente', 'ubicacion', 'tecnico', 'modelo', 'tipo', 'estado', 'fecha', 'fechaInicio', 'fechaFin', 'duracion', 'duracion_minutos', 'evidenciaBase64', 'evidencia_base64'];
+  const knownKeys = [
+    'id', 'folio', 'cliente', 'ubicacion', 'tecnico', 'modelo', 'tipo', 'estado', 'fecha', 'fechaInicio', 'fechaFin', 
+    'duracion', 'duracion_minutos', 'evidenciaBase64', 'evidencia_base_64', 'evidencia_url', 'bitacora', 'maquinaria_id', 'sitio_id',
+    'ref_necesarias', 'ref_utilizadas', 'firma_tecnico_base64', 'firma_tecnico_nombre', 'firma_tecnico_fecha', 
+    'firma_cliente_base64', 'firma_cliente_nombre', 'firma_cliente_fecha'
+  ];
   knownKeys.forEach(k => delete customData[k]);
   
   const notasJSON = JSON.stringify(customData);
+
+  // Buscar sitio_id en localStorage
+  let sitioId = null;
+  try {
+    const sitios = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+    const match = sitios.find(s => s.cliente === o.cliente && (s.nombre === o.ubicacion || s.direccion === o.ubicacion || s.id === o.ubicacion));
+    if (match) sitioId = match.id;
+  } catch (e) {}
+
+  // Buscar maquinaria_id en localStorage
+  let maquinariaId = null;
+  try {
+    const maquinas = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
+    const match = maquinas.find(m => m.cliente === o.cliente && (m.modelo === o.modelo || m.serie === o.modelo || m.id === o.modelo));
+    if (match) maquinariaId = match.id;
+  } catch (e) {}
 
   return {
     id: o.id,
     folio: o.folio,
     cliente: o.cliente,
-    ubicacion: o.ubicacion || null,
+    sitio_id: sitioId,
     tecnico: o.tecnico || null,
-    modelo: o.modelo || null,
+    maquinaria_id: maquinariaId,
     tipo: o.tipo || 'Servicio',
     estado: o.estado || 'Pendiente',
     fecha: o.fecha || new Date().toISOString(),
@@ -133,35 +153,87 @@ function ordenToRow(o) {
     fecha_fin: o.fechaFin || null,
     duracion_minutos: o.duracion || null,
     notas: notasJSON,
-    evidencia_base64: o.evidenciaBase64 || null
+    evidencia_url: o.evidenciaBase64 || null
   };
 }
 
 function rowToOrden(o) {
   let extraData = {};
-  if (o.notas && o.notas.startsWith('{')) {
+  if (o.notes && o.notes.startsWith('{')) {
+    try { extraData = JSON.parse(o.notes); } catch(e) {}
+  } else if (o.notas && o.notas.startsWith('{')) {
     try {
       extraData = JSON.parse(o.notas);
     } catch(e) {}
   } else if (o.notas) {
-    extraData.observaciones = o.notas; // Fallback por si hay texto legacy
+    extraData.observaciones = o.notas;
   }
 
-  return {
+  // Deducir ubicación (sitio) del ID
+  let ubicacion = o.ubicacion || null;
+  if (o.sitio_id) {
+    try {
+      const sitios = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+      const match = sitios.find(s => s.id === o.sitio_id);
+      if (match) ubicacion = match.nombre || match.direccion;
+    } catch (e) {}
+  }
+
+  // Deducir modelo de maquinaria del ID
+  let modelo = o.modelo || null;
+  if (o.maquinaria_id) {
+    try {
+      const maquinas = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
+      const match = maquinas.find(m => m.id === o.maquinaria_id);
+      if (match) modelo = match.modelo;
+    } catch (e) {}
+  }
+
+  const res = {
     id: o.id, folio: o.folio, cliente: o.cliente,
-    ubicacion: o.ubicacion, tecnico: o.tecnico, modelo: o.modelo,
+    ubicacion: ubicacion, tecnico: o.tecnico, modelo: modelo,
     tipo: o.tipo, estado: o.estado, fecha: o.fecha,
     fechaInicio: o.fecha_inicio, fechaFin: o.fecha_fin,
     duracion: o.duracion_minutos,
-    evidenciaBase64: o.evidencia_base64,
+    maquinaria_id: o.maquinaria_id || null,
+    evidenciaBase64: o.evidencia_url || o.evidencia_base_64 || o.evidencia_base64 || null,
+    bitacora: [],
+    ref_necesarias: [],
+    ref_utilizadas: [],
+    firma_tecnico_base64: null,
+    firma_cliente_base64: null,
     ...extraData
   };
+  
+  if (res.bitacora) delete res.bitacora;
+  if (res.ref_necesarias) delete res.ref_necesarias;
+  if (res.ref_utilizadas) delete res.ref_utilizadas;
+  res.bitacora = [];
+  res.ref_necesarias = [];
+  res.ref_utilizadas = [];
+  
+  return res;
+}
+
+function isValidUUID(uuid) {
+  if (typeof uuid !== 'string') return false;
+  const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return regex.test(uuid);
 }
 
 function gastoToRow(g) {
+  let ordenId = null;
+  if (g.ordenFolio) {
+    try {
+      const ordenes = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+      const match = ordenes.find(o => o.folio === g.ordenFolio || o.id === g.ordenFolio);
+      if (match) ordenId = match.id;
+    } catch(e) {}
+  }
+
   return {
     id: g.id,
-    usuario_id: g.usuarioId || null,
+    usuario_id: isValidUUID(g.usuarioId) ? g.usuarioId : null,
     fecha: g.fecha || null,
     categoria: g.categoria || null,
     descripcion: g.descripcion || null,
@@ -170,7 +242,7 @@ function gastoToRow(g) {
     clara_tx_id: g.claraTxId || null,
     clara_merchant: g.claraMerchant || null,
     clara_card_last4: g.claraCardLast4 || null,
-    orden_folio: g.ordenFolio || null,
+    orden_id: ordenId,
     uuid_fiscal: g.uuidFiscal || null,
     rfc_emisor: g.rfcEmisor || null,
     pdf_factura: g.pdfFactura || null,
@@ -189,6 +261,15 @@ function rowToGasto(g) {
   const u = userList.find(x => x.id === g.usuario_id);
   const nombreUsr = u ? u.nombre : 'Técnico';
 
+  let ordenFolio = null;
+  if (g.orden_id) {
+    try {
+      const ordenes = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+      const match = ordenes.find(o => o.id === g.orden_id);
+      if (match) ordenFolio = match.folio;
+    } catch(e) {}
+  }
+
   return {
     id: g.id,
     usuarioId: g.usuario_id,
@@ -201,7 +282,7 @@ function rowToGasto(g) {
     claraTxId: g.clara_tx_id,
     claraMerchant: g.clara_merchant,
     claraCardLast4: g.clara_card_last4,
-    ordenFolio: g.orden_folio,
+    ordenFolio: ordenFolio,
     uuidFiscal: g.uuid_fiscal,
     rfcEmisor: g.rfc_emisor,
     pdfFactura: g.pdf_factura,
@@ -217,20 +298,13 @@ function rowToGasto(g) {
 
 
 function clienteToRow(c) {
-  if (!c.id) {
-    c.id = crypto.randomUUID();
-  }
   return {
     id: c.id,
     nombre: c.nombre,
     rfc: c.rfc || null,
     email: c.email || null,
     telefono: c.telefono || null,
-    id_fiscal: c.idFiscal || null,
-    sitios: c.sitios || [],
-    maquinas: c.maquinas || [],
-    supervisores_asignados: c.supervisoresAsignados || [],
-    tecnicos_asignados: c.tecnicosAsignados || []
+    id_fiscal: c.idFiscal || null
   };
 }
 
@@ -238,11 +312,50 @@ function rowToCliente(c) {
   return {
     id: c.id, nombre: c.nombre, rfc: c.rfc, email: c.email,
     telefono: c.telefono, idFiscal: c.id_fiscal,
-    sitios: c.sitios || [], maquinas: c.maquinas || [],
-    supervisoresAsignados: c.supervisores_asignados || [],
-    tecnicosAsignados: c.tecnicos_asignados || []
+    sitios: [], maquinas: [],
+    supervisoresAsignados: [], tecnicosAsignados: []
   };
 }
+
+function eventoToRow(e) {
+  return {
+    id: e.id,
+    titulo: e.titulo,
+    descripcion: e.descripcion || null,
+    fecha_inicio: e.fechaInicio || e.start || null,
+    fecha_fin: e.fechaFin || e.end || null,
+    todo_el_dia: e.todoElDia || e.allDay || false,
+    tipo: e.tipo || 'Otro',
+    tecnico_id: e.tecnicoId || null,
+    tecnico_nombre: e.tecnicoNombre || null,
+    creado_por: e.creadoPor || null,
+    orden_id: e.ordenId || null,
+    color: e.color || null,
+    fecha_creacion: e.fechaCreacion || new Date().toISOString()
+  };
+}
+
+function rowToEvento(r) {
+  return {
+    id: r.id,
+    titulo: r.titulo,
+    descripcion: r.descripcion,
+    fechaInicio: r.fecha_inicio,
+    start: r.fecha_inicio,
+    fechaFin: r.fecha_fin,
+    end: r.fecha_fin,
+    todoElDia: r.todo_el_dia,
+    allDay: r.todo_el_dia,
+    tipo: r.tipo,
+    tecnicoId: r.tecnico_id,
+    tecnicoNombre: r.tecnico_nombre,
+    creadoPor: r.creado_por,
+    ordenId: r.orden_id,
+    color: r.color,
+    fechaCreacion: r.fecha_creacion
+  };
+}
+
 
 // ─── Cola de Sincronización Offline ──────────────────────────
 
@@ -399,7 +512,14 @@ async function _processSyncQueueInternal() {
         } else if (item.table === 'sitios') {
           payload = { id: item.data.id, nombre: item.data.nombre, cliente: item.data.cliente, direccion: item.data.direccion, cp: item.data.cp, ciudad: item.data.ciudad, estado: item.data.estado, custom_data: item.data.customData || {} };
         } else if (item.table === 'maquinaria') {
-          payload = { id: item.data.id, serie: item.data.serie, marca: item.data.marca, modelo: item.data.modelo, anio: item.data.anio, cliente: item.data.cliente, id_interno: item.data.idInterno, descripcion: item.data.descripcion, custom_data: item.data.customData || {} };
+          const cleanId = item.data.idInterno || item.data.id || item.data.serie;
+          let clienteId = item.data.cliente || null;
+          try {
+            const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+            const match = clientes.find(c => c.nombre === item.data.cliente || c.id === item.data.cliente);
+            if (match) clienteId = match.id;
+          } catch(e) {}
+          payload = { id: cleanId, serie: item.data.serie, marca: item.data.marca, modelo: item.data.modelo, anio: item.data.anio ? (parseInt(item.data.anio, 10) || null) : null, cliente: clienteId, descripcion: item.data.descripcion, custom_data: item.data.customData || {} };
         } else if (item.table === 'refacciones') {
           payload = { id: item.data.id, codigo: item.data.codigo, descripcion: item.data.descripcion, precio: item.data.precio, moneda: item.data.moneda, stock: item.data.stock, custom_data: { ...(item.data.customData || {}), marca: item.data.marca, grupo: item.data.grupo, origen: item.data.origen, nombre: item.data.nombre } };
         } else if (item.table === 'gastos') {
@@ -420,12 +540,161 @@ async function _processSyncQueueInternal() {
         } else if (item.table === 'roles') {
           resTabla = 'config';
           payload = { id: 'roles', data: item.data };
+        } else if (item.table === 'calendario_eventos') {
+          payload = eventoToRow(item.data);
         } else {
           payload = item.data;
         }
 
         const { error: upsertErr } = await sb.from(resTabla).upsert(payload, { onConflict: 'id' });
         error = upsertErr;
+
+        if (item.table === 'ordenes' && !error) {
+          try {
+            const ordId = item.data.id;
+            
+            // 1. SINCRONIZAR BITÁCORAS DE AVANCES
+            const bitacorasMemoria = item.data.bitacora || [];
+            const { data: bitacorasSupa } = await sb.from('orden_bitacora').select('id').eq('orden_id', ordId);
+            const idsMemoria = bitacorasMemoria.map(b => b.id);
+            const idsABorrar = (bitacorasSupa || []).filter(b => !idsMemoria.includes(b.id)).map(b => b.id);
+            if (idsABorrar.length > 0) {
+              await sb.from('orden_bitacora').delete().in('id', idsABorrar);
+            }
+            if (bitacorasMemoria.length > 0) {
+              const cleanFecha = (f) => {
+                if (!f) return new Date().toISOString();
+                if (f.length === 10) return `${f}T12:00:00-06:00`;
+                return f;
+              };
+              const filasBitacora = bitacorasMemoria.map(b => ({
+                id: b.id,
+                orden_id: ordId,
+                fecha: cleanFecha(b.fecha),
+                tecnico: b.tecnico || null,
+                nota: b.nota || 'Programado por supervisor.',
+                entrada: b.entrada || null,
+                salida: b.salida || null
+              }));
+              await sb.from('orden_bitacora').upsert(filasBitacora, { onConflict: 'id' });
+            }
+
+            // 2. SINCRONIZAR REFACCIONES UTILIZADAS Y NECESARIAS
+            const refNecesarias = item.data.ref_necesarias || [];
+            const refUtilizadas = item.data.ref_utilizadas || [];
+            
+            // Borrar refacciones previas de esta orden
+            await sb.from('orden_refacciones').delete().eq('orden_id', ordId);
+            
+            const refaccionesDb = JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]');
+            const getRefId = (clave) => {
+              const match = refaccionesDb.find(r => r.codigo === clave || r.id === clave);
+              return match ? match.id : null;
+            };
+
+            const filasRefacciones = [];
+            refNecesarias.forEach((r, index) => {
+              const refId = getRefId(r.clave || r.codigo);
+              if (refId) {
+                filasRefacciones.push({
+                  id: `ref_nec_${ordId}_${index}`,
+                  orden_id: ordId,
+                  refaccion_id: refId,
+                  cantidad: parseInt(r.cantidad, 10) || 1,
+                  precio_unitario: Number(r.precio) || 0,
+                  estado: 'Necesaria'
+                });
+              }
+            });
+            refUtilizadas.forEach((r, index) => {
+              const refId = getRefId(r.clave || r.codigo);
+              if (refId) {
+                filasRefacciones.push({
+                  id: `ref_uti_${ordId}_${index}`,
+                  orden_id: ordId,
+                  refaccion_id: refId,
+                  cantidad: parseInt(r.cantidad, 10) || 1,
+                  precio_unitario: Number(r.precio) || 0,
+                  estado: 'Utilizada'
+                });
+              }
+            });
+
+            if (filasRefacciones.length > 0) {
+              await sb.from('orden_refacciones').insert(filasRefacciones);
+            }
+
+            // 3. SUBIDA ASÍNCRONA DE FIRMAS Y PERSISTENCIA RELACIONAL
+            let firmaTecUrl = item.data.firma_tecnico_base64 || null;
+            let firmaCliUrl = item.data.firma_cliente_base64 || null;
+            
+            if (firmaTecUrl && firmaTecUrl.startsWith('data:')) {
+              try {
+                const url = await window.uploadBase64ToStorage(firmaTecUrl, 'evidencias', `firmas/firma_tec_${ordId}.png`);
+                if (url) {
+                  firmaTecUrl = url;
+                  item.data.firma_tecnico_base64 = url;
+                }
+              } catch (e){}
+            }
+            if (firmaCliUrl && firmaCliUrl.startsWith('data:')) {
+              try {
+                const url = await window.uploadBase64ToStorage(firmaCliUrl, 'evidencias', `firmas/firma_cli_${ordId}.png`);
+                if (url) {
+                  firmaCliUrl = url;
+                  item.data.firma_cliente_base64 = url;
+                }
+              } catch (e){}
+            }
+
+            if (firmaTecUrl || firmaCliUrl) {
+              const firmaPayload = {
+                orden_id: ordId,
+                firma_cliente_url: firmaCliUrl,
+                nombre_firmante: item.data.firma_cliente_nombre || null,
+                puesto_firmante: null,
+                firma_tecnico_url: firmaTecUrl,
+                fecha_firma: item.data.firma_cliente_fecha || item.data.firma_tecnico_fecha || new Date().toISOString()
+              };
+              await sb.from('orden_firmas').upsert(firmaPayload, { onConflict: 'orden_id' });
+            }
+
+            // 4. ALIMENTACIÓN DE HISTORIAL DE HORÓMETROS
+            if (item.data.horometro) {
+              const horoVal = parseInt(item.data.horometro, 10);
+              if (!isNaN(horoVal) && horoVal > 0) {
+                // Mapear maquinaria_id
+                let maqId = null;
+                try {
+                  const maquinas = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
+                  const match = maquinas.find(m => m.cliente === item.data.cliente && (m.modelo === item.data.modelo || m.id === item.data.modelo));
+                  if (match) maqId = match.id;
+                } catch(e){}
+
+                if (maqId) {
+                  let activeUserId = null;
+                  try {
+                    const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
+                    activeUserId = session.userId || null;
+                  } catch(e){}
+
+                  const horoPayload = {
+                    id: `horo_${ordId}`,
+                    maquinaria_id: maqId,
+                    horometro: horoVal,
+                    fecha: item.data.fecha ? item.data.fecha : new Date().toISOString(),
+                    orden_id: ordId,
+                    usuario_id: isValidUUID(activeUserId) ? activeUserId : null
+                  };
+                  await sb.from('maquinaria_horometros').upsert(horoPayload, { onConflict: 'id' });
+                }
+              }
+            }
+
+          } catch (ordErr) {
+            console.error('[Sync] Error al procesar sub-entidades de orden:', ordErr.message);
+          }
+        }
       } else if (item.action === 'delete') {
         const { error: deleteErr } = await sb.from(resTabla).delete().eq('id', item.data.id);
         error = deleteErr;
@@ -441,6 +710,31 @@ async function _processSyncQueueInternal() {
           saveSyncQueue(queue);
         }
       } else {
+        // Registrar log de auditoría automática de transacciones críticas
+        if (['ordenes', 'tickets', 'gastos'].includes(item.table)) {
+          try {
+            let activeUserId = null;
+            try {
+              const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
+              activeUserId = session.userId || null;
+            } catch(e){}
+            
+            const logPayload = {
+              usuario_id: isValidUUID(activeUserId) ? activeUserId : null,
+              accion: item.action.toUpperCase(),
+              tabla_afectada: item.table,
+              registro_id: item.data.id,
+              detalles: {
+                folio: item.data.folio || item.data.ordenFolio || null,
+                timestamp: Date.now()
+              }
+            };
+            await sb.from('auditoria_logs').insert(logPayload);
+          } catch(logErr) {
+            console.warn('[Sync] Error al escribir log de auditoria:', logErr.message);
+          }
+        }
+
         queue.shift();
         saveSyncQueue(queue);
         successCount++;
@@ -667,15 +961,72 @@ window.cargarDatosDeSupabase = async function() {
       }
     }
 
-    // Clientes
+    // Clientes (Reconstrucción Dinámica Normalizada)
     const { data: clientes } = await sb.from('clientes').select('*');
     if (clientes && clientes.length > 0) {
+      const { data: sitiosDb } = await sb.from('sitios').select('*');
+      const { data: maqDb } = await sb.from('maquinaria').select('*');
+      
+      let cSups = [];
+      let cTecs = [];
+      try {
+        const { data: dSups } = await sb.from('cliente_supervisores').select('*');
+        if (dSups) cSups = dSups;
+      } catch(e){}
+      try {
+        const { data: dTecs } = await sb.from('cliente_tecnicos').select('*');
+        if (dTecs) cTecs = dTecs;
+      } catch(e){}
+
       const localClientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+      const userList = window.usuarios || (typeof usuarios !== 'undefined' ? usuarios : []);
+
       const mergedClientes = clientes.map(c => {
         const row = rowToCliente(c);
         const local = localClientes.find(lc => lc.id === row.id);
         
-        // Priorizar saldos_sap provenientes del backend background sync
+        // 1. Reconstrucción Dinámica de Sitios (Fuente de verdad: tabla sitios)
+        const matchSitios = (sitiosDb || []).filter(s => s.cliente === row.id);
+        row.sitios = matchSitios.map(s => ({
+          id: s.id,
+          nombre: s.nombre,
+          cliente: s.cliente,
+          direccion: s.direccion,
+          cp: s.cp,
+          ciudad: s.ciudad,
+          estado: s.estado,
+          customData: s.custom_data
+        }));
+        
+        // 2. Reconstrucción Dinámica de Maquinarias (Fuente de verdad: tabla maquinaria)
+        const matchMaq = (maqDb || []).filter(m => m.cliente === row.id);
+        row.maquinas = matchMaq.map(m => ({
+          id: m.id,
+          serie: m.serie,
+          marca: m.marca,
+          modelo: m.modelo,
+          anio: m.anio,
+          cliente: row.nombre,
+          idInterno: m.id || m.id_interno,
+          descripcion: m.descripcion,
+          customData: m.custom_data
+        }));
+        
+        // 3. Reconstrucción Dinámica de Supervisores Asignados (Junction Table)
+        const supsLink = cSups.filter(l => l.cliente_id === row.id);
+        row.supervisoresAsignados = supsLink.map(link => {
+          const u = userList.find(usr => usr.id === link.usuario_id);
+          return u ? { id: u.id, nombre: u.nombre, rol: u.rol } : { id: link.usuario_id, nombre: 'Supervisor', rol: 'supervisor' };
+        });
+        
+        // 4. Reconstrucción Dinámica de Técnicos Asignados (Junction Table)
+        const tecsLink = cTecs.filter(l => l.cliente_id === row.id);
+        row.tecnicosAsignados = tecsLink.map(link => {
+          const u = userList.find(usr => usr.id === link.usuario_id);
+          return u ? { id: u.id, nombre: u.nombre, rol: u.rol } : { id: link.usuario_id, nombre: 'Técnico', rol: 'tecnico' };
+        });
+
+        // Priorizar saldos
         if (saldosSap[row.id]) {
           row.saldoCuenta = saldosSap[row.id].saldoCuenta || 0;
           row.saldoOrdenes = saldosSap[row.id].saldoOrdenes || 0;
@@ -719,10 +1070,120 @@ window.cargarDatosDeSupabase = async function() {
       window._supaTickets = null;
     }
 
+    // Sitios
+    const { data: sitiosDb } = await sb.from('sitios').select('*');
+    if (sitiosDb && sitiosDb.length > 0) {
+      const mapped = sitiosDb.map(s => ({ id: s.id, nombre: s.nombre, cliente: s.cliente, direccion: s.direccion, cp: s.cp, ciudad: s.ciudad, estado: s.estado, customData: s.custom_data }));
+      localStorage.setItem('sapi_sitios_db', JSON.stringify(mapped));
+    }
+
+    // Maquinaria
+    const { data: maqDb } = await sb.from('maquinaria').select('*');
+    if (maqDb && maqDb.length > 0) {
+      const mapped = maqDb.map(m => {
+        let clienteNombre = m.cliente;
+        try {
+          const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+          const match = clientes.find(c => c.id === m.cliente);
+          if (match) clienteNombre = match.nombre;
+        } catch(e) {}
+        return { id: m.id, serie: m.serie, marca: m.marca, modelo: m.modelo, anio: m.anio, cliente: clienteNombre, idInterno: m.id || m.id_interno, descripcion: m.descripcion, customData: m.custom_data };
+      });
+      localStorage.setItem('sapi_maquinaria_db', JSON.stringify(mapped));
+    }
+
     // Órdenes — mismo principio
     const { data: ordenes } = await sb.from('ordenes').select('*');
     if (ordenes && ordenes.length > 0) {
-      let mapped = ordenes.map(rowToOrden);
+      let bitacorasMap = {};
+      try {
+        const { data: bitacorasDb } = await sb.from('orden_bitacora').select('*');
+        if (bitacorasDb && bitacorasDb.length > 0) {
+          bitacorasDb.forEach(b => {
+            if (!bitacorasMap[b.orden_id]) bitacorasMap[b.orden_id] = [];
+            
+            // Formatear fecha a YYYY-MM-DD para la app
+            const datePortion = b.fecha ? b.fecha.substring(0, 10) : '';
+            
+            bitacorasMap[b.orden_id].push({
+              id: b.id,
+              fecha: datePortion,
+              tecnico: b.tecnico,
+              nota: b.nota,
+              entrada: b.entrada,
+              salida: b.salida
+            });
+          });
+        }
+      } catch (bitErr) {
+        console.error('[Sync] Error al descargar orden_bitacora:', bitErr);
+      }
+
+      // Descargar Refacciones Asociadas
+      let refaccionesMap = {};
+      try {
+        const { data: refsDb } = await sb.from('orden_refacciones').select('*, refacciones(codigo, descripcion)');
+        if (refsDb && refsDb.length > 0) {
+          refsDb.forEach(r => {
+            if (!refaccionesMap[r.orden_id]) refaccionesMap[r.orden_id] = { necesarias: [], utilizadas: [] };
+            
+            const refMeta = r.refacciones || {};
+            const refObj = {
+              clave: refMeta.codigo || null,
+              descripcion: refMeta.descripcion || 'Refacción',
+              cantidad: r.cantidad || 1,
+              precio: r.precio_unitario || 0
+            };
+            
+            if (r.estado === 'Necesaria') {
+              refaccionesMap[r.orden_id].necesarias.push(refObj);
+            } else {
+              refaccionesMap[r.orden_id].utilizadas.push(refObj);
+            }
+          });
+        }
+      } catch (refsErr) {
+        console.error('[Sync] Error al descargar orden_refacciones:', refsErr);
+      }
+
+      // Descargar Firmas Asociadas
+      let firmasMap = {};
+      try {
+        const { data: firmasDb } = await sb.from('orden_firmas').select('*');
+        if (firmasDb && firmasDb.length > 0) {
+          firmasDb.forEach(f => {
+            firmasMap[f.orden_id] = {
+              firma_tecnico_base64: f.firma_tecnico_url || null,
+              firma_tecnico_fecha: f.fecha_firma || null,
+              firma_cliente_base64: f.firma_cliente_url || null,
+              firma_cliente_nombre: f.nombre_firmante || null,
+              firma_cliente_fecha: f.fecha_firma || null
+            };
+          });
+        }
+      } catch (firmErr) {
+        console.error('[Sync] Error al descargar orden_firmas:', firmErr);
+      }
+
+      let mapped = ordenes.map(o => {
+        const ord = rowToOrden(o);
+        ord.bitacora = bitacorasMap[ord.id] || [];
+        
+        // Re-inyectar refacciones
+        const refLink = refaccionesMap[ord.id] || { necesarias: [], utilizadas: [] };
+        ord.ref_necesarias = refLink.necesarias;
+        ord.ref_utilizadas = refLink.utilizadas;
+        
+        // Re-inyectar firmas
+        const firmLink = firmasMap[ord.id] || {};
+        ord.firma_tecnico_base64 = firmLink.firma_tecnico_base64 || null;
+        ord.firma_tecnico_fecha = firmLink.firma_tecnico_fecha || null;
+        ord.firma_cliente_base64 = firmLink.firma_cliente_base64 || null;
+        ord.firma_cliente_nombre = firmLink.firma_cliente_nombre || null;
+        ord.firma_cliente_fecha = firmLink.firma_cliente_fecha || null;
+        
+        return ord;
+      });
       
       // FUSIONAR CON CAMBIOS LOCALES PENDIENTES DE SINCRONIZAR
       const queue = getSyncQueue();
@@ -744,20 +1205,6 @@ window.cargarDatosDeSupabase = async function() {
       localStorage.setItem('sapi_ordenes', JSON.stringify(window._supaOrdenes));
     } else {
       window._supaOrdenes = null;
-    }
-
-    // Sitios
-    const { data: sitiosDb } = await sb.from('sitios').select('*');
-    if (sitiosDb && sitiosDb.length > 0) {
-      const mapped = sitiosDb.map(s => ({ id: s.id, nombre: s.nombre, cliente: s.cliente, direccion: s.direccion, cp: s.cp, ciudad: s.ciudad, estado: s.estado, customData: s.custom_data }));
-      localStorage.setItem('sapi_sitios_db', JSON.stringify(mapped));
-    }
-
-    // Maquinaria
-    const { data: maqDb } = await sb.from('maquinaria').select('*');
-    if (maqDb && maqDb.length > 0) {
-      const mapped = maqDb.map(m => ({ id: m.id, serie: m.serie, marca: m.marca, modelo: m.modelo, anio: m.anio, cliente: m.cliente, idInterno: m.id_interno, descripcion: m.descripcion, customData: m.custom_data }));
-      localStorage.setItem('sapi_maquinaria_db', JSON.stringify(mapped));
     }
 
     // Refacciones (con paginación para traer más de 1000 items)
@@ -786,10 +1233,18 @@ window.cargarDatosDeSupabase = async function() {
 
     // La tabla config ahora se procesa arriba antes que clientes.
 
-    // Roles
     const { data: rolesDb } = await sb.from('config').select('*').eq('id', 'roles');
     if (rolesDb && rolesDb.length > 0 && rolesDb[0].data) {
       localStorage.setItem('sapi_roles_config', JSON.stringify(rolesDb[0].data));
+      // Re-aplicar roles y permisos dinámicamente en caliente en el frontend
+      if (typeof window.cargarRolesDesdeStorage === 'function') {
+        window.cargarRolesDesdeStorage();
+      }
+      if (window.currentSession && window.currentSession.viewMode) {
+        if (typeof window.applyRole === 'function') {
+          window.applyRole(window.currentSession.viewMode);
+        }
+      }
     }
     // Clara Transactions
     try {
@@ -842,6 +1297,39 @@ window.cargarDatosDeSupabase = async function() {
 
     window._supaGastos = mergedGastos;
     localStorage.setItem('sapi_gastos', JSON.stringify(mergedGastos));
+
+    // Eventos de Calendario Administrativos (Fase 9)
+    let mappedEventos = [];
+    try {
+      const { data: eventosDb, error: eventosErr } = await sb.from('calendario_eventos').select('*');
+      if (!eventosErr && eventosDb && eventosDb.length > 0) {
+        mappedEventos = eventosDb.map(rowToEvento);
+      }
+    } catch (errEv) {
+      console.warn('[Sync] Tabla de calendario_eventos no disponible en Supabase (o RLS activa). Cargando local.', errEv.message);
+    }
+
+    // FUSIONAR CON CAMBIOS LOCALES PENDIENTES DE SINCRONIZAR
+    const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+    let mergedEventos = mappedEventos.length > 0 ? mappedEventos : localEventos;
+
+    const queueForEventos = getSyncQueue();
+    const pendingEventos = queueForEventos.filter(item => item.table === 'calendario_eventos');
+    pendingEventos.forEach(item => {
+      if (item.action === 'upsert') {
+        const idx = mergedEventos.findIndex(e => e.id === item.data.id);
+        if (idx > -1) {
+          mergedEventos[idx] = item.data;
+        } else {
+          mergedEventos.unshift(item.data);
+        }
+      } else if (item.action === 'delete') {
+        mergedEventos = mergedEventos.filter(e => e.id !== item.data.id);
+      }
+    });
+
+    window._supaCalendarioEventos = mergedEventos;
+    localStorage.setItem('sapi_calendario_eventos', JSON.stringify(mergedEventos));
 
     // Telemetry events
     try {
@@ -924,6 +1412,10 @@ function setupRealtime() {
               window.renderTelemetryDashboard();
             }
           }
+        } else if (tableName === 'calendario_eventos') {
+          const mapped = data.map(rowToEvento);
+          localStorage.setItem('sapi_calendario_eventos', JSON.stringify(mapped));
+          window._supaCalendarioEventos = mapped;
         }
         window.dispatchEvent(new Event('supabase_datos_cargados'));
       }
@@ -940,7 +1432,8 @@ function setupRealtime() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => handleUpdate('tickets'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes' }, () => handleUpdate('ordenes'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clara_transactions' }, () => handleUpdate('clara_transactions'))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sapi_telemetry' }, () => handleUpdate('sapi_telemetry'));
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sapi_telemetry' }, () => handleUpdate('sapi_telemetry'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'calendario_eventos' }, () => handleUpdate('calendario_eventos'));
       
     window.supabaseRealtimeChannel.subscribe();
   } catch (err) {

@@ -471,22 +471,25 @@ function cargarRolesDesdeStorage() {
         ROLES[r].views = savedRoles[r].views;
       }
     }
-  }
-  // Inyección automática para garantizar consistencia del menú nuevo o de calendario
-  for (const r in ROLES) {
-    if (ROLES[r] && Array.isArray(ROLES[r].views)) {
-      if (!ROLES[r].views.includes('calendario') && ['superadmin', 'admin', 'supervisor', 'tecnico', 'consulta'].includes(r)) {
-        ROLES[r].views.push('calendario');
-      }
-      if (!ROLES[r].views.includes('gastos') && ['superadmin', 'admin', 'supervisor', 'tecnico'].includes(r)) {
-        ROLES[r].views.push('gastos');
-      }
-      if (!ROLES[r].views.includes('telemetry') && r === 'superadmin') {
-        ROLES[r].views.push('telemetry');
+  } else {
+    // Inyección automática por defecto ÚNICAMENTE en el primer arranque limpio sin configuración guardada
+    for (const r in ROLES) {
+      if (ROLES[r] && Array.isArray(ROLES[r].views)) {
+        if (!ROLES[r].views.includes('calendario') && ['superadmin', 'admin', 'supervisor', 'tecnico', 'consulta'].includes(r)) {
+          ROLES[r].views.push('calendario');
+        }
+        if (!ROLES[r].views.includes('gastos') && ['superadmin', 'admin', 'supervisor', 'tecnico'].includes(r)) {
+          ROLES[r].views.push('gastos');
+        }
+        if (!ROLES[r].views.includes('telemetry') && r === 'superadmin') {
+          ROLES[r].views.push('telemetry');
+        }
       }
     }
   }
 }
+window.cargarRolesDesdeStorage = cargarRolesDesdeStorage;
+window.applyRole = applyRole;
 cargarRolesDesdeStorage();
 
 // ===== LOGIN STATE =====
@@ -1063,6 +1066,10 @@ function applyRole(rolKey) {
     const btnProgramar = document.getElementById('btn-programar-tecnico');
     if (btnProgramar) {
       btnProgramar.style.display = ['superadmin', 'admin', 'supervisor'].includes(rolKey) ? 'flex' : 'none';
+    }
+    const btnActividad = document.getElementById('btn-registrar-actividad');
+    if (btnActividad) {
+      btnActividad.style.display = ['superadmin', 'admin', 'supervisor'].includes(rolKey) ? 'flex' : 'none';
     }
 
     // Ocultar pestaña de Técnicos en el Dashboard para empresas/clientes
@@ -2259,7 +2266,7 @@ function setupNav() {
       const viewEl = document.getElementById('view-' + view);
       
       // Cerrar sidebar en móvil
-      if (window.innerWidth <= 640) {
+      if (window.innerWidth <= 768) {
         document.querySelector('.sidebar').classList.remove('open');
       }
 
@@ -4387,7 +4394,7 @@ function verDetalleCliente(nombre) {
               <div style="font-weight:600; font-size:1.05rem; color:var(--text-primary); display:flex; align-items:center;">
                 ${logoPath ? `<img src="${logoPath}" alt="${m.marca}" onerror="this.onerror=null; this.outerHTML='<span>${m.marca} </span>';" style="height:24px; object-fit:contain; margin-right:8px;"/>` : `${m.marca || ''} `}
                 ${m.modelo || 'Sin Modelo'}
-                ${currentSession.viewMode !== 'empresa' ? `<span style="font-size:0.75rem; background:var(--bg-body); padding:0.15rem 0.4rem; border-radius:4px; border:1px solid var(--border); margin-left:0.5rem; color:var(--text-muted); font-family:monospace; font-weight:normal;">ID: ${m.idInterno || 'N/A'}</span>` : ''}
+                <span style="font-size:0.75rem; background:var(--bg-body); padding:0.15rem 0.4rem; border-radius:4px; border:1px solid var(--border); margin-left:0.5rem; color:var(--text-muted); font-family:monospace; font-weight:normal;">ID: ${m.idInterno || 'N/A'}</span>
                 <div style="margin-left:auto; display:flex; gap:0.25rem;">
                   <button class="action-btn" onclick="event.stopPropagation(); editarMaquina('${nombre.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Editar Máquina" style="padding:0.25rem; width:auto; height:auto;">
                     <i data-lucide="edit-2" style="width:16px;height:16px;"></i>
@@ -5425,8 +5432,9 @@ function editarMaquina(clienteNombre, idInterno) {
         document.getElementById('am-anio').value = maquina.anio || '';
         const idIntInput = document.getElementById('am-id-interno');
         if (idIntInput) {
-            const isUUID = maquina.idInterno && maquina.idInterno.length > 30 && maquina.idInterno.includes('-');
-            idIntInput.value = (maquina.idInterno && maquina.idInterno !== 'NA' && maquina.idInterno !== 'N/A' && maquina.idInterno !== maquina.id && !isUUID) ? maquina.idInterno : '';
+            const cleanIdInt = maquina.idInterno || maquina.id || '';
+            const isCleanIdUUID = cleanIdInt && cleanIdInt.length > 30 && cleanIdInt.includes('-');
+            idIntInput.value = (cleanIdInt && cleanIdInt !== 'NA' && cleanIdInt !== 'N/A' && !isCleanIdUUID) ? cleanIdInt : '';
         }
         
         const selectTipo = document.getElementById('am-tipo-maquina');
@@ -7271,6 +7279,10 @@ function verDetalle(id) {
           let m = o.marca || (o.equipo ? o.equipo.split(' ')[0] : '');
           return MARCAS_RENDER[m.toUpperCase()] || m || '—';
         })())} ${field('Modelo', o.modelo)} ${field('Serie', o.serie)}
+        ${field('ID Máquina', (() => {
+          const maq = maquinariaDb.find(m => (o.maquinaria_id && m.id === o.maquinaria_id) || (o.serie && m.serie === o.serie) || (o.modelo && m.modelo === o.modelo && m.cliente === o.cliente));
+          return maq && (maq.idInterno || maq.id) ? `<span style="font-family:monospace; font-weight:600; color:var(--accent); background:var(--blue-light); padding:0.15rem 0.4rem; border-radius:4px; border:1px solid rgba(232, 133, 10, 0.3);">${maq.idInterno || maq.id}</span>` : '—';
+        })())}
         ${field('Técnico', o.tecnico)} ${field('Ticket Soporte', (() => { const t = tickets.find(x => x.id === o.soporte); return t ? (t.folio || t.id.slice(0,8)) : o.soporte || null; })())}
       </div>`)}
     ${seccion('Kilómetros / Tipo', `
@@ -7311,7 +7323,7 @@ function verDetalle(id) {
                ${currentSession.viewMode === 'admin' || currentSession.viewMode === 'superadmin' ? `<button class="btn-secondary" onclick="limpiarFirma('${o.id}', 'tecnico')" style="font-size:0.8rem; margin-top:1rem;"><i data-lucide="eraser" style="width:14px;height:14px;"></i> Borrar firma (Admin)</button>` : ''}` 
             : `<div style="width:100%;">
                  <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.5rem;">Firme en el recuadro blanco usando el dedo o mouse:</p>
-                 <canvas id="firma-tecnico-canvas" width="400" height="150" style="width:100%; height:150px; background:white; border:2px dashed var(--border); border-radius:8px; cursor:crosshair; touch-action:none;"></canvas>
+                 <canvas id="firma-tecnico-canvas" style="width:100%; height:150px; background:white; border:2px dashed var(--border); border-radius:8px; cursor:crosshair; touch-action:none;"></canvas>
                  <div style="display:flex; gap:0.5rem; margin-top:0.5rem; justify-content:space-between;">
                    <button class="btn-secondary" onclick="borrarCanvasFirma('tecnico')" style="flex:1;">Borrar</button>
                    <button class="btn-primary" onclick="guardarFirmaCanvas('${o.id}', 'tecnico')" style="flex:2;">Guardar Firma Técnico</button>
@@ -7338,7 +7350,7 @@ function verDetalle(id) {
                : `<div style="width:100%;">
                  <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.5rem;">Firme en el recuadro blanco usando el dedo o mouse:</p>
                  <input type="text" id="nombre-firma-cliente" class="form-control" placeholder="Nombre completo de quien firma" style="margin-bottom:0.5rem; font-size:0.85rem; padding:0.4rem;"/>
-                 <canvas id="firma-cliente-canvas" width="400" height="150" style="width:100%; height:150px; background:white; border:2px dashed var(--border); border-radius:8px; cursor:crosshair; touch-action:none;"></canvas>
+                 <canvas id="firma-cliente-canvas" style="width:100%; height:150px; background:white; border:2px dashed var(--border); border-radius:8px; cursor:crosshair; touch-action:none;"></canvas>
                  <div style="display:flex; gap:0.5rem; margin-top:0.5rem; justify-content:space-between;">
                    <button class="btn-secondary" onclick="borrarCanvasFirma('cliente')" style="flex:1;">Borrar</button>
                    <button class="btn-primary" onclick="guardarFirmaCanvas('${o.id}', 'cliente')" style="flex:2;">Guardar Firma Cliente</button>
@@ -7375,13 +7387,45 @@ function inicializarCanvasFirma(tipo) {
   canvasesFirma[tipo].canvas = c;
   canvasesFirma[tipo].ctx = ctx;
   
-  const rect = c.getBoundingClientRect();
-  c.width = rect.width;
-  c.height = rect.height;
+  // Asegurar dimensiones reales de renderizado para evitar deformación por escala CSS y desfases de toque
+  const parentWidth = c.parentElement ? c.parentElement.clientWidth : 0;
+  c.width = c.offsetWidth || c.clientWidth || parentWidth || 320;
+  c.height = c.offsetHeight || c.clientHeight || 150;
   
   ctx.lineWidth = 3;
   ctx.lineCap = 'round';
   ctx.strokeStyle = '#000000';
+
+  // Manejo responsivo y fluido ante rotación o redimensionamiento del celular del técnico
+  if (canvasesFirma[tipo].resizeHandler) {
+    window.removeEventListener('resize', canvasesFirma[tipo].resizeHandler);
+  }
+  
+  const resizeHandler = () => {
+    if (!c) return;
+    const currentWidth = c.offsetWidth || c.clientWidth || (c.parentElement ? c.parentElement.clientWidth : 0) || 320;
+    if (c.width !== currentWidth) {
+      let tempImage = null;
+      try {
+        tempImage = ctx.getImageData(0, 0, c.width, c.height);
+      } catch(e) {}
+      
+      c.width = currentWidth;
+      c.height = c.offsetHeight || c.clientHeight || 150;
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#000000';
+      
+      if (tempImage) {
+        try {
+          ctx.putImageData(tempImage, 0, 0);
+        } catch(e) {}
+      }
+    }
+  };
+  
+  canvasesFirma[tipo].resizeHandler = resizeHandler;
+  window.addEventListener('resize', resizeHandler);
 
   const startDraw = (e) => { canvasesFirma[tipo].dibujando = true; ctx.beginPath(); ctx.moveTo(getX(e, c), getY(e, c)); e.preventDefault(); };
   const draw = (e) => { if(!canvasesFirma[tipo].dibujando) return; ctx.lineTo(getX(e, c), getY(e, c)); ctx.stroke(); e.preventDefault(); };
@@ -9266,8 +9310,11 @@ function poblarMaquinasCliente(selectId, selectedValue = '', clienteNombre = nul
       c.maquinas.forEach(m => {
         const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
         const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+        const cleanId = m.idInterno || m.id || '';
+        const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+        const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+        const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
         const opt = document.createElement('option');
-        const mName = `${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
         opt.value = mName;
         opt.textContent = mName;
         if (mName === selectedValue) opt.selected = true;
@@ -10447,6 +10494,51 @@ function renderCalendario() {
     }
   });
 
+  // Inyectar eventos administrativos personalizados (Fase 9)
+  try {
+    const adminEvents = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+    adminEvents.forEach(e => {
+      // Filtrar por técnico si hay filtro activo
+      if (filtroTecnico) {
+        const u = usuarios.find(usr => usr.nombre === filtroTecnico || usr.id === filtroTecnico);
+        const uId = u ? u.id : filtroTecnico;
+        if (e.tecnicoId !== uId && e.tecnicoNombre !== filtroTecnico) return;
+      }
+
+      let eventColor = e.color || '#3b82f6';
+      if (e.tipo === 'Junta') eventColor = '#8b5cf6';
+      else if (e.tipo === 'Capacitación') eventColor = '#ec4899';
+      else if (e.tipo === 'Vacaciones') eventColor = '#f59e0b';
+      else if (e.tipo === 'Descanso') eventColor = '#10b981';
+      else if (e.tipo === 'Servicio') eventColor = '#ef4444';
+
+      eventos.push({
+        id: e.id,
+        title: `${e.tipo} | ${e.titulo}`,
+        start: e.fechaInicio || e.start,
+        end: e.fechaFin || e.end || null,
+        allDay: e.todoElDia || e.allDay || false,
+        backgroundColor: eventColor,
+        borderColor: eventColor,
+        textColor: '#ffffff',
+        extendedProps: {
+          isAdminEvent: true,
+          id: e.id,
+          titulo: e.titulo,
+          descripcion: e.descripcion,
+          tipo: e.tipo,
+          tecnicoId: e.tecnicoId,
+          tecnicoNombre: e.tecnicoNombre,
+          creadoPor: e.creadoPor,
+          ordenId: e.ordenId,
+          color: e.color
+        }
+      });
+    });
+  } catch (err) {
+    console.error('Error loading admin events for calendar:', err);
+  }
+
   // Inyectar eventos de prueba si es el "Técnico de Pruebas"
   if (isTecnico && miTecnicoNombre === 'Técnico de Pruebas') {
     const hoy = new Date();
@@ -10503,10 +10595,15 @@ function renderCalendario() {
     });
   }
 
+  const isMobileCalendar = window.innerWidth <= 768;
   calendarInstance = new FullCalendar.Calendar(container, {
-    initialView: 'dayGridMonth',
+    initialView: isMobileCalendar ? 'listWeek' : 'dayGridMonth',
     firstDay: 1, // Start on Monday
-    headerToolbar: {
+    headerToolbar: isMobileCalendar ? {
+      left: 'prev,next',
+      center: 'title',
+      right: 'listWeek,timeGridDay'
+    } : {
       left: 'prev,next today',
       center: 'title',
       right: 'dayGridMonth,timeGridWeek,timeGridDay'
@@ -10515,13 +10612,16 @@ function renderCalendario() {
       today: 'Hoy',
       month: 'Mes',
       week: 'Semana',
-      day: 'Día'
+      day: 'Día',
+      list: 'Lista'
     },
     events: eventos,
     eventClick: function(info) {
       if (info.event.extendedProps.isFestivo) return; // No hacer nada al hacer clic en días festivos
       if (info.event.extendedProps.isBitacora) {
         mostrarPopupBitacora(info);
+      } else if (info.event.extendedProps.isAdminEvent) {
+        mostrarDetalleEventoAdministrativo(info.event.id);
       } else {
         verDetalle(info.event.id);
       }
@@ -10575,6 +10675,158 @@ function renderCalendario() {
   
   calendarInstance.render();
 }
+
+// ===== ACTIVIDADES DE CALENDARIO ADMINISTRATIVAS (FASE 9) =====
+
+window.abrirRegistrarActividad = function() {
+  document.getElementById('mra-id').value = '';
+  document.getElementById('mra-titulo-modal').textContent = 'Registrar Actividad';
+  document.getElementById('mra-titulo').value = '';
+  document.getElementById('mra-tipo').value = 'Junta';
+  document.getElementById('mra-descripcion').value = '';
+  document.getElementById('mra-inicio').value = '';
+  document.getElementById('mra-fin').value = '';
+  document.getElementById('mra-todo-el-dia').checked = false;
+  document.getElementById('mra-btn-eliminar').style.display = 'none';
+
+  // Llenar dropdown de técnicos
+  const selectTec = document.getElementById('mra-tecnico');
+  const tecs = usuarios.filter(u => u.rol === 'tecnico' && u.activo !== false);
+  selectTec.innerHTML = '<option value="">Ninguno / Todos</option>' + tecs.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
+
+  // Llenar dropdown de órdenes
+  const selectOrden = document.getElementById('mra-orden');
+  const activeOrds = ordenes.filter(o => o.estado !== 'Finalizado');
+  selectOrden.innerHTML = '<option value="">Ninguna</option>' + activeOrds.map(o => `<option value="${o.id}">[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}</option>`).join('');
+
+  document.getElementById('modal-registrar-actividad-overlay').classList.add('open');
+};
+
+window.mostrarDetalleEventoAdministrativo = function(eventId) {
+  const adminEvents = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+  const e = adminEvents.find(x => x.id === eventId);
+  if (!e) return;
+
+  // Llenar dropdown de técnicos
+  const selectTec = document.getElementById('mra-tecnico');
+  const tecs = usuarios.filter(u => u.rol === 'tecnico' && u.activo !== false);
+  selectTec.innerHTML = '<option value="">Ninguno / Todos</option>' + tecs.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
+
+  // Llenar dropdown de órdenes
+  const selectOrden = document.getElementById('mra-orden');
+  const activeOrds = ordenes.filter(o => o.estado !== 'Finalizado');
+  selectOrden.innerHTML = '<option value="">Ninguna</option>' + activeOrds.map(o => `<option value="${o.id}">[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}</option>`).join('');
+
+  document.getElementById('mra-id').value = e.id;
+  document.getElementById('mra-titulo-modal').textContent = 'Editar Actividad';
+  document.getElementById('mra-titulo').value = e.titulo || '';
+  document.getElementById('mra-tipo').value = e.tipo || 'Junta';
+  document.getElementById('mra-tecnico').value = e.tecnicoId || '';
+  document.getElementById('mra-orden').value = e.ordenId || '';
+  document.getElementById('mra-descripcion').value = e.descripcion || '';
+  document.getElementById('mra-todo-el-dia').checked = e.todoElDia || e.allDay || false;
+
+  // Formatear fechas para datetime-local
+  const cleanDateForInput = (d) => {
+    if (!d) return '';
+    return d.substring(0, 16);
+  };
+  document.getElementById('mra-inicio').value = cleanDateForInput(e.fechaInicio || e.start);
+  document.getElementById('mra-fin').value = cleanDateForInput(e.fechaFin || e.end);
+
+  // Mostrar botón de eliminar solo para administradores y supervisores
+  const isAdmin = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
+  document.getElementById('mra-btn-eliminar').style.display = isAdmin ? 'flex' : 'none';
+
+  document.getElementById('modal-registrar-actividad-overlay').classList.add('open');
+};
+
+window.guardarActividadCalendario = async function() {
+  const id = document.getElementById('mra-id').value;
+  const titulo = document.getElementById('mra-titulo').value;
+  const tipo = document.getElementById('mra-tipo').value;
+  const tecnicoId = document.getElementById('mra-tecnico').value;
+  const ordenId = document.getElementById('mra-orden').value;
+  const inicio = document.getElementById('mra-inicio').value;
+  const fin = document.getElementById('mra-fin').value;
+  const todoElDia = document.getElementById('mra-todo-el-dia').checked;
+  const descripcion = document.getElementById('mra-descripcion').value;
+
+  if (!titulo || !inicio) {
+    alert("Por favor completa los campos requeridos (Título y Fecha de Inicio).");
+    return;
+  }
+
+  let tecnicoNombre = null;
+  if (tecnicoId) {
+    const u = usuarios.find(usr => usr.id === tecnicoId);
+    if (u) tecnicoNombre = u.nombre;
+  }
+
+  const activeUserId = currentSession.userId || null;
+
+  const eventoObj = {
+    id: id || crypto.randomUUID(),
+    titulo: titulo,
+    tipo: tipo,
+    tecnicoId: tecnicoId || null,
+    tecnicoNombre: tecnicoNombre,
+    ordenId: ordenId || null,
+    fechaInicio: new Date(inicio).toISOString(),
+    start: new Date(inicio).toISOString(),
+    fechaFin: fin ? new Date(fin).toISOString() : null,
+    end: fin ? new Date(fin).toISOString() : null,
+    todoElDia: todoElDia,
+    allDay: todoElDia,
+    descripcion: descripcion || null,
+    creadoPor: activeUserId,
+    color: null
+  };
+
+  // Guardar de forma reactiva y offline-first
+  const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+  const idx = localEventos.findIndex(x => x.id === eventoObj.id);
+  if (idx > -1) {
+    localEventos[idx] = eventoObj;
+  } else {
+    localEventos.unshift(eventoObj);
+  }
+  localStorage.setItem('sapi_calendario_eventos', JSON.stringify(localEventos));
+
+  // Sincronizar asíncronamente con Supabase
+  window.pushToSupabase('calendario_eventos', eventoObj);
+
+  // Cerrar modal y re-renderizar
+  document.getElementById('modal-registrar-actividad-overlay').classList.remove('open');
+  if (typeof renderCalendario === 'function') {
+    renderCalendario();
+  }
+  if (window.mostrarNotificacion) {
+    window.mostrarNotificacion("Actividad guardada exitosamente.", "success");
+  }
+};
+
+window.eliminarActividadCalendario = async function() {
+  const id = document.getElementById('mra-id').value;
+  if (!id) return;
+
+  if (!confirm("¿Estás seguro de que deseas eliminar esta actividad?")) return;
+
+  const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+  const filtrados = localEventos.filter(x => x.id !== id);
+  localStorage.setItem('sapi_calendario_eventos', JSON.stringify(filtrados));
+
+  // Eliminar asíncronamente en Supabase
+  window.deleteFromSupabase('calendario_eventos', id);
+
+  document.getElementById('modal-registrar-actividad-overlay').classList.remove('open');
+  if (typeof renderCalendario === 'function') {
+    renderCalendario();
+  }
+  if (window.mostrarNotificacion) {
+    window.mostrarNotificacion("Actividad eliminada.", "info");
+  }
+};
 
 function mostrarPopupBitacora(info) {
   const dObj = info.event.start;

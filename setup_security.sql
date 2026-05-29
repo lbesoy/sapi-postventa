@@ -33,6 +33,9 @@ DROP POLICY IF EXISTS "Admins y Supervisores full access maquinaria" ON public.m
 DROP POLICY IF EXISTS "Consulta y Tecnicos read access maquinaria" ON public.maquinaria;
 
 DROP POLICY IF EXISTS "Admins full access user_roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Admins insert user_roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Admins update user_roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Admins delete user_roles" ON public.user_roles;
 DROP POLICY IF EXISTS "Usuarios pueden leer su propio rol" ON public.user_roles;
 DROP POLICY IF EXISTS "Allow select on user_roles to authenticated" ON public.user_roles;
 
@@ -60,10 +63,17 @@ CREATE POLICY "Admins y Supervisores full access maquinaria" ON public.maquinari
 ) WITH CHECK (
   (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
 );
+CREATE POLICY "Admins insert user_roles" ON public.user_roles FOR INSERT TO authenticated WITH CHECK (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin')
+);
 
-CREATE POLICY "Admins full access user_roles" ON public.user_roles FOR ALL TO authenticated USING (
+CREATE POLICY "Admins update user_roles" ON public.user_roles FOR UPDATE TO authenticated USING (
   (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin')
 ) WITH CHECK (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin')
+);
+
+CREATE POLICY "Admins delete user_roles" ON public.user_roles FOR DELETE TO authenticated USING (
   (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin')
 );
 
