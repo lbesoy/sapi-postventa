@@ -10614,6 +10614,8 @@ function renderCalendario() {
   const isMobileCalendar = window.innerWidth <= 768;
   calendarInstance = new FullCalendar.Calendar(container, {
     locale: 'es',
+    allDayText: 'Todo el día',
+    noEventsText: 'No hay eventos para mostrar',
     initialView: isMobileCalendar ? 'listWeek' : 'dayGridMonth',
     firstDay: 1, // Start on Monday
     headerToolbar: isMobileCalendar ? {

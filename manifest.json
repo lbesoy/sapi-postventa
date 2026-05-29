@@ -1,6 +1,6 @@
 {
-  "name": "Eurorep Postventa",
-  "short_name": "Eurorep",
+  "name": "sapi postventa",
+  "short_name": "sapi postventa",
   "description": "Sistema de gestión de órdenes de servicio, bitácoras y gastos de postventa de Eurorep.",
   "start_url": "/",
   "display": "standalone",
