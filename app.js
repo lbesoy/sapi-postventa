@@ -701,11 +701,16 @@ async function confirmarCrearUsuario() {
   }
   
   if (data?.user) {
-    // Asegurar que el registro de rol existe en user_roles en la nube
+    const inputEmailRaw = document.getElementById('lc-email').value.trim();
+    const esCelularRaw = inputEmailRaw && !inputEmailRaw.includes('@');
+    const telefonoLimpio = esCelularRaw ? inputEmailRaw.replace(/\s+/g, '') : '';
+
+    // Asegurar que el registro de rol existe en user_roles en la nube con su celular inicial
     const { error: roleErr } = await window.supabaseClient.from('user_roles').insert({
       id: data.user.id,
       nombre: nombre,
       email: email,
+      telefono: telefonoLimpio,
       rol: 'consulta',
       activo: false
     });
@@ -2108,6 +2113,7 @@ async function guardarUsuario(e) {
   e.preventDefault();
   const uNombre = document.getElementById('u-nombre');
   const uEmail = document.getElementById('u-email');
+  const uTelefono = document.getElementById('u-telefono');
   const uEmpresa = document.getElementById('u-empresa');
 
   const nombre = uNombre ? uNombre.value.trim() : '';
@@ -2115,6 +2121,7 @@ async function guardarUsuario(e) {
   if (email && !email.includes('@')) {
     email = email.replace(/\s+/g, '') + '@eurorep.mx';
   }
+  const telefono = uTelefono ? uTelefono.value.trim() : '';
   const rol = document.querySelector('input[name="u-rol"]:checked')?.value;
   const empresa = uEmpresa ? uEmpresa.value.trim() : '';
   const activo = document.getElementById('u-activo')?.checked;
@@ -2122,7 +2129,7 @@ async function guardarUsuario(e) {
   if (!rol) { alert('Selecciona un rol para el usuario.'); return; }
   if (!window.supabaseClient) { alert('Error: no hay conexión con Supabase.'); return; }
 
-  const updateData = { nombre, email, rol, activo: activo === true };
+  const updateData = { nombre, email, telefono, rol, activo: activo === true };
   if (rol === 'empresa' || rol === 'cliente') {
     if (!empresa) { alert('La empresa asociada es obligatoria.'); return; }
     updateData.empresa = empresa;
