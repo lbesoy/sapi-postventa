@@ -7291,6 +7291,18 @@ function verDetalle(id) {
 
         let entriesHtml = diaData.entries.map(b => {
           let horasHtml = '';
+          let desvHtml = '';
+
+          if (b.desviacion) {
+            if (b.desviacion === 'Alineado') {
+              desvHtml = `<span style="display:inline-flex; align-items:center; gap:0.25rem; background:rgba(16, 185, 129, 0.08); color:#10b981; padding:0.15rem 0.45rem; border-radius:12px; font-size:0.65rem; font-weight:600; border:1px solid rgba(16, 185, 129, 0.2); margin-left:0.4rem;" title="Programado original: ${b.programadoEntrada} a ${b.programadoSalida}"><i data-lucide="check-circle" style="width:11px;height:11px;"></i> Alineado</span>`;
+            } else if (b.desviacion.startsWith('+')) {
+              desvHtml = `<span style="display:inline-flex; align-items:center; gap:0.25rem; background:rgba(59, 130, 246, 0.08); color:#3b82f6; padding:0.15rem 0.45rem; border-radius:12px; font-size:0.65rem; font-weight:600; border:1px solid rgba(59, 130, 246, 0.2); margin-left:0.4rem;" title="Programado original: ${b.programadoEntrada} a ${b.programadoSalida}"><i data-lucide="trending-up" style="width:11px;height:11px;"></i> Desviación: ${b.desviacion}</span>`;
+            } else {
+              desvHtml = `<span style="display:inline-flex; align-items:center; gap:0.25rem; background:rgba(239, 68, 68, 0.08); color:#ef4444; padding:0.15rem 0.45rem; border-radius:12px; font-size:0.65rem; font-weight:600; border:1px solid rgba(239, 68, 68, 0.2); margin-left:0.4rem;" title="Programado original: ${b.programadoEntrada} a ${b.programadoSalida}"><i data-lucide="trending-down" style="width:11px;height:11px;"></i> Desviación: ${b.desviacion}</span>`;
+            }
+          }
+
           if (b.entrada && b.salida) {
             const [hE, mE] = b.entrada.split(':').map(Number);
             const [hS, mS] = b.salida.split(':').map(Number);
@@ -7299,9 +7311,9 @@ function verDetalle(id) {
             const hrs = Math.floor(diff / 60);
             const mns = diff % 60;
             const durStr = `${hrs}h ${mns > 0 ? mns + 'm' : ''}`.trim();
-            horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(16, 185, 129, 0.1); color:#10b981; padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="clock" style="width:12px;height:12px;"></i> ${b.entrada} - ${b.salida} (${durStr})</span>`;
+            horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(16, 185, 129, 0.1); color:#10b981; padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="clock" style="width:12px;height:12px;"></i> ${b.entrada} - ${b.salida} (${durStr})</span>${desvHtml}`;
           } else if (b.entrada || b.salida) {
-            horasHtml = `<span style="font-size:0.7rem; color:var(--text-muted);"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:middle;"></i> ${b.entrada || '--:--'} a ${b.salida || '--:--'}</span>`;
+            horasHtml = `<span style="font-size:0.7rem; color:var(--text-muted);"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:middle;"></i> ${b.entrada || '--:--'} a ${b.salida || '--:--'}</span>${desvHtml}`;
           }
 
           return `
@@ -8114,7 +8126,41 @@ function guardarNotaBitacora() {
     }
   } else {
     // MODO CREACIÓN NUEVA (o reporte de asignación pendiente)
+    let progEntrada = '';
+    let progSalida = '';
+    let desviacionStr = null;
+
     if (esAsignacionPendiente) {
+      const bObj = o.bitacora.find(x => x.id === window.currentBitacoraEntryId);
+      if (bObj) {
+        progEntrada = bObj.entrada || '';
+        progSalida = bObj.salida || '';
+        
+        if (progEntrada && progSalida && entrada && salida) {
+          const toMin = (t) => {
+            const [h, m] = t.split(':').map(Number);
+            return h * 60 + m;
+          };
+          let minReal = toMin(salida) - toMin(entrada);
+          if (minReal < 0) minReal += 24 * 60;
+          
+          let minProg = toMin(progSalida) - toMin(progEntrada);
+          if (minProg < 0) minProg += 24 * 60;
+          
+          const diffMin = minReal - minProg;
+          
+          if (diffMin === 0) {
+            desviacionStr = 'Alineado';
+          } else {
+            const absMin = Math.abs(diffMin);
+            const hrs = Math.floor(absMin / 60);
+            const mns = absMin % 60;
+            const sign = diffMin > 0 ? '+' : '-';
+            desviacionStr = `${sign}${hrs > 0 ? hrs + 'h ' : ''}${mns > 0 ? mns + 'm' : ''}`.trim();
+            if (desviacionStr === sign) desviacionStr = 'Alineado'; // fallback
+          }
+        }
+      }
       // Eliminar el pendiente programado original
       o.bitacora = o.bitacora.filter(x => x.id !== window.currentBitacoraEntryId);
     }
@@ -8127,7 +8173,10 @@ function guardarNotaBitacora() {
       entrada: entrada,
       salida: salida,
       tecnico: tecnicoDestino,
-      realizado: true
+      realizado: true,
+      programadoEntrada: progEntrada || null,
+      programadoSalida: progSalida || null,
+      desviacion: desviacionStr || null
     });
   }
   
