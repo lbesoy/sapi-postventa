@@ -11007,6 +11007,9 @@ function mostrarPopupBitacora(info) {
   const fechaStr = dObj.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const p = info.event.extendedProps;
   
+  const o = ordenes.find(x => x.id === p.ordenId);
+  const folio = o ? (o.folio || 'Sin Folio') : 'Sin Folio';
+
   let horasStr = '';
   if (p.entrada || p.salida) {
     horasStr = `<p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Horario:</strong> ${p.entrada || '--:--'} a ${p.salida || '--:--'}</p>`;
@@ -11023,6 +11026,7 @@ function mostrarPopupBitacora(info) {
       </div>
       <div class="modal-body" style="padding:1.5rem;">
         <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:1rem; text-transform:capitalize; font-weight:500;">${fechaStr}</div>
+        <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Orden de Servicio:</strong> ${folio}</p>
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Técnico:</strong> ${p.tecnico}</p>
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Cliente:</strong> ${p.cliente}</p>
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Ubicación:</strong> ${p.ubicacion}</p>
