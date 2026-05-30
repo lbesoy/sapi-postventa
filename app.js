@@ -7167,7 +7167,7 @@ function verDetalle(id) {
         try {
           const dObj = new Date(b.fecha);
           if (!isNaN(dObj)) {
-            fechaFormateada = dObj.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+            fechaFormateada = dObj.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
             fechaFormateada = fechaFormateada.charAt(0).toUpperCase() + fechaFormateada.slice(1);
           }
         } catch(e){}
@@ -7219,7 +7219,7 @@ function verDetalle(id) {
         try {
           fechaDObj = new Date(b.fecha);
           if (!isNaN(fechaDObj)) {
-            const partes = fechaDObj.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' }).split('/');
+            const partes = fechaDObj.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' }).split('/');
             fechaDia = `${partes[2]}-${partes[1]}-${partes[0]}`; // YYYY-MM-DD
           }
         } catch(e){}
@@ -7239,10 +7239,10 @@ function verDetalle(id) {
         let numDia = '';
         if (diaData.objDate && !isNaN(diaData.objDate)) {
           const dObj = diaData.objDate;
-          displayDia = dObj.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+          displayDia = dObj.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
           displayDia = displayDia.charAt(0).toUpperCase() + displayDia.slice(1);
-          mesAbrev = dObj.toLocaleDateString('es-MX', { month: 'short' }).toUpperCase().replace('.', '');
-          numDia = dObj.getDate();
+          mesAbrev = dObj.toLocaleDateString('es-MX', { month: 'short', timeZone: 'UTC' }).toUpperCase().replace('.', '');
+          numDia = dObj.getUTCDate();
         }
 
         // Ordenar entradas dentro del día (por hora de entrada si existe)
