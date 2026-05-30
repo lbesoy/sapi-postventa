@@ -7132,7 +7132,48 @@ function verDetalle(id) {
 
   const renderBitacora = (o) => {
     let html = '';
-    const items = o.bitacora || [];
+    const items = [...(o.bitacora || [])];
+
+    // Unificación inteligente reactiva con eventos de calendario
+    try {
+      const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+      localEventos.forEach(ev => {
+        if (ev.ordenId === o.id) {
+          // Extraer fecha ISO simple (YYYY-MM-DD)
+          const fISO = (ev.fechaInicio || ev.start || '').substring(0, 10);
+          if (!fISO) return;
+
+          // Extraer horas de entrada y salida
+          let ent = '';
+          let sal = '';
+          try {
+            if (ev.fechaInicio || ev.start) {
+              const dI = new Date(ev.fechaInicio || ev.start);
+              ent = `${String(dI.getUTCHours()).padStart(2, '0')}:${String(dI.getUTCMinutes()).padStart(2, '0')}`;
+            }
+            if (ev.fechaFin || ev.end) {
+              const dF = new Date(ev.fechaFin || ev.end);
+              sal = `${String(dF.getUTCHours()).padStart(2, '0')}:${String(dF.getUTCMinutes()).padStart(2, '0')}`;
+            }
+          } catch(e){}
+
+          // Verificar si ya existe en la bitácora
+          const existe = items.some(b => b.id === ev.id || (b.fecha === fISO && b.tecnico === ev.tecnicoNombre && b.entrada === ent));
+          
+          if (!existe) {
+            items.push({
+              id: ev.id,
+              fecha: fISO,
+              tecnico: ev.tecnicoNombre || 'Sin Asignar',
+              nota: ev.descripcion || "Programado por supervisor. Pendiente de llenado por el técnico.",
+              entrada: ent,
+              salida: sal,
+              realizado: false
+            });
+          }
+        }
+      });
+    } catch(e){}
 
     // Separar pendientes de realizados
     const pendientes = items.filter(b => b.realizado === false || (b.nota && b.nota.includes('Programado por supervisor') && b.realizado !== true));
@@ -7788,6 +7829,48 @@ async function guardarProgramacionTecnico() {
     o.tecnico = o.tecnicosAsignados.join(', ');
   }
 
+  // Crear y guardar evento de calendario asociado para sincronía perfecta bidireccional
+  try {
+    const usr = usuarios.find(u => u.nombre === tecnico);
+    const tecnicoId = usr ? usr.id : null;
+
+    const entradaHora = entrada || '08:00';
+    const salidaHora = salida || '18:00';
+
+    const inicioISO = `${fecha}T${entradaHora}:00`;
+    const finISO = `${fecha}T${salidaHora}:00`;
+
+    const eventoObj = {
+      id: nuevaEntrada.id,
+      titulo: `Servicio: ${o.cliente}`,
+      tipo: 'Servicio',
+      tecnicoId: tecnicoId,
+      tecnicoNombre: tecnico,
+      ordenId: o.id,
+      fechaInicio: new Date(inicioISO).toISOString(),
+      start: new Date(inicioISO).toISOString(),
+      fechaFin: new Date(finISO).toISOString(),
+      end: new Date(finISO).toISOString(),
+      todoElDia: false,
+      allDay: false,
+      descripcion: nuevaEntrada.nota,
+      creadoPor: currentSession.userId || null,
+      color: null
+    };
+
+    const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+    const idx = localEventos.findIndex(x => x.id === eventoObj.id);
+    if (idx > -1) {
+      localEventos[idx] = eventoObj;
+    } else {
+      localEventos.push(eventoObj);
+    }
+    localStorage.setItem('sapi_calendario_eventos', JSON.stringify(localEventos));
+    if (window.pushToSupabase) {
+      window.pushToSupabase('calendario_eventos', eventoObj);
+    }
+  } catch(e){}
+
   localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
   if (window.pushToSupabase) {
     await window.pushToSupabase('ordenes', o);
@@ -7795,7 +7878,7 @@ async function guardarProgramacionTecnico() {
 
   mostrarNotificacion('Asignación programada con éxito', 'success');
   document.getElementById('modal-programar-tecnico-overlay').classList.remove('open');
-  if (typeof renderCalendario === 'function' && document.getElementById('view-calendario')?.classList.contains('active')) {
+  if (typeof renderCalendario === 'function') {
     renderCalendario();
   }
 }
@@ -10966,6 +11049,65 @@ window.guardarActividadCalendario = async function() {
     localEventos.unshift(eventoObj);
   }
   localStorage.setItem('sapi_calendario_eventos', JSON.stringify(localEventos));
+
+  // Sincronizar de regreso con la orden de servicio
+  try {
+    if (ordenId) {
+      const oIndex = ordenes.findIndex(o => o.id === ordenId);
+      if (oIndex > -1) {
+        const o = ordenes[oIndex];
+        if (!o.bitacora) o.bitacora = [];
+        
+        const existIdx = o.bitacora.findIndex(b => b.id === eventoObj.id);
+        
+        let entrada = '';
+        let salida = '';
+        try {
+          if (inicio) {
+            const dIni = new Date(inicio);
+            entrada = `${String(dIni.getHours()).padStart(2, '0')}:${String(dIni.getMinutes()).padStart(2, '0')}`;
+          }
+          if (fin) {
+            const dFin = new Date(fin);
+            salida = `${String(dFin.getHours()).padStart(2, '0')}:${String(dFin.getMinutes()).padStart(2, '0')}`;
+          }
+        } catch(e){}
+
+        const fechaISO = inicio.substring(0, 10);
+
+        const nuevaEntrada = {
+          id: eventoObj.id,
+          fecha: fechaISO,
+          tecnico: tecnicoNombre || 'Sin Asignar',
+          nota: descripcion || "Programado por supervisor. Pendiente de llenado por el técnico.",
+          entrada: entrada,
+          salida: salida,
+          realizado: false
+        };
+
+        if (existIdx > -1) {
+          if (o.bitacora[existIdx].realizado !== true) {
+            o.bitacora[existIdx] = { ...o.bitacora[existIdx], ...nuevaEntrada };
+          }
+        } else {
+          o.bitacora.push(nuevaEntrada);
+        }
+
+        if (tecnicoNombre) {
+          if (!o.tecnicosAsignados) o.tecnicosAsignados = [];
+          if (!o.tecnicosAsignados.includes(tecnicoNombre)) {
+            o.tecnicosAsignados.push(tecnicoNombre);
+            o.tecnico = o.tecnicosAsignados.join(', ');
+          }
+        }
+
+        localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+        if (window.pushToSupabase) {
+          window.pushToSupabase('ordenes', o);
+        }
+      }
+    }
+  } catch(e){}
 
   // Sincronizar asíncronamente con Supabase
   window.pushToSupabase('calendario_eventos', eventoObj);
