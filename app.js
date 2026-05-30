@@ -7154,7 +7154,7 @@ function verDetalle(id) {
           horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(139, 92, 246, 0.1); color:#8b5cf6; padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="clock" style="width:12px;height:12px;"></i> ${b.entrada} - ${b.salida}</span>`;
         }
         
-        const btnReportar = currentSession.viewMode !== 'consulta' ? `
+        const btnReportar = ['tecnico', 'superadmin'].includes(currentSession.viewMode) ? `
           <div style="margin-top:0.6rem; text-align:right;">
             <button class="btn-primary" onclick="iniciarReporteDesdeAsignacion('${o.id}', '${b.id}')" style="font-size:0.75rem; padding:0.3rem 0.6rem; display:inline-flex; align-items:center; gap:0.3rem; background:#8b5cf6; border-color:#8b5cf6; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);">
               <i data-lucide="file-signature" style="width:12px; height:12px;"></i> Reportar Trabajo Realizado
@@ -7301,7 +7301,8 @@ function verDetalle(id) {
       html += '</div>';
     }
 
-    if (o.estado !== 'Finalizado' && currentSession.viewMode !== 'consulta') {
+    const puedeLlenarBitacora = ['tecnico', 'superadmin'].includes(currentSession.viewMode);
+    if (o.estado !== 'Finalizado' && puedeLlenarBitacora) {
       html += `<div style="text-align:right; margin-top: 1rem;"><button class="btn-primary" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="abrirBitacora('${o.id}')"><i data-lucide="plus" style="width:14px;height:14px;"></i> Registrar Avance Diario</button></div>`;
     }
     return html;
@@ -7826,6 +7827,11 @@ function calcularRangoFechasLaboral(diasHabilAtras) {
 }
 
 function abrirBitacora(id) {
+  const puedeLlenar = ['tecnico', 'superadmin'].includes(currentSession.viewMode);
+  if (!puedeLlenar) {
+    mostrarNotificacion('Solo los técnicos y superadmins pueden registrar avances o llenar la bitácora.', 'error');
+    return;
+  }
   window.currentBitacoraOrdenId = id;
   window.currentBitacoraEntryId = null;
   const rango = calcularRangoFechasLaboral(2);
@@ -7846,6 +7852,11 @@ function abrirBitacora(id) {
 }
 
 function iniciarReporteDesdeAsignacion(ordenId, bitacoraId) {
+  const puedeLlenar = ['tecnico', 'superadmin'].includes(currentSession.viewMode);
+  if (!puedeLlenar) {
+    mostrarNotificacion('Solo los técnicos y superadmins pueden registrar avances o llenar la bitácora.', 'error');
+    return;
+  }
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
   const b = o.bitacora?.find(x => x.id === bitacoraId);
@@ -7911,6 +7922,11 @@ function cerrarBitacora(e) {
 }
 
 function guardarNotaBitacora() {
+  const puedeLlenar = ['tecnico', 'superadmin'].includes(currentSession.viewMode);
+  if (!puedeLlenar) {
+    mostrarNotificacion('Solo los técnicos y superadmins pueden registrar avances o llenar la bitácora.', 'error');
+    return;
+  }
   const o = ordenes.find(x => x.id === window.currentBitacoraOrdenId);
   if (!o) return;
   
