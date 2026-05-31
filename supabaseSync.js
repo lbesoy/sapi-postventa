@@ -117,7 +117,7 @@ function ordenToRow(o) {
     'id', 'folio', 'cliente', 'ubicacion', 'tecnico', 'modelo', 'tipo', 'estado', 'fecha', 'fechaInicio', 'fechaFin', 
     'duracion', 'duracion_minutos', 'evidenciaBase64', 'evidencia_base_64', 'evidencia_url', 'bitacora', 'maquinaria_id', 'sitio_id',
     'ref_necesarias', 'ref_utilizadas', 'firma_tecnico_base64', 'firma_tecnico_nombre', 'firma_tecnico_fecha', 
-    'firma_cliente_base64', 'firma_cliente_nombre', 'firma_cliente_fecha'
+    'firma_cliente_base64', 'firma_cliente_nombre', 'firma_cliente_fecha', 'evidencias'
   ];
   knownKeys.forEach(k => delete customData[k]);
   
@@ -153,7 +153,8 @@ function ordenToRow(o) {
     fecha_fin: o.fechaFin || null,
     duracion_minutos: o.duracion || null,
     notas: notasJSON,
-    evidencia_url: o.evidenciaBase64 || null
+    evidencia_url: o.evidenciaBase64 || null,
+    evidencias: o.evidencias || {}
   };
 }
 
@@ -197,6 +198,7 @@ function rowToOrden(o) {
     duracion: o.duracion_minutos,
     maquinaria_id: o.maquinaria_id || null,
     evidenciaBase64: o.evidencia_url || o.evidencia_base_64 || o.evidencia_base64 || null,
+    evidencias: o.evidencias || {},
     bitacora: [],
     ref_necesarias: [],
     ref_utilizadas: [],

@@ -33,6 +33,7 @@ CREATE TABLE public.ordenes (
     duracion_minutos INTEGER,
     notas TEXT,
     evidencia_url TEXT,
+    evidencias JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
