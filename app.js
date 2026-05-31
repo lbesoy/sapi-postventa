@@ -7084,6 +7084,254 @@ function completarReporteDesdeDetalle(id) {
   }, 100);
 }
 
+// ===== EVIDENCIA FOTOGRÁFICA Y STORAGE =====
+function renderEvidenciasFotograficas(o) {
+  const ev = o.evidencias || { fotoInicio: null, fotoFin: null, adicionales: [] };
+  const adicionales = ev.adicionales || [];
+  
+  const tieneInicio = !!ev.fotoInicio;
+  const tieneFin = !!ev.fotoFin;
+  const listos = tieneInicio && tieneFin;
+
+  let alertHtml = '';
+  if (listos) {
+    alertHtml = `
+      <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.2); color:#10b981; border-radius:8px; padding:0.75rem 1rem; font-size:0.8rem; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem; font-weight:600;">
+        <i data-lucide="check-circle" style="width:16px;height:16px;"></i> Evidencias obligatorias cargadas correctamente. Firma de conformidad habilitada.
+      </div>
+    `;
+  } else {
+    alertHtml = `
+      <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.2); color:#d97706; border-radius:8px; padding:0.75rem 1rem; font-size:0.8rem; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem; font-weight:600;">
+        <i data-lucide="alert-triangle" style="width:16px;height:16px;"></i> Se requiere la Foto de Inicio y Fin obligatorias para poder firmar y completar el servicio.
+      </div>
+    `;
+  }
+
+  const renderTarjetaFoto = (titulo, tipo, url, obligatoria) => {
+    const isConsulta = currentSession.viewMode === 'consulta';
+    const uploadBtn = isConsulta ? '' : `
+      <label class="btn-primary" style="font-size:0.72rem; min-height:auto; padding:0.35rem 0.75rem; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem; margin-top:0.5rem;">
+        <i data-lucide="upload" style="width:12px;height:12px;"></i> ${url ? 'Reemplazar' : 'Cargar Foto'}
+        <input type="file" accept="image/*" onchange="subirEvidenciaFoto('${o.id}', '${tipo}', this)" style="display:none;" />
+      </label>
+    `;
+
+    const hasImage = !!url;
+
+    return `
+      <div style="flex:1; min-width:200px; background:var(--bg-body); border:1px solid var(--border); border-radius:8px; padding:1rem; display:flex; flex-direction:column; align-items:center; gap:0.5rem; box-shadow:0 2px 5px rgba(0,0,0,0.02); transition:var(--transition); position:relative;">
+        <div style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:0.25rem;">
+          ${obligatoria ? '<span style="color:var(--red); font-size:1.1rem; line-height:0.5; margin-right:2px;">*</span>' : ''} ${titulo}
+        </div>
+        <div style="width:100%; height:130px; border-radius:6px; border:1px solid var(--border); overflow:hidden; background:var(--bg-card); display:flex; justify-content:center; align-items:center; position:relative;">
+          ${hasImage 
+            ? `<img src="${url}" style="width:100%; height:100%; object-fit:cover; cursor:pointer;" onclick="window.previsualizarImagenCompleta('${url}', '${titulo}')" title="Haga clic para ver en pantalla completa" />
+               ${isConsulta ? '' : `
+                 <button type="button" onclick="eliminarEvidenciaFoto('${o.id}', '${tipo}', '${url}')" style="position:absolute; top:4px; right:4px; width:24px; height:24px; border-radius:50%; background:rgba(239,68,68,0.9); border:none; color:white; display:flex; justify-content:center; align-items:center; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.15);" title="Eliminar evidencia">
+                   <i data-lucide="trash-2" style="width:12px;height:12px;"></i>
+                 </button>
+               `}
+              ` 
+            : `<div style="color:var(--text-muted); opacity:0.5; text-align:center; font-size:0.75rem; display:flex; flex-direction:column; gap:0.25rem; align-items:center; justify-content:center;">
+                 <i data-lucide="camera" style="width:24px;height:24px;"></i>
+                 <span>Sin imagen cargada</span>
+               </div>`
+          }
+        </div>
+        ${uploadBtn}
+      </div>
+    `;
+  };
+
+  const renderAdicionalesHtml = () => {
+    const isConsulta = currentSession.viewMode === 'consulta';
+    const uploadBtn = isConsulta ? '' : `
+      <div style="flex-shrink:0; width:100px; height:100px; border:2px dashed var(--border); border-radius:6px; background:var(--bg-body); display:flex; flex-direction:column; gap:0.25rem; align-items:center; justify-content:center; cursor:pointer; color:var(--text-muted); transition:var(--transition); position:relative; box-shadow:0 2px 4px rgba(0,0,0,0.01);" onmouseover="this.style.borderColor='var(--accent)';" onmouseout="this.style.borderColor='var(--border)';" onclick="this.querySelector('input').click();">
+        <i data-lucide="plus" style="width:16px;height:16px;"></i>
+        <span style="font-size:0.65rem; font-weight:600;">Subir foto</span>
+        <input type="file" accept="image/*" onchange="subirEvidenciaFoto('${o.id}', 'adicional', this)" style="display:none;" />
+      </div>
+    `;
+
+    const fotosList = adicionales.map((url, idx) => `
+      <div style="width:100px; height:100px; border-radius:6px; border:1px solid var(--border); overflow:hidden; position:relative; background:var(--bg-card); flex-shrink:0;">
+        <img src="${url}" style="width:100%; height:100%; object-fit:cover; cursor:pointer;" onclick="window.previsualizarImagenCompleta('${url}', 'Evidencia Adicional ${idx + 1}')" />
+        ${isConsulta ? '' : `
+          <button type="button" onclick="eliminarEvidenciaFoto('${o.id}', 'adicional', '${url}')" style="position:absolute; top:3px; right:3px; width:18px; height:18px; border-radius:50%; background:rgba(239,68,68,0.95); border:none; color:white; display:flex; justify-content:center; align-items:center; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.2);" title="Eliminar foto">
+            <i data-lucide="trash-2" style="width:10px;height:10px;"></i>
+          </button>
+        `}
+      </div>
+    `).join('');
+
+    return `
+      <div style="display:flex; flex-wrap:wrap; gap:0.75rem; margin-top:0.75rem; align-items:center;">
+        ${fotosList}
+        ${uploadBtn}
+      </div>
+    `;
+  };
+
+  return `
+    <div style="margin-top:0.5rem;">
+      ${alertHtml}
+      <div style="display:flex; flex-wrap:wrap; gap:1.25rem;">
+        ${renderTarjetaFoto('FOTO DE INICIO (Entrada)', 'fotoInicio', ev.fotoInicio, true)}
+        ${renderTarjetaFoto('FOTO DE FIN (Salida)', 'fotoFin', ev.fotoFin, true)}
+      </div>
+      <div style="margin-top:1.5rem; border-top:1px solid var(--border); padding-top:1rem;">
+        <div style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Evidencias Adicionales (Opcionales)</div>
+        ${renderAdicionalesHtml()}
+      </div>
+    </div>
+  `;
+}
+
+window.previsualizarImagenCompleta = function(url, titulo) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.style.zIndex = '100000';
+  overlay.style.background = 'rgba(0,0,0,0.85)';
+  overlay.innerHTML = `
+    <div style="position:relative; max-width:90%; max-height:90%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; outline:none;">
+      <h3 style="color:white; margin:0; font-size:1.1rem; text-shadow:0 2px 4px rgba(0,0,0,0.5);">${titulo}</h3>
+      <img src="${url}" style="max-width:100%; max-height:80vh; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.5); object-fit:contain;" />
+      <button onclick="this.closest('.modal-overlay').remove()" style="position:absolute; top:-35px; right:-15px; background:none; border:none; color:white; font-size:2rem; cursor:pointer;" title="Cerrar">&times;</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+};
+
+window.subirEvidenciaFoto = async function(ordenId, tipo, inputEl) {
+  const file = inputEl.files[0];
+  if (!file) return;
+
+  const o = ordenes.find(x => x.id === ordenId);
+  if (!o) return;
+
+  if (window.mostrarNotificacion) {
+    window.mostrarNotificacion('Comprimiendo y preparando imagen...', 'info');
+  }
+
+  const compressImage = (imageFile) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          const MAX_WIDTH = 1200;
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob((blob) => {
+            resolve(blob);
+          }, 'image/jpeg', 0.85);
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(imageFile);
+    });
+  };
+
+  try {
+    const compressedBlob = await compressImage(file);
+    const uniqueName = `${tipo}_${Date.now()}_${Math.random().toString(36).substring(2,7)}.jpg`;
+    const filePath = `ordenes/${ordenId}/${uniqueName}`;
+
+    if (!window.supabaseClient) {
+      alert("Error: Cliente Supabase no está conectado.");
+      return;
+    }
+
+    if (window.mostrarNotificacion) {
+      window.mostrarNotificacion('Subiendo imagen a Supabase Storage...', 'info');
+    }
+
+    const { data: uploadData, error: uploadErr } = await window.supabaseClient.storage
+      .from('evidencias')
+      .upload(filePath, compressedBlob, {
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (uploadErr) {
+      console.error("Error al subir a Supabase Storage:", uploadErr);
+      alert("Fallo al subir la imagen: " + uploadErr.message);
+      return;
+    }
+
+    const { data: urlData } = window.supabaseClient.storage
+      .from('evidencias')
+      .getPublicUrl(filePath);
+
+    const publicUrl = urlData.publicUrl;
+
+    if (!o.evidencias) o.evidencias = { fotoInicio: null, fotoFin: null, adicionales: [] };
+    
+    if (tipo === 'fotoInicio') {
+      o.evidencias.fotoInicio = publicUrl;
+    } else if (tipo === 'fotoFin') {
+      o.evidencias.fotoFin = publicUrl;
+    } else if (tipo === 'adicional') {
+      if (!o.evidencias.adicionales) o.evidencias.adicionales = [];
+      o.evidencias.adicionales.push(publicUrl);
+    }
+
+    localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+    if (window.pushToSupabase) {
+      await window.pushToSupabase('ordenes', o);
+    }
+
+    if (window.mostrarNotificacion) {
+      window.mostrarNotificacion('Evidencia fotográfica subida correctamente.', 'success');
+    }
+
+    verDetalle(ordenId);
+  } catch (err) {
+    console.error("Error en subirEvidenciaFoto:", err);
+    alert("Ocurrió un error inesperado al subir la imagen.");
+  }
+};
+
+window.eliminarEvidenciaFoto = async function(ordenId, tipo, url) {
+  const o = ordenes.find(x => x.id === ordenId);
+  if (!o || !o.evidencias) return;
+
+  if (!confirm("¿Estás seguro de que deseas quitar esta foto de evidencia?")) return;
+
+  if (tipo === 'fotoInicio') {
+    o.evidencias.fotoInicio = null;
+  } else if (tipo === 'fotoFin') {
+    o.evidencias.fotoFin = null;
+  } else if (tipo === 'adicional') {
+    o.evidencias.adicionales = (o.evidencias.adicionales || []).filter(x => x !== url);
+  }
+
+  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  if (window.pushToSupabase) {
+    await window.pushToSupabase('ordenes', o);
+  }
+
+  if (window.mostrarNotificacion) {
+    window.mostrarNotificacion('Foto removida correctamente.', 'info');
+  }
+
+  verDetalle(ordenId);
+};
+
 // ===== DETALLE =====
 function verDetalle(id) {
   const o = ordenes.find(x => x.id === id);
@@ -7455,6 +7703,7 @@ function verDetalle(id) {
         ${field('No. Noches', o.noches)} ${field('Alimentación', o.alimentacion ? '$'+o.alimentacion : '')} ${field('Traslado', o.traslado_costo ? '$'+o.traslado_costo : '')}
       </div>`) : ''}
     ${seccion('Bitácora Diaria', renderBitacora(o))}
+    ${seccion('Evidencias Fotográficas', renderEvidenciasFotograficas(o))}
     
     ${seccion('Firmas de Conformidad', `
       <div style="display:flex; flex-wrap:wrap; gap:2rem; margin-top:1rem; justify-content:center;">
@@ -7469,14 +7718,28 @@ function verDetalle(id) {
                  ${o.firma_tecnico_fecha ? `<p style="text-align:center; color:var(--text-muted); font-size:0.75rem; margin-top:0.25rem; margin-bottom:0;">${new Date(o.firma_tecnico_fecha).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'})}</p>` : ''}
                </div>
                ${currentSession.viewMode === 'admin' || currentSession.viewMode === 'superadmin' ? `<button class="btn-secondary" onclick="limpiarFirma('${o.id}', 'tecnico')" style="font-size:0.8rem; margin-top:1rem;"><i data-lucide="eraser" style="width:14px;height:14px;"></i> Borrar firma (Admin)</button>` : ''}` 
-            : `<div style="width:100%;">
-                 <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.5rem;">Firme en el recuadro blanco usando el dedo o mouse:</p>
-                 <canvas id="firma-tecnico-canvas" style="width:100%; height:150px; background:white; border:2px dashed var(--border); border-radius:8px; cursor:crosshair; touch-action:none;"></canvas>
-                 <div style="display:flex; gap:0.5rem; margin-top:0.5rem; justify-content:space-between;">
-                   <button class="btn-secondary" onclick="borrarCanvasFirma('tecnico')" style="flex:1;">Borrar</button>
-                   <button class="btn-primary" onclick="guardarFirmaCanvas('${o.id}', 'tecnico')" style="flex:2;">Guardar Firma Técnico</button>
-                 </div>
-               </div>`
+            : (() => {
+                const ev = o.evidencias || {};
+                const tieneObligatorias = !!(ev.fotoInicio && ev.fotoFin);
+                if (!tieneObligatorias) {
+                  return `
+                    <div style="width:100%; text-align:center; padding: 2rem 1rem; border: 1px dashed var(--border); border-radius: 8px; color: var(--text-muted); font-size: 0.85rem; background:var(--bg-body); display:flex; flex-direction:column; align-items:center; gap:0.4rem;">
+                      <i data-lucide="image" style="width:24px;height:24px;color:var(--accent);opacity:0.7;"></i>
+                      <span>Debes cargar la <strong>Foto de Inicio</strong> y <strong>Foto de Fin</strong> obligatorias en la sección de Evidencias para habilitar la firma del técnico.</span>
+                    </div>
+                  `;
+                }
+                return `
+                  <div style="width:100%;">
+                    <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.5rem;">Firme en el recuadro blanco usando el dedo o mouse:</p>
+                    <canvas id="firma-tecnico-canvas" style="width:100%; height:150px; background:white; border:2px dashed var(--border); border-radius:8px; cursor:crosshair; touch-action:none;"></canvas>
+                    <div style="display:flex; gap:0.5rem; margin-top:0.5rem; justify-content:space-between;">
+                      <button class="btn-secondary" onclick="borrarCanvasFirma('tecnico')" style="flex:1;">Borrar</button>
+                      <button class="btn-primary" onclick="guardarFirmaCanvas('${o.id}', 'tecnico')" style="flex:2;">Guardar Firma Técnico</button>
+                    </div>
+                  </div>
+                `;
+              })()
           }
         </div>
 
@@ -7626,6 +7889,11 @@ function guardarFirmaCanvas(ordenId, tipo) {
     const fechaFirma = new Date().toISOString();
     
     if (tipo === 'tecnico') {
+      const ev = ordenes[idx].evidencias || {};
+      if (!ev.fotoInicio || !ev.fotoFin) {
+        mostrarNotificacion('Debes subir la Foto de Inicio y Fin obligatorias antes de guardar la firma.', 'error');
+        return;
+      }
       const currentUser = usuarios.find(u => u.id === currentSession.userId);
       ordenes[idx].firma_tecnico_base64 = base64Firma;
       ordenes[idx].firma_tecnico_nombre = currentUser ? currentUser.nombre : (currentSession.nombre || ordenes[idx].tecnico || 'Técnico');
