@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.1.4'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.1.5'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -6057,7 +6057,7 @@ function renderTecnicos() {
     const ultCompletada = ordenesCompletadas.length > 0 ? ordenesCompletadas[0] : null;
 
     const tecObj = tecnicosDb.find(x => formatNombreCorto(x.nombre) === t) || usuarios.find(u => formatNombreCorto(u.nombre) === t);
-    const celular = tecObj?.celular || 'Sin celular';
+    const celular = tecObj?.telefono || tecObj?.celular || 'Sin celular';
     const tipoUsuario = tecObj?.tipoUsuario || 'Técnico';
 
     const proxTxt = proxOrden ? `<span onclick="event.stopPropagation(); verDetalle('${proxOrden.id}')" style="color:var(--accent); font-weight:600; text-decoration:underline; cursor:pointer;" title="Ver Orden de Servicio">${proxOrden.cliente}</span> <span style="color:var(--text-muted);">(${proxOrden.fecha ? proxOrden.fecha.split('T')[0] : ''})</span>` : '<span style="color:var(--text-muted);">Ninguna</span>';
@@ -6125,7 +6125,7 @@ function renderTecnicos() {
       const ultCompletada = ordenesCompletadas.length > 0 ? ordenesCompletadas[0] : null;
 
       const tecObj = tecnicosDb.find(x => formatNombreCorto(x.nombre) === t) || usuarios.find(u => formatNombreCorto(u.nombre) === t);
-      const celular = tecObj?.celular || 'Sin celular';
+      const celular = tecObj?.telefono || tecObj?.celular || 'Sin celular';
       const tipoUsuario = tecObj?.tipoUsuario || 'Técnico';
 
       const proxTxt = proxOrden ? `<div onclick="event.stopPropagation(); verDetalle('${proxOrden.id}')" style="font-weight:600; color:var(--accent); text-decoration:underline; cursor:pointer;" title="Ver Orden de Servicio">${proxOrden.cliente}</div><div style="font-size:0.75rem; color:var(--text-muted);">${proxOrden.fecha ? proxOrden.fecha.split('T')[0] : ''}</div>` : '<span style="color:var(--text-muted);">Ninguna</span>';
