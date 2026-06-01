@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.1.7'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.1.8'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -2519,12 +2519,12 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     
     thead.innerHTML = `<tr><th>Folio</th><th>Cliente</th><th>Estado</th><th>Fecha</th></tr>`;
     
-    let ordenesFiltradas = ordenes;
+    let ordenesFiltradas = getFilteredOrders();
     if (isEmpresa && currentUser) {
       const hasEmpresa = !!(currentUser.empresa && String(currentUser.empresa).trim() !== '');
       const nombreFiltro = String(currentUser.empresa || currentUser.nombre).toLowerCase().trim();
       
-      ordenesFiltradas = ordenes.filter(o => {
+      ordenesFiltradas = ordenesFiltradas.filter(o => {
         const ocli = String(o.cliente || '').toLowerCase().trim();
         let fromTicket = false;
         if (!hasEmpresa && o.soporte) {
@@ -2562,9 +2562,9 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     
     thead.innerHTML = `<tr><th>#</th><th>Asunto</th><th>Empresa</th><th>Estado</th>${!isEmpresa ? '<th>Prioridad</th>' : ''}</tr>`;
     
-    let ticketsFiltrados = tickets;
+    let ticketsFiltrados = getFilteredTickets();
     if (isEmpresa && nombreEmpresaLogged) {
-      ticketsFiltrados = tickets.filter(t => {
+      ticketsFiltrados = ticketsFiltrados.filter(t => {
         const tcli = String(t.cliente || '').toLowerCase().trim();
         const tsol = String(t.solicitante || '').toLowerCase().trim();
         return tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged;
@@ -2645,7 +2645,7 @@ function renderStats() {
     let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
     if (nombreEmpresaLogged) {
       nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
-      ordenesFilter = ordenes.filter(o => {
+      ordenesFilter = ordenesFilter.filter(o => {
         const ocli = String(o.cliente || '').toLowerCase().trim();
         let fromTicket = false;
         if (!hasEmpresa && o.soporte) {
@@ -2659,7 +2659,7 @@ function renderStats() {
         if (hasEmpresa) return ocli === nombreEmpresaLogged;
         return ocli === nombreEmpresaLogged || fromTicket;
       });
-      ticketsFilter = tickets.filter(t => {
+      ticketsFilter = ticketsFilter.filter(t => {
         const tcli = String(t.cliente || '').toLowerCase().trim();
         if (hasEmpresa) return tcli === nombreEmpresaLogged;
         const tsol = String(t.solicitante || '').toLowerCase().trim();
@@ -2710,7 +2710,7 @@ function renderStats() {
       const userRole = currentSession.viewMode || '';
       if (userRole === 'tecnico') {
         const tecName = currentUser ? currentUser.nombre : '';
-        ordenesFilter = ordenes.filter(o => {
+        ordenesFilter = ordenesFilter.filter(o => {
           let assigned = [];
           if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados;
           else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
@@ -2730,7 +2730,7 @@ function renderStats() {
           return assigned.includes(tecName) || isCreator || isTkAssigned;
         });
 
-        ticketsFilter = tickets.filter(t => {
+        ticketsFilter = ticketsFilter.filter(t => {
           let assigned = [];
           if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
           else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
@@ -2738,7 +2738,7 @@ function renderStats() {
         });
       } else if (userRole === 'supervisor') {
         const supFilter = currentUser ? currentUser.nombre : '';
-        ordenesFilter = ordenes.filter(o => {
+        ordenesFilter = ordenesFilter.filter(o => {
           let passSupClient = false;
           const cli = clientesDb.find(c => c.nombre === o.cliente);
           if (cli) {
@@ -2767,7 +2767,7 @@ function renderStats() {
           return passSupClient || passSupTicket || isCreator;
         });
 
-        ticketsFilter = tickets.filter(t => {
+        ticketsFilter = ticketsFilter.filter(t => {
           let passSupClient = false;
           const cli = clientesDb.find(c => c.nombre === t.cliente);
           if (cli) {
@@ -2854,7 +2854,7 @@ function renderDashboardV2() {
   let maquinariaDash = maquinariaDb;
 
   if (isEmpresa && nombreEmpresaLogged) {
-    ordenesDash = ordenes.filter(o => {
+    ordenesDash = ordenesDash.filter(o => {
       const ocli = String(o.cliente || '').toLowerCase().trim();
       let fromTicket = false;
       if (o.soporte) {
@@ -2867,7 +2867,7 @@ function renderDashboardV2() {
       }
       return ocli === nombreEmpresaLogged || fromTicket;
     });
-    ticketsDash = tickets.filter(t => {
+    ticketsDash = ticketsDash.filter(t => {
       const tcli = String(t.cliente || '').toLowerCase().trim();
       const tsol = String(t.solicitante || '').toLowerCase().trim();
       return tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged;
@@ -2880,7 +2880,7 @@ function renderDashboardV2() {
     const chart3 = document.getElementById('v2-title-chart-3'); if (chart3) chart3.textContent = 'Top Equipos (Mantenimientos)';
   } else if ((currentSession.viewMode || '') === 'tecnico') {
     const tecName = currentUser ? currentUser.nombre : '';
-    ordenesDash = ordenes.filter(o => {
+    ordenesDash = ordenesDash.filter(o => {
       let assigned = [];
       if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados;
       else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
@@ -2900,7 +2900,7 @@ function renderDashboardV2() {
       return assigned.includes(tecName) || isCreator || isTkAssigned;
     });
 
-    ticketsDash = tickets.filter(t => {
+    ticketsDash = ticketsDash.filter(t => {
       let assigned = [];
       if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
       else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
@@ -2913,7 +2913,7 @@ function renderDashboardV2() {
     const chart3 = document.getElementById('v2-title-chart-3'); if (chart3) chart3.textContent = 'Top Clientes (Ordenes)';
   } else if ((currentSession.viewMode || '') === 'supervisor') {
     const supFilter = currentUser ? currentUser.nombre : '';
-    ordenesDash = ordenes.filter(o => {
+    ordenesDash = ordenesDash.filter(o => {
       let passSupClient = false;
       const cli = clientesDb.find(c => c.nombre === o.cliente);
       if (cli) {
@@ -2942,7 +2942,7 @@ function renderDashboardV2() {
       return passSupClient || passSupTicket || isCreator;
     });
 
-    ticketsDash = tickets.filter(t => {
+    ticketsDash = ticketsDash.filter(t => {
       let passSupClient = false;
       const cli = clientesDb.find(c => c.nombre === t.cliente);
       if (cli) {
