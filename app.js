@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.1.0'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.1.1'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -2035,10 +2035,12 @@ function renderUsuariosList() {
           <div class="usuario-email">${u.email || ''} ${u.empresa ? `| ${u.empresa}` : ''}</div>
         </div>
         <span class="badge" style="background:${ROLE_COLORS[u.rol]}22;color:${ROLE_COLORS[u.rol]};border-radius:99px;padding:0.2rem 0.6rem;font-size:0.72rem;font-weight:600;">${ROLES[u.rol]?.label || u.rol}</span>
-        ${u.rol !== 'superadmin' ? `
+        <div style="display:flex; gap:0.25rem;">
           <button class="action-btn" onclick="editarUsuario('${u.id}')" title="Editar"><i data-lucide="pencil"></i></button>
-          <button class="action-btn del" onclick="eliminarUsuario('${u.id}')" title="Desactivar / Borrar"><i data-lucide="trash-2"></i></button>
-        ` : ''}
+          ${u.rol !== 'superadmin' ? `
+            <button class="action-btn del" onclick="eliminarUsuario('${u.id}')" title="Desactivar / Borrar"><i data-lucide="trash-2"></i></button>
+          ` : ''}
+        </div>
       </div>
     `).join('');
     lucide.createIcons();
@@ -2106,6 +2108,10 @@ function abrirModalUsuario(id) {
   if (uEmpresaContainer) uEmpresaContainer.style.display = 'none';
   if (uEmpresa) uEmpresa.removeAttribute('required');
 
+  const rolRadios = document.querySelectorAll('input[name="u-rol"]');
+  rolRadios.forEach(r => r.disabled = false);
+  if (uActivo) uActivo.disabled = false;
+
   if (id) {
     const u = usuarios.find(x => x.id === id);
     if (!u) return;
@@ -2124,6 +2130,12 @@ function abrirModalUsuario(id) {
           uEmpresa.value = u.empresa || '';
         }
       }
+    }
+
+    // Si es superadmin, bloquear el cambio de rol y de activo para evitar desastres
+    if (u.rol === 'superadmin') {
+      rolRadios.forEach(r => r.disabled = true);
+      if (uActivo) uActivo.disabled = true;
     }
   }
   if (uModalOverlay) uModalOverlay.classList.add('open');
@@ -2166,9 +2178,12 @@ async function guardarUsuario(e) {
     email = email.replace(/\s+/g, '') + '@eurorep.mx';
   }
   const telefono = uTelefono ? uTelefono.value.trim() : '';
-  const rol = document.querySelector('input[name="u-rol"]:checked')?.value;
+  
+  // Seguridad extra para superadmin: no cambiar su rol ni desactivarlo
+  const existingUser = editandoUserId ? usuarios.find(x => x.id === editandoUserId) : null;
+  const rol = existingUser && existingUser.rol === 'superadmin' ? 'superadmin' : document.querySelector('input[name="u-rol"]:checked')?.value;
   const empresa = uEmpresa ? uEmpresa.value.trim() : '';
-  const activo = document.getElementById('u-activo')?.checked;
+  const activo = existingUser && existingUser.rol === 'superadmin' ? true : document.getElementById('u-activo')?.checked;
 
   if (!rol) { alert('Selecciona un rol para el usuario.'); return; }
   if (!window.supabaseClient) { alert('Error: no hay conexión con Supabase.'); return; }
@@ -2204,6 +2219,16 @@ async function guardarUsuario(e) {
       if (insertErr) {
         console.warn('[Supabase] No se pudo insertar en user_roles (puede ser un usuario sin registro en auth.users):', insertErr.message);
       }
+    }
+
+    // SI EL USUARIO EDITADO ES EL ACTUALMENTE LOGUEADO, ACTUALIZAMOS LA SESIÓN EN LOCAL DE INMEDIATO
+    if (editandoUserId === currentSession.userId) {
+      currentSession.nombre = nombre || 'Usuario';
+      if (currentSession.userId === currentSession.realUserId) {
+        currentSession.realRol = rol;
+      }
+      localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
+      applyRole(currentSession.viewMode);
     }
 
   } else {
