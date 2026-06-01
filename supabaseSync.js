@@ -21,6 +21,8 @@ if (typeof JSON !== 'undefined' && !JSON.parse.__isSafeWrapper) {
   })();
 }
 
+window.isConnectionVerifiedOnline = false;
+
 
 
 window.ensureBackdoorUsers = function(users) {
@@ -433,7 +435,7 @@ async function _processSyncQueueInternal() {
     return;
   }
 
-  if (!navigator.onLine) {
+  if (!navigator.onLine && !window.isConnectionVerifiedOnline) {
     console.log('[Sync] Dispositivo sin conexión. Sincronización en pausa.');
     updateSyncStatusUI();
     return;
@@ -772,7 +774,8 @@ function updateSyncStatusUI() {
 
   container.classList.remove('status-online', 'status-syncing', 'status-offline');
 
-  if (!navigator.onLine) {
+  const showOfflineUI = () => {
+    container.classList.remove('status-online', 'status-syncing');
     container.classList.add('status-offline');
     if (iconEl) {
       iconEl.setAttribute('data-lucide', 'wifi-off');
@@ -787,55 +790,112 @@ function updateSyncStatusUI() {
         badgeEl.style.display = 'none';
       }
     }
-  } else if (pendingCount > 0) {
-    container.classList.add('status-syncing');
-    if (iconEl) {
-      iconEl.setAttribute('data-lucide', 'refresh-cw');
-      iconEl.style.animation = 'spin 2s linear infinite';
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
     }
-    if (textEl) textEl.textContent = _isProcessingQueue ? 'Sincronizando...' : 'Cambios pendientes';
-    if (badgeEl) {
-      badgeEl.textContent = pendingCount;
-      badgeEl.style.display = 'inline-block';
-    }
-  } else {
-    container.classList.add('status-online');
-    if (iconEl) {
-      iconEl.setAttribute('data-lucide', 'wifi');
-      iconEl.style.animation = 'none';
-    }
-    if (textEl) textEl.textContent = 'Conectado';
-    if (badgeEl) {
-      badgeEl.style.display = 'none';
-    }
-  }
+  };
 
-  if (window.lucide && typeof window.lucide.createIcons === 'function') {
-    window.lucide.createIcons();
+  const showOnlineUI = () => {
+    container.classList.remove('status-offline');
+    if (pendingCount > 0) {
+      container.classList.add('status-syncing');
+      if (iconEl) {
+        iconEl.setAttribute('data-lucide', 'refresh-cw');
+        iconEl.style.animation = 'spin 2s linear infinite';
+      }
+      if (textEl) textEl.textContent = _isProcessingQueue ? 'Sincronizando...' : 'Cambios pendientes';
+      if (badgeEl) {
+        badgeEl.textContent = pendingCount;
+        badgeEl.style.display = 'inline-block';
+      }
+    } else {
+      container.classList.add('status-online');
+      if (iconEl) {
+        iconEl.setAttribute('data-lucide', 'wifi');
+        iconEl.style.animation = 'none';
+      }
+      if (textEl) textEl.textContent = 'Conectado';
+      if (badgeEl) {
+        badgeEl.style.display = 'none';
+      }
+    }
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
+  };
+
+  if (!navigator.onLine && !window.isConnectionVerifiedOnline) {
+    showOfflineUI();
+    
+    // Doble verificación asíncrona de red real (descartar falso negativo de navigator.onLine)
+    const pingController = new AbortController();
+    const timeoutId = setTimeout(() => pingController.abort(), 2000);
+    
+    fetch('https://mupevytlssqcbhlmzmcp.supabase.co', {
+      method: 'GET',
+      mode: 'no-cors',
+      cache: 'no-store',
+      signal: pingController.signal
+    }).then(() => {
+      clearTimeout(timeoutId);
+      window.isConnectionVerifiedOnline = true;
+      showOnlineUI();
+      if (pendingCount > 0 && !_isProcessingQueue) {
+        processSyncQueue();
+      }
+    }).catch(() => {
+      clearTimeout(timeoutId);
+      window.isConnectionVerifiedOnline = false;
+    });
+  } else {
+    showOnlineUI();
   }
 }
 
 window.forzarSincronizacionManual = function() {
-  if (!navigator.onLine) {
+  const trySync = () => {
     if (window.mostrarNotificacion) {
-      window.mostrarNotificacion('No se puede sincronizar sin conexión a internet.', 'warning');
+      window.mostrarNotificacion('Iniciando sincronización...', 'info');
     }
-    return;
+    processSyncQueue();
+  };
+
+  if (!navigator.onLine && !window.isConnectionVerifiedOnline) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    
+    fetch('https://mupevytlssqcbhlmzmcp.supabase.co', {
+      method: 'GET',
+      mode: 'no-cors',
+      cache: 'no-store',
+      signal: controller.signal
+    }).then(() => {
+      clearTimeout(timeoutId);
+      window.isConnectionVerifiedOnline = true;
+      updateSyncStatusUI();
+      trySync();
+    }).catch(() => {
+      clearTimeout(timeoutId);
+      window.isConnectionVerifiedOnline = false;
+      if (window.mostrarNotificacion) {
+        window.mostrarNotificacion('No se puede sincronizar sin conexión a internet.', 'warning');
+      }
+    });
+  } else {
+    trySync();
   }
-  if (window.mostrarNotificacion) {
-    window.mostrarNotificacion('Iniciando sincronización...', 'info');
-  }
-  processSyncQueue();
 };
 
 window.addEventListener('online', () => {
   console.log('[Network] Conexión detectada. Iniciando sincronización...');
+  window.isConnectionVerifiedOnline = true;
   updateSyncStatusUI();
   processSyncQueue();
 });
 
 window.addEventListener('offline', () => {
   console.log('[Network] Conexión perdida. Modo local activado.');
+  window.isConnectionVerifiedOnline = false;
   updateSyncStatusUI();
 });
 
@@ -843,7 +903,7 @@ if (window.syncQueueInterval) {
   clearInterval(window.syncQueueInterval);
 }
 window.syncQueueInterval = setInterval(() => {
-  if (navigator.onLine && getSyncQueue().length > 0 && !_isProcessingQueue) {
+  if ((navigator.onLine || window.isConnectionVerifiedOnline) && getSyncQueue().length > 0 && !_isProcessingQueue) {
     processSyncQueue();
   }
 }, 30000);
