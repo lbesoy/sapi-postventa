@@ -1048,6 +1048,7 @@ window.getFilteredTickets = getFilteredTickets;
 
 function applyRole(rolKey) {
   try {
+    const user = usuarios.find(u => u.id === currentSession.userId);
     const rol = ROLES[rolKey] || ROLES.superadmin;
     const navViews = rol.views;
 
@@ -1090,7 +1091,6 @@ function applyRole(rolKey) {
     const testModeContainer = document.getElementById('test-mode-container');
     if (testModeContainer) {
       const isSuperadmin = (currentSession.realRol === 'superadmin');
-      const user = usuarios.find(u => u.id === currentSession.userId);
       const isTest = isTestUser(user);
       testModeContainer.style.display = (isSuperadmin || isTest) ? 'flex' : 'none';
       const checkbox = document.getElementById('test-mode-checkbox');
