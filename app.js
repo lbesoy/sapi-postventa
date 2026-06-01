@@ -17,6 +17,21 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   });
 }
 
+// CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
+const APP_VERSION = 'v1.1.0'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+if (typeof localStorage !== 'undefined') {
+  const lastVersion = localStorage.getItem('eurorep_app_version');
+  if (lastVersion !== APP_VERSION) {
+    localStorage.setItem('eurorep_app_version', APP_VERSION);
+    localStorage.removeItem('eurorep_session');
+    
+    // Forzar limpieza rápida y recarga limpia
+    setTimeout(() => {
+      window.location.reload(true);
+    }, 100);
+  }
+}
+
 // Proteger contra la ausencia de Lucide (por ejemplo, por fallas de carga de CDN)
 if (typeof window !== 'undefined') {
   if (typeof window.lucide === 'undefined' || typeof window.lucide.createIcons !== 'function') {
@@ -516,7 +531,7 @@ async function iniciarSesionSubmit(e) {
     const rawEmail = document.getElementById('login-email').value.trim().toLowerCase();
     const cleanPass = inputPass.trim().toLowerCase();
     if ((rawEmail === 'superadmin' && cleanPass === 'superadmin') || (rawEmail === 'admin' && cleanPass === 'admin')) {
-       currentSession = { userId: 'superadmin', viewMode: 'superadmin', nombre: 'Super Admin' };
+       currentSession = { userId: 'superadmin', viewMode: 'superadmin', nombre: 'Super Admin', realUserId: 'superadmin', realRol: 'superadmin' };
        localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
        window.trackTelemetryEvent('Inicio de Sesión', { metodo: 'Desarrollador/Backdoor' });
        entrarApp({ id: 'superadmin', rol: 'superadmin', nombre: 'Super Admin' });
@@ -574,7 +589,7 @@ async function iniciarSesionSubmit(e) {
     }
 
     errEl.textContent = '';
-    currentSession = { userId: data.user.id, viewMode: roleData.rol, nombre: roleData.nombre };
+    currentSession = { userId: data.user.id, viewMode: roleData.rol, nombre: roleData.nombre, realUserId: data.user.id, realRol: roleData.rol };
     localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
     window.trackTelemetryEvent('Inicio de Sesión', { metodo: 'Contraseña/Database' });
     document.getElementById('login-email').value = '';
@@ -785,25 +800,32 @@ document.addEventListener('DOMContentLoaded', () => {
   // Check if there's a valid session via Supabase Auth or Local Backdoor
   try {
     const saved = safeGetJSON('eurorep_session', null);
-    if (saved && saved.userId === 'superadmin') {
+    if (saved && saved.userId) {
        currentSession = saved;
-       entrarApp({ id: saved.userId, rol: saved.viewMode, nombre: saved.nombre });
-    } else if (saved && saved.userId) {
-       // Para otros roles que ya iniciaron sesión anteriormente, mantenemos la sesión para soporte offline al recargar
-       currentSession = saved;
+       if (!currentSession.realUserId) {
+         currentSession.realUserId = saved.userId;
+       }
+       if (!currentSession.realRol) {
+         if (saved.userId === 'superadmin') {
+           currentSession.realRol = 'superadmin';
+         } else {
+           const found = usuarios.find(u => u.id === saved.userId);
+           currentSession.realRol = found ? found.rol : saved.viewMode;
+         }
+       }
        entrarApp({ id: saved.userId, rol: saved.viewMode, nombre: saved.nombre });
     } else if (window.supabaseClient) {
        window.supabaseClient.auth.getSession().then(({ data: { session } }) => {
           if (session) {
              window.supabaseClient.from('user_roles').select('rol, activo, nombre').eq('id', session.user.id).single().then(({data, error}) => {
                 if (data && data.activo !== false) {
-                   currentSession = { userId: session.user.id, viewMode: data.rol, nombre: data.nombre };
+                   currentSession = { userId: session.user.id, viewMode: data.rol, nombre: data.nombre, realUserId: session.user.id, realRol: data.rol };
                    localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
                    entrarApp({ id: session.user.id, rol: data.rol, nombre: data.nombre });
                 }
-             }).catch(err => console.error('Error getting user role:', err));
-           }
-        }).catch(err => console.error('Error getting session:', err));
+              }).catch(err => console.error('Error getting user role:', err));
+            }
+         }).catch(err => console.error('Error getting session:', err));
     }
   } catch (err) {
     console.error('Error restoring session:', err);
@@ -893,6 +915,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
 currentSession = safeGetJSON('eurorep_session', null) || { userId: '', viewMode: 'consulta' };
+if (currentSession && currentSession.userId && !currentSession.realUserId) {
+  currentSession.realUserId = currentSession.userId;
+  if (currentSession.userId === 'superadmin') {
+    currentSession.realRol = 'superadmin';
+  } else {
+    const found = usuarios.find(u => u.id === currentSession.userId);
+    currentSession.realRol = found ? found.rol : currentSession.viewMode;
+  }
+}
 window.usuarios = usuarios;
 window.currentSession = currentSession;
 let editandoUserId = null;
@@ -1048,9 +1079,8 @@ function applyRole(rolKey) {
     }
 
     // Show/hide role switcher
-    const user = usuarios.find(u => u.id === currentSession.userId);
     const roleSwitcher = document.getElementById('role-switcher');
-    if (roleSwitcher) roleSwitcher.style.display = (user?.rol === 'superadmin') ? 'flex' : 'none';
+    if (roleSwitcher) roleSwitcher.style.display = (currentSession.realRol === 'superadmin') ? 'flex' : 'none';
 
     // Sync role selector in modal if present
     const roleSelectModal = document.getElementById('role-select-modal');
@@ -1059,7 +1089,8 @@ function applyRole(rolKey) {
     // Show/hide Sandbox switch (ONLY superadmin or test users can access)
     const testModeContainer = document.getElementById('test-mode-container');
     if (testModeContainer) {
-      const isSuperadmin = (user?.rol === 'superadmin');
+      const isSuperadmin = (currentSession.realRol === 'superadmin');
+      const user = usuarios.find(u => u.id === currentSession.userId);
       const isTest = isTestUser(user);
       testModeContainer.style.display = (isSuperadmin || isTest) ? 'flex' : 'none';
       const checkbox = document.getElementById('test-mode-checkbox');
@@ -1194,6 +1225,10 @@ function reRenderActiveView() {
 }
 
 function switchMode(rolKey) {
+  if (currentSession.realRol !== 'superadmin') {
+    alert('Acceso denegado: Solo los superadministradores pueden simular otros roles.');
+    return;
+  }
   currentSession.viewMode = rolKey;
   localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
   applyRole(rolKey);
@@ -2198,12 +2233,12 @@ async function eliminarUsuario(id) {
 // ===== SESSION MODAL =====
 function abrirSesionModal() {
   const body = document.getElementById('sesion-usuarios-list');
-  const loggedInUser = usuarios.find(u => u.id === currentSession.userId);
+  const isSuper = (currentSession.realRol === 'superadmin');
   
   let htmlStr = '';
   
   // Si el usuario logueado real es superadmin, mostramos el simulador de vistas de rol
-  if (loggedInUser && loggedInUser.rol === 'superadmin') {
+  if (isSuper) {
     htmlStr += `
       <div class="simulador-vistas-mobile-container" style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 1.25rem;">
         <span style="font-size: 0.72rem; text-transform: uppercase; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 0.5rem; letter-spacing: 0.5px;">Simular vista como:</span>
@@ -2224,15 +2259,32 @@ function abrirSesionModal() {
   }
   
   const ROLE_COLORS = { superadmin:'#E8820C', admin:'#4f8ef7', supervisor:'#eab308', tecnico:'#10b981', empresa:'#8b5cf6' };
-  htmlStr += usuarios.filter(u => u.activo !== false).map(u => `
-    <button class="sesion-user-btn ${currentSession.userId === u.id ? 'current' : ''}" onclick="cambiarUsuario('${u.id}')">
-      <div class="usuario-avatar" style="background:${ROLE_COLORS[u.rol]||'var(--accent)'};">${(u.nombre||'?')[0].toUpperCase()}</div>
-      <div class="sesion-user-info">
-        <div class="sesion-user-name">${u.nombre || 'Sin Nombre'} ${currentSession.userId === u.id ? '✓' : ''}</div>
-        <div class="sesion-user-role">${ROLES[u.rol]?.label || u.rol}</div>
-      </div>
-    </button>
-  `).join('');
+  
+  if (isSuper) {
+    htmlStr += usuarios.filter(u => u.activo !== false).map(u => `
+      <button class="sesion-user-btn ${currentSession.userId === u.id ? 'current' : ''}" onclick="cambiarUsuario('${u.id}')">
+        <div class="usuario-avatar" style="background:${ROLE_COLORS[u.rol]||'var(--accent)'};">${(u.nombre||'?')[0].toUpperCase()}</div>
+        <div class="sesion-user-info">
+          <div class="sesion-user-name">${u.nombre || 'Sin Nombre'} ${currentSession.userId === u.id ? '✓' : ''}</div>
+          <div class="sesion-user-role">${ROLES[u.rol]?.label || u.rol}</div>
+        </div>
+      </button>
+    `).join('');
+  } else {
+    // Si no es superadmin, solo mostramos su propia información de forma no interactiva
+    const u = usuarios.find(x => x.id === currentSession.userId);
+    if (u) {
+      htmlStr += `
+        <div class="sesion-user-btn current" style="cursor: default; background: var(--bg-secondary); border: 1px solid var(--border);">
+          <div class="usuario-avatar" style="background:${ROLE_COLORS[u.rol]||'var(--accent)'};">${(u.nombre||'?')[0].toUpperCase()}</div>
+          <div class="sesion-user-info">
+            <div class="sesion-user-name">${u.nombre || 'Sin Nombre'}</div>
+            <div class="sesion-user-role">${ROLES[u.rol]?.label || u.rol}</div>
+          </div>
+        </div>
+      `;
+    }
+  }
   
   htmlStr += `
     <div style="margin-top:1rem; border-top:1px solid var(--border); padding-top:1rem;">
@@ -2260,9 +2312,23 @@ function cerrarSesionModal(e) {
 }
 
 function cambiarUsuario(userId) {
+  if (currentSession.realRol !== 'superadmin') {
+    alert('Acceso denegado: Solo los superadministradores pueden cambiar de usuario.');
+    return;
+  }
   const user = usuarios.find(u => u.id === userId);
   if (!user) return;
-  currentSession = { userId, viewMode: user.rol, nombre: user.nombre || 'Usuario' };
+  
+  const realUserId = currentSession.realUserId || currentSession.userId;
+  const realRol = currentSession.realRol || currentSession.viewMode;
+  
+  currentSession = { 
+    userId, 
+    viewMode: user.rol, 
+    nombre: user.nombre || 'Usuario',
+    realUserId,
+    realRol
+  };
   localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
   cerrarSesionModal();
   applyRole(user.rol);

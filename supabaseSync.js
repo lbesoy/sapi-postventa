@@ -1016,17 +1016,11 @@ window.cargarDatosDeSupabase = async function() {
         
         // 3. Reconstrucción Dinámica de Supervisores Asignados (Junction Table)
         const supsLink = cSups.filter(l => l.cliente_id === row.id);
-        row.supervisoresAsignados = supsLink.map(link => {
-          const u = userList.find(usr => usr.id === link.usuario_id);
-          return u ? { id: u.id, nombre: u.nombre, rol: u.rol } : { id: link.usuario_id, nombre: 'Supervisor', rol: 'supervisor' };
-        });
+        row.supervisoresAsignados = supsLink.map(link => link.usuario_id);
         
         // 4. Reconstrucción Dinámica de Técnicos Asignados (Junction Table)
         const tecsLink = cTecs.filter(l => l.cliente_id === row.id);
-        row.tecnicosAsignados = tecsLink.map(link => {
-          const u = userList.find(usr => usr.id === link.usuario_id);
-          return u ? { id: u.id, nombre: u.nombre, rol: u.rol } : { id: link.usuario_id, nombre: 'Técnico', rol: 'tecnico' };
-        });
+        row.tecnicosAsignados = tecsLink.map(link => link.usuario_id);
 
         // Priorizar saldos
         if (saldosSap[row.id]) {
