@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.1.1'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.1.2'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -8739,8 +8739,39 @@ function actualizarFiltrosPersonal() {
 
     const uniqueStaff = Array.from(allStaff).filter(Boolean).sort((a,b) => a.localeCompare(b));
     
+    // Crear lista separada exclusiva para supervisores
+    let allSupervisores = new Set();
+    if (Array.isArray(usuarios)) {
+      usuarios.forEach(u => {
+        if (u && u.rol === 'supervisor' && u.activo !== false && typeof u.nombre === 'string') {
+          allSupervisores.add(u.nombre.trim());
+        }
+      });
+    }
+    if (Array.isArray(clientesDb)) {
+      clientesDb.forEach(c => {
+        if (!c) return;
+        if (typeof c.supervisorAsignado === 'string' && c.supervisorAsignado.trim()) {
+          allSupervisores.add(c.supervisorAsignado.trim());
+        }
+        if (Array.isArray(c.supervisoresAsignados)) {
+          c.supervisoresAsignados.forEach(s => {
+            if (typeof s === 'string') {
+              if (s.includes('-')) { // Es un UUID de usuario, buscamos su nombre
+                const u = usuarios.find(usr => usr.id === s);
+                if (u && typeof u.nombre === 'string') allSupervisores.add(u.nombre.trim());
+              } else {
+                allSupervisores.add(s.trim());
+              }
+            }
+          });
+        }
+      });
+    }
+    const uniqueSupervisores = Array.from(allSupervisores).filter(Boolean).sort((a,b) => a.localeCompare(b));
+
     const tecOptionsHtml = '<option value="">Cualquier Técnico</option>' + uniqueStaff.map(n => `<option value="${n}">${n}</option>`).join('');
-    const supOptionsHtml = '<option value="">Cualquier Supervisor</option>' + uniqueStaff.map(n => `<option value="${n}">${n}</option>`).join('');
+    const supOptionsHtml = '<option value="">Cualquier Supervisor</option>' + uniqueSupervisores.map(n => `<option value="${n}">${n}</option>`).join('');
     
     selectsTecnico.forEach(sel => { 
       if(sel) { 
