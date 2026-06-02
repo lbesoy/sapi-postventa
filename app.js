@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.2.7'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.2.8'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -1326,7 +1326,11 @@ const GH_WORKFLOW = 'sync-sap.yml';
 
 async function sincronizarConGitHub(modulo = 'all', btnEl = null) {
   const origHTML = btnEl ? btnEl.innerHTML : '';
-  if (btnEl) { btnEl.innerHTML = '<i data-lucide="loader" class="btn-icon rotating"></i> Enviando a SAP...'; lucide.createIcons(); }
+  if (btnEl) { 
+    btnEl.innerHTML = '<i data-lucide="loader" class="btn-icon rotating"></i> Conectando SAP...'; 
+    btnEl.disabled = true;
+    lucide.createIcons(); 
+  }
 
   try {
     const headers = {
@@ -1341,29 +1345,96 @@ async function sincronizarConGitHub(modulo = 'all', btnEl = null) {
       }
     }
 
+    const triggerTime = new Date().getTime();
+
     const resp = await fetch('/api/trigger-sync', {
       method: 'POST',
       headers,
       body: JSON.stringify({ modulo })
     });
 
-    if (resp.ok) {
-      mostrarNotificacion(`✅ Sincronización SAP iniciada. Los datos estarán listos en ~20 segundos.`, 'success');
-      // Esperar 25 segundos y recargar datos desde Supabase
-      setTimeout(async () => {
-        if (window.cargarDatosDeSupabase) {
-          await window.cargarDatosDeSupabase();
-          mostrarNotificacion('✅ Datos actualizados desde SAP.', 'success');
-        }
-      }, 25000);
-    } else {
+    if (!resp.ok) {
       const errData = await resp.json().catch(() => ({}));
       throw new Error(errData.error || `Error ${resp.status}`);
     }
+
+    mostrarNotificacion(`⏳ Sincronización iniciada en SAP. Procesando datos...`, 'info');
+    if (btnEl) {
+      btnEl.innerHTML = '<i data-lucide="loader" class="btn-icon rotating"></i> Procesando SAP...';
+      lucide.createIcons();
+    }
+
+    let targetRunId = null;
+    let attempts = 0;
+    const maxAttempts = 40; // max ~3 minutos (5s por intento)
+
+    const pollStatus = setInterval(async () => {
+      attempts++;
+      if (attempts > maxAttempts) {
+        clearInterval(pollStatus);
+        mostrarNotificacion('⚠️ Tiempo de espera agotado. Verifica la actualización en unos minutos.', 'warning');
+        finishSync();
+        return;
+      }
+
+      try {
+        const statusResp = await fetch('/api/sync-status', {
+          method: 'POST',
+          headers
+        });
+
+        if (statusResp.ok) {
+          const run = await statusResp.json();
+          const runCreatedTime = new Date(run.created_at).getTime();
+
+          if (!targetRunId) {
+            if (run.status !== 'completed' || (runCreatedTime > triggerTime - 120000)) {
+              targetRunId = run.id;
+              console.log(`[Sync] Detectado workflow run activo: ID ${targetRunId}, Estado: ${run.status}`);
+            }
+          }
+
+          if (targetRunId && run.id === targetRunId) {
+            if (btnEl) {
+              btnEl.innerHTML = `<i data-lucide="loader" class="btn-icon rotating"></i> SAP: ${run.status === 'in_progress' ? 'Procesando' : run.status}...`;
+              lucide.createIcons();
+            }
+
+            if (run.status === 'completed') {
+              clearInterval(pollStatus);
+              if (run.conclusion === 'success') {
+                mostrarNotificacion('⏳ Recargando base de datos...', 'info');
+                if (window.cargarDatosDeSupabase) {
+                  await window.cargarDatosDeSupabase();
+                }
+                mostrarNotificacion('✅ Sincronización SAP finalizada con éxito.', 'success');
+              } else {
+                mostrarNotificacion(`❌ Sincronización SAP fallida: ${run.conclusion || 'desconocido'}`, 'error');
+              }
+              finishSync();
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Error sondeando estado de sync:', err);
+      }
+    }, 5000);
+
+    function finishSync() {
+      if (btnEl) {
+        btnEl.innerHTML = origHTML;
+        btnEl.disabled = false;
+        lucide.createIcons();
+      }
+    }
+
   } catch(e) {
     mostrarNotificacion(`❌ Error al disparar sync: ${e.message}`, 'error');
-  } finally {
-    if (btnEl) { setTimeout(() => { btnEl.innerHTML = origHTML; lucide.createIcons(); }, 3000); }
+    if (btnEl) {
+      btnEl.innerHTML = origHTML;
+      btnEl.disabled = false;
+      lucide.createIcons();
+    }
   }
 }
 

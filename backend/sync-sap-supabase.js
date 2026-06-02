@@ -112,21 +112,9 @@ async function upsertSupabase(tabla, rows) {
 async function syncClientes() {
   log('Sincronizando Clientes...');
   
-  // 1. Obtener clientes actuales de Supabase para preservar sus arrays manuales (maquinas, sitios, etc)
-  let dbClientes = [];
-  try {
-    const res = await axios.get(`${SUPABASE_URL}/rest/v1/clientes?select=id,maquinas,sitios,supervisores_asignados,tecnicos_asignados`, {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-    });
-    dbClientes = res.data || [];
-  } catch (e) {
-    log(`⚠️ Advertencia: No se pudieron obtener clientes previos (${e.message}). Se usaran arrays vacios para nuevos.`);
-  }
-
   const raw = await fetchQuery(QUERIES.clientes);
   const rows = raw.map(bp => {
     const idVal = bp.CardCode || null;
-    const existing = dbClientes.find(c => c.id === idVal) || {};
     
     return {
       id:          idVal,
@@ -134,11 +122,7 @@ async function syncClientes() {
       rfc:         bp.LicTradNum || '',
       email:       bp.E_Mail || '',
       telefono:    '',
-      id_fiscal:   bp.LicTradNum || '',
-      sitios:      existing.sitios || [],
-      maquinas:    existing.maquinas || [],
-      supervisores_asignados: existing.supervisores_asignados || [],
-      tecnicos_asignados: existing.tecnicos_asignados || []
+      id_fiscal:   bp.LicTradNum || ''
     };
   }).filter(r => r.id);  // Solo los que tienen ID válido
   

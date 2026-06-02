@@ -343,34 +343,16 @@ app.get('/api/sync-all', ensureSAPConnection, async (req, res) => {
     try {
         if (modulo === 'all' || modulo === 'clientes') {
             try {
-                // 1. Obtener clientes actuales de Supabase para no borrar máquinas/asignaciones manuales
-                let supaMap = {};
-                try {
-                    const supaReq = await axios.get(`${SUPABASE_URL_SRV}/rest/v1/clientes?select=id,sitios,maquinas,supervisores_asignados,tecnicos_asignados`, {
-                        headers: { 'apikey': SUPABASE_KEY_SRV, 'Authorization': `Bearer ${SUPABASE_KEY_SRV}` }
-                    });
-                    if (supaReq.data) {
-                        supaReq.data.forEach(c => supaMap[c.id] = c);
-                    }
-                } catch(err) {
-                    console.error('Error obteniendo clientes previos de Supabase:', err.message);
-                }
-
                 const qc = process.env.QUERY_CLIENTES || 'eurorep_clientes';
                 const r = await sapApi.get(`${SAP_URL}/SQLQueries('${qc}')/List`, { headers: { 'B1S-PageSize': 5000 } });
                 const rows = (r.data.value || []).map(bp => {
-                    const existing = supaMap[bp.CardCode] || {};
                     return {
                         id: bp.CardCode || null, 
                         nombre: bp.CardName || '', 
                         rfc: bp.LicTradNum || '',
                         email: bp.E_Mail || '', 
                         telefono: '', 
-                        id_fiscal: bp.LicTradNum || '',
-                        sitios: existing.sitios || [], 
-                        maquinas: existing.maquinas || [], 
-                        supervisores_asignados: existing.supervisores_asignados || [], 
-                        tecnicos_asignados: existing.tecnicos_asignados || []
+                        id_fiscal: bp.LicTradNum || ''
                     };
                 }).filter(x => x.id);
                 resultado.clientes = await upsertSupa('clientes', rows);
