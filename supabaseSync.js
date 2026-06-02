@@ -543,7 +543,23 @@ async function _processSyncQueueInternal() {
               latitud: item.data.latitud || item.data.customData?.latitud || null,
               longitud: item.data.longitud || item.data.customData?.longitud || null
             };
-            payload = { id: cleanId, serie: item.data.serie, marca: item.data.marca, modelo: item.data.modelo, anio: item.data.anio ? (parseInt(item.data.anio, 10) || null) : null, cliente: clienteId, descripcion: item.data.descripcion, custom_data: customData };
+            payload = {
+              id: cleanId,
+              serie: item.data.serie,
+              marca: item.data.marca,
+              modelo: item.data.modelo,
+              anio: item.data.anio ? (parseInt(item.data.anio, 10) || null) : null,
+              cliente: clienteId,
+              descripcion: item.data.descripcion,
+              custom_data: customData,
+              tipo: item.data.tipo || item.data.customData?.tipo || null,
+              numero_economico: item.data.numeroEconomico || item.data.customData?.numeroEconomico || null,
+              numero_motor: item.data.numeroMotor || item.data.customData?.numeroMotor || null,
+              venta: item.data.venta || item.data.customData?.venta || null,
+              ubicacion: item.data.ubicacion || item.data.customData?.ubicacion || null,
+              latitud: (item.data.latitud !== undefined && item.data.latitud !== null) ? (parseFloat(item.data.latitud) || null) : ((item.data.customData?.latitud !== undefined && item.data.customData?.latitud !== null) ? (parseFloat(item.data.customData.latitud) || null) : null),
+              longitud: (item.data.longitud !== undefined && item.data.longitud !== null) ? (parseFloat(item.data.longitud) || null) : ((item.data.customData?.longitud !== undefined && item.data.customData?.longitud !== null) ? (parseFloat(item.data.customData.longitud) || null) : null)
+            };
           } else if (item.table === 'refacciones') {
             payload = { id: item.data.id, codigo: item.data.codigo, descripcion: item.data.descripcion, precio: item.data.precio, moneda: item.data.moneda, stock: item.data.stock, custom_data: { ...(item.data.customData || {}), marca: item.data.marca, grupo: item.data.grupo, origen: item.data.origen, nombre: item.data.nombre } };
           } else if (item.table === 'gastos') {
@@ -1117,13 +1133,13 @@ window.cargarDatosDeSupabase = async function() {
             cliente: row.nombre,
             idInterno: m.id || m.id_interno,
             descripcion: m.descripcion,
-            tipo: cData.tipo || m.tipo || 'N/A',
-            numeroEconomico: cData.numeroEconomico || m.numeroEconomico || 'N/A',
-            numeroMotor: cData.numeroMotor || m.numeroMotor || 'N/A',
-            venta: cData.venta || m.venta || '',
-            ubicacion: cData.ubicacion || m.ubicacion || 'N/A',
-            latitud: cData.latitud || m.latitud,
-            longitud: cData.longitud || m.longitud,
+            tipo: m.tipo || cData.tipo || 'N/A',
+            numeroEconomico: m.numero_economico || cData.numeroEconomico || 'N/A',
+            numeroMotor: m.numero_motor || cData.numeroMotor || 'N/A',
+            venta: m.venta || cData.venta || '',
+            ubicacion: m.ubicacion || cData.ubicacion || 'N/A',
+            latitud: (m.latitud !== null && m.latitud !== undefined) ? m.latitud : cData.latitud,
+            longitud: (m.longitud !== null && m.longitud !== undefined) ? m.longitud : cData.longitud,
             customData: cData
           };
         });
@@ -1246,13 +1262,13 @@ window.cargarDatosDeSupabase = async function() {
           cliente: clienteNombre,
           idInterno: m.id || m.id_interno,
           descripcion: m.descripcion,
-          tipo: cData.tipo || m.tipo || 'N/A',
-          numeroEconomico: cData.numeroEconomico || m.numeroEconomico || 'N/A',
-          numeroMotor: cData.numeroMotor || m.numeroMotor || 'N/A',
-          venta: cData.venta || m.venta || '',
-          ubicacion: cData.ubicacion || m.ubicacion || 'N/A',
-          latitud: cData.latitud || m.latitud,
-          longitud: cData.longitud || m.longitud,
+          tipo: m.tipo || cData.tipo || 'N/A',
+          numeroEconomico: m.numero_economico || cData.numeroEconomico || 'N/A',
+          numeroMotor: m.numero_motor || cData.numeroMotor || 'N/A',
+          venta: m.venta || cData.venta || '',
+          ubicacion: m.ubicacion || cData.ubicacion || 'N/A',
+          latitud: (m.latitud !== null && m.latitud !== undefined) ? m.latitud : cData.latitud,
+          longitud: (m.longitud !== null && m.longitud !== undefined) ? m.longitud : cData.longitud,
           customData: cData
         };
       });
