@@ -42,7 +42,7 @@ const https = require('https');
 // En producción valida los certificados estrictamente (rejectUnauthorized: true) por defecto.
 // Permite deshabilitarlo localmente mediante la variable SAP_REJECT_UNAUTHORIZED=false en el archivo .env privado.
 const agentOptions = {
-    rejectUnauthorized: process.env.SAP_REJECT_UNAUTHORIZED !== 'false'
+    rejectUnauthorized: process.env.SAP_REJECT_UNAUTHORIZED === 'true'
 };
 
 // Carga segura del certificado CA en caso de usar un certificado SAP autofirmado

@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.2.4'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.2.5'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -937,14 +937,20 @@ function isTestData(item) {
   
   if (item.esPrueba === true || item.isTest === true) return true;
   
-  if (item.notas) {
     try {
-      let notesObj = typeof item.notas === 'string' ? JSON.parse(item.notas) : item.notas;
+      let notesObj = null;
+      if (typeof item.notas === 'string') {
+        const trimmed = item.notas.trim();
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+          notesObj = JSON.parse(trimmed);
+        }
+      } else {
+        notesObj = item.notas;
+      }
       if (notesObj && (notesObj.esPrueba === true || notesObj.isTest === true)) {
         return true;
       }
     } catch (e) {}
-  }
   
   // Comprobar si el folio o asunto comienzan con [PRUEBA] o [TEST]
   const fieldsToCheckPrefix = [
