@@ -299,25 +299,75 @@ async function syncSitios() {
   log(`✅ Sitios: ${n} registros sincronizados a Supabase.`);
 }
 
-async function syncTecnicos() {
-  log('Sincronizando Técnicos...');
-  const raw = await fetchQuery(QUERIES.tecnicos);
-  
-  const rows = raw.map(t => {
-    return {
-      id:          t.empID || t.EmployeeID || t.firstName || null,
-      nombre:      t.firstName ? `${t.firstName} ${t.lastName || ''}`.trim() : t.Name || 'Sin Nombre',
-      tipoUsuario: t.jobTitle || t.Position || 'tecnico',
-      departamento: t.dept || t.Department || '',
-      email:       t.email || '',
-      telefono:    t.mobile || t.officeExt || '',
+async function fetchTecnicosFromSAP() {
+  try {
+    log('Consultando técnicos vía SQL Query...');
+    const res = await sapApi.get(`${SAP_URL}/SQLQueries('${QUERIES.tecnicos}')/List`, {
+      headers: { 'B1S-PageSize': 5000, 'Prefer': 'odata.maxpagesize=5000' },
+      timeout: 8000
+    });
+    if (res.data && res.data.value) {
+      log(`✅ Técnicos obtenidos vía SQL Query (${res.data.value.length} registros).`);
+      return res.data.value.map(t => ({
+        id:          (t.empID || t.EmployeeID || t.firstName || '').toString(),
+        nombre:      t.firstName ? `${t.firstName} ${t.lastName || ''}`.trim() : t.Name || 'Sin Nombre',
+        tipoUsuario: t.jobTitle || t.Position || 'tecnico',
+        departamento: t.dept || t.Department || '',
+        email:       t.email || '',
+        telefono:    t.mobile || t.officeExt || '',
+        activo:      true,
+        custom_data: {}
+      }));
+    }
+  } catch (errQ) {
+    log(`⚠️ SQL Query de técnicos falló o no existe: ${errQ.message}. Intentando fallback nativo a SalesPersons...`);
+  }
+
+  try {
+    const filterStr = "SalesEmployeeCode ne -1 and Active eq 'tYES' and Fax ne 'N/A' and Fax ne null";
+    const queryParams = `$select=Remarks,SalesEmployeeCode,SalesEmployeeName,Fax,Mobile&$filter=${encodeURIComponent(filterStr)}&$orderby=Remarks asc`;
+    
+    log('Consultando técnicos vía OData SalesPersons...');
+    const response = await sapApi.get(`${SAP_URL}/SalesPersons?${queryParams}`, { timeout: 15000 });
+    const items = response.data.value || [];
+    log(`✅ Técnicos obtenidos vía SalesPersons nativo (${items.length} registros).`);
+    
+    return items.map(t => ({
+      id:          t.SalesEmployeeCode ? t.SalesEmployeeCode.toString() : null,
+      nombre:      t.SalesEmployeeName || 'Sin Nombre',
+      tipoUsuario: t.Fax || 'tecnico',
+      departamento: t.Remarks || 'Ventas',
+      email:       '',
+      telefono:    t.Mobile || '',
       activo:      true,
       custom_data: {}
-    };
-  }).filter(r => r.id);
-  
-  const n = await upsertSupabase('tecnicos', rows);
-  log(`✅ Técnicos: ${n} registros sincronizados a Supabase.`);
+    }));
+  } catch (errO) {
+    log(`❌ Fallback nativo de técnicos también falló: ${errO.message}`);
+    throw new Error('No se pudieron obtener técnicos de SAP usando ningún método.');
+  }
+}
+
+async function syncTecnicos() {
+  log('Sincronizando Técnicos...');
+  try {
+    const rows = await fetchTecnicosFromSAP();
+    const validRows = rows.filter(r => r.id);
+    
+    try {
+      const n = await upsertSupabase('tecnicos', validRows);
+      log(`✅ Técnicos: ${n} registros sincronizados a Supabase.`);
+    } catch (supaErr) {
+      if (supaErr.message?.includes('404') || (supaErr.response && supaErr.response.status === 404)) {
+        log(`⚠️ Advertencia: La tabla 'tecnicos' no existe en Supabase (404). Omitiendo persistencia en Supabase.`);
+      } else {
+        throw supaErr;
+      }
+    }
+  } catch (err) {
+    log(`⚠️ Advertencia: Sincronización de técnicos falló de forma no crítica: ${err.message}`);
+    // No relanzamos el error para evitar romper la sincronización general (ej. clientes/refacciones/sitios)
+  }
 }
 
 async function loadConfigFromSupabase() {
