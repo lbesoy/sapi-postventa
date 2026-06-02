@@ -33,5 +33,7 @@ jobs:
           SAP_COMPANY_DB: ${{ secrets.SAP_COMPANY_DB }}
           SAP_USER: ${{ secrets.SAP_USER }}
           SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
           cd backend && node sync-sap-supabase.js
