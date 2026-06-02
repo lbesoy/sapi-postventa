@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.2.2'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.2.3'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -7076,7 +7076,7 @@ function guardarOrden(e) {
   }
 
   const orden = {
-    id: editandoId || crypto.randomUUID(),
+    id: editandoId || folioVal,
     fecha: oVieja ? oVieja.fecha : new Date().toISOString().split('T')[0],
     folio: folioVal,
     pedido: document.getElementById('f-pedido').value.trim(),
@@ -10688,7 +10688,7 @@ async function cerrarCotizacionTicket(id) {
       }
 
       const nuevaOrden = {
-        id: crypto.randomUUID(),
+        id: newFolio,
         fecha: new Date().toISOString().split('T')[0],
         folio: newFolio,
         pedido: pedidoSAP || '',
