@@ -1082,9 +1082,32 @@ window.cargarDatosDeSupabase = async function() {
         }));
         
         // 2. Reconstrucción Dinámica de Maquinarias (Fuente de verdad: tabla maquinaria)
-        const matchMaq = (maqDb || []).filter(m => m.cliente === row.id);
+        const matchMaq = (maqDb || []).filter(m => {
+          if (m.cliente === row.id) return true;
+          if (m.cliente === row.nombre) return true;
+          return false;
+        });
         row.maquinas = matchMaq.map(m => {
           const cData = m.custom_data || {};
+          
+          // ESTRATEGIA DE AUTOLIMPIEZA: Si la máquina está ligada por nombre en vez de ID, la corregimos en la nube
+          if (m.cliente === row.nombre && row.id !== row.nombre) {
+            console.log(`[Sync] Corrigiendo vinculación por nombre de máquina ${m.id} al ID ${row.id}`);
+            if (window.pushToSupabase) {
+              window.pushToSupabase('maquinaria', {
+                idInterno: m.id,
+                id: m.id,
+                serie: m.serie,
+                marca: m.marca,
+                modelo: m.modelo,
+                anio: m.anio,
+                cliente: row.id,
+                descripcion: m.descripcion,
+                customData: cData
+              });
+            }
+          }
+
           return {
             id: m.id,
             serie: m.serie,
@@ -1189,8 +1212,29 @@ window.cargarDatosDeSupabase = async function() {
         let clienteNombre = m.cliente;
         try {
           const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
-          const match = clientes.find(c => c.id === m.cliente);
-          if (match) clienteNombre = match.nombre;
+          
+          // ESTRATEGIA DE AUTOLIMPIEZA: Si la máquina está ligada por nombre en vez de ID, la corregimos en la nube
+          const matchByName = clientes.find(c => c.nombre === m.cliente && c.id !== m.cliente);
+          if (matchByName) {
+            console.log(`[Sync] Corrigiendo ID de cliente para máquina ${m.id}: de '${m.cliente}' a '${matchByName.id}'`);
+            if (window.pushToSupabase) {
+              window.pushToSupabase('maquinaria', {
+                idInterno: m.id,
+                id: m.id,
+                serie: m.serie,
+                marca: m.marca,
+                modelo: m.modelo,
+                anio: m.anio,
+                cliente: matchByName.id,
+                descripcion: m.descripcion,
+                customData: m.custom_data
+              });
+            }
+            clienteNombre = matchByName.nombre;
+          } else {
+            const match = clientes.find(c => c.id === m.cliente);
+            if (match) clienteNombre = match.nombre;
+          }
         } catch(e) {}
         const cData = m.custom_data || {};
         return {
