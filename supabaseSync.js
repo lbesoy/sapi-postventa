@@ -1089,13 +1089,23 @@ async function migrarDatosASupabase() {
 
 // ─── cargarDatosDeSupabase: Descarga la nube a localStorage / variables ─────
 
-window.cargarDatosDeSupabase = async function() {
-  const sb = window.supabaseClient;
-  if (!sb) return;
+window._syncPromise = null;
 
-  window._isSyncingFromSupabase = true;
+window.cargarDatosDeSupabase = function() {
+  if (window._syncPromise) {
+    return window._syncPromise;
+  }
 
-  try {
+  window._syncPromise = (async () => {
+    const sb = window.supabaseClient;
+    if (!sb) {
+      window._syncPromise = null;
+      return;
+    }
+
+    window._isSyncingFromSupabase = true;
+
+    try {
     // Usuarios - Cargar desde user_roles para todos los usuarios.
     // Para evitar truncar el caché local debido a restricciones de RLS (que devuelven 0 o 1 fila del propio usuario)
     // solo sobreescribimos si obtenemos más de 1 usuario, o si somos admin/superadmin.
@@ -1610,9 +1620,13 @@ window.cargarDatosDeSupabase = async function() {
     console.error('[Supabase] Error cargando datos:', error.message);
   } finally {
     window._isSyncingFromSupabase = false;
+    window._syncPromise = null;
     window.dispatchEvent(new Event('supabase_datos_cargados'));
     console.log('[Supabase] ✅ Carga completa. Evento "supabase_datos_cargados" disparado.');
   }
+  })();
+
+  return window._syncPromise;
 }
 
 // ─── Realtime Subscriptions ──────────────────────────────────────────────────
