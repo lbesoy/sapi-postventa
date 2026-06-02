@@ -506,7 +506,79 @@ async function _processSyncQueueInternal() {
           if (item.table === 'tickets') {
             payload = ticketToRow(item.data);
           } else if (item.table === 'ordenes') {
+            let finalId = item.data.id;
+            let finalFolio = item.data.folio;
+            
+            try {
+              // Comprobar si ya existe una orden con este ID en Supabase
+              const { data: existingOrd } = await sb.from('ordenes')
+                .select('id, cliente, soporte')
+                .eq('id', finalId)
+                .maybeSingle();
+                
+              if (existingOrd) {
+                // Si pertenece a otro cliente o soporte, es una colisión de folios offline
+                const esColision = existingOrd.cliente !== item.data.cliente || 
+                                   existingOrd.soporte !== item.data.soporte;
+                                   
+                if (esColision) {
+                  console.log(`[Sync] Colisión de folio detectada para ${finalId}. Calculando nuevo folio...`);
+                  const { data: todasLasOrd } = await sb.from('ordenes').select('folio');
+                  const currentYear = new Date().getFullYear().toString().slice(-2);
+                  const prefix = `OS-${currentYear}`;
+                  let maxConsecutivo = 0;
+                  
+                  (todasLasOrd || []).forEach(o => {
+                    if (o.folio && o.folio.startsWith(prefix)) {
+                      const numStr = o.folio.substring(prefix.length);
+                      const num = parseInt(numStr, 10);
+                      if (!isNaN(num) && num > maxConsecutivo) maxConsecutivo = num;
+                    }
+                  });
+                  
+                  // Revisar también localmente
+                  const localOrdenes = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+                  localOrdenes.forEach(o => {
+                    if (o.folio && o.folio.startsWith(prefix)) {
+                      const numStr = o.folio.substring(prefix.length);
+                      const num = parseInt(numStr, 10);
+                      if (!isNaN(num) && num > maxConsecutivo) maxConsecutivo = num;
+                    }
+                  });
+                  
+                  maxConsecutivo++;
+                  const padded = maxConsecutivo.toString().padStart(3, '0');
+                  const nuevoFolio = `${prefix}${padded}`;
+                  
+                  console.log(`[Sync] Re-asignando folio colisionado: ${finalFolio} -> ${nuevoFolio}`);
+                  
+                  const oldId = finalId;
+                  finalId = nuevoFolio;
+                  finalFolio = nuevoFolio;
+                  item.data.id = finalId;
+                  item.data.folio = finalFolio;
+                  
+                  // Actualizar localStorage local
+                  try {
+                    const ordenesLocales = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+                    const idx = ordenesLocales.findIndex(o => o.id === oldId || o.folio === oldId);
+                    if (idx > -1) {
+                      ordenesLocales[idx].id = finalId;
+                      ordenesLocales[idx].folio = finalFolio;
+                      localStorage.setItem('sapi_ordenes', JSON.stringify(ordenesLocales));
+                    }
+                  } catch (e) {
+                    console.error('[Sync] Error al actualizar localOrdenes en colisión:', e);
+                  }
+                }
+              }
+            } catch (exErr) {
+              console.error('[Sync] Error en validación de colisión de orden:', exErr);
+            }
+            
             payload = ordenToRow(item.data);
+            payload.id = finalId;
+            payload.folio = finalFolio;
           } else if (item.table === 'clientes') {
             payload = clienteToRow(item.data);
           } else if (item.table === 'user_roles') {
