@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.1.8'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.1.9'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -15569,6 +15569,9 @@ window.cerrarPdfVisor = function() {
 window.trackTelemetryEvent = function(action, details = {}) {
   try {
     if (!currentSession || !currentSession.userId) return;
+
+    // Si estamos impersonando/simulando a otro usuario, no registrar telemetría para mantener las métricas limpias
+    if (currentSession.userId !== currentSession.realUserId) return;
 
     const events = JSON.parse(localStorage.getItem('sapi_telemetry_events') || '[]');
     let userName = currentSession.nombre || 'Desconocido';
