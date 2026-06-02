@@ -59,9 +59,9 @@ CREATE POLICY "Admins y Supervisores full access clientes" ON public.clientes FO
 );
 
 CREATE POLICY "Admins y Supervisores full access maquinaria" ON public.maquinaria FOR ALL TO authenticated USING (
-  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor', 'tecnico')
 ) WITH CHECK (
-  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor', 'tecnico')
 );
 CREATE POLICY "Admins insert user_roles" ON public.user_roles FOR INSERT TO authenticated WITH CHECK (
   (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin')

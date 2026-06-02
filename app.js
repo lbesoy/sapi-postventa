@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.1.9'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.2.0'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -5727,6 +5727,7 @@ function guardarNuevaMaquina(e) {
             }
           }
           clienteObj.maquinas.push(maquinaDatos);
+          if (window.pushToSupabase) window.pushToSupabase('maquinaria', { ...maquinaDatos, cliente: clienteObj.id });
         } else {
           const maquinaIdx = clienteObj.maquinas.findIndex(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
           if (maquinaIdx >= 0) {
@@ -5735,12 +5736,15 @@ function guardarNuevaMaquina(e) {
               idInterno: finalIdInterno,
               marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, latitud, longitud, tipo
             };
+            if (window.pushToSupabase) window.pushToSupabase('maquinaria', { ...clienteObj.maquinas[maquinaIdx], cliente: clienteObj.id });
           }
         }
     }
   } else {
     const idInterno = generarIdInternoMaquina(marca, venta || anio);
-    clienteObj.maquinas.push({ idInterno, marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, latitud, longitud, tipo });
+    const nuevaMaq = { idInterno, marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, latitud, longitud, tipo };
+    clienteObj.maquinas.push(nuevaMaq);
+    if (window.pushToSupabase) window.pushToSupabase('maquinaria', { ...nuevaMaq, cliente: clienteObj.id });
   }
   
   if (ubicacion) {
@@ -5817,6 +5821,7 @@ function eliminarMaquinaActual() {
     // Guardar cambios
     localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
     if (window.pushToSupabase) window.pushToSupabase('clientes', clienteObj);
+    if (window.deleteFromSupabase) window.deleteFromSupabase('maquinaria', editandoMaquinaId);
     
     cerrarModalAgregarMaquina();
     
@@ -5886,7 +5891,10 @@ function guardarMoverMaquina(e) {
       }
       
       localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
-      if (window.pushToSupabase) window.pushToSupabase('clientes', clienteObj);
+      if (window.pushToSupabase) {
+        window.pushToSupabase('clientes', clienteObj);
+        window.pushToSupabase('maquinaria', { ...maq, cliente: clienteObj.id });
+      }
       
       cerrarModalMoverMaquina();
       
