@@ -335,6 +335,51 @@ async function upsertSupa(tabla, rows) {
     return n;
 }
 
+async function fetchClientesFromSAPServer(qc) {
+    try {
+        console.log('Consultando clientes vía SQL Query...');
+        const res = await sapApi.get(`${SAP_URL}/SQLQueries('${qc}')/List`, {
+            headers: { 'B1S-PageSize': 5000, 'Prefer': 'odata.maxpagesize=5000' },
+            timeout: 8000
+        });
+        if (res.data && res.data.value) {
+            console.log(`✅ Clientes obtenidos vía SQL Query (${res.data.value.length} registros).`);
+            return res.data.value;
+        }
+    } catch (errQ) {
+        console.warn(`⚠️ SQL Query falló o dio timeout: ${errQ.message}. Intentando fallback nativo OData...`);
+    }
+
+    try {
+        let url = `${SAP_URL}/BusinessPartners?$filter=CardType eq 'cCustomer' and GroupCode eq 100`;
+        let allClients = [];
+        let page = 1;
+
+        while (url) {
+            console.log(`- Fetching OData page ${page}...`);
+            const bpRes = await sapApi.get(url, { timeout: 15000 });
+            const items = bpRes.data.value || [];
+            allClients = allClients.concat(items);
+            url = bpRes.data['odata.nextLink'] ? `${SAP_URL}/${bpRes.data['odata.nextLink']}` : null;
+            page++;
+        }
+
+        console.log(`✅ Clientes obtenidos vía OData nativo (${allClients.length} registros).`);
+        return allClients.map(c => ({
+            CardCode: c.CardCode,
+            CardName: c.CardName,
+            LicTradNum: c.FederalTaxID,
+            E_Mail: c.EmailAddress,
+            Phone1: c.Phone1,
+            Balance: c.Balance,
+            OrdersBal: c.OrdersBal
+        }));
+    } catch (errO) {
+        console.error(`❌ Fallback nativo OData también falló: ${errO.message}`);
+        throw new Error('No se pudieron obtener clientes de SAP usando ningún método.');
+    }
+}
+
 app.get('/api/sync-all', ensureSAPConnection, async (req, res) => {
     const modulo = req.query.modulo || 'all';
     const inicio = Date.now();
@@ -344,14 +389,14 @@ app.get('/api/sync-all', ensureSAPConnection, async (req, res) => {
         if (modulo === 'all' || modulo === 'clientes') {
             try {
                 const qc = process.env.QUERY_CLIENTES || 'eurorep_clientes';
-                const r = await sapApi.get(`${SAP_URL}/SQLQueries('${qc}')/List`, { headers: { 'B1S-PageSize': 5000 } });
-                const rows = (r.data.value || []).map(bp => {
+                const raw = await fetchClientesFromSAPServer(qc);
+                const rows = raw.map(bp => {
                     return {
                         id: bp.CardCode || null, 
                         nombre: bp.CardName || '', 
                         rfc: bp.LicTradNum || '',
                         email: bp.E_Mail || '', 
-                        telefono: '', 
+                        telefono: bp.Phone1 || '', 
                         id_fiscal: bp.LicTradNum || ''
                     };
                 }).filter(x => x.id);

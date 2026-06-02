@@ -109,10 +109,55 @@ async function upsertSupabase(tabla, rows) {
   return inserted;
 }
 
+async function fetchClientesFromSAP() {
+  try {
+    log('Consultando clientes vía SQL Query...');
+    const res = await sapApi.get(`${SAP_URL}/SQLQueries('${QUERIES.clientes}')/List`, {
+      headers: { 'B1S-PageSize': 5000, 'Prefer': 'odata.maxpagesize=5000' },
+      timeout: 8000
+    });
+    if (res.data && res.data.value) {
+      log(`✅ Clientes obtenidos vía SQL Query (${res.data.value.length} registros).`);
+      return res.data.value;
+    }
+  } catch (errQ) {
+    log(`⚠️ SQL Query falló o dio timeout: ${errQ.message}. Intentando fallback nativo OData...`);
+  }
+
+  try {
+    let url = `${SAP_URL}/BusinessPartners?$filter=CardType eq 'cCustomer' and GroupCode eq 100`;
+    let allClients = [];
+    let page = 1;
+
+    while (url) {
+      log(`- Fetching OData page ${page}...`);
+      const bpRes = await sapApi.get(url, { timeout: 15000 });
+      const items = bpRes.data.value || [];
+      allClients = allClients.concat(items);
+      url = bpRes.data['odata.nextLink'] ? `${SAP_URL}/${bpRes.data['odata.nextLink']}` : null;
+      page++;
+    }
+
+    log(`✅ Clientes obtenidos vía OData nativo (${allClients.length} registros).`);
+    return allClients.map(c => ({
+      CardCode: c.CardCode,
+      CardName: c.CardName,
+      LicTradNum: c.FederalTaxID,
+      E_Mail: c.EmailAddress,
+      Phone1: c.Phone1,
+      Balance: c.Balance,
+      OrdersBal: c.OrdersBal
+    }));
+  } catch (errO) {
+    log(`❌ Fallback nativo OData también falló: ${errO.message}`);
+    throw new Error('No se pudieron obtener clientes de SAP usando ningún método.');
+  }
+}
+
 async function syncClientes() {
   log('Sincronizando Clientes...');
   
-  const raw = await fetchQuery(QUERIES.clientes);
+  const raw = await fetchClientesFromSAP();
   const rows = raw.map(bp => {
     const idVal = bp.CardCode || null;
     
@@ -121,7 +166,7 @@ async function syncClientes() {
       nombre:      bp.CardName || 'Sin Nombre',
       rfc:         bp.LicTradNum || '',
       email:       bp.E_Mail || '',
-      telefono:    '',
+      telefono:    bp.Phone1 || '',
       id_fiscal:   bp.LicTradNum || ''
     };
   }).filter(r => r.id);  // Solo los que tienen ID válido
