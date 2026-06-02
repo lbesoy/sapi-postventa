@@ -310,7 +310,7 @@ app.get('/api/maquinaria', ensureSAPConnection, async (req, res) => {
 
 // ── /api/sync-all: Sincroniza todos los catálogos SAP → Supabase ────────────
 const SUPABASE_URL_SRV = process.env.SUPABASE_URL;
-const SUPABASE_KEY_SRV = process.env.SUPABASE_KEY;
+const SUPABASE_KEY_SRV = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 
 if (!SUPABASE_URL_SRV || !SUPABASE_KEY_SRV) {
     console.error('CRITICAL: SUPABASE_URL or SUPABASE_KEY is missing from environment variables.');

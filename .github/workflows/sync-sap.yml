@@ -35,6 +35,7 @@ jobs:
           SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SAP_REJECT_UNAUTHORIZED: 'false'
         run: |
           cd backend && node sync-sap-supabase.js

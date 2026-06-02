@@ -20,9 +20,10 @@ const SAP_DB       = process.env.SAP_COMPANY_DB;
 const SAP_USER     = process.env.SAP_USER;
 const SAP_PASS     = process.env.SAP_PASSWORD;
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://mupevytlssqcbhlmzmcp.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11cGV2eXRsc3NxY2JobG16bWNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NjE0MzUsImV4cCI6MjA5MzMzNzQzNX0.sdAI9nJluJCP6skq0lfdj8CQvFEyqqV4z6ntbqvQdPY';
+// Preferir la Service Role Key si está presente para evitar restricciones de RLS en el servidor
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11cGV2eXRsc3NxY2JobG16bWNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NjE0MzUsImV4cCI6MjA5MzMzNzQzNX0.sdAI9nJluJCP6skq0lfdj8CQvFEyqqV4z6ntbqvQdPY';
 
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
+if (!process.env.SUPABASE_URL || (!process.env.SUPABASE_KEY && !process.env.SUPABASE_SERVICE_ROLE_KEY)) {
   console.warn('[Sync] Advertencia: Usando credenciales de Supabase por defecto (no provistas en entorno).');
 }
 
@@ -361,16 +362,26 @@ async function main() {
     if (argModulo === 'all' || argModulo === 'tecnicos') tasks.push(syncTecnicos());
 
     const resultados = await Promise.allSettled(tasks);
+    let algunFallo = false;
 
     resultados.forEach((r, i) => {
-      if (r.status === 'rejected') err(`Tarea fallida: ${r.reason?.message}`);
+      if (r.status === 'rejected') {
+        err(`Tarea fallida: ${r.reason?.message}`);
+        algunFallo = true;
+      }
     });
 
     const seg = ((Date.now() - inicio) / 1000).toFixed(1);
     log('═══════════════════════════════════════════');
-    log(`✅ Sincronización completa en ${seg}s`);
-    log('═══════════════════════════════════════════');
-    process.exit(0);
+    if (algunFallo) {
+      err(`❌ Sincronización finalizada con ERRORES en ${seg}s`);
+      log('═══════════════════════════════════════════');
+      process.exit(1);
+    } else {
+      log(`✅ Sincronización completa en ${seg}s`);
+      log('═══════════════════════════════════════════');
+      process.exit(0);
+    }
   } catch (e) {
     err(`Error fatal: ${e.message}`);
     process.exit(1);
