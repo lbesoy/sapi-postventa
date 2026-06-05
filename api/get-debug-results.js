@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const resp = await fetch(`${supabaseUrl}/rest/v1/config?id=eq.debug_tickets_result`, {
+    const resp = await fetch(`${supabaseUrl}/rest/v1/config`, {
       method: 'GET',
       headers: {
         'apikey': supabaseKey,
