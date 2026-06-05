@@ -5,7 +5,6 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
 async function run() {
   console.log('Consultando Supabase en:', SUPABASE_URL);
-  console.log('SUPABASE_KEY length:', SUPABASE_KEY ? SUPABASE_KEY.length : 0);
   try {
     const res = await axios.get(`${SUPABASE_URL}/rest/v1/tickets?select=id,folio,asunto,fecha_creacion,es_prueba,estado&order=folio.asc`, {
       headers: {
@@ -13,22 +12,32 @@ async function run() {
         'Authorization': `Bearer ${SUPABASE_KEY}`
       }
     });
-    console.log('Total tickets en Supabase:', res.data.length);
-    console.log('Lista completa de tickets ordenados por folio:');
-    res.data.forEach(t => {
-      console.log(`- Folio: ${t.folio} | Asunto: ${t.asunto} | Estado: ${t.estado} | esPrueba: ${t.es_prueba} | Creado: ${t.fecha_creacion}`);
-    });
+    console.log('Total tickets recuperados:', res.data.length);
     
-    // Buscar específicamente si hay folios que contengan "24" o similares
-    const t24 = res.data.filter(t => t.folio && t.folio.includes('24'));
-    console.log('\nTickets que contienen "24" en su folio:');
-    if (t24.length > 0) {
-      t24.forEach(t => {
-        console.log(`- Folio: ${t.folio} | ID: ${t.id} | Asunto: ${t.asunto} | Estado: ${t.estado} | esPrueba: ${t.es_prueba}`);
-      });
-    } else {
-      console.log('No se encontró ningún ticket con "24" en el folio.');
-    }
+    const ticketList = res.data.map(t => ({
+      folio: t.folio,
+      asunto: t.asunto,
+      estado: t.estado,
+      es_prueba: t.es_prueba,
+      created_at: t.fecha_creacion
+    }));
+    
+    // Guardar en la tabla config de Supabase
+    console.log('Guardando resultados en config (debug_tickets_result)...');
+    await axios.post(`${SUPABASE_URL}/rest/v1/config`, {
+      id: 'debug_tickets_result',
+      data: {
+        total: res.data.length,
+        tickets: ticketList
+      }
+    }, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      }
+    });
+    console.log('✅ Resultados de diagnóstico guardados con éxito.');
   } catch (err) {
     console.error('Error:', err.message, err.response?.data);
   }
