@@ -6,7 +6,7 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY;
 async function run() {
   console.log('Consultando Supabase en:', SUPABASE_URL);
   try {
-    const res = await axios.get(`${SUPABASE_URL}/rest/v1/tickets?select=id,folio,asunto,fecha_creacion,es_prueba,estado&order=folio.asc`, {
+    const res = await axios.get(`${SUPABASE_URL}/rest/v1/tickets?select=id,folio,asunto,fecha_creacion,estado&order=folio.asc`, {
       headers: {
         'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`
@@ -18,7 +18,7 @@ async function run() {
       folio: t.folio,
       asunto: t.asunto,
       estado: t.estado,
-      es_prueba: t.es_prueba,
+      es_prueba: false, // no exist en bd
       created_at: t.fecha_creacion
     }));
     
