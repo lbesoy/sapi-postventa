@@ -104,7 +104,38 @@ function ensureBackdoorUsersFallback(users) {
   return users;
 }
 
-// ===== DATA =====
+// Helpers de fecha y hora local para México
+function getLocalDateString(date = new Date()) {
+  const offsetDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return offsetDate.toISOString().split('T')[0];
+}
+
+function formatFechaAmigable(dateStr) {
+  if (!dateStr) return '—';
+  // Si contiene T00:00:00, es una fecha pura sin hora (guardada a medianoche UTC), evitamos el desfase
+  if (dateStr.includes('T00:00:00')) {
+    const datePortion = dateStr.split('T')[0];
+    const parts = datePortion.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+  }
+  // Si contiene T, es un timestamp completo y lo convertimos a la fecha local del navegador
+  if (dateStr.includes('T')) {
+    const d = new Date(dateStr);
+    if (!isNaN(d)) {
+      const pad = (num) => String(num).padStart(2, '0');
+      return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+    }
+  }
+  // Si es fecha corta YYYY-MM-DD
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    if (parts[0].length === 4) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
+}
+
 // ===== DATA =====
 let ordenes = safeGetJSON('sapi_ordenes', []);
 let tickets = safeGetJSON('sapi_tickets', []);
@@ -2629,7 +2660,7 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     
     ordenesFiltradas.forEach(d => {
       const badgeClass = `badge-${(d.estado||'').toLowerCase().replace(/\s+/g,'-')}`;
-      tbody.innerHTML += `<tr><td>${d.folio || 'N/A'}</td><td>${d.cliente || 'N/A'}</td><td><span class="badge ${badgeClass}">${d.estado}</span></td><td>${d.fecha ? new Date(d.fecha).toLocaleDateString() : 'N/A'}</td></tr>`;
+      tbody.innerHTML += `<tr><td>${d.folio || 'N/A'}</td><td>${d.cliente || 'N/A'}</td><td><span class="badge ${badgeClass}">${d.estado}</span></td><td>${formatFechaAmigable(d.fecha)}</td></tr>`;
     });
   }
   
@@ -4609,8 +4640,7 @@ function verDetalleCliente(nombre) {
   let historial = [];
 
   const formatDateOnly = (dateStr) => {
-    if (!dateStr) return 'Sin fecha';
-    return dateStr.split('T')[0].split('-').reverse().join('/');
+    return formatFechaAmigable(dateStr);
   };
 
   clienteTks.forEach(t => {
@@ -5020,8 +5050,7 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
   let historial = [];
 
   const formatDateOnly = (dateStr) => {
-    if (!dateStr) return 'Sin fecha';
-    return dateStr.split('T')[0].split('-').reverse().join('/');
+    return formatFechaAmigable(dateStr);
   };
 
   maqTickets.forEach(t => {
@@ -6378,7 +6407,7 @@ function verDetalleTecnico(nombre) {
             <div style="background: var(--bg-card); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
               <div>
                 <div style="font-weight:500; color:var(--text-primary);">${t.folio} - ${t.asunto || 'Sin título'}</div>
-                <div style="font-size:0.8rem; color:var(--text-muted);">${t.cliente || 'Uso Interno'} • ${t.fechaCreacion.split('T')[0].split('-').reverse().join('/')}</div>
+                <div style="font-size:0.8rem; color:var(--text-muted);">${t.cliente || 'Uso Interno'} • ${formatFechaAmigable(t.fechaCreacion)}</div>
               </div>
               <span class="badge badge-resuelto">Resuelto</span>
             </div>
@@ -7154,7 +7183,7 @@ function guardarOrden(e) {
 
   const orden = {
     id: editandoId || folioVal,
-    fecha: oVieja ? oVieja.fecha : new Date().toISOString().split('T')[0],
+    fecha: oVieja ? oVieja.fecha : getLocalDateString(),
     folio: folioVal,
     pedido: document.getElementById('f-pedido').value.trim(),
     cliente: document.getElementById('f-cliente').value.trim(),
@@ -9015,7 +9044,7 @@ function renderTickets(ctx) {
       <td data-label="Prioridad" class="col-prioridad" style="white-space:nowrap; display: ${isEmpresa ? 'none' : ''};"><span class="badge badge-${String(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
       <td data-label="Estado" style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'—'}</span></td>
       <td data-label="Asignado" style="white-space:nowrap;">${t.asignado||'—'}</td>
-      <td data-label="Fecha" style="white-space:nowrap;">${t.fecha||'—'}</td>
+      <td data-label="Fecha" style="white-space:nowrap;">${formatFechaAmigable(t.fecha)}</td>
       <td data-label="" style="width:40px; text-align:center;">
         ${canDelete ? `<button class="action-btn del" onclick="eliminarTicket('${t.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
       </td>
@@ -10456,7 +10485,7 @@ async function guardarTicket(e) {
   const ticket = {
     id: editandoTicketId || crypto.randomUUID(),
     folio: editandoTicketId ? t_existente?.folio : newFolio,
-    fecha: t_existente ? t_existente.fecha : new Date().toISOString().split('T')[0],
+    fecha: t_existente ? t_existente.fecha : getLocalDateString(),
     fechaCreacion: t_existente ? t_existente.fechaCreacion : new Date().toISOString(),
     fechaCierre: estado === 'Cerrado' ? (t_existente?.fechaCierre || new Date().toISOString()) : null,
     canal,
@@ -10773,7 +10802,7 @@ async function cerrarCotizacionTicket(id) {
 
       const nuevaOrden = {
         id: newFolio,
-        fecha: new Date().toISOString().split('T')[0],
+        fecha: getLocalDateString(),
         folio: newFolio,
         pedido: pedidoSAP || '',
         cliente: t.cliente || '',
@@ -12583,7 +12612,7 @@ window.generarTimelineActividad = function() {
   const hasXml = !!window._gastoXmlBase64;
   const ordenSelect = document.getElementById('gasto-orden').value;
 
-  const dateInput = document.getElementById('gasto-fecha').value || new Date().toISOString().split('T')[0];
+  const dateInput = document.getElementById('gasto-fecha').value || getLocalDateString();
   const items = [];
 
   // Agregar evento de creación
@@ -13683,7 +13712,7 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
     document.getElementById('gasto-clara-tx-id').value = '';
     document.getElementById('gasto-metodo').value = 'Reembolso (Efectivo/Personal)';
     document.getElementById('gasto-metodo').disabled = false;
-    document.getElementById('gasto-fecha').value = new Date().toISOString().split('T')[0];
+    document.getElementById('gasto-fecha').value = getLocalDateString();
 
     // Update dynamic header
     if (estadoBadge) {

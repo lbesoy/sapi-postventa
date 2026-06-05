@@ -46,6 +46,22 @@ window.ensureBackdoorUsers = function(users) {
 // ─── Helpers de mapeo camelCase <-> snake_case ───────────────
 
 function ticketToRow(t) {
+  // Encontrar el ID del cliente por su nombre
+  let clienteId = t.cliente || null;
+  try {
+    const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+    const match = clientes.find(c => c.nombre === t.cliente || c.id === t.cliente);
+    if (match) clienteId = match.id;
+  } catch (e) {}
+
+  // Encontrar el ID del sitio por su nombre
+  let sitioId = t.sitio || null;
+  try {
+    const sitios = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+    const match = sitios.find(s => s.cliente === clienteId && (s.nombre === t.sitio || s.direccion === t.sitio || s.id === t.sitio));
+    if (match) sitioId = match.id;
+  } catch (e) {}
+
   return {
     id: t.id,
     folio: t.folio,
@@ -54,8 +70,8 @@ function ticketToRow(t) {
     canal: t.canal || null,
     contacto: t.contacto || null,
     asunto: t.asunto || null,
-    cliente: t.cliente || null,
-    sitio: t.sitio || null,
+    cliente: clienteId,
+    sitio: sitioId,
     solicitante: t.solicitante || null,
     area: t.area || null,
     categoria: t.categoria || null,
@@ -75,6 +91,20 @@ function ticketToRow(t) {
 }
 
 function rowToTicket(t) {
+  let clienteNombre = t.cliente;
+  try {
+    const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+    const match = clientes.find(c => c.id === t.cliente);
+    if (match) clienteNombre = match.nombre;
+  } catch (e) {}
+
+  let sitioNombre = t.sitio;
+  try {
+    const sitios = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+    const match = sitios.find(s => s.id === t.sitio);
+    if (match) sitioNombre = match.nombre || match.direccion;
+  } catch (e) {}
+
   const obj = {
     id: t.id,
     folio: t.folio,
@@ -83,8 +113,8 @@ function rowToTicket(t) {
     canal: t.canal,
     contacto: t.contacto,
     asunto: t.asunto,
-    cliente: t.cliente,
-    sitio: t.sitio,
+    cliente: clienteNombre,
+    sitio: sitioNombre,
     solicitante: t.solicitante,
     area: t.area,
     categoria: t.categoria,
