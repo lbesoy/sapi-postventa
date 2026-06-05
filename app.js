@@ -8900,6 +8900,13 @@ function renderTickets(ctx) {
     String(t.folio||'').toLowerCase().includes(q)
   );
   
+  // Ordenar por folio descendente por defecto (más recientes primero)
+  filtered.sort((a, b) => {
+    const folioA = String(a.folio || '');
+    const folioB = String(b.folio || '');
+    return folioB.localeCompare(folioA, undefined, { numeric: true, sensitivity: 'base' });
+  });
+  
   let tecFilter = document.getElementById(isDashView ? 'filter-dash-tkt-tecnico' : 'filter-tkt-tecnico')?.value;
   let supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value;
   
