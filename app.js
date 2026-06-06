@@ -2733,10 +2733,10 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
       ordenes.forEach(o => {
         if ((o.estado || '').toLowerCase() === 'completado') {
           let fCreacion = new Date(o.fecha || 0);
-          let fCierre = fCreacion;
+          let fCierre = o.fechaFin ? new Date(o.fechaFin) : fCreacion;
           if (o.bitacora && o.bitacora.length > 0) {
             let maxB = Math.max(...o.bitacora.map(b => new Date(b.fecha).getTime()));
-            if (!isNaN(maxB)) fCierre = new Date(maxB);
+            if (!isNaN(maxB) && maxB > fCierre.getTime()) fCierre = new Date(maxB);
           }
           let diff = fCierre.getTime() - fCreacion.getTime();
           let dias = Math.ceil(diff / (1000 * 3600 * 24));
@@ -3119,10 +3119,10 @@ function renderDashboardV2() {
       }
     } else {
       let fCreacion = new Date(o.fecha || 0);
-      let fCierre = fCreacion;
+      let fCierre = o.fechaFin ? new Date(o.fechaFin) : fCreacion;
       if (o.bitacora && o.bitacora.length > 0) {
         let maxB = Math.max(...o.bitacora.map(b => new Date(b.fecha).getTime()));
-        if (!isNaN(maxB)) fCierre = new Date(maxB);
+        if (!isNaN(maxB) && maxB > fCierre.getTime()) fCierre = new Date(maxB);
       }
       let diff = fCierre.getTime() - fCreacion.getTime();
       let dias = Math.ceil(diff / (1000 * 3600 * 24));
