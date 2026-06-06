@@ -3662,7 +3662,7 @@ function renderTabla(ctx) {
 
       <td data-label="Tipo"><span class="badge badge-${(o.tipo||'otro').toLowerCase().replace('é','e').replace('í','i')}">${o.tipo||'-'}</span></td>
       <td data-label="Estado"><span class="badge ${badgeEstado(o.estado)}">${o.estado||'-'}</span></td>
-      <td data-label="Fecha">${o.fecha ? o.fecha.split('T')[0] : '-'}</td>
+      <td data-label="Fecha">${formatFechaAmigable(o.fecha)}</td>
       <td data-label="" style="width:40px; text-align:center;">
         ${canDelete ? `<button class="action-btn del" onclick="eliminarOrden('${o.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
       </td>
@@ -10574,7 +10574,7 @@ function verDetalleTicket(id) {
       <div class="detalle-section-title">Datos del Ticket</div>
       <div class="detalle-grid">
         ${field('Folio', t.folio)}
-        ${field('Fecha', t.fecha)}
+        ${field('Fecha', formatFechaAmigable(t.fecha))}
         ${t.cliente ? field('Cliente', `${t.cliente}${t.sitio ? ` (Sitio: ${t.sitio})` : ''}`) : ''}
         ${field('Canal', t.canal ? ({correo:'Correo',whatsapp:'WhatsApp',telefono:'Llamada Tel.'}[t.canal]||t.canal) : '—')}
         ${field('Contacto', t.contacto)}
