@@ -136,6 +136,32 @@ function formatFechaAmigable(dateStr) {
   return dateStr;
 }
 
+function formatFechaHoraAmigable(dateStr) {
+  if (!dateStr) return '—';
+  // Si contiene T00:00:00, es una fecha pura sin hora (guardada a medianoche UTC), evitamos el desfase
+  if (dateStr.includes('T00:00:00')) {
+    const datePortion = dateStr.split('T')[0];
+    const parts = datePortion.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+  }
+  // Si contiene T, es un timestamp completo y lo convertimos a la fecha y hora local del navegador
+  if (dateStr.includes('T')) {
+    const d = new Date(dateStr);
+    if (!isNaN(d)) {
+      const pad = (num) => String(num).padStart(2, '0');
+      return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+  }
+  // Si es fecha corta YYYY-MM-DD
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    if (parts[0].length === 4) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
+}
+
 // ===== DATA =====
 let ordenes = safeGetJSON('sapi_ordenes', []);
 let tickets = safeGetJSON('sapi_tickets', []);
@@ -4640,7 +4666,7 @@ function verDetalleCliente(nombre) {
   let historial = [];
 
   const formatDateOnly = (dateStr) => {
-    return formatFechaAmigable(dateStr);
+    return formatFechaHoraAmigable(dateStr);
   };
 
   clienteTks.forEach(t => {
@@ -5050,7 +5076,7 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
   let historial = [];
 
   const formatDateOnly = (dateStr) => {
-    return formatFechaAmigable(dateStr);
+    return formatFechaHoraAmigable(dateStr);
   };
 
   maqTickets.forEach(t => {
@@ -9044,7 +9070,7 @@ function renderTickets(ctx) {
       <td data-label="Prioridad" class="col-prioridad" style="white-space:nowrap; display: ${isEmpresa ? 'none' : ''};"><span class="badge badge-${String(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
       <td data-label="Estado" style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'—'}</span></td>
       <td data-label="Asignado" style="white-space:nowrap;">${t.asignado||'—'}</td>
-      <td data-label="Fecha" style="white-space:nowrap;">${formatFechaAmigable(t.fecha)}</td>
+      <td data-label="Fecha" style="white-space:nowrap;">${formatFechaHoraAmigable(t.fechaCreacion || t.fecha)}</td>
       <td data-label="" style="width:40px; text-align:center;">
         ${canDelete ? `<button class="action-btn del" onclick="eliminarTicket('${t.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
       </td>
@@ -10485,7 +10511,7 @@ async function guardarTicket(e) {
   const ticket = {
     id: editandoTicketId || crypto.randomUUID(),
     folio: editandoTicketId ? t_existente?.folio : newFolio,
-    fecha: t_existente ? t_existente.fecha : getLocalDateString(),
+    fecha: t_existente ? t_existente.fecha : new Date().toISOString(),
     fechaCreacion: t_existente ? t_existente.fechaCreacion : new Date().toISOString(),
     fechaCierre: estado === 'Cerrado' ? (t_existente?.fechaCierre || new Date().toISOString()) : null,
     canal,
@@ -10574,7 +10600,7 @@ function verDetalleTicket(id) {
       <div class="detalle-section-title">Datos del Ticket</div>
       <div class="detalle-grid">
         ${field('Folio', t.folio)}
-        ${field('Fecha', formatFechaAmigable(t.fecha))}
+        ${field('Fecha', formatFechaHoraAmigable(t.fechaCreacion || t.fecha))}
         ${t.cliente ? field('Cliente', `${t.cliente}${t.sitio ? ` (Sitio: ${t.sitio})` : ''}`) : ''}
         ${field('Canal', t.canal ? ({correo:'Correo',whatsapp:'WhatsApp',telefono:'Llamada Tel.'}[t.canal]||t.canal) : '—')}
         ${field('Contacto', t.contacto)}
