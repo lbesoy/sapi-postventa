@@ -2901,23 +2901,30 @@ function renderStats() {
           return passSupClient || passSupTicket || isCreator;
         });
 
-        ticketsFilter = ticketsFilter.filter(t => {
-          let passSupClient = false;
-          const cli = clientesDb.find(c => c.nombre === t.cliente);
-          if (cli) {
-            const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
-            const supId = supUser ? supUser.id : supFilter;
-            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
-          }
-          
-          let assigned = [];
-          if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
-          else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
-          
-          let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
-          
-          return passSupClient || passSupTicket;
-        });
+        const isLauraPaz = currentUser && (
+          String(currentUser.nombre).toLowerCase().trim() === 'laura paz' ||
+          String(currentUser.email).toLowerCase().trim().includes('laura.paz') ||
+          String(currentUser.email).toLowerCase().trim().includes('laurapaz')
+        );
+        if (!isLauraPaz) {
+          ticketsFilter = ticketsFilter.filter(t => {
+            let passSupClient = false;
+            const cli = clientesDb.find(c => c.nombre === t.cliente);
+            if (cli) {
+              const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
+              const supId = supUser ? supUser.id : supFilter;
+              passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
+            }
+            
+            let assigned = [];
+            if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+            else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+            
+            let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
+            
+            return passSupClient || passSupTicket;
+          });
+        }
       }
   }
 
@@ -3076,23 +3083,30 @@ function renderDashboardV2() {
       return passSupClient || passSupTicket || isCreator;
     });
 
-    ticketsDash = ticketsDash.filter(t => {
-      let passSupClient = false;
-      const cli = clientesDb.find(c => c.nombre === t.cliente);
-      if (cli) {
-        const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
-        const supId = supUser ? supUser.id : supFilter;
-        passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
-      }
-      
-      let assigned = [];
-      if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
-      else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
-      
-      let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
-      
-      return passSupClient || passSupTicket;
-    });
+    const isLauraPaz = currentUser && (
+      String(currentUser.nombre).toLowerCase().trim() === 'laura paz' ||
+      String(currentUser.email).toLowerCase().trim().includes('laura.paz') ||
+      String(currentUser.email).toLowerCase().trim().includes('laurapaz')
+    );
+    if (!isLauraPaz) {
+      ticketsDash = ticketsDash.filter(t => {
+        let passSupClient = false;
+        const cli = clientesDb.find(c => c.nombre === t.cliente);
+        if (cli) {
+          const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
+          const supId = supUser ? supUser.id : supFilter;
+          passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
+        }
+        
+        let assigned = [];
+        if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+        else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+        
+        let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
+        
+        return passSupClient || passSupTicket;
+      });
+    }
 
     const rend1 = document.getElementById('v2-label-rend-1'); if (rend1) rend1.textContent = 'Refacciones Faltantes';
     const rend2 = document.getElementById('v2-label-rend-2'); if (rend2) rend2.textContent = 'Resolución Órdenes';
@@ -8934,10 +8948,15 @@ function actualizarFiltrosPersonal() {
     
     selectsSupervisor.forEach(sel => { 
       if(sel) { 
-        const val = isSupervisor ? userName : (isTecnico ? '' : sel.value); 
+        const isLauraPaz = currentUser && (
+          String(currentUser.nombre).toLowerCase().trim() === 'laura paz' ||
+          String(currentUser.email).toLowerCase().trim().includes('laura.paz') ||
+          String(currentUser.email).toLowerCase().trim().includes('laurapaz')
+        );
+        const val = (isSupervisor && !isLauraPaz) ? userName : (isTecnico ? '' : sel.value); 
         sel.innerHTML = supOptionsHtml; 
         sel.value = val; 
-        sel.disabled = isSupervisor || isTecnico;
+        sel.disabled = (isSupervisor && !isLauraPaz) || isTecnico;
       } 
     });
   } catch (error) {
@@ -9001,7 +9020,18 @@ function renderTickets(ctx) {
       tecFilter = currentUser ? currentUser.nombre : '';
     }
   }
-  if (userRole === 'supervisor') supFilter = currentUser ? currentUser.nombre : '';
+  if (userRole === 'supervisor') {
+    const isLauraPaz = currentUser && (
+      String(currentUser.nombre).toLowerCase().trim() === 'laura paz' ||
+      String(currentUser.email).toLowerCase().trim().includes('laura.paz') ||
+      String(currentUser.email).toLowerCase().trim().includes('laurapaz')
+    );
+    if (isLauraPaz) {
+      supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value || '';
+    } else {
+      supFilter = currentUser ? currentUser.nombre : '';
+    }
+  }
   
   if (tecFilter || supFilter) {
     const tecName = tecFilter; // Ahora usamos el nombre directamente
