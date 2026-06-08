@@ -7288,6 +7288,10 @@ function guardarOrden(e) {
   if (window.supabaseClient) {
     window.pushToSupabase('ordenes', orden);
   }
+  if (window.trackTelemetryEvent) {
+    const act = editandoId ? 'Edición de Orden' : 'Creación de Orden';
+    window.trackTelemetryEvent(act, { folio: orden.folio, cliente: orden.cliente });
+  }
   cerrarFormulario();
   renderTabla();
   renderTabla('servicios');
@@ -7297,11 +7301,17 @@ function guardarOrden(e) {
 // ===== ELIMINAR =====
 function eliminarOrden(id) {
   if (!confirm('¿Eliminar esta orden de servicio?')) return;
+  const o = ordenes.find(x => x.id === id);
+  const folio = o ? o.folio : 'Desconocido';
+
   ordenes = ordenes.filter(o => o.id !== id);
   localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
   
   if (window.deleteFromSupabase) {
     window.deleteFromSupabase('ordenes', id);
+  }
+  if (window.trackTelemetryEvent) {
+    window.trackTelemetryEvent('Eliminación de Orden', { id, folio });
   }
   renderTabla();
   renderTabla('servicios');
@@ -10568,6 +10578,10 @@ async function guardarTicket(e) {
   if (window.supabaseClient) {
     await window.pushToSupabase('tickets', ticket);
   }
+  if (window.trackTelemetryEvent) {
+    const act = editandoTicketId ? 'Edición de Ticket' : 'Creación de Ticket';
+    window.trackTelemetryEvent(act, { folio: ticket.folio, asunto: ticket.asunto });
+  }
   cerrarTicket();
   renderTickets();
   updateTicketBadge();
@@ -10575,11 +10589,17 @@ async function guardarTicket(e) {
 
 function eliminarTicket(id) {
   if (!confirm('¿Eliminar este ticket?')) return;
+  const t = tickets.find(x => x.id === id);
+  const folio = t ? t.folio : 'Desconocido';
+
   tickets = tickets.filter(t => t.id !== id);
   localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
   
   if (window.deleteFromSupabase) {
     window.deleteFromSupabase('tickets', id);
+  }
+  if (window.trackTelemetryEvent) {
+    window.trackTelemetryEvent('Eliminación de Ticket', { id, folio });
   }
   renderTickets();
   updateTicketBadge();
@@ -13904,12 +13924,18 @@ window.procesarArchivoFactura = function(e, type) {
 
 window.eliminarGasto = function(gastoId) {
   if (!confirm('¿Estás seguro de que deseas eliminar este gasto?')) return;
+  const gObj = gastos.find(x => x.id === gastoId);
+  const desc = gObj ? `${gObj.categoria || 'Gastos'}: ${gObj.descripcion || 'Sin descripción'}` : 'Gasto';
+  const monto = gObj ? gObj.monto : 0;
 
   gastos = gastos.filter(g => g.id !== gastoId);
   localStorage.setItem('sapi_gastos', JSON.stringify(gastos));
 
   if (typeof window.deleteFromSupabase === 'function') {
     window.deleteFromSupabase('gastos', gastoId);
+  }
+  if (window.trackTelemetryEvent) {
+    window.trackTelemetryEvent('Eliminación de Gasto', { id: gastoId, descripcion: desc, monto: monto });
   }
 
   mostrarNotificacion('Gasto eliminado', 'success');
@@ -13978,6 +14004,10 @@ window.guardarGasto = function(e) {
 
   if (typeof window.pushToSupabase === 'function') {
     window.pushToSupabase('gastos', gasto);
+  }
+  if (window.trackTelemetryEvent) {
+    const act = isNew ? 'Creación de Gasto' : 'Edición de Gasto';
+    window.trackTelemetryEvent(act, { categoria: gasto.categoria, monto: gasto.monto, descripcion: gasto.descripcion });
   }
 
   mostrarNotificacion(isNew ? 'Gasto registrado correctamente' : 'Gasto actualizado correctamente', 'success');
@@ -15913,7 +15943,12 @@ window.renderTelemetryEventsFeed = function() {
   } else if (filter === 'views') {
     filtered = filtered.filter(e => e.action === 'Visualización de Módulo');
   } else if (filter === 'actions') {
-    filtered = filtered.filter(e => ['Conexión OneDrive', 'Importación OneDrive', 'Vinculación de Factura', 'Guardado de Gasto', 'Visor PDF SAT'].includes(e.action));
+    filtered = filtered.filter(e => [
+      'Conexión OneDrive', 'Importación OneDrive', 'Vinculación de Factura', 'Guardado de Gasto', 'Visor PDF SAT',
+      'Creación de Gasto', 'Edición de Gasto', 'Eliminación de Gasto',
+      'Creación de Ticket', 'Edición de Ticket', 'Eliminación de Ticket',
+      'Creación de Orden', 'Edición de Orden', 'Eliminación de Orden'
+    ].includes(e.action));
   }
 
   if (filtered.length === 0) {
@@ -15970,6 +16005,54 @@ window.renderTelemetryEventsFeed = function() {
       iconColor = 'var(--red)';
       iconBg = 'rgba(239,68,68,0.12)';
       desc = `Visualizó Ficha SAT detallada para el archivo PDF <strong>${e.details?.archivo || '-'}</strong>.`;
+    } else if (e.action === 'Creación de Ticket') {
+      icon = 'plus-circle';
+      iconColor = 'var(--accent)';
+      iconBg = 'rgba(168,85,247,0.12)';
+      desc = `Creó el Ticket folio <strong>${e.details?.folio || '-'}</strong>: "${e.details?.asunto || ''}"`;
+    } else if (e.action === 'Edición de Ticket') {
+      icon = 'edit';
+      iconColor = 'var(--accent)';
+      iconBg = 'rgba(168,85,247,0.12)';
+      desc = `Editó el Ticket folio <strong>${e.details?.folio || '-'}</strong>.`;
+    } else if (e.action === 'Eliminación de Ticket') {
+      icon = 'trash-2';
+      iconColor = 'var(--red)';
+      iconBg = 'rgba(239,68,68,0.12)';
+      desc = `Eliminó el Ticket folio <strong>${e.details?.folio || '-'}</strong>.`;
+    } else if (e.action === 'Creación de Orden') {
+      icon = 'plus-circle';
+      iconColor = 'var(--green)';
+      iconBg = 'rgba(16,185,129,0.12)';
+      desc = `Creó la Orden de Servicio folio <strong>${e.details?.folio || '-'}</strong> para el cliente <strong>${e.details?.cliente || ''}</strong>.`;
+    } else if (e.action === 'Edición de Orden') {
+      icon = 'edit';
+      iconColor = 'var(--green)';
+      iconBg = 'rgba(16,185,129,0.12)';
+      desc = `Editó la Orden de Servicio folio <strong>${e.details?.folio || '-'}</strong>.`;
+    } else if (e.action === 'Eliminación de Orden') {
+      icon = 'trash-2';
+      iconColor = 'var(--red)';
+      iconBg = 'rgba(239,68,68,0.12)';
+      desc = `Eliminó la Orden de Servicio folio <strong>${e.details?.folio || '-'}</strong>.`;
+    } else if (e.action === 'Creación de Gasto') {
+      icon = 'plus-circle';
+      iconColor = 'var(--green)';
+      iconBg = 'rgba(16,185,129,0.12)';
+      const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
+      desc = `Registró un gasto de <strong>${e.details?.categoria || 'Gastos'}</strong> por <strong>${formatMoney(e.details?.monto)}</strong> ("${e.details?.descripcion || ''}").`;
+    } else if (e.action === 'Edición de Gasto') {
+      icon = 'edit';
+      iconColor = 'var(--green)';
+      iconBg = 'rgba(16,185,129,0.12)';
+      const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
+      desc = `Actualizó el gasto de <strong>${e.details?.categoria || 'Gastos'}</strong> por un total de <strong>${formatMoney(e.details?.monto)}</strong>.`;
+    } else if (e.action === 'Eliminación de Gasto') {
+      icon = 'trash-2';
+      iconColor = 'var(--red)';
+      iconBg = 'rgba(239,68,68,0.12)';
+      const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
+      desc = `Eliminó el gasto de <strong>${e.details?.descripcion || 'Gasto'}</strong> por <strong>${formatMoney(e.details?.monto)}</strong>.`;
     } else {
       desc = `${e.action} - ${JSON.stringify(e.details || {})}`;
     }
