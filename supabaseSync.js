@@ -108,6 +108,7 @@ function rowToTicket(t) {
 
   const obj = {
     id: t.id,
+    _synced: true,
     folio: t.folio,
     fecha: t.fecha,
     fechaCreacion: t.fecha_creacion,
@@ -225,7 +226,9 @@ function rowToOrden(o) {
   }
 
   const res = {
-    id: o.id, folio: o.folio, cliente: o.cliente,
+    id: o.id,
+    _synced: true,
+    folio: o.folio, cliente: o.cliente,
     ubicacion: ubicacion, tecnico: o.tecnico, modelo: modelo,
     tipo: o.tipo, estado: o.estado, fecha: o.fecha,
     fechaInicio: o.fecha_inicio, fechaFin: o.fecha_fin,
@@ -308,6 +311,7 @@ function rowToGasto(g) {
 
   return {
     id: g.id,
+    _synced: true,
     usuarioId: g.usuario_id,
     nombreUsuario: nombreUsr,
     fecha: g.fecha,
@@ -374,6 +378,7 @@ function eventoToRow(e) {
 function rowToEvento(r) {
   return {
     id: r.id,
+    _synced: true,
     titulo: r.titulo,
     descripcion: r.descripcion,
     fechaInicio: r.fecha_inicio,
@@ -1321,6 +1326,21 @@ window.cargarDatosDeSupabase = function() {
         }
       });
 
+      // ESTRATEGIA ANTI-PÉRDIDA: Preservar tickets que solo existen localmente y nunca se han sincronizado
+      try {
+        const localTickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+        const unsyncedLocal = localTickets.filter(t => t && t._synced !== true);
+        unsyncedLocal.forEach(lt => {
+          const exists = mapped.some(m => m.id === lt.id);
+          if (!exists) {
+            console.log(`[Sync] Preservando ticket local no sincronizado: ${lt.id} (Folio: ${lt.folio})`);
+            mapped.push(lt);
+          }
+        });
+      } catch (e) {
+        console.error('[Sync] Error al preservar tickets locales no sincronizados:', e);
+      }
+
       window._supaTickets = mapped;
       localStorage.setItem('sapi_tickets', JSON.stringify(mapped));
     } else {
@@ -1498,6 +1518,21 @@ window.cargarDatosDeSupabase = function() {
         }
       });
 
+      // ESTRATEGIA ANTI-PÉRDIDA: Preservar órdenes que solo existen localmente y nunca se han sincronizado
+      try {
+        const localOrdenes = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+        const unsyncedLocal = localOrdenes.filter(o => o && o._synced !== true);
+        unsyncedLocal.forEach(lo => {
+          const exists = mapped.some(m => m.id === lo.id);
+          if (!exists) {
+            console.log(`[Sync] Preservando orden local no sincronizada: ${lo.id} (Folio: ${lo.folio})`);
+            mapped.push(lo);
+          }
+        });
+      } catch (e) {
+        console.error('[Sync] Error al preservar órdenes locales no sincronizadas:', e);
+      }
+
       window._supaOrdenes = mapped;
       localStorage.setItem('sapi_ordenes', JSON.stringify(window._supaOrdenes));
     } else {
@@ -1592,6 +1627,22 @@ window.cargarDatosDeSupabase = function() {
       }
     });
 
+    // ESTRATEGIA ANTI-PÉRDIDA: Preservar gastos locales no sincronizados
+    if (mappedGastos.length > 0) {
+      try {
+        const unsyncedLocal = localGastos.filter(g => g && g._synced !== true);
+        unsyncedLocal.forEach(lg => {
+          const exists = mergedGastos.some(m => m.id === lg.id);
+          if (!exists) {
+            console.log(`[Sync] Preservando gasto local no sincronizado: ${lg.id}`);
+            mergedGastos.push(lg);
+          }
+        });
+      } catch (e) {
+        console.error('[Sync] Error al preservar gastos locales no sincronizados:', e);
+      }
+    }
+
     window._supaGastos = mergedGastos;
     localStorage.setItem('sapi_gastos', JSON.stringify(mergedGastos));
 
@@ -1624,6 +1675,22 @@ window.cargarDatosDeSupabase = function() {
         mergedEventos = mergedEventos.filter(e => e.id !== item.data.id);
       }
     });
+
+    // ESTRATEGIA ANTI-PÉRDIDA: Preservar eventos locales no sincronizados
+    if (mappedEventos.length > 0) {
+      try {
+        const unsyncedLocal = localEventos.filter(e => e && e._synced !== true);
+        unsyncedLocal.forEach(le => {
+          const exists = mergedEventos.some(m => m.id === le.id);
+          if (!exists) {
+            console.log(`[Sync] Preservando evento local no sincronizado: ${le.id}`);
+            mergedEventos.push(le);
+          }
+        });
+      } catch (e) {
+        console.error('[Sync] Error al preservar eventos locales no sincronizados:', e);
+      }
+    }
 
     window._supaCalendarioEventos = mergedEventos;
     localStorage.setItem('sapi_calendario_eventos', JSON.stringify(mergedEventos));
