@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.2.8'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.2.9'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -3516,6 +3516,7 @@ function toggleSortOrdenes(col) {
 }
 
 function renderTabla(ctx) {
+  try { actualizarFiltrosPersonal(); } catch (e) {}
   const isServiciosView = ctx === 'servicios';
   const isV2 = ctx === 'v2';
   const bodyId = isServiciosView ? 'tabla-body-servicios' : (isV2 ? 'v2-tabla-body' : 'tabla-body');
@@ -8966,6 +8967,7 @@ function actualizarFiltrosPersonal() {
 
 // ===== RENDER TICKETS =====
 function renderTickets(ctx) {
+  try { actualizarFiltrosPersonal(); } catch (e) {}
   const isDashView = ctx === 'dash-tickets';
   const isV2 = ctx === 'v2';
   const bodyId = isDashView ? 'tabla-body-dash-tickets' : (isV2 ? 'v2-tickets-body' : 'tickets-body');
