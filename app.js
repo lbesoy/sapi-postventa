@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.7'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.8'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -10171,9 +10171,10 @@ function abrirTicket(id) {
 
   // Si es empresa y es un ticket nuevo, autocompletamos su perfil
   if (isEmpresa && !id) {
-    document.getElementById('t-solicitante').value = nombreEmpresaLogged || '';
-    if (nombreEmpresaLogged) {
-      selectComboOption('t-cliente', nombreEmpresaLogged, nombreEmpresaLogged);
+    document.getElementById('t-solicitante').value = currentUser ? currentUser.nombre : '';
+    const cliName = currentUser ? (currentUser.empresa || currentUser.nombre) : '';
+    if (cliName) {
+      selectComboOption('t-cliente', cliName, cliName);
     }
   }
 
