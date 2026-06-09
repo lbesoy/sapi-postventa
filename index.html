@@ -2,6 +2,12 @@
 <html lang="es">
 
 <head>
+  <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+      alert("ERROR GLOBAL DETECTADO:\n" + message + "\n\nArchivo: " + source + "\nLínea: " + lineno + "\n\nDetalle: " + (error ? error.stack : 'N/A'));
+      return false;
+    };
+  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Eurorep – Seguimiento de Servicios</title>
@@ -230,7 +236,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version">v1.3.20</div>
+          <div class="sidebar-version">v1.3.21</div>
         </div>
       </div>
     </aside>
@@ -4548,7 +4554,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js?v=2"></script>
   <script src="supabaseSync.js?v=27"></script>
-  <script src="app.js?v=59"></script>
+  <script src="app.js?v=60"></script>
   <script>lucide.createIcons();</script>
 </body>
 
