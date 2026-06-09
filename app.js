@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.19'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.20'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -12282,6 +12282,7 @@ window.procesarArchivoTarjetas = function(event) {
       const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
       if (json.length === 0) {
+        alert('Error: El archivo Excel leído está vacío (0 filas encontradas).');
         mostrarNotificacion('El archivo está vacío o no es válido.', 'error');
         resetInputAndButton();
         return;
@@ -12307,19 +12308,19 @@ window.procesarArchivoTarjetas = function(event) {
         const cleaned = cleanCol(k);
         if (cleaned === 'alias') {
           colMap['alias'] = k;
-        } else if (cleaned === 'usuario' || cleaned === 'titular' || cleaned === 'user') {
+        } else if (cleaned === 'usuario' || cleaned === 'titular' || cleaned === 'user' || cleaned.includes('usuario') || cleaned.includes('titular') || cleaned.includes('user') || cleaned.includes('alias / titular') || cleaned.includes('alias/titular') || cleaned.includes('nombre')) {
           colMap['usuario'] = k;
         } else if (cleaned.includes('correo') || cleaned.includes('email') || cleaned.includes('electronico')) {
           colMap['correo'] = k;
-        } else if (cleaned === 'estado' || cleaned === 'status') {
+        } else if (cleaned === 'estado' || cleaned === 'status' || cleaned.includes('estado') || cleaned.includes('status') || cleaned.includes('estatus')) {
           colMap['estado'] = k;
-        } else if (cleaned === 'tipo' || cleaned === 'type') {
+        } else if (cleaned === 'tipo' || cleaned === 'type' || cleaned.includes('tipo') || cleaned.includes('type')) {
           colMap['tipo'] = k;
-        } else if (cleaned === 'tarjeta' || cleaned === 'card') {
+        } else if (cleaned === 'tarjeta' || cleaned === 'card' || cleaned.includes('tarjeta') || cleaned.includes('card') || cleaned.includes('num') || cleaned.includes('no')) {
           colMap['tarjeta'] = k;
-        } else if (cleaned.includes('limite') || cleaned.includes('limit')) {
+        } else if (cleaned.includes('limite') || cleaned.includes('limit') || cleaned.includes('monto') || cleaned.includes('credito')) {
           colMap['limite'] = k;
-        } else if (cleaned.includes('saldo utilizado') || cleaned.includes('saldo util') || cleaned.includes('utilizado')) {
+        } else if (cleaned.includes('saldo utilizado') || cleaned.includes('saldo util') || cleaned.includes('utilizado') || cleaned.includes('consumido') || cleaned.includes('saldo')) {
           colMap['saldoUtilizado'] = k;
         } else if (cleaned.includes('ultima actualizacion') || cleaned.includes('actualizacion') || cleaned.includes('fecha')) {
           colMap['ultimaActualizacion'] = k;
@@ -12328,15 +12329,22 @@ window.procesarArchivoTarjetas = function(event) {
         }
       });
 
-      // Fallback mínimo
+      // Fallback mínimo super robusto
       if (!colMap['tarjeta']) {
-        colMap['tarjeta'] = keys.find(k => cleanCol(k).includes('tarjeta') || cleanCol(k).includes('card'));
+        colMap['tarjeta'] = keys.find(k => {
+          const c = cleanCol(k);
+          return c.includes('tarjeta') || c.includes('card') || c.includes('num') || c.includes('no') || c.includes('digito');
+        });
       }
       if (!colMap['usuario']) {
-        colMap['usuario'] = keys.find(k => cleanCol(k).includes('usuario') || cleanCol(k).includes('user') || cleanCol(k).includes('nombre'));
+        colMap['usuario'] = keys.find(k => {
+          const c = cleanCol(k);
+          return c.includes('usuario') || c.includes('user') || c.includes('nombre') || c.includes('titular') || c.includes('alias') || c.includes('empleado') || c.includes('colaborador') || c.includes('propietario');
+        });
       }
 
       if (!colMap['tarjeta'] || !colMap['usuario']) {
+        alert('Error de Columnas: No pudimos identificar columnas para "Tarjeta" y "Usuario" en tu archivo.\n\nColumnas encontradas en el Excel:\n' + keys.join('\n') + '\n\nRevisa que el archivo contenga encabezados como "Tarjeta", "Usuario" o "Titular".');
         mostrarNotificacion('No se pudieron identificar las columnas mínimas requeridas (Tarjeta, Usuario).', 'error');
         resetInputAndButton();
         return;
@@ -12393,6 +12401,7 @@ window.procesarArchivoTarjetas = function(event) {
       });
 
       if (parsedCards.length === 0) {
+        alert('Error: No se encontraron filas con números de tarjeta válidos.');
         mostrarNotificacion('No se encontraron tarjetas válidas en el archivo.', 'error');
         resetInputAndButton();
         return;
@@ -12420,6 +12429,7 @@ window.procesarArchivoTarjetas = function(event) {
       resetInputAndButton();
     } catch (err) {
       console.error(err);
+      alert('Excepción capturada al procesar archivo:\n' + err.message + '\n' + err.stack);
       mostrarNotificacion('Error al procesar el archivo de tarjetas.', 'error');
       resetInputAndButton();
     }
