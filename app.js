@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.42'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.43'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -16409,13 +16409,57 @@ if (typeof window !== 'undefined' && window.pdfjsLib) {
 window.extraerFacturaSatNube = async function(type, base64Data) {
   // Always use our 100% precise local client-side extraction engine as the primary path
   try {
+    let satData;
     if (type === 'xml') {
       const xmlText = window.decodificarXmlBase64(base64Data);
-      return window.extraerDatosCompletosXml(xmlText);
+      satData = window.extraerDatosCompletosXml(xmlText);
     } else {
       const text = await window.extraerTextoPdf(base64Data);
-      return window.analizarFacturaPdfTexto(text);
+      satData = window.analizarFacturaPdfTexto(text);
     }
+
+    // Guardar en Supabase facturas_analizadas si tenemos cliente supabaseClient y satData tiene UUID
+    const sb = window.supabaseClient;
+    if (sb && satData && satData.uuid) {
+      const payload = {
+        id: satData.uuid, // Usamos el UUID de la factura como ID único si no viene de OneDrive
+        file_name: satData.uuid + '.' + type,
+        file_type: type,
+        version_cfdi: satData.versionCfdi || null,
+        uuid: satData.uuid || null,
+        estatus: satData.estatus || null,
+        fecha_cancelacion: satData.fechaCancelacion || null,
+        tipo_comprobante: satData.tipoComprobante || null,
+        fecha_emision: satData.fechaEmision || null,
+        ano_emision: satData.anoEmision || null,
+        mes_emision: satData.mesEmision || null,
+        dia_emision: satData.diaEmision || null,
+        fecha_timbrado: satData.fechaTimbrado || null,
+        serie: satData.serie || null,
+        folio: satData.folio || null,
+        forma_pago: satData.formaPago || null,
+        metodo_pago: satData.metodoPago || null,
+        condiciones_pago: satData.condicionesPago || null,
+        rfc_emisor: satData.rfcEmisor || null,
+        nombre_emisor: satData.nombreEmisor || null,
+        rfc_receptor: satData.rfcReceptor || null,
+        nombre_receptor: satData.nombreReceptor || null,
+        moneda: satData.moneda || null,
+        tipo_cambio: satData.tipoCambio || null,
+        subtotal: parseFloat(satData.subtotal) || 0,
+        descuento: parseFloat(satData.descuento) || 0,
+        total: parseFloat(satData.total) || 0,
+        isr_retenido: parseFloat(satData.isrRetenido) || 0,
+        iva_retenido: parseFloat(satData.ivaRetenido) || 0,
+        iva_trasladado: parseFloat(satData.ivaTrasladado) || 0,
+        base64_content: base64Data
+      };
+      sb.from('facturas_analizadas')
+        .upsert(payload)
+        .catch(err => console.error('[Supabase] Error al guardar factura analizada en caché:', err));
+    }
+
+    return satData;
   } catch (localErr) {
     console.warn('[Sync] Falló extracción local, intentando respaldo en la nube:', localErr.message);
     if (!window.supabaseClient) {
@@ -16428,7 +16472,48 @@ window.extraerFacturaSatNube = async function(type, base64Data) {
     
     if (error) throw error;
     if (data && data.status === 'success') {
-      return data.data;
+      // También intentar cachear el resultado si viene de la nube
+      const satData = data.data;
+      const sb = window.supabaseClient;
+      if (sb && satData && satData.uuid) {
+        const payload = {
+          id: satData.uuid,
+          file_name: satData.uuid + '.' + type,
+          file_type: type,
+          version_cfdi: satData.versionCfdi || null,
+          uuid: satData.uuid || null,
+          estatus: satData.estatus || null,
+          fecha_cancelacion: satData.fechaCancelacion || null,
+          tipo_comprobante: satData.tipoComprobante || null,
+          fecha_emision: satData.fechaEmision || null,
+          ano_emision: satData.anoEmision || null,
+          mes_emision: satData.mesEmision || null,
+          dia_emision: satData.diaEmision || null,
+          fecha_timbrado: satData.fechaTimbrado || null,
+          serie: satData.serie || null,
+          folio: satData.folio || null,
+          forma_pago: satData.formaPago || null,
+          metodo_pago: satData.metodoPago || null,
+          condiciones_pago: satData.condicionesPago || null,
+          rfc_emisor: satData.rfcEmisor || null,
+          nombre_emisor: satData.nombreEmisor || null,
+          rfc_receptor: satData.rfcReceptor || null,
+          nombre_receptor: satData.nombreReceptor || null,
+          moneda: satData.moneda || null,
+          tipo_cambio: satData.tipoCambio || null,
+          subtotal: parseFloat(satData.subtotal) || 0,
+          descuento: parseFloat(satData.descuento) || 0,
+          total: parseFloat(satData.total) || 0,
+          isr_retenido: parseFloat(satData.isrRetenido) || 0,
+          iva_retenido: parseFloat(satData.ivaRetenido) || 0,
+          iva_trasladado: parseFloat(satData.ivaTrasladado) || 0,
+          base64_content: base64Data
+        };
+        sb.from('facturas_analizadas')
+          .upsert(payload)
+          .catch(err => console.error('[Supabase] Error al guardar factura de la nube en caché:', err));
+      }
+      return satData;
     } else {
       throw new Error(data?.error || 'Error en la nube');
     }
