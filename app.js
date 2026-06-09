@@ -13194,12 +13194,18 @@ window.cerrarModalImportacion = function() {
 // Parser robusto para fechas de Excel/CSV
 function parseExcelDate(val) {
   if (val instanceof Date) {
-    return val.toISOString().split('T')[0];
+    return !isNaN(val.getTime()) ? val.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
   }
   if (typeof val === 'number') {
-    // Excel base date is 1899-12-30
-    const date = new Date(Math.round((val - 25569) * 86400 * 1000));
-    return date.toISOString().split('T')[0];
+    if (isNaN(val) || !isFinite(val)) {
+      return new Date().toISOString().split('T')[0];
+    }
+    try {
+      const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+      return !isNaN(date.getTime()) ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    } catch(e) {
+      return new Date().toISOString().split('T')[0];
+    }
   }
   if (typeof val === 'string') {
     const cleaned = val.trim();
