@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.9'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.10'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -3180,9 +3180,30 @@ function renderDashboardV2() {
   const textTkt = cardTkt ? cardTkt.lastElementChild : null;
   
   if (isEmpresa && nombreEmpresaLogged) {
-    const clienteObj = clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === nombreEmpresaLogged);
-    const sitiosCount = clienteObj && clienteObj.sitios ? clienteObj.sitios.length : 0;
-    const equiposCount = maquinariaDash.length;
+    let countMaquinas = 0;
+    maquinariaDash.forEach(m => {
+      const mcli = String(m.cliente || '').toLowerCase().trim();
+      if (mcli === nombreEmpresaLogged) countMaquinas++;
+    });
+    clientesDb.forEach(c => {
+      if (c.nombre && String(c.nombre).toLowerCase().trim() === nombreEmpresaLogged) {
+        if (c.maquinas) countMaquinas += c.maquinas.length;
+      }
+    });
+
+    let countSitios = 0;
+    sitiosDb.forEach(s => {
+      const scli = String(s.cliente || '').toLowerCase().trim();
+      if (scli === nombreEmpresaLogged) countSitios++;
+    });
+    clientesDb.forEach(c => {
+      if (c.nombre && String(c.nombre).toLowerCase().trim() === nombreEmpresaLogged) {
+        if (c.sitios) countSitios += c.sitios.length;
+      }
+    });
+
+    const sitiosCount = countSitios;
+    const equiposCount = countMaquinas;
     
     if (labelOrd) labelOrd.textContent = 'Mis Sitios';
     if (textOrd) textOrd.textContent = 'Registrados en el sistema';
