@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.3'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.4'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -1296,6 +1296,7 @@ function switchMode(rolKey) {
   localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
   applyRole(rolKey);
   reRenderActiveView();
+  try { updateTicketBadge(); } catch(e){}
 }
 
 // ===== CONFIG =====
@@ -2490,7 +2491,7 @@ function cambiarUsuario(userId) {
   };
   localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
   cerrarSesionModal();
-  applyRole(user.rol);
+  actualizarVistaActual();
   renderUsuariosList();
 }
 
