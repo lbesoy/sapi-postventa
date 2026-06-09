@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.12'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.19'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -263,6 +263,7 @@ window.addEventListener('supabase_datos_cargados', () => {
   }
   if (typeof renderGastos === 'function' && document.getElementById('view-gastos')?.classList.contains('active')) {
     renderGastos();
+    if (typeof renderClaraCards === 'function') renderClaraCards();
   }
   
   // Re-aplicar rol para asegurar que el role-switcher se muestre si el usuario recién se descargó
@@ -12109,10 +12110,29 @@ async function guardarNuevaPassword(e) {
 window.switchGastosTab = function(tabName) {
   const btnHistorial = document.getElementById('btn-tab-gastos-historial');
   const btnClara = document.getElementById('btn-tab-gastos-clara');
+  const btnTarjetas = document.getElementById('btn-tab-gastos-tarjetas');
+  
   const tabHistorial = document.getElementById('gastos-tab-historial');
   const tabClara = document.getElementById('gastos-tab-clara');
+  const tabTarjetas = document.getElementById('gastos-tab-tarjetas');
 
   if (!btnHistorial || !btnClara || !tabHistorial || !tabClara) return;
+
+  // Reset all buttons
+  [btnHistorial, btnClara, btnTarjetas].forEach(b => {
+    if (b) {
+      b.classList.remove('active');
+      b.style.background = 'transparent';
+      b.style.boxShadow = 'none';
+      b.style.color = 'var(--text-muted)';
+      b.style.fontWeight = '500';
+    }
+  });
+
+  // Hide all tabs
+  tabHistorial.style.display = 'none';
+  tabClara.style.display = 'none';
+  if (tabTarjetas) tabTarjetas.style.display = 'none';
 
   if (tabName === 'historial') {
     btnHistorial.classList.add('active');
@@ -12120,32 +12140,499 @@ window.switchGastosTab = function(tabName) {
     btnHistorial.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
     btnHistorial.style.color = 'var(--text-primary)';
     btnHistorial.style.fontWeight = '600';
-
-    btnClara.classList.remove('active');
-    btnClara.style.background = 'transparent';
-    btnClara.style.boxShadow = 'none';
-    btnClara.style.color = 'var(--text-muted)';
-    btnClara.style.fontWeight = '500';
-
     tabHistorial.style.display = 'block';
-    tabClara.style.display = 'none';
     window.renderGastos();
-  } else {
+  } else if (tabName === 'clara') {
     btnClara.classList.add('active');
     btnClara.style.background = 'var(--bg-card)';
     btnClara.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
     btnClara.style.color = 'var(--text-primary)';
     btnClara.style.fontWeight = '600';
-
-    btnHistorial.classList.remove('active');
-    btnHistorial.style.background = 'transparent';
-    btnHistorial.style.boxShadow = 'none';
-    btnHistorial.style.color = 'var(--text-muted)';
-    btnHistorial.style.fontWeight = '500';
-
-    tabHistorial.style.display = 'none';
     tabClara.style.display = 'block';
     window.renderClaraTxs();
+  } else if (tabName === 'tarjetas') {
+    if (btnTarjetas) {
+      btnTarjetas.classList.add('active');
+      btnTarjetas.style.background = 'var(--bg-card)';
+      btnTarjetas.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+      btnTarjetas.style.color = 'var(--text-primary)';
+      btnTarjetas.style.fontWeight = '600';
+    }
+    if (tabTarjetas) tabTarjetas.style.display = 'block';
+    window.renderClaraCards();
+  }
+};
+
+const defaultClaraCards = [
+  { id: 'card_6041', alias: 'DRM', usuario: 'VICTOR DANIEL', correo: 'compras@eurorep.mx', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '6041', limite: 10, saldoUtilizado: 0, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_7209', alias: 'AFC', usuario: 'Ruben Adrian', correo: 'refacciones@eurorep.mx', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '7209', limite: 1000, saldoUtilizado: 0, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_9878', alias: 'JRG', usuario: 'Julio Cesar R', correo: 'julio.reyes.gtz@gmail.com', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '9878', limite: 10, saldoUtilizado: 0, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_6783', alias: 'SGP', usuario: 'SONIA ALEJANDRA', correo: 'sonia@eurorep.mx', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '6783', limite: 10, saldoUtilizado: 0, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_3189', alias: 'RAN', usuario: 'Rodrigo Alonso', correo: 'postventa1@eurorep.mx', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '3189', limite: 10, saldoUtilizado: 0, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_6889', alias: 'Lizeth Rodriguez', usuario: 'Lizeth Guadalupe', correo: 'admon@eurorep.mx', estado: 'ACTIVA', tipo: 'Clara Virtual', tarjeta: '6889', limite: 200000, saldoUtilizado: 0, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_5694', alias: 'Arturo Caloc', usuario: 'Arturo Caloc', correo: 'arturo@eurorep.mx', estado: 'ACTIVA', tipo: 'Clara Virtual', tarjeta: '5694', limite: 470779, saldoUtilizado: 0, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_0307', alias: 'Pagos', usuario: 'Arturo Caloc', correo: 'arturo@eurorep.mx', estado: 'ACTIVA', tipo: 'Clara Virtual', tarjeta: '0307', limite: 20000, saldoUtilizado: 0, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_6434', alias: 'LPNS', usuario: 'Laura Paz', correo: 'operaciones@eurorep.mx', estado: 'ACTIVA', tipo: 'Clara Virtual', tarjeta: '6434', limite: 10000, saldoUtilizado: 0, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_1615', alias: 'ISA', usuario: 'Ignacio Silverio', correo: 'silvestrealbaignacio@gmail.com', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '1615', limite: 10, saldoUtilizado: 0, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_8384', alias: 'VSF', usuario: 'Victor Edmundo', correo: 'victor@eurorep.mx', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '8384', limite: 2000, saldoUtilizado: 351, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_5449', alias: 'Lalo', usuario: 'Eduardo Jimenez', correo: 'eduardojim1836@gmail.com', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '5449', limite: 3000, saldoUtilizado: 1000, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_9517', alias: 'ARZ', usuario: 'Abraham Reyes', correo: 'abrahamr584@gmail.com', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '9517', limite: 3500, saldoUtilizado: 1916.01, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_4416', alias: 'Valeria Hernandez', usuario: 'Valeria Hernandez', correo: 'logistica@eurorep.mx', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '4416', limite: 3000, saldoUtilizado: 2356.83, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_8646', alias: 'HELL', usuario: 'HUGO ERNESTO', correo: 'hevell1@hotmail.com', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '8646', limite: 4112, saldoUtilizado: 4111.59, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_7650', alias: 'BHG', usuario: 'Bernardino Hernandez', correo: 'almacen@eurorep.mx', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '7650', limite: 7000, saldoUtilizado: 4474.33, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_2992', alias: 'RMJ', usuario: 'Roberto Martin', correo: 'robertomt1290@gmail.com', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '2992', limite: 23000, saldoUtilizado: 4778.76, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_1178', alias: 'Enrique', usuario: 'Enrique Alonso', correo: 'tamayoavalos526@gmail.com', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '1178', limite: 10000, saldoUtilizado: 5721.42, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_5911', alias: 'SSC', usuario: 'Sergio Soria', correo: 'servicioconcreto@eurorep.mx', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '5911', limite: 12200, saldoUtilizado: 9328.29, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_3001', alias: 'JAM', usuario: 'JOSE ANTONIO', correo: 'dwjosh_3@hotmail.com', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '3001', limite: 12000, saldoUtilizado: 9682, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_5931', alias: 'LGG', usuario: 'Luis Erasmo', correo: 'serviciot7@eurorep.mx', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '5931', limite: 15000, saldoUtilizado: 10870.99, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_0438', alias: 'JGG', usuario: 'Jesus Garduño', correo: 'serviciotrituracion@eurorep.mx', estado: 'ACTIVA', tipo: 'Clara White', tarjeta: '0438', limite: 13000, saldoUtilizado: 11780.99, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' },
+  { id: 'card_8766', alias: 'Euro Repuestos', usuario: '-', correo: '-', estado: 'ACTIVA', tipo: 'Clara Virtual', tarjeta: '8766', limite: 470779, saldoUtilizado: 0, ultimaActualizacion: '08/06/26 19:43', dondeComprar: 'En cualquier lugar' }
+];
+
+window.getClaraCards = function() {
+  return safeGetJSON('sapi_clara_cards', defaultClaraCards);
+};
+
+window.renderClaraCards = function() {
+  const container = document.getElementById('tarjetas-table-body');
+  if (!container) return;
+
+  const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
+  const cards = window.getClaraCards();
+
+  // Actualizar KPIs
+  let totalLimite = 0;
+  let totalUtilizado = 0;
+  cards.forEach(c => {
+    totalLimite += Number(c.limite || 0);
+    totalUtilizado += Number(c.saldoUtilizado || 0);
+  });
+
+  document.getElementById('kpi-tarjetas-total').textContent = cards.length;
+  document.getElementById('kpi-tarjetas-limite').textContent = formatMoney(totalLimite);
+  document.getElementById('kpi-tarjetas-utilizado').textContent = formatMoney(totalUtilizado);
+
+  if (cards.length === 0) {
+    container.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center; padding:2rem; color:var(--text-muted);">
+          No se encontraron tarjetas registradas. Importa un archivo de tarjetas para comenzar.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  container.innerHTML = cards.map(c => {
+    const disponible = Math.max(0, Number(c.limite || 0) - Number(c.saldoUtilizado || 0));
+    const isActiva = String(c.estado || '').toLowerCase().includes('activ');
+    const badgeEstado = isActiva
+      ? `<span class="badge" style="background:rgba(16,185,129,0.12); color:var(--green); font-size:0.75rem;">${c.estado}</span>`
+      : `<span class="badge" style="background:rgba(239,68,68,0.12); color:var(--red); font-size:0.75rem;">${c.estado}</span>`;
+
+    return `
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.85rem 1rem;">
+          <div style="font-weight:700; color:var(--text-primary);">${c.alias}</div>
+          <div style="font-size:0.78rem; color:var(--text-secondary); margin-top:1px;">${c.usuario || 'Sin asignar'}</div>
+        </td>
+        <td style="padding:0.85rem 1rem; font-size:0.82rem; color:var(--text-muted);">${c.correo || '-'}</td>
+        <td style="padding:0.85rem 1rem; font-family:monospace; font-size:0.85rem; font-weight:600; color:var(--text-primary);">•••• ${c.tarjeta}</td>
+        <td style="padding:0.85rem 1rem;">
+          <div style="font-size:0.82rem; color:var(--text-primary); font-weight:500; margin-bottom:3px;">${c.tipo}</div>
+          ${badgeEstado}
+        </td>
+        <td style="padding:0.85rem 1rem; text-align:right; font-weight:600; color:var(--text-primary);">${formatMoney(c.limite)}</td>
+        <td style="padding:0.85rem 1rem; text-align:right; font-weight:600; color:var(--red);">${formatMoney(c.saldoUtilizado)}</td>
+        <td style="padding:0.85rem 1rem; text-align:right; font-weight:700; color:var(--green);">${formatMoney(disponible)}</td>
+      </tr>
+    `;
+  }).join('');
+};
+
+window.procesarArchivoTarjetas = function(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
+
+  // Mostrar indicador visual de carga
+  const btn = document.getElementById('btn-importar-tarjetas-excel');
+  const originalHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border" style="width:12px; height:12px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; display:inline-block; animation:spin 0.75s linear infinite; margin-right:5px; vertical-align:middle;"></span> Procesando...`;
+  }
+
+  const resetInputAndButton = () => {
+    event.target.value = ''; // Reset file input so they can upload the same file again
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  };
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+      if (json.length === 0) {
+        mostrarNotificacion('El archivo está vacío o no es válido.', 'error');
+        resetInputAndButton();
+        return;
+      }
+
+      // Mapear dinámicamente columnas por heurística de nombres limpiados
+      const keys = Object.keys(json[0]);
+      const cleanCol = (str) => {
+        if (!str) return '';
+        let s = str.toString().toLowerCase().trim();
+        s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        s = s.replace(/Ã³|ã³|ã³|ó|ó/g, 'o');
+        s = s.replace(/Ã©|é|é/g, 'e');
+        s = s.replace(/Ãa|í|í/g, 'i');
+        s = s.replace(/Ãº|ú|ú/g, 'u');
+        s = s.replace(/Ã¡|á|á/g, 'a');
+        s = s.replace(/[^a-z0-9\s_\-\/]/g, '');
+        return s;
+      };
+
+      let colMap = {};
+      keys.forEach(k => {
+        const cleaned = cleanCol(k);
+        if (cleaned === 'alias') {
+          colMap['alias'] = k;
+        } else if (cleaned === 'usuario' || cleaned === 'titular' || cleaned === 'user') {
+          colMap['usuario'] = k;
+        } else if (cleaned.includes('correo') || cleaned.includes('email') || cleaned.includes('electronico')) {
+          colMap['correo'] = k;
+        } else if (cleaned === 'estado' || cleaned === 'status') {
+          colMap['estado'] = k;
+        } else if (cleaned === 'tipo' || cleaned === 'type') {
+          colMap['tipo'] = k;
+        } else if (cleaned === 'tarjeta' || cleaned === 'card') {
+          colMap['tarjeta'] = k;
+        } else if (cleaned.includes('limite') || cleaned.includes('limit')) {
+          colMap['limite'] = k;
+        } else if (cleaned.includes('saldo utilizado') || cleaned.includes('saldo util') || cleaned.includes('utilizado')) {
+          colMap['saldoUtilizado'] = k;
+        } else if (cleaned.includes('ultima actualizacion') || cleaned.includes('actualizacion') || cleaned.includes('fecha')) {
+          colMap['ultimaActualizacion'] = k;
+        } else if (cleaned.includes('donde') || cleaned.includes('comprar')) {
+          colMap['dondeComprar'] = k;
+        }
+      });
+
+      // Fallback mínimo
+      if (!colMap['tarjeta']) {
+        colMap['tarjeta'] = keys.find(k => cleanCol(k).includes('tarjeta') || cleanCol(k).includes('card'));
+      }
+      if (!colMap['usuario']) {
+        colMap['usuario'] = keys.find(k => cleanCol(k).includes('usuario') || cleanCol(k).includes('user') || cleanCol(k).includes('nombre'));
+      }
+
+      if (!colMap['tarjeta'] || !colMap['usuario']) {
+        mostrarNotificacion('No se pudieron identificar las columnas mínimas requeridas (Tarjeta, Usuario).', 'error');
+        resetInputAndButton();
+        return;
+      }
+
+      const parsedCards = [];
+      let totalLimite = 0;
+
+      json.forEach(row => {
+        const usuario = String(row[colMap['usuario']] || '').trim();
+        let tarjetaRaw = String(row[colMap['tarjeta']] || '').trim();
+        if (!tarjetaRaw) return;
+
+        // Limpiar tarjeta para extraer últimos 4 dígitos
+        const digits = tarjetaRaw.replace(/[^0-9]/g, '');
+        let tarjeta = tarjetaRaw;
+        if (digits.length >= 4) {
+          tarjeta = digits.slice(-4);
+        }
+
+        const alias = colMap['alias'] ? String(row[colMap['alias']] || '').trim() : usuario.split(' ')[0] || 'Tarjeta';
+        const correo = colMap['correo'] ? String(row[colMap['correo']] || '').trim() : '';
+        const estado = colMap['estado'] ? String(row[colMap['estado']] || '').trim() : 'ACTIVA';
+        const tipo = colMap['tipo'] ? String(row[colMap['tipo']] || '').trim() : 'Clara White';
+
+        const limiteVal = row[colMap['limite']] || 0;
+        let limite = Number(String(limiteVal).replace(/[^0-9\.\-]/g, ''));
+        if (isNaN(limite)) limite = 0;
+
+        const saldoVal = row[colMap['saldoUtilizado']] || 0;
+        let saldoUtilizado = Number(String(saldoVal).replace(/[^0-9\.\-]/g, ''));
+        if (isNaN(saldoUtilizado)) saldoUtilizado = 0;
+
+        const ultimaActualizacion = colMap['ultimaActualizacion'] ? String(row[colMap['ultimaActualizacion']] || '').trim() : '';
+        const dondeComprar = colMap['dondeComprar'] ? String(row[colMap['dondeComprar']] || '').trim() : 'En cualquier lugar';
+
+        const id = 'card_' + tarjeta;
+
+        parsedCards.push({
+          id,
+          alias,
+          usuario,
+          correo,
+          estado,
+          tipo,
+          tarjeta,
+          limite,
+          saldoUtilizado,
+          ultimaActualizacion,
+          dondeComprar
+        });
+
+        totalLimite += limite;
+      });
+
+      if (parsedCards.length === 0) {
+        mostrarNotificacion('No se encontraron tarjetas válidas en el archivo.', 'error');
+        resetInputAndButton();
+        return;
+      }
+
+      window._pendingImportedCards = parsedCards;
+
+      // Mostrar modal de confirmación
+      document.getElementById('import-cards-preview-count').textContent = parsedCards.length;
+      document.getElementById('import-cards-preview-amount').textContent = formatMoney(totalLimite);
+      
+      const currentCards = window.getClaraCards();
+      const currentIds = new Set(currentCards.map(c => c.id));
+      const duplicates = parsedCards.filter(c => currentIds.has(c.id)).length;
+
+      if (duplicates > 0) {
+        document.getElementById('import-cards-preview-duplicates-msg').textContent = 
+          `Nota: Se detectaron ${duplicates} tarjetas ya existentes. Al confirmar, se actualizará su información (límites, saldo, etc.).`;
+      } else {
+        document.getElementById('import-cards-preview-duplicates-msg').textContent = 
+          'Todas las tarjetas del archivo son nuevas y serán añadidas.';
+      }
+
+      document.getElementById('modal-importar-tarjetas').style.display = 'flex';
+      resetInputAndButton();
+    } catch (err) {
+      console.error(err);
+      mostrarNotificacion('Error al procesar el archivo de tarjetas.', 'error');
+      resetInputAndButton();
+    }
+  };
+
+  reader.onerror = function() {
+    mostrarNotificacion('Error al leer el archivo.', 'error');
+    resetInputAndButton();
+  };
+
+  reader.readAsArrayBuffer(file);
+};
+
+window.cerrarModalImportarTarjetas = function() {
+  document.getElementById('modal-importar-tarjetas').style.display = 'none';
+  window._pendingImportedCards = null;
+};
+
+window.mostrarPopCargadoTarjetas = function(cantidad) {
+  // Eliminar cualquier popup existente
+  const anterior = document.getElementById('pop-cargado-tarjetas');
+  if (anterior) anterior.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'pop-cargado-tarjetas';
+  overlay.style.position = 'fixed';
+  overlay.style.top = '0';
+  overlay.style.left = '0';
+  overlay.style.width = '100vw';
+  overlay.style.height = '100vh';
+  overlay.style.background = 'rgba(15, 23, 42, 0.82)';
+  overlay.style.backdropFilter = 'blur(16px)';
+  overlay.style.webkitBackdropFilter = 'blur(16px)';
+  overlay.style.display = 'flex';
+  overlay.style.justifyContent = 'center';
+  overlay.style.alignItems = 'center';
+  overlay.style.zIndex = '999999';
+  overlay.style.opacity = '0';
+  overlay.style.transition = 'opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
+
+  // Contenido modal
+  const content = document.createElement('div');
+  content.style.background = 'var(--bg-card, #1e293b)';
+  content.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+  content.style.borderRadius = '24px';
+  content.style.padding = '3rem 2.5rem';
+  content.style.maxWidth = '360px';
+  content.style.width = '90%';
+  content.style.textAlign = 'center';
+  content.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.5)';
+  content.style.transform = 'scale(0.8) translateY(20px)';
+  content.style.transition = 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+  
+  // Agregar logo de Eurorep con animación
+  const logo = document.createElement('img');
+  logo.src = 'logo_transparent.png';
+  logo.alt = 'Eurorep';
+  logo.style.height = '70px';
+  logo.style.width = 'auto';
+  logo.style.marginBottom = '1.5rem';
+  logo.style.filter = 'drop-shadow(0 10px 15px rgba(0,0,0,0.3))';
+  logo.style.animation = 'popPulse 2.5s ease-in-out infinite';
+
+  // Añadir los estilos CSS clave en línea para la animación
+  if (!document.getElementById('style-pop-pulse')) {
+    const styleSheet = document.createElement("style");
+    styleSheet.id = 'style-pop-pulse';
+    styleSheet.innerText = `
+      @keyframes popPulse {
+        0%, 100% { transform: scale(1); filter: drop-shadow(0 10px 15px rgba(79, 142, 247, 0.2)) brightness(1); }
+        50% { transform: scale(1.1); filter: drop-shadow(0 15px 25px rgba(79, 142, 247, 0.5)) brightness(1.15); }
+      }
+      @keyframes checkAnimation {
+        0% { transform: scale(0); opacity: 0; }
+        50% { transform: scale(1.2); }
+        100% { transform: scale(1); opacity: 1; }
+      }
+    `;
+    document.head.appendChild(styleSheet);
+  }
+
+  // Título
+  const title = document.createElement('h3');
+  title.textContent = '¡Cargado!';
+  title.style.fontSize = '1.75rem';
+  title.style.fontWeight = '800';
+  title.style.color = 'var(--text-primary)';
+  title.style.margin = '0 0 0.5rem 0';
+
+  // Subtítulo / detalle
+  const detail = document.createElement('p');
+  detail.textContent = `Se importaron ${cantidad} tarjetas Clara correctamente.`;
+  detail.style.fontSize = '0.9rem';
+  detail.style.color = 'var(--text-secondary)';
+  detail.style.margin = '0 0 2rem 0';
+  detail.style.lineHeight = '1.5';
+
+  // Círculo de Checkmark
+  const checkCircle = document.createElement('div');
+  checkCircle.style.width = '56px';
+  checkCircle.style.height = '56px';
+  checkCircle.style.borderRadius = '50%';
+  checkCircle.style.background = 'rgba(16, 185, 129, 0.12)';
+  checkCircle.style.color = 'var(--green)';
+  checkCircle.style.display = 'inline-flex';
+  checkCircle.style.justifyContent = 'center';
+  checkCircle.style.alignItems = 'center';
+  checkCircle.style.marginBottom = '1.25rem';
+  checkCircle.style.animation = 'checkAnimation 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
+  checkCircle.innerHTML = `<i data-lucide="check" style="width:28px; height:28px; stroke-width:3;"></i>`;
+
+  // Botón cerrar / Aceptar
+  const btnClose = document.createElement('button');
+  btnClose.textContent = 'Aceptar';
+  btnClose.className = 'btn-primary';
+  btnClose.style.width = '100%';
+  btnClose.style.borderRadius = '12px';
+  btnClose.style.padding = '0.75rem 1.5rem';
+  btnClose.style.fontWeight = '700';
+  btnClose.style.fontSize = '0.95rem';
+  btnClose.style.cursor = 'pointer';
+  btnClose.style.border = 'none';
+  btnClose.style.background = 'var(--accent, #4f8ef7)';
+  btnClose.style.color = '#ffffff';
+  btnClose.style.boxShadow = '0 4px 12px rgba(79, 142, 247, 0.3)';
+  btnClose.onclick = () => {
+    overlay.style.opacity = '0';
+    content.style.transform = 'scale(0.8) translateY(20px)';
+    setTimeout(() => overlay.remove(), 400);
+  };
+
+  // Ensamblar
+  content.appendChild(logo);
+  content.appendChild(checkCircle);
+  content.appendChild(title);
+  content.appendChild(detail);
+  content.appendChild(btnClose);
+  overlay.appendChild(content);
+  document.body.appendChild(overlay);
+
+  // Inicializar íconos de Lucide en el nuevo elemento
+  if (window.lucide) {
+    window.lucide.createIcons({
+      attrs: {
+        class: 'lucide'
+      },
+      nameAttr: 'data-lucide',
+      node: checkCircle
+    });
+  }
+
+  // Activar entrada
+  setTimeout(() => {
+    overlay.style.opacity = '1';
+    content.style.transform = 'scale(1) translateY(0)';
+  }, 50);
+
+  // Autocerrado opcional a los 6 segundos
+  setTimeout(() => {
+    if (document.body.contains(overlay)) {
+      overlay.style.opacity = '0';
+      content.style.transform = 'scale(0.8) translateY(20px)';
+      setTimeout(() => {
+        if (document.body.contains(overlay)) overlay.remove();
+      }, 400);
+    }
+  }, 6000);
+};
+
+window.confirmarImportacionTarjetas = async function() {
+  const pending = window._pendingImportedCards;
+  if (!pending || pending.length === 0) return;
+
+  const btnConfirm = document.getElementById('btn-import-cards-confirm');
+  if (btnConfirm) {
+    btnConfirm.disabled = true;
+    btnConfirm.textContent = 'Guardando...';
+  }
+
+  try {
+    const currentCards = window.getClaraCards();
+    const currentMap = new Map(currentCards.map(c => [c.id, c]));
+
+    // Sobrescribir/Actualizar o añadir
+    pending.forEach(c => {
+      currentMap.set(c.id, c);
+    });
+
+    const updatedList = Array.from(currentMap.values());
+    localStorage.setItem('sapi_clara_cards', JSON.stringify(updatedList));
+
+    // Si Supabase está en línea, guardamos en la base de datos
+    if (typeof syncQueuePush === 'function') {
+      pending.forEach(c => {
+        syncQueuePush('clara_cards', c);
+      });
+      // Forzar procesamiento de cola
+      if (typeof processSyncQueue === 'function') {
+        processSyncQueue();
+      }
+    }
+
+    window.cerrarModalImportarTarjetas();
+    window.renderClaraCards();
+    window.mostrarPopCargadoTarjetas(pending.length);
+  } catch (err) {
+    console.error(err);
+    mostrarNotificacion('Error al guardar las tarjetas.', 'error');
+  } finally {
+    if (btnConfirm) {
+      btnConfirm.disabled = false;
+      btnConfirm.textContent = 'Guardar Tarjetas';
+    }
   }
 };
 
@@ -12576,30 +13063,101 @@ window.procesarArchivoMovimientos = function(event) {
         return;
       }
 
-      // Mapear dinámicamente columnas por heurística de nombres
+      // Mapear dinámicamente columnas por heurística de nombres limpiados
       const keys = Object.keys(json[0]);
-      let colFecha = '', colMerchant = '', colMonto = '', colCard = '', colUser = '', colCat = '';
+      
+      const cleanCol = (str) => {
+        if (!str) return '';
+        let s = str.toString().toLowerCase().trim();
+        s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        s = s.replace(/Ã³|ã³|ã³|ó|ó/g, 'o');
+        s = s.replace(/Ã©|é|é/g, 'e');
+        s = s.replace(/Ãa|í|í/g, 'i');
+        s = s.replace(/Ãº|ú|ú/g, 'u');
+        s = s.replace(/Ã¡|á|á/g, 'a');
+        s = s.replace(/[^a-z0-9\s_\-\/]/g, '');
+        return s;
+      };
 
+      let colMap = {};
       keys.forEach(k => {
-        const kl = k.toLowerCase().trim();
-        if (!colFecha && (kl.includes('fecha') || kl.includes('date') || kl.includes('day') || kl.includes('transaccion') || kl.includes('transaction'))) {
-          colFecha = k;
-        } else if (!colMerchant && (kl.includes('comercio') || kl.includes('establecimiento') || kl.includes('merchant') || kl.includes('descripcion') || kl.includes('description') || kl.includes('negocio') || kl.includes('concepto') || kl.includes('proveedor'))) {
-          colMerchant = k;
-        } else if (!colMonto && (kl.includes('monto') || kl.includes('importe') || kl.includes('amount') || kl.includes('total') || kl.includes('cargo') || kl.includes('valor'))) {
-          colMonto = k;
-        } else if (!colUser && (kl.includes('usuario') || kl.includes('user') || kl.includes('nombre') || kl.includes('name') || kl.includes('tarjetahabiente') || kl.includes('empleado') || kl.includes('titular'))) {
-          colUser = k;
-        } else if (!colCard && (kl.includes('tarjeta') || kl.includes('card') || kl.includes('last4') || kl.includes('terminacion') || kl.includes('digitos') || kl.includes('dígitos') || kl.includes('ultimos'))) {
-          colCard = k;
-        } else if (!colCat && (kl.includes('categoria') || kl.includes('category') || kl.includes('rubro') || kl.includes('giro'))) {
-          colCat = k;
+        const cleaned = cleanCol(k);
+        if (cleaned.includes('fecha de transaccion') || (cleaned.startsWith('fecha') && cleaned.includes('tran'))) {
+          colMap['fechaTransaccion'] = k;
+        } else if (cleaned.includes('estado de cuenta') || (cleaned.startsWith('estado') && cleaned.includes('cue'))) {
+          colMap['estadoCuenta'] = k;
+        } else if (cleaned === 'transaccion' || cleaned.includes('merchant') || cleaned === 'comercio' || cleaned === 'establecimiento') {
+          colMap['transaccion'] = k;
+        } else if (cleaned.includes('monto original') || cleaned.includes('monto orig')) {
+          colMap['montoOriginal'] = k;
+        } else if (cleaned.includes('moneda original') || cleaned.includes('moneda orig')) {
+          colMap['monedaOriginal'] = k;
+        } else if (cleaned.includes('monto en mxn') || cleaned.includes('mxn')) {
+          colMap['montoMxn'] = k;
+        } else if (cleaned === 'tarjeta' || cleaned === 'card') {
+          colMap['tarjeta'] = k;
+        } else if (cleaned.includes('alias de la tarjeta') || cleaned.includes('alias de la tarj') || cleaned.includes('alias')) {
+          colMap['aliasTarjeta'] = k;
+        } else if (cleaned === 'estado' || cleaned === 'status') {
+          colMap['estado'] = k;
+        } else if (cleaned.includes('estado de aprobacion') || cleaned.includes('estado de apr')) {
+          colMap['estadoAprobacion'] = k;
+        } else if (cleaned.includes('nombre de aprobador') || cleaned.includes('nombre de apr')) {
+          colMap['nombreAprobador'] = k;
+        } else if (cleaned.includes('nota de aprobacion') || cleaned.includes('nota de aprob')) {
+          colMap['notaAprobacion'] = k;
+        } else if (cleaned.includes('codigo de autorizacion') || cleaned.includes('codigo de aut') || cleaned.includes('codigo aut')) {
+          colMap['codigoAutorizacion'] = k;
+        } else if (cleaned.includes('categoria de clara') || cleaned.includes('categoria de c') || cleaned.includes('categoria')) {
+          colMap['categoriaClara'] = k;
+        } else if (cleaned.includes('factura electronica') || cleaned.includes('factura electr')) {
+          colMap['facturaElectronica'] = k;
+        } else if (cleaned.includes('factura auto-vinculada') || cleaned.includes('factura auto-v') || cleaned.includes('factura auto')) {
+          colMap['facturaAutovinculada'] = k;
+        } else if (cleaned.includes('archivos factura') || cleaned.includes('archivos fact')) {
+          colMap['archivosFactura'] = k;
+        } else if (cleaned === 'anexos') {
+          colMap['anexos'] = k;
+        } else if (cleaned.includes('archivos anexo') || cleaned.includes('archivos anex')) {
+          colMap['archivosAnexo'] = k;
+        } else if (cleaned.includes('folio fiscal')) {
+          colMap['folioFiscal'] = k;
+        } else if (cleaned === 'titular' || cleaned === 'usuario' || cleaned === 'user') {
+          colMap['titular'] = k;
+        } else if (cleaned === 'grupos' || cleaned === 'grupo') {
+          colMap['grupos'] = k;
+        } else if (cleaned.includes('ubicacion')) {
+          colMap['ubicacion'] = k;
+        } else if (cleaned.includes('etiquetas')) {
+          colMap['etiquetas'] = k;
+        } else if (cleaned.includes('descripcion')) {
+          colMap['descripcion'] = k;
         }
       });
 
+      // Fallback para columnas básicas requeridas
+      if (!colMap['fechaTransaccion']) {
+        colMap['fechaTransaccion'] = keys.find(k => {
+          const c = cleanCol(k);
+          return c.includes('fecha') || c.includes('date') || c.includes('day') || c.includes('created') || c.includes('time');
+        });
+      }
+      if (!colMap['transaccion']) {
+        colMap['transaccion'] = keys.find(k => {
+          const c = cleanCol(k);
+          return c.includes('comercio') || c.includes('establecimiento') || c.includes('merchant') || c.includes('descripcion') || c.includes('concept') || c.includes('proveedor') || c.includes('concepto');
+        });
+      }
+      if (!colMap['montoMxn']) {
+        colMap['montoMxn'] = keys.find(k => {
+          const c = cleanCol(k);
+          return c.includes('monto') || c.includes('importe') || c.includes('amount') || c.includes('total') || c.includes('cargo') || c.includes('valor');
+        });
+      }
+
       // Validar columnas requeridas mínimas
-      if (!colFecha || !colMerchant || !colMonto) {
-        mostrarNotificacion('No se pudieron identificar las columnas requeridas (Fecha, Comercio, Monto). Revisa el formato.', 'error');
+      if (!colMap['fechaTransaccion'] || !colMap['transaccion'] || (!colMap['montoMxn'] && !colMap['montoOriginal'])) {
+        mostrarNotificacion('No se pudieron identificar las columnas requeridas (Fecha, Transacción/Comercio, Monto). Revisa el formato.', 'error');
         return;
       }
 
@@ -12607,41 +13165,67 @@ window.procesarArchivoMovimientos = function(event) {
       const parsedTxs = [];
 
       json.forEach(row => {
-        const rawMonto = row[colMonto];
-        // Quitar signos de moneda, comas y convertir a número absoluto
-        let cleanMonto = Number(String(rawMonto).replace(/[^0-9\.\-]/g, ''));
+        const valMonto = row[colMap['montoMxn']] || row[colMap['montoOriginal']] || 0;
+        let cleanMonto = Number(String(valMonto).replace(/[^0-9\.\-]/g, ''));
         if (isNaN(cleanMonto)) cleanMonto = 0;
         cleanMonto = Math.abs(cleanMonto); // los gastos se registran positivos
         if (cleanMonto === 0) return; // omitir movimientos en cero
 
-        const rawFecha = parseExcelDate(row[colFecha]);
-        const merchant = String(row[colMerchant] || '').trim();
-        if (!merchant) return;
+        const rawFecha = parseExcelDate(row[colMap['fechaTransaccion']]);
+        const transaccion = String(row[colMap['transaccion']] || '').trim();
+        if (!transaccion) return;
 
         // Tarjeta
         let cardLast4 = '4321';
-        if (colCard && row[colCard]) {
-          const digits = String(row[colCard]).replace(/[^0-9]/g, '');
+        if (colMap['tarjeta'] && row[colMap['tarjeta']]) {
+          const digits = String(row[colMap['tarjeta']]).replace(/[^0-9]/g, '');
           if (digits.length >= 4) {
             cardLast4 = digits.slice(-4);
           }
         }
 
-        // Usuario
-        const usuario = colUser ? String(row[colUser] || '').trim() : 'Técnico Asignado';
+        // Titular
+        const titular = colMap['titular'] ? String(row[colMap['titular']] || '').trim() : 'Técnico Asignado';
         // Categoría
-        const categoria = colCat ? String(row[colCat] || '').trim() : 'Otros';
+        const categoriaClara = colMap['categoriaClara'] ? String(row[colMap['categoriaClara']] || '').trim() : 'Otros';
 
-        const id = generateTxId(rawFecha, merchant, cleanMonto, cardLast4);
+        const id = generateTxId(rawFecha, transaccion, cleanMonto, cardLast4);
 
         parsedTxs.push({
           id,
           fecha: rawFecha,
-          merchant,
+          merchant: transaccion,
           monto: cleanMonto,
           cardLast4,
-          usuario,
-          categoria
+          usuario: titular,
+          categoria: categoriaClara,
+
+          // Campos extendidos de Excel Clara
+          fechaTransaccion: rawFecha,
+          estadoCuenta: colMap['estadoCuenta'] ? String(row[colMap['estadoCuenta']] || '').trim() : '',
+          transaccion: transaccion,
+          montoOriginal: colMap['montoOriginal'] ? (Number(String(row[colMap['montoOriginal']] || 0).replace(/[^0-9\.\-]/g, '')) || cleanMonto) : cleanMonto,
+          monedaOriginal: colMap['monedaOriginal'] ? String(row[colMap['monedaOriginal']] || 'MXN').trim() : 'MXN',
+          montoMxn: cleanMonto,
+          tarjeta: colMap['tarjeta'] ? String(row[colMap['tarjeta']]).trim() : cardLast4,
+          aliasTarjeta: colMap['aliasTarjeta'] ? String(row[colMap['aliasTarjeta']] || '').trim() : '',
+          estado: colMap['estado'] ? String(row[colMap['estado']] || '').trim() : '',
+          estadoAprobacion: colMap['estadoAprobacion'] ? String(row[colMap['estadoAprobacion']] || '').trim() : '',
+          nombreAprobador: colMap['nombreAprobador'] ? String(row[colMap['nombreAprobador']] || '').trim() : '',
+          notaAprobacion: colMap['notaAprobacion'] ? String(row[colMap['notaAprobacion']] || '').trim() : '',
+          codigoAutorizacion: colMap['codigoAutorizacion'] ? String(row[colMap['codigoAutorizacion']] || '').trim() : '',
+          categoriaClara: categoriaClara,
+          facturaElectronica: colMap['facturaElectronica'] ? String(row[colMap['facturaElectronica']] || '').trim() : '',
+          facturaAutovinculada: colMap['facturaAutovinculada'] ? String(row[colMap['facturaAutovinculada']] || '').trim() : '',
+          archivosFactura: colMap['archivosFactura'] ? String(row[colMap['archivosFactura']] || '').trim() : '',
+          anexos: colMap['anexos'] ? String(row[colMap['anexos']] || '').trim() : '',
+          archivosAnexo: colMap['archivosAnexo'] ? String(row[colMap['archivosAnexo']] || '').trim() : '',
+          folioFiscal: colMap['folioFiscal'] ? String(row[colMap['folioFiscal']] || '').trim() : '',
+          titular: titular,
+          grupos: colMap['grupos'] ? String(row[colMap['grupos']] || '').trim() : '',
+          ubicacion: colMap['ubicacion'] ? String(row[colMap['ubicacion']] || '').trim() : '',
+          etiquetas: colMap['etiquetas'] ? String(row[colMap['etiquetas']] || '').trim() : '',
+          descripcion: colMap['descripcion'] ? String(row[colMap['descripcion']] || '').trim() : ''
         });
 
         totalMonto += cleanMonto;

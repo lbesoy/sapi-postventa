@@ -230,7 +230,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version">v1.3.12</div>
+          <div class="sidebar-version">v1.3.19</div>
         </div>
       </div>
     </aside>
@@ -647,6 +647,11 @@
               </span>
               Conciliación Clara <span class="nav-badge" id="badge-clara-txs" style="margin-left: 5px; background: var(--purple); color: #fff;">0</span>
             </button>
+            <button class="btn-secondary" id="btn-tab-gastos-tarjetas" onclick="switchGastosTab('tarjetas')"
+              style="padding:0.4rem 1rem; border:none; background:transparent; color:var(--text-muted); font-weight:500; display:inline-flex; align-items:center; gap:0.25rem;">
+              <i data-lucide="credit-card" style="width:16px; height:16px; margin-right:6px; vertical-align:text-bottom;"></i>
+              Tarjetas Clara
+            </button>
 
 
 
@@ -657,9 +662,14 @@
             <div class="section-header"
               style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom: 1.5rem;">
               <h2>Control de Gastos</h2>
-              <button class="btn-primary" onclick="abrirModalGasto()" id="btn-registrar-gasto">
-                <i data-lucide="plus-circle" class="btn-icon"></i> Registrar Gasto
-              </button>
+              <div style="display:flex; gap:0.5rem; align-items:center;">
+                <button class="btn-secondary" onclick="document.getElementById('clara-upload-input').click()" id="btn-subir-movimientos-csv" style="display:inline-flex; align-items:center; gap:0.4rem; height:38px; border-radius:8px; padding:0 1rem; cursor:pointer; font-weight:600; font-size:0.85rem; border:1px solid var(--border); background:var(--bg-card); transition:var(--transition); font-family:inherit; color:var(--text-primary) !important;">
+                  <i data-lucide="upload" style="width:14px; height:14px;"></i> Subir CSV/Excel
+                </button>
+                <button class="btn-primary" onclick="abrirModalGasto()" id="btn-registrar-gasto">
+                  <i data-lucide="plus-circle" class="btn-icon"></i> Registrar Gasto
+                </button>
+              </div>
             </div>
 
             <!-- KPIs -->
@@ -842,9 +852,6 @@
                 <button class="btn-primary" style="display:inline-flex; align-items:center; gap:0.4rem; height:38px; border-radius:8px; padding:0 1rem; cursor:pointer; font-weight:600; font-size:0.85rem;" onclick="mostrarNotificacion('Descargando reporte de movimientos...')">
                   <i data-lucide="download" style="width:14px; height:14px;"></i> Descargar
                 </button>
-                <button class="btn-primary" style="display:inline-flex; align-items:center; gap:0.4rem; height:38px; border-radius:8px; padding:0 1rem; cursor:pointer; font-weight:600; font-size:0.85rem;" onclick="document.getElementById('clara-upload-input').click()">
-                  <i data-lucide="upload" style="width:14px; height:14px;"></i> Importar
-                </button>
                 <input type="file" id="clara-upload-input" style="display:none;" accept=".xlsx,.xls,.csv" onchange="window.procesarArchivoMovimientos(event)" />
               </div>
             </div>
@@ -871,6 +878,65 @@
             </div>
             <!-- HIDDEN TEST CONTAINER FOR JSDOM TESTS COMPATIBILITY -->
             <div id="clara-txs-list" style="display:none;"></div>
+          </div>
+
+          <!-- TAB 3: TARJETAS CLARA -->
+          <div id="gastos-tab-tarjetas" style="display:none;">
+            <div class="section-header"
+              style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom: 1.5rem;">
+              <h2>Tarjetas Corporativas Clara</h2>
+              <div style="display:flex; gap:0.5rem; align-items:center;">
+                <button class="btn-secondary" onclick="document.getElementById('tarjetas-upload-input').click()" id="btn-importar-tarjetas-excel" style="display:inline-flex; align-items:center; gap:0.4rem; height:38px; border-radius:8px; padding:0 1rem; cursor:pointer; font-weight:600; font-size:0.85rem; border:1px solid var(--border); background:var(--bg-card); transition:var(--transition); font-family:inherit; color:var(--text-primary) !important;">
+                  <i data-lucide="upload" style="width:14px; height:14px;"></i> Importar Tarjetas
+                </button>
+                <input type="file" id="tarjetas-upload-input" style="display:none;" accept=".xlsx,.xls,.csv" onchange="window.procesarArchivoTarjetas(event)" />
+              </div>
+            </div>
+
+            <!-- KPIs DE TARJETAS -->
+            <div class="stats-grid" style="margin-bottom: 1.5rem;">
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:var(--accent);"><i data-lucide="credit-card"></i></div>
+                <div>
+                  <div class="stat-label">Total de Tarjetas</div>
+                  <div class="stat-value" id="kpi-tarjetas-total">0</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:var(--green);"><i data-lucide="wallet"></i></div>
+                <div>
+                  <div class="stat-label">Límite de Crédito Total</div>
+                  <div class="stat-value" id="kpi-tarjetas-limite">$0.00</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:var(--red);"><i data-lucide="trending-up"></i></div>
+                <div>
+                  <div class="stat-label">Saldo Total Utilizado</div>
+                  <div class="stat-value" id="kpi-tarjetas-utilizado">$0.00</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TABLA DE TARJETAS -->
+            <div class="table-wrapper" style="border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--bg-card); box-shadow:var(--shadow-sm); margin-bottom:2rem;">
+              <table class="orders-table" style="width:100%; border-collapse:collapse; text-align:left;">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--border); background:var(--bg-hover);">
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Alias / Titular</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Correo</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Tarjeta</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Tipo / Estado</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:right; vertical-align:middle;">Límite</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:right; vertical-align:middle;">Utilizado</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:right; vertical-align:middle;">Disponible</th>
+                  </tr>
+                </thead>
+                <tbody id="tarjetas-table-body">
+                  <!-- Injected via renderClaraCards() -->
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -4448,11 +4514,41 @@
     </div>
   </div>
 
+  <!-- MODAL CONFIRMAR IMPORTACIÓN DE TARJETAS -->
+  <div id="modal-importar-tarjetas" class="modal-overlay" style="display:none; align-items:center; justify-content:center;">
+    <div class="modal-content" style="max-width:550px; width:90%; border-radius:16px;">
+      <div class="modal-header">
+        <h2>Confirmar Importación de Tarjetas</h2>
+        <button class="modal-close" onclick="window.cerrarModalImportarTarjetas()">✕</button>
+      </div>
+      <div class="modal-body" style="padding:1.5rem 0;">
+        <p style="margin-bottom:1.25rem; color:var(--text-secondary); font-size:0.9rem;">Se han procesado correctamente las tarjetas de tu archivo:</p>
+        
+        <div style="background:var(--bg-hover); border-radius:12px; padding:1.25rem; margin-bottom:1.25rem; display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; border:1px solid var(--border);">
+          <div>
+            <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; letter-spacing:0.05em;">Total Tarjetas</span>
+            <h4 id="import-cards-preview-count" style="font-size:1.6rem; margin:0.35rem 0 0 0; font-weight:800; color:var(--text-primary);">0</h4>
+          </div>
+          <div>
+            <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; letter-spacing:0.05em;">Límite de Crédito</span>
+            <h4 id="import-cards-preview-amount" style="font-size:1.6rem; margin:0.35rem 0 0 0; font-weight:800; color:#10b981;">$0.00</h4>
+          </div>
+        </div>
+        
+        <p style="font-size:0.85rem; color:var(--text-muted); line-height:1.4;" id="import-cards-preview-duplicates-msg"></p>
+      </div>
+      <div class="form-actions" style="display:flex; justify-content:flex-end; gap:0.75rem; border-top:1px solid var(--border); padding-top:1.25rem;">
+        <button type="button" class="btn-secondary" onclick="window.cerrarModalImportarTarjetas()">Cancelar</button>
+        <button type="button" class="btn-primary" id="btn-import-cards-confirm" onclick="window.confirmarImportacionTarjetas()">Guardar Tarjetas</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js?v=2"></script>
-  <script src="supabaseSync.js?v=26"></script>
-  <script src="app.js?v=51"></script>
+  <script src="supabaseSync.js?v=27"></script>
+  <script src="app.js?v=58"></script>
   <script>lucide.createIcons();</script>
 </body>
 

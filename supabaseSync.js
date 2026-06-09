@@ -699,7 +699,46 @@ async function _processSyncQueueInternal() {
               monto: Number(item.data.monto),
               card_last_4: String(item.data.cardLast4 || ''),
               usuario: item.data.usuario || null,
-              categoria: item.data.categoria || null
+              categoria: item.data.categoria || null,
+              fecha_transaccion: item.data.fechaTransaccion || null,
+              estado_cuenta: item.data.estadoCuenta || null,
+              transaccion: item.data.transaccion || null,
+              monto_original: item.data.montoOriginal !== undefined ? Number(item.data.montoOriginal) : null,
+              moneda_original: item.data.monedaOriginal || null,
+              monto_mxn: item.data.montoMxn !== undefined ? Number(item.data.montoMxn) : null,
+              tarjeta: item.data.tarjeta || null,
+              alias_tarjeta: item.data.aliasTarjeta || null,
+              estado: item.data.estado || null,
+              estado_aprobacion: item.data.estadoAprobacion || null,
+              nombre_aprobador: item.data.nombreAprobador || null,
+              nota_aprobacion: item.data.notaAprobacion || null,
+              codigo_autorizacion: item.data.codigoAutorizacion || null,
+              categoria_clara: item.data.categoriaClara || null,
+              factura_electronica: item.data.facturaElectronica || null,
+              factura_autovinculada: item.data.facturaAutovinculada || null,
+              archivos_factura: item.data.archivosFactura || null,
+              anexos: item.data.anexos || null,
+              archivos_anexo: item.data.archivosAnexo || null,
+              folio_fiscal: item.data.folioFiscal || null,
+              titular: item.data.titular || null,
+              grupos: item.data.grupos || null,
+              ubicacion: item.data.ubicacion || null,
+              etiquetas: item.data.etiquetas || null,
+              descripcion: item.data.descripcion || null
+            };
+          } else if (item.table === 'clara_cards') {
+            payload = {
+              id: item.data.id,
+              alias: item.data.alias || null,
+              usuario: item.data.usuario || null,
+              correo: item.data.correo || null,
+              estado: item.data.estado || null,
+              tipo: item.data.tipo || null,
+              tarjeta: item.data.tarjeta || null,
+              limite: item.data.limite !== undefined ? Number(item.data.limite) : 0,
+              saldo_utilizado: item.data.saldoUtilizado !== undefined ? Number(item.data.saldoUtilizado) : 0,
+              ultima_actualizacion: item.data.ultimaActualizacion || null,
+              donde_comprar: item.data.dondeComprar || null
             };
           } else {
             payload = item.data;
@@ -1599,13 +1638,62 @@ window.cargarDatosDeSupabase = function() {
           monto: Number(row.monto),
           cardLast4: row.card_last_4,
           usuario: row.usuario || 'Técnico Asignado',
-          categoria: row.categoria || 'Otros'
+          categoria: row.categoria || 'Otros',
+          fechaTransaccion: row.fecha_transaccion,
+          estadoCuenta: row.estado_cuenta,
+          transaccion: row.transaccion,
+          montoOriginal: Number(row.monto_original || 0),
+          monedaOriginal: row.moneda_original,
+          montoMxn: Number(row.monto_mxn || 0),
+          tarjeta: row.tarjeta,
+          aliasTarjeta: row.alias_tarjeta,
+          estado: row.estado,
+          estadoAprobacion: row.estado_aprobacion,
+          nombreAprobador: row.nombre_aprobador,
+          notaAprobacion: row.nota_aprobacion,
+          codigoAutorizacion: row.codigo_autorizacion,
+          categoriaClara: row.categoria_clara,
+          facturaElectronica: row.factura_electronica,
+          facturaAutovinculada: row.factura_autovinculada,
+          archivosFactura: row.archivos_factura,
+          anexos: row.anexos,
+          archivosAnexo: row.archivos_anexo,
+          folioFiscal: row.folio_fiscal,
+          titular: row.titular,
+          grupos: row.grupos,
+          ubicacion: row.ubicacion,
+          etiquetas: row.etiquetas,
+          descripcion: row.descripcion
         }));
         window._supaClaraTxs = mappedClara;
         localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(mappedClara));
       }
     } catch (errC) {
       console.warn('[Sync] Tabla clara_transactions no disponible en Supabase. Se usarán datos locales/mock.', errC.message);
+    }
+
+    // Clara Cards
+    try {
+      const { data: cardsDb, error: cardsErr } = await sb.from('clara_cards').select('*');
+      if (!cardsErr && cardsDb) {
+        const mappedCards = cardsDb.map(row => ({
+          id: row.id,
+          alias: row.alias,
+          usuario: row.usuario,
+          correo: row.correo,
+          estado: row.estado,
+          tipo: row.tipo,
+          tarjeta: row.tarjeta,
+          limite: Number(row.limite || 0),
+          saldoUtilizado: Number(row.saldo_utilizado || 0),
+          ultimaActualizacion: row.ultima_actualizacion,
+          dondeComprar: row.donde_comprar
+        }));
+        window._supaClaraCards = mappedCards;
+        localStorage.setItem('sapi_clara_cards', JSON.stringify(mappedCards));
+      }
+    } catch (errCards) {
+      console.warn('[Sync] Tabla clara_cards no disponible en Supabase. Se usarán datos locales/mock.', errCards.message);
     }
 
     // Gastos
@@ -1769,7 +1857,32 @@ function setupRealtime() {
             monto: Number(row.monto),
             cardLast4: row.card_last_4,
             usuario: row.usuario || 'Técnico Asignado',
-            categoria: row.categoria || 'Otros'
+            categoria: row.categoria || 'Otros',
+            fechaTransaccion: row.fecha_transaccion,
+            estadoCuenta: row.estado_cuenta,
+            transaccion: row.transaccion,
+            montoOriginal: Number(row.monto_original || 0),
+            monedaOriginal: row.moneda_original,
+            montoMxn: Number(row.monto_mxn || 0),
+            tarjeta: row.tarjeta,
+            aliasTarjeta: row.alias_tarjeta,
+            estado: row.estado,
+            estadoAprobacion: row.estado_aprobacion,
+            nombreAprobador: row.nombre_aprobador,
+            notaAprobacion: row.nota_aprobacion,
+            codigoAutorizacion: row.codigo_autorizacion,
+            categoriaClara: row.categoria_clara,
+            facturaElectronica: row.factura_electronica,
+            facturaAutovinculada: row.factura_autovinculada,
+            archivosFactura: row.archivos_factura,
+            anexos: row.anexos,
+            archivosAnexo: row.archivos_anexo,
+            folioFiscal: row.folio_fiscal,
+            titular: row.titular,
+            grupos: row.grupos,
+            ubicacion: row.ubicacion,
+            etiquetas: row.etiquetas,
+            descripcion: row.descripcion
           }));
           localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(mappedClara));
           window._supaClaraTxs = mappedClara;
@@ -1798,6 +1911,22 @@ function setupRealtime() {
           const mapped = data.map(rowToEvento);
           localStorage.setItem('sapi_calendario_eventos', JSON.stringify(mapped));
           window._supaCalendarioEventos = mapped;
+        } else if (tableName === 'clara_cards') {
+          const mappedCards = data.map(row => ({
+            id: row.id,
+            alias: row.alias,
+            usuario: row.usuario,
+            correo: row.correo,
+            estado: row.estado,
+            tipo: row.tipo,
+            tarjeta: row.tarjeta,
+            limite: Number(row.limite || 0),
+            saldoUtilizado: Number(row.saldo_utilizado || 0),
+            ultimaActualizacion: row.ultima_actualizacion,
+            dondeComprar: row.donde_comprar
+          }));
+          localStorage.setItem('sapi_clara_cards', JSON.stringify(mappedCards));
+          window._supaClaraCards = mappedCards;
         }
         window.dispatchEvent(new Event('supabase_datos_cargados'));
       }
@@ -1814,6 +1943,7 @@ function setupRealtime() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => handleUpdate('tickets'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes' }, () => handleUpdate('ordenes'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clara_transactions' }, () => handleUpdate('clara_transactions'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clara_cards' }, () => handleUpdate('clara_cards'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sapi_telemetry' }, () => handleUpdate('sapi_telemetry'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'calendario_eventos' }, () => handleUpdate('calendario_eventos'));
       
