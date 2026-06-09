@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.6'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.7'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -217,15 +217,15 @@ if (claraMockTxs.length < 6 || !localStorage.getItem('sapi_clara_mock_txs')) {
 window.addEventListener('supabase_datos_cargados', () => {
   console.log('[App] Refrescando configuración, catálogos y re-renderizando UI desde Supabase...');
   
-  ordenes = window._supaOrdenes || safeGetJSON('sapi_ordenes', []);
-  tickets = window._supaTickets || safeGetJSON('sapi_tickets', []);
+  ordenes = safeGetJSON('sapi_ordenes', []);
+  tickets = safeGetJSON('sapi_tickets', []);
   clientesDb = safeGetJSON('sapi_clientes_db', []);
   refaccionesDb = safeGetJSON('sapi_refacciones_db', []);
   maquinariaDb = safeGetJSON('sapi_maquinaria_db', []);
   sitiosDb = safeGetJSON('sapi_sitios_db', []);
   tecnicosDb = safeGetJSON('sapi_tecnicos_db', []);
-  gastos = window._supaGastos || safeGetJSON('sapi_gastos', []);
-  claraMockTxs = window._supaClaraTxs || safeGetJSON('sapi_clara_mock_txs', claraMockTxs);
+  gastos = safeGetJSON('sapi_gastos', []);
+  claraMockTxs = safeGetJSON('sapi_clara_mock_txs', claraMockTxs);
 
   usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
   configData = safeGetJSON('eurorep_config', {});
