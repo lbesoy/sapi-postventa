@@ -230,7 +230,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version">v1.3.4</div>
+          <div class="sidebar-version">v1.3.5</div>
         </div>
       </div>
     </aside>
@@ -4380,10 +4380,47 @@
     </div>
   </div>
 
+  <!-- MODAL REDACTAR CORREO -->
+  <div class="modal-overlay" id="modal-correo-overlay" onclick="if(event.target===this) cerrarModalCorreo()">
+    <div class="modal" style="max-width: 600px;">
+      <div class="modal-header">
+        <h2>Enviar Orden de Servicio</h2>
+        <button class="modal-close" onclick="cerrarModalCorreo()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-correo" onsubmit="procesarEnviarCorreo(event)">
+          <input type="hidden" id="correo-orden-id" />
+          <div class="form-group full-width" style="margin-bottom: 1rem;">
+            <label>Destinatario(s) * (separa con coma para múltiples correos)</label>
+            <input type="text" id="correo-destinatario" placeholder="cliente@ejemplo.com, supervisor@ejemplo.com" required />
+          </div>
+          <div class="form-group full-width" style="margin-bottom: 1rem;">
+            <label>Asunto *</label>
+            <input type="text" id="correo-asunto" placeholder="Asunto del correo" required />
+          </div>
+          <div class="form-group full-width" style="margin-bottom: 1rem;">
+            <label>Mensaje / Cuerpo del correo *</label>
+            <textarea id="correo-mensaje" rows="8" placeholder="Escribe tu mensaje personal aquí..." required></textarea>
+          </div>
+          <div style="background: var(--bg-hover); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 1.5rem; font-size: 0.8rem; color: var(--text-secondary);">
+            <i data-lucide="info" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; color:var(--accent);"></i>
+            <strong>Nota:</strong> Se anexará automáticamente el reporte de servicio estructurado (Folio, Cliente, Trabajos Realizados y Observaciones) al final de tu mensaje.
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" onclick="cerrarModalCorreo()">Cancelar</button>
+            <button type="submit" class="btn-primary" id="btn-enviar-correo-submit">
+              <i data-lucide="send" class="btn-icon"></i> Enviar Correo
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js?v=2"></script>
   <script src="supabaseSync.js?v=25"></script>
-  <script src="app.js?v=43"></script>
+  <script src="app.js?v=44"></script>
   <script>lucide.createIcons();</script>
 </body>
 

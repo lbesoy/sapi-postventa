@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.4'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.5'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -8779,29 +8779,83 @@ function cerrarDetalle(e) {
 
 function imprimirOrden() { window.print(); }
 
-async function enviarCorreoOrden(ordenId) {
+function enviarCorreoOrden(ordenId) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
   
-  const destinatario = prompt("¿A qué correo deseas enviar esta orden de servicio?", "cliente@ejemplo.com");
-  if (!destinatario) return;
+  // Buscar correo del cliente en clientesDb
+  const cli = clientesDb.find(c => c.nombre === o.cliente);
+  const destEmail = cli ? (cli.email || cli.E_Mail || '') : '';
+  
+  document.getElementById('correo-orden-id').value = ordenId;
+  document.getElementById('correo-destinatario').value = destEmail || 'cliente@ejemplo.com';
+  document.getElementById('correo-asunto').value = `Reporte de Servicio ${o.folio || ''} - ${o.cliente || ''}`;
+  
+  // Mensaje por defecto
+  const defaultMsg = `Hola,\n\nAdjuntamos el reporte de servicio correspondiente a la orden de servicio folio ${o.folio || ''}.\n\nSaludos cordiales,\nEuro Representaciones`;
+  document.getElementById('correo-mensaje').value = defaultMsg;
+  
+  const overlay = document.getElementById('modal-correo-overlay');
+  if (overlay) {
+    overlay.classList.add('open');
+  }
+  
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+}
+
+function cerrarModalCorreo() {
+  const overlay = document.getElementById('modal-correo-overlay');
+  if (overlay) {
+    overlay.classList.remove('open');
+  }
+}
+
+async function procesarEnviarCorreo(e) {
+  if (e) e.preventDefault();
+  
+  const ordenId = document.getElementById('correo-orden-id').value;
+  const destinatario = document.getElementById('correo-destinatario').value.trim();
+  const asunto = document.getElementById('correo-asunto').value.trim();
+  const mensaje = document.getElementById('correo-mensaje').value;
+  
+  const o = ordenes.find(x => x.id === ordenId);
+  if (!o) return;
+  
+  if (!destinatario) {
+    mostrarNotificacion("Por favor ingresa un destinatario válido", "error");
+    return;
+  }
+  
+  const btnSubmit = document.getElementById('btn-enviar-correo-submit');
+  if (btnSubmit) {
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = 'Enviando...';
+  }
   
   mostrarNotificacion("Enviando correo, por favor espera...", "info");
   
+  const mensajeHtml = mensaje.replace(/\n/g, '<br>');
   const htmlBody = `
     <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
-      <h2 style="color: #e8820c; text-align: center;">Orden de Servicio: ${o.folio || 'N/A'}</h2>
-      <p><strong>Cliente:</strong> ${o.cliente || '—'}</p>
-      <p><strong>Fecha:</strong> ${o.fecha || '—'}</p>
-      <p><strong>Equipo/Modelo:</strong> ${o.modelo || '—'} (Serie: ${o.serie || '—'})</p>
-      <p><strong>Técnico Asignado:</strong> ${o.tecnico || '—'}</p>
-      <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
-      <h3 style="color: #444;">Trabajos Realizados</h3>
-      <p>${(o.trabajos || 'Sin descripción').replace(/\n/g, '<br>')}</p>
-      <h3 style="color: #444;">Observaciones</h3>
-      <p>${(o.observaciones || '—').replace(/\n/g, '<br>')}</p>
-      <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
-      <p style="text-align: center; color: #777; font-size: 12px;">Para ver el reporte completo, consulte el portal de Eurorep.</p>
+      <div style="margin-bottom: 20px; line-height: 1.5; font-size: 14px; color: #444; white-space: pre-wrap;">
+        ${mensajeHtml}
+      </div>
+      <div style="border-top: 2px solid #e8820c; padding-top: 20px; margin-top: 20px;">
+        <h2 style="color: #e8820c; text-align: center; margin-top: 0;">Orden de Servicio: ${o.folio || 'N/A'}</h2>
+        <p><strong>Cliente:</strong> ${o.cliente || '—'}</p>
+        <p><strong>Fecha:</strong> ${o.fecha || '—'}</p>
+        <p><strong>Equipo/Modelo:</strong> ${o.modelo || '—'} (Serie: ${o.serie || '—'})</p>
+        <p><strong>Técnico Asignado:</strong> ${o.tecnico || '—'}</p>
+        <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
+        <h3 style="color: #444;">Trabajos Realizados</h3>
+        <p>${(o.trabajos || 'Sin descripción').replace(/\n/g, '<br>')}</p>
+        <h3 style="color: #444;">Observaciones</h3>
+        <p>${(o.observaciones || '—').replace(/\n/g, '<br>')}</p>
+        <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
+        <p style="text-align: center; color: #777; font-size: 12px;">Para ver el reporte completo, consulte el portal de Eurorep.</p>
+      </div>
     </div>
   `;
 
@@ -8825,7 +8879,7 @@ async function enviarCorreoOrden(ordenId) {
       },
       body: JSON.stringify({
         to: destinatario,
-        subject: `Reporte de Servicio ${o.folio || ''} - ${o.cliente || ''}`,
+        subject: asunto,
         htmlBody: htmlBody
       })
     });
@@ -8833,13 +8887,20 @@ async function enviarCorreoOrden(ordenId) {
     const result = await response.json();
     if (response.ok) {
       mostrarNotificacion("¡Correo enviado exitosamente!", "success");
+      cerrarModalCorreo();
     } else {
-      mostrarNotificacion("Error al enviar: " + (result.error || "Revisa las credenciales SMTP en Vercel"), "error");
       console.error(result);
+      mostrarNotificacion("Error al enviar el correo: " + (result.error || result.message || 'Error desconocido'), "error");
     }
   } catch (err) {
     console.error(err);
-    mostrarNotificacion("Error de red al intentar enviar el correo.", "error");
+    mostrarNotificacion("Error de conexión al enviar el correo.", "error");
+  } finally {
+    if (btnSubmit) {
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = '<i data-lucide="send" class="btn-icon"></i> Enviar Correo';
+      if (window.lucide) window.lucide.createIcons();
+    }
   }
 }
 
