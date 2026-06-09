@@ -20,7 +20,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.24'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.25'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -13093,7 +13093,10 @@ window._pendingImportedTxs = [];
 
 window.cerrarModalImportacion = function() {
   const modal = document.getElementById('modal-importar-movimientos');
-  if (modal) modal.style.display = 'none';
+  if (modal) {
+    modal.style.display = '';
+    modal.classList.remove('open');
+  }
   // Reset input file
   const fileInput = document.getElementById('clara-upload-input');
   if (fileInput) fileInput.value = '';
@@ -13361,7 +13364,8 @@ window.procesarArchivoMovimientos = function(event) {
       // Mostrar modal
       const modal = document.getElementById('modal-importar-movimientos');
       if (modal) {
-        modal.style.display = 'flex';
+        modal.style.display = '';
+        modal.classList.add('open');
       }
 
     } catch (err) {
