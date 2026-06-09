@@ -20,7 +20,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.26'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.27'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -12700,6 +12700,8 @@ window.confirmarImportacionTarjetas = async function() {
     const currentCards = window.getClaraCards();
     const currentMap = new Map(currentCards.map(c => [c.id, c]));
 
+    window.logImportTarjetas(`Guardando ${pending.length} tarjetas en almacenamiento local...`, 'info');
+
     // Sobrescribir/Actualizar o añadir
     pending.forEach(c => {
       currentMap.set(c.id, c);
@@ -12709,21 +12711,23 @@ window.confirmarImportacionTarjetas = async function() {
     localStorage.setItem('sapi_clara_cards', JSON.stringify(updatedList));
 
     // Si Supabase está en línea, guardamos en la base de datos
-    if (typeof syncQueuePush === 'function') {
+    if (window.pushToSupabase) {
+      window.logImportTarjetas(`Enviando ${pending.length} tarjetas a la cola de Supabase...`, 'info');
       pending.forEach(c => {
-        syncQueuePush('clara_cards', c);
+        window.pushToSupabase('clara_cards', c);
       });
-      // Forzar procesamiento de cola
-      if (typeof processSyncQueue === 'function') {
-        processSyncQueue();
-      }
+      window.logImportTarjetas(`Sincronización de tarjetas encolada correctamente.`, 'info');
+    } else {
+      window.logImportTarjetas(`Advertencia: pushToSupabase no está disponible, guardado solo local.`, 'warning');
     }
 
+    window.logImportTarjetas(`Proceso finalizado. Cerrando ventana y actualizando tabla.`, 'success');
     window.cerrarModalImportarTarjetas();
     window.renderClaraCards();
     window.mostrarPopCargadoTarjetas(pending.length);
   } catch (err) {
     console.error(err);
+    window.logImportTarjetas(`Error al guardar tarjetas: ${err.message}`, 'error');
     mostrarNotificacion('Error al guardar las tarjetas.', 'error');
   } finally {
     if (btnConfirm) {
