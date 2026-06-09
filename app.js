@@ -14426,15 +14426,57 @@ function descargarYProcesarPdfReal(pdfItem, sb) {
 
       // Guardar PDF en caché de Supabase
       if (sb) {
-        const payload = {
-          id: pdfItem.id,
-          file_name: pdfItem.name,
-          file_type: 'pdf',
-          base64_content: base64Data
-        };
-        sb.from('facturas_analizadas')
-          .upsert(payload)
-          .catch(err => console.error('[OneDrive] Error al guardar caché de PDF:', err));
+        window.extraerFacturaSatNube('pdf', base64Data)
+          .then(satData => {
+            const payload = {
+              id: pdfItem.id,
+              file_name: pdfItem.name,
+              file_type: 'pdf',
+              version_cfdi: satData.versionCfdi || null,
+              uuid: satData.uuid || null,
+              estatus: satData.estatus || null,
+              fecha_cancelacion: satData.fechaCancelacion || null,
+              tipo_comprobante: satData.tipoComprobante || null,
+              fecha_emision: satData.fechaEmision || null,
+              ano_emision: satData.anoEmision || null,
+              mes_emision: satData.mesEmision || null,
+              dia_emision: satData.diaEmision || null,
+              fecha_timbrado: satData.fechaTimbrado || null,
+              serie: satData.serie || null,
+              folio: satData.folio || null,
+              forma_pago: satData.formaPago || null,
+              metodo_pago: satData.metodoPago || null,
+              condiciones_pago: satData.condicionesPago || null,
+              rfc_emisor: satData.rfcEmisor || null,
+              nombre_emisor: satData.nombreEmisor || null,
+              rfc_receptor: satData.rfcReceptor || null,
+              nombre_receptor: satData.nombreReceptor || null,
+              moneda: satData.moneda || null,
+              tipo_cambio: satData.tipoCambio || null,
+              subtotal: parseFloat(satData.subtotal) || 0,
+              descuento: parseFloat(satData.descuento) || 0,
+              total: parseFloat(satData.total) || 0,
+              isr_retenido: parseFloat(satData.isrRetenido) || 0,
+              iva_retenido: parseFloat(satData.ivaRetenido) || 0,
+              iva_trasladado: parseFloat(satData.ivaTrasladado) || 0,
+              base64_content: base64Data
+            };
+            sb.from('facturas_analizadas')
+              .upsert(payload)
+              .catch(err => console.error('[OneDrive] Error al guardar caché de PDF:', err));
+          })
+          .catch(err => {
+            console.warn('[OneDrive] Falló la extracción de datos SAT del PDF para la caché:', err.message);
+            const payload = {
+              id: pdfItem.id,
+              file_name: pdfItem.name,
+              file_type: 'pdf',
+              base64_content: base64Data
+            };
+            sb.from('facturas_analizadas')
+              .upsert(payload)
+              .catch(err => console.error('[OneDrive] Error al guardar caché básica de PDF:', err));
+          });
       }
     })
     .catch(err => {
@@ -14611,11 +14653,33 @@ window.silentPreloadOneDriveFiles = function() {
                   uuid: cached.id,
                   isOneDriveVirtual: true,
                   satData: {
+                    versionCfdi: cached.version_cfdi,
+                    uuid: cached.uuid,
+                    estatus: cached.estatus,
+                    fechaCancelacion: cached.fecha_cancelacion,
+                    tipoComprobante: cached.tipo_comprobante,
+                    fechaEmision: cached.fecha_emision,
+                    anoEmision: cached.ano_emision,
+                    mesEmision: cached.mes_emision,
+                    diaEmision: cached.dia_emision,
+                    fechaTimbrado: cached.fecha_timbrado,
+                    serie: cached.serie,
+                    folio: cached.folio,
+                    formaPago: cached.forma_pago,
+                    metodoPago: cached.metodo_pago,
+                    condicionesPago: cached.condiciones_pago,
                     rfcEmisor: cached.rfc_emisor,
                     nombreEmisor: cached.nombre_emisor,
-                    uuid: cached.uuid_xml,
-                    total: cached.total,
-                    fechaEmision: cached.fecha_emision
+                    rfcReceptor: cached.rfc_receptor,
+                    nombreReceptor: cached.nombre_receptor,
+                    moneda: cached.moneda,
+                    tipoCambio: cached.tipo_cambio,
+                    subtotal: parseFloat(cached.subtotal) || 0,
+                    descuento: parseFloat(cached.descuento) || 0,
+                    total: parseFloat(cached.total) || 0,
+                    isrRetenido: parseFloat(cached.isr_retenido) || 0,
+                    ivaRetenido: parseFloat(cached.iva_retenido) || 0,
+                    ivaTrasladado: parseFloat(cached.iva_trasladado) || 0
                   }
                 });
               }
@@ -14636,11 +14700,33 @@ window.silentPreloadOneDriveFiles = function() {
                       id: item.id,
                       file_name: item.name,
                       file_type: 'xml',
+                      version_cfdi: satData.versionCfdi || null,
+                      uuid: satData.uuid || null,
+                      estatus: satData.estatus || null,
+                      fecha_cancelacion: satData.fechaCancelacion || null,
+                      tipo_comprobante: satData.tipoComprobante || null,
+                      fecha_emision: satData.fechaEmision || null,
+                      ano_emision: satData.anoEmision || null,
+                      mes_emision: satData.mesEmision || null,
+                      dia_emision: satData.diaEmision || null,
+                      fecha_timbrado: satData.fechaTimbrado || null,
+                      serie: satData.serie || null,
+                      folio: satData.folio || null,
+                      forma_pago: satData.formaPago || null,
+                      metodo_pago: satData.metodoPago || null,
+                      condiciones_pago: satData.condicionesPago || null,
                       rfc_emisor: satData.rfcEmisor || null,
                       nombre_emisor: satData.nombreEmisor || null,
-                      uuid_xml: satData.uuid || null,
+                      rfc_receptor: satData.rfcReceptor || null,
+                      nombre_receptor: satData.nombreReceptor || null,
+                      moneda: satData.moneda || null,
+                      tipo_cambio: satData.tipoCambio || null,
+                      subtotal: parseFloat(satData.subtotal) || 0,
+                      descuento: parseFloat(satData.descuento) || 0,
                       total: parseFloat(satData.total) || 0,
-                      fecha_emision: satData.fechaEmision || null,
+                      isr_retenido: parseFloat(satData.isrRetenido) || 0,
+                      iva_retenido: parseFloat(satData.ivaRetenido) || 0,
+                      iva_trasladado: parseFloat(satData.ivaTrasladado) || 0,
                       base64_content: base64
                     };
                     sb.from('facturas_analizadas')

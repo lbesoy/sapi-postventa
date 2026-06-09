@@ -6,11 +6,36 @@ CREATE TABLE IF NOT EXISTS public.facturas_analizadas (
     id TEXT PRIMARY KEY, -- ID del elemento en OneDrive
     file_name TEXT NOT NULL,
     file_type TEXT NOT NULL, -- 'xml' o 'pdf'
+    
+    -- Campos extraídos del XML/PDF SAT (27 campos)
+    version_cfdi TEXT,
+    uuid TEXT, -- Folio Fiscal UUID
+    estatus TEXT,
+    fecha_cancelacion TEXT,
+    tipo_comprobante TEXT,
+    fecha_emision TEXT,
+    ano_emision TEXT,
+    mes_emision TEXT,
+    dia_emision TEXT,
+    fecha_timbrado TEXT,
+    serie TEXT,
+    folio TEXT,
+    forma_pago TEXT,
+    metodo_pago TEXT,
+    condiciones_pago TEXT,
     rfc_emisor TEXT,
     nombre_emisor TEXT,
-    uuid_xml TEXT,
+    rfc_receptor TEXT,
+    nombre_receptor TEXT,
+    moneda TEXT,
+    tipo_cambio TEXT,
+    subtotal NUMERIC(12,2) DEFAULT 0,
+    descuento NUMERIC(12,2) DEFAULT 0,
     total NUMERIC(12,2) DEFAULT 0,
-    fecha_emision TEXT,
+    isr_retenido NUMERIC(12,2) DEFAULT 0,
+    iva_retenido NUMERIC(12,2) DEFAULT 0,
+    iva_trasladado NUMERIC(12,2) DEFAULT 0,
+
     base64_content TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
