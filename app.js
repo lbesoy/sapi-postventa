@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.8'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.9'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -2824,7 +2824,7 @@ function renderStats() {
       });
       
       const elDashKpis = document.getElementById('dash-kpis-cliente');
-      if (elDashKpis) elDashKpis.style.display = 'grid';
+      if (elDashKpis) elDashKpis.style.display = 'none';
       
       const elMaquinas = document.getElementById('stat-cli-maquinas');
       if (elMaquinas) elMaquinas.textContent = countMaquinas;
@@ -3017,8 +3017,8 @@ function renderDashboardV2() {
     maquinariaDash = maquinariaDb.filter(m => String(m.cliente || '').toLowerCase().trim() === nombreEmpresaLogged);
 
     const rend1 = document.getElementById('v2-label-rend-1'); if (rend1) rend1.textContent = 'Refacciones Faltantes';
-    const rend2 = document.getElementById('v2-label-rend-2'); if (rend2) rend2.textContent = 'Sitios Activos';
-    const rend3 = document.getElementById('v2-label-rend-3'); if (rend3) rend3.textContent = 'Equipos Instalados';
+    const rend2 = document.getElementById('v2-label-rend-2'); if (rend2) rend2.textContent = 'Mis Sitios';
+    const rend3 = document.getElementById('v2-label-rend-3'); if (rend3) rend3.textContent = 'Mis Máquinas';
     const chart3 = document.getElementById('v2-title-chart-3'); if (chart3) chart3.textContent = 'Top Equipos (Mantenimientos)';
   } else if ((currentSession.viewMode || '') === 'tecnico') {
     const tecName = currentUser ? currentUser.nombre : '';
@@ -3184,13 +3184,13 @@ function renderDashboardV2() {
     const sitiosCount = clienteObj && clienteObj.sitios ? clienteObj.sitios.length : 0;
     const equiposCount = maquinariaDash.length;
     
-    if (labelOrd) labelOrd.textContent = 'Sitios Activos';
+    if (labelOrd) labelOrd.textContent = 'Mis Sitios';
     if (textOrd) textOrd.textContent = 'Registrados en el sistema';
     if (elOrd) { elOrd.textContent = sitiosCount; elOrd.style.color = '#4f8ef7'; }
     if (cardOrd) cardOrd.setAttribute('onclick', "abrirDesgloseDashboard('sitios', '')");
     if (iconDivOrd) iconDivOrd.innerHTML = '<i data-lucide="map-pin"></i>';
 
-    if (labelTkt) labelTkt.textContent = 'Equipos Instalados';
+    if (labelTkt) labelTkt.textContent = 'Mis Máquinas';
     if (textTkt) textTkt.textContent = 'Maquinaria vinculada';
     if (elTkt) { elTkt.textContent = equiposCount; elTkt.style.color = '#8b5cf6'; }
     if (cardTkt) cardTkt.setAttribute('onclick', "abrirDesgloseDashboard('maquinas', '')");
