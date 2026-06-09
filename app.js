@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.43'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.44'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -17327,6 +17327,70 @@ window.abrirPdfVisor = function(name) {
   if (file.satData) {
     window.renderSatDetailsTable(file.satData, 'pdf-visor-sat-body');
   } else {
+    // 1. Intentar buscar un archivo XML cargado localmente con el mismo nombre base que tenga satData
+    const baseName = (file.name || '').substring(0, (file.name || '').lastIndexOf('.'));
+    const localXml = window._gastoUploadedFiles.find(x => x.type === 'xml' && x.name.startsWith(baseName));
+    
+    if (localXml && localXml.satData) {
+      file.satData = localXml.satData;
+      window.renderSatDetailsTable(file.satData, 'pdf-visor-sat-body');
+    } else {
+      // 2. Consultar la base de datos Supabase por registros con el mismo nombre base que tengan Ficha SAT
+      const sb = window.supabaseClient;
+      if (sb && baseName) {
+        sb.from('facturas_analizadas')
+          .select('*')
+          .like('file_name', baseName + '%')
+          .then(({ data: list, error }) => {
+            if (!error && list && list.length > 0) {
+              const matched = list.find(x => x.uuid || x.rfc_emisor);
+              if (matched) {
+                const satData = {
+                  versionCfdi: matched.version_cfdi,
+                  uuid: matched.uuid,
+                  estatus: matched.estatus,
+                  fechaCancelacion: matched.fecha_cancelacion,
+                  tipoComprobante: matched.tipo_comprobante,
+                  fechaEmision: matched.fecha_emision,
+                  anoEmision: matched.ano_emision,
+                  mesEmision: matched.mes_emision,
+                  diaEmision: matched.dia_emision,
+                  fechaTimbrado: matched.fecha_timbrado,
+                  serie: matched.serie,
+                  folio: matched.folio,
+                  formaPago: matched.forma_pago,
+                  metodoPago: matched.metodo_pago,
+                  condicionesPago: matched.condiciones_pago,
+                  rfcEmisor: matched.rfc_emisor,
+                  nombreEmisor: matched.nombre_emisor,
+                  rfcReceptor: matched.rfc_receptor,
+                  nombreReceptor: matched.nombre_receptor,
+                  moneda: matched.moneda,
+                  tipoCambio: matched.tipo_cambio,
+                  subtotal: parseFloat(matched.subtotal) || 0,
+                  descuento: parseFloat(matched.descuento) || 0,
+                  total: parseFloat(matched.total) || 0,
+                  isrRetenido: parseFloat(matched.isr_retenido) || 0,
+                  ivaRetenido: parseFloat(matched.iva_retenido) || 0,
+                  ivaTrasladado: parseFloat(matched.iva_trasladado) || 0
+                };
+                file.satData = satData;
+                window.renderSatDetailsTable(satData, 'pdf-visor-sat-body');
+                return;
+              }
+            }
+            extraerDelPdfDirecto();
+          })
+          .catch(() => {
+            extraerDelPdfDirecto();
+          });
+      } else {
+        extraerDelPdfDirecto();
+      }
+    }
+  }
+
+  function extraerDelPdfDirecto() {
     window.extraerFacturaSatNube('pdf', file.base64)
       .then(satData => {
         file.satData = satData;
