@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.5'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.6'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -6867,8 +6867,9 @@ function setDiasData(data) {
 
 // ===== FORM =====
 function generarFolioConsecutivo() {
+  const isTest = isTestModeActive();
   const currentYear = new Date().getFullYear().toString().slice(-2);
-  const prefix = `OS-${currentYear}`;
+  const prefix = isTest ? `OS-PRUEBA-` : `OS-${currentYear}`;
   let maxConsecutivo = 0;
   
   ordenes.forEach(o => {
@@ -9151,12 +9152,16 @@ function renderTickets(ctx) {
     return folioB.localeCompare(folioA, undefined, { numeric: true, sensitivity: 'base' });
   });
   
-  let tecFilter = document.getElementById(isDashView ? 'filter-dash-tkt-tecnico' : 'filter-tkt-tecnico')?.value;
-  let supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value;
-  
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
-  
+
+  let tecFilter = '';
+  let supFilter = '';
+  if (!isEmpresa) {
+    tecFilter = document.getElementById(isDashView ? 'filter-dash-tkt-tecnico' : 'filter-tkt-tecnico')?.value || '';
+    supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value || '';
+  }
+
   if (isEmpresa) {
     let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
     if (nombreEmpresaLogged) {
@@ -10689,12 +10694,13 @@ async function guardarTicket(e) {
 
   let newFolio = '';
   if (!editandoTicketId) {
+    const isTest = isTestModeActive();
     const yearStr = new Date().getFullYear().toString().slice(-2);
-    const prefix = `TKT-${yearStr}`;
+    const prefix = isTest ? `TKT-PRUEBA-` : `TKT-${yearStr}`;
     const ticketsDelAnio = tickets.filter(t => t.folio && t.folio.startsWith(prefix));
     let maxConsecutivo = 0;
     ticketsDelAnio.forEach(t => {
-      const numStr = t.folio.replace(prefix, '');
+      const numStr = t.folio.substring(prefix.length);
       const num = parseInt(numStr, 10);
       if (!isNaN(num) && num > maxConsecutivo) maxConsecutivo = num;
     });
