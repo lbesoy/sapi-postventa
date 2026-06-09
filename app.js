@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.37'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.38'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -13499,10 +13499,10 @@ window.confirmarImportacion = function() {
     if (!existingIds.has(tx.id)) {
       currentTxs.push(tx);
       newTxsCount++;
-    }
-    // Subir a Supabase (siempre intentamos upsert para asegurar sincronización en nube)
-    if (window.pushToSupabase) {
-      window.pushToSupabase('clara_transactions', tx);
+      // Subir a Supabase solo si es nuevo
+      if (window.pushToSupabase) {
+        window.pushToSupabase('clara_transactions', tx);
+      }
     }
   });
 
