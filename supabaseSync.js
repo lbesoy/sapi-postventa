@@ -487,14 +487,17 @@ async function _processSyncQueueInternal() {
   updateSyncStatusUI();
 
   try {
-    console.log(`[Sync] Iniciando envío de ${queue.length} operaciones pendientes...`);
     let successCount = 0;
     
-    while (queue.length > 0) {
+    while (true) {
+      const queue = getSyncQueue();
+      if (queue.length === 0) break;
+
       const item = queue[0];
       if (!item) {
-        queue.shift();
-        saveSyncQueue(queue);
+        const latestQueue = getSyncQueue();
+        latestQueue.shift();
+        saveSyncQueue(latestQueue);
         continue;
       }
       let payload;
@@ -904,8 +907,9 @@ async function _processSyncQueueInternal() {
             break; // Error de red temporal, pausar procesamiento
           } else {
             console.warn(`[Sync] Error permanente de BD. Saltando elemento.`);
-            queue.shift();
-            saveSyncQueue(queue);
+            const latestQueue = getSyncQueue();
+            latestQueue.shift();
+            saveSyncQueue(latestQueue);
           }
         } else {
           // Registrar log de auditoría automática de transacciones críticas
@@ -933,8 +937,9 @@ async function _processSyncQueueInternal() {
             }
           }
 
-          queue.shift();
-          saveSyncQueue(queue);
+          const latestQueue = getSyncQueue();
+          latestQueue.shift();
+          saveSyncQueue(latestQueue);
           successCount++;
         }
       } catch (e) {
@@ -942,8 +947,9 @@ async function _processSyncQueueInternal() {
         if (e.message && (e.message.includes('Failed to fetch') || e.message.includes('network') || e.message.includes('fetch'))) {
           break;
         } else {
-          queue.shift();
-          saveSyncQueue(queue);
+          const latestQueue = getSyncQueue();
+          latestQueue.shift();
+          saveSyncQueue(latestQueue);
         }
       }
     }
