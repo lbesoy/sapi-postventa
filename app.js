@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.2.9'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.0'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -1188,7 +1188,7 @@ function applyRole(rolKey) {
 
     // Ocultar campo y columna de Prioridad para empresas/clientes
     const isCliente = ['empresa', 'cliente'].includes(rolKey);
-    document.querySelectorAll('.col-prioridad').forEach(el => el.style.display = isCliente ? 'none' : '');
+    document.querySelectorAll('.col-prioridad, .col-asignado').forEach(el => el.style.display = isCliente ? 'none' : '');
     const groupPrioridad = document.getElementById('group-t-prioridad');
     if (groupPrioridad) {
       groupPrioridad.style.display = isCliente ? 'none' : '';
@@ -9111,7 +9111,7 @@ function renderTickets(ctx) {
       <td data-label="Área" style="white-space:nowrap;">${t.area||'—'}</td>
       <td data-label="Prioridad" class="col-prioridad" style="white-space:nowrap; display: ${isEmpresa ? 'none' : ''};"><span class="badge badge-${String(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
       <td data-label="Estado" style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'—'}</span></td>
-      <td data-label="Asignado" style="white-space:nowrap;">${t.asignado||'—'}</td>
+      <td data-label="Asignado" class="col-asignado" style="white-space:nowrap; display: ${isEmpresa ? 'none' : ''};">${t.asignado||'—'}</td>
       <td data-label="Fecha" style="white-space:nowrap;">${formatFechaHoraAmigable(t.fechaCreacion || t.fecha)}</td>
       <td data-label="" style="width:40px; text-align:center;">
         ${canDelete ? `<button class="action-btn del" onclick="eliminarTicket('${t.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
