@@ -391,6 +391,47 @@ body {
 .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
 .btn-secondary.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
 
+/* Clara specific action buttons */
+.btn-clara-action {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  height: 38px !important;
+  border-radius: 8px !important;
+  padding: 0 1rem !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+  font-family: inherit !important;
+  cursor: pointer !important;
+  transition: var(--transition) !important;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary) !important;
+}
+.btn-clara-action.btn-primary {
+  background: var(--accent) !important;
+  border: none !important;
+  color: #fff !important;
+}
+.btn-clara-icon {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  transition: var(--transition) !important;
+  border: 1px solid var(--border) !important;
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+.btn-clara-icon:hover, .btn-clara-action:hover {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
 /* ===== CONTENT ===== */
 .content { flex: 1; overflow: hidden; min-height: 0; }
 .view { display: none; }

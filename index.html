@@ -257,7 +257,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version">v1.3.38</div>
+          <div class="sidebar-version">v1.3.39</div>
         </div>
       </div>
     </aside>
@@ -690,8 +690,8 @@
               style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom: 1.5rem;">
               <h2>Control de Gastos</h2>
               <div style="display:flex; gap:0.5rem; align-items:center;">
-                <button class="btn-secondary" onclick="document.getElementById('clara-upload-input').click()" id="btn-subir-movimientos-csv" style="display:inline-flex; align-items:center; gap:0.4rem; height:38px; border-radius:8px; padding:0 1rem; cursor:pointer; font-weight:600; font-size:0.85rem; border:1px solid var(--border); background:var(--bg-card); transition:var(--transition); font-family:inherit; color:var(--text-primary) !important;">
-                  <i data-lucide="upload" style="width:14px; height:14px;"></i> Subir CSV/Excel
+                <button class="btn-secondary btn-clara-action" onclick="document.getElementById('clara-upload-input').click()" id="btn-subir-movimientos-csv">
+                  <i data-lucide="upload" class="btn-icon"></i> Subir CSV/Excel
                 </button>
                 <button class="btn-primary" onclick="abrirModalGasto()" id="btn-registrar-gasto">
                   <i data-lucide="plus-circle" class="btn-icon"></i> Registrar Gasto
@@ -873,11 +873,14 @@
               </div>
               
               <div style="display:flex; gap:0.5rem; align-items:center;">
-                <button class="btn-secondary" style="width:38px; height:38px; border-radius:8px; border:1px solid var(--border); background:var(--bg-card); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-primary) !important; transition:var(--transition);" title="Enviar estado de cuenta por correo" onclick="mostrarNotificacion('Estado de cuenta enviado por correo electrónico')">
-                  <i data-lucide="mail" style="width:16px; height:16px; color:var(--text-primary) !important;"></i>
+                <button class="btn-secondary btn-clara-icon" title="Enviar estado de cuenta por correo" onclick="mostrarNotificacion('Estado de cuenta enviado por correo electrónico')">
+                  <i data-lucide="mail" class="btn-icon"></i>
                 </button>
-                <button class="btn-primary" style="display:inline-flex; align-items:center; gap:0.4rem; height:38px; border-radius:8px; padding:0 1rem; cursor:pointer; font-weight:600; font-size:0.85rem;" onclick="mostrarNotificacion('Descargando reporte de movimientos...')">
-                  <i data-lucide="download" style="width:14px; height:14px;"></i> Descargar
+                <button class="btn-primary btn-clara-action" onclick="mostrarNotificacion('Descargando reporte de movimientos...')">
+                  <i data-lucide="download" class="btn-icon"></i> Descargar
+                </button>
+                <button class="btn-secondary btn-clara-action" onclick="document.getElementById('clara-upload-input').click()">
+                  <i data-lucide="upload" class="btn-icon"></i> Importar
                 </button>
                 <input type="file" id="clara-upload-input" style="display:none;" accept=".xlsx,.xls,.csv" onchange="window.procesarArchivoMovimientos(event)" />
               </div>
@@ -913,8 +916,8 @@
               style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom: 1.5rem;">
               <h2>Tarjetas Corporativas Clara</h2>
               <div style="display:flex; gap:0.5rem; align-items:center;">
-                <button class="btn-secondary" onclick="window.abrirSeleccionadorArchivoTarjetas()" id="btn-importar-tarjetas-excel" style="display:inline-flex; align-items:center; gap:0.4rem; height:38px; border-radius:8px; padding:0 1rem; cursor:pointer; font-weight:600; font-size:0.85rem; border:1px solid var(--border); background:var(--bg-card); transition:var(--transition); font-family:inherit; color:var(--text-primary) !important;">
-                  <i data-lucide="upload" style="width:14px; height:14px;"></i> Importar Tarjetas
+                <button class="btn-secondary btn-clara-action" onclick="window.abrirSeleccionadorArchivoTarjetas()" id="btn-importar-tarjetas-excel">
+                  <i data-lucide="upload" class="btn-icon"></i> Importar Tarjetas
                 </button>
                 <input type="file" id="tarjetas-upload-input" style="display:none;" accept=".xlsx,.xls,.csv" onchange="window.procesarArchivoTarjetas(event)" />
               </div>
@@ -4580,8 +4583,8 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js?v=2"></script>
-  <script src="supabaseSync.js?v=33"></script>
-  <script src="app.js?v=77"></script>
+  <script src="supabaseSync.js?v=34"></script>
+  <script src="app.js?v=78"></script>
   <script>lucide.createIcons();</script>
 </body>
 
