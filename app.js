@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.39'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.40'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -599,19 +599,19 @@ function cargarRolesDesdeStorage() {
         ROLES[r].views = savedRoles[r].views;
       }
     }
-  } else {
-    // Inyección automática por defecto ÚNICAMENTE en el primer arranque limpio sin configuración guardada
-    for (const r in ROLES) {
-      if (ROLES[r] && Array.isArray(ROLES[r].views)) {
-        if (!ROLES[r].views.includes('calendario') && ['superadmin', 'admin', 'supervisor', 'tecnico', 'consulta'].includes(r)) {
-          ROLES[r].views.push('calendario');
-        }
-        if (!ROLES[r].views.includes('gastos') && ['superadmin', 'admin', 'supervisor', 'tecnico'].includes(r)) {
-          ROLES[r].views.push('gastos');
-        }
-        if (!ROLES[r].views.includes('telemetry') && r === 'superadmin') {
-          ROLES[r].views.push('telemetry');
-        }
+  }
+  
+  // Garantizar siempre la inyección de vistas críticas por defecto si faltan en la configuración cargada
+  for (const r in ROLES) {
+    if (ROLES[r] && Array.isArray(ROLES[r].views)) {
+      if (!ROLES[r].views.includes('calendario') && ['superadmin', 'admin', 'supervisor', 'tecnico', 'consulta'].includes(r)) {
+        ROLES[r].views.push('calendario');
+      }
+      if (!ROLES[r].views.includes('gastos') && ['superadmin', 'admin', 'supervisor', 'tecnico'].includes(r)) {
+        ROLES[r].views.push('gastos');
+      }
+      if (!ROLES[r].views.includes('telemetry') && r === 'superadmin') {
+        ROLES[r].views.push('telemetry');
       }
     }
   }
