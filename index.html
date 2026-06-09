@@ -230,7 +230,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version">v1.3.11</div>
+          <div class="sidebar-version">v1.3.12</div>
         </div>
       </div>
     </aside>
@@ -842,6 +842,10 @@
                 <button class="btn-primary" style="display:inline-flex; align-items:center; gap:0.4rem; height:38px; border-radius:8px; padding:0 1rem; cursor:pointer; font-weight:600; font-size:0.85rem;" onclick="mostrarNotificacion('Descargando reporte de movimientos...')">
                   <i data-lucide="download" style="width:14px; height:14px;"></i> Descargar
                 </button>
+                <button class="btn-primary" style="display:inline-flex; align-items:center; gap:0.4rem; height:38px; border-radius:8px; padding:0 1rem; cursor:pointer; font-weight:600; font-size:0.85rem;" onclick="document.getElementById('clara-upload-input').click()">
+                  <i data-lucide="upload" style="width:14px; height:14px;"></i> Importar
+                </button>
+                <input type="file" id="clara-upload-input" style="display:none;" accept=".xlsx,.xls,.csv" onchange="window.procesarArchivoMovimientos(event)" />
               </div>
             </div>
 
@@ -4414,13 +4418,41 @@
           </div>
         </form>
       </div>
+  <!-- MODAL CONFIRMAR IMPORTACIÓN DE MOVIMIENTOS -->
+  <div id="modal-importar-movimientos" class="modal-overlay" style="display:none; align-items:center; justify-content:center;">
+    <div class="modal-content" style="max-width:550px; width:90%; border-radius:16px;">
+      <div class="modal-header">
+        <h2>Confirmar Importación de Movimientos</h2>
+        <button class="modal-close" onclick="window.cerrarModalImportacion()">✕</button>
+      </div>
+      <div class="modal-body" style="padding:1.5rem 0;">
+        <p style="margin-bottom:1.25rem; color:var(--text-secondary); font-size:0.9rem;">Se han procesado correctamente los registros de tu archivo:</p>
+        
+        <div style="background:var(--bg-hover); border-radius:12px; padding:1.25rem; margin-bottom:1.25rem; display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; border:1px solid var(--border);">
+          <div>
+            <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; letter-spacing:0.05em;">Total de Movimientos</span>
+            <h4 id="import-preview-count" style="font-size:1.6rem; margin:0.35rem 0 0 0; font-weight:800; color:var(--text-primary);">0</h4>
+          </div>
+          <div>
+            <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; letter-spacing:0.05em;">Monto Total</span>
+            <h4 id="import-preview-amount" style="font-size:1.6rem; margin:0.35rem 0 0 0; font-weight:800; color:#10b981;">$0.00</h4>
+          </div>
+        </div>
+        
+        <p style="font-size:0.85rem; color:var(--text-muted); line-height:1.4;" id="import-preview-duplicates-msg"></p>
+      </div>
+      <div class="form-actions" style="display:flex; justify-content:flex-end; gap:0.75rem; border-top:1px solid var(--border); padding-top:1.25rem;">
+        <button type="button" class="btn-secondary" onclick="window.cerrarModalImportacion()">Cancelar</button>
+        <button type="button" class="btn-primary" id="btn-import-confirm" onclick="window.confirmarImportacion()">Guardar Movimientos</button>
+      </div>
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js?v=2"></script>
-  <script src="supabaseSync.js?v=25"></script>
-  <script src="app.js?v=50"></script>
+  <script src="supabaseSync.js?v=26"></script>
+  <script src="app.js?v=51"></script>
   <script>lucide.createIcons();</script>
 </body>
 

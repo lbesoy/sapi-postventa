@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.11'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.12'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -12500,6 +12500,237 @@ document.addEventListener('click', (e) => {
     dropdown.style.display = 'none';
   }
 });
+
+// ==========================================
+// IMPORTACIÓN DE MOVIMIENTOS DESDE EXCEL/CSV
+// ==========================================
+
+window._pendingImportedTxs = [];
+
+window.cerrarModalImportacion = function() {
+  const modal = document.getElementById('modal-importar-movimientos');
+  if (modal) modal.style.display = 'none';
+  // Reset input file
+  const fileInput = document.getElementById('clara-upload-input');
+  if (fileInput) fileInput.value = '';
+};
+
+// Parser robusto para fechas de Excel/CSV
+function parseExcelDate(val) {
+  if (val instanceof Date) {
+    return val.toISOString().split('T')[0];
+  }
+  if (typeof val === 'number') {
+    // Excel base date is 1899-12-30
+    const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+    return date.toISOString().split('T')[0];
+  }
+  if (typeof val === 'string') {
+    const cleaned = val.trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(cleaned)) {
+      return cleaned.substring(0, 10);
+    }
+    const parts = cleaned.split(/[\/\-]/);
+    if (parts.length === 3) {
+      if (parts[0].length === 4) { // YYYY/MM/DD
+        return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      } else { // DD/MM/YYYY
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+    }
+  }
+  return new Date().toISOString().split('T')[0];
+}
+
+// Hashing determinista para evitar duplicidades
+function generateTxId(fecha, merchant, monto, cardLast4) {
+  const cleanMerchant = String(merchant || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const cleanMonto = Number(monto || 0).toFixed(2);
+  const cleanCard = String(cardLast4 || '').replace(/[^0-9]/g, '').slice(-4);
+  const raw = `${fecha}_${cleanMerchant}_${cleanMonto}_${cleanCard}`;
+  
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const char = raw.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash;
+  }
+  return 'tx_import_' + Math.abs(hash).toString(36);
+}
+
+window.procesarArchivoMovimientos = function(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+      if (json.length === 0) {
+        mostrarNotificacion('El archivo está vacío o no es válido.', 'error');
+        return;
+      }
+
+      // Mapear dinámicamente columnas por heurística de nombres
+      const keys = Object.keys(json[0]);
+      let colFecha = '', colMerchant = '', colMonto = '', colCard = '', colUser = '', colCat = '';
+
+      keys.forEach(k => {
+        const kl = k.toLowerCase().trim();
+        if (!colFecha && (kl.includes('fecha') || kl.includes('date') || kl.includes('day') || kl.includes('transaccion') || kl.includes('transaction'))) {
+          colFecha = k;
+        } else if (!colMerchant && (kl.includes('comercio') || kl.includes('establecimiento') || kl.includes('merchant') || kl.includes('descripcion') || kl.includes('description') || kl.includes('negocio') || kl.includes('concepto') || kl.includes('proveedor'))) {
+          colMerchant = k;
+        } else if (!colMonto && (kl.includes('monto') || kl.includes('importe') || kl.includes('amount') || kl.includes('total') || kl.includes('cargo') || kl.includes('valor'))) {
+          colMonto = k;
+        } else if (!colUser && (kl.includes('usuario') || kl.includes('user') || kl.includes('nombre') || kl.includes('name') || kl.includes('tarjetahabiente') || kl.includes('empleado') || kl.includes('titular'))) {
+          colUser = k;
+        } else if (!colCard && (kl.includes('tarjeta') || kl.includes('card') || kl.includes('last4') || kl.includes('terminacion') || kl.includes('digitos') || kl.includes('dígitos') || kl.includes('ultimos'))) {
+          colCard = k;
+        } else if (!colCat && (kl.includes('categoria') || kl.includes('category') || kl.includes('rubro') || kl.includes('giro'))) {
+          colCat = k;
+        }
+      });
+
+      // Validar columnas requeridas mínimas
+      if (!colFecha || !colMerchant || !colMonto) {
+        mostrarNotificacion('No se pudieron identificar las columnas requeridas (Fecha, Comercio, Monto). Revisa el formato.', 'error');
+        return;
+      }
+
+      let totalMonto = 0;
+      const parsedTxs = [];
+
+      json.forEach(row => {
+        const rawMonto = row[colMonto];
+        // Quitar signos de moneda, comas y convertir a número absoluto
+        let cleanMonto = Number(String(rawMonto).replace(/[^0-9\.\-]/g, ''));
+        if (isNaN(cleanMonto)) cleanMonto = 0;
+        cleanMonto = Math.abs(cleanMonto); // los gastos se registran positivos
+        if (cleanMonto === 0) return; // omitir movimientos en cero
+
+        const rawFecha = parseExcelDate(row[colFecha]);
+        const merchant = String(row[colMerchant] || '').trim();
+        if (!merchant) return;
+
+        // Tarjeta
+        let cardLast4 = '4321';
+        if (colCard && row[colCard]) {
+          const digits = String(row[colCard]).replace(/[^0-9]/g, '');
+          if (digits.length >= 4) {
+            cardLast4 = digits.slice(-4);
+          }
+        }
+
+        // Usuario
+        const usuario = colUser ? String(row[colUser] || '').trim() : 'Técnico Asignado';
+        // Categoría
+        const categoria = colCat ? String(row[colCat] || '').trim() : 'Otros';
+
+        const id = generateTxId(rawFecha, merchant, cleanMonto, cardLast4);
+
+        parsedTxs.push({
+          id,
+          fecha: rawFecha,
+          merchant,
+          monto: cleanMonto,
+          cardLast4,
+          usuario,
+          categoria
+        });
+
+        totalMonto += cleanMonto;
+      });
+
+      if (parsedTxs.length === 0) {
+        mostrarNotificacion('No se encontraron movimientos válidos en el archivo.', 'error');
+        return;
+      }
+
+      window._pendingImportedTxs = parsedTxs;
+
+      // Calcular cuántos ya existen
+      const localTxs = safeGetJSON('sapi_clara_mock_txs', claraMockTxs);
+      const existingIds = new Set(localTxs.map(t => t.id));
+      const duplicatesCount = parsedTxs.filter(t => existingIds.has(t.id)).length;
+      const newCount = parsedTxs.length - duplicatesCount;
+
+      // Actualizar modal
+      const elCount = document.getElementById('import-preview-count');
+      const elAmount = document.getElementById('import-preview-amount');
+      const elMsg = document.getElementById('import-preview-duplicates-msg');
+
+      if (elCount) elCount.textContent = parsedTxs.length;
+      if (elAmount) {
+        elAmount.textContent = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(totalMonto);
+      }
+      if (elMsg) {
+        if (duplicatesCount > 0) {
+          elMsg.innerHTML = `Detectados <strong>${duplicatesCount}</strong> movimientos duplicados o previamente importados. Se omitirán automáticamente. <br/><strong>${newCount}</strong> movimientos nuevos listos para guardar.`;
+        } else {
+          elMsg.innerHTML = `Todos los <strong>${parsedTxs.length}</strong> movimientos son nuevos y listos para guardar.`;
+        }
+      }
+
+      // Mostrar modal
+      const modal = document.getElementById('modal-importar-movimientos');
+      if (modal) {
+        modal.style.display = 'flex';
+      }
+
+    } catch (err) {
+      console.error('[Import] Error al procesar archivo:', err);
+      mostrarNotificacion('Error al procesar el archivo. Revisa que sea un Excel o CSV válido.', 'error');
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
+};
+
+window.confirmarImportacion = function() {
+  const parsedTxs = window._pendingImportedTxs || [];
+  if (parsedTxs.length === 0) {
+    window.cerrarModalImportacion();
+    return;
+  }
+
+  // Cargar existentes
+  let currentTxs = safeGetJSON('sapi_clara_mock_txs', claraMockTxs);
+  const existingIds = new Set(currentTxs.map(t => t.id));
+
+  let newTxsCount = 0;
+
+  parsedTxs.forEach(tx => {
+    if (!existingIds.has(tx.id)) {
+      currentTxs.push(tx);
+      newTxsCount++;
+      // Subir a Supabase
+      if (window.pushToSupabase) {
+        window.pushToSupabase('clara_transactions', tx);
+      }
+    }
+  });
+
+  // Guardar local
+  claraMockTxs = currentTxs;
+  localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(currentTxs));
+
+  // Re-render
+  window.renderClaraTxs();
+
+  // Cerrar y notificar
+  window.cerrarModalImportacion();
+  if (newTxsCount > 0) {
+    mostrarNotificacion(`¡Importación exitosa! Se añadieron ${newTxsCount} movimientos nuevos.`, 'success');
+  } else {
+    mostrarNotificacion('Todos los movimientos en el archivo ya estaban registrados.', 'info');
+  }
+};
 
 window.renderGastos = function() {
   const isTecnico = currentSession.viewMode === 'tecnico';

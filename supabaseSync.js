@@ -691,6 +691,16 @@ async function _processSyncQueueInternal() {
             payload = { id: 'roles', data: item.data };
           } else if (item.table === 'calendario_eventos') {
             payload = eventoToRow(item.data);
+          } else if (item.table === 'clara_transactions') {
+            payload = {
+              id: item.data.id,
+              fecha: item.data.fecha,
+              merchant: item.data.merchant,
+              monto: Number(item.data.monto),
+              card_last_4: String(item.data.cardLast4 || ''),
+              usuario: item.data.usuario || null,
+              categoria: item.data.categoria || null
+            };
           } else {
             payload = item.data;
           }
@@ -1587,7 +1597,9 @@ window.cargarDatosDeSupabase = function() {
           fecha: row.fecha ? row.fecha.split('T')[0] : '',
           merchant: row.merchant,
           monto: Number(row.monto),
-          cardLast4: row.card_last_4
+          cardLast4: row.card_last_4,
+          usuario: row.usuario || 'Técnico Asignado',
+          categoria: row.categoria || 'Otros'
         }));
         window._supaClaraTxs = mappedClara;
         localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(mappedClara));
@@ -1755,7 +1767,9 @@ function setupRealtime() {
             fecha: row.fecha ? row.fecha.split('T')[0] : '',
             merchant: row.merchant,
             monto: Number(row.monto),
-            cardLast4: row.card_last_4
+            cardLast4: row.card_last_4,
+            usuario: row.usuario || 'Técnico Asignado',
+            categoria: row.categoria || 'Otros'
           }));
           localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(mappedClara));
           window._supaClaraTxs = mappedClara;
