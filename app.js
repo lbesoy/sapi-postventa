@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.10'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.11'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -3176,8 +3176,8 @@ function renderDashboardV2() {
   const labelTkt = document.getElementById('v2-label-rend-3');
   const iconDivOrd = cardOrd ? cardOrd.querySelector('.stat-icon') : null;
   const iconDivTkt = cardTkt ? cardTkt.querySelector('.stat-icon') : null;
-  const textOrd = cardOrd ? cardOrd.lastElementChild : null;
-  const textTkt = cardTkt ? cardTkt.lastElementChild : null;
+  const textOrd = document.getElementById('v2-desc-rend-2');
+  const textTkt = document.getElementById('v2-desc-rend-3');
   
   if (isEmpresa && nombreEmpresaLogged) {
     let countMaquinas = 0;
