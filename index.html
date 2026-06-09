@@ -257,7 +257,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version">v1.3.41</div>
+          <div class="sidebar-version">v1.3.42</div>
         </div>
       </div>
     </aside>
@@ -4200,7 +4200,12 @@
                   <i data-lucide="sparkles" style="width:14px; height:14px; color:#c084fc;"></i>
                   <h4 style="margin:0; font-size:0.75rem; font-weight:700; color:var(--text-primary);">Facturas sugeridas (OneDrive / Subidas)</h4>
                 </div>
-                <span style="font-size:0.6rem; background:rgba(168,85,247,0.12); color:#c084fc; padding:0.1rem 0.35rem; border-radius:4px; font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">IA MATCH</span>
+                <div style="display:flex; align-items:center; gap:0.4rem;">
+                  <button type="button" onclick="window.forzarRecargaOneDrive()" title="Sincronizar y Recargar OneDrive" style="background:none; border:none; color:var(--text-muted); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; padding:2px; border-radius:4px; transition:var(--transition); font-family:inherit;" onmouseover="this.style.color='var(--accent)'; this.style.background='rgba(168,85,247,0.1)';" onmouseout="this.style.color='var(--text-muted)'; this.style.background='none';">
+                    <i data-lucide="refresh-cw" style="width:13px; height:13px;"></i>
+                  </button>
+                  <span style="font-size:0.6rem; background:rgba(168,85,247,0.12); color:#c084fc; padding:0.1rem 0.35rem; border-radius:4px; font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">IA MATCH</span>
+                </div>
               </div>
               <div id="gasto-sat-suggested-matches-list" style="display:flex; flex-direction:column; gap:0.4rem; max-height:150px; overflow-y:auto; padding-right:2px;">
                 <!-- Suggested matches rendered here dynamically -->

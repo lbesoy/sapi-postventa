@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.41'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.42'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -14346,11 +14346,44 @@ window.vincularFacturaSugerida = function(type, uuid) {
     // Auto-link matching PDF sharing same base filename
     if (file.name) {
       const baseName = file.name.substring(0, file.name.lastIndexOf('.'));
-      const matchingPdf = window._gastoUploadedFiles.find(x => x.type === 'pdf' && x.isOneDriveVirtual && x.name.startsWith(baseName));
+      const matchingPdf = window._gastoUploadedFiles.find(x => x.type === 'pdf' && x.name.startsWith(baseName));
+      
       if (matchingPdf) {
         matchingPdf.isOneDriveVirtual = false;
         window.procesarPdfFacturaExtraida(matchingPdf.name, matchingPdf.base64);
         mostrarNotificacion('Factura PDF vinculada automáticamente', 'success');
+      } else if (window._oneDriveFolderChildren) {
+        // PDF is not loaded yet. Let's look for it in the folder children
+        const pdfItem = window._oneDriveFolderChildren.find(x => {
+          if (!x || x.folder) return false;
+          const ext = (x.name.split('.').pop() || '').toLowerCase();
+          return ext === 'pdf' && x.name.startsWith(baseName);
+        });
+
+        if (pdfItem && pdfItem['@microsoft.graph.downloadUrl']) {
+          mostrarNotificacion('Descargando PDF correspondiente desde OneDrive...', 'info');
+          const sb = window.supabaseClient;
+          
+          if (sb) {
+            sb.from('facturas_analizadas')
+              .select('*')
+              .eq('id', pdfItem.id)
+              .then(({ data: cachedList }) => {
+                if (cachedList && cachedList.length > 0 && cachedList[0].base64_content) {
+                  const cached = cachedList[0];
+                  window.procesarPdfFacturaExtraida(cached.file_name, cached.base64_content);
+                  mostrarNotificacion('Factura PDF vinculada automáticamente (desde caché)', 'success');
+                } else {
+                  descargarYProcesarPdfReal(pdfItem, sb);
+                }
+              })
+              .catch(() => {
+                descargarYProcesarPdfReal(pdfItem, sb);
+              });
+          } else {
+            descargarYProcesarPdfReal(pdfItem, null);
+          }
+        }
       }
     }
   } else if (type === 'pdf') {
@@ -14367,7 +14400,7 @@ window.vincularFacturaSugerida = function(type, uuid) {
     // Auto-link matching XML sharing same base filename
     if (file.name) {
       const baseName = file.name.substring(0, file.name.lastIndexOf('.'));
-      const matchingXml = window._gastoUploadedFiles.find(x => x.type === 'xml' && x.isOneDriveVirtual && x.name.startsWith(baseName));
+      const matchingXml = window._gastoUploadedFiles.find(x => x.type === 'xml' && x.name.startsWith(baseName));
       if (matchingXml) {
         matchingXml.isOneDriveVirtual = false;
         window.adjuntarXmlFactura(matchingXml.uuid);
@@ -14376,6 +14409,39 @@ window.vincularFacturaSugerida = function(type, uuid) {
     }
   }
 };
+
+function descargarYProcesarPdfReal(pdfItem, sb) {
+  fetch(pdfItem['@microsoft.graph.downloadUrl'])
+    .then(res => res.blob())
+    .then(blob => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.readAsDataURL(blob);
+      });
+    })
+    .then(base64Data => {
+      window.procesarPdfFacturaExtraida(pdfItem.name, base64Data);
+      mostrarNotificacion('Factura PDF vinculada automáticamente', 'success');
+
+      // Guardar PDF en caché de Supabase
+      if (sb) {
+        const payload = {
+          id: pdfItem.id,
+          file_name: pdfItem.name,
+          file_type: 'pdf',
+          base64_content: base64Data
+        };
+        sb.from('facturas_analizadas')
+          .upsert(payload)
+          .catch(err => console.error('[OneDrive] Error al guardar caché de PDF:', err));
+      }
+    })
+    .catch(err => {
+      console.error('[OneDrive] Error al descargar/vincular PDF:', err);
+      mostrarNotificacion('Error al descargar el PDF complementario de OneDrive', 'error');
+    });
+}
 
 window.extraerPathOneDrive = function(folderId) {
   if (!folderId) return '';
@@ -14491,60 +14557,134 @@ window.silentPreloadOneDriveFiles = function() {
       .then(data => {
         try {
           const children = (data && Array.isArray(data.value)) ? data.value : [];
-          const promises = children.map(item => {
-            if (!item) return Promise.resolve(null);
-            if (item.folder) return Promise.resolve(null);
+          window._oneDriveFolderChildren = children;
+
+          // Filtrar únicamente los archivos XML
+          const xmlItems = children.filter(item => {
+            if (!item || item.folder) return false;
             const ext = (item.name.split('.').pop() || '').toLowerCase();
-            if (ext !== 'xml' && ext !== 'pdf') return Promise.resolve(null);
-
-            // Fetch the file download URL to load base64 content
-            const downloadUrl = item['@microsoft.graph.downloadUrl'];
-            if (!downloadUrl) return Promise.resolve(null);
-
-            return fetch(downloadUrl)
-              .then(res => {
-                if (ext === 'xml') return res.text();
-                else return res.blob();
-              })
-              .then(content => {
-                let base64 = '';
-                if (ext === 'xml') {
-                  base64 = 'data:text/xml;base64,' + btoa(unescape(encodeURIComponent(content)));
-                  return { item, base64, ext };
-                } else {
-                  return new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => resolve({ item, base64: e.target.result, ext });
-                    reader.readAsDataURL(content);
-                  });
-                }
-              })
-              .catch(() => null);
+            return ext === 'xml';
           });
 
-          Promise.all(promises).then(loadedFiles => {
-            if (!window._gastoUploadedFiles) window._gastoUploadedFiles = [];
-            loadedFiles.forEach(f => {
-              if (!f || !f.item) return;
-              const alreadyExists = window._gastoUploadedFiles.some(x => x.name === f.item.name);
-              if (!alreadyExists) {
-                window._gastoUploadedFiles.push({
-                  type: f.ext,
-                  base64: f.base64,
-                  name: f.item.name,
-                  uuid: f.item.id,
-                  isOneDriveVirtual: true
-                });
-              }
-            });
+          if (xmlItems.length === 0) {
             window._isPreloadingOneDrive = false;
             if (window.actualizarFacturasSugeridas) {
               window.actualizarFacturasSugeridas();
             }
-          }).catch(err => {
-            console.error('[OneDrive] Promise.all processing failed:', err);
-            window._isPreloadingOneDrive = false;
-          });
+            return;
+          }
+
+          // Consultar a Supabase cuáles de estos xmlItems ya están en la base de datos
+          const xmlIds = xmlItems.map(x => x.id);
+          const sb = window.supabaseClient;
+          
+          if (!sb) {
+            console.warn('[OneDrive] SupabaseClient no disponible, procesando archivos sin caché local.');
+            procesarXmls(xmlItems, []);
+          } else {
+            sb.from('facturas_analizadas')
+              .select('*')
+              .in('id', xmlIds)
+              .then(({ data: cachedList, error }) => {
+                if (error) {
+                  console.error('[OneDrive] Error consultando caché de facturas:', error.message);
+                  procesarXmls(xmlItems, []);
+                } else {
+                  procesarXmls(xmlItems, cachedList || []);
+                }
+              })
+              .catch(err => {
+                console.error('[OneDrive] Excepción consultando caché de facturas:', err);
+                procesarXmls(xmlItems, []);
+              });
+          }
+
+          function procesarXmls(items, cachedList) {
+            const promises = items.map(item => {
+              const cached = cachedList.find(x => x.id === item.id);
+              if (cached) {
+                // Devolver desde la caché
+                return Promise.resolve({
+                  type: 'xml',
+                  base64: cached.base64_content,
+                  name: cached.file_name,
+                  uuid: cached.id,
+                  isOneDriveVirtual: true,
+                  satData: {
+                    rfcEmisor: cached.rfc_emisor,
+                    nombreEmisor: cached.nombre_emisor,
+                    uuid: cached.uuid_xml,
+                    total: cached.total,
+                    fechaEmision: cached.fecha_emision
+                  }
+                });
+              }
+
+              // Descargar y procesar en caliente, guardando luego en la caché
+              const downloadUrl = item['@microsoft.graph.downloadUrl'];
+              if (!downloadUrl) return Promise.resolve(null);
+
+              return fetch(downloadUrl)
+                .then(res => res.text())
+                .then(xmlText => {
+                  const base64 = 'data:text/xml;base64,' + btoa(unescape(encodeURIComponent(xmlText)));
+                  const satData = window.extraerDatosCompletosXml(xmlText);
+                  
+                  // Guardar de forma asíncrona en Supabase en segundo plano
+                  if (sb) {
+                    const payload = {
+                      id: item.id,
+                      file_name: item.name,
+                      file_type: 'xml',
+                      rfc_emisor: satData.rfcEmisor || null,
+                      nombre_emisor: satData.nombreEmisor || null,
+                      uuid_xml: satData.uuid || null,
+                      total: parseFloat(satData.total) || 0,
+                      fecha_emision: satData.fechaEmision || null,
+                      base64_content: base64
+                    };
+                    sb.from('facturas_analizadas')
+                      .upsert(payload)
+                      .then(({ error }) => {
+                        if (error) console.error('[OneDrive] Error al guardar factura en caché de Supabase:', error.message);
+                      })
+                      .catch(e => console.error('[OneDrive] Excepción al guardar factura en caché:', e));
+                  }
+
+                  return {
+                    type: 'xml',
+                    base64: base64,
+                    name: item.name,
+                    uuid: item.id,
+                    isOneDriveVirtual: true,
+                    satData: satData
+                  };
+                })
+                .catch(err => {
+                  console.error(`[OneDrive] Error al descargar/procesar archivo XML ${item.name}:`, err);
+                  return null;
+                });
+            });
+
+            Promise.all(promises).then(loadedFiles => {
+              if (!window._gastoUploadedFiles) window._gastoUploadedFiles = [];
+              loadedFiles.forEach(f => {
+                if (!f) return;
+                const alreadyExists = window._gastoUploadedFiles.some(x => x.uuid === f.uuid || x.name === f.name);
+                if (!alreadyExists) {
+                  window._gastoUploadedFiles.push(f);
+                }
+              });
+              window._isPreloadingOneDrive = false;
+              if (window.actualizarFacturasSugeridas) {
+                window.actualizarFacturasSugeridas();
+              }
+            }).catch(err => {
+              console.error('[OneDrive] Promise.all processing failed:', err);
+              window._isPreloadingOneDrive = false;
+              if (window.actualizarFacturasSugeridas) window.actualizarFacturasSugeridas();
+            });
+          }
         } catch (e) {
           console.error('[OneDrive] Exception processing children list:', e);
           window._isPreloadingOneDrive = false;
@@ -14567,6 +14707,16 @@ window.silentPreloadOneDriveFiles = function() {
     if (window.actualizarFacturasSugeridas) {
       window.actualizarFacturasSugeridas();
     }
+  }
+};
+
+window.forzarRecargaOneDrive = function() {
+  mostrarNotificacion('Escaneando y actualizando carpeta OneDrive...', 'info');
+  if (window._gastoUploadedFiles) {
+    window._gastoUploadedFiles = window._gastoUploadedFiles.filter(x => !x.isOneDriveVirtual);
+  }
+  if (window.silentPreloadOneDriveFiles) {
+    window.silentPreloadOneDriveFiles();
   }
 };
 
