@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.36'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.37'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -13271,7 +13271,9 @@ window.procesarArchivoMovimientos = function(event) {
       let colMap = {};
       keys.forEach(k => {
         const cleaned = cleanCol(k);
-        if (cleaned.includes('fecha de transaccion') || (cleaned.startsWith('fecha') && cleaned.includes('tran'))) {
+        if (cleaned === 'id' || cleaned.includes('uuid') || cleaned.includes('id de transaccion') || cleaned.includes('id de la transaccion') || cleaned.includes('id del cargo') || cleaned.includes('transaction id')) {
+          colMap['id'] = k;
+        } else if (cleaned.includes('fecha de transaccion') || (cleaned.startsWith('fecha') && cleaned.includes('tran'))) {
           colMap['fechaTransaccion'] = k;
         } else if (cleaned.includes('estado de cuenta') || (cleaned.startsWith('estado') && cleaned.includes('cue'))) {
           colMap['estadoCuenta'] = k;
@@ -13352,6 +13354,7 @@ window.procesarArchivoMovimientos = function(event) {
 
       let totalMonto = 0;
       const parsedTxs = [];
+      const seenIdsInImport = {};
 
       json.forEach(row => {
         const valMonto = row[colMap['montoMxn']] || row[colMap['montoOriginal']] || 0;
@@ -13378,7 +13381,20 @@ window.procesarArchivoMovimientos = function(event) {
         // Categoría
         const categoriaClara = window.cleanMojibake(colMap['categoriaClara'] ? String(row[colMap['categoriaClara']] || '').trim() : 'Otros');
 
-        const id = generateTxId(rawFecha, transaccion, cleanMonto, cardLast4);
+        // Determinar ID único de transacción (evitando colisión de montos/fechas idénticos el mismo día)
+        let id = '';
+        if (colMap['id'] && row[colMap['id']]) {
+          id = String(row[colMap['id']]).trim();
+        } else {
+          const baseId = generateTxId(rawFecha, transaccion, cleanMonto, cardLast4);
+          if (seenIdsInImport[baseId] === undefined) {
+            seenIdsInImport[baseId] = 0;
+            id = baseId;
+          } else {
+            seenIdsInImport[baseId]++;
+            id = `${baseId}_${seenIdsInImport[baseId]}`;
+          }
+        }
 
         parsedTxs.push({
           id,
