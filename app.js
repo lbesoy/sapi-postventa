@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.40'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.41'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -592,7 +592,20 @@ const ROLES_LABELS = {
 };
 
 function cargarRolesDesdeStorage() {
-  const savedRoles = safeGetJSON('sapi_roles_config', null);
+  const savedData = safeGetJSON('sapi_roles_config', null);
+  let savedRoles = null;
+  let isMigrated = false;
+
+  if (savedData) {
+    if (savedData.migrated_v2 && savedData.roles) {
+      savedRoles = savedData.roles;
+      isMigrated = true;
+    } else {
+      savedRoles = savedData;
+      isMigrated = false;
+    }
+  }
+
   if (savedRoles) {
     for (const r in savedRoles) {
       if (ROLES[r] && savedRoles[r] && Array.isArray(savedRoles[r].views)) {
@@ -602,17 +615,30 @@ function cargarRolesDesdeStorage() {
   }
   
   // Garantizar siempre la inyección de vistas críticas por defecto si faltan en la configuración cargada
-  for (const r in ROLES) {
-    if (ROLES[r] && Array.isArray(ROLES[r].views)) {
-      if (!ROLES[r].views.includes('calendario') && ['superadmin', 'admin', 'supervisor', 'tecnico', 'consulta'].includes(r)) {
-        ROLES[r].views.push('calendario');
+  // Solo se realiza si no se ha migrado a v2 (legacy) para no sobreescribir la configuración del usuario
+  if (!isMigrated) {
+    for (const r in ROLES) {
+      if (ROLES[r] && Array.isArray(ROLES[r].views)) {
+        if (!ROLES[r].views.includes('calendario') && ['superadmin', 'admin', 'supervisor', 'tecnico', 'consulta'].includes(r)) {
+          ROLES[r].views.push('calendario');
+        }
+        if (!ROLES[r].views.includes('gastos') && ['superadmin', 'admin', 'supervisor', 'tecnico'].includes(r)) {
+          ROLES[r].views.push('gastos');
+        }
+        if (!ROLES[r].views.includes('telemetry') && r === 'superadmin') {
+          ROLES[r].views.push('telemetry');
+        }
       }
-      if (!ROLES[r].views.includes('gastos') && ['superadmin', 'admin', 'supervisor', 'tecnico'].includes(r)) {
-        ROLES[r].views.push('gastos');
-      }
-      if (!ROLES[r].views.includes('telemetry') && r === 'superadmin') {
-        ROLES[r].views.push('telemetry');
-      }
+    }
+    
+    // Migrar y guardar inmediatamente la versión persistente v2
+    const configToSave = {
+      roles: ROLES,
+      migrated_v2: true
+    };
+    localStorage.setItem('sapi_roles_config', JSON.stringify(configToSave));
+    if (window.pushToSupabase) {
+      window.pushToSupabase('roles', configToSave);
     }
   }
 }
@@ -6176,8 +6202,12 @@ function guardarPermisosRoles() {
     }
   });
   
-  localStorage.setItem('sapi_roles_config', JSON.stringify(ROLES));
-  if (window.pushToSupabase) window.pushToSupabase('roles', ROLES);
+  const configToSave = {
+    roles: ROLES,
+    migrated_v2: true
+  };
+  localStorage.setItem('sapi_roles_config', JSON.stringify(configToSave));
+  if (window.pushToSupabase) window.pushToSupabase('roles', configToSave);
   
   // Recargar la UI
   setupNav();
