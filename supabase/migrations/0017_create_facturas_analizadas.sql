@@ -44,6 +44,10 @@ CREATE TABLE IF NOT EXISTS public.facturas_analizadas (
 -- Habilitar Row Level Security (RLS)
 ALTER TABLE public.facturas_analizadas ENABLE ROW LEVEL SECURITY;
 
+-- Eliminar políticas si ya existen para evitar errores al volver a correr el script
+DROP POLICY IF EXISTS "Allow public select" ON public.facturas_analizadas;
+DROP POLICY IF EXISTS "Allow public all" ON public.facturas_analizadas;
+
 -- Crear políticas públicas para lectura y escritura desde la aplicación cliente
 CREATE POLICY "Allow public select" ON public.facturas_analizadas
     FOR SELECT USING (true);
