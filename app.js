@@ -20,7 +20,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.22'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.23'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -12252,9 +12252,58 @@ window.renderClaraCards = function() {
   }).join('');
 };
 
+window.logImportTarjetas = function(msg, type = 'info') {
+  const container = document.getElementById('import-cards-debug-log');
+  if (container) container.style.display = 'flex';
+  
+  const statusBadge = document.getElementById('import-cards-debug-status');
+  if (statusBadge) {
+    if (type === 'error') {
+      statusBadge.textContent = 'ERROR';
+      statusBadge.style.background = '#ef4444';
+    } else if (type === 'success') {
+      statusBadge.textContent = 'ÉXITO';
+      statusBadge.style.background = '#10b981';
+    } else if (type === 'processing') {
+      statusBadge.textContent = 'PROCESANDO';
+      statusBadge.style.background = '#e8820c';
+    } else {
+      statusBadge.textContent = 'MONITOREANDO';
+      statusBadge.style.background = '#3b82f6';
+    }
+  }
+
+  const lines = document.getElementById('import-cards-debug-lines');
+  if (lines) {
+    const time = new Date().toLocaleTimeString();
+    const color = type === 'error' ? '#ef4444' : (type === 'success' ? '#10b981' : (type === 'processing' ? '#e8820c' : 'var(--text-secondary)'));
+    const line = document.createElement('div');
+    line.style.color = color;
+    line.innerHTML = `[${time}] ${msg}`;
+    lines.appendChild(line);
+    lines.scrollTop = lines.scrollHeight;
+  }
+};
+
+window.abrirSeleccionadorArchivoTarjetas = function() {
+  window.logImportTarjetas('Se presionó el botón "Importar Tarjetas". Abriendo ventana de archivos...', 'processing');
+  const input = document.getElementById('tarjetas-upload-input');
+  if (input) {
+    input.click();
+  } else {
+    window.logImportTarjetas('Error crítico: No se encontró el input "tarjetas-upload-input".', 'error');
+  }
+};
+
 window.procesarArchivoTarjetas = function(event) {
+  window.logImportTarjetas('Evento "change" detectado en el selector de archivos.', 'processing');
   const file = event.target.files[0];
-  if (!file) return;
+  if (!file) {
+    window.logImportTarjetas('Cancelado: No se seleccionó ningún archivo.', 'info');
+    return;
+  }
+
+  window.logImportTarjetas(`Archivo seleccionado: "${file.name}" | Tamaño: ${(file.size / 1024).toFixed(2)} KB | Tipo: ${file.type || 'desconocido'}`, 'processing');
 
   const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
 
@@ -12276,14 +12325,29 @@ window.procesarArchivoTarjetas = function(event) {
 
   const reader = new FileReader();
   reader.onload = function(e) {
+    window.logImportTarjetas('Lectura exitosa del archivo como ArrayBuffer.', 'processing');
     try {
       const data = new Uint8Array(e.target.result);
+      window.logImportTarjetas(`Uint8Array de datos inicializado (${data.length} bytes).`, 'processing');
+      
+      if (typeof XLSX === 'undefined') {
+        window.logImportTarjetas('Error crítico: La librería XLSX (SheetJS) no está cargada en la página.', 'error');
+        alert('Error: La librería XLSX no se ha cargado. Revisa tu conexión a internet.');
+        resetInputAndButton();
+        return;
+      }
+
+      window.logImportTarjetas('Llamando a XLSX.read()...', 'processing');
       const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+      window.logImportTarjetas(`Libro leído correctamente. Hojas encontradas: ${workbook.SheetNames.join(', ')}`, 'processing');
+      
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
       const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+      window.logImportTarjetas(`sheet_to_json ejecutado. Total filas extraídas: ${json.length}`, 'processing');
 
       if (json.length === 0) {
+        window.logImportTarjetas('Error: El archivo Excel no contiene ninguna fila de datos.', 'error');
         alert('Error: El archivo Excel leído está vacío (0 filas encontradas).');
         mostrarNotificacion('El archivo está vacío o no es válido.', 'error');
         resetInputAndButton();
@@ -12292,6 +12356,8 @@ window.procesarArchivoTarjetas = function(event) {
 
       // Mapear dinámicamente columnas por heurística de nombres limpiados
       const keys = Object.keys(json[0]);
+      window.logImportTarjetas(`Encabezados crudos leídos del Excel: [${keys.join(', ')}]`, 'processing');
+
       const cleanCol = (str) => {
         if (!str) return '';
         let s = str.toString().toLowerCase().trim();
@@ -12345,7 +12411,10 @@ window.procesarArchivoTarjetas = function(event) {
         });
       }
 
+      window.logImportTarjetas(`Resultado de la detección de columnas:\n` + JSON.stringify(colMap, null, 2), 'processing');
+
       if (!colMap['tarjeta'] || !colMap['usuario']) {
+        window.logImportTarjetas('Error crítico de columnas: Faltan las columnas mínimas (Tarjeta, Usuario/Titular).', 'error');
         alert('Error de Columnas: No pudimos identificar columnas para "Tarjeta" y "Usuario" en tu archivo.\n\nColumnas encontradas en el Excel:\n' + keys.join('\n') + '\n\nRevisa que el archivo contenga encabezados como "Tarjeta", "Usuario" o "Titular".');
         mostrarNotificacion('No se pudieron identificar las columnas mínimas requeridas (Tarjeta, Usuario).', 'error');
         resetInputAndButton();
@@ -12355,10 +12424,13 @@ window.procesarArchivoTarjetas = function(event) {
       const parsedCards = [];
       let totalLimite = 0;
 
-      json.forEach(row => {
+      json.forEach((row, idx) => {
         const usuario = String(row[colMap['usuario']] || '').trim();
         let tarjetaRaw = String(row[colMap['tarjeta']] || '').trim();
-        if (!tarjetaRaw) return;
+        if (!tarjetaRaw) {
+          window.logImportTarjetas(`[Advertencia] Fila ${idx + 2} omitida por número de tarjeta vacío.`, 'processing');
+          return;
+        }
 
         // Limpiar tarjeta para extraer últimos 4 dígitos
         const digits = tarjetaRaw.replace(/[^0-9]/g, '');
@@ -12402,7 +12474,10 @@ window.procesarArchivoTarjetas = function(event) {
         totalLimite += limite;
       });
 
+      window.logImportTarjetas(`Extracción completada. ${parsedCards.length} tarjetas válidas leídas.`, 'processing');
+
       if (parsedCards.length === 0) {
+        window.logImportTarjetas('Error: No se leyeron tarjetas válidas del contenido.', 'error');
         alert('Error: No se encontraron filas con números de tarjeta válidos.');
         mostrarNotificacion('No se encontraron tarjetas válidas en el archivo.', 'error');
         resetInputAndButton();
@@ -12410,6 +12485,7 @@ window.procesarArchivoTarjetas = function(event) {
       }
 
       window._pendingImportedCards = parsedCards;
+      window.logImportTarjetas('Guardando estado temporal en _pendingImportedCards. Abriendo modal de confirmación...', 'success');
 
       // Mostrar modal de confirmación
       document.getElementById('import-cards-preview-count').textContent = parsedCards.length;
@@ -12431,6 +12507,7 @@ window.procesarArchivoTarjetas = function(event) {
       resetInputAndButton();
     } catch (err) {
       console.error(err);
+      window.logImportTarjetas(`Excepción en el procesamiento del Excel: ${err.message}`, 'error');
       alert('Excepción capturada al procesar archivo:\n' + err.message + '\n' + err.stack);
       mostrarNotificacion('Error al procesar el archivo de tarjetas.', 'error');
       resetInputAndButton();
