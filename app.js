@@ -14352,6 +14352,10 @@ window.vincularFacturaSugerida = function(type, uuid) {
         matchingPdf.isOneDriveVirtual = false;
         window.procesarPdfFacturaExtraida(matchingPdf.name, matchingPdf.base64);
         mostrarNotificacion('Factura PDF vinculada automáticamente', 'success');
+      } else if (file.pdfBase64) {
+        // PDF content is cached in XML file object
+        window.procesarPdfFacturaExtraida(baseName + '.pdf', file.pdfBase64);
+        mostrarNotificacion('Factura PDF vinculada automáticamente (desde caché)', 'success');
       } else if (window._oneDriveFolderChildren) {
         // PDF is not loaded yet. Let's look for it in the folder children
         const pdfItem = window._oneDriveFolderChildren.find(x => {
@@ -14373,15 +14377,20 @@ window.vincularFacturaSugerida = function(type, uuid) {
                   const cached = cachedList[0];
                   window.procesarPdfFacturaExtraida(cached.file_name, cached.base64_content);
                   mostrarNotificacion('Factura PDF vinculada automáticamente (desde caché)', 'success');
+                  // También guardar en la fila del XML para futura carga rápida
+                  sb.from('facturas_analizadas')
+                    .update({ pdf_content: cached.base64_content })
+                    .eq('id', file.uuid)
+                    .catch(() => {});
                 } else {
-                  descargarYProcesarPdfReal(pdfItem, sb);
+                  descargarYProcesarPdfReal(pdfItem, sb, file.uuid);
                 }
               })
               .catch(() => {
-                descargarYProcesarPdfReal(pdfItem, sb);
+                descargarYProcesarPdfReal(pdfItem, sb, file.uuid);
               });
           } else {
-            descargarYProcesarPdfReal(pdfItem, null);
+            descargarYProcesarPdfReal(pdfItem, null, null);
           }
         }
       }
@@ -14410,7 +14419,7 @@ window.vincularFacturaSugerida = function(type, uuid) {
   }
 };
 
-function descargarYProcesarPdfReal(pdfItem, sb) {
+function descargarYProcesarPdfReal(pdfItem, sb, xmlItemId) {
   fetch(pdfItem['@microsoft.graph.downloadUrl'])
     .then(res => res.blob())
     .then(blob => {
@@ -14477,6 +14486,14 @@ function descargarYProcesarPdfReal(pdfItem, sb) {
               .upsert(payload)
               .catch(err => console.error('[OneDrive] Error al guardar caché básica de PDF:', err));
           });
+
+        // Ligar el PDF a la factura XML
+        if (xmlItemId) {
+          sb.from('facturas_analizadas')
+            .update({ pdf_content: base64Data })
+            .eq('id', xmlItemId)
+            .catch(err => console.error('[OneDrive] Error al ligar PDF en el registro del XML:', err));
+        }
       }
     })
     .catch(err => {
@@ -14651,6 +14668,7 @@ window.silentPreloadOneDriveFiles = function() {
                   base64: cached.base64_content,
                   name: cached.file_name,
                   uuid: cached.id,
+                  pdfBase64: cached.pdf_content,
                   isOneDriveVirtual: true,
                   satData: {
                     versionCfdi: cached.version_cfdi,

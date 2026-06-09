@@ -3,7 +3,7 @@
 -- ========================================================
 
 CREATE TABLE IF NOT EXISTS public.facturas_analizadas (
-    id TEXT PRIMARY KEY, -- ID del elemento en OneDrive
+    id TEXT PRIMARY KEY, -- ID del elemento en OneDrive (o UUID de CFDI si es manual)
     file_name TEXT NOT NULL,
     file_type TEXT NOT NULL, -- 'xml' o 'pdf'
     
@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS public.facturas_analizadas (
     iva_retenido NUMERIC(12,2) DEFAULT 0,
     iva_trasladado NUMERIC(12,2) DEFAULT 0,
 
-    base64_content TEXT,
+    base64_content TEXT, -- Contenido XML o PDF principal
+    pdf_content TEXT,    -- Contenido PDF ligado (si el principal es XML)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
