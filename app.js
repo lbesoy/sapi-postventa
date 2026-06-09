@@ -18,7 +18,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.1'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.2'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -7304,7 +7304,10 @@ function guardarOrden(e) {
     window.pushToSupabase('ordenes', orden);
   }
   if (window.trackTelemetryEvent) {
-    const act = editandoId ? 'Edición de Orden' : 'Creación de Orden';
+    let act = editandoId ? 'Edición de Orden' : 'Creación de Orden';
+    if (editandoId && currentSession.viewMode === 'tecnico') {
+      act = 'Llenado de Orden (Técnico)';
+    }
     window.trackTelemetryEvent(act, { folio: orden.folio, cliente: orden.cliente });
   }
   cerrarFormulario();
@@ -7549,6 +7552,11 @@ window.subirEvidenciaFoto = async function(ordenId, tipo, inputEl) {
     localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
     if (window.pushToSupabase) {
       await window.pushToSupabase('ordenes', o);
+    }
+
+    if (window.trackTelemetryEvent) {
+      const labelFoto = tipo === 'fotoInicio' ? 'Foto de Inicio' : (tipo === 'fotoFin' ? 'Foto de Fin' : 'Foto Adicional');
+      window.trackTelemetryEvent('Carga de Evidencia', { id: ordenId, folio: o.folio, tipo: labelFoto });
     }
 
     if (window.mostrarNotificacion) {
@@ -8175,6 +8183,11 @@ function guardarFirmaCanvas(ordenId, tipo) {
          mostrarNotificacion('Error guardando en la nube', 'error');
       });
     }
+
+    if (window.trackTelemetryEvent) {
+      const act = tipo === 'tecnico' ? 'Firma de Técnico (Orden Completada)' : 'Firma de Cliente (Orden Firmada)';
+      window.trackTelemetryEvent(act, { id: ordenId, folio: ordenes[idx].folio, cliente: ordenes[idx].cliente });
+    }
     
     mostrarNotificacion(`Firma del ${tipo} guardada`, 'success');
     verDetalle(ordenId); 
@@ -8710,6 +8723,11 @@ function guardarNotaBitacora() {
   if (window.pushToSupabase) {
     window.pushToSupabase('ordenes', o);
   }
+
+  if (window.trackTelemetryEvent) {
+    const act = window.currentBitacoraEntryId ? 'Edición de Avance (Bitácora)' : 'Registro de Avance (Bitácora)';
+    window.trackTelemetryEvent(act, { id: o.id, folio: o.folio, cliente: o.cliente });
+  }
   
   mostrarNotificacion(window.currentBitacoraEntryId ? 'Bitácora actualizada.' : 'Entrada de bitácora guardada.', 'success');
   cerrarBitacora();
@@ -8826,7 +8844,85 @@ async function enviarCorreoOrden(ordenId) {
 
 // ===== TICKETS DATA =====
 function updateTicketBadge() {
-  const abiertos = getFilteredTickets().filter(t => t.estado === 'Abierto' || t.estado === 'En Proceso').length;
+  let filtered = getFilteredTickets();
+  
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  
+  if (isEmpresa) {
+    let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+    if (nombreEmpresaLogged) {
+      nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
+      filtered = filtered.filter(t => {
+        const tcli = String(t.cliente || '').toLowerCase().trim();
+        const tsol = String(t.solicitante || '').toLowerCase().trim();
+        return tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged;
+      });
+    } else {
+      filtered = [];
+    }
+  }
+
+  const userRole = currentSession.viewMode || '';
+  let tecFilter = '';
+  let supFilter = '';
+  if (userRole === 'tecnico') {
+    const isSuperadmin = (usuarios.find(u => u.id === currentSession.userId)?.rol === 'superadmin');
+    if (isSuperadmin && isTestModeActive()) {
+      tecFilter = '';
+    } else {
+      tecFilter = currentUser ? currentUser.nombre : '';
+    }
+  }
+  if (userRole === 'supervisor') {
+    const isLauraPaz = currentUser && (
+      String(currentUser.nombre).toLowerCase().trim() === 'laura paz' ||
+      String(currentUser.email).toLowerCase().trim().includes('laura.paz') ||
+      String(currentUser.email).toLowerCase().trim().includes('laurapaz')
+    );
+    if (isLauraPaz) {
+      supFilter = '';
+    } else {
+      supFilter = currentUser ? currentUser.nombre : '';
+    }
+  }
+  
+  if (tecFilter || supFilter) {
+    const tecName = tecFilter;
+    filtered = filtered.filter(t => {
+      let passTec = true;
+      let passSup = true;
+      
+      if (tecFilter && tecName) {
+         let assigned = [];
+         if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+         else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+         passTec = assigned.includes(tecName) || t.solicitante === tecName || t.creadoPor === tecName;
+      }
+      
+      if (supFilter) {
+         let passSupClient = false;
+         const cli = clientesDb.find(c => c.nombre === t.cliente);
+         if (cli) {
+            const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
+            const supId = supUser ? supUser.id : supFilter;
+            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
+         }
+         
+         let assigned = [];
+         if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+         else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+         
+         let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
+         
+         passSup = passSupClient || passSupTicket;
+      }
+      
+      return passTec && passSup;
+    });
+  }
+
+  const abiertos = filtered.filter(t => t.estado === 'Abierto' || t.estado === 'Cotización').length;
   const badge = document.getElementById('nav-badge-tickets');
   if (!badge) return;
   if (abiertos > 0) {
