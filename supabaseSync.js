@@ -1672,6 +1672,25 @@ window.cargarDatosDeSupabase = function() {
           etiquetas: row.etiquetas,
           descripcion: row.descripcion
         }));
+        // Recuperar y fusionar transacciones locales pendientes de subir
+        let localTxs = [];
+        try {
+          localTxs = JSON.parse(localStorage.getItem('sapi_clara_mock_txs') || '[]');
+        } catch(e) {}
+        
+        const dbIds = new Set(mappedClara.map(t => t.id));
+        const pendingUploads = localTxs.filter(t => t && t.id && !dbIds.has(t.id));
+        
+        if (pendingUploads.length > 0) {
+          console.log(`[Sync] Detectadas ${pendingUploads.length} transacciones Clara locales no sincronizadas. Conservando y re-intentando subir.`);
+          pendingUploads.forEach(t => {
+            mappedClara.push(t);
+            if (window.pushToSupabase) {
+              window.pushToSupabase('clara_transactions', t);
+            }
+          });
+        }
+
         window._supaClaraTxs = mappedClara;
         localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(mappedClara));
       }
@@ -1697,6 +1716,25 @@ window.cargarDatosDeSupabase = function() {
           dondeComprar: row.donde_comprar,
           usuarioVinculadoId: row.usuario_vinculado_id || null
         }));
+        // Recuperar y fusionar tarjetas locales pendientes de subir
+        let localCards = [];
+        try {
+          localCards = JSON.parse(localStorage.getItem('sapi_clara_cards') || '[]');
+        } catch(e) {}
+
+        const dbCardIds = new Set(mappedCards.map(c => c.id));
+        const pendingCards = localCards.filter(c => c && c.id && !dbCardIds.has(c.id));
+
+        if (pendingCards.length > 0) {
+          console.log(`[Sync] Detectadas ${pendingCards.length} tarjetas Clara locales no sincronizadas. Conservando y re-intentando subir.`);
+          pendingCards.forEach(c => {
+            mappedCards.push(c);
+            if (window.pushToSupabase) {
+              window.pushToSupabase('clara_cards', c);
+            }
+          });
+        }
+
         window._supaClaraCards = mappedCards;
         localStorage.setItem('sapi_clara_cards', JSON.stringify(mappedCards));
       }
