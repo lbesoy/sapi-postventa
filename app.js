@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.33'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.34'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -12280,6 +12280,11 @@ window.renderClaraCards = function() {
       ? `<span class="badge" style="background:rgba(16,185,129,0.12); color:var(--green); font-size:0.75rem;">${estado}</span>`
       : `<span class="badge" style="background:rgba(239,68,68,0.12); color:var(--red); font-size:0.75rem;">${estado}</span>`;
 
+    const optionsHtml = (usuarios || [])
+      .filter(u => u.activo !== false)
+      .map(u => `<option value="${u.id}" ${c.usuarioVinculadoId === u.id ? 'selected' : ''}>${u.nombre}</option>`)
+      .join('');
+
     return `
       <tr style="border-bottom:1px solid var(--border);">
         <td style="padding:0.85rem 1rem;">
@@ -12292,12 +12297,41 @@ window.renderClaraCards = function() {
           <div style="font-size:0.82rem; color:var(--text-primary); font-weight:500; margin-bottom:3px;">${tipo}</div>
           ${badgeEstado}
         </td>
+        <td style="padding:0.85rem 1rem; vertical-align:middle;">
+          <select 
+            onchange="window.cambiarUsuarioVinculadoTarjeta('${c.id}', this.value)" 
+            style="background:var(--bg-body); color:var(--text-primary); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0.5rem; font-size:0.8rem; font-family:inherit; cursor:pointer; width:100%; max-width:180px;"
+          >
+            <option value="">-- Sin Vincular --</option>
+            ${optionsHtml}
+          </select>
+        </td>
         <td style="padding:0.85rem 1rem; text-align:right; font-weight:600; color:var(--text-primary);">${formatMoney(c.limite)}</td>
         <td style="padding:0.85rem 1rem; text-align:right; font-weight:600; color:var(--red);">${formatMoney(c.saldoUtilizado)}</td>
         <td style="padding:0.85rem 1rem; text-align:right; font-weight:700; color:var(--green);">${formatMoney(disponible)}</td>
       </tr>
     `;
   }).join('');
+};
+
+window.cambiarUsuarioVinculadoTarjeta = function(cardId, userId) {
+  const cards = window.getClaraCards();
+  const cardIndex = cards.findIndex(c => c.id === cardId);
+  if (cardIndex === -1) return;
+
+  cards[cardIndex].usuarioVinculadoId = userId || null;
+  localStorage.setItem('sapi_clara_cards', JSON.stringify(cards));
+
+  // Push update to Supabase via sync queue
+  if (typeof window.pushToSupabase === 'function') {
+    window.pushToSupabase('clara_cards', cards[cardIndex]);
+    mostrarNotificacion('Vínculo de tarjeta actualizado.', 'success');
+  } else {
+    mostrarNotificacion('Guardado localmente. Pendiente de sincronización.', 'info');
+  }
+
+  // Re-render
+  window.renderClaraCards();
 };
 
 window.logImportTarjetas = function(msg, type = 'info') {
@@ -12750,8 +12784,11 @@ window.confirmarImportacionTarjetas = async function() {
 
     window.logImportTarjetas(`Guardando ${pending.length} tarjetas en almacenamiento local...`, 'info');
 
-    // Sobrescribir/Actualizar o añadir
+    // Sobrescribir/Actualizar o añadir (preservando el usuario vinculado si ya existía)
     pending.forEach(c => {
+      if (currentMap.has(c.id)) {
+        c.usuarioVinculadoId = currentMap.get(c.id).usuarioVinculadoId || null;
+      }
       currentMap.set(c.id, c);
     });
 

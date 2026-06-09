@@ -741,7 +741,8 @@ async function _processSyncQueueInternal() {
               limite: item.data.limite !== undefined ? Number(item.data.limite) : 0,
               saldo_utilizado: item.data.saldoUtilizado !== undefined ? Number(item.data.saldoUtilizado) : 0,
               ultima_actualizacion: item.data.ultimaActualizacion || null,
-              donde_comprar: item.data.dondeComprar || null
+              donde_comprar: item.data.dondeComprar || null,
+              usuario_vinculado_id: item.data.usuarioVinculadoId || null
             };
           } else {
             payload = item.data;
@@ -1693,7 +1694,8 @@ window.cargarDatosDeSupabase = function() {
           limite: Number(row.limite || 0),
           saldoUtilizado: Number(row.saldo_utilizado || 0),
           ultimaActualizacion: row.ultima_actualizacion,
-          dondeComprar: row.donde_comprar
+          dondeComprar: row.donde_comprar,
+          usuarioVinculadoId: row.usuario_vinculado_id || null
         }));
         window._supaClaraCards = mappedCards;
         localStorage.setItem('sapi_clara_cards', JSON.stringify(mappedCards));
@@ -1929,7 +1931,8 @@ function setupRealtime() {
             limite: Number(row.limite || 0),
             saldoUtilizado: Number(row.saldo_utilizado || 0),
             ultimaActualizacion: row.ultima_actualizacion,
-            dondeComprar: row.donde_comprar
+            dondeComprar: row.donde_comprar,
+            usuarioVinculadoId: row.usuario_vinculado_id || null
           }));
           localStorage.setItem('sapi_clara_cards', JSON.stringify(mappedCards));
           window._supaClaraCards = mappedCards;
