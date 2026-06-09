@@ -230,7 +230,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version">v1.3.0</div>
+          <div class="sidebar-version">v1.3.1</div>
         </div>
       </div>
     </aside>
@@ -1710,7 +1710,7 @@
               <button class="filter-btn" data-filter="Cerrado" onclick="filtrarTickets(this)">Cerrados</button>
             </div>
             <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
-              <select id="filter-tkt-supervisor" onchange="renderTickets()" class="form-select">
+              <select id="filter-tkt-supervisor" onchange="renderTickets()" class="form-select col-asignado">
                 <option value="">Cualquier Supervisor</option>
               </select>
               <div class="search-bar" style="margin:0;">
@@ -4383,7 +4383,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js?v=2"></script>
   <script src="supabaseSync.js?v=25"></script>
-  <script src="app.js?v=39"></script>
+  <script src="app.js?v=40"></script>
   <script>lucide.createIcons();</script>
 </body>
 
