@@ -8,6 +8,50 @@ let currentDesgSortCol = 'fecha';
 let currentDesgSortDir = 'asc';
 let currentDesgloseData = [];
 
+window.cleanMojibake = function(str) {
+  if (typeof str !== 'string' || !str) return str;
+
+  // 1. Try smart UTF-8 decode from character codes (bytes interpreted as Windows-1252/ISO-8859-1)
+  if (str.includes('Ã') || str.includes('Â') || str.includes('Âº') || str.includes('Â±')) {
+    try {
+      const bytes = new Uint8Array(str.length);
+      let valid = true;
+      for (let i = 0; i < str.length; i++) {
+        const code = str.charCodeAt(i);
+        if (code > 255) {
+          valid = false;
+          break;
+        }
+        bytes[i] = code;
+      }
+      if (valid) {
+        const decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+        return decoded.trim();
+      }
+    } catch (e) {
+      // Ignore error and fall back to replacements
+    }
+  }
+
+  // 2. Fallback replacements for common Spanish Mojibake patterns
+  let fixed = str;
+  const replacements = {
+    'Ã¡': 'á', 'Ã©': 'é', 'Ã­': 'í', 'Ã³': 'ó', 'Ãº': 'ú', 'Ã±': 'ñ',
+    'Ã': 'Á', 'Ã‰': 'É', 'Ã': 'Í', 'Ã“': 'Ó', 'Ãš': 'Ú', 'Ã‘': 'Ñ',
+    'Ã¼': 'ü', 'Ãœ': 'Ü',
+    'Ãa': 'ía', // Garcia correction
+    'Âº': 'º',
+    'Â±': '±',
+    'Â': ''
+  };
+
+  for (const [bad, good] of Object.entries(replacements)) {
+    fixed = fixed.split(bad).join(good);
+  }
+
+  return fixed.trim();
+};
+
 // Registrar Service Worker para soporte PWA (sólo en producción, no en localhost)
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
@@ -20,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.32'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.33'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -12226,22 +12270,26 @@ window.renderClaraCards = function() {
   }
 
   container.innerHTML = cards.map(c => {
+    const alias = window.cleanMojibake(c.alias || '');
+    const usuario = window.cleanMojibake(c.usuario || 'Sin asignar');
+    const estado = window.cleanMojibake(c.estado || '');
+    const tipo = window.cleanMojibake(c.tipo || '');
     const disponible = Math.max(0, Number(c.limite || 0) - Number(c.saldoUtilizado || 0));
-    const isActiva = String(c.estado || '').toLowerCase().includes('activ');
+    const isActiva = String(estado || '').toLowerCase().includes('activ');
     const badgeEstado = isActiva
-      ? `<span class="badge" style="background:rgba(16,185,129,0.12); color:var(--green); font-size:0.75rem;">${c.estado}</span>`
-      : `<span class="badge" style="background:rgba(239,68,68,0.12); color:var(--red); font-size:0.75rem;">${c.estado}</span>`;
+      ? `<span class="badge" style="background:rgba(16,185,129,0.12); color:var(--green); font-size:0.75rem;">${estado}</span>`
+      : `<span class="badge" style="background:rgba(239,68,68,0.12); color:var(--red); font-size:0.75rem;">${estado}</span>`;
 
     return `
       <tr style="border-bottom:1px solid var(--border);">
         <td style="padding:0.85rem 1rem;">
-          <div style="font-weight:700; color:var(--text-primary);">${c.alias}</div>
-          <div style="font-size:0.78rem; color:var(--text-secondary); margin-top:1px;">${c.usuario || 'Sin asignar'}</div>
+          <div style="font-weight:700; color:var(--text-primary);">${alias}</div>
+          <div style="font-size:0.78rem; color:var(--text-secondary); margin-top:1px;">${usuario}</div>
         </td>
         <td style="padding:0.85rem 1rem; font-size:0.82rem; color:var(--text-muted);">${c.correo || '-'}</td>
         <td style="padding:0.85rem 1rem; font-family:monospace; font-size:0.85rem; font-weight:600; color:var(--text-primary);">•••• ${c.tarjeta}</td>
         <td style="padding:0.85rem 1rem;">
-          <div style="font-size:0.82rem; color:var(--text-primary); font-weight:500; margin-bottom:3px;">${c.tipo}</div>
+          <div style="font-size:0.82rem; color:var(--text-primary); font-weight:500; margin-bottom:3px;">${tipo}</div>
           ${badgeEstado}
         </td>
         <td style="padding:0.85rem 1rem; text-align:right; font-weight:600; color:var(--text-primary);">${formatMoney(c.limite)}</td>
@@ -12425,7 +12473,7 @@ window.procesarArchivoTarjetas = function(event) {
       let totalLimite = 0;
 
       json.forEach((row, idx) => {
-        const usuario = String(row[colMap['usuario']] || '').trim();
+        const usuario = window.cleanMojibake(String(row[colMap['usuario']] || '').trim());
         let tarjetaRaw = String(row[colMap['tarjeta']] || '').trim();
         if (!tarjetaRaw) {
           window.logImportTarjetas(`[Advertencia] Fila ${idx + 2} omitida por número de tarjeta vacío.`, 'processing');
@@ -12439,10 +12487,10 @@ window.procesarArchivoTarjetas = function(event) {
           tarjeta = digits.slice(-4);
         }
 
-        const alias = colMap['alias'] ? String(row[colMap['alias']] || '').trim() : usuario.split(' ')[0] || 'Tarjeta';
-        const correo = colMap['correo'] ? String(row[colMap['correo']] || '').trim() : '';
-        const estado = colMap['estado'] ? String(row[colMap['estado']] || '').trim() : 'ACTIVA';
-        const tipo = colMap['tipo'] ? String(row[colMap['tipo']] || '').trim() : 'Clara White';
+        const alias = window.cleanMojibake(colMap['alias'] ? String(row[colMap['alias']] || '').trim() : usuario.split(' ')[0] || 'Tarjeta');
+        const correo = String(row[colMap['correo']] || '').trim();
+        const estado = window.cleanMojibake(colMap['estado'] ? String(row[colMap['estado']] || '').trim() : 'ACTIVA');
+        const tipo = window.cleanMojibake(colMap['tipo'] ? String(row[colMap['tipo']] || '').trim() : 'Clara White');
 
         const limiteVal = row[colMap['limite']] || 0;
         let limite = Number(String(limiteVal).replace(/[^0-9\.\-]/g, ''));
@@ -12453,7 +12501,7 @@ window.procesarArchivoTarjetas = function(event) {
         if (isNaN(saldoUtilizado)) saldoUtilizado = 0;
 
         const ultimaActualizacion = colMap['ultimaActualizacion'] ? String(row[colMap['ultimaActualizacion']] || '').trim() : '';
-        const dondeComprar = colMap['dondeComprar'] ? String(row[colMap['dondeComprar']] || '').trim() : 'En cualquier lugar';
+        const dondeComprar = window.cleanMojibake(colMap['dondeComprar'] ? String(row[colMap['dondeComprar']] || '').trim() : 'En cualquier lugar');
 
         const id = 'card_' + tarjeta;
 
@@ -12943,8 +12991,8 @@ window.renderClaraTxs = function() {
               <i data-lucide="${iconName}" style="width:16px; height:16px;"></i>
             </div>
             <div style="min-width:0; display:flex; flex-direction:column; gap:2px;">
-              <span style="font-weight:600; font-size:0.85rem; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${tx.merchant}</span>
-              <span style="font-size:0.72rem; color:var(--text-muted);">${tx.categoria || 'Otros'} • Autorizada</span>
+              <span style="font-weight:600; font-size:0.85rem; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${window.cleanMojibake(tx.merchant || '')}</span>
+              <span style="font-size:0.72rem; color:var(--text-muted);">${window.cleanMojibake(tx.categoria || 'Otros')} • Autorizada</span>
             </div>
           </div>
         </td>
@@ -12955,7 +13003,7 @@ window.renderClaraTxs = function() {
           ${formatDateClara(tx.fecha)}
         </td>
         <td style="padding:0.75rem 1rem; font-size:0.82rem; color:var(--text-primary); vertical-align:middle;">
-          ${tx.usuario || 'Técnico Asignado'}
+          ${window.cleanMojibake(tx.usuario || 'Técnico Asignado')}
         </td>
         <td style="padding:0.75rem 1rem; font-size:0.82rem; color:var(--text-muted); font-family:monospace; vertical-align:middle;">
           *${tx.cardLast4 || '4321'}
@@ -13276,7 +13324,7 @@ window.procesarArchivoMovimientos = function(event) {
         if (cleanMonto === 0) return; // omitir movimientos en cero
 
         const rawFecha = parseExcelDate(row[colMap['fechaTransaccion']]);
-        const transaccion = String(row[colMap['transaccion']] || '').trim();
+        const transaccion = window.cleanMojibake(String(row[colMap['transaccion']] || '').trim());
         if (!transaccion) return;
 
         // Tarjeta
@@ -13289,9 +13337,9 @@ window.procesarArchivoMovimientos = function(event) {
         }
 
         // Titular
-        const titular = colMap['titular'] ? String(row[colMap['titular']] || '').trim() : 'Técnico Asignado';
+        const titular = window.cleanMojibake(colMap['titular'] ? String(row[colMap['titular']] || '').trim() : 'Técnico Asignado');
         // Categoría
-        const categoriaClara = colMap['categoriaClara'] ? String(row[colMap['categoriaClara']] || '').trim() : 'Otros';
+        const categoriaClara = window.cleanMojibake(colMap['categoriaClara'] ? String(row[colMap['categoriaClara']] || '').trim() : 'Otros');
 
         const id = generateTxId(rawFecha, transaccion, cleanMonto, cardLast4);
 
@@ -13312,11 +13360,11 @@ window.procesarArchivoMovimientos = function(event) {
           monedaOriginal: colMap['monedaOriginal'] ? String(row[colMap['monedaOriginal']] || 'MXN').trim() : 'MXN',
           montoMxn: cleanMonto,
           tarjeta: colMap['tarjeta'] ? String(row[colMap['tarjeta']]).trim() : cardLast4,
-          aliasTarjeta: colMap['aliasTarjeta'] ? String(row[colMap['aliasTarjeta']] || '').trim() : '',
-          estado: colMap['estado'] ? String(row[colMap['estado']] || '').trim() : '',
-          estadoAprobacion: colMap['estadoAprobacion'] ? String(row[colMap['estadoAprobacion']] || '').trim() : '',
-          nombreAprobador: colMap['nombreAprobador'] ? String(row[colMap['nombreAprobador']] || '').trim() : '',
-          notaAprobacion: colMap['notaAprobacion'] ? String(row[colMap['notaAprobacion']] || '').trim() : '',
+          aliasTarjeta: colMap['aliasTarjeta'] ? window.cleanMojibake(String(row[colMap['aliasTarjeta']] || '').trim()) : '',
+          estado: colMap['estado'] ? window.cleanMojibake(String(row[colMap['estado']] || '').trim()) : '',
+          estadoAprobacion: colMap['estadoAprobacion'] ? window.cleanMojibake(String(row[colMap['estadoAprobacion']] || '').trim()) : '',
+          nombreAprobador: colMap['nombreAprobador'] ? window.cleanMojibake(String(row[colMap['nombreAprobador']] || '').trim()) : '',
+          notaAprobacion: colMap['notaAprobacion'] ? window.cleanMojibake(String(row[colMap['notaAprobacion']] || '').trim()) : '',
           codigoAutorizacion: colMap['codigoAutorizacion'] ? String(row[colMap['codigoAutorizacion']] || '').trim() : '',
           categoriaClara: categoriaClara,
           facturaElectronica: colMap['facturaElectronica'] ? String(row[colMap['facturaElectronica']] || '').trim() : '',
@@ -13326,10 +13374,10 @@ window.procesarArchivoMovimientos = function(event) {
           archivosAnexo: colMap['archivosAnexo'] ? String(row[colMap['archivosAnexo']] || '').trim() : '',
           folioFiscal: colMap['folioFiscal'] ? String(row[colMap['folioFiscal']] || '').trim() : '',
           titular: titular,
-          grupos: colMap['grupos'] ? String(row[colMap['grupos']] || '').trim() : '',
-          ubicacion: colMap['ubicacion'] ? String(row[colMap['ubicacion']] || '').trim() : '',
-          etiquetas: colMap['etiquetas'] ? String(row[colMap['etiquetas']] || '').trim() : '',
-          descripcion: colMap['descripcion'] ? String(row[colMap['descripcion']] || '').trim() : ''
+          grupos: colMap['grupos'] ? window.cleanMojibake(String(row[colMap['grupos']] || '').trim()) : '',
+          ubicacion: colMap['ubicacion'] ? window.cleanMojibake(String(row[colMap['ubicacion']] || '').trim()) : '',
+          etiquetas: colMap['etiquetas'] ? window.cleanMojibake(String(row[colMap['etiquetas']] || '').trim()) : '',
+          descripcion: colMap['descripcion'] ? window.cleanMojibake(String(row[colMap['descripcion']] || '').trim()) : ''
         });
 
         totalMonto += cleanMonto;
