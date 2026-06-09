@@ -20,7 +20,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.29'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.30'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -12505,13 +12505,8 @@ window.procesarArchivoTarjetas = function(event) {
 
       const modalEl = document.getElementById('modal-importar-tarjetas');
       if (modalEl) {
-        window.logImportTarjetas(`[DEBUG] Modal encontrado en DOM. Clases antes: "${modalEl.className}", display inline antes: "${modalEl.style.display}"`, 'info');
         modalEl.style.display = '';
         modalEl.classList.add('open');
-        const computedStyle = window.getComputedStyle(modalEl);
-        window.logImportTarjetas(`[DEBUG] Modal abierto. Clases después: "${modalEl.className}", display computado: "${computedStyle.display}", zIndex: "${computedStyle.zIndex}", visibilidad: "${computedStyle.visibility}"`, 'info');
-      } else {
-        window.logImportTarjetas(`[DEBUG] ERROR: No se encontró el elemento modal-importar-tarjetas en el DOM.`, 'error');
       }
       resetInputAndButton();
     } catch (err) {
