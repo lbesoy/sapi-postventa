@@ -1221,10 +1221,12 @@ window.verDetallesSincronizacion = function() {
         const itemEl = document.createElement('div');
         itemEl.style.display = 'flex';
         itemEl.style.flexDirection = 'column';
-        itemEl.style.gap = '0.25rem';
-        itemEl.style.borderBottom = '1px solid var(--border)';
-        itemEl.style.paddingBottom = '0.5rem';
-        itemEl.style.marginBottom = '0.5rem';
+        itemEl.style.gap = '0.5rem';
+        itemEl.style.background = 'var(--bg-card, #ffffff)';
+        itemEl.style.border = '1px solid var(--border, #e5e7eb)';
+        itemEl.style.borderRadius = '10px';
+        itemEl.style.padding = '0.85rem 1rem';
+        itemEl.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.04)';
         
         const headerEl = document.createElement('div');
         headerEl.style.display = 'flex';
@@ -1235,20 +1237,27 @@ window.verDetallesSincronizacion = function() {
         
         const tableBadge = document.createElement('span');
         tableBadge.textContent = item.table;
-        tableBadge.style.background = 'rgba(232, 130, 12, 0.15)';
+        tableBadge.style.background = 'rgba(232, 130, 12, 0.08)';
         tableBadge.style.color = 'var(--accent, #e8820c)';
-        tableBadge.style.padding = '0.15rem 0.4rem';
-        tableBadge.style.borderRadius = '4px';
+        tableBadge.style.border = '1px solid rgba(232, 130, 12, 0.2)';
+        tableBadge.style.padding = '0.2rem 0.5rem';
+        tableBadge.style.borderRadius = '6px';
         tableBadge.style.textTransform = 'uppercase';
+        tableBadge.style.fontWeight = '700';
+        tableBadge.style.fontSize = '0.65rem';
+        tableBadge.style.letterSpacing = '0.05em';
         
         const actionBadge = document.createElement('span');
         actionBadge.textContent = item.action;
         actionBadge.style.background = 'var(--bg-hover, #f3f4f6)';
         actionBadge.style.color = 'var(--text-secondary, #4b5563)';
-        actionBadge.style.padding = '0.15rem 0.4rem';
-        actionBadge.style.borderRadius = '4px';
+        actionBadge.style.border = '1px solid var(--border, #e5e7eb)';
+        actionBadge.style.padding = '0.2rem 0.5rem';
+        actionBadge.style.borderRadius = '6px';
         actionBadge.style.textTransform = 'uppercase';
-        actionBadge.style.border = '1px solid var(--border)';
+        actionBadge.style.fontWeight = '700';
+        actionBadge.style.fontSize = '0.65rem';
+        actionBadge.style.letterSpacing = '0.05em';
         
         headerEl.appendChild(tableBadge);
         headerEl.appendChild(actionBadge);
@@ -1256,9 +1265,10 @@ window.verDetallesSincronizacion = function() {
         const bodyEl = document.createElement('div');
         bodyEl.textContent = desc;
         bodyEl.style.fontSize = '0.85rem';
-        bodyEl.style.fontWeight = '500';
+        bodyEl.style.fontWeight = '600';
         bodyEl.style.color = 'var(--text-primary)';
         bodyEl.style.wordBreak = 'break-word';
+        bodyEl.style.lineHeight = '1.4';
         
         itemEl.appendChild(headerEl);
         itemEl.appendChild(bodyEl);
@@ -1270,6 +1280,9 @@ window.verDetallesSincronizacion = function() {
     if (modal) {
       console.log('[Sync] Mostrando modal con clase open.');
       modal.classList.add('open');
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
     } else {
       console.error('[Sync] No se encontró el modal con id modal-sync-detalles.');
       alert('Error: No se encontró el modal en el documento. Asegúrate de forzar la recarga de la página (Cmd+Shift+R o Ctrl+F5).');
