@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.66'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.67'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -360,6 +360,25 @@ window.migrarOrdenesExistentesMaquinaria = function() {
   }
 };
 
+// Función para reintentar sincronizar gastos locales que no han subido a Supabase
+window.reintentarSincronizacionGastosLocales = function() {
+  console.log('[App] Verificando gastos locales pendientes de sincronización...');
+  const localGastos = safeGetJSON('sapi_gastos', []);
+  let encolados = 0;
+  localGastos.forEach(g => {
+    if (g && g._synced !== true) {
+      console.log('[Sync] Re-sincronizando gasto local:', g.id);
+      if (window.pushToSupabase) {
+        window.pushToSupabase('gastos', g);
+        encolados++;
+      }
+    }
+  });
+  if (encolados > 0) {
+    console.log(`[App] Se re-encolaron ${encolados} gastos locales para subida.`);
+  }
+};
+
 // Sincronización con Supabase (escuchar cuando los datos bajen a localStorage)
 window.addEventListener('supabase_datos_cargados', () => {
   console.log('[App] Refrescando configuración, catálogos y re-renderizando UI desde Supabase...');
@@ -380,6 +399,9 @@ window.addEventListener('supabase_datos_cargados', () => {
 
   // Ejecutar migración para rellenar datos de maquinaria perdidos en órdenes previas
   window.migrarOrdenesExistentesMaquinaria();
+
+  // Auto-sincronizar cualquier gasto local huérfano (no sincronizado en la base de datos)
+  window.reintentarSincronizacionGastosLocales();
 
   // Si estamos en la vista de configuración, actualizar los campos
   if (document.getElementById('view-config')?.classList.contains('active')) {

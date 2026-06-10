@@ -548,22 +548,64 @@ async function _processSyncQueueInternal() {
             } catch (stErr) {
               console.error('[Storage] Error en la subida automática de evidencia de orden:', stErr);
             }
-          } else if (item.table === 'gastos' && item.data.evidencia && item.data.evidencia.startsWith('data:')) {
-            try {
-              const fileName = `gasto_${item.data.id}_${Date.now()}.png`;
-              const publicUrl = await window.uploadBase64ToStorage(item.data.evidencia, 'evidencias', `gastos/${fileName}`);
-              if (publicUrl) {
-                item.data.evidencia = publicUrl;
-                // Actualizar también en el almacenamiento local de gastos
-                const localGast = JSON.parse(localStorage.getItem('sapi_gastos') || '[]');
-                const idx = localGast.findIndex(g => g.id === item.data.id);
-                if (idx > -1) {
-                  localGast[idx].evidencia = publicUrl;
-                  localStorage.setItem('sapi_gastos', JSON.stringify(localGast));
+          } else if (item.table === 'gastos') {
+            let actualizoGastoLocal = false;
+            const localGast = JSON.parse(localStorage.getItem('sapi_gastos') || '[]');
+            const idx = localGast.findIndex(g => g.id === item.data.id);
+
+            // Subir Evidencia si es base64
+            if (item.data.evidencia && item.data.evidencia.startsWith('data:')) {
+              try {
+                const fileName = `gasto_${item.data.id}_${Date.now()}.png`;
+                const publicUrl = await window.uploadBase64ToStorage(item.data.evidencia, 'evidencias', `gastos/${fileName}`);
+                if (publicUrl) {
+                  item.data.evidencia = publicUrl;
+                  if (idx > -1) {
+                    localGast[idx].evidencia = publicUrl;
+                    actualizoGastoLocal = true;
+                  }
                 }
+              } catch (stErr) {
+                console.error('[Storage] Error en la subida automática de evidencia de gasto:', stErr);
               }
-            } catch (stErr) {
-              console.error('[Storage] Error en la subida automática de evidencia de gasto:', stErr);
+            }
+
+            // Subir PDF Factura si es base64
+            if (item.data.pdfFactura && item.data.pdfFactura.startsWith('data:')) {
+              try {
+                const fileName = `factura_${item.data.id}_${Date.now()}.pdf`;
+                const publicUrl = await window.uploadBase64ToStorage(item.data.pdfFactura, 'evidencias', `facturas/${fileName}`);
+                if (publicUrl) {
+                  item.data.pdfFactura = publicUrl;
+                  if (idx > -1) {
+                    localGast[idx].pdfFactura = publicUrl;
+                    actualizoGastoLocal = true;
+                  }
+                }
+              } catch (stErr) {
+                console.error('[Storage] Error en la subida automática de PDF de gasto:', stErr);
+              }
+            }
+
+            // Subir XML Factura si es base64
+            if (item.data.xmlFactura && item.data.xmlFactura.startsWith('data:')) {
+              try {
+                const fileName = `factura_${item.data.id}_${Date.now()}.xml`;
+                const publicUrl = await window.uploadBase64ToStorage(item.data.xmlFactura, 'evidencias', `facturas/${fileName}`);
+                if (publicUrl) {
+                  item.data.xmlFactura = publicUrl;
+                  if (idx > -1) {
+                    localGast[idx].xmlFactura = publicUrl;
+                    actualizoGastoLocal = true;
+                  }
+                }
+              } catch (stErr) {
+                console.error('[Storage] Error en la subida automática de XML de gasto:', stErr);
+              }
+            }
+
+            if (actualizoGastoLocal) {
+              localStorage.setItem('sapi_gastos', JSON.stringify(localGast));
             }
           }
 
@@ -928,6 +970,11 @@ async function _processSyncQueueInternal() {
 
         if (error) {
           console.error(`[Sync] Error en operación (${item.table} - ${item.action}):`, error.message);
+          
+          if (typeof window.mostrarNotificacion === 'function') {
+            window.mostrarNotificacion(`Error BD (${item.table}): ${error.message}`, 'error');
+          }
+
           if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('network') || error.message.includes('timeout') || error.message.includes('connection') || error.message.includes('TypeError: Failed to fetch'))) {
             break; // Error de red temporal, pausar procesamiento
           } else {
