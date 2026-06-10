@@ -13972,7 +13972,7 @@ window.renderGastos = function() {
               <button class="btn-secondary" onclick="abrirDetalleGasto('${g.id}')" style="padding:0.25rem 0.5rem; font-size:0.75rem; min-height:auto; margin-right:4px;">
                 <i data-lucide="eye" style="width:12px; height:12px;"></i> Ver
               </button>
-              ${(g.estado === 'Pendiente' && (isTecnico || isAdminOrSupervisor)) ? `
+              ${((g.estado === 'Pendiente' || g.estado === 'Rechazado') && (isTecnico || isAdminOrSupervisor)) ? `
                 <button class="btn-secondary" onclick="abrirModalGasto('${g.id}')" style="padding:0.25rem 0.5rem; font-size:0.75rem; min-height:auto; color:var(--accent); border-color:rgba(232,130,12,0.3);">
                   <i data-lucide="edit-3" style="width:12px; height:12px;"></i>
                 </button>
@@ -14032,7 +14032,7 @@ window.renderGastos = function() {
               <button class="btn-secondary" onclick="abrirDetalleGasto('${g.id}')" style="padding:0.25rem 0.5rem; font-size:0.75rem; min-height:auto; margin-right:4px;">
                 <i data-lucide="eye" style="width:12px; height:12px; margin-right:4px; vertical-align:text-bottom;"></i>Ver Detalle
               </button>
-              ${(g.estado === 'Pendiente' && (isTecnico || isAdminOrSupervisor)) ? `
+              ${((g.estado === 'Pendiente' || g.estado === 'Rechazado') && (isTecnico || isAdminOrSupervisor)) ? `
                 <button class="btn-secondary" onclick="abrirModalGasto('${g.id}')" style="padding:0.25rem 0.5rem; font-size:0.75rem; min-height:auto; color:var(--accent); border-color:rgba(232,130,12,0.3);">
                   <i data-lucide="edit-3" style="width:12px; height:12px; margin-right:4px; vertical-align:text-bottom;"></i>Editar
                 </button>
@@ -16890,10 +16890,15 @@ window.abrirDetalleGasto = function(gastoId) {
 
   const footer = document.querySelector('#modal-gasto-detalle-overlay .modal-footer');
   if (footer) {
-    if (g.estado === 'Pendiente' && g.usuarioId === currentSession.userId) {
+    const isOwner = g.usuarioId === currentSession.userId;
+    const isEditableState = ['Pendiente', 'Rechazado'].includes(g.estado);
+    if (isEditableState && (isOwner || isAdminOrSupervisor)) {
       footer.innerHTML = `
         <button class="btn-secondary" onclick="eliminarGasto('${g.id}')" style="color:var(--red); border-color:rgba(239,68,68,0.3); margin-right:auto;">
           <i data-lucide="trash-2" style="width:14px; height:14px; margin-right:4px; vertical-align:text-bottom;"></i>Eliminar Gasto
+        </button>
+        <button class="btn-secondary" onclick="cerrarDetalleGasto(); abrirModalGasto('${g.id}');" style="color:var(--accent); border-color:rgba(232,130,12,0.3);">
+          <i data-lucide="edit-3" style="width:14px; height:14px; margin-right:4px; vertical-align:text-bottom;"></i>Editar Gasto
         </button>
         <button class="btn-secondary" onclick="cerrarDetalleGasto()">Cerrar</button>
       `;
