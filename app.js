@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.53'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.54'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -15297,7 +15297,8 @@ window.adjuntarXmlFactura = function(uuid) {
               .then(({ data: dataC, error: errorC }) => {
                 if (errorC || !dataC || dataC.length === 0) {
                   console.error('Error fetching base64 from database (analizadas & conciliadas):', error || errorC);
-                  mostrarNotificacion('Error al recuperar el contenido del XML de la base de datos', 'error');
+                  const detailedError = (error?.message || errorC?.message || 'No encontrado en la base de datos (analizadas/conciliadas)');
+                  mostrarNotificacion('Error al recuperar el XML: ' + detailedError, 'error');
                   return;
                 }
                 xml.base64 = dataC[0].base64_content;
