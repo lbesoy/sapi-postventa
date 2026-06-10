@@ -1187,7 +1187,7 @@ window.limpiarColaSincronizacion = function() {
 
 window.cerrarModalSyncDetalles = function() {
   const modal = document.getElementById('modal-sync-detalles');
-  if (modal) modal.style.display = 'none';
+  if (modal) modal.classList.remove('open');
 };
 
 window.ejecutarForzarSyncDesdeModal = function() {
@@ -1210,6 +1210,7 @@ window.verDetallesSincronizacion = function() {
   if (listaEl) {
     listaEl.innerHTML = '';
     queue.forEach(item => {
+      if (!item) return;
       let desc = 'Sin descripción';
       if (item.data) {
         desc = item.data.descripcion || item.data.concepto || item.data.cliente || item.data.id || 'Sin descripción';
@@ -1264,7 +1265,7 @@ window.verDetallesSincronizacion = function() {
   }
   
   const modal = document.getElementById('modal-sync-detalles');
-  if (modal) modal.style.display = 'flex';
+  if (modal) modal.classList.add('open');
 };
 
 window.addEventListener('online', () => {
