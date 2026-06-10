@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.49'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.50'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -14184,11 +14184,16 @@ window.actualizarFacturasSugeridas = function() {
 
   // 1. If currently preloading files asynchronously
   if (window._isPreloadingOneDrive) {
+    const isSupabase = window._oneDrivePreloadStatus === 'supabase';
+    const title = isSupabase ? 'Revisando caché de Supabase...' : 'Escaneando OneDrive...';
+    const sub = isSupabase 
+      ? 'Recuperando facturas de la base de datos para conciliación rápida...'
+      : 'Buscando facturas XML y PDF en tu carpeta de OneDrive configurada.';
     listEl.innerHTML = `
       <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:1.25rem; text-align:center; display:flex; flex-direction:column; align-items:center; gap:0.5rem; justify-content:center;">
         <div style="width:24px; height:24px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite;"></div>
-        <div style="font-weight:600; font-size:0.78rem; color:var(--text-primary); margin-top:0.25rem;">Escaneando OneDrive...</div>
-        <div style="font-size:0.68rem; color:var(--text-muted); max-width:260px;">Buscando facturas XML y PDF en tu carpeta de OneDrive configurada.</div>
+        <div style="font-weight:600; font-size:0.78rem; color:var(--text-primary); margin-top:0.25rem;">${title}</div>
+        <div style="font-size:0.68rem; color:var(--text-muted); max-width:260px;">${sub}</div>
       </div>
     `;
     return;
@@ -14614,6 +14619,7 @@ window.silentPreloadOneDriveFiles = function(forceScan = false) {
 
   window._isPreloadingOneDrive = true;
   window._preloadOneDriveError = null;
+  window._oneDrivePreloadStatus = forceScan ? 'onedrive' : 'supabase';
   if (window.actualizarFacturasSugeridas) {
     window.actualizarFacturasSugeridas();
   }
@@ -14630,7 +14636,7 @@ window.silentPreloadOneDriveFiles = function(forceScan = false) {
         
         while (keepFetching) {
           const { data, error } = await sb.from('facturas_analizadas')
-            .select('*')
+            .select('id, file_name, version_cfdi, uuid, estatus, fecha_cancelacion, tipo_comprobante, fecha_emision, ano_emision, mes_emision, dia_emision, fecha_timbrado, serie, folio, forma_pago, metodo_pago, condiciones_pago, rfc_emisor, nombre_emisor, rfc_receptor, nombre_receptor, moneda, tipo_cambio, subtotal, descuento, total, isr_retenido, iva_retenido, iva_trasladado')
             .range(from, from + step - 1);
             
           if (error) throw error;
@@ -14649,10 +14655,10 @@ window.silentPreloadOneDriveFiles = function(forceScan = false) {
         
         const loadedFiles = allData.map(cached => ({
           type: 'xml',
-          base64: cached.base64_content,
+          base64: undefined, // Se descarga en caliente de Supabase únicamente cuando el usuario decida vincular esta factura
           name: cached.file_name,
           uuid: cached.id,
-          pdfBase64: cached.pdf_content,
+          pdfBase64: undefined, // Se descarga en caliente igual al vincular
           isOneDriveVirtual: true,
           satData: {
             versionCfdi: cached.version_cfdi,
@@ -15040,6 +15046,33 @@ window.adjuntarXmlFactura = function(uuid) {
 
   const xml = window._gastoUploadedFiles.find(x => x.type === 'xml' && x.uuid === uuid);
   if (!xml) return;
+
+  // Si no tiene base64 (cargado de Supabase de modo optimizado sin base64), lo descargamos en caliente de la base de datos
+  if (!xml.base64) {
+    mostrarNotificacion('Obteniendo detalles del comprobante...', 'info');
+    const sb = window.supabaseClient;
+    if (sb) {
+      sb.from('facturas_analizadas')
+        .select('base64_content, pdf_content')
+        .eq('id', uuid)
+        .then(({ data, error }) => {
+          if (error || !data || data.length === 0) {
+            console.error('Error fetching base64 from database:', error);
+            mostrarNotificacion('Error al recuperar el contenido del XML de la base de datos', 'error');
+            return;
+          }
+          xml.base64 = data[0].base64_content;
+          xml.pdfBase64 = data[0].pdf_content;
+          // Re-invocar para continuar el flujo normal
+          window.adjuntarXmlFactura(uuid);
+        })
+        .catch(err => {
+          console.error('Exception fetching base64 from database:', err);
+          mostrarNotificacion('Error de red al recuperar el XML', 'error');
+        });
+      return;
+    }
+  }
 
   // Mark as officially linked (non-virtual)
   xml.isOneDriveVirtual = false;
