@@ -13066,7 +13066,11 @@ window.renderClaraTxs = function() {
   const filterStatus = document.getElementById('filter-clara-status')?.value || '';
   const filterUser = document.getElementById('filter-clara-user')?.value || '';
 
-  let filteredTxs = getFilteredClaraTxs();
+  let filteredTxs = getFilteredClaraTxs().filter(tx => {
+    const g = getFilteredGastos().find(x => x.claraTxId === tx.id && x.estado !== 'Rechazado');
+    const hasFacturaOrEvidencia = g && (g.uuidFiscal || g.rfcEmisor || g.pdfFactura || g.xmlFactura || g.evidencia);
+    return !hasFacturaOrEvidencia;
+  });
 
   if (q) {
     filteredTxs = filteredTxs.filter(tx => 
