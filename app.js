@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.62'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.63'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -14152,18 +14152,27 @@ window.actualizarDetalleVinculacionOrdenDetalle = function(folio) {
   const container = document.getElementById('gd-vinculacion-orden-container');
   if (!container) return;
 
+  const infoEl = document.getElementById('gd-vinculacion-orden-info');
+  const emptyEl = document.getElementById('gd-vinculacion-orden-empty');
+
   if (!folio) {
-    container.style.display = 'none';
+    if (infoEl) infoEl.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'block';
+    lucide.createIcons();
     return;
   }
 
   const o = ordenes.find(x => x.folio === folio);
   if (!o) {
-    container.style.display = 'none';
+    if (infoEl) infoEl.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'block';
+    lucide.createIcons();
     return;
   }
 
-  container.style.display = 'block';
+  if (infoEl) infoEl.style.display = 'block';
+  if (emptyEl) emptyEl.style.display = 'none';
+
   document.getElementById('gd-vinc-cliente').textContent = o.cliente || 'Sin cliente';
   document.getElementById('gd-vinc-ubicacion').textContent = o.ubicacion || 'Sin ubicación';
 
@@ -16560,7 +16569,11 @@ window.cambiarOrdenGastoDetalle = function(nuevoFolio) {
       sb.from('facturas_conciliadas')
         .update({ orden_folio: nuevoFolio || null })
         .eq('gasto_id', g.id)
-        .catch(err => console.error('[OneDrive] Error actualizando orden_folio en facturas_conciliadas:', err));
+        .then(res => {
+          if (res && res.error) {
+            console.error('[OneDrive] Error actualizando orden_folio en facturas_conciliadas:', res.error);
+          }
+        });
     }
   }
 
