@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.48'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.49'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -14241,7 +14241,7 @@ window.actualizarFacturasSugeridas = function() {
         <div style="font-size:0.68rem; color:var(--text-muted); max-width:240px; margin-bottom:0.25rem;">
           No se encontraron archivos XML ni PDF en la carpeta de OneDrive configurada.
         </div>
-        <button type="button" onclick="window.silentPreloadOneDriveFiles()" class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.7rem; min-height:auto; display:inline-flex; align-items:center; gap:4px; font-family:inherit;">
+        <button type="button" onclick="window.silentPreloadOneDriveFiles(true)" class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.7rem; min-height:auto; display:inline-flex; align-items:center; gap:4px; font-family:inherit;">
           <i data-lucide="refresh-cw" style="width:12px; height:12px;"></i> Sincronizar Carpeta
         </button>
       </div>
@@ -14598,7 +14598,7 @@ window.extraerPathOneDrive = function(folderId) {
   return path;
 };
 
-window.silentPreloadOneDriveFiles = function() {
+window.silentPreloadOneDriveFiles = function(forceScan = false) {
   // Restore Microsoft Graph token from sessionStorage if present and valid
   if (!onedriveRealToken) {
     const sessionToken = sessionStorage.getItem('ms_access_token');
@@ -14616,6 +14616,97 @@ window.silentPreloadOneDriveFiles = function() {
   window._preloadOneDriveError = null;
   if (window.actualizarFacturasSugeridas) {
     window.actualizarFacturasSugeridas();
+  }
+
+  const sb = window.supabaseClient;
+  if (!forceScan && sb && !odForceMock) {
+    // Si no se fuerza el escaneo de OneDrive, cargamos directamente desde Supabase sin consultar la Graph API
+    (async () => {
+      try {
+        let allData = [];
+        let from = 0;
+        const step = 1000;
+        let keepFetching = true;
+        
+        while (keepFetching) {
+          const { data, error } = await sb.from('facturas_analizadas')
+            .select('*')
+            .range(from, from + step - 1);
+            
+          if (error) throw error;
+          
+          if (data && data.length > 0) {
+            allData = allData.concat(data);
+            if (data.length < step) {
+              keepFetching = false;
+            } else {
+              from += step;
+            }
+          } else {
+            keepFetching = false;
+          }
+        }
+        
+        const loadedFiles = allData.map(cached => ({
+          type: 'xml',
+          base64: cached.base64_content,
+          name: cached.file_name,
+          uuid: cached.id,
+          pdfBase64: cached.pdf_content,
+          isOneDriveVirtual: true,
+          satData: {
+            versionCfdi: cached.version_cfdi,
+            uuid: cached.uuid,
+            estatus: cached.estatus,
+            fechaCancelacion: cached.fecha_cancelacion,
+            tipoComprobante: cached.tipo_comprobante,
+            fechaEmision: cached.fecha_emision,
+            anoEmision: cached.ano_emision,
+            mesEmision: cached.mes_emision,
+            diaEmision: cached.dia_emision,
+            fechaTimbrado: cached.fecha_timbrado,
+            serie: cached.serie,
+            folio: cached.folio,
+            formaPago: cached.forma_pago,
+            metodoPago: cached.metodo_pago,
+            condicionesPago: cached.condiciones_pago,
+            rfcEmisor: cached.rfc_emisor,
+            nombreEmisor: cached.nombre_emisor,
+            rfcReceptor: cached.rfc_receptor,
+            nombreReceptor: cached.nombre_receptor,
+            moneda: cached.moneda,
+            tipoCambio: cached.tipo_cambio,
+            subtotal: parseFloat(cached.subtotal) || 0,
+            descuento: parseFloat(cached.descuento) || 0,
+            total: parseFloat(cached.total) || 0,
+            isrRetenido: parseFloat(cached.isr_retenido) || 0,
+            ivaRetenido: parseFloat(cached.iva_retenido) || 0,
+            ivaTrasladado: parseFloat(cached.iva_trasladado) || 0
+          }
+        }));
+
+        if (!window._gastoUploadedFiles) window._gastoUploadedFiles = [];
+        loadedFiles.forEach(f => {
+          const alreadyExists = window._gastoUploadedFiles.some(x => x.uuid === f.uuid || x.name === f.name);
+          if (!alreadyExists) {
+            window._gastoUploadedFiles.push(f);
+          }
+        });
+        
+        window._isPreloadingOneDrive = false;
+        if (window.actualizarFacturasSugeridas) {
+          window.actualizarFacturasSugeridas();
+        }
+      } catch (err) {
+        console.error('[OneDrive Cache Only] Error al cargar facturas desde Supabase:', err);
+        window._isPreloadingOneDrive = false;
+        window._preloadOneDriveError = 'Error al cargar facturas de Supabase.';
+        if (window.actualizarFacturasSugeridas) {
+          window.actualizarFacturasSugeridas();
+        }
+      }
+    })();
+    return;
   }
 
   if (odForceMock) {
@@ -14932,7 +15023,7 @@ window.forzarRecargaOneDrive = function() {
     window._gastoUploadedFiles = window._gastoUploadedFiles.filter(x => !x.isOneDriveVirtual);
   }
   if (window.silentPreloadOneDriveFiles) {
-    window.silentPreloadOneDriveFiles();
+    window.silentPreloadOneDriveFiles(true);
   }
 };
 
