@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.57'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.58'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -15473,18 +15473,32 @@ window.quitarSidebarFile = function(type, uuid = null) {
       window.actualizarFacturasSugeridas();
     }
   } else if (type === 'xml') {
-    const isCurrentlyAttached = document.getElementById('gasto-uuid-fiscal').value === uuid;
+    const isCurrentlyAttached = document.getElementById('gasto-uuid-fiscal').value === uuid || 
+                                (window._gastoSatData && window._gastoSatData.uuid === uuid);
     if (isCurrentlyAttached) {
       window.desadjuntarXmlFactura();
     }
     
     // Restore virtual state if it was a OneDrive file so it returns to suggestions list
-    const fileObj = window._gastoUploadedFiles.find(x => x.type === 'xml' && x.uuid === uuid);
-    if (fileObj && fileObj.uuid) {
+    const fileObj = window._gastoUploadedFiles.find(x => x.type === 'xml' && (x.uuid === uuid || x.satData?.uuid === uuid));
+    if (fileObj) {
       fileObj.isOneDriveVirtual = true;
+      
+      // Si tiene PDF auto-vinculado, también quitarlo
+      if (fileObj.name) {
+        const baseName = fileObj.name.replace(/\.[^/.]+$/, "");
+        window._gastoUploadedFiles = window._gastoUploadedFiles.filter(x => !(x.type === 'pdf' && x.name.startsWith(baseName)));
+      }
     } else {
-      window._gastoUploadedFiles = window._gastoUploadedFiles.filter(x => !(x.type === 'xml' && x.uuid === uuid));
+      window._gastoUploadedFiles = window._gastoUploadedFiles.filter(x => !(x.type === 'xml' && (x.uuid === uuid || x.satData?.uuid === uuid)));
     }
+    
+    // También limpiar el PDF global ligado a esta factura
+    window._gastoPdfBase64 = null;
+    window._gastoUploadedFiles = window._gastoUploadedFiles.filter(x => x.type !== 'pdf');
+    const pdfFile = document.getElementById('gasto-pdf-file');
+    if (pdfFile) pdfFile.value = '';
+
     const xmlFile = document.getElementById('gasto-xml-file');
     if (xmlFile) xmlFile.value = '';
 
