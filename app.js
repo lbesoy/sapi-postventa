@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.50'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.51'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -1436,13 +1436,16 @@ function cargarConfig() {
   const odClientId = configData.onedriveClientId || 'MOCK';
   const odForceMock = configData.onedriveForceMock !== false;
   const odFolderId = configData.onedriveFolderId || '';
+  const odFolderConciliadosId = configData.onedriveFolderConciliadosId || '';
   
   const inputOdClientId = document.getElementById('cfg-onedrive-client-id');
   const inputOdForceMock = document.getElementById('cfg-onedrive-force-mock');
   const inputOdFolderId = document.getElementById('cfg-onedrive-folder-id');
+  const inputOdFolderConciliadosId = document.getElementById('cfg-onedrive-folder-conciliados-id');
   
   if (inputOdClientId) inputOdClientId.value = odClientId;
   if (inputOdFolderId) inputOdFolderId.value = odFolderId;
+  if (inputOdFolderConciliadosId) inputOdFolderConciliadosId.value = odFolderConciliadosId;
   if (inputOdForceMock) {
     inputOdForceMock.checked = odForceMock;
     setTimeout(() => { window.toggleOneDriveDemoMode(); }, 0);
@@ -1598,6 +1601,7 @@ window.toggleOneDriveDemoMode = function() {
   const checkbox = document.getElementById('cfg-onedrive-force-mock');
   const container = document.getElementById('onedrive-redirect-uri-container');
   const folderContainer = document.getElementById('onedrive-folder-id-container');
+  const conciliadosContainer = document.getElementById('onedrive-folder-conciliados-id-container');
   const text = document.getElementById('onedrive-redirect-uri-text');
   
   if (!checkbox) return;
@@ -1605,9 +1609,11 @@ window.toggleOneDriveDemoMode = function() {
   if (checkbox.checked) {
     if (container) container.style.display = 'none';
     if (folderContainer) folderContainer.style.display = 'none';
+    if (conciliadosContainer) conciliadosContainer.style.display = 'none';
   } else {
     if (container) container.style.display = 'block';
     if (folderContainer) folderContainer.style.display = 'block';
+    if (conciliadosContainer) conciliadosContainer.style.display = 'block';
     if (text) {
       text.textContent = window.location.origin;
     }
@@ -1618,10 +1624,12 @@ window.guardarOneDriveConfig = function() {
   const clientId = document.getElementById('cfg-onedrive-client-id').value.trim();
   const forceMock = document.getElementById('cfg-onedrive-force-mock').checked;
   const folderId = document.getElementById('cfg-onedrive-folder-id')?.value.trim() || '';
+  const folderConciliadosId = document.getElementById('cfg-onedrive-folder-conciliados-id')?.value.trim() || '';
 
   configData.onedriveClientId = clientId || 'MOCK';
   configData.onedriveForceMock = forceMock;
   configData.onedriveFolderId = folderId;
+  configData.onedriveFolderConciliadosId = folderConciliadosId;
 
   localStorage.setItem('eurorep_config', JSON.stringify(configData));
   if (window.pushToSupabase) window.pushToSupabase('config', configData);
@@ -14603,6 +14611,231 @@ window.extraerPathOneDrive = function(folderId) {
   return path;
 };
 
+window.moverArchivoOneDrive = async function(fileId, targetFolderId) {
+  if (configData.onedriveForceMock !== false) {
+    console.log(`[OneDrive Mock] Simulación de movimiento: Archivo ${fileId} movido a la carpeta ${targetFolderId}`);
+    return true;
+  }
+  
+  if (!onedriveRealToken) {
+    console.warn('[OneDrive] No hay token real de OneDrive para mover el archivo.');
+    return false;
+  }
+  if (!targetFolderId) {
+    console.warn('[OneDrive] No se especificó la carpeta destino para mover el archivo.');
+    return false;
+  }
+
+  const url = `https://graph.microsoft.com/v1.0/me/drive/items/${fileId}`;
+  try {
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${onedriveRealToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        parentReference: {
+          id: targetFolderId
+        }
+      })
+    });
+    if (!res.ok) {
+      const errDetail = await res.text();
+      console.error('[OneDrive] Error al mover archivo:', errDetail);
+      return false;
+    }
+    console.log(`[OneDrive] Archivo ${fileId} movido exitosamente a la carpeta ${targetFolderId}`);
+    return true;
+  } catch (err) {
+    console.error('[OneDrive] Excepción al mover archivo:', err);
+    return false;
+  }
+};
+
+window.buscarArchivoPorNombreEnCarpeta = async function(folderId, name) {
+  if (configData.onedriveForceMock !== false || !onedriveRealToken || !folderId) return null;
+  try {
+    const res = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${folderId}/children`, {
+      headers: { 'Authorization': `Bearer ${onedriveRealToken}` }
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && Array.isArray(json.value)) {
+        const match = json.value.find(c => c.name.toLowerCase() === name.toLowerCase());
+        return match ? match.id : null;
+      }
+    }
+  } catch (e) {
+    console.error('[OneDrive] Error buscando archivo por nombre en carpeta:', e);
+  }
+  return null;
+};
+
+window.procesarMovimientoFacturaConciliada = async function(gastoId, newOneDriveId, originalOneDriveId) {
+  const sb = window.supabaseClient;
+  if (!sb) {
+    console.warn('[Supabase] supabaseClient no disponible para procesar movimientos de factura conciliada.');
+    return;
+  }
+
+  // Caso 1: Desvincular original (si existía y es diferente del nuevo)
+  if (originalOneDriveId && originalOneDriveId !== newOneDriveId) {
+    try {
+      console.log(`[Conciliación] Desvinculando factura original: ${originalOneDriveId}`);
+      // 1. Obtener de facturas_conciliadas
+      const { data, error } = await sb.from('facturas_conciliadas')
+        .select('*')
+        .eq('id', originalOneDriveId);
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const row = data[0];
+        // 2. Insertar de vuelta a facturas_analizadas
+        const insertPayload = {
+          id: row.id,
+          file_name: row.file_name,
+          file_type: 'xml',
+          version_cfdi: row.version_cfdi,
+          uuid: row.uuid,
+          estatus: row.estatus,
+          fecha_cancelacion: row.fecha_cancelacion,
+          tipo_comprobante: row.tipo_comprobante,
+          fecha_emision: row.fecha_emision,
+          ano_emision: row.ano_emision,
+          mes_emision: row.mes_emision,
+          dia_emision: row.dia_emision,
+          fecha_timbrado: row.fecha_timbrado,
+          serie: row.serie,
+          folio: row.folio,
+          forma_pago: row.forma_pago,
+          metodo_pago: row.metodo_pago,
+          condiciones_pago: row.condiciones_pago,
+          rfc_emisor: row.rfc_emisor,
+          nombre_emisor: row.nombre_emisor,
+          rfc_receptor: row.rfc_receptor,
+          nombre_receptor: row.nombre_receptor,
+          moneda: row.moneda,
+          tipo_cambio: row.tipo_cambio,
+          subtotal: row.subtotal,
+          descuento: row.descuento,
+          total: row.total,
+          isr_retenido: row.isr_retenido,
+          iva_retenido: row.iva_retenido,
+          iva_trasladado: row.iva_trasladado,
+          base64_content: row.base64_content,
+          pdf_content: row.pdf_content
+        };
+        
+        const { error: insErr } = await sb.from('facturas_analizadas').insert(insertPayload);
+        if (insErr) throw insErr;
+        
+        // 3. Eliminar de facturas_conciliadas
+        const { error: delErr } = await sb.from('facturas_conciliadas').delete().eq('id', originalOneDriveId);
+        if (delErr) throw delErr;
+
+        // 4. Mover archivos en OneDrive de vuelta a la carpeta origen (si aplica)
+        const sourceFolderId = configData.onedriveFolderId || 'root';
+        const targetFolderId = configData.onedriveFolderConciliadosId;
+        
+        if (targetFolderId) {
+          // Mover el archivo XML original de vuelta a la carpeta de origen
+          await window.moverArchivoOneDrive(originalOneDriveId, sourceFolderId);
+          
+          // Buscar el PDF en la carpeta de Conciliados y moverlo de vuelta
+          const xmlBaseName = row.file_name.substring(0, row.file_name.lastIndexOf('.'));
+          const pdfName = xmlBaseName + '.pdf';
+          const pdfOneDriveId = await window.buscarArchivoPorNombreEnCarpeta(targetFolderId, pdfName);
+          if (pdfOneDriveId) {
+            await window.moverArchivoOneDrive(pdfOneDriveId, sourceFolderId);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Conciliación] Error desvinculando factura original:', err);
+    }
+  }
+
+  // Caso 2: Vincular nueva factura (si existe y es diferente de la original)
+  if (newOneDriveId && newOneDriveId !== originalOneDriveId) {
+    try {
+      console.log(`[Conciliación] Vinculando nueva factura: ${newOneDriveId} al gasto ${gastoId}`);
+      // 1. Obtener de facturas_analizadas
+      const { data, error } = await sb.from('facturas_analizadas')
+        .select('*')
+        .eq('id', newOneDriveId);
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const row = data[0];
+        // 2. Insertar en facturas_conciliadas
+        const insertPayload = {
+          id: row.id,
+          gasto_id: gastoId,
+          file_name: row.file_name,
+          version_cfdi: row.version_cfdi,
+          uuid: row.uuid,
+          estatus: row.estatus,
+          fecha_cancelacion: row.fecha_cancelacion,
+          tipo_comprobante: row.tipo_comprobante,
+          fecha_emision: row.fecha_emision,
+          ano_emision: row.ano_emision,
+          mes_emision: row.mes_emision,
+          dia_emision: row.dia_emision,
+          fecha_timbrado: row.fecha_timbrado,
+          serie: row.serie,
+          folio: row.folio,
+          forma_pago: row.forma_pago,
+          metodo_pago: row.metodo_pago,
+          condiciones_pago: row.condiciones_pago,
+          rfc_emisor: row.rfc_emisor,
+          nombre_emisor: row.nombre_emisor,
+          rfc_receptor: row.rfc_receptor,
+          nombre_receptor: row.nombre_receptor,
+          moneda: row.moneda,
+          tipo_cambio: row.tipo_cambio,
+          subtotal: row.subtotal,
+          descuento: row.descuento,
+          total: row.total,
+          isr_retenido: row.isr_retenido,
+          iva_retenido: row.iva_retenido,
+          iva_trasladado: row.iva_trasladado,
+          base64_content: row.base64_content,
+          pdf_content: row.pdf_content
+        };
+        
+        const { error: insErr } = await sb.from('facturas_conciliadas').insert(insertPayload);
+        if (insErr) throw insErr;
+        
+        // 3. Eliminar de facturas_analizadas
+        const { error: delErr } = await sb.from('facturas_analizadas').delete().eq('id', newOneDriveId);
+        if (delErr) throw delErr;
+
+        // 4. Mover archivos en OneDrive a la carpeta de Conciliados
+        const sourceFolderId = configData.onedriveFolderId || 'root';
+        const targetFolderId = configData.onedriveFolderConciliadosId;
+        
+        if (targetFolderId) {
+          // Mover XML
+          await window.moverArchivoOneDrive(newOneDriveId, targetFolderId);
+          
+          // Buscar PDF coincidente en la carpeta origen y moverlo
+          const xmlBaseName = row.file_name.substring(0, row.file_name.lastIndexOf('.'));
+          const pdfName = xmlBaseName + '.pdf';
+          const pdfOneDriveId = await window.buscarArchivoPorNombreEnCarpeta(sourceFolderId, pdfName);
+          if (pdfOneDriveId) {
+            await window.moverArchivoOneDrive(pdfOneDriveId, targetFolderId);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Conciliación] Error vinculando nueva factura:', err);
+    }
+  }
+};
+
 window.silentPreloadOneDriveFiles = function(forceScan = false) {
   // Restore Microsoft Graph token from sessionStorage if present and valid
   if (!onedriveRealToken) {
@@ -15085,6 +15318,7 @@ window.adjuntarXmlFactura = function(uuid) {
   
   // Set window global base64
   window._gastoXmlBase64 = xml.base64;
+  window._linkedXmlOneDriveId = uuid;
 
   const datBox = document.getElementById('gasto-sat-datos-vinculados');
   if (datBox) {
@@ -15119,6 +15353,7 @@ window.desadjuntarXmlFactura = function() {
   document.getElementById('gasto-uuid-fiscal').value = '';
   window._gastoXmlBase64 = null;
   window._gastoSatData = null;
+  window._linkedXmlOneDriveId = null;
 
   const datBox = document.getElementById('gasto-sat-datos-vinculados');
   if (datBox) datBox.style.display = 'none';
@@ -15322,6 +15557,8 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
   window._gastoXmlBase64 = null;
   window._gastoUploadedFiles = [];
   window._gastoSatData = null;
+  window._linkedXmlOneDriveId = null;
+  window._originalXmlOneDriveId = null;
 
   const accordion = document.getElementById('gasto-sat-details-accordion');
   if (accordion) {
@@ -15362,6 +15599,23 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
   if (gastoId) {
     const g = gastos.find(x => x.id === gastoId);
     if (!g) return;
+
+    const sb = window.supabaseClient;
+    if (sb) {
+      sb.from('facturas_conciliadas')
+        .select('id')
+        .eq('gasto_id', g.id)
+        .then(({ data, error }) => {
+          if (data && data.length > 0) {
+            window._linkedXmlOneDriveId = data[0].id;
+            window._originalXmlOneDriveId = data[0].id;
+            console.log('[OneDrive] Cargada factura vinculada preexistente:', data[0].id);
+          }
+        })
+        .catch(err => {
+          console.error('[OneDrive] Error consultando facturas_conciliadas:', err);
+        });
+    }
 
     titleEl.innerHTML = g.claraTxId 
       ? `Editar Gasto <img src="Logo_de_Clara.svg" alt="Clara" style="height: 14px; width: auto; vertical-align: middle; margin-left: 0.5rem; display: inline-block; filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.15));" />` 
@@ -15696,6 +15950,22 @@ window.eliminarGasto = function(gastoId) {
   gastos = gastos.filter(g => g.id !== gastoId);
   localStorage.setItem('sapi_gastos', JSON.stringify(gastos));
 
+  const sb = window.supabaseClient;
+  if (sb) {
+    sb.from('facturas_conciliadas')
+      .select('id')
+      .eq('gasto_id', gastoId)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          const originalOneDriveId = data[0].id;
+          if (typeof window.procesarMovimientoFacturaConciliada === 'function') {
+            window.procesarMovimientoFacturaConciliada(gastoId, null, originalOneDriveId);
+          }
+        }
+      })
+      .catch(err => console.error('[OneDrive] Error al desvincular factura al eliminar gasto:', err));
+  }
+
   if (typeof window.deleteFromSupabase === 'function') {
     window.deleteFromSupabase('gastos', gastoId);
   }
@@ -15769,6 +16039,10 @@ window.guardarGasto = function(e) {
 
   if (typeof window.pushToSupabase === 'function') {
     window.pushToSupabase('gastos', gasto);
+  }
+  
+  if (typeof window.procesarMovimientoFacturaConciliada === 'function') {
+    window.procesarMovimientoFacturaConciliada(gasto.id, window._linkedXmlOneDriveId, window._originalXmlOneDriveId);
   }
   if (window.trackTelemetryEvent) {
     const act = isNew ? 'Creación de Gasto' : 'Edición de Gasto';
