@@ -974,6 +974,19 @@ async function _processSyncQueueInternal() {
               console.error('[Sync] Error al procesar sub-entidades de orden:', ordErr.message);
             }
           }
+          if (item.table === 'gastos' && !error) {
+            try {
+              const localGast = JSON.parse(localStorage.getItem('sapi_gastos') || '[]');
+              const idx = localGast.findIndex(g => g.id === item.data.id);
+              if (idx > -1) {
+                localGast[idx]._synced = true;
+                localStorage.setItem('sapi_gastos', JSON.stringify(localGast));
+                console.log(`[Sync] Marcado gasto local como sincronizado (_synced: true) para ${item.data.id}`);
+              }
+            } catch (lgErr) {
+              console.error('[Sync] Error al marcar gasto local como sincronizado:', lgErr);
+            }
+          }
         } else if (item.action === 'delete') {
           const { error: deleteErr } = await sb.from(resTabla).delete().eq('id', item.data.id);
           error = deleteErr;
@@ -1052,9 +1065,20 @@ async function _processSyncQueueInternal() {
     }
 
     if (successCount > 0) {
-      window.dispatchEvent(new Event('supabase_datos_cargados'));
-      if (window._isSyncManualForced) {
-        alert('¡Sincronización completada con éxito! Se sincronizaron ' + successCount + ' elemento(s) pendiente(s).');
+      if (typeof window.cargarDatosDeSupabase === 'function') {
+        window.cargarDatosDeSupabase().then(() => {
+          if (window._isSyncManualForced) {
+            alert('¡Sincronización completada con éxito! Se sincronizaron ' + successCount + ' elemento(s) pendiente(s).');
+          }
+        }).catch(err => {
+          console.error('[Sync] Error al recargar datos tras sincronización:', err);
+          window.dispatchEvent(new Event('supabase_datos_cargados'));
+        });
+      } else {
+        window.dispatchEvent(new Event('supabase_datos_cargados'));
+        if (window._isSyncManualForced) {
+          alert('¡Sincronización completada con éxito! Se sincronizaron ' + successCount + ' elemento(s) pendiente(s).');
+        }
       }
     } else {
       if (window._isSyncManualForced && getSyncQueue().length > 0) {
