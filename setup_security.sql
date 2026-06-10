@@ -152,3 +152,32 @@ CREATE POLICY "Permitir todo a autenticados" ON public.clara_transactions FOR AL
 CREATE POLICY "Permitir todo a autenticados" ON public.clara_cards FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir todo a autenticados" ON public.facturas_analizadas FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir todo a autenticados" ON public.facturas_conciliadas FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ========================================================
+-- 7. Configuración de Storage Bucket (evidencias)
+-- ========================================================
+
+-- Crear el bucket "evidencias" si no existe
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('evidencias', 'evidencias', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Asegurar RLS en objects
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- Limpiar políticas previas de storage para evitar duplicación
+DROP POLICY IF EXISTS "Permitir subidas a todo el crm" ON storage.objects;
+DROP POLICY IF EXISTS "Permitir lectura publica" ON storage.objects;
+
+-- Crear políticas de storage
+CREATE POLICY "Permitir subidas a todo el crm" 
+ON storage.objects 
+FOR INSERT 
+TO public 
+WITH CHECK (bucket_id = 'evidencias');
+
+CREATE POLICY "Permitir lectura publica" 
+ON storage.objects 
+FOR SELECT 
+TO public 
+USING (bucket_id = 'evidencias');
