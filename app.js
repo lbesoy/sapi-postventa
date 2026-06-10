@@ -16083,7 +16083,7 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
 
     document.getElementById('gasto-id').value = g.id;
 
-    document.getElementById('gasto-fecha').value = g.fecha || '';
+    document.getElementById('gasto-fecha').value = g.fecha ? g.fecha.split('T')[0] : '';
     document.getElementById('gasto-metodo').value = g.metodoPago || 'Reembolso (Efectivo/Personal)';
     document.getElementById('gasto-categoria').value = g.categoria || 'Otros';
     document.getElementById('gasto-monto').value = g.monto || '';
@@ -16316,7 +16316,7 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
 
     document.getElementById('gasto-id').value = '';
     document.getElementById('gasto-clara-tx-id').value = tx.id;
-    document.getElementById('gasto-fecha').value = tx.fecha || '';
+    document.getElementById('gasto-fecha').value = tx.fecha ? tx.fecha.split('T')[0] : '';
     document.getElementById('gasto-metodo').value = 'Tarjeta Clara';
     document.getElementById('gasto-metodo').disabled = true;
     document.getElementById('gasto-monto').value = tx.monto || '';
@@ -18560,7 +18560,7 @@ window.procesarPdfFacturaExtraida = function(name, base64Data) {
         if (fechaVal) {
           const fechaInput = document.getElementById('gasto-fecha');
           if (fechaInput) {
-            fechaInput.value = fechaVal;
+            fechaInput.value = fechaVal ? fechaVal.split('T')[0] : '';
             dataFound = true;
           }
         }
