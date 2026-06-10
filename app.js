@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.47'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.48'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -14721,29 +14721,52 @@ window.silentPreloadOneDriveFiles = function() {
             console.warn('[OneDrive] SupabaseClient no disponible, procesando archivos sin caché local.');
             procesarXmls(xmlItems, []);
           } else {
-            sb.from('facturas_analizadas')
-              .select('*')
-              .in('id', xmlIds)
-              .then(({ data: cachedList, error }) => {
-                if (error) {
-                  console.error('[OneDrive] Error consultando caché de facturas:', error.message);
-                  procesarXmls(xmlItems, []);
-                } else {
-                  procesarXmls(xmlItems, cachedList || []);
-                }
-              })
-              .catch(err => {
-                console.error('[OneDrive] Excepción consultando caché de facturas:', err);
-                procesarXmls(xmlItems, []);
-              });
+            // Consultar en bloques de 400 para evitar límites de la API de Supabase o SQL IN
+            const chunkSize = 400;
+            const chunks = [];
+            for (let i = 0; i < xmlIds.length; i += chunkSize) {
+              chunks.push(xmlIds.slice(i, i + chunkSize));
+            }
+            
+            Promise.all(chunks.map(chunk => 
+              sb.from('facturas_analizadas')
+                .select('*')
+                .in('id', chunk)
+                .then(({ data, error }) => {
+                  if (error) throw error;
+                  return data || [];
+                })
+            ))
+            .then(results => {
+              const cachedList = results.flat();
+              procesarXmls(xmlItems, cachedList);
+            })
+            .catch(err => {
+              console.error('[OneDrive] Error consultando caché de facturas:', err);
+              procesarXmls(xmlItems, []);
+            });
           }
 
-          function procesarXmls(items, cachedList) {
-            const promises = items.map(item => {
-              const cached = cachedList.find(x => x.id === item.id);
-              if (cached) {
-                // Devolver desde la caché
-                return Promise.resolve({
+          async function procesarXmls(items, cachedList) {
+            try {
+              const loadedFiles = [];
+              const concurrencyLimit = 15; // procesar descargas simultáneas controladas
+              
+              const cachedItems = [];
+              const uncachedItems = [];
+              
+              items.forEach(item => {
+                const cached = cachedList.find(x => x.id === item.id);
+                if (cached) {
+                  cachedItems.push({ item, cached });
+                } else {
+                  uncachedItems.push(item);
+                }
+              });
+              
+              // 1. Cargar instantáneamente los registros que ya están en la caché local/Supabase
+              cachedItems.forEach(({ item, cached }) => {
+                loadedFiles.push({
                   type: 'xml',
                   base64: cached.base64_content,
                   name: cached.file_name,
@@ -14780,94 +14803,103 @@ window.silentPreloadOneDriveFiles = function() {
                     ivaTrasladado: parseFloat(cached.iva_trasladado) || 0
                   }
                 });
-              }
-
-              // Descargar y procesar en caliente, guardando luego en la caché
-              const downloadUrl = item['@microsoft.graph.downloadUrl'];
-              if (!downloadUrl) return Promise.resolve(null);
-
-              return fetch(downloadUrl)
-                .then(res => res.text())
-                .then(xmlText => {
-                  const base64 = 'data:text/xml;base64,' + btoa(unescape(encodeURIComponent(xmlText)));
-                  const satData = window.extraerDatosCompletosXml(xmlText);
-                  
-                  // Guardar de forma asíncrona en Supabase en segundo plano
-                  if (sb) {
-                    const payload = {
-                      id: item.id,
-                      file_name: item.name,
-                      file_type: 'xml',
-                      version_cfdi: satData.versionCfdi || null,
-                      uuid: satData.uuid || null,
-                      estatus: satData.estatus || null,
-                      fecha_cancelacion: satData.fechaCancelacion || null,
-                      tipo_comprobante: satData.tipoComprobante || null,
-                      fecha_emision: satData.fechaEmision || null,
-                      ano_emision: satData.anoEmision || null,
-                      mes_emision: satData.mesEmision || null,
-                      dia_emision: satData.diaEmision || null,
-                      fecha_timbrado: satData.fechaTimbrado || null,
-                      serie: satData.serie || null,
-                      folio: satData.folio || null,
-                      forma_pago: satData.formaPago || null,
-                      metodo_pago: satData.metodoPago || null,
-                      condiciones_pago: satData.condicionesPago || null,
-                      rfc_emisor: satData.rfcEmisor || null,
-                      nombre_emisor: satData.nombreEmisor || null,
-                      rfc_receptor: satData.rfcReceptor || null,
-                      nombre_receptor: satData.nombreReceptor || null,
-                      moneda: satData.moneda || null,
-                      tipo_cambio: satData.tipoCambio || null,
-                      subtotal: parseFloat(satData.subtotal) || 0,
-                      descuento: parseFloat(satData.descuento) || 0,
-                      total: parseFloat(satData.total) || 0,
-                      isr_retenido: parseFloat(satData.isrRetenido) || 0,
-                      iva_retenido: parseFloat(satData.ivaRetenido) || 0,
-                      iva_trasladado: parseFloat(satData.ivaTrasladado) || 0,
-                      base64_content: base64
+              });
+              
+              // 2. Descargar los no cacheados en bloques para evitar denegación de servicio o throttling
+              if (uncachedItems.length > 0) {
+                const downloadWorker = async (item) => {
+                  const downloadUrl = item['@microsoft.graph.downloadUrl'];
+                  if (!downloadUrl) return null;
+                  try {
+                    const res = await fetch(downloadUrl);
+                    if (!res.ok) throw new Error(`Status ${res.status}`);
+                    const xmlText = await res.text();
+                    const base64 = 'data:text/xml;base64,' + btoa(unescape(encodeURIComponent(xmlText)));
+                    const satData = window.extraerDatosCompletosXml(xmlText);
+                    
+                    if (sb) {
+                      const payload = {
+                        id: item.id,
+                        file_name: item.name,
+                        file_type: 'xml',
+                        version_cfdi: satData.versionCfdi || null,
+                        uuid: satData.uuid || null,
+                        estatus: satData.estatus || null,
+                        fecha_cancelacion: satData.fechaCancelacion || null,
+                        tipo_comprobante: satData.tipoComprobante || null,
+                        fecha_emision: satData.fechaEmision || null,
+                        ano_emision: satData.anoEmision || null,
+                        mes_emision: satData.mesEmision || null,
+                        dia_emision: satData.diaEmision || null,
+                        fecha_timbrado: satData.fechaTimbrado || null,
+                        serie: satData.serie || null,
+                        folio: satData.folio || null,
+                        forma_pago: satData.formaPago || null,
+                        metodo_pago: satData.metodoPago || null,
+                        condiciones_pago: satData.condicionesPago || null,
+                        rfc_emisor: satData.rfcEmisor || null,
+                        nombre_emisor: satData.nombreEmisor || null,
+                        rfc_receptor: satData.rfcReceptor || null,
+                        nombre_receptor: satData.nombreReceptor || null,
+                        moneda: satData.moneda || null,
+                        tipo_cambio: satData.tipoCambio || null,
+                        subtotal: parseFloat(satData.subtotal) || 0,
+                        descuento: parseFloat(satData.descuento) || 0,
+                        total: parseFloat(satData.total) || 0,
+                        isr_retenido: parseFloat(satData.isrRetenido) || 0,
+                        iva_retenido: parseFloat(satData.ivaRetenido) || 0,
+                        iva_trasladado: parseFloat(satData.ivaTrasladado) || 0,
+                        base64_content: base64
+                      };
+                      sb.from('facturas_analizadas')
+                        .upsert(payload)
+                        .then(({ error }) => {
+                          if (error) console.error('[OneDrive] Error al guardar en Supabase:', error.message);
+                        })
+                        .catch(e => console.error('[OneDrive] Excepción al guardar factura en Supabase:', e));
+                    }
+                    
+                    return {
+                      type: 'xml',
+                      base64: base64,
+                      name: item.name,
+                      uuid: item.id,
+                      isOneDriveVirtual: true,
+                      satData: satData
                     };
-                    sb.from('facturas_analizadas')
-                      .upsert(payload)
-                      .then(({ error }) => {
-                        if (error) console.error('[OneDrive] Error al guardar factura en caché de Supabase:', error.message);
-                      })
-                      .catch(e => console.error('[OneDrive] Excepción al guardar factura en caché:', e));
+                  } catch (err) {
+                    console.error(`[OneDrive] Error al descargar/procesar archivo XML ${item.name}:`, err);
+                    return null;
                   }
-
-                  return {
-                    type: 'xml',
-                    base64: base64,
-                    name: item.name,
-                    uuid: item.id,
-                    isOneDriveVirtual: true,
-                    satData: satData
-                  };
-                })
-                .catch(err => {
-                  console.error(`[OneDrive] Error al descargar/procesar archivo XML ${item.name}:`, err);
-                  return null;
-                });
-            });
-
-            Promise.all(promises).then(loadedFiles => {
+                };
+                
+                for (let i = 0; i < uncachedItems.length; i += concurrencyLimit) {
+                  const batch = uncachedItems.slice(i, i + concurrencyLimit);
+                  const batchResults = await Promise.all(batch.map(downloadWorker));
+                  batchResults.forEach(r => {
+                    if (r) loadedFiles.push(r);
+                  });
+                }
+              }
+              
+              // 3. Registrar los archivos en el contenedor global
               if (!window._gastoUploadedFiles) window._gastoUploadedFiles = [];
               loadedFiles.forEach(f => {
-                if (!f) return;
                 const alreadyExists = window._gastoUploadedFiles.some(x => x.uuid === f.uuid || x.name === f.name);
                 if (!alreadyExists) {
                   window._gastoUploadedFiles.push(f);
                 }
               });
+              
               window._isPreloadingOneDrive = false;
               if (window.actualizarFacturasSugeridas) {
                 window.actualizarFacturasSugeridas();
               }
-            }).catch(err => {
-              console.error('[OneDrive] Promise.all processing failed:', err);
+            } catch (err) {
+              console.error('[OneDrive] Error en procesarXmls:', err);
               window._isPreloadingOneDrive = false;
               if (window.actualizarFacturasSugeridas) window.actualizarFacturasSugeridas();
-            });
+            }
           }
         } catch (e) {
           console.error('[OneDrive] Exception processing children list:', e);
