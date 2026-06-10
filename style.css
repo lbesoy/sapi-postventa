@@ -494,6 +494,14 @@ body {
   z-index: 10;
   background: var(--bg-secondary);
 }
+.orders-table th[onclick] {
+  cursor: pointer;
+  transition: var(--transition);
+}
+.orders-table th[onclick]:hover, .data-table th[onclick]:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
 .orders-table tr, .data-table tr { border-bottom: 1px solid var(--border); }
 .orders-table td {
   padding: 0.85rem 1rem;
