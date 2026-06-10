@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "dev": "npx -y serve . -l 5000",
+    "backend": "node backend/server.js"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",
     "axios": "^1.16.1",
