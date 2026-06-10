@@ -257,7 +257,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version">v1.3.60</div>
+          <div class="sidebar-version">v1.3.61</div>
         </div>
       </div>
     </aside>
@@ -4365,7 +4365,15 @@
           </div>
           <div>
             <label class="form-label" style="font-size:0.75rem; color:var(--text-secondary);">ORDEN RELACIONADA</label>
-            <div id="gd-orden" style="font-weight:600; font-size:0.9rem;">-</div>
+            <div style="display:flex; align-items:center; gap:0.5rem; position:relative; min-height:1.35rem;">
+              <select id="gd-orden-select" class="form-select" style="font-weight:600; font-size:0.82rem; padding:0.2rem 0.5rem; height:auto; min-height:auto; width:100%; border-radius:4px; display:none;" onchange="window.cambiarOrdenGastoDetalle(this.value)">
+                <!-- Se poblará dinámicamente -->
+              </select>
+              <div id="gd-orden" style="font-weight:600; font-size:0.9rem;">-</div>
+              <button type="button" id="gd-btn-editar-orden" onclick="window.habilitarEdicionOrdenDetalle()" style="background:none; border:none; padding:4px; cursor:pointer; display:inline-flex; align-items:center; color:var(--text-muted); transition:var(--transition); margin-left:2px;" title="Cambiar orden" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">
+                <i data-lucide="edit-3" style="width:14px; height:14px;"></i>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -4593,7 +4601,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js?v=2"></script>
   <script src="supabaseSync.js?v=35"></script>
-  <script src="app.js?v=88"></script>
+  <script src="app.js?v=89"></script>
   <script>lucide.createIcons();</script>
 </body>
 

@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.60'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.61'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -16276,7 +16276,27 @@ window.abrirDetalleGasto = function(gastoId) {
   document.getElementById('gd-tecnico').textContent = g.nombreUsuario || 'Desconocido';
   document.getElementById('gd-fecha').textContent = g.fecha ? new Date(g.fecha).toLocaleDateString('es-MX', {timeZone: 'UTC'}) : '-';
   document.getElementById('gd-categoria').textContent = g.categoria || 'Otros';
-  document.getElementById('gd-orden').textContent = g.ordenFolio || 'General (Sin orden)';
+  const gdOrdenText = document.getElementById('gd-orden');
+  gdOrdenText.textContent = g.ordenFolio || 'General (Sin orden)';
+  gdOrdenText.style.display = 'block';
+
+  const selectOrdenDetalle = document.getElementById('gd-orden-select');
+  if (selectOrdenDetalle) {
+    selectOrdenDetalle.innerHTML = '<option value="">General (Sin orden)</option>';
+    ordenes.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.folio || '';
+      opt.textContent = `[${o.folio || 'S/N'}] ${o.cliente || ''} - ${o.servicio || o.tipo || ''}`;
+      selectOrdenDetalle.appendChild(opt);
+    });
+    selectOrdenDetalle.value = g.ordenFolio || '';
+    selectOrdenDetalle.style.display = 'none';
+  }
+
+  const btnEditarOrden = document.getElementById('gd-btn-editar-orden');
+  if (btnEditarOrden) {
+    btnEditarOrden.style.display = 'inline-flex';
+  }
   document.getElementById('gd-descripcion').textContent = g.descripcion || '';
 
   const claraBlock = document.getElementById('gd-clara-block');
@@ -16455,6 +16475,56 @@ window.cerrarDetalleGasto = function() {
   const modal = document.getElementById('modal-gasto-detalle-overlay');
   if (modal) modal.style.display = 'none';
   window._gdGastoId = null;
+};
+
+window.habilitarEdicionOrdenDetalle = function() {
+  document.getElementById('gd-orden').style.display = 'none';
+  document.getElementById('gd-orden-select').style.display = 'block';
+  document.getElementById('gd-btn-editar-orden').style.display = 'none';
+};
+
+window.cambiarOrdenGastoDetalle = function(nuevoFolio) {
+  const gastoId = window._gdGastoId;
+  const g = gastos.find(x => x.id === gastoId);
+  if (!g) return;
+
+  g.ordenFolio = nuevoFolio || null;
+
+  // Actualizar localStorage
+  localStorage.setItem('sapi_gastos', JSON.stringify(gastos));
+
+  // Empujar a Supabase
+  if (typeof window.pushToSupabase === 'function') {
+    window.pushToSupabase('gastos', g);
+  }
+
+  // Si existe la factura vinculada, actualizar también la relación en la tabla facturas_conciliadas en Supabase
+  if (g.uuidFiscal) {
+    const sb = window.supabaseClient;
+    if (sb) {
+      sb.from('facturas_conciliadas')
+        .update({ orden_folio: nuevoFolio || null })
+        .eq('gasto_id', g.id)
+        .catch(err => console.error('[OneDrive] Error actualizando orden_folio en facturas_conciliadas:', err));
+    }
+  }
+
+  // Registrar telemetría
+  if (window.trackTelemetryEvent) {
+    window.trackTelemetryEvent('Vinculación Orden en Detalle', { gastoId: g.id, ordenFolio: nuevoFolio });
+  }
+
+  // Mostrar notificación
+  mostrarNotificacion('Orden vinculada correctamente', 'success');
+
+  // Actualizar UI
+  document.getElementById('gd-orden').textContent = nuevoFolio || 'General (Sin orden)';
+  document.getElementById('gd-orden').style.display = 'block';
+  document.getElementById('gd-orden-select').style.display = 'none';
+  document.getElementById('gd-btn-editar-orden').style.display = 'inline-flex';
+
+  // Recargar el listado principal de gastos de fondo
+  window.renderGastos();
 };
 
 window.procesarAprobacionGasto = function(isApproved) {
