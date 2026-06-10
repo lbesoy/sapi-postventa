@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.68'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.69'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -14450,7 +14450,27 @@ window.actualizarFacturasSugeridas = function() {
   }
 
   // 3. If disconnected (Real mode active but no token yet)
-  if (!forceMock && !isConnected) {
+  // Only return early if we don't have any matching files loaded from Supabase facturas_analizadas
+  const hasMatches = files.some(file => {
+    const sat = file.satData;
+    if (!sat) return false;
+    let score = 0;
+    const invoiceTotal = parseFloat(sat.total || sat.monto || 0);
+    const invoiceFecha = sat.fechaEmision || sat.date || '';
+    if (Math.abs(gastoMonto - invoiceTotal) < 0.02) score += 50;
+    else if (gastoMonto > 0 && Math.abs(gastoMonto - invoiceTotal) / gastoMonto <= 0.05) score += 30;
+    if (gastoFecha && invoiceFecha) {
+      if (invoiceFecha.startsWith(gastoFecha)) score += 30;
+      else {
+        const t1 = new Date(gastoFecha).getTime();
+        const t2 = new Date(invoiceFecha.split('T')[0]).getTime();
+        if (!isNaN(t1) && !isNaN(t2) && Math.abs(t1 - t2) <= 3 * 24 * 60 * 60 * 1000) score += 15;
+      }
+    }
+    return score >= 30;
+  });
+
+  if (!forceMock && !isConnected && !hasMatches) {
     listEl.innerHTML = `
       <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.5rem; text-align: center;">
         <div style="display:flex; align-items:center; justify-content:center; gap:0.4rem; color:var(--text-secondary); font-size:0.78rem;">
@@ -14587,7 +14607,7 @@ window.actualizarFacturasSugeridas = function() {
     container.style.display = 'block';
     const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
 
-    listEl.innerHTML = dedupedMatches.map(({ file, satData, score }) => {
+    let html = dedupedMatches.map(({ file, satData, score }) => {
       const matchPct = Math.min(score + 20, 100); // map to visual percentage
       const badgeColor = matchPct >= 80 ? 'var(--green)' : 'var(--accent)';
       const badgeBg = matchPct >= 80 ? 'rgba(16,185,129,0.12)' : 'rgba(168,85,247,0.12)';
@@ -14639,6 +14659,17 @@ window.actualizarFacturasSugeridas = function() {
       `;
     }).join('');
 
+    if (!forceMock && !isConnected) {
+      html += `
+        <div style="margin-top: 0.5rem; border-top: 1px dashed var(--border); padding-top: 0.5rem; text-align: center;">
+          <a href="#" onclick="abrirOneDrivePicker(); event.preventDefault();" style="font-size: 0.7rem; color: #0078d4; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; justify-content: center;">
+            <i data-lucide="cloud" style="width:12px; height:12px;"></i> Conectar OneDrive para más sugerencias
+          </a>
+        </div>
+      `;
+    }
+
+    listEl.innerHTML = html;
     lucide.createIcons();
   });
 };
@@ -15028,8 +15059,8 @@ window.silentPreloadOneDriveFiles = function(forceScan = false) {
   }
 
   const sb = window.supabaseClient;
-  if (!forceScan && sb && !odForceMock) {
-    // Si no se fuerza el escaneo de OneDrive, cargamos directamente desde Supabase sin consultar la Graph API
+  if (!forceScan && sb) {
+    // Cargar directamente desde Supabase sin consultar la Graph API
     (async () => {
       try {
         let allData = [];
@@ -15101,6 +15132,30 @@ window.silentPreloadOneDriveFiles = function(forceScan = false) {
             window._gastoUploadedFiles.push(f);
           }
         });
+
+        // Si además está activo el modo Mock, cargamos las mock files también para visualización local
+        if (odForceMock) {
+          const targetFolder = lockedFolder || 'folder_mayo';
+          const mockFiles = onedriveMockDb[targetFolder] || onedriveMockDb['folder_mayo'] || onedriveMockDb['/'] || [];
+          mockFiles.forEach(m => {
+            if (m.type === 'file' && (m.ext === 'xml' || m.ext === 'pdf')) {
+              const alreadyExists = window._gastoUploadedFiles.some(x => x.name === m.name);
+              if (!alreadyExists) {
+                let base64 = m.content;
+                if (m.ext === 'xml' && !base64.startsWith('data:')) {
+                  base64 = 'data:text/xml;base64,' + btoa(unescape(encodeURIComponent(m.content)));
+                }
+                window._gastoUploadedFiles.push({
+                  type: m.ext,
+                  base64: base64,
+                  name: m.name,
+                  uuid: m.id,
+                  isOneDriveVirtual: true
+                });
+              }
+            }
+          });
+        }
         
         window._isPreloadingOneDrive = false;
         if (window.actualizarFacturasSugeridas) {
