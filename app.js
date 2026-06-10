@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.55'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.56'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -14437,8 +14437,35 @@ window.vincularFacturaSugerida = function(type, uuid) {
       
       if (matchingPdf) {
         matchingPdf.isOneDriveVirtual = false;
-        window.procesarPdfFacturaExtraida(matchingPdf.name, matchingPdf.base64);
-        mostrarNotificacion('Factura PDF vinculada automáticamente', 'success');
+        if (matchingPdf.base64) {
+          window.procesarPdfFacturaExtraida(matchingPdf.name, matchingPdf.base64);
+          mostrarNotificacion('Factura PDF vinculada automáticamente', 'success');
+        } else if (matchingPdf.uuid) {
+          const sb = window.supabaseClient;
+          if (sb) {
+            sb.from('facturas_analizadas')
+              .select('*')
+              .eq('id', matchingPdf.uuid)
+              .then(({ data, error }) => {
+                if (!error && data && data.length > 0 && data[0].base64_content) {
+                  matchingPdf.base64 = data[0].base64_content;
+                  window.procesarPdfFacturaExtraida(matchingPdf.name, matchingPdf.base64);
+                  mostrarNotificacion('Factura PDF vinculada automáticamente', 'success');
+                } else {
+                  sb.from('facturas_conciliadas')
+                    .select('*')
+                    .eq('id', matchingPdf.uuid)
+                    .then(({ data: dataC, error: errorC }) => {
+                      if (!errorC && dataC && dataC.length > 0 && dataC[0].base64_content) {
+                        matchingPdf.base64 = dataC[0].base64_content;
+                        window.procesarPdfFacturaExtraida(matchingPdf.name, matchingPdf.base64);
+                        mostrarNotificacion('Factura PDF vinculada automáticamente', 'success');
+                      }
+                    });
+                }
+              });
+          }
+        }
       } else if (file.pdfBase64) {
         // PDF content is cached in XML file object
         window.procesarPdfFacturaExtraida(baseName + '.pdf', file.pdfBase64);
@@ -15358,6 +15385,47 @@ window.adjuntarXmlFactura = function(uuid) {
     .catch(err => {
       console.error('Error parsing XML in adjuntarXmlFactura:', err);
     });
+
+  // Auto-link matching PDF sharing same base name
+  if (xml.name) {
+    const baseName = xml.name.replace(/\.[^/.]+$/, "");
+    const matchingPdf = window._gastoUploadedFiles.find(x => x.type === 'pdf' && x.name.startsWith(baseName));
+    if (matchingPdf) {
+      matchingPdf.isOneDriveVirtual = false;
+      if (matchingPdf.base64) {
+        window.procesarPdfFacturaExtraida(matchingPdf.name, matchingPdf.base64);
+        mostrarNotificacion('Factura PDF vinculada automáticamente', 'success');
+      } else if (matchingPdf.uuid) {
+        const sb = window.supabaseClient;
+        if (sb) {
+          sb.from('facturas_analizadas')
+            .select('*')
+            .eq('id', matchingPdf.uuid)
+            .then(({ data, error }) => {
+              if (!error && data && data.length > 0 && data[0].base64_content) {
+                matchingPdf.base64 = data[0].base64_content;
+                window.procesarPdfFacturaExtraida(matchingPdf.name, matchingPdf.base64);
+                mostrarNotificacion('Factura PDF vinculada automáticamente', 'success');
+              } else {
+                sb.from('facturas_conciliadas')
+                  .select('*')
+                  .eq('id', matchingPdf.uuid)
+                  .then(({ data: dataC, error: errorC }) => {
+                    if (!errorC && dataC && dataC.length > 0 && dataC[0].base64_content) {
+                      matchingPdf.base64 = dataC[0].base64_content;
+                      window.procesarPdfFacturaExtraida(matchingPdf.name, matchingPdf.base64);
+                      mostrarNotificacion('Factura PDF vinculada automáticamente', 'success');
+                    }
+                  });
+              }
+            });
+        }
+      }
+    } else if (xml.pdfBase64) {
+      window.procesarPdfFacturaExtraida(baseName + '.pdf', xml.pdfBase64);
+      mostrarNotificacion('Factura PDF vinculada automáticamente (desde caché)', 'success');
+    }
+  }
 
   // Refresh sidebar cards
   window.renderUploaderSidebar();
