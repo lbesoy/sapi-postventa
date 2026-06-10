@@ -14435,7 +14435,20 @@ window.actualizarFacturasSugeridas = function() {
 
   container.style.display = 'block';
 
-  const files = window._gastoUploadedFiles || [];
+  const currentGastoId = document.getElementById('gasto-id')?.value || null;
+  const files = (window._gastoUploadedFiles || []).filter(file => {
+    if (!file.isOneDriveVirtual) return true;
+    const fileUuid = file.satData?.uuid || file.uuid;
+    if (fileUuid) {
+      const isAlreadyLinked = gastos.some(g => 
+        g.id !== currentGastoId && 
+        g.estado !== 'Rechazado' && 
+        g.uuidFiscal === fileUuid
+      );
+      if (isAlreadyLinked) return false;
+    }
+    return true;
+  });
   const forceMock = configData.onedriveForceMock !== false;
   const isConnected = !!onedriveRealToken;
 
