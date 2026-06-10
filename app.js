@@ -15811,6 +15811,9 @@ window.desadjuntarXmlFactura = function() {
   }
 
   window.renderUploaderSidebar();
+  if (window.actualizarFacturasSugeridas) {
+    window.actualizarFacturasSugeridas();
+  }
   mostrarNotificacion('Comprobante XML desvinculado', 'success');
   lucide.createIcons();
 };
