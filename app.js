@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.52'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.53'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -15290,8 +15290,24 @@ window.adjuntarXmlFactura = function(uuid) {
         .eq('id', uuid)
         .then(({ data, error }) => {
           if (error || !data || data.length === 0) {
-            console.error('Error fetching base64 from database:', error);
-            mostrarNotificacion('Error al recuperar el contenido del XML de la base de datos', 'error');
+            // Intento secundario: buscar en facturas_conciliadas
+            sb.from('facturas_conciliadas')
+              .select('base64_content, pdf_content')
+              .eq('id', uuid)
+              .then(({ data: dataC, error: errorC }) => {
+                if (errorC || !dataC || dataC.length === 0) {
+                  console.error('Error fetching base64 from database (analizadas & conciliadas):', error || errorC);
+                  mostrarNotificacion('Error al recuperar el contenido del XML de la base de datos', 'error');
+                  return;
+                }
+                xml.base64 = dataC[0].base64_content;
+                xml.pdfBase64 = dataC[0].pdf_content;
+                window.adjuntarXmlFactura(uuid);
+              })
+              .catch(err => {
+                console.error('Exception fetching from facturas_conciliadas:', err);
+                mostrarNotificacion('Error de red al recuperar el XML', 'error');
+              });
             return;
           }
           xml.base64 = data[0].base64_content;
@@ -17856,6 +17872,40 @@ window.abrirPdfVisor = function(name) {
       // 2. Consultar la base de datos Supabase por registros con el mismo nombre base que tengan Ficha SAT
       const sb = window.supabaseClient;
       if (sb && baseName) {
+        const mostrarMatchedSatData = (matched) => {
+          const satData = {
+            versionCfdi: matched.version_cfdi,
+            uuid: matched.uuid,
+            estatus: matched.estatus,
+            fechaCancelacion: matched.fecha_cancelacion,
+            tipoComprobante: matched.tipo_comprobante,
+            fechaEmision: matched.fecha_emision,
+            anoEmision: matched.ano_emision,
+            mesEmision: matched.mes_emision,
+            diaEmision: matched.dia_emision,
+            fechaTimbrado: matched.fecha_timbrado,
+            serie: matched.serie,
+            folio: matched.folio,
+            formaPago: matched.forma_pago,
+            metodoPago: matched.metodo_pago,
+            condicionesPago: matched.condiciones_pago,
+            rfcEmisor: matched.rfc_emisor,
+            nombreEmisor: matched.nombre_emisor,
+            rfcReceptor: matched.rfc_receptor,
+            nombreReceptor: matched.nombre_receptor,
+            moneda: matched.moneda,
+            tipoCambio: matched.tipo_cambio,
+            subtotal: parseFloat(matched.subtotal) || 0,
+            descuento: parseFloat(matched.descuento) || 0,
+            total: parseFloat(matched.total) || 0,
+            isrRetenido: parseFloat(matched.isr_retenido) || 0,
+            ivaRetenido: parseFloat(matched.iva_retenido) || 0,
+            ivaTrasladado: parseFloat(matched.iva_trasladado) || 0
+          };
+          file.satData = satData;
+          window.renderSatDetailsTable(satData, 'pdf-visor-sat-body');
+        };
+
         sb.from('facturas_analizadas')
           .select('*')
           .like('file_name', baseName + '%')
@@ -17863,45 +17913,27 @@ window.abrirPdfVisor = function(name) {
             if (!error && list && list.length > 0) {
               const matched = list.find(x => x.uuid || x.rfc_emisor);
               if (matched) {
-                const satData = {
-                  versionCfdi: matched.version_cfdi,
-                  uuid: matched.uuid,
-                  estatus: matched.estatus,
-                  fechaCancelacion: matched.fecha_cancelacion,
-                  tipoComprobante: matched.tipo_comprobante,
-                  fechaEmision: matched.fecha_emision,
-                  anoEmision: matched.ano_emision,
-                  mesEmision: matched.mes_emision,
-                  diaEmision: matched.dia_emision,
-                  fechaTimbrado: matched.fecha_timbrado,
-                  serie: matched.serie,
-                  folio: matched.folio,
-                  formaPago: matched.forma_pago,
-                  metodoPago: matched.metodo_pago,
-                  condicionesPago: matched.condiciones_pago,
-                  rfcEmisor: matched.rfc_emisor,
-                  nombreEmisor: matched.nombre_emisor,
-                  rfcReceptor: matched.rfc_receptor,
-                  nombreReceptor: matched.nombre_receptor,
-                  moneda: matched.moneda,
-                  tipoCambio: matched.tipo_cambio,
-                  subtotal: parseFloat(matched.subtotal) || 0,
-                  descuento: parseFloat(matched.descuento) || 0,
-                  total: parseFloat(matched.total) || 0,
-                  isrRetenido: parseFloat(matched.isr_retenido) || 0,
-                  ivaRetenido: parseFloat(matched.iva_retenido) || 0,
-                  ivaTrasladado: parseFloat(matched.iva_trasladado) || 0
-                };
-                file.satData = satData;
-                window.renderSatDetailsTable(satData, 'pdf-visor-sat-body');
+                mostrarMatchedSatData(matched);
                 return;
               }
             }
-            extraerDelPdfDirecto();
+            // Buscar en facturas_conciliadas
+            sb.from('facturas_conciliadas')
+              .select('*')
+              .like('file_name', baseName + '%')
+              .then(({ data: listC, error: errorC }) => {
+                if (!errorC && listC && listC.length > 0) {
+                  const matchedC = listC.find(x => x.uuid || x.rfc_emisor);
+                  if (matchedC) {
+                    mostrarMatchedSatData(matchedC);
+                    return;
+                  }
+                }
+                extraerDelPdfDirecto();
+              })
+              .catch(() => extraerDelPdfDirecto());
           })
-          .catch(() => {
-            extraerDelPdfDirecto();
-          });
+          .catch(() => extraerDelPdfDirecto());
       } else {
         extraerDelPdfDirecto();
       }
