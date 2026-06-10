@@ -13898,7 +13898,7 @@ window.renderGastos = function() {
   // Actualizar KPIs (basados en el universo total del rol)
   let totalPendiente = 0;
   let totalAprobado = 0;
-  let totalReembolso = 0;
+  let totalRechazado = 0;
 
   const kpiBaseList = isTecnico ? getFilteredGastos().filter(g => g.usuarioId === currentSession.userId) : getFilteredGastos();
   kpiBaseList.forEach(g => {
@@ -13907,9 +13907,8 @@ window.renderGastos = function() {
       totalPendiente += montoVal;
     } else if (g.estado === 'Aprobado') {
       totalAprobado += montoVal;
-      if (g.metodoPago === 'Reembolso (Efectivo/Personal)') {
-        totalReembolso += montoVal;
-      }
+    } else if (g.estado === 'Rechazado') {
+      totalRechazado += montoVal;
     }
   });
 
@@ -13917,7 +13916,10 @@ window.renderGastos = function() {
 
   document.getElementById('kpi-gastos-pendiente').textContent = formatMoney(totalPendiente);
   document.getElementById('kpi-gastos-aprobado').textContent = formatMoney(totalAprobado);
-  document.getElementById('kpi-gastos-reembolso').textContent = formatMoney(totalReembolso);
+  const kpiRechazadoEl = document.getElementById('kpi-gastos-rechazado');
+  if (kpiRechazadoEl) {
+    kpiRechazadoEl.textContent = formatMoney(totalRechazado);
+  }
 
   // Renderizar tabla desktop
   const tbody = document.getElementById('tabla-gastos-body');
