@@ -117,10 +117,30 @@ FOR EACH ROW
 EXECUTE FUNCTION public.eliminar_gastos_estado();
 
 -- Poblar datos preexistentes
-INSERT INTO public.gastos_aprobados 
-SELECT * FROM public.gastos WHERE estado = 'Aprobado'
+INSERT INTO public.gastos_aprobados (
+    id, usuario_id, fecha, categoria, descripcion, monto, metodo_pago,
+    clara_tx_id, clara_merchant, clara_card_last4, orden_id, uuid_fiscal,
+    rfc_emisor, pdf_factura, xml_factura, evidencia, estado,
+    comentarios_aprobacion, es_prueba, fecha_creacion, sat_data, created_at
+)
+SELECT 
+    id, usuario_id, fecha, categoria, descripcion, monto, metodo_pago,
+    clara_tx_id, clara_merchant, clara_card_last4, orden_id, uuid_fiscal,
+    rfc_emisor, pdf_factura, xml_factura, evidencia, estado,
+    comentarios_aprobacion, es_prueba, fecha_creacion, sat_data, created_at
+FROM public.gastos WHERE estado = 'Aprobado'
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.gastos_rechazados 
-SELECT * FROM public.gastos WHERE estado = 'Rechazado'
+INSERT INTO public.gastos_rechazados (
+    id, usuario_id, fecha, categoria, descripcion, monto, metodo_pago,
+    clara_tx_id, clara_merchant, clara_card_last4, orden_id, uuid_fiscal,
+    rfc_emisor, pdf_factura, xml_factura, evidencia, estado,
+    comentarios_aprobacion, es_prueba, fecha_creacion, sat_data, created_at
+)
+SELECT 
+    id, usuario_id, fecha, categoria, descripcion, monto, metodo_pago,
+    clara_tx_id, clara_merchant, clara_card_last4, orden_id, uuid_fiscal,
+    rfc_emisor, pdf_factura, xml_factura, evidencia, estado,
+    comentarios_aprobacion, es_prueba, fecha_creacion, sat_data, created_at
+FROM public.gastos WHERE estado = 'Rechazado'
 ON CONFLICT (id) DO NOTHING;
