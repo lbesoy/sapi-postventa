@@ -16696,6 +16696,18 @@ window.abrirDetalleGasto = function(gastoId) {
       document.getElementById('gd-clara-tx-id').textContent = g.claraTxId;
       document.getElementById('gd-clara-merchant').textContent = g.claraMerchant || 'N/A';
       document.getElementById('gd-clara-card').textContent = g.claraCardLast4 ? `•••• ${g.claraCardLast4}` : 'N/A';
+      
+      // Buscar usuario vinculado a la tarjeta
+      let linkedUser = 'No asignado';
+      if (g.claraCardLast4) {
+        const cards = typeof window.getClaraCards === 'function' ? window.getClaraCards() : [];
+        const cardMatch = cards.find(c => c.tarjeta === g.claraCardLast4);
+        if (cardMatch && cardMatch.usuario && cardMatch.usuario !== '-') {
+          linkedUser = cardMatch.usuario;
+        }
+      }
+      const gdClaraUser = document.getElementById('gd-clara-user');
+      if (gdClaraUser) gdClaraUser.textContent = linkedUser;
     } else {
       claraBlock.style.display = 'none';
     }
