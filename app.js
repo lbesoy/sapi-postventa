@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.46'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.47'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -14679,17 +14679,23 @@ window.silentPreloadOneDriveFiles = function() {
         }
         return res.json();
       })
-      .then(folderMeta => {
+      .then(async folderMeta => {
         const childrenUrl = `https://graph.microsoft.com/v1.0/me/drive/items/${folderMeta.id}/children`;
-        return fetch(childrenUrl, { headers: { 'Authorization': `Bearer ${onedriveRealToken}` } });
+        let allItems = [];
+        let nextUrl = childrenUrl;
+        while (nextUrl) {
+          const res = await fetch(nextUrl, { headers: { 'Authorization': `Bearer ${onedriveRealToken}` } });
+          if (!res.ok) throw new Error('Error al listar archivos de la carpeta OneDrive.');
+          const chunk = await res.json();
+          if (chunk && Array.isArray(chunk.value)) {
+            allItems = allItems.concat(chunk.value);
+          }
+          nextUrl = chunk ? chunk['@odata.nextLink'] : null;
+        }
+        return allItems;
       })
-      .then(res => {
-        if (!res.ok) throw new Error('Error al listar archivos de la carpeta OneDrive.');
-        return res.json();
-      })
-      .then(data => {
+      .then(children => {
         try {
-          const children = (data && Array.isArray(data.value)) ? data.value : [];
           window._oneDriveFolderChildren = children;
 
           // Filtrar únicamente los archivos XML
@@ -16154,15 +16160,22 @@ window.navegarOneDriveReal = function(folderId) {
     
     const childrenUrl = `https://graph.microsoft.com/v1.0/me/drive/items/${folderMeta.id}/children`;
       
-    return fetch(childrenUrl, {
-      headers: { 'Authorization': `Bearer ${onedriveRealToken}` }
-    })
-    .then(res => {
-      if (!res.ok) throw new Error('Error al obtener contenido de la carpeta');
-      return res.json();
-    })
-    .then(data => {
-      const mappedItems = (data.value || []).map(item => {
+    return (async () => {
+      let allItems = [];
+      let nextUrl = childrenUrl;
+      while (nextUrl) {
+        const res = await fetch(nextUrl, { headers: { 'Authorization': `Bearer ${onedriveRealToken}` } });
+        if (!res.ok) throw new Error('Error al obtener contenido de la carpeta');
+        const chunk = await res.json();
+        if (chunk && Array.isArray(chunk.value)) {
+          allItems = allItems.concat(chunk.value);
+        }
+        nextUrl = chunk ? chunk['@odata.nextLink'] : null;
+      }
+      return allItems;
+    })()
+    .then(children => {
+      const mappedItems = children.map(item => {
         const isFolder = !!item.folder;
         const ext = isFolder ? '' : (item.name.split('.').pop() || '').toLowerCase();
         let date = '--';
