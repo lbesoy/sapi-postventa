@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.59'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.60'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -15835,6 +15835,42 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
         base64: g.pdfFactura,
         name: 'factura.pdf'
       });
+    } else if (g.uuidFiscal) {
+      // Autocuración: si falta el PDF en el gasto pero existe en la base de datos de facturas
+      const sb = window.supabaseClient;
+      if (sb) {
+        sb.from('facturas_analizadas')
+          .select('pdf_content')
+          .eq('uuid', g.uuidFiscal)
+          .then(({ data }) => {
+            if (data && data.length > 0 && data[0].pdf_content) {
+              const pdf = data[0].pdf_content;
+              g.pdfFactura = pdf;
+              window._gastoPdfBase64 = pdf;
+              if (!window._gastoUploadedFiles.some(x => x.type === 'pdf')) {
+                window._gastoUploadedFiles.push({ type: 'pdf', base64: pdf, name: 'factura.pdf' });
+                window.renderUploaderSidebar();
+              }
+              sb.from('gastos').update({ pdfFactura: pdf }).eq('id', g.id).catch(() => {});
+            } else {
+              sb.from('facturas_conciliadas')
+                .select('pdf_content')
+                .eq('uuid', g.uuidFiscal)
+                .then(({ data: dataC }) => {
+                  if (dataC && dataC.length > 0 && dataC[0].pdf_content) {
+                    const pdf = dataC[0].pdf_content;
+                    g.pdfFactura = pdf;
+                    window._gastoPdfBase64 = pdf;
+                    if (!window._gastoUploadedFiles.some(x => x.type === 'pdf')) {
+                      window._gastoUploadedFiles.push({ type: 'pdf', base64: pdf, name: 'factura.pdf' });
+                      window.renderUploaderSidebar();
+                    }
+                    sb.from('gastos').update({ pdfFactura: pdf }).eq('id', g.id).catch(() => {});
+                  }
+                });
+            }
+          });
+      }
     }
 
     if (g.xmlFactura) {
@@ -16300,10 +16336,48 @@ window.abrirDetalleGasto = function(gastoId) {
       noFacturaMsg.style.display = 'none';
       if (g.pdfFactura) {
         btnPdf.style.display = 'inline-flex';
-        btnPdf.href = g.pdfFactura;
-        btnPdf.download = `Factura_${g.uuidFiscal || 'gasto'}.pdf`;
+        btnPdf.onclick = function(e) {
+          e.preventDefault();
+          window.visualizarPdfBase64(g.pdfFactura, `Factura_${g.uuidFiscal || 'gasto'}.pdf`);
+        };
       } else {
         btnPdf.style.display = 'none';
+        if (g.uuidFiscal) {
+          const sb = window.supabaseClient;
+          if (sb) {
+            sb.from('facturas_analizadas')
+              .select('pdf_content')
+              .eq('uuid', g.uuidFiscal)
+              .then(({ data }) => {
+                if (data && data.length > 0 && data[0].pdf_content) {
+                  const pdf = data[0].pdf_content;
+                  g.pdfFactura = pdf;
+                  btnPdf.style.display = 'inline-flex';
+                  btnPdf.onclick = function(e) {
+                    e.preventDefault();
+                    window.visualizarPdfBase64(pdf, `Factura_${g.uuidFiscal || 'gasto'}.pdf`);
+                  };
+                  sb.from('gastos').update({ pdfFactura: pdf }).eq('id', g.id).catch(() => {});
+                } else {
+                  sb.from('facturas_conciliadas')
+                    .select('pdf_content')
+                    .eq('uuid', g.uuidFiscal)
+                    .then(({ data: dataC }) => {
+                      if (dataC && dataC.length > 0 && dataC[0].pdf_content) {
+                        const pdf = dataC[0].pdf_content;
+                        g.pdfFactura = pdf;
+                        btnPdf.style.display = 'inline-flex';
+                        btnPdf.onclick = function(e) {
+                          e.preventDefault();
+                          window.visualizarPdfBase64(pdf, `Factura_${g.uuidFiscal || 'gasto'}.pdf`);
+                        };
+                        sb.from('gastos').update({ pdfFactura: pdf }).eq('id', g.id).catch(() => {});
+                      }
+                    });
+                }
+              });
+          }
+        }
       }
 
       if (g.xmlFactura) {
@@ -17959,17 +18033,12 @@ window.procesarPdfFacturaExtraida = function(name, base64Data) {
 // ── VISOR DE PDF Y FICHA SAT 26 CAMPOS ────────────────────────────────────
 // =========================================================================
 
-window.abrirPdfVisor = function(name) {
-  if (!window._gastoUploadedFiles) return;
-  const file = window._gastoUploadedFiles.find(x => x.type === 'pdf' && x.name === name);
-  if (!file) {
-    mostrarNotificacion('Archivo PDF no encontrado en caché', 'error');
-    return;
-  }
+window.visualizarPdfBase64 = function(base64, name) {
+  if (!base64) return;
 
   // Track telemetry PDF visor open
   if (window.trackTelemetryEvent) {
-    window.trackTelemetryEvent('Visor PDF SAT', { archivo: file.name });
+    window.trackTelemetryEvent('Visor PDF SAT', { archivo: name || 'documento.pdf' });
   }
 
   const modal = document.getElementById('modal-pdf-visor');
@@ -17981,10 +18050,10 @@ window.abrirPdfVisor = function(name) {
 
   if (!modal) return;
 
-  title.textContent = file.name || 'Visor de PDF';
-  frame.src = file.base64;
-  downloadLink.href = file.base64;
-  downloadLink.download = file.name || 'documento.pdf';
+  title.textContent = name || 'Visor de PDF';
+  frame.src = base64;
+  downloadLink.href = base64;
+  downloadLink.download = name || 'documento.pdf';
   
   modal.style.display = 'flex';
   errorBox.style.display = 'none';
@@ -17999,21 +18068,14 @@ window.abrirPdfVisor = function(name) {
   `;
   if (window.lucide) lucide.createIcons();
 
-  // If the file already has satData, render it instantly
-  if (file.satData) {
-    window.renderSatDetailsTable(file.satData, 'pdf-visor-sat-body');
-  } else {
-    // 1. Intentar buscar un archivo XML cargado localmente con el mismo nombre base que tenga satData
-    const baseName = (file.name || '').substring(0, (file.name || '').lastIndexOf('.'));
-    const localXml = window._gastoUploadedFiles.find(x => x.type === 'xml' && x.name.startsWith(baseName));
-    
-    if (localXml && localXml.satData) {
-      file.satData = localXml.satData;
-      window.renderSatDetailsTable(file.satData, 'pdf-visor-sat-body');
-    } else {
-      // 2. Consultar la base de datos Supabase por registros con el mismo nombre base que tengan Ficha SAT
+  window.extraerFacturaSatNube('pdf', base64)
+    .then(satData => {
+      window.renderSatDetailsTable(satData, 'pdf-visor-sat-body');
+    })
+    .catch(err => {
+      const baseName = (name || '').substring(0, (name || '').lastIndexOf('.'));
       const sb = window.supabaseClient;
-      if (sb && baseName) {
+      if (sb && baseName && baseName !== 'factura') {
         const mostrarMatchedSatData = (matched) => {
           const satData = {
             versionCfdi: matched.version_cfdi,
@@ -18044,7 +18106,6 @@ window.abrirPdfVisor = function(name) {
             ivaRetenido: parseFloat(matched.iva_retenido) || 0,
             ivaTrasladado: parseFloat(matched.iva_trasladado) || 0
           };
-          file.satData = satData;
           window.renderSatDetailsTable(satData, 'pdf-visor-sat-body');
         };
 
@@ -18059,7 +18120,6 @@ window.abrirPdfVisor = function(name) {
                 return;
               }
             }
-            // Buscar en facturas_conciliadas
             sb.from('facturas_conciliadas')
               .select('*')
               .like('file_name', baseName + '%')
@@ -18071,34 +18131,36 @@ window.abrirPdfVisor = function(name) {
                     return;
                   }
                 }
-                extraerDelPdfDirecto();
+                mostrarFalloSat();
               })
-              .catch(() => extraerDelPdfDirecto());
+              .catch(() => mostrarFalloSat());
           })
-          .catch(() => extraerDelPdfDirecto());
+          .catch(() => mostrarFalloSat());
       } else {
-        extraerDelPdfDirecto();
+        mostrarFalloSat();
       }
-    }
-  }
+    });
 
-  function extraerDelPdfDirecto() {
-    window.extraerFacturaSatNube('pdf', file.base64)
-      .then(satData => {
-        file.satData = satData;
-        window.renderSatDetailsTable(satData, 'pdf-visor-sat-body');
-      })
-      .catch(err => {
-        satBody.innerHTML = `
-          <div style="background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.15); padding:1.25rem; border-radius:8px; color:var(--red); text-align:center; display:flex; flex-direction:column; align-items:center; gap:0.4rem; justify-content:center;">
-            <i data-lucide="alert-triangle" style="width:24px; height:24px;"></i>
-            <strong style="font-size:0.8rem;">Ficha SAT no disponible</strong>
-            <div style="font-size:0.68rem; opacity:0.8; max-width:250px;">El PDF no contiene texto legible (imagen escaneada o formato no compatible).</div>
-          </div>
-        `;
-        if (window.lucide) lucide.createIcons();
-      });
+  function mostrarFalloSat() {
+    satBody.innerHTML = `
+      <div style="background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.15); padding:1.25rem; border-radius:8px; color:var(--red); text-align:center; display:flex; flex-direction:column; align-items:center; gap:0.4rem; justify-content:center;">
+        <i data-lucide="alert-triangle" style="width:24px; height:24px;"></i>
+        <strong style="font-size:0.8rem;">Ficha SAT no disponible</strong>
+        <div style="font-size:0.68rem; opacity:0.8; max-width:250px;">El PDF no contiene texto legible (imagen escaneada o formato no compatible).</div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
   }
+};
+
+window.abrirPdfVisor = function(name) {
+  if (!window._gastoUploadedFiles) return;
+  const file = window._gastoUploadedFiles.find(x => x.type === 'pdf' && x.name === name);
+  if (!file) {
+    mostrarNotificacion('Archivo PDF no encontrado en caché', 'error');
+    return;
+  }
+  window.visualizarPdfBase64(file.base64, file.name);
 };
 
 window.cerrarPdfVisor = function() {
