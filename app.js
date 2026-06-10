@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.61'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.62'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -14148,6 +14148,58 @@ window.actualizarDetalleVinculacionOrden = function(folio) {
   lucide.createIcons();
 };
 
+window.actualizarDetalleVinculacionOrdenDetalle = function(folio) {
+  const container = document.getElementById('gd-vinculacion-orden-container');
+  if (!container) return;
+
+  if (!folio) {
+    container.style.display = 'none';
+    return;
+  }
+
+  const o = ordenes.find(x => x.folio === folio);
+  if (!o) {
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'block';
+  document.getElementById('gd-vinc-cliente').textContent = o.cliente || 'Sin cliente';
+  document.getElementById('gd-vinc-ubicacion').textContent = o.ubicacion || 'Sin ubicación';
+
+  const ticket = tickets.find(t => t.id === o.soporte);
+  document.getElementById('gd-vinc-ticket').textContent = ticket ? `#${ticket.folio}` : 'Sin ticket';
+  document.getElementById('gd-vinc-ticket-asunto').textContent = ticket ? ticket.asunto : 'N/A';
+  document.getElementById('gd-vinc-tipo').textContent = o.tipo || 'N/A';
+  document.getElementById('gd-vinc-maquina').textContent = o.modelo || o.maquina || 'N/A';
+
+  // Populating Service Order Folio and dates
+  const elFolio = document.getElementById('gd-vinc-orden-folio');
+  if (elFolio) elFolio.textContent = o.folio || 'Sin folio';
+
+  const elCreada = document.getElementById('gd-vinc-fecha-creacion');
+  if (elCreada) elCreada.textContent = o.fecha ? new Date(o.fecha).toLocaleDateString('es-MX', { timeZone: 'UTC' }) : 'N/A';
+
+  const elCerrada = document.getElementById('gd-vinc-fecha-cierre');
+  if (elCerrada) {
+    const stateLower = (o.estado || '').toLowerCase();
+    if (stateLower === 'cerrada' || stateLower === 'completado') {
+      let fCierre = new Date(o.fecha || 0);
+      if (o.bitacora && o.bitacora.length > 0) {
+        const maxB = Math.max(...o.bitacora.map(b => new Date(b.fecha).getTime()));
+        if (!isNaN(maxB)) fCierre = new Date(maxB);
+      }
+      elCerrada.textContent = fCierre.toLocaleDateString('es-MX', { timeZone: 'UTC' });
+      elCerrada.style.color = 'var(--green)';
+    } else {
+      elCerrada.textContent = o.estado || 'Abierta';
+      elCerrada.style.color = 'var(--accent)';
+    }
+  }
+
+  lucide.createIcons();
+};
+
 window.actualizarMontoCabeceraGasto = function(monto) {
   const montEl = document.getElementById('gasto-header-monto');
   if (!montEl) return;
@@ -16297,6 +16349,9 @@ window.abrirDetalleGasto = function(gastoId) {
   if (btnEditarOrden) {
     btnEditarOrden.style.display = 'inline-flex';
   }
+  if (window.actualizarDetalleVinculacionOrdenDetalle) {
+    window.actualizarDetalleVinculacionOrdenDetalle(g.ordenFolio);
+  }
   document.getElementById('gd-descripcion').textContent = g.descripcion || '';
 
   const claraBlock = document.getElementById('gd-clara-block');
@@ -16522,6 +16577,10 @@ window.cambiarOrdenGastoDetalle = function(nuevoFolio) {
   document.getElementById('gd-orden').style.display = 'block';
   document.getElementById('gd-orden-select').style.display = 'none';
   document.getElementById('gd-btn-editar-orden').style.display = 'inline-flex';
+
+  if (window.actualizarDetalleVinculacionOrdenDetalle) {
+    window.actualizarDetalleVinculacionOrdenDetalle(nuevoFolio);
+  }
 
   // Recargar el listado principal de gastos de fondo
   window.renderGastos();

@@ -257,7 +257,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version">v1.3.61</div>
+          <div class="sidebar-version">v1.3.62</div>
         </div>
       </div>
     </aside>
@@ -4392,6 +4392,31 @@
           </div>
         </div>
 
+        <!-- DETALLE DE VINCULACIÓN OPERATIVA DINÁMICO (DETALLE GASTO) -->
+        <div id="gd-vinculacion-orden-container" style="display:none; background: var(--bg-hover); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem; font-size:0.8rem; line-height:1.4;">
+          <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); font-weight:600; margin-bottom:0.4rem; letter-spacing:0.05em; display:flex; align-items:center; gap:0.25rem;">
+            <i data-lucide="link-2" style="width:12px;height:12px;color:var(--accent);"></i> Orden de Servicio Relacionada
+          </div>
+          <div style="display:flex; flex-direction:column; gap:0.3rem;">
+            <div>Cliente: <strong id="gd-vinc-cliente" style="color:var(--text-primary);">-</strong></div>
+            <div>Ubicación: <span id="gd-vinc-ubicacion" style="color:var(--text-secondary);">-</span></div>
+            <div style="margin-top:0.25rem; border-top:1px dashed var(--border); padding-top:0.25rem;">
+              Ticket Vinculado: <strong id="gd-vinc-ticket" style="color:var(--accent); font-family:monospace;">-</strong>
+            </div>
+            <div style="font-size:0.72rem; color:var(--text-muted);" id="gd-vinc-ticket-asunto">Sin Asunto</div>
+            <div style="margin-top:0.25rem; border-top:1px dashed var(--border); padding-top:0.25rem; font-size:0.72rem; color:var(--text-muted);">
+              Orden de Servicio: <strong id="gd-vinc-orden-folio" style="color:var(--text-secondary); font-family:monospace;">-</strong>
+            </div>
+            <div style="font-size:0.72rem; color:var(--text-muted); display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.15rem;">
+              <span>Creada: <strong id="gd-vinc-fecha-creacion" style="color:var(--text-secondary); font-family:monospace;">-</strong></span>
+              <span>Cerrada: <strong id="gd-vinc-fecha-cierre" style="color:var(--text-secondary); font-family:monospace;">-</strong></span>
+            </div>
+            <div style="margin-top:0.25rem; border-top:1px dashed var(--border); padding-top:0.25rem; font-size:0.72rem; color:var(--text-muted);">
+              Tipo: <span id="gd-vinc-tipo" style="font-weight:600; color:var(--text-secondary);">-</span> • Máquina: <span id="gd-vinc-maquina" style="color:var(--text-secondary);">-</span>
+            </div>
+          </div>
+        </div>
+
         <!-- SAT Billing details -->
         <div style="border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; background: var(--bg-hover);">
           <div style="font-weight:600; font-size:0.85rem; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.3rem; color:var(--text-primary);">
@@ -4601,7 +4626,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js?v=2"></script>
   <script src="supabaseSync.js?v=35"></script>
-  <script src="app.js?v=89"></script>
+  <script src="app.js?v=90"></script>
   <script>lucide.createIcons();</script>
 </body>
 
