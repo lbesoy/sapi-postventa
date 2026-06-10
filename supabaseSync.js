@@ -149,7 +149,7 @@ function rowToTicket(t) {
 function ordenToRow(o) {
   const customData = { ...o };
   const knownKeys = [
-    'id', 'folio', 'cliente', 'ubicacion', 'tecnico', 'modelo', 'tipo', 'estado', 'fecha', 'fechaInicio', 'fechaFin', 
+    'id', 'folio', 'cliente', 'ubicacion', 'tecnico', 'tipo', 'estado', 'fecha', 'fechaInicio', 'fechaFin', 
     'duracion', 'duracion_minutos', 'evidenciaBase64', 'evidencia_base_64', 'evidencia_url', 'bitacora', 'maquinaria_id', 'sitio_id',
     'ref_necesarias', 'ref_utilizadas', 'firma_tecnico_base64', 'firma_tecnico_nombre', 'firma_tecnico_fecha', 
     'firma_cliente_base64', 'firma_cliente_nombre', 'firma_cliente_fecha', 'evidencias'
@@ -167,12 +167,20 @@ function ordenToRow(o) {
   } catch (e) {}
 
   // Buscar maquinaria_id en localStorage
-  let maquinariaId = null;
-  try {
-    const maquinas = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
-    const match = maquinas.find(m => m.cliente === o.cliente && (m.modelo === o.modelo || m.serie === o.modelo || m.id === o.modelo));
-    if (match) maquinariaId = match.id;
-  } catch (e) {}
+  let maquinariaId = o.maquinaria_id || null;
+  if (!maquinariaId) {
+    try {
+      const maquinas = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
+      const match = maquinas.find(m => 
+        m.cliente === o.cliente && (
+          (o.serie && m.serie === o.serie) || 
+          (o.modelo && m.modelo === o.modelo) ||
+          (o.equipo && (m.idInterno === o.equipo || m.id === o.equipo || m.serie === o.equipo))
+        )
+      );
+      if (match) maquinariaId = match.id;
+    } catch (e) {}
+  }
 
   return {
     id: o.id,
@@ -187,6 +195,7 @@ function ordenToRow(o) {
     fecha_inicio: o.fechaInicio || null,
     fecha_fin: o.fechaFin || null,
     duracion_minutos: o.duracion || null,
+    notes: notasJSON, // Soporta tanto notes como notas en BD
     notas: notasJSON,
     evidencia_url: o.evidenciaBase64 || null,
     evidencias: o.evidencias || {}
@@ -215,13 +224,22 @@ function rowToOrden(o) {
     } catch (e) {}
   }
 
-  // Deducir modelo de maquinaria del ID
+  // Deducir modelo, marca, serie, eco de maquinaria del ID
   let modelo = o.modelo || null;
+  let serie = extraData.serie || null;
+  let marca = extraData.marca || null;
+  let eco = extraData.eco || null;
+
   if (o.maquinaria_id) {
     try {
       const maquinas = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
       const match = maquinas.find(m => m.id === o.maquinaria_id);
-      if (match) modelo = match.modelo;
+      if (match) {
+        modelo = match.modelo || modelo;
+        serie = match.serie || serie;
+        marca = match.marca || marca;
+        eco = match.no_economico || match.numeroEconomico || eco;
+      }
     } catch (e) {}
   }
 
@@ -229,7 +247,7 @@ function rowToOrden(o) {
     id: o.id,
     _synced: true,
     folio: o.folio, cliente: o.cliente,
-    ubicacion: ubicacion, tecnico: o.tecnico, modelo: modelo,
+    ubicacion: ubicacion, tecnico: o.tecnico,
     tipo: o.tipo, estado: o.estado, fecha: o.fecha,
     fechaInicio: o.fecha_inicio, fechaFin: o.fecha_fin,
     duracion: o.duracion_minutos,
@@ -250,6 +268,12 @@ function rowToOrden(o) {
   res.bitacora = [];
   res.ref_necesarias = [];
   res.ref_utilizadas = [];
+
+  // Priorizar el modelo deducido o el de extraData si no hay id relacional
+  res.modelo = modelo || res.modelo || null;
+  res.serie = serie || res.serie || null;
+  res.marca = marca || res.marca || null;
+  res.eco = eco || res.eco || null;
   
   return res;
 }

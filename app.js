@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.63'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.64'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -11125,21 +11125,56 @@ async function cerrarCotizacionTicket(id) {
     if (!ordenExistente) {
       let modeloStr = '';
       let serieStr = '';
+      let marcaStr = '';
+      let ecoStr = '';
+      let maquinariaId = null;
+
       if (t.equipo) {
+        const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+        
+        const matchMaquina = (m) => {
+          const cleanId = m.idInterno || m.id || '';
+          const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+          const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+          const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+          const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+          
+          return (
+            t.equipo === mName ||
+            t.equipo === cleanId ||
+            t.equipo === m.serie ||
+            t.equipo.includes(cleanId) ||
+            (m.serie && t.equipo.includes(m.serie))
+          );
+        };
+
         let maq = null;
         clientesDb.forEach(c => {
           if (c.maquinas) {
-            const found = c.maquinas.find(m => m.idInterno === t.equipo);
+            const found = c.maquinas.find(matchMaquina);
             if (found) maq = found;
           }
         });
-        if (!maq) maq = maquinariaDb.find(m => m.idInterno === t.equipo);
-        
+        if (!maq) maq = maquinariaDb.find(matchMaquina);
+
         if (maq) {
           modeloStr = maq.modelo || '';
           serieStr = maq.serie || '';
+          marcaStr = maq.marca || '';
+          ecoStr = maq.no_economico || '';
+          maquinariaId = maq.id || null;
         } else {
-          modeloStr = t.equipo;
+          if (t.equipo.includes('(SN: ')) {
+            const parts = t.equipo.split('(SN: ');
+            serieStr = parts[1].replace(')', '').trim();
+            let left = parts[0].trim();
+            if (left.startsWith('[') && left.includes(']')) {
+              left = left.substring(left.indexOf(']') + 1).trim();
+            }
+            modeloStr = left;
+          } else {
+            modeloStr = t.equipo;
+          }
         }
       }
 
@@ -11157,10 +11192,13 @@ async function cerrarCotizacionTicket(id) {
         cliente: t.cliente || '',
         ubicacion: t.sitio || '',
         operador: '', // Se preguntará en sitio
-        eco: '',
+        eco: ecoStr || '',
         horometro: '',
         modelo: modeloStr,
         serie: serieStr,
+        marca: marcaStr || '',
+        maquinaria_id: maquinariaId || null,
+        equipo: t.equipo || '',
         tecnico: tecnicosAsignados.join(', '),
         tecnicosAsignados: tecnicosAsignados,
         soporte: t.id,
