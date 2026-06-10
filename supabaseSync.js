@@ -1185,6 +1185,36 @@ window.limpiarColaSincronizacion = function() {
   return 'Cola de sincronización vaciada con éxito.';
 };
 
+window.verDetallesSincronizacion = function() {
+  const queue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+  if (queue.length === 0) {
+    alert('No hay cambios pendientes de sincronizar.');
+    return;
+  }
+  
+  let msg = `Tienes ${queue.length} cambio(s) pendiente(s) de sincronizar:\n\n`;
+  queue.forEach((item, idx) => {
+    let desc = 'Sin descripción';
+    if (item.data) {
+      desc = item.data.descripcion || item.data.concepto || item.data.cliente || item.data.id || 'Sin descripción';
+    }
+    msg += `${idx + 1}. Tabla: ${item.table} | Acción: ${item.action} | Detalle: ${desc}\n`;
+  });
+  msg += `\n¿Deseas intentar forzar la sincronización ahora? (Presiona ACEPTAR)\n`;
+  msg += `Si deseas borrar/limpiar estos cambios atascados de la cola local, presiona CANCELAR.`;
+  
+  const ok = confirm(msg);
+  if (ok) {
+    window.forzarSincronizacionManual();
+  } else {
+    const limpiar = confirm('¿Deseas BORRAR/LIMPIAR la cola de cambios pendientes? (Esto evitará que sigan intentando sincronizarse, pero los datos seguirán guardados en tu dispositivo)');
+    if (limpiar) {
+      window.limpiarColaSincronizacion();
+      alert('Cola de sincronización vaciada correctamente.');
+    }
+  }
+};
+
 window.addEventListener('online', () => {
   console.log('[Network] Conexión detectada. Iniciando sincronización...');
   window.isConnectionVerifiedOnline = true;
