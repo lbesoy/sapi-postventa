@@ -195,7 +195,6 @@ function ordenToRow(o) {
     fecha_inicio: o.fechaInicio || null,
     fecha_fin: o.fechaFin || null,
     duracion_minutos: o.duracion || null,
-    notes: notasJSON, // Soporta tanto notes como notas en BD
     notas: notasJSON,
     evidencia_url: o.evidenciaBase64 || null,
     evidencias: o.evidencias || {}
