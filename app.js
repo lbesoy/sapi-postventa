@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.54'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.55'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -15286,13 +15286,13 @@ window.adjuntarXmlFactura = function(uuid) {
     const sb = window.supabaseClient;
     if (sb) {
       sb.from('facturas_analizadas')
-        .select('base64_content, pdf_content')
+        .select('*')
         .eq('id', uuid)
         .then(({ data, error }) => {
           if (error || !data || data.length === 0) {
             // Intento secundario: buscar en facturas_conciliadas
             sb.from('facturas_conciliadas')
-              .select('base64_content, pdf_content')
+              .select('*')
               .eq('id', uuid)
               .then(({ data: dataC, error: errorC }) => {
                 if (errorC || !dataC || dataC.length === 0) {
