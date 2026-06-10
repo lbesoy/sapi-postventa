@@ -486,7 +486,12 @@ function processSyncQueue() {
 }
 
 async function _processSyncQueueInternal() {
-  if (_isProcessingQueue) return;
+  if (_isProcessingQueue) {
+    if (window._isSyncManualForced) {
+      alert('La sincronización ya está en progreso. Por favor, espera un momento...');
+    }
+    return;
+  }
   const sb = window.supabaseClient;
   if (!sb) {
     console.warn('[Sync] SupabaseClient no disponible. Sincronización en espera.');
@@ -981,6 +986,10 @@ async function _processSyncQueueInternal() {
             window.mostrarNotificacion(`Error BD (${item.table}): ${error.message}`, 'error');
           }
 
+          if (window._isSyncManualForced) {
+            alert('Error de Base de Datos al sincronizar ' + item.table + ' (' + item.action + '):\n\n' + error.message + '\n\nCódigo: ' + (error.code || 'N/A') + '\nDetalles: ' + (error.details || 'Ninguno'));
+          }
+
           if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('network') || error.message.includes('timeout') || error.message.includes('connection') || error.message.includes('TypeError: Failed to fetch'))) {
             break; // Error de red temporal, pausar procesamiento
           } else {
@@ -1044,6 +1053,13 @@ async function _processSyncQueueInternal() {
 
     if (successCount > 0) {
       window.dispatchEvent(new Event('supabase_datos_cargados'));
+      if (window._isSyncManualForced) {
+        alert('¡Sincronización completada con éxito! Se sincronizaron ' + successCount + ' elemento(s) pendiente(s).');
+      }
+    } else {
+      if (window._isSyncManualForced && getSyncQueue().length > 0) {
+        alert('No se pudo subir ningún elemento. Revisa tu conexión a internet o los errores detallados en la consola del navegador.');
+      }
     }
   } finally {
     _isProcessingQueue = false;
@@ -1145,11 +1161,14 @@ function updateSyncStatusUI() {
 }
 
 window.forzarSincronizacionManual = function() {
+  window._isSyncManualForced = true;
   const trySync = () => {
     if (window.mostrarNotificacion) {
       window.mostrarNotificacion('Iniciando sincronización...', 'info');
     }
-    processSyncQueue();
+    processSyncQueue().finally(() => {
+      window._isSyncManualForced = false;
+    });
   };
 
   if (!navigator.onLine && !window.isConnectionVerifiedOnline) {
