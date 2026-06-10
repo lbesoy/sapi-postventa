@@ -1185,34 +1185,86 @@ window.limpiarColaSincronizacion = function() {
   return 'Cola de sincronización vaciada con éxito.';
 };
 
+window.cerrarModalSyncDetalles = function() {
+  const modal = document.getElementById('modal-sync-detalles');
+  if (modal) modal.style.display = 'none';
+};
+
+window.ejecutarForzarSyncDesdeModal = function() {
+  window.cerrarModalSyncDetalles();
+  window.forzarSincronizacionManual();
+};
+
 window.verDetallesSincronizacion = function() {
   const queue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
   if (queue.length === 0) {
-    alert('No hay cambios pendientes de sincronizar.');
+    if (window.mostrarNotificacion) {
+      window.mostrarNotificacion('No hay cambios pendientes de sincronizar.', 'info');
+    } else {
+      alert('No hay cambios pendientes de sincronizar.');
+    }
     return;
   }
   
-  let msg = `Tienes ${queue.length} cambio(s) pendiente(s) de sincronizar:\n\n`;
-  queue.forEach((item, idx) => {
-    let desc = 'Sin descripción';
-    if (item.data) {
-      desc = item.data.descripcion || item.data.concepto || item.data.cliente || item.data.id || 'Sin descripción';
-    }
-    msg += `${idx + 1}. Tabla: ${item.table} | Acción: ${item.action} | Detalle: ${desc}\n`;
-  });
-  msg += `\n¿Deseas intentar forzar la sincronización ahora? (Presiona ACEPTAR)\n`;
-  msg += `Si deseas borrar/limpiar estos cambios atascados de la cola local, presiona CANCELAR.`;
-  
-  const ok = confirm(msg);
-  if (ok) {
-    window.forzarSincronizacionManual();
-  } else {
-    const limpiar = confirm('¿Deseas BORRAR/LIMPIAR la cola de cambios pendientes? (Esto evitará que sigan intentando sincronizarse, pero los datos seguirán guardados en tu dispositivo)');
-    if (limpiar) {
-      window.limpiarColaSincronizacion();
-      alert('Cola de sincronización vaciada correctamente.');
-    }
+  const listaEl = document.getElementById('sync-detalles-lista');
+  if (listaEl) {
+    listaEl.innerHTML = '';
+    queue.forEach(item => {
+      let desc = 'Sin descripción';
+      if (item.data) {
+        desc = item.data.descripcion || item.data.concepto || item.data.cliente || item.data.id || 'Sin descripción';
+      }
+      
+      const itemEl = document.createElement('div');
+      itemEl.style.display = 'flex';
+      itemEl.style.flexDirection = 'column';
+      itemEl.style.gap = '0.25rem';
+      itemEl.style.borderBottom = '1px solid var(--border)';
+      itemEl.style.paddingBottom = '0.5rem';
+      itemEl.style.marginBottom = '0.5rem';
+      
+      const headerEl = document.createElement('div');
+      headerEl.style.display = 'flex';
+      headerEl.style.alignItems = 'center';
+      headerEl.style.gap = '0.5rem';
+      headerEl.style.fontSize = '0.7rem';
+      headerEl.style.fontWeight = '700';
+      
+      const tableBadge = document.createElement('span');
+      tableBadge.textContent = item.table;
+      tableBadge.style.background = 'rgba(232, 130, 12, 0.15)';
+      tableBadge.style.color = 'var(--accent, #e8820c)';
+      tableBadge.style.padding = '0.15rem 0.4rem';
+      tableBadge.style.borderRadius = '4px';
+      tableBadge.style.textTransform = 'uppercase';
+      
+      const actionBadge = document.createElement('span');
+      actionBadge.textContent = item.action;
+      actionBadge.style.background = 'var(--bg-hover, #f3f4f6)';
+      actionBadge.style.color = 'var(--text-secondary, #4b5563)';
+      actionBadge.style.padding = '0.15rem 0.4rem';
+      actionBadge.style.borderRadius = '4px';
+      actionBadge.style.textTransform = 'uppercase';
+      actionBadge.style.border = '1px solid var(--border)';
+      
+      headerEl.appendChild(tableBadge);
+      headerEl.appendChild(actionBadge);
+      
+      const bodyEl = document.createElement('div');
+      bodyEl.textContent = desc;
+      bodyEl.style.fontSize = '0.85rem';
+      bodyEl.style.fontWeight = '500';
+      bodyEl.style.color = 'var(--text-primary)';
+      bodyEl.style.wordBreak = 'break-word';
+      
+      itemEl.appendChild(headerEl);
+      itemEl.appendChild(bodyEl);
+      listaEl.appendChild(itemEl);
+    });
   }
+  
+  const modal = document.getElementById('modal-sync-detalles');
+  if (modal) modal.style.display = 'flex';
 };
 
 window.addEventListener('online', () => {
