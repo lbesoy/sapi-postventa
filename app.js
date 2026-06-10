@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.65'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.66'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -1230,7 +1230,7 @@ function getFilteredTickets() {
 
 function isTestGasto(g) {
   if (!g) return false;
-  if (g.isTest === true || g.id === 'gasto_seed_1') return true;
+  if (g.esPrueba === true || g.isTest === true || g.id === 'gasto_seed_1') return true;
   if (g.claraTxId && g.claraTxId.startsWith('tx_clara_')) return true;
   return false;
 }
