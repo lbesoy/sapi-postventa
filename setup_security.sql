@@ -124,3 +124,31 @@ CREATE TRIGGER on_auth_user_created
 CREATE POLICY "Allow select on user_roles to authenticated" ON public.user_roles FOR SELECT TO authenticated USING (
   true
 );
+
+-- ========================================================
+-- 6. Políticas de RLS para Tablas de Gastos, Calendario, Clara y Facturas
+-- ========================================================
+
+-- Habilitar RLS
+ALTER TABLE public.gastos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.calendario_eventos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.clara_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.clara_cards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.facturas_analizadas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.facturas_conciliadas ENABLE ROW LEVEL SECURITY;
+
+-- Limpiar políticas previas para evitar conflictos de duplicación
+DROP POLICY IF EXISTS "Permitir todo a autenticados" ON public.gastos;
+DROP POLICY IF EXISTS "Permitir todo a autenticados" ON public.calendario_eventos;
+DROP POLICY IF EXISTS "Permitir todo a autenticados" ON public.clara_transactions;
+DROP POLICY IF EXISTS "Permitir todo a autenticados" ON public.clara_cards;
+DROP POLICY IF EXISTS "Permitir todo a autenticados" ON public.facturas_analizadas;
+DROP POLICY IF EXISTS "Permitir todo a autenticados" ON public.facturas_conciliadas;
+
+-- Crear políticas universales para usuarios autenticados
+CREATE POLICY "Permitir todo a autenticados" ON public.gastos FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir todo a autenticados" ON public.calendario_eventos FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir todo a autenticados" ON public.clara_transactions FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir todo a autenticados" ON public.clara_cards FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir todo a autenticados" ON public.facturas_analizadas FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir todo a autenticados" ON public.facturas_conciliadas FOR ALL TO authenticated USING (true) WITH CHECK (true);
