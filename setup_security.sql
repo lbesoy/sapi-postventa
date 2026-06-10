@@ -136,6 +136,7 @@ ALTER TABLE public.clara_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clara_cards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.facturas_analizadas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.facturas_conciliadas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.auditoria_logs ENABLE ROW LEVEL SECURITY;
 
 -- Limpiar políticas previas para evitar conflictos de duplicación
 DROP POLICY IF EXISTS "Permitir todo a autenticados" ON public.gastos;
@@ -144,6 +145,7 @@ DROP POLICY IF EXISTS "Permitir todo a autenticados" ON public.clara_transaction
 DROP POLICY IF EXISTS "Permitir todo a autenticados" ON public.clara_cards;
 DROP POLICY IF EXISTS "Permitir todo a autenticados" ON public.facturas_analizadas;
 DROP POLICY IF EXISTS "Permitir todo a autenticados" ON public.facturas_conciliadas;
+DROP POLICY IF EXISTS "Permitir todo a autenticados" ON public.auditoria_logs;
 
 -- Crear políticas universales para usuarios autenticados
 CREATE POLICY "Permitir todo a autenticados" ON public.gastos FOR ALL TO authenticated USING (true) WITH CHECK (true);
@@ -152,6 +154,7 @@ CREATE POLICY "Permitir todo a autenticados" ON public.clara_transactions FOR AL
 CREATE POLICY "Permitir todo a autenticados" ON public.clara_cards FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir todo a autenticados" ON public.facturas_analizadas FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir todo a autenticados" ON public.facturas_conciliadas FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir todo a autenticados" ON public.auditoria_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- ========================================================
 -- 7. Configuración de Storage Bucket (evidencias)

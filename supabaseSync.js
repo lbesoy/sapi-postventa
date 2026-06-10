@@ -617,14 +617,21 @@ async function _processSyncQueueInternal() {
             try {
               // Comprobar si ya existe una orden con este ID en Supabase
               const { data: existingOrd } = await sb.from('ordenes')
-                .select('id, cliente, soporte')
+                .select('id, cliente, notas')
                 .eq('id', finalId)
                 .maybeSingle();
                 
               if (existingOrd) {
+                let existingSoporte = null;
+                if (existingOrd.notas) {
+                  try {
+                    const parsed = JSON.parse(existingOrd.notas);
+                    existingSoporte = parsed.soporte || null;
+                  } catch (e) {}
+                }
                 // Si pertenece a otro cliente o soporte, es una colisión de folios offline
                 const esColision = existingOrd.cliente !== item.data.cliente || 
-                                   existingOrd.soporte !== item.data.soporte;
+                                   existingSoporte !== item.data.soporte;
                                    
                 if (esColision) {
                   console.log(`[Sync] Colisión de folio detectada para ${finalId}. Calculando nuevo folio...`);
@@ -1002,7 +1009,17 @@ async function _processSyncQueueInternal() {
                   timestamp: Date.now()
                 }
               };
-              await sb.from('auditoria_logs').insert(logPayload);
+              // Solo intentar insertar si tenemos una sesión autenticada activa en Supabase (evita 403 Forbidden)
+              let hasSession = false;
+              if (typeof sb.auth.getSession === 'function') {
+                const sessionRes = await sb.auth.getSession().catch(() => null);
+                if (sessionRes && sessionRes.data && sessionRes.data.session) {
+                  hasSession = true;
+                }
+              }
+              if (hasSession) {
+                await sb.from('auditoria_logs').insert(logPayload);
+              }
             } catch(logErr) {
               console.warn('[Sync] Error al escribir log de auditoria:', logErr.message);
             }
@@ -2072,6 +2089,24 @@ function setupRealtime() {
 
 // ─── Arrancar cuando el DOM esté listo ───────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  // Limpiar cualquier elemento de prueba en la cola de sincronización para evitar fallos
+  try {
+    const queue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+    const filtered = queue.filter(item => {
+      if (item && item.data) {
+        const isTest = item.data.isTest || item.data.esPrueba || item.data.id === 'gasto_seed_1';
+        if (isTest) return false;
+      }
+      return true;
+    });
+    if (filtered.length !== queue.length) {
+      localStorage.setItem('sapi_sync_queue', JSON.stringify(filtered));
+      console.log(`[Sync] Limpiados ${queue.length - filtered.length} elementos de prueba de la cola offline.`);
+    }
+  } catch (e) {
+    console.warn('[Sync] Error al limpiar cola de pruebas:', e);
+  }
+
   setTimeout(() => {
     migrarDatosASupabase();
     setupRealtime();
@@ -2083,6 +2118,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // Convert base64 data URL to Blob for binary storage upload
 window.base64ToBlob = async function(base64Data) {
   try {
+    if (!base64Data || typeof base64Data !== 'string' || !base64Data.startsWith('data:') || base64Data.includes('mockevidence') || base64Data.length < 30) {
+      console.warn('[Storage] Skipping conversion: invalid or mock base64 data URL.');
+      return null;
+    }
     const res = await fetch(base64Data);
     return await res.blob();
   } catch (err) {

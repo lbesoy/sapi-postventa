@@ -235,7 +235,8 @@ if (gastos.length === 0 || !gastos.some(g => g.claraTxId === 'tx_clara_3')) {
     uuid: '4a2b9c7d-8e3f-4a0c-9b8d-7e6f5a4b3c2d',
     estado: 'Aprobado',
     comentario: '',
-    isTest: true
+    isTest: true,
+    _synced: true
   });
   localStorage.setItem('sapi_gastos', JSON.stringify(gastos));
 }
@@ -367,6 +368,10 @@ window.reintentarSincronizacionGastosLocales = function() {
   let encolados = 0;
   localGastos.forEach(g => {
     if (g && g._synced !== true) {
+      // Evitar reintentar sincronizar gastos de prueba/mock
+      if (g.esPrueba === true || g.isTest === true || g.id === 'gasto_seed_1') {
+        return;
+      }
       console.log('[Sync] Re-sincronizando gasto local:', g.id);
       if (window.pushToSupabase) {
         window.pushToSupabase('gastos', g);
@@ -16175,41 +16180,108 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
     }
 
     // Load satData directly from cloud if available, otherwise fallback to on-the-fly extraction
-    if (g.satData) {
-      window._gastoSatData = g.satData;
-      const accordion = document.getElementById('gasto-sat-details-accordion');
-      if (accordion) {
+    const accordion = document.getElementById('gasto-sat-details-accordion');
+    if (accordion) {
+      const renderFromMatched = (matched) => {
+        const satData = {
+          versionCfdi: matched.version_cfdi || matched.versionCfdi || '4.0',
+          uuid: matched.uuid,
+          estatus: matched.estatus,
+          fechaCancelacion: matched.fecha_cancelacion || matched.fechaCancelacion || 'N/A',
+          tipoComprobante: matched.tipo_comprobante || matched.tipoComprobante || 'I - Ingreso',
+          fechaEmision: matched.fecha_emision || matched.fechaEmision,
+          anoEmision: matched.ano_emision || matched.anoEmision,
+          mesEmision: matched.mes_emision || matched.mesMesEmision || matched.mesEmision,
+          diaEmision: matched.dia_emision || matched.diaEmision,
+          fechaTimbrado: matched.fecha_timbrado || matched.fechaTimbrado,
+          serie: matched.serie,
+          folio: matched.folio,
+          formaPago: matched.forma_pago || matched.formaPago,
+          metodoPago: matched.metodo_pago || matched.metodoPago,
+          condicionesPago: matched.condiciones_pago || matched.condicionesPago || 'N/A',
+          rfcEmisor: matched.rfc_emisor || matched.rfcEmisor,
+          nombreEmisor: matched.nombre_emisor || matched.nombreEmisor,
+          rfcReceptor: matched.rfc_receptor || matched.rfcReceptor,
+          nombreReceptor: matched.nombre_receptor || matched.nombreReceptor,
+          moneda: matched.moneda,
+          tipoCambio: matched.tipo_cambio || matched.tipoCambio,
+          subtotal: parseFloat(matched.subtotal) || 0,
+          descuento: parseFloat(matched.descuento) || 0,
+          total: parseFloat(matched.total) || 0,
+          isrRetenido: parseFloat(matched.isr_retenido || matched.isrRetenido) || 0,
+          ivaRetenido: parseFloat(matched.iva_retenido || matched.ivaRetenido) || 0,
+          ivaTrasladado: parseFloat(matched.iva_trasladado || matched.ivaTrasladado) || 0
+        };
+        window._gastoSatData = satData;
+        window.renderSatDetailsTable(satData, 'gasto-sat-accordion-body');
+      };
+
+      // Si tenemos datos satData válidos en memoria local, los renderizamos
+      if (g.satData && g.satData.uuid && g.satData.total > 0) {
+        window._gastoSatData = g.satData;
         accordion.style.display = 'block';
         window.renderSatDetailsTable(g.satData, 'gasto-sat-accordion-body');
-      }
-    } else if (g.xmlFactura) {
-      try {
-        const xmlText = window.decodificarXmlBase64(g.xmlFactura);
-        const satData = window.extraerDatosCompletosXml(xmlText);
-        window._gastoSatData = satData;
-        const accordion = document.getElementById('gasto-sat-details-accordion');
-        if (accordion) {
-          accordion.style.display = 'block';
-          window.renderSatDetailsTable(satData, 'gasto-sat-accordion-body');
-        }
-      } catch (err) {
-        console.error('Error parsing existing XML in abrirModalGasto:', err);
-      }
-    } else if (g.pdfFactura) {
-      const accordion = document.getElementById('gasto-sat-details-accordion');
-      if (accordion) {
+      } else {
         accordion.style.display = 'block';
-        document.getElementById('gasto-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--text-muted);">Cargando datos del PDF...</div>';
-        window.extraerTextoPdf(g.pdfFactura)
-          .then(text => {
-            const satData = window.analizarFacturaPdfTexto(text);
-            window._gastoSatData = satData;
-            window.renderSatDetailsTable(satData, 'gasto-sat-accordion-body');
-          })
-          .catch(err => {
-            console.error('Error parsing existing PDF in abrirModalGasto:', err);
-            document.getElementById('gasto-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--red);">No se pudo parsear el PDF.</div>';
-          });
+        document.getElementById('gasto-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--text-muted);">Cargando datos fiscales...</div>';
+        
+        const loadDataCascade = async () => {
+          try {
+            const sb = window.supabaseClient;
+            
+            // 1. Intentar buscar por UUID fiscal en las tablas de facturas ya analizadas
+            if (g.uuidFiscal && sb) {
+              const { data: listA, error: errA } = await sb.from('facturas_analizadas').select('*').eq('uuid', g.uuidFiscal);
+              if (!errA && listA && listA.length > 0) {
+                renderFromMatched(listA[0]);
+                return;
+              }
+              const { data: listC, error: errC } = await sb.from('facturas_conciliadas').select('*').eq('uuid', g.uuidFiscal);
+              if (!errC && listC && listC.length > 0) {
+                renderFromMatched(listC[0]);
+                return;
+              }
+            }
+
+            // 2. Intentar parsear sobre la marcha desde el archivo XML
+            if (g.xmlFactura) {
+              const xmlText = await window.getXmlTextFromUrlOrBase64(g.xmlFactura);
+              if (xmlText) {
+                const satData = window.extraerDatosCompletosXml(xmlText);
+                if (satData && satData.total > 0) {
+                  window._gastoSatData = satData;
+                  window.renderSatDetailsTable(satData, 'gasto-sat-accordion-body');
+                  return;
+                }
+              }
+            }
+
+            // 3. Intentar parsear sobre la marcha desde el archivo PDF
+            if (g.pdfFactura) {
+              const localBase64 = await window.ensureBase64FromStorageUrl(g.pdfFactura);
+              const text = await window.extraerTextoPdf(localBase64);
+              const satData = window.analizarFacturaPdfTexto(text);
+              if (satData && satData.total > 0) {
+                window._gastoSatData = satData;
+                window.renderSatDetailsTable(satData, 'gasto-sat-accordion-body');
+                return;
+              }
+            }
+
+            // Fallback por defecto si todo falló
+            if (g.satData) {
+              window._gastoSatData = g.satData;
+              window.renderSatDetailsTable(g.satData, 'gasto-sat-accordion-body');
+            } else {
+              document.getElementById('gasto-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--red);">No se pudieron recuperar los datos fiscales.</div>';
+            }
+          } catch (err) {
+            console.error('[Gasto Modal] Error en carga en cascada:', err);
+            document.getElementById('gasto-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--red);">Error al cargar los datos fiscales.</div>';
+          }
+        };
+        
+        loadDataCascade();
       }
     }
 
@@ -16598,34 +16670,101 @@ window.abrirDetalleGasto = function(gastoId) {
 
   const gdAccordion = document.getElementById('gd-sat-details-accordion');
   if (gdAccordion) {
-    if (g.satData) {
+    const renderFromMatched = (matched) => {
+      const satData = {
+        versionCfdi: matched.version_cfdi || matched.versionCfdi || '4.0',
+        uuid: matched.uuid,
+        estatus: matched.estatus,
+        fechaCancelacion: matched.fecha_cancelacion || matched.fechaCancelacion || 'N/A',
+        tipoComprobante: matched.tipo_comprobante || matched.tipoComprobante || 'I - Ingreso',
+        fechaEmision: matched.fecha_emision || matched.fechaEmision,
+        anoEmision: matched.ano_emision || matched.anoEmision,
+        mesEmision: matched.mes_emision || matched.mesMesEmision || matched.mesEmision,
+        diaEmision: matched.dia_emision || matched.diaEmision,
+        fechaTimbrado: matched.fecha_timbrado || matched.fechaTimbrado,
+        serie: matched.serie,
+        folio: matched.folio,
+        formaPago: matched.forma_pago || matched.formaPago,
+        metodoPago: matched.metodo_pago || matched.metodoPago,
+        condicionesPago: matched.condiciones_pago || matched.condicionesPago || 'N/A',
+        rfcEmisor: matched.rfc_emisor || matched.rfcEmisor,
+        nombreEmisor: matched.nombre_emisor || matched.nombreEmisor,
+        rfcReceptor: matched.rfc_receptor || matched.rfcReceptor,
+        nombreReceptor: matched.nombre_receptor || matched.nombreReceptor,
+        moneda: matched.moneda,
+        tipoCambio: matched.tipo_cambio || matched.tipoCambio,
+        subtotal: parseFloat(matched.subtotal) || 0,
+        descuento: parseFloat(matched.descuento) || 0,
+        total: parseFloat(matched.total) || 0,
+        isrRetenido: parseFloat(matched.isr_retenido || matched.isrRetenido) || 0,
+        ivaRetenido: parseFloat(matched.iva_retenido || matched.ivaRetenido) || 0,
+        ivaTrasladado: parseFloat(matched.iva_trasladado || matched.ivaTrasladado) || 0
+      };
+      window.renderSatDetailsTable(satData, 'gd-sat-accordion-body');
+    };
+
+    // Si tenemos datos satData válidos en memoria local, los renderizamos
+    if (g.satData && g.satData.uuid && g.satData.total > 0) {
       gdAccordion.style.display = 'block';
       window.renderSatDetailsTable(g.satData, 'gd-sat-accordion-body');
-    } else if (g.xmlFactura) {
-      gdAccordion.style.display = 'block';
-      try {
-        const xmlText = window.decodificarXmlBase64(g.xmlFactura);
-        const satData = window.extraerDatosCompletosXml(xmlText);
-        window.renderSatDetailsTable(satData, 'gd-sat-accordion-body');
-      } catch (err) {
-        console.error('Error parsing XML in abrirDetalleGasto:', err);
-        document.getElementById('gd-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--red);">Error al analizar XML.</div>';
-      }
-    } else if (g.pdfFactura) {
-      gdAccordion.style.display = 'block';
-      document.getElementById('gd-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--text-muted);">Cargando datos del PDF...</div>';
-      window.extraerTextoPdf(g.pdfFactura)
-        .then(text => {
-          const satData = window.analizarFacturaPdfTexto(text);
-          window.renderSatDetailsTable(satData, 'gd-sat-accordion-body');
-        })
-        .catch(err => {
-          console.error('Error parsing PDF in abrirDetalleGasto:', err);
-          document.getElementById('gd-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--red);">No se pudo parsear el PDF.</div>';
-        });
     } else {
-      gdAccordion.style.display = 'none';
-      document.getElementById('gd-sat-accordion-body').innerHTML = '';
+      gdAccordion.style.display = 'block';
+      document.getElementById('gd-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--text-muted);">Cargando datos fiscales...</div>';
+      
+      const loadDataCascade = async () => {
+        try {
+          const sb = window.supabaseClient;
+          
+          // 1. Intentar buscar por UUID fiscal en las tablas de facturas ya analizadas
+          if (g.uuidFiscal && sb) {
+            const { data: listA, error: errA } = await sb.from('facturas_analizadas').select('*').eq('uuid', g.uuidFiscal);
+            if (!errA && listA && listA.length > 0) {
+              renderFromMatched(listA[0]);
+              return;
+            }
+            const { data: listC, error: errC } = await sb.from('facturas_conciliadas').select('*').eq('uuid', g.uuidFiscal);
+            if (!errC && listC && listC.length > 0) {
+              renderFromMatched(listC[0]);
+              return;
+            }
+          }
+
+          // 2. Intentar parsear sobre la marcha desde el archivo XML
+          if (g.xmlFactura) {
+            const xmlText = await window.getXmlTextFromUrlOrBase64(g.xmlFactura);
+            if (xmlText) {
+              const satData = window.extraerDatosCompletosXml(xmlText);
+              if (satData && satData.total > 0) {
+                window.renderSatDetailsTable(satData, 'gd-sat-accordion-body');
+                return;
+              }
+            }
+          }
+
+          // 3. Intentar parsear sobre la marcha desde el archivo PDF
+          if (g.pdfFactura) {
+            const localBase64 = await window.ensureBase64FromStorageUrl(g.pdfFactura);
+            const text = await window.extraerTextoPdf(localBase64);
+            const satData = window.analizarFacturaPdfTexto(text);
+            if (satData && satData.total > 0) {
+              window.renderSatDetailsTable(satData, 'gd-sat-accordion-body');
+              return;
+            }
+          }
+
+          // Fallback por defecto si todo falló
+          if (g.satData) {
+            window.renderSatDetailsTable(g.satData, 'gd-sat-accordion-body');
+          } else {
+            document.getElementById('gd-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--red);">No se pudieron recuperar los datos fiscales.</div>';
+          }
+        } catch (err) {
+          console.error('[Gasto Detalle] Error en carga en cascada:', err);
+          document.getElementById('gd-sat-accordion-body').innerHTML = '<div style="padding: 10px; color: var(--red);">Error al cargar los datos fiscales.</div>';
+        }
+      };
+      
+      loadDataCascade();
     }
   }
 
@@ -17696,6 +17835,59 @@ window.decodificarXmlBase64 = function(dataUrl) {
   }
 };
 
+window.ensureBase64FromStorageUrl = async function(urlOrBase64) {
+  if (!urlOrBase64) return '';
+  if (!urlOrBase64.startsWith('http') || !urlOrBase64.includes('/storage/v1/object/public/')) {
+    return urlOrBase64;
+  }
+  try {
+    const parts = urlOrBase64.split('/storage/v1/object/public/');
+    if (parts.length === 2) {
+      const pathParts = parts[1].split('/');
+      const bucketName = pathParts[0];
+      const filePath = pathParts.slice(1).join('/');
+      if (window.supabaseClient) {
+        const { data, error } = await window.supabaseClient.storage.from(bucketName).download(filePath);
+        if (!error && data) {
+          return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(data);
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Storage Helper] Error fetching/converting url to base64:', err);
+  }
+  return urlOrBase64;
+};
+
+window.getXmlTextFromUrlOrBase64 = async function(urlOrBase64) {
+  if (!urlOrBase64) return '';
+  if (urlOrBase64.startsWith('http') && urlOrBase64.includes('/storage/v1/object/public/')) {
+    try {
+      const parts = urlOrBase64.split('/storage/v1/object/public/');
+      if (parts.length === 2) {
+        const pathParts = parts[1].split('/');
+        const bucketName = pathParts[0];
+        const filePath = pathParts.slice(1).join('/');
+        if (window.supabaseClient) {
+          const { data, error } = await window.supabaseClient.storage.from(bucketName).download(filePath);
+          if (!error && data) {
+            return await data.text();
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Storage Helper] Error fetching XML text from URL:', err);
+    }
+    return '';
+  }
+  return window.decodificarXmlBase64(urlOrBase64);
+};
+
 window.extraerDatosCompletosXml = function(xmlText) {
   const data = {
     versionCfdi: '4.0',
@@ -18393,7 +18585,7 @@ window.procesarPdfFacturaExtraida = function(name, base64Data) {
 // ── VISOR DE PDF Y FICHA SAT 26 CAMPOS ────────────────────────────────────
 // =========================================================================
 
-window.visualizarPdfBase64 = function(base64, name) {
+window.visualizarPdfBase64 = async function(base64, name) {
   if (!base64) return;
 
   // Track telemetry PDF visor open
@@ -18411,8 +18603,11 @@ window.visualizarPdfBase64 = function(base64, name) {
   if (!modal) return;
 
   title.textContent = name || 'Visor de PDF';
-  frame.src = base64;
-  downloadLink.href = base64;
+
+  const localBase64 = await window.ensureBase64FromStorageUrl(base64);
+
+  frame.src = localBase64;
+  downloadLink.href = localBase64;
   downloadLink.download = name || 'documento.pdf';
   
   modal.style.display = 'flex';
@@ -18428,72 +18623,99 @@ window.visualizarPdfBase64 = function(base64, name) {
   `;
   if (window.lucide) lucide.createIcons();
 
-  window.extraerFacturaSatNube('pdf', base64)
+  window.extraerFacturaSatNube('pdf', localBase64)
     .then(satData => {
       window.renderSatDetailsTable(satData, 'pdf-visor-sat-body');
     })
     .catch(err => {
       const baseName = (name || '').substring(0, (name || '').lastIndexOf('.'));
+      const cleanBaseName = baseName.replace(/^(factura|Factura)_/, '');
+      const uuidMatch = (name || '').match(/\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/i);
+      const uuid = uuidMatch ? uuidMatch[1] : null;
       const sb = window.supabaseClient;
-      if (sb && baseName && baseName !== 'factura') {
-        const mostrarMatchedSatData = (matched) => {
-          const satData = {
-            versionCfdi: matched.version_cfdi,
-            uuid: matched.uuid,
-            estatus: matched.estatus,
-            fechaCancelacion: matched.fecha_cancelacion,
-            tipoComprobante: matched.tipo_comprobante,
-            fechaEmision: matched.fecha_emision,
-            anoEmision: matched.ano_emision,
-            mesEmision: matched.mes_emision,
-            diaEmision: matched.dia_emision,
-            fechaTimbrado: matched.fecha_timbrado,
-            serie: matched.serie,
-            folio: matched.folio,
-            formaPago: matched.forma_pago,
-            metodoPago: matched.metodo_pago,
-            condicionesPago: matched.condiciones_pago,
-            rfcEmisor: matched.rfc_emisor,
-            nombreEmisor: matched.nombre_emisor,
-            rfcReceptor: matched.rfc_receptor,
-            nombreReceptor: matched.nombre_receptor,
-            moneda: matched.moneda,
-            tipoCambio: matched.tipo_cambio,
-            subtotal: parseFloat(matched.subtotal) || 0,
-            descuento: parseFloat(matched.descuento) || 0,
-            total: parseFloat(matched.total) || 0,
-            isrRetenido: parseFloat(matched.isr_retenido) || 0,
-            ivaRetenido: parseFloat(matched.iva_retenido) || 0,
-            ivaTrasladado: parseFloat(matched.iva_trasladado) || 0
-          };
-          window.renderSatDetailsTable(satData, 'pdf-visor-sat-body');
+
+      if (sb) {
+        // Ejecutar búsqueda en cascada por UUID o nombre de archivo
+        const buscarDatosSat = async () => {
+          // 1. Intentar por UUID en facturas_analizadas
+          if (uuid) {
+            const { data, error } = await sb.from('facturas_analizadas').select('*').eq('uuid', uuid);
+            if (!error && data && data.length > 0) {
+              const matched = data.find(x => x.uuid || x.rfc_emisor);
+              if (matched) return matched;
+            }
+          }
+
+          // 2. Intentar por UUID en facturas_conciliadas
+          if (uuid) {
+            const { data, error } = await sb.from('facturas_conciliadas').select('*').eq('uuid', uuid);
+            if (!error && data && data.length > 0) {
+              const matched = data.find(x => x.uuid || x.rfc_emisor);
+              if (matched) return matched;
+            }
+          }
+
+          // 3. Intentar por nombre de archivo aproximado en facturas_analizadas
+          {
+            const { data, error } = await sb.from('facturas_analizadas')
+              .select('*')
+              .or(`file_name.ilike.%${cleanBaseName}%,file_name.ilike.%${baseName}%`);
+            if (!error && data && data.length > 0) {
+              const matched = data.find(x => x.uuid || x.rfc_emisor);
+              if (matched) return matched;
+            }
+          }
+
+          // 4. Intentar por nombre de archivo aproximado en facturas_conciliadas
+          {
+            const { data, error } = await sb.from('facturas_conciliadas')
+              .select('*')
+              .or(`file_name.ilike.%${cleanBaseName}%,file_name.ilike.%${baseName}%`);
+            if (!error && data && data.length > 0) {
+              const matched = data.find(x => x.uuid || x.rfc_emisor);
+              if (matched) return matched;
+            }
+          }
+
+          return null;
         };
 
-        sb.from('facturas_analizadas')
-          .select('*')
-          .like('file_name', baseName + '%')
-          .then(({ data: list, error }) => {
-            if (!error && list && list.length > 0) {
-              const matched = list.find(x => x.uuid || x.rfc_emisor);
-              if (matched) {
-                mostrarMatchedSatData(matched);
-                return;
-              }
+        buscarDatosSat()
+          .then(matched => {
+            if (matched) {
+              const satData = {
+                versionCfdi: matched.version_cfdi,
+                uuid: matched.uuid,
+                estatus: matched.estatus,
+                fechaCancelacion: matched.fecha_cancelacion,
+                tipoComprobante: matched.tipo_comprobante,
+                fechaEmision: matched.fecha_emision,
+                anoEmision: matched.ano_emision,
+                mesEmision: matched.mes_emision,
+                diaEmision: matched.dia_emision,
+                fechaTimbrado: matched.fecha_timbrado,
+                serie: matched.serie,
+                folio: matched.folio,
+                formaPago: matched.forma_pago,
+                metodoPago: matched.metodo_pago,
+                condicionesPago: matched.condiciones_pago,
+                rfcEmisor: matched.rfc_emisor,
+                nombreEmisor: matched.nombre_emisor,
+                rfcReceptor: matched.rfc_receptor,
+                nombreReceptor: matched.nombre_receptor,
+                moneda: matched.moneda,
+                tipoCambio: matched.tipo_cambio,
+                subtotal: parseFloat(matched.subtotal) || 0,
+                descuento: parseFloat(matched.descuento) || 0,
+                total: parseFloat(matched.total) || 0,
+                isrRetenido: parseFloat(matched.isr_retenido) || 0,
+                ivaRetenido: parseFloat(matched.iva_retenido) || 0,
+                ivaTrasladado: parseFloat(matched.iva_trasladado) || 0
+              };
+              window.renderSatDetailsTable(satData, 'pdf-visor-sat-body');
+            } else {
+              mostrarFalloSat();
             }
-            sb.from('facturas_conciliadas')
-              .select('*')
-              .like('file_name', baseName + '%')
-              .then(({ data: listC, error: errorC }) => {
-                if (!errorC && listC && listC.length > 0) {
-                  const matchedC = listC.find(x => x.uuid || x.rfc_emisor);
-                  if (matchedC) {
-                    mostrarMatchedSatData(matchedC);
-                    return;
-                  }
-                }
-                mostrarFalloSat();
-              })
-              .catch(() => mostrarFalloSat());
           })
           .catch(() => mostrarFalloSat());
       } else {
