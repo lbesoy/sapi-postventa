@@ -1060,6 +1060,9 @@ function updateSyncStatusUI() {
   const badgeEl = document.getElementById('sync-pending-badge');
   const queue = getSyncQueue();
   const pendingCount = queue.length;
+  if (pendingCount > 0) {
+    console.log('[Sync] Cola de sincronización pendiente:', queue);
+  }
 
   container.classList.remove('status-online', 'status-syncing', 'status-offline');
 
@@ -1173,6 +1176,13 @@ window.forzarSincronizacionManual = function() {
   } else {
     trySync();
   }
+};
+
+window.limpiarColaSincronizacion = function() {
+  localStorage.setItem('sapi_sync_queue', '[]');
+  if (typeof updateSyncStatusUI === 'function') updateSyncStatusUI();
+  console.log('[Sync] Cola de sincronización limpiada manualmente.');
+  return 'Cola de sincronización vaciada con éxito.';
 };
 
 window.addEventListener('online', () => {
