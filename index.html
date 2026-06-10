@@ -257,7 +257,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version">v1.3.44</div>
+          <div class="sidebar-version">v1.3.45</div>
         </div>
       </div>
     </aside>
@@ -892,13 +892,13 @@
                 <thead>
                   <tr style="border-bottom:1px solid var(--border); background:var(--bg-hover);">
                     <th style="padding:0.75rem 1rem; width:40px; vertical-align:middle;"><input type="checkbox" style="cursor:pointer;" /></th>
-                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Movimiento</th>
-                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:right; vertical-align:middle;">Monto</th>
-                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Fecha</th>
-                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Usuario</th>
-                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Tarjeta</th>
-                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:center; vertical-align:middle;">Evidencia</th>
-                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:center; vertical-align:middle;">Revisión de gastos</th>
+                    <th onclick="window.sortClaraTable('movimiento')" style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle; cursor:pointer; user-select:none; transition:var(--transition);" id="th-clara-movimiento" onmouseover="this.style.background='rgba(168,85,247,0.05)';" onmouseout="this.style.background='none';">Movimiento <span class="sort-icon"></span></th>
+                    <th onclick="window.sortClaraTable('monto')" style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:right; vertical-align:middle; cursor:pointer; user-select:none; transition:var(--transition);" id="th-clara-monto" onmouseover="this.style.background='rgba(168,85,247,0.05)';" onmouseout="this.style.background='none';">Monto <span class="sort-icon"></span></th>
+                    <th onclick="window.sortClaraTable('fecha')" style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle; cursor:pointer; user-select:none; transition:var(--transition);" id="th-clara-fecha" onmouseover="this.style.background='rgba(168,85,247,0.05)';" onmouseout="this.style.background='none';">Fecha <span class="sort-icon"></span></th>
+                    <th onclick="window.sortClaraTable('usuario')" style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle; cursor:pointer; user-select:none; transition:var(--transition);" id="th-clara-usuario" onmouseover="this.style.background='rgba(168,85,247,0.05)';" onmouseout="this.style.background='none';">Usuario <span class="sort-icon"></span></th>
+                    <th onclick="window.sortClaraTable('tarjeta')" style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle; cursor:pointer; user-select:none; transition:var(--transition);" id="th-clara-tarjeta" onmouseover="this.style.background='rgba(168,85,247,0.05)';" onmouseout="this.style.background='none';">Tarjeta <span class="sort-icon"></span></th>
+                    <th onclick="window.sortClaraTable('evidencia')" style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:center; vertical-align:middle; cursor:pointer; user-select:none; transition:var(--transition);" id="th-clara-evidencia" onmouseover="this.style.background='rgba(168,85,247,0.05)';" onmouseout="this.style.background='none';">Evidencia <span class="sort-icon"></span></th>
+                    <th onclick="window.sortClaraTable('revision')" style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:center; vertical-align:middle; cursor:pointer; user-select:none; transition:var(--transition);" id="th-clara-revision" onmouseover="this.style.background='rgba(168,85,247,0.05)';" onmouseout="this.style.background='none';">Revisión de gastos <span class="sort-icon"></span></th>
                   </tr>
                 </thead>
                 <tbody id="clara-movimientos-table-body">

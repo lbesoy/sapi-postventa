@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.44'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.45'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -12852,6 +12852,19 @@ window.confirmarImportacionTarjetas = async function() {
   }
 };
 
+window._claraSortColumn = 'fecha';
+window._claraSortOrder = 'desc';
+
+window.sortClaraTable = function(column) {
+  if (window._claraSortColumn === column) {
+    window._claraSortOrder = window._claraSortOrder === 'asc' ? 'desc' : 'asc';
+  } else {
+    window._claraSortColumn = column;
+    window._claraSortOrder = 'asc';
+  }
+  window.renderClaraTxs();
+};
+
 window.renderClaraTxs = function() {
   const container = document.getElementById('clara-movimientos-table-body');
   if (!container) return;
@@ -12918,6 +12931,49 @@ window.renderClaraTxs = function() {
     });
   }
 
+  // Ordenar transacciones si hay columna activa
+  if (window._claraSortColumn) {
+    const col = window._claraSortColumn;
+    const order = window._claraSortOrder === 'asc' ? 1 : -1;
+    
+    filteredTxs.sort((a, b) => {
+      let valA, valB;
+      
+      if (col === 'movimiento') {
+        valA = String(a.merchant || '').toLowerCase();
+        valB = String(b.merchant || '').toLowerCase();
+      } else if (col === 'monto') {
+        valA = parseFloat(a.monto) || 0;
+        valB = parseFloat(b.monto) || 0;
+      } else if (col === 'fecha') {
+        valA = a.fecha ? new Date(a.fecha).getTime() : 0;
+        valB = b.fecha ? new Date(b.fecha).getTime() : 0;
+      } else if (col === 'usuario') {
+        valA = String(a.usuario || '').toLowerCase();
+        valB = String(b.usuario || '').toLowerCase();
+      } else if (col === 'tarjeta') {
+        valA = String(a.tarjeta || '').toLowerCase();
+        valB = String(b.tarjeta || '').toLowerCase();
+      } else if (col === 'evidencia') {
+        const gA = getFilteredGastos().find(x => x.claraTxId === a.id && x.estado !== 'Rechazado');
+        const gB = getFilteredGastos().find(x => x.claraTxId === b.id && x.estado !== 'Rechazado');
+        valA = gA && (gA.evidencia || gA.comprobantePdf) ? 1 : 0;
+        valB = gB && (gB.evidencia || gB.comprobantePdf) ? 1 : 0;
+      } else if (col === 'revision') {
+        const gA = getFilteredGastos().find(x => x.claraTxId === a.id && x.estado !== 'Rechazado');
+        const gB = getFilteredGastos().find(x => x.claraTxId === b.id && x.estado !== 'Rechazado');
+        let statusA = gA ? (gA.estado === 'Aprobado' ? 2 : 1) : 0;
+        let statusB = gB ? (gB.estado === 'Aprobado' ? 2 : 1) : 0;
+        valA = statusA;
+        valB = statusB;
+      }
+      
+      if (valA < valB) return -order;
+      if (valA > valB) return order;
+      return 0;
+    });
+  }
+
   // CALCULO DE KPIs GLOBALES (de acuerdo con el diseño de Clara en la foto)
   let gastoTotal = 0;
   let realizados = getFilteredClaraTxs().length;
@@ -12954,6 +13010,24 @@ window.renderClaraTxs = function() {
   if (elSinEvidencia) elSinEvidencia.textContent = sinEvidencia;
 
   container.innerHTML = '';
+
+  // Actualizar indicadores visuales de ordenamiento en las cabeceras de tabla
+  const cols = ['movimiento', 'monto', 'fecha', 'usuario', 'tarjeta', 'evidencia', 'revision'];
+  cols.forEach(col => {
+    const th = document.getElementById(`th-clara-${col}`);
+    if (th) {
+      const span = th.querySelector('.sort-icon');
+      if (span) {
+        if (window._claraSortColumn === col) {
+          span.innerHTML = window._claraSortOrder === 'asc' ? ' &uarr;' : ' &darr;';
+          th.style.color = 'var(--accent)';
+        } else {
+          span.innerHTML = '';
+          th.style.color = 'var(--text-secondary)';
+        }
+      }
+    }
+  });
 
   // RELLENAR CONTENEDOR OCULTO PARA COMPATIBILIDAD CON TESTS AUTOMATIZADOS (JSDOM)
   const testContainer = document.getElementById('clara-txs-list');
