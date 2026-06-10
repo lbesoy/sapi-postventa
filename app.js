@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.64'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.65'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -259,6 +259,107 @@ if (claraMockTxs.length < 6 || !localStorage.getItem('sapi_clara_mock_txs')) {
   localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(claraMockTxs));
 }
 
+// Función para migrar y reparar la maquinaria de órdenes existentes
+window.migrarOrdenesExistentesMaquinaria = function() {
+  console.log('[App] Ejecutando migración de maquinaria en órdenes existentes...');
+  let modificados = 0;
+  
+  const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+
+  ordenes.forEach(o => {
+    if (!o.soporte) return;
+    if (o.maquinaria_id && o.modelo && o.serie && o.marca && o.eco && o.equipo) return;
+    
+    const t = tickets.find(x => x.id === o.soporte);
+    if (!t || !t.equipo) return;
+    
+    const prevModelo = o.modelo;
+    const prevSerie = o.serie;
+    const prevMarca = o.marca;
+    const prevEco = o.eco;
+    const prevMaqId = o.maquinaria_id;
+    const prevEquipo = o.equipo;
+
+    const matchMaquina = (m) => {
+      const cleanId = m.idInterno || m.id || '';
+      const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+      const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+      const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+      const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+      
+      return (
+        t.equipo === mName ||
+        t.equipo === cleanId ||
+        t.equipo === m.serie ||
+        t.equipo.includes(cleanId) ||
+        (m.serie && t.equipo.includes(m.serie))
+      );
+    };
+
+    let maq = null;
+    clientesDb.forEach(c => {
+      if (c.maquinas) {
+        const found = c.maquinas.find(matchMaquina);
+        if (found) maq = found;
+      }
+    });
+    if (!maq) maq = maquinariaDb.find(matchMaquina);
+
+    let modeloStr = o.modelo || '';
+    let serieStr = o.serie || '';
+    let marcaStr = o.marca || '';
+    let ecoStr = o.eco || '';
+    let maquinariaId = o.maquinaria_id || null;
+
+    if (maq) {
+      modeloStr = maq.modelo || modeloStr;
+      serieStr = maq.serie || serieStr;
+      marcaStr = maq.marca || marcaStr;
+      ecoStr = maq.no_economico || ecoStr;
+      maquinariaId = maq.id || maquinariaId;
+    } else {
+      if (t.equipo.includes('(SN: ')) {
+        const parts = t.equipo.split('(SN: ');
+        serieStr = serieStr || parts[1].replace(')', '').trim();
+        let left = parts[0].trim();
+        if (left.startsWith('[') && left.includes(']')) {
+          left = left.substring(left.indexOf(']') + 1).trim();
+        }
+        modeloStr = modeloStr || left;
+      } else {
+        modeloStr = modeloStr || t.equipo;
+      }
+    }
+
+    if (
+      modeloStr !== prevModelo ||
+      serieStr !== prevSerie ||
+      marcaStr !== prevMarca ||
+      ecoStr !== prevEco ||
+      maquinariaId !== prevMaqId ||
+      !o.equipo
+    ) {
+      o.modelo = modeloStr;
+      o.serie = serieStr;
+      o.marca = marcaStr;
+      o.eco = ecoStr;
+      o.maquinaria_id = maquinariaId;
+      o.equipo = t.equipo;
+      
+      modificados++;
+      
+      if (window.pushToSupabase) {
+        window.pushToSupabase('ordenes', o);
+      }
+    }
+  });
+
+  if (modificados > 0) {
+    console.log(`[App] Se migraron y corrigieron ${modificados} órdenes con datos de maquinaria.`);
+    localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  }
+};
+
 // Sincronización con Supabase (escuchar cuando los datos bajen a localStorage)
 window.addEventListener('supabase_datos_cargados', () => {
   console.log('[App] Refrescando configuración, catálogos y re-renderizando UI desde Supabase...');
@@ -277,7 +378,9 @@ window.addEventListener('supabase_datos_cargados', () => {
   configData = safeGetJSON('eurorep_config', {});
   cargarRolesDesdeStorage();
 
-  
+  // Ejecutar migración para rellenar datos de maquinaria perdidos en órdenes previas
+  window.migrarOrdenesExistentesMaquinaria();
+
   // Si estamos en la vista de configuración, actualizar los campos
   if (document.getElementById('view-config')?.classList.contains('active')) {
     if (typeof cargarConfig === 'function') cargarConfig();
