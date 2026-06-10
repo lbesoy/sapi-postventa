@@ -13245,8 +13245,10 @@ window.renderClaraTxs = function() {
 
   let accumulatedRows = '';
   filteredTxs.forEach(tx => {
-    // Buscar si hay gasto vinculado a este cargo
+    // Buscar si hay gasto vinculado a este cargo (activo o rechazado)
     const g = getFilteredGastos().find(x => x.claraTxId === tx.id && x.estado !== 'Rechazado');
+    const rejectedG = getFilteredGastos().find(x => x.claraTxId === tx.id && x.estado === 'Rechazado');
+    const activeG = g || rejectedG;
     const hasEvidencia = g && (g.evidencia || g.comprobantePdf);
 
     // Mapeo de Categoría e Icono circular Clara
@@ -13281,6 +13283,12 @@ window.renderClaraTxs = function() {
     let evidenciaHtml = '';
     if (hasEvidencia) {
       evidenciaHtml = `<i data-lucide="file-check-2" style="color:var(--green); width:18px; height:18px; opacity:0.9;" title="Evidencia cargada"></i>`;
+    } else if (rejectedG) {
+      evidenciaHtml = `
+        <button type="button" onclick="abrirDetalleGasto('${rejectedG.id}')" style="background:none; border:none; color:var(--red); cursor:pointer; padding:4px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; transition:var(--transition);" title="Gasto rechazado. Clic para corregir." onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--red)'">
+          <i data-lucide="plus-circle" style="width:20px; height:20px;"></i>
+        </button>
+      `;
     } else {
       evidenciaHtml = `
         <button type="button" onclick="abrirModalGasto(null, '${tx.id}')" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; transition:var(--transition);" title="Conciliar / Añadir evidencia" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">
@@ -13299,12 +13307,14 @@ window.renderClaraTxs = function() {
       } else {
         estadoHtml = `<span class="badge" style="background:rgba(79,142,247,0.12); color:var(--accent); border-radius:99px; padding:0.25rem 0.65rem; font-size:0.75rem; font-weight:600; text-transform:capitalize;">En revisión</span>`;
       }
+    } else if (rejectedG) {
+      estadoHtml = `<span class="badge" style="background:rgba(239,68,68,0.12); color:var(--red); border-radius:99px; padding:0.25rem 0.65rem; font-size:0.75rem; font-weight:600; text-transform:capitalize; cursor:pointer;" onclick="abrirDetalleGasto('${rejectedG.id}')" title="Motivo: ${rejectedG.comentariosAprobacion || 'Sin comentarios'}. Haz clic para corregir.">Rechazada</span>`;
     } else {
       estadoHtml = `<span class="badge" style="background:rgba(79,142,247,0.12); color:var(--accent); border-radius:99px; padding:0.25rem 0.65rem; font-size:0.75rem; font-weight:600; text-transform:capitalize; cursor:pointer;" onclick="abrirModalGasto(null, '${tx.id}')">En revisión</span>`;
     }
 
     const rowHtml = `
-      <tr style="border-bottom:1px solid var(--border); transition:var(--transition); background:var(--bg-card); cursor:pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='var(--bg-card)'" onclick="if(event.target.tagName !== 'INPUT' && event.target.tagName !== 'BUTTON' && !event.target.closest('button')) ${g ? `abrirDetalleGasto('${g.id}')` : `abrirModalGasto(null, '${tx.id}')`}">
+      <tr style="border-bottom:1px solid var(--border); transition:var(--transition); background:var(--bg-card); cursor:pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='var(--bg-card)'" onclick="if(event.target.tagName !== 'INPUT' && event.target.tagName !== 'BUTTON' && !event.target.closest('button')) ${activeG ? `abrirDetalleGasto('${activeG.id}')` : `abrirModalGasto(null, '${tx.id}')`}">
         <td style="padding:0.75rem 1rem; vertical-align:middle;" onclick="event.stopPropagation();"><input type="checkbox" style="cursor:pointer;" /></td>
         <td style="padding:0.75rem 1rem; vertical-align:middle;">
           <div style="display:flex; align-items:center; gap:0.75rem;">
@@ -14046,6 +14056,10 @@ window.renderGastos = function() {
   const badgeClara = document.getElementById('badge-clara-txs');
   if (badgeClara) {
     badgeClara.textContent = pendingTxsCount;
+  }
+
+  if (typeof window.renderClaraTxs === 'function') {
+    try { window.renderClaraTxs(); } catch(e){}
   }
 
   lucide.createIcons();
