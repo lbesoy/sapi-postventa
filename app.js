@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.45'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.46'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -16227,34 +16227,35 @@ window.actualizarBreadcrumbsOneDrive = function(folderName) {
   const breadcrumbsEl = document.getElementById('onedrive-breadcrumbs');
   if (!breadcrumbsEl) return;
   
-  let html = '';
+  const prefix = `<span style="font-weight:600; color:#605e5c; margin-right:0.25rem;">Carpeta de origen:</span>`;
+  let pathHtml = '';
   
   if (onedriveRealMode) {
     const isAtVirtualRoot = (onedriveCurrentFolder === onedriveRealRootId);
     
     if (isAtVirtualRoot) {
-      html = `<span style="color:#242424; font-weight:600;">${folderName}</span>`;
+      pathHtml = `<span style="color:#242424; font-weight:600;">${folderName}</span>`;
     } else {
       const parentId = onedriveFolderParents[onedriveCurrentFolder];
       if (parentId) {
-        html += `<span style="color:#0078d4; cursor:pointer; font-weight:600; display:flex; align-items:center; gap:0.25rem;" onclick="window.navegarOneDriveReal('${parentId}')">
+        pathHtml += `<span style="color:#0078d4; cursor:pointer; font-weight:600; display:flex; align-items:center; gap:0.25rem;" onclick="window.navegarOneDriveReal('${parentId}')">
           <i data-lucide="chevron-left" style="width:14px; height:14px;"></i> Atrás
         </span>
         <span style="color:#a19f9d; margin:0 0.2rem;">|</span>`;
       }
-      html += `<span style="color:#605e5c;">...</span> <span style="color:#a19f9d; margin:0 0.2rem;">/</span> <span style="color:#242424; font-weight:600;">${folderName}</span>`;
+      pathHtml += `<span style="color:#605e5c;">...</span> <span style="color:#a19f9d; margin:0 0.2rem;">/</span> <span style="color:#242424; font-weight:600;">${folderName}</span>`;
     }
   } else {
     if (onedriveCurrentFolder === '/') {
-      html = `<span style="color:#242424; font-weight:600;">Mis archivos</span>`;
+      pathHtml = `<span style="color:#242424; font-weight:600;">Mis archivos</span>`;
     } else {
-      html = `<span style="color:#0078d4; cursor:pointer; font-weight:600;" onclick="window.navegarOneDriveSimulado('/')">Mis archivos</span>
+      pathHtml = `<span style="color:#0078d4; cursor:pointer; font-weight:600;" onclick="window.navegarOneDriveSimulado('/')">Mis archivos</span>
       <span style="color:#a19f9d; margin:0 0.2rem;">/</span>
       <span style="color:#242424; font-weight:600;">${folderName}</span>`;
     }
   }
   
-  breadcrumbsEl.innerHTML = html;
+  breadcrumbsEl.innerHTML = `${prefix} ${pathHtml}`;
   if (window.lucide) lucide.createIcons();
 };
 
