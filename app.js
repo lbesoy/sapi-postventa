@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.96'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.97'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -1238,8 +1238,17 @@ if (currentSession && currentSession.userId && !currentSession.realUserId) {
     currentSession.realRol = found ? found.rol : currentSession.viewMode;
   }
 }
-window.usuarios = usuarios;
-window.currentSession = currentSession;
+// Sincronizar dinámicamente propiedades del window con variables locales de app.js para evitar que se desfasen
+Object.defineProperty(window, 'usuarios', {
+  get() { return usuarios; },
+  set(val) { usuarios = val; },
+  configurable: true
+});
+Object.defineProperty(window, 'currentSession', {
+  get() { return currentSession; },
+  set(val) { currentSession = val; },
+  configurable: true
+});
 let editandoUserId = null;
 
 // ===== SANDBOX / MODO PRUEBAS =====
