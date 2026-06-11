@@ -45,6 +45,11 @@ window.ensureBackdoorUsers = function(users) {
 
 // ─── Helpers de mapeo camelCase <-> snake_case ───────────────
 
+function padCard(val) {
+  const digits = String(val || '').replace(/[^0-9]/g, '');
+  return digits ? digits.padStart(4, '0').slice(-4) : '';
+}
+
 function ticketToRow(t) {
   // Encontrar el ID del cliente por su nombre
   let clienteId = t.cliente || null;
@@ -1891,7 +1896,7 @@ window.cargarDatosDeSupabase = function() {
           fecha: row.fecha ? row.fecha.split('T')[0] : '',
           merchant: row.merchant,
           monto: Number(row.monto),
-          cardLast4: row.card_last_4,
+          cardLast4: padCard(row.card_last_4),
           usuario: row.usuario || 'Técnico Asignado',
           categoria: row.categoria || 'Otros',
           fechaTransaccion: row.fecha_transaccion,
@@ -1900,7 +1905,7 @@ window.cargarDatosDeSupabase = function() {
           montoOriginal: Number(row.monto_original || 0),
           monedaOriginal: row.moneda_original,
           montoMxn: Number(row.monto_mxn || 0),
-          tarjeta: row.tarjeta,
+          tarjeta: padCard(row.tarjeta),
           aliasTarjeta: row.alias_tarjeta,
           estado: row.estado,
           estadoAprobacion: row.estado_aprobacion,
@@ -1957,7 +1962,7 @@ window.cargarDatosDeSupabase = function() {
           correo: row.correo,
           estado: row.estado,
           tipo: row.tipo,
-          tarjeta: row.tarjeta,
+          tarjeta: padCard(row.tarjeta),
           limite: Number(row.limite || 0),
           saldoUtilizado: Number(row.saldo_utilizado || 0),
           ultimaActualizacion: row.ultima_actualizacion,
@@ -2149,7 +2154,7 @@ function setupRealtime() {
             fecha: row.fecha ? row.fecha.split('T')[0] : '',
             merchant: row.merchant,
             monto: Number(row.monto),
-            cardLast4: row.card_last_4,
+            cardLast4: padCard(row.card_last_4),
             usuario: row.usuario || 'Técnico Asignado',
             categoria: row.categoria || 'Otros',
             fechaTransaccion: row.fecha_transaccion,
@@ -2158,7 +2163,7 @@ function setupRealtime() {
             montoOriginal: Number(row.monto_original || 0),
             monedaOriginal: row.moneda_original,
             montoMxn: Number(row.monto_mxn || 0),
-            tarjeta: row.tarjeta,
+            tarjeta: padCard(row.tarjeta),
             aliasTarjeta: row.alias_tarjeta,
             estado: row.estado,
             estadoAprobacion: row.estado_aprobacion,
@@ -2213,7 +2218,7 @@ function setupRealtime() {
             correo: row.correo,
             estado: row.estado,
             tipo: row.tipo,
-            tarjeta: row.tarjeta,
+            tarjeta: padCard(row.tarjeta),
             limite: Number(row.limite || 0),
             saldoUtilizado: Number(row.saldo_utilizado || 0),
             ultimaActualizacion: row.ultima_actualizacion,

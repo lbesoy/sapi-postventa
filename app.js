@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.69'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.95'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -743,6 +743,24 @@ function cargarRolesDesdeStorage() {
       }
     }
   }
+
+  // Garantizar siempre la protección del rol superadmin para evitar bloqueos o sidebars incompletos
+  if (ROLES.superadmin) {
+    const defaultSuperadminViews = ['dashboard','servicios','calendario','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos','telemetry'];
+    if (!Array.isArray(ROLES.superadmin.views) || ROLES.superadmin.views.length < defaultSuperadminViews.length) {
+      console.log('[Roles] Configuración de superadmin corrupta o incompleta detectada en almacenamiento. Auto-reparando...');
+      ROLES.superadmin.views = [...defaultSuperadminViews];
+      
+      const configToSave = {
+        roles: ROLES,
+        migrated_v2: true
+      };
+      localStorage.setItem('sapi_roles_config', JSON.stringify(configToSave));
+      if (window.pushToSupabase) {
+        window.pushToSupabase('roles', configToSave);
+      }
+    }
+  }
   
   // Garantizar siempre la inyección de vistas críticas por defecto si faltan en la configuración cargada
   // Solo se realiza si no se ha migrado a v2 (legacy) para no sobreescribir la configuración del usuario
@@ -1038,6 +1056,22 @@ document.addEventListener('DOMContentLoaded', () => {
     lucide.createIcons();
   } catch (err) {
     console.error('Error rendering Lucide icons:', err);
+  }
+  
+  try {
+    if (typeof window.repararTarjetasTransacciones === 'function') {
+      window.repararTarjetasTransacciones();
+    }
+  } catch (err) {
+    console.error('Error running repairing routine:', err);
+  }
+  
+  try {
+    if (typeof window.actualizarAlertaRechazos === 'function') {
+      window.actualizarAlertaRechazos();
+    }
+  } catch (err) {
+    console.error('Error running rejections badge routine:', err);
   }
   
   // Theme check
@@ -1420,11 +1454,28 @@ function applyRole(rolKey) {
     const navMaquinariaText = document.getElementById('nav-maquinaria-text');
     if (navMaquinariaText) navMaquinariaText.textContent = isEmpresa ? 'Mis máquinas' : 'Maquinaria';
 
-    // Update topbar buttons visibility according to role and view
-    const currentActiveView = document.querySelector('.view.active');
-    if (currentActiveView) {
-      const activeViewId = currentActiveView.id.replace('view-', '');
-      updateTopbarButtons(activeViewId, rolKey);
+    // Hide Clara importing/actions buttons for non-admins
+    const isAdminOrSuper = ['superadmin', 'admin'].includes(rolKey);
+    const btnImportarTarjetas = document.getElementById('btn-importar-tarjetas-excel');
+    if (btnImportarTarjetas) {
+      btnImportarTarjetas.style.setProperty('display', isAdminOrSuper ? 'inline-flex' : 'none', 'important');
+    }
+    const btnImportarClaraTxs = document.getElementById('btn-importar-clara-txs');
+    if (btnImportarClaraTxs) {
+      btnImportarClaraTxs.style.setProperty('display', isAdminOrSuper ? 'inline-flex' : 'none', 'important');
+    }
+    const btnSubirMovimientos = document.getElementById('btn-subir-movimientos-csv');
+    if (btnSubirMovimientos) {
+      btnSubirMovimientos.style.setProperty('display', isAdminOrSuper ? 'inline-flex' : 'none', 'important');
+    }
+    const btnRegistrarGasto = document.getElementById('btn-registrar-gasto');
+    if (btnRegistrarGasto) {
+      btnRegistrarGasto.style.display = isAdminOrSuper ? '' : 'none';
+    }
+    const isTecnico = rolKey === 'tecnico';
+    const filterClaraUserWrapper = document.getElementById('filter-clara-user-wrapper');
+    if (filterClaraUserWrapper) {
+      filterClaraUserWrapper.style.display = isTecnico ? 'none' : 'flex';
     }
 
     lucide.createIcons();
@@ -12450,7 +12501,20 @@ window.renderClaraCards = function() {
   if (!container) return;
 
   const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
-  const cards = window.getClaraCards();
+  let cards = window.getClaraCards();
+
+  const isTecnico = currentSession.viewMode === 'tecnico';
+  if (isTecnico) {
+    const user = usuarios.find(u => u.id === currentSession.userId);
+    const userEmail = (user?.email || currentSession.email || '').toLowerCase().trim();
+    const userName = (user?.nombre || currentSession.nombre || '').toLowerCase().trim();
+    cards = cards.filter(c => {
+      const isVinculado = c.usuarioVinculadoId === currentSession.userId;
+      const isMail = userEmail && c.correo && c.correo.toLowerCase().trim() === userEmail;
+      const isName = userName && c.usuario && c.usuario.toLowerCase().trim().includes(userName);
+      return isVinculado || isMail || isName;
+    });
+  }
 
   // Actualizar KPIs
   let totalLimite = 0;
@@ -12467,7 +12531,7 @@ window.renderClaraCards = function() {
   if (cards.length === 0) {
     container.innerHTML = `
       <tr>
-        <td colspan="7" style="text-align:center; padding:2rem; color:var(--text-muted);">
+        <td colspan="8" style="text-align:center; padding:2rem; color:var(--text-muted);">
           No se encontraron tarjetas registradas. Importa un archivo de tarjetas para comenzar.
         </td>
       </tr>
@@ -12507,6 +12571,7 @@ window.renderClaraCards = function() {
           <select 
             onchange="window.cambiarUsuarioVinculadoTarjeta('${c.id}', this.value)" 
             style="background:var(--bg-body); color:var(--text-primary); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0.5rem; font-size:0.8rem; font-family:inherit; cursor:pointer; width:100%; max-width:180px;"
+            ${isTecnico ? 'disabled' : ''}
           >
             <option value="">-- Sin Vincular --</option>
             ${optionsHtml}
@@ -12521,6 +12586,10 @@ window.renderClaraCards = function() {
 };
 
 window.cambiarUsuarioVinculadoTarjeta = function(cardId, userId) {
+  if (currentSession.viewMode === 'tecnico') {
+    mostrarNotificacion('No tienes permisos para modificar el vínculo de tarjetas.', 'error');
+    return;
+  }
   const cards = window.getClaraCards();
   const cardIndex = cards.findIndex(c => c.id === cardId);
   if (cardIndex === -1) return;
@@ -12574,6 +12643,11 @@ window.logImportTarjetas = function(msg, type = 'info') {
 };
 
 window.abrirSeleccionadorArchivoTarjetas = function() {
+  const isAdminOrSuper = ['superadmin', 'admin'].includes(currentSession.viewMode);
+  if (!isAdminOrSuper) {
+    mostrarNotificacion('Solo los administradores pueden importar tarjetas.', 'error');
+    return;
+  }
   window.logImportTarjetas('Se presionó el botón "Importar Tarjetas". Abriendo ventana de archivos...', 'processing');
   const input = document.getElementById('tarjetas-upload-input');
   if (input) {
@@ -12584,6 +12658,11 @@ window.abrirSeleccionadorArchivoTarjetas = function() {
 };
 
 window.procesarArchivoTarjetas = function(event) {
+  const isAdminOrSuper = ['superadmin', 'admin'].includes(currentSession.viewMode);
+  if (!isAdminOrSuper) {
+    mostrarNotificacion('Solo los administradores pueden importar tarjetas.', 'error');
+    return;
+  }
   window.logImportTarjetas('Evento "change" detectado en el selector de archivos.', 'processing');
   const file = event.target.files[0];
   if (!file) {
@@ -12723,8 +12802,8 @@ window.procesarArchivoTarjetas = function(event) {
         // Limpiar tarjeta para extraer últimos 4 dígitos
         const digits = tarjetaRaw.replace(/[^0-9]/g, '');
         let tarjeta = tarjetaRaw;
-        if (digits.length >= 4) {
-          tarjeta = digits.slice(-4);
+        if (digits.length > 0) {
+          tarjeta = digits.padStart(4, '0').slice(-4);
         }
 
         const alias = window.cleanMojibake(colMap['alias'] ? String(row[colMap['alias']] || '').trim() : usuario.split(' ')[0] || 'Tarjeta');
@@ -13045,6 +13124,32 @@ window.renderClaraTxs = function() {
   const container = document.getElementById('clara-movimientos-table-body');
   if (!container) return;
 
+  let txsBase = getFilteredClaraTxs();
+  const isTecnico = currentSession.viewMode === 'tecnico';
+  const isAdminOrSuper = ['superadmin', 'admin'].includes(currentSession.viewMode);
+  if (isTecnico) {
+    const user = usuarios.find(u => u.id === currentSession.userId);
+    const userEmail = (user?.email || currentSession.email || '').toLowerCase().trim();
+    const userName = (user?.nombre || currentSession.nombre || '').toLowerCase().trim();
+    
+    // Find the technician's cards
+    const allCards = window.getClaraCards();
+    const myCards = allCards.filter(c => {
+      const isVinculado = c.usuarioVinculadoId === currentSession.userId;
+      const isMail = userEmail && c.correo && c.correo.toLowerCase().trim() === userEmail;
+      const isName = userName && c.usuario && c.usuario.toLowerCase().trim().includes(userName);
+      return isVinculado || isMail || isName;
+    });
+    
+    const myCardNumbers = new Set(myCards.map(c => c.tarjeta).filter(Boolean));
+    
+    txsBase = txsBase.filter(tx => {
+      const cardMatch = tx.cardLast4 && myCardNumbers.has(tx.cardLast4);
+      const nameMatch = userName && tx.usuario && tx.usuario.toLowerCase().trim().includes(userName);
+      return cardMatch || nameMatch;
+    });
+  }
+
   // Filtrar transacciones que no tengan un gasto activo asociado (que no esté Rechazado)
   const associatedTxIds = new Set(
     getFilteredGastos()
@@ -13052,7 +13157,7 @@ window.renderClaraTxs = function() {
       .map(g => g.claraTxId)
   );
 
-  const pendingTxs = getFilteredClaraTxs().filter(tx => !associatedTxIds.has(tx.id));
+  const pendingTxs = txsBase.filter(tx => !associatedTxIds.has(tx.id));
 
   // Actualizar el contador en la pestaña
   const badgeClara = document.getElementById('badge-clara-txs');
@@ -13066,7 +13171,7 @@ window.renderClaraTxs = function() {
   const filterStatus = document.getElementById('filter-clara-status')?.value || '';
   const filterUser = document.getElementById('filter-clara-user')?.value || '';
 
-  let filteredTxs = getFilteredClaraTxs().filter(tx => {
+  let filteredTxs = txsBase.filter(tx => {
     const g = getFilteredGastos().find(x => x.claraTxId === tx.id && x.estado !== 'Rechazado');
     const hasFacturaOrEvidencia = g && (g.uuidFiscal || g.rfcEmisor || g.pdfFactura || g.xmlFactura || g.evidencia);
     return !hasFacturaOrEvidencia;
@@ -13156,11 +13261,11 @@ window.renderClaraTxs = function() {
 
   // CALCULO DE KPIs GLOBALES (de acuerdo con el diseño de Clara en la foto)
   let gastoTotal = 0;
-  let realizados = getFilteredClaraTxs().length;
+  let realizados = txsBase.length;
   let sinFactura = 0;
   let sinEvidencia = 0;
 
-  getFilteredClaraTxs().forEach(tx => {
+  txsBase.forEach(tx => {
     gastoTotal += tx.monto || 0;
     
     // Buscar si hay un gasto registrado y no rechazado vinculado a este swipe
@@ -13355,6 +13460,101 @@ window.renderClaraTxs = function() {
 };
 
 // =========================================================================
+// ── ALERTA Y MODAL DE GASTOS RECHAZADOS ──────────────────────────────────
+// =========================================================================
+
+window.actualizarAlertaRechazos = function() {
+  const btn = document.getElementById('btn-gastos-rechados-alerta');
+  const badge = document.getElementById('badge-rechazos-count');
+  if (!btn) return;
+
+  const currentUserId = currentSession.userId;
+  // Filtrar los gastos rechazados que pertenecen al usuario logueado
+  const userGastos = getFilteredGastos().filter(g => g.estado === 'Rechazado' && g.usuarioId === currentUserId);
+
+  // ALWAYS show the button
+  btn.style.setProperty('display', 'flex', 'important');
+
+  // Contar los rechazos que no han sido vistos por el usuario
+  const unseenCount = userGastos.filter(g => !localStorage.getItem('eurorep_vistos_rechazos_' + g.id)).length;
+  if (badge) {
+    if (unseenCount > 0) {
+      badge.textContent = unseenCount;
+      badge.style.setProperty('display', 'inline-flex', 'important');
+      btn.style.borderColor = 'rgba(239,68,68,0.25)';
+      btn.style.background = 'rgba(239,68,68,0.05)';
+      btn.style.color = 'var(--red)';
+    } else {
+      badge.style.setProperty('display', 'none', 'important');
+      btn.style.borderColor = 'var(--border)';
+      btn.style.background = 'transparent';
+      btn.style.color = 'var(--text-secondary)';
+    }
+  }
+};
+
+window.abrirModalRechazados = function() {
+  const modal = document.getElementById('modal-gastos-rechazados');
+  if (!modal) return;
+
+  const currentUserId = currentSession.userId;
+  const userGastos = getFilteredGastos().filter(g => g.estado === 'Rechazado' && g.usuarioId === currentUserId);
+
+  // Marcar todos los rechazos del usuario como vistos al abrir el modal
+  userGastos.forEach(g => {
+    localStorage.setItem('eurorep_vistos_rechazos_' + g.id, 'true');
+  });
+
+  // Actualizar la alerta/badge inmediatamente
+  window.actualizarAlertaRechazos();
+
+  const listContainer = document.getElementById('gastos-rechazados-lista');
+  if (listContainer) {
+    if (userGastos.length === 0) {
+      listContainer.innerHTML = `
+        <div style="text-align:center; padding:2rem; color:var(--text-muted); font-size:0.9rem;">
+          <i data-lucide="check-circle" style="width:24px; height:24px; display:block; margin:0 auto 0.5rem; color:var(--green);"></i>
+          No tienes ningún gasto rechazado actualmente.
+        </div>
+      `;
+      if (window.lucide) window.lucide.createIcons();
+    } else {
+      const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
+      listContainer.innerHTML = userGastos.map(g => {
+        const fechaStr = g.fecha ? g.fecha.split('T')[0] : '—';
+        return `
+          <div onclick="window.cerrarModalRechazados(); abrirDetalleGasto('${g.id}')" style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:1rem; cursor:pointer; display:flex; flex-direction:column; gap:0.5rem; transition:var(--transition); position:relative;" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;">
+              <div style="font-weight:700; font-size:0.9rem; color:var(--text-primary);">${g.claraMerchant || g.descripcion || 'Gasto Sin Nombre'}</div>
+              <div style="font-weight:700; font-size:0.9rem; color:var(--red);">${formatMoney(g.monto)}</div>
+            </div>
+            <div style="font-size:0.78rem; color:var(--text-secondary); display:flex; justify-content:space-between;">
+              <span>Fecha: ${fechaStr}</span>
+              <span>Tarjeta: ${g.claraCardLast4 ? `•••• ${g.claraCardLast4}` : 'N/A'}</span>
+            </div>
+            <div style="background:rgba(239,68,68,0.05); border:1px solid rgba(239,68,68,0.1); border-radius:6px; padding:0.5rem 0.75rem; font-size:0.8rem; color:var(--red); font-weight:500;">
+              <strong>Motivo del rechazo:</strong> ${g.comentariosAprobacion || 'Sin comentarios adicionales.'}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  modal.style.display = 'flex';
+  modal.classList.add('open');
+  if (window.lucide) window.lucide.createIcons();
+};
+
+window.cerrarModalRechazados = function() {
+  const modal = document.getElementById('modal-gastos-rechazados');
+  if (modal) {
+    modal.style.display = 'none';
+    modal.classList.remove('open');
+  }
+};
+
+// =========================================================================
 // ── INTERACTIVE CLARA MOVIMIENTOS FILTERS ─────────────────────────────────
 // =========================================================================
 
@@ -13522,7 +13722,7 @@ function parseExcelDate(val) {
 function generateTxId(fecha, merchant, monto, cardLast4) {
   const cleanMerchant = String(merchant || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   const cleanMonto = Number(monto || 0).toFixed(2);
-  const cleanCard = String(cardLast4 || '').replace(/[^0-9]/g, '').slice(-4);
+  const cleanCard = String(cardLast4 || '').replace(/[^0-9]/g, '').padStart(4, '0').slice(-4);
   const raw = `${fecha}_${cleanMerchant}_${cleanMonto}_${cleanCard}`;
   
   let hash = 0;
@@ -13534,7 +13734,93 @@ function generateTxId(fecha, merchant, monto, cardLast4) {
   return 'tx_import_' + Math.abs(hash).toString(36);
 }
 
+// Función para reparar números de tarjeta con ceros a la izquierda o que por defecto tomaron 4321
+window.repararTarjetasTransacciones = function() {
+  try {
+    // 1. Reparar Tarjetas Clara
+    const currentCards = window.getClaraCards ? window.getClaraCards() : [];
+    let cardsModified = false;
+    currentCards.forEach(c => {
+      // Si tarjeta es de 3 dígitos, rellenar con cero a la izquierda
+      if (c.tarjeta && c.tarjeta.length === 3) {
+        c.tarjeta = c.tarjeta.padStart(4, '0');
+        cardsModified = true;
+      }
+      // Si el id es card_XXX (con 3 dígitos), rellenar con cero
+      if (c.id && c.id.startsWith('card_') && c.id.length === 9) { // card_ + 3 digitos = 9 chars
+        const suffix = c.id.replace('card_', '');
+        c.id = 'card_' + suffix.padStart(4, '0');
+        cardsModified = true;
+      }
+      // Reparar límites de tarjetas si están en 0 buscando en defaultClaraCards
+      if ((!c.limite || Number(c.limite) === 0) && typeof defaultClaraCards !== 'undefined') {
+        const defaultCard = defaultClaraCards.find(dc => dc.tarjeta === c.tarjeta || dc.id === c.id);
+        if (defaultCard) {
+          c.limite = defaultCard.limite;
+          cardsModified = true;
+        }
+      }
+    });
+    if (cardsModified) {
+      localStorage.setItem('sapi_clara_cards', JSON.stringify(currentCards));
+      if (window.pushToSupabase) {
+        currentCards.forEach(c => {
+          window.pushToSupabase('clara_cards', c);
+        });
+      }
+      if (typeof window.renderClaraCards === 'function') {
+        window.renderClaraCards();
+      }
+    }
+
+    // 2. Reparar Transacciones
+    let currentTxs = safeGetJSON('sapi_clara_mock_txs', null);
+    if (Array.isArray(currentTxs) && currentTxs.length > 0) {
+      let txsModified = false;
+      currentTxs.forEach(tx => {
+        // Rellenar con cero a la izquierda si tiene 3 dígitos
+        if (tx.cardLast4 && tx.cardLast4.length === 3) {
+          tx.cardLast4 = tx.cardLast4.padStart(4, '0');
+          if (tx.tarjeta) tx.tarjeta = tx.tarjeta.padStart(4, '0');
+          txsModified = true;
+        }
+        
+        // Si cardLast4 es '4321' (defaulted) o no tiene, intentar asociarla por el nombre de usuario
+        if ((tx.cardLast4 === '4321' || !tx.cardLast4) && tx.usuario && tx.usuario !== 'Técnico Asignado') {
+          const matchCard = currentCards.find(c => {
+            const cUser = (c.usuario || '').toLowerCase().trim();
+            const txUser = (tx.usuario || '').toLowerCase().trim();
+            return cUser && txUser && (cUser.includes(txUser) || txUser.includes(cUser));
+          });
+          if (matchCard && matchCard.tarjeta && matchCard.tarjeta !== '4321') {
+            tx.cardLast4 = matchCard.tarjeta;
+            tx.tarjeta = matchCard.tarjeta;
+            txsModified = true;
+            console.log(`[App] Reparando transacción ${tx.id} (${tx.merchant}): asignado *${matchCard.tarjeta} (Usuario: ${tx.usuario})`);
+          }
+        }
+      });
+      
+      if (txsModified) {
+        localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(currentTxs));
+        if (window.pushToSupabase) {
+          currentTxs.forEach(tx => {
+            window.pushToSupabase('clara_transactions', tx);
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[App] Error al reparar tarjetas/transacciones:', e);
+  }
+};
+
 window.procesarArchivoMovimientos = function(event) {
+  const isAdminOrSuper = ['superadmin', 'admin'].includes(currentSession.viewMode);
+  if (!isAdminOrSuper) {
+    mostrarNotificacion('Solo los administradores pueden importar movimientos.', 'error');
+    return;
+  }
   const file = event.target.files[0];
   if (!file) return;
 
@@ -13671,8 +13957,8 @@ window.procesarArchivoMovimientos = function(event) {
         let cardLast4 = '4321';
         if (colMap['tarjeta'] && row[colMap['tarjeta']]) {
           const digits = String(row[colMap['tarjeta']]).replace(/[^0-9]/g, '');
-          if (digits.length >= 4) {
-            cardLast4 = digits.slice(-4);
+          if (digits.length > 0) {
+            cardLast4 = digits.padStart(4, '0').slice(-4);
           }
         }
 
@@ -13823,6 +14109,9 @@ window.confirmarImportacion = function() {
 };
 
 window.renderGastos = function() {
+  if (typeof window.actualizarAlertaRechazos === 'function') {
+    window.actualizarAlertaRechazos();
+  }
   const isTecnico = currentSession.viewMode === 'tecnico';
   const isAdminOrSupervisor = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
 
@@ -14497,13 +14786,17 @@ window.actualizarFacturasSugeridas = function() {
     const invoiceFecha = sat.fechaEmision || sat.date || '';
     if (Math.abs(gastoMonto - invoiceTotal) < 0.02) score += 50;
     else if (gastoMonto > 0 && Math.abs(gastoMonto - invoiceTotal) / gastoMonto <= 0.05) score += 30;
-    if (gastoFecha && invoiceFecha) {
-      if (invoiceFecha.startsWith(gastoFecha)) score += 30;
-      else {
-        const t1 = new Date(gastoFecha).getTime();
-        const t2 = new Date(invoiceFecha.split('T')[0]).getTime();
-        if (!isNaN(t1) && !isNaN(t2) && Math.abs(t1 - t2) <= 3 * 24 * 60 * 60 * 1000) score += 15;
-      }
+    if (gastoFecha) {
+      if (!invoiceFecha) return false;
+      const t1 = new Date(gastoFecha).getTime();
+      const t2 = new Date(invoiceFecha.split('T')[0]).getTime();
+      if (isNaN(t1) || isNaN(t2)) return false;
+      
+      const diffDays = (t1 - t2) / (24 * 60 * 60 * 1000);
+      if (diffDays < 0 || diffDays > 2) return false;
+      
+      if (diffDays === 0) score += 30;
+      else score += 15;
     }
     return score >= 30;
   });
@@ -14591,17 +14884,22 @@ window.actualizarFacturasSugeridas = function() {
         score += 30; // close match (5% tolerance)
       }
 
-      // Date matching
-      if (gastoFecha && invoiceFecha) {
-        if (invoiceFecha.startsWith(gastoFecha)) {
+      // Date matching & hard restriction (2 days before up to the movement date)
+      if (gastoFecha) {
+        if (!invoiceFecha) return;
+        const t1 = new Date(gastoFecha).getTime();
+        const t2 = new Date(invoiceFecha.split('T')[0]).getTime();
+        if (isNaN(t1) || isNaN(t2)) return;
+        
+        const diffDays = (t1 - t2) / (24 * 60 * 60 * 1000);
+        if (diffDays < 0 || diffDays > 2) {
+          return; // Discard if not within [gastoFecha - 2 days, gastoFecha]
+        }
+        
+        if (diffDays === 0) {
           score += 30; // exact match
         } else {
-          // Check if within 3 days
-          const t1 = new Date(gastoFecha).getTime();
-          const t2 = new Date(invoiceFecha.split('T')[0]).getTime();
-          if (!isNaN(t1) && !isNaN(t2) && Math.abs(t1 - t2) <= 3 * 24 * 60 * 60 * 1000) {
-            score += 15;
-          }
+          score += 15; // 1 or 2 days before
         }
       }
 
@@ -16029,6 +16327,12 @@ window.cerrarModalGasto = function() {
 };
 
 window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
+  const isAdminOrSuper = ['superadmin', 'admin'].includes(currentSession.viewMode);
+  if (!gastoId && !mockClaraId && !isAdminOrSuper) {
+    mostrarNotificacion('Solo los administradores pueden registrar nuevos gastos.', 'error');
+    return;
+  }
+
   // Reset window base64s and uploaded files array
   window._gastoEvidenciaBase64 = null;
   window._gastoPdfBase64 = null;
@@ -16638,6 +16942,14 @@ window.guardarGasto = function(e) {
 window.abrirDetalleGasto = function(gastoId) {
   const g = gastos.find(x => x.id === gastoId);
   if (!g) return;
+
+  // Si es un gasto rechazado perteneciente al usuario actual, marcar como visto
+  if (g.estado === 'Rechazado' && g.usuarioId === currentSession.userId) {
+    localStorage.setItem('eurorep_vistos_rechazos_' + g.id, 'true');
+    if (typeof window.actualizarAlertaRechazos === 'function') {
+      window.actualizarAlertaRechazos();
+    }
+  }
 
   const isAdminOrSupervisor = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
 
