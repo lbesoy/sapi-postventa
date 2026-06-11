@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.95'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.96'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -747,9 +747,29 @@ function cargarRolesDesdeStorage() {
   // Garantizar siempre la protección del rol superadmin para evitar bloqueos o sidebars incompletos
   if (ROLES.superadmin) {
     const defaultSuperadminViews = ['dashboard','servicios','calendario','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos','telemetry'];
-    if (!Array.isArray(ROLES.superadmin.views) || ROLES.superadmin.views.length < defaultSuperadminViews.length) {
+    const hasAllViews = Array.isArray(ROLES.superadmin.views) && defaultSuperadminViews.every(v => ROLES.superadmin.views.includes(v));
+    if (!hasAllViews) {
       console.log('[Roles] Configuración de superadmin corrupta o incompleta detectada en almacenamiento. Auto-reparando...');
       ROLES.superadmin.views = [...defaultSuperadminViews];
+      
+      const configToSave = {
+        roles: ROLES,
+        migrated_v2: true
+      };
+      localStorage.setItem('sapi_roles_config', JSON.stringify(configToSave));
+      if (window.pushToSupabase) {
+        window.pushToSupabase('roles', configToSave);
+      }
+    }
+  }
+
+  // Garantizar siempre la protección del rol admin
+  if (ROLES.admin) {
+    const defaultAdminViews = ['dashboard','servicios','calendario','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos'];
+    const hasAllViews = Array.isArray(ROLES.admin.views) && defaultAdminViews.every(v => ROLES.admin.views.includes(v));
+    if (!hasAllViews) {
+      console.log('[Roles] Configuración de admin corrupta o incompleta detectada en almacenamiento. Auto-reparando...');
+      ROLES.admin.views = [...defaultAdminViews];
       
       const configToSave = {
         roles: ROLES,
