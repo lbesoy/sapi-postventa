@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.102'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.103'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -19984,7 +19984,7 @@ async function confirmarFusionClientes() {
     mostrarNotificacion('Por favor, selecciona ambos clientes.', 'error');
     return;
   }
-  if (_fusionPrincipal.nombre === _fusionDuplicado.nombre) {
+  if (esMismoCliente(_fusionPrincipal, _fusionDuplicado)) {
     mostrarNotificacion('No se puede fusionar un cliente consigo mismo.', 'error');
     return;
   }
@@ -20044,7 +20044,7 @@ async function confirmarFusionClientes() {
     // 3. Reasignar Maquinaria
     let maqModificada = [];
     maquinariaDb.forEach(m => {
-      if (m.cliente === dNombre || m.cliente === dId || (dId && m.cliente === dId)) {
+      if (m.cliente === dNombre || (dId && m.cliente === dId)) {
         m.cliente = pId; // Preferimos ID de SAP para la maquinaria
         maqModificada.push(m);
       }
@@ -20053,7 +20053,7 @@ async function confirmarFusionClientes() {
     // 4. Reasignar Sitios
     let sitiosModificados = [];
     sitiosDb.forEach(s => {
-      if (s.cliente === dNombre || s.cliente === dId || (dId && s.cliente === dId)) {
+      if (s.cliente === dNombre || (dId && s.cliente === dId)) {
         s.cliente = pId;
         sitiosModificados.push(s);
       }
@@ -20089,7 +20089,7 @@ async function confirmarFusionClientes() {
     principalEnDb.grupoSinergia = principalEnDb.grupoSinergia || _fusionDuplicado.grupoSinergia || '';
 
     // 8. Eliminar cliente duplicado de la lista local
-    clientesDb = clientesDb.filter(c => c.nombre !== dNombre && c.id !== dId);
+    clientesDb = clientesDb.filter(c => !esMismoCliente(c, _fusionDuplicado));
 
     // 9. Guardar cambios en LocalStorage
     localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
