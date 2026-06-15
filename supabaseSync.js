@@ -187,10 +187,17 @@ function ordenToRow(o) {
     } catch (e) {}
   }
 
+  let clienteId = o.cliente || null;
+  try {
+    const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+    const match = clientes.find(c => c.nombre === o.cliente || c.id === o.cliente);
+    if (match) clienteId = match.id;
+  } catch (e) {}
+
   return {
     id: o.id,
     folio: o.folio,
-    cliente: o.cliente,
+    cliente: clienteId,
     sitio_id: sitioId,
     tecnico: o.tecnico || null,
     maquinaria_id: maquinariaId,
@@ -247,10 +254,17 @@ function rowToOrden(o) {
     } catch (e) {}
   }
 
+  let clienteNombre = o.cliente;
+  try {
+    const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+    const match = clientes.find(c => c.id === o.cliente);
+    if (match) clienteNombre = match.nombre;
+  } catch (e) {}
+
   const res = {
     id: o.id,
     _synced: true,
-    folio: o.folio, cliente: o.cliente,
+    folio: o.folio, cliente: clienteNombre,
     ubicacion: ubicacion, tecnico: o.tecnico,
     tipo: o.tipo, estado: o.estado, fecha: o.fecha,
     fechaInicio: o.fecha_inicio, fechaFin: o.fecha_fin,
