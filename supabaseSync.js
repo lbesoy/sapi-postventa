@@ -677,7 +677,14 @@ async function _processSyncQueueInternal() {
                   } catch (e) {}
                 }
                 // Si pertenece a otro cliente o soporte, es una colisión de folios offline
-                const esColision = existingOrd.cliente !== item.data.cliente || 
+                let existingClienteNombre = existingOrd.cliente;
+                try {
+                  const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+                  const match = clientes.find(c => c.id === existingOrd.cliente);
+                  if (match) existingClienteNombre = match.nombre;
+                } catch (e) {}
+
+                const esColision = existingClienteNombre !== item.data.cliente || 
                                    existingSoporte !== item.data.soporte;
                                    
                 if (esColision) {
