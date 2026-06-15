@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.113'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.114'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -20306,15 +20306,15 @@ window.regenerarOrdenesDesdeTickets = async function() {
     }
   }
 
-  // 3. Filtrar y ordenar tickets cerrados aprobados (de más antiguo a más nuevo)
-  const ticketsFiltrados = tickets.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'si');
+  // 3. Filtrar y ordenar tickets cerrados (excluyendo rechazados si los hay)
+  const ticketsFiltrados = tickets.filter(t => t.estado === 'Cerrado' && t.cotAceptada !== 'no');
   ticketsFiltrados.sort((a, b) => {
     const d1 = new Date(a.fechaCreacion || a.fecha || 0);
     const d2 = new Date(b.fechaCreacion || b.fecha || 0);
     return d1 - d2;
   });
 
-  console.log(`[Regenerar] Encontrados ${ticketsFiltrados.length} tickets cerrados y aprobados para regenerar.`);
+  console.log(`[Regenerar] Encontrados ${ticketsFiltrados.length} tickets cerrados para regenerar.`);
 
   const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
 
