@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.101'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.102'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -4642,7 +4642,7 @@ function renderClientes() {
     const qtyOrdenes = ordenes.filter(x => x.cliente === c.nombre).length;
     
     // Contar máquinas combinadas (SAP + manuales)
-    const maqClient = maquinariaDb.filter(m => m.cliente === c.nombre || m.cliente === c.id || m.cliente === c.rfc);
+    const maqClient = maquinariaDb.filter(m => m.cliente === c.nombre || (c.id && m.cliente === c.id) || (c.rfc && m.cliente === c.rfc));
     let totalMaquinas = maqClient.length;
     (c.maquinas || []).forEach(m => {
        if (!maqClient.some(sap => sap.id === m.idInterno || sap.serie === m.serie || sap.idInterno === m.idInterno)) {
@@ -4691,7 +4691,7 @@ function renderClientes() {
   if (tbody) {
     tbody.innerHTML = paginatedClientes.map(c => {
       // Re-contar para la tabla (ya que el map es independiente)
-      const maqClient = maquinariaDb.filter(m => m.cliente === c.nombre || m.cliente === c.id || m.cliente === c.rfc);
+      const maqClient = maquinariaDb.filter(m => m.cliente === c.nombre || (c.id && m.cliente === c.id) || (c.rfc && m.cliente === c.rfc));
       let totalMaquinas = maqClient.length;
       (c.maquinas || []).forEach(m => {
          if (!maqClient.some(sap => sap.id === m.idInterno || sap.serie === m.serie || sap.idInterno === m.idInterno)) {
@@ -4925,7 +4925,7 @@ function verDetalleCliente(nombre) {
   let allClientMachines = [];
   
   // 1. Agregar de maquinariaDb (SAP/Supabase)
-  const maqClient = maquinariaDb.filter(m => m.cliente === nombre || m.cliente === clienteOb?.id || m.cliente === clienteOb?.rfc);
+  const maqClient = maquinariaDb.filter(m => m.cliente === nombre || (clienteOb?.id && m.cliente === clienteOb.id) || (clienteOb?.rfc && m.cliente === clienteOb.rfc));
   maqClient.forEach(m => {
       allClientMachines.push({
           idInterno: m.idInterno || m.id || m.serie || 'N/A',
