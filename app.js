@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.108'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.109'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -20269,3 +20269,154 @@ async function confirmarFusionClientes() {
     })();
   }
 }
+
+window.regenerarOrdenesDesdeTickets = async function() {
+  const confirmacion = confirm("¿Estás seguro de que quieres borrar TODAS las órdenes de servicio de la base de datos y del navegador, y regenerarlas a partir de los tickets cerrados y aceptados? Esta acción no se puede deshacer.");
+  if (!confirmacion) return;
+
+  console.log('[Regenerar] Iniciando limpieza de órdenes...');
+  
+  // 1. Limpiar localmente
+  ordenes = [];
+  localStorage.setItem('sapi_ordenes', '[]');
+  
+  // Limpiar cola de sincronización para evitar conflictos con folios viejos
+  try {
+    const queue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+    const newQueue = queue.filter(item => item.table !== 'ordenes');
+    localStorage.setItem('sapi_sync_queue', JSON.stringify(newQueue));
+  } catch (e) {}
+
+  // 2. Limpiar en Supabase
+  const sb = window.supabaseClient;
+  if (sb) {
+    console.log('[Regenerar] Borrando todas las órdenes en Supabase...');
+    const { error: delErr } = await sb.from('ordenes').delete().neq('id', 'dummy_id_never_exists');
+    if (delErr) {
+      console.error('[Regenerar] Error al borrar órdenes en Supabase:', delErr);
+      alert('Error al borrar las órdenes de la base de datos de Supabase: ' + delErr.message);
+      return;
+    }
+  }
+
+  // 3. Filtrar y ordenar tickets cerrados aprobados (de más antiguo a más nuevo)
+  const ticketsFiltrados = tickets.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'si');
+  ticketsFiltrados.sort((a, b) => {
+    const d1 = new Date(a.fechaCreacion || a.fecha || 0);
+    const d2 = new Date(b.fechaCreacion || b.fecha || 0);
+    return d1 - d2;
+  });
+
+  console.log(`[Regenerar] Encontrados ${ticketsFiltrados.length} tickets cerrados y aprobados para regenerar.`);
+
+  const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+
+  // 4. Regenerar orden por orden
+  for (const t of ticketsFiltrados) {
+    let modeloStr = '';
+    let serieStr = '';
+    let marcaStr = '';
+    let ecoStr = '';
+    let maquinariaId = null;
+
+    if (t.equipo) {
+      const matchMaquina = (m) => {
+        const cleanId = m.idInterno || m.id || '';
+        const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+        const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+        const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+        const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+        
+        return (
+          t.equipo === mName ||
+          t.equipo === cleanId ||
+          t.equipo === m.serie ||
+          t.equipo.includes(cleanId) ||
+          (m.serie && t.equipo.includes(m.serie))
+        );
+      };
+
+      let maq = null;
+      clientesDb.forEach(c => {
+        if (c.maquinas) {
+          const found = c.maquinas.find(matchMaquina);
+          if (found) maq = found;
+        }
+      });
+      if (!maq) maq = maquinariaDb.find(matchMaquina);
+
+      if (maq) {
+        modeloStr = maq.modelo || '';
+        serieStr = maq.serie || '';
+        marcaStr = maq.marca || '';
+        ecoStr = maq.no_economico || '';
+        maquinariaId = maq.id || null;
+      } else {
+        if (t.equipo.includes('(SN: ')) {
+          const parts = t.equipo.split('(SN: ');
+          serieStr = parts[1].replace(')', '').trim();
+          let left = parts[0].trim();
+          if (left.startsWith('[') && left.includes(']')) {
+            left = left.substring(left.indexOf(']') + 1).trim();
+          }
+          modeloStr = left;
+        } else {
+          modeloStr = t.equipo;
+        }
+      }
+    }
+
+    // Calcular folio secuencial
+    let newFolio = generarFolioConsecutivo();
+    const isTest = isTestData(t) || isTestModeActive();
+    if (isTest && newFolio && !newFolio.startsWith('[PRUEBA]')) {
+      newFolio = `[PRUEBA] ${newFolio}`;
+    }
+
+    const nuevaOrden = {
+      id: newFolio,
+      fecha: t.fechaCierre || t.fecha || getLocalDateString(),
+      folio: newFolio,
+      pedido: t.pedidoSAP || '',
+      cliente: t.cliente || '',
+      ubicacion: t.sitio || '',
+      operador: '',
+      eco: ecoStr || '',
+      horometro: '',
+      modelo: modeloStr,
+      serie: serieStr,
+      marca: marcaStr || '',
+      maquinaria_id: maquinariaId || null,
+      equipo: t.equipo || '',
+      tecnico: (t.tecnicosAsignados || []).join(', '),
+      tecnicosAsignados: t.tecnicosAsignados || [],
+      soporte: t.id,
+      km_ida: '', km_vuelta: '', km_total: '',
+      tipo: 'Servicio',
+      estado: 'Pendiente',
+      falla: (t.asunto ? t.asunto + '\n' : '') + (t.descripcion || ''),
+      trabajos: '', dictamen: '', condiciones: '',
+      observaciones: '', pendientes: '',
+      ref_utilizadas: [], ref_necesarias: [],
+      factura_ref: '', factura_mo: '',
+      noches: '', alimentacion: '', traslado_costo: '',
+      dias: [],
+      esPrueba: isTest,
+    };
+
+    ordenes.push(nuevaOrden);
+    if (window.supabaseClient) {
+      await window.pushToSupabase('ordenes', nuevaOrden);
+    }
+  }
+
+  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  console.log(`[Regenerar] Completado. Se crearon ${ordenes.length} órdenes.`);
+  alert(`¡Proceso completado! Se eliminaron todas las órdenes anteriores y se regeneraron ${ordenes.length} órdenes secuenciales a partir de los tickets cerrados y aprobados.`);
+  
+  if (typeof renderTabla === 'function') renderTabla('servicios');
+  if (window.updateSyncStatusUI) window.updateSyncStatusUI();
+  
+  // Forzar reload
+  location.reload();
+};
