@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.109'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.110'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -20405,8 +20405,12 @@ window.regenerarOrdenesDesdeTickets = async function() {
     };
 
     ordenes.push(nuevaOrden);
-    if (window.supabaseClient) {
-      await window.pushToSupabase('ordenes', nuevaOrden);
+    if (window.supabaseClient && window.ordenToRow) {
+      const row = window.ordenToRow(nuevaOrden);
+      const { error: upsertErr } = await window.supabaseClient.from('ordenes').upsert(row);
+      if (upsertErr) {
+        console.error('[Regenerar] Error al subir orden a Supabase:', upsertErr);
+      }
     }
   }
 

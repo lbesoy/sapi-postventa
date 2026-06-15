@@ -151,6 +151,7 @@ function rowToTicket(t) {
   return obj;
 }
 
+window.ordenToRow = ordenToRow;
 function ordenToRow(o) {
   const customData = { ...o };
   const knownKeys = [
@@ -213,6 +214,7 @@ function ordenToRow(o) {
   };
 }
 
+window.rowToOrden = rowToOrden;
 function rowToOrden(o) {
   let extraData = {};
   if (o.notes && o.notes.startsWith('{')) {
