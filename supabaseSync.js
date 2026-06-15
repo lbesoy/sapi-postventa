@@ -458,6 +458,29 @@ function addToSyncQueue(table, action, data) {
 }
 
 window.pushToSupabase = async function(tabla, item) {
+  // La telemetría es no-crítica: se envía directo sin cola para evitar
+  // acumulación de errores "Failed to fetch" en la UI.
+  if (tabla === 'sapi_telemetry') {
+    const sb = window.supabaseClient;
+    if (!sb) return;
+    try {
+      const sessionRes = await sb.auth.getSession().catch(() => null);
+      if (!sessionRes || !sessionRes.data || !sessionRes.data.session) return;
+      const payload = {
+        id: item.id,
+        user_id: item.userId,
+        user_name: item.userName,
+        user_role: item.userRole,
+        action: item.action,
+        details: item.details || {},
+        timestamp: item.timestamp,
+        user_agent: item.userAgent
+      };
+      sb.from('sapi_telemetry').upsert(payload, { onConflict: 'id' }).then(() => {}).catch(() => {});
+    } catch (e) { /* silencioso */ }
+    return;
+  }
+
   // Añadir a la cola local para estrategia offline-first
   addToSyncQueue(tabla, 'upsert', item);
   
@@ -998,23 +1021,31 @@ async function _processSyncQueueInternal() {
         }
 
         if (error) {
-          console.error(`[Sync] Error en operación (${item.table} - ${item.action}):`, error.message);
-          
-          if (typeof window.mostrarNotificacion === 'function') {
-            window.mostrarNotificacion(`Error BD (${item.table}): ${error.message}`, 'error');
-          }
-
-          if (window._isSyncManualForced) {
-            alert('Error de Base de Datos al sincronizar ' + item.table + ' (' + item.action + '):\n\n' + error.message + '\n\nCódigo: ' + (error.code || 'N/A') + '\nDetalles: ' + (error.details || 'Ninguno'));
-          }
-
-          if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('network') || error.message.includes('timeout') || error.message.includes('connection') || error.message.includes('TypeError: Failed to fetch'))) {
-            break; // Error de red temporal, pausar procesamiento
-          } else {
-            console.warn(`[Sync] Error permanente de BD. Saltando elemento.`);
+          // La telemetría es no-crítica: siempre se descarta silenciosamente sin notificar al usuario.
+          if (item.table === 'sapi_telemetry') {
+            console.warn('[Sync] Telemetría no enviada, descartando sin notificar:', error.message);
             const latestQueue = getSyncQueue();
             latestQueue.shift();
             saveSyncQueue(latestQueue);
+          } else {
+            console.error(`[Sync] Error en operación (${item.table} - ${item.action}):`, error.message);
+            
+            if (typeof window.mostrarNotificacion === 'function') {
+              window.mostrarNotificacion(`Error BD (${item.table}): ${error.message}`, 'error');
+            }
+
+            if (window._isSyncManualForced) {
+              alert('Error de Base de Datos al sincronizar ' + item.table + ' (' + item.action + '):\n\n' + error.message + '\n\nCódigo: ' + (error.code || 'N/A') + '\nDetalles: ' + (error.details || 'Ninguno'));
+            }
+
+            if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('network') || error.message.includes('timeout') || error.message.includes('connection') || error.message.includes('TypeError: Failed to fetch'))) {
+              break; // Error de red temporal, pausar procesamiento
+            } else {
+              console.warn(`[Sync] Error permanente de BD. Saltando elemento.`);
+              const latestQueue = getSyncQueue();
+              latestQueue.shift();
+              saveSyncQueue(latestQueue);
+            }
           }
         } else {
           // Registrar log de auditoría automática de transacciones críticas
@@ -2263,11 +2294,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const isTest = item.data.isTest || item.data.esPrueba || item.data.id === 'gasto_seed_1';
         if (isTest) return false;
       }
+      // La telemetría nunca se encola: limpiar items rezagados de versiones anteriores
+      if (item && item.table === 'sapi_telemetry') return false;
       return true;
     });
     if (filtered.length !== queue.length) {
       localStorage.setItem('sapi_sync_queue', JSON.stringify(filtered));
-      console.log(`[Sync] Limpiados ${queue.length - filtered.length} elementos de prueba de la cola offline.`);
+      console.log(`[Sync] Limpiados ${queue.length - filtered.length} elementos de la cola offline (pruebas + telemetría rezagada).`);
     }
   } catch (e) {
     console.warn('[Sync] Error al limpiar cola de pruebas:', e);
