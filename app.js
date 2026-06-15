@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.110'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.111'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -3832,6 +3832,13 @@ function toggleSortOrdenes(col) {
 function renderTabla(ctx) {
   try { actualizarFiltrosPersonal(); } catch (e) {}
   const isServiciosView = ctx === 'servicios';
+  if (isServiciosView) {
+    const btnRegen = document.getElementById('btn-regenerar-ordenes');
+    if (btnRegen) {
+      const isAdmin = currentSession && ['superadmin', 'admin'].includes(currentSession.viewMode);
+      btnRegen.style.display = isAdmin ? 'flex' : 'none';
+    }
+  }
   const isV2 = ctx === 'v2';
   const bodyId = isServiciosView ? 'tabla-body-servicios' : (isV2 ? 'v2-tabla-body' : 'tabla-body');
   const searchId = isServiciosView ? 'search-servicios' : (isV2 ? 'v2-search-ordenes' : 'search-input');
