@@ -1025,6 +1025,32 @@ async function _processSyncQueueInternal() {
               console.error('[Sync] Error al procesar sub-entidades de orden:', ordErr.message);
             }
           }
+          if (item.table === 'ordenes' && !error) {
+            try {
+              const localOrd = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+              const idx = localOrd.findIndex(o => o.id === item.data.id);
+              if (idx > -1) {
+                localOrd[idx]._synced = true;
+                localStorage.setItem('sapi_ordenes', JSON.stringify(localOrd));
+                console.log(`[Sync] Marcado orden local como sincronizada (_synced: true) para ${item.data.id}`);
+              }
+            } catch (loErr) {
+              console.error('[Sync] Error al marcar orden local como sincronizada:', loErr);
+            }
+          }
+          if (item.table === 'tickets' && !error) {
+            try {
+              const localTk = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+              const idx = localTk.findIndex(t => t.id === item.data.id);
+              if (idx > -1) {
+                localTk[idx]._synced = true;
+                localStorage.setItem('sapi_tickets', JSON.stringify(localTk));
+                console.log(`[Sync] Marcado ticket local como sincronizado (_synced: true) para ${item.data.id}`);
+              }
+            } catch (ltErr) {
+              console.error('[Sync] Error al marcar ticket local como sincronizado:', ltErr);
+            }
+          }
           if (item.table === 'gastos' && !error) {
             try {
               const localGast = JSON.parse(localStorage.getItem('sapi_gastos') || '[]');
