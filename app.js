@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.107'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.108'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -210,7 +210,7 @@ function formatFechaHoraAmigable(dateStr) {
 
 // ===== DATA =====
 let ordenes = safeGetJSON('sapi_ordenes', []);
-deduplicarOrdenesLocales(); // Eliminar duplicados fantasmas al iniciar
+setTimeout(deduplicarOrdenesLocales, 2000); // Eliminar duplicados fantasmas en segundo plano tras inicializar
 let tickets = safeGetJSON('sapi_tickets', []);
 let clientesDb = safeGetJSON('sapi_clientes_db', []);
 let refaccionesDb = safeGetJSON('sapi_refacciones_db', []);
@@ -20193,7 +20193,7 @@ async function confirmarFusionClientes() {
   });
 
   if (removedIds.size > 0) {
-    console.log(`[Deduplicar] Eliminadas ${removedIds.size} órdenes duplicadas.`);
+    console.log(`[Deduplicar] Eliminadas ${removedIds.size} órdenes duplicadas locales.`);
     localStorage.setItem('sapi_ordenes', JSON.stringify(keep));
     ordenes = keep; // actualizar la variable global en memoria
     
@@ -20208,8 +20208,64 @@ async function confirmarFusionClientes() {
         return true;
       });
       localStorage.setItem('sapi_sync_queue', JSON.stringify(newQueue));
+      if (window.updateSyncStatusUI) window.updateSyncStatusUI();
     } catch (e) {
       console.error('Error limpiando cola de sync en deduplicación:', e);
     }
+  }
+
+  // Deduplicar en Supabase usando la sesión actual del usuario
+  const sb = window.supabaseClient;
+  if (sb) {
+    (async () => {
+      try {
+        const { data: supaOrds, error: fetchErr } = await sb.from('ordenes').select('*');
+        if (!fetchErr && supaOrds && supaOrds.length > 0) {
+          const sSeen = new Map();
+          const sDupIds = [];
+
+          // Ordenar para mantener el primer folio creado
+          supaOrds.sort((a, b) => String(a.folio || a.id).localeCompare(String(b.folio || b.id)));
+
+          supaOrds.forEach(o => {
+            let cName = o.cliente || '';
+            try {
+              const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+              const match = clientes.find(c => c.id === o.cliente);
+              if (match) cName = match.nombre;
+            } catch (e) {}
+
+            const key = [
+              cName || '',
+              o.tecnico || '',
+              o.tipo || '',
+              o.fecha || '',
+              o.maquinaria_id || '',
+              o.sitio_id || '',
+              o.notas || '',
+              o.evidencia_url || ''
+            ].join('|');
+
+            if (!sSeen.has(key)) {
+              sSeen.set(key, o.id);
+            } else {
+              sDupIds.push(o.id);
+            }
+          });
+
+          if (sDupIds.length > 0) {
+            console.log(`[Deduplicar Supabase] Eliminando ${sDupIds.length} duplicados en Supabase...`);
+            for (let i = 0; i < sDupIds.length; i += 50) {
+              const batch = sDupIds.slice(i, i + 50);
+              await sb.from('ordenes').delete().in('id', batch);
+            }
+            console.log('[Deduplicar Supabase] Devolviendo ordenes deduplicadas.');
+            mostrarNotificacion(`Se han eliminado ${sDupIds.length} órdenes duplicadas en la base de datos.`, 'info');
+          }
+        }
+      } catch (e) {
+        console.warn('Bypassing Supabase deduplication due to session/auth:', e);
+      }
+    })();
   }
 }

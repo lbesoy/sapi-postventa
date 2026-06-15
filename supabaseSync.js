@@ -684,8 +684,8 @@ async function _processSyncQueueInternal() {
                   if (match) existingClienteNombre = match.nombre;
                 } catch (e) {}
 
-                const esColision = existingClienteNombre !== item.data.cliente || 
-                                   existingSoporte !== item.data.soporte;
+                const esColision = (existingClienteNombre || '').trim().toLowerCase() !== (item.data.cliente || '').trim().toLowerCase() || 
+                                   (existingSoporte || '').trim().toLowerCase() !== (item.data.soporte || '').trim().toLowerCase();
                                    
                 if (esColision) {
                   console.log(`[Sync] Colisión de folio detectada para ${finalId}. Calculando nuevo folio...`);
