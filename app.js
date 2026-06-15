@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.103'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.104'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -19814,6 +19814,27 @@ function cerrarModalFusionarClientes() {
   }
 }
 
+function esMismoCliente(c1, c2) {
+  if (!c1 || !c2) return false;
+  return c1.nombre === c2.nombre && (c1.id || '') === (c2.id || '') && !!c1.legacy === !!c2.legacy;
+}
+
+function mostrarCargando(show, text = 'Cargando...') {
+  const btn = document.getElementById('btn-confirmar-fusion');
+  if (!btn) return;
+  if (show) {
+    btn.disabled = true;
+    btn.dataset.originalHtml = btn.innerHTML;
+    btn.innerHTML = `<span style="display:inline-block; width:14px; height:14px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; margin-right:6px; vertical-align:middle; animation:spin 0.75s linear infinite;"></span> ${text}`;
+    btn.style.opacity = '0.7';
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = btn.dataset.originalHtml || `<i data-lucide="git-merge" style="width:15px;height:15px;"></i> Fusionar Clientes`;
+    btn.style.opacity = '1';
+    if (window.lucide) window.lucide.createIcons();
+  }
+}
+
 function filtrarFusionClientes(tipo) {
   const input = document.getElementById(`fusionar-${tipo}-input`);
   const lista = document.getElementById(`fusionar-${tipo}-lista`);
@@ -19825,8 +19846,8 @@ function filtrarFusionClientes(tipo) {
   // Filtrar de todos los clientes de la app
   const matches = todos.filter(c => {
     // Excluir si es el otro cliente ya seleccionado
-    if (tipo === 'principal' && _fusionDuplicado && c.nombre === _fusionDuplicado.nombre) return false;
-    if (tipo === 'duplicado' && _fusionPrincipal && c.nombre === _fusionPrincipal.nombre) return false;
+    if (tipo === 'principal' && _fusionDuplicado && esMismoCliente(c, _fusionDuplicado)) return false;
+    if (tipo === 'duplicado' && _fusionPrincipal && esMismoCliente(c, _fusionPrincipal)) return false;
     
     return (
       (c.nombre || '').toLowerCase().includes(val) ||
@@ -19841,7 +19862,7 @@ function filtrarFusionClientes(tipo) {
     lista.innerHTML = matches.map(c => {
       const idText = c.id && c.id !== 'Usuario registrado' ? `<span style="font-family:monospace; font-size:0.7rem; background:var(--bg-body); padding:0.1rem 0.3rem; border-radius:3px; color:var(--text-muted); border:1px solid var(--border);">${c.id}</span>` : '<span style="font-size:0.7rem; color:var(--text-muted);">Sin ID SAP</span>';
       return `
-        <div onclick="seleccionarClienteFusion('${tipo}', '${c.nombre.replace(/'/g, "\\'")}')"
+        <div onclick="seleccionarClienteFusion('${tipo}', '${c.nombre.replace(/'/g, "\\'")}', '${(c.id || '').replace(/'/g, "\\'")}', ${c.legacy ? 'true' : 'false'})"
           style="padding:0.6rem 0.75rem; cursor:pointer; font-size:0.85rem; border-bottom:1px solid var(--border); transition:background 0.2s; display:flex; align-items:center; justify-content:space-between;"
           onmouseover="this.style.background='var(--bg-hover)'"
           onmouseout="this.style.background='transparent'">
@@ -19872,8 +19893,12 @@ document.addEventListener('click', function(e) {
   }
 });
 
-function seleccionarClienteFusion(tipo, nombre) {
-  const client = obtenerTodosLosClientes().find(c => c.nombre === nombre);
+function seleccionarClienteFusion(tipo, nombre, id, isLegacy) {
+  const client = obtenerTodosLosClientes().find(c => 
+    c.nombre === nombre && 
+    (c.id || '') === (id || '') && 
+    !!c.legacy === !!isLegacy
+  );
   if (!client) return;
 
   if (tipo === 'principal') {
