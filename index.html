@@ -29,7 +29,7 @@
       }
     } else if (typeof window !== 'undefined') {
       // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
-      const currentAppVer = '1.3.98';
+      const currentAppVer = '1.3.99';
       const lastAppVer = localStorage.getItem('sapi_app_version');
       if (lastAppVer && lastAppVer !== currentAppVer) {
         if ('serviceWorker' in navigator) {
@@ -281,7 +281,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version">v1.3.98</div>
+          <div class="sidebar-version">v1.3.99</div>
         </div>
       </div>
     </aside>
@@ -1023,6 +1023,12 @@
                 <button class="btn-secondary" id="btn-cli-lista" onclick="setCliView('lista')" title="Vista Lista"
                   style="padding:0.4rem;"><i data-lucide="list" style="width:18px;height:18px;"></i></button>
               </div>
+              <button class="action-btn" onclick="abrirModalFusionarClientes()"
+                id="btn-fusionar-clientes"
+                title="Fusionar cliente duplicado con el original de SAP"
+                style="height:38px; display:none; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--orange, #f59e0b); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
+                <i data-lucide="git-merge" class="btn-icon" style="width:14px;height:14px;"></i> Fusionar Duplicados
+              </button>
               <button class="action-btn" onclick="sincronizarConGitHub('clientes', this)"
                 title="Actualizar Clientes desde SAP"
                 style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
@@ -2619,6 +2625,93 @@
         <div class="modal-body" id="detalle-cliente-body"
           style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
           <!-- Llenado dinámicamente con JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL FUSIONAR CLIENTES DUPLICADOS -->
+    <div class="modal-overlay" id="modal-fusionar-clientes-overlay" onclick="if(event.target===this) cerrarModalFusionarClientes()" style="display:none; opacity:0; transition: opacity 0.2s;">
+      <div class="modal" style="max-width:620px; transition: transform 0.2s, opacity 0.2s; transform: translateY(20px); opacity:0;" id="modal-fusionar-clientes-inner">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:0.75rem;">
+            <div style="width:36px; height:36px; border-radius:50%; background:rgba(245,158,11,0.12); display:flex; align-items:center; justify-content:center;">
+              <i data-lucide="git-merge" style="width:18px; height:18px; color:#f59e0b;"></i>
+            </div>
+            <div>
+              <h2 style="margin:0; font-size:1.1rem;">Fusionar Clientes Duplicados</h2>
+              <p style="margin:0; font-size:0.78rem; color:var(--text-muted);">El duplicado se eliminará. Sus tickets, órdenes y máquinas pasarán al cliente principal.</p>
+            </div>
+          </div>
+          <button class="modal-close" onclick="cerrarModalFusionarClientes()">✕</button>
+        </div>
+        <div class="modal-body" style="padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem;">
+
+          <!-- CLIENTE PRINCIPAL (conservar) -->
+          <div>
+            <label style="font-size:0.8rem; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom:0.5rem;">
+              <i data-lucide="shield-check" style="width:13px;height:13px;vertical-align:middle;color:var(--green, #22c55e);margin-right:4px;"></i>
+              Cliente Principal (conservar)
+            </label>
+            <div style="position:relative;">
+              <input type="text" id="fusionar-principal-input" placeholder="Buscar cliente SAP..." autocomplete="off"
+                oninput="filtrarFusionClientes('principal')"
+                onfocus="mostrarListaFusion('principal')"
+                style="width:100%; padding:0.7rem 0.9rem; border:1.5px solid var(--border); border-radius:var(--radius-md); background:var(--bg-secondary); color:var(--text-primary); font-size:0.9rem; box-sizing:border-box;">
+              <div id="fusionar-principal-lista" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-md); box-shadow:0 8px 24px rgba(0,0,0,0.3); max-height:200px; overflow-y:auto; margin-top:4px;"></div>
+            </div>
+            <div id="fusionar-principal-preview" style="display:none; margin-top:0.5rem; padding:0.75rem; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.3); border-radius:var(--radius-sm);">
+            </div>
+          </div>
+
+          <!-- FLECHA DE FUSIÓN -->
+          <div style="text-align:center; color:var(--text-muted);">
+            <div style="display:flex; align-items:center; gap:0.5rem; justify-content:center;">
+              <div style="height:1px; flex:1; background:var(--border);"></div>
+              <span style="font-size:0.8rem; display:flex; align-items:center; gap:0.4rem; white-space:nowrap;">
+                <i data-lucide="arrow-up" style="width:14px;height:14px;color:var(--orange,#f59e0b);"></i>
+                absorbe a
+              </span>
+              <div style="height:1px; flex:1; background:var(--border);"></div>
+            </div>
+          </div>
+
+          <!-- CLIENTE DUPLICADO (eliminar) -->
+          <div>
+            <label style="font-size:0.8rem; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom:0.5rem;">
+              <i data-lucide="trash-2" style="width:13px;height:13px;vertical-align:middle;color:var(--red, #ef4444);margin-right:4px;"></i>
+              Cliente Duplicado (eliminar)
+            </label>
+            <div style="position:relative;">
+              <input type="text" id="fusionar-duplicado-input" placeholder="Buscar cliente duplicado..." autocomplete="off"
+                oninput="filtrarFusionClientes('duplicado')"
+                onfocus="mostrarListaFusion('duplicado')"
+                style="width:100%; padding:0.7rem 0.9rem; border:1.5px solid var(--border); border-radius:var(--radius-md); background:var(--bg-secondary); color:var(--text-primary); font-size:0.9rem; box-sizing:border-box;">
+              <div id="fusionar-duplicado-lista" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-md); box-shadow:0 8px 24px rgba(0,0,0,0.3); max-height:200px; overflow-y:auto; margin-top:4px;"></div>
+            </div>
+            <div id="fusionar-duplicado-preview" style="display:none; margin-top:0.5rem; padding:0.75rem; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3); border-radius:var(--radius-sm);">
+            </div>
+          </div>
+
+          <!-- RESUMEN DE LO QUE SE VA A REASIGNAR -->
+          <div id="fusionar-resumen" style="display:none; padding:1rem; background:var(--bg-secondary); border-radius:var(--radius-md); font-size:0.85rem; line-height:1.7;">
+          </div>
+
+          <!-- ADVERTENCIA -->
+          <div style="padding:0.75rem; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:var(--radius-sm); font-size:0.8rem; color:var(--text-muted); display:flex; gap:0.5rem; align-items:flex-start;">
+            <i data-lucide="alert-triangle" style="width:15px;height:15px;color:#f59e0b;flex-shrink:0;margin-top:1px;"></i>
+            <span>Esta operación <strong>no se puede deshacer</strong>. El cliente duplicado será eliminado permanentemente de la base de datos.</span>
+          </div>
+
+          <!-- BOTONES -->
+          <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:0.25rem;">
+            <button class="btn-secondary" onclick="cerrarModalFusionarClientes()" style="padding:0.6rem 1.25rem;">Cancelar</button>
+            <button id="btn-confirmar-fusion" onclick="confirmarFusionClientes()" disabled
+              style="padding:0.6rem 1.5rem; background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:var(--radius-md); cursor:pointer; font-weight:600; font-size:0.9rem; display:flex; align-items:center; gap:0.5rem; opacity:0.4; transition: opacity 0.2s;">
+              <i data-lucide="git-merge" style="width:15px;height:15px;"></i>
+              Fusionar Clientes
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
@@ -4711,7 +4804,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js?v=2"></script>
   <script src="supabaseSync.js?v=52"></script>
-  <script src="app.js?v=118"></script>
+  <script src="app.js?v=119"></script>
   <script>lucide.createIcons();</script>
 </body>
 

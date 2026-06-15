@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.98'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.99'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -4525,6 +4525,12 @@ function renderClientes() {
   const tbody = document.getElementById('clientes-table-body');
   const paginationContainer = document.getElementById('clientes-pagination');
   
+  const btnFusionar = document.getElementById('btn-fusionar-clientes');
+  if (btnFusionar) {
+    const isAdmin = currentSession && ['superadmin', 'admin'].includes(currentSession.viewMode);
+    btnFusionar.style.display = isAdmin ? 'flex' : 'none';
+  }
+  
   // Eliminado el auto-sync bloqueante. Cargamos directamente la caché local.
   // Combina clientes legacy (de las órdenes) con clientes registrados
   const legacyMap = new Map();
@@ -5078,32 +5084,32 @@ function verDetalleCliente(nombre) {
          </div>
        `;
      } else {
-       const o = item.obj;
-       return `
-         <div onclick="verDetalle('${o.id}')" style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:var(--bg-card); display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition: border-color 0.2s, box-shadow 0.2s;" onmouseover="this.style.borderColor='var(--accent)';" onmouseout="this.style.borderColor='var(--border)';">
-           <div>
-             <div style="display:flex; align-items:center; gap:0.4rem;">
-               <i data-lucide="clipboard-list" style="width:14px;height:14px;color:var(--accent);"></i>
-               <span style="font-weight:500; color:var(--accent);">Orden #${o.folio || '-'}</span>
-             </div>
-             <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.3rem;">
-               ${formatDateOnly(o.fecha)}
-             </div>
-           </div>
-           <span class="badge badge-${o.estado==='Pendiente'?'pendiente':o.estado==='En Proceso'?'proceso':'completado'}">${o.estado||'Pendiente'}</span>
-         </div>
-       `;
-     }
+        const o = item.obj;
+        return `
+          <div onclick="verDetalle('${o.id}')" style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:var(--bg-card); display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition: border-color 0.2s, box-shadow 0.2s;" onmouseover="this.style.borderColor='var(--accent)';" onmouseout="this.style.borderColor='var(--border)';">
+            <div>
+              <div style="display:flex; align-items:center; gap:0.4rem;">
+                <i data-lucide="clipboard-list" style="width:14px;height:14px;color:var(--accent);"></i>
+                <span style="font-weight:500; color:var(--accent);">Orden #${o.folio || '-'}</span>
+              </div>
+              <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.3rem;">
+                ${formatDateOnly(o.fecha)}
+              </div>
+            </div>
+            <span class="badge badge-${o.estado==='Pendiente'?'pendiente':o.estado==='En Proceso'?'proceso':'completado'}">${o.estado||'Pendiente'}</span>
+          </div>
+        `;
+      }
   };
 
   if (historial.length > 0) {
     html += `
       <div style="margin-top: 1.5rem;">
-        <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="layers" style="width:18px;height:18px;color:var(--text-muted);"></i> Historial de Servicios (${historial.length})</h3>
+        <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);"><i data-lucide="layers" style="width:18px;height:18px;color:var(--text-muted);"></i> Historial de Servicios (${historial.length})</h3>
         <div style="display:flex; flex-direction:column;">
           ${activos.map(renderItem).join('')}
           <div style="margin-top: 0.2rem; margin-bottom: 0.5rem; text-align: center;">
-             <button type="button" onclick="const div = document.getElementById('cliente-historial-cerrados'); div.style.display = div.style.display === 'none' ? 'block' : 'none'; const icon = this.querySelector('i'); if(div.style.display==='none'){ icon.setAttribute('data-lucide', 'chevron-down'); } else { icon.setAttribute('data-lucide', 'chevron-up'); } lucide.createIcons();" style="background: none; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-muted); font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.8rem; font-weight: 500; transition: background 0.2s;">
+             <button type="button" onclick="const div = document.getElementById('cliente-historial-cerrados'); div.style.display = div.style.display === 'none' ? 'block' : 'none'; const icon = this.querySelector('i') || this.querySelector('svg'); if(div.style.display==='none'){ icon && icon.setAttribute('data-lucide', 'chevron-down'); } else { icon && icon.setAttribute('data-lucide', 'chevron-up'); } if(this.querySelector('i')) lucide.createIcons();" style="background: none; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-muted); font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.8rem; font-weight: 500; transition: background 0.2s;">
                 Ver completados (${cerrados.length}) <i data-lucide="chevron-down" style="width:14px;height:14px;"></i>
              </button>
           </div>
@@ -5114,6 +5120,7 @@ function verDetalleCliente(nombre) {
       </div>
     `;
   }
+
 
   body.innerHTML = html;
   document.getElementById('modal-detalle-cliente-overlay').classList.add('open');
@@ -5540,16 +5547,16 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
 
   if (historial.length > 0) {
     html += `
-      <div>
+      <div style="margin-top: 1.5rem;">
         <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="layers" style="width:18px;height:18px;color:var(--text-muted);"></i> Historial de Servicios (${historial.length})</h3>
         <div style="display:flex; flex-direction:column;">
           ${activos.map(renderItem).join('')}
           <div style="margin-top: 0.2rem; margin-bottom: 0.5rem; text-align: center;">
-             <button type="button" onclick="const div = document.getElementById('historial-cerrados'); div.style.display = div.style.display === 'none' ? 'block' : 'none'; const icon = this.querySelector('i'); if(div.style.display==='none'){ icon.setAttribute('data-lucide', 'chevron-down'); } else { icon.setAttribute('data-lucide', 'chevron-up'); } lucide.createIcons();" style="background: none; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-muted); font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.8rem; font-weight: 500; transition: background 0.2s;">
-                Ver completados (${cerrados.length}) <i data-lucide="chevron-down" style="width:14px;height:14px;"></i>
+             <button type="button" onclick="const div = document.getElementById('cliente-historial-cerrados'); div.style.display = div.style.display === 'none' ? 'block' : 'none'; const icon = this.querySelector('i') || this.querySelector('svg'); if(div.style.display==='none'){ icon && icon.setAttribute('data-lucide', 'chevron-down'); } else { icon && icon.setAttribute('data-lucide', 'chevron-up'); } if(this.querySelector('i')) lucide.createIcons();" style="background: none; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-muted); font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.8rem; font-weight: 500; transition: background 0.2s;">
+                 Ver completados (${cerrados.length}) <i data-lucide="chevron-down" style="width:14px;height:14px;"></i>
              </button>
           </div>
-          <div id="historial-cerrados" style="display:none;">
+          <div id="cliente-historial-cerrados" style="display:none;">
              ${cerrados.length > 0 ? cerrados.map(renderItem).join('') : '<div style="text-align:center; padding:1rem; color:var(--text-muted); font-size:0.8rem;">No hay servicios completados aún.</div>'}
           </div>
         </div>
@@ -19718,5 +19725,356 @@ window.renderTelemetryDashboard = function() {
   // 4. Render Event feed list
   window.renderTelemetryEventsFeed();
 };
+
+
+// ==========================================
+// FUSIÓN DE CLIENTES DUPLICADOS (v1.3.99)
+// ==========================================
+let _fusionPrincipal = null;  // Cliente principal (conservar)
+let _fusionDuplicado = null;  // Cliente duplicado (eliminar)
+
+function abrirModalFusionarClientes() {
+  _fusionPrincipal = null;
+  _fusionDuplicado = null;
+
+  document.getElementById('fusionar-principal-input').value = '';
+  document.getElementById('fusionar-duplicado-input').value = '';
+
+  document.getElementById('fusionar-principal-preview').style.display = 'none';
+  document.getElementById('fusionar-duplicado-preview').style.display = 'none';
+  document.getElementById('fusionar-resumen').style.display = 'none';
+
+  const btnConfirmar = document.getElementById('btn-confirmar-fusion');
+  if (btnConfirmar) {
+    btnConfirmar.disabled = true;
+    btnConfirmar.style.opacity = '0.4';
+  }
+
+  const overlay = document.getElementById('modal-fusionar-clientes-overlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    requestAnimationFrame(() => {
+      overlay.style.opacity = '1';
+      const inner = document.getElementById('modal-fusionar-clientes-inner');
+      if (inner) {
+        inner.style.transform = 'translateY(0)';
+        inner.style.opacity = '1';
+      }
+    });
+  }
+  lucide.createIcons();
+}
+
+function cerrarModalFusionarClientes() {
+  const overlay = document.getElementById('modal-fusionar-clientes-overlay');
+  const inner = document.getElementById('modal-fusionar-clientes-inner');
+  if (overlay && inner) {
+    overlay.style.opacity = '0';
+    inner.style.transform = 'translateY(20px)';
+    inner.style.opacity = '0';
+    setTimeout(() => {
+      overlay.style.display = 'none';
+    }, 200);
+  }
+}
+
+function filtrarFusionClientes(tipo) {
+  const input = document.getElementById(`fusionar-${tipo}-input`);
+  const lista = document.getElementById(`fusionar-${tipo}-lista`);
+  if (!input || !lista) return;
+
+  const val = input.value.toLowerCase().trim();
+  
+  // Filtrar de clientesDb
+  const matches = clientesDb.filter(c => {
+    // Excluir si es el otro cliente ya seleccionado
+    if (tipo === 'principal' && _fusionDuplicado && c.nombre === _fusionDuplicado.nombre) return false;
+    if (tipo === 'duplicado' && _fusionPrincipal && c.nombre === _fusionPrincipal.nombre) return false;
+    
+    return (
+      (c.nombre || '').toLowerCase().includes(val) ||
+      (c.rfc || '').toLowerCase().includes(val) ||
+      (c.id || '').toLowerCase().includes(val)
+    );
+  });
+
+  if (matches.length === 0) {
+    lista.innerHTML = `<div style="padding:0.6rem 0.75rem; color:var(--text-muted); font-size:0.85rem; text-align:center;">No se encontraron resultados</div>`;
+  } else {
+    lista.innerHTML = matches.map(c => {
+      const idText = c.id ? `<span style="font-family:monospace; font-size:0.7rem; background:var(--bg-body); padding:0.1rem 0.3rem; border-radius:3px; color:var(--text-muted); border:1px solid var(--border);">${c.id}</span>` : '<span style="font-size:0.7rem; color:var(--text-muted);">Sin ID SAP</span>';
+      return `
+        <div onclick="seleccionarClienteFusion('${tipo}', '${c.nombre.replace(/'/g, "\\'")}')"
+          style="padding:0.6rem 0.75rem; cursor:pointer; font-size:0.85rem; border-bottom:1px solid var(--border); transition:background 0.2s; display:flex; align-items:center; justify-content:space-between;"
+          onmouseover="this.style.background='var(--bg-hover)'"
+          onmouseout="this.style.background='transparent'">
+          <span style="font-weight:500; color:var(--text-primary);">${c.nombre}</span>
+          ${idText}
+        </div>
+      `;
+    }).join('');
+  }
+  lista.style.display = 'block';
+}
+
+function mostrarListaFusion(tipo) {
+  filtrarFusionClientes(tipo);
+}
+
+// Cerrar listas si se hace click afuera
+document.addEventListener('click', function(e) {
+  const pInput = document.getElementById('fusionar-principal-input');
+  const pLista = document.getElementById('fusionar-principal-lista');
+  if (pInput && pLista && !e.target.closest('#fusionar-principal-input') && !e.target.closest('#fusionar-principal-lista')) {
+    pLista.style.display = 'none';
+  }
+  const dInput = document.getElementById('fusionar-duplicado-input');
+  const dLista = document.getElementById('fusionar-duplicado-lista');
+  if (dInput && dLista && !e.target.closest('#fusionar-duplicado-input') && !e.target.closest('#fusionar-duplicado-lista')) {
+    dLista.style.display = 'none';
+  }
+});
+
+function seleccionarClienteFusion(tipo, nombre) {
+  const client = clientesDb.find(c => c.nombre === nombre);
+  if (!client) return;
+
+  if (tipo === 'principal') {
+    _fusionPrincipal = client;
+  } else {
+    _fusionDuplicado = client;
+  }
+
+  const input = document.getElementById(`fusionar-${tipo}-input`);
+  const lista = document.getElementById(`fusionar-${tipo}-lista`);
+  if (input) input.value = nombre;
+  if (lista) lista.style.display = 'none';
+
+  // Mostrar previsualización
+  const preview = document.getElementById(`fusionar-${tipo}-preview`);
+  if (preview) {
+    const pfx = tipo === 'principal' ? 'conservar' : 'eliminar';
+    const color = tipo === 'principal' ? 'var(--green, #22c55e)' : 'var(--red, #ef4444)';
+    const bg = tipo === 'principal' ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)';
+    const border = tipo === 'principal' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)';
+
+    // Contar tickets y órdenes
+    const tkCount = tickets.filter(t => t.cliente === client.nombre || t.solicitante === client.nombre).length;
+    const ordCount = ordenes.filter(o => o.cliente === client.nombre).length;
+
+    // Contar maquinaria
+    let clientMaqs = [];
+    const mSAP = maquinariaDb.filter(m => m.cliente === client.nombre || (client.id && m.cliente === client.id) || (client.rfc && m.cliente === client.rfc));
+    mSAP.forEach(m => clientMaqs.push(m.id || m.idInterno || m.serie));
+    (client.maquinas || []).forEach(m => {
+      if (!mSAP.some(sap => sap.id === m.idInterno || sap.serie === m.serie)) {
+        clientMaqs.push(m.idInterno || m.serie);
+      }
+    });
+    const maqCount = [...new Set(clientMaqs)].length;
+
+    preview.style.background = bg;
+    preview.style.borderColor = border;
+    preview.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <div style="font-weight:600; color:var(--text-primary); font-size:0.9rem;">${client.nombre}</div>
+          <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.15rem; display:flex; gap:0.5rem; align-items:center;">
+            <span>RFC: ${client.rfc || 'N/A'}</span>
+            ${client.id ? `• <span>ID SAP: <strong style="font-family:monospace;">${client.id}</strong></span>` : '• <span style="color:#d97706; font-weight:500;">Sin ID SAP</span>'}
+          </div>
+        </div>
+        <span style="font-size:0.7rem; font-weight:600; text-transform:uppercase; color:${color}; background:rgba(${tipo === 'principal' ? '34,197,94,0.12' : '239,68,68,0.12'}); padding:0.15rem 0.4rem; border-radius:4px;">${pfx}</span>
+      </div>
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:0.5rem; margin-top:0.5rem; text-align:center; font-size:0.78rem; border-top:1px dashed var(--border); padding-top:0.4rem; color:var(--text-muted);">
+        <div><strong>${ordCount}</strong> órdenes</div>
+        <div><strong>${tkCount}</strong> tickets</div>
+        <div><strong>${maqCount}</strong> máquinas</div>
+      </div>
+    `;
+    preview.style.display = 'block';
+  }
+
+  actualizarResumenFusion();
+}
+
+function actualizarResumenFusion() {
+  const resumen = document.getElementById('fusionar-resumen');
+  const btnConfirmar = document.getElementById('btn-confirmar-fusion');
+  if (!resumen || !btnConfirmar) return;
+
+  if (_fusionPrincipal && _fusionDuplicado) {
+    const dupOrd = ordenes.filter(o => o.cliente === _fusionDuplicado.nombre).length;
+    const dupTk = tickets.filter(t => t.cliente === _fusionDuplicado.nombre || t.solicitante === _fusionDuplicado.nombre).length;
+
+    let dupMaqs = [];
+    const mSAP = maquinariaDb.filter(m => m.cliente === _fusionDuplicado.nombre || (_fusionDuplicado.id && m.cliente === _fusionDuplicado.id) || (_fusionDuplicado.rfc && m.cliente === _fusionDuplicado.rfc));
+    mSAP.forEach(m => dupMaqs.push(m.id || m.idInterno || m.serie));
+    (_fusionDuplicado.maquinas || []).forEach(m => {
+      if (!mSAP.some(sap => sap.id === m.idInterno || sap.serie === m.serie)) {
+        dupMaqs.push(m.idInterno || m.serie);
+      }
+    });
+    const dupMaqCount = [...new Set(dupMaqs)].length;
+
+    resumen.innerHTML = `
+      <div style="font-weight:600; color:var(--text-primary); margin-bottom:0.4rem;">Resumen de la Fusión:</div>
+      <ul style="margin:0; padding-left:1.2rem; color:var(--text-secondary);">
+        <li>Se reasignarán <strong>${dupOrd}</strong> órdenes a <strong>${_fusionPrincipal.nombre}</strong>.</li>
+        <li>Se reasignarán <strong>${dupTk}</strong> tickets a <strong>${_fusionPrincipal.nombre}</strong>.</li>
+        <li>Se transferirán <strong>${dupMaqCount}</strong> máquinas registradas a <strong>${_fusionPrincipal.nombre}</strong>.</li>
+        <li>El cliente duplicado <strong>${_fusionDuplicado.nombre}</strong> será eliminado permanentemente.</li>
+      </ul>
+    `;
+    resumen.style.display = 'block';
+    btnConfirmar.disabled = false;
+    btnConfirmar.style.opacity = '1';
+  } else {
+    resumen.style.display = 'none';
+    btnConfirmar.disabled = true;
+    btnConfirmar.style.opacity = '0.4';
+  }
+}
+
+async function confirmarFusionClientes() {
+  if (!_fusionPrincipal || !_fusionDuplicado) {
+    mostrarNotificacion('Por favor, selecciona ambos clientes.', 'error');
+    return;
+  }
+  if (_fusionPrincipal.nombre === _fusionDuplicado.nombre) {
+    mostrarNotificacion('No se puede fusionar un cliente consigo mismo.', 'error');
+    return;
+  }
+
+  const pNombre = _fusionPrincipal.nombre;
+  const dNombre = _fusionDuplicado.nombre;
+  const pId = _fusionPrincipal.id || pNombre;
+  const dId = _fusionDuplicado.id;
+
+  try {
+    mostrarCargando(true, 'Fusionando clientes...');
+
+    // 1. Reasignar Órdenes
+    let ordenesModificadas = [];
+    ordenes.forEach(o => {
+      if (o.cliente === dNombre) {
+        o.cliente = pNombre;
+        ordenesModificadas.push(o);
+      }
+    });
+
+    // 2. Reasignar Tickets
+    let ticketsModificados = [];
+    tickets.forEach(t => {
+      let mod = false;
+      if (t.cliente === dNombre) {
+        t.cliente = pNombre;
+        mod = true;
+      }
+      if (t.solicitante === dNombre) {
+        t.solicitante = pNombre;
+        mod = true;
+      }
+      if (mod) {
+        ticketsModificados.push(t);
+      }
+    });
+
+    // 3. Reasignar Maquinaria
+    let maqModificada = [];
+    maquinariaDb.forEach(m => {
+      if (m.cliente === dNombre || m.cliente === dId || (dId && m.cliente === dId)) {
+        m.cliente = pId; // Preferimos ID de SAP para la maquinaria
+        maqModificada.push(m);
+      }
+    });
+
+    // 4. Reasignar Sitios
+    let sitiosModificados = [];
+    sitiosDb.forEach(s => {
+      if (s.cliente === dNombre || s.cliente === dId || (dId && s.cliente === dId)) {
+        s.cliente = pId;
+        sitiosModificados.push(s);
+      }
+    });
+
+    // 5. Combinar máquinas del arreglo local en el Cliente Principal
+    const pMaquinas = _fusionPrincipal.maquinas || [];
+    const dMaquinas = _fusionDuplicado.maquinas || [];
+    dMaquinas.forEach(dm => {
+      const existe = pMaquinas.some(pm => pm.idInterno === dm.idInterno || pm.serie === dm.serie);
+      if (!existe) {
+        pMaquinas.push(dm);
+      }
+    });
+    _fusionPrincipal.maquinas = pMaquinas;
+
+    // 6. Combinar sitios del arreglo local en el Cliente Principal
+    const pSitios = _fusionPrincipal.sitios || [];
+    const dSitios = _fusionDuplicado.sitios || [];
+    dSitios.forEach(ds => {
+      if (!pSitios.includes(ds)) {
+        pSitios.push(ds);
+      }
+    });
+    _fusionPrincipal.sitios = pSitios;
+
+    // 7. Completar campos vacíos en Cliente Principal con datos del duplicado
+    _fusionPrincipal.contacto = _fusionPrincipal.contacto || _fusionDuplicado.contacto || '';
+    _fusionPrincipal.telefono = _fusionPrincipal.telefono || _fusionDuplicado.telefono || '';
+    _fusionPrincipal.email = _fusionPrincipal.email || _fusionDuplicado.email || '';
+    _fusionPrincipal.rfc = _fusionPrincipal.rfc || _fusionDuplicado.rfc || '';
+    _fusionPrincipal.ubicacion = _fusionPrincipal.ubicacion || _fusionDuplicado.ubicacion || '';
+    _fusionPrincipal.grupoSinergia = _fusionPrincipal.grupoSinergia || _fusionDuplicado.grupoSinergia || '';
+
+    // 8. Eliminar cliente duplicado de la lista local
+    clientesDb = clientesDb.filter(c => c.nombre !== dNombre && c.id !== dId);
+
+    // 9. Guardar cambios en LocalStorage
+    localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+    localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+    localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+    localStorage.setItem('sapi_maquinaria_db', JSON.stringify(maquinariaDb));
+    localStorage.setItem('sapi_sitios_db', JSON.stringify(sitiosDb));
+
+    // 10. Encolar / Sincronizar en Supabase
+    if (window.pushToSupabase) {
+      // Registrar modificaciones de órdenes
+      for (const o of ordenesModificadas) {
+        window.pushToSupabase('ordenes', o);
+      }
+      // Registrar modificaciones de tickets
+      for (const t of ticketsModificados) {
+        window.pushToSupabase('tickets', t);
+      }
+      // Registrar modificaciones de maquinaria
+      for (const m of maqModificada) {
+        window.pushToSupabase('maquinaria', m);
+      }
+      // Registrar modificaciones de sitios
+      for (const s of sitiosModificados) {
+        window.pushToSupabase('sitios', s);
+      }
+      // Actualizar cliente principal
+      window.pushToSupabase('clientes', _fusionPrincipal);
+
+      // Eliminar cliente duplicado
+      if (dId) {
+        if (window.deleteFromSupabase) {
+          window.deleteFromSupabase('clientes', dId);
+        }
+      }
+    }
+
+    mostrarCargando(false);
+    mostrarNotificacion(`Fusión completada con éxito. ${dNombre} ha sido absorbido por ${pNombre}.`, 'success');
+    cerrarModalFusionarClientes();
+    renderClientes();
+  } catch (err) {
+    console.error('Error al fusionar clientes:', err);
+    mostrarCargando(false);
+    mostrarNotificacion('Ocurrió un error inesperado al realizar la fusión.', 'error');
+  }
+}
 
 
