@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.99'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.100'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -19728,10 +19728,40 @@ window.renderTelemetryDashboard = function() {
 
 
 // ==========================================
-// FUSIÓN DE CLIENTES DUPLICADOS (v1.3.99)
+// FUSIÓN DE CLIENTES DUPLICADOS (v1.3.100)
 // ==========================================
 let _fusionPrincipal = null;  // Cliente principal (conservar)
 let _fusionDuplicado = null;  // Cliente duplicado (eliminar)
+
+function obtenerTodosLosClientes() {
+  const legacyMap = new Map();
+  ordenes.forEach(o => {
+    if (o.cliente) {
+      if (!legacyMap.has(o.cliente)) {
+        legacyMap.set(o.cliente, { nombre: o.cliente, ubicacion: o.ubicacion, legacy: true });
+      }
+    }
+  });
+
+  const merged = [...clientesDb];
+  
+  usuarios.forEach(u => {
+    if (u.rol === 'empresa' || u.rol === 'cliente') {
+      const nomEmpresa = u.empresa || u.nombre;
+      if (!merged.find(c => (c.nombre || '').toLowerCase() === (nomEmpresa || '').toLowerCase())) {
+        merged.push({ nombre: nomEmpresa, id: u.id, ubicacion: 'Usuario registrado' });
+      }
+    }
+  });
+
+  legacyMap.forEach((legacyClient) => {
+    if (!merged.find(c => (c.nombre || '').toLowerCase() === (legacyClient.nombre || '').toLowerCase())) {
+      merged.push(legacyClient);
+    }
+  });
+
+  return merged;
+}
 
 function abrirModalFusionarClientes() {
   _fusionPrincipal = null;
@@ -19784,9 +19814,10 @@ function filtrarFusionClientes(tipo) {
   if (!input || !lista) return;
 
   const val = input.value.toLowerCase().trim();
+  const todos = obtenerTodosLosClientes();
   
-  // Filtrar de clientesDb
-  const matches = clientesDb.filter(c => {
+  // Filtrar de todos los clientes de la app
+  const matches = todos.filter(c => {
     // Excluir si es el otro cliente ya seleccionado
     if (tipo === 'principal' && _fusionDuplicado && c.nombre === _fusionDuplicado.nombre) return false;
     if (tipo === 'duplicado' && _fusionPrincipal && c.nombre === _fusionPrincipal.nombre) return false;
@@ -19802,7 +19833,7 @@ function filtrarFusionClientes(tipo) {
     lista.innerHTML = `<div style="padding:0.6rem 0.75rem; color:var(--text-muted); font-size:0.85rem; text-align:center;">No se encontraron resultados</div>`;
   } else {
     lista.innerHTML = matches.map(c => {
-      const idText = c.id ? `<span style="font-family:monospace; font-size:0.7rem; background:var(--bg-body); padding:0.1rem 0.3rem; border-radius:3px; color:var(--text-muted); border:1px solid var(--border);">${c.id}</span>` : '<span style="font-size:0.7rem; color:var(--text-muted);">Sin ID SAP</span>';
+      const idText = c.id && c.id !== 'Usuario registrado' ? `<span style="font-family:monospace; font-size:0.7rem; background:var(--bg-body); padding:0.1rem 0.3rem; border-radius:3px; color:var(--text-muted); border:1px solid var(--border);">${c.id}</span>` : '<span style="font-size:0.7rem; color:var(--text-muted);">Sin ID SAP</span>';
       return `
         <div onclick="seleccionarClienteFusion('${tipo}', '${c.nombre.replace(/'/g, "\\'")}')"
           style="padding:0.6rem 0.75rem; cursor:pointer; font-size:0.85rem; border-bottom:1px solid var(--border); transition:background 0.2s; display:flex; align-items:center; justify-content:space-between;"
@@ -19836,7 +19867,7 @@ document.addEventListener('click', function(e) {
 });
 
 function seleccionarClienteFusion(tipo, nombre) {
-  const client = clientesDb.find(c => c.nombre === nombre);
+  const client = obtenerTodosLosClientes().find(c => c.nombre === nombre);
   if (!client) return;
 
   if (tipo === 'principal') {
@@ -19881,7 +19912,7 @@ function seleccionarClienteFusion(tipo, nombre) {
           <div style="font-weight:600; color:var(--text-primary); font-size:0.9rem;">${client.nombre}</div>
           <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.15rem; display:flex; gap:0.5rem; align-items:center;">
             <span>RFC: ${client.rfc || 'N/A'}</span>
-            ${client.id ? `• <span>ID SAP: <strong style="font-family:monospace;">${client.id}</strong></span>` : '• <span style="color:#d97706; font-weight:500;">Sin ID SAP</span>'}
+            ${client.id && client.id !== 'Usuario registrado' ? `• <span>ID SAP: <strong style="font-family:monospace;">${client.id}</strong></span>` : '• <span style="color:#d97706; font-weight:500;">Sin ID SAP</span>'}
           </div>
         </div>
         <span style="font-size:0.7rem; font-weight:600; text-transform:uppercase; color:${color}; background:rgba(${tipo === 'principal' ? '34,197,94,0.12' : '239,68,68,0.12'}); padding:0.15rem 0.4rem; border-radius:4px;">${pfx}</span>
@@ -19948,11 +19979,29 @@ async function confirmarFusionClientes() {
 
   const pNombre = _fusionPrincipal.nombre;
   const dNombre = _fusionDuplicado.nombre;
-  const pId = _fusionPrincipal.id || pNombre;
-  const dId = _fusionDuplicado.id;
+  const pId = (_fusionPrincipal.id && _fusionPrincipal.id !== 'Usuario registrado') ? _fusionPrincipal.id : pNombre;
+  const dId = (_fusionDuplicado.id && _fusionDuplicado.id !== 'Usuario registrado') ? _fusionDuplicado.id : null;
 
   try {
     mostrarCargando(true, 'Fusionando clientes...');
+
+    // Asegurarse de que el principal exista en clientesDb
+    let principalEnDb = clientesDb.find(c => c.nombre === pNombre || (pId && c.id === pId));
+    if (!principalEnDb) {
+      principalEnDb = {
+        id: pId && pId !== pNombre ? pId : crypto.randomUUID(),
+        nombre: pNombre,
+        rfc: _fusionPrincipal.rfc || '',
+        ubicacion: _fusionPrincipal.ubicacion || '',
+        contacto: _fusionPrincipal.contacto || '',
+        telefono: _fusionPrincipal.telefono || '',
+        email: _fusionPrincipal.email || '',
+        maquinas: [],
+        sitios: [],
+        createdAt: new Date().toISOString()
+      };
+      clientesDb.push(principalEnDb);
+    }
 
     // 1. Reasignar Órdenes
     let ordenesModificadas = [];
@@ -19998,8 +20047,8 @@ async function confirmarFusionClientes() {
       }
     });
 
-    // 5. Combinar máquinas del arreglo local en el Cliente Principal
-    const pMaquinas = _fusionPrincipal.maquinas || [];
+    // 5. Combinar máquinas en el Cliente Principal
+    const pMaquinas = principalEnDb.maquinas || [];
     const dMaquinas = _fusionDuplicado.maquinas || [];
     dMaquinas.forEach(dm => {
       const existe = pMaquinas.some(pm => pm.idInterno === dm.idInterno || pm.serie === dm.serie);
@@ -20007,25 +20056,25 @@ async function confirmarFusionClientes() {
         pMaquinas.push(dm);
       }
     });
-    _fusionPrincipal.maquinas = pMaquinas;
+    principalEnDb.maquinas = pMaquinas;
 
-    // 6. Combinar sitios del arreglo local en el Cliente Principal
-    const pSitios = _fusionPrincipal.sitios || [];
+    // 6. Combinar sitios en el Cliente Principal
+    const pSitios = principalEnDb.sitios || [];
     const dSitios = _fusionDuplicado.sitios || [];
     dSitios.forEach(ds => {
       if (!pSitios.includes(ds)) {
         pSitios.push(ds);
       }
     });
-    _fusionPrincipal.sitios = pSitios;
+    principalEnDb.sitios = pSitios;
 
     // 7. Completar campos vacíos en Cliente Principal con datos del duplicado
-    _fusionPrincipal.contacto = _fusionPrincipal.contacto || _fusionDuplicado.contacto || '';
-    _fusionPrincipal.telefono = _fusionPrincipal.telefono || _fusionDuplicado.telefono || '';
-    _fusionPrincipal.email = _fusionPrincipal.email || _fusionDuplicado.email || '';
-    _fusionPrincipal.rfc = _fusionPrincipal.rfc || _fusionDuplicado.rfc || '';
-    _fusionPrincipal.ubicacion = _fusionPrincipal.ubicacion || _fusionDuplicado.ubicacion || '';
-    _fusionPrincipal.grupoSinergia = _fusionPrincipal.grupoSinergia || _fusionDuplicado.grupoSinergia || '';
+    principalEnDb.contacto = principalEnDb.contacto || _fusionDuplicado.contacto || '';
+    principalEnDb.telefono = principalEnDb.telefono || _fusionDuplicado.telefono || '';
+    principalEnDb.email = principalEnDb.email || _fusionDuplicado.email || '';
+    principalEnDb.rfc = principalEnDb.rfc || _fusionDuplicado.rfc || '';
+    principalEnDb.ubicacion = principalEnDb.ubicacion || _fusionDuplicado.ubicacion || '';
+    principalEnDb.grupoSinergia = principalEnDb.grupoSinergia || _fusionDuplicado.grupoSinergia || '';
 
     // 8. Eliminar cliente duplicado de la lista local
     clientesDb = clientesDb.filter(c => c.nombre !== dNombre && c.id !== dId);
@@ -20056,7 +20105,7 @@ async function confirmarFusionClientes() {
         window.pushToSupabase('sitios', s);
       }
       // Actualizar cliente principal
-      window.pushToSupabase('clientes', _fusionPrincipal);
+      window.pushToSupabase('clientes', principalEnDb);
 
       // Eliminar cliente duplicado
       if (dId) {
