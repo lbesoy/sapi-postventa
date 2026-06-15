@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.100'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.101'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -19764,6 +19764,12 @@ function obtenerTodosLosClientes() {
 }
 
 function abrirModalFusionarClientes() {
+  const isAdmin = currentSession && ['superadmin', 'admin'].includes(currentSession.viewMode);
+  if (!isAdmin) {
+    mostrarNotificacion('No tienes permisos para realizar esta acción.', 'error');
+    return;
+  }
+
   _fusionPrincipal = null;
   _fusionDuplicado = null;
 
@@ -19968,6 +19974,12 @@ function actualizarResumenFusion() {
 }
 
 async function confirmarFusionClientes() {
+  const isAdmin = currentSession && ['superadmin', 'admin'].includes(currentSession.viewMode);
+  if (!isAdmin) {
+    mostrarNotificacion('No tienes permisos para realizar esta acción.', 'error');
+    return;
+  }
+
   if (!_fusionPrincipal || !_fusionDuplicado) {
     mostrarNotificacion('Por favor, selecciona ambos clientes.', 'error');
     return;
