@@ -1694,9 +1694,9 @@ window.cargarDatosDeSupabase = function() {
       localStorage.setItem('sapi_clientes_db', JSON.stringify(mergedClientes));
     }
 
-    // Tickets — SOLO sobreescribir local si la nube tiene tickets
+    // Tickets — SOLO sobreescribir local si la consulta fue exitosa
     const { data: ticketsDb } = await sb.from('tickets').select('*');
-    if (ticketsDb && ticketsDb.length > 0) {
+    if (ticketsDb) {
       let mapped = ticketsDb.map(rowToTicket);
       
       // FUSIONAR CON CAMBIOS LOCALES PENDIENTES DE SINCRONIZAR
@@ -1800,7 +1800,7 @@ window.cargarDatosDeSupabase = function() {
 
     // Órdenes — mismo principio
     const { data: ordenes } = await sb.from('ordenes').select('*');
-    if (ordenes && ordenes.length > 0) {
+    if (ordenes) {
       let bitacorasMap = {};
       try {
         const { data: bitacorasDb } = await sb.from('orden_bitacora').select('*');
