@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.106'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.107'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -210,6 +210,7 @@ function formatFechaHoraAmigable(dateStr) {
 
 // ===== DATA =====
 let ordenes = safeGetJSON('sapi_ordenes', []);
+deduplicarOrdenesLocales(); // Eliminar duplicados fantasmas al iniciar
 let tickets = safeGetJSON('sapi_tickets', []);
 let clientesDb = safeGetJSON('sapi_clientes_db', []);
 let refaccionesDb = safeGetJSON('sapi_refacciones_db', []);
@@ -20161,6 +20162,54 @@ async function confirmarFusionClientes() {
     mostrarCargando(false);
     mostrarNotificacion('Ocurrió un error inesperado al realizar la fusión.', 'error');
   }
+}function deduplicarOrdenesLocales() {
+  if (typeof localStorage === 'undefined') return;
+  const localOrds = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+  if (localOrds.length === 0) return;
+
+  const seen = new Map();
+  const keep = [];
+  const removedIds = new Set();
+
+  localOrds.forEach(o => {
+    // Generar una clave única basada en el contenido de la orden (excluyendo id y folio)
+    const key = [
+      o.cliente || '',
+      o.tecnico || '',
+      o.tipo || '',
+      o.fecha || '',
+      o.maquinaria_id || '',
+      o.sitio_id || '',
+      o.notas || '',
+      o.evidencia_url || o.evidenciaBase64 || ''
+    ].join('|');
+
+    if (!seen.has(key)) {
+      seen.set(key, true);
+      keep.push(o);
+    } else {
+      removedIds.add(o.id);
+    }
+  });
+
+  if (removedIds.size > 0) {
+    console.log(`[Deduplicar] Eliminadas ${removedIds.size} órdenes duplicadas.`);
+    localStorage.setItem('sapi_ordenes', JSON.stringify(keep));
+    ordenes = keep; // actualizar la variable global en memoria
+    
+    // Limpiar cola de sincronización de las órdenes eliminadas
+    try {
+      const queue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+      const newQueue = queue.filter(item => {
+        if (item.table === 'ordenes') {
+          const orderId = item.data ? item.data.id : null;
+          if (removedIds.has(orderId)) return false;
+        }
+        return true;
+      });
+      localStorage.setItem('sapi_sync_queue', JSON.stringify(newQueue));
+    } catch (e) {
+      console.error('Error limpiando cola de sync en deduplicación:', e);
+    }
+  }
 }
-
-
