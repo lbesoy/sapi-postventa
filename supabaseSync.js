@@ -1079,15 +1079,25 @@ async function _processSyncQueueInternal() {
           } else {
             console.error(`[Sync] Error en operación (${item.table} - ${item.action}):`, error.message);
             
-            if (typeof window.mostrarNotificacion === 'function') {
-              window.mostrarNotificacion(`Error BD (${item.table}): ${error.message}`, 'error');
+            const isNetworkError = error.message && (
+              error.message.includes('Failed to fetch') ||
+              error.message.includes('network') ||
+              error.message.includes('timeout') ||
+              error.message.includes('connection') ||
+              error.message.includes('TypeError') ||
+              error.message.includes('fetch')
+            );
+
+            if (!isNetworkError) {
+              if (typeof window.mostrarNotificacion === 'function') {
+                window.mostrarNotificacion(`Error BD (${item.table}): ${error.message}`, 'error');
+              }
+              if (window._isSyncManualForced) {
+                alert('Error de Base de Datos al sincronizar ' + item.table + ' (' + item.action + '):\n\n' + error.message + '\n\nCódigo: ' + (error.code || 'N/A') + '\nDetalles: ' + (error.details || 'Ninguno'));
+              }
             }
 
-            if (window._isSyncManualForced) {
-              alert('Error de Base de Datos al sincronizar ' + item.table + ' (' + item.action + '):\n\n' + error.message + '\n\nCódigo: ' + (error.code || 'N/A') + '\nDetalles: ' + (error.details || 'Ninguno'));
-            }
-
-            if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('network') || error.message.includes('timeout') || error.message.includes('connection') || error.message.includes('TypeError: Failed to fetch'))) {
+            if (isNetworkError) {
               break; // Error de red temporal, pausar procesamiento
             } else {
               console.warn(`[Sync] Error permanente de BD. Saltando elemento.`);
