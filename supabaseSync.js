@@ -1472,19 +1472,8 @@ async function migrarDatosASupabase() {
       for (const c of lCli) await window.pushToSupabase('clientes', c);
     }
 
-    // ── 3. TICKETS ───────────────────────────────────────────
-    const { data: tSupa } = await sb.from('tickets').select('id');
-    const lTik = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
-    if ((!tSupa || tSupa.length === 0) && lTik.length > 0) {
-      for (const t of lTik) await window.pushToSupabase('tickets', t);
-    }
-
-    // ── 4. ÓRDENES ───────────────────────────────────────────
-    const { data: oSupa } = await sb.from('ordenes').select('id');
-    const lOrd = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
-    if ((!oSupa || oSupa.length === 0) && lOrd.length > 0) {
-      for (const o of lOrd) await window.pushToSupabase('ordenes', o);
-    }
+    // NOTA: Se ha removido la migración automática de tickets y órdenes al inicio para evitar
+    // que navegadores con caché local vieja resuciten registros borrados cuando la base de datos se limpia o regenera.
 
     // NOTA: Sitios, Maquinaria y Refacciones se obtienen de SAP directamente.
     // No se migran a Supabase para evitar conflictos con IDs nulos de SAP.
