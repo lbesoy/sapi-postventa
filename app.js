@@ -362,6 +362,108 @@ window.migrarOrdenesExistentesMaquinaria = function() {
   }
 };
 
+window.migrarUbicacionesMaquinariaDesdeTickets = function() {
+  console.log('[App] Ejecutando migración de ubicaciones de maquinaria desde tickets...');
+  let modificadosMaquinariaDb = false;
+  let modificadosClientesDb = false;
+  let syncCount = 0;
+
+  const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+
+  // Ordenar tickets de más antiguo a más reciente para que prevalezca la ubicación del ticket más reciente
+  const ticketsOrdenados = [...tickets].sort((a, b) => new Date(a.fechaCreacion || a.fecha || 0) - new Date(b.fechaCreacion || b.fecha || 0));
+
+  ticketsOrdenados.forEach(t => {
+    if (!t.equipo || t.equipo === 'Otra / No registrada') return;
+    if (!t.sitio || t.sitio === 'Ninguno' || t.sitio.toLowerCase() === 'n/a') return;
+
+    const matchMaquina = (m) => {
+      const cleanId = m.idInterno || m.id || '';
+      const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+      const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+      const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+      const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+      
+      return (
+        t.equipo === mName ||
+        t.equipo === cleanId ||
+        t.equipo === m.serie ||
+        t.equipo.includes(cleanId) ||
+        (m.serie && t.equipo.includes(m.serie))
+      );
+    };
+
+    // Buscar en clientesDb (máquinas manuales)
+    clientesDb.forEach(c => {
+      if (c.maquinas) {
+        c.maquinas.forEach(m => {
+          if (matchMaquina(m)) {
+            const currentUbi = m.ubicacion || m.customData?.ubicacion || '';
+            if (!currentUbi || currentUbi.toLowerCase() === 'n/a') {
+              console.log(`[Migración] Asignando ubicación '${t.sitio}' a máquina manual ${m.idInterno} del cliente ${c.nombre} según ticket ${t.folio}`);
+              m.ubicacion = t.sitio;
+              
+              // Resolver sitio_id
+              let sitioId = m.sitio_id || null;
+              const existSitio = sitiosDb.find(s => (s.cliente === c.id || s.cliente === c.nombre) && s.nombre === t.sitio);
+              if (existSitio) sitioId = existSitio.id;
+              m.sitio_id = sitioId;
+              
+              modificadosClientesDb = true;
+              syncCount++;
+              
+              // Sincronizar máquina manual con Supabase
+              if (window.pushToSupabase) {
+                window.pushToSupabase('maquinaria', { ...m, cliente: c.id });
+              }
+            }
+          }
+        });
+      }
+    });
+
+    // Buscar en maquinariaDb (máquinas de SAP/Supabase)
+    maquinariaDb.forEach(m => {
+      if (matchMaquina(m)) {
+        const currentUbi = m.ubicacion || m.customData?.ubicacion || '';
+        if (!currentUbi || currentUbi.toLowerCase() === 'n/a') {
+          console.log(`[Migración] Asignando ubicación '${t.sitio}' a máquina SAP ${m.idInterno || m.id} según ticket ${t.folio}`);
+          m.ubicacion = t.sitio;
+          
+          // Resolver sitio_id
+          let clientObj = clientesDb.find(c => c.nombre === m.cliente || c.id === m.cliente);
+          let clientDbId = clientObj ? clientObj.id : m.cliente;
+          let sitioId = m.sitio_id || null;
+          const existSitio = sitiosDb.find(s => (s.cliente === clientDbId || s.cliente === m.cliente) && s.nombre === t.sitio);
+          if (existSitio) sitioId = existSitio.id;
+          m.sitio_id = sitioId;
+          
+          if (!m.customData) m.customData = {};
+          m.customData.ubicacion = t.sitio;
+          
+          modificadosMaquinariaDb = true;
+          syncCount++;
+          
+          // Sincronizar máquina con Supabase
+          if (window.pushToSupabase) {
+            window.pushToSupabase('maquinaria', m);
+          }
+        }
+      }
+    });
+  });
+
+  if (modificadosClientesDb) {
+    localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+  }
+  if (modificadosMaquinariaDb) {
+    localStorage.setItem('sapi_maquinaria_db', JSON.stringify(maquinariaDb));
+  }
+  if (syncCount > 0) {
+    console.log(`[Migración] Se corrigieron las ubicaciones de ${syncCount} máquinas y se enviaron a sincronización.`);
+  }
+};
+
 // Función para reintentar sincronizar gastos locales que no han subido a Supabase
 window.reintentarSincronizacionGastosLocales = function() {
   console.log('[App] Verificando gastos locales pendientes de sincronización...');
@@ -405,6 +507,11 @@ window.addEventListener('supabase_datos_cargados', () => {
 
   // Ejecutar migración para rellenar datos de maquinaria perdidos en órdenes previas
   window.migrarOrdenesExistentesMaquinaria();
+
+  // Ejecutar migración para rellenar ubicaciones de maquinaria perdidas desde tickets
+  if (typeof window.migrarUbicacionesMaquinariaDesdeTickets === 'function') {
+    window.migrarUbicacionesMaquinariaDesdeTickets();
+  }
 
   // Auto-sincronizar cualquier gasto local huérfano (no sincronizado en la base de datos)
   window.reintentarSincronizacionGastosLocales();
@@ -6201,6 +6308,44 @@ function guardarNuevaMaquina(e) {
     clienteObj.maquinas = [];
   }
 
+  // Resolver o crear sitio_id para vincular con sitiosDb y la BD
+  let sitioId = null;
+  if (ubicacion) {
+    // Buscar si ya existe el sitio en sitiosDb para este cliente
+    const existSitio = sitiosDb.find(s => s.cliente === clienteObj.id && s.nombre === ubicacion);
+    if (existSitio) {
+      sitioId = existSitio.id;
+      // Actualizar coordenadas si cambiaron
+      if (latitud) existSitio.latitud = latitud;
+      if (longitud) existSitio.longitud = longitud;
+      if (!existSitio.customData) existSitio.customData = {};
+      existSitio.customData.latitud = latitud;
+      existSitio.customData.longitud = longitud;
+      localStorage.setItem('sapi_sitios_db', JSON.stringify(sitiosDb));
+      if (window.pushToSupabase) window.pushToSupabase('sitios', existSitio);
+    } else {
+      // Si no existe, creamos un nuevo sitio
+      sitioId = crypto.randomUUID();
+      const nuevoSitioObj = {
+        id: sitioId,
+        nombre: ubicacion,
+        cliente: clienteObj.id,
+        direccion: '',
+        cp: '',
+        ciudad: '',
+        estado: '',
+        customData: { latitud, longitud }
+      };
+      sitiosDb.push(nuevoSitioObj);
+      localStorage.setItem('sapi_sitios_db', JSON.stringify(sitiosDb));
+      if (window.pushToSupabase) window.pushToSupabase('sitios', nuevoSitioObj);
+      
+      // Añadir al listado de sitios del cliente en local
+      if (!clienteObj.sitios) clienteObj.sitios = [];
+      clienteObj.sitios.push({ id: sitioId, nombre: ubicacion, latitud, longitud });
+    }
+  }
+
   if (editandoMaquinaId && editandoMaquinaCliente) {
     const maqDbIdx = maquinariaDb.findIndex(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
     
@@ -6216,6 +6361,7 @@ function guardarNuevaMaquina(e) {
         maquinariaDb[maqDbIdx].tipo = tipo;
         maquinariaDb[maqDbIdx].idInterno = finalIdInterno;
         maquinariaDb[maqDbIdx].ubicacion = ubicacion;
+        maquinariaDb[maqDbIdx].sitio_id = sitioId;
         maquinariaDb[maqDbIdx].latitud = latitud;
         maquinariaDb[maqDbIdx].longitud = longitud;
 
@@ -6234,7 +6380,7 @@ function guardarNuevaMaquina(e) {
         // MÁQUINA MANUAL (En clientesDb)
         if (clienteSeleccionado !== editandoMaquinaCliente) {
           const clienteAntiguo = clientesDb.find(c => c.nombre === editandoMaquinaCliente);
-          let maquinaDatos = { idInterno: finalIdInterno, marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, latitud, longitud, tipo };
+          let maquinaDatos = { idInterno: finalIdInterno, marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, sitio_id: sitioId, latitud, longitud, tipo };
           if (clienteAntiguo && clienteAntiguo.maquinas) {
             const oldIdx = clienteAntiguo.maquinas.findIndex(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
             if (oldIdx >= 0) {
@@ -6251,7 +6397,7 @@ function guardarNuevaMaquina(e) {
             clienteObj.maquinas[maquinaIdx] = {
               ...clienteObj.maquinas[maquinaIdx],
               idInterno: finalIdInterno,
-              marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, latitud, longitud, tipo
+              marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, sitio_id: sitioId, latitud, longitud, tipo
             };
             if (window.pushToSupabase) window.pushToSupabase('maquinaria', { ...clienteObj.maquinas[maquinaIdx], cliente: clienteObj.id });
           }
@@ -6259,33 +6405,9 @@ function guardarNuevaMaquina(e) {
     }
   } else {
     const idInterno = generarIdInternoMaquina(marca, venta || anio);
-    const nuevaMaq = { idInterno, marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, latitud, longitud, tipo };
+    const nuevaMaq = { idInterno, marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, sitio_id: sitioId, latitud, longitud, tipo };
     clienteObj.maquinas.push(nuevaMaq);
     if (window.pushToSupabase) window.pushToSupabase('maquinaria', { ...nuevaMaq, cliente: clienteObj.id });
-  }
-  
-  if (ubicacion) {
-    if (!clienteObj.sitios) clienteObj.sitios = [];
-    const isSapSite = sitiosDb.some(s => s.nombre === ubicacion);
-    if (!isSapSite) {
-      let sIdx = clienteObj.sitios.findIndex(s => getSitioNombre(s) === ubicacion);
-      if (sIdx === -1) {
-         clienteObj.sitios.push({ nombre: ubicacion, latitud, longitud });
-      } else {
-         if (typeof clienteObj.sitios[sIdx] === 'string') {
-           clienteObj.sitios[sIdx] = { nombre: ubicacion, latitud, longitud };
-         } else {
-           if (latitud) clienteObj.sitios[sIdx].latitud = latitud;
-           if (longitud) clienteObj.sitios[sIdx].longitud = longitud;
-         }
-      }
-    } else {
-      const sapSite = sitiosDb.find(s => s.nombre === ubicacion);
-      if (sapSite) {
-        if (latitud) sapSite.latitud = latitud;
-        if (longitud) sapSite.longitud = longitud;
-      }
-    }
   }
   
   localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
@@ -10814,6 +10936,33 @@ function onEquipoOrdenChange() {
           const amCliente = document.getElementById('am-cliente');
           if (amCliente) {
               amCliente.value = cliente;
+              if (typeof amCliente.onchange === 'function') {
+                  amCliente.onchange({ target: amCliente });
+              }
+              const orderSitio = document.getElementById('f-ubicacion')?.value || '';
+              if (orderSitio) {
+                  const amUbicacionSelect = document.getElementById('am-ubicacion-select');
+                  const amUbicacionOtra = document.getElementById('am-ubicacion-otra');
+                  if (amUbicacionSelect) {
+                      let exists = false;
+                      for (let i = 0; i < amUbicacionSelect.options.length; i++) {
+                          if (amUbicacionSelect.options[i].value === orderSitio) {
+                              exists = true;
+                              break;
+                          }
+                      }
+                      if (exists) {
+                          amUbicacionSelect.value = orderSitio;
+                          amUbicacionSelect.dispatchEvent(new Event('change'));
+                      } else {
+                          amUbicacionSelect.value = 'otra';
+                          amUbicacionSelect.dispatchEvent(new Event('change'));
+                          if (amUbicacionOtra) {
+                              amUbicacionOtra.value = orderSitio;
+                          }
+                      }
+                  }
+              }
           }
       }, 100);
       return;
@@ -10849,6 +10998,33 @@ function onEquipoTicketChange() {
           const amCliente = document.getElementById('am-cliente');
           if (amCliente) {
               amCliente.value = cliente;
+              if (typeof amCliente.onchange === 'function') {
+                  amCliente.onchange({ target: amCliente });
+              }
+              const ticketSitio = document.getElementById('t-sitio')?.value || '';
+              if (ticketSitio) {
+                  const amUbicacionSelect = document.getElementById('am-ubicacion-select');
+                  const amUbicacionOtra = document.getElementById('am-ubicacion-otra');
+                  if (amUbicacionSelect) {
+                      let exists = false;
+                      for (let i = 0; i < amUbicacionSelect.options.length; i++) {
+                          if (amUbicacionSelect.options[i].value === ticketSitio) {
+                              exists = true;
+                              break;
+                          }
+                      }
+                      if (exists) {
+                          amUbicacionSelect.value = ticketSitio;
+                          amUbicacionSelect.dispatchEvent(new Event('change'));
+                      } else {
+                          amUbicacionSelect.value = 'otra';
+                          amUbicacionSelect.dispatchEvent(new Event('change'));
+                          if (amUbicacionOtra) {
+                              amUbicacionOtra.value = ticketSitio;
+                          }
+                      }
+                  }
+              }
           }
       }, 100);
   }
@@ -11160,6 +11336,87 @@ async function guardarTicket(e) {
     pdfCotizacion: pdfCotizacionBase64,
     esPrueba: t_existente ? (t_existente.esPrueba || false) : isTestModeActive()
   };
+
+  // Actualizar ubicación de la máquina si es N/A o vacía
+  if (ticket.equipo && ticket.equipo !== 'Otra / No registrada' && ticket.sitio && ticket.sitio !== 'Ninguno') {
+    const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+    
+    const matchMaquina = (m) => {
+      const cleanId = m.idInterno || m.id || '';
+      const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+      const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+      const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+      const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+      
+      return (
+        ticket.equipo === mName ||
+        ticket.equipo === cleanId ||
+        ticket.equipo === m.serie ||
+        ticket.equipo.includes(cleanId) ||
+        (m.serie && ticket.equipo.includes(m.serie))
+      );
+    };
+
+    let maqModificada = false;
+
+    // Buscar en clientesDb
+    clientesDb.forEach(c => {
+      if (c.maquinas) {
+        c.maquinas.forEach(m => {
+          if (matchMaquina(m)) {
+            const currentUbi = m.ubicacion || m.customData?.ubicacion || '';
+            if (!currentUbi || currentUbi.toLowerCase() === 'n/a') {
+              console.log(`[Ticket] Asignando ubicación '${ticket.sitio}' a máquina manual ${m.idInterno} según ticket`);
+              m.ubicacion = ticket.sitio;
+              
+              // Resolver sitio_id
+              let sitioId = m.sitio_id || null;
+              const existSitio = sitiosDb.find(s => (s.cliente === c.id || s.cliente === c.nombre) && s.nombre === ticket.sitio);
+              if (existSitio) sitioId = existSitio.id;
+              m.sitio_id = sitioId;
+              
+              maqModificada = true;
+              if (window.pushToSupabase) {
+                window.pushToSupabase('maquinaria', { ...m, cliente: c.id });
+              }
+            }
+          }
+        });
+      }
+    });
+
+    // Buscar en maquinariaDb
+    maquinariaDb.forEach(m => {
+      if (matchMaquina(m)) {
+        const currentUbi = m.ubicacion || m.customData?.ubicacion || '';
+        if (!currentUbi || currentUbi.toLowerCase() === 'n/a') {
+          console.log(`[Ticket] Asignando ubicación '${ticket.sitio}' a máquina SAP ${m.idInterno || m.id} según ticket`);
+          m.ubicacion = ticket.sitio;
+          
+          // Resolver sitio_id
+          let clientObj = clientesDb.find(c => c.nombre === m.cliente || c.id === m.cliente);
+          let clientDbId = clientObj ? clientObj.id : m.cliente;
+          let sitioId = m.sitio_id || null;
+          const existSitio = sitiosDb.find(s => (s.cliente === clientDbId || s.cliente === m.cliente) && s.nombre === ticket.sitio);
+          if (existSitio) sitioId = existSitio.id;
+          m.sitio_id = sitioId;
+          
+          if (!m.customData) m.customData = {};
+          m.customData.ubicacion = ticket.sitio;
+          
+          maqModificada = true;
+          if (window.pushToSupabase) {
+            window.pushToSupabase('maquinaria', m);
+          }
+        }
+      }
+    });
+
+    if (maqModificada) {
+      localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+      localStorage.setItem('sapi_maquinaria_db', JSON.stringify(maquinariaDb));
+    }
+  }
   
   if (isEmpresa && !editandoTicketId && !ticket.asignado) {
     const c = clientesDb.find(x => x.nombre === ticket.cliente);
