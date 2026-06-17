@@ -1462,53 +1462,13 @@ async function migrarDatosASupabase() {
     return;
   }
 
-  console.log('[Supabase] Iniciando migración/carga...');
-
+  // DESACTIVADO: La migración legacy local->Supabase ya no es necesaria en producción.
+  // Evitamos llamadas innecesarias que provocaban errores de RLS (Row-Level Security)
+  // en usuarios con roles no-administradores al iniciar la app.
   try {
-    // ── 1. USUARIOS ──────────────────────────────────────────
-    const { data: uSupa } = await sb.from('user_roles').select('id');
-    const lUsu = window.ensureBackdoorUsers(JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]'));
-    if ((!uSupa || uSupa.length <= 1) && lUsu.length > 0) {
-      for (const u of lUsu) {
-        if (u.id === 'tecnico_test') continue;
-        await window.pushToSupabase('user_roles', u);
-      }
-    }
-
-    // ── 2. CLIENTES ──────────────────────────────────────────
-    const { data: cSupa } = await sb.from('clientes').select('id');
-    const lCli = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
-    if ((!cSupa || cSupa.length === 0) && lCli.length > 0) {
-      for (const c of lCli) await window.pushToSupabase('clientes', c);
-    }
-
-    // NOTA: Se ha removido la migración automática de tickets y órdenes al inicio para evitar
-    // que navegadores con caché local vieja resuciten registros borrados cuando la base de datos se limpia o regenera.
-
-    // NOTA: Sitios, Maquinaria y Refacciones se obtienen de SAP directamente.
-    // No se migran a Supabase para evitar conflictos con IDs nulos de SAP.
-
-    // ── 8. CONFIG ────────────────────────────────────────────
-    const { data: cfgSupa } = await sb.from('config').select('id');
-    const lCfg = JSON.parse(localStorage.getItem('eurorep_config') || 'null');
-    if ((!cfgSupa || cfgSupa.length === 0) && lCfg) {
-      await window.pushToSupabase('config', lCfg);
-    }
-
-    // ── 9. ROLES ─────────────────────────────────────────────
-    const { data: rolSupa } = await sb.from('roles').select('id');
-    const lRol = JSON.parse(localStorage.getItem('sapi_roles_config') || 'null');
-    if ((!rolSupa || rolSupa.length === 0) && lRol) {
-      await window.pushToSupabase('roles', lRol);
-    }
-
-    console.log('[Supabase] Migración completada. Descargando datos actuales...');
     await window.cargarDatosDeSupabase();
-
   } catch (err) {
-    console.error('[Supabase] Error durante la migración:', err.message);
-    // Aún así intentamos cargar lo que hay en la nube
-    try { await window.cargarDatosDeSupabase(); } catch(e2) {}
+    console.error('[Supabase] Error cargando datos iniciales:', err.message);
   }
 }
 
