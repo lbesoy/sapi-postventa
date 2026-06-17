@@ -1490,6 +1490,24 @@ window.cargarDatosDeSupabase = function() {
 
     window._isSyncingFromSupabase = true;
 
+    // Asegurar que la sesión de Supabase esté activa antes de realizar consultas.
+    // Si no hay sesión activa (ej. expirada en este recargo o backdoor local), 
+    // evitamos sobreescribir el caché local con arreglos vacíos por restricciones de RLS.
+    try {
+      const { data: sessionData } = await sb.auth.getSession();
+      const hasSession = !!(sessionData && sessionData.session);
+      
+      if (!hasSession && !window._isSyncManualForced) {
+        console.warn('[Sync] No hay sesión activa de Supabase. Omitiendo descarga para proteger el caché local.');
+        window._isSyncingFromSupabase = false;
+        window._syncPromise = null;
+        window.dispatchEvent(new Event('supabase_datos_cargados'));
+        return;
+      }
+    } catch (e) {
+      console.error('[Sync] Error al verificar sesión en cargarDatosDeSupabase:', e);
+    }
+
     try {
     // Usuarios - Cargar desde user_roles para todos los usuarios.
     // Para evitar truncar el caché local debido a restricciones de RLS (que devuelven 0 o 1 fila del propio usuario)

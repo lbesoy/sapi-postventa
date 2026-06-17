@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.118'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.119'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -1129,6 +1129,18 @@ document.addEventListener('DOMContentLoaded', () => {
          }
        }
        entrarApp({ id: saved.userId, rol: saved.viewMode, nombre: saved.nombre });
+
+       // Sincronizar y refrescar estado de sesión de Supabase en segundo plano
+       if (window.supabaseClient && saved.userId !== 'superadmin' && saved.userId !== 'tecnico_test') {
+         window.supabaseClient.auth.getSession().then(({ data: { session } }) => {
+           if (session) {
+             console.log('[Auth] Sesión de Supabase Auth validada/refrescada en segundo plano.');
+             if (window.cargarDatosDeSupabase) {
+               window.cargarDatosDeSupabase().catch(console.error);
+             }
+           }
+         }).catch(err => console.error('[Auth] Error al refrescar sesión de Supabase:', err));
+       }
     } else if (window.supabaseClient) {
        window.supabaseClient.auth.getSession().then(({ data: { session } }) => {
           if (session) {
