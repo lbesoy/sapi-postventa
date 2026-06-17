@@ -5317,6 +5317,17 @@ function guardarCoordenadasSitio(sitioNombre) {
   if (sitioDbOb) {
     sitioDbOb.latitud = lat;
     sitioDbOb.longitud = lon;
+    if (!sitioDbOb.customData) sitioDbOb.customData = {};
+    sitioDbOb.customData.latitud = lat;
+    sitioDbOb.customData.longitud = lon;
+    
+    // Guardar cambios locales de sitiosDb
+    localStorage.setItem('sapi_sitios_db', JSON.stringify(sitiosDb));
+    
+    // Sincronizar sitio con Supabase
+    if (window.pushToSupabase) {
+      window.pushToSupabase('sitios', sitioDbOb);
+    }
   }
   
   // 2. Actualizar en clientesDb (sitios locales)
@@ -5330,6 +5341,11 @@ function guardarCoordenadasSitio(sitioNombre) {
           c.sitios[idx].latitud = lat;
           c.sitios[idx].longitud = lon;
         }
+        
+        // Sincronizar cliente con Supabase
+        if (window.pushToSupabase) {
+          window.pushToSupabase('clientes', c);
+        }
       }
     }
   });
@@ -5340,9 +5356,17 @@ function guardarCoordenadasSitio(sitioNombre) {
     if (m.ubicacion === sitioNombre || m.sitio === sitioNombre) {
        m.latitud = lat;
        m.longitud = lon;
+       if (!m.customData) m.customData = {};
+       m.customData.latitud = lat;
+       m.customData.longitud = lon;
        changedMachines = true;
+       
+       if (window.pushToSupabase) {
+         window.pushToSupabase('maquinaria', m);
+       }
     }
   });
+  
   clientesDb.forEach(c => {
     if (c.maquinas) {
       c.maquinas.forEach(m => {
@@ -5350,12 +5374,19 @@ function guardarCoordenadasSitio(sitioNombre) {
            m.latitud = lat;
            m.longitud = lon;
            changedMachines = true;
+           
+           if (window.pushToSupabase) {
+             window.pushToSupabase('maquinaria', { ...m, cliente: c.id });
+           }
         }
       });
     }
   });
   
   localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+  if (changedMachines) {
+    localStorage.setItem('sapi_maquinaria_db', JSON.stringify(maquinariaDb));
+  }
   
   abrirDetalleSitio(sitioNombre);
   mostrarNotificacion('Coordenadas actualizadas exitosamente', 'success');
@@ -6183,8 +6214,10 @@ function guardarNuevaMaquina(e) {
         maquinariaDb[maqDbIdx].numeroMotor = numeroMotor;
         maquinariaDb[maqDbIdx].anio = anio;
         maquinariaDb[maqDbIdx].tipo = tipo;
-        
         maquinariaDb[maqDbIdx].idInterno = finalIdInterno;
+        maquinariaDb[maqDbIdx].ubicacion = ubicacion;
+        maquinariaDb[maqDbIdx].latitud = latitud;
+        maquinariaDb[maqDbIdx].longitud = longitud;
 
         if (!maquinariaDb[maqDbIdx].customData) maquinariaDb[maqDbIdx].customData = {};
         maquinariaDb[maqDbIdx].customData.tipo = tipo;
@@ -6363,12 +6396,45 @@ function guardarMoverMaquina(e) {
   if (!nuevaUbicacion) return;
 
   const clienteObj = clientesDb.find(c => c.nombre === clienteNombre);
+  let machineFound = false;
+
+  // 1. Buscar en maquinariaDb (máquinas de SAP/Supabase)
+  const maqSap = maquinariaDb.find(m => m.id === idInterno || m.idInterno === idInterno || m.serie === idInterno);
+  if (maqSap) {
+    maqSap.ubicacion = nuevaUbicacion;
+    if (!maqSap.customData) maqSap.customData = {};
+    maqSap.customData.ubicacion = nuevaUbicacion;
+    
+    // Heredar coordenadas del sitio destino si están registradas
+    const sitioDest = sitiosDb.find(s => s.nombre === nuevaUbicacion);
+    if (sitioDest) {
+      maqSap.latitud = sitioDest.latitud || sitioDest.lat || null;
+      maqSap.longitud = sitioDest.longitud || sitioDest.lon || sitioDest.lng || null;
+      maqSap.customData.latitud = maqSap.latitud;
+      maqSap.customData.longitud = maqSap.longitud;
+    }
+    
+    localStorage.setItem('sapi_maquinaria_db', JSON.stringify(maquinariaDb));
+    if (window.pushToSupabase) {
+      window.pushToSupabase('maquinaria', maqSap);
+    }
+    machineFound = true;
+  }
+
+  // 2. Buscar en las máquinas manuales del cliente
   if (clienteObj && clienteObj.maquinas) {
-    const maq = clienteObj.maquinas.find(m => m.idInterno === idInterno);
-    if (maq) {
-      maq.ubicacion = nuevaUbicacion;
+    const maqManual = clienteObj.maquinas.find(m => m.idInterno === idInterno || m.id === idInterno || m.serie === idInterno);
+    if (maqManual) {
+      maqManual.ubicacion = nuevaUbicacion;
       
-      // Auto-add to sitios if not there
+      // Heredar coordenadas del sitio destino si están registradas
+      const sitioDest = sitiosDb.find(s => s.nombre === nuevaUbicacion);
+      if (sitioDest) {
+        maqManual.latitud = sitioDest.latitud || sitioDest.lat || null;
+        maqManual.longitud = sitioDest.longitud || sitioDest.lon || sitioDest.lng || null;
+      }
+      
+      // Auto-agregar a sitios del cliente si no existe
       if (!clienteObj.sitios) clienteObj.sitios = [];
       if (!clienteObj.sitios.includes(nuevaUbicacion)) {
         clienteObj.sitios.push(nuevaUbicacion);
@@ -6377,19 +6443,27 @@ function guardarMoverMaquina(e) {
       localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
       if (window.pushToSupabase) {
         window.pushToSupabase('clientes', clienteObj);
-        window.pushToSupabase('maquinaria', { ...maq, cliente: clienteObj.id });
+        window.pushToSupabase('maquinaria', { ...maqManual, cliente: clienteObj.id });
       }
-      
-      cerrarModalMoverMaquina();
-      
-      // Re-render
-      if (document.getElementById('modal-detalle-cliente-overlay').classList.contains('open')) {
-        verDetalleCliente(clienteNombre);
-      }
-      if (document.getElementById('view-maquinaria').classList.contains('active')) {
-        renderMaquinaria();
-      }
+      machineFound = true;
     }
+  }
+
+  if (machineFound) {
+    cerrarModalMoverMaquina();
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion(`Máquina asignada exitosamente al sitio: ${nuevaUbicacion}`, 'success');
+    }
+    
+    // Re-renderizar vistas activas
+    if (document.getElementById('modal-detalle-cliente-overlay').classList.contains('open')) {
+      verDetalleCliente(clienteNombre);
+    }
+    if (document.getElementById('view-maquinaria').classList.contains('active')) {
+      renderMaquinaria();
+    }
+  } else {
+    alert('No se pudo encontrar la máquina para mover.');
   }
 }
 
