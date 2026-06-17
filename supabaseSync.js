@@ -497,7 +497,55 @@ window.pushToSupabase = async function(tabla, item) {
     return;
   }
 
-  // Añadir a la cola local para estrategia offline-first
+  // Determinar si la operación debe ser ONLINE-ONLY (directa a Supabase sin encolar offline)
+  let isOnlineOnly = false;
+  
+  if (tabla === 'tickets') {
+    isOnlineOnly = true;
+  } else if (tabla === 'ordenes') {
+    // Si es ordenes, solo permitimos offline/sync queue si el usuario actual es técnico (para rellenar reportes)
+    let currentRole = 'consulta';
+    try {
+      const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
+      currentRole = session.viewMode || 'consulta';
+    } catch(e) {}
+    
+    if (currentRole !== 'tecnico') {
+      isOnlineOnly = true;
+    }
+  }
+
+  if (isOnlineOnly) {
+    const sb = window.supabaseClient;
+    if (!sb) {
+      if (typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion(`No hay conexión con la base de datos para guardar en ${tabla}.`, 'error');
+      }
+      throw new Error('No hay conexión con la base de datos.');
+    }
+    
+    // Mapear el objeto de negocio a fila de Supabase si aplica
+    let row = item;
+    if (tabla === 'ordenes' && typeof window.ordenToRow === 'function') {
+      row = window.ordenToRow(item);
+    } else if (tabla === 'tickets' && typeof window.ticketToRow === 'function') {
+      row = window.ticketToRow(item);
+    }
+    
+    // Upsert directo en la nube
+    const { error } = await sb.from(tabla).upsert(row);
+    if (error) {
+      console.error(`[Direct Push] Error al guardar en ${tabla}:`, error.message);
+      if (typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion(`Error al guardar en ${tabla}: ${error.message}`, 'error');
+      }
+      throw error;
+    }
+    console.log(`[Direct Push] Guardado exitoso directo en la tabla ${tabla}.`);
+    return;
+  }
+
+  // Añadir a la cola local para estrategia offline-first (tecnicos / otras tablas)
   addToSyncQueue(tabla, 'upsert', item);
   
   // Intentar sincronizar inmediatamente en segundo plano
@@ -505,6 +553,45 @@ window.pushToSupabase = async function(tabla, item) {
 };
 
 window.deleteFromSupabase = async function(tabla, id) {
+  // Determinar si la operación debe ser ONLINE-ONLY
+  let isOnlineOnly = false;
+  
+  if (tabla === 'tickets') {
+    isOnlineOnly = true;
+  } else if (tabla === 'ordenes') {
+    let currentRole = 'consulta';
+    try {
+      const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
+      currentRole = session.viewMode || 'consulta';
+    } catch(e) {}
+    
+    if (currentRole !== 'tecnico') {
+      isOnlineOnly = true;
+    }
+  }
+
+  if (isOnlineOnly) {
+    const sb = window.supabaseClient;
+    if (!sb) {
+      if (typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion(`No hay conexión con la base de datos para eliminar de ${tabla}.`, 'error');
+      }
+      throw new Error('No hay conexión con la base de datos.');
+    }
+    
+    // Borrado directo en la nube
+    const { error } = await sb.from(tabla).delete().eq('id', id);
+    if (error) {
+      console.error(`[Direct Delete] Error al eliminar en ${tabla}:`, error.message);
+      if (typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion(`Error al eliminar de ${tabla}: ${error.message}`, 'error');
+      }
+      throw error;
+    }
+    console.log(`[Direct Delete] Eliminado exitoso directo de la tabla ${tabla}.`);
+    return;
+  }
+
   // Añadir borrado a la cola
   addToSyncQueue(tabla, 'delete', { id });
   
