@@ -464,6 +464,152 @@ window.migrarUbicacionesMaquinariaDesdeTickets = function() {
   }
 };
 
+window.recuperarMaquinariaDesdeTickets = function() {
+  console.log('[App] Ejecutando recuperación de maquinaria desaparecida desde tickets...');
+  let modificadosClientesDb = false;
+  let recoverCount = 0;
+
+  const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+
+  tickets.forEach(t => {
+    if (!t.equipo || t.equipo === 'Otra / No registrada' || t.equipo.toLowerCase() === 'n/a') return;
+    if (!t.cliente || t.cliente === 'Ninguno / Uso Interno' || t.cliente === 'Ninguno') return;
+
+    const matchMaquina = (m) => {
+      const cleanId = m.idInterno || m.id || '';
+      const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+      const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+      const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+      const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+      
+      return (
+        t.equipo === mName ||
+        t.equipo === cleanId ||
+        t.equipo === m.serie ||
+        t.equipo.includes(cleanId) ||
+        (m.serie && t.equipo.includes(m.serie))
+      );
+    };
+
+    // 1. Verificar si la máquina ya existe en clientesDb
+    let maqExiste = false;
+    clientesDb.forEach(c => {
+      if (c.maquinas && c.maquinas.some(matchMaquina)) maqExiste = true;
+    });
+
+    // 2. Verificar en maquinariaDb
+    if (maquinariaDb.some(matchMaquina)) maqExiste = true;
+
+    // 3. Si no existe en ningún lado, la recreamos
+    if (!maqExiste) {
+      console.log(`[Recuperación] Recreando máquina desaparecida '${t.equipo}' para el cliente '${t.cliente}'`);
+      
+      let idInterno = null;
+      let marca = 'OTM';
+      let modelo = 'Sin Modelo';
+      let serie = 'N/A';
+
+      let equipoStr = t.equipo.trim();
+      if (equipoStr.includes('(SN: ')) {
+        const parts = equipoStr.split('(SN: ');
+        serie = parts[1].replace(')', '').trim();
+        let left = parts[0].trim();
+        if (left.startsWith('[') && left.includes(']')) {
+          const idIndex = left.indexOf(']');
+          idInterno = left.substring(1, idIndex).trim();
+          left = left.substring(idIndex + 1).trim();
+        }
+        
+        let foundMarcaKey = null;
+        for (const [key, value] of Object.entries(MARCAS_RENDER)) {
+          if (left.toUpperCase().startsWith(value.toUpperCase())) {
+            foundMarcaKey = key;
+            modelo = left.substring(value.length).trim();
+            break;
+          }
+          if (left.toUpperCase().startsWith(key.toUpperCase())) {
+            foundMarcaKey = key;
+            modelo = left.substring(key.length).trim();
+            break;
+          }
+        }
+        
+        if (foundMarcaKey) {
+          marca = foundMarcaKey;
+        } else {
+          const words = left.split(' ');
+          if (words.length > 0) {
+            marca = words[0];
+            modelo = words.slice(1).join(' ') || 'Sin Modelo';
+          }
+        }
+      } else {
+        modelo = equipoStr;
+      }
+
+      // Encontrar o crear clienteObj en clientesDb
+      let clienteObj = clientesDb.find(c => c.nombre === t.cliente);
+      if (!clienteObj) {
+        clienteObj = {
+          id: crypto.randomUUID(),
+          nombre: t.cliente,
+          maquinas: [],
+          sitios: [],
+          createdAt: new Date().toISOString()
+        };
+        clientesDb.push(clienteObj);
+        modificadosClientesDb = true;
+      }
+
+      if (!clienteObj.maquinas) {
+        clienteObj.maquinas = [];
+      }
+
+      const nuevaMaq = {
+        idInterno: idInterno || generarIdInternoMaquina(marca, ''),
+        id: crypto.randomUUID(),
+        marca,
+        modelo,
+        serie,
+        ubicacion: t.sitio || 'N/A',
+        sitio_id: null,
+        latitud: null,
+        longitud: null,
+        tipo: 'N/A',
+        customData: {
+          tipo: 'N/A',
+          numeroEconomico: 'N/A',
+          numeroMotor: 'N/A',
+          venta: '',
+          ubicacion: t.sitio || 'N/A'
+        }
+      };
+
+      // Resolver sitio_id
+      if (t.sitio && t.sitio !== 'Ninguno') {
+        const existSitio = sitiosDb.find(s => (s.cliente === clienteObj.id || s.cliente === clienteObj.nombre) && s.nombre === t.sitio);
+        if (existSitio) nuevaMaq.sitio_id = existSitio.id;
+      }
+
+      clienteObj.maquinas.push(nuevaMaq);
+      modificadosClientesDb = true;
+      recoverCount++;
+
+      // Sincronizar nueva máquina con Supabase
+      if (window.pushToSupabase) {
+        window.pushToSupabase('maquinaria', { ...nuevaMaq, cliente: clienteObj.id });
+      }
+    }
+  });
+
+  if (modificadosClientesDb) {
+    localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+  }
+  if (recoverCount > 0) {
+    console.log(`[Recuperación] Se recuperaron con éxito ${recoverCount} máquinas desaparecidas desde los tickets.`);
+  }
+};
+
 // Función para reintentar sincronizar gastos locales que no han subido a Supabase
 window.reintentarSincronizacionGastosLocales = function() {
   console.log('[App] Verificando gastos locales pendientes de sincronización...');
@@ -511,6 +657,11 @@ window.addEventListener('supabase_datos_cargados', () => {
   // Ejecutar migración para rellenar ubicaciones de maquinaria perdidas desde tickets
   if (typeof window.migrarUbicacionesMaquinariaDesdeTickets === 'function') {
     window.migrarUbicacionesMaquinariaDesdeTickets();
+  }
+
+  // Ejecutar recuperación de maquinaria desaparecida desde los tickets
+  if (typeof window.recuperarMaquinariaDesdeTickets === 'function') {
+    window.recuperarMaquinariaDesdeTickets();
   }
 
   // Auto-sincronizar cualquier gasto local huérfano (no sincronizado en la base de datos)
