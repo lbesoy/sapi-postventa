@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.120'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.126'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -11656,7 +11656,7 @@ function verDetalleTicket(id) {
       <div class="detalle-section-title">Descripción</div>
       <div class="detalle-field"><div class="detalle-value" style="white-space:pre-wrap;">${t.descripcion||'—'}</div></div>
     </div>
-    ${(t.notas && currentSession.viewMode !== 'empresa') ? `
+    ${(t.notes || t.notas && currentSession.viewMode !== 'empresa') ? `
     <div class="detalle-section">
       <div class="detalle-section-title">Notas Internas</div>
       <div class="detalle-field"><div class="detalle-value" style="white-space:pre-wrap;">${t.notas}</div></div>
@@ -11667,11 +11667,11 @@ function verDetalleTicket(id) {
       <div class="detalle-section-title">Resolución Final</div>
       <div class="detalle-grid">
         ${t.cotizacionSAP ? field('Cotización SAP', t.cotizacionSAP) : ''}
-        ${t.pdfCotizacion ? field('PDF Cotización', `<a href="${t.pdfCotizacion}" download="Cotizacion_${t.folio}.pdf" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</a>`) : ''}
+        ${t.pdfCotizacion ? field('PDF Cotización', `<button type="button" onclick="window.descargarPdfOnDemand('${t.id}', 'cotizacion')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</button>`) : ''}
         ${t.cotAceptada ? field('Resultado', t.cotAceptada === 'si' ? '<span style="color:var(--success); display:inline-flex; align-items:center; gap:4px;"><i data-lucide="check-circle" style="width:14px;height:14px;"></i> Aprobada</span>' : '<span style="color:var(--danger); display:inline-flex; align-items:center; gap:4px;"><i data-lucide="x-circle" style="width:14px;height:14px;"></i> Rechazada</span>') : ''}
         ${t.motivoRechazo ? field('Motivo Rechazo', t.motivoRechazo) : ''}
         ${t.pedidoSAP ? field('Pedido SAP', t.pedidoSAP) : ''}
-        ${t.pdfPedido ? field('PDF Pedido', `<a href="${t.pdfPedido}" download="Pedido_${t.folio}.pdf" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</a>`) : ''}
+        ${t.pdfPedido ? field('PDF Pedido', `<button type="button" onclick="window.descargarPdfOnDemand('${t.id}', 'pedido')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</button>`) : ''}
         ${t.tecnicosAsignados && t.tecnicosAsignados.length > 0 ? field('Técnicos Asignados', t.tecnicosAsignados.join(', ')) : ''}
       </div>
     </div>
@@ -11761,6 +11761,66 @@ function verDetalleTicket(id) {
   document.body.style.overflow = 'hidden';
   lucide.createIcons();
 }
+
+// Descarga de PDF bajo demanda desde Supabase para evitar saturación de localStorage
+window.descargarPdfOnDemand = async function(ticketId, tipo) {
+  const t = tickets.find(x => x.id === ticketId);
+  if (!t) {
+    mostrarNotificacion('Ticket no encontrado.', 'error');
+    return;
+  }
+
+  const label = tipo === 'pedido' ? 'pdfPedido' : 'pdfCotizacion';
+  const dbCol = tipo === 'pedido' ? 'pdf_pedido' : 'pdf_cotizacion';
+  const folio = t.folio || 'ticket';
+
+  // 1. Si el archivo ya está en memoria local (ej. recién subido/editado y no sincronizado)
+  const localVal = t[label];
+  if (localVal && localVal.startsWith('data:')) {
+    const link = document.createElement('a');
+    link.href = localVal;
+    link.download = `${tipo === 'pedido' ? 'Pedido' : 'Cotizacion'}_${folio}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return;
+  }
+
+  // 2. Si es el marcador, se requiere estar online para descargarlo de Supabase
+  if (!window.supabaseClient) {
+    mostrarNotificacion('No hay conexión con la base de datos para descargar el PDF.', 'error');
+    return;
+  }
+
+  mostrarNotificacion('Descargando archivo PDF...', 'info');
+
+  try {
+    const { data, error } = await window.supabaseClient
+      .from('tickets')
+      .select(dbCol)
+      .eq('id', ticketId)
+      .single();
+
+    if (error) throw error;
+
+    const dbVal = data ? data[dbCol] : null;
+    if (!dbVal) {
+      mostrarNotificacion('El archivo no está disponible en el servidor.', 'error');
+      return;
+    }
+
+    const link = document.createElement('a');
+    link.href = dbVal;
+    link.download = `${tipo === 'pedido' ? 'Pedido' : 'Cotizacion'}_${folio}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    mostrarNotificacion('Descarga iniciada con éxito.', 'success');
+  } catch (err) {
+    console.error('[PDF Download] Error:', err);
+    mostrarNotificacion('Error al descargar el archivo: ' + err.message, 'error');
+  }
+};
 
 function avanzarCotizacionTicket(id) {
   const t = tickets.find(x => x.id === id);

@@ -67,7 +67,7 @@ function ticketToRow(t) {
     if (match) sitioId = match.id;
   } catch (e) {}
 
-  return {
+  const row = {
     id: t.id,
     folio: t.folio,
     fecha: t.fecha,
@@ -91,10 +91,18 @@ function ticketToRow(t) {
     cot_aceptada: t.cotAceptada || null,
     motivo_rechazo: t.motivoRechazo || null,
     pedido_sap: t.pedidoSAP || null,
-    pdf_pedido: t.pdfPedido || null,
-    pdf_cotizacion: t.pdfCotizacion || null,
     es_prueba: t.esPrueba || false
   };
+
+  // Solo incluir campos PDF si tienen el Base64 real y no un marcador
+  if (t.pdfPedido !== undefined && t.pdfPedido !== '__HAS_PDF__' && t.pdfPedido !== true) {
+    row.pdf_pedido = t.pdfPedido;
+  }
+  if (t.pdfCotizacion !== undefined && t.pdfCotizacion !== '__HAS_PDF__' && t.pdfCotizacion !== true) {
+    row.pdf_cotizacion = t.pdfCotizacion;
+  }
+
+  return row;
 }
 
 function rowToTicket(t) {
@@ -111,6 +119,10 @@ function rowToTicket(t) {
     const match = sitios.find(s => s.id === t.sitio);
     if (match) sitioNombre = match.nombre || match.direccion;
   } catch (e) {}
+
+  // Optimizar Base64 de PDFs guardando un marcador local para ahorrar espacio
+  const pdfPedidoVal = (t.pdf_pedido && t.pdf_pedido.startsWith('data:')) ? '__HAS_PDF__' : (t.pdf_pedido || null);
+  const pdfCotizacionVal = (t.pdf_cotizacion && t.pdf_cotizacion.startsWith('data:')) ? '__HAS_PDF__' : (t.pdf_cotizacion || null);
 
   const obj = {
     id: t.id,
@@ -138,8 +150,8 @@ function rowToTicket(t) {
     motivoRechazo: t.motivo_rechazo,
     pedidoSAP: t.pedido_sap,
     tecnicosAsignados: [], // Siempre vacío por diseño relacional de negocio
-    pdfPedido: t.pdf_pedido,
-    pdfCotizacion: t.pdf_cotizacion,
+    pdfPedido: pdfPedidoVal,
+    pdfCotizacion: pdfCotizacionVal,
     esPrueba: t.es_prueba || false
   };
   
