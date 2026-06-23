@@ -77,17 +77,16 @@ CREATE POLICY "Admins delete user_roles" ON public.user_roles FOR DELETE TO auth
   (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin')
 );
 
--- 4. Crear Políticas de Lectura (SELECT) para Roles de Consulta y Técnicos sobre Catálogos
 CREATE POLICY "Consulta y Tecnicos read access clientes" ON public.clientes FOR SELECT TO authenticated USING (
-  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('tecnico', 'consulta', 'empresa')
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('tecnico', 'consulta', 'empresa', 'supervisor')
 );
 
 CREATE POLICY "Consulta y Tecnicos read access maquinaria" ON public.maquinaria FOR SELECT TO authenticated USING (
-  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('tecnico', 'consulta', 'empresa')
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('tecnico', 'consulta', 'empresa', 'supervisor')
 );
 
 CREATE POLICY "Consulta y Tecnicos read access tickets" ON public.tickets FOR SELECT TO authenticated USING (
-  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('tecnico', 'consulta', 'empresa')
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('tecnico', 'consulta', 'empresa', 'supervisor')
 );
 
 -- 5. Crear Políticas para Técnicos y Consulta sobre Órdenes de Servicio

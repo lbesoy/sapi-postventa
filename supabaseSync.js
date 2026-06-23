@@ -92,7 +92,8 @@ function ticketToRow(t) {
     motivo_rechazo: t.motivoRechazo || null,
     pedido_sap: t.pedidoSAP || null,
     pdf_pedido: t.pdfPedido || null,
-    pdf_cotizacion: t.pdfCotizacion || null
+    pdf_cotizacion: t.pdfCotizacion || null,
+    es_prueba: t.esPrueba || false
   };
 }
 
@@ -138,7 +139,8 @@ function rowToTicket(t) {
     pedidoSAP: t.pedido_sap,
     tecnicosAsignados: [], // Siempre vacío por diseño relacional de negocio
     pdfPedido: t.pdf_pedido,
-    pdfCotizacion: t.pdf_cotizacion
+    pdfCotizacion: t.pdf_cotizacion,
+    esPrueba: t.es_prueba || false
   };
   
   if (obj.notas && obj.notas.startsWith('[H:')) {

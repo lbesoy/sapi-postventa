@@ -87,6 +87,7 @@ CREATE TABLE public.maquinaria (
     modelo TEXT,
     anio SMALLINT,
     cliente TEXT REFERENCES public.clientes(id) ON DELETE CASCADE,
+    sitio_id TEXT REFERENCES public.sitios(id) ON DELETE SET NULL,
     descripcion TEXT,
     custom_data JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
