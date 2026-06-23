@@ -1399,13 +1399,39 @@ function updateSyncStatusUI() {
 
 window.forzarSincronizacionManual = function() {
   window._isSyncManualForced = true;
+  const queue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+
   const trySync = () => {
-    if (window.mostrarNotificacion) {
-      window.mostrarNotificacion('Iniciando sincronización...', 'info');
+    if (queue.length === 0) {
+      if (window.mostrarNotificacion) {
+        window.mostrarNotificacion('Descargando datos recientes de Supabase...', 'info');
+      }
+      if (window.cargarDatosDeSupabase) {
+        window.cargarDatosDeSupabase().then(() => {
+          if (window.mostrarNotificacion) {
+            window.mostrarNotificacion('Datos actualizados correctamente.', 'success');
+          } else {
+            alert('Datos actualizados correctamente.');
+          }
+        }).catch(err => {
+          console.error('[Sync] Error al descargar datos:', err);
+          if (window.mostrarNotificacion) {
+            window.mostrarNotificacion('Error al descargar datos: ' + err.message, 'error');
+          }
+        }).finally(() => {
+          window._isSyncManualForced = false;
+        });
+      } else {
+        window._isSyncManualForced = false;
+      }
+    } else {
+      if (window.mostrarNotificacion) {
+        window.mostrarNotificacion('Iniciando sincronización de cambios locales...', 'info');
+      }
+      processSyncQueue().finally(() => {
+        window._isSyncManualForced = false;
+      });
     }
-    processSyncQueue().finally(() => {
-      window._isSyncManualForced = false;
-    });
   };
 
   if (!navigator.onLine && !window.isConnectionVerifiedOnline) {
@@ -1455,81 +1481,95 @@ window.verDetallesSincronizacion = function() {
   try {
     console.log('[Sync] verDetallesSincronizacion invocado.');
     const queue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
-    if (queue.length === 0) {
-      if (window.mostrarNotificacion) {
-        window.mostrarNotificacion('No hay cambios pendientes de sincronizar.', 'info');
-      } else {
-        alert('No hay cambios pendientes de sincronizar.');
-      }
-      return;
-    }
     
     const listaEl = document.getElementById('sync-detalles-lista');
+    const titleEl = document.querySelector('#modal-sync-detalles h2');
+    const descEl = document.querySelector('#modal-sync-detalles .modal-body p');
+    const actionBtn = document.getElementById('btn-import-cards-confirm') || document.querySelector('#modal-sync-detalles .form-actions button.btn-primary');
+    
     if (listaEl) {
       listaEl.innerHTML = '';
-      queue.forEach(item => {
-        if (!item) return;
-        let desc = 'Sin descripción';
-        if (item.data) {
-          desc = item.data.descripcion || item.data.concepto || item.data.cliente || item.data.id || 'Sin descripción';
-        }
+      if (queue.length === 0) {
+        if (titleEl) titleEl.textContent = 'Estado del Sistema';
+        if (descEl) descEl.textContent = 'Todos tus cambios locales están guardados. Puedes forzar una descarga completa para obtener los últimos tickets creados desde otros dispositivos:';
+        if (actionBtn) actionBtn.textContent = 'Descargar Nube (Sincronizar)';
         
-        const itemEl = document.createElement('div');
-        itemEl.style.display = 'flex';
-        itemEl.style.flexDirection = 'column';
-        itemEl.style.gap = '0.5rem';
-        itemEl.style.background = 'var(--bg-card, #ffffff)';
-        itemEl.style.border = '1px solid var(--border, #e5e7eb)';
-        itemEl.style.borderRadius = '10px';
-        itemEl.style.padding = '0.85rem 1rem';
-        itemEl.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.04)';
+        const emptyEl = document.createElement('div');
+        emptyEl.style.textAlign = 'center';
+        emptyEl.style.padding = '1.5rem';
+        emptyEl.style.color = 'var(--text-muted)';
+        emptyEl.style.fontSize = '0.9rem';
+        emptyEl.innerHTML = '<i data-lucide="cloud-lightning" style="width:36px;height:36px;margin:0 auto 0.5rem auto;display:block;color:var(--accent,#e8820c);"></i> No hay cambios locales pendientes.';
+        listaEl.appendChild(emptyEl);
+      } else {
+        if (titleEl) titleEl.textContent = 'Cambios Pendientes de Sincronizar';
+        if (descEl) descEl.textContent = 'Los siguientes cambios se realizaron de manera local y están esperando a ser subidos a Supabase:';
+        if (actionBtn) actionBtn.textContent = 'Sincronizar Ahora';
         
-        const headerEl = document.createElement('div');
-        headerEl.style.display = 'flex';
-        headerEl.style.alignItems = 'center';
-        headerEl.style.gap = '0.5rem';
-        headerEl.style.fontSize = '0.7rem';
-        headerEl.style.fontWeight = '700';
-        
-        const tableBadge = document.createElement('span');
-        tableBadge.textContent = item.table;
-        tableBadge.style.background = 'rgba(232, 130, 12, 0.08)';
-        tableBadge.style.color = 'var(--accent, #e8820c)';
-        tableBadge.style.border = '1px solid rgba(232, 130, 12, 0.2)';
-        tableBadge.style.padding = '0.2rem 0.5rem';
-        tableBadge.style.borderRadius = '6px';
-        tableBadge.style.textTransform = 'uppercase';
-        tableBadge.style.fontWeight = '700';
-        tableBadge.style.fontSize = '0.65rem';
-        tableBadge.style.letterSpacing = '0.05em';
-        
-        const actionBadge = document.createElement('span');
-        actionBadge.textContent = item.action;
-        actionBadge.style.background = 'var(--bg-hover, #f3f4f6)';
-        actionBadge.style.color = 'var(--text-secondary, #4b5563)';
-        actionBadge.style.border = '1px solid var(--border, #e5e7eb)';
-        actionBadge.style.padding = '0.2rem 0.5rem';
-        actionBadge.style.borderRadius = '6px';
-        actionBadge.style.textTransform = 'uppercase';
-        actionBadge.style.fontWeight = '700';
-        actionBadge.style.fontSize = '0.65rem';
-        actionBadge.style.letterSpacing = '0.05em';
-        
-        headerEl.appendChild(tableBadge);
-        headerEl.appendChild(actionBadge);
-        
-        const bodyEl = document.createElement('div');
-        bodyEl.textContent = desc;
-        bodyEl.style.fontSize = '0.85rem';
-        bodyEl.style.fontWeight = '600';
-        bodyEl.style.color = 'var(--text-primary)';
-        bodyEl.style.wordBreak = 'break-word';
-        bodyEl.style.lineHeight = '1.4';
-        
-        itemEl.appendChild(headerEl);
-        itemEl.appendChild(bodyEl);
-        listaEl.appendChild(itemEl);
-      });
+        queue.forEach(item => {
+          if (!item) return;
+          let desc = 'Sin descripción';
+          if (item.data) {
+            desc = item.data.descripcion || item.data.concepto || item.data.cliente || item.data.id || 'Sin descripción';
+          }
+          
+          const itemEl = document.createElement('div');
+          itemEl.style.display = 'flex';
+          itemEl.style.flexDirection = 'column';
+          itemEl.style.gap = '0.5rem';
+          itemEl.style.background = 'var(--bg-card, #ffffff)';
+          itemEl.style.border = '1px solid var(--border, #e5e7eb)';
+          itemEl.style.borderRadius = '10px';
+          itemEl.style.padding = '0.85rem 1rem';
+          itemEl.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.04)';
+          
+          const headerEl = document.createElement('div');
+          headerEl.style.display = 'flex';
+          headerEl.style.alignItems = 'center';
+          headerEl.style.gap = '0.5rem';
+          headerEl.style.fontSize = '0.7rem';
+          headerEl.style.fontWeight = '700';
+          
+          const tableBadge = document.createElement('span');
+          tableBadge.textContent = item.table;
+          tableBadge.style.background = 'rgba(232, 130, 12, 0.08)';
+          tableBadge.style.color = 'var(--accent, #e8820c)';
+          tableBadge.style.border = '1px solid rgba(232, 130, 12, 0.2)';
+          tableBadge.style.padding = '0.2rem 0.5rem';
+          tableBadge.style.borderRadius = '6px';
+          tableBadge.style.textTransform = 'uppercase';
+          tableBadge.style.fontWeight = '700';
+          tableBadge.style.fontSize = '0.65rem';
+          tableBadge.style.letterSpacing = '0.05em';
+          
+          const actionBadge = document.createElement('span');
+          actionBadge.textContent = item.action;
+          actionBadge.style.background = 'var(--bg-hover, #f3f4f6)';
+          actionBadge.style.color = 'var(--text-secondary, #4b5563)';
+          actionBadge.style.border = '1px solid var(--border, #e5e7eb)';
+          actionBadge.style.padding = '0.2rem 0.5rem';
+          actionBadge.style.borderRadius = '6px';
+          actionBadge.style.textTransform = 'uppercase';
+          actionBadge.style.fontWeight = '700';
+          actionBadge.style.fontSize = '0.65rem';
+          actionBadge.style.letterSpacing = '0.05em';
+          
+          headerEl.appendChild(tableBadge);
+          headerEl.appendChild(actionBadge);
+          
+          const bodyEl = document.createElement('div');
+          bodyEl.textContent = desc;
+          bodyEl.style.fontSize = '0.85rem';
+          bodyEl.style.fontWeight = '600';
+          bodyEl.style.color = 'var(--text-primary)';
+          bodyEl.style.wordBreak = 'break-word';
+          bodyEl.style.lineHeight = '1.4';
+          
+          itemEl.appendChild(headerEl);
+          itemEl.appendChild(bodyEl);
+          listaEl.appendChild(itemEl);
+        });
+      }
     }
     
     const modal = document.getElementById('modal-sync-detalles');
