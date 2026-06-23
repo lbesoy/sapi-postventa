@@ -22,6 +22,8 @@ DROP POLICY IF EXISTS "Consulta read access ordenes" ON public.ordenes;
 
 DROP POLICY IF EXISTS "Admins full access tickets" ON public.tickets;
 DROP POLICY IF EXISTS "Admins y Supervisores full access tickets" ON public.tickets;
+DROP POLICY IF EXISTS "Admins y Laura Paz full access tickets" ON public.tickets;
+DROP POLICY IF EXISTS "Supervisores own access tickets" ON public.tickets;
 DROP POLICY IF EXISTS "Consulta y Tecnicos read access tickets" ON public.tickets;
 
 DROP POLICY IF EXISTS "Admins full access clientes" ON public.clientes;
@@ -46,10 +48,34 @@ CREATE POLICY "Admins y Supervisores full access ordenes" ON public.ordenes FOR 
   (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
 );
 
-CREATE POLICY "Admins y Supervisores full access tickets" ON public.tickets FOR ALL TO authenticated USING (
-  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
+CREATE POLICY "Admins y Laura Paz full access tickets" ON public.tickets FOR ALL TO authenticated USING (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin')
+  OR (
+    (SELECT rol FROM public.user_roles WHERE id = auth.uid()) = 'supervisor'
+    AND (SELECT nombre FROM public.user_roles WHERE id = auth.uid()) ILIKE '%laura%paz%'
+  )
 ) WITH CHECK (
-  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin')
+  OR (
+    (SELECT rol FROM public.user_roles WHERE id = auth.uid()) = 'supervisor'
+    AND (SELECT nombre FROM public.user_roles WHERE id = auth.uid()) ILIKE '%laura%paz%'
+  )
+);
+
+CREATE POLICY "Supervisores own access tickets" ON public.tickets FOR ALL TO authenticated USING (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) = 'supervisor'
+  AND NOT ((SELECT nombre FROM public.user_roles WHERE id = auth.uid()) ILIKE '%laura%paz%')
+  AND (
+    asignado = (SELECT nombre FROM public.user_roles WHERE id = auth.uid())
+    OR solicitante = (SELECT nombre FROM public.user_roles WHERE id = auth.uid())
+  )
+) WITH CHECK (
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) = 'supervisor'
+  AND NOT ((SELECT nombre FROM public.user_roles WHERE id = auth.uid()) ILIKE '%laura%paz%')
+  AND (
+    asignado = (SELECT nombre FROM public.user_roles WHERE id = auth.uid())
+    OR solicitante = (SELECT nombre FROM public.user_roles WHERE id = auth.uid())
+  )
 );
 
 CREATE POLICY "Admins y Supervisores full access clientes" ON public.clientes FOR ALL TO authenticated USING (
@@ -86,7 +112,15 @@ CREATE POLICY "Consulta y Tecnicos read access maquinaria" ON public.maquinaria 
 );
 
 CREATE POLICY "Consulta y Tecnicos read access tickets" ON public.tickets FOR SELECT TO authenticated USING (
-  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('tecnico', 'consulta', 'empresa', 'supervisor')
+  (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('tecnico', 'consulta', 'empresa')
+  OR (
+    (SELECT rol FROM public.user_roles WHERE id = auth.uid()) = 'supervisor'
+    AND (
+      (SELECT nombre FROM public.user_roles WHERE id = auth.uid()) ILIKE '%laura%paz%'
+      OR asignado = (SELECT nombre FROM public.user_roles WHERE id = auth.uid())
+      OR solicitante = (SELECT nombre FROM public.user_roles WHERE id = auth.uid())
+    )
+  )
 );
 
 -- 5. Crear Políticas para Técnicos y Consulta sobre Órdenes de Servicio
