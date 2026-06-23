@@ -630,6 +630,22 @@ async function _processSyncQueueInternal() {
     return;
   }
 
+  // Evitar procesar la cola de sincronización si no hay sesión activa en Supabase.
+  // Esto previene que se disparen errores de RLS ("violates row-level security policy")
+  // al intentar subir datos de forma anónima, y evita que se descarten elementos de la cola.
+  try {
+    const sessionRes = await sb.auth.getSession().catch(() => null);
+    if (!sessionRes || !sessionRes.data || !sessionRes.data.session) {
+      console.log('[Sync] No hay sesión activa en Supabase. Sincronización pospuesta hasta iniciar sesión.');
+      updateSyncStatusUI();
+      return;
+    }
+  } catch (e) {
+    console.error('[Sync] Error al verificar sesión para processSyncQueue:', e);
+    updateSyncStatusUI();
+    return;
+  }
+
   const queue = getSyncQueue();
   if (queue.length === 0) {
     updateSyncStatusUI();
@@ -860,6 +876,18 @@ async function _processSyncQueueInternal() {
               const match = clientes.find(c => c.nombre === item.data.cliente || c.id === item.data.cliente);
               if (match) clienteId = match.id;
             } catch(e) {}
+            
+            // Encontrar el ID del sitio por su nombre
+            let sitioId = item.data.sitio_id || null;
+            if (!sitioId && (item.data.ubicacion || item.data.customData?.ubicacion)) {
+              const ubiName = item.data.ubicacion || item.data.customData?.ubicacion;
+              try {
+                const sitios = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+                const match = sitios.find(s => s.cliente === clienteId && (s.nombre === ubiName || s.direccion === ubiName || s.id === ubiName));
+                if (match) sitioId = match.id;
+              } catch (e) {}
+            }
+            
             const customData = {
               ...(item.data.customData || {}),
               tipo: item.data.tipo || item.data.customData?.tipo || null,
@@ -877,6 +905,7 @@ async function _processSyncQueueInternal() {
               modelo: item.data.modelo,
               anio: item.data.anio ? (parseInt(item.data.anio, 10) || null) : null,
               cliente: clienteId,
+              sitio_id: sitioId,
               descripcion: item.data.descripcion,
               custom_data: customData,
               tipo: item.data.tipo || item.data.customData?.tipo || null,
@@ -1691,9 +1720,17 @@ window.cargarDatosDeSupabase = function() {
                 anio: m.anio,
                 cliente: row.id,
                 descripcion: m.descripcion,
-                customData: cData
+                customData: cData,
+                sitio_id: m.sitio_id
               });
             }
+          }
+
+          // Resolver nombre del sitio a partir del sitio_id
+          let ubiName = m.ubicacion || cData.ubicacion || 'N/A';
+          if (m.sitio_id) {
+            const sMatch = (sitiosDb || []).find(s => s.id === m.sitio_id);
+            if (sMatch) ubiName = sMatch.nombre;
           }
 
           return {
@@ -1709,7 +1746,8 @@ window.cargarDatosDeSupabase = function() {
             numeroEconomico: m.numero_economico || cData.numeroEconomico || 'N/A',
             numeroMotor: m.numero_motor || cData.numeroMotor || 'N/A',
             venta: m.venta || cData.venta || '',
-            ubicacion: m.ubicacion || cData.ubicacion || 'N/A',
+            ubicacion: ubiName,
+            sitio_id: m.sitio_id || null,
             latitud: (m.latitud !== null && m.latitud !== undefined) ? m.latitud : cData.latitud,
             longitud: (m.longitud !== null && m.longitud !== undefined) ? m.longitud : cData.longitud,
             customData: cData
@@ -1830,7 +1868,8 @@ window.cargarDatosDeSupabase = function() {
                 anio: m.anio,
                 cliente: matchByName.id,
                 descripcion: m.descripcion,
-                customData: m.custom_data
+                customData: m.custom_data,
+                sitio_id: m.sitio_id
               });
             }
             clienteNombre = matchByName.nombre;
@@ -1840,6 +1879,17 @@ window.cargarDatosDeSupabase = function() {
           }
         } catch(e) {}
         const cData = m.custom_data || {};
+
+        // Resolver nombre del sitio a partir del sitio_id
+        let ubiName = m.ubicacion || cData.ubicacion || 'N/A';
+        if (m.sitio_id) {
+          try {
+            const sitios = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+            const sMatch = sitios.find(s => s.id === m.sitio_id);
+            if (sMatch) ubiName = sMatch.nombre;
+          } catch(e) {}
+        }
+
         return {
           id: m.id,
           serie: m.serie,
@@ -1853,7 +1903,8 @@ window.cargarDatosDeSupabase = function() {
           numeroEconomico: m.numero_economico || cData.numeroEconomico || 'N/A',
           numeroMotor: m.numero_motor || cData.numeroMotor || 'N/A',
           venta: m.venta || cData.venta || '',
-          ubicacion: m.ubicacion || cData.ubicacion || 'N/A',
+          ubicacion: ubiName,
+          sitio_id: m.sitio_id || null,
           latitud: (m.latitud !== null && m.latitud !== undefined) ? m.latitud : cData.latitud,
           longitud: (m.longitud !== null && m.longitud !== undefined) ? m.longitud : cData.longitud,
           customData: cData
