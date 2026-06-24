@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.127'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.128'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -7978,6 +7978,7 @@ function guardarOrden(e) {
     const tIndex = tickets.findIndex(t => t.id === orden.soporte);
     if (tIndex >= 0 && tickets[tIndex].estado !== 'Cerrado') {
       tickets[tIndex].estado = 'Cerrado';
+      localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
       if (window.supabaseClient) {
         window.pushToSupabase('tickets', tickets[tIndex]);
       }
@@ -11832,6 +11833,7 @@ function avanzarCotizacionTicket(id) {
   }
   t.cotizacionSAP = sap;
   t.estado = 'Cotización';
+  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
   if (window.supabaseClient) {
     window.pushToSupabase('tickets', t);
   }
