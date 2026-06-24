@@ -90,8 +90,7 @@ function ticketToRow(t) {
     cotizacion_sap: t.cotizacionSAP || null,
     cot_aceptada: t.cotAceptada || null,
     motivo_rechazo: t.motivoRechazo || null,
-    pedido_sap: t.pedidoSAP || null,
-    es_prueba: t.esPrueba || false
+    pedido_sap: t.pedidoSAP || null
   };
 
   // Solo incluir campos PDF si tienen el Base64 real y no un marcador
@@ -152,7 +151,7 @@ function rowToTicket(t) {
     tecnicosAsignados: [], // Siempre vacío por diseño relacional de negocio
     pdfPedido: pdfPedidoVal,
     pdfCotizacion: pdfCotizacionVal,
-    esPrueba: t.es_prueba || false
+    esPrueba: t.es_prueba || (t.folio && t.folio.includes('PRUEBA')) || (t.asunto && t.asunto.startsWith('[PRUEBA]')) || false
   };
   
   if (obj.notas && obj.notas.startsWith('[H:')) {
