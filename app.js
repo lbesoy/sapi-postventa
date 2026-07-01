@@ -11563,36 +11563,74 @@ window.validarCotizacionConSAP = async function(isModal = true, ticketId = null)
     
     let isMontoMatch = Math.abs(montoVal - sapMonto) < 0.05;
     
+    const tClientName = isModal
+      ? (document.getElementById('t-cliente')?.value || (ticket ? ticket.cliente : ''))
+      : (ticket ? ticket.cliente : '');
+
     let isClientMatch = true;
-    if (ticket && ticket.cliente) {
-      const tClientClean = String(ticket.cliente).toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (tClientName) {
+      const tClientClean = String(tClientName).toLowerCase().replace(/[^a-z0-9]/g, '');
       const sClientClean = String(sapCliente).toLowerCase().replace(/[^a-z0-9]/g, '');
       isClientMatch = tClientClean.includes(sClientClean) || sClientClean.includes(tClientClean);
     }
 
+    const comparisonTableHtml = `
+      <table style="width:100%; border-collapse:collapse; margin-top:0.4rem; font-size:0.72rem; text-align:left; border:1px solid var(--border); background:rgba(0,0,0,0.15); border-radius:6px; overflow:hidden;">
+        <thead>
+          <tr style="background:rgba(255,255,255,0.02); color:var(--text-muted); border-bottom:1px solid var(--border);">
+            <th style="padding:4px 6px; font-weight:500;">Concepto</th>
+            <th style="padding:4px 6px; font-weight:500;">En Formulario / Ticket</th>
+            <th style="padding:4px 6px; font-weight:500;">Registrado en SAP</th>
+            <th style="padding:4px 6px; font-weight:500; text-align:center;">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+            <td style="padding:4px 6px; font-weight:600; color:var(--text-secondary);">Monto</td>
+            <td style="padding:4px 6px; font-family:monospace; color:var(--text-primary);">${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(montoVal)}</td>
+            <td style="padding:4px 6px; font-family:monospace; color:var(--text-primary);">${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(sapMonto)}</td>
+            <td style="padding:4px 6px; text-align:center; font-weight:600; color:${isMontoMatch ? '#10b981' : '#ef4444'};">
+              ${isMontoMatch ? '✔️ Coincide' : '❌ Difiere'}
+            </td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+            <td style="padding:4px 6px; font-weight:600; color:var(--text-secondary);">Cliente</td>
+            <td style="padding:4px 6px; color:var(--text-primary);">${tClientName || '—'}</td>
+            <td style="padding:4px 6px; color:var(--text-primary);">${sapCliente || '—'}</td>
+            <td style="padding:4px 6px; text-align:center; font-weight:600; color:${isClientMatch ? '#10b981' : '#ef4444'};">
+              ${isClientMatch ? '✔️ Coincide' : '❌ Difiere'}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
     let alertHtml = '';
     if (!isMontoMatch && montoVal > 0) {
-      alertHtml += `<div>⚠️ El monto ingresado (${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(montoVal)}) no coincide con SAP (${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(sapMonto)}).</div>`;
+      alertHtml += `<div>⚠️ El monto ingresado no coincide con el registrado en SAP.</div>`;
     }
     if (!isClientMatch) {
-      alertHtml += `<div>⚠️ El cliente en SAP es <strong>"${sapCliente}"</strong>, pero este ticket pertenece a <strong>"${ticket?.cliente || 'N/A'}"</strong>.</div>`;
+      alertHtml += `<div>⚠️ El cliente del ticket no coincide con el cliente de la cotización en SAP.</div>`;
     }
 
     if (alertHtml) {
       statusDiv.innerHTML = `
-        <div style="padding:0.5rem 0.75rem; border-radius:6px; background:rgba(245,158,11,0.06); border:1px solid rgba(245,158,11,0.15); font-size:0.78rem; color:#f59e0b; display:flex; flex-direction:column; gap:0.25rem;">
+        <div style="padding:0.6rem 0.8rem; border-radius:8px; background:rgba(245,158,11,0.05); border:1px solid rgba(245,158,11,0.15); font-size:0.78rem; color:#f59e0b; display:flex; flex-direction:column; gap:0.3rem;">
           <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="alert-triangle" style="width:14px; height:14px;"></i> Coincidencia Parcial con SAP</div>
-          <div style="font-size:0.75rem; color:#d97706; display:flex; flex-direction:column; gap:2px;">
+          <div style="font-size:0.74rem; color:#d97706; display:flex; flex-direction:column; gap:1px;">
             ${alertHtml}
           </div>
-          <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px;">Fecha SAP: ${sapFecha} | Monto SAP: ${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(sapMonto)}</div>
+          ${comparisonTableHtml}
+          <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Fecha SAP: ${sapFecha}</div>
         </div>
       `;
     } else {
       statusDiv.innerHTML = `
-        <div style="padding:0.5rem 0.75rem; border-radius:6px; background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.15); font-size:0.78rem; color:#10b981; display:flex; flex-direction:column; gap:0.25rem;">
+        <div style="padding:0.6rem 0.8rem; border-radius:8px; background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.15); font-size:0.78rem; color:#10b981; display:flex; flex-direction:column; gap:0.3rem;">
           <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="check-circle" style="width:14px; height:14px;"></i> Cotización Validada con SAP</div>
-          <div style="font-size:0.72rem; color:var(--text-muted);">Monto coincidente, Cliente verificado. Fecha SAP: ${sapFecha}</div>
+          <div style="font-size:0.74rem; color:var(--text-muted);">Monto y Cliente coinciden plenamente con el catálogo.</div>
+          ${comparisonTableHtml}
+          <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Fecha SAP: ${sapFecha}</div>
         </div>
       `;
     }
