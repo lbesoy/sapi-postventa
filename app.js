@@ -11299,42 +11299,56 @@ window.autoExtraerDesdePdfCotizacion = async function(file, isModal = true, tick
     let detectedClientName = null;
     let isSapMatch = false;
     let cleanText = '';
-    let isAiProcessed = false;
+    let isFileNameMatch = false;
 
-    // 1. Intentar llamar al backend para extraer texto o usar IA
-    try {
-      const response = await fetch('/api/extract-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ base64Data: base64 })
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        if (result.ai) {
-          isAiProcessed = true;
-          extractedDoc = result.data.numero_cotizacion ? String(result.data.numero_cotizacion) : null;
-          extractedMonto = result.data.monto ? parseFloat(result.data.monto) : null;
-          detectedClientName = result.data.cliente || null;
-          console.log('[PDF Auto-Extract] AI parsed fields successfully:', { extractedDoc, extractedMonto, detectedClientName });
-        } else if (result.text) {
-          cleanText = result.text.replace(/\s+/g, ' ').trim();
+    // 1. Extraer número de cotización directamente del nombre del archivo (Método ultra-preciso sin IA)
+    if (file.name) {
+      const fnMatch = file.name.match(/\b([123]10[0-9]{4})\b/) || file.name.match(/\b([0-9]{7})\b/);
+      if (fnMatch) {
+        const docNum = fnMatch[1];
+        const quotes = window._cacheCotizacionesSap || [];
+        const found = quotes.find(q => q.numero_cotizacion === docNum);
+        if (found) {
+          isFileNameMatch = true;
+          isSapMatch = true;
+          extractedDoc = found.numero_cotizacion;
+          extractedMonto = found.monto;
+          detectedClientName = found.cliente;
+          console.log('[PDF Auto-Extract] Matched quotation from filename via SAP cache:', found);
+        } else {
+          extractedDoc = docNum;
         }
       }
-    } catch (apiErr) {
-      console.warn('[PDF Auto-Extract] Backend extraction failed, falling back to local:', apiErr);
     }
 
-    // 2. Si no se procesó por IA, caemos a las heurísticas de expresiones regulares (con texto de la API o local de PDF.js)
-    if (!isAiProcessed) {
+    // 2. Si no se emparejó por nombre de archivo, intentar extraer el texto llamando al backend local
+    if (!isFileNameMatch) {
+      try {
+        const response = await fetch('/api/extract-pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ base64Data: base64 })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.text) {
+            cleanText = result.text.replace(/\s+/g, ' ').trim();
+          }
+        }
+      } catch (apiErr) {
+        console.warn('[PDF Auto-Extract] Local backend extraction failed:', apiErr);
+      }
+
+      // 3. Fallback: usar PDF.js local en el navegador si no tenemos texto del backend
       if (!cleanText) {
         try {
           const text = await window.extraerTextoPdf(base64);
           cleanText = text.replace(/\s+/g, ' ').trim();
         } catch (pdfjsErr) {
-          console.error('[PDF Auto-Extract] Browser PDF.js also failed:', pdfjsErr);
+          console.error('[PDF Auto-Extract] Browser PDF.js failed:', pdfjsErr);
         }
       }
 
@@ -11358,7 +11372,7 @@ window.autoExtraerDesdePdfCotizacion = async function(file, isModal = true, tick
         detectedClientName = detectedQuote.cliente;
       } else if (cleanText) {
         const docMatch = cleanText.match(/\b([123]10[0-9]{4})\b/) || cleanText.match(/\b([0-9]{7})\b/);
-        extractedDoc = docMatch ? docMatch[1] : null;
+        extractedDoc = docMatch ? docMatch[1] : (extractedDoc || null);
         
         const totalRegex = /(?:importe\s+total|total|importe|monto|neto)[:\s\$\-]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2}))/gi;
         let match;
@@ -11394,7 +11408,7 @@ window.autoExtraerDesdePdfCotizacion = async function(file, isModal = true, tick
       }
     }
 
-    // 3. Auto-llenar campos
+    // 4. Auto-llenar campos en la interfaz
     const sapInputId = isModal ? 't-cotizacion-sap' : `quick-cot-sap-${ticketId}`;
     const montoInputId = isModal ? 't-cotizacion-monto' : `quick-cot-monto-${ticketId}`;
     const sapInput = document.getElementById(sapInputId);
@@ -11431,8 +11445,8 @@ window.autoExtraerDesdePdfCotizacion = async function(file, isModal = true, tick
       if (montoInput) montoInput.value = extractedMonto;
     }
 
-    if (isAiProcessed) {
-      mostrarNotificacion(`✅ Extracción con IA (Gemini) exitosa para cotización ${extractedDoc || ''}.`, 'success');
+    if (isFileNameMatch) {
+      mostrarNotificacion(`✅ Cotización ${extractedDoc} vinculada desde el nombre del archivo.`, 'success');
     } else if (extractedDoc || extractedMonto) {
       let clientMsg = detectedClientName ? ` | Cliente: "${detectedClientName}"` : '';
       mostrarNotificacion(`⚠️ Datos extraídos del PDF (Doc: ${extractedDoc || '?'}, Monto: $${extractedMonto || '?'}${clientMsg}). Valida la información.`, 'warning');
@@ -11440,7 +11454,7 @@ window.autoExtraerDesdePdfCotizacion = async function(file, isModal = true, tick
       mostrarNotificacion('No se pudo extraer el folio o monto del PDF. Ingresa los datos manualmente.', 'info');
     }
 
-    // 4. Dibujar la tabla
+    // 5. Dibujar la tabla de extracción
     const tableContainerId = isModal ? 'pdf-extraction-table-container' : `quick-pdf-extraction-table-container-${ticketId}`;
     const tableContainer = document.getElementById(tableContainerId);
     if (tableContainer) {
@@ -11449,8 +11463,8 @@ window.autoExtraerDesdePdfCotizacion = async function(file, isModal = true, tick
         <div class="pdf-data-table" style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:0.75rem; font-size:0.8rem; margin-top:0.5rem; display:flex; flex-direction:column; gap:0.5rem;">
           <div style="font-weight:600; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
             <span>📋 Datos Extraídos del Archivo</span>
-            <span style="font-size:0.7rem; padding:2px 6px; border-radius:4px; ${isAiProcessed ? 'background:rgba(99,102,241,0.1); color:#6366f1;' : (isSapMatch ? 'background:rgba(16,185,129,0.1); color:#10b981;' : 'background:rgba(245,158,11,0.1); color:#f59e0b;')} font-weight:600;">
-              ${isAiProcessed ? 'Procesado con IA' : (isSapMatch ? 'Coincidencia SAP' : 'Lectura de Texto')}
+            <span style="font-size:0.7rem; padding:2px 6px; border-radius:4px; ${isFileNameMatch ? 'background:rgba(16,185,129,0.1); color:#10b981;' : (isSapMatch ? 'background:rgba(16,185,129,0.1); color:#10b981;' : 'background:rgba(245,158,11,0.1); color:#f59e0b;')} font-weight:600;">
+              ${isFileNameMatch ? 'Nombre de Archivo + SAP' : (isSapMatch ? 'Coincidencia SAP' : 'Lectura de Texto')}
             </span>
           </div>
           <table style="width:100%; border-collapse:collapse; text-align:left;">
@@ -11465,23 +11479,23 @@ window.autoExtraerDesdePdfCotizacion = async function(file, isModal = true, tick
               <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
                 <td style="padding:6px 8px; font-weight:600;">Folio / Doc SAP</td>
                 <td style="padding:6px 8px; font-family:monospace; color:var(--text-primary);">${extractedDoc || '—'}</td>
-                <td style="padding:6px 8px;"><span style="font-size:0.7rem;">${isAiProcessed ? 'Lector IA' : (isSapMatch ? 'Catálogo SAP' : 'Texto del PDF')}</span></td>
+                <td style="padding:6px 8px;"><span style="font-size:0.7rem;">${isFileNameMatch ? 'Nombre del archivo' : 'Texto del PDF'}</span></td>
               </tr>
               <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
                 <td style="padding:6px 8px; font-weight:600;">Monto Total</td>
                 <td style="padding:6px 8px; color:var(--text-primary); font-weight:600;">${extractedMonto ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(extractedMonto) : '—'}</td>
-                <td style="padding:6px 8px;"><span style="font-size:0.7rem;">${isAiProcessed ? 'Lector IA' : (isSapMatch ? 'Catálogo SAP' : 'Texto del PDF')}</span></td>
+                <td style="padding:6px 8px;"><span style="font-size:0.7rem;">${isSapMatch ? 'Catálogo SAP' : 'Texto del PDF'}</span></td>
               </tr>
               <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
                 <td style="padding:6px 8px; font-weight:600;">Cliente</td>
                 <td style="padding:6px 8px; color:var(--text-primary);">${detectedClientName || '—'}</td>
-                <td style="padding:6px 8px;"><span style="font-size:0.7rem;">${isAiProcessed ? 'Lector IA' : (isSapMatch ? 'Catálogo SAP' : 'Texto del PDF')}</span></td>
+                <td style="padding:6px 8px;"><span style="font-size:0.7rem;">${isSapMatch ? 'Catálogo SAP' : 'Texto del PDF'}</span></td>
               </tr>
             </tbody>
           </table>
           <details style="margin-top:0.25rem; color:var(--text-muted); font-size:0.72rem;">
             <summary style="cursor:pointer; user-select:none; font-weight:500;">🔍 Ver texto extraído (Diagnóstico)</summary>
-            <pre style="margin-top:0.25rem; white-space:pre-wrap; background:rgba(0,0,0,0.15); padding:0.5rem; border-radius:4px; max-height:150px; overflow-y:auto; font-family:monospace; color:var(--text-secondary); border:1px solid var(--border);">${cleanText || (isAiProcessed ? '(Datos procesados directamente por la IA)' : '(Vacío)')}</pre>
+            <pre style="margin-top:0.25rem; white-space:pre-wrap; background:rgba(0,0,0,0.15); padding:0.5rem; border-radius:4px; max-height:150px; overflow-y:auto; font-family:monospace; color:var(--text-secondary); border:1px solid var(--border);">${cleanText || (isFileNameMatch ? '(Sincronizado directamente desde catálogo SAP usando el nombre del archivo)' : '(Vacío)')}</pre>
           </details>
         </div>
       `;
