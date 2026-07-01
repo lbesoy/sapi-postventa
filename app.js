@@ -211,6 +211,12 @@ function formatFechaHoraAmigable(dateStr) {
 // ===== DATA =====
 let ordenes = safeGetJSON('sapi_ordenes', []);
 setTimeout(deduplicarOrdenesLocales, 2000); // Eliminar duplicados fantasmas en segundo plano tras inicializar
+// Limpieza única de tickets fantasmas de la caché local debido a la reasignación de folios en Supabase
+if (typeof localStorage !== 'undefined' && !localStorage.getItem('eurorep_tickets_cleaned_v2')) {
+  localStorage.removeItem('sapi_tickets');
+  localStorage.setItem('eurorep_tickets_cleaned_v2', 'true');
+  console.log('[Deduplicar] Limpieza inicial única de tickets locales realizada para evitar fantasmas.');
+}
 let tickets = safeGetJSON('sapi_tickets', []);
 let clientesDb = safeGetJSON('sapi_clientes_db', []);
 let refaccionesDb = safeGetJSON('sapi_refacciones_db', []);

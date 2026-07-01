@@ -586,6 +586,23 @@ window.pushToSupabase = async function(tabla, item) {
       }
       throw error;
     }
+    
+    // Marcar el elemento local en localStorage como sincronizado (_synced = true)
+    try {
+      const storageKey = tabla === 'tickets' ? 'sapi_tickets' : (tabla === 'ordenes' ? 'sapi_ordenes' : null);
+      if (storageKey) {
+        const localItems = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        const idx = localItems.findIndex(x => x.id === item.id);
+        if (idx > -1) {
+          localItems[idx]._synced = true;
+          localStorage.setItem(storageKey, JSON.stringify(localItems));
+          console.log(`[Direct Push] Marcado local ${tabla} como sincronizado (_synced: true) para ${item.id}`);
+        }
+      }
+    } catch (e) {
+      console.error('[Direct Push] Error al marcar elemento local como sincronizado:', e);
+    }
+
     console.log(`[Direct Push] Guardado exitoso directo en la tabla ${tabla}.`);
     return;
   }
