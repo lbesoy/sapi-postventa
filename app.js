@@ -1167,6 +1167,11 @@ async function iniciarSesionSubmit(e) {
 }
 
 function entrarApp(user) {
+  if (user && (user.rol === 'empresa' || user.rol === 'cliente')) {
+    console.log('[Auth] Redirigiendo cliente al Portal de Clientes (cliente.html)...');
+    window.location.href = 'cliente.html';
+    return;
+  }
   try {
     const loginScreen = document.getElementById('login-screen');
     if (loginScreen) loginScreen.classList.add('hidden');
@@ -11532,6 +11537,82 @@ window.validarCotizacionConSAP = async function(isModal = true, ticketId = null)
       return;
     }
 
+window.checkPdfSapMatchCount = function(sapVal, montoVal, tClientName) {
+  const pdfData = window._lastPdfExtracted;
+  if (!pdfData) return 3; // No PDF uploaded, bypass check
+  
+  // Find registered SAP quotation from cache
+  const quotes = window._cacheCotizacionesSap || [];
+  const found = quotes.find(q => q.numero_cotizacion === sapVal);
+  if (!found) return 0; // If quotation selected is not in cache/SAP, 0 matches
+  
+  const sapMonto = Number(found.monto) || 0;
+  const sapCliente = found.cliente || '';
+  
+  let isPdfDocMatch = String(pdfData.doc || '').trim() === String(sapVal).trim();
+  let isPdfMontoMatch = pdfData.monto ? Math.abs(Number(pdfData.monto) - sapMonto) < 0.05 : true;
+  
+  let isPdfClientMatch = true;
+  if (pdfData.cliente) {
+    const pClientClean = String(pdfData.cliente).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const sClientClean = String(sapCliente).toLowerCase().replace(/[^a-z0-9]/g, '');
+    isPdfClientMatch = pClientClean.includes(sClientClean) || sClientClean.includes(pClientClean);
+  }
+  
+  let matchCount = 0;
+  if (isPdfDocMatch) matchCount++;
+  if (isPdfMontoMatch) matchCount++;
+  if (isPdfClientMatch) matchCount++;
+  
+  return matchCount;
+};
+
+window.validarCotizacionConSAP = async function(isModal = true, ticketId = null) {
+  const sb = window.supabaseClient;
+  if (!sb) return;
+
+  const sapInputId = isModal ? 't-cotizacion-sap' : `quick-cot-sap-${ticketId}`;
+  const montoInputId = isModal ? 't-cotizacion-monto' : `quick-cot-monto-${ticketId}`;
+  const statusDivId = isModal ? 't-sap-validation-status' : `quick-sap-validation-status-${ticketId}`;
+
+  const sapVal = document.getElementById(sapInputId)?.value.trim();
+  const montoVal = parseFloat(document.getElementById(montoInputId)?.value) || 0;
+  const statusDiv = document.getElementById(statusDivId);
+
+  if (!statusDiv) return;
+
+  if (!sapVal) {
+    statusDiv.style.display = 'none';
+    statusDiv.innerHTML = '';
+    return;
+  }
+
+  let ticket = null;
+  const tId = ticketId || editandoTicketId;
+  if (tId) {
+    ticket = tickets.find(t => t.id === tId);
+  }
+
+  statusDiv.style.display = 'block';
+  statusDiv.innerHTML = '<div style="font-size:0.75rem; color:var(--text-muted); display:flex; align-items:center; gap:4px;"><i data-lucide="loader" class="rotating" style="width:12px; height:12px;"></i> Validando con SAP...</div>';
+  if (window.lucide) lucide.createIcons();
+
+  try {
+    const { data, error } = await sb.from('cotizaciones_sap').select('*').eq('numero_cotizacion', sapVal).maybeSingle();
+    
+    if (error) throw error;
+
+    if (!data) {
+      statusDiv.innerHTML = `
+        <div style="padding:0.5rem 0.75rem; border-radius:6px; background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.15); font-size:0.78rem; color:#ef4444; display:flex; flex-direction:column; gap:0.25rem;">
+          <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="x-circle" style="width:14px; height:14px;"></i> Cotización no encontrada en SAP</div>
+          <div style="font-size:0.72rem; color:var(--text-muted);">Verifique el número ingresado o presione "Sincronizar con SAP".</div>
+        </div>
+      `;
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+
     const sapMonto = Number(data.monto) || 0;
     const sapCliente = data.cliente || '';
     const sapFecha = data.fecha ? new Date(data.fecha).toLocaleDateString('es-MX') : '—';
@@ -11566,12 +11647,19 @@ window.validarCotizacionConSAP = async function(isModal = true, ticketId = null)
       }
     }
 
+    let matchCount = 0;
+    if (isPdfDocMatch) matchCount++;
+    if (isPdfMontoMatch) matchCount++;
+    if (isPdfClientMatch) matchCount++;
+
+    const isBlocked = hasPdf && (matchCount < 2);
+
     let comparisonTableHtml = '';
     if (hasPdf) {
       comparisonTableHtml = `
-        <table style="width:100%; border-collapse:collapse; margin-top:0.4rem; font-size:0.7rem; text-align:left; border:1px solid var(--border); background:rgba(0,0,0,0.15); border-radius:6px; overflow:hidden;">
+        <table style="width:100%; border-collapse:collapse; margin-top:0.4rem; font-size:0.7rem; text-align:left; border:1px solid ${isBlocked ? 'rgba(239,68,68,0.2)' : 'var(--border)'}; background:rgba(0,0,0,0.15); border-radius:6px; overflow:hidden;">
           <thead>
-            <tr style="background:rgba(255,255,255,0.02); color:var(--text-muted); border-bottom:1px solid var(--border);">
+            <tr style="background:rgba(255,255,255,0.02); color:var(--text-muted); border-bottom:1px solid ${isBlocked ? 'rgba(239,68,68,0.2)' : 'var(--border)'};">
               <th style="padding:4px 6px; font-weight:500;">Dato</th>
               <th style="padding:4px 6px; font-weight:500;">En Formulario</th>
               <th style="padding:4px 6px; font-weight:500;">Extraído de PDF</th>
@@ -11662,12 +11750,24 @@ window.validarCotizacionConSAP = async function(isModal = true, ticketId = null)
       }
     }
 
-    if (alertHtml) {
+    if (alertHtml || isBlocked) {
+      const bg = isBlocked ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.05)';
+      const border = isBlocked ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)';
+      const color = isBlocked ? '#ef4444' : '#f59e0b';
+      const icon = isBlocked ? 'x-circle' : 'alert-triangle';
+      const title = isBlocked ? 'Validación Bloqueada' : 'Coincidencia Parcial con SAP';
+      
+      let blockedMessage = '';
+      if (isBlocked) {
+        blockedMessage = `<div style="font-weight:700; margin-top:0.35rem; border-top:1px dashed rgba(239,68,68,0.15); padding-top:0.35rem; color:#ef4444;">🚫 Acceso Bloqueado: Deben coincidir al menos 2 parámetros del PDF para avanzar a Cotización.</div>`;
+      }
+
       statusDiv.innerHTML = `
-        <div style="padding:0.6rem 0.8rem; border-radius:8px; background:rgba(245,158,11,0.05); border:1px solid rgba(245,158,11,0.15); font-size:0.78rem; color:#f59e0b; display:flex; flex-direction:column; gap:0.3rem;">
-          <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="alert-triangle" style="width:14px; height:14px;"></i> Coincidencia Parcial con SAP</div>
-          <div style="font-size:0.74rem; color:#d97706; display:flex; flex-direction:column; gap:1px;">
+        <div style="padding:0.6rem 0.8rem; border-radius:8px; background:${bg}; border:1px solid ${border}; font-size:0.78rem; color:${color}; display:flex; flex-direction:column; gap:0.3rem;">
+          <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="${icon}" style="width:14px; height:14px;"></i> ${title}</div>
+          <div style="font-size:0.74rem; color:${isBlocked ? '#ef4444' : '#d97706'}; display:flex; flex-direction:column; gap:1px;">
             ${alertHtml}
+            ${blockedMessage}
           </div>
           ${comparisonTableHtml}
           <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Fecha SAP: ${sapFecha}</div>
@@ -12341,6 +12441,16 @@ async function guardarTicket(e) {
       if (!cotMontoVal || isNaN(parseFloat(cotMontoVal)) || parseFloat(cotMontoVal) <= 0) {
         mostrarNotificacion('Debe ingresar un Monto de Cotización válido (mayor a 0).', 'error');
         return;
+      }
+      
+      // Validar coincidencia mínima de PDF si hay uno cargado
+      if (window._lastPdfExtracted && window.checkPdfSapMatchCount) {
+        const clientVal = document.getElementById('t-cliente')?.value || '';
+        const matchCount = window.checkPdfSapMatchCount(cotSAP, parseFloat(cotMontoVal) || 0, clientVal);
+        if (matchCount < 2) {
+          mostrarNotificacion('Bloqueado: Los datos del PDF no coinciden con la cotización SAP seleccionada en al menos dos parámetros (Folio, Monto o Cliente).', 'error');
+          return;
+        }
       }
     }
   }
@@ -13047,6 +13157,15 @@ async function avanzarCotizacionTicket(id) {
   if (!hasFile && !t.pdfCotizacion) {
     mostrarNotificacion('Debes adjuntar el archivo PDF de la cotización.', 'warning');
     return;
+  }
+
+  // Validar coincidencia mínima de PDF si hay uno cargado
+  if (window._lastPdfExtracted && window.checkPdfSapMatchCount) {
+    const matchCount = window.checkPdfSapMatchCount(sap, quickMontoVal, t.cliente);
+    if (matchCount < 2) {
+      mostrarNotificacion('Bloqueado: Los datos del PDF no coinciden con la cotización SAP seleccionada en al menos dos parámetros (Folio, Monto o Cliente).', 'error');
+      return;
+    }
   }
 
   let pdfCotizacionBase64 = t.pdfCotizacion || null;
