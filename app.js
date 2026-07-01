@@ -11159,22 +11159,15 @@ window.clearPdfInput = function(isModal = true, ticketId = null) {
     tableContainer.innerHTML = '';
   }
   
-  // Limpiar también la validación SAP si corresponde
-  if (isModal) {
-    const sapSel = document.getElementById('t-cotizacion-sap');
-    const montoIn = document.getElementById('t-cotizacion-monto');
-    if (sapSel) sapSel.value = '';
-    if (montoIn) montoIn.value = '';
-    if (window.validarCotizacionConSAP) window.validarCotizacionConSAP(true);
-  } else {
-    const sapSel = document.getElementById(`quick-cot-sap-${ticketId}`);
-    const montoIn = document.getElementById(`quick-cot-monto-${ticketId}`);
-    if (sapSel) sapSel.value = '';
-    if (montoIn) montoIn.value = '';
-    if (window.validarCotizacionConSAP) window.validarCotizacionConSAP(false, ticketId);
+  // Limpiar caché temporal de extracción
+  window._lastPdfExtracted = null;
+
+  // Ejecutar validación para actualizar el recuadro con los valores de los inputs manuales
+  if (window.validarCotizacionConSAP) {
+    window.validarCotizacionConSAP(isModal, ticketId);
   }
   
-  mostrarNotificacion('Archivo PDF removido y campos reiniciados.', 'info');
+  mostrarNotificacion('Archivo PDF removido.', 'info');
 };
 
 // ===== SAP QUOTATION VALIDATION & SYNC =====
@@ -11408,12 +11401,6 @@ window.autoExtraerDesdePdfCotizacion = async function(file, isModal = true, tick
       }
     }
 
-    // 4. Auto-llenar campos en la interfaz
-    const sapInputId = isModal ? 't-cotizacion-sap' : `quick-cot-sap-${ticketId}`;
-    const montoInputId = isModal ? 't-cotizacion-monto' : `quick-cot-monto-${ticketId}`;
-    const sapInput = document.getElementById(sapInputId);
-    const montoInput = document.getElementById(montoInputId);
-
     if (extractedDoc && !isSapMatch) {
       const matchInCache = (window._cacheCotizacionesSap || []).find(q => q.numero_cotizacion === extractedDoc);
       if (matchInCache) {
@@ -11423,39 +11410,23 @@ window.autoExtraerDesdePdfCotizacion = async function(file, isModal = true, tick
       }
     }
 
-    if (extractedDoc) {
-      if (sapInput) {
-        let exists = Array.from(sapInput.options).some(opt => opt.value === extractedDoc);
-        if (!exists) {
-          const opt = document.createElement('option');
-          opt.value = extractedDoc;
-          if (isSapMatch) {
-            const montoFormateado = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(extractedMonto || 0);
-            opt.textContent = `${extractedDoc} - ${detectedClientName || 'Sin cliente'} (${montoFormateado} | SAP)`;
-          } else {
-            opt.textContent = `${extractedDoc} (Detectado en PDF)`;
-          }
-          sapInput.appendChild(opt);
-        }
-        sapInput.value = extractedDoc;
-        sapInput.dispatchEvent(new Event('change'));
-      }
-    }
-    
-    if (extractedMonto && extractedMonto > 0) {
-      if (montoInput) {
-        montoInput.value = extractedMonto;
-        montoInput.dispatchEvent(new Event('input'));
-      }
-    }
+    // Guardar los datos extraídos en una caché temporal para que la validación los compare
+    window._lastPdfExtracted = {
+      doc: extractedDoc,
+      monto: extractedMonto,
+      cliente: detectedClientName,
+      isFileNameMatch: isFileNameMatch,
+      isSapMatch: isSapMatch,
+      cleanText: cleanText
+    };
 
     if (isFileNameMatch) {
-      mostrarNotificacion(`✅ Cotización ${extractedDoc} vinculada desde el nombre del archivo.`, 'success');
+      mostrarNotificacion(`✅ Datos de cotización ${extractedDoc} extraídos del nombre del archivo.`, 'success');
     } else if (extractedDoc || extractedMonto) {
       let clientMsg = detectedClientName ? ` | Cliente: "${detectedClientName}"` : '';
-      mostrarNotificacion(`⚠️ Datos extraídos del PDF (Doc: ${extractedDoc || '?'}, Monto: $${extractedMonto || '?'}${clientMsg}). Valida la información.`, 'warning');
+      mostrarNotificacion(`⚠️ Datos extraídos del PDF (Doc: ${extractedDoc || '?'}, Monto: $${extractedMonto || '?'}${clientMsg}).`, 'warning');
     } else {
-      mostrarNotificacion('No se pudo extraer el folio o monto del PDF. Ingresa los datos manualmente.', 'info');
+      mostrarNotificacion('No se pudo extraer el folio o monto del PDF.', 'info');
     }
 
     // 5. Dibujar la tabla de extracción
@@ -11578,36 +11549,99 @@ window.validarCotizacionConSAP = async function(isModal = true, ticketId = null)
       isClientMatch = tClientClean.includes(sClientClean) || sClientClean.includes(tClientClean);
     }
 
-    const comparisonTableHtml = `
-      <table style="width:100%; border-collapse:collapse; margin-top:0.4rem; font-size:0.72rem; text-align:left; border:1px solid var(--border); background:rgba(0,0,0,0.15); border-radius:6px; overflow:hidden;">
-        <thead>
-          <tr style="background:rgba(255,255,255,0.02); color:var(--text-muted); border-bottom:1px solid var(--border);">
-            <th style="padding:4px 6px; font-weight:500;">Concepto</th>
-            <th style="padding:4px 6px; font-weight:500;">En Formulario / Ticket</th>
-            <th style="padding:4px 6px; font-weight:500;">Registrado en SAP</th>
-            <th style="padding:4px 6px; font-weight:500; text-align:center;">Estado</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
-            <td style="padding:4px 6px; font-weight:600; color:var(--text-secondary);">Monto</td>
-            <td style="padding:4px 6px; font-family:monospace; color:var(--text-primary);">${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(montoVal)}</td>
-            <td style="padding:4px 6px; font-family:monospace; color:var(--text-primary);">${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(sapMonto)}</td>
-            <td style="padding:4px 6px; text-align:center; font-weight:600; color:${isMontoMatch ? '#10b981' : '#ef4444'};">
-              ${isMontoMatch ? '✔️ Coincide' : '❌ Difiere'}
-            </td>
-          </tr>
-          <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
-            <td style="padding:4px 6px; font-weight:600; color:var(--text-secondary);">Cliente</td>
-            <td style="padding:4px 6px; color:var(--text-primary);">${tClientName || '—'}</td>
-            <td style="padding:4px 6px; color:var(--text-primary);">${sapCliente || '—'}</td>
-            <td style="padding:4px 6px; text-align:center; font-weight:600; color:${isClientMatch ? '#10b981' : '#ef4444'};">
-              ${isClientMatch ? '✔️ Coincide' : '❌ Difiere'}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    `;
+    const pdfData = window._lastPdfExtracted;
+    const hasPdf = !!pdfData;
+    
+    let isPdfDocMatch = true;
+    let isPdfMontoMatch = true;
+    let isPdfClientMatch = true;
+
+    if (hasPdf) {
+      isPdfDocMatch = String(pdfData.doc || '').trim() === String(sapVal).trim();
+      isPdfMontoMatch = pdfData.monto ? Math.abs(Number(pdfData.monto) - sapMonto) < 0.05 : true;
+      if (pdfData.cliente) {
+        const pClientClean = String(pdfData.cliente).toLowerCase().replace(/[^a-z0-9]/g, '');
+        const sClientClean = String(sapCliente).toLowerCase().replace(/[^a-z0-9]/g, '');
+        isPdfClientMatch = pClientClean.includes(sClientClean) || sClientClean.includes(pClientClean);
+      }
+    }
+
+    let comparisonTableHtml = '';
+    if (hasPdf) {
+      comparisonTableHtml = `
+        <table style="width:100%; border-collapse:collapse; margin-top:0.4rem; font-size:0.7rem; text-align:left; border:1px solid var(--border); background:rgba(0,0,0,0.15); border-radius:6px; overflow:hidden;">
+          <thead>
+            <tr style="background:rgba(255,255,255,0.02); color:var(--text-muted); border-bottom:1px solid var(--border);">
+              <th style="padding:4px 6px; font-weight:500;">Dato</th>
+              <th style="padding:4px 6px; font-weight:500;">En Formulario</th>
+              <th style="padding:4px 6px; font-weight:500;">Extraído de PDF</th>
+              <th style="padding:4px 6px; font-weight:500;">Registrado en SAP</th>
+              <th style="padding:4px 6px; font-weight:500; text-align:center;">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+              <td style="padding:5px 6px; font-weight:600; color:var(--text-secondary);">Folio / Doc</td>
+              <td style="padding:5px 6px; font-family:monospace; color:var(--text-primary);">${sapVal || '—'}</td>
+              <td style="padding:5px 6px; font-family:monospace; color:var(--text-primary);">${pdfData.doc || '—'}</td>
+              <td style="padding:5px 6px; font-family:monospace; color:var(--text-primary);">${sapVal || '—'}</td>
+              <td style="padding:5px 6px; text-align:center; font-weight:600; color:${isPdfDocMatch ? '#10b981' : '#ef4444'};">
+                ${isPdfDocMatch ? '✔️ Coincide' : '❌ Difiere'}
+              </td>
+            </tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+              <td style="padding:5px 6px; font-weight:600; color:var(--text-secondary);">Monto</td>
+              <td style="padding:5px 6px; font-family:monospace; color:var(--text-primary);">${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(montoVal)}</td>
+              <td style="padding:5px 6px; font-family:monospace; color:var(--text-primary);">${pdfData.monto ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(pdfData.monto) : '—'}</td>
+              <td style="padding:5px 6px; font-family:monospace; color:var(--text-primary);">${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(sapMonto)}</td>
+              <td style="padding:5px 6px; text-align:center; font-weight:600; color:${(isMontoMatch && isPdfMontoMatch) ? '#10b981' : '#ef4444'};">
+                ${(isMontoMatch && isPdfMontoMatch) ? '✔️ Coincide' : '❌ Difiere'}
+              </td>
+            </tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+              <td style="padding:5px 6px; font-weight:600; color:var(--text-secondary);">Cliente</td>
+              <td style="padding:5px 6px; color:var(--text-primary);">${tClientName || '—'}</td>
+              <td style="padding:5px 6px; color:var(--text-primary);">${pdfData.cliente || '—'}</td>
+              <td style="padding:5px 6px; color:var(--text-primary);">${sapCliente || '—'}</td>
+              <td style="padding:5px 6px; text-align:center; font-weight:600; color:${(isClientMatch && isPdfClientMatch) ? '#10b981' : '#ef4444'};">
+                ${(isClientMatch && isPdfClientMatch) ? '✔️ Coincide' : '❌ Difiere'}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+    } else {
+      comparisonTableHtml = `
+        <table style="width:100%; border-collapse:collapse; margin-top:0.4rem; font-size:0.72rem; text-align:left; border:1px solid var(--border); background:rgba(0,0,0,0.15); border-radius:6px; overflow:hidden;">
+          <thead>
+            <tr style="background:rgba(255,255,255,0.02); color:var(--text-muted); border-bottom:1px solid var(--border);">
+              <th style="padding:4px 6px; font-weight:500;">Concepto</th>
+              <th style="padding:4px 6px; font-weight:500;">En Formulario / Ticket</th>
+              <th style="padding:4px 6px; font-weight:500;">Registrado en SAP</th>
+              <th style="padding:4px 6px; font-weight:500; text-align:center;">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+              <td style="padding:4px 6px; font-weight:600; color:var(--text-secondary);">Monto</td>
+              <td style="padding:4px 6px; font-family:monospace; color:var(--text-primary);">${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(montoVal)}</td>
+              <td style="padding:4px 6px; font-family:monospace; color:var(--text-primary);">${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(sapMonto)}</td>
+              <td style="padding:4px 6px; text-align:center; font-weight:600; color:${isMontoMatch ? '#10b981' : '#ef4444'};">
+                ${isMontoMatch ? '✔️ Coincide' : '❌ Difiere'}
+              </td>
+            </tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+              <td style="padding:4px 6px; font-weight:600; color:var(--text-secondary);">Cliente</td>
+              <td style="padding:4px 6px; color:var(--text-primary);">${tClientName || '—'}</td>
+              <td style="padding:4px 6px; color:var(--text-primary);">${sapCliente || '—'}</td>
+              <td style="padding:4px 6px; text-align:center; font-weight:600; color:${isClientMatch ? '#10b981' : '#ef4444'};">
+                ${isClientMatch ? '✔️ Coincide' : '❌ Difiere'}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+    }
 
     let alertHtml = '';
     if (!isMontoMatch && montoVal > 0) {
@@ -11615,6 +11649,17 @@ window.validarCotizacionConSAP = async function(isModal = true, ticketId = null)
     }
     if (!isClientMatch) {
       alertHtml += `<div>⚠️ El cliente del ticket no coincide con el cliente de la cotización en SAP.</div>`;
+    }
+    if (hasPdf) {
+      if (!isPdfDocMatch) {
+        alertHtml += `<div>⚠️ El número de cotización del PDF (${pdfData.doc || '?'}) difiere de la seleccionada (${sapVal}).</div>`;
+      }
+      if (!isPdfMontoMatch && pdfData.monto > 0) {
+        alertHtml += `<div>⚠️ El monto extraído del PDF (${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(pdfData.monto)}) difiere de SAP.</div>`;
+      }
+      if (!isPdfClientMatch) {
+        alertHtml += `<div>⚠️ El cliente extraído del PDF (${pdfData.cliente || '?'}) difiere de SAP.</div>`;
+      }
     }
 
     if (alertHtml) {
@@ -11632,7 +11677,7 @@ window.validarCotizacionConSAP = async function(isModal = true, ticketId = null)
       statusDiv.innerHTML = `
         <div style="padding:0.6rem 0.8rem; border-radius:8px; background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.15); font-size:0.78rem; color:#10b981; display:flex; flex-direction:column; gap:0.3rem;">
           <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="check-circle" style="width:14px; height:14px;"></i> Cotización Validada con SAP</div>
-          <div style="font-size:0.74rem; color:var(--text-muted);">Monto y Cliente coinciden plenamente con el catálogo.</div>
+          <div style="font-size:0.74rem; color:var(--text-muted);">El formulario, el archivo PDF y SAP coinciden plenamente.</div>
           ${comparisonTableHtml}
           <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Fecha SAP: ${sapFecha}</div>
         </div>
