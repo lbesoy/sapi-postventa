@@ -11491,52 +11491,6 @@ window.autoExtraerDesdePdfCotizacion = async function(file, isModal = true, tick
   }
 };
 
-window.validarCotizacionConSAP = async function(isModal = true, ticketId = null) {
-  const sb = window.supabaseClient;
-  if (!sb) return;
-
-  const sapInputId = isModal ? 't-cotizacion-sap' : `quick-cot-sap-${ticketId}`;
-  const montoInputId = isModal ? 't-cotizacion-monto' : `quick-cot-monto-${ticketId}`;
-  const statusDivId = isModal ? 't-sap-validation-status' : `quick-sap-validation-status-${ticketId}`;
-
-  const sapVal = document.getElementById(sapInputId)?.value.trim();
-  const montoVal = parseFloat(document.getElementById(montoInputId)?.value) || 0;
-  const statusDiv = document.getElementById(statusDivId);
-
-  if (!statusDiv) return;
-
-  if (!sapVal) {
-    statusDiv.style.display = 'none';
-    statusDiv.innerHTML = '';
-    return;
-  }
-
-  let ticket = null;
-  const tId = ticketId || editandoTicketId;
-  if (tId) {
-    ticket = tickets.find(t => t.id === tId);
-  }
-
-  statusDiv.style.display = 'block';
-  statusDiv.innerHTML = '<div style="font-size:0.75rem; color:var(--text-muted); display:flex; align-items:center; gap:4px;"><i data-lucide="loader" class="rotating" style="width:12px; height:12px;"></i> Validando con SAP...</div>';
-  if (window.lucide) lucide.createIcons();
-
-  try {
-    const { data, error } = await sb.from('cotizaciones_sap').select('*').eq('numero_cotizacion', sapVal).maybeSingle();
-    
-    if (error) throw error;
-
-    if (!data) {
-      statusDiv.innerHTML = `
-        <div style="padding:0.5rem 0.75rem; border-radius:6px; background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.15); font-size:0.78rem; color:#ef4444; display:flex; flex-direction:column; gap:0.25rem;">
-          <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="x-circle" style="width:14px; height:14px;"></i> Cotización no encontrada en SAP</div>
-          <div style="font-size:0.72rem; color:var(--text-muted);">Verifique el número ingresado o presione "Sincronizar con SAP".</div>
-        </div>
-      `;
-      if (window.lucide) lucide.createIcons();
-      return;
-    }
-
 window.checkPdfSapMatchCount = function(sapVal, montoVal, tClientName) {
   const pdfData = window._lastPdfExtracted;
   if (!pdfData) return 3; // No PDF uploaded, bypass check
