@@ -11438,11 +11438,15 @@ window.autoExtraerDesdePdfCotizacion = async function(file, isModal = true, tick
           sapInput.appendChild(opt);
         }
         sapInput.value = extractedDoc;
+        sapInput.dispatchEvent(new Event('change'));
       }
     }
     
     if (extractedMonto && extractedMonto > 0) {
-      if (montoInput) montoInput.value = extractedMonto;
+      if (montoInput) {
+        montoInput.value = extractedMonto;
+        montoInput.dispatchEvent(new Event('input'));
+      }
     }
 
     if (isFileNameMatch) {
