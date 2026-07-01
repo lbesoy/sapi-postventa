@@ -864,9 +864,12 @@ body {
 
 /* Ticket status */
 .badge-abierto { background: var(--orange-light); color: var(--orange); }
+.badge-refacciones { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
 .badge-en-proceso { background: var(--accent-light); color: var(--accent); }
 .badge-resuelto { background: var(--green-light); color: var(--green); }
 .badge-cerrado { background: rgba(100,116,139,0.15); color: #94a3b8; }
+.badge-cerrado-aprobado { background: var(--green-light); color: var(--green); }
+.badge-cerrado-rechazado { background: var(--red-light); color: var(--red); }
 
 /* Nav badge counter */
 .nav-badge {

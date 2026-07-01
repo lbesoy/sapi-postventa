@@ -32,7 +32,8 @@ let QUERIES = {
   clientes:    'eurorep_clientes',
   refacciones: 'CAT_REFACCIONES',
   sitios:      'CAT_Sitos',
-  tecnicos:    'eurorep_tecnicos'
+  tecnicos:    'eurorep_tecnicos',
+  cotizaciones: 'eurorep_cotizaciones'
 };
 
 // Mapeos configurados (se sobreescriben con la config de Supabase)
@@ -382,12 +383,84 @@ async function loadConfigFromSupabase() {
       if (config.queryRefacciones) QUERIES.refacciones = config.queryRefacciones;
       if (config.querySitios) QUERIES.sitios = config.querySitios;
       if (config.queryTecnicos) QUERIES.tecnicos = config.queryTecnicos;
+      if (config.queryCotizaciones) QUERIES.cotizaciones = config.queryCotizaciones;
       // if (config.mappings && config.mappings.sitios) MAPPINGS.sitios = config.mappings.sitios; // DESHABILITADO temporalmente
       // if (config.mappings && config.mappings.maquinaria) MAPPINGS.maquinaria = config.mappings.maquinaria; // DESHABILITADO temporalmente
       log('⚙️ Configuración de queries cargada desde la nube.');
     }
   } catch (err) {
     log(`⚠️ Advertencia: No se pudo cargar config de la nube (${err.message}). Usando defaults.`);
+  }
+}
+
+async function fetchCotizacionesFromSAP() {
+  try {
+    log(`Consultando cotizaciones vía SQL Query '${QUERIES.cotizaciones}'...`);
+    const res = await sapApi.get(`${SAP_URL}/SQLQueries('${QUERIES.cotizaciones}')/List`, {
+      headers: { 'B1S-PageSize': 5000, 'Prefer': 'odata.maxpagesize=5000' },
+      timeout: 15000
+    });
+    if (res.data && res.data.value) {
+      log(`✅ Cotizaciones obtenidas vía SQL Query (${res.data.value.length} registros).`);
+      return res.data.value.map(q => ({
+        numero_cotizacion: (q['Folio Pedido'] || q.DocNum || '').toString(),
+        fecha: q.DocDate ? new Date(q.DocDate).toISOString() : null,
+        monto: q['Importe MXN'] !== undefined ? Number(q['Importe MXN']) : (q.DocTotal !== undefined ? Number(q.DocTotal) : null),
+        cliente: q.Nombre || q.CardName || null
+      }));
+    }
+  } catch (errQ) {
+    log(`⚠️ SQL Query de cotizaciones falló o no existe: ${errQ.message}. Intentando fallback nativo a OData Quotations...`);
+  }
+
+  // Fallback a OData estándar de SAP (Quotations)
+  try {
+    log('Consultando cotizaciones de SAP (OData)...');
+    let url = `${SAP_URL}/Quotations?$select=DocNum,DocDate,DocTotal,CardName,Cancelled&$filter=Cancelled eq 'tNO'`;
+    let allQuotes = [];
+    let page = 1;
+
+    while (url) {
+      log(`- Obteniendo página ${page} de cotizaciones...`);
+      const qRes = await sapApi.get(url, { timeout: 15000 });
+      const items = qRes.data.value || [];
+      allQuotes = allQuotes.concat(items);
+      url = qRes.data['odata.nextLink'] ? `${SAP_URL}/${qRes.data['odata.nextLink']}` : null;
+      page++;
+      if (page > 100) break;
+    }
+
+    log(`✅ Cotizaciones obtenidas de SAP (${allQuotes.length} registros).`);
+    return allQuotes.map(q => ({
+      numero_cotizacion: q.DocNum ? q.DocNum.toString() : null,
+      fecha: q.DocDate ? new Date(q.DocDate).toISOString() : null,
+      monto: q.DocTotal !== undefined ? Number(q.DocTotal) : null,
+      cliente: q.CardName || null
+    }));
+  } catch (errFallback) {
+    log(`❌ Fallback nativo de cotizaciones también falló: ${errFallback.message}`);
+    throw errFallback;
+  }
+}
+
+async function syncCotizaciones() {
+  log('Sincronizando Cotizaciones SAP...');
+  try {
+    const rows = await fetchCotizacionesFromSAP();
+    const validRows = rows.filter(r => r.numero_cotizacion);
+    
+    try {
+      const n = await upsertSupabase('cotizaciones_sap', validRows);
+      log(`✅ Cotizaciones SAP: ${n} registros sincronizados a Supabase.`);
+    } catch (supaErr) {
+      if (supaErr.message?.includes('404') || (supaErr.response && supaErr.response.status === 404)) {
+        log(`⚠️ Advertencia: La tabla 'cotizaciones_sap' no existe en Supabase (404). Omitiendo persistencia.`);
+      } else {
+        throw supaErr;
+      }
+    }
+  } catch (err) {
+    log(`⚠️ Advertencia: Sincronización de cotizaciones SAP falló de forma no crítica: ${err.message}`);
   }
 }
 
@@ -410,6 +483,7 @@ async function main() {
     if (argModulo === 'all' || argModulo === 'refacciones') tasks.push(syncRefacciones());
     if (argModulo === 'all' || argModulo === 'sitios') tasks.push(syncSitios());
     if (argModulo === 'all' || argModulo === 'tecnicos') tasks.push(syncTecnicos());
+    if (argModulo === 'all' || argModulo === 'cotizaciones') tasks.push(syncCotizaciones());
 
     const resultados = await Promise.allSettled(tasks);
     let algunFallo = false;

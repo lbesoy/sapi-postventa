@@ -28,6 +28,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+app.use(express.static(require('path').join(__dirname, '..')));
 
 // Configuracion de SAP B1 Service Layer
 const SAP_URL = process.env.SAP_SL_URL;
@@ -446,6 +447,150 @@ app.get('/api/myip', async (req, res) => {
         res.json({ ip: r.data.ip });
     } catch (e) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+// Local endpoints to emulate Vercel serverless trigger-sync and sync-status
+const { exec } = require('child_process');
+const path = require('path');
+
+let localSyncStatus = {
+    id: 1,
+    status: 'completed',
+    conclusion: 'success',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+};
+
+app.post('/api/trigger-sync', (req, res) => {
+    if (localSyncStatus.status === 'in_progress') {
+        return res.json({ success: true, message: 'Sync already in progress' });
+    }
+
+    localSyncStatus = {
+        id: localSyncStatus.id + 1,
+        status: 'in_progress',
+        conclusion: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+    };
+
+    const scriptPath = path.join(__dirname, 'sync-sap-supabase.js');
+    console.log(`[Local Sync] Triggering background sync script: node "${scriptPath}"`);
+    
+    exec(`node "${scriptPath}"`, (error, stdout, stderr) => {
+        localSyncStatus.status = 'completed';
+        if (error) {
+            console.error('[Local Sync] Finished with error:', error);
+            localSyncStatus.conclusion = 'failure';
+        } else {
+            console.log('[Local Sync] Finished successfully.');
+            localSyncStatus.conclusion = 'success';
+        }
+        localSyncStatus.updated_at = new Date().toISOString();
+    });
+
+    res.json({ success: true, message: 'Local sync triggered successfully' });
+});
+
+app.post('/api/sync-status', (req, res) => {
+    res.json(localSyncStatus);
+});
+
+app.post('/api/extract-pdf', async (req, res) => {
+    try {
+        const { base64Data } = req.body;
+        if (!base64Data) {
+            return res.status(400).json({ error: 'No base64Data provided' });
+        }
+        
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (apiKey) {
+            console.log('[PDF Auto-Extract] Using Gemini API for multimodal extraction...');
+            const base64Clean = base64Data.split(',')[1] || base64Data;
+            
+            const payload = {
+                contents: [{
+                    parts: [
+                        {
+                            inlineData: {
+                                mimeType: "application/pdf",
+                                data: base64Clean
+                            }
+                        },
+                        {
+                            text: `Extract the following fields from this quotation PDF:
+1. Document Number (Número de documento / Folio / Número de cotización). It's usually a 7-digit number (e.g. 1100001).
+2. Total Amount (Importe TOTAL / Total / Monto / Subtotal + Impuestos). It must be a decimal number representing the final total amount, e.g. 135043.49.
+3. Client Code (CardCode, e.g. CL029) or Client Name (e.g. Concretos Delese).
+
+Return a JSON object matching this structure:
+{
+  "numero_cotizacion": "1100001",
+  "monto": 135043.49,
+  "cliente": "Concretos Delese"
+}`
+                        }
+                    ]
+                }],
+                generationConfig: {
+                    responseMimeType: "application/json"
+                }
+            };
+            
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+            try {
+                const response = await fetch(geminiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (jsonText) {
+                        const result = JSON.parse(jsonText.trim());
+                        console.log('[PDF Auto-Extract] Gemini API Result:', result);
+                        return res.json({ ai: true, data: result });
+                    }
+                } else {
+                    const errText = await response.text();
+                    console.error('[PDF Auto-Extract] Gemini API error response:', errText);
+                }
+            } catch (apiErr) {
+                console.error('[PDF Auto-Extract] Failed to connect to Gemini API:', apiErr);
+            }
+        }
+        
+        // Fallback: usar el extractor nativo de macOS PDFKit
+        console.log('[PDF Auto-Extract] Falling back to native macOS PDFKit extractor...');
+        const fs = require('fs');
+        const path = require('path');
+        const { execFile } = require('child_process');
+        
+        const base64Clean = base64Data.split(',')[1] || base64Data;
+        const buffer = Buffer.from(base64Clean, 'base64');
+        
+        const tempFile = path.join(__dirname, `temp_${Date.now()}.pdf`);
+        fs.writeFileSync(tempFile, buffer);
+        
+        const extractorPath = path.join(__dirname, 'pdf_extractor');
+        execFile(extractorPath, [tempFile], { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+            try { fs.unlinkSync(tempFile); } catch(e) {}
+            
+            if (error) {
+                console.error('[Extract PDF API] Error:', error, stderr);
+                return res.status(500).json({ error: 'Failed to extract PDF text' });
+            }
+            
+            res.json({ ai: false, text: stdout });
+        });
+    } catch (err) {
+        console.error('[Extract PDF API] Critical Error:', err);
+        res.status(500).json({ error: err.message });
     }
 });
 

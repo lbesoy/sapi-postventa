@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.128'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.138'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -2020,6 +2020,14 @@ async function sincronizarConGitHub(modulo = 'all', btnEl = null) {
                   await window.cargarDatosDeSupabase();
                 }
                 mostrarNotificacion('✅ Sincronización SAP finalizada con éxito.', 'success');
+                if (window.validarCotizacionConSAP) {
+                  window.validarCotizacionConSAP(true);
+                  const activeInlineStatusEl = document.querySelector('[id^="quick-sap-validation-status-"]');
+                  if (activeInlineStatusEl) {
+                    const activeInlineTransitionId = activeInlineStatusEl.id.replace('quick-sap-validation-status-', '');
+                    window.validarCotizacionConSAP(false, activeInlineTransitionId);
+                  }
+                }
               } else {
                 mostrarNotificacion(`❌ Sincronización SAP fallida: ${run.conclusion || 'desconocido'}`, 'error');
               }
@@ -3254,7 +3262,7 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     if (tipo === 'tickets') title.textContent = filtro ? `Desglose: Tickets - ${filtro}` : `Desglose: Total Tickets`;
     if (tipo === 'chart_tkt_area') title.textContent = `Desglose: Tickets - Área: ${filtro}`;
     
-    thead.innerHTML = `<tr><th>#</th><th>Asunto</th><th>Empresa</th><th>Estado</th>${!isEmpresa ? '<th>Prioridad</th>' : ''}</tr>`;
+    thead.innerHTML = `<tr><th>#</th><th>Asunto</th><th>Empresa</th><th>Estado</th><th>Monto</th>${!isEmpresa ? '<th>Prioridad</th>' : ''}</tr>`;
     
     let ticketsFiltrados = getFilteredTickets();
     if (isEmpresa && nombreEmpresaLogged) {
@@ -3266,14 +3274,22 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     }
     
     if (tipo === 'tickets' && filtro) {
-      ticketsFiltrados = ticketsFiltrados.filter(t => (t.estado || '').toLowerCase().trim() === filtro.toLowerCase().trim());
+      if (filtro === 'Cerrado - Aprobado') {
+        ticketsFiltrados = ticketsFiltrados.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'si');
+      } else if (filtro === 'Cerrado - Rechazado') {
+        ticketsFiltrados = ticketsFiltrados.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'no');
+      } else {
+        ticketsFiltrados = ticketsFiltrados.filter(t => (t.estado || '').toLowerCase().trim() === filtro.toLowerCase().trim());
+      }
     } else if (tipo === 'chart_tkt_area') {
       ticketsFiltrados = ticketsFiltrados.filter(t => (t.area || 'Sin área').toLowerCase().trim() === filtro.toLowerCase().trim());
     }
     
     ticketsFiltrados.forEach(d => {
-      const badgeClass = `badge-${(d.estado||'').toLowerCase()}`;
-      tbody.innerHTML += `<tr><td>${d.folio || d.id.split('-')[0]}</td><td>${d.asunto || 'N/A'}</td><td>${d.cliente || d.solicitante || 'N/A'}</td><td><span class="badge ${badgeClass}">${d.estado}</span></td>${!isEmpresa ? `<td>${d.prioridad || 'Media'}</td>` : ''}</tr>`;
+      const badgeClass = `badge-${badgeTicketEstado(d)}`;
+      const estadoText = d.estado === 'Cerrado' ? (d.cotAceptada === 'si' ? 'Cerrado (Aceptado)' : 'Cerrado (Rechazado)') : d.estado;
+      const montoText = (d.montoCotizacion !== undefined && d.montoCotizacion !== null) ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(d.montoCotizacion) : '—';
+      tbody.innerHTML += `<tr><td>${d.folio || d.id.split('-')[0]}</td><td>${d.asunto || 'N/A'}</td><td>${d.cliente || d.solicitante || 'N/A'}</td><td><span class="badge ${badgeClass}">${estadoText}</span></td><td style="font-weight:600; white-space:nowrap;">${montoText}</td>${!isEmpresa ? `<td>${d.prioridad || 'Media'}</td>` : ''}</tr>`;
     });
   }
   
@@ -3508,8 +3524,16 @@ function renderStats() {
   // Stats Tickets
   const t_total = ticketsFilter.length;
   const t_abiertos = ticketsFilter.filter(t => t.estado === 'Abierto').length;
+  const t_refacciones = ticketsFilter.filter(t => t.estado === 'Refacciones').length;
   const t_cotizacion = ticketsFilter.filter(t => t.estado === 'Cotización').length;
-  const t_cerrados = ticketsFilter.filter(t => t.estado === 'Cerrado').length;
+  const t_cerrados_aprobados = ticketsFilter.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'si').length;
+  const t_cerrados_rechazados = ticketsFilter.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'no').length;
+  const t_cerrados = t_cerrados_aprobados + t_cerrados_rechazados;
+
+  const sum_cotizacion = ticketsFilter.filter(t => t.estado === 'Cotización').reduce((sum, t) => sum + (Number(t.montoCotizacion) || 0), 0);
+  const sum_cerrados_aprobados = ticketsFilter.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'si').reduce((sum, t) => sum + (Number(t.montoCotizacion) || 0), 0);
+  const formatMontoShort = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
+
   const elTotalT = document.getElementById('stat-t-total');
   if (elTotalT) {
     elTotalT.textContent = t_total;
@@ -3520,15 +3544,63 @@ function renderStats() {
   if (document.getElementById('stat-tkt-total')) {
     document.getElementById('stat-tkt-total').textContent = t_total;
     document.getElementById('stat-tkt-abiertos').textContent = t_abiertos;
+    document.getElementById('stat-tkt-refacciones').textContent = t_refacciones;
     document.getElementById('stat-tkt-cotizacion').textContent = t_cotizacion;
-    document.getElementById('stat-tkt-cerrados').textContent = t_cerrados;
+    
+    const elCerrAp = document.getElementById('stat-tkt-cerrados-aprobados');
+    if (elCerrAp) elCerrAp.textContent = t_cerrados_aprobados;
+    const elCerrRech = document.getElementById('stat-tkt-cerrados-rechazados');
+    if (elCerrRech) elCerrRech.textContent = t_cerrados_rechazados;
+    
+    // Update sum of amounts
+    const elCotMonto = document.getElementById('stat-tkt-cotizacion-monto');
+    if (elCotMonto) {
+      if (sum_cotizacion > 0) {
+        elCotMonto.textContent = formatMontoShort(sum_cotizacion);
+        elCotMonto.style.display = 'inline-block';
+      } else {
+        elCotMonto.style.display = 'none';
+      }
+    }
+    const elCerrMonto = document.getElementById('stat-tkt-cerrados-aprobados-monto');
+    if (elCerrMonto) {
+      if (sum_cerrados_aprobados > 0) {
+        elCerrMonto.textContent = formatMontoShort(sum_cerrados_aprobados);
+        elCerrMonto.style.display = 'inline-block';
+      } else {
+        elCerrMonto.style.display = 'none';
+      }
+    }
   }
   // V2 dashboard stats
   const setV2 = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
   setV2('v2-stat-total', total); setV2('v2-stat-pendientes', pendientes);
   setV2('v2-stat-proceso', proceso); setV2('v2-stat-completas', completas);
   setV2('v2-stat-t-total', t_total); setV2('v2-stat-t-abiertos', t_abiertos);
-  setV2('v2-stat-t-cotizacion', t_cotizacion); setV2('v2-stat-t-cerrados', t_cerrados);
+  setV2('v2-stat-t-refacciones', t_refacciones);
+  setV2('v2-stat-t-cotizacion', t_cotizacion);
+  setV2('v2-stat-t-cerrados-aprobados', t_cerrados_aprobados);
+  setV2('v2-stat-t-cerrados-rechazados', t_cerrados_rechazados);
+  
+  // Set amounts for V2 dashboard
+  const elV2CotMonto = document.getElementById('v2-stat-t-cotizacion-monto');
+  if (elV2CotMonto) {
+    if (sum_cotizacion > 0) {
+      elV2CotMonto.textContent = formatMontoShort(sum_cotizacion);
+      elV2CotMonto.style.display = 'inline-block';
+    } else {
+      elV2CotMonto.style.display = 'none';
+    }
+  }
+  const elV2CerrMonto = document.getElementById('v2-stat-t-cerrados-aprobados-monto');
+  if (elV2CerrMonto) {
+    if (sum_cerrados_aprobados > 0) {
+      elV2CerrMonto.textContent = formatMontoShort(sum_cerrados_aprobados);
+      elV2CerrMonto.style.display = 'inline-block';
+    } else {
+      elV2CerrMonto.style.display = 'none';
+    }
+  }
   
   if (typeof renderDashboardV2 === 'function') {
     renderDashboardV2();
@@ -3928,15 +4000,32 @@ function renderDashboardV2() {
     // Donut: Estado de Tickets
     destroyChart('tkt-estado');
     const tktAb = ticketsDash.filter(t => (t.estado||'').toLowerCase() === 'abierto').length;
+    const tktRef = ticketsDash.filter(t => (t.estado||'').toLowerCase() === 'refacciones').length;
     const tktCot = ticketsDash.filter(t => (t.estado||'').toLowerCase() === 'cotización' || (t.estado||'').toLowerCase() === 'cotizacion').length;
-    const tktCer = ticketsDash.filter(t => (t.estado||'').toLowerCase() === 'cerrado').length;
+    const tktCerAp = ticketsDash.filter(t => (t.estado||'').toLowerCase() === 'cerrado' && t.cotAceptada === 'si').length;
+    const tktCerRech = ticketsDash.filter(t => (t.estado||'').toLowerCase() === 'cerrado' && t.cotAceptada === 'no').length;
     const ctxTE = document.getElementById('chart-tickets-estado');
     if (ctxTE) _v2Charts['tkt-estado'] = new Chart(ctxTE, {
       type: 'doughnut',
-      data: { labels: ['Abierto','Cotización','Cerrado'], datasets: [{ data: [tktAb, tktCot, tktCer], backgroundColor: ['#ef4444','#E8820C','#10b981'], borderWidth: 0 }] },
+      data: {
+        labels: ['Abierto','Refacciones','Cotización','Cerrado (Aceptado)','Cerrado (Rechazado)'],
+        datasets: [{
+          data: [tktAb, tktRef, tktCot, tktCerAp, tktCerRech],
+          backgroundColor: ['#ef4444','#f59e0b','#E8820C','#10b981','#94a3b8'],
+          borderWidth: 0
+        }]
+      },
       options: {
         cutout: '65%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8 } } },
-        onClick: (e, els) => { if(els.length) { abrirDesgloseDashboard('tickets', e.chart.data.labels[els[0].index]); } },
+        onClick: (e, els) => {
+          if(els.length) {
+            const label = e.chart.data.labels[els[0].index];
+            let filterVal = label;
+            if (label === 'Cerrado (Aceptado)') filterVal = 'Cerrado - Aprobado';
+            else if (label === 'Cerrado (Rechazado)') filterVal = 'Cerrado - Rechazado';
+            abrirDesgloseDashboard('tickets', filterVal);
+          }
+        },
         onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
       }
     });
@@ -5340,7 +5429,7 @@ function verDetalleCliente(nombre) {
                  # ${t.folio || t.id.substring(0,8)} - ${formatDateOnly(t.fechaCreacion)}
                </div>
              </div>
-             <span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'Abierto'}</span>
+             <span class="badge badge-${badgeTicketEstado(t)}">${t.estado === 'Cerrado' ? (t.cotAceptada === 'si' ? 'Cerrado (Aceptado)' : 'Cerrado (Rechazado)') : (t.estado||'Abierto')}</span>
            </div>
            ${ordenes.map(o => `
              <div onclick="event.stopPropagation(); verDetalle('${o.id}')" style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px dashed var(--border); display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.6';" onmouseout="this.style.opacity='1';">
@@ -5814,7 +5903,7 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
                  # ${t.folio || t.id.substring(0,8)} - ${formatDateOnly(t.fechaCreacion)}
                </div>
              </div>
-             <span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'Abierto'}</span>
+             <span class="badge badge-${badgeTicketEstado(t)}">${t.estado === 'Cerrado' ? (t.cotAceptada === 'si' ? 'Cerrado (Aceptado)' : 'Cerrado (Rechazado)') : (t.estado||'Abierto')}</span>
            </div>
            ${ordenes.map(o => `
              <div onclick="event.stopPropagation(); verDetalle('${o.id}')" style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px dashed var(--border); display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.6';" onmouseout="this.style.opacity='1';">
@@ -6053,6 +6142,14 @@ function abrirModalAgregarMaquina() {
   editandoMaquinaCliente = null;
   document.getElementById('agregar-maquina-title').textContent = 'Agregar Máquina a Cliente';
   document.getElementById('form-agregar-maquina').reset();
+  
+  const multiSection = document.getElementById('am-multiempresa-section');
+  if (multiSection) multiSection.style.display = 'none';
+  const multiSearch = document.getElementById('am-multiempresa-search');
+  if (multiSearch) multiSearch.value = '';
+  const multiList = document.getElementById('am-multiempresa-list');
+  if (multiList) multiList.innerHTML = '';
+
   const select = document.getElementById('am-cliente');
   select.removeAttribute('disabled');
   document.getElementById('am-venta').disabled = false;
@@ -6122,6 +6219,11 @@ function abrirModalAgregarMaquina() {
   
   select.onchange = (e) => {
     const nombre = e.target.value;
+    const multiSection = document.getElementById('am-multiempresa-section');
+    if (multiSection) multiSection.style.display = 'none';
+    const multiList = document.getElementById('am-multiempresa-list');
+    if (multiList) multiList.innerHTML = '';
+    
     const selectUbicacion = document.getElementById('am-ubicacion-select');
     const inputOtraUbicacion = document.getElementById('am-ubicacion-otra');
     
@@ -6222,6 +6324,98 @@ function toggleVentaTercero() {
     if (knob) knob.style.transform = 'translateX(0)';
   }
 }
+
+window.toggleMultiempresaSection = function() {
+  const section = document.getElementById('am-multiempresa-section');
+  if (!section) return;
+  
+  const isHidden = section.style.display === 'none';
+  section.style.display = isHidden ? 'block' : 'none';
+  
+  if (isHidden) {
+    const list = document.getElementById('am-multiempresa-list');
+    if (!list) return;
+    
+    list.innerHTML = '';
+    const clientSelect = document.getElementById('am-cliente');
+    const selectedClient = clientSelect ? clientSelect.value : '';
+    
+    const legacyMap = new Map();
+    ordenes.forEach(o => {
+      if (o.cliente && !legacyMap.has(o.cliente)) {
+        legacyMap.set(o.cliente, o.cliente);
+      }
+    });
+    const allClients = [...new Set([...clientesDb.map(c => c.nombre), ...legacyMap.values()])].sort();
+    const otherClients = allClients.filter(c => c !== selectedClient);
+    
+    if (otherClients.length === 0) {
+      list.innerHTML = '<div style="font-size:0.8rem;color:var(--text-muted);padding:0.25rem;">No hay otras empresas registradas</div>';
+      return;
+    }
+    
+    let linked = [];
+    if (editandoMaquinaId) {
+      let maquina = null;
+      if (editandoMaquinaCliente) {
+        const cObj = clientesDb.find(c => c.nombre === editandoMaquinaCliente);
+        maquina = cObj?.maquinas?.find(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
+      }
+      if (!maquina) {
+        maquina = maquinariaDb.find(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
+      }
+      if (maquina && maquina.customData && Array.isArray(maquina.customData.empresasVinculadas)) {
+        linked = maquina.customData.empresasVinculadas;
+      }
+    }
+    
+    otherClients.forEach(nombre => {
+      const isChecked = linked.includes(nombre);
+      const item = document.createElement('label');
+      item.style.display = 'flex';
+      item.style.alignItems = 'center';
+      item.style.gap = '0.5rem';
+      item.style.fontSize = '0.85rem';
+      item.style.color = 'var(--text-primary)';
+      item.style.cursor = 'pointer';
+      item.style.padding = '0.2rem 0';
+      
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = nombre;
+      cb.checked = isChecked;
+      cb.style.cursor = 'pointer';
+      
+      const span = document.createElement('span');
+      span.textContent = nombre;
+      
+      item.appendChild(cb);
+      item.appendChild(span);
+      list.appendChild(item);
+    });
+  }
+};
+
+window.desmarcarTodasMultiempresas = function() {
+  const list = document.getElementById('am-multiempresa-list');
+  if (list) {
+    const checkboxes = list.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = false);
+  }
+};
+
+window.filtrarMultiempresaList = function(val) {
+  const list = document.getElementById('am-multiempresa-list');
+  if (!list) return;
+  
+  const query = String(val).toLowerCase().trim();
+  const items = list.querySelectorAll('label');
+  items.forEach(item => {
+    const span = item.querySelector('span');
+    const text = span ? span.textContent.toLowerCase() : '';
+    item.style.display = text.includes(query) ? 'flex' : 'none';
+  });
+};
 
 function editarMaquina(clienteNombre, idInterno) {
   abrirModalAgregarMaquina();
@@ -6417,6 +6611,15 @@ function editarMaquina(clienteNombre, idInterno) {
 function guardarNuevaMaquina(e) {
   e.preventDefault();
   const clienteSeleccionado = document.getElementById('am-cliente').value;
+  
+  // Read multiempresa checkboxes
+  const linkedCompanies = [];
+  const multiempresaList = document.getElementById('am-multiempresa-list');
+  if (multiempresaList) {
+    const checkboxes = multiempresaList.querySelectorAll('input[type="checkbox"]:checked');
+    checkboxes.forEach(cb => linkedCompanies.push(cb.value));
+  }
+
   const selectMarca = document.getElementById('am-marca-select');
   const inputOtraMarca = document.getElementById('am-marca-otra');
   const marca = selectMarca.value === 'otra' ? inputOtraMarca.value.trim() : selectMarca.value.trim();
@@ -6524,6 +6727,7 @@ function guardarNuevaMaquina(e) {
         maquinariaDb[maqDbIdx].customData.ubicacion = ubicacion;
         maquinariaDb[maqDbIdx].customData.latitud = latitud;
         maquinariaDb[maqDbIdx].customData.longitud = longitud;
+        maquinariaDb[maqDbIdx].customData.empresasVinculadas = linkedCompanies;
         
         localStorage.setItem('sapi_maquinaria_db', JSON.stringify(maquinariaDb));
         if (window.pushToSupabase) window.pushToSupabase('maquinaria', maquinariaDb[maqDbIdx]);
@@ -6540,6 +6744,10 @@ function guardarNuevaMaquina(e) {
                if (window.pushToSupabase) window.pushToSupabase('clientes', clienteAntiguo);
             }
           }
+          maquinaDatos.customData = {
+            ...(maquinaDatos.customData || {}),
+            empresasVinculadas: linkedCompanies
+          };
           clienteObj.maquinas.push(maquinaDatos);
           if (window.pushToSupabase) window.pushToSupabase('maquinaria', { ...maquinaDatos, cliente: clienteObj.id });
         } else {
@@ -6548,7 +6756,11 @@ function guardarNuevaMaquina(e) {
             clienteObj.maquinas[maquinaIdx] = {
               ...clienteObj.maquinas[maquinaIdx],
               idInterno: finalIdInterno,
-              marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, sitio_id: sitioId, latitud, longitud, tipo
+              marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, sitio_id: sitioId, latitud, longitud, tipo,
+              customData: {
+                ...(clienteObj.maquinas[maquinaIdx].customData || {}),
+                empresasVinculadas: linkedCompanies
+              }
             };
             if (window.pushToSupabase) window.pushToSupabase('maquinaria', { ...clienteObj.maquinas[maquinaIdx], cliente: clienteObj.id });
           }
@@ -6556,7 +6768,10 @@ function guardarNuevaMaquina(e) {
     }
   } else {
     const idInterno = generarIdInternoMaquina(marca, venta || anio);
-    const nuevaMaq = { idInterno, marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, sitio_id: sitioId, latitud, longitud, tipo };
+    const nuevaMaq = {
+      idInterno, marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, sitio_id: sitioId, latitud, longitud, tipo,
+      customData: { empresasVinculadas: linkedCompanies }
+    };
     clienteObj.maquinas.push(nuevaMaq);
     if (window.pushToSupabase) window.pushToSupabase('maquinaria', { ...nuevaMaq, cliente: clienteObj.id });
   }
@@ -8007,8 +8222,15 @@ function guardarOrden(e) {
 }
 
 // ===== ELIMINAR =====
-function eliminarOrden(id) {
-  if (!confirm('¿Eliminar esta orden de servicio?')) return;
+async function eliminarOrden(id) {
+  const confirmed = await window.confirmarAccion({
+    titulo: 'Eliminar Orden de Servicio',
+    mensaje: '¿Estás seguro de que deseas eliminar esta orden de servicio?',
+    textoAceptar: 'Eliminar',
+    textoCancelar: 'Cancelar',
+    esPeligroso: true
+  });
+  if (!confirmed) return;
   const o = ordenes.find(x => x.id === id);
   const folio = o ? o.folio : 'Desconocido';
 
@@ -9812,6 +10034,60 @@ function actualizarFiltrosPersonal() {
   }
 }
 
+let ticketSortColumn = 'folio';
+let ticketSortDirection = 'desc';
+
+window.actualizarCabeceraOrdenacion = function() {
+  const headers = {
+    'folio': 'th-ord-folio',
+    'asunto': 'th-ord-asunto',
+    'solicitante': 'th-ord-solicitante',
+    'area': 'th-ord-area',
+    'prioridad': 'th-ord-prioridad',
+    'estado': 'th-ord-estado',
+    'cotizacion': 'th-ord-cotizacion',
+    'monto': 'th-ord-monto-cotizacion',
+    'pedido': 'th-ord-pedido',
+    'asignado': 'th-ord-asignado',
+    'fecha': 'th-ord-fecha'
+  };
+  
+  Object.values(headers).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      const text = el.dataset.labelOriginal || el.textContent.replace(/[▲▼]/g, '').trim();
+      if (!el.dataset.labelOriginal) {
+        el.dataset.labelOriginal = text;
+      }
+      el.classList.remove('sort-asc', 'sort-desc');
+      el.innerHTML = `<span style="display:inline-flex; align-items:center; gap:4px; cursor:pointer;">${text} <i data-lucide="chevrons-up-down" style="width:14px;height:14px;opacity:0.3;"></i></span>`;
+    }
+  });
+  
+  const activeId = headers[ticketSortColumn];
+  const activeEl = document.getElementById(activeId);
+  if (activeEl) {
+    const text = activeEl.dataset.labelOriginal;
+    const isAsc = ticketSortDirection === 'asc';
+    activeEl.classList.add(isAsc ? 'sort-asc' : 'sort-desc');
+    activeEl.innerHTML = `<span style="display:inline-flex; align-items:center; gap:4px; cursor:pointer;">${text} <i data-lucide="${isAsc ? 'chevron-up' : 'chevron-down'}" style="width:14px;height:14px;color:var(--accent);"></i></span>`;
+  }
+  
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    lucide.createIcons();
+  }
+};
+
+window.ordenarTicketsPor = function(columna) {
+  if (ticketSortColumn === columna) {
+    ticketSortDirection = ticketSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    ticketSortColumn = columna;
+    ticketSortDirection = 'asc';
+  }
+  renderTickets();
+};
+
 // ===== RENDER TICKETS =====
 function renderTickets(ctx) {
   try { actualizarFiltrosPersonal(); } catch (e) {}
@@ -9830,14 +10106,70 @@ function renderTickets(ctx) {
     String(t.solicitante||'').toLowerCase().includes(q) ||
     String(t.cliente||'').toLowerCase().includes(q) ||
     String(t.asignado||'').toLowerCase().includes(q) ||
-    String(t.folio||'').toLowerCase().includes(q)
+    String(t.folio||'').toLowerCase().includes(q) ||
+    String(t.cotizacionSAP||'').toLowerCase().includes(q) ||
+    String(t.pedidoSAP||'').toLowerCase().includes(q)
   );
   
-  // Ordenar por folio descendente por defecto (más recientes primero)
+  // Ordenar dinámicamente según la columna seleccionada
   filtered.sort((a, b) => {
-    const folioA = String(a.folio || '');
-    const folioB = String(b.folio || '');
-    return folioB.localeCompare(folioA, undefined, { numeric: true, sensitivity: 'base' });
+    let valA, valB;
+    switch(ticketSortColumn) {
+      case 'folio':
+        valA = String(a.folio || '');
+        valB = String(b.folio || '');
+        return ticketSortDirection === 'asc'
+          ? valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' })
+          : valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+      case 'asunto':
+        valA = String(a.asunto || '').toLowerCase();
+        valB = String(b.asunto || '').toLowerCase();
+        break;
+      case 'solicitante':
+        valA = String(a.solicitante || '').toLowerCase();
+        valB = String(b.solicitante || '').toLowerCase();
+        break;
+      case 'area':
+        valA = String(a.area || '').toLowerCase();
+        valB = String(b.area || '').toLowerCase();
+        break;
+      case 'prioridad':
+        const prioMap = { 'alta': 3, 'media': 2, 'baja': 1 };
+        valA = prioMap[String(a.prioridad || '').toLowerCase()] || 0;
+        valB = prioMap[String(b.prioridad || '').toLowerCase()] || 0;
+        return ticketSortDirection === 'asc' ? valA - valB : valB - valA;
+      case 'estado':
+        valA = String(a.estado || '').toLowerCase();
+        valB = String(b.estado || '').toLowerCase();
+        break;
+      case 'cotizacion':
+        valA = String(a.cotizacionSAP || '').toLowerCase();
+        valB = String(b.cotizacionSAP || '').toLowerCase();
+        break;
+      case 'monto':
+        valA = Number(a.montoCotizacion || 0);
+        valB = Number(b.montoCotizacion || 0);
+        return ticketSortDirection === 'asc' ? valA - valB : valB - valA;
+      case 'pedido':
+        valA = String(a.pedidoSAP || '').toLowerCase();
+        valB = String(b.pedidoSAP || '').toLowerCase();
+        break;
+      case 'asignado':
+        valA = String(a.asignado || '').toLowerCase();
+        valB = String(b.asignado || '').toLowerCase();
+        break;
+      case 'fecha':
+        valA = new Date(a.fechaCreacion || a.fecha || 0).getTime();
+        valB = new Date(b.fechaCreacion || b.fecha || 0).getTime();
+        return ticketSortDirection === 'asc' ? valA - valB : valB - valA;
+      default:
+        valA = String(a.folio || '');
+        valB = String(b.folio || '');
+        return valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+    }
+    if (valA < valB) return ticketSortDirection === 'asc' ? -1 : 1;
+    if (valA > valB) return ticketSortDirection === 'asc' ? 1 : -1;
+    return 0;
   });
   
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
@@ -9923,7 +10255,13 @@ function renderTickets(ctx) {
   }
   
   if (!isDashView && !isV2 && ticketFiltroActivo !== 'todos') {
-    filtered = filtered.filter(t => t.estado === ticketFiltroActivo);
+    if (ticketFiltroActivo === 'Cerrado - Aprobado') {
+      filtered = filtered.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'si');
+    } else if (ticketFiltroActivo === 'Cerrado - Rechazado') {
+      filtered = filtered.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'no');
+    } else {
+      filtered = filtered.filter(t => t.estado === ticketFiltroActivo);
+    }
   }
   if (isV2 && filtroTicketsV2 !== 'todos') {
     filtered = filtered.filter(t => (t.estado || '').toLowerCase() === filtroTicketsV2.toLowerCase());
@@ -9935,7 +10273,7 @@ function renderTickets(ctx) {
   }
   
   if (!filtered.length) {
-    body.innerHTML = `<tr><td colspan="9" class="empty-state">No hay tickets${q||(!isDashView && ticketFiltroActivo!=='todos')?' que coincidan':' registrados'}.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="13" class="empty-state">No hay tickets${q||(!isDashView && ticketFiltroActivo!=='todos')?' que coincidan':' registrados'}.</td></tr>`;
     return;
   }
   const canEdit = currentSession.viewMode !== 'consulta';
@@ -9961,7 +10299,10 @@ function renderTickets(ctx) {
       </td>
       <td data-label="Área" style="white-space:nowrap;">${t.area||'—'}</td>
       <td data-label="Prioridad" class="col-prioridad" style="white-space:nowrap; display: ${isEmpresa ? 'none' : ''};"><span class="badge badge-${String(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
-      <td data-label="Estado" style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado||'—'}</span></td>
+      <td data-label="Estado" style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t)}">${t.estado === 'Cerrado' ? (t.cotAceptada === 'si' ? 'Cerrado (Aceptado)' : 'Cerrado (Rechazado)') : (t.estado||'—')}</span></td>
+      <td data-label="Cotización SAP" style="white-space:nowrap; font-family: monospace;">${t.cotizacionSAP||'—'}</td>
+      <td data-label="Monto" style="white-space:nowrap; font-weight: 600;">${(t.montoCotizacion !== undefined && t.montoCotizacion !== null) ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(t.montoCotizacion) : '—'}</td>
+      <td data-label="Pedido SAP" style="white-space:nowrap; font-family: monospace;">${t.pedidoSAP||'—'}</td>
       <td data-label="Asignado" class="col-asignado" style="white-space:nowrap; display: ${isEmpresa ? 'none' : ''};">${t.asignado||'—'}</td>
       <td data-label="Fecha" style="white-space:nowrap;">${formatFechaHoraAmigable(t.fechaCreacion || t.fecha)}</td>
       <td data-label="" style="width:40px; text-align:center;">
@@ -9969,11 +10310,16 @@ function renderTickets(ctx) {
       </td>
     </tr>
   `).join('');
+  try { actualizarCabeceraOrdenacion(); } catch (e) {}
   lucide.createIcons();
 }
 
-function badgeTicketEstado(estado) {
-  const map = { 'Abierto':'abierto', 'Cotización':'en-proceso', 'Cerrado':'cerrado' };
+function badgeTicketEstado(tOrEstado) {
+  const estado = typeof tOrEstado === 'object' ? tOrEstado.estado : tOrEstado;
+  if (typeof tOrEstado === 'object' && tOrEstado.estado === 'Cerrado') {
+    return tOrEstado.cotAceptada === 'si' ? 'cerrado-aprobado' : 'cerrado-rechazado';
+  }
+  const map = { 'Abierto':'abierto', 'Cotización':'en-proceso', 'Refacciones':'refacciones', 'Cerrado':'cerrado' };
   return map[estado] || 'abierto';
 }
 
@@ -10736,7 +11082,9 @@ function setFiltroTickets(estado) {
   ticketFiltroActivo = estado;
   // Sync the existing filter buttons
   document.querySelectorAll('.filter-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.filter === estado);
+    const filterVal = b.dataset.filter;
+    const isActive = filterVal === estado || (filterVal === 'Cerrado' && estado.startsWith('Cerrado -'));
+    b.classList.toggle('active', isActive);
   });
   renderTickets();
 }
@@ -10755,7 +11103,9 @@ function seleccionarCanal(canal) {
 
 function updateFileLabel(input) {
   const textSpan = input.parentElement.querySelector('.file-label-text');
-  if (input.files && input.files.length > 0) {
+  const isSelected = input.files && input.files.length > 0;
+  
+  if (isSelected) {
     if (input.files.length === 1) {
       textSpan.textContent = input.files[0].name;
     } else {
@@ -10765,12 +11115,480 @@ function updateFileLabel(input) {
     input.parentElement.style.color = 'var(--accent)';
     input.parentElement.style.background = 'var(--accent-light)';
   } else {
-    textSpan.textContent = 'Toca para subir foto(s)';
+    // Si es cotización o pedido en PDF, poner el texto por defecto correcto
+    const defaultText = input.id.includes('cotizacion') ? 'Subir cotización en PDF' : 'Subir pedido en PDF';
+    textSpan.textContent = defaultText;
     input.parentElement.style.borderColor = 'var(--border)';
     input.parentElement.style.color = 'var(--text-muted)';
     input.parentElement.style.background = 'rgba(255,255,255,0.02)';
   }
+
+  // Controlar visibilidad del botón de limpiar/basura si existe
+  const isCotizacionPdf = input.id === 't-cotizacion-pdf' || input.id.startsWith('quick-cot-pdf-');
+  if (isCotizacionPdf) {
+    const isModal = input.id === 't-cotizacion-pdf';
+    const ticketId = isModal ? null : input.id.replace('quick-cot-pdf-', '');
+    const clearBtnId = isModal ? 'btn-clear-pdf-modal' : `btn-clear-pdf-quick-${ticketId}`;
+    const clearBtn = document.getElementById(clearBtnId);
+    if (clearBtn) {
+      clearBtn.style.display = isSelected ? 'inline-flex' : 'none';
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+  }
 }
+
+window.clearPdfInput = function(isModal = true, ticketId = null) {
+  const inputId = isModal ? 't-cotizacion-pdf' : `quick-cot-pdf-${ticketId}`;
+  const input = document.getElementById(inputId);
+  if (input) {
+    input.value = '';
+    updateFileLabel(input);
+  }
+  
+  // Ocultar la tabla de información extraída
+  const tableId = isModal ? 'pdf-extraction-table-container' : `quick-pdf-extraction-table-container-${ticketId}`;
+  const tableContainer = document.getElementById(tableId);
+  if (tableContainer) {
+    tableContainer.style.display = 'none';
+    tableContainer.innerHTML = '';
+  }
+  
+  // Limpiar también la validación SAP si corresponde
+  if (isModal) {
+    const sapSel = document.getElementById('t-cotizacion-sap');
+    const montoIn = document.getElementById('t-cotizacion-monto');
+    if (sapSel) sapSel.value = '';
+    if (montoIn) montoIn.value = '';
+    if (window.validarCotizacionConSAP) window.validarCotizacionConSAP(true);
+  } else {
+    const sapSel = document.getElementById(`quick-cot-sap-${ticketId}`);
+    const montoIn = document.getElementById(`quick-cot-monto-${ticketId}`);
+    if (sapSel) sapSel.value = '';
+    if (montoIn) montoIn.value = '';
+    if (window.validarCotizacionConSAP) window.validarCotizacionConSAP(false, ticketId);
+  }
+  
+  mostrarNotificacion('Archivo PDF removido y campos reiniciados.', 'info');
+};
+
+// ===== SAP QUOTATION VALIDATION & SYNC =====
+window._cacheCotizacionesSap = JSON.parse(localStorage.getItem('eurorep_cotizaciones_sap') || '[]');
+
+window.poblarCotizacionesDropdown = async function(isModal = true, ticketId = null, selectedValue = '') {
+  const sb = window.supabaseClient;
+  if (!sb) return;
+
+  const selectId = isModal ? 't-cotizacion-sap' : `quick-cot-sap-${ticketId}`;
+  const selectEl = document.getElementById(selectId);
+  if (!selectEl) return;
+
+  try {
+    // Si no tenemos cache o está vacío, cargamos de supabase
+    if (!window._cacheCotizacionesSap || window._cacheCotizacionesSap.length === 0) {
+      const { data, error } = await sb.from('cotizaciones_sap').select('*').order('numero_cotizacion', { ascending: false });
+      if (!error && data) {
+        window._cacheCotizacionesSap = data;
+        localStorage.setItem('eurorep_cotizaciones_sap', JSON.stringify(data));
+      }
+    }
+
+    let quotes = window._cacheCotizacionesSap || [];
+    
+    // Filtrar cotizaciones por cliente del ticket actual
+    const tId = isModal ? editandoTicketId : ticketId;
+    const ticketObj = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets.find(x => x.id === tId) : null;
+    
+    if (ticketObj && ticketObj.cliente) {
+      const tClientClean = String(ticketObj.cliente).toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+      if (tClientClean) {
+        const filtered = quotes.filter(q => {
+          if (!q.cliente) return false;
+          const sClientClean = String(q.cliente).toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+          return tClientClean.includes(sClientClean) || sClientClean.includes(tClientClean);
+        });
+        
+        // Si hay coincidencia de cliente, reducimos la lista, si no, mostramos todo como fallback
+        if (filtered.length > 0) {
+          quotes = filtered;
+        }
+      }
+    }
+
+    selectEl.innerHTML = '<option value="">— Seleccione una cotización —</option>';
+    
+    // Si hay un valor seleccionado que no está en la caché o en la lista filtrada, lo agregamos temporalmente para evitar pérdidas
+    if (selectedValue && !quotes.some(q => q.numero_cotizacion === selectedValue)) {
+      const tempOpt = document.createElement('option');
+      tempOpt.value = selectedValue;
+      tempOpt.textContent = `${selectedValue} (Ingresado manualmente)`;
+      selectEl.appendChild(tempOpt);
+    }
+
+    quotes.forEach(q => {
+      const option = document.createElement('option');
+      option.value = q.numero_cotizacion;
+      const montoFormateado = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(q.monto || 0);
+      const fechaFormateada = q.fecha ? new Date(q.fecha).toLocaleDateString('es-MX') : '—';
+      option.textContent = `${q.numero_cotizacion} - ${q.cliente || 'Sin cliente'} (${montoFormateado} | ${fechaFormateada})`;
+      selectEl.appendChild(option);
+    });
+
+    if (selectedValue) {
+      selectEl.value = selectedValue;
+    }
+  } catch (err) {
+    console.error('[SAP Autocomplete] Error populating select dropdown:', err);
+  }
+};
+
+window.onModalCotizacionSelected = function() {
+  const sapVal = document.getElementById('t-cotizacion-sap')?.value.trim();
+  if (!sapVal) return;
+  
+  const quote = (window._cacheCotizacionesSap || []).find(q => q.numero_cotizacion === sapVal);
+  if (quote) {
+    const montoInput = document.getElementById('t-cotizacion-monto');
+    if (montoInput) {
+      montoInput.value = quote.monto || '';
+    }
+  }
+  
+  if (window.validarCotizacionConSAP) {
+    window.validarCotizacionConSAP(true);
+  }
+};
+
+window.onQuickCotizacionSelected = function(ticketId) {
+  const sapVal = document.getElementById(`quick-cot-sap-${ticketId}`)?.value.trim();
+  if (!sapVal) return;
+  
+  const quote = (window._cacheCotizacionesSap || []).find(q => q.numero_cotizacion === sapVal);
+  if (quote) {
+    const montoInput = document.getElementById(`quick-cot-monto-${ticketId}`);
+    if (montoInput) {
+      montoInput.value = quote.monto || '';
+    }
+  }
+  
+  if (window.validarCotizacionConSAP) {
+    window.validarCotizacionConSAP(false, ticketId);
+  }
+};
+
+window.autoExtraerDesdePdfCotizacion = async function(file, isModal = true, ticketId = null) {
+  if (!file) return;
+  
+  mostrarNotificacion('Analizando PDF de cotización...', 'info');
+  
+  try {
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+    
+    let extractedDoc = null;
+    let extractedMonto = null;
+    let detectedClientName = null;
+    let isSapMatch = false;
+    let cleanText = '';
+    let isAiProcessed = false;
+
+    // 1. Intentar llamar al backend para extraer texto o usar IA
+    try {
+      const response = await fetch('/api/extract-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ base64Data: base64 })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.ai) {
+          isAiProcessed = true;
+          extractedDoc = result.data.numero_cotizacion ? String(result.data.numero_cotizacion) : null;
+          extractedMonto = result.data.monto ? parseFloat(result.data.monto) : null;
+          detectedClientName = result.data.cliente || null;
+          console.log('[PDF Auto-Extract] AI parsed fields successfully:', { extractedDoc, extractedMonto, detectedClientName });
+        } else if (result.text) {
+          cleanText = result.text.replace(/\s+/g, ' ').trim();
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[PDF Auto-Extract] Backend extraction failed, falling back to local:', apiErr);
+    }
+
+    // 2. Si no se procesó por IA, caemos a las heurísticas de expresiones regulares (con texto de la API o local de PDF.js)
+    if (!isAiProcessed) {
+      if (!cleanText) {
+        try {
+          const text = await window.extraerTextoPdf(base64);
+          cleanText = text.replace(/\s+/g, ' ').trim();
+        } catch (pdfjsErr) {
+          console.error('[PDF Auto-Extract] Browser PDF.js also failed:', pdfjsErr);
+        }
+      }
+
+      console.log('[PDF Auto-Extract] Processing text parsing via Regex rules...');
+      
+      let detectedQuote = null;
+      const quotes = window._cacheCotizacionesSap || [];
+      if (cleanText) {
+        for (const q of quotes) {
+          if (q.numero_cotizacion && cleanText.includes(q.numero_cotizacion)) {
+            detectedQuote = q;
+            break;
+          }
+        }
+      }
+
+      if (detectedQuote) {
+        isSapMatch = true;
+        extractedDoc = detectedQuote.numero_cotizacion;
+        extractedMonto = detectedQuote.monto;
+        detectedClientName = detectedQuote.cliente;
+      } else if (cleanText) {
+        const docMatch = cleanText.match(/\b([123]10[0-9]{4})\b/) || cleanText.match(/\b([0-9]{7})\b/);
+        extractedDoc = docMatch ? docMatch[1] : null;
+        
+        const totalRegex = /(?:importe\s+total|total|importe|monto|neto)[:\s\$\-]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2}))/gi;
+        let match;
+        let maxMonto = 0;
+        while ((match = totalRegex.exec(cleanText)) !== null) {
+          const val = parseFloat(match[1].replace(/,/g, ''));
+          if (val > maxMonto) {
+            maxMonto = val;
+          }
+        }
+        if (maxMonto > 0) {
+          extractedMonto = maxMonto;
+        }
+        
+        try {
+          const clients = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+          const ccMatch = cleanText.match(/\b(CL[0-9]{2,6})\b/i);
+          if (ccMatch) {
+            const found = clients.find(c => String(c.id).toLowerCase() === ccMatch[1].toLowerCase());
+            if (found) {
+              detectedClientName = found.nombre;
+            }
+          }
+          if (!detectedClientName) {
+            for (const c of clients) {
+              if (c.nombre && cleanText.toLowerCase().includes(c.nombre.toLowerCase())) {
+                detectedClientName = c.nombre;
+                break;
+              }
+            }
+          }
+        } catch(e) {}
+      }
+    }
+
+    // 3. Auto-llenar campos
+    const sapInputId = isModal ? 't-cotizacion-sap' : `quick-cot-sap-${ticketId}`;
+    const montoInputId = isModal ? 't-cotizacion-monto' : `quick-cot-monto-${ticketId}`;
+    const sapInput = document.getElementById(sapInputId);
+    const montoInput = document.getElementById(montoInputId);
+
+    if (extractedDoc && !isSapMatch) {
+      const matchInCache = (window._cacheCotizacionesSap || []).find(q => q.numero_cotizacion === extractedDoc);
+      if (matchInCache) {
+        isSapMatch = true;
+        extractedMonto = matchInCache.monto;
+        detectedClientName = matchInCache.cliente;
+      }
+    }
+
+    if (extractedDoc) {
+      if (sapInput) {
+        let exists = Array.from(sapInput.options).some(opt => opt.value === extractedDoc);
+        if (!exists) {
+          const opt = document.createElement('option');
+          opt.value = extractedDoc;
+          if (isSapMatch) {
+            const montoFormateado = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(extractedMonto || 0);
+            opt.textContent = `${extractedDoc} - ${detectedClientName || 'Sin cliente'} (${montoFormateado} | SAP)`;
+          } else {
+            opt.textContent = `${extractedDoc} (Detectado en PDF)`;
+          }
+          sapInput.appendChild(opt);
+        }
+        sapInput.value = extractedDoc;
+      }
+    }
+    
+    if (extractedMonto && extractedMonto > 0) {
+      if (montoInput) montoInput.value = extractedMonto;
+    }
+
+    if (isAiProcessed) {
+      mostrarNotificacion(`✅ Extracción con IA (Gemini) exitosa para cotización ${extractedDoc || ''}.`, 'success');
+    } else if (extractedDoc || extractedMonto) {
+      let clientMsg = detectedClientName ? ` | Cliente: "${detectedClientName}"` : '';
+      mostrarNotificacion(`⚠️ Datos extraídos del PDF (Doc: ${extractedDoc || '?'}, Monto: $${extractedMonto || '?'}${clientMsg}). Valida la información.`, 'warning');
+    } else {
+      mostrarNotificacion('No se pudo extraer el folio o monto del PDF. Ingresa los datos manualmente.', 'info');
+    }
+
+    // 4. Dibujar la tabla
+    const tableContainerId = isModal ? 'pdf-extraction-table-container' : `quick-pdf-extraction-table-container-${ticketId}`;
+    const tableContainer = document.getElementById(tableContainerId);
+    if (tableContainer) {
+      tableContainer.style.display = 'block';
+      tableContainer.innerHTML = `
+        <div class="pdf-data-table" style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:0.75rem; font-size:0.8rem; margin-top:0.5rem; display:flex; flex-direction:column; gap:0.5rem;">
+          <div style="font-weight:600; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
+            <span>📋 Datos Extraídos del Archivo</span>
+            <span style="font-size:0.7rem; padding:2px 6px; border-radius:4px; ${isAiProcessed ? 'background:rgba(99,102,241,0.1); color:#6366f1;' : (isSapMatch ? 'background:rgba(16,185,129,0.1); color:#10b981;' : 'background:rgba(245,158,11,0.1); color:#f59e0b;')} font-weight:600;">
+              ${isAiProcessed ? 'Procesado con IA' : (isSapMatch ? 'Coincidencia SAP' : 'Lectura de Texto')}
+            </span>
+          </div>
+          <table style="width:100%; border-collapse:collapse; text-align:left;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border); color:var(--text-muted);">
+                <th style="padding:4px 8px; font-weight:500;">Dato</th>
+                <th style="padding:4px 8px; font-weight:500;">Valor Extraído</th>
+                <th style="padding:4px 8px; font-weight:500;">Origen</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+                <td style="padding:6px 8px; font-weight:600;">Folio / Doc SAP</td>
+                <td style="padding:6px 8px; font-family:monospace; color:var(--text-primary);">${extractedDoc || '—'}</td>
+                <td style="padding:6px 8px;"><span style="font-size:0.7rem;">${isAiProcessed ? 'Lector IA' : (isSapMatch ? 'Catálogo SAP' : 'Texto del PDF')}</span></td>
+              </tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+                <td style="padding:6px 8px; font-weight:600;">Monto Total</td>
+                <td style="padding:6px 8px; color:var(--text-primary); font-weight:600;">${extractedMonto ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(extractedMonto) : '—'}</td>
+                <td style="padding:6px 8px;"><span style="font-size:0.7rem;">${isAiProcessed ? 'Lector IA' : (isSapMatch ? 'Catálogo SAP' : 'Texto del PDF')}</span></td>
+              </tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+                <td style="padding:6px 8px; font-weight:600;">Cliente</td>
+                <td style="padding:6px 8px; color:var(--text-primary);">${detectedClientName || '—'}</td>
+                <td style="padding:6px 8px;"><span style="font-size:0.7rem;">${isAiProcessed ? 'Lector IA' : (isSapMatch ? 'Catálogo SAP' : 'Texto del PDF')}</span></td>
+              </tr>
+            </tbody>
+          </table>
+          <details style="margin-top:0.25rem; color:var(--text-muted); font-size:0.72rem;">
+            <summary style="cursor:pointer; user-select:none; font-weight:500;">🔍 Ver texto extraído (Diagnóstico)</summary>
+            <pre style="margin-top:0.25rem; white-space:pre-wrap; background:rgba(0,0,0,0.15); padding:0.5rem; border-radius:4px; max-height:150px; overflow-y:auto; font-family:monospace; color:var(--text-secondary); border:1px solid var(--border);">${cleanText || (isAiProcessed ? '(Datos procesados directamente por la IA)' : '(Vacío)')}</pre>
+          </details>
+        </div>
+      `;
+    }
+
+    if (window.validarCotizacionConSAP) {
+      window.validarCotizacionConSAP(isModal, ticketId);
+    }
+    
+  } catch (err) {
+    console.error('[PDF Auto-Extract] Error reading/parsing PDF:', err);
+    mostrarNotificacion('Error al leer el archivo PDF.', 'error');
+  }
+};
+
+window.validarCotizacionConSAP = async function(isModal = true, ticketId = null) {
+  const sb = window.supabaseClient;
+  if (!sb) return;
+
+  const sapInputId = isModal ? 't-cotizacion-sap' : `quick-cot-sap-${ticketId}`;
+  const montoInputId = isModal ? 't-cotizacion-monto' : `quick-cot-monto-${ticketId}`;
+  const statusDivId = isModal ? 't-sap-validation-status' : `quick-sap-validation-status-${ticketId}`;
+
+  const sapVal = document.getElementById(sapInputId)?.value.trim();
+  const montoVal = parseFloat(document.getElementById(montoInputId)?.value) || 0;
+  const statusDiv = document.getElementById(statusDivId);
+
+  if (!statusDiv) return;
+
+  if (!sapVal) {
+    statusDiv.style.display = 'none';
+    statusDiv.innerHTML = '';
+    return;
+  }
+
+  let ticket = null;
+  const tId = ticketId || editandoTicketId;
+  if (tId) {
+    ticket = tickets.find(t => t.id === tId);
+  }
+
+  statusDiv.style.display = 'block';
+  statusDiv.innerHTML = '<div style="font-size:0.75rem; color:var(--text-muted); display:flex; align-items:center; gap:4px;"><i data-lucide="loader" class="rotating" style="width:12px; height:12px;"></i> Validando con SAP...</div>';
+  if (window.lucide) lucide.createIcons();
+
+  try {
+    const { data, error } = await sb.from('cotizaciones_sap').select('*').eq('numero_cotizacion', sapVal).maybeSingle();
+    
+    if (error) throw error;
+
+    if (!data) {
+      statusDiv.innerHTML = `
+        <div style="padding:0.5rem 0.75rem; border-radius:6px; background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.15); font-size:0.78rem; color:#ef4444; display:flex; flex-direction:column; gap:0.25rem;">
+          <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="x-circle" style="width:14px; height:14px;"></i> Cotización no encontrada en SAP</div>
+          <div style="font-size:0.72rem; color:var(--text-muted);">Verifique el número ingresado o presione "Sincronizar con SAP".</div>
+        </div>
+      `;
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+
+    const sapMonto = Number(data.monto) || 0;
+    const sapCliente = data.cliente || '';
+    const sapFecha = data.fecha ? new Date(data.fecha).toLocaleDateString('es-MX') : '—';
+    
+    let isMontoMatch = Math.abs(montoVal - sapMonto) < 0.05;
+    
+    let isClientMatch = true;
+    if (ticket && ticket.cliente) {
+      const tClientClean = String(ticket.cliente).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const sClientClean = String(sapCliente).toLowerCase().replace(/[^a-z0-9]/g, '');
+      isClientMatch = tClientClean.includes(sClientClean) || sClientClean.includes(tClientClean);
+    }
+
+    let alertHtml = '';
+    if (!isMontoMatch && montoVal > 0) {
+      alertHtml += `<div>⚠️ El monto ingresado (${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(montoVal)}) no coincide con SAP (${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(sapMonto)}).</div>`;
+    }
+    if (!isClientMatch) {
+      alertHtml += `<div>⚠️ El cliente en SAP es <strong>"${sapCliente}"</strong>, pero este ticket pertenece a <strong>"${ticket?.cliente || 'N/A'}"</strong>.</div>`;
+    }
+
+    if (alertHtml) {
+      statusDiv.innerHTML = `
+        <div style="padding:0.5rem 0.75rem; border-radius:6px; background:rgba(245,158,11,0.06); border:1px solid rgba(245,158,11,0.15); font-size:0.78rem; color:#f59e0b; display:flex; flex-direction:column; gap:0.25rem;">
+          <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="alert-triangle" style="width:14px; height:14px;"></i> Coincidencia Parcial con SAP</div>
+          <div style="font-size:0.75rem; color:#d97706; display:flex; flex-direction:column; gap:2px;">
+            ${alertHtml}
+          </div>
+          <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px;">Fecha SAP: ${sapFecha} | Monto SAP: ${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(sapMonto)}</div>
+        </div>
+      `;
+    } else {
+      statusDiv.innerHTML = `
+        <div style="padding:0.5rem 0.75rem; border-radius:6px; background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.15); font-size:0.78rem; color:#10b981; display:flex; flex-direction:column; gap:0.25rem;">
+          <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="check-circle" style="width:14px; height:14px;"></i> Cotización Validada con SAP</div>
+          <div style="font-size:0.72rem; color:var(--text-muted);">Monto coincidente, Cliente verificado. Fecha SAP: ${sapFecha}</div>
+        </div>
+      `;
+    }
+    if (window.lucide) lucide.createIcons();
+  } catch (errVal) {
+    console.error('[SAP Validation] Error querying Supabase:', errVal);
+    statusDiv.style.display = 'none';
+  }
+};
+
+window.syncSapCotizacionManual = function(ticketId = null) {
+  const isModal = !ticketId;
+  const btnId = isModal ? 'btn-sync-sap-cot' : `btn-sync-sap-cot-${ticketId}`;
+  const btn = document.getElementById(btnId);
+  sincronizarConGitHub('cotizaciones', btn);
+};
 
 // ===== TICKET FORM =====
 function abrirTicket(id) {
@@ -10781,8 +11599,18 @@ function abrirTicket(id) {
   editandoTicketId = id || null;
   document.getElementById('ticket-modal-title').textContent = id ? 'Editar Ticket' : 'Nuevo Ticket';
   document.getElementById('form-ticket').reset();
+  
+  const statusDiv = document.getElementById('t-sap-validation-status');
+  if (statusDiv) {
+    statusDiv.style.display = 'none';
+    statusDiv.innerHTML = '';
+  }
 
   const t = id ? tickets.find(x => x.id === id) : null;
+
+  if (window.poblarCotizacionesDropdown) {
+    window.poblarCotizacionesDropdown(true, null, t?.cotizacionSAP || '');
+  }
 
   // Reset file labels
   ['t-cotizacion-pdf', 't-pedido-pdf'].forEach(inputId => {
@@ -10873,6 +11701,8 @@ function abrirTicket(id) {
     if (el) {
       if (!isEmpresa && elId === 'group-t-cliente') {
         el.style.display = 'block'; // Ensure block for combo box wrapper
+      } else if (elId === 'section-t-estado') {
+        el.style.display = (id && !isEmpresa) ? 'block' : 'none'; // Only show if editing and not empresa
       } else {
         el.style.display = displayInternal;
       }
@@ -10934,6 +11764,13 @@ function abrirTicket(id) {
       
       const elCotSap = document.getElementById('t-cotizacion-sap');
       if (elCotSap) elCotSap.value = t.cotizacionSAP || '';
+      
+      const elCotMonto = document.getElementById('t-cotizacion-monto');
+      if (elCotMonto) elCotMonto.value = t.montoCotizacion || '';
+
+      if (t.cotizacionSAP && window.validarCotizacionConSAP) {
+        setTimeout(() => { window.validarCotizacionConSAP(true); }, 100);
+      }
       
       const elPedidoSap = document.getElementById('t-pedido-sap');
       if (elPedidoSap) elPedidoSap.value = t.pedidoSAP || '';
@@ -11386,12 +12223,18 @@ async function guardarTicket(e) {
     }
   }
   
-  if (!isEmpresa && estado === 'Cotización') {
+  if (!isEmpresa && (estado === 'Cotización' || estado === 'Cerrado')) {
     const cotSAP = document.getElementById('t-cotizacion-sap')?.value.trim();
-    
-    if (!cotSAP) {
-      mostrarNotificacion('Debe ingresar el Número de Cotización SAP para pasar a Cotización.', 'error');
-      return;
+    const cotMontoVal = document.getElementById('t-cotizacion-monto')?.value.trim();
+    if (estado === 'Cotización' || cotSAP || cotMontoVal) {
+      if (!cotSAP) {
+        mostrarNotificacion('Debe ingresar el Número de Cotización SAP.', 'error');
+        return;
+      }
+      if (!cotMontoVal || isNaN(parseFloat(cotMontoVal)) || parseFloat(cotMontoVal) <= 0) {
+        mostrarNotificacion('Debe ingresar un Monto de Cotización válido (mayor a 0).', 'error');
+        return;
+      }
     }
   }
 
@@ -11480,6 +12323,7 @@ async function guardarTicket(e) {
     notas: document.getElementById('t-notas').value.trim(),
     estado,
     cotizacionSAP: document.getElementById('t-cotizacion-sap')?.value.trim() || '',
+    montoCotizacion: document.getElementById('t-cotizacion-monto')?.value ? parseFloat(document.getElementById('t-cotizacion-monto').value) : null,
     cotAceptada: document.querySelector('input[name="t-cot-aceptada"]:checked')?.value || '',
     motivoRechazo: document.getElementById('t-motivo-rechazo')?.value.trim() || '',
     pedidoSAP: document.getElementById('t-pedido-sap')?.value.trim() || '',
@@ -11604,11 +12448,19 @@ async function guardarTicket(e) {
   }
   cerrarTicket();
   renderTickets();
+  renderStats();
   updateTicketBadge();
 }
 
-function eliminarTicket(id) {
-  if (!confirm('¿Eliminar este ticket?')) return;
+async function eliminarTicket(id) {
+  const confirmed = await window.confirmarAccion({
+    titulo: 'Eliminar Ticket',
+    mensaje: '¿Estás seguro de que deseas eliminar este ticket?',
+    textoAceptar: 'Eliminar',
+    textoCancelar: 'Cancelar',
+    esPeligroso: true
+  });
+  if (!confirmed) return;
   const t = tickets.find(x => x.id === id);
   const folio = t ? t.folio : 'Desconocido';
 
@@ -11622,6 +12474,7 @@ function eliminarTicket(id) {
     window.trackTelemetryEvent('Eliminación de Ticket', { id, folio });
   }
   renderTickets();
+  renderStats();
   updateTicketBadge();
 }
 
@@ -11644,7 +12497,7 @@ function verDetalleTicket(id) {
         ${t.cliente ? field('Cliente', `${t.cliente}${t.sitio ? ` (Sitio: ${t.sitio})` : ''}`) : ''}
         ${field('Canal', t.canal ? ({correo:'Correo',whatsapp:'WhatsApp',telefono:'Llamada Tel.'}[t.canal]||t.canal) : '—')}
         ${field('Contacto', t.contacto)}
-        ${field('Estado', `<span class="badge badge-${badgeTicketEstado(t.estado)}">${t.estado}</span>`)}
+        ${field('Estado', `<span class="badge badge-${badgeTicketEstado(t)}">${t.estado === 'Cerrado' ? (t.cotAceptada === 'si' ? 'Cerrado (Aceptado)' : 'Cerrado (Rechazado)') : t.estado}</span>`)}
         ${!['empresa', 'cliente'].includes(currentSession.viewMode) ? field('Prioridad', `<span class="badge badge-${(t.prioridad||'media').toLowerCase()}">${t.prioridad}</span>`) : ''}
         ${field('Solicitante', t.solicitante)}
         ${field('Área', t.area)}
@@ -11666,44 +12519,212 @@ function verDetalleTicket(id) {
     ${t.estado === 'Cerrado' ? `
     <div class="detalle-section">
       <div class="detalle-section-title">Resolución Final</div>
+      
+      <!-- Elegant metadata cards -->
+      <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem;">
+        <!-- SAP Card -->
+        <div style="flex: 1; min-width: 150px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; box-shadow: var(--shadow-sm);">
+          <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Cotización SAP</span>
+          <span style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">${t.cotizacionSAP || '—'}</span>
+        </div>
+        <!-- Monto Card -->
+        <div style="flex: 1; min-width: 150px; background: linear-gradient(135deg, rgba(232, 130, 12, 0.08) 0%, rgba(232, 130, 12, 0.02) 100%); border: 1px solid rgba(232, 130, 12, 0.2); border-radius: 8px; padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; box-shadow: var(--shadow-sm);">
+          <span style="font-size: 0.75rem; color: var(--accent); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Monto Total</span>
+          <span style="font-size: 1.25rem; font-weight: 800; color: var(--accent);">${(t.montoCotizacion !== undefined && t.montoCotizacion !== null) ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(t.montoCotizacion) : '—'}</span>
+        </div>
+      </div>
+
       <div class="detalle-grid">
-        ${t.cotizacionSAP ? field('Cotización SAP', t.cotizacionSAP) : ''}
-        ${t.pdfCotizacion ? field('PDF Cotización', `<button type="button" onclick="window.descargarPdfOnDemand('${t.id}', 'cotizacion')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</button>`) : ''}
-        ${t.cotAceptada ? field('Resultado', t.cotAceptada === 'si' ? '<span style="color:var(--success); display:inline-flex; align-items:center; gap:4px;"><i data-lucide="check-circle" style="width:14px;height:14px;"></i> Aprobada</span>' : '<span style="color:var(--danger); display:inline-flex; align-items:center; gap:4px;"><i data-lucide="x-circle" style="width:14px;height:14px;"></i> Rechazada</span>') : ''}
+        ${t.pdfCotizacion ? field('PDF Cotización', `<div style="display:inline-flex; gap:0.25rem;"><button type="button" onclick="window.visualizarPdfOnDemand('${t.id}', 'cotizacion')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="eye" style="width:14px;height:14px;"></i> Ver</button><button type="button" onclick="window.descargarPdfOnDemand('${t.id}', 'cotizacion')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</button></div>`) : ''}
+        ${t.cotAceptada ? field('Resultado', t.cotAceptada === 'si' ? '<span style="color:var(--green); display:inline-flex; align-items:center; gap:4px;"><i data-lucide="check-circle" style="width:14px;height:14px;"></i> Aprobada</span>' : '<span style="color:var(--red); display:inline-flex; align-items:center; gap:4px;"><i data-lucide="x-circle" style="width:14px;height:14px;"></i> Rechazada</span>') : ''}
         ${t.motivoRechazo ? field('Motivo Rechazo', t.motivoRechazo) : ''}
         ${t.pedidoSAP ? field('Pedido SAP', t.pedidoSAP) : ''}
-        ${t.pdfPedido ? field('PDF Pedido', `<button type="button" onclick="window.descargarPdfOnDemand('${t.id}', 'pedido')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</button>`) : ''}
+        ${t.pdfPedido ? field('PDF Pedido', `<div style="display:inline-flex; gap:0.25rem;"><button type="button" onclick="window.visualizarPdfOnDemand('${t.id}', 'pedido')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="eye" style="width:14px;height:14px;"></i> Ver</button><button type="button" onclick="window.descargarPdfOnDemand('${t.id}', 'pedido')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</button></div>`) : ''}
         ${t.tecnicosAsignados && t.tecnicosAsignados.length > 0 ? field('Técnicos Asignados', t.tecnicosAsignados.join(', ')) : ''}
       </div>
     </div>
     ` : ''}
 
     ${t.estado === 'Abierto' && currentSession.viewMode !== 'empresa' ? `
-    <div class="detalle-section" style="background: var(--bg-hover); padding: 1rem; border-radius: 8px;">
-      <div class="detalle-section-title" style="margin-bottom:0.5rem; color:var(--accent); display:flex; align-items:center; gap:0.5rem;"><i data-lucide="file-text"></i> Procesar Cotización</div>
-      <div class="form-group full-width" style="margin-bottom:0;">
-        <label>Ingresa el No. Cotización SAP para avanzar:</label>
-        <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
-          <input type="text" id="quick-cot-sap-${t.id}" placeholder="COT-XXXXX" style="flex:1;">
-          <button class="btn-primary" onclick="avanzarCotizacionTicket('${t.id}')">Pasar a Cotización</button>
+    <div class="detalle-section" style="background: var(--bg-hover); padding: 1rem; border-radius: 8px; display:flex; flex-direction:column; gap:1rem;">
+      <div class="detalle-section-title" style="margin-bottom:0; color:var(--accent); display:flex; align-items:center; gap:0.5rem;"><i data-lucide="settings"></i> Procesar Ticket: Selección de Refacciones</div>
+      
+      <!-- Listado/Editor inline de Refacciones (idéntico a órdenes de servicio) -->
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:0.75rem; display:flex; flex-direction:column; gap:0.5rem;">
+        <div style="font-weight:600; font-size:0.82rem; color:var(--text-secondary); margin-bottom:0.25rem;">Refacciones Requeridas</div>
+        <div id="ref-ticket-list" style="display:flex; flex-direction:column; gap:0.5rem;">
+          <!-- Las filas se insertan dinámicamente -->
         </div>
+        ${['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode) ? `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem; flex-wrap:wrap; gap:0.5rem;">
+            <button type="button" class="btn-add-ref" style="width:fit-content; margin:0;" onclick="window.agregarFilaRefaccionTicket('${t.id}')">+ Agregar Refacción</button>
+            <button type="button" class="btn-primary" style="background:var(--green); border-color:var(--green);" onclick="window.guardarRefaccionesTicketDesdeUI('${t.id}', true)">Guardar Refacciones</button>
+          </div>
+        ` : ''}
       </div>
     </div>
     ` : ''}
 
+    ${t.estado === 'Refacciones' && currentSession.viewMode !== 'empresa' ? `
+    <div class="detalle-section" style="background: var(--bg-hover); padding: 1.25rem; border-radius: 8px; display:flex; flex-direction:column; gap:1.25rem; border: 1px solid var(--border);">
+      <div class="detalle-section-title" style="margin-bottom:0; color:var(--accent); display:flex; align-items:center; gap:0.5rem;"><i data-lucide="check-square"></i> Etapa: Selección de Refacciones</div>
+      
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:1rem; display:flex; flex-direction:column; gap:0.75rem; box-shadow: var(--shadow-sm);">
+        <div style="font-weight:600; font-size:0.85rem; color:var(--text-secondary); border-bottom:1px solid var(--border); padding-bottom:0.5rem; display:flex; align-items:center; gap:0.35rem;"><i data-lucide="lock" style="width:14px;height:14px;color:var(--text-muted);"></i> Refacciones Solicitadas (Bloqueado / Lectura)</div>
+        
+        ${t.refaccionesSeleccionadas && t.refaccionesSeleccionadas.length > 0 ? `
+          <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+              <thead>
+                <tr style="border-bottom:1.5px solid var(--border); text-align:left; color:var(--text-muted); font-weight:600; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">
+                  <th style="padding:0.5rem 0.25rem; width:15%;">Marca</th>
+                  <th style="padding:0.5rem 0.25rem; width:55%;">Descripción</th>
+                  <th style="padding:0.5rem 0.25rem; width:18%;">Clave</th>
+                  <th style="padding:0.5rem 0.25rem; width:12%; text-align:center;">Cant.</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${t.refaccionesSeleccionadas.map(ref => {
+                  const brandName = {
+                    'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM',
+                    'MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS',
+                    'TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM',
+                    'POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG',
+                    'HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
+                  }[String(ref.marca).toUpperCase()] || ref.marca || '—';
+                  return `
+                    <tr style="border-bottom:1px solid var(--border); color:var(--text-primary);">
+                      <td style="padding:0.6rem 0.25rem; font-weight:600; color:var(--orange);">${brandName}</td>
+                      <td style="padding:0.6rem 0.25rem; line-height:1.3; font-weight:500;">${ref.nombre || '—'}</td>
+                      <td style="padding:0.6rem 0.25rem; font-family:monospace; font-size:0.8rem; color:var(--text-secondary);">${ref.codigo || '—'}</td>
+                      <td style="padding:0.6rem 0.25rem; text-align:center; font-weight:700; color:var(--text-primary);">${ref.cantidad || 1}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : `
+          <div style="text-align:center; color:var(--text-muted); padding:1.5rem; font-style:italic;">No hay refacciones solicitadas.</div>
+        `}
+      </div>
+
+      <!-- Avanzar a Cotización -->
+      ${['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode) && (t.refaccionesSeleccionadas && t.refaccionesSeleccionadas.length > 0) ? `
+      <div style="border-top:1px dashed var(--border); padding-top:1rem; margin-top:0.25rem; display:flex; flex-direction:column; gap:0.75rem;">
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+            <label style="font-weight:600; font-size:0.85rem; display:block; margin:0; color:var(--text-secondary);">No. Cotización SAP *</label>
+            <button type="button" id="btn-sync-sap-cot-${t.id}" onclick="window.syncSapCotizacionManual('${t.id}')" class="btn-text-action" style="font-size:0.7rem; color:var(--accent); background:none; border:none; cursor:pointer; font-weight:600; padding:0; display:inline-flex; align-items:center; gap:4px;"><i data-lucide="refresh-cw" style="width:12px; height:12px;"></i> Sincronizar con SAP</button>
+          </div>
+          <select id="quick-cot-sap-${t.id}" onchange="window.onQuickCotizacionSelected('${t.id}')" style="width:100%; padding:0.55rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); font-size:0.85rem;"></select>
+        </div>
+        <div>
+          <label style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:0.4rem; color:var(--text-secondary);">Monto de Cotización ($) *</label>
+          <input type="number" id="quick-cot-monto-${t.id}" value="${t.montoCotizacion || ''}" oninput="window.validarCotizacionConSAP(false, '${t.id}')" step="0.01" min="0" placeholder="Ej. 12500.00" style="width:100%; padding:0.55rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); font-size:0.85rem;">
+        </div>
+        <div>
+          <label style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:0.4rem; color:var(--text-secondary);">Archivo Cotización (PDF) *</label>
+          <div style="display:flex; flex-direction:column; gap:0.5rem; width:100%;">
+            <div style="display:flex; gap:0.5rem; align-items:center; width:100%;">
+              <label class="custom-file-upload" style="flex:1; margin:0;">
+                <input type="file" id="quick-cot-pdf-${t.id}" accept="application/pdf" onchange="updateFileLabel(this); if(this.files[0]) window.autoExtraerDesdePdfCotizacion(this.files[0], false, '${t.id}');"/>
+                <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
+                <span class="file-label-text">Subir cotización en PDF</span>
+              </label>
+              <button type="button" id="btn-clear-pdf-quick-${t.id}" onclick="window.clearPdfInput(false, '${t.id}')" class="btn-icon" style="display:none; background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); border-radius:6px; padding:0.6rem; cursor:pointer; height:45px; width:45px; align-items:center; justify-content:center;" title="Eliminar archivo"><i data-lucide="trash-2" style="width:16px; height:16px;"></i></button>
+            </div>
+            <div id="quick-pdf-extraction-table-container-${t.id}" style="display:none;"></div>
+          </div>
+        </div>
+        <div id="quick-sap-validation-status-${t.id}" style="display:none; margin-top: 0.25rem;"></div>
+        <button class="btn-primary" style="background:var(--accent); border-color:var(--accent); margin-top:0.25rem; justify-content:center;" onclick="avanzarCotizacionTicket('${t.id}')">Pasar a Cotización</button>
+      </div>
+      ` : ''}
+    </div>
+    ` : ''}
+
     ${t.estado === 'Cotización' && currentSession.viewMode !== 'empresa' ? `
-    <div class="detalle-section" style="background: var(--bg-hover); padding: 1rem; border-radius: 8px;">
-      <div class="detalle-section-title" style="margin-bottom:0.5rem; color:var(--accent); display:flex; align-items:center; gap:0.5rem;"><i data-lucide="check-square"></i> Cierre de Cotización (SAP: ${t.cotizacionSAP || 'N/A'})</div>
-      <div class="form-group full-width" style="margin-bottom:0;">
-        <label>¿El cliente aceptó la cotización?</label>
+    <div class="detalle-section" style="background: var(--bg-hover); padding: 1.25rem; border-radius: 8px; display:flex; flex-direction:column; gap:1.25rem; border: 1px solid var(--border);">
+      <div class="detalle-section-title" style="margin-bottom:0; color:var(--accent); display:flex; align-items:center; gap:0.5rem;"><i data-lucide="check-square"></i> Cierre de Cotización</div>
+      
+      <!-- Elegant metadata cards -->
+      <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        <!-- SAP Card -->
+        <div style="flex: 1; min-width: 150px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; box-shadow: var(--shadow-sm);">
+          <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Cotización SAP</span>
+          <span style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">${t.cotizacionSAP || '—'}</span>
+        </div>
+        <!-- Monto Card -->
+        <div style="flex: 1; min-width: 150px; background: linear-gradient(135deg, rgba(232, 130, 12, 0.08) 0%, rgba(232, 130, 12, 0.02) 100%); border: 1px solid rgba(232, 130, 12, 0.2); border-radius: 8px; padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; box-shadow: var(--shadow-sm);">
+          <span style="font-size: 0.75rem; color: var(--accent); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Monto Total</span>
+          <span style="font-size: 1.25rem; font-weight: 800; color: var(--accent);">${(t.montoCotizacion !== undefined && t.montoCotizacion !== null) ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(t.montoCotizacion) : '—'}</span>
+        </div>
+      </div>
+      
+      ${t.pdfCotizacion ? `
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:1rem; display:flex; align-items:center; justify-content:space-between; box-shadow: var(--shadow-sm);">
+        <div style="display:flex; align-items:center; gap:0.5rem; font-weight:600; font-size:0.85rem; color:var(--text-secondary);">
+          <i data-lucide="file-text" style="width:16px;height:16px;color:var(--accent);"></i> Archivo de Cotización
+        </div>
+        <div style="display:flex; gap:0.25rem;">
+          <button type="button" onclick="window.visualizarPdfOnDemand('${t.id}', 'cotizacion')" class="btn-secondary" style="padding:0.25rem 0.6rem; font-size:0.78rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="eye" style="width:14px;height:14px;"></i> Ver</button>
+          <button type="button" onclick="window.descargarPdfOnDemand('${t.id}', 'cotizacion')" class="btn-secondary" style="padding:0.25rem 0.6rem; font-size:0.78rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</button>
+        </div>
+      </div>
+      ` : ''}
+      
+      <!-- Refacciones Solicitadas (Bloqueado / Lectura) -->
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:1rem; display:flex; flex-direction:column; gap:0.75rem; box-shadow: var(--shadow-sm);">
+        <div style="font-weight:600; font-size:0.85rem; color:var(--text-secondary); border-bottom:1px solid var(--border); padding-bottom:0.5rem; display:flex; align-items:center; gap:0.35rem;"><i data-lucide="lock" style="width:14px;height:14px;color:var(--text-muted);"></i> Refacciones Solicitadas (Bloqueado / Lectura)</div>
+        
+        ${t.refaccionesSeleccionadas && t.refaccionesSeleccionadas.length > 0 ? `
+          <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+              <thead>
+                <tr style="border-bottom:1.5px solid var(--border); text-align:left; color:var(--text-muted); font-weight:600; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">
+                  <th style="padding:0.5rem 0.25rem; width:15%;">Marca</th>
+                  <th style="padding:0.5rem 0.25rem; width:55%;">Descripción</th>
+                  <th style="padding:0.5rem 0.25rem; width:18%;">Clave</th>
+                  <th style="padding:0.5rem 0.25rem; width:12%; text-align:center;">Cant.</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${t.refaccionesSeleccionadas.map(ref => {
+                  const brandName = {
+                    'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM',
+                    'MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS',
+                    'TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM',
+                    'POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG',
+                    'HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
+                  }[String(ref.marca).toUpperCase()] || ref.marca || '—';
+                  return `
+                    <tr style="border-bottom:1px solid var(--border); color:var(--text-primary);">
+                      <td style="padding:0.6rem 0.25rem; font-weight:600; color:var(--orange);">${brandName}</td>
+                      <td style="padding:0.6rem 0.25rem; line-height:1.3; font-weight:500;">${ref.nombre || '—'}</td>
+                      <td style="padding:0.6rem 0.25rem; font-family:monospace; font-size:0.8rem; color:var(--text-secondary);">${ref.codigo || '—'}</td>
+                      <td style="padding:0.6rem 0.25rem; text-align:center; font-weight:700; color:var(--text-primary);">${ref.cantidad || 1}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : `
+          <div style="text-align:center; color:var(--text-muted); padding:1.5rem; font-style:italic;">No hay refacciones solicitadas.</div>
+        `}
+      </div>
+
+      <div class="form-group full-width" style="margin-bottom:0; border-top: 1px dashed var(--border); padding-top: 1rem;">
+        <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; display:block; margin-bottom:0.5rem;">¿El cliente aceptó la cotización?</label>
         <div style="display:flex; gap:1rem; margin-top:0.5rem; margin-bottom: 0.75rem;">
-          <label style="cursor:pointer; display:flex; align-items:center; gap:0.25rem;">
+          <label style="cursor:pointer; display:flex; align-items:center; gap:0.25rem; font-size:0.85rem; font-weight:500; color:var(--text-primary);">
             <input type="radio" name="quick-cot-acep-${t.id}" value="si" onchange="document.getElementById('quick-motivo-${t.id}').style.display='none'; document.getElementById('quick-pedido-${t.id}').style.display='block';"> 
-            <i data-lucide="check-circle" style="width:16px;height:16px;color:var(--success);"></i> Sí, aprobada
+            <i data-lucide="check-circle" style="width:16px;height:16px;color:var(--green);"></i> Sí, aprobada
           </label>
-          <label style="cursor:pointer; display:flex; align-items:center; gap:0.25rem;">
+          <label style="cursor:pointer; display:flex; align-items:center; gap:0.25rem; font-size:0.85rem; font-weight:500; color:var(--text-primary);">
             <input type="radio" name="quick-cot-acep-${t.id}" value="no" onchange="document.getElementById('quick-motivo-${t.id}').style.display='block'; document.getElementById('quick-pedido-${t.id}').style.display='none';"> 
-            <i data-lucide="x-circle" style="width:16px;height:16px;color:var(--danger);"></i> No, rechazada
+            <i data-lucide="x-circle" style="width:16px;height:16px;color:var(--red);"></i> No, rechazada
           </label>
         </div>
         <div id="quick-motivo-${t.id}" style="display:none; margin-bottom:0.75rem;">
@@ -11711,11 +12732,11 @@ function verDetalleTicket(id) {
         </div>
         <div id="quick-pedido-${t.id}" style="display:none; margin-bottom:0.75rem;">
           <div class="form-group full-width">
-            <label>No. Pedido SAP *</label>
+            <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem;">No. Pedido SAP *</label>
             <input type="text" id="quick-pedido-sap-${t.id}" placeholder="Ej. PED-200450" />
           </div>
           <div class="form-group full-width" style="margin-top:0.5rem;">
-            <label>Archivo Pedido (PDF) *</label>
+            <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem;">Archivo Pedido (PDF) *</label>
             <label class="custom-file-upload">
               <input type="file" id="quick-pedido-pdf-${t.id}" accept="application/pdf" onchange="updateFileLabel(this)"/>
               <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
@@ -11723,7 +12744,7 @@ function verDetalleTicket(id) {
             </label>
           </div>
           <div class="form-group full-width" style="margin-top:0.75rem;">
-            <label>Tipo de Visita *</label>
+            <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem;">Tipo de Visita *</label>
             <select id="quick-tipo-${t.id}">
               <option value="Servicio preventivo">Servicio preventivo</option>
               <option value="Garantía">Garantía</option>
@@ -11733,9 +12754,8 @@ function verDetalleTicket(id) {
               <option value="Entrega Refacciones">Entrega Refacciones</option>
             </select>
           </div>
-          </div>
         </div>
-        <button class="btn-primary full-width" style="justify-content:center;" onclick="cerrarCotizacionTicket('${t.id}')">Finalizar y Cerrar Ticket</button>
+        <button class="btn-primary full-width" style="justify-content:center; margin-top: 1rem;" onclick="cerrarCotizacionTicket('${t.id}')">Finalizar y Cerrar Ticket</button>
       </div>
     </div>
     ` : ''}
@@ -11760,8 +12780,86 @@ function verDetalleTicket(id) {
   `;
   document.getElementById('modal-ticket-detalle-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
+  if (t.estado === 'Abierto' && currentSession.viewMode !== 'empresa') {
+    window.inicializarRefaccionesTicket(t.id, t.refaccionesSeleccionadas || []);
+  }
+  if (t.estado === 'Refacciones' && currentSession.viewMode !== 'empresa') {
+    if (window.poblarCotizacionesDropdown) {
+      window.poblarCotizacionesDropdown(false, t.id, t.cotizacionSAP || '');
+    }
+    if (t.cotizacionSAP && window.validarCotizacionConSAP) {
+      setTimeout(() => { window.validarCotizacionConSAP(false, t.id); }, 100);
+    }
+  }
   lucide.createIcons();
 }
+
+// Visualización de PDF bajo demanda en una pestaña nueva
+window.visualizarPdfOnDemand = async function(ticketId, tipo) {
+  const t = tickets.find(x => x.id === ticketId);
+  if (!t) {
+    mostrarNotificacion('Ticket no encontrado.', 'error');
+    return;
+  }
+
+  const label = tipo === 'pedido' ? 'pdfPedido' : 'pdfCotizacion';
+  const dbCol = tipo === 'pedido' ? 'pdf_pedido' : 'pdf_cotizacion';
+
+  const showPdf = (base64Data) => {
+    let base64Pure = base64Data;
+    if (base64Data.startsWith('data:')) {
+      base64Pure = base64Data.split(',')[1];
+    }
+    try {
+      const byteCharacters = atob(base64Pure);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/pdf' });
+      const fileURL = URL.createObjectURL(blob);
+      window.open(fileURL, '_blank');
+    } catch (e) {
+      console.error('Error al decodificar Base64:', e);
+      window.open(base64Data, '_blank');
+    }
+  };
+
+  const localVal = t[label];
+  if (localVal && localVal.startsWith('data:')) {
+    showPdf(localVal);
+    return;
+  }
+
+  if (!window.supabaseClient) {
+    mostrarNotificacion('No hay conexión con la base de datos para visualizar el PDF.', 'error');
+    return;
+  }
+
+  mostrarNotificacion('Cargando archivo PDF...', 'info');
+
+  try {
+    const { data, error } = await window.supabaseClient
+      .from('tickets')
+      .select(dbCol)
+      .eq('id', ticketId)
+      .single();
+
+    if (error) throw error;
+
+    const dbVal = data ? data[dbCol] : null;
+    if (!dbVal) {
+      mostrarNotificacion('El archivo no está disponible en el servidor.', 'error');
+      return;
+    }
+
+    showPdf(dbVal);
+  } catch (err) {
+    console.error('[PDF View] Error:', err);
+    mostrarNotificacion('Error al cargar el archivo: ' + err.message, 'error');
+  }
+};
 
 // Descarga de PDF bajo demanda desde Supabase para evitar saturación de localStorage
 window.descargarPdfOnDemand = async function(ticketId, tipo) {
@@ -11823,7 +12921,7 @@ window.descargarPdfOnDemand = async function(ticketId, tipo) {
   }
 };
 
-function avanzarCotizacionTicket(id) {
+async function avanzarCotizacionTicket(id) {
   const t = tickets.find(x => x.id === id);
   if (!t) return;
   const sap = document.getElementById(`quick-cot-sap-${id}`)?.value.trim();
@@ -11831,15 +12929,40 @@ function avanzarCotizacionTicket(id) {
     mostrarNotificacion('Ingresa el número de cotización SAP.', 'warning');
     return;
   }
+  const quickMontoInput = document.getElementById(`quick-cot-monto-${id}`);
+  const quickMontoVal = quickMontoInput ? parseFloat(quickMontoInput.value) : 0;
+  if (isNaN(quickMontoVal) || quickMontoVal <= 0) {
+    mostrarNotificacion('Ingresa un monto de cotización válido (mayor a 0).', 'warning');
+    return;
+  }
+  const fileInput = document.getElementById(`quick-cot-pdf-${id}`);
+  const hasFile = fileInput?.files.length > 0;
+  if (!hasFile && !t.pdfCotizacion) {
+    mostrarNotificacion('Debes adjuntar el archivo PDF de la cotización.', 'warning');
+    return;
+  }
+
+  let pdfCotizacionBase64 = t.pdfCotizacion || null;
+  if (hasFile) {
+    try {
+      pdfCotizacionBase64 = await readFileAsBase64(fileInput.files[0]);
+    } catch (e) {
+      console.error('[Base64 Conversion] Error:', e);
+    }
+  }
+
   t.cotizacionSAP = sap;
+  t.montoCotizacion = quickMontoVal;
+  t.pdfCotizacion = pdfCotizacionBase64;
   t.estado = 'Cotización';
   localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
   if (window.supabaseClient) {
-    window.pushToSupabase('tickets', t);
+    await window.pushToSupabase('tickets', t);
   }
   mostrarNotificacion('Ticket avanzado a Cotización.', 'success');
   cerrarDetalleTicket();
   renderTickets();
+  renderStats();
   updateTicketBadge();
 }
 
@@ -12961,7 +14084,7 @@ async function enviarRecoveryLink(e) {
       errEl.style.color = 'var(--red)';
     } else {
       errEl.textContent = '¡Enlace enviado! Revisa tu bandeja de entrada o spam. Ya puedes cerrar esta ventana.';
-      errEl.style.color = 'var(--success)';
+      errEl.style.color = 'var(--green)';
     }
   } catch (error) {
     errEl.textContent = 'Error de red. Intenta de nuevo.';
@@ -18749,8 +19872,29 @@ window.extraerFacturaSatNube = async function(type, base64Data) {
   }
 };
 
-// Función central para extraer texto de un archivo PDF usando PDF.js
 window.extraerTextoPdf = async function(base64Data) {
+  // Intentar extraer el texto usando el endpoint del backend (PDFKit nativo de macOS)
+  // que soluciona los problemas de codificación de fuentes (cuadritos vacíos)
+  try {
+    const response = await fetch('/api/extract-pdf', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ base64Data })
+    });
+    if (response.ok) {
+      const data = await response.json();
+      if (data && typeof data.text === 'string' && data.text.trim().length > 0) {
+        console.log('[PDF Auto-Extract] Text extracted successfully via backend PDFKit.');
+        return data.text;
+      }
+    }
+  } catch (err) {
+    console.warn('[PDF Auto-Extract] Backend PDFKit API error, falling back to local PDF.js:', err);
+  }
+
+  // Fallback: usar PDF.js local en el navegador
   if (!window.pdfjsLib) {
     throw new Error('Librería PDF.js no cargada');
   }
@@ -20984,4 +22128,253 @@ window.regenerarOrdenesDesdeTickets = async function() {
   
   // Forzar reload
   location.reload();
+};
+
+window.refComboCounter = window.refComboCounter || 0;
+
+window.inicializarRefaccionesTicket = function(ticketId, refaccionesList) {
+  const list = document.getElementById('ref-ticket-list');
+  if (!list) return;
+  list.innerHTML = '';
+  
+  if (refaccionesList && refaccionesList.length > 0) {
+    refaccionesList.forEach(item => {
+      window.agregarFilaRefaccionTicket(ticketId, item);
+    });
+  } else {
+    window.agregarFilaRefaccionTicket(ticketId, {});
+  }
+};
+
+window.agregarFilaRefaccionTicket = function(ticketId, initialData = {}) {
+  const list = document.getElementById('ref-ticket-list');
+  if (!list) return;
+  
+  const row = document.createElement('div');
+  row.className = 'ref-row';
+  row.style.margin = '0';
+  row.style.borderBottom = '1px solid var(--border)';
+  row.style.padding = '0.35rem 0';
+  
+  window.refComboCounter++;
+  const idComboMarca = `ref-tkt-marca-${window.refComboCounter}`;
+  const idComboDesc = `ref-tkt-desc-${window.refComboCounter}`;
+  
+  let html = `
+    <!-- MARCA COMBO -->
+    <div style="flex: 1.2; min-width: 100px; position:relative;" class="group-ref-marca">
+      <div class="combo-box" tabindex="0" id="${idComboMarca}-combo" style="padding: 0.45rem 0.4rem;">
+        <span id="${idComboMarca}-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 20px); font-size:0.8rem;">Marca...</span>
+        <i data-lucide="chevron-down" style="width:14px;height:14px; flex-shrink:0;"></i>
+      </div>
+      <div class="combo-menu" id="${idComboMarca}-menu" style="width: 250px; z-index: 9999;">
+        <div class="combo-search">
+          <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted)"></i>
+          <input type="text" id="${idComboMarca}-search" placeholder="Buscar..." oninput="filterCombo('${idComboMarca}', this.value)" onclick="event.stopPropagation()">
+        </div>
+        <div class="combo-options" id="${idComboMarca}-options">
+          <!-- Populated by popularSelectMarcas -->
+        </div>
+      </div>
+      <input type="hidden" class="ref-marca" id="${idComboMarca}" />
+    </div>
+    
+    <!-- DESC COMBO -->
+    <div style="flex: 2; position:relative; min-width: 120px;" class="group-ref-desc">
+      <div class="combo-box" tabindex="0" id="${idComboDesc}-combo" style="padding: 0.45rem 0.4rem;">
+        <span id="${idComboDesc}-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 20px); font-size:0.8rem;">Descripción...</span>
+        <i data-lucide="chevron-down" style="width:14px;height:14px; flex-shrink:0;"></i>
+      </div>
+      <div class="combo-menu" id="${idComboDesc}-menu" style="width: 100%; min-width: 300px; z-index: 9999;">
+        <div class="combo-search">
+          <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted)"></i>
+          <input type="text" id="${idComboDesc}-search" placeholder="Buscar..." oninput="filterCombo('${idComboDesc}', this.value)" onclick="event.stopPropagation()">
+        </div>
+        <div class="combo-options" id="${idComboDesc}-options">
+          <div class="combo-option" style="color:var(--text-muted)">Seleccione una marca primero</div>
+        </div>
+      </div>
+      <input type="hidden" class="ref-desc-hidden ref-desc" id="${idComboDesc}" />
+    </div>
+
+    <input type="text" placeholder="Clave" class="ref-clave" style="width:70px; padding: 0.45rem 0.4rem; font-size:0.8rem;" readonly />
+    <input type="number" placeholder="Cant." class="ref-cant" style="width:50px; padding: 0.45rem 0.4rem; font-size:0.8rem;" min="1" value="1"/>
+    <button type="button" class="btn-del-ref" onclick="window.eliminarFilaRefaccionTicket(this, '${ticketId}')">✕</button>
+  `;
+  
+  row.innerHTML = html;
+  list.appendChild(row);
+  
+  if (window.lucide) window.lucide.createIcons({ root: row });
+  
+  // Attach Event Listeners dynamically
+  const comboMarca = document.getElementById(`${idComboMarca}-combo`);
+  if (comboMarca) {
+    comboMarca.addEventListener('click', (e) => {
+      e.stopPropagation();
+      window.toggleCombo(idComboMarca);
+    });
+  }
+  
+  const comboDesc = document.getElementById(`${idComboDesc}-combo`);
+  if (comboDesc) {
+    comboDesc.addEventListener('click', (e) => {
+      e.stopPropagation();
+      window.toggleCombo(idComboDesc);
+    });
+  }
+  
+  // Prevent menu clicks from bubbling
+  const menuMarca = document.getElementById(`${idComboMarca}-menu`);
+  if (menuMarca) menuMarca.addEventListener('click', e => e.stopPropagation());
+  
+  const menuDesc = document.getElementById(`${idComboDesc}-menu`);
+  if (menuDesc) menuDesc.addEventListener('click', e => e.stopPropagation());
+  
+  // Populate marca options
+  window.popularSelectMarcas(idComboMarca, idComboDesc);
+  
+  // Apply initialData if present
+  if (initialData.marca) {
+    const hiddenMarca = row.querySelector('.ref-marca');
+    const hiddenDesc = row.querySelector('.ref-desc-hidden');
+    const comboSpanMarca = document.getElementById(idComboMarca + '-display');
+    const comboSpanDesc = document.getElementById(idComboDesc + '-display');
+    
+    hiddenMarca.value = initialData.marca;
+    const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+    if (comboSpanMarca) comboSpanMarca.textContent = MARCAS_RENDER[initialData.marca.toUpperCase()] || initialData.marca;
+    
+    window.actualizarDescripcionesCombo(idComboMarca, idComboDesc);
+    
+    if (initialData.nombre) {
+      hiddenDesc.value = initialData.nombre;
+      if (comboSpanDesc) comboSpanDesc.textContent = initialData.nombre;
+      
+      const comboOptions = document.getElementById(idComboDesc + '-options');
+      if (comboOptions) {
+        let optExists = false;
+        comboOptions.querySelectorAll('.combo-option').forEach(opt => {
+          if (opt.textContent === initialData.nombre) optExists = true;
+        });
+        if (!optExists) {
+          const legacyHtml = `<div class="combo-option" onclick="window.seleccionarDescRefaccion(this, '${idComboDesc}', '${initialData.codigo || ''}', 0)">${initialData.nombre}</div>`;
+          if (comboOptions.innerHTML.includes('Seleccione una marca')) {
+            comboOptions.innerHTML = legacyHtml;
+          } else {
+            comboOptions.innerHTML += legacyHtml;
+          }
+        }
+      }
+    }
+  }
+  
+  if (initialData.codigo) row.querySelector('.ref-clave').value = initialData.codigo;
+  if (initialData.cantidad) row.querySelector('.ref-cant').value = initialData.cantidad;
+};
+
+window.eliminarFilaRefaccionTicket = function(btn, ticketId) {
+  const row = btn.closest('.ref-row');
+  if (row) {
+    row.remove();
+    const list = document.getElementById('ref-ticket-list');
+    if (list && list.querySelectorAll('.ref-row').length === 0) {
+      window.agregarFilaRefaccionTicket(ticketId, {});
+    }
+  }
+};
+
+window.guardarRefaccionesTicketDesdeUI = function(ticketId, transitionToRefacciones = false) {
+  const t = tickets.find(x => x.id === ticketId);
+  if (!t) return;
+  
+  const rows = document.querySelectorAll('#ref-ticket-list .ref-row');
+  const list = [];
+  rows.forEach(row => {
+    const marca = row.querySelector('.ref-marca')?.value;
+    const nombre = row.querySelector('.ref-desc-hidden')?.value;
+    const codigo = row.querySelector('.ref-clave')?.value;
+    const cantidad = parseInt(row.querySelector('.ref-cant')?.value) || 1;
+    if (codigo || nombre) {
+      list.push({ marca, codigo, nombre, cantidad });
+    }
+  });
+  
+  t.refaccionesSeleccionadas = list;
+  t.notas = window.inyectarRefaccionesEnNotas(t.notas || '', list);
+  
+  if (transitionToRefacciones) {
+    t.estado = 'Refacciones';
+  }
+  
+  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  if (window.pushToSupabase) window.pushToSupabase('tickets', t);
+  
+  if (transitionToRefacciones) {
+    mostrarNotificacion('Refacciones guardadas. Ticket enviado a etapa de Refacciones.', 'success');
+  } else {
+    mostrarNotificacion('Cambios en refacciones guardados.', 'success');
+  }
+  
+  verDetalleTicket(ticketId);
+  renderTickets();
+  updateTicketBadge();
+};
+
+window.confirmarAccion = function(options = {}) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('modal-confirmacion-global');
+    if (!modal) {
+      resolve(confirm(options.mensaje || '¿Estás seguro?'));
+      return;
+    }
+    
+    const titleEl = document.getElementById('modal-confirm-title');
+    const messageEl = document.getElementById('modal-confirm-message');
+    const btnCancel = document.getElementById('modal-confirm-btn-cancel');
+    const btnAccept = document.getElementById('modal-confirm-btn-accept');
+    
+    titleEl.textContent = options.titulo || 'Confirmación';
+    messageEl.textContent = options.mensaje || '¿Estás seguro de realizar esta acción?';
+    btnCancel.textContent = options.textoCancelar || 'Cancelar';
+    btnAccept.textContent = options.textoAceptar || 'Aceptar';
+    
+    if (options.esPeligroso) {
+      btnAccept.style.background = 'var(--red, #ef4444)';
+      btnAccept.style.borderColor = 'var(--red, #ef4444)';
+      btnAccept.style.color = '#ffffff';
+    } else {
+      btnAccept.style.background = 'var(--accent, #E8820C)';
+      btnAccept.style.borderColor = 'var(--accent, #E8820C)';
+      btnAccept.style.color = '#ffffff';
+    }
+    
+    const cleanUp = () => {
+      modal.style.display = 'none';
+      modal.classList.remove('open');
+      btnCancel.onclick = null;
+      btnAccept.onclick = null;
+    };
+    
+    btnCancel.onclick = (e) => {
+      e.stopPropagation();
+      cleanUp();
+      resolve(false);
+    };
+    
+    btnAccept.onclick = (e) => {
+      e.stopPropagation();
+      cleanUp();
+      resolve(true);
+    };
+    
+    modal.style.display = 'flex';
+    setTimeout(() => {
+      modal.classList.add('open');
+    }, 10);
+    
+    if (window.lucide) {
+      window.lucide.createIcons({ root: modal });
+    }
+  });
 };

@@ -29,7 +29,7 @@
       }
     } else if (typeof window !== 'undefined') {
       // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
-      const currentAppVer = '1.3.128';
+      const currentAppVer = '1.3.145';
       const lastAppVer = localStorage.getItem('sapi_app_version');
       if (lastAppVer && lastAppVer !== currentAppVer) {
         if ('serviceWorker' in navigator) {
@@ -281,7 +281,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version">v1.3.128</div>
+          <div class="sidebar-version">v1.3.145</div>
         </div>
       </div>
     </aside>
@@ -504,7 +504,7 @@
             </div>
 
             <!-- KPIs TICKETS -->
-            <div class="dashboard-grid grid-4">
+            <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.25rem; margin-bottom: 1.75rem;">
               <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('tickets', '')">
                 <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:#8b5cf6;border-radius:4px 0 0 4px;"></div>
                 <div style="display:flex; flex-direction:column; flex:1;">
@@ -523,23 +523,47 @@
                 </div>
                 <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="alert-circle"></i></div>
               </div>
+              <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('tickets', 'Refacciones')">
+                <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:#f59e0b;border-radius:4px 0 0 4px;"></div>
+                <div style="display:flex; flex-direction:column; flex:1;">
+                  <div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Refacciones</div>
+                  <div class="stat-value" id="v2-stat-t-refacciones" style="font-size:2rem;margin:0;color:#f59e0b;line-height:1;">0</div>
+                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">En selección</div>
+                </div>
+                <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:#f59e0b;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="settings"></i></div>
+              </div>
               <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('tickets', 'Cotización')">
                 <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:#E8820C;border-radius:4px 0 0 4px;"></div>
                 <div style="display:flex; flex-direction:column; flex:1;">
-                  <div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Cotizacion</div>
-                  <div class="stat-value" id="v2-stat-t-cotizacion" style="font-size:2rem;margin:0;color:#E8820C;line-height:1;">0</div>
-                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">En aprobacion</div>
+                  <div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Cotización</div>
+                  <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                    <div class="stat-value" id="v2-stat-t-cotizacion" style="font-size:2rem;margin:0;color:#E8820C;line-height:1;">0</div>
+                    <span id="v2-stat-t-cotizacion-monto" style="font-size: 0.7rem; font-weight:600; padding:0.15rem 0.4rem; border-radius:6px; background:rgba(232,130,12,0.08); color:#E8820C; border:1px solid rgba(232,130,12,0.15); display:none; white-space:nowrap;"></span>
+                  </div>
+                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">En aprobación</div>
                 </div>
                 <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="file-text"></i></div>
               </div>
-              <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('tickets', 'Cerrado')">
+              <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('tickets', 'Cerrado - Aprobado')">
                 <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:#10b981;border-radius:4px 0 0 4px;"></div>
                 <div style="display:flex; flex-direction:column; flex:1;">
-                  <div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Cerrados</div>
-                  <div class="stat-value" id="v2-stat-t-cerrados" style="font-size:2rem;margin:0;color:#10b981;line-height:1;">0</div>
-                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">Resueltos</div>
+                  <div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Cerrados Aceptados</div>
+                  <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                    <div class="stat-value" id="v2-stat-t-cerrados-aprobados" style="font-size:2rem;margin:0;color:#10b981;line-height:1;">0</div>
+                    <span id="v2-stat-t-cerrados-aprobados-monto" style="font-size: 0.7rem; font-weight:600; padding:0.15rem 0.4rem; border-radius:6px; background:rgba(16,185,129,0.08); color:#10b981; border:1px solid rgba(16,185,129,0.15); display:none; white-space:nowrap;"></span>
+                  </div>
+                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">Aprobados</div>
                 </div>
                 <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="check-circle"></i></div>
+              </div>
+              <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('tickets', 'Cerrado - Rechazado')">
+                <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:#ef4444;border-radius:4px 0 0 4px;"></div>
+                <div style="display:flex; flex-direction:column; flex:1;">
+                  <div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Cerrados Rechazados</div>
+                  <div class="stat-value" id="v2-stat-t-cerrados-rechazados" style="font-size:2rem;margin:0;color:#ef4444;line-height:1;">0</div>
+                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">Rechazados</div>
+                </div>
+                <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="x-circle"></i></div>
               </div>
             </div>
 
@@ -1827,7 +1851,7 @@
 
         <!-- TICKETS VIEW -->
         <div id="view-tickets" class="view">
-          <div class="stats-grid" style="margin-bottom: 1.5rem;">
+          <div class="stats-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
             <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('todos')">
               <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="ticket"></i></div>
               <div>
@@ -1842,18 +1866,38 @@
                 <div class="stat-value" id="stat-tkt-abiertos">0</div>
               </div>
             </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('Refacciones')">
+              <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:#f59e0b;"><i data-lucide="settings"></i></div>
+              <div>
+                <div class="stat-label">Refacciones</div>
+                <div class="stat-value" id="stat-tkt-refacciones">0</div>
+              </div>
+            </div>
             <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('Cotización')">
               <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i data-lucide="file-text"></i></div>
               <div>
                 <div class="stat-label">Cotización</div>
-                <div class="stat-value" id="stat-tkt-cotizacion">0</div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                  <div class="stat-value" id="stat-tkt-cotizacion" style="line-height: 1;">0</div>
+                  <span id="stat-tkt-cotizacion-monto" style="font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.4rem; border-radius: 6px; background: rgba(232,130,12,0.08); color: #E8820C; border: 1px solid rgba(232,130,12,0.15); display: none; white-space: nowrap;"></span>
+                </div>
               </div>
             </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('Cerrado')">
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('Cerrado - Aprobado')">
               <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle"></i></div>
               <div>
-                <div class="stat-label">Cerrados</div>
-                <div class="stat-value" id="stat-tkt-cerrados">0</div>
+                <div class="stat-label">Cerrados Aceptados</div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                  <div class="stat-value" id="stat-tkt-cerrados-aprobados" style="line-height: 1;">0</div>
+                  <span id="stat-tkt-cerrados-aprobados-monto" style="font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.4rem; border-radius: 6px; background: rgba(16,185,129,0.08); color: #10b981; border: 1px solid rgba(16,185,129,0.15); display: none; white-space: nowrap;"></span>
+                </div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('Cerrado - Rechazado')">
+              <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="x-circle"></i></div>
+              <div>
+                <div class="stat-label">Cerrados Rechazados</div>
+                <div class="stat-value" id="stat-tkt-cerrados-rechazados">0</div>
               </div>
             </div>
           </div>
@@ -1861,6 +1905,7 @@
             <div class="ticket-filters">
               <button class="filter-btn active" data-filter="todos" onclick="filtrarTickets(this)">Todos</button>
               <button class="filter-btn" data-filter="Abierto" onclick="filtrarTickets(this)">Abiertos</button>
+              <button class="filter-btn" data-filter="Refacciones" onclick="filtrarTickets(this)">Refacciones</button>
               <button class="filter-btn" data-filter="Cotización" onclick="filtrarTickets(this)">Cotización</button>
               <button class="filter-btn" data-filter="Cerrado" onclick="filtrarTickets(this)">Cerrados</button>
             </div>
@@ -1878,14 +1923,17 @@
               <thead>
                 <tr>
                   <th style="width: 60px;">Acciones</th>
-                  <th>#</th>
-                  <th>Asunto</th>
-                  <th>Solicitante / Empresa</th>
-                  <th>Área</th>
-                  <th class="col-prioridad">Prioridad</th>
-                  <th id="th-ord-estado">Estado </th>
-                  <th class="col-asignado">Asignado</th>
-                  <th id="th-ord-fecha">Fecha </th>
+                  <th id="th-ord-folio" onclick="ordenarTicketsPor('folio')" style="cursor:pointer; user-select:none;">#</th>
+                  <th id="th-ord-asunto" onclick="ordenarTicketsPor('asunto')" style="cursor:pointer; user-select:none;">Asunto</th>
+                  <th id="th-ord-solicitante" onclick="ordenarTicketsPor('solicitante')" style="cursor:pointer; user-select:none;">Solicitante / Empresa</th>
+                  <th id="th-ord-area" onclick="ordenarTicketsPor('area')" style="cursor:pointer; user-select:none;">Área</th>
+                  <th id="th-ord-prioridad" onclick="ordenarTicketsPor('prioridad')" class="col-prioridad" style="cursor:pointer; user-select:none;">Prioridad</th>
+                  <th id="th-ord-estado" onclick="ordenarTicketsPor('estado')" style="cursor:pointer; user-select:none;">Estado</th>
+                  <th id="th-ord-cotizacion" onclick="ordenarTicketsPor('cotizacion')" style="cursor:pointer; user-select:none;">Cotización SAP</th>
+                  <th id="th-ord-monto-cotizacion" onclick="ordenarTicketsPor('monto')" style="cursor:pointer; user-select:none;">Monto</th>
+                  <th id="th-ord-pedido" onclick="ordenarTicketsPor('pedido')" style="cursor:pointer; user-select:none;">Pedido SAP</th>
+                  <th id="th-ord-asignado" onclick="ordenarTicketsPor('asignado')" class="col-asignado" style="cursor:pointer; user-select:none;">Asignado</th>
+                  <th id="th-ord-fecha" onclick="ordenarTicketsPor('fecha')" style="cursor:pointer; user-select:none;">Fecha</th>
                   <th style="width: 40px; text-align:center;"></th>
                 </tr>
               </thead>
@@ -2474,6 +2522,21 @@
                   <!-- Llenado dinámicamente -->
                 </select>
               </div>
+              <div class="form-group" style="margin-top: 0.5rem;">
+                <button type="button" class="btn-secondary" id="btn-am-multiempresa" onclick="window.toggleMultiempresaSection()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.85rem; padding: 0.4rem; height: 35px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-card); cursor: pointer; color: var(--text-primary); transition: all 0.2s;">
+                  <i data-lucide="building"></i> Multiempresa
+                </button>
+              </div>
+              <div id="am-multiempresa-section" style="display: none; border-top: 1px dashed var(--border); padding-top: 0.75rem; margin-top: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                  <label style="font-weight: 500; font-size: 0.85rem; color: var(--text-muted); margin: 0;">Empresas Adicionales Vinculadas</label>
+                  <button type="button" onclick="window.desmarcarTodasMultiempresas()" style="background: none; border: none; color: var(--accent); font-size: 0.75rem; cursor: pointer; padding: 0; font-weight: 500; text-decoration: underline;">Desmarcar todas</button>
+                </div>
+                <input type="text" id="am-multiempresa-search" placeholder="Buscar empresa..." oninput="window.filtrarMultiempresaList(this.value)" style="width: 100%; padding: 0.4rem 0.5rem; font-size: 0.85rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-hover); color: var(--text-primary); margin-bottom: 0.5rem; outline: none;" />
+                <div id="am-multiempresa-list" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 150px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem; background: rgba(0,0,0,0.15);">
+                  <!-- Checkboxes of other clients populated dynamically -->
+                </div>
+              </div>
             </div>
 
             <div class="form-section">
@@ -3011,6 +3074,8 @@
               <div class="tipo-chips">
                 <label class="chip"><input type="radio" name="t-estado" value="Abierto" checked
                     onchange="toggleResolucionTicket()" /><span>Abierto</span></label>
+                <label class="chip"><input type="radio" name="t-estado" value="Refacciones"
+                    onchange="toggleResolucionTicket()" /><span>Refacciones</span></label>
                 <label class="chip"><input type="radio" name="t-estado" value="Cotización"
                     onchange="toggleResolucionTicket()" /><span>Cotización</span></label>
                 <label class="chip"><input type="radio" name="t-estado" value="Cerrado"
@@ -3020,9 +3085,31 @@
               <div id="group-t-resolucion"
                 style="display:none; margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border);">
                 <div class="form-group full-width">
-                  <label>No. Cotización SAP *</label>
-                  <input type="text" id="t-cotizacion-sap" placeholder="Ej. COT-100230" />
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
+                    <label style="margin:0;">No. Cotización SAP *</label>
+                    <button type="button" id="btn-sync-sap-cot" onclick="window.syncSapCotizacionManual()" class="btn-text-action" style="font-size:0.7rem; color:var(--accent); background:none; border:none; cursor:pointer; font-weight:600; padding:0; display:inline-flex; align-items:center; gap:4px;"><i data-lucide="refresh-cw" style="width:12px; height:12px;"></i> Sincronizar con SAP</button>
+                  </div>
+                  <select id="t-cotizacion-sap" onchange="window.onModalCotizacionSelected()"></select>
                 </div>
+                <div class="form-group full-width" style="margin-top:0.75rem;">
+                  <label>Monto de Cotización ($) *</label>
+                  <input type="number" id="t-cotizacion-monto" oninput="window.validarCotizacionConSAP(true)" step="0.01" min="0" placeholder="Ej. 12500.00" />
+                </div>
+                <div class="form-group full-width" style="margin-top:0.75rem;">
+                  <label>Archivo Cotización (PDF) *</label>
+                  <div style="display:flex; flex-direction:column; gap:0.5rem; width:100%;">
+                    <div style="display:flex; gap:0.5rem; align-items:center; width:100%;">
+                      <label class="custom-file-upload" style="flex:1; margin:0;">
+                        <input type="file" id="t-cotizacion-pdf" accept="application/pdf" onchange="updateFileLabel(this); if(this.files[0]) window.autoExtraerDesdePdfCotizacion(this.files[0], true);" />
+                        <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
+                        <span class="file-label-text">Subir cotización en PDF</span>
+                      </label>
+                      <button type="button" id="btn-clear-pdf-modal" onclick="window.clearPdfInput(true)" class="btn-icon" style="display:none; background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); border-radius:6px; padding:0.6rem; cursor:pointer; height:45px; width:45px; align-items:center; justify-content:center;" title="Eliminar archivo"><i data-lucide="trash-2" style="width:16px; height:16px;"></i></button>
+                    </div>
+                    <div id="pdf-extraction-table-container" style="display:none;"></div>
+                  </div>
+                </div>
+                <div id="t-sap-validation-status" style="margin-top: 0.75rem; display: none;"></div>
               </div>
 
               <div id="group-t-cierre"
@@ -4808,11 +4895,28 @@
     </div>
   </div>
 
+  <!-- MODAL CONFIRMACIÓN PERSONALIZADO -->
+  <div id="modal-confirmacion-global" class="modal-overlay" style="z-index:999999; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); transition: opacity 0.2s ease;">
+    <div class="modal" style="max-width:400px; width:90%; border-radius:16px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); box-shadow:var(--shadow-xl); padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem; transform:scale(0.95); transition:transform 0.2s ease;">
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <div style="background:rgba(239,68,68,0.12); color:#ef4444; border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <i data-lucide="help-circle" style="width:22px; height:22px;"></i>
+        </div>
+        <h3 id="modal-confirm-title" style="margin:0; font-size:1.15rem; font-weight:700; color:var(--text-primary);">Confirmación</h3>
+      </div>
+      <p id="modal-confirm-message" style="margin:0; color:var(--text-secondary); font-size:0.9rem; line-height:1.5;"></p>
+      <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:0.25rem;">
+        <button type="button" id="modal-confirm-btn-cancel" class="btn-secondary" style="margin:0; padding:0.5rem 1rem; height:auto; font-size:0.85rem;">Cancelar</button>
+        <button type="button" id="modal-confirm-btn-accept" class="btn-primary" style="margin:0; padding:0.5rem 1rem; height:auto; font-size:0.85rem;">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js?v=2"></script>
-  <script src="supabaseSync.js?v=60"></script>
-  <script src="app.js?v=131"></script>
+  <script src="supabaseSync.js?v=62"></script>
+  <script src="app.js?v=152"></script>
   <script>lucide.createIcons();</script>
 </body>
 

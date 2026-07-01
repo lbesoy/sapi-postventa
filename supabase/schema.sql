@@ -58,6 +58,7 @@ CREATE TABLE public.tickets (
     notas TEXT,
     estado TEXT,
     cotizacion_sap TEXT,
+    monto_cotizacion NUMERIC,
     cot_aceptada TEXT,
     motivo_rechazo TEXT,
     pedido_sap TEXT,
@@ -253,3 +254,17 @@ CREATE POLICY "Tecnicos pueden gestionar sus propios eventos" ON public.calendar
 ) WITH CHECK (
     tecnico_id = auth.uid()
 );
+
+-- 20. TABLE: cotizaciones_sap (Cache de Cotizaciones de SAP B1)
+CREATE TABLE IF NOT EXISTS public.cotizaciones_sap (
+    numero_cotizacion TEXT PRIMARY KEY,
+    fecha TIMESTAMP WITH TIME ZONE,
+    monto NUMERIC,
+    cliente TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE public.cotizaciones_sap ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Permitir todo a autenticados" ON public.cotizaciones_sap FOR ALL TO authenticated USING (true);
+CREATE POLICY "Permitir select a publico" ON public.cotizaciones_sap FOR SELECT TO public USING (true);
+

@@ -1,3 +1,29 @@
+// Helpers de serialización de refacciones en el campo 'notas' del ticket
+window.extraerRefaccionesDeNotas = function(notasStr) {
+  const str = notasStr || '';
+  const separator = '=== REFACCIONES ===';
+  const idx = str.indexOf(separator);
+  if (idx > -1) {
+    const notasLimpias = str.substring(0, idx).trim();
+    const refaccionesJSON = str.substring(idx + separator.length).trim();
+    try {
+      const refacciones = JSON.parse(refaccionesJSON);
+      return { notasLimpias, refacciones: Array.isArray(refacciones) ? refacciones : [] };
+    } catch (e) {
+      console.warn("Error parsing refacciones JSON from notes:", e);
+      return { notasLimpias: str, refacciones: [] };
+    }
+  }
+  return { notasLimpias: str, refacciones: [] };
+};
+
+window.inyectarRefaccionesEnNotas = function(rawOrCleanNotasStr, refacciones) {
+  const extracted = window.extraerRefaccionesDeNotas(rawOrCleanNotasStr);
+  const clean = (extracted.notasLimpias || '').trim();
+  if (!refacciones || refacciones.length === 0) return clean;
+  return `${clean}\n\n=== REFACCIONES ===\n${JSON.stringify(refacciones)}`;
+};
+
 // ============================================================
 
 // Proteger contra errores fatales de parseo de JSON malformados o corruptos en sincronización
@@ -22,6 +48,7 @@ if (typeof JSON !== 'undefined' && !JSON.parse.__isSafeWrapper) {
 }
 
 window.isConnectionVerifiedOnline = false;
+window._cacheCotizacionesSap = JSON.parse(localStorage.getItem('eurorep_cotizaciones_sap') || '[]');
 
 
 
@@ -85,9 +112,10 @@ function ticketToRow(t) {
     asignado: t.asignado || null,
     descripcion: t.descripcion || null,
     equipo: t.equipo || null,
-    notas: (t.horometro ? `[H:${t.horometro}]\n` : '') + (t.notas || ''),
+    notas: window.inyectarRefaccionesEnNotas((t.horometro ? `[H:${t.horometro}]\n` : '') + (t.notas || ''), t.refaccionesSeleccionadas || []),
     estado: t.estado || null,
     cotizacion_sap: t.cotizacionSAP || null,
+    monto_cotizacion: (t.montoCotizacion !== undefined && t.montoCotizacion !== null) ? Number(t.montoCotizacion) : null,
     cot_aceptada: t.cotAceptada || null,
     motivo_rechazo: t.motivoRechazo || null,
     pedido_sap: t.pedidoSAP || null
@@ -123,6 +151,8 @@ function rowToTicket(t) {
   const pdfPedidoVal = (t.pdf_pedido && t.pdf_pedido.startsWith('data:')) ? '__HAS_PDF__' : (t.pdf_pedido || null);
   const pdfCotizacionVal = (t.pdf_cotizacion && t.pdf_cotizacion.startsWith('data:')) ? '__HAS_PDF__' : (t.pdf_cotizacion || null);
 
+  const extracted = window.extraerRefaccionesDeNotas(t.notas);
+
   const obj = {
     id: t.id,
     _synced: true,
@@ -142,9 +172,11 @@ function rowToTicket(t) {
     asignado: t.asignado,
     descripcion: t.descripcion,
     equipo: t.equipo,
-    notas: t.notas,
+    notas: extracted.notasLimpias,
+    refaccionesSeleccionadas: extracted.refacciones,
     estado: t.estado,
     cotizacionSAP: t.cotizacion_sap,
+    montoCotizacion: (t.monto_cotizacion !== undefined && t.monto_cotizacion !== null) ? Number(t.monto_cotizacion) : null,
     cotAceptada: t.cot_aceptada,
     motivoRechazo: t.motivo_rechazo,
     pedidoSAP: t.pedido_sap,
@@ -1755,6 +1787,9 @@ window.cargarDatosDeSupabase = function() {
         const matchMaq = (maqDb || []).filter(m => {
           if (m.cliente === row.id) return true;
           if (m.cliente === row.nombre) return true;
+          const cData = m.custom_data || {};
+          const addClients = cData.clientesAdicionales || [];
+          if (Array.isArray(addClients) && (addClients.includes(row.id) || addClients.includes(row.nombre))) return true;
           return false;
         });
         row.maquinas = matchMaq.map(m => {
@@ -2360,6 +2395,17 @@ window.cargarDatosDeSupabase = function() {
       }
     } catch (errT) {
       console.warn('[Sync] Tabla sapi_telemetry no disponible en Supabase (o RLS activa).', errT.message);
+    }
+
+    // Cotizaciones SAP (Caché en memoria y localStorage para autocompletar)
+    try {
+      const { data: cotizaciones, error: cotizacionesErr } = await sb.from('cotizaciones_sap').select('*');
+      if (!cotizacionesErr && cotizaciones) {
+        window._cacheCotizacionesSap = cotizaciones;
+        localStorage.setItem('eurorep_cotizaciones_sap', JSON.stringify(cotizaciones));
+      }
+    } catch (errCot) {
+      console.warn('[Sync] Error al cargar cotizaciones_sap:', errCot);
     }
 
   } catch (error) {

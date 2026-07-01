@@ -15,3 +15,5 @@ backend/test*.js
 backend/scratch.js
 backend/debug_sap.js
 backend/delete_all.js
+backend/pdf_extractor
+
