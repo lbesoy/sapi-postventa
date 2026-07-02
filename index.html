@@ -2271,7 +2271,7 @@
     <div class="modal-overlay" id="modal-registrar-actividad-overlay" onclick="if(event.target===this) this.classList.remove('open')" style="z-index:999999; backdrop-filter:blur(6px); transition:opacity 0.25s ease-in-out;">
       <style>
         #modal-registrar-actividad {
-          max-width: 520px;
+          max-width: 550px;
           width: 92%;
           border-radius: 20px;
           background: var(--bg-card);
@@ -2328,14 +2328,24 @@
           display: block;
         }
         #modal-registrar-actividad .form-group input[type="text"],
-        #modal-registrar-actividad .form-group select,
-        #modal-registrar-actividad .form-group input[type="datetime-local"] {
+        #modal-registrar-actividad .form-group select {
           border-radius: 10px;
           padding: 0.65rem 0.85rem;
           border: 1px solid var(--border);
           background: var(--bg-hover);
           color: var(--text-primary);
           font-size: 0.9rem;
+          width: 100%;
+          box-sizing: border-box;
+          transition: all 0.2s;
+        }
+        #modal-registrar-actividad .form-group input[type="datetime-local"] {
+          border-radius: 10px;
+          padding: 0.65rem 0.5rem;
+          border: 1px solid var(--border);
+          background: var(--bg-hover);
+          color: var(--text-primary);
+          font-size: 0.85rem;
           width: 100%;
           box-sizing: border-box;
           transition: all 0.2s;
