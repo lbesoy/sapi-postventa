@@ -1865,7 +1865,7 @@ window.cargarDatosDeSupabase = function() {
           if (m.cliente === row.id) return true;
           if (m.cliente === row.nombre) return true;
           const cData = m.custom_data || {};
-          const addClients = cData.clientesAdicionales || [];
+          const addClients = cData.clientesAdicionales || cData.empresasVinculadas || [];
           if (Array.isArray(addClients) && (addClients.includes(row.id) || addClients.includes(row.nombre))) return true;
           return false;
         });

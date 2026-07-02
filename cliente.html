@@ -3,10 +3,23 @@
 <head>
   <script>
     window.addEventListener('error', function(e) {
-      alert('ERROR DE JS: ' + e.message + '\nArchivo: ' + e.filename + '\nLínea: ' + e.lineno);
+      console.error('ERROR DE JS:', e.message, '\nArchivo:', e.filename, '\nLínea:', e.lineno, e);
+      if (typeof window.showToast === 'function') {
+        window.showToast('Error interno: ' + e.message, 'error');
+      } else {
+        var errDiv = document.createElement('div');
+        errDiv.style = 'position:fixed; bottom:20px; right:20px; background:#ef4444; color:white; padding:12px 20px; border-radius:6px; font-family:system-ui,sans-serif; font-size:14px; z-index:99999; box-shadow:0 4px 6px rgba(0,0,0,0.1);';
+        errDiv.textContent = 'Error de inicialización: ' + e.message;
+        document.body.appendChild(errDiv);
+        setTimeout(function() { errDiv.remove(); }, 6000);
+      }
     });
+    
     window.addEventListener('unhandledrejection', function(e) {
-      alert('PROMESA RECHAZADA: ' + e.reason);
+      console.error('PROMESA RECHAZADA:', e.reason);
+      if (typeof window.showToast === 'function') {
+        window.showToast('Error de red o base de datos: ' + (e.reason ? (e.reason.message || e.reason) : 'Desconocido'), 'error');
+      }
     });
   </script>
   <meta charset="UTF-8">

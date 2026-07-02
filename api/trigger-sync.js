@@ -2,6 +2,7 @@ export default async function handler(req, res) {
   // Configurar CORS dinámico y seguro idéntico a send-email.js
   const allowedOrigins = [
     'https://sapi-postventa.vercel.app',
+    'https://plataforma.eurorep.mx',
     'http://localhost:5173',
     'http://localhost:3000',
     'http://127.0.0.1:5173',
@@ -17,7 +18,7 @@ export default async function handler(req, res) {
   }
 
   res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', isAllowedOrigin ? origin : 'https://sapi-postventa.vercel.app');
+  res.setHeader('Access-Control-Allow-Origin', isAllowedOrigin ? origin : 'https://plataforma.eurorep.mx');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, X-Sapi-Client-Token');
 

@@ -4,7 +4,17 @@
 <head>
   <script>
     window.onerror = function(message, source, lineno, colno, error) {
-      alert("ERROR GLOBAL DETECTADO:\n" + message + "\n\nArchivo: " + source + "\nLínea: " + lineno + "\n\nDetalle: " + (error ? error.stack : 'N/A'));
+      console.error("ERROR GLOBAL DETECTADO:", message, "\nArchivo:", source, "\nLínea:", lineno, "\nColumna:", colno, "\nError:", error);
+      
+      if (typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion("Ocurrió un error interno. Por favor refresca la página si experimentas fallas.", "error");
+      } else {
+        var errDiv = document.createElement('div');
+        errDiv.style = 'position:fixed; bottom:20px; right:20px; background:#ef4444; color:white; padding:12px 20px; border-radius:6px; font-family:system-ui,sans-serif; font-size:14px; z-index:99999; box-shadow:0 4px 6px rgba(0,0,0,0.1);';
+        errDiv.textContent = 'Falla de carga: ' + message;
+        document.body.appendChild(errDiv);
+        setTimeout(function() { errDiv.remove(); }, 6000);
+      }
       return false;
     };
     

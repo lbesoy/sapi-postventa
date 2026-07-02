@@ -7,6 +7,7 @@ const app = express();
 
 const allowedOrigins = [
   'https://sapi-postventa.vercel.app',
+  'https://plataforma.eurorep.mx',
   'http://localhost:5173',
   'http://localhost:3000',
   'http://127.0.0.1:5173',
@@ -58,34 +59,99 @@ if (process.env.SAP_CA_CERT_PATH) {
 
 const sapHttpsAgent = new https.Agent(agentOptions);
 
+const SUPABASE_URL_SRV = process.env.SUPABASE_URL;
+const SUPABASE_KEY_SRV = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+
+async function persistSAPSession(sid) {
+    if (!SUPABASE_URL_SRV || !SUPABASE_KEY_SRV || !sid) return;
+    try {
+        await axios.post(
+            `${SUPABASE_URL_SRV}/rest/v1/config`,
+            { id: 'sap_session', data: { sessionId: sid, updated_at: new Date().toISOString() } },
+            {
+                headers: {
+                    'apikey': SUPABASE_KEY_SRV,
+                    'Authorization': `Bearer ${SUPABASE_KEY_SRV}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'resolution=merge-duplicates,return=minimal'
+                },
+                timeout: 10000
+            }
+        );
+        console.log('💾 SessionId de SAP persistido en Supabase config.');
+    } catch (e) {
+        console.error('❌ Error persistiendo sessionId en Supabase:', e.message);
+    }
+}
+
+async function getStoredSAPSession() {
+    if (!SUPABASE_URL_SRV || !SUPABASE_KEY_SRV) return null;
+    try {
+        const response = await axios.get(
+            `${SUPABASE_URL_SRV}/rest/v1/config?id=eq.sap_session&select=data`,
+            {
+                headers: {
+                    'apikey': SUPABASE_KEY_SRV,
+                    'Authorization': `Bearer ${SUPABASE_KEY_SRV}`
+                },
+                timeout: 10000
+            }
+        );
+        if (response.data && response.data.length > 0 && response.data[0].data) {
+            console.log('📖 SessionId recuperado desde Supabase config:', response.data[0].data.sessionId);
+            return response.data[0].data.sessionId;
+        }
+    } catch (e) {
+        console.warn('⚠️ No se pudo leer sessionId de Supabase:', e.message);
+    }
+    return null;
+}
+
 // Almacenar el sessionId en memoria (en produccion se debe manejar mejor, e.g. redis o base de datos)
 let sessionId = null;
+let currentLoginPromise = null;
 
 // ==========================================
 // 1. AUTENTICACIÓN CON SAP BUSINESS ONE
 // ==========================================
 async function loginToSAP() {
-    try {
-        const response = await axios.post(`${SAP_URL}/Login`, {
-            CompanyDB: SAP_DB,
-            UserName: SAP_USER,
-            Password: SAP_PASS
-        }, {
-            httpsAgent: sapHttpsAgent,
-            timeout: 60000 // 60 segundos máximo
-        });
-        
-        sessionId = response.data.SessionId;
-        console.log('✅ Conectado a SAP Business One exitosamente.');
-        return sessionId;
-    } catch (error) {
-        console.error('❌ Error conectando a SAP:', error.response?.data?.error?.message?.value || error.message);
-        throw new Error('No se pudo autenticar con SAP');
+    if (currentLoginPromise) {
+        console.log('⏳ Solicitud de inicio de sesión de SAP ya en progreso. Coalesciendo petición...');
+        return currentLoginPromise;
     }
+
+    currentLoginPromise = (async () => {
+        try {
+            console.log('🔄 Iniciando login en SAP Business One...');
+            const response = await axios.post(`${SAP_URL}/Login`, {
+                CompanyDB: SAP_DB,
+                UserName: SAP_USER,
+                Password: SAP_PASS
+            }, {
+                httpsAgent: sapHttpsAgent,
+                timeout: 60000 // 60 segundos máximo
+            });
+            
+            sessionId = response.data.SessionId;
+            console.log('✅ Conectado a SAP Business One exitosamente.');
+            await persistSAPSession(sessionId);
+            return sessionId;
+        } catch (error) {
+            console.error('❌ Error conectando a SAP:', error.response?.data?.error?.message?.value || error.message);
+            throw new Error('No se pudo autenticar con SAP');
+        } finally {
+            currentLoginPromise = null; // Liberar el bloqueo
+        }
+    })();
+
+    return currentLoginPromise;
 }
 
 // Middleware para asegurar que estamos conectados a SAP antes de cada petición
 async function ensureSAPConnection(req, res, next) {
+    if (!sessionId) {
+        sessionId = await getStoredSAPSession();
+    }
     if (!sessionId) {
         try {
             await loginToSAP();
@@ -310,8 +376,7 @@ app.get('/api/maquinaria', ensureSAPConnection, async (req, res) => {
 });
 
 // ── /api/sync-all: Sincroniza todos los catálogos SAP → Supabase ────────────
-const SUPABASE_URL_SRV = process.env.SUPABASE_URL;
-const SUPABASE_KEY_SRV = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+// Variables Supabase declaradas al inicio del archivo
 
 if (!SUPABASE_URL_SRV || !SUPABASE_KEY_SRV) {
     console.error('CRITICAL: SUPABASE_URL or SUPABASE_KEY is missing from environment variables.');

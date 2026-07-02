@@ -6408,8 +6408,9 @@ window.toggleMultiempresaSection = function() {
       if (!maquina) {
         maquina = maquinariaDb.find(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
       }
-      if (maquina && maquina.customData && Array.isArray(maquina.customData.empresasVinculadas)) {
-        linked = maquina.customData.empresasVinculadas;
+      if (maquina && maquina.customData) {
+        linked = maquina.customData.empresasVinculadas || maquina.customData.clientesAdicionales || [];
+        if (!Array.isArray(linked)) linked = [];
       }
     }
     
@@ -6772,6 +6773,7 @@ function guardarNuevaMaquina(e) {
         maquinariaDb[maqDbIdx].customData.latitud = latitud;
         maquinariaDb[maqDbIdx].customData.longitud = longitud;
         maquinariaDb[maqDbIdx].customData.empresasVinculadas = linkedCompanies;
+        maquinariaDb[maqDbIdx].customData.clientesAdicionales = linkedCompanies;
         
         localStorage.setItem('sapi_maquinaria_db', JSON.stringify(maquinariaDb));
         if (window.pushToSupabase) window.pushToSupabase('maquinaria', maquinariaDb[maqDbIdx]);
@@ -6790,7 +6792,8 @@ function guardarNuevaMaquina(e) {
           }
           maquinaDatos.customData = {
             ...(maquinaDatos.customData || {}),
-            empresasVinculadas: linkedCompanies
+            empresasVinculadas: linkedCompanies,
+            clientesAdicionales: linkedCompanies
           };
           clienteObj.maquinas.push(maquinaDatos);
           if (window.pushToSupabase) window.pushToSupabase('maquinaria', { ...maquinaDatos, cliente: clienteObj.id });
@@ -6803,7 +6806,8 @@ function guardarNuevaMaquina(e) {
               marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, sitio_id: sitioId, latitud, longitud, tipo,
               customData: {
                 ...(clienteObj.maquinas[maquinaIdx].customData || {}),
-                empresasVinculadas: linkedCompanies
+                empresasVinculadas: linkedCompanies,
+                clientesAdicionales: linkedCompanies
               }
             };
             if (window.pushToSupabase) window.pushToSupabase('maquinaria', { ...clienteObj.maquinas[maquinaIdx], cliente: clienteObj.id });
@@ -6814,7 +6818,7 @@ function guardarNuevaMaquina(e) {
     const idInterno = generarIdInternoMaquina(marca, venta || anio);
     const nuevaMaq = {
       idInterno, marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, sitio_id: sitioId, latitud, longitud, tipo,
-      customData: { empresasVinculadas: linkedCompanies }
+      customData: { empresasVinculadas: linkedCompanies, clientesAdicionales: linkedCompanies }
     };
     clienteObj.maquinas.push(nuevaMaq);
     if (window.pushToSupabase) window.pushToSupabase('maquinaria', { ...nuevaMaq, cliente: clienteObj.id });
@@ -10440,10 +10444,12 @@ function renderMaquinaria() {
   
   // Agregar máquinas de SAP
   maquinariaDb.forEach(m => {
+    const linked = m.customData?.empresasVinculadas || m.customData?.clientesAdicionales || [];
     if (isEmpresa) {
       if (!nombreEmpresaLogged) return;
       const mcli = String(m.cliente || '').toLowerCase().trim();
-      if (mcli !== nombreEmpresaLogged) return;
+      const isLinked = Array.isArray(linked) && linked.some(c => String(c).toLowerCase().trim() === nombreEmpresaLogged);
+      if (mcli !== nombreEmpresaLogged && !isLinked) return;
     }
     allMachines.push({
       cliente: m.cliente || 'N/A',
@@ -10459,15 +10465,20 @@ function renderMaquinaria() {
       venta: m.venta || m.customData?.venta || '',
       ubicacion: m.ubicacion || m.customData?.ubicacion || m.cliente || 'N/A',
       latitud: m.latitud || m.customData?.latitud,
-      longitud: m.longitud || m.customData?.longitud
+      longitud: m.longitud || m.customData?.longitud,
+      customData: m.customData || {}
     });
   });
 
   // Combinar con máquinas creadas manualmente en clientesDb
   clientesDb.forEach(c => {
-    if (isEmpresa && c.nombre !== nombreEmpresaLogged) return; // Filtro de seguridad
     if (c.maquinas) {
       c.maquinas.forEach(m => {
+        const linked = m.customData?.empresasVinculadas || m.customData?.clientesAdicionales || [];
+        const isLinked = Array.isArray(linked) && linked.some(comp => String(comp).toLowerCase().trim() === nombreEmpresaLogged);
+        
+        if (isEmpresa && String(c.nombre).toLowerCase().trim() !== nombreEmpresaLogged && !isLinked) return; // Filtro de seguridad
+        
         // En base a que la maquinaria es 100% manual y no viene de SAP,
         // no ocultamos por serie duplicada para evitar que pruebas o errores de capa 8
         // hagan pensar al usuario que la máquina se borró.
@@ -10481,15 +10492,16 @@ function renderMaquinaria() {
               tipo: m.tipo || 'N/A',
               marca: m.marca || '',
               modelo: m.modelo || 'Sin Modelo',
-            serie: m.serie || 'N/A',
-            numeroEconomico: m.numeroEconomico || 'N/A',
-            numeroMotor: m.numeroMotor || 'N/A',
-            anio: m.anio || 'N/A',
-            venta: m.venta || '',
-            ubicacion: m.ubicacion || 'N/A',
-            latitud: m.latitud,
-            longitud: m.longitud
-          });
+              serie: m.serie || 'N/A',
+              numeroEconomico: m.numeroEconomico || 'N/A',
+              numeroMotor: m.numeroMotor || 'N/A',
+              anio: m.anio || 'N/A',
+              venta: m.venta || '',
+              ubicacion: m.ubicacion || 'N/A',
+              latitud: m.latitud,
+              longitud: m.longitud,
+              customData: m.customData || {}
+            });
         }
       });
     }
@@ -10520,7 +10532,12 @@ function renderMaquinaria() {
 
   // Filtrar
   let filtered = allMachines.filter(m => {
-    const matchQ = !q || m.cliente.toLowerCase().includes(q) || m.idInterno.toLowerCase().includes(q) || m.marca.toLowerCase().includes(q) || m.modelo.toLowerCase().includes(q) || m.serie.toLowerCase().includes(q);
+    let matchLinked = false;
+    const linked = m.customData?.empresasVinculadas || m.customData?.clientesAdicionales || [];
+    if (Array.isArray(linked)) {
+      matchLinked = linked.some(comp => comp.toLowerCase().includes(q));
+    }
+    const matchQ = !q || m.cliente.toLowerCase().includes(q) || m.idInterno.toLowerCase().includes(q) || m.marca.toLowerCase().includes(q) || m.modelo.toLowerCase().includes(q) || m.serie.toLowerCase().includes(q) || matchLinked;
     const matchSitio = !filterSitio || m.ubicacion === filterSitio;
     const matchMarca = !filterMarca || m.marca === filterMarca;
     return matchQ && matchSitio && matchMarca;
@@ -10610,6 +10627,13 @@ function renderMaquinaria() {
       <td data-label="Cliente / Ubicación">
         <div style="font-weight:500;">${m.cliente}</div>
         ${m.ubicacion !== 'N/A' ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">${m.ubicacion}</div>` : ''}
+        ${m.customData && (m.customData.empresasVinculadas || m.customData.clientesAdicionales) ? (() => {
+          const linked = m.customData.empresasVinculadas || m.customData.clientesAdicionales || [];
+          if (Array.isArray(linked) && linked.length > 0) {
+            return `<div style="font-size:0.7rem; color:var(--accent); margin-top:0.2rem; font-weight:500; display:flex; align-items:center; gap:3px;"><i data-lucide="building" style="width:11px;height:11px;flex-shrink:0;"></i>Multi: ${linked.join(', ')}</div>`;
+          }
+          return '';
+        })() : ''}
       </td>
       ${customTds}
       <td data-label="">
