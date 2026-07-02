@@ -1407,6 +1407,10 @@ document.addEventListener('DOMContentLoaded', () => {
              if (window.cargarDatosDeSupabase) {
                window.cargarDatosDeSupabase().catch(console.error);
              }
+           } else if (navigator.onLine) {
+             console.warn('[Auth] Sesión de Supabase expirada. Redirigiendo a Login...');
+             localStorage.removeItem('eurorep_session');
+             window.location.reload();
            }
          }).catch(err => console.error('[Auth] Error al refrescar sesión de Supabase:', err));
        }

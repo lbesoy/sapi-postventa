@@ -188,6 +188,30 @@ async function verificarSesionCliente() {
       // Si es empresa o cliente, permitir el paso
       if (rol === 'empresa' || rol === 'cliente') {
         currentSession = sessionObj;
+        
+        // Validar que la sesión en Supabase esté activa si estamos online
+        let isSupaSessionActive = true;
+        if (window.supabaseClient && navigator.onLine) {
+          try {
+            const { data: { session } } = await window.supabaseClient.auth.getSession();
+            if (!session) {
+              isSupaSessionActive = false;
+            }
+          } catch(e) {
+            console.error('[Auth] Error al comprobar sesión de Supabase:', e);
+          }
+        }
+
+        if (!isSupaSessionActive) {
+          console.warn('[Auth] Sesión de Supabase expirada. Redirigiendo a Login...');
+          localStorage.removeItem('eurorep_session');
+          loginScr.style.display = 'flex';
+          appWrap.classList.remove('visible');
+          loader.classList.add('fade-out');
+          loader.style.display = 'none';
+          return;
+        }
+
         nombreEmpresaLogged = String(currentSession.empresa || currentSession.nombre).toLowerCase().trim();
         
         loginScr.style.display = 'none';
