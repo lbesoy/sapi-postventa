@@ -9259,7 +9259,7 @@ function abrirProgramarTecnico() {
 
   // Llenar dropdown de órdenes
   const selectOrden = document.getElementById('pt-orden');
-  const openOrds = ordenes.filter(o => o.estado !== 'Finalizado');
+  const openOrds = getFilteredOrders().filter(o => o.estado !== 'Finalizado');
   selectOrden.innerHTML = '<option value="">Selecciona una orden...</option>' + openOrds.map(o => `<option value="${o.id}">[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}</option>`).join('');
 
   document.getElementById('modal-programar-tecnico-overlay').classList.add('open');
@@ -14405,7 +14405,7 @@ window.abrirRegistrarActividad = function() {
 
   // Llenar dropdown de órdenes
   const selectOrden = document.getElementById('mra-orden');
-  const activeOrds = ordenes.filter(o => o.estado !== 'Finalizado');
+  const activeOrds = getFilteredOrders().filter(o => o.estado !== 'Finalizado');
   selectOrden.innerHTML = '<option value="">Ninguna</option>' + activeOrds.map(o => `<option value="${o.id}">[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}</option>`).join('');
 
   document.getElementById('modal-registrar-actividad-overlay').classList.add('open');
@@ -14426,7 +14426,7 @@ window.mostrarDetalleEventoAdministrativo = function(eventId) {
 
   // Llenar dropdown de órdenes
   const selectOrden = document.getElementById('mra-orden');
-  const activeOrds = ordenes.filter(o => o.estado !== 'Finalizado');
+  const activeOrds = getFilteredOrders().filter(o => o.estado !== 'Finalizado');
   selectOrden.innerHTML = '<option value="">Ninguna</option>' + activeOrds.map(o => `<option value="${o.id}">[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}</option>`).join('');
 
   document.getElementById('mra-id').value = e.id;
