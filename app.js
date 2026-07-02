@@ -9523,8 +9523,8 @@ function guardarNotaBitacora() {
   const entrada = document.getElementById('bitacora-entrada').value;
   const salida = document.getElementById('bitacora-salida').value;
   
-  if (!fecha || !nota) {
-    mostrarNotificacion('La fecha y la nota son obligatorias.', 'warning');
+  if (!fecha || !nota || !entrada || !salida) {
+    mostrarNotificacion('Todos los campos son obligatorios (fecha, nota, hora de entrada y hora de salida).', 'warning');
     return;
   }
 
@@ -11214,6 +11214,209 @@ window.clearPdfInput = function(isModal = true, ticketId = null) {
 // ===== SAP QUOTATION VALIDATION & SYNC =====
 window._cacheCotizacionesSap = JSON.parse(localStorage.getItem('eurorep_cotizaciones_sap') || '[]');
 
+window.renderLinkedCotizaciones = function(isModal = true, ticketId = null) {
+  const containerId = isModal ? 'linked-cotizaciones-container' : `quick-linked-cotizaciones-container-${ticketId}`;
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const list = isModal ? window.editandoCotizaciones : (window.quickEditandoCotizaciones ? window.quickEditandoCotizaciones[ticketId] : []);
+  if (!Array.isArray(list)) return;
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center; color:var(--text-muted); padding:1rem; border:1px dashed var(--border); border-radius:6px; font-size:0.8rem; font-style:italic; width:100%;">
+        No hay cotizaciones vinculadas aún.
+      </div>
+    `;
+    togglePasarCotizacionBtn(isModal, ticketId, false);
+    return;
+  }
+
+  let html = '<div style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:0.75rem; width:100%;">';
+  list.forEach((c, idx) => {
+    const formatMonto = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(c.monto || 0);
+    html += `
+      <div style="display:flex; align-items:center; justify-content:space-between; background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:0.5rem 0.75rem; width:100%;">
+        <div style="display:flex; flex-direction:column; gap:2px;">
+          <div style="font-size:0.8rem; font-weight:700; color:var(--text-primary); font-family:monospace;">
+            ${c.sap}
+          </div>
+          <div style="font-size:0.74rem; color:var(--text-secondary);">
+            Monto: <span style="font-weight:600; color:var(--text-primary);">${formatMonto}</span>
+            ${c.pdf ? ` &bull; <span style="color:#10b981; font-weight:600;"><i data-lucide="check" style="width:12px; height:12px; display:inline-block; vertical-align:middle;"></i> PDF</span>` : ''}
+          </div>
+        </div>
+        <div style="display:flex; gap:0.25rem;">
+          ${c.pdf ? `<button type="button" onclick="window.viewLinkedCotizacionPdf(${isModal}, '${ticketId}', ${idx})" class="btn-icon" style="background:rgba(16,185,129,0.1); color:#10b981; border:1px solid rgba(16,185,129,0.2); border-radius:4px; padding:0.3rem; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;" title="Ver PDF"><i data-lucide="eye" style="width:14px; height:14px;"></i></button>` : ''}
+          <button type="button" onclick="window.deleteLinkedCotizacion(${isModal}, '${ticketId}', ${idx})" class="btn-icon" style="background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); border-radius:4px; padding:0.3rem; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;" title="Eliminar Cotización"><i data-lucide="trash-2" style="width:14px; height:14px;"></i></button>
+        </div>
+      </div>
+    `;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+
+  if (window.lucide) lucide.createIcons();
+  togglePasarCotizacionBtn(isModal, ticketId, true);
+};
+
+function togglePasarCotizacionBtn(isModal, ticketId, enable) {
+  const btnId = isModal ? null : `btn-pasar-cotizacion-${ticketId}`;
+  if (!isModal && btnId) {
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      btn.disabled = !enable;
+      btn.style.opacity = enable ? '1' : '0.5';
+      btn.style.cursor = enable ? 'pointer' : 'not-allowed';
+    }
+  }
+}
+
+window.deleteLinkedCotizacion = async function(isModal, ticketId, index) {
+  const confirmed = await window.confirmarAccion({
+    titulo: 'Desvincular Cotización',
+    mensaje: '¿Está seguro de desvincular esta cotización?',
+    textoCancelar: 'Cancelar',
+    textoAceptar: 'Desvincular',
+    esPeligroso: true
+  });
+  
+  if (!confirmed) return;
+  
+  const list = isModal ? window.editandoCotizaciones : window.quickEditandoCotizaciones[ticketId];
+  if (list && list[index]) {
+    list.splice(index, 1);
+    window.renderLinkedCotizaciones(isModal, ticketId);
+    mostrarNotificacion('Cotización desvinculada.', 'info');
+  }
+};
+
+window.viewLinkedCotizacionPdf = function(isModal, ticketId, index) {
+  const list = isModal ? window.editandoCotizaciones : window.quickEditandoCotizaciones[ticketId];
+  if (list && list[index] && list[index].pdf) {
+    const pdfData = list[index].pdf;
+    if (pdfData.startsWith('data:application/pdf;base64,')) {
+      const base64Content = pdfData.split(',')[1];
+      const binary = atob(base64Content);
+      const len = binary.length;
+      const buffer = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        buffer[i] = binary.charCodeAt(i);
+      }
+      const blob = new Blob([buffer], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } else {
+      window.open(pdfData, '_blank');
+    }
+  }
+};
+
+window.vincularNuevaCotizacion = async function(isModal = true, ticketId = null) {
+  const sapInputId = isModal ? 't-cotizacion-sap' : `quick-cot-sap-${ticketId}`;
+  const montoInputId = isModal ? 't-cotizacion-monto' : `quick-cot-monto-${ticketId}`;
+  const pdfInputId = isModal ? 't-cotizacion-pdf' : `quick-cot-pdf-${ticketId}`;
+
+  const sapVal = document.getElementById(sapInputId)?.value.trim();
+  const montoVal = parseFloat(document.getElementById(montoInputId)?.value) || 0;
+
+  if (!sapVal || montoVal <= 0) {
+    mostrarNotificacion('Debe seleccionar una cotización de SAP válida y especificar un monto mayor a cero.', 'warning');
+    return;
+  }
+
+  const list = isModal ? window.editandoCotizaciones : (window.quickEditandoCotizaciones ? window.quickEditandoCotizaciones[ticketId] : []);
+  if (list && list.some(c => c.sap === sapVal)) {
+    mostrarNotificacion('Esta cotización ya ha sido vinculada.', 'warning');
+    return;
+  }
+
+  const statusDivId = isModal ? 't-sap-validation-status' : `quick-sap-validation-status-${ticketId}`;
+  const statusDiv = document.getElementById(statusDivId);
+  const isBlocked = statusDiv && statusDiv.innerHTML.includes('🚫 Acceso Bloqueado');
+  if (isBlocked) {
+    mostrarNotificacion('No se puede vincular: la validación con el PDF está bloqueada.', 'error');
+    return;
+  }
+
+  let pdfBase64 = null;
+  const fileInput = document.getElementById(pdfInputId);
+  if (fileInput && fileInput.files.length > 0) {
+    pdfBase64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = (e) => reject(e);
+      reader.readAsDataURL(fileInput.files[0]);
+    });
+  } else {
+    if (window._lastPdfExtracted && String(window._lastPdfExtracted.doc).trim() === String(sapVal).trim() && window._lastPdfExtracted.base64) {
+      pdfBase64 = window._lastPdfExtracted.base64;
+    }
+  }
+
+  if (!pdfBase64) {
+    const tId = isModal ? editandoTicketId : ticketId;
+    const t = tId ? tickets.find(x => x.id === tId) : null;
+    if (t && t.cotizacionSAP === sapVal && t.pdfCotizacion) {
+      pdfBase64 = t.pdfCotizacion;
+    }
+  }
+
+  if (!pdfBase64) {
+    mostrarNotificacion('Debes subir el archivo PDF de la cotización.', 'warning');
+    return;
+  }
+
+  const newCot = {
+    sap: sapVal,
+    monto: montoVal,
+    pdf: pdfBase64
+  };
+  
+  if (isModal) {
+    if (!window.editandoCotizaciones) window.editandoCotizaciones = [];
+    window.editandoCotizaciones.push(newCot);
+  } else {
+    if (!window.quickEditandoCotizaciones) window.quickEditandoCotizaciones = {};
+    if (!window.quickEditandoCotizaciones[ticketId]) window.quickEditandoCotizaciones[ticketId] = [];
+    window.quickEditandoCotizaciones[ticketId].push(newCot);
+  }
+
+  document.getElementById(sapInputId).value = '';
+  document.getElementById(montoInputId).value = '';
+  if (fileInput) fileInput.value = '';
+  
+  const labelTextSpan = document.getElementById(pdfInputId)?.parentElement.querySelector('.file-label-text');
+  if (labelTextSpan) {
+    labelTextSpan.textContent = 'Subir cotización en PDF';
+  }
+  const labelParent = document.getElementById(pdfInputId)?.parentElement;
+  if (labelParent) {
+    labelParent.style.borderColor = 'var(--border)';
+    labelParent.style.color = 'var(--text-muted)';
+    labelParent.style.background = 'rgba(255,255,255,0.02)';
+  }
+
+  const clearBtnId = isModal ? 'btn-clear-pdf-modal' : `btn-clear-pdf-quick-${ticketId}`;
+  const clearBtn = document.getElementById(clearBtnId);
+  if (clearBtn) clearBtn.style.display = 'none';
+
+  const extTableId = isModal ? 'pdf-extraction-table-container' : `quick-pdf-extraction-table-container-${ticketId}`;
+  const extTable = document.getElementById(extTableId);
+  if (extTable) {
+    extTable.style.display = 'none';
+    extTable.innerHTML = '';
+  }
+
+  if (statusDiv) {
+    statusDiv.style.display = 'none';
+    statusDiv.innerHTML = '';
+  }
+
+  window.renderLinkedCotizaciones(isModal, ticketId);
+  mostrarNotificacion('Cotización vinculada correctamente.', 'success');
+};
+
 window.poblarCotizacionesDropdown = async function(isModal = true, ticketId = null, selectedValue = '') {
   const sb = window.supabaseClient;
   if (!sb) return;
@@ -11928,8 +12131,27 @@ function abrirTicket(id) {
 
   const t = id ? tickets.find(x => x.id === id) : null;
 
+  window.editandoCotizaciones = [];
+  if (t) {
+    if (Array.isArray(t.cotizacionesAdicionales) && t.cotizacionesAdicionales.length > 0) {
+      window.editandoCotizaciones = JSON.parse(JSON.stringify(t.cotizacionesAdicionales));
+    } else if (t.cotizacionSAP) {
+      window.editandoCotizaciones = [{
+        sap: t.cotizacionSAP,
+        monto: t.montoCotizacion || 0,
+        pdf: t.pdfCotizacion || null
+      }];
+    }
+  }
+
+  setTimeout(() => {
+    if (window.renderLinkedCotizaciones) {
+      window.renderLinkedCotizaciones(true);
+    }
+  }, 100);
+
   if (window.poblarCotizacionesDropdown) {
-    window.poblarCotizacionesDropdown(true, null, t?.cotizacionSAP || '');
+    window.poblarCotizacionesDropdown(true, null, '');
   }
 
   // Reset file labels
@@ -12083,14 +12305,10 @@ function abrirTicket(id) {
       poblarMaquinasCliente('t-equipo', t.equipo, t.cliente);
       
       const elCotSap = document.getElementById('t-cotizacion-sap');
-      if (elCotSap) elCotSap.value = t.cotizacionSAP || '';
+      if (elCotSap) elCotSap.value = '';
       
       const elCotMonto = document.getElementById('t-cotizacion-monto');
-      if (elCotMonto) elCotMonto.value = t.montoCotizacion || '';
-
-      if (t.cotizacionSAP && window.validarCotizacionConSAP) {
-        setTimeout(() => { window.validarCotizacionConSAP(true); }, 100);
-      }
+      if (elCotMonto) elCotMonto.value = '';
       
       const elPedidoSap = document.getElementById('t-pedido-sap');
       if (elPedidoSap) elPedidoSap.value = t.pedidoSAP || '';
@@ -12592,27 +12810,18 @@ async function guardarTicket(e) {
   }
   
   if (!isEmpresa && (estado === 'Cotización' || estado === 'Cerrado')) {
-    const cotSAP = document.getElementById('t-cotizacion-sap')?.value.trim();
-    const cotMontoVal = document.getElementById('t-cotizacion-monto')?.value.trim();
-    if (estado === 'Cotización' || cotSAP || cotMontoVal) {
-      if (!cotSAP) {
-        mostrarNotificacion('Debe ingresar el Número de Cotización SAP.', 'error');
-        return;
+    // Si la lista de cotizaciones está vacía, intentar vincular los valores actuales de los inputs
+    if (!window.editandoCotizaciones || window.editandoCotizaciones.length === 0) {
+      const sapInputVal = document.getElementById('t-cotizacion-sap')?.value.trim();
+      const montoInputVal = document.getElementById('t-cotizacion-monto')?.value.trim();
+      if (sapInputVal || montoInputVal) {
+        await window.vincularNuevaCotizacion(true);
       }
-      if (!cotMontoVal || isNaN(parseFloat(cotMontoVal)) || parseFloat(cotMontoVal) <= 0) {
-        mostrarNotificacion('Debe ingresar un Monto de Cotización válido (mayor a 0).', 'error');
-        return;
-      }
-      
-      // Validar coincidencia mínima de PDF si hay uno cargado
-      if (window._lastPdfExtracted && window.checkPdfSapMatchCount) {
-        const clientVal = document.getElementById('t-cliente')?.value || '';
-        const matchCount = window.checkPdfSapMatchCount(cotSAP, parseFloat(cotMontoVal) || 0, clientVal);
-        if (matchCount < 2) {
-          mostrarNotificacion('Bloqueado: Los datos del PDF no coinciden con la cotización SAP seleccionada en al menos dos parámetros (Folio, Monto o Cliente).', 'error');
-          return;
-        }
-      }
+    }
+
+    if (!window.editandoCotizaciones || window.editandoCotizaciones.length === 0) {
+      mostrarNotificacion('Debe vincular al menos una cotización de SAP para este ticket.', 'error');
+      return;
     }
   }
 
@@ -12700,14 +12909,15 @@ async function guardarTicket(e) {
     horometro: document.getElementById('t-horometro')?.value.trim() || '',
     notas: document.getElementById('t-notas').value.trim(),
     estado,
-    cotizacionSAP: document.getElementById('t-cotizacion-sap')?.value.trim() || '',
-    montoCotizacion: document.getElementById('t-cotizacion-monto')?.value ? parseFloat(document.getElementById('t-cotizacion-monto').value) : null,
+    cotizacionSAP: (window.editandoCotizaciones && window.editandoCotizaciones.length > 0) ? window.editandoCotizaciones[0].sap : '',
+    montoCotizacion: (window.editandoCotizaciones && window.editandoCotizaciones.length > 0) ? window.editandoCotizaciones.reduce((sum, c) => sum + (Number(c.monto) || 0), 0) : null,
     cotAceptada: document.querySelector('input[name="t-cot-aceptada"]:checked')?.value || '',
     motivoRechazo: document.getElementById('t-motivo-rechazo')?.value.trim() || '',
     pedidoSAP: document.getElementById('t-pedido-sap')?.value.trim() || '',
     tecnicosAsignados: t_existente ? (t_existente.tecnicosAsignados || []) : [],
     pdfPedido: pdfPedidoBase64,
-    pdfCotizacion: pdfCotizacionBase64,
+    pdfCotizacion: (window.editandoCotizaciones && window.editandoCotizaciones.length > 0) ? window.editandoCotizaciones[0].pdf : null,
+    cotizacionesAdicionales: window.editandoCotizaciones || [],
     esPrueba: t_existente ? (t_existente.esPrueba || false) : isTestModeActive()
   };
 
@@ -12990,6 +13200,9 @@ function verDetalleTicket(id) {
       <!-- Avanzar a Cotización -->
       ${['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode) ? `
       <div style="border-top:1px dashed var(--border); padding-top:1rem; margin-top:0.25rem; display:flex; flex-direction:column; gap:0.75rem;">
+        <!-- Contenedor para múltiples cotizaciones vinculadas en panel rápido -->
+        <div id="quick-linked-cotizaciones-container-${t.id}" style="margin-bottom:0.5rem; width:100%;"></div>
+        
         <div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
             <label style="font-weight:600; font-size:0.85rem; display:block; margin:0; color:var(--text-secondary);">No. Cotización SAP *</label>
@@ -12999,7 +13212,7 @@ function verDetalleTicket(id) {
         </div>
         <div>
           <label style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:0.4rem; color:var(--text-secondary);">Monto de Cotización ($) *</label>
-          <input type="number" id="quick-cot-monto-${t.id}" value="${t.montoCotizacion || ''}" oninput="window.validarCotizacionConSAP(false, '${t.id}')" step="0.01" min="0" placeholder="Ej. 12500.00" style="width:100%; padding:0.55rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); font-size:0.85rem;">
+          <input type="number" id="quick-cot-monto-${t.id}" value="" oninput="window.validarCotizacionConSAP(false, '${t.id}')" step="0.01" min="0" placeholder="Ej. 12500.00" style="width:100%; padding:0.55rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); font-size:0.85rem;">
         </div>
         <div>
           <label style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:0.4rem; color:var(--text-secondary);">Archivo Cotización (PDF) *</label>
@@ -13016,7 +13229,10 @@ function verDetalleTicket(id) {
           </div>
         </div>
         <div id="quick-sap-validation-status-${t.id}" style="display:none; margin-top: 0.25rem;"></div>
-        <button id="btn-pasar-cotizacion-${t.id}" class="btn-primary" style="background:var(--accent); border-color:var(--accent); margin-top:0.25rem; justify-content:center; ${!t.cotizacionSAP ? 'opacity:0.5; cursor:not-allowed;' : ''}" ${!t.cotizacionSAP ? 'disabled' : ''} onclick="avanzarCotizacionTicket('${t.id}')">Pasar a Cotización</button>
+        
+        <button type="button" class="btn-secondary" id="btn-quick-vincular-cotizacion-${t.id}" style="width:100%; margin-top:0.25rem; justify-content:center; display:inline-flex; align-items:center; gap:4px; font-size:0.8rem;" onclick="window.vincularNuevaCotizacion(false, '${t.id}')"><i data-lucide="plus-circle" style="width:14px; height:14px;"></i> Vincular esta Cotización</button>
+        
+        <button id="btn-pasar-cotizacion-${t.id}" class="btn-primary" style="background:var(--accent); border-color:var(--accent); margin-top:0.5rem; justify-content:center; ${!t.cotizacionSAP ? 'opacity:0.5; cursor:not-allowed;' : ''}" ${!t.cotizacionSAP ? 'disabled' : ''} onclick="avanzarCotizacionTicket('${t.id}')">Pasar a Cotización</button>
       </div>
       ` : ''}
     </div>
@@ -13162,11 +13378,26 @@ function verDetalleTicket(id) {
     window.inicializarRefaccionesTicket(t.id, t.refaccionesSeleccionadas || []);
   }
   if (t.estado === 'Refacciones' && currentSession.viewMode !== 'empresa') {
-    if (window.poblarCotizacionesDropdown) {
-      window.poblarCotizacionesDropdown(false, t.id, t.cotizacionSAP || '');
+    if (!window.quickEditandoCotizaciones) window.quickEditandoCotizaciones = {};
+    window.quickEditandoCotizaciones[t.id] = [];
+    if (Array.isArray(t.cotizacionesAdicionales) && t.cotizacionesAdicionales.length > 0) {
+      window.quickEditandoCotizaciones[t.id] = JSON.parse(JSON.stringify(t.cotizacionesAdicionales));
+    } else if (t.cotizacionSAP) {
+      window.quickEditandoCotizaciones[t.id] = [{
+        sap: t.cotizacionSAP,
+        monto: t.montoCotizacion || 0,
+        pdf: t.pdfCotizacion || null
+      }];
     }
-    if (t.cotizacionSAP && window.validarCotizacionConSAP) {
-      setTimeout(() => { window.validarCotizacionConSAP(false, t.id); }, 100);
+
+    setTimeout(() => {
+      if (window.renderLinkedCotizaciones) {
+        window.renderLinkedCotizaciones(false, t.id);
+      }
+    }, 100);
+
+    if (window.poblarCotizacionesDropdown) {
+      window.poblarCotizacionesDropdown(false, t.id, '');
     }
   }
   lucide.createIcons();
@@ -13302,46 +13533,32 @@ window.descargarPdfOnDemand = async function(ticketId, tipo) {
 async function avanzarCotizacionTicket(id) {
   const t = tickets.find(x => x.id === id);
   if (!t) return;
-  const sap = document.getElementById(`quick-cot-sap-${id}`)?.value.trim();
-  if (!sap) {
-    mostrarNotificacion('Ingresa el número de cotización SAP.', 'warning');
-    return;
-  }
-  const quickMontoInput = document.getElementById(`quick-cot-monto-${id}`);
-  const quickMontoVal = quickMontoInput ? parseFloat(quickMontoInput.value) : 0;
-  if (isNaN(quickMontoVal) || quickMontoVal <= 0) {
-    mostrarNotificacion('Ingresa un monto de cotización válido (mayor a 0).', 'warning');
-    return;
-  }
-  const fileInput = document.getElementById(`quick-cot-pdf-${id}`);
-  const hasFile = fileInput?.files.length > 0;
-  if (!hasFile && !t.pdfCotizacion) {
-    mostrarNotificacion('Debes adjuntar el archivo PDF de la cotización.', 'warning');
-    return;
-  }
 
-  // Validar coincidencia mínima de PDF si hay uno cargado
-  if (window._lastPdfExtracted && window.checkPdfSapMatchCount) {
-    const matchCount = window.checkPdfSapMatchCount(sap, quickMontoVal, t.cliente);
-    if (matchCount < 2) {
-      mostrarNotificacion('Bloqueado: Los datos del PDF no coinciden con la cotización SAP seleccionada en al menos dos parámetros (Folio, Monto o Cliente).', 'error');
-      return;
+  // Si la lista está vacía, intentar vincular los valores actuales
+  if (!window.quickEditandoCotizaciones || !window.quickEditandoCotizaciones[id] || window.quickEditandoCotizaciones[id].length === 0) {
+    const quickSap = document.getElementById(`quick-cot-sap-${id}`)?.value.trim();
+    const quickMontoInput = document.getElementById(`quick-cot-monto-${id}`);
+    const quickMontoVal = quickMontoInput ? parseFloat(quickMontoInput.value) : 0;
+    if (quickSap || quickMontoVal > 0) {
+      await window.vincularNuevaCotizacion(false, id);
     }
   }
 
-  let pdfCotizacionBase64 = t.pdfCotizacion || null;
-  if (hasFile) {
-    try {
-      pdfCotizacionBase64 = await readFileAsBase64(fileInput.files[0]);
-    } catch (e) {
-      console.error('[Base64 Conversion] Error:', e);
-    }
+  const list = window.quickEditandoCotizaciones ? window.quickEditandoCotizaciones[id] : [];
+  if (!Array.isArray(list) || list.length === 0) {
+    mostrarNotificacion('Debe vincular al menos una cotización de SAP para este ticket.', 'error');
+    return;
   }
 
-  t.cotizacionSAP = sap;
-  t.montoCotizacion = quickMontoVal;
-  t.pdfCotizacion = pdfCotizacionBase64;
+  const primaryCot = list[0];
+  const totalMonto = list.reduce((sum, c) => sum + (Number(c.monto) || 0), 0);
+
+  t.cotizacionSAP = primaryCot.sap;
+  t.montoCotizacion = totalMonto;
+  t.pdfCotizacion = primaryCot.pdf;
+  t.cotizacionesAdicionales = list;
   t.estado = 'Cotización';
+
   localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
   if (window.supabaseClient) {
     await window.pushToSupabase('tickets', t);

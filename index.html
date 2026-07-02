@@ -2373,12 +2373,12 @@
           </div>
           <div class="form-group full-width" style="margin-top:0.75rem; display:flex; gap:1rem;">
             <div style="flex:1;">
-              <label>Hora de Entrada</label>
-              <input type="time" id="bitacora-entrada" />
+              <label>Hora de Entrada *</label>
+              <input type="time" id="bitacora-entrada" required />
             </div>
             <div style="flex:1;">
-              <label>Hora de Salida</label>
-              <input type="time" id="bitacora-salida" />
+              <label>Hora de Salida *</label>
+              <input type="time" id="bitacora-salida" required />
             </div>
           </div>
           <div class="form-actions" style="margin-top:1.5rem; justify-content:center;">
@@ -3110,6 +3110,9 @@
 
               <div id="group-t-resolucion"
                 style="display:none; margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border);">
+                <!-- Contenedor para múltiples cotizaciones vinculadas -->
+                <div id="linked-cotizaciones-container" style="margin-bottom:0.75rem; width:100%;"></div>
+                
                 <div class="form-group full-width">
                   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
                     <label style="margin:0;">No. Cotización SAP *</label>
@@ -3136,6 +3139,8 @@
                   </div>
                 </div>
                 <div id="t-sap-validation-status" style="margin-top: 0.75rem; display: none;"></div>
+                
+                <button type="button" class="btn-secondary" id="btn-modal-vincular-cotizacion" style="width:100%; margin-top:0.75rem; justify-content:center; display:inline-flex; align-items:center; gap:4px; font-size:0.85rem;" onclick="window.vincularNuevaCotizacion(true)"><i data-lucide="plus-circle" style="width:14px; height:14px;"></i> Vincular esta Cotización</button>
               </div>
 
               <div id="group-t-cierre"
@@ -4942,8 +4947,8 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js?v=2"></script>
-  <script src="supabaseSync.js?v=62"></script>
-  <script src="app.js?v=154"></script>
+  <script src="supabaseSync.js?v=65"></script>
+  <script src="app.js?v=157"></script>
   <script>lucide.createIcons();</script>
 </body>
 

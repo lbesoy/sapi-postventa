@@ -14,7 +14,14 @@ window.safeCreateIcons = function() {
 // Variable segura para formatear fechas sin lanzar excepciones RangeError
 function safeFormatDate(fechaStr, options = { day:'numeric', month:'short' }, defaultVal = 'N/A') {
   if (!fechaStr) return defaultVal;
-  const d = new Date(fechaStr);
+  
+  // Si la fecha es YYYY-MM-DD, añadir hora del mediodía local para evitar desfases de zona horaria
+  let cleanStr = String(fechaStr).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cleanStr)) {
+    cleanStr += 'T12:00:00';
+  }
+  
+  const d = new Date(cleanStr);
   if (isNaN(d.getTime())) return defaultVal;
   try {
     return d.toLocaleDateString('es-MX', options);
@@ -1566,6 +1573,203 @@ async function descargarTicketPdf(ticketId, tipo) {
   }
 }
 
+// Función para unificar y formatear la bitácora diaria (avances) del cliente
+function renderBitacoraCliente(o) {
+  let html = '';
+  const items = [...(o.bitacora || [])];
+
+  // Unificación inteligente reactiva con eventos de calendario locales
+  try {
+    const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+    localEventos.forEach(ev => {
+      if (ev.ordenId === o.id) {
+        // Extraer fecha ISO simple (YYYY-MM-DD)
+        const fISO = (ev.fechaInicio || ev.start || '').substring(0, 10);
+        if (!fISO) return;
+
+        // Extraer horas de entrada y salida
+        let ent = '';
+        let sal = '';
+        try {
+          if (ev.fechaInicio || ev.start) {
+            const dI = new Date(ev.fechaInicio || ev.start);
+            ent = `${String(dI.getUTCHours()).padStart(2, '0')}:${String(dI.getUTCMinutes()).padStart(2, '0')}`;
+          }
+          if (ev.fechaFin || ev.end) {
+            const dF = new Date(ev.fechaFin || ev.end);
+            sal = `${String(dF.getUTCHours()).padStart(2, '0')}:${String(dF.getUTCMinutes()).padStart(2, '0')}`;
+          }
+        } catch(e){}
+
+        // Verificar si ya existe en la bitácora
+        const existe = items.some(b => b.id === ev.id || (b.fecha === fISO && b.tecnico === ev.tecnicoNombre && b.entrada === ent));
+        
+        if (!existe) {
+          items.push({
+            id: ev.id,
+            fecha: fISO,
+            tecnico: ev.tecnicoNombre || 'Sin Asignar',
+            nota: ev.descripcion || "Programado por supervisor. Pendiente de llenado por el técnico.",
+            entrada: ent,
+            salida: sal,
+            realizado: false
+          });
+        }
+      }
+    });
+  } catch(e){}
+
+  // Separar pendientes de realizados
+  const pendientes = items.filter(b => b.realizado === false || (b.nota && b.nota.includes('Programado por supervisor') && b.realizado !== true));
+  const realizados = items.filter(b => b.realizado === true || (!pendientes.some(p => p.id === b.id)));
+
+  // 1. Renderizar Visitas Programadas (Pendientes)
+  if (pendientes.length > 0) {
+    html += `
+      <div style="margin-bottom:1.25rem; background:rgba(139, 92, 246, 0.03); border: 1px solid rgba(139, 92, 246, 0.15); border-radius:var(--radius-md); padding:1rem;">
+        <h4 style="font-size:0.8rem; font-weight:700; color:#8b5cf6; text-transform:uppercase; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.4rem; letter-spacing:0.5px; border-bottom:1px solid rgba(139, 92, 246, 0.15); padding-bottom:0.4rem; margin-top:0;">
+          <i data-lucide="calendar" style="width:14px; height:14px;"></i> Visitas Programadas (Pendientes)
+        </h4>
+        <div style="display:flex; flex-direction:column; gap:0.75rem;">
+    `;
+    
+    pendientes.forEach(b => {
+      let horasHtml = '';
+      if (b.entrada && b.salida) {
+        horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.25rem; background:rgba(139, 92, 246, 0.1); color:#8b5cf6; padding:0.15rem 0.45rem; border-radius:12px; font-size:0.68rem; font-weight:600;"><i data-lucide="clock" style="width:11px;height:11px;"></i> ${b.entrada} - ${b.salida}</span>`;
+      }
+      
+      const fechaFormateada = safeFormatDate(b.fecha, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, b.fecha);
+      const capitalizeFecha = fechaFormateada.charAt(0).toUpperCase() + fechaFormateada.slice(1);
+
+      html += `
+        <div style="background:var(--bg-primary); border: 1px solid var(--border); border-left: 4px solid #8b5cf6; border-radius:var(--radius-sm); padding:0.75rem 0.85rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem; flex-wrap:wrap; gap:0.5rem;">
+            <div style="display:flex; align-items:center; gap:0.4rem;">
+              <div style="width:22px; height:22px; border-radius:50%; background:#8b5cf6; color:white; display:flex; align-items:center; justify-content:center; font-size:0.65rem; font-weight:bold;">
+                ${(b.tecnico || 'T').charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <span style="font-size:0.8rem; font-weight:600; color:var(--text-primary);">${b.tecnico || 'Sin asignar'}</span>
+                <div style="font-size:0.7rem; color:var(--text-muted);">${capitalizeFecha}</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.4rem;">
+              <span style="background:rgba(139, 92, 246, 0.1); color:#8b5cf6; border-radius:99px; padding:0.15rem 0.45rem; font-size:0.6rem; font-weight:700;">PROGRAMADO</span>
+              ${horasHtml}
+            </div>
+          </div>
+          <div style="font-size:0.78rem; color:var(--text-secondary); white-space:pre-wrap; padding-left:1.8rem; line-height:1.4; font-style:italic;">${b.nota}</div>
+        </div>
+      `;
+    });
+    
+    html += `
+        </div>
+      </div>
+    `;
+  }
+
+  // 2. Renderizar Historial de Trabajo (Realizados)
+  html += `
+    <h4 style="font-size:0.82rem; font-weight:700; color:#10b981; text-transform:uppercase; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.4rem; letter-spacing:0.5px; border-bottom:1px solid var(--border); padding-bottom:0.4rem; margin-top: 1rem;">
+      <i data-lucide="clipboard-check" style="width:14px; height:14px;"></i> Bitácora de Trabajos Diarios
+    </h4>
+  `;
+
+  if (realizados.length === 0) {
+    html += '<p style="color:var(--text-muted); font-size:0.8rem; margin-bottom:1rem; text-align:center; padding:1.25rem; background:var(--bg-primary); border-radius:var(--radius-sm); border:1px dashed var(--border);">Aún no hay reportes de trabajo diarios registrados.</p>';
+  } else {
+    // Agrupar por día
+    const agrupado = {};
+    realizados.forEach(b => {
+      let fechaDia = b.fecha;
+      let fechaDObj = null;
+      try {
+        fechaDObj = new Date(b.fecha);
+        if (!isNaN(fechaDObj)) {
+          fechaDia = safeFormatDate(b.fecha, { year: 'numeric', month: '2-digit', day: '2-digit' });
+        }
+      } catch(e){}
+      if (!agrupado[fechaDia]) agrupado[fechaDia] = { objDate: fechaDObj, entries: [] };
+      agrupado[fechaDia].entries.push(b);
+    });
+
+    // Ordenar días del más reciente al más antiguo
+    const diasSorted = Object.keys(agrupado).sort((a, b) => b.localeCompare(a));
+
+    html += '<div style="display:flex; flex-direction:column; gap:1rem; margin-bottom:1.25rem;">';
+    
+    diasSorted.forEach(diaKey => {
+      const diaData = agrupado[diaKey];
+      const displayDia = safeFormatDate(diaKey, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, diaKey);
+      const capitalizeDia = displayDia.charAt(0).toUpperCase() + displayDia.slice(1);
+
+      // Ordenar entradas dentro del día (por hora de entrada si existe)
+      diaData.entries.sort((a,b) => (a.entrada || '').localeCompare(b.entrada || ''));
+
+      let entriesHtml = diaData.entries.map(b => {
+        let horasHtml = '';
+        let desvHtml = '';
+
+        if (b.desviacion) {
+          if (b.desviacion === 'Alineado') {
+            desvHtml = `<span style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(16, 185, 129, 0.08); color:#10b981; padding:0.12rem 0.4rem; border-radius:12px; font-size:0.62rem; font-weight:600; border:1px solid rgba(16, 185, 129, 0.2); margin-left:0.35rem;" title="Programado original: ${b.programadoEntrada} a ${b.programadoSalida}"><i data-lucide="check-circle" style="width:10px;height:10px;"></i> Alineado</span>`;
+          } else if (b.desviacion.startsWith('+')) {
+            desvHtml = `<span style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(59, 130, 246, 0.08); color:#3b82f6; padding:0.12rem 0.4rem; border-radius:12px; font-size:0.62rem; font-weight:600; border:1px solid rgba(59, 130, 246, 0.2); margin-left:0.35rem;" title="Programado original: ${b.programadoEntrada} a ${b.programadoSalida}"><i data-lucide="trending-up" style="width:10px;height:10px;"></i> Desviación: ${b.desviacion}</span>`;
+          } else {
+            desvHtml = `<span style="display:inline-flex; align-items:center; gap:0.2rem; background:rgba(239, 68, 68, 0.08); color:#ef4444; padding:0.12rem 0.4rem; border-radius:12px; font-size:0.62rem; font-weight:600; border:1px solid rgba(239, 68, 68, 0.2); margin-left:0.35rem;" title="Programado original: ${b.programadoEntrada} a ${b.programadoSalida}"><i data-lucide="trending-down" style="width:10px;height:10px;"></i> Desviación: ${b.desviacion}</span>`;
+          }
+        }
+
+        if (b.entrada && b.salida) {
+          const [hE, mE] = b.entrada.split(':').map(Number);
+          const [hS, mS] = b.salida.split(':').map(Number);
+          let diff = (hS * 60 + mS) - (hE * 60 + mE);
+          if (diff < 0) diff += 24 * 60;
+          const hrs = Math.floor(diff / 60);
+          const mns = diff % 60;
+          const durStr = `${hrs}h ${mns > 0 ? mns + 'm' : ''}`.trim();
+          horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.25rem; background:rgba(16, 185, 129, 0.1); color:#10b981; padding:0.15rem 0.45rem; border-radius:12px; font-size:0.68rem; font-weight:600;"><i data-lucide="clock" style="width:11px;height:11px;"></i> ${b.entrada} - ${b.salida} (${durStr})</span>${desvHtml}`;
+        } else if (b.entrada || b.salida) {
+          horasHtml = `<span style="font-size:0.68rem; color:var(--text-muted);"><i data-lucide="clock" style="width:11px;height:11px;vertical-align:middle;"></i> ${b.entrada || '--:--'} a ${b.salida || '--:--'}</span>${desvHtml}`;
+        }
+
+        return `
+          <div style="background:var(--bg-primary); border-left: 3px solid #10b981; border-radius:var(--radius-xs); padding:0.65rem 0.85rem; margin-top:0.5rem; border: 1px solid var(--border); border-left-width: 3px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem; flex-wrap:wrap; gap:0.5rem;">
+              <div style="display:flex; align-items:center; gap:0.4rem;">
+                <div style="width:20px; height:20px; border-radius:50%; background:#10b981; color:white; display:flex; align-items:center; justify-content:center; font-size:0.62rem; font-weight:bold;">
+                  ${(b.tecnico || 'U').charAt(0).toUpperCase()}
+                </div>
+                <span style="font-size:0.78rem; font-weight:600; color:var(--text-primary);">${b.tecnico || 'Técnico'}</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:0.4rem;">
+                <span style="background:rgba(16, 185, 129, 0.1); color:#10b981; border-radius:99px; padding:0.12rem 0.4rem; font-size:0.6rem; font-weight:700;">REPORTADO</span>
+                ${horasHtml}
+              </div>
+            </div>
+            <div style="font-size:0.78rem; color:var(--text-secondary); white-space:pre-wrap; padding-left:1.6rem; line-height:1.4;">${b.nota || 'Sin comentarios registrados.'}</div>
+          </div>
+        `;
+      }).join('');
+
+      html += `
+        <div style="background:var(--bg-hover); border:1px solid var(--border); border-radius:var(--radius-md); padding:0.85rem; margin-bottom: 0.5rem;">
+          <div style="font-size:0.8rem; font-weight:700; color:var(--text-secondary); display:flex; align-items:center; gap:0.35rem; border-bottom:1px dashed var(--border); padding-bottom:0.45rem; margin-bottom:0.25rem;">
+            <i data-lucide="calendar-days" style="width:14px; height:14px; color:var(--accent);"></i> ${capitalizeDia}
+          </div>
+          ${entriesHtml}
+        </div>
+      `;
+    });
+
+    html += '</div>';
+  }
+
+  return html;
+}
+
 // Detalle de la Orden de Servicio en Modal
 function abrirDetalleOrdenCliente(id) {
   const o = ordenes.find(x => x.id === id);
@@ -1610,28 +1814,7 @@ function abrirDetalleOrdenCliente(id) {
   }
 
   // Bitácora Diaria / Avances
-  let bitacoraHtml = '';
-  if (o.bitacora && o.bitacora.length > 0) {
-    bitacoraHtml = `
-      <div style="border-top:1px solid var(--border); padding-top:1.25rem; margin-top:1.25rem;">
-        <h4 style="font-size:0.9rem; font-weight:700; color:var(--text-secondary); margin-bottom:0.75rem;"><i data-lucide="calendar" style="width:16px; height:16px; vertical-align:middle; margin-right:4px; color:var(--accent);"></i> Avance Diario</h4>
-        <div style="display:flex; flex-direction:column; gap:0.5rem; max-height:200px; overflow-y:auto; padding-right:0.25rem;">
-          ${o.bitacora.map(b => {
-            const bFecha = safeFormatDate(b.fecha, { day:'numeric', month:'short', year:'numeric' }, 'Fecha N/A');
-            return `
-              <div style="background:var(--bg-hover); border:1px solid var(--border); border-radius:var(--radius-sm); padding:0.75rem; font-size:0.8rem; line-height:1.4;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem; font-weight:600;">
-                  <span>${bFecha}</span>
-                  <span style="color:var(--text-secondary); font-size:0.75rem;">Horario: ${b.entrada || '—'} a ${b.salida || '—'}</span>
-                </div>
-                <div style="color:var(--text-primary);">${b.nota || 'Sin comentarios registrados.'}</div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </div>
-    `;
-  }
+  const bitacoraHtml = renderBitacoraCliente(o);
 
   // Registro de Jornadas semanales (dias)
   let diasHtml = '';

@@ -24,6 +24,32 @@ window.inyectarRefaccionesEnNotas = function(rawOrCleanNotasStr, refacciones) {
   return `${clean}\n\n=== REFACCIONES ===\n${JSON.stringify(refacciones)}`;
 };
 
+// Helpers de serialización de cotizaciones en el campo 'notas' del ticket
+window.extraerCotizacionesDeNotas = function(notasStr) {
+  const str = notasStr || '';
+  const separator = '=== COTIZACIONES ===';
+  const idx = str.indexOf(separator);
+  if (idx > -1) {
+    const notasLimpias = str.substring(0, idx).trim();
+    const cotizacionesJSON = str.substring(idx + separator.length).trim();
+    try {
+      const cotizaciones = JSON.parse(cotizacionesJSON);
+      return { notasLimpias, cotizaciones: Array.isArray(cotizaciones) ? cotizaciones : [] };
+    } catch (e) {
+      console.warn("Error parsing cotizaciones JSON from notes:", e);
+      return { notasLimpias: str, cotizaciones: [] };
+    }
+  }
+  return { notasLimpias: str, cotizaciones: [] };
+};
+
+window.inyectarCotizacionesEnNotas = function(rawOrCleanNotasStr, cotizaciones) {
+  const extracted = window.extraerCotizacionesDeNotas(rawOrCleanNotasStr);
+  const clean = (extracted.notasLimpias || '').trim();
+  if (!cotizaciones || cotizaciones.length === 0) return clean;
+  return `${clean}\n\n=== COTIZACIONES ===\n${JSON.stringify(cotizaciones)}`;
+};
+
 // ============================================================
 
 // Proteger contra errores fatales de parseo de JSON malformados o corruptos en sincronización
@@ -94,6 +120,11 @@ function ticketToRow(t) {
     if (match) sitioId = match.id;
   } catch (e) {}
 
+  const baseNotas = t.notas || '';
+  let finalNotas = baseNotas;
+  finalNotas = window.inyectarCotizacionesEnNotas(finalNotas, t.cotizacionesAdicionales || []);
+  finalNotas = window.inyectarRefaccionesEnNotas(finalNotas, t.refaccionesSeleccionadas || []);
+
   const row = {
     id: t.id,
     folio: t.folio,
@@ -112,7 +143,7 @@ function ticketToRow(t) {
     asignado: t.asignado || null,
     descripcion: t.descripcion || null,
     equipo: t.equipo || null,
-    notas: window.inyectarRefaccionesEnNotas((t.horometro ? `[H:${t.horometro}]\n` : '') + (t.notas || ''), t.refaccionesSeleccionadas || []),
+    notas: (t.horometro ? `[H:${t.horometro}]\n` : '') + finalNotas,
     estado: t.estado || null,
     cotizacion_sap: t.cotizacionSAP || null,
     monto_cotizacion: (t.montoCotizacion !== undefined && t.montoCotizacion !== null) ? Number(t.montoCotizacion) : null,
@@ -152,6 +183,7 @@ function rowToTicket(t) {
   const pdfCotizacionVal = (t.pdf_cotizacion && t.pdf_cotizacion.startsWith('data:')) ? '__HAS_PDF__' : (t.pdf_cotizacion || null);
 
   const extracted = window.extraerRefaccionesDeNotas(t.notas);
+  const extractedCot = window.extraerCotizacionesDeNotas(extracted.notasLimpias);
 
   const obj = {
     id: t.id,
@@ -172,8 +204,9 @@ function rowToTicket(t) {
     asignado: t.asignado,
     descripcion: t.descripcion,
     equipo: t.equipo,
-    notas: extracted.notasLimpias,
+    notas: extractedCot.notasLimpias,
     refaccionesSeleccionadas: extracted.refacciones,
+    cotizacionesAdicionales: extractedCot.cotizaciones,
     estado: t.estado,
     cotizacionSAP: t.cotizacion_sap,
     montoCotizacion: (t.monto_cotizacion !== undefined && t.monto_cotizacion !== null) ? Number(t.monto_cotizacion) : null,
@@ -196,11 +229,29 @@ function rowToTicket(t) {
   return obj;
 }
 
+function getValidDbTecnico(tecnicoStr) {
+  if (!tecnicoStr) return null;
+  const names = tecnicoStr.split(',').map(n => n.trim()).filter(Boolean);
+  
+  let localUsers = [];
+  try {
+    localUsers = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+  } catch (e) {}
+  
+  for (const name of names) {
+    const match = localUsers.find(u => u.nombre && u.nombre.trim().toLowerCase() === name.toLowerCase());
+    if (match) {
+      return match.nombre;
+    }
+  }
+  return null;
+}
+
 window.ordenToRow = ordenToRow;
 function ordenToRow(o) {
   const customData = { ...o };
   const knownKeys = [
-    'id', 'folio', 'cliente', 'ubicacion', 'tecnico', 'tipo', 'estado', 'fecha', 'fechaInicio', 'fechaFin', 
+    'id', 'folio', 'cliente', 'ubicacion', 'tipo', 'estado', 'fecha', 'fechaInicio', 'fechaFin', 
     'duracion', 'duracion_minutos', 'evidenciaBase64', 'evidencia_base_64', 'evidencia_url', 'bitacora', 'maquinaria_id', 'sitio_id',
     'ref_necesarias', 'ref_utilizadas', 'firma_tecnico_base64', 'firma_tecnico_nombre', 'firma_tecnico_fecha', 
     'firma_cliente_base64', 'firma_cliente_nombre', 'firma_cliente_fecha', 'evidencias'
@@ -245,7 +296,7 @@ function ordenToRow(o) {
     folio: o.folio,
     cliente: clienteId,
     sitio_id: sitioId,
-    tecnico: o.tecnico || null,
+    tecnico: getValidDbTecnico(o.tecnico) || null,
     maquinaria_id: maquinariaId,
     tipo: o.tipo || 'Servicio',
     estado: o.estado || 'Pendiente',
@@ -312,7 +363,7 @@ function rowToOrden(o) {
     id: o.id,
     _synced: true,
     folio: o.folio, cliente: clienteNombre,
-    ubicacion: ubicacion, tecnico: o.tecnico,
+    ubicacion: ubicacion, tecnico: extraData.tecnico || o.tecnico || null,
     tipo: o.tipo, estado: o.estado, fecha: o.fecha,
     fechaInicio: o.fecha_inicio, fechaFin: o.fecha_fin,
     duracion: o.duracion_minutos,
@@ -547,17 +598,6 @@ window.pushToSupabase = async function(tabla, item) {
   
   if (tabla === 'tickets') {
     isOnlineOnly = true;
-  } else if (tabla === 'ordenes') {
-    // Si es ordenes, solo permitimos offline/sync queue si el usuario actual es técnico (para rellenar reportes)
-    let currentRole = 'consulta';
-    try {
-      const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
-      currentRole = session.viewMode || 'consulta';
-    } catch(e) {}
-    
-    if (currentRole !== 'tecnico') {
-      isOnlineOnly = true;
-    }
   }
 
   if (isOnlineOnly) {
@@ -620,16 +660,6 @@ window.deleteFromSupabase = async function(tabla, id) {
   
   if (tabla === 'tickets') {
     isOnlineOnly = true;
-  } else if (tabla === 'ordenes') {
-    let currentRole = 'consulta';
-    try {
-      const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
-      currentRole = session.viewMode || 'consulta';
-    } catch(e) {}
-    
-    if (currentRole !== 'tecnico') {
-      isOnlineOnly = true;
-    }
   }
 
   if (isOnlineOnly) {
@@ -1075,15 +1105,22 @@ async function _processSyncQueueInternal() {
                   if (f.length === 10) return `${f}T12:00:00-06:00`;
                   return f;
                 };
-                const filasBitacora = bitacorasMemoria.map(b => ({
-                  id: b.id,
-                  orden_id: ordId,
-                  fecha: cleanFecha(b.fecha),
-                  tecnico: b.tecnico || null,
-                  nota: b.nota || 'Programado por supervisor.',
-                  entrada: b.entrada || null,
-                  salida: b.salida || null
-                }));
+                const filasBitacora = bitacorasMemoria.map(b => {
+                  const dbTecnico = getValidDbTecnico(b.tecnico);
+                  let dbNota = b.nota || 'Programado por supervisor.';
+                  if (!dbTecnico && b.tecnico) {
+                    dbNota += `\n[Técnico: ${b.tecnico}]`;
+                  }
+                  return {
+                    id: b.id,
+                    orden_id: ordId,
+                    fecha: cleanFecha(b.fecha),
+                    tecnico: dbTecnico || null,
+                    nota: dbNota,
+                    entrada: b.entrada || null,
+                    salida: b.salida || null
+                  };
+                });
                 await sb.from('orden_bitacora').upsert(filasBitacora, { onConflict: 'id' });
               }
 
@@ -2054,11 +2091,21 @@ window.cargarDatosDeSupabase = function() {
             // Formatear fecha a YYYY-MM-DD para la app
             const datePortion = b.fecha ? b.fecha.substring(0, 10) : '';
             
+            let tecnico = b.tecnico;
+            let nota = b.nota || '';
+            if (!tecnico && nota.includes('[Técnico: ')) {
+              const match = nota.match(/\n\[Técnico: (.*?)\]$/);
+              if (match) {
+                tecnico = match[1];
+                nota = nota.replace(/\n\[Técnico: (.*?)\]$/, '');
+              }
+            }
+
             bitacorasMap[b.orden_id].push({
               id: b.id,
               fecha: datePortion,
-              tecnico: b.tecnico,
-              nota: b.nota,
+              tecnico: tecnico,
+              nota: nota,
               entrada: b.entrada,
               salida: b.salida
             });
