@@ -1806,36 +1806,134 @@ function abrirDetalleOrdenCliente(id) {
     `;
   }
 
-  body.innerHTML = `
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.5rem; font-size:0.9rem;">
-      <div>
-        <span style="color:var(--text-muted); font-size:0.75rem; display:block;">Equipo / Maquinaria</span>
-        <strong>${o.modelo || o.equipo || 'Maquinaria'}</strong>
+  // Mapear marca formateada
+  const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+  let mBrand = o.marca || (o.equipo ? o.equipo.split(' ')[0] : '');
+  const marcaText = MARCAS_RENDER[mBrand.toUpperCase()] || mBrand || '—';
+
+  // Buscar ID de maquinaria
+  const maq = (maquinariaDb || []).find(m => (o.maquinaria_id && m.id === o.maquinaria_id) || (o.serie && m.serie === o.serie) || (o.modelo && m.modelo === o.modelo && m.cliente === o.cliente));
+  const idMaquinaText = maq && (maq.idInterno || maq.id) ? maq.idInterno || maq.id : '—';
+
+  // Buscar Ticket de Soporte de origen
+  const tktSoporte = (tickets || []).find(x => x.id === o.soporte);
+  const ticketSoporteText = tktSoporte ? (tktSoporte.folio || tktSoporte.id.slice(0,8)) : o.soporte || '—';
+
+  // Layout de los bloques de información general
+  const infoGeneralHtml = `
+    <div style="margin-bottom:1.5rem; border-top:1px solid var(--border); padding-top:1.25rem;">
+      <h4 style="font-size:0.85rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:0.75rem;"><i data-lucide="info" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; color:var(--accent);"></i> Información General</h4>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:1rem; font-size:0.85rem; line-height:1.4;">
+        <div>
+          <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Folio de Orden</span>
+          <strong>${o.folio || '—'}</strong>
+        </div>
+        <div>
+          <span style="color:var(--text-muted); font-size:0.72rem; display:block;">No. Pedido / PO</span>
+          <strong>${o.pedido || '—'}</strong>
+        </div>
+        <div>
+          <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Fecha de Registro</span>
+          <span>${safeFormatDate(o.fecha, { day:'numeric', month:'short', year:'numeric' }, '—')}</span>
+        </div>
+        <div>
+          <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Ubicación / Sitio</span>
+          <span>${o.ubicacion || '—'}</span>
+        </div>
+        <div>
+          <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Operador</span>
+          <span>${o.operador || '—'}</span>
+        </div>
+        <div>
+          <span style="color:var(--text-muted); font-size:0.72rem; display:block;">No. ECO</span>
+          <span>${o.eco || '—'}</span>
+        </div>
+        <div>
+          <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Horómetro Real</span>
+          <span>${o.horometro_real ? Number(o.horometro_real).toLocaleString() + ' h' : '—'}</span>
+        </div>
+        <div>
+          <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Marca</span>
+          <span>${marcaText}</span>
+        </div>
+        <div>
+          <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Modelo</span>
+          <span>${o.modelo || '—'}</span>
+        </div>
+        <div>
+          <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Número de Serie</span>
+          <span style="font-family:monospace; font-size:0.8rem;">${o.serie || '—'}</span>
+        </div>
+        <div>
+          <span style="color:var(--text-muted); font-size:0.72rem; display:block;">ID Máquina</span>
+          <span style="font-family:monospace; font-size:0.8rem; font-weight:600; color:var(--accent);">${idMaquinaText}</span>
+        </div>
+        <div>
+          <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Ticket Soporte</span>
+          <strong>${ticketSoporteText}</strong>
+        </div>
       </div>
+    </div>
+  `;
+
+  // Layout de kilómetros / traslado (si existen)
+  let viajeHtml = '';
+  if (o.km_ida || o.km_vuelta || o.km_total) {
+    viajeHtml = `
+      <div style="border-top:1px dashed var(--border); padding-top:1.25rem; margin-top:1.25rem; margin-bottom:1.5rem;">
+        <h4 style="font-size:0.85rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:0.75rem;"><i data-lucide="map" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; color:var(--accent);"></i> Kilómetros y Traslado</h4>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:1rem; font-size:0.85rem; line-height:1.4;">
+          <div>
+            <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Origen → Frente de Trabajo</span>
+            <span>${o.km_ida ? o.km_ida + ' km' : '—'}</span>
+          </div>
+          <div>
+            <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Frente de Trabajo → Origen</span>
+            <span>${o.km_vuelta ? o.km_vuelta + ' km' : '—'}</span>
+          </div>
+          <div>
+            <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Distancia Total</span>
+            <strong>${o.km_total ? o.km_total + ' km' : '—'}</strong>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  body.innerHTML = `
+    <!-- Cabecera rápida de labores -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:1rem; margin-bottom:1.5rem; background:var(--bg-hover); border:1px solid var(--border); border-radius:var(--radius-md); padding:1rem; font-size:0.85rem; line-height:1.4;">
       <div>
-        <span style="color:var(--text-muted); font-size:0.75rem; display:block;">Estado del Servicio</span>
+        <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Estado del Servicio</span>
         <span class="status-pill ${est}">${o.estado || 'Pendiente'}</span>
       </div>
       <div>
-        <span style="color:var(--text-muted); font-size:0.75rem; display:block;">Tipo de Servicio</span>
-        <span>${o.tipo || 'Servicio Técnico'}</span>
+        <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Tipo de Servicio</span>
+        <strong>${o.tipo || 'Servicio Técnico'}</strong>
       </div>
       <div>
-        <span style="color:var(--text-muted); font-size:0.75rem; display:block;">Ingeniero Asignado</span>
-        <strong>${o.tecnico || 'Por asignar'}</strong>
+        <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Ingeniero Asignado</span>
+        <strong><i data-lucide="user" style="width:13px; height:13px; vertical-align:middle; margin-right:2px; color:var(--accent);"></i> ${o.tecnico || 'Por asignar'}</strong>
       </div>
       <div>
-        <span style="color:var(--text-muted); font-size:0.75rem; display:block;">Inicio de Labores</span>
+        <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Inicio de Labores</span>
         <span>${fechaFormat}</span>
       </div>
       <div>
-        <span style="color:var(--text-muted); font-size:0.75rem; display:block;">Fin de Labores</span>
+        <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Fin de Labores</span>
         <span>${fechaFinFormat}</span>
       </div>
     </div>
     
-    <div style="border-top:1px solid var(--border); padding-top:1rem;">
-      <h4 style="font-size:0.9rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.5rem;">Actividades y Reporte Técnico</h4>
+    <!-- Información General -->
+    ${infoGeneralHtml}
+
+    <!-- Traslado / Viáticos -->
+    ${viajeHtml}
+    
+    <!-- Reporte Técnico y Actividades -->
+    <div style="border-top:1px solid var(--border); padding-top:1.25rem; margin-top:1.25rem;">
+      <h4 style="font-size:0.9rem; font-weight:700; color:var(--text-secondary); margin-bottom:0.75rem;"><i data-lucide="clipboard-list" style="width:16px; height:16px; vertical-align:middle; margin-right:4px; color:var(--accent);"></i> Reporte Técnico y Actividades</h4>
       ${actividadesHtml}
     </div>
 
