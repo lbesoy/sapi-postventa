@@ -2283,6 +2283,8 @@
           border-top: 4px solid var(--accent, #E8820C);
           display: flex;
           flex-direction: column;
+          max-height: 88vh;
+          overflow: hidden;
         }
         #modal-registrar-actividad .modal-header {
           border-bottom: 1px solid var(--border);
@@ -2371,7 +2373,7 @@
           <h2 id="mra-titulo-modal"><i data-lucide="calendar" style="width:20px; height:20px; color:var(--accent);"></i> Registrar Actividad</h2>
           <button class="modal-close" onclick="document.getElementById('modal-registrar-actividad-overlay').classList.remove('open')">✕</button>
         </div>
-        <div class="modal-body" style="padding:1.5rem; max-height: 80vh; overflow-y: auto;">
+        <div class="modal-body" style="padding: 1.25rem 1.5rem; flex: 1; overflow-y: auto;">
           <input type="hidden" id="mra-id" />
           
           <div class="form-group">
