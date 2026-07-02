@@ -1308,7 +1308,12 @@ async function _processSyncQueueInternal() {
               error.message.includes('timeout') ||
               error.message.includes('connection') ||
               error.message.includes('TypeError') ||
-              error.message.includes('fetch')
+              error.message.includes('fetch') ||
+              error.message.includes('schema cache') ||
+              error.message.includes('503') ||
+              error.message.includes('502') ||
+              error.message.includes('Service Unavailable') ||
+              error.message.includes('Bad Gateway')
             );
 
             if (!isNetworkError) {
