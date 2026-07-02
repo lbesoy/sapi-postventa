@@ -12988,7 +12988,7 @@ function verDetalleTicket(id) {
       </div>
 
       <!-- Avanzar a Cotización -->
-      ${['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode) && (t.refaccionesSeleccionadas && t.refaccionesSeleccionadas.length > 0) ? `
+      ${['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode) ? `
       <div style="border-top:1px dashed var(--border); padding-top:1rem; margin-top:0.25rem; display:flex; flex-direction:column; gap:0.75rem;">
         <div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
