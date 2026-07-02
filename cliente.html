@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script>
+    window.addEventListener('error', function(e) {
+      alert('ERROR DE JS: ' + e.message + '\nArchivo: ' + e.filename + '\nLínea: ' + e.lineno);
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      alert('PROMESA RECHAZADA: ' + e.reason);
+    });
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal de Clientes – Eurorep</title>
+  <meta name="description" content="Portal de seguimiento y solicitudes de servicio técnico de Eurorep para clientes." />
+  
+  <!-- Typography & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="cliente.css" />
+  
+  <!-- Mobile & PWA Capabilites -->
+  <link rel="icon" href="logo_transparent.png" type="image/png" />
+  <meta name="theme-color" content="#e8820c" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+</head>
+<body>
+
+  <!-- ===== LOADER SCREEN ===== -->
+  <div id="loader-screen" class="loader-screen">
+    <img src="logo_transparent.png" alt="Eurorep" class="loader-logo" />
+    <div class="spinner"></div>
+  </div>
+
+  <!-- ===== LOGIN SCREEN ===== -->
+  <div id="login-screen" class="login-screen" style="display:none;">
+    <div class="login-card">
+      <img src="logo_transparent.png" alt="Eurorep" class="login-logo" />
+      
+      <!-- PASO 1: Iniciar Sesión -->
+      <div id="login-step-login">
+        <h2 class="login-title">Portal de Clientes</h2>
+        <p class="login-subtitle">Ingresa a tu cuenta corporativa</p>
+        
+        <form onsubmit="iniciarSesionCliente(event)">
+          <div class="form-group">
+            <label for="login-email">Correo Electrónico</label>
+            <input type="email" id="login-email" placeholder="cliente@empresa.com" required autocapitalize="none" />
+          </div>
+          <div class="form-group">
+            <label for="login-password">Contraseña</label>
+            <input type="password" id="login-password" placeholder="••••••••" required />
+          </div>
+          <div id="login-error" style="color:var(--red); font-size:0.85rem; margin-bottom:1rem; text-align:left;"></div>
+          <button type="submit" class="btn-primary" style="width:100%; justify-content:center; padding:0.8rem;">
+            <i data-lucide="log-in"></i> Iniciar Sesión
+          </button>
+        </form>
+        
+        <div style="margin-top:1.5rem; font-size:0.85rem; color:var(--text-muted);">
+          ¿No tienes cuenta? <a href="#" onclick="mostrarRegistroCliente(event)" style="color:var(--accent); font-weight:600; text-decoration:none;">Regístrate aquí</a>
+        </div>
+      </div>
+
+      <!-- PASO 2: Registrar Nuevo Cliente -->
+      <div id="login-step-register" style="display:none;">
+        <h2 class="login-title">Crear Cuenta</h2>
+        <p class="login-subtitle">Regístrate para acceder al portal</p>
+        
+        <form onsubmit="registrarClienteSubmit(event)">
+          <div class="form-group">
+            <label for="reg-nombre">Nombre Completo</label>
+            <input type="text" id="reg-nombre" placeholder="Ej. Juan Pérez" required />
+          </div>
+          <div class="form-group">
+            <label for="reg-email">Correo Electrónico</label>
+            <input type="email" id="reg-email" placeholder="usuario@empresa.com" required autocapitalize="none" />
+          </div>
+          <div class="form-group">
+            <label for="reg-empresa">¿De qué empresa eres?</label>
+            <input type="text" id="reg-empresa" placeholder="Nombre de tu empresa / compañía" required />
+          </div>
+          <div class="form-group">
+            <label for="reg-password">Contraseña</label>
+            <input type="password" id="reg-password" placeholder="Mínimo 6 caracteres" required minlength="6" />
+          </div>
+          <div class="form-group">
+            <label for="reg-password-confirm">Confirmar Contraseña</label>
+            <input type="password" id="reg-password-confirm" placeholder="••••••••" required minlength="6" />
+          </div>
+          <div id="reg-error" style="color:var(--red); font-size:0.85rem; margin-bottom:1rem; text-align:left;"></div>
+          <button type="submit" class="btn-primary" style="width:100%; justify-content:center; padding:0.8rem;">
+            <i data-lucide="user-plus"></i> Registrarme y solicitar acceso
+          </button>
+        </form>
+        
+        <div style="margin-top:1.5rem; font-size:0.85rem; color:var(--text-muted);">
+          ¿Ya tienes cuenta? <a href="#" onclick="mostrarLoginCliente(event)" style="color:var(--accent); font-weight:600; text-decoration:none;">Inicia sesión</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== APP WRAPPER ===== -->
+  <div id="app-wrapper">
+    
+    <!-- SIDEBAR (Desktop) -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <img src="logo_transparent.png" alt="Eurorep" class="sidebar-logo" />
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-target="dashboard">
+          <i data-lucide="layout-dashboard"></i> <span>Resumen</span>
+        </a>
+        <a href="#" class="nav-item" data-target="maquinaria">
+          <i data-lucide="settings-2"></i> <span>Mis Equipos</span>
+        </a>
+        <a href="#" class="nav-item" data-target="tickets">
+          <i data-lucide="ticket"></i> <span>Solicitudes</span>
+        </a>
+        <a href="#" class="nav-item" data-target="servicios">
+          <i data-lucide="clipboard-list"></i> <span>Órdenes de Servicio</span>
+        </a>
+        <a href="#" class="nav-item" data-target="sitios">
+          <i data-lucide="map-pin"></i> <span>Mis Sitios</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-badge">
+          <div class="user-avatar" id="sidebar-avatar">-</div>
+          <div class="user-info">
+            <span class="user-name" id="sidebar-name">Cargando...</span>
+            <span class="user-role" id="sidebar-empresa">Empresa</span>
+          </div>
+        </div>
+        <button class="btn-logout" onclick="cerrarSesionCliente()">
+          <i data-lucide="log-out"></i> <span>Cerrar Sesión</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN AREA -->
+    <div class="main-area">
+      
+      <!-- HEADER -->
+      <header class="app-header">
+        <div class="header-title-area">
+          <h1 id="view-title">Resumen</h1>
+        </div>
+        <div class="header-actions" style="display:flex; align-items:center; gap:1rem;">
+          <!-- Sandbox Mode Switch -->
+          <div class="sandbox-toggle-container">
+            <label class="toggle-switch-sb">
+              <input type="checkbox" id="sandbox-mode-toggle" onchange="toggleClientSandboxMode(this.checked)" />
+              <span class="toggle-track-sb"></span>
+            </label>
+            <span style="font-weight:600; display:flex; align-items:center; gap:0.25rem;"><i data-lucide="shield-alert" style="width:13px; height:13px;"></i> Sandbox</span>
+          </div>
+
+          <div style="font-size:0.9rem; color:var(--text-secondary); font-weight:500;" id="header-company-name"></div>
+          <button class="theme-toggle" onclick="toggleTheme()" title="Cambiar tema">
+            <i data-lucide="sun" id="theme-icon"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- VIEWS CONTAINER -->
+      <div class="views-container">
+        
+        <!-- 1. DASHBOARD VIEW -->
+        <div id="view-dashboard" class="view active">
+          <!-- Fleet Health Executive Summary Banner -->
+          <div class="fleet-kpi-container" id="fleet-health-kpi-container" style="display:none; margin-bottom:1.5rem;">
+            <div class="fleet-health-section">
+              <div class="fleet-progress-ring" id="fleet-health-ring">
+                <div class="fleet-progress-val"><span id="fleet-health-percent">0%</span><span>DISP</span></div>
+              </div>
+              <div class="fleet-health-info">
+                <div class="fleet-health-title">Disponibilidad de la Flota</div>
+                <div class="fleet-health-desc" id="fleet-health-desc">Cargando estado de equipos...</div>
+              </div>
+            </div>
+            <div class="fleet-status-labels">
+              <div class="fleet-status-row">
+                <span><span class="fleet-status-dot" style="background:var(--green);"></span>Operando</span>
+                <span id="fleet-count-operando" style="font-weight:700;">0</span>
+              </div>
+              <div class="fleet-status-row">
+                <span><span class="fleet-status-dot" style="background:var(--orange);"></span>Mantenimiento</span>
+                <span id="fleet-count-mantenimiento" style="font-weight:700;">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPIs -->
+          <div class="stats-grid">
+            <div class="stat-card" style="border-left:4px solid var(--accent);" onclick="navegarA('maquinaria')">
+              <div class="stat-icon" style="background:var(--accent-light); color:var(--accent);">
+                <i data-lucide="settings-2"></i>
+              </div>
+              <div class="stat-info">
+                <span class="stat-label">Mis Equipos</span>
+                <span class="stat-val" id="kpi-equipos">0</span>
+              </div>
+            </div>
+            <div class="stat-card" style="border-left:4px solid var(--blue);" onclick="navegarA('tickets')">
+              <div class="stat-icon" style="background:var(--blue-light); color:var(--blue);">
+                <i data-lucide="ticket"></i>
+              </div>
+              <div class="stat-info">
+                <span class="stat-label">Tickets Activos</span>
+                <span class="stat-val" id="kpi-tickets">0</span>
+              </div>
+            </div>
+            <div class="stat-card" style="border-left:4px solid var(--orange);" onclick="navegarA('servicios')">
+              <div class="stat-icon" style="background:var(--orange-light); color:var(--orange);">
+                <i data-lucide="clipboard-list"></i>
+              </div>
+              <div class="stat-info">
+                <span class="stat-label">Servicios en Proceso</span>
+                <span class="stat-val" id="kpi-servicios">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Services & Recent Tickets -->
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:1.5rem;">
+            
+            <!-- Active Service Progress -->
+            <div class="section-card">
+              <h2 class="section-title"><i data-lucide="activity" style="color:var(--accent);"></i> Servicios en Curso</h2>
+              <div id="active-services-list">
+                <!-- JS Rendered -->
+                <div class="empty-state">
+                  <i data-lucide="check-circle-2"></i>
+                  <p>No tienes ningún servicio en curso en este momento.</p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Quick Ticket & Action Card -->
+            <div class="section-card" style="display:flex; flex-direction:column; justify-content:space-between; background:linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-hover) 100%);">
+              <div>
+                <h2 class="section-title"><i data-lucide="help-circle" style="color:var(--accent);"></i> ¿Necesitas soporte técnico?</h2>
+                <p style="color:var(--text-secondary); line-height:1.5; margin-bottom:1.5rem;">
+                  Reporta fallas, solicita refacciones o pide un mantenimiento preventivo. Nuestro equipo de ingenieros responderá de inmediato.
+                </p>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                <button class="btn-primary" onclick="abrirReportarFallaRapida()" style="justify-content:center;">
+                  <i data-lucide="alert-triangle"></i> Reportar una Falla de Equipo
+                </button>
+                <a href="https://wa.me/525512345678" target="_blank" class="btn-secondary" style="justify-content:center; text-decoration:none;">
+                  <i data-lucide="message-circle" style="color:#25d366;"></i> WhatsApp Soporte Eurorep
+                </a>
+              </div>
+            </div>
+            
+          </div>
+        </div>
+
+        <!-- 2. MACHINERY VIEW -->
+        <div id="view-maquinaria" class="view">
+          <div class="machinery-grid" id="machinery-container">
+            <!-- JS Rendered Machinery -->
+          </div>
+        </div>
+
+        <!-- 3. TICKETS VIEW -->
+        <div id="view-tickets" class="view">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:2rem; align-items:start;">
+            
+            <!-- Ticket Creation Form -->
+            <div class="section-card">
+              <h2 class="section-title"><i data-lucide="plus-circle" style="color:var(--accent);"></i> Nueva Solicitud</h2>
+              <form id="form-nuevo-ticket" onsubmit="crearTicketCliente(event)">
+                <div class="form-group">
+                  <label for="t-sitio">Sitio / Ubicación</label>
+                  <select id="t-sitio" required>
+                    <option value="" disabled selected>Selecciona ubicación...</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="t-equipo">Equipo / Maquinaria</label>
+                  <select id="t-equipo" required onchange="onTicketEquipoChange(this.value)">
+                    <option value="" disabled selected>Selecciona equipo...</option>
+                  </select>
+                </div>
+                <div class="form-group" id="t-horometro-group" style="display:none;">
+                  <label for="t-horometro">Horómetro Actual (Horas)</label>
+                  <input type="text" id="t-horometro" placeholder="Ej. 1245.5" />
+                </div>
+                <div class="form-group">
+                  <label for="t-prioridad">Prioridad del Reporte</label>
+                  <select id="t-prioridad" required>
+                    <option value="Baja">Baja (Consulta / Preventivo)</option>
+                    <option value="Media" selected>Media (Falla no crítica)</option>
+                    <option value="Alta">Alta (Equipo Detenido)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="t-categoria">Categoría</label>
+                  <select id="t-categoria" required>
+                    <option value="Correctivo">Falla Mecánica / Eléctrica</option>
+                    <option value="Preventivo">Mantenimiento Preventivo</option>
+                    <option value="Refacciones">Solicitud de Refacciones</option>
+                    <option value="Otros">Otro asunto</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="t-asunto">Asunto Breve</label>
+                  <input type="text" id="t-asunto" placeholder="Ej. Pérdida de presión en bomba" required />
+                </div>
+                <div class="form-group">
+                  <label for="t-descripcion">Descripción del Problema</label>
+                  <textarea id="t-descripcion" rows="4" placeholder="Describe detalladamente los síntomas de la falla..." required></textarea>
+                </div>
+                
+                <!-- Image Upload -->
+                <div class="form-group">
+                  <label>Adjuntar Foto / Evidencia (Opcional)</label>
+                  <div class="file-upload-area" onclick="document.getElementById('t-foto').click()">
+                    <i data-lucide="image"></i>
+                    <span>Toca para tomar foto o seleccionar archivo</span>
+                    <span style="font-size:0.75rem; color:var(--text-muted);">Formatos aceptados: JPG, PNG (Max 5MB)</span>
+                  </div>
+                  <input type="file" id="t-foto" accept="image/*" style="display:none;" onchange="previewFotoTicket(this)" />
+                  <div class="preview-container" id="ticket-photo-preview"></div>
+                </div>
+                
+                <button type="submit" class="btn-primary" style="width:100%; justify-content:center; margin-top:1rem;">
+                  <i data-lucide="send"></i> Enviar Solicitud a Soporte
+                </button>
+              </form>
+            </div>
+            
+            <!-- Tickets List -->
+            <div class="section-card">
+              <h2 class="section-title"><i data-lucide="history" style="color:var(--accent);"></i> Historial de Solicitudes</h2>
+              <!-- Filtros y Ordenación del Historial -->
+              <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem; background:rgba(255,255,255,0.02); border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); align-items:center;">
+                <!-- Filtro de Estado (Botones) -->
+                <div style="display:flex; gap:0.25rem;">
+                  <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px;" id="btn-filtro-t-abiertos" onclick="filtrarHistorialTickets('abiertos')">Abiertos</button>
+                  <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px;" id="btn-filtro-t-todos" onclick="filtrarHistorialTickets('todos')">Todos</button>
+                </div>
+                
+                <!-- Filtro por Prioridad (Dropdown) -->
+                <select id="historial-filtro-prio" onchange="onHistorialFiltroChange()" style="flex:1; min-width:110px; padding:0.35rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-secondary); font-size:0.75rem; min-height:32px; outline:none;">
+                  <option value="">Prioridad: Todas</option>
+                  <option value="Alta">Alta</option>
+                  <option value="Media">Media</option>
+                  <option value="Baja">Baja</option>
+                </select>
+
+                <!-- Ordenación (Dropdown) -->
+                <select id="historial-ordenar" onchange="onHistorialFiltroChange()" style="flex:1; min-width:120px; padding:0.35rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-secondary); font-size:0.75rem; min-height:32px; outline:none;">
+                  <option value="reciente">Más recientes</option>
+                  <option value="antiguo">Más antiguos</option>
+                  <option value="prioridad">Mayor prioridad</option>
+                  <option value="estado">Por estado</option>
+                </select>
+              </div>
+              <div id="tickets-history-list" style="display:flex; flex-direction:column; gap:1rem; max-height: 600px; overflow-y:auto; padding-right:5px;">
+                <!-- JS Rendered -->
+              </div>
+            </div>
+            
+          </div>
+        </div>
+
+        <!-- 4. SERVICES VIEW -->
+        <div id="view-servicios" class="view">
+          <!-- Table of Service Reports -->
+          <div class="section-card" style="margin-bottom:2rem;">
+            <h2 class="section-title"><i data-lucide="clipboard-list" style="color:var(--accent);"></i> Órdenes de Servicio Técnico</h2>
+            <div class="table-wrapper">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th>Folio</th>
+                    <th>Equipo</th>
+                    <th>Tipo</th>
+                    <th>Fecha</th>
+                    <th>Técnico</th>
+                    <th>Estado</th>
+                    <th style="text-align:right;">Reporte</th>
+                  </tr>
+                </thead>
+                <tbody id="services-table-body">
+                  <!-- JS Rendered Rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Document Downloads Grid -->
+          <div class="section-card">
+            <h2 class="section-title"><i data-lucide="download" style="color:var(--accent);"></i> Reportes PDF y Cotizaciones Firmadas</h2>
+            <div class="docs-downloads-grid" id="document-downloads-container">
+              <!-- JS Rendered PDF Cards -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. LOCATIONS VIEW -->
+        <div id="view-sitios" class="view">
+          <div class="section-card">
+            <h2 class="section-title"><i data-lucide="map-pin" style="color:var(--accent);"></i> Mis Frentes de Trabajo / Sitios</h2>
+            <div class="table-wrapper">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th>Nombre del Sitio</th>
+                    <th>Dirección</th>
+                    <th>Equipos en este Sitio</th>
+                  </tr>
+                </thead>
+                <tbody id="locations-table-body">
+                  <!-- JS Rendered Rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- MOBILE BOTTOM NAVIGATION BAR -->
+    <nav class="mobile-nav-bar">
+      <a href="#" class="mobile-nav-item active" data-target="dashboard">
+        <i data-lucide="layout-dashboard"></i>
+        <span>Inicio</span>
+      </a>
+      <a href="#" class="mobile-nav-item" data-target="maquinaria">
+        <i data-lucide="settings-2"></i>
+        <span>Equipos</span>
+      </a>
+      <a href="#" class="mobile-nav-item fab-btn" data-target="tickets" onclick="abrirReportarFallaRapidaMobile(event)">
+        <i data-lucide="alert-triangle"></i>
+        <span>Reportar</span>
+      </a>
+      <a href="#" class="mobile-nav-item" data-target="tickets">
+        <i data-lucide="ticket"></i>
+        <span>Tickets</span>
+      </a>
+      <a href="#" class="mobile-nav-item" data-target="servicios">
+        <i data-lucide="clipboard-list"></i>
+        <span>Servicios</span>
+      </a>
+    </nav>
+
+  </div>
+
+  <!-- ===== MODALS ===== -->
+  
+  <!-- Ticket Detail Modal -->
+  <div class="modal-overlay" id="modal-ticket">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-ticket-title">Detalle de Ticket</h3>
+        <button class="btn-close-modal" onclick="cerrarModal('modal-ticket')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body" id="modal-ticket-body">
+        <!-- JS Rendered -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="cerrarModal('modal-ticket')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order Detail Modal -->
+  <div class="modal-overlay" id="modal-order">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-order-title">Orden de Servicio</h3>
+        <button class="btn-close-modal" onclick="cerrarModal('modal-order')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body" id="modal-order-body">
+        <!-- JS Rendered -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" id="btn-download-pdf" style="display:none;"><i data-lucide="download"></i> Descargar Reporte PDF</button>
+        <button class="btn-secondary" onclick="cerrarModal('modal-order')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- JS DEPENDENCIES -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabaseClient.js?v=2"></script>
+  <script src="supabaseSync.js?v=62"></script>
+  <script src="cliente.js"></script>
+
+</body>
+</html>

@@ -1257,6 +1257,14 @@ async function _processSyncQueueInternal() {
           } else {
             console.error(`[Sync] Error en operación (${item.table} - ${item.action}):`, error.message);
             
+            // Guardar el mensaje de error en el primer item de la cola
+            const currentQueue = getSyncQueue();
+            if (currentQueue.length > 0) {
+              currentQueue[0].lastError = error.message;
+              currentQueue[0].lastErrorCode = error.code || 'N/A';
+              saveSyncQueue(currentQueue);
+            }
+            
             const isNetworkError = error.message && (
               error.message.includes('Failed to fetch') ||
               error.message.includes('network') ||
@@ -1627,6 +1635,21 @@ window.verDetallesSincronizacion = function() {
           
           itemEl.appendChild(headerEl);
           itemEl.appendChild(bodyEl);
+
+          // Si el elemento falló en un intento previo, mostrar el error en rojo
+          if (item.lastError) {
+            const errEl = document.createElement('div');
+            errEl.style.fontSize = '0.72rem';
+            errEl.style.color = '#ef4444';
+            errEl.style.marginTop = '0.25rem';
+            errEl.style.fontWeight = '600';
+            errEl.style.background = 'rgba(239, 68, 68, 0.05)';
+            errEl.style.border = '1px solid rgba(239, 68, 68, 0.12)';
+            errEl.style.padding = '0.35rem 0.5rem';
+            errEl.style.borderRadius = '6px';
+            errEl.innerHTML = `⚠️ Error: ${item.lastError} ${item.lastErrorCode ? `(Código: ${item.lastErrorCode})` : ''}`;
+            itemEl.appendChild(errEl);
+          }
           listaEl.appendChild(itemEl);
         });
       }

@@ -1130,7 +1130,7 @@ async function iniciarSesionSubmit(e) {
     // Ahora buscamos el rol en la tabla oficial del trigger
     const resRoles = await window.supabaseClient
       .from('user_roles')
-      .select('rol, activo, nombre')
+      .select('rol, activo, nombre, empresa')
       .eq('id', data.user.id)
       .single();
       
@@ -1152,13 +1152,13 @@ async function iniciarSesionSubmit(e) {
     }
 
     errEl.textContent = '';
-    currentSession = { userId: data.user.id, viewMode: roleData.rol, nombre: roleData.nombre, realUserId: data.user.id, realRol: roleData.rol };
+    currentSession = { userId: data.user.id, viewMode: roleData.rol, nombre: roleData.nombre, empresa: roleData.empresa, realUserId: data.user.id, realRol: roleData.rol };
     localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
     window.trackTelemetryEvent('Inicio de Sesión', { metodo: 'Contraseña/Database' });
     document.getElementById('login-email').value = '';
     document.getElementById('login-password').value = '';
     
-    entrarApp({ id: data.user.id, rol: roleData.rol, nombre: roleData.nombre });
+    entrarApp({ id: data.user.id, rol: roleData.rol, nombre: roleData.nombre, empresa: roleData.empresa });
   } catch (err) {
     console.error("Login exception:", err);
     errEl.textContent = "Error fatal: " + err.message;
@@ -1397,7 +1397,7 @@ document.addEventListener('DOMContentLoaded', () => {
            currentSession.realRol = found ? found.rol : saved.viewMode;
          }
        }
-       entrarApp({ id: saved.userId, rol: saved.viewMode, nombre: saved.nombre });
+       entrarApp({ id: saved.userId, rol: saved.viewMode, nombre: saved.nombre, empresa: saved.empresa });
 
        // Sincronizar y refrescar estado de sesión de Supabase en segundo plano
        if (window.supabaseClient && saved.userId !== 'superadmin' && saved.userId !== 'tecnico_test') {
@@ -1413,11 +1413,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (window.supabaseClient) {
        window.supabaseClient.auth.getSession().then(({ data: { session } }) => {
           if (session) {
-             window.supabaseClient.from('user_roles').select('rol, activo, nombre').eq('id', session.user.id).single().then(({data, error}) => {
+             window.supabaseClient.from('user_roles').select('rol, activo, nombre, empresa').eq('id', session.user.id).single().then(({data, error}) => {
                 if (data && data.activo !== false) {
-                   currentSession = { userId: session.user.id, viewMode: data.rol, nombre: data.nombre, realUserId: session.user.id, realRol: data.rol };
+                   currentSession = { userId: session.user.id, viewMode: data.rol, nombre: data.nombre, empresa: data.empresa, realUserId: session.user.id, realRol: data.rol };
                    localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
-                   entrarApp({ id: session.user.id, rol: data.rol, nombre: data.nombre });
+                   entrarApp({ id: session.user.id, rol: data.rol, nombre: data.nombre, empresa: data.empresa });
                 }
               }).catch(err => console.error('Error getting user role:', err));
             }
@@ -1755,7 +1755,14 @@ function applyRole(rolKey) {
     if (sessionNameEl) sessionNameEl.textContent = sessionName;
     
     const sessionRole = document.getElementById('session-role');
-    if (sessionRole) sessionRole.textContent = ROLES[currentSession.viewMode]?.label || '';
+    if (sessionRole) {
+      const isClientRole = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+      if (isClientRole && currentSession.empresa) {
+        sessionRole.textContent = currentSession.empresa;
+      } else {
+        sessionRole.textContent = ROLES[currentSession.viewMode]?.label || '';
+      }
+    }
 
     // Rename Maquinaria text if Empresa
     const isEmpresa = rolKey === 'empresa';
@@ -2832,6 +2839,18 @@ function abrirModalUsuario(id) {
     if (uEmail) uEmail.value = u.email || '';
     if (uTelefono) uTelefono.value = u.telefono || '';
     if (uActivo) uActivo.checked = u.activo !== false;
+    if (uEmpresa) uEmpresa.value = u.empresa || '';
+
+    // Mostrar sugerencia de empresa si la tiene
+    const uEmpresaSugerida = document.getElementById('u-empresa-sugerida');
+    if (u.empresa) {
+      if (uEmpresaSugerida) {
+        uEmpresaSugerida.innerHTML = `<i data-lucide="info" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i> Empresa indicada al registrarse: <strong>${u.empresa}</strong>`;
+        uEmpresaSugerida.style.display = 'block';
+      }
+    } else {
+      if (uEmpresaSugerida) uEmpresaSugerida.style.display = 'none';
+    }
     
     const radio = document.querySelector(`input[name="u-rol"][value="${u.rol}"]`);
     if (radio) {
@@ -2840,7 +2859,6 @@ function abrirModalUsuario(id) {
         if (uEmpresaContainer) uEmpresaContainer.style.display = 'block';
         if (uEmpresa) {
           uEmpresa.setAttribute('required', 'true');
-          uEmpresa.value = u.empresa || '';
         }
       }
     }
@@ -2866,7 +2884,7 @@ function toggleEmpresaField(radio) {
   } else {
     container.style.display = 'none';
     input.removeAttribute('required');
-    input.value = '';
+    // No borramos input.value para conservar la sugerencia que traiga el usuario
   }
 }
 
@@ -2901,6 +2919,17 @@ async function guardarUsuario(e) {
   if (!rol) { alert('Selecciona un rol para el usuario.'); return; }
   if (!window.supabaseClient) { alert('Error: no hay conexión con Supabase.'); return; }
 
+  // Verificar sesión activa en Supabase Auth antes de escribir
+  try {
+    const { data: { session }, error: sessionErr } = await window.supabaseClient.auth.getSession();
+    if (sessionErr || !session) {
+      alert('Error de Autenticación: Tu sesión de Supabase Auth ha expirado o no es válida. Por favor, cierra sesión en la app (con el botón "Cerrar Sesión" en la esquina inferior izquierda) y vuelve a ingresar.');
+      return;
+    }
+  } catch(e) {
+    console.error('Error al verificar sesión de Supabase Auth:', e);
+  }
+
   const updateData = { nombre, email, telefono, rol, activo: activo === true };
   if (rol === 'empresa' || rol === 'cliente') {
     if (!empresa) { alert('La empresa asociada es obligatoria.'); return; }
@@ -2922,16 +2951,16 @@ async function guardarUsuario(e) {
       return;
     }
 
-    // Si el registro de rol no existía, intentamos insertarlo
     if (!updateRes || updateRes.length === 0) {
-      const insertData = { id: editandoUserId, ...updateData };
-      const { error: insertErr } = await window.supabaseClient
-        .from('user_roles')
-        .insert(insertData);
+      alert('Error de Seguridad: No se actualizó ningún registro en Supabase (0 filas afectadas). Esto indica que la base de datos bloqueó la edición por políticas de seguridad RLS (por ejemplo, si no tienes el rol adecuado) o que el ID del usuario no coincide. Por favor, reporta este error.');
+      return;
+    }
 
-      if (insertErr) {
-        console.warn('[Supabase] No se pudo insertar en user_roles (puede ser un usuario sin registro en auth.users):', insertErr.message);
-      }
+    // Actualizar en el array local en memoria para refrescar la UI de inmediato
+    const localUIndex = usuarios.findIndex(x => x.id === editandoUserId);
+    if (localUIndex !== -1) {
+      usuarios[localUIndex] = { ...usuarios[localUIndex], ...updateData };
+      localStorage.setItem('eurorep_usuarios', JSON.stringify(usuarios));
     }
 
     // SI EL USUARIO EDITADO ES EL ACTUALMENTE LOGUEADO, ACTUALIZAMOS LA SESIÓN EN LOCAL DE INMEDIATO
@@ -10102,6 +10131,9 @@ window.ordenarTicketsPor = function(columna) {
 // ===== RENDER TICKETS =====
 function renderTickets(ctx) {
   try { actualizarFiltrosPersonal(); } catch (e) {}
+  if (window.updateNotificationBell) {
+    try { window.updateNotificationBell(); } catch (e) {}
+  }
   const isDashView = ctx === 'dash-tickets';
   const isV2 = ctx === 'v2';
   const bodyId = isDashView ? 'tabla-body-dash-tickets' : (isV2 ? 'v2-tickets-body' : 'tickets-body');
@@ -11535,16 +11567,30 @@ window.validarCotizacionConSAP = async function(isModal = true, ticketId = null)
 
   if (!statusDiv) return;
 
+  const tId = ticketId || editandoTicketId;
+  const btnId = `btn-pasar-cotizacion-${tId}`;
+  const btn = document.getElementById(btnId);
+
+  // Verificar si hay archivo PDF seleccionado o ya guardado en el ticket
+  const pdfInputId = isModal ? 't-cotizacion-pdf' : `quick-cot-pdf-${tId}`;
+  const fileInput = document.getElementById(pdfInputId);
+  
+  let ticket = null;
+  if (tId) {
+    ticket = tickets.find(t => t.id === tId);
+  }
+  
+  const hasUploadedFile = (fileInput && fileInput.files.length > 0) || (ticket && ticket.pdfCotizacion);
+
   if (!sapVal) {
     statusDiv.style.display = 'none';
     statusDiv.innerHTML = '';
+    if (btn) {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+    }
     return;
-  }
-
-  let ticket = null;
-  const tId = ticketId || editandoTicketId;
-  if (tId) {
-    ticket = tickets.find(t => t.id === tId);
   }
 
   statusDiv.style.display = 'block';
@@ -11563,6 +11609,11 @@ window.validarCotizacionConSAP = async function(isModal = true, ticketId = null)
           <div style="font-size:0.72rem; color:var(--text-muted);">Verifique el número ingresado o presione "Sincronizar con SAP".</div>
         </div>
       `;
+      if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'not-allowed';
+      }
       if (window.lucide) lucide.createIcons();
       return;
     }
@@ -11737,10 +11788,28 @@ window.validarCotizacionConSAP = async function(isModal = true, ticketId = null)
         </div>
       `;
     }
+
+    if (btn) {
+      if (isBlocked || !hasUploadedFile) {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'not-allowed';
+      } else {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+      }
+    }
+
     if (window.lucide) lucide.createIcons();
   } catch (errVal) {
     console.error('[SAP Validation] Error querying Supabase:', errVal);
     statusDiv.style.display = 'none';
+    if (btn) {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+    }
   }
 };
 
@@ -11749,6 +11818,92 @@ window.syncSapCotizacionManual = function(ticketId = null) {
   const btnId = isModal ? 'btn-sync-sap-cot' : `btn-sync-sap-cot-${ticketId}`;
   const btn = document.getElementById(btnId);
   sincronizarConGitHub('cotizaciones', btn);
+};
+
+// ===== NOTIFICATION BELL (TICKETS SIN ASIGNAR) =====
+window.toggleNotificationDropdown = function(event) {
+  if (event) event.stopPropagation();
+  const dd = document.getElementById('notification-dropdown');
+  if (dd) {
+    const isHidden = dd.style.display === 'none' || dd.style.display === '';
+    dd.style.display = isHidden ? 'block' : 'none';
+  }
+};
+
+document.addEventListener('click', function(e) {
+  const dd = document.getElementById('notification-dropdown');
+  const bell = document.getElementById('notification-bell-container');
+  if (dd && bell && !bell.contains(e.target)) {
+    dd.style.display = 'none';
+  }
+});
+
+window.updateNotificationBell = function() {
+  const badge = document.getElementById('notification-badge');
+  const dropCount = document.getElementById('notification-dropdown-count');
+  const container = document.getElementById('notification-items-container');
+  
+  if (!tickets) return;
+
+  // Filtrar según el modo Sandbox activo
+  const filteredTickets = getFilteredTickets();
+  
+  const unassigned = filteredTickets.filter(t => {
+    const asignadoClean = String(t.asignado || '').trim().toLowerCase();
+    const estadoClean = String(t.estado || '').trim().toLowerCase();
+    return (asignadoClean === 'sin asignar' || asignadoClean === '') && (estadoClean !== 'cerrado' && estadoClean !== 'finalizado');
+  });
+
+  if (badge) {
+    if (unassigned.length > 0) {
+      badge.textContent = unassigned.length;
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  if (dropCount) {
+    dropCount.textContent = unassigned.length;
+  }
+
+  if (container) {
+    if (unassigned.length === 0) {
+      container.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:0.75rem; padding:1.5rem; font-style:italic;">Todos los tickets están asignados.</div>`;
+    } else {
+      let html = '';
+      unassigned.forEach(t => {
+        const prioColor = t.prioridad === 'Alta' ? 'var(--red)' : (t.prioridad === 'Baja' ? 'var(--blue)' : 'var(--orange)');
+        const fechaFormat = t.fecha ? new Date(t.fecha).toLocaleDateString('es-MX', { day:'numeric', month:'short' }) : 'Reciente';
+        
+        html += `
+          <div style="padding:0.6rem 1rem; border-bottom:1px solid rgba(255,255,255,0.02); display:flex; flex-direction:column; gap:0.2rem; cursor:pointer; transition:background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="window.abrirTicketDesdeNotification('${t.id}')">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:700; font-size:0.78rem; color:var(--text-primary);">${t.folio || 'N/A'}</span>
+              <span style="background:${prioColor}15; color:${prioColor}; border:1px solid ${prioColor}30; padding:0.1rem 0.35rem; border-radius:4px; font-size:0.6rem; font-weight:600;">${t.prioridad || 'Media'}</span>
+            </div>
+            <span style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.asunto || 'Sin asunto'}</span>
+            <div style="display:flex; justify-content:space-between; font-size:0.65rem; color:var(--text-muted);">
+              <span>Cliente: ${t.cliente || 'Genérico'}</span>
+              <span>${fechaFormat}</span>
+            </div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+};
+
+window.abrirTicketDesdeNotification = function(ticketId) {
+  const dd = document.getElementById('notification-dropdown');
+  if (dd) dd.style.display = 'none';
+  
+  const navItem = document.querySelector('.nav-item[data-view="tickets"]');
+  if (navItem) {
+    navItem.click();
+  }
+  abrirTicket(ticketId);
 };
 
 // ===== TICKET FORM =====
@@ -11947,7 +12102,55 @@ function abrirTicket(id) {
     }
   }
 
+  // Cargar y mostrar la evidencia fotográfica del cliente si existe
+  const elAdminEvidencia = document.getElementById('group-t-admin-evidencia');
+  const imgAdminEvidencia = document.getElementById('t-admin-evidence-img');
+  const loaderAdminEvidencia = document.getElementById('t-admin-evidence-loading');
 
+  if (elAdminEvidencia && imgAdminEvidencia && loaderAdminEvidencia) {
+    if (t && t.pdfCotizacion && !t.cotizacionSAP) {
+      elAdminEvidencia.style.display = 'block';
+      const isPlaceholder = t.pdfCotizacion === '__HAS_PDF__';
+      if (isPlaceholder) {
+        imgAdminEvidencia.src = '';
+        imgAdminEvidencia.style.display = 'none';
+        loaderAdminEvidencia.style.display = 'inline-block';
+        
+        // Descargar bajo demanda
+        setTimeout(async () => {
+          try {
+            const { data, error } = await window.supabaseClient
+              .from('tickets')
+              .select('pdf_cotizacion')
+              .eq('id', t.id)
+              .single();
+            if (error) throw error;
+            const base64 = data ? data.pdf_cotizacion : null;
+            if (base64) {
+              t.pdfCotizacion = base64; // guardar localmente en caché
+              imgAdminEvidencia.src = base64;
+              imgAdminEvidencia.style.display = 'block';
+              loaderAdminEvidencia.style.display = 'none';
+            } else {
+              loaderAdminEvidencia.innerHTML = '<span style="color:var(--text-muted);">Sin imagen</span>';
+            }
+          } catch (err) {
+            console.error('Error cargando evidencia fotográfica en admin:', err);
+            loaderAdminEvidencia.innerHTML = '<span style="color:var(--red);">Error al cargar imagen</span>';
+          }
+        }, 50);
+      } else {
+        imgAdminEvidencia.src = t.pdfCotizacion;
+        imgAdminEvidencia.style.display = 'block';
+        loaderAdminEvidencia.style.display = 'none';
+      }
+    } else {
+      elAdminEvidencia.style.display = 'none';
+      imgAdminEvidencia.src = '';
+      imgAdminEvidencia.style.display = 'none';
+      loaderAdminEvidencia.style.display = 'none';
+    }
+  }
 
   toggleResolucionTicket();
   toggleMotivoRechazo();
@@ -12809,7 +13012,7 @@ function verDetalleTicket(id) {
           </div>
         </div>
         <div id="quick-sap-validation-status-${t.id}" style="display:none; margin-top: 0.25rem;"></div>
-        <button class="btn-primary" style="background:var(--accent); border-color:var(--accent); margin-top:0.25rem; justify-content:center;" onclick="avanzarCotizacionTicket('${t.id}')">Pasar a Cotización</button>
+        <button id="btn-pasar-cotizacion-${t.id}" class="btn-primary" style="background:var(--accent); border-color:var(--accent); margin-top:0.25rem; justify-content:center; ${!t.cotizacionSAP ? 'opacity:0.5; cursor:not-allowed;' : ''}" ${!t.cotizacionSAP ? 'disabled' : ''} onclick="avanzarCotizacionTicket('${t.id}')">Pasar a Cotización</button>
       </div>
       ` : ''}
     </div>
