@@ -14389,7 +14389,7 @@ function renderCalendario() {
 
 window.abrirRegistrarActividad = function() {
   document.getElementById('mra-id').value = '';
-  document.getElementById('mra-titulo-modal').textContent = 'Registrar Actividad';
+  document.getElementById('mra-titulo-modal').innerHTML = '<i data-lucide="calendar" style="width:20px; height:20px; color:var(--accent);"></i> Registrar Actividad';
   document.getElementById('mra-titulo').value = '';
   document.getElementById('mra-tipo').value = 'Junta';
   document.getElementById('mra-descripcion').value = '';
@@ -14409,6 +14409,9 @@ window.abrirRegistrarActividad = function() {
   selectOrden.innerHTML = '<option value="">Ninguna</option>' + activeOrds.map(o => `<option value="${o.id}">[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}</option>`).join('');
 
   document.getElementById('modal-registrar-actividad-overlay').classList.add('open');
+  if (window.lucide) {
+    window.lucide.createIcons({ root: document.getElementById('modal-registrar-actividad') });
+  }
 };
 
 window.mostrarDetalleEventoAdministrativo = function(eventId) {
@@ -14427,7 +14430,7 @@ window.mostrarDetalleEventoAdministrativo = function(eventId) {
   selectOrden.innerHTML = '<option value="">Ninguna</option>' + activeOrds.map(o => `<option value="${o.id}">[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}</option>`).join('');
 
   document.getElementById('mra-id').value = e.id;
-  document.getElementById('mra-titulo-modal').textContent = 'Editar Actividad';
+  document.getElementById('mra-titulo-modal').innerHTML = '<i data-lucide="edit" style="width:20px; height:20px; color:var(--accent);"></i> Editar Actividad';
   document.getElementById('mra-titulo').value = e.titulo || '';
   document.getElementById('mra-tipo').value = e.tipo || 'Junta';
   document.getElementById('mra-tecnico').value = e.tecnicoId || '';
@@ -14445,9 +14448,12 @@ window.mostrarDetalleEventoAdministrativo = function(eventId) {
 
   // Mostrar botón de eliminar solo para administradores y supervisores
   const isAdmin = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
-  document.getElementById('mra-btn-eliminar').style.display = isAdmin ? 'flex' : 'none';
+  document.getElementById('mra-btn-eliminar').style.display = isAdmin ? 'inline-flex' : 'none';
 
   document.getElementById('modal-registrar-actividad-overlay').classList.add('open');
+  if (window.lucide) {
+    window.lucide.createIcons({ root: document.getElementById('modal-registrar-actividad') });
+  }
 };
 
 window.guardarActividadCalendario = async function() {
