@@ -4928,18 +4928,20 @@
   </div>
 
   <!-- MODAL CONFIRMACIÓN PERSONALIZADO -->
-  <div id="modal-confirmacion-global" class="modal-overlay" style="z-index:999999; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); transition: opacity 0.2s ease;">
-    <div class="modal" style="max-width:400px; width:90%; border-radius:16px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); box-shadow:var(--shadow-xl); padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem; transform:scale(0.95); transition:transform 0.2s ease;">
-      <div style="display:flex; align-items:center; gap:0.75rem;">
-        <div style="background:rgba(239,68,68,0.12); color:#ef4444; border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-          <i data-lucide="help-circle" style="width:22px; height:22px;"></i>
+  <div id="modal-confirmacion-global" class="modal-overlay" style="z-index:999999; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(6px); transition: opacity 0.25s ease-in-out;">
+    <div class="modal" style="max-width:440px; width:92%; border-radius:20px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4); padding:2rem; display:flex; flex-direction:column; gap:1.25rem; transform:scale(0.9); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); border-top: 4px solid var(--accent, #E8820C);">
+      <div style="display:flex; gap:1rem; align-items:flex-start;">
+        <div id="modal-confirm-icon-container" style="background:rgba(232,130,12,0.1); color:var(--accent, #E8820C); border-radius:12px; width:48px; height:48px; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+          <i id="modal-confirm-icon" data-lucide="help-circle" style="width:24px; height:24px;"></i>
         </div>
-        <h3 id="modal-confirm-title" style="margin:0; font-size:1.15rem; font-weight:700; color:var(--text-primary);">Confirmación</h3>
+        <div style="display:flex; flex-direction:column; gap:0.35rem; flex:1;">
+          <h3 id="modal-confirm-title" style="margin:0; font-size:1.25rem; font-weight:700; color:var(--text-primary); font-family:var(--font-title, inherit); letter-spacing:-0.02em;">Confirmación</h3>
+          <p id="modal-confirm-message" style="margin:0; color:var(--text-secondary); font-size:0.95rem; line-height:1.6; font-weight:400;"></p>
+        </div>
       </div>
-      <p id="modal-confirm-message" style="margin:0; color:var(--text-secondary); font-size:0.9rem; line-height:1.5;"></p>
-      <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:0.25rem;">
-        <button type="button" id="modal-confirm-btn-cancel" class="btn-secondary" style="margin:0; padding:0.5rem 1rem; height:auto; font-size:0.85rem;">Cancelar</button>
-        <button type="button" id="modal-confirm-btn-accept" class="btn-primary" style="margin:0; padding:0.5rem 1rem; height:auto; font-size:0.85rem;">Aceptar</button>
+      <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:0.5rem; border-top:1px solid var(--border); padding-top:1.25rem;">
+        <button type="button" id="modal-confirm-btn-cancel" class="btn-secondary" style="margin:0; padding:0.6rem 1.25rem; height:auto; font-size:0.9rem; font-weight:600; border-radius:10px; transition: all 0.2s;">Cancelar</button>
+        <button type="button" id="modal-confirm-btn-accept" class="btn-primary" style="margin:0; padding:0.6rem 1.25rem; height:auto; font-size:0.9rem; font-weight:600; border-radius:10px; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.15);">Aceptar</button>
       </div>
     </div>
   </div>
@@ -4948,7 +4950,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js?v=2"></script>
   <script src="supabaseSync.js?v=65"></script>
-  <script src="app.js?v=157"></script>
+  <script src="app.js?v=158"></script>
   <script>lucide.createIcons();</script>
 </body>
 

@@ -22937,25 +22937,50 @@ window.confirmarAccion = function(options = {}) {
     const messageEl = document.getElementById('modal-confirm-message');
     const btnCancel = document.getElementById('modal-confirm-btn-cancel');
     const btnAccept = document.getElementById('modal-confirm-btn-accept');
+    const iconContainer = document.getElementById('modal-confirm-icon-container');
+    const modalContent = modal.querySelector('.modal');
     
     titleEl.textContent = options.titulo || 'Confirmación';
     messageEl.textContent = options.mensaje || '¿Estás seguro de realizar esta acción?';
     btnCancel.textContent = options.textoCancelar || 'Cancelar';
     btnAccept.textContent = options.textoAceptar || 'Aceptar';
     
+    // Configurar icono dinámico
+    if (iconContainer) {
+      const iconName = options.esPeligroso ? (options.icono || 'alert-triangle') : (options.icono || 'help-circle');
+      iconContainer.innerHTML = `<i id="modal-confirm-icon" data-lucide="${iconName}" style="width:24px; height:24px;"></i>`;
+    }
+    
+    // Configurar colores según tipo de confirmación
     if (options.esPeligroso) {
       btnAccept.style.background = 'var(--red, #ef4444)';
       btnAccept.style.borderColor = 'var(--red, #ef4444)';
       btnAccept.style.color = '#ffffff';
+      if (modalContent) modalContent.style.borderTop = '4px solid var(--red, #ef4444)';
+      if (iconContainer) {
+        iconContainer.style.background = 'rgba(239,68,68,0.12)';
+        iconContainer.style.color = '#ef4444';
+      }
     } else {
       btnAccept.style.background = 'var(--accent, #E8820C)';
       btnAccept.style.borderColor = 'var(--accent, #E8820C)';
       btnAccept.style.color = '#ffffff';
+      if (modalContent) modalContent.style.borderTop = '4px solid var(--accent, #E8820C)';
+      if (iconContainer) {
+        iconContainer.style.background = 'rgba(232,130,12,0.12)';
+        iconContainer.style.color = 'var(--accent, #E8820C)';
+      }
     }
     
     const cleanUp = () => {
-      modal.style.display = 'none';
-      modal.classList.remove('open');
+      modal.style.opacity = '0';
+      if (modalContent) {
+        modalContent.style.transform = 'scale(0.9)';
+      }
+      setTimeout(() => {
+        modal.style.display = 'none';
+        modal.classList.remove('open');
+      }, 200);
       btnCancel.onclick = null;
       btnAccept.onclick = null;
     };
@@ -22972,9 +22997,19 @@ window.confirmarAccion = function(options = {}) {
       resolve(true);
     };
     
+    // Resetear estilos iniciales de animación
+    modal.style.opacity = '0';
+    if (modalContent) {
+      modalContent.style.transform = 'scale(0.9)';
+    }
+    
     modal.style.display = 'flex';
     setTimeout(() => {
       modal.classList.add('open');
+      modal.style.opacity = '1';
+      if (modalContent) {
+        modalContent.style.transform = 'scale(1)';
+      }
     }, 10);
     
     if (window.lucide) {
