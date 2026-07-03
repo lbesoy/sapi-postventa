@@ -657,17 +657,27 @@ window.addEventListener('supabase_datos_cargados', () => {
   configData = safeGetJSON('eurorep_config', {});
   cargarRolesDesdeStorage();
 
-  // Ejecutar migración para rellenar datos de maquinaria perdidos en órdenes previas
-  window.migrarOrdenesExistentesMaquinaria();
+  // Ejecutar migraciones heredadas solo una vez por sesión y solo para administradores
+  // Esto previene bucles infinitos de escritura y consultas redundantes en clientes no-admin
+  const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
+  const isAdmin = ['superadmin', 'admin'].includes(session.viewMode || session.rol);
+  
+  if (isAdmin && !sessionStorage.getItem('eurorep_migrations_executed')) {
+    sessionStorage.setItem('eurorep_migrations_executed', 'true');
+    console.log('[App] Iniciando migraciones heredadas únicas de la sesión para administrador...');
 
-  // Ejecutar migración para rellenar ubicaciones de maquinaria perdidas desde tickets
-  if (typeof window.migrarUbicacionesMaquinariaDesdeTickets === 'function') {
-    window.migrarUbicacionesMaquinariaDesdeTickets();
-  }
+    // Ejecutar migración para rellenar datos de maquinaria perdidos en órdenes previas
+    window.migrarOrdenesExistentesMaquinaria();
 
-  // Ejecutar recuperación de maquinaria desaparecida desde los tickets
-  if (typeof window.recuperarMaquinariaDesdeTickets === 'function') {
-    window.recuperarMaquinariaDesdeTickets();
+    // Ejecutar migración para rellenar ubicaciones de maquinaria perdidas desde tickets
+    if (typeof window.migrarUbicacionesMaquinariaDesdeTickets === 'function') {
+      window.migrarUbicacionesMaquinariaDesdeTickets();
+    }
+
+    // Ejecutar recuperación de maquinaria desaparecida desde los tickets
+    if (typeof window.recuperarMaquinariaDesdeTickets === 'function') {
+      window.recuperarMaquinariaDesdeTickets();
+    }
   }
 
   // Auto-sincronizar cualquier gasto local huérfano (no sincronizado en la base de datos)
@@ -14361,6 +14371,10 @@ function renderCalendario() {
   try {
     const adminEvents = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
     adminEvents.forEach(e => {
+      // Si tiene ordenId, no lo renderizamos como evento administrativo duplicado,
+      // porque ya se renderiza de manera más precisa desde la bitácora de la orden
+      if (e.ordenId) return;
+
       // Filtrar por técnico si hay filtro activo
       if (filtroTecnico) {
         const u = usuarios.find(usr => usr.nombre === filtroTecnico || usr.id === filtroTecnico);
@@ -14368,12 +14382,11 @@ function renderCalendario() {
         if (e.tecnicoId !== uId && e.tecnicoNombre !== filtroTecnico) return;
       }
 
-      let eventColor = e.color || '#3b82f6';
-      if (e.tipo === 'Junta') eventColor = '#8b5cf6';
-      else if (e.tipo === 'Capacitación') eventColor = '#ec4899';
-      else if (e.tipo === 'Vacaciones') eventColor = '#f59e0b';
-      else if (e.tipo === 'Descanso') eventColor = '#10b981';
-      else if (e.tipo === 'Servicio') eventColor = '#ef4444';
+      let eventColor = '#3b82f6'; // Azul por defecto
+      if (e.tipo === 'Junta' || e.tipo === 'Capacitación') eventColor = '#8b5cf6'; // Morado: Asignación Programada
+      else if (e.tipo === 'Vacaciones') eventColor = '#f59e0b'; // Naranja: Vacaciones
+      else if (e.tipo === 'Descanso') eventColor = '#10b981'; // Verde: Descanso (Completado/Tiempo libre)
+      else eventColor = '#3b82f6'; // Azul: Trabajo/Actividad sin asignación
 
       eventos.push({
         id: e.id,

@@ -1111,6 +1111,15 @@ async function _processSyncQueueInternal() {
                   if (!dbTecnico && b.tecnico) {
                     dbNota += `\n[Técnico: ${b.tecnico}]`;
                   }
+                  if (typeof b.realizado !== 'undefined') {
+                    dbNota += `\n[Realizado: ${b.realizado}]`;
+                  }
+                  if (b.programadoEntrada && b.programadoSalida) {
+                    dbNota += `\n[Prog: ${b.programadoEntrada}-${b.programadoSalida}]`;
+                  }
+                  if (b.desviacion) {
+                    dbNota += `\n[Desv: ${b.desviacion}]`;
+                  }
                   return {
                     id: b.id,
                     orden_id: ordId,
@@ -2098,6 +2107,40 @@ window.cargarDatosDeSupabase = function() {
             
             let tecnico = b.tecnico;
             let nota = b.nota || '';
+            let realizado = true;
+            let programadoEntrada = null;
+            let programadoSalida = null;
+            let desviacion = null;
+
+            if (nota.includes('[Realizado: ')) {
+              const match = nota.match(/\n\[Realizado: (.*?)\]/);
+              if (match) {
+                realizado = match[1] === 'true';
+                nota = nota.replace(/\n\[Realizado: (.*?)\]/g, '');
+              }
+            } else {
+              // Retrocompatibilidad
+              const esPendiente = nota.includes('Programado por supervisor');
+              realizado = !esPendiente;
+            }
+
+            if (nota.includes('[Prog: ')) {
+              const match = nota.match(/\n\[Prog: (.*?)-(.*?)\]/);
+              if (match) {
+                programadoEntrada = match[1];
+                programadoSalida = match[2];
+                nota = nota.replace(/\n\[Prog: (.*?)-(.*?)\]/g, '');
+              }
+            }
+
+            if (nota.includes('[Desv: ')) {
+              const match = nota.match(/\n\[Desv: (.*?)\]/);
+              if (match) {
+                desviacion = match[1];
+                nota = nota.replace(/\n\[Desv: (.*?)\]/g, '');
+              }
+            }
+
             if (!tecnico && nota.includes('[Técnico: ')) {
               const match = nota.match(/\n\[Técnico: (.*?)\]$/);
               if (match) {
@@ -2112,7 +2155,11 @@ window.cargarDatosDeSupabase = function() {
               tecnico: tecnico,
               nota: nota,
               entrada: b.entrada,
-              salida: b.salida
+              salida: b.salida,
+              realizado: realizado,
+              programadoEntrada: programadoEntrada,
+              programadoSalida: programadoSalida,
+              desviacion: desviacion
             });
           });
         }
@@ -2521,101 +2568,222 @@ function setupRealtime() {
     return;
   }
 
-  const handleUpdate = async (tableName) => {
+  const handleUpdate = async (tableName, payload) => {
     try {
-      console.log(`[Supabase Realtime] Cambio detectado en la tabla: ${tableName}. Actualizando...`);
-      const { data, error } = await window.supabaseClient.from(tableName).select('*');
-      if (!error && data) {
-        if (tableName === 'tickets') {
-          const mapped = data.map(rowToTicket);
-          localStorage.setItem('sapi_tickets', JSON.stringify(mapped));
-          window._supaTickets = mapped;
-        } else if (tableName === 'ordenes') {
-          const mapped = data.map(rowToOrden);
-          localStorage.setItem('sapi_ordenes', JSON.stringify(mapped));
-          window._supaOrdenes = mapped;
-        } else if (tableName === 'clara_transactions') {
-          const mappedClara = data.map(row => ({
-            id: row.id,
-            fecha: row.fecha ? row.fecha.split('T')[0] : '',
-            merchant: row.merchant,
-            monto: Number(row.monto),
-            cardLast4: padCard(row.card_last_4),
-            usuario: row.usuario || 'Técnico Asignado',
-            categoria: row.categoria || 'Otros',
-            fechaTransaccion: row.fecha_transaccion,
-            estadoCuenta: row.estado_cuenta,
-            transaccion: row.transaccion,
-            montoOriginal: Number(row.monto_original || 0),
-            monedaOriginal: row.moneda_original,
-            montoMxn: Number(row.monto_mxn || 0),
-            tarjeta: padCard(row.tarjeta),
-            aliasTarjeta: row.alias_tarjeta,
-            estado: row.estado,
-            estadoAprobacion: row.estado_aprobacion,
-            nombreAprobador: row.nombre_aprobador,
-            notaAprobacion: row.nota_aprobacion,
-            codigoAutorizacion: row.codigo_autorizacion,
-            categoriaClara: row.categoria_clara,
-            facturaElectronica: row.factura_electronica,
-            facturaAutovinculada: row.factura_autovinculada,
-            archivosFactura: row.archivos_factura,
-            anexos: row.anexos,
-            archivosAnexo: row.archivos_anexo,
-            folioFiscal: row.folio_fiscal,
-            titular: row.titular,
-            grupos: row.grupos,
-            ubicacion: row.ubicacion,
-            etiquetas: row.etiquetas,
-            descripcion: row.descripcion
-          }));
-          localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(mappedClara));
-          window._supaClaraTxs = mappedClara;
-        } else if (tableName === 'sapi_telemetry') {
-          const { data: telemetryDb, error: telemetryErr } = await window.supabaseClient.from('sapi_telemetry').select('*').limit(300).order('timestamp', { ascending: false });
-          if (!telemetryErr && telemetryDb && telemetryDb.length > 0) {
-            const mapped = telemetryDb.map(t => ({
-              id: t.id,
-              userId: t.user_id,
-              userName: t.user_name,
-              userRole: t.user_role,
-              action: t.action,
-              details: t.details || {},
-              timestamp: t.timestamp,
-              userAgent: t.user_agent
-            }));
-            localStorage.setItem('sapi_telemetry_events', JSON.stringify(mapped));
-            
-            // Re-render dashboard live if they are currently on the telemetry tab
-            const activeView = document.querySelector('.view.active');
-            if (activeView && activeView.id === 'view-telemetry' && window.renderTelemetryDashboard) {
-              window.renderTelemetryDashboard();
-            }
-          }
-        } else if (tableName === 'calendario_eventos') {
-          const mapped = data.map(rowToEvento);
-          localStorage.setItem('sapi_calendario_eventos', JSON.stringify(mapped));
-          window._supaCalendarioEventos = mapped;
-        } else if (tableName === 'clara_cards') {
-          const mappedCards = data.map(row => ({
-            id: row.id,
-            alias: row.alias,
-            usuario: row.usuario,
-            correo: row.correo,
-            estado: row.estado,
-            tipo: row.tipo,
-            tarjeta: padCard(row.tarjeta),
-            limite: Number(row.limite || 0),
-            saldoUtilizado: Number(row.saldo_utilizado || 0),
-            ultimaActualizacion: row.ultima_actualizacion,
-            dondeComprar: row.donde_comprar,
-            usuarioVinculadoId: row.usuario_vinculado_id || null
-          }));
-          localStorage.setItem('sapi_clara_cards', JSON.stringify(mappedCards));
-          window._supaClaraCards = mappedCards;
-        }
-        window.dispatchEvent(new Event('supabase_datos_cargados'));
+      console.log(`[Supabase Realtime] Cambio detectado en la tabla: ${tableName}. Evento: ${payload?.eventType || 'SELECT_FALLBACK'}`);
+      
+      let data = [];
+      let isFallback = !payload || !payload.eventType;
+
+      if (isFallback) {
+        const { data: dbData, error } = await window.supabaseClient.from(tableName).select('*');
+        if (error) throw error;
+        data = dbData || [];
       }
+
+      if (tableName === 'tickets') {
+        let mapped = [];
+        if (!isFallback) {
+          const current = window._supaTickets || JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+          if (payload.eventType === 'DELETE') {
+            mapped = current.filter(t => t.id !== payload.old.id);
+          } else {
+            const ticket = rowToTicket(payload.new);
+            const idx = current.findIndex(t => t.id === ticket.id);
+            if (idx > -1) {
+              current[idx] = ticket;
+            } else {
+              current.unshift(ticket);
+            }
+            mapped = current;
+          }
+        } else {
+          mapped = data.map(rowToTicket);
+        }
+        localStorage.setItem('sapi_tickets', JSON.stringify(mapped));
+        window._supaTickets = mapped;
+
+      } else if (tableName === 'ordenes') {
+        let mapped = [];
+        if (!isFallback) {
+          const current = window._supaOrdenes || JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+          if (payload.eventType === 'DELETE') {
+            mapped = current.filter(o => o.id !== payload.old.id);
+          } else {
+            const orden = rowToOrden(payload.new);
+            const idx = current.findIndex(o => o.id === orden.id);
+            if (idx > -1) {
+              current[idx] = orden;
+            } else {
+              current.unshift(orden);
+            }
+            mapped = current;
+          }
+        } else {
+          mapped = data.map(rowToOrden);
+        }
+        localStorage.setItem('sapi_ordenes', JSON.stringify(mapped));
+        window._supaOrdenes = mapped;
+
+      } else if (tableName === 'clara_transactions') {
+        let mappedClara = [];
+        const mapTx = row => ({
+          id: row.id,
+          fecha: row.fecha ? row.fecha.split('T')[0] : '',
+          merchant: row.merchant,
+          monto: Number(row.monto),
+          cardLast4: padCard(row.card_last_4),
+          usuario: row.usuario || 'Técnico Asignado',
+          categoria: row.categoria || 'Otros',
+          fechaTransaccion: row.fecha_transaccion,
+          estadoCuenta: row.estado_cuenta,
+          transaccion: row.transaccion,
+          montoOriginal: Number(row.monto_original || 0),
+          monedaOriginal: row.moneda_original,
+          montoMxn: Number(row.monto_mxn || 0),
+          tarjeta: padCard(row.tarjeta),
+          aliasTarjeta: row.alias_tarjeta,
+          estado: row.estado,
+          estadoAprobacion: row.estado_aprobacion,
+          nombreAprobador: row.nombre_aprobador,
+          notaAprobacion: row.nota_aprobacion,
+          codigoAutorizacion: row.codigo_autorizacion,
+          categoriaClara: row.categoria_clara,
+          facturaElectronica: row.factura_electronica,
+          facturaAutovinculada: row.factura_autovinculada,
+          archivosFactura: row.archivos_factura,
+          anexos: row.anexos,
+          archivosAnexo: row.archivos_anexo,
+          folioFiscal: row.folio_fiscal,
+          titular: row.titular,
+          grupos: row.grupos,
+          ubicacion: row.ubicacion,
+          etiquetas: row.etiquetas,
+          descripcion: row.descripcion
+        });
+
+        if (!isFallback) {
+          const current = window._supaClaraTxs || JSON.parse(localStorage.getItem('sapi_clara_mock_txs') || '[]');
+          if (payload.eventType === 'DELETE') {
+            mappedClara = current.filter(t => t.id !== payload.old.id);
+          } else {
+            const tx = mapTx(payload.new);
+            const idx = current.findIndex(t => t.id === tx.id);
+            if (idx > -1) {
+              current[idx] = tx;
+            } else {
+              current.unshift(tx);
+            }
+            mappedClara = current;
+          }
+        } else {
+          mappedClara = data.map(mapTx);
+        }
+        localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(mappedClara));
+        window._supaClaraTxs = mappedClara;
+
+      } else if (tableName === 'sapi_telemetry') {
+        let mapped = [];
+        const mapTelemetry = t => ({
+          id: t.id,
+          userId: t.user_id,
+          userName: t.user_name,
+          userRole: t.user_role,
+          action: t.action,
+          details: t.details || {},
+          timestamp: t.timestamp,
+          userAgent: t.user_agent
+        });
+
+        if (!isFallback) {
+          const current = JSON.parse(localStorage.getItem('sapi_telemetry_events') || '[]');
+          if (payload.eventType === 'DELETE') {
+            mapped = current.filter(t => t.id !== payload.old.id);
+          } else {
+            const item = mapTelemetry(payload.new);
+            const idx = current.findIndex(t => t.id === item.id);
+            if (idx > -1) {
+              current[idx] = item;
+            } else {
+              current.unshift(item);
+            }
+            mapped = current.slice(0, 300);
+          }
+        } else {
+          const { data: telemetryDb, error: telemetryErr } = await window.supabaseClient.from('sapi_telemetry').select('*').limit(300).order('timestamp', { ascending: false });
+          if (!telemetryErr && telemetryDb) {
+            mapped = telemetryDb.map(mapTelemetry);
+          }
+        }
+        localStorage.setItem('sapi_telemetry_events', JSON.stringify(mapped));
+
+        // Re-render dashboard live if they are currently on the telemetry tab
+        const activeView = document.querySelector('.view.active');
+        if (activeView && activeView.id === 'view-telemetry' && window.renderTelemetryDashboard) {
+          window.renderTelemetryDashboard();
+        }
+
+      } else if (tableName === 'calendario_eventos') {
+        let mapped = [];
+        if (!isFallback) {
+          const current = window._supaCalendarioEventos || JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+          if (payload.eventType === 'DELETE') {
+            mapped = current.filter(e => e.id !== payload.old.id);
+          } else {
+            const evento = rowToEvento(payload.new);
+            const idx = current.findIndex(e => e.id === evento.id);
+            if (idx > -1) {
+              current[idx] = evento;
+            } else {
+              current.unshift(evento);
+            }
+            mapped = current;
+          }
+        } else {
+          mapped = data.map(rowToEvento);
+        }
+        localStorage.setItem('sapi_calendario_eventos', JSON.stringify(mapped));
+        window._supaCalendarioEventos = mapped;
+
+      } else if (tableName === 'clara_cards') {
+        let mappedCards = [];
+        const mapCard = row => ({
+          id: row.id,
+          alias: row.alias,
+          usuario: row.usuario,
+          correo: row.correo,
+          estado: row.estado,
+          tipo: row.tipo,
+          tarjeta: padCard(row.tarjeta),
+          limite: Number(row.limite || 0),
+          saldoUtilizado: Number(row.saldo_utilizado || 0),
+          ultimaActualizacion: row.ultima_actualizacion,
+          dondeComprar: row.donde_comprar,
+          usuarioVinculadoId: row.usuario_vinculado_id || null
+        });
+
+        if (!isFallback) {
+          const current = window._supaClaraCards || JSON.parse(localStorage.getItem('sapi_clara_cards') || '[]');
+          if (payload.eventType === 'DELETE') {
+            mappedCards = current.filter(c => c.id !== payload.old.id);
+          } else {
+            const card = mapCard(payload.new);
+            const idx = current.findIndex(c => c.id === card.id);
+            if (idx > -1) {
+              current[idx] = card;
+            } else {
+              current.unshift(card);
+            }
+            mappedCards = current;
+          }
+        } else {
+          mappedCards = data.map(mapCard);
+        }
+        localStorage.setItem('sapi_clara_cards', JSON.stringify(mappedCards));
+        window._supaClaraCards = mappedCards;
+      }
+      
+      window.dispatchEvent(new Event('supabase_datos_cargados'));
     } catch (e) {
       console.error(`[Realtime] Error al procesar actualización de la tabla ${tableName}:`, e.message);
     }
@@ -2626,12 +2794,12 @@ function setupRealtime() {
       window.supabaseClient.removeChannel(window.supabaseRealtimeChannel);
     }
     window.supabaseRealtimeChannel = window.supabaseClient.channel('custom-all-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => handleUpdate('tickets'))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes' }, () => handleUpdate('ordenes'))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'clara_transactions' }, () => handleUpdate('clara_transactions'))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'clara_cards' }, () => handleUpdate('clara_cards'))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sapi_telemetry' }, () => handleUpdate('sapi_telemetry'))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'calendario_eventos' }, () => handleUpdate('calendario_eventos'));
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, (payload) => handleUpdate('tickets', payload))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes' }, (payload) => handleUpdate('ordenes', payload))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clara_transactions' }, (payload) => handleUpdate('clara_transactions', payload))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clara_cards' }, (payload) => handleUpdate('clara_cards', payload))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sapi_telemetry' }, (payload) => handleUpdate('sapi_telemetry', payload))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'calendario_eventos' }, (payload) => handleUpdate('calendario_eventos', payload));
       
     window.supabaseRealtimeChannel.subscribe();
   } catch (err) {
