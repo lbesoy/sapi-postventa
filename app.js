@@ -8173,6 +8173,16 @@ function guardarOrden(e) {
   } else if (oVieja) {
     tecnicosSeleccionados = oVieja.tecnicosAsignados || (oVieja.tecnico ? oVieja.tecnico.split(',').map(s => s.trim()) : []);
   }
+
+  // Si el usuario que guarda es técnico, nos aseguramos de que esté asignado a la orden
+  if (currentSession.viewMode === 'tecnico') {
+    const currentUser = usuarios.find(u => u.id === currentSession.userId);
+    const miTecnicoNombre = currentUser ? currentUser.nombre : '';
+    if (miTecnicoNombre && !tecnicosSeleccionados.includes(miTecnicoNombre)) {
+      tecnicosSeleccionados.push(miTecnicoNombre);
+    }
+  }
+
   let folioVal = document.getElementById('f-folio').value.trim();
   if (!editandoId && isTestModeActive()) {
     if (folioVal && !folioVal.startsWith('[PRUEBA]')) {
