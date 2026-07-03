@@ -2084,13 +2084,87 @@ body.light-mode .badge-metodo-reembolso { background: rgba(100, 116, 139, 0.08);
   border: 1px solid var(--border);
 }
 
-/* Media query to switch table/cards */
+/* Media query to switch table/cards and general mobile overrides */
 @media screen and (max-width: 768px) {
   .gastos-desktop-table {
     display: none !important;
   }
   .gastos-mobile-cards {
     display: flex !important;
+  }
+
+  /* Scrollable view-toggle tabs on mobile globally */
+  .view-toggle {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 0.35rem !important;
+    margin: 0 !important;
+    padding: 0.3rem !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+  }
+  .view-toggle::-webkit-scrollbar {
+    display: none; /* Safari/Chrome */
+  }
+  .view-toggle button {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+    font-size: 0.8rem !important;
+    padding: 0.45rem 0.85rem !important;
+  }
+
+  /* Stack KPIs / Stats in 1 column to prevent overflow */
+  #view-gastos .stats-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+    width: 100% !important;
+  }
+  #view-gastos .stat-card {
+    padding: 1rem !important;
+  }
+  #view-gastos .stat-value {
+    font-size: 1.5rem !important;
+  }
+
+  /* Wrap main header actions dynamically */
+  #view-gastos .section-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+  }
+  #view-gastos .section-header div {
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
+  #view-gastos .section-header button {
+    flex: 1 !important;
+    font-size: 0.8rem !important;
+    padding: 0.5rem !important;
+  }
+
+  /* Search and select inputs stretching on mobile */
+  #view-gastos .search-bar-container {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 0.75rem !important;
+    gap: 0.5rem !important;
+  }
+  #view-gastos .search-bar {
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+  #view-gastos #filter-gasto-estado {
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+  
+  /* Ensure page content has correct padding and behaves well */
+  .view {
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
   }
 }
 
