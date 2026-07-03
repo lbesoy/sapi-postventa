@@ -1,4 +1,4 @@
-const CACHE_NAME = 'eurorep-postventa-v211';
+const CACHE_NAME = 'eurorep-postventa-v212';
 const ASSETS = [
   '/',
   '/index.html',

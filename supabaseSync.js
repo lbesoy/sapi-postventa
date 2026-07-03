@@ -60,7 +60,6 @@ if (typeof JSON !== 'undefined' && !JSON.parse.__isSafeWrapper) {
       try {
         return originalParse.call(JSON, text, reviver);
       } catch (err) {
-        console.warn('[JSON Sync] Parseo seguro interceptado ante error:', err.message);
         if (typeof text === 'string') {
           const trimmed = text.trim();
           if (trimmed.startsWith('[')) return [];
@@ -1433,7 +1432,7 @@ function updateSyncStatusUI() {
   const queue = getSyncQueue();
   const pendingCount = queue.length;
   if (pendingCount > 0) {
-    console.log('[Sync] Cola de sincronización pendiente:', queue);
+    console.log('[Sync] Cola de sincronización pendiente: ' + pendingCount + ' elementos.');
   }
 
   container.classList.remove('status-online', 'status-syncing', 'status-offline');
@@ -2113,10 +2112,10 @@ window.cargarDatosDeSupabase = function() {
             let desviacion = null;
 
             if (nota.includes('[Realizado: ')) {
-              const match = nota.match(/\n\[Realizado: (.*?)\]/);
+              const match = nota.match(/(?:\r?\n|^)\[Realizado: (.*?)\]/);
               if (match) {
                 realizado = match[1] === 'true';
-                nota = nota.replace(/\n\[Realizado: (.*?)\]/g, '');
+                nota = nota.replace(/(?:\r?\n|^)\[Realizado: (.*?)\]/g, '');
               }
             } else {
               // Retrocompatibilidad
@@ -2125,19 +2124,19 @@ window.cargarDatosDeSupabase = function() {
             }
 
             if (nota.includes('[Prog: ')) {
-              const match = nota.match(/\n\[Prog: (.*?)-(.*?)\]/);
+              const match = nota.match(/(?:\r?\n|^)\[Prog: (.*?)-(.*?)\]/);
               if (match) {
                 programadoEntrada = match[1];
                 programadoSalida = match[2];
-                nota = nota.replace(/\n\[Prog: (.*?)-(.*?)\]/g, '');
+                nota = nota.replace(/(?:\r?\n|^)\[Prog: (.*?)-(.*?)\]/g, '');
               }
             }
 
             if (nota.includes('[Desv: ')) {
-              const match = nota.match(/\n\[Desv: (.*?)\]/);
+              const match = nota.match(/(?:\r?\n|^)\[Desv: (.*?)\]/);
               if (match) {
                 desviacion = match[1];
-                nota = nota.replace(/\n\[Desv: (.*?)\]/g, '');
+                nota = nota.replace(/(?:\r?\n|^)\[Desv: (.*?)\]/g, '');
               }
             }
 
