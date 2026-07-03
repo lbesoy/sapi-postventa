@@ -3143,19 +3143,6 @@ function setupNav() {
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       viewEl.classList.add('active');
 
-      console.log('[Debug View] Vista cambiada a:', view);
-      if (viewEl) {
-        console.log('[Debug View] Clases:', viewEl.className);
-        console.log('[Debug View] Estilo inline display:', viewEl.style.display);
-        console.log('[Debug View] Computed style display:', window.getComputedStyle(viewEl).display);
-        console.log('[Debug View] Computed style visibility:', window.getComputedStyle(viewEl).visibility);
-        console.log('[Debug View] Computed style opacity:', window.getComputedStyle(viewEl).opacity);
-        console.log('[Debug View] Elemento padre:', viewEl.parentElement.tagName, 'ID:', viewEl.parentElement.id, 'Clases:', viewEl.parentElement.className);
-        console.log('[Debug View] Cantidad de elementos hijos:', viewEl.children.length);
-        Array.from(viewEl.children).forEach((child, idx) => {
-          console.log('[Debug Child ' + idx + '] Tag:', child.tagName, 'ID:', child.id, 'Clases:', child.className, 'Computed display:', window.getComputedStyle(child).display, 'Height:', child.offsetHeight);
-        });
-      }
 
       // Track telemetry tab view (excluding the telemetry monitoring module itself)
       if (window.trackTelemetryEvent && view !== 'telemetry') {
