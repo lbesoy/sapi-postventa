@@ -10499,7 +10499,6 @@ function renderTickets(ctx) {
     }
   }
 }
-}
 
 function badgeTicketEstado(tOrEstado) {
   const estado = typeof tOrEstado === 'object' ? tOrEstado.estado : tOrEstado;
