@@ -88,7 +88,7 @@
       }
     } else if (typeof window !== 'undefined') {
       // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
-      const currentAppVer = '1.3.147';
+      const currentAppVer = '1.3.148';
       const lastAppVer = localStorage.getItem('sapi_app_version');
       if (lastAppVer && lastAppVer !== currentAppVer) {
         if ('serviceWorker' in navigator) {
@@ -340,7 +340,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version">v1.3.147</div>
+          <div class="sidebar-version">v1.3.148</div>
         </div>
       </div>
     </aside>
@@ -689,7 +689,7 @@
 
           </div><!-- /dash-content-v2 -->
           
-          </div><!-- /dash-v1 -->
+          <!-- /dash-v1 -->
 
         </div>
 
@@ -5173,7 +5173,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js?v=2"></script>
   <script src="supabaseSync.js?v=66"></script>
-  <script src="app.js?v=163"></script>
+  <script src="app.js?v=164"></script>
   <script>lucide.createIcons();</script>
 </body>
 
