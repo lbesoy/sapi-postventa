@@ -3407,6 +3407,14 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
 
 // ===== STATS =====
 function renderStats() {
+  try {
+    _renderStatsInternal();
+  } catch (error) {
+    console.error("Error in renderStats:", error);
+  }
+}
+
+function _renderStatsInternal() {
   let ordenesFilter = getFilteredOrders();
   let ticketsFilter = getFilteredTickets();
 
