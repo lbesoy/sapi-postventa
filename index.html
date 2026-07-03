@@ -6,15 +6,17 @@
     window.onerror = function(message, source, lineno, colno, error) {
       console.error("ERROR GLOBAL DETECTADO:", message, "\nArchivo:", source, "\nLínea:", lineno, "\nColumna:", colno, "\nError:", error);
       
-      if (typeof window.mostrarNotificacion === 'function') {
-        window.mostrarNotificacion("Ocurrió un error interno. Por favor refresca la página si experimentas fallas.", "error");
-      } else {
-        var errDiv = document.createElement('div');
-        errDiv.style = 'position:fixed; bottom:20px; right:20px; background:#ef4444; color:white; padding:12px 20px; border-radius:6px; font-family:system-ui,sans-serif; font-size:14px; z-index:99999; box-shadow:0 4px 6px rgba(0,0,0,0.1);';
-        errDiv.textContent = 'Falla de carga: ' + message;
-        document.body.appendChild(errDiv);
-        setTimeout(function() { errDiv.remove(); }, 6000);
-      }
+      var errDiv = document.createElement('div');
+      errDiv.id = 'floating-error-banner';
+      errDiv.style = 'position:fixed; top:10px; left:10px; right:10px; background:#ef4444; color:white; padding:15px; border-radius:8px; font-family:monospace; font-size:12px; z-index:999999; box-shadow:0 10px 30px rgba(0,0,0,0.3); max-height:85vh; overflow-y:auto; line-height:1.4;';
+      errDiv.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:8px; margin-bottom:8px; font-weight:bold; font-size:13px;">' +
+                         '<span>⚠️ ERROR DE RUNTIME DETECTADO</span>' +
+                         '<button onclick="this.parentElement.parentElement.remove()" style="background:none; border:none; color:white; font-size:16px; cursor:pointer; font-weight:bold;">✕</button>' +
+                         '</div>' +
+                         '<strong>Mensaje:</strong> ' + message + '<br>' +
+                         '<strong>Archivo:</strong> ' + source + ' (Línea ' + lineno + ', Columna ' + colno + ')<br>' +
+                         '<strong>Stack:</strong><br><pre style="margin:5px 0 0 0; white-space:pre-wrap; font-size:11px; background:rgba(0,0,0,0.15); padding:8px; border-radius:4px;">' + (error ? error.stack : 'No disponible') + '</pre>';
+      document.body.appendChild(errDiv);
       return false;
     };
     

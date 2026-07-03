@@ -10256,231 +10256,249 @@ window.ordenarTicketsPor = function(columna) {
 
 // ===== RENDER TICKETS =====
 function renderTickets(ctx) {
-  try { actualizarFiltrosPersonal(); } catch (e) {}
-  if (window.updateNotificationBell) {
-    try { window.updateNotificationBell(); } catch (e) {}
-  }
   const isDashView = ctx === 'dash-tickets';
   const isV2 = ctx === 'v2';
   const bodyId = isDashView ? 'tabla-body-dash-tickets' : (isV2 ? 'v2-tickets-body' : 'tickets-body');
-  const searchId = isDashView ? 'search-dash-tickets' : (isV2 ? 'v2-search-tickets' : 'search-tickets');
   
-  const body = document.getElementById(bodyId);
-  if (!body) return;
-  const q = (document.getElementById(searchId)?.value || '').toLowerCase();
-  
-  let filtered = getFilteredTickets().filter(t =>
-    !q ||
-    String(t.asunto||'').toLowerCase().includes(q) ||
-    String(t.solicitante||'').toLowerCase().includes(q) ||
-    String(t.cliente||'').toLowerCase().includes(q) ||
-    String(t.asignado||'').toLowerCase().includes(q) ||
-    String(t.folio||'').toLowerCase().includes(q) ||
-    String(t.cotizacionSAP||'').toLowerCase().includes(q) ||
-    String(t.pedidoSAP||'').toLowerCase().includes(q)
-  );
-  
-  // Ordenar dinámicamente según la columna seleccionada
-  filtered.sort((a, b) => {
-    let valA, valB;
-    switch(ticketSortColumn) {
-      case 'folio':
-        valA = String(a.folio || '');
-        valB = String(b.folio || '');
-        return ticketSortDirection === 'asc'
-          ? valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' })
-          : valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
-      case 'asunto':
-        valA = String(a.asunto || '').toLowerCase();
-        valB = String(b.asunto || '').toLowerCase();
-        break;
-      case 'solicitante':
-        valA = String(a.solicitante || '').toLowerCase();
-        valB = String(b.solicitante || '').toLowerCase();
-        break;
-      case 'area':
-        valA = String(a.area || '').toLowerCase();
-        valB = String(b.area || '').toLowerCase();
-        break;
-      case 'prioridad':
-        const prioMap = { 'alta': 3, 'media': 2, 'baja': 1 };
-        valA = prioMap[String(a.prioridad || '').toLowerCase()] || 0;
-        valB = prioMap[String(b.prioridad || '').toLowerCase()] || 0;
-        return ticketSortDirection === 'asc' ? valA - valB : valB - valA;
-      case 'estado':
-        valA = String(a.estado || '').toLowerCase();
-        valB = String(b.estado || '').toLowerCase();
-        break;
-      case 'cotizacion':
-        valA = String(a.cotizacionSAP || '').toLowerCase();
-        valB = String(b.cotizacionSAP || '').toLowerCase();
-        break;
-      case 'monto':
-        valA = Number(a.montoCotizacion || 0);
-        valB = Number(b.montoCotizacion || 0);
-        return ticketSortDirection === 'asc' ? valA - valB : valB - valA;
-      case 'pedido':
-        valA = String(a.pedidoSAP || '').toLowerCase();
-        valB = String(b.pedidoSAP || '').toLowerCase();
-        break;
-      case 'asignado':
-        valA = String(a.asignado || '').toLowerCase();
-        valB = String(b.asignado || '').toLowerCase();
-        break;
-      case 'fecha':
-        valA = new Date(a.fechaCreacion || a.fecha || 0).getTime();
-        valB = new Date(b.fechaCreacion || b.fecha || 0).getTime();
-        return ticketSortDirection === 'asc' ? valA - valB : valB - valA;
-      default:
-        valA = String(a.folio || '');
-        valB = String(b.folio || '');
-        return valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+  try {
+    try { actualizarFiltrosPersonal(); } catch (e) {}
+    if (window.updateNotificationBell) {
+      try { window.updateNotificationBell(); } catch (e) {}
     }
-    if (valA < valB) return ticketSortDirection === 'asc' ? -1 : 1;
-    if (valA > valB) return ticketSortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
-  
-  const currentUser = usuarios.find(u => u.id === currentSession.userId);
-  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
-
-  let tecFilter = '';
-  let supFilter = '';
-  if (!isEmpresa) {
-    tecFilter = document.getElementById(isDashView ? 'filter-dash-tkt-tecnico' : 'filter-tkt-tecnico')?.value || '';
-    supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value || '';
-  }
-
-  if (isEmpresa) {
-    let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
-    if (nombreEmpresaLogged) {
-      nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
-      filtered = filtered.filter(t => {
-        const tcli = String(t.cliente || '').toLowerCase().trim();
-        const tsol = String(t.solicitante || '').toLowerCase().trim();
-        return tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged;
-      });
-    } else {
-      filtered = [];
-    }
-  }
-
-  const userRole = currentSession.viewMode || '';
-  if (userRole === 'tecnico') {
-    const isSuperadmin = (usuarios.find(u => u.id === currentSession.userId)?.rol === 'superadmin');
-    if (isSuperadmin && isTestModeActive()) {
-      tecFilter = '';
-    } else {
-      tecFilter = currentUser ? currentUser.nombre : '';
-    }
-  }
-  if (userRole === 'supervisor') {
-    const isLauraPaz = currentUser && (
-      String(currentUser.nombre).toLowerCase().trim() === 'laura paz' ||
-      String(currentUser.email).toLowerCase().trim().includes('laura.paz') ||
-      String(currentUser.email).toLowerCase().trim().includes('laurapaz')
-    );
-    if (isLauraPaz) {
-      supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value || '';
-    } else {
-      supFilter = currentUser ? currentUser.nombre : '';
-    }
-  }
-  
-  if (tecFilter || supFilter) {
-    const tecName = tecFilter; // Ahora usamos el nombre directamente
+    const searchId = isDashView ? 'search-dash-tickets' : (isV2 ? 'v2-search-tickets' : 'search-tickets');
     
-    filtered = filtered.filter(t => {
-      let passTec = true;
-      let passSup = true;
-      
-      if (tecFilter && tecName) {
-         let assigned = [];
-         if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
-         else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
-         passTec = assigned.includes(tecName) || t.solicitante === tecName || t.creadoPor === tecName;
+    const body = document.getElementById(bodyId);
+    if (!body) return;
+    const q = (document.getElementById(searchId)?.value || '').toLowerCase();
+    
+    let filtered = getFilteredTickets().filter(t =>
+      t && (
+        !q ||
+        String(t.asunto||'').toLowerCase().includes(q) ||
+        String(t.solicitante||'').toLowerCase().includes(q) ||
+        String(t.cliente||'').toLowerCase().includes(q) ||
+        String(t.asignado||'').toLowerCase().includes(q) ||
+        String(t.folio||'').toLowerCase().includes(q) ||
+        String(t.cotizacionSAP||'').toLowerCase().includes(q) ||
+        String(t.pedidoSAP||'').toLowerCase().includes(q)
+      )
+    );
+    
+    // Ordenar dinámicamente según la columna seleccionada
+    filtered.sort((a, b) => {
+      if (!a || !b) return 0;
+      let valA, valB;
+      switch(ticketSortColumn) {
+        case 'folio':
+          valA = String(a.folio || '');
+          valB = String(b.folio || '');
+          return ticketSortDirection === 'asc'
+            ? valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' })
+            : valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+        case 'asunto':
+          valA = String(a.asunto || '').toLowerCase();
+          valB = String(b.asunto || '').toLowerCase();
+          break;
+        case 'solicitante':
+          valA = String(a.solicitante || '').toLowerCase();
+          valB = String(b.solicitante || '').toLowerCase();
+          break;
+        case 'area':
+          valA = String(a.area || '').toLowerCase();
+          valB = String(b.area || '').toLowerCase();
+          break;
+        case 'prioridad':
+          const prioMap = { 'alta': 3, 'media': 2, 'baja': 1 };
+          valA = prioMap[String(a.prioridad || '').toLowerCase()] || 0;
+          valB = prioMap[String(b.prioridad || '').toLowerCase()] || 0;
+          return ticketSortDirection === 'asc' ? valA - valB : valB - valA;
+        case 'estado':
+          valA = String(a.estado || '').toLowerCase();
+          valB = String(b.estado || '').toLowerCase();
+          break;
+        case 'cotizacion':
+          valA = String(a.cotizacionSAP || '').toLowerCase();
+          valB = String(b.cotizacionSAP || '').toLowerCase();
+          break;
+        case 'monto':
+          valA = Number(a.montoCotizacion || 0);
+          valB = Number(b.montoCotizacion || 0);
+          return ticketSortDirection === 'asc' ? valA - valB : valB - valA;
+        case 'pedido':
+          valA = String(a.pedidoSAP || '').toLowerCase();
+          valB = String(b.pedidoSAP || '').toLowerCase();
+          break;
+        case 'asignado':
+          valA = String(a.asignado || '').toLowerCase();
+          valB = String(b.asignado || '').toLowerCase();
+          break;
+        case 'fecha':
+          valA = new Date(a.fechaCreacion || a.fecha || 0).getTime();
+          valB = new Date(b.fechaCreacion || b.fecha || 0).getTime();
+          return ticketSortDirection === 'asc' ? valA - valB : valB - valA;
+        default:
+          valA = String(a.folio || '');
+          valB = String(b.folio || '');
+          return valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
       }
-      
-      if (supFilter) {
-         let passSupClient = false;
-         const cli = clientesDb.find(c => c.nombre === t.cliente);
-         if (cli) {
-            const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
-            const supId = supUser ? supUser.id : supFilter;
-            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
-         }
-         
-         let assigned = [];
-         if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
-         else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
-         
-         let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
-         
-         passSup = passSupClient || passSupTicket;
-      }
-      
-      return passTec && passSup;
+      if (valA < valB) return ticketSortDirection === 'asc' ? -1 : 1;
+      if (valA > valB) return ticketSortDirection === 'asc' ? 1 : -1;
+      return 0;
     });
-  }
+    
+    const currentUser = usuarios.find(u => u && u.id === currentSession.userId);
+    const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
   
-  if (!isDashView && !isV2 && ticketFiltroActivo !== 'todos') {
-    if (ticketFiltroActivo === 'Cerrado - Aprobado') {
-      filtered = filtered.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'si');
-    } else if (ticketFiltroActivo === 'Cerrado - Rechazado') {
-      filtered = filtered.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'no');
-    } else {
-      filtered = filtered.filter(t => t.estado === ticketFiltroActivo);
+    let tecFilter = '';
+    let supFilter = '';
+    if (!isEmpresa) {
+      tecFilter = document.getElementById(isDashView ? 'filter-dash-tkt-tecnico' : 'filter-tkt-tecnico')?.value || '';
+      supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value || '';
+    }
+  
+    if (isEmpresa) {
+      let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+      if (nombreEmpresaLogged) {
+        nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
+        filtered = filtered.filter(t => {
+          if (!t) return false;
+          const tcli = String(t.cliente || '').toLowerCase().trim();
+          const tsol = String(t.solicitante || '').toLowerCase().trim();
+          return tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged;
+        });
+      } else {
+        filtered = [];
+      }
+    }
+  
+    const userRole = currentSession.viewMode || '';
+    if (userRole === 'tecnico') {
+      const isSuperadmin = (usuarios.find(u => u && u.id === currentSession.userId)?.rol === 'superadmin');
+      if (isSuperadmin && isTestModeActive()) {
+        tecFilter = '';
+      } else {
+        tecFilter = currentUser ? currentUser.nombre : '';
+      }
+    }
+    if (userRole === 'supervisor') {
+      const isLauraPaz = currentUser && (
+        String(currentUser.nombre).toLowerCase().trim() === 'laura paz' ||
+        String(currentUser.email).toLowerCase().trim().includes('laura.paz') ||
+        String(currentUser.email).toLowerCase().trim().includes('laurapaz')
+      );
+      if (isLauraPaz) {
+        supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value || '';
+      } else {
+        supFilter = currentUser ? currentUser.nombre : '';
+      }
+    }
+    
+    if (tecFilter || supFilter) {
+      const tecName = tecFilter;
+      
+      filtered = filtered.filter(t => {
+        if (!t) return false;
+        let passTec = true;
+        let passSup = true;
+        
+        if (tecFilter && tecName) {
+           let assigned = [];
+           if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+           else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+           passTec = assigned.includes(tecName) || t.solicitante === tecName || t.creadoPor === tecName;
+        }
+        
+        if (supFilter) {
+           let passSupClient = false;
+           const cli = clientesDb.find(c => c && c.nombre === t.cliente);
+           if (cli) {
+              const supUser = usuarios.find(u => u && (u.nombre === supFilter || u.id === supFilter));
+              const supId = supUser ? supUser.id : supFilter;
+              passSupClient = (cli.supervisoresAsignados && Array.isArray(cli.supervisoresAsignados) && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
+           }
+           
+           let assigned = [];
+           if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+           else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+           
+           let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
+           
+           passSup = passSupClient || passSupTicket;
+        }
+        
+        return passTec && passSup;
+      });
+    }
+    
+    if (!isDashView && !isV2 && ticketFiltroActivo !== 'todos') {
+      if (ticketFiltroActivo === 'Cerrado - Aprobado') {
+        filtered = filtered.filter(t => t && t.estado === 'Cerrado' && t.cotAceptada === 'si');
+      } else if (ticketFiltroActivo === 'Cerrado - Rechazado') {
+        filtered = filtered.filter(t => t && t.estado === 'Cerrado' && t.cotAceptada === 'no');
+      } else {
+        filtered = filtered.filter(t => t && t.estado === ticketFiltroActivo);
+      }
+    }
+    if (isV2 && filtroTicketsV2 !== 'todos') {
+      filtered = filtered.filter(t => t && (t.estado || '').toLowerCase() === filtroTicketsV2.toLowerCase());
+    }
+    
+    if (isDashView && !q) {
+      filtered = filtered.slice(0, 8);
+    }
+    
+    if (!filtered.length) {
+      body.innerHTML = `<tr><td colspan="13" class="empty-state">No hay tickets${q||(!isDashView && ticketFiltroActivo!=='todos')?' que coincidan':' registrados'}.</td></tr>`;
+      return;
+    }
+    const canEdit = currentSession.viewMode !== 'consulta';
+    const canDelete = ['superadmin', 'admin'].includes(currentSession.viewMode);
+  
+    body.innerHTML = filtered.map((t, i) => {
+      if (!t) return '';
+      return `
+      <tr style="cursor:pointer; transition: background 0.2s;" onclick="if(!event.target.closest('.action-btn')){ verDetalleTicket('${t.id}'); }" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
+        <td data-label="Acciones" style="white-space:nowrap; width:60px;">
+          <div style="display:flex;gap:0.25rem;">
+            <button class="action-btn" onclick="verDetalleTicket('${t.id}')" title="Ver"><i data-lucide="eye"></i></button>
+            ${canEdit ? `<button class="action-btn" onclick="editarTicket('${t.id}')" title="Editar"><i data-lucide="pencil"></i></button>` : ''}
+          </div>
+        </td>
+        <td data-label="Folio"><strong>${t.folio||('#'+(i+1))}</strong></td>
+        <td data-label="Asunto">
+          <div style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.asunto || ''}">
+            ${t.asunto||'—'}
+          </div>
+        </td>
+        <td data-label="Solicitante">
+          <div style="font-weight:500; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.solicitante || ''}">${t.solicitante||'—'}</div>
+          ${t.cliente ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}"><i data-lucide="building-2" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}</div>` : ''}
+        </td>
+        <td data-label="Área" style="white-space:nowrap;">${t.area||'—'}</td>
+        <td data-label="Prioridad" class="col-prioridad" style="white-space:nowrap; display: ${isEmpresa ? 'none' : ''};"><span class="badge badge-${String(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
+        <td data-label="Estado" style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t)}">${t.estado === 'Cerrado' ? (t.cotAceptada === 'si' ? 'Cerrado (Aceptado)' : 'Cerrado (Rechazado)') : (t.estado||'—')}</span></td>
+        <td data-label="Cotización SAP" style="white-space:nowrap; font-family: monospace;">${t.cotizacionSAP||'—'}</td>
+        <td data-label="Monto" style="white-space:nowrap; font-weight: 600;">${(t.montoCotizacion !== undefined && t.montoCotizacion !== null) ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(t.montoCotizacion) : '—'}</td>
+        <td data-label="Pedido SAP" style="white-space:nowrap; font-family: monospace;">${t.pedidoSAP||'—'}</td>
+        <td data-label="Asignado" class="col-asignado" style="white-space:nowrap; display: ${isEmpresa ? 'none' : ''};">${t.asignado||'—'}</td>
+        <td data-label="Fecha" style="white-space:nowrap;">${formatFechaHoraAmigable(t.fechaCreacion || t.fecha)}</td>
+        <td data-label="" style="width:40px; text-align:center;">
+          ${canDelete ? `<button class="action-btn del" onclick="eliminarTicket('${t.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
+        </td>
+      </tr>
+      `;
+    }).join('');
+    
+    try { actualizarCabeceraOrdenacion(); } catch (e) {}
+    lucide.createIcons();
+  } catch (error) {
+    console.error("Error in renderTickets:", error);
+    const body = document.getElementById(bodyId);
+    if (body) {
+      body.innerHTML = `<tr><td colspan="13" class="error-state" style="color:#ef4444; font-weight:600; padding:20px; text-align:center; background:rgba(239,68,68,0.05);">Falla al renderizar tickets: ${error.message}</td></tr>`;
     }
   }
-  if (isV2 && filtroTicketsV2 !== 'todos') {
-    filtered = filtered.filter(t => (t.estado || '').toLowerCase() === filtroTicketsV2.toLowerCase());
-  }
-  
-  if (isDashView && !q) {
-    // Si estamos en el dashboard y no hay búsqueda, mostramos los 8 más recientes
-    filtered = filtered.slice(0, 8);
-  }
-  
-  if (!filtered.length) {
-    body.innerHTML = `<tr><td colspan="13" class="empty-state">No hay tickets${q||(!isDashView && ticketFiltroActivo!=='todos')?' que coincidan':' registrados'}.</td></tr>`;
-    return;
-  }
-  const canEdit = currentSession.viewMode !== 'consulta';
-  const canDelete = ['superadmin', 'admin'].includes(currentSession.viewMode);
-
-  body.innerHTML = filtered.map((t, i) => `
-    <tr style="cursor:pointer; transition: background 0.2s;" onclick="if(!event.target.closest('.action-btn')){ verDetalleTicket('${t.id}'); }" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
-      <td data-label="Acciones" style="white-space:nowrap; width:60px;">
-        <div style="display:flex;gap:0.25rem;">
-          <button class="action-btn" onclick="verDetalleTicket('${t.id}')" title="Ver"><i data-lucide="eye"></i></button>
-          ${canEdit ? `<button class="action-btn" onclick="editarTicket('${t.id}')" title="Editar"><i data-lucide="pencil"></i></button>` : ''}
-        </div>
-      </td>
-      <td data-label="Folio"><strong>${t.folio||('#'+(i+1))}</strong></td>
-      <td data-label="Asunto">
-        <div style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.asunto || ''}">
-          ${t.asunto||'—'}
-        </div>
-      </td>
-      <td data-label="Solicitante">
-        <div style="font-weight:500; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.solicitante || ''}">${t.solicitante||'—'}</div>
-        ${t.cliente ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}"><i data-lucide="building-2" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}</div>` : ''}
-      </td>
-      <td data-label="Área" style="white-space:nowrap;">${t.area||'—'}</td>
-      <td data-label="Prioridad" class="col-prioridad" style="white-space:nowrap; display: ${isEmpresa ? 'none' : ''};"><span class="badge badge-${String(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
-      <td data-label="Estado" style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t)}">${t.estado === 'Cerrado' ? (t.cotAceptada === 'si' ? 'Cerrado (Aceptado)' : 'Cerrado (Rechazado)') : (t.estado||'—')}</span></td>
-      <td data-label="Cotización SAP" style="white-space:nowrap; font-family: monospace;">${t.cotizacionSAP||'—'}</td>
-      <td data-label="Monto" style="white-space:nowrap; font-weight: 600;">${(t.montoCotizacion !== undefined && t.montoCotizacion !== null) ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(t.montoCotizacion) : '—'}</td>
-      <td data-label="Pedido SAP" style="white-space:nowrap; font-family: monospace;">${t.pedidoSAP||'—'}</td>
-      <td data-label="Asignado" class="col-asignado" style="white-space:nowrap; display: ${isEmpresa ? 'none' : ''};">${t.asignado||'—'}</td>
-      <td data-label="Fecha" style="white-space:nowrap;">${formatFechaHoraAmigable(t.fechaCreacion || t.fecha)}</td>
-      <td data-label="" style="width:40px; text-align:center;">
-        ${canDelete ? `<button class="action-btn del" onclick="eliminarTicket('${t.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
-      </td>
-    </tr>
-  `).join('');
-  try { actualizarCabeceraOrdenacion(); } catch (e) {}
-  lucide.createIcons();
+}
 }
 
 function badgeTicketEstado(tOrEstado) {
