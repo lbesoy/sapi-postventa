@@ -716,6 +716,9 @@ window.addEventListener('supabase_datos_cargados', () => {
     renderGastos();
     if (typeof renderClaraCards === 'function') renderClaraCards();
   }
+  if (typeof renderCalendario === 'function' && document.getElementById('view-calendario')?.classList.contains('active')) {
+    renderCalendario();
+  }
   
   // Re-aplicar rol para asegurar que el role-switcher se muestre si el usuario recién se descargó
   if (currentSession && currentSession.viewMode) {
@@ -8293,6 +8296,9 @@ function guardarOrden(e) {
   renderTabla();
   renderTabla('servicios');
   renderStats();
+  if (typeof renderCalendario === 'function') {
+    renderCalendario();
+  }
 }
 
 // ===== ELIMINAR =====
@@ -8320,6 +8326,9 @@ async function eliminarOrden(id) {
   renderTabla();
   renderTabla('servicios');
   renderStats();
+  if (typeof renderCalendario === 'function') {
+    renderCalendario();
+  }
 }
 
 function completarReporteDesdeDetalle(id) {
@@ -9800,6 +9809,9 @@ function guardarNotaBitacora() {
   verDetalle(o.id); // Recargar modal
   renderTabla();
   renderTabla('servicios');
+  if (typeof renderCalendario === 'function') {
+    renderCalendario();
+  }
 }
 
 // ==========================
