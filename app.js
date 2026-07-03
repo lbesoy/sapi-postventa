@@ -1630,6 +1630,7 @@ function toggleTestMode(isActive) {
 function actualizarVistaActual() {
   try { applyRole(currentSession.viewMode); } catch(e){}
   try { renderTabla(); } catch(e){}
+  try { renderServiciosProgramadosTecnico(); } catch(e){}
   try { renderTabla('servicios'); } catch(e){}
   if (typeof renderTickets === 'function') {
     try { renderTickets(); } catch(e){}
@@ -3171,6 +3172,11 @@ function setupNav() {
         if (view === 'dashboard') {
           renderStats();
           // renderStats() ya invoca internamente a renderDashboardV2() si existe
+        }
+        if (view === 'preferencias') {
+          if (typeof renderServiciosProgramadosTecnico === 'function') {
+            renderServiciosProgramadosTecnico();
+          }
         }
       } catch (err) {
         console.error(`[Navigation] Error al renderizar vista "${view}":`, err);
@@ -12070,6 +12076,16 @@ document.addEventListener('click', function(e) {
 });
 
 window.updateNotificationBell = function() {
+  const bell = document.getElementById('notification-bell-container');
+  if (bell) {
+    if (currentSession.viewMode === 'tecnico') {
+      bell.style.display = 'none';
+      return;
+    } else {
+      bell.style.display = 'flex';
+    }
+  }
+
   const badge = document.getElementById('notification-badge');
   const dropCount = document.getElementById('notification-dropdown-count');
   const container = document.getElementById('notification-items-container');
@@ -12135,6 +12151,98 @@ window.abrirTicketDesdeNotification = function(ticketId) {
     navItem.click();
   }
   abrirTicket(ticketId);
+};
+
+window.abrirOrdenDesdePerfil = function(id) {
+  editarOrden(id);
+};
+
+window.renderServiciosProgramadosTecnico = function() {
+  const card = document.getElementById('card-servicios-programados');
+  const container = document.getElementById('servicios-programados-list');
+  if (!card || !container) return;
+
+  const isTecnico = currentSession.viewMode === 'tecnico';
+  if (!isTecnico) {
+    card.style.display = 'none';
+    return;
+  }
+
+  // Si es técnico, mostramos la tarjeta
+  card.style.display = 'block';
+
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const miTecnicoNombre = currentUser ? currentUser.nombre : '';
+  const miNombreClean = miTecnicoNombre.trim().toLowerCase();
+
+  if (!miNombreClean) {
+    container.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:0.8rem; padding:1.5rem; font-style:italic;">No se pudo resolver el nombre del técnico.</div>`;
+    return;
+  }
+
+  // Filtrar órdenes que no estén resueltas / finalizadas
+  const pendingServices = getFilteredOrders().filter(o => {
+    const estadoClean = String(o.estado || '').trim().toLowerCase();
+    if (estadoClean === 'finalizado' || estadoClean === 'cerrada' || estadoClean === 'completada') return false;
+
+    const orderTecnicoClean = String(o.tecnico || '').trim().toLowerCase();
+    const isAssignedToOrder = orderTecnicoClean === miNombreClean;
+
+    let hasPendingBitacora = false;
+    if (o.bitacora && Array.isArray(o.bitacora)) {
+      hasPendingBitacora = o.bitacora.some(b => {
+        const bTecnicoClean = String(b.tecnico || '').trim().toLowerCase();
+        const esAsignacionPendiente = b.realizado === false || (b.nota && b.nota.includes('Programado por supervisor') && b.realizado !== true);
+        return bTecnicoClean === miNombreClean && esAsignacionPendiente;
+      });
+    }
+
+    return isAssignedToOrder || hasPendingBitacora;
+  });
+
+  let html = '';
+  if (pendingServices.length === 0) {
+    html = `<div style="text-align:center; color:var(--text-muted); font-size:0.8rem; padding:1.5rem; font-style:italic;">No tienes servicios programados pendientes. ¡Buen trabajo!</div>`;
+  } else {
+    pendingServices.forEach(o => {
+      let scheduledTimeText = 'No especificada';
+      let scheduledDateText = o.fecha ? new Date(o.fecha).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : 'Sin fecha';
+
+      if (o.bitacora && Array.isArray(o.bitacora)) {
+        const myBitacora = o.bitacora.find(b => String(b.tecnico || '').trim().toLowerCase() === miNombreClean);
+        if (myBitacora) {
+          if (myBitacora.fecha) {
+            scheduledDateText = new Date(myBitacora.fecha + 'T00:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+          }
+          if (myBitacora.entrada) {
+            scheduledTimeText = `${myBitacora.entrada} hs`;
+            if (myBitacora.salida) {
+              scheduledTimeText += ` - ${myBitacora.salida} hs`;
+            }
+          }
+        }
+      }
+
+      html += `
+        <div class="service-item-card" onclick="window.abrirOrdenDesdePerfil('${o.id}')" style="background:var(--bg-primary); border:1px solid var(--border); border-radius:8px; padding:0.75rem 1rem; display:flex; flex-direction:column; gap:0.4rem; cursor:pointer; transition:var(--transition);" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-family:monospace; font-weight:600; color:var(--accent); font-size:0.85rem;">${o.folio}</span>
+            <span class="badge" style="background:rgba(245,158,11,0.1); color:var(--orange); font-size:0.7rem; border:1px solid rgba(245,158,11,0.2);">${o.tipo || 'Servicio'}</span>
+          </div>
+          <div style="font-weight:600; font-size:0.85rem; color:var(--text-primary);">${o.cliente}</div>
+          <div style="font-size:0.75rem; color:var(--text-secondary);">${o.marca || ''} ${o.modelo || ''}</div>
+          <div style="margin-top:0.25rem; display:flex; gap:0.75rem; flex-wrap:wrap; font-size:0.75rem; border-top:1px dashed var(--border); padding-top:0.4rem;">
+            <div style="color:var(--text-muted); display:flex; align-items:center; gap:3px;"><i data-lucide="calendar" style="width:12px;height:12px;"></i> ${scheduledDateText}</div>
+            <div style="color:var(--accent); display:flex; align-items:center; gap:3px; font-weight:500;"><i data-lucide="clock" style="width:12px;height:12px;"></i> ${scheduledTimeText}</div>
+          </div>
+        </div>
+      `;
+    });
+  }
+  container.innerHTML = html;
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
 };
 
 // ===== TICKET FORM =====
