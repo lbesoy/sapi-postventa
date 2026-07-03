@@ -14289,10 +14289,25 @@ function renderCalendario() {
         let dateStr = b.fecha;
         if (dateStr.includes('T')) dateStr = dateStr.split('T')[0];
         
-        let eventColor = bgColor;
+        let eventColor = '#3b82f6'; // Azul: Trabajo realizado sin asignación por defecto
         const esAsignacionPendiente = b.realizado === false || (b.nota && b.nota.includes('Programado por supervisor') && b.realizado !== true);
+        
         if (esAsignacionPendiente) {
-          eventColor = '#8b5cf6'; // Morado para los programados
+          eventColor = '#8b5cf6'; // Morado: Asignación programada (Pendiente)
+        } else {
+          // Asignación o trabajo completado
+          if (b.programadoEntrada) {
+            // Era una asignación programada original
+            const isAligned = !b.desviacion || b.desviacion === 'Alineado' || b.desviacion === '0m';
+            if (isAligned) {
+              eventColor = '#10b981'; // Verde: Asignación completada al 100%
+            } else {
+              eventColor = '#ef4444'; // Rojo: Asignación completada pero con horas distintas
+            }
+          } else {
+            // Trabajo realizado sin asignación
+            eventColor = '#3b82f6'; // Azul: Trabajo realizado sin asignación
+          }
         }
 
         let isAllDay = true;
