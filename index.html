@@ -19,6 +19,53 @@
       document.body.appendChild(errDiv);
       return false;
     };
+
+    (function() {
+      var originalLog = console.log;
+      var originalWarn = console.warn;
+      var originalError = console.error;
+      
+      function logToPanel(type, args) {
+        var msg = Array.from(args).map(function(arg) {
+          if (arg === null) return 'null';
+          if (arg === undefined) return 'undefined';
+          return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
+        }).join(' ');
+        
+        var panel = document.getElementById('debug-log-panel');
+        if (!panel) {
+          panel = document.createElement('div');
+          panel.id = 'debug-log-panel';
+          panel.style = 'position:fixed; bottom:10px; left:10px; width:450px; height:250px; background:rgba(0,0,0,0.85); color:#00ff00; font-family:monospace; font-size:10px; padding:10px; z-index:999999; border-radius:8px; overflow-y:auto; box-shadow:0 4px 10px rgba(0,0,0,0.5); border:1px solid #00ff00;';
+          panel.innerHTML = '<div style="display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #00ff00; padding-bottom:3px; font-weight:bold; font-size:11px;"><span>CONSOLE LOGS</span><button onclick="this.parentElement.parentElement.remove()" style="background:none; border:none; color:#00ff00; cursor:pointer; font-weight:bold;">✕</button></div><div id="debug-log-content"></div>';
+          document.body.appendChild(panel);
+        }
+        var content = document.getElementById('debug-log-content');
+        if (content) {
+          var line = document.createElement('div');
+          line.style.borderBottom = '1px solid rgba(0,255,0,0.1)';
+          line.style.padding = '2px 0';
+          if (type === 'ERROR') line.style.color = '#ff4444';
+          if (type === 'WARN') line.style.color = '#ffaa00';
+          line.textContent = '[' + type + '] ' + msg;
+          content.appendChild(line);
+          panel.scrollTop = panel.scrollHeight;
+        }
+      }
+      
+      console.log = function() {
+        originalLog.apply(console, arguments);
+        logToPanel('LOG', arguments);
+      };
+      console.warn = function() {
+        originalWarn.apply(console, arguments);
+        logToPanel('WARN', arguments);
+      };
+      console.error = function() {
+        originalError.apply(console, arguments);
+        logToPanel('ERROR', arguments);
+      };
+    })();
     
     // Desactivar caché de Service Worker en desarrollo local (localhost)
     if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
