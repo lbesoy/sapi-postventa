@@ -9390,7 +9390,7 @@ async function guardarProgramacionTecnico() {
       allDay: false,
       descripcion: nuevaEntrada.nota,
       creadoPor: currentSession.userId || null,
-      color: null
+      color: '#8b5cf6'
     };
 
     const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
@@ -9539,6 +9539,83 @@ function cerrarBitacora(e) {
   document.getElementById('modal-bitacora-overlay').classList.remove('open');
 }
 
+function actualizarEventoCalendarioDesdeBitacora(orden, bitacoraEntry) {
+  try {
+    const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+    
+    // Buscar si ya existe el evento por ID
+    let idx = localEventos.findIndex(x => x.id === bitacoraEntry.id || x.id === `bit-${bitacoraEntry.id}`);
+    
+    // Si no existe por ID, buscamos si hay algún evento de esta orden en el mismo día y técnico
+    if (idx === -1 && bitacoraEntry.fecha) {
+      const bitDate = bitacoraEntry.fecha.substring(0, 10);
+      idx = localEventos.findIndex(x => 
+        x.ordenId === orden.id && 
+        (x.start && x.start.substring(0, 10) === bitDate) &&
+        (x.tecnicoNombre === bitacoraEntry.tecnico)
+      );
+    }
+
+    let color = '#3b82f6'; // Azul: Trabajo realizado sin asignación
+    if (bitacoraEntry.realizado === false || (bitacoraEntry.nota && bitacoraEntry.nota.includes('Programado por supervisor') && bitacoraEntry.realizado !== true)) {
+      color = '#8b5cf6'; // Morado: Asignación programada (Pendiente)
+    } else if (bitacoraEntry.realizado === true) {
+      if (bitacoraEntry.programadoEntrada) {
+        const isAligned = !bitacoraEntry.desviacion || bitacoraEntry.desviacion === 'Alineado' || bitacoraEntry.desviacion === '0m';
+        color = isAligned ? '#10b981' : '#ef4444'; // Verde o Rojo
+      } else {
+        color = '#3b82f6'; // Azul: Trabajo realizado sin asignación
+      }
+    }
+
+    const entradaHora = bitacoraEntry.entrada || '08:00';
+    const salidaHora = bitacoraEntry.salida || '18:00';
+    const dateStr = bitacoraEntry.fecha ? bitacoraEntry.fecha.substring(0, 10) : new Date().toISOString().split('T')[0];
+    const startISO = `${dateStr}T${entradaHora}:00`;
+    
+    let endDateStr = dateStr;
+    if (bitacoraEntry.salida && bitacoraEntry.entrada && bitacoraEntry.salida < bitacoraEntry.entrada) {
+      const dObj = new Date(dateStr + 'T00:00:00');
+      dObj.setDate(dObj.getDate() + 1);
+      endDateStr = dObj.toISOString().split('T')[0];
+    }
+    const endISO = `${endDateStr}T${salidaHora}:00`;
+
+    const usr = usuarios.find(u => u.nombre === bitacoraEntry.tecnico);
+    const tecnicoId = usr ? usr.id : null;
+
+    const eventTitle = `${(bitacoraEntry.tecnico || 'Téc').split(' ')[0]} | ${orden.cliente}`;
+
+    const eventoObj = {
+      id: idx > -1 ? localEventos[idx].id : bitacoraEntry.id,
+      titulo: eventTitle,
+      start: new Date(startISO).toISOString(),
+      end: new Date(endISO).toISOString(),
+      tipo: 'Servicio',
+      tecnicoId: tecnicoId,
+      tecnicoNombre: bitacoraEntry.tecnico,
+      ordenId: orden.id,
+      descripcion: bitacoraEntry.nota || '',
+      color: color,
+      todoElDia: false,
+      allDay: false
+    };
+
+    if (idx > -1) {
+      localEventos[idx] = eventoObj;
+    } else {
+      localEventos.push(eventoObj);
+    }
+
+    localStorage.setItem('sapi_calendario_eventos', JSON.stringify(localEventos));
+    if (window.pushToSupabase) {
+      window.pushToSupabase('calendario_eventos', eventoObj);
+    }
+  } catch(e) {
+    console.error('Error al sincronizar evento en calendario_eventos:', e);
+  }
+}
+
 function guardarNotaBitacora() {
   const puedeLlenar = ['tecnico', 'superadmin'].includes(currentSession.viewMode);
   if (!puedeLlenar) {
@@ -9646,6 +9723,7 @@ function guardarNotaBitacora() {
       o.bitacora[bIndex].entrada = entrada;
       o.bitacora[bIndex].salida = salida;
       o.bitacora[bIndex].realizado = true;
+      actualizarEventoCalendarioDesdeBitacora(o, o.bitacora[bIndex]);
     }
   } else {
     // MODO CREACIÓN NUEVA (o reporte de asignación pendiente)
@@ -9689,8 +9767,8 @@ function guardarNotaBitacora() {
     }
 
     // Insertar reporte de trabajo limpio y realizado
-    o.bitacora.push({
-      id: crypto.randomUUID(),
+    const nuevaEntrada = {
+      id: esAsignacionPendiente ? window.currentBitacoraEntryId : crypto.randomUUID(),
       fecha: new Date(fecha).toISOString(),
       nota: nota,
       entrada: entrada,
@@ -9700,7 +9778,9 @@ function guardarNotaBitacora() {
       programadoEntrada: progEntrada || null,
       programadoSalida: progSalida || null,
       desviacion: desviacionStr || null
-    });
+    };
+    o.bitacora.push(nuevaEntrada);
+    actualizarEventoCalendarioDesdeBitacora(o, nuevaEntrada);
   }
   
   o.estado = calcularEstadoOrden(o);
