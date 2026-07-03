@@ -8161,7 +8161,9 @@ function guardarOrden(e) {
   const soporteIdGuardar = document.getElementById('f-soporte').value.trim();
   const oVieja = editandoId ? (ordenes.find(x => x.id === editandoId) || {}) : null;
   
-  if (soporteIdGuardar) {
+  if (oVieja && (oVieja.tecnicosAsignados?.length > 0 || oVieja.tecnico)) {
+    tecnicosSeleccionados = oVieja.tecnicosAsignados || oVieja.tecnico.split(',').map(s => s.trim());
+  } else if (soporteIdGuardar) {
     const t = tickets.find(x => x.id === soporteIdGuardar);
     if (t) {
       if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) {
@@ -8170,8 +8172,6 @@ function guardarOrden(e) {
         tecnicosSeleccionados = t.asignado.split(',').map(s => s.trim());
       }
     }
-  } else if (oVieja) {
-    tecnicosSeleccionados = oVieja.tecnicosAsignados || (oVieja.tecnico ? oVieja.tecnico.split(',').map(s => s.trim()) : []);
   }
 
   // Si el usuario que guarda es técnico, nos aseguramos de que esté asignado a la orden
