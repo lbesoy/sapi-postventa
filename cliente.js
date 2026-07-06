@@ -1085,7 +1085,7 @@ async function crearTicketCliente(e) {
     // Generar Folio consecutivo local temporal
     const yearStr = new Date().getFullYear().toString().slice(-2);
     const isSandbox = isTestModeActive();
-    const prefix = isSandbox ? `PRUEBA-TKT-${yearStr}` : `TKT-${yearStr}`;
+    const prefix = isSandbox ? 'TKT-PRUEBA-' : `TKT-${yearStr}`;
     const ticketsDelAnio = tickets.filter(t => t.folio && t.folio.startsWith(prefix));
     let maxConsecutivo = 0;
     ticketsDelAnio.forEach(t => {
