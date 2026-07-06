@@ -295,3 +295,30 @@ ON storage.objects
 FOR SELECT 
 TO public 
 USING (bucket_id = 'evidencias');
+
+-- ========================================================
+-- 8. Configuración de Telemetría (sapi_telemetry)
+-- ========================================================
+
+CREATE TABLE IF NOT EXISTS public.sapi_telemetry (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id text,
+    user_name text,
+    user_role text,
+    action text,
+    details jsonb,
+    timestamp timestamptz DEFAULT now(),
+    user_agent text
+);
+
+ALTER TABLE public.sapi_telemetry ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Permitir insert de telemetria a todos" ON public.sapi_telemetry;
+CREATE POLICY "Permitir insert de telemetria a todos" ON public.sapi_telemetry 
+FOR INSERT TO authenticated 
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir select de telemetria a admins y superadmins" ON public.sapi_telemetry;
+CREATE POLICY "Permitir select de telemetria a admins y superadmins" ON public.sapi_telemetry 
+FOR SELECT TO authenticated 
+USING (public.get_my_role() IN ('superadmin', 'admin'));
