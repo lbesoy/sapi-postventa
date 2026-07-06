@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.171'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.172'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -13192,6 +13192,10 @@ function abrirTicket(id) {
         if (t.canal === 'correo') document.getElementById('t-correo').value = t.contacto || '';
         if (t.canal === 'whatsapp') document.getElementById('t-whatsapp').value = t.contacto || '';
         if (t.canal === 'telefono') document.getElementById('t-telefono').value = t.contacto || '';
+      } else {
+        // Deseleccionar canales y ocultar inputs si es un canal del portal o vacío
+        document.querySelectorAll('input[name="t-canal"]').forEach(el => el.checked = false);
+        seleccionarCanal('');
       }
       
       if (t.cliente) {
@@ -13690,12 +13694,20 @@ async function guardarTicket(e) {
   const t_existente = editandoTicketId ? tickets.find(x=>x.id===editandoTicketId) : null;
   const isEmpresa = currentSession.viewMode === 'empresa';
   const estado = (isEmpresa || !editandoTicketId) ? 'Abierto' : (document.querySelector('input[name="t-estado"]:checked')?.value || 'Abierto');
-  const canal = isEmpresa ? 'portal' : (document.querySelector('input[name="t-canal"]:checked')?.value || '');
+  // Preservar canal y contacto de portal si se edita desde el panel administrativo
+  let canal = isEmpresa ? 'portal' : (document.querySelector('input[name="t-canal"]:checked')?.value || '');
+  if (!isEmpresa && editandoTicketId && !canal && t_existente?.canal === 'portal') {
+    canal = 'portal';
+  }
+
   let contacto = '';
   if (!isEmpresa) {
     if (canal === 'correo') contacto = document.getElementById('t-correo')?.value?.trim();
-    if (canal === 'whatsapp') contacto = document.getElementById('t-whatsapp')?.value?.trim();
-    if (canal === 'telefono') contacto = document.getElementById('t-telefono')?.value?.trim();
+    else if (canal === 'whatsapp') contacto = document.getElementById('t-whatsapp')?.value?.trim();
+    else if (canal === 'telefono') contacto = document.getElementById('t-telefono')?.value?.trim();
+    else if (canal === 'portal' && editandoTicketId && t_existente?.contacto) {
+      contacto = t_existente.contacto;
+    }
   } else {
     // Si es empresa, el contacto es su propio correo si existe
     const currentUser = usuarios.find(u => u.id === currentSession.userId);

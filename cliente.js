@@ -154,7 +154,7 @@ async function verificarSesionCliente() {
     } catch(e) {}
 
     // 2. Si no hay sesión local o está incompleta, verificar Supabase Auth
-    if (!sessionObj || !sessionObj.userId) {
+    if (!sessionObj || !sessionObj.userId || !sessionObj.email) {
       if (window.supabaseClient) {
         const { data: { session } } = await window.supabaseClient.auth.getSession();
         if (session) {
@@ -1091,6 +1091,19 @@ async function crearTicketCliente(e) {
     });
     const newFolio = `${prefix}${(maxConsecutivo + 1).toString().padStart(3, '0')}`;
 
+    // Obtener correo registrado con fallback dinámico de la sesión de Supabase si el caché local no lo tiene
+    let emailContacto = currentSession.email || '';
+    if (!emailContacto && window.supabaseClient) {
+      try {
+        const { data: { session } } = await window.supabaseClient.auth.getSession();
+        if (session && session.user && session.user.email) {
+          emailContacto = session.user.email;
+        }
+      } catch (errSession) {
+        console.error('[Ticket] Fallback de sesión no pudo obtener correo:', errSession);
+      }
+    }
+
     // Construir Objeto Ticket
     const ticketId = crypto.randomUUID();
     const newTicket = {
@@ -1101,7 +1114,7 @@ async function crearTicketCliente(e) {
       fechaCreacion: new Date().toISOString(),
       fechaCierre: null,
       canal: 'portal',
-      contacto: currentSession.email || '',
+      contacto: emailContacto || '',
       asunto: isSandbox ? `[PRUEBA] ${asuntoVal}` : asuntoVal,
       cliente: currentSession.empresa || currentSession.nombre,
       sitio: sitioVal,
