@@ -481,7 +481,7 @@ async function fetchPedidosFromSAP() {
     } catch (errGet) {
       if (errGet.response && errGet.response.status === 404) {
         log(`ℹ️ La Query '${QUERIES.pedidos}' no existe en SAP. Intentando crearla automáticamente...`);
-        const sqlText = `SELECT T0."DocEntry" AS "ID DocInternal", T0."DocNum" AS "Folio Pedido", T0."CardCode" AS "ID_Cliente", T0."CardName" AS "Nombre", T0."DocDate", T0."DocDueDate" AS "Fecha Entrega", T0."DocCur", T0."DocTotalFC" as "Importe ME", T0."DocTotal" as "Importe MXN", T2."SlpName" AS "Vendedor" FROM ORDR T0 LEFT JOIN OSLP T2 ON T0."SlpCode" = T2."SlpCode" WHERE T0."CANCELED" = 'N' ORDER BY T0."DocDate", T0."DocNum"`;
+        const sqlText = `SELECT T0."DocEntry" AS "ID DocInternal", T0."DocNum" AS "Folio Pedido", T0."CardCode" AS "ID_Cliente", T0."CardName" AS "Nombre", T0."DocDate", T0."DocDueDate" AS "Fecha Entrega", T0."DocCur", T0."DocTotalFC" as "Importe ME", T0."DocTotal" as "Importe MXN", T0."SlpCode" AS "Vendedor" FROM ORDR T0 WHERE T0."CANCELED" = 'N' ORDER BY T0."DocDate", T0."DocNum"`;
         try {
           await sapApi.post(`${SAP_URL}/SQLQueries`, {
             SqlCode: QUERIES.pedidos,
@@ -512,7 +512,7 @@ async function fetchPedidosFromSAP() {
         moneda: q.DocCur || null,
         cliente_id: q.CardCode || q['ID_Cliente'] || null,
         cliente_nombre: q.CardName || q.Nombre || null,
-        vendedor: q.Vendedor || 'SIN Vendedor'
+        vendedor: q.Vendedor ? q.Vendedor.toString() : 'SIN Vendedor'
       }));
     }
   } catch (errQ) {
@@ -522,7 +522,7 @@ async function fetchPedidosFromSAP() {
   // Fallback a OData estándar de SAP (Orders)
   try {
     log('Consultando pedidos de SAP (OData)...');
-    let url = `${SAP_URL}/Orders?$select=DocNum,DocDate,DocDueDate,DocTotal,DocCur,CardCode,CardName,SalesPersonCode,Cancelled&$filter=Cancelled eq 'tNO'`;
+    let url = `${SAP_URL}/Orders?$select=DocNum,DocDate,DocDueDate,DocTotal,DocCurrency,CardCode,CardName,SalesPersonCode,Cancelled&$filter=Cancelled eq 'tNO'`;
     let allOrders = [];
     let page = 1;
 
@@ -542,7 +542,7 @@ async function fetchPedidosFromSAP() {
       fecha: q.DocDate ? new Date(q.DocDate).toISOString() : null,
       fecha_entrega: q.DocDueDate ? new Date(q.DocDueDate).toISOString() : null,
       monto: q.DocTotal !== undefined ? Number(q.DocTotal) : null,
-      moneda: q.DocCur || null,
+      moneda: q.DocCurrency || null,
       cliente_id: q.CardCode || null,
       cliente_nombre: q.CardName || null,
       vendedor: q.SalesPersonCode ? q.SalesPersonCode.toString() : null
