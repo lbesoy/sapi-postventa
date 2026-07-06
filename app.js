@@ -7901,6 +7901,54 @@ function abrirFormulario(id, modoReporte = false) {
   editandoId = id || null;
   document.getElementById('modal-title').textContent = modoReporte ? 'Llenar Reporte Técnico' : (id ? 'Editar Orden' : 'Nueva Orden de Servicio');
   document.getElementById('form-orden').reset();
+
+  // Restaurar estilos y propiedades habilitadas por defecto (evita que se queden bloqueadas de sesiones anteriores)
+  const todosCamposTexto = [
+    'f-folio', 'f-pedido', 'f-ubicacion', 'f-operador', 'f-eco',
+    'f-horometro', 'f-horometro-real', 'f-modelo', 'f-serie',
+    'f-km-ida', 'f-km-vuelta'
+  ];
+  todosCamposTexto.forEach(f => {
+    const el = document.getElementById(f);
+    if (el) {
+      el.readOnly = false;
+      el.style.background = '';
+      el.style.cursor = '';
+      el.style.opacity = '';
+    }
+  });
+
+  const todosSelects = ['f-soporte', 'f-equipo', 'f-estado'];
+  todosSelects.forEach(f => {
+    const el = document.getElementById(f);
+    if (el) {
+      el.disabled = false;
+      el.style.background = '';
+      el.style.opacity = '';
+    }
+  });
+
+  const fClienteComboReset = document.getElementById('f-cliente-combo');
+  if (fClienteComboReset) {
+    fClienteComboReset.style.pointerEvents = 'auto';
+    fClienteComboReset.style.background = '';
+    fClienteComboReset.style.opacity = '';
+  }
+
+  document.querySelectorAll('input[name="tipo"]').forEach(radio => {
+    radio.disabled = false;
+  });
+
+  document.querySelectorAll('input[name="f-tecnicos"]').forEach(cb => {
+    cb.disabled = false;
+  });
+
+  const elFallaReset = document.getElementById('f-falla');
+  if (elFallaReset) {
+    elFallaReset.readOnly = false;
+    elFallaReset.style.background = '';
+    elFallaReset.style.cursor = '';
+  }
   
   const sectionEstado = document.getElementById('section-estado-orden');
   if (sectionEstado) {
@@ -8066,7 +8114,7 @@ function abrirFormulario(id, modoReporte = false) {
     const camposInfoGeneral = [
       'f-folio', 'f-pedido', 'f-ubicacion', 'f-operador', 'f-eco',
       'f-horometro', 'f-modelo', 'f-serie',
-      'f-km-ida', 'f-km-vuelta', 'f-km-total'
+      'f-km-total'
     ];
     camposInfoGeneral.forEach(f => {
       const el = document.getElementById(f);

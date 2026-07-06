@@ -470,13 +470,34 @@ async function syncCotizaciones() {
 }
 
 async function fetchPedidosFromSAP() {
+  let res;
   try {
     log(`Consultando pedidos vía SQL Query '${QUERIES.pedidos}'...`);
-    const res = await sapApi.get(`${SAP_URL}/SQLQueries('${QUERIES.pedidos}')/List`, {
-      headers: { 'B1S-PageSize': 5000, 'Prefer': 'odata.maxpagesize=5000' },
-      timeout: 15000
-    });
-    if (res.data && res.data.value) {
+    try {
+      res = await sapApi.get(`${SAP_URL}/SQLQueries('${QUERIES.pedidos}')/List`, {
+        headers: { 'B1S-PageSize': 5000, 'Prefer': 'odata.maxpagesize=5000' },
+        timeout: 15000
+      });
+    } catch (errGet) {
+      if (errGet.response && errGet.response.status === 404) {
+        log(`ℹ️ La Query '${QUERIES.pedidos}' no existe en SAP. Intentando crearla automáticamente...`);
+        const sqlText = `SELECT T0."DocEntry" AS "ID DocInternal", T0."DocNum" AS "Folio Pedido", T0."CardCode" AS "ID_Cliente", T0."CardName" AS "Nombre", T0."DocDate", T0."DocDueDate" AS "Fecha Entrega", T0."DocCur", T0."DocTotalFC" as "Importe ME", T0."DocTotal" as "Importe MXN", CASE WHEN T0."SlpCode" = '-1' THEN 'SIN Vendedor' ELSE T2."SlpName" END AS "Vendedor" FROM ORDR T0 LEFT JOIN OSLP T2 ON T0."SlpCode" = T2."SlpCode" WHERE T0."CANCELED" = 'N' ORDER BY T0."DocDate", T0."DocNum"`;
+        await sapApi.post(`${SAP_URL}/SQLQueries`, {
+          SqlCode: QUERIES.pedidos,
+          SqlName: "Eurorep Pedidos",
+          SqlText: sqlText
+        });
+        log(`✅ Query '${QUERIES.pedidos}' creada con éxito en SAP. Volviendo a consultar...`);
+        res = await sapApi.get(`${SAP_URL}/SQLQueries('${QUERIES.pedidos}')/List`, {
+          headers: { 'B1S-PageSize': 5000, 'Prefer': 'odata.maxpagesize=5000' },
+          timeout: 15000
+        });
+      } else {
+        throw errGet;
+      }
+    }
+
+    if (res && res.data && res.data.value) {
       log(`✅ Pedidos obtenidos vía SQL Query (${res.data.value.length} registros).`);
       return res.data.value.map(q => ({
         numero_pedido: (q['Folio Pedido'] || q.DocNum || '').toString(),
@@ -490,13 +511,13 @@ async function fetchPedidosFromSAP() {
       }));
     }
   } catch (errQ) {
-    log(`⚠️ SQL Query de pedidos falló o no existe: ${errQ.message}. Intentando fallback nativo a OData Orders...`);
+    log(`⚠️ SQL Query de pedidos falló o no se pudo crear: ${errQ.message}. Intentando fallback nativo a OData Orders...`);
   }
 
   // Fallback a OData estándar de SAP (Orders)
   try {
     log('Consultando pedidos de SAP (OData)...');
-    let url = `${SAP_URL}/Orders?$select=DocNum,DocDate,DocDueDate,DocTotal,DocTotalFC,DocCur,CardCode,CardName,SlpCode,Cancelled&$filter=Cancelled eq 'tNO'`;
+    let url = `${SAP_URL}/Orders?$select=DocNum,DocDate,DocDueDate,DocTotal,DocTotalFC,DocCur,CardCode,CardName,SalesPersonCode,Cancelled&$filter=Cancelled eq 'tNO'`;
     let allOrders = [];
     let page = 1;
 
@@ -519,7 +540,7 @@ async function fetchPedidosFromSAP() {
       moneda: q.DocCur || null,
       cliente_id: q.CardCode || null,
       cliente_nombre: q.CardName || null,
-      vendedor: q.SlpCode ? q.SlpCode.toString() : null
+      vendedor: q.SalesPersonCode ? q.SalesPersonCode.toString() : null
     }));
   } catch (errFallback) {
     log(`❌ Fallback nativo de pedidos también falló: ${errFallback.message}`);
