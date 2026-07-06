@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.153'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.154'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -8648,13 +8648,23 @@ function verDetalle(id) {
 
   const renderBitacora = (o) => {
     let html = '';
-    const items = [...(o.bitacora || [])];
+    const isTecnico = currentSession.viewMode === 'tecnico';
+    const currentUser = usuarios.find(u => u.id === currentSession.userId);
+    const miTecnicoNombre = currentUser ? currentUser.nombre : '';
+
+    let items = [...(o.bitacora || [])];
+    if (isTecnico && miTecnicoNombre) {
+      items = items.filter(b => b.tecnico === miTecnicoNombre);
+    }
 
     // Unificación inteligente reactiva con eventos de calendario
     try {
       const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
       localEventos.forEach(ev => {
         if (ev.ordenId === o.id) {
+          if (isTecnico && miTecnicoNombre && ev.tecnicoNombre !== miTecnicoNombre) {
+            return;
+          }
           // Extraer fecha ISO simple (YYYY-MM-DD)
           const fISO = (ev.fechaInicio || ev.start || '').substring(0, 10);
           if (!fISO) return;
