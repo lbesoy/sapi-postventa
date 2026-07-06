@@ -64,10 +64,19 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.169'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.170'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
+    // Limpiar toda la caché local pesada para liberar espacio y obligar a una resincronización limpia
+    localStorage.removeItem('sapi_tickets');
+    localStorage.removeItem('sapi_ordenes');
+    localStorage.removeItem('sapi_telemetry_events');
+    localStorage.removeItem('sapi_refacciones_db');
+    localStorage.removeItem('sapi_clientes_db');
+    localStorage.removeItem('sapi_sitios_db');
+    localStorage.removeItem('sapi_maquinaria_db');
+    
     localStorage.setItem('eurorep_app_version', APP_VERSION);
     localStorage.removeItem('eurorep_session');
     
@@ -107,6 +116,8 @@ if (typeof window !== 'undefined' && window.localStorage) {
           try {
             // Intenta liberar espacio removiendo telemetría no crítica
             window.localStorage.removeItem('sapi_telemetry_events');
+            // IMPORTANTE: Primero removemos la clave vieja para evitar el pico de memoria transitorio durante la sobreescritura
+            window.localStorage.removeItem(key);
             originalSetItem.call(window.localStorage, key, value);
             console.warn('[LocalStorage] Elemento guardado tras purgar telemetría de depuración.');
           } catch (innerErr) {
