@@ -74,6 +74,7 @@ if (typeof JSON !== 'undefined' && !JSON.parse.__isSafeWrapper) {
 
 window.isConnectionVerifiedOnline = false;
 window._cacheCotizacionesSap = JSON.parse(localStorage.getItem('eurorep_cotizaciones_sap') || '[]');
+window._cachePedidosSap = JSON.parse(localStorage.getItem('eurorep_pedidos_sap') || '[]');
 
 
 
@@ -2544,6 +2545,17 @@ window.cargarDatosDeSupabase = function() {
       }
     } catch (errCot) {
       console.warn('[Sync] Error al cargar cotizaciones_sap:', errCot);
+    }
+
+    // Pedidos SAP (Caché en memoria y localStorage para autocompletar)
+    try {
+      const { data: pedidos, error: pedidosErr } = await sb.from('pedidos_sap').select('*');
+      if (!pedidosErr && pedidos) {
+        window._cachePedidosSap = pedidos;
+        localStorage.setItem('eurorep_pedidos_sap', JSON.stringify(pedidos));
+      }
+    } catch (errPed) {
+      console.warn('[Sync] Error al cargar pedidos_sap:', errPed);
     }
 
   } catch (error) {

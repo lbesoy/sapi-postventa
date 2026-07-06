@@ -322,3 +322,25 @@ DROP POLICY IF EXISTS "Permitir select de telemetria a admins y superadmins" ON 
 CREATE POLICY "Permitir select de telemetria a admins y superadmins" ON public.sapi_telemetry 
 FOR SELECT TO authenticated 
 USING (public.get_my_role() IN ('superadmin', 'admin'));
+
+-- 9. Configuración de tabla de Pedidos SAP (pedidos_sap)
+-- ========================================================
+CREATE TABLE IF NOT EXISTS public.pedidos_sap (
+    numero_pedido TEXT PRIMARY KEY,
+    fecha TIMESTAMP WITH TIME ZONE,
+    fecha_entrega TIMESTAMP WITH TIME ZONE,
+    monto NUMERIC,
+    moneda TEXT,
+    cliente_id TEXT,
+    cliente_nombre TEXT,
+    vendedor TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE public.pedidos_sap ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Permitir todo a autenticados en pedidos" ON public.pedidos_sap;
+CREATE POLICY "Permitir todo a autenticados en pedidos" ON public.pedidos_sap FOR ALL TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Permitir select a publico en pedidos" ON public.pedidos_sap;
+CREATE POLICY "Permitir select a publico en pedidos" ON public.pedidos_sap FOR SELECT TO public USING (true);

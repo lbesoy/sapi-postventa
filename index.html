@@ -41,7 +41,7 @@
       }
     } else if (typeof window !== 'undefined') {
       // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
-      const currentAppVer = '1.3.159';
+      const currentAppVer = '1.3.160';
       const lastAppVer = localStorage.getItem('sapi_app_version');
       if (lastAppVer && lastAppVer !== currentAppVer) {
         if ('serviceWorker' in navigator) {
@@ -3342,17 +3342,31 @@
                 <!-- Mostrado si SI aceptada -->
                 <div id="group-t-pedido" style="display:none; margin-top:0.75rem;">
                   <div class="form-group full-width">
-                    <label>No. Pedido SAP *</label>
-                    <input type="text" id="t-pedido-sap" placeholder="Ej. PED-200450" />
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+                      <label style="margin:0;">No. Pedido SAP *</label>
+                      <button type="button" id="btn-sync-sap-ped-modal" onclick="window.syncSapPedidoManual(true)" class="btn-text-action" style="font-size:0.75rem; color:var(--accent); background:none; border:none; cursor:pointer; font-weight:600; padding:0; display:inline-flex; align-items:center; gap:4px;"><i data-lucide="refresh-cw" style="width:12px; height:12px;"></i> Sincronizar con SAP</button>
+                    </div>
+                    <select id="t-pedido-sap" onchange="window.onModalPedidoSelected()"></select>
+                  </div>
+                  <div class="form-group full-width" style="margin-top:0.75rem;">
+                    <label>Monto de Pedido ($) *</label>
+                    <input type="number" id="t-pedido-monto" oninput="window.validarPedidoConSAP(true)" step="0.01" min="0" placeholder="Ej. 12500.00" />
                   </div>
                   <div class="form-group full-width" style="margin-top:0.75rem;">
                     <label>Archivo Pedido (PDF) *</label>
-                    <label class="custom-file-upload">
-                      <input type="file" id="t-pedido-pdf" accept="application/pdf" onchange="updateFileLabel(this)" />
-                      <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
-                      <span class="file-label-text">Subir pedido en PDF</span>
-                    </label>
+                    <div style="display:flex; flex-direction:column; gap:0.5rem; width:100%;">
+                      <div style="display:flex; gap:0.5rem; align-items:center; width:100%;">
+                        <label class="custom-file-upload" style="flex:1; margin:0;">
+                          <input type="file" id="t-pedido-pdf" accept="application/pdf" onchange="updateFileLabel(this); if(this.files[0]) window.autoExtraerDesdePdfPedido(this.files[0], true);" />
+                          <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
+                          <span class="file-label-text">Subir pedido en PDF</span>
+                        </label>
+                        <button type="button" id="btn-clear-pdf-pedido-modal" onclick="window.clearPdfPedidoInput(true)" class="btn-icon" style="display:none; background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); border-radius:6px; padding:0.6rem; cursor:pointer; height:45px; width:45px; align-items:center; justify-content:center;" title="Eliminar archivo"><i data-lucide="trash-2" style="width:16px; height:16px;"></i></button>
+                      </div>
+                      <div id="pdf-pedido-extraction-table-container" style="display:none;"></div>
+                    </div>
                   </div>
+                  <div id="t-pedido-sap-validation-status" style="margin-top: 0.75rem; display: none;"></div>
                 </div>
               </div>
             </div>

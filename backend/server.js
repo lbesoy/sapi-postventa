@@ -540,10 +540,11 @@ app.post('/api/trigger-sync', (req, res) => {
         updated_at: new Date().toISOString()
     };
 
+    const modulo = req.body && req.body.modulo ? req.body.modulo : 'all';
     const scriptPath = path.join(__dirname, 'sync-sap-supabase.js');
-    console.log(`[Local Sync] Triggering background sync script: node "${scriptPath}"`);
+    console.log(`[Local Sync] Triggering background sync script: node "${scriptPath}" ${modulo}`);
     
-    exec(`node "${scriptPath}"`, (error, stdout, stderr) => {
+    exec(`node "${scriptPath}" ${modulo}`, (error, stdout, stderr) => {
         localSyncStatus.status = 'completed';
         if (error) {
             console.error('[Local Sync] Finished with error:', error);

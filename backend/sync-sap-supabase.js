@@ -33,7 +33,8 @@ let QUERIES = {
   refacciones: 'CAT_REFACCIONES',
   sitios:      'CAT_Sitos',
   tecnicos:    'eurorep_tecnicos',
-  cotizaciones: 'eurorep_cotizaciones'
+  cotizaciones: 'eurorep_cotizaciones',
+  pedidos:     'eurorep_pedidos'
 };
 
 // Mapeos configurados (se sobreescriben con la config de Supabase)
@@ -387,6 +388,7 @@ async function loadConfigFromSupabase() {
       if (config.querySitios) QUERIES.sitios = config.querySitios;
       if (config.queryTecnicos) QUERIES.tecnicos = config.queryTecnicos;
       if (config.queryCotizaciones) QUERIES.cotizaciones = config.queryCotizaciones;
+      if (config.queryPedidos) QUERIES.pedidos = config.queryPedidos;
       // if (config.mappings && config.mappings.sitios) MAPPINGS.sitios = config.mappings.sitios; // DESHABILITADO temporalmente
       // if (config.mappings && config.mappings.maquinaria) MAPPINGS.maquinaria = config.mappings.maquinaria; // DESHABILITADO temporalmente
       log('⚙️ Configuración de queries cargada desde la nube.');
@@ -467,6 +469,85 @@ async function syncCotizaciones() {
   }
 }
 
+async function fetchPedidosFromSAP() {
+  try {
+    log(`Consultando pedidos vía SQL Query '${QUERIES.pedidos}'...`);
+    const res = await sapApi.get(`${SAP_URL}/SQLQueries('${QUERIES.pedidos}')/List`, {
+      headers: { 'B1S-PageSize': 5000, 'Prefer': 'odata.maxpagesize=5000' },
+      timeout: 15000
+    });
+    if (res.data && res.data.value) {
+      log(`✅ Pedidos obtenidos vía SQL Query (${res.data.value.length} registros).`);
+      return res.data.value.map(q => ({
+        numero_pedido: (q['Folio Pedido'] || q.DocNum || '').toString(),
+        fecha: q.DocDate ? new Date(q.DocDate).toISOString() : null,
+        fecha_entrega: q.DocDueDate || q['Fecha Entrega'] ? new Date(q.DocDueDate || q['Fecha Entrega']).toISOString() : null,
+        monto: q['Importe MXN'] !== undefined ? Number(q['Importe MXN']) : (q.DocTotal !== undefined ? Number(q.DocTotal) : null),
+        moneda: q.DocCur || null,
+        cliente_id: q.CardCode || q['ID_Cliente'] || null,
+        cliente_nombre: q.CardName || q.Nombre || null,
+        vendedor: q.Vendedor || null
+      }));
+    }
+  } catch (errQ) {
+    log(`⚠️ SQL Query de pedidos falló o no existe: ${errQ.message}. Intentando fallback nativo a OData Orders...`);
+  }
+
+  // Fallback a OData estándar de SAP (Orders)
+  try {
+    log('Consultando pedidos de SAP (OData)...');
+    let url = `${SAP_URL}/Orders?$select=DocNum,DocDate,DocDueDate,DocTotal,DocTotalFC,DocCur,CardCode,CardName,SlpCode,Cancelled&$filter=Cancelled eq 'tNO'`;
+    let allOrders = [];
+    let page = 1;
+
+    while (url) {
+      log(`- Obteniendo página ${page} de pedidos...`);
+      const qRes = await sapApi.get(url, { timeout: 15000 });
+      const items = qRes.data.value || [];
+      allOrders = allOrders.concat(items);
+      url = qRes.data['odata.nextLink'] ? `${SAP_URL}/${qRes.data['odata.nextLink']}` : null;
+      page++;
+      if (page > 100) break;
+    }
+
+    log(`✅ Pedidos obtenidos de SAP (${allOrders.length} registros).`);
+    return allOrders.map(q => ({
+      numero_pedido: q.DocNum ? q.DocNum.toString() : null,
+      fecha: q.DocDate ? new Date(q.DocDate).toISOString() : null,
+      fecha_entrega: q.DocDueDate ? new Date(q.DocDueDate).toISOString() : null,
+      monto: q.DocTotal !== undefined ? Number(q.DocTotal) : null,
+      moneda: q.DocCur || null,
+      cliente_id: q.CardCode || null,
+      cliente_nombre: q.CardName || null,
+      vendedor: q.SlpCode ? q.SlpCode.toString() : null
+    }));
+  } catch (errFallback) {
+    log(`❌ Fallback nativo de pedidos también falló: ${errFallback.message}`);
+    throw errFallback;
+  }
+}
+
+async function syncPedidos() {
+  log('Sincronizando Pedidos SAP...');
+  try {
+    const rows = await fetchPedidosFromSAP();
+    const validRows = rows.filter(r => r.numero_pedido);
+    
+    try {
+      const n = await upsertSupabase('pedidos_sap', validRows);
+      log(`✅ Pedidos SAP: ${n} registros sincronizados a Supabase.`);
+    } catch (supaErr) {
+      if (supaErr.message?.includes('404') || (supaErr.response && supaErr.response.status === 404)) {
+        log(`⚠️ Advertencia: La tabla 'pedidos_sap' no existe en Supabase (404). Omitiendo persistencia.`);
+      } else {
+        throw supaErr;
+      }
+    }
+  } catch (err) {
+    log(`⚠️ Advertencia: Sincronización de pedidos SAP falló de forma no crítica: ${err.message}`);
+  }
+}
+
 // ── 5. Main ───────────────────────────────────────────────────────
 async function main() {
   const inicio = Date.now();
@@ -496,6 +577,7 @@ async function main() {
     if (argModulo === 'all' || argModulo === 'sitios') await runTask('sitios', syncSitios);
     if (argModulo === 'all' || argModulo === 'tecnicos') await runTask('tecnicos', syncTecnicos);
     if (argModulo === 'all' || argModulo === 'cotizaciones') await runTask('cotizaciones', syncCotizaciones);
+    if (argModulo === 'all' || argModulo === 'pedidos') await runTask('pedidos', syncPedidos);
 
     const seg = ((Date.now() - inicio) / 1000).toFixed(1);
     log('═══════════════════════════════════════════');

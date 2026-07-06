@@ -268,3 +268,21 @@ ALTER TABLE public.cotizaciones_sap ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Permitir todo a autenticados" ON public.cotizaciones_sap FOR ALL TO authenticated USING (true);
 CREATE POLICY "Permitir select a publico" ON public.cotizaciones_sap FOR SELECT TO public USING (true);
 
+-- 21. TABLE: pedidos_sap (Cache de Pedidos de SAP B1)
+CREATE TABLE IF NOT EXISTS public.pedidos_sap (
+    numero_pedido TEXT PRIMARY KEY,
+    fecha TIMESTAMP WITH TIME ZONE,
+    fecha_entrega TIMESTAMP WITH TIME ZONE,
+    monto NUMERIC,
+    moneda TEXT,
+    cliente_id TEXT,
+    cliente_nombre TEXT,
+    vendedor TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE public.pedidos_sap ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Permitir todo a autenticados en pedidos" ON public.pedidos_sap FOR ALL TO authenticated USING (true);
+CREATE POLICY "Permitir select a publico en pedidos" ON public.pedidos_sap FOR SELECT TO public USING (true);
+
+

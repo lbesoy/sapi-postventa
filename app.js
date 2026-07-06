@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.159'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.160'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -11404,6 +11404,7 @@ window.clearPdfInput = function(isModal = true, ticketId = null) {
 
 // ===== SAP QUOTATION VALIDATION & SYNC =====
 window._cacheCotizacionesSap = JSON.parse(localStorage.getItem('eurorep_cotizaciones_sap') || '[]');
+window._cachePedidosSap = JSON.parse(localStorage.getItem('eurorep_pedidos_sap') || '[]');
 
 window.renderLinkedCotizaciones = function(isModal = true, ticketId = null) {
   const containerId = isModal ? 'linked-cotizaciones-container' : `quick-linked-cotizaciones-container-${ticketId}`;
@@ -11674,6 +11675,505 @@ window.poblarCotizacionesDropdown = async function(isModal = true, ticketId = nu
     }
   } catch (err) {
     console.error('[SAP Autocomplete] Error populating select dropdown:', err);
+  }
+};
+
+window.poblarPedidosDropdown = async function(isModal = true, ticketId = null, selectedValue = '') {
+  const sb = window.supabaseClient;
+  if (!sb) return;
+
+  const selectId = isModal ? 't-pedido-sap' : `quick-ped-sap-${ticketId}`;
+  const selectEl = document.getElementById(selectId);
+  if (!selectEl) return;
+
+  try {
+    if (!window._cachePedidosSap || window._cachePedidosSap.length === 0) {
+      const { data, error } = await sb.from('pedidos_sap').select('*').order('numero_pedido', { ascending: false });
+      if (!error && data) {
+        window._cachePedidosSap = data;
+        localStorage.setItem('eurorep_pedidos_sap', JSON.stringify(data));
+      }
+    }
+
+    let orders = window._cachePedidosSap || [];
+    
+    // Filtrar pedidos por cliente del ticket actual
+    const tId = isModal ? editandoTicketId : ticketId;
+    const ticketObj = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets.find(x => x.id === tId) : null;
+    
+    if (ticketObj && ticketObj.cliente) {
+      const tClientClean = String(ticketObj.cliente).toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+      if (tClientClean) {
+        const filtered = orders.filter(o => {
+          if (!o.cliente_nombre) return false;
+          const sClientClean = String(o.cliente_nombre).toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+          return tClientClean.includes(sClientClean) || sClientClean.includes(tClientClean);
+        });
+        if (filtered.length > 0) {
+          orders = filtered;
+        }
+      }
+    }
+
+    selectEl.innerHTML = '<option value="">— Seleccione un pedido —</option>';
+    
+    if (selectedValue && !orders.some(o => o.numero_pedido === selectedValue)) {
+      const tempOpt = document.createElement('option');
+      tempOpt.value = selectedValue;
+      tempOpt.textContent = `${selectedValue} (Ingresado manualmente)`;
+      selectEl.appendChild(tempOpt);
+    }
+
+    orders.forEach(o => {
+      const option = document.createElement('option');
+      option.value = o.numero_pedido;
+      const montoFormateado = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(o.monto || 0);
+      const fechaFormateada = o.fecha ? new Date(o.fecha).toLocaleDateString('es-MX') : '—';
+      option.textContent = `${o.numero_pedido} - ${o.cliente_nombre || 'Sin cliente'} (${montoFormateado} | ${fechaFormateada})`;
+      selectEl.appendChild(option);
+    });
+
+    if (selectedValue) {
+      selectEl.value = selectedValue;
+    }
+  } catch (err) {
+    console.error('[SAP Autocomplete Pedidos] Error populating select dropdown:', err);
+  }
+};
+
+window.onModalPedidoSelected = function() {
+  const sapVal = document.getElementById('t-pedido-sap')?.value.trim();
+  if (!sapVal) return;
+  
+  const order = (window._cachePedidosSap || []).find(o => o.numero_pedido === sapVal);
+  if (order) {
+    const montoInput = document.getElementById('t-pedido-monto');
+    if (montoInput) {
+      montoInput.value = order.monto || '';
+    }
+  }
+  
+  if (window.validarPedidoConSAP) {
+    window.validarPedidoConSAP(true);
+  }
+};
+
+window.autoExtraerDesdePdfPedido = async function(file, isModal = true, ticketId = null) {
+  if (!file) return;
+  
+  mostrarNotificacion('Analizando PDF de pedido...', 'info');
+  
+  try {
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+    
+    let extractedDoc = null;
+    let extractedMonto = null;
+    let detectedClientName = null;
+    let isSapMatch = false;
+    let cleanText = '';
+    let isFileNameMatch = false;
+
+    if (file.name) {
+      const fnMatch = file.name.match(/\b([123]10[0-9]{4})\b/) || file.name.match(/\b([0-9]{5,8})\b/);
+      if (fnMatch) {
+        const docNum = fnMatch[1];
+        const orders = window._cachePedidosSap || [];
+        const found = orders.find(o => o.numero_pedido === docNum);
+        if (found) {
+          isFileNameMatch = true;
+          isSapMatch = true;
+          extractedDoc = found.numero_pedido;
+          extractedMonto = found.monto;
+          detectedClientName = found.cliente_nombre;
+          console.log('[PDF Auto-Extract Pedido] Matched pedido from filename via SAP cache:', found);
+        } else {
+          extractedDoc = docNum;
+        }
+      }
+    }
+
+    if (!isFileNameMatch) {
+      try {
+        const response = await fetch('/api/extract-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ base64Data: base64 })
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.text) {
+            cleanText = result.text.replace(/\s+/g, ' ').trim();
+          }
+        }
+      } catch (apiErr) {
+        console.warn('[PDF Auto-Extract Pedido] Local backend extraction failed:', apiErr);
+      }
+
+      if (!cleanText) {
+        try {
+          const text = await window.extraerTextoPdf(base64);
+          cleanText = text.replace(/\s+/g, ' ').trim();
+        } catch (pdfjsErr) {
+          console.error('[PDF Auto-Extract Pedido] Browser PDF.js failed:', pdfjsErr);
+        }
+      }
+
+      console.log('[PDF Auto-Extract Pedido] Parsing text...');
+      let detectedOrder = null;
+      const orders = window._cachePedidosSap || [];
+      if (cleanText) {
+        for (const o of orders) {
+          if (o.numero_pedido && cleanText.includes(o.numero_pedido)) {
+            detectedOrder = o;
+            break;
+          }
+        }
+      }
+
+      if (detectedOrder) {
+        isSapMatch = true;
+        extractedDoc = detectedOrder.numero_pedido;
+        extractedMonto = detectedOrder.monto;
+        detectedClientName = detectedOrder.cliente_nombre;
+      } else if (cleanText) {
+        const docMatch = cleanText.match(/\b([123]10[0-9]{4})\b/) || cleanText.match(/\b([0-9]{5,8})\b/);
+        extractedDoc = docMatch ? docMatch[1] : (extractedDoc || null);
+        
+        const totalRegex = /(?:importe\s+total|total|importe|monto|neto)[:\s\$\-]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2}))/gi;
+        let match;
+        let maxMonto = 0;
+        while ((match = totalRegex.exec(cleanText)) !== null) {
+          const val = parseFloat(match[1].replace(/,/g, ''));
+          if (val > maxMonto) {
+            maxMonto = val;
+          }
+        }
+        if (maxMonto > 0) {
+          extractedMonto = maxMonto;
+        }
+      }
+    }
+
+    if (extractedDoc && !isSapMatch) {
+      const matchInCache = (window._cachePedidosSap || []).find(o => o.numero_pedido === extractedDoc);
+      if (matchInCache) {
+        isSapMatch = true;
+        extractedMonto = matchInCache.monto;
+        detectedClientName = matchInCache.cliente_nombre;
+      }
+    }
+
+    window._lastPdfPedidoExtracted = {
+      doc: extractedDoc,
+      monto: extractedMonto,
+      cliente: detectedClientName,
+      isFileNameMatch: isFileNameMatch,
+      isSapMatch: isSapMatch,
+      cleanText: cleanText
+    };
+
+    if (isFileNameMatch) {
+      mostrarNotificacion(`✅ Datos de pedido ${extractedDoc} extraídos del nombre del archivo.`, 'success');
+    } else if (extractedDoc || extractedMonto) {
+      let clientMsg = detectedClientName ? ` | Cliente: "${detectedClientName}"` : '';
+      mostrarNotificacion(`⚠️ Datos extraídos del PDF (Pedido: ${extractedDoc || '?'}, Monto: $${extractedMonto || '?'}${clientMsg}).`, 'warning');
+    } else {
+      mostrarNotificacion('No se pudo extraer el folio o monto del PDF del pedido.', 'info');
+    }
+
+    const tableContainerId = isModal ? 'pdf-pedido-extraction-table-container' : `quick-pdf-pedido-extraction-table-container-${ticketId}`;
+    const tableContainer = document.getElementById(tableContainerId);
+    if (tableContainer) {
+      tableContainer.style.display = 'block';
+      tableContainer.innerHTML = `
+        <div class="pdf-data-table" style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:0.75rem; font-size:0.8rem; margin-top:0.5rem; display:flex; flex-direction:column; gap:0.5rem;">
+          <div style="font-weight:600; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
+            <span>📋 Datos Extraídos del Archivo</span>
+            <span style="font-size:0.7rem; padding:2px 6px; border-radius:4px; ${isFileNameMatch ? 'background:rgba(16,185,129,0.1); color:#10b981;' : (isSapMatch ? 'background:rgba(16,185,129,0.1); color:#10b981;' : 'background:rgba(245,158,11,0.1); color:#f59e0b;')} font-weight:600;">
+              ${isFileNameMatch ? 'Nombre de Archivo + SAP' : (isSapMatch ? 'Coincidencia SAP' : 'Lectura de Texto')}
+            </span>
+          </div>
+          <table style="width:100%; border-collapse:collapse; text-align:left;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border); color:var(--text-muted);">
+                <th style="padding:4px 8px; font-weight:500;">Dato</th>
+                <th style="padding:4px 8px; font-weight:500;">Valor Extraído</th>
+                <th style="padding:4px 8px; font-weight:500;">Origen</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+                <td style="padding:6px 8px; font-weight:600;">Folio / Doc SAP</td>
+                <td style="padding:6px 8px; font-family:monospace; color:var(--text-primary);">${extractedDoc || '—'}</td>
+                <td style="padding:6px 8px;"><span style="font-size:0.7rem;">${isFileNameMatch ? 'Nombre del archivo' : 'Texto del PDF'}</span></td>
+              </tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+                <td style="padding:6px 8px; font-weight:600;">Monto Total</td>
+                <td style="padding:6px 8px; color:var(--text-primary); font-weight:600;">${extractedMonto ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(extractedMonto) : '—'}</td>
+                <td style="padding:6px 8px;"><span style="font-size:0.7rem;">${isSapMatch ? 'Catálogo SAP' : 'Texto del PDF'}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    const clearBtnId = isModal ? 'btn-clear-pdf-pedido-modal' : `btn-clear-pdf-pedido-quick-${ticketId}`;
+    const clearBtn = document.getElementById(clearBtnId);
+    if (clearBtn) clearBtn.style.display = 'flex';
+
+    if (window.validarPedidoConSAP) {
+      window.validarPedidoConSAP(isModal, ticketId);
+    }
+  } catch (err) {
+    console.error('[PDF Auto-Extract Pedido] Error:', err);
+    mostrarNotificacion('Error al leer el archivo PDF: ' + err.message, 'error');
+  }
+};
+
+window.clearPdfPedidoInput = function(isModal = true, ticketId = null) {
+  const fileInputId = isModal ? 't-pedido-pdf' : `quick-ped-pdf-${ticketId}`;
+  const fileInput = document.getElementById(fileInputId);
+  if (fileInput) {
+    fileInput.value = '';
+    const textSpan = fileInput.parentElement.querySelector('.file-label-text');
+    if (textSpan) textSpan.textContent = 'Subir pedido en PDF';
+    fileInput.parentElement.style.borderColor = 'var(--border)';
+    fileInput.parentElement.style.color = 'var(--text-muted)';
+    fileInput.parentElement.style.background = 'rgba(255,255,255,0.02)';
+  }
+
+  const tableContainerId = isModal ? 'pdf-pedido-extraction-table-container' : `quick-pdf-pedido-extraction-table-container-${ticketId}`;
+  const tableContainer = document.getElementById(tableContainerId);
+  if (tableContainer) {
+    tableContainer.innerHTML = '';
+    tableContainer.style.display = 'none';
+  }
+
+  const clearBtnId = isModal ? 'btn-clear-pdf-pedido-modal' : `btn-clear-pdf-pedido-quick-${ticketId}`;
+  const clearBtn = document.getElementById(clearBtnId);
+  if (clearBtn) clearBtn.style.display = 'none';
+
+  window._lastPdfPedidoExtracted = null;
+
+  if (window.validarPedidoConSAP) {
+    window.validarPedidoConSAP(isModal, ticketId);
+  }
+  mostrarNotificacion('Archivo PDF de pedido removido.', 'info');
+};
+
+window.validarPedidoConSAP = async function(isModal = true, ticketId = null) {
+  const sb = window.supabaseClient;
+  if (!sb) return;
+
+  const sapInputId = isModal ? 't-pedido-sap' : `quick-ped-sap-${ticketId}`;
+  const sapVal = document.getElementById(sapInputId)?.value.trim();
+
+  const montoInputId = isModal ? 't-pedido-monto' : `quick-ped-monto-${ticketId}`;
+  const montoInput = document.getElementById(montoInputId);
+  const montoVal = montoInput ? parseFloat(montoInput.value) || 0 : 0;
+
+  const statusDivId = isModal ? 't-pedido-sap-validation-status' : `quick-pedido-sap-validation-status-${ticketId}`;
+  const statusDiv = document.getElementById(statusDivId);
+  if (!statusDiv) return;
+
+  const tId = ticketId || editandoTicketId;
+  const ticket = tId ? tickets.find(t => t.id === tId) : null;
+
+  const pdfInputId = isModal ? 't-pedido-pdf' : `quick-ped-pdf-${ticketId}`;
+  const fileInput = document.getElementById(pdfInputId);
+  const hasUploadedFile = (fileInput && fileInput.files.length > 0) || (ticket && ticket.pdfPedido);
+
+  if (!sapVal) {
+    statusDiv.style.display = 'none';
+    statusDiv.innerHTML = '';
+    window._isPedidoSapBlocked = false;
+    return;
+  }
+
+  statusDiv.style.display = 'block';
+  statusDiv.innerHTML = '<div style="font-size:0.75rem; color:var(--text-muted); display:flex; align-items:center; gap:4px;"><i data-lucide="loader" class="rotating" style="width:12px; height:12px;"></i> Validando pedido con SAP...</div>';
+  if (window.lucide) lucide.createIcons();
+
+  try {
+    const { data, error } = await sb.from('pedidos_sap').select('*').eq('numero_pedido', sapVal).maybeSingle();
+    if (error) throw error;
+
+    if (!data) {
+      statusDiv.innerHTML = `
+        <div style="padding:0.5rem 0.75rem; border-radius:6px; background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.15); font-size:0.78rem; color:#ef4444; display:flex; flex-direction:column; gap:0.25rem;">
+          <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="x-circle" style="width:14px; height:14px;"></i> Pedido no encontrado en SAP</div>
+          <div style="font-size:0.72rem; color:var(--text-muted);">Verifique el número ingresado o presione "Sincronizar con SAP".</div>
+        </div>
+      `;
+      window._isPedidoSapBlocked = true;
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+
+    const sapMonto = Number(data.monto) || 0;
+    const sapCliente = data.cliente_nombre || '';
+    const sapFecha = data.fecha ? new Date(data.fecha).toLocaleDateString('es-MX') : '—';
+    
+    let isMontoMatch = Math.abs(montoVal - sapMonto) < 0.05;
+    
+    const tClientName = isModal
+      ? (document.getElementById('t-cliente')?.value || (ticket ? ticket.cliente : ''))
+      : (ticket ? ticket.cliente : '');
+
+    let isClientMatch = true;
+    if (tClientName) {
+      const tClientClean = String(tClientName).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const sClientClean = String(sapCliente).toLowerCase().replace(/[^a-z0-9]/g, '');
+      isClientMatch = tClientClean.includes(sClientClean) || sClientClean.includes(tClientClean);
+    }
+
+    const pdfData = window._lastPdfPedidoExtracted;
+    const hasPdf = !!pdfData;
+    
+    let isPdfDocMatch = true;
+    let isPdfMontoMatch = true;
+    let isPdfClientMatch = true;
+
+    if (hasPdf) {
+      isPdfDocMatch = String(pdfData.doc || '').trim() === String(sapVal).trim();
+      isPdfMontoMatch = pdfData.monto ? Math.abs(Number(pdfData.monto) - sapMonto) < 0.05 : true;
+      if (pdfData.cliente) {
+        const pClientClean = String(pdfData.cliente).toLowerCase().replace(/[^a-z0-9]/g, '');
+        const sClientClean = String(sapCliente).toLowerCase().replace(/[^a-z0-9]/g, '');
+        isPdfClientMatch = pClientClean.includes(sClientClean) || sClientClean.includes(pClientClean);
+      }
+    }
+
+    let matchCount = 0;
+    if (isPdfDocMatch) matchCount++;
+    if (isPdfMontoMatch) matchCount++;
+    if (isPdfClientMatch) matchCount++;
+
+    const isBlocked = hasPdf && (matchCount < 2);
+    window._isPedidoSapBlocked = isBlocked;
+
+    let comparisonTableHtml = '';
+    if (hasPdf) {
+      comparisonTableHtml = `
+        <table style="width:100%; border-collapse:collapse; margin-top:0.4rem; font-size:0.7rem; text-align:left; border:1px solid ${isBlocked ? 'rgba(239,68,68,0.2)' : 'var(--border)'}; background:rgba(0,0,0,0.15); border-radius:6px; overflow:hidden;">
+          <thead>
+            <tr style="background:rgba(255,255,255,0.02); color:var(--text-muted); border-bottom:1px solid ${isBlocked ? 'rgba(239,68,68,0.2)' : 'var(--border)'};">
+              <th style="padding:4px 6px; font-weight:500;">Dato</th>
+              <th style="padding:4px 6px; font-weight:500;">En Formulario</th>
+              <th style="padding:4px 6px; font-weight:500;">Extraído de PDF</th>
+              <th style="padding:4px 6px; font-weight:500;">Registrado en SAP</th>
+              <th style="padding:4px 6px; font-weight:500; text-align:center;">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+              <td style="padding:5px 6px; font-weight:600; color:var(--text-secondary);">Folio / Doc</td>
+              <td style="padding:5px 6px; font-family:monospace;">${sapVal}</td>
+              <td style="padding:5px 6px; font-family:monospace; color:${isPdfDocMatch ? '#10b981' : '#ef4444'};">${pdfData.doc || '—'}</td>
+              <td style="padding:5px 6px; font-family:monospace;">${sapVal}</td>
+              <td style="padding:5px 6px; text-align:center; color:${isPdfDocMatch ? '#10b981' : '#ef4444'};"><i data-lucide="${isPdfDocMatch ? 'check-circle' : 'alert-triangle'}" style="width:14px; height:14px; display:inline-block;"></i></td>
+            </tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+              <td style="padding:5px 6px; font-weight:600; color:var(--text-secondary);">Monto Total</td>
+              <td style="padding:5px 6px;">${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(montoVal)}</td>
+              <td style="padding:5px 6px; color:${isPdfMontoMatch ? 'var(--text-primary)' : '#ef4444'};">${pdfData.monto ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(pdfData.monto) : '—'}</td>
+              <td style="padding:5px 6px;">${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(sapMonto)}</td>
+              <td style="padding:5px 6px; text-align:center; color:${isMontoMatch && isPdfMontoMatch ? '#10b981' : '#ef4444'};"><i data-lucide="${isMontoMatch && isPdfMontoMatch ? 'check-circle' : 'alert-triangle'}" style="width:14px; height:14px; display:inline-block;"></i></td>
+            </tr>
+            <tr>
+              <td style="padding:5px 6px; font-weight:600; color:var(--text-secondary);">Cliente</td>
+              <td style="padding:5px 6px; white-space:nowrap; max-width:80px; overflow:hidden; text-overflow:ellipsis;" title="${tClientName || ''}">${tClientName || '—'}</td>
+              <td style="padding:5px 6px; white-space:nowrap; max-width:80px; overflow:hidden; text-overflow:ellipsis; color:${isPdfClientMatch ? 'var(--text-primary)' : '#f59e0b'};" title="${pdfData.cliente || ''}">${pdfData.cliente || '—'}</td>
+              <td style="padding:5px 6px; white-space:nowrap; max-width:80px; overflow:hidden; text-overflow:ellipsis;" title="${sapCliente}">${sapCliente}</td>
+              <td style="padding:5px 6px; text-align:center; color:${isClientMatch && isPdfClientMatch ? '#10b981' : '#f59e0b'};"><i data-lucide="${isClientMatch && isPdfClientMatch ? 'check-circle' : 'alert-triangle'}" style="width:14px; height:14px; display:inline-block;"></i></td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+    }
+
+    if (isBlocked) {
+      statusDiv.innerHTML = `
+        <div style="padding:0.6rem 0.8rem; border-radius:8px; background:rgba(239,68,68,0.05); border:1px solid rgba(239,68,68,0.15); font-size:0.78rem; color:#ef4444; display:flex; flex-direction:column; gap:0.3rem;">
+          <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="alert-octagon" style="width:14px; height:14px;"></i> Discrepancia Crítica Detectada</div>
+          <div style="font-size:0.74rem; color:var(--text-muted);">Los datos del PDF subido no coinciden con la información oficial de SAP. Verifique el archivo.</div>
+          ${comparisonTableHtml}
+          <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Fecha SAP: ${sapFecha}</div>
+        </div>
+      `;
+    } else {
+      statusDiv.innerHTML = `
+        <div style="padding:0.6rem 0.8rem; border-radius:8px; background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.15); font-size:0.78rem; color:#10b981; display:flex; flex-direction:column; gap:0.3rem;">
+          <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="check-circle" style="width:14px; height:14px;"></i> Pedido Validado con SAP</div>
+          <div style="font-size:0.74rem; color:var(--text-muted);">El formulario, el archivo PDF y SAP coinciden plenamente.</div>
+          ${comparisonTableHtml}
+          <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Fecha SAP: ${sapFecha}</div>
+        </div>
+      `;
+    }
+
+    if (window.lucide) lucide.createIcons();
+  } catch (errVal) {
+    console.error('[SAP Validation Pedido] Error querying Supabase:', errVal);
+    statusDiv.style.display = 'none';
+    window._isPedidoSapBlocked = true;
+  }
+};
+
+window.syncSapPedidoManual = async function(isModal = true) {
+  const btnId = isModal ? 'btn-sync-sap-ped-modal' : 'btn-sync-sap-ped-quick';
+  const btn = document.getElementById(btnId);
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader" class="rotating" style="width:12px; height:12px;"></i> Sincronizando...';
+    if (window.lucide) lucide.createIcons();
+  }
+
+  mostrarNotificacion('Consultando pedidos más recientes en SAP...', 'info');
+
+  try {
+    const response = await fetch('/api/trigger-sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ modulo: 'pedidos' })
+    });
+    if (!response.ok) throw new Error('Error al sincronizar con SAP (Servidor)');
+    
+    const sb = window.supabaseClient;
+    if (sb) {
+      const { data, error } = await sb.from('pedidos_sap').select('*').order('numero_pedido', { ascending: false });
+      if (!error && data) {
+        window._cachePedidosSap = data;
+        localStorage.setItem('eurorep_pedidos_sap', JSON.stringify(data));
+      }
+    }
+
+    const selectId = isModal ? 't-pedido-sap' : 'quick-ped-sap';
+    const selectEl = document.getElementById(selectId);
+    let currentVal = selectEl ? selectEl.value : '';
+
+    await window.poblarPedidosDropdown(isModal, null, currentVal);
+    
+    if (window.validarPedidoConSAP) {
+      window.validarPedidoConSAP(isModal);
+    }
+    
+    mostrarNotificacion('Pedidos actualizados con SAP exitosamente.', 'success');
+  } catch (err) {
+    console.error('[SAP Sync Manual Pedidos] Error:', err);
+    mostrarNotificacion('Error al sincronizar pedidos con SAP: ' + err.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="refresh-cw" style="width:12px; height:12px;"></i> Sincronizar con SAP';
+      if (window.lucide) lucide.createIcons();
+    }
   }
 };
 
@@ -12428,6 +12928,20 @@ function abrirTicket(id) {
     statusDiv.innerHTML = '';
   }
 
+  const pedidoStatusDiv = document.getElementById('t-pedido-sap-validation-status');
+  if (pedidoStatusDiv) {
+    pedidoStatusDiv.style.display = 'none';
+    pedidoStatusDiv.innerHTML = '';
+  }
+
+  const pedidoPdfExtDiv = document.getElementById('pdf-pedido-extraction-table-container');
+  if (pedidoPdfExtDiv) {
+    pedidoPdfExtDiv.style.display = 'none';
+    pedidoPdfExtDiv.innerHTML = '';
+  }
+
+  window._lastPdfPedidoExtracted = null;
+
   const t = id ? tickets.find(x => x.id === id) : null;
 
   window.editandoCotizaciones = [];
@@ -12451,6 +12965,27 @@ function abrirTicket(id) {
 
   if (window.poblarCotizacionesDropdown) {
     window.poblarCotizacionesDropdown(true, null, '');
+  }
+
+  if (window.poblarPedidosDropdown) {
+    window.poblarPedidosDropdown(true, null, t ? t.pedidoSAP : '');
+  }
+
+  if (t && t.pedidoSAP) {
+    const elPedMonto = document.getElementById('t-pedido-monto');
+    // Si ya existe monto del pedido en el ticket lo mostramos, de lo contrario buscamos en la orden de SAP
+    if (elPedMonto) {
+      const order = (window._cachePedidosSap || []).find(o => o.numero_pedido === t.pedidoSAP);
+      elPedMonto.value = t.montoPedido || (order ? order.monto : '');
+    }
+    setTimeout(() => {
+      if (window.validarPedidoConSAP) {
+        window.validarPedidoConSAP(true);
+      }
+    }, 200);
+  } else {
+    const elPedMonto = document.getElementById('t-pedido-monto');
+    if (elPedMonto) elPedMonto.value = '';
   }
 
   // Reset file labels
@@ -12707,6 +13242,10 @@ function toggleMotivoRechazo() {
   
   if (groupPedido) groupPedido.style.display = (aceptada === 'si') ? 'block' : 'none';
   if (inPedidoSap) inPedidoSap.required = (aceptada === 'si');
+
+  if (aceptada === 'si' && window.validarPedidoConSAP) {
+    window.validarPedidoConSAP(true);
+  }
 }
 
 function editarTicket(id) { abrirTicket(id); }
@@ -13142,13 +13681,20 @@ async function guardarTicket(e) {
     }
     
     if (cotAceptada === 'si') {
-      if (!pedidoSAP) {
-        mostrarNotificacion('Debe ingresar el Número de Pedido SAP para cerrar una cotización aceptada.', 'error');
-        return;
-      }
-      if (!pedidoPdfUpload && !t_existente?.pdfPedido) {
-        mostrarNotificacion('Debe adjuntar el archivo PDF del pedido para cerrar la cotización aceptada.', 'error');
-        return;
+      const bypass = window.isTemporaryNoQuotePeriodActive && window.isTemporaryNoQuotePeriodActive();
+      if (!bypass) {
+        if (!pedidoSAP) {
+          mostrarNotificacion('Debe ingresar el Número de Pedido SAP para cerrar una cotización aceptada.', 'error');
+          return;
+        }
+        if (!pedidoPdfUpload && !t_existente?.pdfPedido) {
+          mostrarNotificacion('Debe adjuntar el archivo PDF del pedido para cerrar la cotización aceptada.', 'error');
+          return;
+        }
+        if (window._isPedidoSapBlocked) {
+          mostrarNotificacion('No se puede guardar el ticket debido a una discrepancia crítica entre el PDF y SAP.', 'error');
+          return;
+        }
       }
     }
   }
