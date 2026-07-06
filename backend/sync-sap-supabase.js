@@ -481,17 +481,22 @@ async function fetchPedidosFromSAP() {
     } catch (errGet) {
       if (errGet.response && errGet.response.status === 404) {
         log(`ℹ️ La Query '${QUERIES.pedidos}' no existe en SAP. Intentando crearla automáticamente...`);
-        const sqlText = `SELECT T0."DocEntry" AS "ID DocInternal", T0."DocNum" AS "Folio Pedido", T0."CardCode" AS "ID_Cliente", T0."CardName" AS "Nombre", T0."DocDate", T0."DocDueDate" AS "Fecha Entrega", T0."DocCur", T0."DocTotalFC" as "Importe ME", T0."DocTotal" as "Importe MXN", CASE WHEN T0."SlpCode" = '-1' THEN 'SIN Vendedor' ELSE T2."SlpName" END AS "Vendedor" FROM ORDR T0 LEFT JOIN OSLP T2 ON T0."SlpCode" = T2."SlpCode" WHERE T0."CANCELED" = 'N' ORDER BY T0."DocDate", T0."DocNum"`;
-        await sapApi.post(`${SAP_URL}/SQLQueries`, {
-          SqlCode: QUERIES.pedidos,
-          SqlName: "Eurorep Pedidos",
-          SqlText: sqlText
-        });
-        log(`✅ Query '${QUERIES.pedidos}' creada con éxito en SAP. Volviendo a consultar...`);
-        res = await sapApi.get(`${SAP_URL}/SQLQueries('${QUERIES.pedidos}')/List`, {
-          headers: { 'B1S-PageSize': 5000, 'Prefer': 'odata.maxpagesize=5000' },
-          timeout: 15000
-        });
+        const sqlText = `SELECT T0."DocEntry" AS "ID DocInternal", T0."DocNum" AS "Folio Pedido", T0."CardCode" AS "ID_Cliente", T0."CardName" AS "Nombre", T0."DocDate", T0."DocDueDate" AS "Fecha Entrega", T0."DocCur", T0."DocTotalFC" as "Importe ME", T0."DocTotal" as "Importe MXN", CASE WHEN T0."SlpCode" = -1 THEN 'SIN Vendedor' ELSE T2."SlpName" END AS "Vendedor" FROM ORDR T0 LEFT JOIN OSLP T2 ON T0."SlpCode" = T2."SlpCode" WHERE T0."CANCELED" = 'N' ORDER BY T0."DocDate", T0."DocNum"`;
+        try {
+          await sapApi.post(`${SAP_URL}/SQLQueries`, {
+            SqlCode: QUERIES.pedidos,
+            SqlName: "Eurorep Pedidos",
+            SqlText: sqlText
+          });
+          log(`✅ Query '${QUERIES.pedidos}' creada con éxito en SAP. Volviendo a consultar...`);
+          res = await sapApi.get(`${SAP_URL}/SQLQueries('${QUERIES.pedidos}')/List`, {
+            headers: { 'B1S-PageSize': 5000, 'Prefer': 'odata.maxpagesize=5000' },
+            timeout: 15000
+          });
+        } catch (errPost) {
+          log(`❌ Error al crear Query en SAP: ${errPost.message}. Detalle: ${JSON.stringify(errPost.response?.data || '')}`);
+          throw errPost;
+        }
       } else {
         throw errGet;
       }
@@ -511,7 +516,7 @@ async function fetchPedidosFromSAP() {
       }));
     }
   } catch (errQ) {
-    log(`⚠️ SQL Query de pedidos falló o no se pudo crear: ${errQ.message}. Intentando fallback nativo a OData Orders...`);
+    log(`⚠️ SQL Query de pedidos falló o no se pudo crear: ${errQ.message}. Detalle: ${JSON.stringify(errQ.response?.data || '')}. Intentando fallback nativo a OData Orders...`);
   }
 
   // Fallback a OData estándar de SAP (Orders)
@@ -543,7 +548,7 @@ async function fetchPedidosFromSAP() {
       vendedor: q.SalesPersonCode ? q.SalesPersonCode.toString() : null
     }));
   } catch (errFallback) {
-    log(`❌ Fallback nativo de pedidos también falló: ${errFallback.message}`);
+    log(`❌ Fallback nativo de pedidos también falló: ${errFallback.message}. Detalle: ${JSON.stringify(errFallback.response?.data || '')}`);
     throw errFallback;
   }
 }
