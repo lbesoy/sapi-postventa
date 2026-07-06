@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.158'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.159'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -11456,9 +11456,11 @@ function togglePasarCotizacionBtn(isModal, ticketId, enable) {
   if (!isModal && btnId) {
     const btn = document.getElementById(btnId);
     if (btn) {
-      btn.disabled = !enable;
-      btn.style.opacity = enable ? '1' : '0.5';
-      btn.style.cursor = enable ? 'pointer' : 'not-allowed';
+      const bypass = window.isTemporaryNoQuotePeriodActive && window.isTemporaryNoQuotePeriodActive();
+      const finalEnable = enable || bypass;
+      btn.disabled = !finalEnable;
+      btn.style.opacity = finalEnable ? '1' : '0.5';
+      btn.style.cursor = finalEnable ? 'pointer' : 'not-allowed';
     }
   }
 }
@@ -11984,9 +11986,10 @@ window.validarCotizacionConSAP = async function(isModal = true, ticketId = null)
     statusDiv.style.display = 'none';
     statusDiv.innerHTML = '';
     if (btn) {
-      btn.disabled = true;
-      btn.style.opacity = '0.5';
-      btn.style.cursor = 'not-allowed';
+      const bypass = window.isTemporaryNoQuotePeriodActive && window.isTemporaryNoQuotePeriodActive();
+      btn.disabled = !bypass;
+      btn.style.opacity = bypass ? '1' : '0.5';
+      btn.style.cursor = bypass ? 'pointer' : 'not-allowed';
     }
     return;
   }
@@ -12008,9 +12011,10 @@ window.validarCotizacionConSAP = async function(isModal = true, ticketId = null)
         </div>
       `;
       if (btn) {
-        btn.disabled = true;
-        btn.style.opacity = '0.5';
-        btn.style.cursor = 'not-allowed';
+        const bypass = window.isTemporaryNoQuotePeriodActive && window.isTemporaryNoQuotePeriodActive();
+        btn.disabled = !bypass;
+        btn.style.opacity = bypass ? '1' : '0.5';
+        btn.style.cursor = bypass ? 'pointer' : 'not-allowed';
       }
       if (window.lucide) lucide.createIcons();
       return;
@@ -12188,10 +12192,11 @@ window.validarCotizacionConSAP = async function(isModal = true, ticketId = null)
     }
 
     if (btn) {
+      const bypass = window.isTemporaryNoQuotePeriodActive && window.isTemporaryNoQuotePeriodActive();
       if (isBlocked || !hasUploadedFile) {
-        btn.disabled = true;
-        btn.style.opacity = '0.5';
-        btn.style.cursor = 'not-allowed';
+        btn.disabled = !bypass;
+        btn.style.opacity = bypass ? '1' : '0.5';
+        btn.style.cursor = bypass ? 'pointer' : 'not-allowed';
       } else {
         btn.disabled = false;
         btn.style.opacity = '1';
@@ -12204,9 +12209,10 @@ window.validarCotizacionConSAP = async function(isModal = true, ticketId = null)
     console.error('[SAP Validation] Error querying Supabase:', errVal);
     statusDiv.style.display = 'none';
     if (btn) {
-      btn.disabled = true;
-      btn.style.opacity = '0.5';
-      btn.style.cursor = 'not-allowed';
+      const bypass = window.isTemporaryNoQuotePeriodActive && window.isTemporaryNoQuotePeriodActive();
+      btn.disabled = !bypass;
+      btn.style.opacity = bypass ? '1' : '0.5';
+      btn.style.cursor = bypass ? 'pointer' : 'not-allowed';
     }
   }
 };
