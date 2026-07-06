@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.156'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.157'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -9454,6 +9454,10 @@ async function guardarProgramacionTecnico() {
     await window.pushToSupabase('ordenes', o);
   }
 
+  if (window.trackTelemetryEvent) {
+    window.trackTelemetryEvent('Creación de Asignación', { tecnico, fecha, folio: o.folio || 'Sin Folio' });
+  }
+
   mostrarNotificacion('Asignación programada con éxito', 'success');
   document.getElementById('modal-programar-tecnico-overlay').classList.remove('open');
   if (typeof renderCalendario === 'function') {
@@ -14994,6 +14998,16 @@ window.guardarActividadCalendario = async function() {
   // Sincronizar asíncronamente con Supabase
   window.pushToSupabase('calendario_eventos', eventoObj);
 
+  if (window.trackTelemetryEvent) {
+    const o = ordenId ? ordenes.find(x => x.id === ordenId) : null;
+    const folioStr = o ? (o.folio || 'Sin Folio') : 'Sin Folio';
+    window.trackTelemetryEvent(id ? 'Edición de Asignación' : 'Creación de Asignación', { 
+      tecnico: tecnicoNombre || 'Sin Asignar', 
+      fecha: inicio ? inicio.substring(0, 10) : '', 
+      folio: folioStr 
+    });
+  }
+
   // Cerrar modal y re-renderizar
   document.getElementById('modal-registrar-actividad-overlay').classList.remove('open');
   if (typeof renderCalendario === 'function') {
@@ -15048,6 +15062,11 @@ window.eliminarActividadCalendario = async function() {
   if (typeof renderCalendario === 'function') {
     renderCalendario();
   }
+
+  if (window.trackTelemetryEvent) {
+    window.trackTelemetryEvent('Eliminación de Asignación', { id });
+  }
+
   if (window.mostrarNotificacion) {
     window.mostrarNotificacion("Actividad eliminada.", "info");
   }
@@ -23519,6 +23538,12 @@ window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId)
   
   if (window.deleteFromSupabase) {
     window.deleteFromSupabase('calendario_eventos', bitacoraId);
+  }
+
+  if (window.trackTelemetryEvent) {
+    const o = oIndex > -1 ? ordenes[oIndex] : null;
+    const folioStr = o ? (o.folio || 'Sin Folio') : 'Sin Folio';
+    window.trackTelemetryEvent('Eliminación de Asignación', { id: bitacoraId, folio: folioStr });
   }
 
   if (window.mostrarNotificacion) {
