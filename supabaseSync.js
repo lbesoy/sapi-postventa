@@ -163,7 +163,7 @@ function ticketToRow(t) {
   return row;
 }
 
-function rowToTicket(t) {
+function rowToTicket(t, idsWithPedido, idsWithCotizacion) {
   let clienteNombre = t.cliente;
   try {
     const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
@@ -179,8 +179,22 @@ function rowToTicket(t) {
   } catch (e) {}
 
   // Optimizar Base64 de PDFs guardando un marcador local para ahorrar espacio (evitar saturación de localStorage)
-  const pdfPedidoVal = t.pdf_pedido ? '__HAS_PDF__' : null;
-  const pdfCotizacionVal = t.pdf_cotizacion ? '__HAS_PDF__' : null;
+  let hasPed = false;
+  if (t.pdf_pedido) {
+    hasPed = true;
+  } else if (idsWithPedido && idsWithPedido.has(t.id)) {
+    hasPed = true;
+  }
+
+  let hasCot = false;
+  if (t.pdf_cotizacion) {
+    hasCot = true;
+  } else if (idsWithCotizacion && idsWithCotizacion.has(t.id)) {
+    hasCot = true;
+  }
+
+  const pdfPedidoVal = hasPed ? '__HAS_PDF__' : null;
+  const pdfCotizacionVal = hasCot ? '__HAS_PDF__' : null;
 
   const extracted = window.extraerRefaccionesDeNotas(t.notas);
   const extractedCot = window.extraerCotizacionesDeNotas(extracted.notasLimpias);
@@ -1978,8 +1992,19 @@ window.cargarDatosDeSupabase = function() {
     // Tickets — SOLO sobreescribir local si la consulta fue exitosa
     let ticketsDb = null;
     let ticketsError = null;
+    let idsWithPedido = new Set();
+    let idsWithCotizacion = new Set();
     try {
-      const res = await sb.from('tickets').select('*');
+      // 1. Descargar IDs que tienen PDF de forma rápida (sin Base64)
+      const resPed = await sb.from('tickets').select('id').not('pdf_pedido', 'is', null);
+      if (resPed.data) idsWithPedido = new Set(resPed.data.map(x => x.id));
+      
+      const resCot = await sb.from('tickets').select('id').not('pdf_cotizacion', 'is', null);
+      if (resCot.data) idsWithCotizacion = new Set(resCot.data.map(x => x.id));
+
+      // 2. Descargar columnas principales del ticket (excluyendo Base64 pesados de PDFs)
+      const columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, notas, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion';
+      const res = await sb.from('tickets').select(columns);
       ticketsDb = res.data;
       ticketsError = res.error;
     } catch (e) {
@@ -2000,7 +2025,7 @@ window.cargarDatosDeSupabase = function() {
       let mapErrors = [];
       ticketsDb.forEach(t => {
         try {
-          mapped.push(rowToTicket(t));
+          mapped.push(rowToTicket(t, idsWithPedido, idsWithCotizacion));
         } catch (e) {
           mapErrors.push({ folio: t.folio, error: e.message });
         }
