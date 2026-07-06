@@ -124,7 +124,7 @@ const MARCAS_RENDER = {
 };
 
 // Inicialización del Portal
-document.addEventListener('DOMContentLoaded', async () => {
+async function inicializarPortal() {
   // Inicializar Tema (Oscuro por defecto)
   const savedTheme = localStorage.getItem('theme_mode') || 'dark';
   if (savedTheme === 'light') {
@@ -138,7 +138,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Verificar Auth y Rol
   await verificarSesionCliente();
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', inicializarPortal);
+} else {
+  inicializarPortal();
+}
 
 // Verificación de sesión y restricciones
 async function verificarSesionCliente() {

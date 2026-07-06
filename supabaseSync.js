@@ -2849,7 +2849,7 @@ function setupRealtime() {
 }
 
 // ─── Arrancar cuando el DOM esté listo ───────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+function arrancarSync() {
   // Limpiar cualquier elemento de prueba en la cola de sincronización para evitar fallos
   try {
     const queue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
@@ -2876,7 +2876,13 @@ document.addEventListener('DOMContentLoaded', () => {
     updateSyncStatusUI();
     processSyncQueue();
   }, 300);
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', arrancarSync);
+} else {
+  arrancarSync();
+}
 
 // Convert base64 data URL to Blob for binary storage upload
 window.base64ToBlob = async function(base64Data) {
