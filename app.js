@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.170'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.171'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -22656,8 +22656,8 @@ window.trackTelemetryEvent = function(action, details = {}) {
     };
 
     events.unshift(newEvent);
-    // Limit to 1000 events to prevent localStorage bloat
-    if (events.length > 1000) events.pop();
+    // Limit to 100 events to prevent localStorage bloat
+    if (events.length > 100) events.pop();
 
     localStorage.setItem('sapi_telemetry_events', JSON.stringify(events));
 
