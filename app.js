@@ -11764,6 +11764,23 @@ window.onModalPedidoSelected = function() {
   }
 };
 
+window.onQuickPedidoSelected = function(ticketId) {
+  const sapVal = document.getElementById(`quick-ped-sap-${ticketId}`)?.value.trim();
+  if (!sapVal) return;
+  
+  const order = (window._cachePedidosSap || []).find(o => o.numero_pedido === sapVal);
+  if (order) {
+    const montoInput = document.getElementById(`quick-ped-monto-${ticketId}`);
+    if (montoInput) {
+      montoInput.value = order.monto || '';
+    }
+  }
+  
+  if (window.validarPedidoConSAP) {
+    window.validarPedidoConSAP(false, ticketId);
+  }
+};
+
 window.autoExtraerDesdePdfPedido = async function(file, isModal = true, ticketId = null) {
   if (!file) return;
   
@@ -11995,10 +12012,13 @@ window.validarPedidoConSAP = async function(isModal = true, ticketId = null) {
   const fileInput = document.getElementById(pdfInputId);
   const hasUploadedFile = (fileInput && fileInput.files.length > 0) || (ticket && ticket.pdfPedido);
 
+  window._pedidoSapBlockedState = window._pedidoSapBlockedState || {};
+
   if (!sapVal) {
     statusDiv.style.display = 'none';
     statusDiv.innerHTML = '';
     window._isPedidoSapBlocked = false;
+    if (tId) window._pedidoSapBlockedState[tId] = false;
     return;
   }
 
@@ -12018,6 +12038,7 @@ window.validarPedidoConSAP = async function(isModal = true, ticketId = null) {
         </div>
       `;
       window._isPedidoSapBlocked = true;
+      if (tId) window._pedidoSapBlockedState[tId] = true;
       if (window.lucide) lucide.createIcons();
       return;
     }
@@ -12063,6 +12084,7 @@ window.validarPedidoConSAP = async function(isModal = true, ticketId = null) {
 
     const isBlocked = hasPdf && (matchCount < 2);
     window._isPedidoSapBlocked = isBlocked;
+    if (tId) window._pedidoSapBlockedState[tId] = isBlocked;
 
     let comparisonTableHtml = '';
     if (hasPdf) {
@@ -12129,6 +12151,7 @@ window.validarPedidoConSAP = async function(isModal = true, ticketId = null) {
     console.error('[SAP Validation Pedido] Error querying Supabase:', errVal);
     statusDiv.style.display = 'none';
     window._isPedidoSapBlocked = true;
+    if (tId) window._pedidoSapBlockedState[tId] = true;
   }
 };
 
@@ -14289,17 +14312,31 @@ function verDetalleTicket(id) {
         </div>
         <div id="quick-pedido-${t.id}" style="display:none; margin-bottom:0.75rem;">
           <div class="form-group full-width">
-            <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem;">No. Pedido SAP *</label>
-            <input type="text" id="quick-pedido-sap-${t.id}" placeholder="Ej. PED-200450" />
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+              <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; margin:0;">No. Pedido SAP *</label>
+              <button type="button" id="btn-sync-sap-ped-quick-${t.id}" onclick="window.syncSapPedidoManual(false, '${t.id}')" class="btn-text-action" style="font-size:0.75rem; color:var(--accent); background:none; border:none; cursor:pointer; font-weight:600; padding:0; display:inline-flex; align-items:center; gap:4px;"><i data-lucide="refresh-cw" style="width:12px; height:12px;"></i> Sincronizar con SAP</button>
+            </div>
+            <select id="quick-ped-sap-${t.id}" onchange="window.onQuickPedidoSelected('${t.id}')" style="width:100%; border:1px solid var(--border); border-radius:6px; background:rgba(255,255,255,0.02); color:var(--text-primary); padding:0.6rem; font-size:0.85rem;"></select>
+          </div>
+          <div class="form-group full-width" style="margin-top:0.5rem;">
+            <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem;">Monto de Pedido ($) *</label>
+            <input type="number" id="quick-ped-monto-${t.id}" oninput="window.validarPedidoConSAP(false, '${t.id}')" step="0.01" min="0" placeholder="Ej. 12500.00" style="width:100%; border:1px solid var(--border); border-radius:6px; background:rgba(255,255,255,0.02); color:var(--text-primary); padding:0.6rem; font-size:0.85rem;" />
           </div>
           <div class="form-group full-width" style="margin-top:0.5rem;">
             <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem;">Archivo Pedido (PDF) *</label>
-            <label class="custom-file-upload">
-              <input type="file" id="quick-pedido-pdf-${t.id}" accept="application/pdf" onchange="updateFileLabel(this)"/>
-              <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
-              <span class="file-label-text">Subir pedido en PDF</span>
-            </label>
+            <div style="display:flex; flex-direction:column; gap:0.5rem; width:100%;">
+              <div style="display:flex; gap:0.5rem; align-items:center; width:100%;">
+                <label class="custom-file-upload" style="flex:1; margin:0;">
+                  <input type="file" id="quick-ped-pdf-${t.id}" accept="application/pdf" onchange="updateFileLabel(this); if(this.files[0]) window.autoExtraerDesdePdfPedido(this.files[0], false, '${t.id}');" />
+                  <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
+                  <span class="file-label-text">Subir pedido en PDF</span>
+                </label>
+                <button type="button" id="btn-clear-pdf-pedido-quick-${t.id}" onclick="window.clearPdfPedidoInput(false, '${t.id}')" class="btn-icon" style="display:none; background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); border-radius:6px; padding:0.6rem; cursor:pointer; height:45px; width:45px; align-items:center; justify-content:center;" title="Eliminar archivo"><i data-lucide="trash-2" style="width:16px; height:16px;"></i></button>
+              </div>
+              <div id="quick-pdf-pedido-extraction-table-container-${t.id}" style="display:none;"></div>
+            </div>
           </div>
+          <div id="quick-pedido-sap-validation-status-${t.id}" style="margin-top: 0.75rem; display: none;"></div>
           <div class="form-group full-width" style="margin-top:0.75rem;">
             <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem;">Tipo de Visita *</label>
             <select id="quick-tipo-${t.id}">
@@ -14361,6 +14398,23 @@ function verDetalleTicket(id) {
 
     if (window.poblarCotizacionesDropdown) {
       window.poblarCotizacionesDropdown(false, t.id, '');
+    }
+  }
+  if (t.estado === 'Cotización' && currentSession.viewMode !== 'empresa') {
+    if (window.poblarPedidosDropdown) {
+      window.poblarPedidosDropdown(false, t.id, t.pedidoSAP || '');
+    }
+    if (t.pedidoSAP) {
+      const elPedMonto = document.getElementById(`quick-ped-monto-${t.id}`);
+      if (elPedMonto) {
+        const order = (window._cachePedidosSap || []).find(o => o.numero_pedido === t.pedidoSAP);
+        elPedMonto.value = t.montoPedido || (order ? order.monto : '');
+      }
+      setTimeout(() => {
+        if (window.validarPedidoConSAP) {
+          window.validarPedidoConSAP(false, t.id);
+        }
+      }, 200);
     }
   }
   lucide.createIcons();
@@ -14555,25 +14609,34 @@ async function cerrarCotizacionTicket(id) {
       return;
     }
   } else if (aceptada === 'si') {
-    pedidoSAP = document.getElementById(`quick-pedido-sap-${id}`)?.value.trim();
-    const pdfUpload = document.getElementById(`quick-pedido-pdf-${id}`)?.files.length > 0;
+    pedidoSAP = document.getElementById(`quick-ped-sap-${id}`)?.value.trim();
+    const pdfUpload = document.getElementById(`quick-ped-pdf-${id}`)?.files.length > 0;
     
     const selTipo = document.getElementById(`quick-tipo-${id}`)?.value;
     if (selTipo) {
       tipoVisitaSeleccionado = selTipo;
     }
     
-    if (!pedidoSAP) {
-      mostrarNotificacion('Debes ingresar el Número de Pedido SAP.', 'warning');
-      return;
-    }
-    if (!pdfUpload && !pdfPedidoBase64) {
-      mostrarNotificacion('Debes adjuntar el archivo PDF del pedido.', 'warning');
-      return;
+    const bypass = window.isTemporaryNoQuotePeriodActive && window.isTemporaryNoQuotePeriodActive();
+    if (!bypass) {
+      if (!pedidoSAP) {
+        mostrarNotificacion('Debes ingresar el Número de Pedido SAP.', 'warning');
+        return;
+      }
+      if (!pdfUpload && !pdfPedidoBase64) {
+        mostrarNotificacion('Debes adjuntar el archivo PDF del pedido.', 'warning');
+        return;
+      }
+      
+      const isBlocked = window._pedidoSapBlockedState && window._pedidoSapBlockedState[id];
+      if (isBlocked) {
+        mostrarNotificacion('No se puede cerrar el ticket debido a una discrepancia crítica entre el PDF y SAP.', 'error');
+        return;
+      }
     }
     
     if (pdfUpload) {
-      try { pdfPedidoBase64 = await readFileAsBase64(document.getElementById(`quick-pedido-pdf-${id}`).files[0]); } catch(e){}
+      try { pdfPedidoBase64 = await readFileAsBase64(document.getElementById(`quick-ped-pdf-${id}`).files[0]); } catch(e){}
     }
   }
   
