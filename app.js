@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.162'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.163'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -1166,8 +1166,8 @@ async function iniciarSesionSubmit(e) {
 
 function entrarApp(user) {
   if (user && (user.rol === 'empresa' || user.rol === 'cliente')) {
-    console.log('[Auth] Redirigiendo cliente al Portal de Clientes (cliente.html)...');
-    window.location.href = 'cliente.html';
+    console.log('[Auth] Redirigiendo cliente al Portal de Clientes (cliente)...');
+    window.location.href = 'cliente';
     return;
   }
   try {

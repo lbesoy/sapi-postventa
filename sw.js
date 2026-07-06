@@ -1,10 +1,10 @@
-const CACHE_NAME = 'eurorep-postventa-v223';
+const CACHE_NAME = 'eurorep-postventa-v224';
 const ASSETS = [
   '/',
   '/index.html',
   '/app.js',
   '/style.css',
-  '/cliente.html',
+  '/cliente',
   '/cliente.css',
   '/cliente.js',
   '/supabaseSync.js',
