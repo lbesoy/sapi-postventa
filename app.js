@@ -1346,6 +1346,12 @@ let isSincronizandoSAP = false;
 
 // Helpers: Inicializar fecha límite por defecto a +3 días
 document.addEventListener('DOMContentLoaded', () => {
+  // Sincronizar etiqueta de versión en el sidebar
+  const verEl = document.getElementById('app-sidebar-version');
+  if (verEl) {
+    verEl.textContent = APP_VERSION;
+  }
+
   // Cerrar popup de filtros al hacer click afuera
   try {
     document.addEventListener('click', (e) => {
