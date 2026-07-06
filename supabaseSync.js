@@ -2043,6 +2043,10 @@ window.cargarDatosDeSupabase = function() {
 
       window._supaTickets = mapped;
       localStorage.setItem('sapi_tickets', JSON.stringify(mapped));
+      
+      // Emitir evento inmediato para que la UI renderice los tickets descargados sin esperar el resto del sync
+      console.log('[Sync] Tickets guardados. Despachando evento de renderizado inmediato.');
+      window.dispatchEvent(new Event('supabase_datos_cargados'));
     } else {
       // Si la nube está vacía, respetamos el local (no borramos nada)
       window._supaTickets = null;
@@ -2296,6 +2300,10 @@ window.cargarDatosDeSupabase = function() {
 
       window._supaOrdenes = mapped;
       localStorage.setItem('sapi_ordenes', JSON.stringify(window._supaOrdenes));
+      
+      // Emitir evento inmediato para que la UI renderice las órdenes descargadas sin esperar el resto del sync
+      console.log('[Sync] Órdenes guardadas. Despachando evento de renderizado inmediato.');
+      window.dispatchEvent(new Event('supabase_datos_cargados'));
     } else {
       window._supaOrdenes = null;
     }
