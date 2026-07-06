@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.160'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.161'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -2074,6 +2074,22 @@ async function sincronizarConGitHub(modulo = 'all', btnEl = null) {
                   if (activeInlineStatusEl) {
                     const activeInlineTransitionId = activeInlineStatusEl.id.replace('quick-sap-validation-status-', '');
                     window.validarCotizacionConSAP(false, activeInlineTransitionId);
+                  }
+                }
+                if (window.poblarPedidosDropdown) {
+                  window.poblarPedidosDropdown(true, null, document.getElementById('t-pedido-sap')?.value || '');
+                  const activeQuickPedEl = document.querySelector('[id^="quick-ped-sap-"]');
+                  if (activeQuickPedEl) {
+                    const activeQuickTicketId = activeQuickPedEl.id.replace('quick-ped-sap-', '');
+                    window.poblarPedidosDropdown(false, activeQuickTicketId, activeQuickPedEl.value || '');
+                  }
+                }
+                if (window.validarPedidoConSAP) {
+                  window.validarPedidoConSAP(true);
+                  const activeQuickPedEl = document.querySelector('[id^="quick-ped-sap-"]');
+                  if (activeQuickPedEl) {
+                    const activeQuickTicketId = activeQuickPedEl.id.replace('quick-ped-sap-', '');
+                    window.validarPedidoConSAP(false, activeQuickTicketId);
                   }
                 }
               } else {
@@ -12155,54 +12171,14 @@ window.validarPedidoConSAP = async function(isModal = true, ticketId = null) {
   }
 };
 
-window.syncSapPedidoManual = async function(isModal = true) {
-  const btnId = isModal ? 'btn-sync-sap-ped-modal' : 'btn-sync-sap-ped-quick';
+window.syncSapPedidoManual = async function(isModal = true, ticketId = null) {
+  const btnId = isModal ? 'btn-sync-sap-ped-modal' : `btn-sync-sap-ped-quick-${ticketId}`;
   const btn = document.getElementById(btnId);
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<i data-lucide="loader" class="rotating" style="width:12px; height:12px;"></i> Sincronizando...';
-    if (window.lucide) lucide.createIcons();
-  }
-
-  mostrarNotificacion('Consultando pedidos más recientes en SAP...', 'info');
-
   try {
-    const response = await fetch('/api/trigger-sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ modulo: 'pedidos' })
-    });
-    if (!response.ok) throw new Error('Error al sincronizar con SAP (Servidor)');
-    
-    const sb = window.supabaseClient;
-    if (sb) {
-      const { data, error } = await sb.from('pedidos_sap').select('*').order('numero_pedido', { ascending: false });
-      if (!error && data) {
-        window._cachePedidosSap = data;
-        localStorage.setItem('eurorep_pedidos_sap', JSON.stringify(data));
-      }
-    }
-
-    const selectId = isModal ? 't-pedido-sap' : 'quick-ped-sap';
-    const selectEl = document.getElementById(selectId);
-    let currentVal = selectEl ? selectEl.value : '';
-
-    await window.poblarPedidosDropdown(isModal, null, currentVal);
-    
-    if (window.validarPedidoConSAP) {
-      window.validarPedidoConSAP(isModal);
-    }
-    
-    mostrarNotificacion('Pedidos actualizados con SAP exitosamente.', 'success');
+    await sincronizarConGitHub('pedidos', btn);
   } catch (err) {
     console.error('[SAP Sync Manual Pedidos] Error:', err);
     mostrarNotificacion('Error al sincronizar pedidos con SAP: ' + err.message, 'error');
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = '<i data-lucide="refresh-cw" style="width:12px; height:12px;"></i> Sincronizar con SAP';
-      if (window.lucide) lucide.createIcons();
-    }
   }
 };
 
