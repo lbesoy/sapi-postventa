@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.154'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.155'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -9591,15 +9591,15 @@ function actualizarEventoCalendarioDesdeBitacora(orden, bitacoraEntry) {
       );
     }
 
-    let color = '#3b82f6'; // Azul: Trabajo realizado sin asignación
+    let color = '#ef4444'; // Rojo: Trabajo realizado sin asignación
     if (bitacoraEntry.realizado === false || (bitacoraEntry.nota && bitacoraEntry.nota.includes('Programado por supervisor') && bitacoraEntry.realizado !== true)) {
       color = '#8b5cf6'; // Morado: Asignación programada (Pendiente)
     } else if (bitacoraEntry.realizado === true) {
       if (bitacoraEntry.programadoEntrada) {
         const isAligned = !bitacoraEntry.desviacion || bitacoraEntry.desviacion === 'Alineado' || bitacoraEntry.desviacion === '0m';
-        color = isAligned ? '#10b981' : '#ef4444'; // Verde o Rojo
+        color = isAligned ? '#10b981' : '#3b82f6'; // Verde o Azul
       } else {
-        color = '#3b82f6'; // Azul: Trabajo realizado sin asignación
+        color = '#ef4444'; // Rojo: Trabajo realizado sin asignación
       }
     }
 
@@ -14537,7 +14537,7 @@ function renderCalendario() {
         let dateStr = b.fecha;
         if (dateStr.includes('T')) dateStr = dateStr.split('T')[0];
         
-        let eventColor = '#3b82f6'; // Azul: Trabajo realizado sin asignación por defecto
+        let eventColor = '#ef4444'; // Rojo: Trabajo realizado sin asignación por defecto
         const esAsignacionPendiente = b.realizado === false || (b.nota && b.nota.includes('Programado por supervisor') && b.realizado !== true);
         
         if (esAsignacionPendiente) {
@@ -14550,11 +14550,11 @@ function renderCalendario() {
             if (isAligned) {
               eventColor = '#10b981'; // Verde: Asignación completada al 100%
             } else {
-              eventColor = '#ef4444'; // Rojo: Asignación completada pero con horas distintas
+              eventColor = '#3b82f6'; // Azul: Asignación completada pero con horas distintas
             }
           } else {
             // Trabajo realizado sin asignación
-            eventColor = '#3b82f6'; // Azul: Trabajo realizado sin asignación
+            eventColor = '#ef4444'; // Rojo: Trabajo realizado sin asignación
           }
         }
 
