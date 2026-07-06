@@ -1976,9 +1976,38 @@ window.cargarDatosDeSupabase = function() {
     }
 
     // Tickets — SOLO sobreescribir local si la consulta fue exitosa
-    const { data: ticketsDb } = await sb.from('tickets').select('*');
+    let ticketsDb = null;
+    let ticketsError = null;
+    try {
+      const res = await sb.from('tickets').select('*');
+      ticketsDb = res.data;
+      ticketsError = res.error;
+    } catch (e) {
+      ticketsError = e;
+    }
+
+    if (window.trackTelemetryEvent) {
+      window.trackTelemetryEvent('Diag: Tickets Fetch', {
+        success: !!ticketsDb,
+        count: ticketsDb ? ticketsDb.length : 0,
+        error: ticketsError ? (ticketsError.message || String(ticketsError)) : null
+      });
+    }
+
     if (ticketsDb) {
-      let mapped = ticketsDb.map(rowToTicket);
+      let mapped = [];
+      let mapErrors = [];
+      ticketsDb.forEach(t => {
+        try {
+          mapped.push(rowToTicket(t));
+        } catch (e) {
+          mapErrors.push({ folio: t.folio, error: e.message });
+        }
+      });
+      
+      if (mapErrors.length > 0 && window.trackTelemetryEvent) {
+        window.trackTelemetryEvent('Diag: Mapping Errors', { errors: mapErrors });
+      }
       
       // FUSIONAR CON CAMBIOS LOCALES PENDIENTES DE SINCRONIZAR
       const queue = getSyncQueue();
