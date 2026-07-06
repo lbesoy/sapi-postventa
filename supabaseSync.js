@@ -178,9 +178,9 @@ function rowToTicket(t) {
     if (match) sitioNombre = match.nombre || match.direccion;
   } catch (e) {}
 
-  // Optimizar Base64 de PDFs guardando un marcador local para ahorrar espacio
-  const pdfPedidoVal = (t.pdf_pedido && t.pdf_pedido.startsWith('data:')) ? '__HAS_PDF__' : (t.pdf_pedido || null);
-  const pdfCotizacionVal = (t.pdf_cotizacion && t.pdf_cotizacion.startsWith('data:')) ? '__HAS_PDF__' : (t.pdf_cotizacion || null);
+  // Optimizar Base64 de PDFs guardando un marcador local para ahorrar espacio (evitar saturación de localStorage)
+  const pdfPedidoVal = t.pdf_pedido ? '__HAS_PDF__' : null;
+  const pdfCotizacionVal = t.pdf_cotizacion ? '__HAS_PDF__' : null;
 
   const extracted = window.extraerRefaccionesDeNotas(t.notas);
   const extractedCot = window.extraerCotizacionesDeNotas(extracted.notasLimpias);
