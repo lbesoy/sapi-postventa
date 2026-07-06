@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.155'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.156'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -8694,7 +8694,8 @@ function verDetalle(id) {
               nota: ev.descripcion || "Programado por supervisor. Pendiente de llenado por el técnico.",
               entrada: ent,
               salida: sal,
-              realizado: false
+              realizado: false,
+              asignadoPorName: ev.creadoPorNombre || 'Supervisor'
             });
           }
         }
@@ -8758,7 +8759,7 @@ function verDetalle(id) {
                 </div>
                 <div>
                   <span style="font-size:0.85rem; font-weight:600; color:var(--text-primary);">${b.tecnico || 'Sin asignar'}</span>
-                  <div style="font-size:0.72rem; color:var(--text-muted);">${fechaFormateada}</div>
+                  <div style="font-size:0.72rem; color:var(--text-muted);">${fechaFormateada}${b.asignadoPorName ? ` &bull; Asignado por: ${b.asignadoPorName}` : ''}</div>
                 </div>
               </div>
               <div style="display:flex; align-items:center; gap:0.4rem;">
@@ -9391,7 +9392,9 @@ async function guardarProgramacionTecnico() {
     nota: "Programado por supervisor. Pendiente de llenado por el técnico.",
     entrada: entrada,
     salida: salida,
-    realizado: false
+    realizado: false,
+    asignadoPorName: currentSession.nombre || 'Supervisor',
+    asignadoPorId: currentSession.userId || null
   };
   
   o.bitacora.push(nuevaEntrada);
@@ -9429,6 +9432,7 @@ async function guardarProgramacionTecnico() {
       allDay: false,
       descripcion: nuevaEntrada.nota,
       creadoPor: currentSession.userId || null,
+      creadoPorNombre: currentSession.nombre || 'Supervisor',
       color: '#8b5cf6'
     };
 
@@ -14594,7 +14598,8 @@ function renderCalendario() {
             ubicacion: o.ubicacion || 'Sin ubicación',
             nota: b.nota,
             entrada: b.entrada,
-            salida: b.salida
+            salida: b.salida,
+            creadoPorNombre: b.asignadoPorName || 'Supervisor'
           }
         };
 
@@ -14887,6 +14892,7 @@ window.guardarActividadCalendario = async function() {
   }
 
   const activeUserId = currentSession.userId || null;
+  const activeUserName = currentSession.nombre || 'Supervisor';
 
   const eventoObj = {
     id: id || crypto.randomUUID(),
@@ -14903,6 +14909,7 @@ window.guardarActividadCalendario = async function() {
     allDay: todoElDia,
     descripcion: descripcion || null,
     creadoPor: activeUserId,
+    creadoPorNombre: activeUserName,
     color: null
   };
 
@@ -14910,7 +14917,7 @@ window.guardarActividadCalendario = async function() {
   const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
   const idx = localEventos.findIndex(x => x.id === eventoObj.id);
   if (idx > -1) {
-    localEventos[idx] = eventoObj;
+    localEventos[idx] = { ...localEventos[idx], ...eventoObj };
   } else {
     localEventos.unshift(eventoObj);
   }
@@ -14948,12 +14955,21 @@ window.guardarActividadCalendario = async function() {
           nota: descripcion || "Programado por supervisor. Pendiente de llenado por el técnico.",
           entrada: entrada,
           salida: salida,
-          realizado: false
+          realizado: false,
+          asignadoPorName: activeUserName,
+          asignadoPorId: activeUserId
         };
 
         if (existIdx > -1) {
           if (o.bitacora[existIdx].realizado !== true) {
-            o.bitacora[existIdx] = { ...o.bitacora[existIdx], ...nuevaEntrada };
+            const origAsignado = o.bitacora[existIdx].asignadoPorName || activeUserName;
+            const origAsignadoId = o.bitacora[existIdx].asignadoPorId || activeUserId;
+            o.bitacora[existIdx] = { 
+              ...o.bitacora[existIdx], 
+              ...nuevaEntrada,
+              asignadoPorName: origAsignado,
+              asignadoPorId: origAsignadoId
+            };
           }
         } else {
           o.bitacora.push(nuevaEntrada);
@@ -15055,6 +15071,8 @@ function mostrarPopupBitacora(info) {
   const esAsignacionPendiente = b && (b.realizado === false || (b.nota && b.nota.includes('Programado por supervisor') && b.realizado !== true));
   const esSupervisorOrAdmin = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
 
+  const asignador = b?.asignadoPorName || p.creadoPorNombre || 'Supervisor';
+
   let actionButtonsHtml = '';
   if (esAsignacionPendiente && esSupervisorOrAdmin) {
     actionButtonsHtml = `
@@ -15080,6 +15098,7 @@ function mostrarPopupBitacora(info) {
         <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:1rem; text-transform:capitalize; font-weight:500;">${fechaStr}</div>
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Orden de Servicio:</strong> ${folio}</p>
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Técnico:</strong> ${p.tecnico}</p>
+        <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Asignado por:</strong> ${asignador}</p>
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Cliente:</strong> ${p.cliente}</p>
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Ubicación:</strong> ${p.ubicacion}</p>
         ${horasStr}
