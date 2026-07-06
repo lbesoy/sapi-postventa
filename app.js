@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.152'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.153'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -9452,19 +9452,15 @@ function calcularRangoFechasLaboral(diasHabilAtras) {
   const ahora = new Date();
   ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset()); // ajuste zona horaria local
 
-  // Si hoy es fin de semana, el máximo permitido es el viernes anterior
-  const maxDate = new Date(ahora);
-  const dow = maxDate.getDay(); // 0=Dom, 1=Lun, ..., 6=Sáb
-  if (dow === 6) maxDate.setDate(maxDate.getDate() - 1); // Sábado → Viernes
-  if (dow === 0) maxDate.setDate(maxDate.getDate() - 2); // Domingo → Viernes
+  const maxDate = new Date(ahora); // El máximo siempre es hoy (incluso en fin de semana)
 
-  // Retroceder N días hábiles desde el máximo
-  const minDate = new Date(maxDate);
+  // Retroceder N días hábiles para el mínimo
+  const minDate = new Date(ahora);
   let retrocedidos = 0;
   while (retrocedidos < diasHabilAtras) {
     minDate.setDate(minDate.getDate() - 1);
     const d = minDate.getDay();
-    if (d !== 0 && d !== 6) retrocedidos++; // Solo cuenta lunes-viernes
+    if (d !== 0 && d !== 6) retrocedidos++; // Solo cuenta lunes-viernes para el límite inferior
   }
 
   return {
@@ -9667,15 +9663,7 @@ function guardarNotaBitacora() {
   const isAdmin = ['superadmin', 'admin'].includes(currentSession.viewMode);
 
   if (!isAdmin) {
-    // Validar que la fecha seleccionada no sea fin de semana
-    const fechaObj = new Date(fecha + 'T12:00:00'); // mediodía para evitar desfases de timezone
-    const diaSemana = fechaObj.getDay();
-    if (diaSemana === 0 || diaSemana === 6) {
-      mostrarNotificacion('No se pueden registrar entradas en fin de semana.', 'error');
-      return;
-    }
-
-    // Validar que esté dentro del rango hábil permitido
+    // Validar que esté dentro del rango hábil permitido (que ahora permite fines de semana si caen en el rango)
     const rango = calcularRangoFechasLaboral(2);
     if (fecha < rango.min || fecha > rango.max) {
       mostrarNotificacion('La fecha seleccionada está fuera del rango permitido.', 'error');
