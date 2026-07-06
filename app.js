@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.165'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.166'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -647,88 +647,100 @@ window.reintentarSincronizacionGastosLocales = function() {
 
 // Sincronización con Supabase (escuchar cuando los datos bajen a localStorage)
 window.addEventListener('supabase_datos_cargados', () => {
-  console.log('[App] Refrescando configuración, catálogos y re-renderizando UI desde Supabase...');
-  
-  ordenes = safeGetJSON('sapi_ordenes', []);
-  tickets = safeGetJSON('sapi_tickets', []);
-  clientesDb = safeGetJSON('sapi_clientes_db', []);
-  refaccionesDb = safeGetJSON('sapi_refacciones_db', []);
-  maquinariaDb = safeGetJSON('sapi_maquinaria_db', []);
-  sitiosDb = safeGetJSON('sapi_sitios_db', []);
-  tecnicosDb = safeGetJSON('sapi_tecnicos_db', []);
-  gastos = safeGetJSON('sapi_gastos', []);
-  claraMockTxs = safeGetJSON('sapi_clara_mock_txs', claraMockTxs);
+  try {
+    console.log('[App] Refrescando configuración, catálogos y re-renderizando UI desde Supabase...');
+    
+    ordenes = safeGetJSON('sapi_ordenes', []);
+    tickets = safeGetJSON('sapi_tickets', []);
+    clientesDb = safeGetJSON('sapi_clientes_db', []);
+    refaccionesDb = safeGetJSON('sapi_refacciones_db', []);
+    maquinariaDb = safeGetJSON('sapi_maquinaria_db', []);
+    sitiosDb = safeGetJSON('sapi_sitios_db', []);
+    tecnicosDb = safeGetJSON('sapi_tecnicos_db', []);
+    gastos = safeGetJSON('sapi_gastos', []);
+    claraMockTxs = safeGetJSON('sapi_clara_mock_txs', claraMockTxs);
 
-  usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
-  configData = safeGetJSON('eurorep_config', {});
-  cargarRolesDesdeStorage();
+    usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
+    configData = safeGetJSON('eurorep_config', {});
+    cargarRolesDesdeStorage();
 
-  // Ejecutar migraciones heredadas solo una vez por sesión y solo para administradores
-  // Esto previene bucles infinitos de escritura y consultas redundantes en clientes no-admin
-  const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
-  const isAdmin = ['superadmin', 'admin'].includes(session.viewMode || session.rol);
-  
-  if (isAdmin && !sessionStorage.getItem('eurorep_migrations_executed')) {
-    sessionStorage.setItem('eurorep_migrations_executed', 'true');
-    console.log('[App] Iniciando migraciones heredadas únicas de la sesión para administrador...');
+    // Ejecutar migraciones heredadas solo una vez por sesión y solo para administradores
+    // Esto previene bucles infinitos de escritura y consultas redundantes en clientes no-admin
+    const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
+    const isAdmin = ['superadmin', 'admin'].includes(session.viewMode || session.rol);
+    
+    if (isAdmin && !sessionStorage.getItem('eurorep_migrations_executed')) {
+      sessionStorage.setItem('eurorep_migrations_executed', 'true');
+      console.log('[App] Iniciando migraciones heredadas únicas de la sesión para administrador...');
 
-    // Ejecutar migración para rellenar datos de maquinaria perdidos en órdenes previas
-    window.migrarOrdenesExistentesMaquinaria();
+      // Ejecutar migración para rellenar datos de maquinaria perdidos en órdenes previas
+      window.migrarOrdenesExistentesMaquinaria();
 
-    // Ejecutar migración para rellenar ubicaciones de maquinaria perdidas desde tickets
-    if (typeof window.migrarUbicacionesMaquinariaDesdeTickets === 'function') {
-      window.migrarUbicacionesMaquinariaDesdeTickets();
+      // Ejecutar migración para rellenar ubicaciones de maquinaria perdidas desde tickets
+      if (typeof window.migrarUbicacionesMaquinariaDesdeTickets === 'function') {
+        window.migrarUbicacionesMaquinariaDesdeTickets();
+      }
+
+      // Ejecutar recuperación de maquinaria desaparecida desde los tickets
+      if (typeof window.recuperarMaquinariaDesdeTickets === 'function') {
+        window.recuperarMaquinariaDesdeTickets();
+      }
     }
 
-    // Ejecutar recuperación de maquinaria desaparecida desde los tickets
-    if (typeof window.recuperarMaquinariaDesdeTickets === 'function') {
-      window.recuperarMaquinariaDesdeTickets();
+    // Auto-sincronizar cualquier gasto local huérfano (no sincronizado en la base de datos)
+    window.reintentarSincronizacionGastosLocales();
+
+    // Si estamos en la vista de configuración, actualizar los campos
+    if (document.getElementById('view-config')?.classList.contains('active')) {
+      if (typeof cargarConfig === 'function') cargarConfig();
     }
-  }
-
-  // Auto-sincronizar cualquier gasto local huérfano (no sincronizado en la base de datos)
-  window.reintentarSincronizacionGastosLocales();
-
-  // Si estamos en la vista de configuración, actualizar los campos
-  if (document.getElementById('view-config')?.classList.contains('active')) {
-    if (typeof cargarConfig === 'function') cargarConfig();
-  }
-  
-  // Re-render UI
-  actualizarFiltrosPersonal();
-  renderTabla();
-  renderTabla('servicios');
-  
-  if (typeof renderClientes === 'function') renderClientes();
-  if (typeof renderUsuariosList === 'function') renderUsuariosList();
-  if (typeof renderStats === 'function') renderStats();
-  
-  if (typeof renderTickets === 'function') {
-    renderTickets();
-    renderTickets('dash-tickets');
-  }
-  if (typeof updateTicketBadge === 'function') updateTicketBadge();
-  
-  if (typeof renderMaquinaria === 'function' && document.getElementById('view-maquinaria')?.classList.contains('active')) {
-    renderMaquinaria();
-  }
-  if (typeof renderSitios === 'function' && document.getElementById('view-sitios')?.classList.contains('active')) {
-    renderSitios();
-  }
-  if (typeof renderRefacciones === 'function' && document.getElementById('view-refacciones')?.classList.contains('active')) {
-    renderRefacciones();
-  }
-  if (typeof renderGastos === 'function' && document.getElementById('view-gastos')?.classList.contains('active')) {
-    renderGastos();
-    if (typeof renderClaraCards === 'function') renderClaraCards();
-  }
-  if (typeof renderCalendario === 'function' && document.getElementById('view-calendario')?.classList.contains('active')) {
-    renderCalendario();
-  }
-  
-  // Re-aplicar rol para asegurar que el role-switcher se muestre si el usuario recién se descargó
-  if (currentSession && currentSession.viewMode) {
-    if (typeof applyRole === 'function') applyRole(currentSession.viewMode);
+    
+    // Re-render UI
+    actualizarFiltrosPersonal();
+    renderTabla();
+    renderTabla('servicios');
+    
+    if (typeof renderClientes === 'function') renderClientes();
+    if (typeof renderUsuariosList === 'function') renderUsuariosList();
+    if (typeof renderStats === 'function') renderStats();
+    
+    if (typeof renderTickets === 'function') {
+      renderTickets();
+      renderTickets('dash-tickets');
+    }
+    if (typeof updateTicketBadge === 'function') updateTicketBadge();
+    
+    if (typeof renderMaquinaria === 'function' && document.getElementById('view-maquinaria')?.classList.contains('active')) {
+      renderMaquinaria();
+    }
+    if (typeof renderSitios === 'function' && document.getElementById('view-sitios')?.classList.contains('active')) {
+      renderSitios();
+    }
+    if (typeof renderRefacciones === 'function' && document.getElementById('view-refacciones')?.classList.contains('active')) {
+      renderRefacciones();
+    }
+    if (typeof renderGastos === 'function' && document.getElementById('view-gastos')?.classList.contains('active')) {
+      renderGastos();
+      if (typeof renderClaraCards === 'function') renderClaraCards();
+    }
+    if (typeof renderCalendario === 'function' && document.getElementById('view-calendario')?.classList.contains('active')) {
+      renderCalendario();
+    }
+    
+    // Re-aplicar rol para asegurar que el role-switcher se muestre si el usuario recién se descargó
+    if (currentSession && currentSession.viewMode) {
+      if (typeof applyRole === 'function') applyRole(currentSession.viewMode);
+    }
+  } catch (err) {
+    console.error('[App] Error en listener supabase_datos_cargados:', err);
+    if (window.trackTelemetryEvent) {
+      try {
+        window.trackTelemetryEvent('Diag: Listener Crash', {
+          message: err.message,
+          stack: err.stack
+        });
+      } catch (e) {}
+    }
   }
 });
 let editandoId = null;
