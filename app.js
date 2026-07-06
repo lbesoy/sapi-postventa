@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.157'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.158'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -87,6 +87,12 @@ if (typeof window !== 'undefined') {
     };
   }
 }
+
+// Función temporal activa por 48 horas (hasta el 8 de julio de 2026 a las 10:30 AM) para permitir pasar tickets sin cotización.
+window.isTemporaryNoQuotePeriodActive = function() {
+  const deadline = new Date('2026-07-08T10:30:00-06:00');
+  return new Date() < deadline;
+};
 
 // Proteger contra errores de cuota de almacenamiento (QuotaExceededError) de localStorage.setItem
 if (typeof window !== 'undefined' && window.localStorage) {
@@ -13106,7 +13112,8 @@ async function guardarTicket(e) {
       }
     }
 
-    if (!window.editandoCotizaciones || window.editandoCotizaciones.length === 0) {
+    const bypassQuote = window.isTemporaryNoQuotePeriodActive && window.isTemporaryNoQuotePeriodActive();
+    if (!bypassQuote && (!window.editandoCotizaciones || window.editandoCotizaciones.length === 0)) {
       mostrarNotificacion('Debe vincular al menos una cotización de SAP para este ticket.', 'error');
       return;
     }
@@ -13630,7 +13637,7 @@ function verDetalleTicket(id) {
         
         <button type="button" class="btn-secondary" id="btn-quick-vincular-cotizacion-${t.id}" style="width:100%; margin-top:0.25rem; justify-content:center; display:inline-flex; align-items:center; gap:4px; font-size:0.8rem;" onclick="window.vincularNuevaCotizacion(false, '${t.id}')"><i data-lucide="plus-circle" style="width:14px; height:14px;"></i> Vincular esta Cotización</button>
         
-        <button id="btn-pasar-cotizacion-${t.id}" class="btn-primary" style="background:var(--accent); border-color:var(--accent); margin-top:0.5rem; justify-content:center; ${!t.cotizacionSAP ? 'opacity:0.5; cursor:not-allowed;' : ''}" ${!t.cotizacionSAP ? 'disabled' : ''} onclick="avanzarCotizacionTicket('${t.id}')">Pasar a Cotización</button>
+        <button id="btn-pasar-cotizacion-${t.id}" class="btn-primary" style="background:var(--accent); border-color:var(--accent); margin-top:0.5rem; justify-content:center; ${(!t.cotizacionSAP && !(window.isTemporaryNoQuotePeriodActive && window.isTemporaryNoQuotePeriodActive())) ? 'opacity:0.5; cursor:not-allowed;' : ''}" ${(!t.cotizacionSAP && !(window.isTemporaryNoQuotePeriodActive && window.isTemporaryNoQuotePeriodActive())) ? 'disabled' : ''} onclick="avanzarCotizacionTicket('${t.id}')">Pasar a Cotización</button>
       </div>
       ` : ''}
     </div>
@@ -13943,13 +13950,14 @@ async function avanzarCotizacionTicket(id) {
   }
 
   const list = window.quickEditandoCotizaciones ? window.quickEditandoCotizaciones[id] : [];
-  if (!Array.isArray(list) || list.length === 0) {
+  const bypassQuote = window.isTemporaryNoQuotePeriodActive && window.isTemporaryNoQuotePeriodActive();
+  if (!bypassQuote && (!Array.isArray(list) || list.length === 0)) {
     mostrarNotificacion('Debe vincular al menos una cotización de SAP para este ticket.', 'error');
     return;
   }
 
-  const primaryCot = list[0];
-  const totalMonto = list.reduce((sum, c) => sum + (Number(c.monto) || 0), 0);
+  const primaryCot = list[0] || { sap: '', pdf: null };
+  const totalMonto = list.length > 0 ? list.reduce((sum, c) => sum + (Number(c.monto) || 0), 0) : null;
 
   t.cotizacionSAP = primaryCot.sap;
   t.montoCotizacion = totalMonto;
