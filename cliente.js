@@ -413,13 +413,11 @@ function cargarDatosLocales() {
 }
 
 async function inicializarDatos() {
-  // 1. Intentar descargar datos frescos de la nube
+  // 1. Intentar descargar datos frescos de la nube en segundo plano (no bloqueante)
   if (window.cargarDatosDeSupabase) {
-    try {
-      await window.cargarDatosDeSupabase();
-    } catch(e) {
-      console.warn('[Sync] Falló la sincronización en tiempo real, usando caché local.', e);
-    }
+    window.cargarDatosDeSupabase().catch(e => {
+      console.warn('[Sync] Falló la sincronización en tiempo real en segundo plano.', e);
+    });
   }
 
   // 2. Extraer datos locales de LocalStorage
