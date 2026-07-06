@@ -64,23 +64,28 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.172'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.173'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
-    // Limpiar toda la caché local pesada para liberar espacio y obligar a una resincronización limpia
-    localStorage.removeItem('sapi_tickets');
-    localStorage.removeItem('sapi_ordenes');
-    localStorage.removeItem('sapi_telemetry_events');
-    localStorage.removeItem('sapi_refacciones_db');
-    localStorage.removeItem('sapi_clientes_db');
-    localStorage.removeItem('sapi_sitios_db');
-    localStorage.removeItem('sapi_maquinaria_db');
+    console.log(`[Version] Nueva versión detectada: ${APP_VERSION}. Purgando caché de LocalStorage para liberar espacio...`);
+    
+    // 1. Respaldar claves críticas de sesión y preferencias del usuario
+    const session = localStorage.getItem('eurorep_session');
+    const darkmode = localStorage.getItem('eurorep_darkmode');
+    const themeMode = localStorage.getItem('theme_mode');
+    
+    // 2. Limpiar todo el almacenamiento local para eliminar PDFs obsoletos y liberar espacio
+    localStorage.clear();
+    
+    // 3. Restaurar claves críticas
+    if (session) localStorage.setItem('eurorep_session', session);
+    if (darkmode) localStorage.setItem('eurorep_darkmode', darkmode);
+    if (themeMode) localStorage.setItem('theme_mode', themeMode);
     
     localStorage.setItem('eurorep_app_version', APP_VERSION);
-    localStorage.removeItem('eurorep_session');
     
-    // Forzar limpieza rápida y recarga limpia
+    // Forzar recarga limpia para cargar los nuevos scripts y datos frescos
     setTimeout(() => {
       window.location.reload(true);
     }, 100);
