@@ -70,18 +70,22 @@ if (typeof localStorage !== 'undefined') {
   if (lastVersion !== APP_VERSION) {
     console.log(`[Version] Nueva versión detectada: ${APP_VERSION}. Purgando caché de LocalStorage para liberar espacio...`);
     
-    // 1. Respaldar claves críticas de sesión y preferencias del usuario
-    const session = localStorage.getItem('eurorep_session');
-    const darkmode = localStorage.getItem('eurorep_darkmode');
-    const themeMode = localStorage.getItem('theme_mode');
+    // 1. Respaldar claves críticas de sesión, preferencias y tokens de Supabase Auth
+    const preserved = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key === 'eurorep_session' || key === 'eurorep_darkmode' || key === 'theme_mode' || key.startsWith('sb-'))) {
+        preserved[key] = localStorage.getItem(key);
+      }
+    }
     
-    // 2. Limpiar todo el almacenamiento local para eliminar PDFs obsoletos y liberar espacio
+    // 2. Limpiar todo el almacenamiento local
     localStorage.clear();
     
-    // 3. Restaurar claves críticas
-    if (session) localStorage.setItem('eurorep_session', session);
-    if (darkmode) localStorage.setItem('eurorep_darkmode', darkmode);
-    if (themeMode) localStorage.setItem('theme_mode', themeMode);
+    // 3. Restaurar claves preservadas
+    for (const key in preserved) {
+      localStorage.setItem(key, preserved[key]);
+    }
     
     localStorage.setItem('eurorep_app_version', APP_VERSION);
     
