@@ -92,6 +92,9 @@ async function upsertSupabase(tabla, rows) {
   const BATCH = 500;
   let inserted = 0;
   for (let i = 0; i < rows.length; i += BATCH) {
+    if (i > 0) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
     const chunk = rows.slice(i, i + BATCH);
     const res = await axios.post(
       `${SUPABASE_URL}/rest/v1/${tabla}`,
@@ -477,23 +480,22 @@ async function main() {
     await loginSAP();
 
     const argModulo = process.argv[2] || 'all';
-    const tasks = [];
-    
-    if (argModulo === 'all' || argModulo === 'clientes') tasks.push(syncClientes());
-    if (argModulo === 'all' || argModulo === 'refacciones') tasks.push(syncRefacciones());
-    if (argModulo === 'all' || argModulo === 'sitios') tasks.push(syncSitios());
-    if (argModulo === 'all' || argModulo === 'tecnicos') tasks.push(syncTecnicos());
-    if (argModulo === 'all' || argModulo === 'cotizaciones') tasks.push(syncCotizaciones());
-
-    const resultados = await Promise.allSettled(tasks);
     let algunFallo = false;
 
-    resultados.forEach((r, i) => {
-      if (r.status === 'rejected') {
-        err(`Tarea fallida: ${r.reason?.message}`);
+    const runTask = async (name, fn) => {
+      try {
+        await fn();
+      } catch (e) {
+        err(`Tarea fallida (${name}): ${e.message}`);
         algunFallo = true;
       }
-    });
+    };
+    
+    if (argModulo === 'all' || argModulo === 'clientes') await runTask('clientes', syncClientes);
+    if (argModulo === 'all' || argModulo === 'refacciones') await runTask('refacciones', syncRefacciones);
+    if (argModulo === 'all' || argModulo === 'sitios') await runTask('sitios', syncSitios);
+    if (argModulo === 'all' || argModulo === 'tecnicos') await runTask('tecnicos', syncTecnicos);
+    if (argModulo === 'all' || argModulo === 'cotizaciones') await runTask('cotizaciones', syncCotizaciones);
 
     const seg = ((Date.now() - inicio) / 1000).toFixed(1);
     log('═══════════════════════════════════════════');

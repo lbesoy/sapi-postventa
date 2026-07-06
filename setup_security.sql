@@ -12,6 +12,7 @@ ALTER TABLE public.tickets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.maquinaria ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cotizaciones_sap ENABLE ROW LEVEL SECURITY;
 
 -- 2.2 Crear Helpers de Seguridad con Caching STABLE (Evita cuellos de botella en RLS)
 CREATE OR REPLACE FUNCTION public.get_my_role()

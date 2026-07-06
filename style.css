@@ -391,6 +391,44 @@ body {
 .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
 .btn-secondary.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
 
+.btn-secondary-flex {
+  background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border); padding: 0.55rem 1.1rem; border-radius: var(--radius-sm);
+  font-weight: 500; cursor: pointer; font-size: 0.875rem;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.btn-secondary-flex:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-light);
+  transform: translateY(-1px);
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.btn-danger:hover {
+  background: #ef4444;
+  color: #fff;
+  border-color: #ef4444;
+  transform: translateY(-1px);
+}
+
+
 /* Clara specific action buttons */
 .btn-clara-action {
   display: inline-flex !important;

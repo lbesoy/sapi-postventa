@@ -8729,6 +8729,16 @@ function verDetalle(id) {
           }
         } catch(e){}
 
+        const esSupervisorOrAdmin = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
+        const actionButtons = esSupervisorOrAdmin ? `
+          <button class="action-btn" onclick="window.mostrarDetalleEventoAdministrativo('${b.id}')" style="margin-left:0.5rem;" title="Editar Asignación">
+            <i data-lucide="edit-2"></i>
+          </button>
+          <button class="action-btn del" onclick="window.eliminarAsignacionProgramadaDirecto('${o.id}', '${b.id}')" title="Eliminar Asignación">
+            <i data-lucide="trash-2"></i>
+          </button>
+        ` : '';
+
         html += `
           <div style="background:var(--bg-body); border: 1px solid var(--border); border-left: 4px solid #8b5cf6; border-radius:8px; padding:0.85rem 1rem;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; flex-wrap:wrap; gap:0.5rem;">
@@ -8744,6 +8754,7 @@ function verDetalle(id) {
               <div style="display:flex; align-items:center; gap:0.4rem;">
                 <span class="badge" style="background:rgba(139, 92, 246, 0.1); color:#8b5cf6; border-radius:99px; padding:0.15rem 0.45rem; font-size:0.65rem; font-weight:700;">PROGRAMADO</span>
                 ${horasHtml}
+                ${actionButtons}
               </div>
             </div>
             <div style="font-size:0.85rem; color:var(--text-secondary); white-space:pre-wrap; padding-left:2.2rem; line-height:1.4; font-style:italic;">${b.nota}</div>
@@ -13300,6 +13311,117 @@ async function guardarTicket(e) {
   if (window.supabaseClient) {
     await window.pushToSupabase('tickets', ticket);
   }
+
+  // Generar Orden de Servicio automáticamente si se cierra el ticket y fue aceptada la cotización
+  if (estado === 'Cerrado' && ticket.cotAceptada === 'si') {
+    const ordenExistente = ordenes.find(o => o.soporte === ticket.id);
+    if (!ordenExistente) {
+      let modeloStr = '';
+      let serieStr = '';
+      let marcaStr = '';
+      let ecoStr = '';
+      let maquinariaId = null;
+
+      if (ticket.equipo) {
+        const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+        
+        const matchMaquina = (m) => {
+          const cleanId = m.idInterno || m.id || '';
+          const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+          const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+          const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+          const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+          
+          return (
+            ticket.equipo === mName ||
+            ticket.equipo === cleanId ||
+            ticket.equipo === m.serie ||
+            ticket.equipo.includes(cleanId) ||
+            (m.serie && ticket.equipo.includes(m.serie))
+          );
+        };
+
+        let maq = null;
+        clientesDb.forEach(c => {
+          if (c.maquinas) {
+            const found = c.maquinas.find(matchMaquina);
+            if (found) maq = found;
+          }
+        });
+        if (!maq) maq = maquinariaDb.find(matchMaquina);
+
+        if (maq) {
+          modeloStr = maq.modelo || '';
+          serieStr = maq.serie || '';
+          marcaStr = maq.marca || '';
+          ecoStr = maq.no_economico || '';
+          maquinariaId = maq.id || null;
+        } else {
+          if (ticket.equipo.includes('(SN: ')) {
+            const parts = ticket.equipo.split('(SN: ');
+            serieStr = parts[1].replace(')', '').trim();
+            let left = parts[0].trim();
+            if (left.startsWith('[') && left.includes(']')) {
+              left = left.substring(left.indexOf(']') + 1).trim();
+            }
+            modeloStr = left;
+          } else {
+            modeloStr = ticket.equipo;
+          }
+        }
+      }
+
+      let newFolio = generarFolioConsecutivo();
+      const isTest = isTestData(ticket) || isTestModeActive();
+      if (isTest && newFolio && !newFolio.startsWith('[PRUEBA]')) {
+        newFolio = `[PRUEBA] ${newFolio}`;
+      }
+
+      let orderTecnicos = [...(ticket.tecnicosAsignados || [])];
+      if (orderTecnicos.length === 0 && ticket.asignado) {
+        orderTecnicos = ticket.asignado.split(',').map(s => s.trim()).filter(Boolean);
+      }
+
+      const nuevaOrden = {
+        id: newFolio,
+        fecha: getLocalDateString(),
+        folio: newFolio,
+        pedido: ticket.pedidoSAP || '',
+        cliente: ticket.cliente || '',
+        ubicacion: ticket.sitio || '',
+        operador: '',
+        eco: ecoStr || '',
+        horometro: '',
+        modelo: modeloStr,
+        serie: serieStr,
+        marca: marcaStr || '',
+        maquinaria_id: maquinariaId || null,
+        equipo: ticket.equipo || '',
+        tecnico: orderTecnicos.join(', '),
+        tecnicosAsignados: orderTecnicos,
+        soporte: ticket.id,
+        km_ida: '', km_vuelta: '', km_total: '',
+        tipo: 'Servicio',
+        estado: 'Pendiente',
+        falla: (ticket.asunto ? ticket.asunto + '\n' : '') + (ticket.descripcion || ''),
+        trabajos: '', dictamen: '', condiciones: '',
+        observaciones: '', pendientes: '',
+        ref_utilizadas: [], ref_necesarias: [],
+        factura_ref: '', factura_mo: '',
+        noches: '', alimentacion: '', traslado_costo: '',
+        dias: [],
+        esPrueba: isTest,
+      };
+
+      ordenes.unshift(nuevaOrden);
+      localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+      if (window.supabaseClient) {
+        await window.pushToSupabase('ordenes', nuevaOrden);
+      }
+      mostrarNotificacion('Orden de servicio pre-cargada y generada.', 'success');
+      if (typeof renderTabla === 'function') renderTabla('servicios');
+    }
+  }
   if (window.trackTelemetryEvent) {
     const act = editandoTicketId ? 'Edición de Ticket' : 'Creación de Ticket';
     window.trackTelemetryEvent(act, { folio: ticket.folio, asunto: ticket.asunto });
@@ -14881,6 +15003,33 @@ window.eliminarActividadCalendario = async function() {
   // Eliminar asíncronamente en Supabase
   window.deleteFromSupabase('calendario_eventos', id);
 
+  // Eliminar también de la bitácora de la orden correspondiente si estaba asociada
+  try {
+    const ordenesLocales = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+    let ordenModificada = null;
+    ordenesLocales.forEach(o => {
+      if (o.bitacora && o.bitacora.some(b => b.id === id)) {
+        o.bitacora = o.bitacora.filter(b => b.id !== id);
+        ordenModificada = o;
+      }
+    });
+    if (ordenModificada) {
+      if (typeof ordenes !== 'undefined') {
+        const idx = ordenes.findIndex(o => o.id === ordenModificada.id);
+        if (idx > -1) ordenes[idx] = ordenModificada;
+      }
+      localStorage.setItem('sapi_ordenes', JSON.stringify(ordenesLocales));
+      if (window.pushToSupabase) {
+        window.pushToSupabase('ordenes', ordenModificada);
+      }
+      if (typeof window.currentDetalleOrdenId !== 'undefined' && window.currentDetalleOrdenId === ordenModificada.id) {
+        verDetalle(ordenModificada.id);
+      }
+    }
+  } catch(e) {
+    console.error('Error al remover bitácora al eliminar evento:', e);
+  }
+
   document.getElementById('modal-registrar-actividad-overlay').classList.remove('open');
   if (typeof renderCalendario === 'function') {
     renderCalendario();
@@ -14903,6 +15052,23 @@ function mostrarPopupBitacora(info) {
     horasStr = `<p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Horario:</strong> ${p.entrada || '--:--'} a ${p.salida || '--:--'}</p>`;
   }
 
+  const bitacoraId = String(info.event.id || '').replace('bit-', '');
+  const b = o?.bitacora?.find(x => x.id === bitacoraId);
+  const esAsignacionPendiente = b && (b.realizado === false || (b.nota && b.nota.includes('Programado por supervisor') && b.realizado !== true));
+  const esSupervisorOrAdmin = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
+
+  let actionButtonsHtml = '';
+  if (esAsignacionPendiente && esSupervisorOrAdmin) {
+    actionButtonsHtml = `
+      <button class="btn-secondary-flex" onclick="this.closest('.modal-overlay').remove(); window.mostrarDetalleEventoAdministrativo('${bitacoraId}')" style="margin-right:0.5rem;">
+        <i data-lucide="edit-2" class="btn-icon" style="width:14px; height:14px;"></i> Editar Asignación
+      </button>
+      <button class="btn-danger" onclick="this.closest('.modal-overlay').remove(); window.eliminarAsignacionProgramadaDirecto('${p.ordenId}', '${bitacoraId}')" style="margin-right:0.5rem;">
+        <i data-lucide="trash-2" class="btn-icon" style="width:14px; height:14px;"></i> Eliminar Asignación
+      </button>
+    `;
+  }
+
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.style.zIndex = '9999';
@@ -14920,7 +15086,8 @@ function mostrarPopupBitacora(info) {
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Ubicación:</strong> ${p.ubicacion}</p>
         ${horasStr}
         <div style="margin-top:1rem; padding:1rem; background:var(--bg-body); border-radius:6px; font-size:0.85rem; border:1px solid var(--border); white-space:pre-wrap; line-height:1.5; color:var(--text-secondary); max-height:250px; overflow-y:auto;">${p.nota}</div>
-        <div style="margin-top:1.5rem; text-align:right;">
+        <div style="margin-top:1.5rem; text-align:right; display:flex; justify-content:flex-end;">
+          ${actionButtonsHtml}
           <button class="btn-primary" onclick="this.closest('.modal-overlay').remove(); verDetalle('${p.ordenId}')">Ver Orden Completa</button>
         </div>
       </div>
@@ -23310,4 +23477,40 @@ window.confirmarAccion = function(options = {}) {
       window.lucide.createIcons({ root: modal });
     }
   });
+};
+
+window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId) {
+  if (!confirm("¿Estás seguro de que deseas eliminar esta asignación programada?")) return;
+
+  // 1. Eliminar de la bitácora de la orden
+  const oIndex = ordenes.findIndex(o => o.id === ordenId);
+  if (oIndex > -1) {
+    const o = ordenes[oIndex];
+    if (o.bitacora) {
+      o.bitacora = o.bitacora.filter(b => b.id !== bitacoraId);
+      localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+      if (window.pushToSupabase) {
+        await window.pushToSupabase('ordenes', o);
+      }
+    }
+  }
+
+  // 2. Eliminar el evento del calendario
+  const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+  const filtrados = localEventos.filter(x => x.id !== bitacoraId);
+  localStorage.setItem('sapi_calendario_eventos', JSON.stringify(filtrados));
+  
+  if (window.deleteFromSupabase) {
+    window.deleteFromSupabase('calendario_eventos', bitacoraId);
+  }
+
+  if (window.mostrarNotificacion) {
+    window.mostrarNotificacion("Asignación programada eliminada.", "info");
+  }
+
+  // 3. Re-renderizar detalle y calendarios
+  verDetalle(ordenId);
+  if (typeof renderCalendario === 'function') {
+    renderCalendario();
+  }
 };
