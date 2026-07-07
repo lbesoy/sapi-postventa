@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.182'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.183'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -3274,6 +3274,9 @@ function setupNav() {
         }
         if (view === 'gastos') {
           if (typeof renderGastos === 'function') renderGastos();
+        }
+        if (view === 'refacciones') {
+          if (typeof renderRefacciones === 'function') renderRefacciones();
         }
         if (view === 'dashboard') {
           renderStats();
