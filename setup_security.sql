@@ -350,3 +350,14 @@ CREATE POLICY "Permitir todo a autenticados en pedidos" ON public.pedidos_sap FO
 
 DROP POLICY IF EXISTS "Permitir select a publico en pedidos" ON public.pedidos_sap;
 CREATE POLICY "Permitir select a publico en pedidos" ON public.pedidos_sap FOR SELECT TO public USING (true);
+
+-- 10. Configuración de Políticas para Refacciones y Sitios
+-- ========================================================
+ALTER TABLE public.refacciones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sitios ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Permitir select a publico en refacciones" ON public.refacciones;
+CREATE POLICY "Permitir select a publico en refacciones" ON public.refacciones FOR SELECT TO public USING (true);
+
+DROP POLICY IF EXISTS "Permitir select a publico en sitios" ON public.sitios;
+CREATE POLICY "Permitir select a publico en sitios" ON public.sitios FOR SELECT TO public USING (true);
