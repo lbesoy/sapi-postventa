@@ -30,8 +30,13 @@ window.saveCatalogOffline = async function(catalogKey, dataArray) {
       });
       console.log(`[IndexedDB] Catálogo ${catalogKey} guardado con éxito.`);
       // Eliminar de localStorage para evitar duplicidad y liberar espacio
+      // IMPORTANTE: Si la clave está redireccionada a IndexedDB por el puente de index.html, 
+      // llamar a localStorage.removeItem borraría los datos de IndexedDB. Así que lo omitimos.
       if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(catalogKey);
+        const redirectedKeys = ['sapi_refacciones_db', 'eurorep_pedidos_sap', 'eurorep_cotizaciones_sap', 'sapi_tickets'];
+        if (!redirectedKeys.includes(catalogKey)) {
+          localStorage.removeItem(catalogKey);
+        }
       }
       return;
     }
@@ -1895,8 +1900,19 @@ window.cargarDatosDeSupabase = function() {
       const { data: sessionData } = await sb.auth.getSession();
       const hasSession = !!(sessionData && sessionData.session);
       
-      if (!hasSession && !window._isSyncManualForced) {
-        console.warn('[Sync] No hay sesión activa de Supabase. Omitiendo descarga para proteger el caché local.');
+      const savedSessionStr = localStorage.getItem('eurorep_session');
+      let isBackdoorUser = false;
+      if (savedSessionStr) {
+        try {
+          const saved = JSON.parse(savedSessionStr);
+          if (saved && (saved.userId === 'superadmin' || saved.userId === 'tecnico_test')) {
+            isBackdoorUser = true;
+          }
+        } catch(e) {}
+      }
+
+      if (!hasSession && !isBackdoorUser && !window._isSyncManualForced) {
+        console.warn('[Sync] No hay sesión activa de Supabase ni de desarrollo. Omitiendo descarga para proteger el caché local.');
         window._isSyncingFromSupabase = false;
         window._syncPromise = null;
         window.dispatchEvent(new Event('supabase_datos_cargados'));

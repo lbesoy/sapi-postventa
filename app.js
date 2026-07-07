@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.184'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.191'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -803,6 +803,30 @@ window.addEventListener('supabase_datos_cargados', async () => {
     if (currentSession && currentSession.viewMode) {
       if (typeof applyRole === 'function') applyRole(currentSession.viewMode);
     }
+
+    // Calcular y reportar uso de almacenamiento local en megabytes
+    try {
+      let lsBytes = 0;
+      for (let i = 0; i < localStorage.length; i++) {
+        let key = localStorage.key(i);
+        let val = localStorage.getItem(key) || '';
+        lsBytes += (key.length + val.length) * 2; // UTF-16
+      }
+      let idbBytes = 0;
+      if (window.localStorageCache) {
+        for (let key in window.localStorageCache) {
+          if (window.localStorageCache.hasOwnProperty(key)) {
+            let val = window.localStorageCache[key] || '';
+            idbBytes += (key.length + val.length) * 2;
+          }
+        }
+      }
+      console.log(`[Storage] LocalStorage real: ${(lsBytes / 1024 / 1024).toFixed(3)} MB`);
+      console.log(`[Storage] IndexedDB (Puente): ${(idbBytes / 1024 / 1024).toFixed(3)} MB`);
+      console.log(`[Storage] Total ocupado: ${((lsBytes + idbBytes) / 1024 / 1024).toFixed(3)} MB`);
+    } catch (eStorage) {
+      console.warn('[Storage] Error al calcular espacio ocupado:', eStorage);
+    }
   } catch (err) {
     console.error('[App] Error en listener supabase_datos_cargados:', err);
     if (window.trackTelemetryEvent) {
@@ -1488,20 +1512,27 @@ function inicializarApp() {
        entrarApp({ id: saved.userId, rol: saved.viewMode, nombre: saved.nombre, empresa: saved.empresa });
 
        // Sincronizar y refrescar estado de sesión de Supabase en segundo plano
-       if (window.supabaseClient && saved.userId !== 'superadmin' && saved.userId !== 'tecnico_test') {
-         window.supabaseClient.auth.getSession().then(({ data: { session } }) => {
-           if (session) {
-             console.log('[Auth] Sesión de Supabase Auth validada/refrescada en segundo plano.');
-             if (window.cargarDatosDeSupabase) {
-               window.cargarDatosDeSupabase().catch(console.error);
-             }
-           } else if (navigator.onLine) {
-             console.warn('[Auth] Sesión de Supabase expirada. Redirigiendo a Login...');
-             localStorage.removeItem('eurorep_session');
-             window.location.reload();
-           }
-         }).catch(err => console.error('[Auth] Error al refrescar sesión de Supabase:', err));
-       }
+       if (window.supabaseClient) {
+          if (saved.userId === 'superadmin' || saved.userId === 'tecnico_test') {
+            console.log('[Auth] Usuario backdoor detectado. Iniciando descarga de base de datos en segundo plano...');
+            if (window.cargarDatosDeSupabase) {
+              window.cargarDatosDeSupabase().catch(console.error);
+            }
+          } else {
+            window.supabaseClient.auth.getSession().then(({ data: { session } }) => {
+              if (session) {
+                console.log('[Auth] Sesión de Supabase Auth validada/refrescada en segundo plano.');
+                if (window.cargarDatosDeSupabase) {
+                  window.cargarDatosDeSupabase().catch(console.error);
+                }
+              } else if (navigator.onLine) {
+                console.warn('[Auth] Sesión de Supabase expirada. Redirigiendo a Login...');
+                localStorage.removeItem('eurorep_session');
+                window.location.reload();
+              }
+            }).catch(err => console.error('[Auth] Error al refrescar sesión de Supabase:', err));
+          }
+        }
     } else if (window.supabaseClient) {
        window.supabaseClient.auth.getSession().then(({ data: { session } }) => {
           if (session) {
@@ -11230,6 +11261,11 @@ function renderRefacciones(resetPage = false) {
   });
 
   console.log(`[renderRefacciones] filtered length: ${filtered.length}, query: "${q}"`);
+
+  const debugEl = document.getElementById('debug-refacciones');
+  if (debugEl) {
+    debugEl.style.display = 'none';
+  }
 
   const total = filtered.length;
   const totalPages = Math.ceil(total / REFACCIONES_PAGE_SIZE) || 1;
