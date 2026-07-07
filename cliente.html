@@ -10,7 +10,7 @@
       const originalSetItem = localStorage.setItem;
       const originalRemoveItem = localStorage.removeItem;
       const originalClear = localStorage.clear;
-      const redirectedKeys = ['sapi_refacciones_db', 'eurorep_pedidos_sap', 'eurorep_cotizaciones_sap', 'sapi_tickets'];
+      const redirectedKeys = ['sapi_refacciones_db', 'eurorep_pedidos_sap', 'eurorep_cotizaciones_sap', 'sapi_tickets', 'sapi_ordenes'];
 
       window.initLocalStorageIndexedDBBridge = function() {
         return new Promise((resolve) => {
@@ -137,7 +137,7 @@
     // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
     (function() {
       if (typeof window !== 'undefined') {
-        const currentAppVer = '1.3.201';
+        const currentAppVer = '1.3.202';
         const lastAppVer = localStorage.getItem('sapi_app_version');
         if (lastAppVer !== currentAppVer) {
           if (!lastAppVer) {
@@ -686,7 +686,7 @@
       var scripts = [
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=201",
+        "supabaseSync.js?v=202",
         "cliente.js?v=13"
       ];
       var index = 0;

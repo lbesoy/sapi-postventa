@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.201'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.202'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -1742,11 +1742,19 @@ function isTestUser(user) {
 
 function isTestModeActive() {
   const user = usuarios.find(u => u.id === currentSession.userId);
-  if (!user) return false;
-  if (user.rol === 'superadmin') {
-    return localStorage.getItem('eurorep_test_mode') === 'true';
+  if (user) {
+    if (user.rol === 'superadmin') {
+      return localStorage.getItem('eurorep_test_mode') === 'true';
+    }
+    return isTestUser(user);
   }
-  return isTestUser(user);
+  if (currentSession && currentSession.userId) {
+    if (currentSession.realRol === 'superadmin') {
+      return localStorage.getItem('eurorep_test_mode') === 'true';
+    }
+    return isTestUser({ nombre: currentSession.nombre, email: currentSession.userId + '@temp.com' });
+  }
+  return false;
 }
 
 function getFilteredOrders() {

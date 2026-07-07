@@ -1998,6 +1998,21 @@ window.cargarDatosDeSupabase = function() {
 
         if (usuarios.length > 1 || isCurrentAdmin) {
           localStorage.setItem('eurorep_usuarios', JSON.stringify(window.ensureBackdoorUsers(usuarios)));
+        } else {
+          try {
+            const localUsers = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+            usuarios.forEach(u => {
+              const idx = localUsers.findIndex(lu => lu.id === u.id);
+              if (idx > -1) {
+                localUsers[idx] = u;
+              } else {
+                localUsers.push(u);
+              }
+            });
+            localStorage.setItem('eurorep_usuarios', JSON.stringify(window.ensureBackdoorUsers(localUsers)));
+          } catch (e) {
+            localStorage.setItem('eurorep_usuarios', JSON.stringify(window.ensureBackdoorUsers(usuarios)));
+          }
         }
       }
     } catch (errU) {
