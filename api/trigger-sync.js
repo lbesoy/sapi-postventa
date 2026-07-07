@@ -2,6 +2,7 @@ export default async function handler(req, res) {
   // Configurar CORS dinámico y seguro idéntico a send-email.js
   const allowedOrigins = [
     'https://sapi-postventa.vercel.app',
+    'https://portal.eurorep.mx',
     'https://plataforma.eurorep.mx',
     'http://localhost:5173',
     'http://localhost:3000',
