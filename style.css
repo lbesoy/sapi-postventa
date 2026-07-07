@@ -1618,6 +1618,7 @@ body {
     padding: 0 !important;
     overflow: visible !important;
     flex: none !important;
+    height: 100% !important;
   }
   .sidebar-nav::-webkit-scrollbar {
     display: none !important;
@@ -1630,6 +1631,7 @@ body {
     margin: 0 !important;
     border-top: none !important;
     flex: none !important;
+    height: 100% !important;
   }
   .sidebar-footer {
     display: none !important;

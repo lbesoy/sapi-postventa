@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.180'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.182'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -1600,11 +1600,7 @@ function inicializarApp() {
     console.error('Error calling renderUsuariosList:', err);
   }
 }
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', inicializarApp);
-} else {
-  inicializarApp();
-}
+
 
 usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
 currentSession = safeGetJSON('eurorep_session', null) || { userId: '', viewMode: 'consulta' };
@@ -15099,11 +15095,7 @@ function initTableResizers() {
 function inicializarTableResizersEvent() {
   setTimeout(initTableResizers, 500);
 }
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', inicializarTableResizersEvent);
-} else {
-  inicializarTableResizersEvent();
-}
+
 
 // ─── CALENDARIO ────────────────────────────────────────────────────────────────
 let calendarInstance = null;
@@ -15908,11 +15900,7 @@ function inicializarPasswordRecovery() {
     });
   }
 }
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', inicializarPasswordRecovery);
-} else {
-  inicializarPasswordRecovery();
-}
+
 
 function abrirRecuperarPassword(e) {
   e.preventDefault();
@@ -24318,3 +24306,28 @@ window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId)
     renderCalendario();
   }
 };
+
+// ===== DISPARAR INICIALIZACIÓN GLOBAL DE LA APP AL FINAL DEL ARCHIVO PARA EVITAR ERRORES DE TDZ =====
+function dispararInicializacionGlobal() {
+  try {
+    inicializarApp();
+  } catch (err) {
+    console.error('Error al inicializar la app:', err);
+  }
+  try {
+    inicializarTableResizersEvent();
+  } catch (err) {
+    console.error('Error al inicializar resizer de tablas:', err);
+  }
+  try {
+    inicializarPasswordRecovery();
+  } catch (err) {
+    console.error('Error al inicializar recuperación de contraseña:', err);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', dispararInicializacionGlobal);
+} else {
+  dispararInicializacionGlobal();
+}

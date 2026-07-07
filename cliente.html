@@ -137,7 +137,7 @@
     // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
     (function() {
       if (typeof window !== 'undefined') {
-        const currentAppVer = '1.3.179';
+        const currentAppVer = '1.3.182';
         const lastAppVer = localStorage.getItem('sapi_app_version');
         if (lastAppVer !== currentAppVer) {
           if (!lastAppVer) {
@@ -198,7 +198,7 @@
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   
   <!-- CSS -->
-  <link rel="stylesheet" href="cliente.css?v=3" />
+  <link rel="stylesheet" href="cliente.css?v=4" />
   
   <!-- Mobile & PWA Capabilites -->
   <link rel="icon" href="logo_transparent.png" type="image/png" />
@@ -686,8 +686,8 @@
       var scripts = [
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=179",
-        "cliente.js?v=10"
+        "supabaseSync.js?v=181",
+        "cliente.js?v=11"
       ];
       var index = 0;
       function loadNext() {
