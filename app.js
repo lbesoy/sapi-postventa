@@ -11910,6 +11910,151 @@ window.vincularNuevaCotizacion = async function(isModal = true, ticketId = null)
   mostrarNotificacion('Cotización vinculada correctamente.', 'success');
 };
 
+window.initSearchableSelect = function(selectId, placeholder = 'Escribe para buscar...') {
+  const originalSelect = document.getElementById(selectId);
+  if (!originalSelect) return;
+
+  // Si ya tiene un wrapper de búsqueda, destruirlo primero para reconstruir
+  let wrapper = originalSelect.parentElement.querySelector(`.custom-select-search-container[data-select-id="${selectId}"]`);
+  if (wrapper) {
+    wrapper.remove();
+  }
+
+  // Ocultar original
+  originalSelect.style.display = 'none';
+
+  // Crear wrapper
+  wrapper = document.createElement('div');
+  wrapper.className = 'custom-select-search-container';
+  wrapper.setAttribute('data-select-id', selectId);
+
+  // Crear trigger
+  const trigger = document.createElement('div');
+  trigger.className = 'custom-select-search-trigger';
+  
+  const triggerLabel = document.createElement('span');
+  triggerLabel.id = `${selectId}-custom-label`;
+  
+  // Rellenar con la opción seleccionada actualmente
+  const selectedOption = originalSelect.options[originalSelect.selectedIndex];
+  triggerLabel.textContent = selectedOption ? selectedOption.textContent : '— Seleccione una opción —';
+  
+  const icon = document.createElement('i');
+  icon.setAttribute('data-lucide', 'chevron-down');
+  icon.style.width = '14px';
+  icon.style.height = '14px';
+  
+  trigger.appendChild(triggerLabel);
+  trigger.appendChild(icon);
+  wrapper.appendChild(trigger);
+
+  // Crear dropdown
+  const dropdown = document.createElement('div');
+  dropdown.className = 'custom-select-search-dropdown';
+  dropdown.style.display = 'none';
+
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.className = 'search-input';
+  searchInput.placeholder = placeholder;
+  dropdown.appendChild(searchInput);
+
+  const optionsContainer = document.createElement('div');
+  optionsContainer.className = 'custom-select-search-options';
+  dropdown.appendChild(optionsContainer);
+
+  wrapper.appendChild(dropdown);
+
+  // Insertar wrapper en el DOM justo después del select original
+  originalSelect.parentNode.insertBefore(wrapper, originalSelect.nextSibling);
+  try { lucide.createIcons(); } catch(e){}
+
+  // Función para rellenar opciones en el dropdown
+  const populateOptions = (filterText = '') => {
+    optionsContainer.innerHTML = '';
+    const query = filterText.toLowerCase().trim();
+    let count = 0;
+
+    Array.from(originalSelect.options).forEach(opt => {
+      const text = opt.textContent;
+      const val = opt.value;
+      
+      // Filtrar por texto
+      if (query && !text.toLowerCase().includes(query) && !val.toLowerCase().includes(query)) {
+        return;
+      }
+
+      count++;
+      const optionEl = document.createElement('div');
+      optionEl.className = 'custom-select-search-option';
+      if (opt.selected) optionEl.classList.add('selected');
+      optionEl.textContent = text;
+      optionEl.title = text;
+      optionEl.onclick = (e) => {
+        e.stopPropagation();
+        originalSelect.value = val;
+        triggerLabel.textContent = text;
+        
+        // Disparar evento change del select original
+        const event = new Event('change', { bubbles: true });
+        originalSelect.dispatchEvent(event);
+        
+        // Cerrar dropdown
+        dropdown.style.display = 'none';
+        wrapper.classList.remove('open');
+      };
+      optionsContainer.appendChild(optionEl);
+    });
+
+    if (count === 0) {
+      const noResults = document.createElement('div');
+      noResults.className = 'custom-select-search-option no-results';
+      noResults.textContent = 'No se encontraron resultados';
+      optionsContainer.appendChild(noResults);
+    }
+  };
+
+  // Eventos del Trigger
+  trigger.onclick = (e) => {
+    e.stopPropagation();
+    
+    // Cerrar cualquier otro dropdown abierto primero
+    document.querySelectorAll('.custom-select-search-container').forEach(c => {
+      if (c !== wrapper) {
+        c.classList.remove('open');
+        const d = c.querySelector('.custom-select-search-dropdown');
+        if (d) d.style.display = 'none';
+      }
+    });
+
+    const isOpen = wrapper.classList.toggle('open');
+    if (isOpen) {
+      dropdown.style.display = 'flex';
+      searchInput.value = '';
+      populateOptions();
+      setTimeout(() => searchInput.focus(), 50);
+    } else {
+      dropdown.style.display = 'none';
+    }
+  };
+
+  // Evento de búsqueda
+  searchInput.oninput = (e) => {
+    populateOptions(e.target.value);
+  };
+  searchInput.onclick = (e) => {
+    e.stopPropagation();
+  };
+
+  // Cerrar al hacer clic afuera
+  document.addEventListener('click', (e) => {
+    if (!wrapper.contains(e.target)) {
+      dropdown.style.display = 'none';
+      wrapper.classList.remove('open');
+    }
+  });
+};
+
 window.poblarCotizacionesDropdown = async function(isModal = true, ticketId = null, selectedValue = '') {
   const sb = window.supabaseClient;
   if (!sb) return;
@@ -11972,6 +12117,7 @@ window.poblarCotizacionesDropdown = async function(isModal = true, ticketId = nu
     if (selectedValue) {
       selectEl.value = selectedValue;
     }
+    window.initSearchableSelect(selectId, 'Buscar cotización SAP...');
   } catch (err) {
     console.error('[SAP Autocomplete] Error populating select dropdown:', err);
   }
@@ -12035,6 +12181,7 @@ window.poblarPedidosDropdown = async function(isModal = true, ticketId = null, s
     if (selectedValue) {
       selectEl.value = selectedValue;
     }
+    window.initSearchableSelect(selectId, 'Buscar pedido SAP...');
   } catch (err) {
     console.error('[SAP Autocomplete Pedidos] Error populating select dropdown:', err);
   }

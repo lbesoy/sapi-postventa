@@ -2251,3 +2251,106 @@ body.light-mode .badge-metodo-reembolso { background: rgba(100, 116, 139, 0.08);
   }
 }
 
+/* Searchable Dropdown Component */
+.custom-select-search-container {
+  position: relative;
+  width: 100%;
+}
+
+.custom-select-search-trigger {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: var(--transition);
+  width: 100%;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+}
+
+.custom-select-search-trigger:hover {
+  border-color: var(--accent);
+}
+
+.custom-select-search-container.open .custom-select-search-trigger {
+  border-color: var(--accent);
+}
+
+.custom-select-search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-top: 4px;
+  z-index: 1000;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: 300px;
+}
+
+.custom-select-search-dropdown .search-input {
+  border: none !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  padding: 0.5rem 0.75rem !important;
+  background: var(--bg-body) !important;
+  font-size: 0.85rem !important;
+}
+
+.custom-select-search-dropdown .search-input:focus {
+  outline: none !important;
+  background: var(--bg-body) !important;
+  border-bottom-color: var(--accent) !important;
+  box-shadow: none !important;
+}
+
+.custom-select-search-options {
+  overflow-y: auto;
+  max-height: 240px;
+}
+
+.custom-select-search-option {
+  padding: 0.55rem 0.75rem;
+  font-size: 0.825rem;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.custom-select-search-option:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+.custom-select-search-option.selected {
+  background: var(--accent-glow);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.custom-select-search-option.no-results {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 1rem;
+  cursor: default;
+}
+.custom-select-search-option.no-results:hover {
+  background: transparent;
+  color: var(--text-muted);
+}
+
