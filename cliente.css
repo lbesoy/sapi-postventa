@@ -1117,9 +1117,10 @@ body {
   padding: 1.25rem;
   cursor: pointer;
   position: relative;
-  overflow: hidden;
   box-shadow: var(--shadow-sm);
   transition: var(--transition);
+  height: auto !important;
+  min-height: fit-content;
 }
 
 .ticket-card-premium:hover {
