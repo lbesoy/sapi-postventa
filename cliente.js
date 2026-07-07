@@ -2037,8 +2037,12 @@ function abrirDetalleOrdenCliente(id) {
           <span>${safeFormatDate(o.fecha, { day:'numeric', month:'short', year:'numeric' }, '—')}</span>
         </div>
         <div>
-          <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Ubicación / Sitio</span>
+          <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Ubicación (Ticket)</span>
           <span>${o.ubicacion || '—'}</span>
+        </div>
+        <div>
+          <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Ubicación en Sitio</span>
+          <span>${o.ubicacion_sitio || '—'}</span>
         </div>
         <div>
           <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Operador</span>

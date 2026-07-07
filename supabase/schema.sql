@@ -34,6 +34,8 @@ CREATE TABLE public.ordenes (
     notas TEXT,
     evidencia_url TEXT,
     evidencias JSONB DEFAULT '{}'::jsonb,
+    ubicacion_sitio TEXT,
+    operador TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

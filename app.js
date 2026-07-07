@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.192'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.195'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -102,7 +102,7 @@ if (typeof localStorage !== 'undefined') {
     const preserved = {};
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && (key === 'eurorep_session' || key === 'eurorep_darkmode' || key === 'theme_mode' || key.startsWith('sb-'))) {
+      if (key && (key === 'eurorep_session' || key === 'eurorep_darkmode' || key === 'theme_mode' || key === 'sapi_roles_config' || key.startsWith('sb-'))) {
         preserved[key] = localStorage.getItem(key);
       }
     }
@@ -887,15 +887,41 @@ const API_CONFIG = {
   LOCAL_URL: localStorage.getItem('eurorep_local_api_url') || null
 };
 
+async function fetchSapApi(endpoint, options = {}) {
+  const localUrl = API_CONFIG.LOCAL_URL;
+  if (localUrl) {
+    try {
+      const url = `${localUrl}${endpoint}`;
+      let opt = { ...options };
+      if (typeof AbortController !== 'undefined') {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        opt.signal = controller.signal;
+        const res = await fetch(url, opt);
+        clearTimeout(timeoutId);
+        if (res.ok) return res;
+      } else {
+        const res = await fetch(url, opt);
+        if (res.ok) return res;
+      }
+    } catch (e) {
+      console.warn(`Local SAP API failed for ${endpoint}:`, e.message);
+    }
+  }
+  
+  const url = `${API_CONFIG.BASE_URL}${endpoint}`;
+  return fetch(url, options);
+}
+
 async function fetchClientesSAP() {
   if (!API_CONFIG.USE_SAP_BACKEND) return clientesDb; // Retorna los locales si no hay SAP
   
   try {
-    let url = `${API_CONFIG.BASE_URL}/clientes`;
+    let path = `/clientes`;
     if (configData && configData.queryClientes) {
-      url += `?queryCode=${encodeURIComponent(configData.queryClientes)}`;
+      path += `?queryCode=${encodeURIComponent(configData.queryClientes)}`;
     }
-    const response = await fetch(url);
+    const response = await fetchSapApi(path);
     const sapData = await response.json();
     
     // Si el servidor responde con error, mostrar mensaje claro en lugar de crash
@@ -968,7 +994,7 @@ async function fetchRefaccionesSAP() {
     };
     let marcaMap = { ...MARCAS_FALLBACK };
     try {
-      const marcaRes = await fetch(`${API_CONFIG.BASE_URL}/sap/udo/OK_MARCA`);
+      const marcaRes = await fetchSapApi(`/sap/udo/OK_MARCA`);
       const marcaJson = await marcaRes.json();
       const udoItems = marcaJson.data || [];
       if (udoItems.length > 0) {
@@ -984,8 +1010,8 @@ async function fetchRefaccionesSAP() {
     }
 
     // 2. Fetch refacciones
-    const url = `${API_CONFIG.BASE_URL}/sap/queries/${encodeURIComponent(configData.queryRefacciones)}/execute?_t=${Date.now()}`;
-    const response = await fetch(url);
+    const path = `/sap/queries/${encodeURIComponent(configData.queryRefacciones)}/execute?_t=${Date.now()}`;
+    const response = await fetchSapApi(path);
     const jsonRes = await response.json();
     const sapData = jsonRes.data || [];
     
@@ -1176,7 +1202,7 @@ function cargarRolesDesdeStorage() {
       migrated_v2: true
     };
     localStorage.setItem('sapi_roles_config', JSON.stringify(configToSave));
-    if (window.pushToSupabase) {
+    if (savedData && window.pushToSupabase) {
       window.pushToSupabase('roles', configToSave);
     }
   }
@@ -2578,14 +2604,14 @@ let listaQueriesCargada = [];
 
 async function cargarListaQueriesSAP() {
   try {
-    const res = await fetch(`${API_CONFIG.BASE_URL}/sap/queries?_t=${Date.now()}`, {
+    const res = await fetchSapApi(`/sap/queries?_t=${Date.now()}`, {
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache'
       }
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    if (!res.ok) throw new Error(data.error || 'Fallo al obtener queries');
 
     listaQueriesCargada = data.data || [];
     
@@ -2686,7 +2712,7 @@ async function programarQuerySAP() {
   btn.disabled = true;
 
   try {
-    const res = await fetch(`${API_CONFIG.BASE_URL}/sap/queries`, {
+    const res = await fetchSapApi(`/sap/queries`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sqlCode, sqlName, sqlText })
@@ -2740,7 +2766,7 @@ async function probarQuerySAP() {
   if (resultsContainer) resultsContainer.style.display = 'none';
 
   try {
-    const res = await fetch(`${API_CONFIG.BASE_URL}/sap/queries/${encodeURIComponent(sqlCode)}/execute?_t=${Date.now()}`, {
+    const res = await fetchSapApi(`/sap/queries/${encodeURIComponent(sqlCode)}/execute?_t=${Date.now()}`, {
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache'
@@ -2785,9 +2811,13 @@ async function eliminarQuerySAP() {
     return;
   }
   
-  if (!confirm(`¿Estás completamente seguro de que deseas eliminar el query "${sqlCode}" directamente de SAP? Esta acción no se puede deshacer.`)) {
-    return;
-  }
+  const confirmado = await window.confirmarAccion({
+    titulo: 'Eliminar Query',
+    mensaje: `¿Estás seguro de que deseas eliminar el query "${sqlCode}" directamente de SAP? Esta acción no se puede deshacer.`,
+    esPeligroso: true,
+    icono: 'alert-triangle'
+  });
+  if (!confirmado) return;
   
   const btn = event.target.closest('button');
   const orig = btn.innerHTML;
@@ -2795,7 +2825,7 @@ async function eliminarQuerySAP() {
   btn.disabled = true;
 
   try {
-    const res = await fetch(`${API_CONFIG.BASE_URL}/sap/queries/${encodeURIComponent(sqlCode)}`, {
+    const res = await fetchSapApi(`/sap/queries/${encodeURIComponent(sqlCode)}`, {
       method: 'DELETE'
     });
     const data = await res.json();
@@ -4784,8 +4814,8 @@ async function fetchTecnicosSAP() {
   if (!API_CONFIG.USE_SAP_BACKEND) return tecnicosDb;
   
   try {
-    const url = `${API_CONFIG.BASE_URL}/tecnicos?_t=${Date.now()}`;
-    const response = await fetch(url);
+    const path = `/tecnicos?_t=${Date.now()}`;
+    const response = await fetchSapApi(path);
     if (!response.ok) return tecnicosDb;
     const sapData = await response.json();
     
@@ -4810,8 +4840,8 @@ async function fetchSitiosSAP() {
   
   try {
     const queryCode = encodeURIComponent(configData.querySitios);
-    const url = `${API_CONFIG.BASE_URL}/sap/queries/${queryCode}/execute?_t=${Date.now()}`;
-    const response = await fetch(url);
+    const path = `/sap/queries/${queryCode}/execute?_t=${Date.now()}`;
+    const response = await fetchSapApi(path);
     if (!response.ok) return sitiosDb;
     const jsonRes = await response.json();
     const sapData = jsonRes.data || (Array.isArray(jsonRes) ? jsonRes : []);
@@ -4850,8 +4880,8 @@ async function fetchMaquinariaSAP() {
   
   try {
     const queryCode = encodeURIComponent(configData.queryMaquinaria);
-    const url = `${API_CONFIG.BASE_URL}/sap/queries/${queryCode}/execute?_t=${Date.now()}`;
-    const response = await fetch(url);
+    const path = `/sap/queries/${queryCode}/execute?_t=${Date.now()}`;
+    const response = await fetchSapApi(path);
     if (!response.ok) return maquinariaDb;
     const jsonRes = await response.json();
     const sapData = jsonRes.data || (Array.isArray(jsonRes) ? jsonRes : []);
@@ -4946,9 +4976,9 @@ async function abrirDesgloseSAP(cardCode, cardName) {
   modal.style.display = 'flex';
   
   try {
-    const res = await fetch(`${API_CONFIG.BASE_URL}/clientes/${cardCode}/ordenes`);
-    if(!res.ok) throw new Error('Error en SAP');
-    const rawData = await res.json();
+    const response = await fetchSapApi(`/clientes/${cardCode}/ordenes`);
+    if(!response.ok) throw new Error('Error en SAP');
+    const rawData = await response.json();
     
     // Calcular Open Amount en base a las líneas del documento
     currentDesgloseData = rawData.map(ord => {
@@ -8002,7 +8032,7 @@ function abrirFormulario(id, modoReporte = false) {
 
   // Restaurar estilos y propiedades habilitadas por defecto (evita que se queden bloqueadas de sesiones anteriores)
   const todosCamposTexto = [
-    'f-folio', 'f-pedido', 'f-ubicacion', 'f-operador', 'f-eco',
+    'f-folio', 'f-pedido', 'f-ubicacion', 'f-ubicacion-sitio', 'f-operador', 'f-eco',
     'f-horometro', 'f-horometro-real', 'f-modelo', 'f-serie',
     'f-km-ida', 'f-km-vuelta'
   ];
@@ -8093,7 +8123,7 @@ function abrirFormulario(id, modoReporte = false) {
   if (id) {
     const o = ordenes.find(x => x.id === id);
     if (!o) return;
-    const fields = ['folio','pedido','ubicacion','operador','eco','horometro','horometro-real',
+    const fields = ['folio','pedido','ubicacion','ubicacion-sitio','operador','eco','horometro','horometro-real',
       'modelo','serie','soporte','km-ida','km-vuelta','km-total',
       'falla','trabajos','dictamen','condiciones','observaciones','pendientes',
       'noches','alimentacion','traslado-costo'];
@@ -8210,7 +8240,7 @@ function abrirFormulario(id, modoReporte = false) {
   if (modoReporte) {
     // Campos de texto/number bloqueados (info general + km)
     const camposInfoGeneral = [
-      'f-folio', 'f-pedido', 'f-ubicacion', 'f-operador', 'f-eco',
+      'f-folio', 'f-pedido', 'f-ubicacion', 'f-eco',
       'f-horometro', 'f-modelo', 'f-serie',
       'f-km-total'
     ];
@@ -8393,6 +8423,7 @@ function guardarOrden(e) {
     pedido: document.getElementById('f-pedido').value.trim(),
     cliente: document.getElementById('f-cliente').value.trim(),
     ubicacion: document.getElementById('f-ubicacion').value.trim(),
+    ubicacion_sitio: document.getElementById('f-ubicacion-sitio').value.trim(),
     operador: document.getElementById('f-operador').value.trim(),
     eco: document.getElementById('f-eco').value.trim(),
     horometro: document.getElementById('f-horometro').value.trim(),
@@ -8584,11 +8615,11 @@ function renderEvidenciasFotograficas(o) {
   const renderAdicionalesHtml = () => {
     const isConsulta = currentSession.viewMode === 'consulta';
     const uploadBtn = isConsulta ? '' : `
-      <div style="flex-shrink:0; width:100px; height:100px; border:2px dashed var(--border); border-radius:6px; background:var(--bg-body); display:flex; flex-direction:column; gap:0.25rem; align-items:center; justify-content:center; cursor:pointer; color:var(--text-muted); transition:var(--transition); position:relative; box-shadow:0 2px 4px rgba(0,0,0,0.01);" onmouseover="this.style.borderColor='var(--accent)';" onmouseout="this.style.borderColor='var(--border)';" onclick="this.querySelector('input').click();">
+      <label style="display:flex; flex-shrink:0; width:100px; height:100px; border:2px dashed var(--border); border-radius:6px; background:var(--bg-body); flex-direction:column; gap:0.25rem; align-items:center; justify-content:center; cursor:pointer; color:var(--text-muted); transition:var(--transition); position:relative; box-shadow:0 2px 4px rgba(0,0,0,0.01); margin:0;" onmouseover="this.style.borderColor='var(--accent)';" onmouseout="this.style.borderColor='var(--border)';">
         <i data-lucide="plus" style="width:16px;height:16px;"></i>
         <span style="font-size:0.65rem; font-weight:600;">Subir foto</span>
         <input type="file" accept="image/*" onchange="subirEvidenciaFoto('${o.id}', 'adicional', this)" style="display:none;" />
-      </div>
+      </label>
     `;
 
     const fotosList = adicionales.map((url, idx) => `
@@ -8752,7 +8783,13 @@ window.eliminarEvidenciaFoto = async function(ordenId, tipo, url) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o || !o.evidencias) return;
 
-  if (!confirm("¿Estás seguro de que deseas quitar esta foto de evidencia?")) return;
+  const confirmado = await window.confirmarAccion({
+    titulo: 'Quitar Evidencia',
+    mensaje: '¿Estás seguro de que deseas quitar esta foto de evidencia?',
+    esPeligroso: true,
+    icono: 'trash-2'
+  });
+  if (!confirmado) return;
 
   if (tipo === 'fotoInicio') {
     o.evidencias.fotoInicio = null;
@@ -9132,7 +9169,7 @@ function verDetalle(id) {
     ${seccion('Información General', `
       <div class="detalle-grid">
         ${field('Folio', o.folio)} ${field('Pedido', o.pedido)} ${field('Fecha', formatFecha(o.fecha))}
-        ${field('Cliente', o.cliente)} ${field('Ubicación', o.ubicacion)} ${field('Operador', o.operador)}
+        ${field('Cliente', o.cliente)} ${field('Ubicación (Ticket)', o.ubicacion)} ${field('Ubicación en Sitio', o.ubicacion_sitio)} ${field('Operador', o.operador)}
         ${field('No. ECO', o.eco)} ${field('Horómetro (Ticket)', o.horometro)} ${field('Horómetro Real', o.horometro_real)}
         ${field('Marca', (() => { 
           const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
@@ -9396,8 +9433,14 @@ function guardarFirmaCanvas(ordenId, tipo) {
   }
 }
 
-function limpiarFirma(ordenId, tipo) {
-  if (!confirm(`¿Borrar la firma del ${tipo}?`)) return;
+async function limpiarFirma(ordenId, tipo) {
+  const confirmado = await window.confirmarAccion({
+    titulo: 'Borrar Firma',
+    mensaje: `¿Estás seguro de que deseas borrar la firma del ${tipo === 'tecnico' ? 'técnico' : 'cliente'}?`,
+    esPeligroso: true,
+    icono: 'eraser'
+  });
+  if (!confirmado) return;
   const idx = ordenes.findIndex(o => o.id === ordenId);
   if (idx !== -1) {
     if (tipo === 'tecnico') ordenes[idx].firma_tecnico_base64 = null;
@@ -14145,6 +14188,7 @@ async function guardarTicket(e) {
         pedido: ticket.pedidoSAP || '',
         cliente: ticket.cliente || '',
         ubicacion: ticket.sitio || '',
+        ubicacion_sitio: '',
         operador: '',
         eco: ecoStr || '',
         horometro: '',
@@ -14885,6 +14929,7 @@ async function cerrarCotizacionTicket(id) {
         pedido: pedidoSAP || '',
         cliente: t.cliente || '',
         ubicacion: t.sitio || '',
+        ubicacion_sitio: '',
         operador: '', // Se preguntará en sitio
         eco: ecoStr || '',
         horometro: '',
@@ -20440,8 +20485,14 @@ window.procesarArchivoFactura = function(e, type) {
   reader.readAsDataURL(file);
 };
 
-window.eliminarGasto = function(gastoId) {
-  if (!confirm('¿Estás seguro de que deseas eliminar este gasto?')) return;
+window.eliminarGasto = async function(gastoId) {
+  const confirmado = await window.confirmarAccion({
+    titulo: 'Eliminar Gasto',
+    mensaje: '¿Estás seguro de que deseas eliminar este gasto?',
+    esPeligroso: true,
+    icono: 'trash-2'
+  });
+  if (!confirmado) return;
   const gObj = gastos.find(x => x.id === gastoId);
   const desc = gObj ? `${gObj.categoria || 'Gastos'}: ${gObj.descripcion || 'Sin descripción'}` : 'Gasto';
   const monto = gObj ? gObj.monto : 0;
@@ -23978,6 +24029,7 @@ window.regenerarOrdenesDesdeTickets = async function() {
       pedido: t.pedidoSAP || '',
       cliente: t.cliente || '',
       ubicacion: t.sitio || '',
+      ubicacion_sitio: '',
       operador: '',
       eco: ecoStr || '',
       horometro: '',

@@ -365,7 +365,8 @@ function ordenToRow(o) {
     'id', 'folio', 'cliente', 'ubicacion', 'tipo', 'estado', 'fecha', 'fechaInicio', 'fechaFin', 
     'duracion', 'duracion_minutos', 'evidenciaBase64', 'evidencia_base_64', 'evidencia_url', 'bitacora', 'maquinaria_id', 'sitio_id',
     'ref_necesarias', 'ref_utilizadas', 'firma_tecnico_base64', 'firma_tecnico_nombre', 'firma_tecnico_fecha', 
-    'firma_cliente_base64', 'firma_cliente_nombre', 'firma_cliente_fecha', 'evidencias'
+    'firma_cliente_base64', 'firma_cliente_nombre', 'firma_cliente_fecha', 'evidencias',
+    'ubicacion_sitio', 'operador'
   ];
   knownKeys.forEach(k => delete customData[k]);
   
@@ -417,7 +418,9 @@ function ordenToRow(o) {
     duracion_minutos: o.duracion || null,
     notas: notasJSON,
     evidencia_url: o.evidenciaBase64 || null,
-    evidencias: o.evidencias || {}
+    evidencias: o.evidencias || {},
+    ubicacion_sitio: o.ubicacion_sitio || null,
+    operador: o.operador || null
   };
 }
 
@@ -470,6 +473,15 @@ function rowToOrden(o) {
     if (match) clienteNombre = match.nombre;
   } catch (e) {}
 
+  let evidenciasObj = o.evidencias || {};
+  if (typeof evidenciasObj === 'string') {
+    try {
+      evidenciasObj = JSON.parse(evidenciasObj);
+    } catch (e) {
+      evidenciasObj = {};
+    }
+  }
+
   const res = {
     id: o.id,
     _synced: true,
@@ -480,12 +492,14 @@ function rowToOrden(o) {
     duracion: o.duracion_minutos,
     maquinaria_id: o.maquinaria_id || null,
     evidenciaBase64: o.evidencia_url || o.evidencia_base_64 || o.evidencia_base64 || null,
-    evidencias: o.evidencias || {},
+    evidencias: evidenciasObj,
     bitacora: [],
     ref_necesarias: [],
     ref_utilizadas: [],
     firma_tecnico_base64: null,
     firma_cliente_base64: null,
+    ubicacion_sitio: o.ubicacion_sitio || null,
+    operador: o.operador || null,
     ...extraData
   };
   
@@ -495,6 +509,9 @@ function rowToOrden(o) {
   res.bitacora = [];
   res.ref_necesarias = [];
   res.ref_utilizadas = [];
+
+  if (!res.ubicacion_sitio && extraData.ubicacion_sitio) res.ubicacion_sitio = extraData.ubicacion_sitio;
+  if (!res.operador && extraData.operador) res.operador = extraData.operador;
 
   // Priorizar el modelo deducido o el de extraData si no hay id relacional
   res.modelo = modelo || res.modelo || null;
