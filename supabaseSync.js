@@ -17,45 +17,45 @@ window.getSapiIndexedDB = function() {
   });
 };
 
-window.saveRefaccionesLocal = async function(refaccionesArray) {
+window.saveCatalogOffline = async function(catalogKey, dataArray) {
   try {
     const db = await window.getSapiIndexedDB();
     if (db) {
       await new Promise((resolve, reject) => {
         const tx = db.transaction('catalogs', 'readwrite');
         const store = tx.objectStore('catalogs');
-        const req = store.put({ id: 'sapi_refacciones_db', data: refaccionesArray });
+        const req = store.put({ id: catalogKey, data: dataArray });
         req.onsuccess = () => resolve();
         req.onerror = () => reject(req.error);
       });
-      console.log('[IndexedDB] Catálogo de refacciones guardado con éxito.');
+      console.log(`[IndexedDB] Catálogo ${catalogKey} guardado con éxito.`);
       // Eliminar de localStorage para evitar duplicidad y liberar espacio
       if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem('sapi_refacciones_db');
+        localStorage.removeItem(catalogKey);
       }
       return;
     }
   } catch (err) {
-    console.error('[IndexedDB] Fallo al guardar en IndexedDB, usando localStorage de respaldo:', err);
+    console.error(`[IndexedDB] Fallo al guardar catálogo ${catalogKey} en IndexedDB:`, err);
   }
   // Fallback
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('sapi_refacciones_db', JSON.stringify(refaccionesArray));
+      localStorage.setItem(catalogKey, JSON.stringify(dataArray));
     }
   } catch (err) {
-    console.error('[LocalStorage] Fallo crítico de espacio:', err);
+    console.error(`[LocalStorage] Fallo crítico al guardar catálogo ${catalogKey}:`, err);
   }
 };
 
-window.loadRefaccionesLocal = async function() {
+window.loadCatalogOffline = async function(catalogKey, defaultValue = []) {
   try {
     const db = await window.getSapiIndexedDB();
     if (db) {
       const result = await new Promise((resolve) => {
         const tx = db.transaction('catalogs', 'readonly');
         const store = tx.objectStore('catalogs');
-        const req = store.get('sapi_refacciones_db');
+        const req = store.get(catalogKey);
         req.onsuccess = () => resolve(req.result ? req.result.data : null);
         req.onerror = () => resolve(null);
       });
@@ -64,16 +64,24 @@ window.loadRefaccionesLocal = async function() {
       }
     }
   } catch (err) {
-    console.error('[IndexedDB] Fallo al leer de IndexedDB:', err);
+    console.error(`[IndexedDB] Fallo al leer catálogo ${catalogKey}:`, err);
   }
-  // Fallback a localStorage
+  // Fallback
   try {
     if (typeof localStorage !== 'undefined') {
-      const local = localStorage.getItem('sapi_refacciones_db');
-      return local ? JSON.parse(local) : [];
+      const local = localStorage.getItem(catalogKey);
+      return local ? JSON.parse(local) : defaultValue;
     }
   } catch (e) {}
-  return [];
+  return defaultValue;
+};
+
+window.saveRefaccionesLocal = async function(refaccionesArray) {
+  return window.saveCatalogOffline('sapi_refacciones_db', refaccionesArray);
+};
+
+window.loadRefaccionesLocal = async function() {
+  return window.loadCatalogOffline('sapi_refacciones_db', []);
 };
 
 // Helpers de serialización de refacciones en el campo 'notas' del ticket
@@ -151,8 +159,14 @@ if (typeof JSON !== 'undefined' && !JSON.parse.__isSafeWrapper) {
 }
 
 window.isConnectionVerifiedOnline = false;
-window._cacheCotizacionesSap = JSON.parse(localStorage.getItem('eurorep_cotizaciones_sap') || '[]');
-window._cachePedidosSap = JSON.parse(localStorage.getItem('eurorep_pedidos_sap') || '[]');
+window._cacheCotizacionesSap = [];
+window._cachePedidosSap = [];
+(async () => {
+  try {
+    window._cacheCotizacionesSap = await window.loadCatalogOffline('eurorep_cotizaciones_sap', []);
+    window._cachePedidosSap = await window.loadCatalogOffline('eurorep_pedidos_sap', []);
+  } catch (e) {}
+})();
 
 
 
@@ -2695,7 +2709,7 @@ window.cargarDatosDeSupabase = function() {
       const { data: cotizaciones, error: cotizacionesErr } = await sb.from('cotizaciones_sap').select('*');
       if (!cotizacionesErr && cotizaciones) {
         window._cacheCotizacionesSap = cotizaciones;
-        localStorage.setItem('eurorep_cotizaciones_sap', JSON.stringify(cotizaciones));
+        await window.saveCatalogOffline('eurorep_cotizaciones_sap', cotizaciones);
       }
     } catch (errCot) {
       console.warn('[Sync] Error al cargar cotizaciones_sap:', errCot);
@@ -2706,7 +2720,7 @@ window.cargarDatosDeSupabase = function() {
       const { data: pedidos, error: pedidosErr } = await sb.from('pedidos_sap').select('*');
       if (!pedidosErr && pedidos) {
         window._cachePedidosSap = pedidos;
-        localStorage.setItem('eurorep_pedidos_sap', JSON.stringify(pedidos));
+        await window.saveCatalogOffline('eurorep_pedidos_sap', pedidos);
       }
     } catch (errPed) {
       console.warn('[Sync] Error al cargar pedidos_sap:', errPed);

@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.177'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.178'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -122,6 +122,21 @@ if (typeof window !== 'undefined' && window.localStorage) {
       } catch (err) {
         console.warn('[LocalStorage] Capturado error al guardar clave:', key, err.message);
         if (err.name === 'QuotaExceededError' || err.message.toLowerCase().includes('quota')) {
+          try {
+            console.log('--- DIAGNÓSTICO DE LOCALSTORAGE ---');
+            let totalMB = 0;
+            for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              const val = localStorage.getItem(k) || '';
+              const sizeMB = (val.length * 2) / (1024 * 1024); // UTF-16 characters are 2 bytes each
+              console.log(`- ${k}: ${sizeMB.toFixed(3)} MB`);
+              totalMB += sizeMB;
+            }
+            console.log(`Total utilizado: ${totalMB.toFixed(3)} MB / 5.000 MB`);
+            console.log('-----------------------------------');
+          } catch (diagErr) {
+            console.error('Error al generar diagnóstico de localStorage:', diagErr);
+          }
           try {
             // Intenta liberar espacio removiendo telemetría no crítica
             window.localStorage.removeItem('sapi_telemetry_events');
@@ -11506,8 +11521,14 @@ window.clearPdfInput = function(isModal = true, ticketId = null) {
 };
 
 // ===== SAP QUOTATION VALIDATION & SYNC =====
-window._cacheCotizacionesSap = JSON.parse(localStorage.getItem('eurorep_cotizaciones_sap') || '[]');
-window._cachePedidosSap = JSON.parse(localStorage.getItem('eurorep_pedidos_sap') || '[]');
+window._cacheCotizacionesSap = [];
+window._cachePedidosSap = [];
+(async () => {
+  try {
+    window._cacheCotizacionesSap = await window.loadCatalogOffline('eurorep_cotizaciones_sap', []);
+    window._cachePedidosSap = await window.loadCatalogOffline('eurorep_pedidos_sap', []);
+  } catch (e) {}
+})();
 
 window.renderLinkedCotizaciones = function(isModal = true, ticketId = null) {
   const containerId = isModal ? 'linked-cotizaciones-container' : `quick-linked-cotizaciones-container-${ticketId}`;
@@ -11728,7 +11749,7 @@ window.poblarCotizacionesDropdown = async function(isModal = true, ticketId = nu
       const { data, error } = await sb.from('cotizaciones_sap').select('*').order('numero_cotizacion', { ascending: false });
       if (!error && data) {
         window._cacheCotizacionesSap = data;
-        localStorage.setItem('eurorep_cotizaciones_sap', JSON.stringify(data));
+        await window.saveCatalogOffline('eurorep_cotizaciones_sap', data);
       }
     }
 
@@ -11794,7 +11815,7 @@ window.poblarPedidosDropdown = async function(isModal = true, ticketId = null, s
       const { data, error } = await sb.from('pedidos_sap').select('*').order('numero_pedido', { ascending: false });
       if (!error && data) {
         window._cachePedidosSap = data;
-        localStorage.setItem('eurorep_pedidos_sap', JSON.stringify(data));
+        await window.saveCatalogOffline('eurorep_pedidos_sap', data);
       }
     }
 
