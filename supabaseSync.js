@@ -1,3 +1,81 @@
+// --- IndexedDB Helper for Refacciones (unlimited offline storage) ---
+window.getSapiIndexedDB = function() {
+  return new Promise((resolve) => {
+    if (typeof indexedDB === 'undefined') {
+      resolve(null);
+      return;
+    }
+    const request = indexedDB.open('SapiOfflineDB', 1);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('catalogs')) {
+        db.createObjectStore('catalogs', { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = (e) => resolve(e.target.result);
+    request.onerror = () => resolve(null);
+  });
+};
+
+window.saveRefaccionesLocal = async function(refaccionesArray) {
+  try {
+    const db = await window.getSapiIndexedDB();
+    if (db) {
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction('catalogs', 'readwrite');
+        const store = tx.objectStore('catalogs');
+        const req = store.put({ id: 'sapi_refacciones_db', data: refaccionesArray });
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+      console.log('[IndexedDB] Catálogo de refacciones guardado con éxito.');
+      // Eliminar de localStorage para evitar duplicidad y liberar espacio
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('sapi_refacciones_db');
+      }
+      return;
+    }
+  } catch (err) {
+    console.error('[IndexedDB] Fallo al guardar en IndexedDB, usando localStorage de respaldo:', err);
+  }
+  // Fallback
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('sapi_refacciones_db', JSON.stringify(refaccionesArray));
+    }
+  } catch (err) {
+    console.error('[LocalStorage] Fallo crítico de espacio:', err);
+  }
+};
+
+window.loadRefaccionesLocal = async function() {
+  try {
+    const db = await window.getSapiIndexedDB();
+    if (db) {
+      const result = await new Promise((resolve) => {
+        const tx = db.transaction('catalogs', 'readonly');
+        const store = tx.objectStore('catalogs');
+        const req = store.get('sapi_refacciones_db');
+        req.onsuccess = () => resolve(req.result ? req.result.data : null);
+        req.onerror = () => resolve(null);
+      });
+      if (result) {
+        return result;
+      }
+    }
+  } catch (err) {
+    console.error('[IndexedDB] Fallo al leer de IndexedDB:', err);
+  }
+  // Fallback a localStorage
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const local = localStorage.getItem('sapi_refacciones_db');
+      return local ? JSON.parse(local) : [];
+    }
+  } catch (e) {}
+  return [];
+};
+
 // Helpers de serialización de refacciones en el campo 'notas' del ticket
 window.extraerRefaccionesDeNotas = function(notasStr) {
   const str = notasStr || '';
@@ -2364,7 +2442,7 @@ window.cargarDatosDeSupabase = function() {
           grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
           ItmsGrpCod: r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
         }));
-        localStorage.setItem('sapi_refacciones_db', JSON.stringify(mapped));
+        await window.saveRefaccionesLocal(mapped);
       }
     } else {
       console.log('[Sync] Omitiendo descarga del catálogo de refacciones para rol cliente/empresa.');

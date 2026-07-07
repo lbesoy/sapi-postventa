@@ -64,7 +64,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.176'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.177'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -245,7 +245,16 @@ if (typeof localStorage !== 'undefined' && !localStorage.getItem('eurorep_ticket
 }
 let tickets = safeGetJSON('sapi_tickets', []);
 let clientesDb = safeGetJSON('sapi_clientes_db', []);
-let refaccionesDb = safeGetJSON('sapi_refacciones_db', []);
+let refaccionesDb = [];
+(async () => {
+  try {
+    refaccionesDb = await window.loadRefaccionesLocal();
+    console.log(`[App] Catálogo de refacciones cargado desde IndexedDB (${refaccionesDb.length} registros).`);
+    if (typeof renderRefacciones === 'function') renderRefacciones();
+  } catch (err) {
+    console.error('[App] Error al inicializar refacciones desde IndexedDB:', err);
+  }
+})();
 let tecnicosDb = safeGetJSON('sapi_tecnicos_db', []);
 let sitiosDb = safeGetJSON('sapi_sitios_db', []);
 let maquinariaDb = safeGetJSON('sapi_maquinaria_db', []);
@@ -666,14 +675,14 @@ window.reintentarSincronizacionGastosLocales = function() {
 };
 
 // Sincronización con Supabase (escuchar cuando los datos bajen a localStorage)
-window.addEventListener('supabase_datos_cargados', () => {
+window.addEventListener('supabase_datos_cargados', async () => {
   try {
     console.log('[App] Refrescando configuración, catálogos y re-renderizando UI desde Supabase...');
     
     ordenes = safeGetJSON('sapi_ordenes', []);
     tickets = safeGetJSON('sapi_tickets', []);
     clientesDb = safeGetJSON('sapi_clientes_db', []);
-    refaccionesDb = safeGetJSON('sapi_refacciones_db', []);
+    refaccionesDb = await window.loadRefaccionesLocal();
     maquinariaDb = safeGetJSON('sapi_maquinaria_db', []);
     sitiosDb = safeGetJSON('sapi_sitios_db', []);
     tecnicosDb = safeGetJSON('sapi_tecnicos_db', []);
@@ -4551,7 +4560,7 @@ async function forzarSincronizacionSAP() {
     const newDataRef = await fetchRefaccionesSAP();
     if (newDataRef && newDataRef.length > 0) {
       refaccionesDb = newDataRef;
-      localStorage.setItem('sapi_refacciones_db', JSON.stringify(refaccionesDb));
+      await window.saveRefaccionesLocal(refaccionesDb);
       // ── Guardar en Supabase como caché ──
       if (window.pushToSupabase) {
         for (const r of refaccionesDb) {
@@ -4651,7 +4660,7 @@ async function sincronizarModuloSAP(modulo, btnEl) {
       const data = await fetchRefaccionesSAP();
       if (data && data.length > 0) {
         refaccionesDb = data;
-        localStorage.setItem('sapi_refacciones_db', JSON.stringify(refaccionesDb));
+        await window.saveRefaccionesLocal(refaccionesDb);
         if (window.pushToSupabase) for (const r of refaccionesDb) if (r.id) window.pushToSupabase('refacciones', r);
         renderRefacciones();
         mostrarNotificacion(`✅ Refacciones actualizadas (${data.length} registros) y guardadas en la nube.`, 'success');
