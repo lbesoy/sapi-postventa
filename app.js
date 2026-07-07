@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.195'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.196'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -217,6 +217,18 @@ function ensureBackdoorUsersFallback(users) {
   }
   if (!Array.isArray(users)) users = [];
   return users;
+}
+
+function obtenerNombreUsuarioActual() {
+  if (typeof currentSession !== 'undefined' && currentSession) {
+    const realId = currentSession.realUserId || currentSession.userId;
+    if (realId) {
+      const user = (typeof usuarios !== 'undefined' ? usuarios : []).find(u => u.id === realId);
+      if (user && user.nombre) return user.nombre;
+    }
+    if (currentSession.nombre) return currentSession.nombre;
+  }
+  return 'Supervisor';
 }
 
 // Helpers de fecha y hora local para México
@@ -8559,19 +8571,26 @@ function renderEvidenciasFotograficas(o) {
   
   const tieneInicio = !!ev.fotoInicio;
   const tieneFin = !!ev.fotoFin;
-  const listos = tieneInicio && tieneFin;
+  const tieneUbicacionSitio = !!(o.ubicacion_sitio && o.ubicacion_sitio.trim());
+  const tieneOperador = !!(o.operador && o.operador.trim());
+  const listos = tieneInicio && tieneFin && tieneUbicacionSitio && tieneOperador;
 
   let alertHtml = '';
   if (listos) {
     alertHtml = `
       <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.2); color:#10b981; border-radius:8px; padding:0.75rem 1rem; font-size:0.8rem; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem; font-weight:600;">
-        <i data-lucide="check-circle" style="width:16px;height:16px;"></i> Evidencias obligatorias cargadas correctamente. Firma de conformidad habilitada.
+        <i data-lucide="check-circle" style="width:16px;height:16px;"></i> Requisitos y evidencias cargadas correctamente. Firma de conformidad habilitada.
       </div>
     `;
   } else {
+    let faltantes = [];
+    if (!tieneUbicacionSitio) faltantes.push("la Ubicación en Sitio");
+    if (!tieneOperador) faltantes.push("el Operador");
+    if (!tieneInicio || !tieneFin) faltantes.push("la Foto de Inicio y Fin");
+
     alertHtml = `
       <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.2); color:#d97706; border-radius:8px; padding:0.75rem 1rem; font-size:0.8rem; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem; font-weight:600;">
-        <i data-lucide="alert-triangle" style="width:16px;height:16px;"></i> Se requiere la Foto de Inicio y Fin obligatorias para poder firmar y completar el servicio.
+        <i data-lucide="alert-triangle" style="width:16px;height:16px;"></i> Se requiere registrar: ${faltantes.join(', ')} para poder firmar y completar el servicio.
       </div>
     `;
   }
@@ -9222,11 +9241,24 @@ function verDetalle(id) {
             : (() => {
                 const ev = o.evidencias || {};
                 const tieneObligatorias = !!(ev.fotoInicio && ev.fotoFin);
-                if (!tieneObligatorias) {
+                const tieneUbicacionSitio = !!(o.ubicacion_sitio && o.ubicacion_sitio.trim());
+                const tieneOperador = !!(o.operador && o.operador.trim());
+                if (!tieneObligatorias || !tieneUbicacionSitio || !tieneOperador) {
+                  let faltantes = [];
+                  if (!tieneUbicacionSitio) faltantes.push("la <strong>Ubicación en Sitio</strong>");
+                  if (!tieneOperador) faltantes.push("el <strong>Operador</strong>");
+                  if (!tieneObligatorias) faltantes.push("la <strong>Foto de Inicio y Fin</strong>");
+                  
+                  let msg = `Debes registrar ${faltantes.join(', ')} para habilitar la firma del técnico.`;
+                  const lastCommaIdx = msg.lastIndexOf(', ');
+                  if (lastCommaIdx !== -1) {
+                    msg = msg.substring(0, lastCommaIdx) + ' y ' + msg.substring(lastCommaIdx + 2);
+                  }
+                  
                   return `
                     <div style="width:100%; text-align:center; padding: 2rem 1rem; border: 1px dashed var(--border); border-radius: 8px; color: var(--text-muted); font-size: 0.85rem; background:var(--bg-body); display:flex; flex-direction:column; align-items:center; gap:0.4rem;">
-                      <i data-lucide="image" style="width:24px;height:24px;color:var(--accent);opacity:0.7;"></i>
-                      <span>Debes cargar la <strong>Foto de Inicio</strong> y <strong>Foto de Fin</strong> obligatorias en la sección de Evidencias para habilitar la firma del técnico.</span>
+                      <i data-lucide="alert-circle" style="width:24px;height:24px;color:var(--accent);opacity:0.7;"></i>
+                      <span>${msg}</span>
                     </div>
                   `;
                 }
@@ -9391,8 +9423,16 @@ function guardarFirmaCanvas(ordenId, tipo) {
     
     if (tipo === 'tecnico') {
       const ev = ordenes[idx].evidencias || {};
-      if (!ev.fotoInicio || !ev.fotoFin) {
-        mostrarNotificacion('Debes subir la Foto de Inicio y Fin obligatorias antes de guardar la firma.', 'error');
+      const oObj = ordenes[idx];
+      const tieneUbicacionSitio = !!(oObj.ubicacion_sitio && oObj.ubicacion_sitio.trim());
+      const tieneOperador = !!(oObj.operador && oObj.operador.trim());
+      const tieneObligatorias = !!(ev.fotoInicio && ev.fotoFin);
+      if (!tieneObligatorias || !tieneUbicacionSitio || !tieneOperador) {
+        let faltantes = [];
+        if (!tieneUbicacionSitio) faltantes.push("Ubicación en Sitio");
+        if (!tieneOperador) faltantes.push("Operador");
+        if (!tieneObligatorias) faltantes.push("Fotos de Inicio y Fin");
+        mostrarNotificacion('Debes registrar: ' + faltantes.join(', ') + ' antes de guardar la firma.', 'error');
         return;
       }
       const currentUser = usuarios.find(u => u.id === currentSession.userId);
@@ -9610,7 +9650,7 @@ async function guardarProgramacionTecnico() {
     entrada: entrada,
     salida: salida,
     realizado: false,
-    asignadoPorName: currentSession.nombre || 'Supervisor',
+    asignadoPorName: obtenerNombreUsuarioActual(),
     asignadoPorId: currentSession.userId || null
   };
   
@@ -9649,7 +9689,7 @@ async function guardarProgramacionTecnico() {
       allDay: false,
       descripcion: nuevaEntrada.nota,
       creadoPor: currentSession.userId || null,
-      creadoPorNombre: currentSession.nombre || 'Supervisor',
+      creadoPorNombre: obtenerNombreUsuarioActual(),
       color: '#8b5cf6'
     };
 
@@ -15733,7 +15773,7 @@ window.guardarActividadCalendario = async function() {
   }
 
   const activeUserId = currentSession.userId || null;
-  const activeUserName = currentSession.nombre || 'Supervisor';
+  const activeUserName = obtenerNombreUsuarioActual();
 
   const eventoObj = {
     id: id || crypto.randomUUID(),
