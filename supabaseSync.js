@@ -3053,7 +3053,6 @@ window.base64ToBlob = async function(base64Data) {
   }
 };
 
-// Uploads a base64 file to Supabase Storage and returns the public URL
 window.uploadBase64ToStorage = async function(base64Data, bucketName, filePath) {
   const sb = window.supabaseClient;
   if (!sb) {
@@ -3061,12 +3060,15 @@ window.uploadBase64ToStorage = async function(base64Data, bucketName, filePath) 
     return null;
   }
 
+  // Sanitizar el filePath para evitar caracteres prohibidos en Supabase Storage (como [, ], *, ?)
+  const sanitizedPath = (filePath || '').replace(/[\[\]\*?]/g, '');
+
   try {
     const blob = await window.base64ToBlob(base64Data);
     if (!blob) return null;
 
     // Upload blob to Supabase Storage bucket
-    const { data, error } = await sb.storage.from(bucketName).upload(filePath, blob, {
+    const { data, error } = await sb.storage.from(bucketName).upload(sanitizedPath, blob, {
       cacheControl: '3600',
       upsert: true
     });
@@ -3077,7 +3079,7 @@ window.uploadBase64ToStorage = async function(base64Data, bucketName, filePath) 
     }
 
     // Get public URL
-    const { data: { publicUrl } } = sb.storage.from(bucketName).getPublicUrl(filePath);
+    const { data: { publicUrl } } = sb.storage.from(bucketName).getPublicUrl(sanitizedPath);
     return publicUrl;
   } catch (err) {
     console.error('[Storage] Exception during upload:', err);
