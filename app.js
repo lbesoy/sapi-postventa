@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.200'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.201'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -8631,7 +8631,11 @@ function guardarOrden(e) {
   if (oVieja) {
     orden.bitacora = oVieja.bitacora;
     orden.firma_tecnico_base64 = oVieja.firma_tecnico_base64;
+    orden.firma_tecnico_nombre = oVieja.firma_tecnico_nombre;
+    orden.firma_tecnico_fecha = oVieja.firma_tecnico_fecha;
     orden.firma_cliente_base64 = oVieja.firma_cliente_base64;
+    orden.firma_cliente_nombre = oVieja.firma_cliente_nombre;
+    orden.firma_cliente_fecha = oVieja.firma_cliente_fecha;
     orden.evidenciaBase64 = oVieja.evidenciaBase64 || oVieja.evidencia_base64;
   }
   

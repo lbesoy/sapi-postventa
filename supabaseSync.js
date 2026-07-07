@@ -1313,6 +1313,26 @@ async function _processSyncQueueInternal() {
               let firmaTecUrl = item.data.firma_tecnico_base64 || null;
               let firmaCliUrl = item.data.firma_cliente_base64 || null;
               
+              // Evitar sobrescribir firmas previas con null recuperándolas de la BD si existen
+              try {
+                const { data: existingFirm } = await sb.from('orden_firmas').select('firma_tecnico_url, firma_cliente_url, nombre_firmante').eq('orden_id', ordId).maybeSingle();
+                if (existingFirm) {
+                  if (!firmaTecUrl && existingFirm.firma_tecnico_url) {
+                    firmaTecUrl = existingFirm.firma_tecnico_url;
+                    item.data.firma_tecnico_base64 = existingFirm.firma_tecnico_url;
+                  }
+                  if (!firmaCliUrl && existingFirm.firma_cliente_url) {
+                    firmaCliUrl = existingFirm.firma_cliente_url;
+                    item.data.firma_cliente_base64 = existingFirm.firma_cliente_url;
+                  }
+                  if (!item.data.firma_cliente_nombre && existingFirm.nombre_firmante) {
+                    item.data.firma_cliente_nombre = existingFirm.nombre_firmante;
+                  }
+                }
+              } catch (e) {
+                console.error('[Sync] Error al recuperar firmas existentes:', e);
+              }
+
               if (firmaTecUrl && firmaTecUrl.startsWith('data:')) {
                 try {
                   const url = await window.uploadBase64ToStorage(firmaTecUrl, 'evidencias', `firmas/firma_tec_${ordId}.png`);
@@ -1335,10 +1355,10 @@ async function _processSyncQueueInternal() {
               if (firmaTecUrl || firmaCliUrl) {
                 const firmaPayload = {
                   orden_id: ordId,
-                  firma_cliente_url: firmaCliUrl,
+                  firma_cliente_url: firmaCliUrl || null,
                   nombre_firmante: item.data.firma_cliente_nombre || null,
                   puesto_firmante: null,
-                  firma_tecnico_url: firmaTecUrl,
+                  firma_tecnico_url: firmaTecUrl || null,
                   fecha_firma: item.data.firma_cliente_fecha || item.data.firma_tecnico_fecha || new Date().toISOString()
                 };
                 await sb.from('orden_firmas').upsert(firmaPayload, { onConflict: 'orden_id' });
@@ -1386,8 +1406,18 @@ async function _processSyncQueueInternal() {
               const idx = localOrd.findIndex(o => o.id === item.data.id);
               if (idx > -1) {
                 localOrd[idx]._synced = true;
+                localOrd[idx].firma_tecnico_base64 = item.data.firma_tecnico_base64;
+                localOrd[idx].firma_cliente_base64 = item.data.firma_cliente_base64;
                 localStorage.setItem('sapi_ordenes', JSON.stringify(localOrd));
-                console.log(`[Sync] Marcado orden local como sincronizada (_synced: true) para ${item.data.id}`);
+                console.log(`[Sync] Marcado orden local como sincronizada y actualizado firmas para ${item.data.id}`);
+              }
+              if (typeof ordenes !== 'undefined') {
+                const idxGlobal = ordenes.findIndex(o => o.id === item.data.id);
+                if (idxGlobal > -1) {
+                  ordenes[idxGlobal]._synced = true;
+                  ordenes[idxGlobal].firma_tecnico_base64 = item.data.firma_tecnico_base64;
+                  ordenes[idxGlobal].firma_cliente_base64 = item.data.firma_cliente_base64;
+                }
               }
             } catch (loErr) {
               console.error('[Sync] Error al marcar orden local como sincronizada:', loErr);
