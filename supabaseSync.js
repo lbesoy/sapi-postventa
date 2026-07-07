@@ -2752,7 +2752,7 @@ window.cargarDatosDeSupabase = function() {
 
     // Cotizaciones SAP (Caché en memoria y localStorage para autocompletar)
     try {
-      const { data: cotizaciones, error: cotizacionesErr } = await sb.from('cotizaciones_sap').select('*');
+      const { data: cotizaciones, error: cotizacionesErr } = await sb.from('cotizaciones_sap').select('*').order('numero_cotizacion', { ascending: false });
       if (!cotizacionesErr && cotizaciones) {
         window._cacheCotizacionesSap = cotizaciones;
         await window.saveCatalogOffline('eurorep_cotizaciones_sap', cotizaciones);
@@ -2763,7 +2763,7 @@ window.cargarDatosDeSupabase = function() {
 
     // Pedidos SAP (Caché en memoria y localStorage para autocompletar)
     try {
-      const { data: pedidos, error: pedidosErr } = await sb.from('pedidos_sap').select('*');
+      const { data: pedidos, error: pedidosErr } = await sb.from('pedidos_sap').select('*').order('numero_pedido', { ascending: false });
       if (!pedidosErr && pedidos) {
         window._cachePedidosSap = pedidos;
         await window.saveCatalogOffline('eurorep_pedidos_sap', pedidos);
