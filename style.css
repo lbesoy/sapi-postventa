@@ -1611,13 +1611,25 @@ body {
     display: none !important;
   }
   .sidebar-nav {
-    display: contents !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    flex: none !important;
   }
   .sidebar-nav::-webkit-scrollbar {
     display: none !important;
   }
   .sidebar-bottom {
-    display: contents !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
+    margin: 0 !important;
+    border-top: none !important;
+    flex: none !important;
   }
   .sidebar-footer {
     display: none !important;
@@ -2198,6 +2210,42 @@ body.light-mode .badge-metodo-reembolso { background: rgba(100, 116, 139, 0.08);
   .view {
     max-width: 100vw !important;
     overflow-x: hidden !important;
+  }
+
+  /* Prevent the permissions table from collapsing into cards on mobile */
+  #tabla-permisos-roles,
+  #tabla-permisos-roles thead,
+  #tabla-permisos-roles tbody,
+  #tabla-permisos-roles tr,
+  #tabla-permisos-roles th,
+  #tabla-permisos-roles td {
+    display: table !important;
+    width: auto !important;
+  }
+  #tabla-permisos-roles thead {
+    display: table-header-group !important;
+  }
+  #tabla-permisos-roles tbody {
+    display: table-row-group !important;
+  }
+  #tabla-permisos-roles tr {
+    display: table-row !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+  #tabla-permisos-roles th,
+  #tabla-permisos-roles td {
+    display: table-cell !important;
+    padding: 0.75rem 1rem !important;
+    border-bottom: 1px solid var(--border) !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+  }
+  #tabla-permisos-roles td:first-child,
+  #tabla-permisos-roles th:first-child {
+    text-align: left !important;
   }
 }
 

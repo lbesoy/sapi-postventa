@@ -57,14 +57,42 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js')
-        .then(reg => console.log('[PWA] Service Worker registrado con éxito:', reg.scope))
+        .then(reg => {
+          console.log('[PWA] Service Worker registrado con éxito:', reg.scope);
+          
+          // Detectar actualizaciones e instalar inmediatamente
+          reg.addEventListener('updatefound', () => {
+            const installingWorker = reg.installing;
+            if (installingWorker) {
+              installingWorker.addEventListener('statechange', () => {
+                if (installingWorker.state === 'installed') {
+                  if (navigator.serviceWorker.controller) {
+                    console.log('[PWA] Nueva versión detectada e instalada. Recargando para aplicar cambios...');
+                    setTimeout(() => {
+                      window.location.reload();
+                    }, 500);
+                  }
+                }
+              });
+            }
+          });
+        })
         .catch(err => console.error('[PWA] Error al registrar Service Worker:', err));
+
+      // Forzar verificación de actualización cuando la app vuelve al primer plano
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          navigator.serviceWorker.ready.then(reg => {
+            reg.update().catch(err => console.log('[PWA] Error al buscar actualizaciones:', err));
+          });
+        }
+      });
     });
   }
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.179'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.180'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -1380,7 +1408,7 @@ const CLIENTES_PER_PAGE = 25;
 let isSincronizandoSAP = false;
 
 // Helpers: Inicializar fecha límite por defecto a +3 días
-document.addEventListener('DOMContentLoaded', () => {
+function inicializarApp() {
   // Sincronizar etiqueta de versión en el sidebar
   const verEl = document.getElementById('app-sidebar-version');
   if (verEl) {
@@ -1571,7 +1599,12 @@ document.addEventListener('DOMContentLoaded', () => {
   } catch (err) {
     console.error('Error calling renderUsuariosList:', err);
   }
-});
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', inicializarApp);
+} else {
+  inicializarApp();
+}
 
 usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
 currentSession = safeGetJSON('eurorep_session', null) || { userId: '', viewMode: 'consulta' };
@@ -3092,12 +3125,12 @@ function abrirSesionModal() {
         <span style="font-size: 0.72rem; text-transform: uppercase; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 0.5rem; letter-spacing: 0.5px;">Simular vista como:</span>
         <div style="position: relative;">
           <select id="role-select-modal" onchange="switchMode(this.value); cerrarSesionModal();" style="width: 100%; padding: 0.6rem 2rem 0.6rem 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.875rem; font-weight: 600; appearance: none; -webkit-appearance: none; cursor: pointer;">
-            <option value="superadmin">SuperAdmin</option>
-            <option value="admin">Admin</option>
-            <option value="supervisor">Supervisor</option>
-            <option value="tecnico">Técnico</option>
-            <option value="empresa">Empresa</option>
-            <option value="consulta">Consulta</option>
+            <option value="superadmin" ${currentSession.viewMode === 'superadmin' ? 'selected' : ''}>SuperAdmin</option>
+            <option value="admin" ${currentSession.viewMode === 'admin' ? 'selected' : ''}>Admin</option>
+            <option value="supervisor" ${currentSession.viewMode === 'supervisor' ? 'selected' : ''}>Supervisor</option>
+            <option value="tecnico" ${currentSession.viewMode === 'tecnico' ? 'selected' : ''}>Técnico</option>
+            <option value="empresa" ${currentSession.viewMode === 'empresa' ? 'selected' : ''}>Empresa</option>
+            <option value="consulta" ${currentSession.viewMode === 'consulta' ? 'selected' : ''}>Consulta</option>
           </select>
           <div style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-muted); font-size: 0.85rem;">▼</div>
         </div>
@@ -15063,9 +15096,14 @@ function initTableResizers() {
   });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function inicializarTableResizersEvent() {
   setTimeout(initTableResizers, 500);
-});
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', inicializarTableResizersEvent);
+} else {
+  inicializarTableResizersEvent();
+}
 
 // ─── CALENDARIO ────────────────────────────────────────────────────────────────
 let calendarInstance = null;
@@ -15854,7 +15892,7 @@ function mostrarPopupBitacora(info) {
 
 // ===== PASSWORD RECOVERY FLOW =====
 
-document.addEventListener('DOMContentLoaded', () => {
+function inicializarPasswordRecovery() {
   if (window.supabaseClient) {
     window.supabaseClient.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
@@ -15869,7 +15907,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-});
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', inicializarPasswordRecovery);
+} else {
+  inicializarPasswordRecovery();
+}
 
 function abrirRecuperarPassword(e) {
   e.preventDefault();
