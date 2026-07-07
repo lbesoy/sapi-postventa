@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.202'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.203'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -4648,8 +4648,7 @@ function renderTabla(ctx) {
 
   const userRole = currentSession.viewMode || '';
   if (userRole === 'tecnico') {
-    const isSuperadmin = (usuarios.find(u => u.id === currentSession.userId)?.rol === 'superadmin');
-    if (isSuperadmin && isTestModeActive()) {
+    if (isTestModeActive()) {
       tecFilter = '';
     } else {
       tecFilter = currentUser ? currentUser.nombre : '';
@@ -10854,8 +10853,7 @@ function renderTickets(ctx) {
   
     const userRole = currentSession.viewMode || '';
     if (userRole === 'tecnico') {
-      const isSuperadmin = (usuarios.find(u => u && u.id === currentSession.userId)?.rol === 'superadmin');
-      if (isSuperadmin && isTestModeActive()) {
+      if (isTestModeActive()) {
         tecFilter = '';
       } else {
         tecFilter = currentUser ? currentUser.nombre : '';
@@ -15718,8 +15716,7 @@ function renderCalendario() {
   const miTecnicoNombre = isTecnico ? (currentSession.nombre || (currentUser ? currentUser.nombre : '')) : null;
 
   if (isTecnico && miTecnicoNombre) {
-    const isSuperadmin = (usuarios.find(u => u.id === currentSession.userId)?.rol === 'superadmin');
-    if (isSuperadmin && isTestModeActive()) {
+    if (isTestModeActive()) {
       filtroTecnico = '';
     } else {
       filtroTecnico = miTecnicoNombre;

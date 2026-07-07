@@ -173,7 +173,7 @@
       }
     } else if (typeof window !== 'undefined') {
       // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
-      const currentAppVer = '1.3.202';
+      const currentAppVer = '1.3.203';
       const lastAppVer = localStorage.getItem('sapi_app_version');
       if (lastAppVer !== currentAppVer) {
         if (!lastAppVer) {
@@ -5304,8 +5304,8 @@
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=202",
-        "app.js?v=202"
+        "supabaseSync.js?v=203",
+        "app.js?v=203"
       ];
       var index = 0;
       function loadNext() {
