@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.196'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.197'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -3192,7 +3192,7 @@ function abrirSesionModal() {
     htmlStr += `
       <div class="simulador-vistas-mobile-container" style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 1.25rem;">
         <span style="font-size: 0.72rem; text-transform: uppercase; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 0.5rem; letter-spacing: 0.5px;">Simular vista como:</span>
-        <div style="position: relative;">
+        <div style="position: relative; margin-bottom: 0.75rem;">
           <select id="role-select-modal" onchange="switchMode(this.value); cerrarSesionModal();" style="width: 100%; padding: 0.6rem 2rem 0.6rem 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.875rem; font-weight: 600; appearance: none; -webkit-appearance: none; cursor: pointer;">
             <option value="superadmin" ${currentSession.viewMode === 'superadmin' ? 'selected' : ''}>SuperAdmin</option>
             <option value="admin" ${currentSession.viewMode === 'admin' ? 'selected' : ''}>Admin</option>
@@ -3202,6 +3202,11 @@ function abrirSesionModal() {
             <option value="consulta" ${currentSession.viewMode === 'consulta' ? 'selected' : ''}>Consulta</option>
           </select>
           <div style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-muted); font-size: 0.85rem;">▼</div>
+        </div>
+        <div style="border-top: 1px dashed var(--border); padding-top: 0.75rem; text-align: center;">
+          <a href="cliente.html" class="btn-primary" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; font-size: 0.8rem; padding: 0.45rem 0.75rem; text-decoration: none; border-radius: 6px; font-weight: 600; background: var(--accent); color: white; width: 100%;">
+            <i data-lucide="external-link" style="width: 13px; height: 13px;"></i> Ir al Portal de Clientes
+          </a>
         </div>
       </div>
       <div style="font-size: 0.72rem; text-transform: uppercase; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 0.5rem; letter-spacing: 0.5px; padding-left: 0.2rem;">O cambiar de usuario:</div>
@@ -8895,21 +8900,36 @@ function verDetalle(id) {
           if (isTecnico && miTecnicoNombre && ev.tecnicoNombre !== miTecnicoNombre) {
             return;
           }
-          // Extraer fecha ISO simple (YYYY-MM-DD)
-          const fISO = (ev.fechaInicio || ev.start || '').substring(0, 10);
+          // Extraer fecha local simple (YYYY-MM-DD)
+          let fISO = '';
+          if (ev.fechaInicio || ev.start) {
+            const dateVal = ev.fechaInicio || ev.start;
+            if (dateVal.includes('T')) {
+              const dI = new Date(dateVal);
+              fISO = `${dI.getFullYear()}-${String(dI.getMonth() + 1).padStart(2, '0')}-${String(dI.getDate()).padStart(2, '0')}`;
+            } else {
+              fISO = dateVal.substring(0, 10);
+            }
+          }
           if (!fISO) return;
 
-          // Extraer horas de entrada y salida
+          // Extraer horas de entrada y salida locales
           let ent = '';
           let sal = '';
           try {
             if (ev.fechaInicio || ev.start) {
-              const dI = new Date(ev.fechaInicio || ev.start);
-              ent = `${String(dI.getUTCHours()).padStart(2, '0')}:${String(dI.getUTCMinutes()).padStart(2, '0')}`;
+              const dateVal = ev.fechaInicio || ev.start;
+              if (dateVal.includes('T')) {
+                const dI = new Date(dateVal);
+                ent = `${String(dI.getHours()).padStart(2, '0')}:${String(dI.getMinutes()).padStart(2, '0')}`;
+              }
             }
             if (ev.fechaFin || ev.end) {
-              const dF = new Date(ev.fechaFin || ev.end);
-              sal = `${String(dF.getUTCHours()).padStart(2, '0')}:${String(dF.getUTCMinutes()).padStart(2, '0')}`;
+              const dateVal = ev.fechaFin || ev.end;
+              if (dateVal.includes('T')) {
+                const dF = new Date(dateVal);
+                sal = `${String(dF.getHours()).padStart(2, '0')}:${String(dF.getMinutes()).padStart(2, '0')}`;
+              }
             }
           } catch(e){}
 
@@ -15732,10 +15752,13 @@ window.mostrarDetalleEventoAdministrativo = function(eventId) {
   document.getElementById('mra-descripcion').value = e.descripcion || '';
   document.getElementById('mra-todo-el-dia').checked = e.todoElDia || e.allDay || false;
 
-  // Formatear fechas para datetime-local
+  // Formatear fechas para datetime-local (conversión de UTC a hora local del navegador)
   const cleanDateForInput = (d) => {
     if (!d) return '';
-    return d.substring(0, 16);
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return '';
+    const pad = (num) => String(num).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   };
   document.getElementById('mra-inicio').value = cleanDateForInput(e.fechaInicio || e.start);
   document.getElementById('mra-fin').value = cleanDateForInput(e.fechaFin || e.end);
