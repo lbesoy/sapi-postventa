@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.198'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.200'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -3855,6 +3855,36 @@ function _renderStatsInternal() {
 // ===== DASHBOARD V2 ANALYTICS =====
 let _v2Charts = {};
 
+function getFilteredByTimeframe(items, timeframe) {
+  if (!timeframe || timeframe === 'all') return items;
+  
+  const now = new Date();
+  let startLimit;
+  
+  if (timeframe === 'today') {
+    startLimit = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  } else if (timeframe === 'week') {
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    startLimit = new Date(now.getFullYear(), now.getMonth(), diff);
+    startLimit.setHours(0,0,0,0);
+  } else if (timeframe === 'month') {
+    startLimit = new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+  
+  return items.filter(item => {
+    const val = item.fecha || item.fechaCreacion || item.fechaInicio || item.start;
+    if (!val) return false;
+    let itemDate;
+    if (val.length === 10) {
+      itemDate = new Date(val + 'T00:00:00');
+    } else {
+      itemDate = new Date(val);
+    }
+    return !isNaN(itemDate.getTime()) && itemDate >= startLimit;
+  });
+}
+
 function renderDashboardV2() {
   // Fecha
   const el = document.getElementById('v2-fecha-hoy');
@@ -3867,8 +3897,9 @@ function renderDashboardV2() {
     nombreEmpresaLogged = String(currentUser.empresa || currentUser.nombre).toLowerCase().trim();
   }
 
-  let ordenesDash = getFilteredOrders();
-  let ticketsDash = getFilteredTickets();
+  const timeframe = document.getElementById('dash-date-filter') ? document.getElementById('dash-date-filter').value : 'all';
+  let ordenesDash = getFilteredByTimeframe(getFilteredOrders(), timeframe);
+  let ticketsDash = getFilteredByTimeframe(getFilteredTickets(), timeframe);
   let maquinariaDash = maquinariaDb;
 
   if (isEmpresa && nombreEmpresaLogged) {
@@ -4325,30 +4356,46 @@ function setDashView(tab) {
 }
 
 function renderDashboardTecnicos() {
+  const timeframe = document.getElementById('dash-date-filter') ? document.getElementById('dash-date-filter').value : 'all';
+  const ordersFiltered = getFilteredByTimeframe(getFilteredOrders(), timeframe);
+  
   const stats = {};
   
   // Inicializar con todos los técnicos activos
   usuarios.filter(u => u.rol === 'tecnico' || u.rol === 'admin' || u.rol === 'superadmin').forEach(u => {
-    stats[u.nombre] = { nombre: u.nombre, proceso: 0, finalizadas: 0, minReportados: 0 };
+    stats[u.nombre] = { nombre: u.nombre, proceso: 0, finalizadas: 0, minReportados: 0, activoHoy: false };
+  });
+
+  // Calcular activoHoy (siempre respecto a la fecha actual)
+  const todayStr = new Date().toISOString().substring(0, 10);
+  getFilteredOrders().forEach(o => {
+    if (o.bitacora && o.bitacora.length > 0) {
+      o.bitacora.forEach(b => {
+        if (b.tecnico && b.fecha === todayStr) {
+          if (stats[b.tecnico]) stats[b.tecnico].activoHoy = true;
+        }
+      });
+    }
   });
 
   // Calcular métricas desde órdenes y bitácoras
-  getFilteredOrders().forEach(o => {
+  ordersFiltered.forEach(o => {
     let techNames = [];
     if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) techNames = o.tecnicosAsignados;
     else if (o.tecnico) techNames = o.tecnico.split(',').map(s => s.trim());
 
     techNames.forEach(tName => {
-      if (!stats[tName]) stats[tName] = { nombre: tName, proceso: 0, finalizadas: 0, minReportados: 0 };
+      if (!stats[tName]) stats[tName] = { nombre: tName, proceso: 0, finalizadas: 0, minReportados: 0, activoHoy: false };
       if (o.estado === 'Finalizado') stats[tName].finalizadas++;
       else stats[tName].proceso++;
     });
 
     if (o.bitacora && o.bitacora.length > 0) {
-      o.bitacora.forEach(b => {
+      const bitacoraFiltered = getFilteredByTimeframe(o.bitacora, timeframe);
+      bitacoraFiltered.forEach(b => {
         const tName = b.tecnico;
         if (tName && b.entrada && b.salida) {
-          if (!stats[tName]) stats[tName] = { nombre: tName, proceso: 0, finalizadas: 0, minReportados: 0 };
+          if (!stats[tName]) stats[tName] = { nombre: tName, proceso: 0, finalizadas: 0, minReportados: 0, activoHoy: false };
           const [hE, mE] = b.entrada.split(':').map(Number);
           const [hS, mS] = b.salida.split(':').map(Number);
           let diff = (hS * 60 + mS) - (hE * 60 + mE);
@@ -4365,24 +4412,43 @@ function renderDashboardTecnicos() {
 
   const totalHoras = list.reduce((sum, s) => sum + s.minReportados, 0);
   const topTech = list.length > 0 ? list[0].nombre : 'N/A';
+  const activeTechsCount = list.filter(s => s.minReportados > 0).length;
+  const ordersWithHours = ordersFiltered.filter(o => o.bitacora && getFilteredByTimeframe(o.bitacora, timeframe).length > 0).length;
+  const avgHoursPerOrder = ordersWithHours > 0 ? (totalHoras / 60 / ordersWithHours).toFixed(1) + 'h' : '0.0h';
 
   const kpisHtml = `
     <div class="stat-card">
       <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="award"></i></div>
       <div>
         <div class="stat-label">Técnico Destacado</div>
-        <div class="stat-value" style="font-size:1.2rem;">${topTech}</div>
+        <div class="stat-value" style="font-size:1.15rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;">${topTech}</div>
       </div>
     </div>
     <div class="stat-card">
       <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="clock"></i></div>
       <div>
-        <div class="stat-label">Total Horas Reportadas (Global)</div>
-        <div class="stat-value">${Math.floor(totalHoras / 60)}h ${totalHoras % 60}m</div>
+        <div class="stat-label">Total Horas Reportadas</div>
+        <div class="stat-value" style="font-size:1.5rem;">${Math.floor(totalHoras / 60)}h ${totalHoras % 60}m</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:#f59e0b;"><i data-lucide="users"></i></div>
+      <div>
+        <div class="stat-label">Técnicos Activos</div>
+        <div class="stat-value" style="font-size:1.5rem;">${activeTechsCount} / ${Object.keys(stats).length}</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:rgba(139,92,246,0.12);color:#8b5cf6;"><i data-lucide="trending-up"></i></div>
+      <div>
+        <div class="stat-label">Promedio por Orden</div>
+        <div class="stat-value" style="font-size:1.5rem;">${avgHoursPerOrder}</div>
       </div>
     </div>
   `;
   document.getElementById('tecnicos-kpis-grid').innerHTML = kpisHtml;
+
+  const maxMin = list.length > 0 ? Math.max(...list.map(s => s.minReportados)) : 1;
 
   const tbody = document.getElementById('tecnicos-stats-body');
   if (list.length === 0) {
@@ -4391,18 +4457,105 @@ function renderDashboardTecnicos() {
     tbody.innerHTML = list.map(s => {
       const hrs = Math.floor(s.minReportados / 60);
       const mns = s.minReportados % 60;
+      const percentage = maxMin > 0 ? (s.minReportados / maxMin) * 100 : 0;
+      const statusDot = s.activoHoy ? '<span style="position:absolute; bottom:0; right:0; width:10px; height:10px; background:#10b981; border:2px solid var(--bg-card); border-radius:50%;" title="Activo Hoy"></span>' : '<span style="position:absolute; bottom:0; right:0; width:10px; height:10px; background:#94a3b8; border:2px solid var(--bg-card); border-radius:50%;" title="Inactivo Hoy"></span>';
+
       return `
         <tr>
-          <td><div style="display:flex;align-items:center;gap:0.75rem;"><div style="width:32px;height:32px;border-radius:50%;background:var(--accent);color:white;display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:bold;">${s.nombre.charAt(0).toUpperCase()}</div><span style="font-weight:600;color:var(--text-primary);">${s.nombre}</span></div></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+              <div style="position:relative; width:32px; height:32px;">
+                <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);color:white;display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:bold;">
+                  ${s.nombre.charAt(0).toUpperCase()}
+                </div>
+                ${statusDot}
+              </div>
+              <span style="font-weight:600;color:var(--text-primary);">${s.nombre}</span>
+            </div>
+          </td>
           <td style="text-align:center;"><span class="badge badge-pendiente" style="padding:0.3rem 0.6rem;">${s.proceso}</span></td>
           <td style="text-align:center;"><span class="badge badge-finalizado" style="padding:0.3rem 0.6rem;">${s.finalizadas}</span></td>
-          <td style="text-align:center;font-weight:700;color:var(--accent); font-size:1.05rem;">${hrs}h ${mns > 0 ? mns + 'm' : ''}</td>
+          <td>
+            <div style="font-weight:700;color:var(--text-primary); font-size:1.05rem; text-align:right; margin-bottom: 0.15rem;">
+              ${hrs}h ${mns > 0 ? mns + 'm' : ''}
+            </div>
+            <div style="display:flex; align-items:center; gap:0.5rem; font-size:0.7rem; color:var(--text-muted);">
+              <div style="flex:1; height:6px; background:var(--bg-hover); border-radius:3px; overflow:hidden; border:1px solid var(--border);">
+                <div style="width:${percentage}%; height:100%; background:linear-gradient(90deg, var(--accent) 0%, #10b981 100%); border-radius:3px;"></div>
+              </div>
+              <span style="font-weight:600; min-width:30px; text-align:right;">${Math.round(percentage)}%</span>
+            </div>
+          </td>
         </tr>
       `;
     }).join('');
   }
+
+  // Renderizar gráfico comparativo de horas por técnico
+  const canvas = document.getElementById('chart-tecnicos-horas');
+  if (canvas && typeof Chart !== 'undefined') {
+    if (_v2Charts['tecnicos-horas']) {
+      _v2Charts['tecnicos-horas'].destroy();
+      delete _v2Charts['tecnicos-horas'];
+    }
+
+    const topList = [...list].slice(0, 8);
+    const labels = topList.map(s => s.nombre);
+    const dataVals = topList.map(s => Number((s.minReportados / 60).toFixed(1)));
+
+    const isDark = document.body.classList.contains('dark-theme') || (typeof currentSession !== 'undefined' && currentSession.theme === 'dark');
+    const isMobile = window.innerWidth <= 768;
+    const textColor = isDark ? '#f1f5f9' : '#0f172a';
+
+    _v2Charts['tecnicos-horas'] = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Horas',
+          data: dataVals,
+          backgroundColor: 'rgba(232, 130, 12, 0.85)',
+          borderRadius: 6,
+          borderWidth: 0,
+          maxBarThickness: 30
+        }]
+      },
+      options: {
+        indexAxis: isMobile ? 'y' : 'x',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const val = context.parsed.y !== undefined ? context.parsed.y : context.parsed.x;
+                return `${val} horas`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: textColor, font: { weight: '500' } }
+          },
+          y: {
+            grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
+            ticks: { color: textColor }
+          }
+        }
+      }
+    });
+  }
+
   if (window.lucide) window.lucide.createIcons();
 }
+
+window.onDashFilterChange = function() {
+  const activeTab = document.getElementById('btn-dash-v2').classList.contains('active') ? 'v2' : 'tecnicos';
+  setDashView(activeTab);
+};
 
 // ===== TABLE =====
 
