@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.183'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.184'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -11213,6 +11213,8 @@ function renderRefacciones(resetPage = false) {
     111: 'Anticipo'
   };
 
+  console.log(`[renderRefacciones] refaccionesDb length: ${refaccionesDb.length}`);
+
   // Filtrar: sin marca → excluir; busqueda
   const filtered = refaccionesDb.filter(r => {
     // Resolve marca for filtering (may be code or full name in cache)
@@ -11226,6 +11228,8 @@ function renderRefacciones(resetPage = false) {
     const itemGrupo = (r.grupo || '').toLowerCase();
     return itemId.includes(q) || itemName.includes(q) || marcaFull.toLowerCase().includes(q) || itemGrupo.includes(q);
   });
+
+  console.log(`[renderRefacciones] filtered length: ${filtered.length}, query: "${q}"`);
 
   const total = filtered.length;
   const totalPages = Math.ceil(total / REFACCIONES_PAGE_SIZE) || 1;
