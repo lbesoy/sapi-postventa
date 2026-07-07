@@ -2,10 +2,142 @@
 <html lang="es">
 <head>
   <script>
+    // --- LOCALSTORAGE TO INDEXEDDB BRIDGE (QuotaExceededError Fix) ---
+    (function() {
+      window.localStorageCache = {};
+      window.localStorageCacheLoaded = false;
+      const originalGetItem = localStorage.getItem;
+      const originalSetItem = localStorage.setItem;
+      const originalRemoveItem = localStorage.removeItem;
+      const originalClear = localStorage.clear;
+      const redirectedKeys = ['sapi_refacciones_db', 'eurorep_pedidos_sap', 'eurorep_cotizaciones_sap', 'sapi_tickets'];
+
+      window.initLocalStorageIndexedDBBridge = function() {
+        return new Promise((resolve) => {
+          if (typeof indexedDB === 'undefined') {
+            resolve();
+            return;
+          }
+          const request = indexedDB.open('SapiOfflineDB', 1);
+          request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('catalogs')) {
+              db.createObjectStore('catalogs', { keyPath: 'id' });
+            }
+          };
+          request.onerror = () => resolve();
+          request.onsuccess = (e) => {
+            const db = e.target.result;
+            const tx = db.transaction('catalogs', 'readonly');
+            const store = tx.objectStore('catalogs');
+            let completed = 0;
+            
+            redirectedKeys.forEach(key => {
+              const req = store.get(key);
+              req.onsuccess = () => {
+                if (req.result && req.result.data) {
+                  window.localStorageCache[key] = JSON.stringify(req.result.data);
+                  originalRemoveItem.call(localStorage, key);
+                }
+                completed++;
+                if (completed === redirectedKeys.length) {
+                  window.localStorageCacheLoaded = true;
+                  resolve();
+                }
+              };
+              req.onerror = () => {
+                completed++;
+                if (completed === redirectedKeys.length) {
+                  window.localStorageCacheLoaded = true;
+                  resolve();
+                }
+              };
+            });
+          };
+        });
+      };
+
+      localStorage.getItem = function(key) {
+        if (redirectedKeys.includes(key)) {
+          if (key in window.localStorageCache) {
+            return window.localStorageCache[key];
+          }
+          return originalGetItem.call(localStorage, key);
+        }
+        return originalGetItem.call(localStorage, key);
+      };
+
+      localStorage.setItem = function(key, value) {
+        if (redirectedKeys.includes(key)) {
+          window.localStorageCache[key] = value;
+          originalRemoveItem.call(localStorage, key);
+          (async () => {
+            try {
+              let parsedData = JSON.parse(value);
+              const db = await new Promise((res) => {
+                const req = indexedDB.open('SapiOfflineDB', 1);
+                req.onsuccess = (ev) => res(ev.target.result);
+                req.onerror = () => res(null);
+              });
+              if (db) {
+                const tx = db.transaction('catalogs', 'readwrite');
+                const store = tx.objectStore('catalogs');
+                store.put({ id: key, data: parsedData });
+              }
+            } catch (e) {
+              console.error('[IndexedDB Bridge] Error al guardar:', key, e);
+            }
+          })();
+          return;
+        }
+        return originalSetItem.call(localStorage, key, value);
+      };
+
+      localStorage.removeItem = function(key) {
+        if (redirectedKeys.includes(key)) {
+          delete window.localStorageCache[key];
+          (async () => {
+            try {
+              const db = await new Promise((res) => {
+                const req = indexedDB.open('SapiOfflineDB', 1);
+                req.onsuccess = (ev) => res(ev.target.result);
+                req.onerror = () => res(null);
+              });
+              if (db) {
+                const tx = db.transaction('catalogs', 'readwrite');
+                const store = tx.objectStore('catalogs');
+                store.delete(key);
+              }
+            } catch (e) {}
+          })();
+        }
+        return originalRemoveItem.call(localStorage, key);
+      };
+
+      localStorage.clear = function() {
+        window.localStorageCache = {};
+        (async () => {
+          try {
+            const db = await new Promise((res) => {
+              const req = indexedDB.open('SapiOfflineDB', 1);
+              req.onsuccess = (ev) => res(ev.target.result);
+              req.onerror = () => res(null);
+            });
+            if (db) {
+              const tx = db.transaction('catalogs', 'readwrite');
+              const store = tx.objectStore('catalogs');
+              store.clear();
+            }
+          } catch (e) {}
+        })();
+        return originalClear.call(localStorage);
+      };
+    })();
+
     // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
     (function() {
       if (typeof window !== 'undefined') {
-        const currentAppVer = '1.3.178';
+        const currentAppVer = '1.3.179';
         const lastAppVer = localStorage.getItem('sapi_app_version');
         if (lastAppVer !== currentAppVer) {
           if (!lastAppVer) {
@@ -549,10 +681,29 @@
   <div class="toast-container" id="toast-container"></div>
 
   <!-- JS DEPENDENCIES -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabaseClient.js?v=2"></script>
-  <script src="supabaseSync.js?v=178"></script>
-  <script src="cliente.js?v=9"></script>
+  <script>
+    window.initLocalStorageIndexedDBBridge().then(function() {
+      var scripts = [
+        "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
+        "supabaseClient.js?v=2",
+        "supabaseSync.js?v=179",
+        "cliente.js?v=10"
+      ];
+      var index = 0;
+      function loadNext() {
+        if (index >= scripts.length) return;
+        var s = document.createElement('script');
+        s.src = scripts[index];
+        s.async = false; // preserve order
+        s.onload = function() {
+          index++;
+          loadNext();
+        };
+        document.body.appendChild(s);
+      }
+      loadNext();
+    });
+  </script>
 
 </body>
 </html>
