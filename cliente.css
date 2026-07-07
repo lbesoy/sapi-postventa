@@ -307,6 +307,29 @@ body {
   color: var(--red);
 }
 
+.btn-go-admin {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem;
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-go-admin:hover {
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+
 /* Main Content Area */
 .main-area {
   flex: 1;
@@ -1558,4 +1581,25 @@ body {
   background: var(--accent);
   color: white;
   border-color: var(--accent);
+}
+
+/* Superadmin Impersonator Selector */
+#superadmin-cliente-selector {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  padding: 0.25rem 0.5rem;
+  width: auto;
+  min-width: 180px;
+  cursor: pointer;
+  outline: none;
+  transition: var(--transition);
+  margin-left: 0.5rem;
+}
+#superadmin-cliente-selector:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
 }

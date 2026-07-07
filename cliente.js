@@ -192,14 +192,14 @@ async function verificarSesionCliente() {
       const rol = String(sessionObj.viewMode || '').toLowerCase().trim();
       
       // Restricción: Si el rol es admin/supervisor/tecnico, regresarlo al panel principal
-      if (['superadmin', 'admin', 'supervisor', 'tecnico', 'consulta'].includes(rol)) {
+      if (['admin', 'supervisor', 'tecnico', 'consulta'].includes(rol)) {
         showToast('Acceso administrativo detectado. Redirigiendo...', 'info');
         setTimeout(() => { window.location.href = 'index.html'; }, 1000);
         return;
       }
 
-      // Si es empresa o cliente, permitir el paso
-      if (rol === 'empresa' || rol === 'cliente') {
+      // Si es empresa, cliente o superadmin, permitir el paso
+      if (rol === 'empresa' || rol === 'cliente' || rol === 'superadmin') {
         currentSession = sessionObj;
         
         // Validar que la sesión en Supabase esté activa si estamos online
@@ -225,7 +225,17 @@ async function verificarSesionCliente() {
           return;
         }
 
-        nombreEmpresaLogged = String(currentSession.empresa || currentSession.nombre).toLowerCase().trim();
+        const isSuperAdmin = (currentSession.realRol === 'superadmin' || currentSession.viewMode === 'superadmin');
+        if (isSuperAdmin) {
+          const savedCliente = localStorage.getItem('superadmin_selected_cliente');
+          if (savedCliente) {
+            nombreEmpresaLogged = savedCliente.toLowerCase().trim();
+          } else {
+            nombreEmpresaLogged = '';
+          }
+        } else {
+          nombreEmpresaLogged = String(currentSession.empresa || currentSession.nombre).toLowerCase().trim();
+        }
         
         loginScr.style.display = 'none';
         appWrap.classList.add('visible');
@@ -327,7 +337,7 @@ async function iniciarSesionCliente(e) {
     }
 
     const rol = String(roleData.rol || '').toLowerCase().trim();
-    if (!['empresa', 'cliente'].includes(rol)) {
+    if (!['empresa', 'cliente', 'superadmin'].includes(rol)) {
       // Si tiene otro rol, mandarlo al index.html
       currentSession = {
         userId: data.user.id,
@@ -423,6 +433,22 @@ async function inicializarDatos() {
   // 2. Extraer datos locales de LocalStorage
   cargarDatosLocales();
 
+  const isSuperAdmin = (currentSession && (currentSession.realRol === 'superadmin' || currentSession.viewMode === 'superadmin'));
+  
+  if (isSuperAdmin) {
+    const savedCliente = localStorage.getItem('superadmin_selected_cliente');
+    if (savedCliente) {
+      nombreEmpresaLogged = savedCliente.toLowerCase().trim();
+    } else if (clientesDb.length > 0) {
+      nombreEmpresaLogged = String(clientesDb[0].nombre || '').toLowerCase().trim();
+      localStorage.setItem('superadmin_selected_cliente', nombreEmpresaLogged);
+    } else {
+      nombreEmpresaLogged = '';
+    }
+  } else {
+    nombreEmpresaLogged = String(currentSession.empresa || currentSession.nombre).toLowerCase().trim();
+  }
+
   // 3. Rellenar Perfil de Sidebar
   const avatar = document.getElementById('sidebar-avatar');
   const nameEl = document.getElementById('sidebar-name');
@@ -430,12 +456,75 @@ async function inicializarDatos() {
   const headerComp = document.getElementById('header-company-name');
 
   const uName = currentSession.nombre || 'Cliente';
-  const cName = currentSession.empresa || 'Empresa';
+  let cName = currentSession.empresa || 'Empresa';
 
   if (avatar) avatar.textContent = uName.charAt(0).toUpperCase();
   if (nameEl) nameEl.textContent = uName;
+
+  if (isSuperAdmin) {
+    const dbClient = clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === nombreEmpresaLogged);
+    cName = dbClient ? dbClient.nombre : (nombreEmpresaLogged || 'Super Admin');
+  }
+
   if (companyEl) companyEl.textContent = cName;
-  if (headerComp) headerComp.textContent = cName;
+
+  if (headerComp) {
+    if (isSuperAdmin) {
+      let selectHtml = `<select id="superadmin-cliente-selector">`;
+      clientesDb.forEach(c => {
+        const cNorm = String(c.nombre || '').toLowerCase().trim();
+        const selectedAttr = (cNorm === nombreEmpresaLogged) ? 'selected' : '';
+        selectHtml += `<option value="${cNorm}" ${selectedAttr}>${c.nombre}</option>`;
+      });
+      selectHtml += `</select>`;
+      headerComp.innerHTML = `Cliente: ${selectHtml}`;
+      
+      const selector = document.getElementById('superadmin-cliente-selector');
+      if (selector) {
+        selector.addEventListener('change', (e) => {
+          const newClient = e.target.value;
+          nombreEmpresaLogged = newClient;
+          localStorage.setItem('superadmin_selected_cliente', newClient);
+          
+          // Re-renderizar
+          doRender();
+          
+          // Actualizar textos
+          const dbClient = clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === newClient);
+          const cNameDisplay = dbClient ? dbClient.nombre : newClient;
+          if (companyEl) companyEl.textContent = cNameDisplay;
+          
+          showToast(`Cargando vista de: ${cNameDisplay}`, 'info');
+        });
+      }
+    } else {
+      headerComp.textContent = cName;
+    }
+  }
+
+  // Botón dinámico para regresar al panel administrativo para superadmins
+  if (isSuperAdmin) {
+    const sidebarFooter = document.querySelector('.sidebar-footer');
+    if (sidebarFooter && !document.getElementById('btn-ir-admin')) {
+      const btnAdmin = document.createElement('button');
+      btnAdmin.id = 'btn-ir-admin';
+      btnAdmin.className = 'btn-go-admin';
+      btnAdmin.style.marginBottom = '0.5rem';
+      btnAdmin.innerHTML = `<i data-lucide="arrow-left-right"></i> <span>Volver a Admin</span>`;
+      btnAdmin.onclick = () => { window.location.href = 'index.html'; };
+      
+      const logoutBtn = sidebarFooter.querySelector('.btn-logout');
+      if (logoutBtn) {
+        sidebarFooter.insertBefore(btnAdmin, logoutBtn);
+      } else {
+        sidebarFooter.appendChild(btnAdmin);
+      }
+      try { lucide.createIcons(); } catch(e){}
+    }
+  } else {
+    const btnAdmin = document.getElementById('btn-ir-admin');
+    if (btnAdmin) btnAdmin.remove();
+  }
 
   // 4. Renderizar Vistas
   doRender();
@@ -1472,9 +1561,25 @@ function abrirDetalleTicketCliente(id) {
           ${t.pedidoSAP ? `<span>Pedido SAP: <strong>${t.pedidoSAP}</strong></span>` : ''}
         </div>
         
-        <div style="display:flex; gap:0.5rem;">
-          ${t.pdfCotizacion ? `<button class="btn-primary" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="descargarTicketPdf('${t.id}', 'cotizacion')"><i data-lucide="download"></i> Descargar Cotización</button>` : ''}
-          ${t.pdfPedido ? `<button class="btn-secondary" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="descargarTicketPdf('${t.id}', 'pedido')"><i data-lucide="download"></i> Descargar Pedido</button>` : ''}
+        <div style="display:flex; flex-direction:column; gap:0.75rem;">
+          ${t.pdfCotizacion ? `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:0.5rem; background:rgba(255,255,255,0.05); border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+              <span style="font-size:0.8rem; font-weight:600;"><i data-lucide="file-text" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; color:var(--accent);"></i> Archivo de Cotización</span>
+              <div style="display:flex; gap:0.35rem;">
+                <button type="button" class="btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.6rem; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;" onclick="visualizarTicketPdf('${t.id}', 'cotizacion')"><i data-lucide="eye" style="width:13px; height:13px;"></i> Ver</button>
+                <button type="button" class="btn-primary" style="font-size:0.75rem; padding:0.35rem 0.6rem; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;" onclick="descargarTicketPdf('${t.id}', 'cotizacion')"><i data-lucide="download" style="width:13px; height:13px;"></i> Descargar</button>
+              </div>
+            </div>
+          ` : ''}
+          ${t.pdfPedido ? `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:0.5rem; background:rgba(255,255,255,0.05); border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+              <span style="font-size:0.8rem; font-weight:600;"><i data-lucide="shopping-cart" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; color:var(--accent);"></i> Archivo de Pedido</span>
+              <div style="display:flex; gap:0.35rem;">
+                <button type="button" class="btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.6rem; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;" onclick="visualizarTicketPdf('${t.id}', 'pedido')"><i data-lucide="eye" style="width:13px; height:13px;"></i> Ver</button>
+                <button type="button" class="btn-primary" style="font-size:0.75rem; padding:0.35rem 0.6rem; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;" onclick="descargarTicketPdf('${t.id}', 'pedido')"><i data-lucide="download" style="width:13px; height:13px;"></i> Descargar</button>
+              </div>
+            </div>
+          ` : ''}
         </div>
       </div>
     `;
@@ -1589,6 +1694,143 @@ async function descargarTicketPdf(ticketId, tipo) {
     showToast('Módulo de descarga no disponible.', 'error');
   }
 }
+
+// Visualizar PDFs de cotización o pedidos desde tickets
+async function visualizarTicketPdf(ticketId, tipo) {
+  if (window.visualizarPdfOnDemand) {
+    try {
+      await window.visualizarPdfOnDemand(ticketId, tipo);
+    } catch(e) {
+      showToast('Error al visualizar el PDF.', 'error');
+    }
+  } else {
+    showToast('Módulo de visualización no disponible.', 'error');
+  }
+}
+
+// Visualización de PDF bajo demanda en una pestaña nueva
+window.visualizarPdfOnDemand = async function(ticketId, tipo) {
+  const t = tickets.find(x => x.id === ticketId);
+  if (!t) {
+    showToast('Ticket no encontrado.', 'error');
+    return;
+  }
+
+  const label = tipo === 'pedido' ? 'pdfPedido' : 'pdfCotizacion';
+  const dbCol = tipo === 'pedido' ? 'pdf_pedido' : 'pdf_cotizacion';
+
+  const showPdf = (base64Data) => {
+    let base64Pure = base64Data;
+    if (base64Data.startsWith('data:')) {
+      base64Pure = base64Data.split(',')[1];
+    }
+    try {
+      const byteCharacters = atob(base64Pure);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/pdf' });
+      const fileURL = URL.createObjectURL(blob);
+      window.open(fileURL, '_blank');
+    } catch (e) {
+      console.error('Error al decodificar Base64:', e);
+      window.open(base64Data, '_blank');
+    }
+  };
+
+  const localVal = t[label];
+  if (localVal && localVal.startsWith('data:')) {
+    showPdf(localVal);
+    return;
+  }
+
+  if (!window.supabaseClient) {
+    showToast('No hay conexión con la base de datos para visualizar el PDF.', 'error');
+    return;
+  }
+
+  showToast('Cargando archivo PDF...', 'info');
+
+  try {
+    const { data, error } = await window.supabaseClient
+      .from('tickets')
+      .select(dbCol)
+      .eq('id', ticketId)
+      .single();
+
+    if (error) throw error;
+
+    const dbVal = data ? data[dbCol] : null;
+    if (!dbVal) {
+      showToast('El archivo no está disponible en el servidor.', 'error');
+      return;
+    }
+
+    showPdf(dbVal);
+  } catch (err) {
+    console.error('[PDF View] Error:', err);
+    showToast('Error al cargar el archivo: ' + err.message, 'error');
+  }
+};
+
+// Descarga de PDF bajo demanda desde Supabase
+window.descargarPdfOnDemand = async function(ticketId, tipo) {
+  const t = tickets.find(x => x.id === ticketId);
+  if (!t) {
+    showToast('Ticket no encontrado.', 'error');
+    return;
+  }
+
+  const label = tipo === 'pedido' ? 'pdfPedido' : 'pdfCotizacion';
+  const dbCol = tipo === 'pedido' ? 'pdf_pedido' : 'pdf_cotizacion';
+  const folio = t.folio || 'ticket';
+
+  const localVal = t[label];
+  if (localVal && localVal.startsWith('data:')) {
+    const link = document.createElement('a');
+    link.href = localVal;
+    link.download = `${tipo === 'pedido' ? 'Pedido' : 'Cotizacion'}_${folio}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return;
+  }
+
+  if (!window.supabaseClient) {
+    showToast('No hay conexión con la base de datos para descargar el PDF.', 'error');
+    return;
+  }
+
+  showToast('Descargando archivo PDF...', 'info');
+
+  try {
+    const { data, error } = await window.supabaseClient
+      .from('tickets')
+      .select(dbCol)
+      .eq('id', ticketId)
+      .single();
+
+    if (error) throw error;
+
+    const dbVal = data ? data[dbCol] : null;
+    if (!dbVal) {
+      showToast('El archivo no está disponible en el servidor.', 'error');
+      return;
+    }
+
+    const link = document.createElement('a');
+    link.href = dbVal;
+    link.download = `${tipo === 'pedido' ? 'Pedido' : 'Cotizacion'}_${folio}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (err) {
+    console.error('[PDF Download] Error:', err);
+    showToast('Error al descargar el archivo: ' + err.message, 'error');
+  }
+};
 
 // Función para unificar y formatear la bitácora diaria (avances) del cliente
 function renderBitacoraCliente(o) {

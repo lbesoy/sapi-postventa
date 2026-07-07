@@ -1248,6 +1248,9 @@ async function _processSyncQueueInternal() {
                   if (b.desviacion) {
                     dbNota += `\n[Desv: ${b.desviacion}]`;
                   }
+                  if (b.asignadoPorName) {
+                    dbNota += `\n[AsignadoPor: ${b.asignadoPorName}]`;
+                  }
                   return {
                     id: b.id,
                     orden_id: ordId,
@@ -2342,6 +2345,15 @@ window.cargarDatosDeSupabase = function() {
               }
             }
 
+            let asignadoPorName = null;
+            if (nota.includes('[AsignadoPor: ')) {
+              const match = nota.match(/(?:\r?\n|^)\[AsignadoPor: (.*?)\]/);
+              if (match) {
+                asignadoPorName = match[1];
+                nota = nota.replace(/(?:\r?\n|^)\[AsignadoPor: (.*?)\]/g, '');
+              }
+            }
+
             bitacorasMap[b.orden_id].push({
               id: b.id,
               fecha: datePortion,
@@ -2352,7 +2364,8 @@ window.cargarDatosDeSupabase = function() {
               realizado: realizado,
               programadoEntrada: programadoEntrada,
               programadoSalida: programadoSalida,
-              desviacion: desviacion
+              desviacion: desviacion,
+              asignadoPorName: asignadoPorName
             });
           });
         }
