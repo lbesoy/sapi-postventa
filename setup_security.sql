@@ -41,6 +41,8 @@ DROP POLICY IF EXISTS "Admins y Supervisores full access ordenes" ON public.orde
 DROP POLICY IF EXISTS "Técnicos pueden ver sus órdenes" ON public.ordenes;
 DROP POLICY IF EXISTS "Técnicos pueden editar sus órdenes" ON public.ordenes;
 DROP POLICY IF EXISTS "Consulta read access ordenes" ON public.ordenes;
+DROP POLICY IF EXISTS "Clientes y Empresas read access ordenes" ON public.ordenes;
+
 
 DROP POLICY IF EXISTS "Admins full access tickets" ON public.tickets;
 DROP POLICY IF EXISTS "Admins y Supervisores full access tickets" ON public.tickets;
@@ -127,15 +129,15 @@ CREATE POLICY "Admins delete user_roles" ON public.user_roles FOR DELETE TO auth
 );
 
 CREATE POLICY "Consulta y Tecnicos read access clientes" ON public.clientes FOR SELECT TO authenticated USING (
-  public.get_my_role() IN ('tecnico', 'consulta', 'empresa', 'supervisor')
+  public.get_my_role() IN ('tecnico', 'consulta', 'empresa', 'cliente', 'supervisor')
 );
 
 CREATE POLICY "Consulta y Tecnicos read access maquinaria" ON public.maquinaria FOR SELECT TO authenticated USING (
-  public.get_my_role() IN ('tecnico', 'consulta', 'empresa', 'supervisor')
+  public.get_my_role() IN ('tecnico', 'consulta', 'empresa', 'cliente', 'supervisor')
 );
 
 CREATE POLICY "Consulta y Tecnicos read access tickets" ON public.tickets FOR SELECT TO authenticated USING (
-  public.get_my_role() IN ('tecnico', 'consulta', 'empresa')
+  public.get_my_role() IN ('tecnico', 'consulta', 'empresa', 'cliente')
   OR (
     public.get_my_role() = 'supervisor'
     AND (
@@ -159,6 +161,10 @@ CREATE POLICY "Técnicos pueden editar sus órdenes" ON public.ordenes FOR UPDAT
 
 CREATE POLICY "Consulta read access ordenes" ON public.ordenes FOR SELECT TO authenticated USING (
   public.get_my_role() = 'consulta'
+);
+
+CREATE POLICY "Clientes y Empresas read access ordenes" ON public.ordenes FOR SELECT TO authenticated USING (
+  public.get_my_role() IN ('empresa', 'cliente')
 );
 
 -- 5. Crear Trigger para añadir automáticamente los usuarios nuevos a la tabla de roles
@@ -268,33 +274,33 @@ CREATE POLICY "Usuarios propios read clara_transactions" ON public.clara_transac
 );
 
 -- ========================================================
--- 7. Configuración de Storage Bucket (evidencias)
+-- 7. Configuración de Storage Bucket (evidencias) - COMENTADO PARA EVITAR ERRORES DE PERMISOS
 -- ========================================================
 
 -- Crear el bucket "evidencias" si no existe
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('evidencias', 'evidencias', true)
-ON CONFLICT (id) DO NOTHING;
+-- INSERT INTO storage.buckets (id, name, public)
+-- VALUES ('evidencias', 'evidencias', true)
+-- ON CONFLICT (id) DO NOTHING;
 
 -- Asegurar RLS en objects
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
 -- Limpiar políticas previas de storage para evitar duplicación
-DROP POLICY IF EXISTS "Permitir subidas a todo el crm" ON storage.objects;
-DROP POLICY IF EXISTS "Permitir lectura publica" ON storage.objects;
+-- DROP POLICY IF EXISTS "Permitir subidas a todo el crm" ON storage.objects;
+-- DROP POLICY IF EXISTS "Permitir lectura publica" ON storage.objects;
 
 -- Crear políticas de storage
-CREATE POLICY "Permitir subidas a todo el crm" 
-ON storage.objects 
-FOR INSERT 
-TO authenticated 
-WITH CHECK (bucket_id = 'evidencias');
+-- CREATE POLICY "Permitir subidas a todo el crm" 
+-- ON storage.objects 
+-- FOR INSERT 
+-- TO authenticated 
+-- WITH CHECK (bucket_id = 'evidencias');
 
-CREATE POLICY "Permitir lectura publica" 
-ON storage.objects 
-FOR SELECT 
-TO public 
-USING (bucket_id = 'evidencias');
+-- CREATE POLICY "Permitir lectura publica" 
+-- ON storage.objects 
+-- FOR SELECT 
+-- TO public 
+-- USING (bucket_id = 'evidencias');
 
 -- ========================================================
 -- 8. Configuración de Telemetría (sapi_telemetry)

@@ -2,6 +2,38 @@
 <html lang="es">
 <head>
   <script>
+    // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
+    (function() {
+      if (typeof window !== 'undefined') {
+        const currentAppVer = '1.3.176';
+        const lastAppVer = localStorage.getItem('sapi_app_version');
+        if (lastAppVer !== currentAppVer) {
+          if (!lastAppVer) {
+            localStorage.setItem('sapi_app_version', currentAppVer);
+          } else {
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for (var i = 0; i < registrations.length; i++) {
+                  registrations[i].unregister();
+                }
+                if ('caches' in window) {
+                  caches.keys().then(function(names) {
+                    return Promise.all(names.map(function(name) { return caches.delete(name); }));
+                  }).then(function() {
+                    localStorage.setItem('sapi_app_version', currentAppVer);
+                    console.log('[Version] Cache y Service Worker purgados por actualización a ' + currentAppVer);
+                    window.location.reload(true);
+                  });
+                }
+              });
+            } else {
+              localStorage.setItem('sapi_app_version', currentAppVer);
+            }
+          }
+        }
+      }
+    })();
+
     window.addEventListener('error', function(e) {
       console.error('ERROR DE JS:', e.message, '\nArchivo:', e.filename, '\nLínea:', e.lineno, e);
       if (typeof window.showToast === 'function') {
@@ -519,8 +551,8 @@
   <!-- JS DEPENDENCIES -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js?v=2"></script>
-  <script src="supabaseSync.js?v=173"></script>
-  <script src="cliente.js?v=6"></script>
+  <script src="supabaseSync.js?v=176"></script>
+  <script src="cliente.js?v=7"></script>
 
 </body>
 </html>

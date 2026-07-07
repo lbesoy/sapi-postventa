@@ -1814,6 +1814,15 @@ window.cargarDatosDeSupabase = function() {
       console.error('[Sync] Error al verificar sesión en cargarDatosDeSupabase:', e);
     }
 
+    let isClientOrEmpresa = false;
+    try {
+      const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
+      const rol = String(session.viewMode || '').toLowerCase().trim();
+      if (['empresa', 'cliente'].includes(rol)) {
+        isClientOrEmpresa = true;
+      }
+    } catch (e) {}
+
     try {
     // Usuarios - Cargar desde user_roles para todos los usuarios.
     // Para evitar truncar el caché local debido a restricciones de RLS (que devuelven 0 o 1 fila del propio usuario)
@@ -2242,7 +2251,7 @@ window.cargarDatosDeSupabase = function() {
               precio: r.precio_unitario || 0
             };
             
-            if (r.estado === 'Necesaria') {
+            if (r.estado === 'Necesaria' || r.estado === 'Solicitado') {
               refaccionesMap[r.orden_id].necesarias.push(refObj);
             } else {
               refaccionesMap[r.orden_id].utilizadas.push(refObj);
@@ -2333,28 +2342,32 @@ window.cargarDatosDeSupabase = function() {
       window._supaOrdenes = null;
     }
 
-    // Refacciones (con paginación para traer más de 1000 items)
-    let allRefacciones = [];
-    let fetchMore = true;
-    let page = 0;
-    while (fetchMore) {
-      const { data: refDbChunk } = await sb.from('refacciones').select('*').range(page * 1000, (page + 1) * 1000 - 1);
-      if (refDbChunk && refDbChunk.length > 0) {
-        allRefacciones = allRefacciones.concat(refDbChunk);
-        if (refDbChunk.length < 1000) fetchMore = false;
-        else page++;
-      } else {
-        fetchMore = false;
+    if (!isClientOrEmpresa) {
+      // Refacciones (con paginación para traer más de 1000 items)
+      let allRefacciones = [];
+      let fetchMore = true;
+      let page = 0;
+      while (fetchMore) {
+        const { data: refDbChunk } = await sb.from('refacciones').select('*').range(page * 1000, (page + 1) * 1000 - 1);
+        if (refDbChunk && refDbChunk.length > 0) {
+          allRefacciones = allRefacciones.concat(refDbChunk);
+          if (refDbChunk.length < 1000) fetchMore = false;
+          else page++;
+        } else {
+          fetchMore = false;
+        }
       }
-    }
-    if (allRefacciones.length > 0) {
-      const mapped = allRefacciones.map(r => ({
-        id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, 
-        customData: r.custom_data, marca: r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.custom_data?.marca || '', 
-        grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
-        ItmsGrpCod: r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
-      }));
-      localStorage.setItem('sapi_refacciones_db', JSON.stringify(mapped));
+      if (allRefacciones.length > 0) {
+        const mapped = allRefacciones.map(r => ({
+          id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, 
+          marca: r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.custom_data?.marca || '', 
+          grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
+          ItmsGrpCod: r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
+        }));
+        localStorage.setItem('sapi_refacciones_db', JSON.stringify(mapped));
+      }
+    } else {
+      console.log('[Sync] Omitiendo descarga del catálogo de refacciones para rol cliente/empresa.');
     }
 
     // La tabla config ahora se procesa arriba antes que clientes.
