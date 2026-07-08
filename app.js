@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.205'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.206'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -4760,37 +4760,41 @@ function renderTabla(ctx) {
   if (userRole === 'supervisor') supFilter = currentUser ? currentUser.nombre : '';
   
   if (tecFilter || supFilter) {
-    const tecName = tecFilter;
+    const tecNameLower = tecFilter ? tecFilter.toLowerCase().trim() : '';
+    const supNameLower = supFilter ? supFilter.toLowerCase().trim() : '';
     
     filtradas = filtradas.filter(o => {
       let passTec = true;
       let passSup = true;
       
-      if (tecFilter && tecName) {
+      if (tecFilter && tecNameLower) {
          let assigned = [];
          if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
          else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
+         const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
          let isCreator = false;
          let isTkAssigned = false;
-         if (o.creadoPor === tecName) isCreator = true;
+         if (o.creadoPor && String(o.creadoPor).toLowerCase().trim() === tecNameLower) isCreator = true;
          if (o.soporte) {
             const tk = tickets.find(x => x.id === o.soporte);
             if (tk) {
-               if (tk.solicitante === tecName || tk.creadoPor === tecName) isCreator = true;
+               if ((tk.solicitante && String(tk.solicitante).toLowerCase().trim() === tecNameLower) || 
+                   (tk.creadoPor && String(tk.creadoPor).toLowerCase().trim() === tecNameLower)) isCreator = true;
                let tkAssigned = [];
                if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(resolveTecnicoNombre);
                else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
-               if (tkAssigned.includes(tecName)) isTkAssigned = true;
+               const tkAssignedLower = tkAssigned.map(s => String(s).toLowerCase().trim());
+               if (tkAssignedLower.includes(tecNameLower)) isTkAssigned = true;
             }
          }
-         passTec = assigned.includes(tecName) || isCreator || isTkAssigned;
+         passTec = assignedLower.includes(tecNameLower) || isCreator || isTkAssigned;
       }
       
-      if (supFilter) {
+      if (supFilter && supNameLower) {
          let passSupClient = false;
          const cli = clientesDb.find(c => c.nombre === o.cliente);
          if (cli) {
-            const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
+            const supUser = usuarios.find(u => (u.nombre && u.nombre.toLowerCase().trim() === supNameLower) || u.id === supFilter);
             const supId = supUser ? supUser.id : supFilter;
             passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
          }
@@ -4798,18 +4802,20 @@ function renderTabla(ctx) {
          let assigned = [];
          if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
          else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
+         const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
          
-         let passSupTicket = assigned.includes(supFilter);
+         let passSupTicket = assignedLower.includes(supNameLower);
          let isCreator = false;
-         if (o.creadoPor === supFilter) isCreator = true;
          if (o.soporte) {
             const tk = tickets.find(x => x.id === o.soporte);
             if (tk) {
-               if (tk.solicitante === supFilter || tk.creadoPor === supFilter) isCreator = true;
+               if ((tk.solicitante && String(tk.solicitante).toLowerCase().trim() === supNameLower) || 
+                   (tk.creadoPor && String(tk.creadoPor).toLowerCase().trim() === supNameLower)) isCreator = true;
                let tkAssigned = [];
                if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(resolveTecnicoNombre);
                else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
-               if (tkAssigned.includes(supFilter)) passSupTicket = true;
+               const tkAssignedLower = tkAssigned.map(s => String(s).toLowerCase().trim());
+               if (tkAssignedLower.includes(supNameLower)) passSupTicket = true;
             }
          }
          passSup = passSupClient || passSupTicket || isCreator;
@@ -10597,23 +10603,27 @@ function updateTicketBadge() {
   }
   
   if (tecFilter || supFilter) {
-    const tecName = tecFilter;
+    const tecNameLower = tecFilter ? tecFilter.toLowerCase().trim() : '';
+    const supNameLower = supFilter ? supFilter.toLowerCase().trim() : '';
     filtered = filtered.filter(t => {
       let passTec = true;
       let passSup = true;
       
-      if (tecFilter && tecName) {
+      if (tecFilter && tecNameLower) {
          let assigned = [];
          if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
          else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
-         passTec = assigned.includes(tecName) || t.solicitante === tecName || t.creadoPor === tecName;
+         const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
+         passTec = assignedLower.includes(tecNameLower) || 
+                   (t.solicitante && String(t.solicitante).toLowerCase().trim() === tecNameLower) || 
+                   (t.creadoPor && String(t.creadoPor).toLowerCase().trim() === tecNameLower);
       }
       
-      if (supFilter) {
+      if (supFilter && supNameLower) {
          let passSupClient = false;
          const cli = clientesDb.find(c => c.nombre === t.cliente);
          if (cli) {
-            const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
+            const supUser = usuarios.find(u => (u.nombre && u.nombre.toLowerCase().trim() === supNameLower) || u.id === supFilter);
             const supId = supUser ? supUser.id : supFilter;
             passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
          }
@@ -10621,8 +10631,11 @@ function updateTicketBadge() {
          let assigned = [];
          if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
          else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+         const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
          
-         let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
+         let passSupTicket = assignedLower.includes(supNameLower) || 
+                             (t.solicitante && String(t.solicitante).toLowerCase().trim() === supNameLower) || 
+                             (t.creadoPor && String(t.creadoPor).toLowerCase().trim() === supNameLower);
          
          passSup = passSupClient || passSupTicket;
       }
@@ -10976,25 +10989,29 @@ function renderTickets(ctx) {
     }
     
     if (tecFilter || supFilter) {
-      const tecName = tecFilter;
+      const tecNameLower = tecFilter ? tecFilter.toLowerCase().trim() : '';
+      const supNameLower = supFilter ? supFilter.toLowerCase().trim() : '';
       
       filtered = filtered.filter(t => {
         if (!t) return false;
         let passTec = true;
         let passSup = true;
         
-        if (tecFilter && tecName) {
+        if (tecFilter && tecNameLower) {
            let assigned = [];
            if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
            else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
-           passTec = assigned.includes(tecName) || t.solicitante === tecName || t.creadoPor === tecName;
+           const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
+           passTec = assignedLower.includes(tecNameLower) || 
+                     (t.solicitante && String(t.solicitante).toLowerCase().trim() === tecNameLower) || 
+                     (t.creadoPor && String(t.creadoPor).toLowerCase().trim() === tecNameLower);
         }
         
-        if (supFilter) {
+        if (supFilter && supNameLower) {
            let passSupClient = false;
            const cli = clientesDb.find(c => c && c.nombre === t.cliente);
            if (cli) {
-              const supUser = usuarios.find(u => u && (u.nombre === supFilter || u.id === supFilter));
+              const supUser = usuarios.find(u => u && ((u.nombre && u.nombre.toLowerCase().trim() === supNameLower) || u.id === supFilter));
               const supId = supUser ? supUser.id : supFilter;
               passSupClient = (cli.supervisoresAsignados && Array.isArray(cli.supervisoresAsignados) && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
            }
@@ -11002,8 +11019,11 @@ function renderTickets(ctx) {
            let assigned = [];
            if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
            else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+           const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
            
-           let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
+           let passSupTicket = assignedLower.includes(supNameLower) || 
+                               (t.solicitante && String(t.solicitante).toLowerCase().trim() === supNameLower) || 
+                               (t.creadoPor && String(t.creadoPor).toLowerCase().trim() === supNameLower);
            
            passSup = passSupClient || passSupTicket;
         }
