@@ -150,13 +150,17 @@ CREATE POLICY "Consulta y Tecnicos read access tickets" ON public.tickets FOR SE
 
 -- 5. Crear Políticas para Técnicos y Consulta sobre Órdenes de Servicio
 CREATE POLICY "Técnicos pueden ver sus órdenes" ON public.ordenes FOR SELECT TO authenticated USING (
-  public.get_my_role() = 'tecnico' AND
-  tecnico = public.get_my_name()
+  public.get_my_role() = 'tecnico' AND (
+    tecnico = public.get_my_name() OR
+    notas LIKE '%"' || public.get_my_name() || '"%'
+  )
 );
 
 CREATE POLICY "Técnicos pueden editar sus órdenes" ON public.ordenes FOR UPDATE TO authenticated USING (
-  public.get_my_role() = 'tecnico' AND
-  tecnico = public.get_my_name()
+  public.get_my_role() = 'tecnico' AND (
+    tecnico = public.get_my_name() OR
+    notas LIKE '%"' || public.get_my_name() || '"%'
+  )
 );
 
 CREATE POLICY "Consulta read access ordenes" ON public.ordenes FOR SELECT TO authenticated USING (
