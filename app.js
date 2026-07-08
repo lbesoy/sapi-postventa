@@ -3631,7 +3631,7 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     if (filtro === 'refacciones') {
       title.textContent = `Desglose: Refacciones Faltantes`;
       thead.innerHTML = `<tr><th>Folio Orden</th><th>Cliente</th><th>Técnico</th><th>Refacciones</th></tr>`;
-      ordenes.forEach(o => {
+      getFilteredOrders().forEach(o => {
         if ((o.estado || '').toLowerCase() !== 'completado' && o.ref_necesarias && o.ref_necesarias.length > 0) {
           const refsStr = o.ref_necesarias.map(r => r.descripcion || r.clave || '').filter(Boolean).join(', ');
           tbody.innerHTML += `<tr><td>${o.folio || 'N/A'}</td><td>${o.cliente || 'N/A'}</td><td>${o.tecnico || 'N/A'}</td><td>${refsStr}</td></tr>`;
@@ -3640,7 +3640,7 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     } else if (filtro === 'ordenes') {
       title.textContent = `Desglose: Resolución de Órdenes`;
       thead.innerHTML = `<tr><th>Folio</th><th>Cliente</th><th>Estado</th><th>Días de Resolución</th></tr>`;
-      ordenes.forEach(o => {
+      getFilteredOrders().forEach(o => {
         if ((o.estado || '').toLowerCase() === 'completado') {
           let fCreacion = new Date(o.fecha || 0);
           let fCierre = o.fechaFin ? new Date(o.fechaFin) : fCreacion;
@@ -3657,7 +3657,7 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     } else if (filtro === 'tickets') {
       title.textContent = `Desglose: Resolución de Tickets`;
       thead.innerHTML = `<tr><th>#</th><th>Asunto</th><th>Estado</th><th>Días de Resolución</th></tr>`;
-      tickets.forEach(t => {
+      getFilteredTickets().forEach(t => {
         if ((t.estado || '').toLowerCase() === 'cerrado') {
           let fCreacion = new Date(t.fechaCreacion || t.created_at || new Date());
           let fCierre = new Date(t.fechaCierre || t.updated_at || t.fechaCreacion || t.created_at || new Date());
