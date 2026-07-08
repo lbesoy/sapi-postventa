@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.207'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.208'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -24911,7 +24911,7 @@ window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId)
   }
 };
 
-window.ejecutarDiagnosticoLocal = function() {
+window.ejecutarDiagnosticoLocal = async function() {
   const diagnosticEl = document.getElementById('diagnostic-results');
   if (!diagnosticEl) return;
   
@@ -24925,9 +24925,28 @@ window.ejecutarDiagnosticoLocal = function() {
     const errorLog = localStorage.getItem('last_sync_error') || 'Ninguno registrado';
     
     let info = '';
-    info += `Usuario ID: ${session.userId || 'N/A'}\n`;
-    info += `Nombre Sesión: ${session.nombre || 'N/A'}\n`;
-    info += `Rol Real / Vista: ${session.realRol || 'N/A'} / ${session.viewMode || 'N/A'}\n`;
+    
+    // Verificar sesión real de Supabase Client
+    if (window.supabaseClient) {
+      try {
+        const { data: supaSession } = await window.supabaseClient.auth.getSession();
+        if (supaSession && supaSession.session) {
+          info += `Supabase Client Auth: ACTIVO\n`;
+          info += `- Supabase User ID: ${supaSession.session.user.id}\n`;
+          info += `- Supabase Email: ${supaSession.session.user.email}\n`;
+        } else {
+          info += `Supabase Client Auth: NO ACTIVO (Sesión vacía)\n`;
+        }
+      } catch (authErr) {
+        info += `Supabase Client Auth: ERROR al obtener (${authErr.message})\n`;
+      }
+    } else {
+      info += `Supabase Client Auth: CLIENTE NO INICIALIZADO\n`;
+    }
+    
+    info += `Usuario ID en Portal: ${session.userId || 'N/A'}\n`;
+    info += `Nombre Sesión Portal: ${session.nombre || 'N/A'}\n`;
+    info += `Rol Real / Vista Portal: ${session.realRol || 'N/A'} / ${session.viewMode || 'N/A'}\n`;
     info += `Usuarios en LocalStorage: ${uList.length}\n`;
     
     // Buscar usuario actual en la lista
