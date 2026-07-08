@@ -190,7 +190,7 @@
       }
     } else if (typeof window !== 'undefined') {
       // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
-      const currentAppVer = '1.3.230';
+      const currentAppVer = '1.3.231';
       const lastAppVer = localStorage.getItem('sapi_app_version');
       if (lastAppVer !== currentAppVer) {
         if ('serviceWorker' in navigator) {
@@ -824,7 +824,7 @@
 
         <!-- SERVICIOS VIEW -->
         <div id="view-servicios" class="view">
-          <div class="stats-grid" style="margin-bottom: 1.5rem;">
+          <div class="stats-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(5, 1fr);">
             <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('')">
               <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="file-text"></i></div>
               <div>
@@ -844,6 +844,13 @@
               <div>
                 <div class="stat-label">En Proceso</div>
                 <div class="stat-value" id="stat-serv-proceso">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('Refacciones pendientes')">
+              <div class="stat-icon" style="background:rgba(236,72,153,0.12);color:#ec4899;"><i data-lucide="package"></i></div>
+              <div>
+                <div class="stat-label">Refacciones Pendientes</div>
+                <div class="stat-value" id="stat-serv-refacciones-pendientes">0</div>
               </div>
             </div>
             <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('Completado')">
@@ -5451,8 +5458,8 @@
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=230",
-        "app.js?v=230"
+        "supabaseSync.js?v=231",
+        "app.js?v=231"
       ];
       var index = 0;
       function loadNext() {

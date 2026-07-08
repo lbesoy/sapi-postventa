@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.230'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.231'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -3866,6 +3866,7 @@ function _renderStatsInternal() {
   const proceso = ordenesFilter.filter(o => (o.estado || '').toLowerCase() === 'en proceso').length;
   const pendientes = ordenesFilter.filter(o => (o.estado || '').toLowerCase() === 'pendiente').length;
   const completas = ordenesFilter.filter(o => (o.estado || '').toLowerCase() === 'completado').length;
+  const refaccionesPendientes = ordenesFilter.filter(o => (o.estado || '').toLowerCase() === 'refacciones pendientes').length;
   const setStat = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
   setStat('stat-total', total);
   setStat('stat-proceso', proceso);
@@ -3876,6 +3877,7 @@ function _renderStatsInternal() {
     document.getElementById('stat-serv-total').textContent = total;
     document.getElementById('stat-serv-proceso').textContent = proceso;
     document.getElementById('stat-serv-pendientes').textContent = pendientes;
+    document.getElementById('stat-serv-refacciones-pendientes').textContent = refaccionesPendientes;
     document.getElementById('stat-serv-completas').textContent = completas;
   }
 
