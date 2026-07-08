@@ -2999,6 +2999,19 @@ function setupRealtime() {
             const orden = rowToOrden(payload.new);
             const idx = current.findIndex(o => o.id === orden.id);
             if (idx > -1) {
+              const oldOrd = current[idx];
+              // Preservar sub-entidades locales que no vienen en el payload de la tabla de órdenes
+              orden.ref_necesarias = oldOrd.ref_necesarias || [];
+              orden.ref_utilizadas = oldOrd.ref_utilizadas || [];
+              orden.bitacora = oldOrd.bitacora || [];
+              if (!orden.firma_tecnico_base64) orden.firma_tecnico_base64 = oldOrd.firma_tecnico_base64;
+              if (!orden.firma_cliente_base64) orden.firma_cliente_base64 = oldOrd.firma_cliente_base64;
+              if (!orden.firma_cliente_nombre) orden.firma_cliente_nombre = oldOrd.firma_cliente_nombre;
+              if (!orden.firma_cliente_fecha) orden.firma_cliente_fecha = oldOrd.firma_cliente_fecha;
+              if (!orden.firma_tecnico_fecha) orden.firma_tecnico_fecha = oldOrd.firma_tecnico_fecha;
+              if (!orden.evidencias || Object.keys(orden.evidencias).length === 0) {
+                orden.evidencias = oldOrd.evidencias || {};
+              }
               current[idx] = orden;
             } else {
               current.unshift(orden);
