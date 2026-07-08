@@ -40,6 +40,7 @@ DROP POLICY IF EXISTS "Admins full access ordenes" ON public.ordenes;
 DROP POLICY IF EXISTS "Admins y Supervisores full access ordenes" ON public.ordenes;
 DROP POLICY IF EXISTS "Técnicos pueden ver sus órdenes" ON public.ordenes;
 DROP POLICY IF EXISTS "Técnicos pueden editar sus órdenes" ON public.ordenes;
+DROP POLICY IF EXISTS "Técnicos pueden insertar sus órdenes" ON public.ordenes;
 DROP POLICY IF EXISTS "Consulta read access ordenes" ON public.ordenes;
 DROP POLICY IF EXISTS "Clientes y Empresas read access ordenes" ON public.ordenes;
 
@@ -161,6 +162,10 @@ CREATE POLICY "Técnicos pueden editar sus órdenes" ON public.ordenes FOR UPDAT
     tecnico = public.get_my_name() OR
     notas LIKE '%"' || public.get_my_name() || '"%'
   )
+);
+
+CREATE POLICY "Técnicos pueden insertar sus órdenes" ON public.ordenes FOR INSERT TO authenticated WITH CHECK (
+  public.get_my_role() = 'tecnico'
 );
 
 CREATE POLICY "Consulta read access ordenes" ON public.ordenes FOR SELECT TO authenticated USING (
