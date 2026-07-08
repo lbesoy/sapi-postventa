@@ -823,6 +823,13 @@ let _isProcessingQueue = false;
 let syncMutexPromise = null;
 
 function processSyncQueue() {
+  const now = Date.now();
+  if (_isProcessingQueue && window._lastSyncStartTimestamp && (now - window._lastSyncStartTimestamp > 45000)) {
+    console.warn('[Sync Watchdog] Sincronización bloqueada por más de 45 segundos. Forzando liberación del candado...');
+    _isProcessingQueue = false;
+    syncMutexPromise = null;
+  }
+
   if (syncMutexPromise) return syncMutexPromise;
   
   syncMutexPromise = (async () => {
@@ -879,6 +886,7 @@ async function _processSyncQueueInternal() {
   }
 
   _isProcessingQueue = true;
+  window._lastSyncStartTimestamp = Date.now();
   updateSyncStatusUI();
 
   try {
