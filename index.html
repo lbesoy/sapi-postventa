@@ -190,7 +190,7 @@
       }
     } else if (typeof window !== 'undefined') {
       // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
-      const currentAppVer = '1.3.229';
+      const currentAppVer = '1.3.230';
       const lastAppVer = localStorage.getItem('sapi_app_version');
       if (lastAppVer !== currentAppVer) {
         if ('serviceWorker' in navigator) {
@@ -2105,6 +2105,7 @@
                 <button type="button" class="telemetry-log-filter" id="btn-tlog-logins" onclick="window.filterTelemetryLogs('logins')" style="background:none; border:none; padding:0.25rem 0.5rem; font-size:0.72rem; color:var(--text-muted); cursor:pointer; font-weight:500; border-bottom:2px solid transparent; font-family:inherit;">Sesiones</button>
                 <button type="button" class="telemetry-log-filter" id="btn-tlog-views" onclick="window.filterTelemetryLogs('views')" style="background:none; border:none; padding:0.25rem 0.5rem; font-size:0.72rem; color:var(--text-muted); cursor:pointer; font-weight:500; border-bottom:2px solid transparent; font-family:inherit;">Navegación</button>
                 <button type="button" class="telemetry-log-filter" id="btn-tlog-actions" onclick="window.filterTelemetryLogs('actions')" style="background:none; border:none; padding:0.25rem 0.5rem; font-size:0.72rem; color:var(--text-muted); cursor:pointer; font-weight:500; border-bottom:2px solid transparent; font-family:inherit;">Acciones / Archivos</button>
+                <button type="button" class="telemetry-log-filter" id="btn-tlog-orders" onclick="window.filterTelemetryLogs('orders')" style="background:none; border:none; padding:0.25rem 0.5rem; font-size:0.72rem; color:var(--text-muted); cursor:pointer; font-weight:500; border-bottom:2px solid transparent; font-family:inherit;">Órdenes</button>
               </div>
 
               <!-- Event Feed container -->
@@ -5450,8 +5451,8 @@
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=229",
-        "app.js?v=229"
+        "supabaseSync.js?v=230",
+        "app.js?v=230"
       ];
       var index = 0;
       function loadNext() {

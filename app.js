@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.229'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.230'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -23956,8 +23956,14 @@ window.renderTelemetryEventsFeed = function() {
     filtered = filtered.filter(e => [
       'Conexión OneDrive', 'Importación OneDrive', 'Vinculación de Factura', 'Guardado de Gasto', 'Visor PDF SAT',
       'Creación de Gasto', 'Edición de Gasto', 'Eliminación de Gasto',
-      'Creación de Ticket', 'Edición de Ticket', 'Eliminación de Ticket',
-      'Creación de Orden', 'Edición de Orden', 'Eliminación de Orden'
+      'Creación de Ticket', 'Edición de Ticket', 'Eliminación de Ticket'
+    ].includes(e.action));
+  } else if (filter === 'orders') {
+    filtered = filtered.filter(e => [
+      'Creación de Orden', 'Edición de Orden', 'Eliminación de Orden',
+      'Creación de Asignación', 'Edición de Asignación', 'Eliminación de Asignación',
+      'Firma de Técnico (Orden Completada)', 'Firma de Cliente (Orden Firmada)',
+      'Vinculación Orden en Detalle'
     ].includes(e.action));
   }
 
@@ -24063,6 +24069,36 @@ window.renderTelemetryEventsFeed = function() {
       iconBg = 'rgba(239,68,68,0.12)';
       const formatMoney = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
       desc = `Eliminó el gasto de <strong>${e.details?.descripcion || 'Gasto'}</strong> por <strong>${formatMoney(e.details?.monto)}</strong>.`;
+    } else if (e.action === 'Firma de Cliente (Orden Firmada)') {
+      icon = 'check-square';
+      iconColor = 'var(--green)';
+      iconBg = 'rgba(16,185,129,0.12)';
+      desc = `Firmó de conformidad la Orden de Servicio folio <strong>${e.details?.folio || '-'}</strong> para el cliente <strong>${e.details?.cliente || ''}</strong>.`;
+    } else if (e.action === 'Firma de Técnico (Orden Completada)') {
+      icon = 'pen-tool';
+      iconColor = 'var(--green)';
+      iconBg = 'rgba(16,185,129,0.12)';
+      desc = `Técnico firmó y completó la Orden de Servicio folio <strong>${e.details?.folio || '-'}</strong>.`;
+    } else if (e.action === 'Creación de Asignación') {
+      icon = 'calendar';
+      iconColor = 'var(--accent)';
+      iconBg = 'rgba(168,85,247,0.12)';
+      desc = `Asignó la orden <strong>${e.details?.folio || '-'}</strong> al técnico <strong>${e.details?.tecnico || ''}</strong> para la fecha <strong>${e.details?.fecha || ''}</strong>.`;
+    } else if (e.action === 'Edición de Asignación') {
+      icon = 'calendar';
+      iconColor = 'var(--accent)';
+      iconBg = 'rgba(168,85,247,0.12)';
+      desc = `Modificó la asignación de la orden <strong>${e.details?.folio || '-'}</strong>.`;
+    } else if (e.action === 'Eliminación de Asignación') {
+      icon = 'trash-2';
+      iconColor = 'var(--red)';
+      iconBg = 'rgba(239,68,68,0.12)';
+      desc = `Eliminó la asignación de servicio folio <strong>${e.details?.folio || '-'}</strong>.`;
+    } else if (e.action === 'Vinculación Orden en Detalle') {
+      icon = 'link';
+      iconColor = 'var(--accent)';
+      iconBg = 'rgba(168,85,247,0.12)';
+      desc = `Vinculó el gasto ID <strong>${e.details?.gastoId || '-'}</strong> con la orden folio <strong>${e.details?.ordenFolio || ''}</strong>.`;
     } else {
       desc = `${e.action} - ${JSON.stringify(e.details || {})}`;
     }
