@@ -2395,30 +2395,87 @@ function abrirDetalleOrdenCliente(id) {
 }
 
 // Descargar/Imprimir Reporte PDF de la Orden
-function abrirReportePdfCliente(e, orderId) {
+async function abrirReportePdfCliente(e, orderId) {
   if (e) e.stopPropagation();
   
-  // La impresión y visualización de PDF está implementada en app.js a través de window.imprimirReporteDirecto o window.descargarReportePdf.
-  // Reutilizaremos esa lógica si está en memoria (se inyecta por el iframe o carga de scripts).
-  // Si no está, podemos crear el visor.
-  if (typeof window.imprimirReporteDirecto === 'function') {
-    window.imprimirReporteDirecto(orderId);
-  } else {
-    // Si no está declarada de forma global en supabaseSync, mostramos el base64 directamente
-    const o = ordenes.find(x => x.id === orderId);
-    if (o) {
-      const base64 = o.firma_cliente_base64 || o.evidenciaBase64 || o.firma_tecnico_base64;
-      if (base64 && base64.startsWith('data:')) {
-        const win = window.open();
-        if (win) {
-          win.document.write(`<iframe src="${base64}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
-        } else {
-          showToast('Permite las ventanas emergentes para ver el reporte.', 'info');
-        }
-      } else {
-        showToast('El archivo del reporte firmado se está generando en el servidor.', 'info');
-      }
+  // Asegurar que el modal está poblado con los datos de esta orden
+  abrirDetalleOrdenCliente(orderId);
+  
+  // Obtener el contenido del cuerpo del modal
+  const original = document.getElementById('modal-order-body');
+  if (!original) return;
+  
+  // Clonar el contenido
+  const clone = original.cloneNode(true);
+  
+  // Remover botones o elementos interactivos que no deben ir en el PDF
+  clone.querySelectorAll('button, select, input, textarea, .no-print').forEach(el => el.remove());
+  
+  // Ajustar estilos para la impresión en PDF (fondo blanco, texto oscuro)
+  clone.style.width = '780px';
+  clone.style.maxHeight = 'none';
+  clone.style.overflow = 'visible';
+  clone.style.boxShadow = 'none';
+  clone.style.border = 'none';
+  clone.style.background = '#ffffff';
+  clone.style.color = '#0f172a';
+  clone.style.padding = '24px';
+  clone.style.fontFamily = "'Outfit', 'Inter', sans-serif";
+  
+  // Forzar estilos de tema claro usando variables CSS
+  clone.style.setProperty('--bg-primary', '#ffffff');
+  clone.style.setProperty('--bg-secondary', '#ffffff');
+  clone.style.setProperty('--bg-card', '#ffffff');
+  clone.style.setProperty('--bg-hover', '#f8fafc');
+  clone.style.setProperty('--border', '#e2e8f0');
+  clone.style.setProperty('--text-primary', '#0f172a');
+  clone.style.setProperty('--text-secondary', '#334155');
+  clone.style.setProperty('--text-muted', '#64748b');
+  
+  // Corregir colores explícitos en los elementos descendientes
+  clone.querySelectorAll('*').forEach(el => {
+    el.style.color = '#0f172a';
+    if (el.tagName === 'STRONG' || el.tagName === 'TH') {
+      el.style.color = '#0a0e17';
     }
+  });
+
+  const tempContainer = document.createElement('div');
+  tempContainer.style.position = 'absolute';
+  tempContainer.style.left = '-9999px';
+  tempContainer.style.top = '-9999px';
+  tempContainer.style.background = '#ffffff';
+  tempContainer.appendChild(clone);
+  document.body.appendChild(tempContainer);
+  
+  const o = ordenes.find(x => x.id === orderId);
+  const folio = o ? (o.folio || orderId) : orderId;
+  
+  const opt = {
+    margin:       12,
+    filename:     `Reporte_Servicio_${folio}.pdf`,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true, letterRendering: true, logging: false },
+    jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' }
+  };
+  
+  try {
+    if (typeof html2pdf === 'function') {
+      showToast('Generando archivo PDF...', 'info');
+      await html2pdf().from(clone).set(opt).save();
+      document.body.removeChild(tempContainer);
+    } else {
+      console.warn('html2pdf library is not loaded, calling window.print()');
+      window.print();
+      document.body.removeChild(tempContainer);
+    }
+  } catch (err) {
+    console.error('Error generating PDF:', err);
+    if (tempContainer.parentNode) {
+      document.body.removeChild(tempContainer);
+    }
+    showToast('Error al compilar el PDF. Iniciando impresión estándar.', 'error');
+    window.print();
   }
 }
 

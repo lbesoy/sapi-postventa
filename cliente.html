@@ -701,10 +701,11 @@
   <script>
     window.initLocalStorageIndexedDBBridge().then(function() {
       var scripts = [
+        "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=220",
-        "cliente.js?v=14"
+        "supabaseSync.js?v=231",
+        "cliente.js?v=15"
       ];
       var index = 0;
       function loadNext() {
