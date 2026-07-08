@@ -286,14 +286,14 @@
           onclick="volverLoginDesdeRecovery()"><i data-lucide="arrow-left"></i> Volver</button>
         <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:0.5rem;color:var(--text-primary);">Recuperar
           Contraseña</h2>
-        <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1.5rem;line-height:1.4;">Ingresa el correo asociado a tu cuenta para enviarte un enlace seguro.</p>
+        <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1.5rem;line-height:1.4;">Ingresa tu correo o teléfono asociado para restablecer tu contraseña.</p>
         <form onsubmit="enviarRecoveryLink(event)">
           <div class="form-group">
-            <label>Correo Electrónico</label>
+            <label>Correo Electrónico o Teléfono</label>
             <div style="position:relative;">
               <i data-lucide="mail"
                 style="position:absolute;left:12px;top:10px;width:1rem;height:1rem;color:var(--text-muted);"></i>
-              <input type="email" id="recovery-email" placeholder="usuario@eurorep.mx" style="padding-left:2.5rem;"
+              <input type="text" id="recovery-email" placeholder="usuario@eurorep.mx o 5512345678" style="padding-left:2.5rem;"
                 required />
             </div>
           </div>

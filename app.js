@@ -16378,9 +16378,23 @@ function volverLoginDesdeRecovery() {
 async function enviarRecoveryLink(e) {
   e.preventDefault();
   const errEl = document.getElementById('recovery-error');
-  const email = document.getElementById('recovery-email').value.trim();
+  let email = document.getElementById('recovery-email').value.trim();
   
   if (!email) return;
+  
+  // Si no contiene '@' o es un correo de celular ficticio (ej: 5548350555@eurorep.mx)
+  const partBeforeAt = email.split('@')[0];
+  const esTelefono = !email.includes('@') || (email.toLowerCase().endsWith('@eurorep.mx') && /^\d+$/.test(partBeforeAt));
+  
+  if (esTelefono) {
+    const telefonoLimpio = partBeforeAt.replace(/\s+/g, '');
+    errEl.innerHTML = `Las cuentas registradas con número celular no pueden recibir correos de recuperación.<br><br>Por favor, contacta al administrador de Eurorep por WhatsApp para restablecer tu contraseña:<br><br><a href="https://wa.me/525512345678?text=Hola,%20necesito%20restablecer%20mi%20contrase%C3%B1a%20para%20la%20cuenta%20de%20tel%C3%A9fono%20${telefonoLimpio}" target="_blank" class="btn-primary" style="display:inline-flex; align-items:center; gap:0.5rem; text-decoration:none; padding:0.5rem 1rem; border-radius:6px; font-weight:600; margin-top:0.5rem; justify-content:center; width:100%; box-sizing:border-box;"><i data-lucide="message-circle" style="width:1.2rem; height:1.2rem; color:#fff;"></i> Solicitar por WhatsApp</a>`;
+    errEl.style.color = 'var(--text-primary)';
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
+    return;
+  }
   
   errEl.textContent = 'Enviando enlace...';
   errEl.style.color = 'var(--text-secondary)';
