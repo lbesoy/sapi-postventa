@@ -7,10 +7,10 @@
     (function() {
       window.localStorageCache = {};
       window.localStorageCacheLoaded = false;
-      const originalGetItem = localStorage.getItem;
-      const originalSetItem = localStorage.setItem;
-      const originalRemoveItem = localStorage.removeItem;
-      const originalClear = localStorage.clear;
+      const originalGetItem = Storage.prototype.getItem;
+      const originalSetItem = Storage.prototype.setItem;
+      const originalRemoveItem = Storage.prototype.removeItem;
+      const originalClear = Storage.prototype.clear;
       const redirectedKeys = ['sapi_refacciones_db', 'eurorep_pedidos_sap', 'eurorep_cotizaciones_sap', 'sapi_tickets', 'sapi_ordenes'];
 
       window.initLocalStorageIndexedDBBridge = function() {
@@ -39,6 +39,21 @@
                 if (req.result && req.result.data) {
                   window.localStorageCache[key] = JSON.stringify(req.result.data);
                   originalRemoveItem.call(localStorage, key);
+                } else {
+                  // MIGRACIÓN: Si existe en localStorage real pero no en IndexedDB
+                  const localVal = originalGetItem.call(localStorage, key);
+                  if (localVal) {
+                    window.localStorageCache[key] = localVal;
+                    try {
+                      const txWrite = db.transaction('catalogs', 'readwrite');
+                      const storeWrite = txWrite.objectStore('catalogs');
+                      storeWrite.put({ id: key, data: JSON.parse(localVal) });
+                      originalRemoveItem.call(localStorage, key);
+                      console.log(`[Bridge Migration] Migrado ${key} a IndexedDB y liberado localStorage.`);
+                    } catch (e) {
+                      console.error(`[Bridge Migration] Error migrando ${key}:`, e);
+                    }
+                  }
                 }
                 completed++;
                 if (completed === redirectedKeys.length) {
@@ -58,20 +73,20 @@
         });
       };
 
-      localStorage.getItem = function(key) {
-        if (redirectedKeys.includes(key)) {
+      Storage.prototype.getItem = function(key) {
+        if (this === localStorage && redirectedKeys.includes(key)) {
           if (key in window.localStorageCache) {
             return window.localStorageCache[key];
           }
-          return originalGetItem.call(localStorage, key);
+          return originalGetItem.call(this, key);
         }
-        return originalGetItem.call(localStorage, key);
+        return originalGetItem.call(this, key);
       };
 
-      localStorage.setItem = function(key, value) {
-        if (redirectedKeys.includes(key)) {
+      Storage.prototype.setItem = function(key, value) {
+        if (this === localStorage && redirectedKeys.includes(key)) {
           window.localStorageCache[key] = value;
-          originalRemoveItem.call(localStorage, key);
+          originalRemoveItem.call(this, key);
           (async () => {
             try {
               let parsedData = JSON.parse(value);
@@ -91,11 +106,11 @@
           })();
           return;
         }
-        return originalSetItem.call(localStorage, key, value);
+        return originalSetItem.call(this, key, value);
       };
 
-      localStorage.removeItem = function(key) {
-        if (redirectedKeys.includes(key)) {
+      Storage.prototype.removeItem = function(key) {
+        if (this === localStorage && redirectedKeys.includes(key)) {
           delete window.localStorageCache[key];
           (async () => {
             try {
@@ -112,26 +127,28 @@
             } catch (e) {}
           })();
         }
-        return originalRemoveItem.call(localStorage, key);
+        return originalRemoveItem.call(this, key);
       };
 
-      localStorage.clear = function() {
-        window.localStorageCache = {};
-        (async () => {
-          try {
-            const db = await new Promise((res) => {
-              const req = indexedDB.open('SapiOfflineDB', 1);
-              req.onsuccess = (ev) => res(ev.target.result);
-              req.onerror = () => res(null);
-            });
-            if (db) {
-              const tx = db.transaction('catalogs', 'readwrite');
-              const store = tx.objectStore('catalogs');
-              store.clear();
-            }
-          } catch (e) {}
-        })();
-        return originalClear.call(localStorage);
+      Storage.prototype.clear = function() {
+        if (this === localStorage) {
+          window.localStorageCache = {};
+          (async () => {
+            try {
+              const db = await new Promise((res) => {
+                const req = indexedDB.open('SapiOfflineDB', 1);
+                req.onsuccess = (ev) => res(ev.target.result);
+                req.onerror = () => res(null);
+              });
+              if (db) {
+                const tx = db.transaction('catalogs', 'readwrite');
+                const store = tx.objectStore('catalogs');
+                store.clear();
+              }
+            } catch (e) {}
+          })();
+        }
+        return originalClear.call(this);
       };
     })();
 
@@ -173,7 +190,7 @@
       }
     } else if (typeof window !== 'undefined') {
       // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
-      const currentAppVer = '1.3.210';
+      const currentAppVer = '1.3.211';
       const lastAppVer = localStorage.getItem('sapi_app_version');
       if (lastAppVer !== currentAppVer) {
         if ('serviceWorker' in navigator) {
@@ -361,7 +378,7 @@
         </div>
       </div>
 
-      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: var(--text-muted);" id="login-app-version">v1.3.210</div>
+      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: var(--text-muted);" id="login-app-version">v1.3.211</div>
     </div>
   </div>
 
@@ -1953,7 +1970,7 @@
                     <div class="toggle-label">Versión de la Aplicación</div>
                     <div class="toggle-sub">Versión actualmente cargada</div>
                   </div>
-                  <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); background: var(--bg-body); padding: 0.25rem 0.6rem; border: 1px solid var(--border); border-radius: 4px;" id="app-profile-version">v1.3.210</div>
+                  <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); background: var(--bg-body); padding: 0.25rem 0.6rem; border: 1px solid var(--border); border-radius: 4px;" id="app-profile-version">v1.3.211</div>
                 </div>
                 <div class="toggle-row" style="border-top: 1px dashed var(--border); padding-top: 0.85rem; margin-top: 0.25rem; flex-direction: column; align-items: stretch; gap: 0.5rem;">
                   <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -5340,8 +5357,8 @@
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=204",
-        "app.js?v=204"
+        "supabaseSync.js?v=210",
+        "app.js?v=210"
       ];
       var index = 0;
       function loadNext() {
