@@ -370,3 +370,18 @@ CREATE POLICY "Permitir select a publico en refacciones" ON public.refacciones F
 
 DROP POLICY IF EXISTS "Permitir select a publico en sitios" ON public.sitios;
 CREATE POLICY "Permitir select a publico en sitios" ON public.sitios FOR SELECT TO public USING (true);
+
+-- 11. Configuración de Políticas para Subtablas de Órdenes (orden_bitacora, orden_refacciones, orden_firmas)
+-- ========================================================
+ALTER TABLE public.orden_bitacora ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orden_refacciones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orden_firmas ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Permitir todo a autenticados en orden_bitacora" ON public.orden_bitacora;
+CREATE POLICY "Permitir todo a autenticados en orden_bitacora" ON public.orden_bitacora FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir todo a autenticados en orden_refacciones" ON public.orden_refacciones;
+CREATE POLICY "Permitir todo a autenticados en orden_refacciones" ON public.orden_refacciones FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir todo a autenticados en orden_firmas" ON public.orden_firmas;
+CREATE POLICY "Permitir todo a autenticados en orden_firmas" ON public.orden_firmas FOR ALL TO authenticated USING (true) WITH CHECK (true);

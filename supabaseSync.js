@@ -1300,11 +1300,14 @@ async function _processSyncQueueInternal() {
               
               // 1. SINCRONIZAR BITÁCORAS DE AVANCES
               const bitacorasMemoria = item.data.bitacora || [];
-              const { data: bitacorasSupa } = await sb.from('orden_bitacora').select('id').eq('orden_id', ordId);
+              const { data: bitacorasSupa, error: selectBitErr } = await sb.from('orden_bitacora').select('id').eq('orden_id', ordId);
+              if (selectBitErr) throw selectBitErr;
+
               const idsMemoria = bitacorasMemoria.map(b => b.id);
               const idsABorrar = (bitacorasSupa || []).filter(b => !idsMemoria.includes(b.id)).map(b => b.id);
               if (idsABorrar.length > 0) {
-                await sb.from('orden_bitacora').delete().in('id', idsABorrar);
+                const { error: delBitErr } = await sb.from('orden_bitacora').delete().in('id', idsABorrar);
+                if (delBitErr) throw delBitErr;
               }
               if (bitacorasMemoria.length > 0) {
                 const cleanFecha = (f) => {
@@ -1340,7 +1343,8 @@ async function _processSyncQueueInternal() {
                     salida: b.salida || null
                   };
                 });
-                await sb.from('orden_bitacora').upsert(filasBitacora, { onConflict: 'id' });
+                const { error: upsertBitErr } = await sb.from('orden_bitacora').upsert(filasBitacora, { onConflict: 'id' });
+                if (upsertBitErr) throw upsertBitErr;
               }
 
               // 2. SINCRONIZAR REFACCIONES UTILIZADAS Y NECESARIAS
@@ -1348,17 +1352,25 @@ async function _processSyncQueueInternal() {
               const refUtilizadas = item.data.ref_utilizadas || [];
               
               // Borrar refacciones previas de esta orden
-              await sb.from('orden_refacciones').delete().eq('orden_id', ordId);
+              const { error: delRefErr } = await sb.from('orden_refacciones').delete().eq('orden_id', ordId);
+              if (delRefErr) throw delRefErr;
               
               const refaccionesDb = JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]');
-              const getRefId = (clave) => {
-                const match = refaccionesDb.find(r => r.codigo === clave || r.id === clave);
+              const getRefId = (clave, descripcion) => {
+                let match = null;
+                if (clave) {
+                  match = refaccionesDb.find(r => r.codigo === clave || r.id === clave);
+                }
+                if (!match && descripcion) {
+                  const descClean = descripcion.trim().toLowerCase();
+                  match = refaccionesDb.find(r => r.descripcion && r.descripcion.trim().toLowerCase() === descClean);
+                }
                 return match ? match.id : null;
               };
 
               const filasRefacciones = [];
               refNecesarias.forEach((r, index) => {
-                const refId = getRefId(r.clave || r.codigo);
+                const refId = getRefId(r.clave || r.codigo, r.descripcion);
                 if (refId) {
                   filasRefacciones.push({
                     id: `ref_nec_${ordId}_${index}`,
@@ -1368,10 +1380,12 @@ async function _processSyncQueueInternal() {
                     precio_unitario: parseFloat(r.precio || r.precioUnitario || 0),
                     estado: r.estado || 'Solicitado'
                   });
+                } else {
+                  console.warn(`[Sync] No se encontró ID para la refacción necesaria: ${r.descripcion} (Clave: ${r.clave})`);
                 }
               });
               refUtilizadas.forEach((r, index) => {
-                const refId = getRefId(r.clave || r.codigo);
+                const refId = getRefId(r.clave || r.codigo, r.descripcion);
                 if (refId) {
                   filasRefacciones.push({
                     id: `ref_ut_${ordId}_${index}`,
@@ -1381,11 +1395,14 @@ async function _processSyncQueueInternal() {
                     precio_unitario: parseFloat(r.precio || r.precioUnitario || 0),
                     estado: r.estado || 'Utilizado'
                   });
+                } else {
+                  console.warn(`[Sync] No se encontró ID para la refacción utilizada: ${r.descripcion} (Clave: ${r.clave})`);
                 }
               });
 
               if (filasRefacciones.length > 0) {
-                await sb.from('orden_refacciones').insert(filasRefacciones);
+                const { error: insRefErr } = await sb.from('orden_refacciones').insert(filasRefacciones);
+                if (insRefErr) throw insRefErr;
               }
 
               // 3. SUBIDA ASÍNCRONA DE FIRMAS Y PERSISTENCIA RELACIONAL
@@ -1431,7 +1448,7 @@ async function _processSyncQueueInternal() {
                 } catch (e){}
               }
 
-              if (firmaTecUrl || firmaCliUrl) {
+               if (firmaTecUrl || firmaCliUrl) {
                 const firmaPayload = {
                   orden_id: ordId,
                   firma_cliente_url: firmaCliUrl || null,
@@ -1440,7 +1457,8 @@ async function _processSyncQueueInternal() {
                   firma_tecnico_url: firmaTecUrl || null,
                   fecha_firma: item.data.firma_cliente_fecha || item.data.firma_tecnico_fecha || new Date().toISOString()
                 };
-                await sb.from('orden_firmas').upsert(firmaPayload, { onConflict: 'orden_id' });
+                const { error: upsertFirmErr } = await sb.from('orden_firmas').upsert(firmaPayload, { onConflict: 'orden_id' });
+                if (upsertFirmErr) throw upsertFirmErr;
               }
 
               // 4. ALIMENTACIÓN DE HISTORIAL DE HORÓMETROS
@@ -1470,13 +1488,15 @@ async function _processSyncQueueInternal() {
                       orden_id: ordId,
                       usuario_id: isValidUUID(activeUserId) ? activeUserId : null
                     };
-                    await sb.from('maquinaria_horometros').upsert(horoPayload, { onConflict: 'id' });
+                    const { error: upsertHoroErr } = await sb.from('maquinaria_horometros').upsert(horoPayload, { onConflict: 'id' });
+                    if (upsertHoroErr) throw upsertHoroErr;
                   }
                 }
               }
 
             } catch (ordErr) {
-              console.error('[Sync] Error al procesar sub-entidades de orden:', ordErr.message);
+              console.error('[Sync] Error al procesar sub-entidades de orden:', ordErr.message || ordErr);
+              error = ordErr;
             }
           }
           if (item.table === 'ordenes' && !error) {
