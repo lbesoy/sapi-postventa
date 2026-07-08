@@ -12,7 +12,8 @@ export default async function handler(req, res) {
   
   const origin = req.headers.origin || '';
   const referer = req.headers.referer || '';
-  const isAllowedOrigin = allowedOrigins.some(o => origin.startsWith(o) || referer.startsWith(o));
+  const isLocal = (url) => /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(url);
+  const isAllowedOrigin = allowedOrigins.some(o => origin.startsWith(o) || referer.startsWith(o)) || isLocal(origin) || isLocal(referer);
   
   if (!isAllowedOrigin && process.env.NODE_ENV === 'production') {
     return res.status(403).json({ error: 'Access Denied: Forbidden Origin' });

@@ -2019,18 +2019,37 @@ window.cargarDatosDeSupabase = function() {
       console.error('[Sync] Error al cargar user_roles:', errU);
     }
 
-    // Config y Saldos
-    const { data: configDb } = await sb.from('config').select('*');
+    // Config, Saldos y Roles (Procesados de forma unificada e independiente)
     let saldosSap = {};
-    if (configDb && configDb.length > 0) {
-      const mainCfg = configDb.find(c => c.id === 'main');
-      if (mainCfg && mainCfg.data) {
-        localStorage.setItem('eurorep_config', JSON.stringify(mainCfg.data));
+    try {
+      const { data: configDb, error: configErr } = await sb.from('config').select('*');
+      if (configErr) {
+        console.error('[Sync] Error al descargar config de Supabase:', configErr.message);
+      } else if (configDb && configDb.length > 0) {
+        const mainCfg = configDb.find(c => c.id === 'main');
+        if (mainCfg && mainCfg.data) {
+          localStorage.setItem('eurorep_config', JSON.stringify(mainCfg.data));
+        }
+        const saldosCfg = configDb.find(c => c.id === 'saldos_sap');
+        if (saldosCfg && saldosCfg.data) {
+          saldosSap = saldosCfg.data;
+        }
+        const rolesCfg = configDb.find(c => c.id === 'roles');
+        if (rolesCfg && rolesCfg.data) {
+          localStorage.setItem('sapi_roles_config', JSON.stringify(rolesCfg.data));
+          // Re-aplicar roles y permisos dinámicamente en caliente en el frontend
+          if (typeof window.cargarRolesDesdeStorage === 'function') {
+            window.cargarRolesDesdeStorage();
+          }
+          if (window.currentSession && window.currentSession.viewMode) {
+            if (typeof window.applyRole === 'function') {
+              window.applyRole(window.currentSession.viewMode);
+            }
+          }
+        }
       }
-      const saldosCfg = configDb.find(c => c.id === 'saldos_sap');
-      if (saldosCfg && saldosCfg.data) {
-        saldosSap = saldosCfg.data;
-      }
+    } catch (cfgErr) {
+      console.error('[Sync] Excepción al procesar config:', cfgErr.message);
     }
 
     // Clientes (Reconstrucción Dinámica Normalizada)
@@ -2553,21 +2572,7 @@ window.cargarDatosDeSupabase = function() {
       console.log('[Sync] Omitiendo descarga del catálogo de refacciones para rol cliente/empresa.');
     }
 
-    // La tabla config ahora se procesa arriba antes que clientes.
-
-    const { data: rolesDb } = await sb.from('config').select('*').eq('id', 'roles');
-    if (rolesDb && rolesDb.length > 0 && rolesDb[0].data) {
-      localStorage.setItem('sapi_roles_config', JSON.stringify(rolesDb[0].data));
-      // Re-aplicar roles y permisos dinámicamente en caliente en el frontend
-      if (typeof window.cargarRolesDesdeStorage === 'function') {
-        window.cargarRolesDesdeStorage();
-      }
-      if (window.currentSession && window.currentSession.viewMode) {
-        if (typeof window.applyRole === 'function') {
-          window.applyRole(window.currentSession.viewMode);
-        }
-      }
-    }
+    // La tabla config y roles ya se procesan arriba de forma segura al inicio de la sincronización.
     // Clara Transactions
     try {
       const { data: claraDb, error: claraErr } = await sb.from('clara_transactions').select('*');

@@ -20,7 +20,8 @@ app.use(cors({
     // Permitir solicitudes sin origen (por ejemplo, herramientas como curl o llamadas servidor a servidor)
     if (!origin) return callback(null, true);
     
-    const isAllowed = allowedOrigins.some(o => origin.startsWith(o));
+    const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+    const isAllowed = allowedOrigins.some(o => origin.startsWith(o)) || isLocalhost;
     if (isAllowed) {
       callback(null, true);
     } else {
