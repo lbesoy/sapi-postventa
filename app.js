@@ -3762,31 +3762,38 @@ function _renderStatsInternal() {
       const userRole = currentSession.viewMode || '';
       if (userRole === 'tecnico') {
         const tecName = currentUser ? currentUser.nombre : '';
+        const tecNameLower = tecName.toLowerCase().trim();
         ordenesFilter = ordenesFilter.filter(o => {
           let assigned = [];
           if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
           else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
+          const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
           let isCreator = false;
           let isTkAssigned = false;
-          if (o.creadoPor === tecName) isCreator = true;
+          if (o.creadoPor && String(o.creadoPor).toLowerCase().trim() === tecNameLower) isCreator = true;
           if (o.soporte) {
             const tk = tickets.find(x => x.id === o.soporte);
             if (tk) {
-              if (tk.solicitante === tecName || tk.creadoPor === tecName) isCreator = true;
+              if ((tk.solicitante && String(tk.solicitante).toLowerCase().trim() === tecNameLower) || 
+                  (tk.creadoPor && String(tk.creadoPor).toLowerCase().trim() === tecNameLower)) isCreator = true;
               let tkAssigned = [];
               if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(resolveTecnicoNombre);
               else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
-              if (tkAssigned.includes(tecName)) isTkAssigned = true;
+              const tkAssignedLower = tkAssigned.map(s => String(s).toLowerCase().trim());
+              if (tkAssignedLower.includes(tecNameLower)) isTkAssigned = true;
             }
           }
-          return assigned.includes(tecName) || isCreator || isTkAssigned;
+          return assignedLower.includes(tecNameLower) || isCreator || isTkAssigned;
         });
 
         ticketsFilter = ticketsFilter.filter(t => {
           let assigned = [];
           if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
           else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
-          return assigned.includes(tecName) || t.solicitante === tecName || t.creadoPor === tecName;
+          const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
+          return assignedLower.includes(tecNameLower) || 
+                 (t.solicitante && String(t.solicitante).toLowerCase().trim() === tecNameLower) || 
+                 (t.creadoPor && String(t.creadoPor).toLowerCase().trim() === tecNameLower);
         });
       } else if (userRole === 'supervisor') {
         const supFilter = currentUser ? currentUser.nombre : '';
@@ -4026,31 +4033,38 @@ function renderDashboardV2() {
     const chart3 = document.getElementById('v2-title-chart-3'); if (chart3) chart3.textContent = 'Top Equipos (Mantenimientos)';
   } else if ((currentSession.viewMode || '') === 'tecnico') {
     const tecName = currentUser ? currentUser.nombre : '';
+    const tecNameLower = tecName.toLowerCase().trim();
     ordenesDash = ordenesDash.filter(o => {
       let assigned = [];
       if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
       else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
+      const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
       let isCreator = false;
       let isTkAssigned = false;
-      if (o.creadoPor === tecName) isCreator = true;
+      if (o.creadoPor && String(o.creadoPor).toLowerCase().trim() === tecNameLower) isCreator = true;
       if (o.soporte) {
         const tk = tickets.find(x => x.id === o.soporte);
         if (tk) {
-          if (tk.solicitante === tecName || tk.creadoPor === tecName) isCreator = true;
+          if ((tk.solicitante && String(tk.solicitante).toLowerCase().trim() === tecNameLower) || 
+              (tk.creadoPor && String(tk.creadoPor).toLowerCase().trim() === tecNameLower)) isCreator = true;
           let tkAssigned = [];
           if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(resolveTecnicoNombre);
           else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
-          if (tkAssigned.includes(tecName)) isTkAssigned = true;
+          const tkAssignedLower = tkAssigned.map(s => String(s).toLowerCase().trim());
+          if (tkAssignedLower.includes(tecNameLower)) isTkAssigned = true;
         }
       }
-      return assigned.includes(tecName) || isCreator || isTkAssigned;
+      return assignedLower.includes(tecNameLower) || isCreator || isTkAssigned;
     });
 
     ticketsDash = ticketsDash.filter(t => {
       let assigned = [];
       if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
       else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
-      return assigned.includes(tecName) || t.solicitante === tecName || t.creadoPor === tecName;
+      const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
+      return assignedLower.includes(tecNameLower) || 
+             (t.solicitante && String(t.solicitante).toLowerCase().trim() === tecNameLower) || 
+             (t.creadoPor && String(t.creadoPor).toLowerCase().trim() === tecNameLower);
     });
 
     const rend1 = document.getElementById('v2-label-rend-1'); if (rend1) rend1.textContent = 'Refacciones Faltantes';
