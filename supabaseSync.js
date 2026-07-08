@@ -2356,7 +2356,10 @@ window.cargarDatosDeSupabase = function() {
     }
 
     // Órdenes — mismo principio
-    const { data: ordenes } = await sb.from('ordenes').select('*');
+    const { data: ordenes, error: ordenesError } = await sb.from('ordenes').select('*');
+    window.lastSyncOrdsLength = ordenes ? ordenes.length : -1;
+    window.lastSyncOrdsError = ordenesError ? ordenesError.message : null;
+    window.lastSyncTimestamp = new Date().toISOString();
     if (ordenes) {
       let bitacorasMap = {};
       try {
@@ -2505,6 +2508,7 @@ window.cargarDatosDeSupabase = function() {
         
         return ord;
       });
+      window.lastSyncMappedLength = mapped ? mapped.length : -1;
       
       // FUSIONAR CON CAMBIOS LOCALES PENDIENTES DE SINCRONIZAR
       const queue = getSyncQueue();
