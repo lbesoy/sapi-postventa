@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.225'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.226'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -3630,11 +3630,20 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
   else if (tipo === 'rendimiento') {
     if (filtro === 'refacciones') {
       title.textContent = `Desglose: Refacciones Faltantes`;
-      thead.innerHTML = `<tr><th>Folio Orden</th><th>Cliente</th><th>Técnico</th><th>Refacciones</th></tr>`;
+      thead.innerHTML = `<tr><th>Refacción</th><th>Cantidad</th><th>Folio Orden</th><th>Cliente</th><th>Técnico</th></tr>`;
       getFilteredOrders().forEach(o => {
         if ((o.estado || '').toLowerCase() !== 'completado' && o.ref_necesarias && o.ref_necesarias.length > 0) {
-          const refsStr = o.ref_necesarias.map(r => r.descripcion || r.clave || '').filter(Boolean).join(', ');
-          tbody.innerHTML += `<tr><td>${o.folio || 'N/A'}</td><td>${o.cliente || 'N/A'}</td><td>${o.tecnico || 'N/A'}</td><td>${refsStr}</td></tr>`;
+          o.ref_necesarias.forEach(r => {
+            const desc = r.descripcion || r.clave || 'N/A';
+            const cant = r.cantidad || 1;
+            tbody.innerHTML += `<tr>
+              <td style="font-weight: 600; color: var(--text-primary);">${desc}</td>
+              <td style="font-weight: 700; color: var(--accent);">${cant}</td>
+              <td>${o.folio || 'N/A'}</td>
+              <td>${o.cliente || 'N/A'}</td>
+              <td>${o.tecnico || 'N/A'}</td>
+            </tr>`;
+          });
         }
       });
     } else if (filtro === 'ordenes') {
