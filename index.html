@@ -3690,6 +3690,21 @@
               <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.4rem;">Las contraseñas ahora son
                 gestionadas por cada usuario desde el inicio de sesión oficial.</p>
             </div>
+            <!-- SECCIÓN: Restablecer Contraseña (Solo cuando se edita un usuario existente) -->
+            <div class="form-section" id="u-reset-pass-section" style="display:none; border-top: 1px dashed var(--border); padding-top: 1rem; margin-top: 1.5rem;">
+              <div class="form-section-title"><i data-lucide="key-round" class="section-icon"></i> Restablecer Contraseña (Administrador)</div>
+              <p style="color:var(--text-secondary);font-size:0.78rem;margin-top:0.25rem;line-height:1.4;">Establece una nueva contraseña para este usuario inmediatamente.</p>
+              <div style="display:flex; gap:0.75rem; margin-top:1rem; align-items:flex-end;">
+                <div class="form-group" style="flex:1; margin-bottom:0;">
+                  <label>Nueva Contraseña (mín. 6 caracteres) *</label>
+                  <input type="password" id="u-new-password" placeholder="••••••••" minlength="6" />
+                </div>
+                <button type="button" class="btn-primary" onclick="adminRestablecerPasswordClick(event)" style="padding:0.75rem 1.25rem; white-space:nowrap;">
+                  <i data-lucide="lock" class="btn-icon"></i> Actualizar
+                </button>
+              </div>
+              <div id="u-reset-pass-error" class="pin-error" style="text-align:left;margin-top:0.5rem;font-size:0.8rem;"></div>
+            </div>
             <div class="form-actions">
               <button type="button" class="btn-secondary" onclick="cerrarModalUsuario()">Cancelar</button>
               <button type="submit" class="btn-primary"><i data-lucide="save" class="btn-icon"></i> Guardar

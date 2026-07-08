@@ -3001,6 +3001,19 @@ function abrirModalUsuario(id) {
   const formEl = document.getElementById('form-usuario');
   if (formEl) formEl.reset();
   
+  // Limpiar y ocultar sección de restablecer contraseña
+  const uResetPassSection = document.getElementById('u-reset-pass-section');
+  const uNewPassword = document.getElementById('u-new-password');
+  const uResetPassError = document.getElementById('u-reset-pass-error');
+  if (uNewPassword) uNewPassword.value = '';
+  if (uResetPassError) {
+    uResetPassError.textContent = '';
+    uResetPassError.style.color = '';
+  }
+  if (uResetPassSection) {
+    uResetPassSection.style.display = id ? 'block' : 'none';
+  }
+
   // Rellenar datalist de empresas (clientesLegacy + clientesDb)
   const legacyMap = new Map();
   ordenes.forEach(o => { if (o.cliente) legacyMap.set(o.cliente, true); });
@@ -3086,6 +3099,67 @@ function cerrarModalUsuario(e) {
   document.body.style.overflow = '';
   editandoUserId = null;
 }
+
+async function adminRestablecerPasswordClick(e) {
+  if (e) e.preventDefault();
+  const newPassEl = document.getElementById('u-new-password');
+  const errorEl = document.getElementById('u-reset-pass-error');
+  const newPass = newPassEl ? newPassEl.value : '';
+
+  if (!editandoUserId) {
+    alert('Error: No se ha seleccionado ningún usuario para editar.');
+    return;
+  }
+
+  if (newPass.length < 6) {
+    errorEl.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+    errorEl.style.color = 'var(--red)';
+    return;
+  }
+
+  errorEl.textContent = 'Estableciendo nueva contraseña...';
+  errorEl.style.color = 'var(--text-secondary)';
+
+  try {
+    const session = window.supabaseClient ? (await window.supabaseClient.auth.getSession())?.data?.session : null;
+    const token = session ? session.access_token : '';
+
+    if (!token) {
+      errorEl.textContent = 'Error: Sesión de administrador no válida. Vuelve a iniciar sesión.';
+      errorEl.style.color = 'var(--red)';
+      return;
+    }
+
+    const response = await fetch('/api/admin-reset-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        targetUserId: editandoUserId,
+        newPassword: newPass
+      })
+    });
+
+    const resData = await response.json();
+
+    if (!response.ok || resData.error) {
+      errorEl.textContent = 'Error: ' + (resData.error || 'No se pudo actualizar la contraseña.');
+      errorEl.style.color = 'var(--red)';
+    } else {
+      errorEl.textContent = '¡Contraseña restablecida exitosamente!';
+      errorEl.style.color = 'var(--green)';
+      newPassEl.value = '';
+      mostrarNotificacion('Contraseña del usuario actualizada con éxito.', 'success');
+    }
+  } catch (err) {
+    console.error('Error al restablecer contraseña por el admin:', err);
+    errorEl.textContent = 'Error de conexión. Intente de nuevo.';
+    errorEl.style.color = 'var(--red)';
+  }
+}
+window.adminRestablecerPasswordClick = adminRestablecerPasswordClick;
 
 async function guardarUsuario(e) {
   e.preventDefault();
