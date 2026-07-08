@@ -2326,14 +2326,7 @@ window.cargarDatosDeSupabase = function() {
       ticketsError = e;
     }
 
-    if (window.trackTelemetryEvent) {
-      window.trackTelemetryEvent('Diag: Tickets Fetch', {
-        success: !!ticketsDb,
-        count: ticketsDb ? ticketsDb.length : 0,
-        error: ticketsError ? (ticketsError.message || String(ticketsError)) : null,
-        syncScriptVersion: 'v1.3.167-optimized'
-      });
-    }
+
 
     if (ticketsDb) {
       let mapped = [];

@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.227'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.228'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -11301,18 +11301,7 @@ function renderTickets(ctx) {
       )
     );
     
-    if (window.trackTelemetryEvent && !isDashView && !isV2) {
-      try {
-        window.trackTelemetryEvent('Diag: Render Filter Statistics', {
-          totalTickets: tickets.length,
-          isTestMode: isTestModeActive(),
-          isTestDataCount: tickets.filter(t => isTestData(t)).length,
-          filteredInitial: filtered.length,
-          searchQuery: q,
-          role: currentSession.viewMode || 'N/A'
-        });
-      } catch (e) {}
-    }
+
     
     // Ordenar dinámicamente según la columna seleccionada
     filtered.sort((a, b) => {
