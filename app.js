@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.204'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.205'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -1476,6 +1476,14 @@ function inicializarApp() {
   if (verEl) {
     verEl.textContent = APP_VERSION;
   }
+  const verElProfile = document.getElementById('app-profile-version');
+  if (verElProfile) {
+    verElProfile.textContent = APP_VERSION;
+  }
+  const loginVerEl = document.getElementById('login-app-version');
+  if (loginVerEl) {
+    loginVerEl.textContent = APP_VERSION;
+  }
 
   // Cerrar popup de filtros al hacer click afuera
   try {
@@ -1755,6 +1763,13 @@ function isTestModeActive() {
     return isTestUser({ nombre: currentSession.nombre, email: currentSession.userId + '@temp.com' });
   }
   return false;
+}
+
+function resolveTecnicoNombre(idOrName) {
+  if (!idOrName) return '';
+  const user = (typeof usuarios !== 'undefined' ? usuarios : []).find(u => u.id === idOrName) || 
+               (typeof tecnicosDb !== 'undefined' ? tecnicosDb : []).find(t => t.id === idOrName);
+  return user ? user.nombre : idOrName;
 }
 
 function getFilteredOrders() {
@@ -3749,7 +3764,7 @@ function _renderStatsInternal() {
         const tecName = currentUser ? currentUser.nombre : '';
         ordenesFilter = ordenesFilter.filter(o => {
           let assigned = [];
-          if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados;
+          if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
           else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
           let isCreator = false;
           let isTkAssigned = false;
@@ -3759,7 +3774,7 @@ function _renderStatsInternal() {
             if (tk) {
               if (tk.solicitante === tecName || tk.creadoPor === tecName) isCreator = true;
               let tkAssigned = [];
-              if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados;
+              if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(resolveTecnicoNombre);
               else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
               if (tkAssigned.includes(tecName)) isTkAssigned = true;
             }
@@ -3769,7 +3784,7 @@ function _renderStatsInternal() {
 
         ticketsFilter = ticketsFilter.filter(t => {
           let assigned = [];
-          if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+          if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
           else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
           return assigned.includes(tecName) || t.solicitante === tecName || t.creadoPor === tecName;
         });
@@ -3785,7 +3800,7 @@ function _renderStatsInternal() {
           }
           
           let assigned = [];
-          if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados;
+          if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
           else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
           
           let passSupTicket = assigned.includes(supFilter);
@@ -3796,7 +3811,7 @@ function _renderStatsInternal() {
             if (tk) {
               if (tk.solicitante === supFilter || tk.creadoPor === supFilter) isCreator = true;
               let tkAssigned = [];
-              if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados;
+              if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(resolveTecnicoNombre);
               else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
               if (tkAssigned.includes(supFilter)) passSupTicket = true;
             }
@@ -3820,7 +3835,7 @@ function _renderStatsInternal() {
             }
             
             let assigned = [];
-            if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+            if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
             else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
             
             let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
@@ -4013,7 +4028,7 @@ function renderDashboardV2() {
     const tecName = currentUser ? currentUser.nombre : '';
     ordenesDash = ordenesDash.filter(o => {
       let assigned = [];
-      if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados;
+      if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
       else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
       let isCreator = false;
       let isTkAssigned = false;
@@ -4023,7 +4038,7 @@ function renderDashboardV2() {
         if (tk) {
           if (tk.solicitante === tecName || tk.creadoPor === tecName) isCreator = true;
           let tkAssigned = [];
-          if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados;
+          if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(resolveTecnicoNombre);
           else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
           if (tkAssigned.includes(tecName)) isTkAssigned = true;
         }
@@ -4033,7 +4048,7 @@ function renderDashboardV2() {
 
     ticketsDash = ticketsDash.filter(t => {
       let assigned = [];
-      if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+      if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
       else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
       return assigned.includes(tecName) || t.solicitante === tecName || t.creadoPor === tecName;
     });
@@ -4054,7 +4069,7 @@ function renderDashboardV2() {
       }
       
       let assigned = [];
-      if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados;
+      if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
       else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
       
       let passSupTicket = assigned.includes(supFilter);
@@ -4065,7 +4080,7 @@ function renderDashboardV2() {
         if (tk) {
           if (tk.solicitante === supFilter || tk.creadoPor === supFilter) isCreator = true;
           let tkAssigned = [];
-          if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados;
+          if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(resolveTecnicoNombre);
           else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
           if (tkAssigned.includes(supFilter)) passSupTicket = true;
         }
@@ -4089,7 +4104,7 @@ function renderDashboardV2() {
         }
         
         let assigned = [];
-        if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+        if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
         else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
         
         let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
@@ -4463,7 +4478,7 @@ function renderDashboardTecnicos() {
   // Calcular métricas desde órdenes y bitácoras
   ordersFiltered.forEach(o => {
     let techNames = [];
-    if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) techNames = o.tecnicosAsignados;
+    if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) techNames = o.tecnicosAsignados.map(resolveTecnicoNombre);
     else if (o.tecnico) techNames = o.tecnico.split(',').map(s => s.trim());
 
     techNames.forEach(tName => {
@@ -4739,7 +4754,7 @@ function renderTabla(ctx) {
       
       if (tecFilter && tecName) {
          let assigned = [];
-         if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados;
+         if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
          else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
          let isCreator = false;
          let isTkAssigned = false;
@@ -4749,7 +4764,7 @@ function renderTabla(ctx) {
             if (tk) {
                if (tk.solicitante === tecName || tk.creadoPor === tecName) isCreator = true;
                let tkAssigned = [];
-               if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados;
+               if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(resolveTecnicoNombre);
                else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
                if (tkAssigned.includes(tecName)) isTkAssigned = true;
             }
@@ -4767,7 +4782,7 @@ function renderTabla(ctx) {
          }
          
          let assigned = [];
-         if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados;
+         if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
          else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
          
          let passSupTicket = assigned.includes(supFilter);
@@ -4778,7 +4793,7 @@ function renderTabla(ctx) {
             if (tk) {
                if (tk.solicitante === supFilter || tk.creadoPor === supFilter) isCreator = true;
                let tkAssigned = [];
-               if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados;
+               if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(resolveTecnicoNombre);
                else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
                if (tkAssigned.includes(supFilter)) passSupTicket = true;
             }
@@ -5697,14 +5712,14 @@ function verDetalleCliente(nombre) {
   let tecNombre = 'N/A';
   if (clienteOb) {
     if (clienteOb.supervisoresAsignados && clienteOb.supervisoresAsignados.length > 0) {
-      supNombre = clienteOb.supervisoresAsignados.map(id => usuarios.find(x => x.id === id)?.nombre).filter(Boolean).join(', ') || 'N/A';
+      supNombre = clienteOb.supervisoresAsignados.map(id => usuarios.find(x => x.id === id)?.nombre || id).filter(Boolean).join(', ') || 'N/A';
     } else if (clienteOb.supervisorAsignado) { // Legacy single support
       const u = usuarios.find(x => x.id === clienteOb.supervisorAsignado);
       if (u) supNombre = u.nombre;
     }
     
     if (clienteOb.tecnicosAsignados && clienteOb.tecnicosAsignados.length > 0) {
-      tecNombre = clienteOb.tecnicosAsignados.map(id => usuarios.find(x => x.id === id)?.nombre).filter(Boolean).join(', ') || 'N/A';
+      tecNombre = clienteOb.tecnicosAsignados.map(id => usuarios.find(x => x.id === id)?.nombre || id).filter(Boolean).join(', ') || 'N/A';
     } else if (clienteOb.tecnicoAsignado) { // Legacy single support
       const u = usuarios.find(x => x.id === clienteOb.tecnicoAsignado);
       if (u) tecNombre = u.nombre;
@@ -7576,7 +7591,7 @@ function renderTecnicos() {
     const tOrdenes = getFilteredOrders().filter(o => {
       let assigned = [];
       if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) {
-        assigned = o.tecnicosAsignados.map(formatNombreCorto);
+        assigned = o.tecnicosAsignados.map(id => formatNombreCorto(resolveTecnicoNombre(id)));
       } else if (o.tecnico) {
         assigned = o.tecnico.split(',').map(s => formatNombreCorto(s.trim()));
       }
@@ -7644,7 +7659,7 @@ function renderTecnicos() {
       const tOrdenes = getFilteredOrders().filter(o => {
         let assigned = [];
         if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) {
-          assigned = o.tecnicosAsignados.map(formatNombreCorto);
+          assigned = o.tecnicosAsignados.map(id => formatNombreCorto(resolveTecnicoNombre(id)));
         } else if (o.tecnico) {
           assigned = o.tecnico.split(',').map(s => formatNombreCorto(s.trim()));
         }
@@ -7727,7 +7742,7 @@ function verDetalleTecnico(nombre) {
   const tOrdenes = getFilteredOrders().filter(o => {
     let assigned = [];
     if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) {
-      assigned = o.tecnicosAsignados.map(formatNombreCorto);
+      assigned = o.tecnicosAsignados.map(id => formatNombreCorto(resolveTecnicoNombre(id)));
     } else if (o.tecnico) {
       assigned = o.tecnico.split(',').map(s => formatNombreCorto(s.trim()));
     }
@@ -10575,7 +10590,7 @@ function updateTicketBadge() {
       
       if (tecFilter && tecName) {
          let assigned = [];
-         if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+         if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
          else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
          passTec = assigned.includes(tecName) || t.solicitante === tecName || t.creadoPor === tecName;
       }
@@ -10590,7 +10605,7 @@ function updateTicketBadge() {
          }
          
          let assigned = [];
-         if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+         if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
          else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
          
          let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
@@ -10956,7 +10971,7 @@ function renderTickets(ctx) {
         
         if (tecFilter && tecName) {
            let assigned = [];
-           if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+           if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
            else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
            passTec = assigned.includes(tecName) || t.solicitante === tecName || t.creadoPor === tecName;
         }
@@ -10971,7 +10986,7 @@ function renderTickets(ctx) {
            }
            
            let assigned = [];
-           if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados;
+           if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
            else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
            
            let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
