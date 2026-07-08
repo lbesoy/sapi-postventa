@@ -564,6 +564,7 @@ body {
 .badge-pendiente { background: var(--red-light); color: var(--red); }
 .badge-proceso { background: var(--accent-light); color: var(--accent); }
 .badge-completado { background: var(--green-light); color: var(--green); }
+.badge-refacciones-pendientes { background: rgba(236,72,153,0.12); color: #ec4899; }
 
 /* ===== ACTION BUTTONS ===== */
 .action-btn {
@@ -1598,6 +1599,9 @@ body {
 .dashboard-grid.grid-4 {
   grid-template-columns: repeat(4, 1fr);
 }
+.dashboard-grid.grid-5 {
+  grid-template-columns: repeat(5, 1fr);
+}
 .dashboard-grid.grid-3 {
   grid-template-columns: repeat(3, 1fr);
 }
@@ -1606,7 +1610,8 @@ body {
 }
 
 @media screen and (max-width: 1024px) {
-  .dashboard-grid.grid-4 {
+  .dashboard-grid.grid-4,
+  .dashboard-grid.grid-5 {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -1739,7 +1744,8 @@ body {
   .dashboard-grid.grid-3 {
     grid-template-columns: repeat(2, 1fr);
   }
-  .dashboard-grid.grid-4 {
+  .dashboard-grid.grid-4,
+  .dashboard-grid.grid-5 {
     grid-template-columns: repeat(2, 1fr);
   }
 
@@ -1948,7 +1954,8 @@ body {
 @media screen and (max-width: 576px) {
   .dashboard-grid.grid-2,
   .dashboard-grid.grid-3,
-  .dashboard-grid.grid-4 {
+  .dashboard-grid.grid-4,
+  .dashboard-grid.grid-5 {
     grid-template-columns: 1fr;
   }
 

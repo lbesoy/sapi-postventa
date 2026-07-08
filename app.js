@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.231'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.232'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -3935,7 +3935,9 @@ function _renderStatsInternal() {
   // V2 dashboard stats
   const setV2 = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
   setV2('v2-stat-total', total); setV2('v2-stat-pendientes', pendientes);
-  setV2('v2-stat-proceso', proceso); setV2('v2-stat-completas', completas);
+  setV2('v2-stat-proceso', proceso);
+  setV2('v2-stat-refacciones-pendientes', refaccionesPendientes);
+  setV2('v2-stat-completas', completas);
   setV2('v2-stat-t-total', t_total); setV2('v2-stat-t-abiertos', t_abiertos);
   setV2('v2-stat-t-refacciones', t_refacciones);
   setV2('v2-stat-t-cotizacion', t_cotizacion);

@@ -190,7 +190,7 @@
       }
     } else if (typeof window !== 'undefined') {
       // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
-      const currentAppVer = '1.3.231';
+      const currentAppVer = '1.3.232';
       const lastAppVer = localStorage.getItem('sapi_app_version');
       if (lastAppVer !== currentAppVer) {
         if ('serviceWorker' in navigator) {
@@ -653,7 +653,7 @@
             </div>
 
             <!-- KPIs ORDENES -->
-            <div class="dashboard-grid grid-4">
+            <div class="dashboard-grid grid-5">
               <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('ordenes', '')">
                 <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:#4f8ef7;border-radius:4px 0 0 4px;"></div>
                 <div style="display:flex; flex-direction:column; flex:1;">
@@ -680,6 +680,15 @@
                   <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">En ejecucion</div>
                 </div>
                 <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="clock"></i></div>
+              </div>
+              <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('ordenes', 'Refacciones pendientes')">
+                <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:#ec4899;border-radius:4px 0 0 4px;"></div>
+                <div style="display:flex; flex-direction:column; flex:1;">
+                  <div class="stat-label" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Refacciones Pendientes</div>
+                  <div class="stat-value" id="v2-stat-refacciones-pendientes" style="font-size:2rem;margin:0;color:#ec4899;line-height:1;">0</div>
+                  <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;line-height:1.2;">Esperando refacciones</div>
+                </div>
+                <div class="stat-icon" style="background:rgba(236,72,153,0.12);color:#ec4899;flex-shrink:0;margin:0 0.25rem;"><i data-lucide="package"></i></div>
               </div>
               <div class="stat-card" style="cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;" onclick="abrirDesgloseDashboard('ordenes', 'Completado')">
                 <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:#10b981;border-radius:4px 0 0 4px;"></div>
@@ -5458,8 +5467,8 @@
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=231",
-        "app.js?v=231"
+        "supabaseSync.js?v=232",
+        "app.js?v=232"
       ];
       var index = 0;
       function loadNext() {
