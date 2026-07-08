@@ -902,22 +902,93 @@ async function _processSyncQueueInternal() {
       try {
         if (item.action === 'upsert') {
           // Pipeline de subida automática a Supabase Storage para archivos binarios (evita guardar base64 en la base de datos)
-          if (item.table === 'ordenes' && item.data.evidenciaBase64 && item.data.evidenciaBase64.startsWith('data:')) {
-            try {
-              const fileName = `orden_${item.data.id}_${Date.now()}.png`;
-              const publicUrl = await window.uploadBase64ToStorage(item.data.evidenciaBase64, 'evidencias', `ordenes/${fileName}`);
-              if (publicUrl) {
-                item.data.evidenciaBase64 = publicUrl;
-                // Actualizar también en el almacenamiento local de órdenes
-                const localOrd = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
-                const idx = localOrd.findIndex(o => o.id === item.data.id);
-                if (idx > -1) {
-                  localOrd[idx].evidenciaBase64 = publicUrl;
-                  localStorage.setItem('sapi_ordenes', JSON.stringify(localOrd));
+          if (item.table === 'ordenes') {
+            let actualizoOrdenLocal = false;
+            const localOrd = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+            const idx = localOrd.findIndex(o => o.id === item.data.id);
+
+            // 1. Evidencia antigua / fallback
+            if (item.data.evidenciaBase64 && item.data.evidenciaBase64.startsWith('data:')) {
+              try {
+                const fileName = `orden_${item.data.id}_${Date.now()}.png`;
+                const publicUrl = await window.uploadBase64ToStorage(item.data.evidenciaBase64, 'evidencias', `ordenes/${fileName}`);
+                if (publicUrl) {
+                  item.data.evidenciaBase64 = publicUrl;
+                  if (idx > -1) {
+                    localOrd[idx].evidenciaBase64 = publicUrl;
+                    actualizoOrdenLocal = true;
+                  }
+                }
+              } catch (stErr) {
+                console.error('[Storage] Error en la subida automática de evidencia de orden (evidenciaBase64):', stErr);
+              }
+            }
+
+            // 2. Estructura de evidencias del técnico (fotoInicio, fotoFin, adicionales)
+            if (item.data.evidencias) {
+              // Subir fotoInicio si es base64
+              if (item.data.evidencias.fotoInicio && item.data.evidencias.fotoInicio.startsWith('data:')) {
+                try {
+                  const fileName = `fotoInicio_${item.data.id}_${Date.now()}.jpg`;
+                  const publicUrl = await window.uploadBase64ToStorage(item.data.evidencias.fotoInicio, 'evidencias', `ordenes/${item.data.id}/${fileName}`);
+                  if (publicUrl) {
+                    item.data.evidencias.fotoInicio = publicUrl;
+                    if (idx > -1) {
+                      if (!localOrd[idx].evidencias) localOrd[idx].evidencias = {};
+                      localOrd[idx].evidencias.fotoInicio = publicUrl;
+                      actualizoOrdenLocal = true;
+                    }
+                  }
+                } catch (stErr) {
+                  console.error('[Storage] Error en la subida automática de fotoInicio:', stErr);
                 }
               }
-            } catch (stErr) {
-              console.error('[Storage] Error en la subida automática de evidencia de orden:', stErr);
+
+              // Subir fotoFin si es base64
+              if (item.data.evidencias.fotoFin && item.data.evidencias.fotoFin.startsWith('data:')) {
+                try {
+                  const fileName = `fotoFin_${item.data.id}_${Date.now()}.jpg`;
+                  const publicUrl = await window.uploadBase64ToStorage(item.data.evidencias.fotoFin, 'evidencias', `ordenes/${item.data.id}/${fileName}`);
+                  if (publicUrl) {
+                    item.data.evidencias.fotoFin = publicUrl;
+                    if (idx > -1) {
+                      if (!localOrd[idx].evidencias) localOrd[idx].evidencias = {};
+                      localOrd[idx].evidencias.fotoFin = publicUrl;
+                      actualizoOrdenLocal = true;
+                    }
+                  }
+                } catch (stErr) {
+                  console.error('[Storage] Error en la subida automática de fotoFin:', stErr);
+                }
+              }
+
+              // Subir fotos adicionales que sean base64
+              if (item.data.evidencias.adicionales && item.data.evidencias.adicionales.length > 0) {
+                for (let i = 0; i < item.data.evidencias.adicionales.length; i++) {
+                  const imgUrl = item.data.evidencias.adicionales[i];
+                  if (imgUrl && imgUrl.startsWith('data:')) {
+                    try {
+                      const fileName = `adicional_${i}_${item.data.id}_${Date.now()}.jpg`;
+                      const publicUrl = await window.uploadBase64ToStorage(imgUrl, 'evidencias', `ordenes/${item.data.id}/${fileName}`);
+                      if (publicUrl) {
+                        item.data.evidencias.adicionales[i] = publicUrl;
+                        if (idx > -1) {
+                          if (!localOrd[idx].evidencias) localOrd[idx].evidencias = {};
+                          if (!localOrd[idx].evidencias.adicionales) localOrd[idx].evidencias.adicionales = [];
+                          localOrd[idx].evidencias.adicionales[i] = publicUrl;
+                          actualizoOrdenLocal = true;
+                        }
+                      }
+                    } catch (stErr) {
+                      console.error('[Storage] Error en la subida automática de foto adicional:', stErr);
+                    }
+                  }
+                }
+              }
+            }
+
+            if (actualizoOrdenLocal && idx > -1) {
+              localStorage.setItem('sapi_ordenes', JSON.stringify(localOrd));
             }
           } else if (item.table === 'gastos') {
             let actualizoGastoLocal = false;

@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.211'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.212'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -9011,38 +9011,62 @@ window.subirEvidenciaFoto = async function(ordenId, tipo, inputEl) {
     });
   };
 
+  const blobToBase64 = (blob) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  };
+
   try {
     const compressedBlob = await compressImage(file);
     const uniqueName = `${tipo}_${Date.now()}_${Math.random().toString(36).substring(2,7)}.jpg`;
     const filePath = `ordenes/${ordenId}/${uniqueName}`.replace(/[\[\]\*?]/g, '');
 
-    if (!window.supabaseClient) {
-      alert("Error: Cliente Supabase no está conectado.");
-      return;
+    let publicUrl = null;
+    let savedOffline = false;
+
+    // Si estamos offline o no hay supabaseClient, guardar directo en base64
+    if (!navigator.onLine || !window.supabaseClient) {
+      const base64Data = await blobToBase64(compressedBlob);
+      publicUrl = base64Data;
+      savedOffline = true;
+      if (window.mostrarNotificacion) {
+        window.mostrarNotificacion('Imagen guardada localmente (Modo Offline)', 'info');
+      }
+    } else {
+      try {
+        if (window.mostrarNotificacion) {
+          window.mostrarNotificacion('Subiendo imagen a Supabase Storage...', 'info');
+        }
+
+        const { data: uploadData, error: uploadErr } = await window.supabaseClient.storage
+          .from('evidencias')
+          .upload(filePath, compressedBlob, {
+            cacheControl: '3600',
+            upsert: true
+          });
+
+        if (uploadErr) {
+          throw uploadErr;
+        }
+
+        const { data: urlData } = window.supabaseClient.storage
+          .from('evidencias')
+          .getPublicUrl(filePath);
+
+        publicUrl = urlData.publicUrl;
+      } catch (err) {
+        console.warn("Fallo la subida directa (guardando como base64 local para sincronizar después):", err);
+        const base64Data = await blobToBase64(compressedBlob);
+        publicUrl = base64Data;
+        savedOffline = true;
+        if (window.mostrarNotificacion) {
+          window.mostrarNotificacion('Guardado localmente (Fallo de red al subir)', 'warning');
+        }
+      }
     }
-
-    if (window.mostrarNotificacion) {
-      window.mostrarNotificacion('Subiendo imagen a Supabase Storage...', 'info');
-    }
-
-    const { data: uploadData, error: uploadErr } = await window.supabaseClient.storage
-      .from('evidencias')
-      .upload(filePath, compressedBlob, {
-        cacheControl: '3600',
-        upsert: true
-      });
-
-    if (uploadErr) {
-      console.error("Error al subir a Supabase Storage:", uploadErr);
-      alert("Fallo al subir la imagen: " + uploadErr.message);
-      return;
-    }
-
-    const { data: urlData } = window.supabaseClient.storage
-      .from('evidencias')
-      .getPublicUrl(filePath);
-
-    const publicUrl = urlData.publicUrl;
 
     if (!o.evidencias) o.evidencias = { fotoInicio: null, fotoFin: null, adicionales: [] };
     
@@ -9066,7 +9090,7 @@ window.subirEvidenciaFoto = async function(ordenId, tipo, inputEl) {
     }
 
     if (window.mostrarNotificacion) {
-      window.mostrarNotificacion('Evidencia fotográfica subida correctamente.', 'success');
+      window.mostrarNotificacion(savedOffline ? 'Evidencia guardada localmente (Offline)' : 'Evidencia fotográfica subida correctamente.', 'success');
     }
 
     verDetalle(ordenId);
