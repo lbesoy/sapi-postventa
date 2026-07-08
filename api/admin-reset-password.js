@@ -1,3 +1,4 @@
+// Disparar nueva compilación en Vercel para cargar variables de entorno
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req, res) {
