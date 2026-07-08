@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.212'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.213'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -8980,30 +8980,51 @@ window.subirEvidenciaFoto = async function(ordenId, tipo, inputEl) {
   }
 
   const compressImage = (imageFile) => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
+      reader.onerror = (e) => reject(e);
       reader.onload = (event) => {
         const img = new Image();
+        img.onerror = (e) => reject(e);
         img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
+          try {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
 
-          const MAX_WIDTH = 1200;
-          if (width > MAX_WIDTH) {
-            height = Math.round((height * MAX_WIDTH) / width);
-            width = MAX_WIDTH;
+            const MAX_WIDTH = 1200;
+            if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            if (canvas.toBlob) {
+              canvas.toBlob((blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error("La compresión de imagen falló (Blob vacío)"));
+              }, 'image/jpeg', 0.85);
+            } else {
+              // Fallback para navegadores antiguos/Safari que no soportan toBlob directamente
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+              const arr = dataUrl.split(','), mime = arr[0].match(/:(.*?);/)[1];
+              const bstr = atob(arr[1]);
+              let n = bstr.length;
+              const u8arr = new Uint8Array(n);
+              while(n--) {
+                u8arr[n] = bstr.charCodeAt(n);
+              }
+              const blob = new Blob([u8arr], {type:mime});
+              resolve(blob);
+            }
+          } catch (err) {
+            reject(err);
           }
-
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-
-          canvas.toBlob((blob) => {
-            resolve(blob);
-          }, 'image/jpeg', 0.85);
         };
         img.src = event.target.result;
       };
@@ -25038,6 +25059,7 @@ window.ejecutarDiagnosticoLocal = async function() {
     });
     
     info += `\nÚltimo Error de Sincronización:\n${errorLog}`;
+    info += `\n\nÚltimo Error de Subida de Imagen:\n${window.lastUploadError || 'Ninguno registrado'}`;
     
     diagnosticEl.textContent = info;
   } catch (err) {
