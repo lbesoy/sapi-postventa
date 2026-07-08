@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.208'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.209'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -24934,6 +24934,21 @@ window.ejecutarDiagnosticoLocal = async function() {
           info += `Supabase Client Auth: ACTIVO\n`;
           info += `- Supabase User ID: ${supaSession.session.user.id}\n`;
           info += `- Supabase Email: ${supaSession.session.user.email}\n`;
+          
+          // Ejecutar consulta de prueba en vivo
+          try {
+            const { data: liveOrds, error: liveErr } = await window.supabaseClient.from('ordenes').select('id, folio, tecnico, notas');
+            if (liveErr) {
+              info += `Live Query Error: ${liveErr.message} (${liveErr.code || ''})\n`;
+            } else {
+              info += `Live Query Success: Trajo ${liveOrds ? liveOrds.length : 0} órdenes\n`;
+              if (liveOrds && liveOrds.length > 0) {
+                info += `  Primer folio: ${liveOrds[0].folio} (Téc: ${liveOrds[0].tecnico})\n`;
+              }
+            }
+          } catch (queryEx) {
+            info += `Live Query Exception: ${queryEx.message}\n`;
+          }
         } else {
           info += `Supabase Client Auth: NO ACTIVO (Sesión vacía)\n`;
         }
