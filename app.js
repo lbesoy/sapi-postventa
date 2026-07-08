@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.218'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.219'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -10091,7 +10091,7 @@ function abrirBitacora(id) {
   }
   window.currentBitacoraOrdenId = id;
   window.currentBitacoraEntryId = null;
-  const rango = calcularRangoFechasLaboral(2);
+  const rango = calcularRangoFechasLaboral(10);
 
   // Restaurar título por defecto del modal
   const modalTitle = document.getElementById('modal-bitacora-title');
@@ -10278,7 +10278,7 @@ function guardarNotaBitacora() {
 
   if (!isAdmin) {
     // Validar que esté dentro del rango hábil permitido (que ahora permite fines de semana si caen en el rango)
-    const rango = calcularRangoFechasLaboral(2);
+    const rango = calcularRangoFechasLaboral(10);
     if (fecha < rango.min || fecha > rango.max) {
       mostrarNotificacion('La fecha seleccionada está fuera del rango permitido.', 'error');
       return;
