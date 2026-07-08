@@ -1097,30 +1097,40 @@ async function _processSyncQueueInternal() {
                   console.log(`[Sync] Colisión de folio detectada para ${finalId}. Calculando nuevo folio...`);
                   const { data: todasLasOrd } = await sb.from('ordenes').select('folio');
                   const currentYear = new Date().getFullYear().toString().slice(-2);
-                  const prefix = `OS-${currentYear}`;
+                  const isTest = (finalFolio && (finalFolio.includes('PRUEBA') || finalFolio.includes('TEST')));
+                  const prefix = isTest ? `OS-PRUEBA-` : `OS-${currentYear}`;
                   let maxConsecutivo = 0;
                   
                   (todasLasOrd || []).forEach(o => {
-                    if (o.folio && o.folio.startsWith(prefix)) {
-                      const numStr = o.folio.substring(prefix.length);
-                      const num = parseInt(numStr, 10);
-                      if (!isNaN(num) && num > maxConsecutivo) maxConsecutivo = num;
+                    if (o.folio && typeof o.folio === 'string') {
+                      const cleanFolio = o.folio.replace('[PRUEBA] ', '').replace('[TEST] ', '').trim();
+                      if (cleanFolio.startsWith(prefix)) {
+                        const numStr = cleanFolio.substring(prefix.length);
+                        const num = parseInt(numStr, 10);
+                        if (!isNaN(num) && num > maxConsecutivo) maxConsecutivo = num;
+                      }
                     }
                   });
                   
                   // Revisar también localmente
                   const localOrdenes = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
                   localOrdenes.forEach(o => {
-                    if (o.folio && o.folio.startsWith(prefix)) {
-                      const numStr = o.folio.substring(prefix.length);
-                      const num = parseInt(numStr, 10);
-                      if (!isNaN(num) && num > maxConsecutivo) maxConsecutivo = num;
+                    if (o.folio && typeof o.folio === 'string') {
+                      const cleanFolio = o.folio.replace('[PRUEBA] ', '').replace('[TEST] ', '').trim();
+                      if (cleanFolio.startsWith(prefix)) {
+                        const numStr = cleanFolio.substring(prefix.length);
+                        const num = parseInt(numStr, 10);
+                        if (!isNaN(num) && num > maxConsecutivo) maxConsecutivo = num;
+                      }
                     }
                   });
                   
                   maxConsecutivo++;
                   const padded = maxConsecutivo.toString().padStart(3, '0');
-                  const nuevoFolio = `${prefix}${padded}`;
+                  let nuevoFolio = `${prefix}${padded}`;
+                  if (isTest && !nuevoFolio.startsWith('[PRUEBA]')) {
+                    nuevoFolio = `[PRUEBA] ${nuevoFolio}`;
+                  }
                   
                   console.log(`[Sync] Re-asignando folio colisionado: ${finalFolio} -> ${nuevoFolio}`);
                   

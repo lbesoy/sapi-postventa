@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.226'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.227'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -8302,11 +8302,14 @@ function generarFolioConsecutivo() {
   let maxConsecutivo = 0;
   
   ordenes.forEach(o => {
-    if (o.folio && typeof o.folio === 'string' && o.folio.startsWith(prefix)) {
-      const numStr = o.folio.substring(prefix.length);
-      const num = parseInt(numStr, 10);
-      if (!isNaN(num) && num > maxConsecutivo) {
-        maxConsecutivo = num;
+    if (o.folio && typeof o.folio === 'string') {
+      const cleanFolio = o.folio.replace('[PRUEBA] ', '').replace('[TEST] ', '').trim();
+      if (cleanFolio.startsWith(prefix)) {
+        const numStr = cleanFolio.substring(prefix.length);
+        const num = parseInt(numStr, 10);
+        if (!isNaN(num) && num > maxConsecutivo) {
+          maxConsecutivo = num;
+        }
       }
     }
   });
