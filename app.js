@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.206'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.207'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -24908,6 +24908,79 @@ window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId)
   verDetalle(ordenId);
   if (typeof renderCalendario === 'function') {
     renderCalendario();
+  }
+};
+
+window.ejecutarDiagnosticoLocal = function() {
+  const diagnosticEl = document.getElementById('diagnostic-results');
+  if (!diagnosticEl) return;
+  
+  diagnosticEl.style.display = 'block';
+  diagnosticEl.textContent = 'Ejecutando diagnóstico...';
+  
+  try {
+    const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
+    const uList = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+    const ords = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+    const errorLog = localStorage.getItem('last_sync_error') || 'Ninguno registrado';
+    
+    let info = '';
+    info += `Usuario ID: ${session.userId || 'N/A'}\n`;
+    info += `Nombre Sesión: ${session.nombre || 'N/A'}\n`;
+    info += `Rol Real / Vista: ${session.realRol || 'N/A'} / ${session.viewMode || 'N/A'}\n`;
+    info += `Usuarios en LocalStorage: ${uList.length}\n`;
+    
+    // Buscar usuario actual en la lista
+    const currentU = uList.find(u => u.id === session.userId);
+    info += `Usuario en BD Local: ${currentU ? 'Encontrado' : 'NO encontrado'}\n`;
+    if (currentU) {
+      info += `- Nombre en BD: ${currentU.nombre}\n`;
+      info += `- Rol en BD: ${currentU.rol}\n`;
+    }
+    
+    info += `Órdenes Totales Local: ${ords.length}\n`;
+    
+    // Contar por tipo (test vs real)
+    let testCount = 0;
+    let realCount = 0;
+    ords.forEach(o => {
+      if (isTestData(o)) testCount++;
+      else realCount++;
+    });
+    info += `- Órdenes Sandbox (Test): ${testCount}\n`;
+    info += `- Órdenes Reales: ${realCount}\n`;
+    
+    // Listar detalles de las órdenes de prueba
+    const testOrds = ords.filter(isTestData);
+    info += `\nÓrdenes Sandbox Detalle (${testOrds.length}):\n`;
+    
+    const tecName = currentU ? currentU.nombre : (session.nombre || '');
+    const tecNameLower = tecName.toLowerCase().trim();
+    
+    testOrds.forEach(o => {
+      let assigned = [];
+      if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) {
+        assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
+      } else if (o.tecnico) {
+        assigned = o.tecnico.split(',').map(s=>s.trim());
+      }
+      const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
+      const isCreator = o.creadoPor && String(o.creadoPor).toLowerCase().trim() === tecNameLower;
+      const isAssigned = assignedLower.includes(tecNameLower);
+      
+      info += `- Folio: ${o.folio}\n`;
+      info += `  Tecnico (col): ${o.tecnico}\n`;
+      info += `  TecnicosAsignados: ${JSON.stringify(o.tecnicosAsignados)}\n`;
+      info += `  CreadoPor: ${o.creadoPor}\n`;
+      info += `  Match Técnico: ${isAssigned ? 'SÍ' : 'NO'}\n`;
+      info += `  Match Creador: ${isCreator ? 'SÍ' : 'NO'}\n`;
+    });
+    
+    info += `\nÚltimo Error de Sincronización:\n${errorLog}`;
+    
+    diagnosticEl.textContent = info;
+  } catch (err) {
+    diagnosticEl.textContent = `Error al ejecutar diagnóstico: ${err.message}\n${err.stack}`;
   }
 };
 

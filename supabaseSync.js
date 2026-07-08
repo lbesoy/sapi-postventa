@@ -1942,6 +1942,9 @@ window.cargarDatosDeSupabase = function() {
     }
 
     window._isSyncingFromSupabase = true;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('last_sync_error');
+    }
 
     // Asegurar que la sesión de Supabase esté activa antes de realizar consultas.
     // Si no hay sesión activa (ej. expirada en este recargo o backdoor local), 
@@ -2824,6 +2827,9 @@ window.cargarDatosDeSupabase = function() {
 
   } catch (error) {
     console.error('[Supabase] Error cargando datos:', error.message);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('last_sync_error', error.message + '\n' + error.stack);
+    }
   } finally {
     window._isSyncingFromSupabase = false;
     window._syncPromise = null;
