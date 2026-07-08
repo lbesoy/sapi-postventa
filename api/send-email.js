@@ -69,16 +69,29 @@ export default async function handler(req, res) {
     }
   }
 
-  const { to, subject, htmlBody, attachments } = req.body;
+  const { to, cc, bcc, subject, htmlBody, attachments } = req.body;
 
   if (!to || !subject || !htmlBody) {
     return res.status(400).json({ error: 'Missing required fields: to, subject, htmlBody' });
   }
 
-  // B2: Validar destinatario con una regex robusta para evitar email header injection y spamming
-  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  if (!emailRegex.test(to)) {
+  // Validar correos que admiten listas separadas por comas
+  const validateEmails = (emailsStr) => {
+    if (!emailsStr) return true;
+    const emails = emailsStr.split(',').map(e => e.trim()).filter(Boolean);
+    if (emails.length === 0) return false;
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return emails.every(e => emailRegex.test(e));
+  };
+
+  if (!validateEmails(to)) {
     return res.status(400).json({ error: 'Invalid email address format for field: to' });
+  }
+  if (cc && !validateEmails(cc)) {
+    return res.status(400).json({ error: 'Invalid email address format for field: cc' });
+  }
+  if (bcc && !validateEmails(bcc)) {
+    return res.status(400).json({ error: 'Invalid email address format for field: bcc' });
   }
 
   try {
@@ -103,6 +116,9 @@ export default async function handler(req, res) {
       attachments: attachments || [] 
       // attachment format: [{ filename: 'reporte.pdf', content: 'base64string', encoding: 'base64' }]
     };
+
+    if (cc) mailOptions.cc = cc;
+    if (bcc) mailOptions.bcc = bcc;
 
     const info = await transporter.sendMail(mailOptions);
     console.log('Message sent: %s', info.messageId);

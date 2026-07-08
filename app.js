@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.219'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.224'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -8847,6 +8847,15 @@ function completarReporteDesdeDetalle(id) {
 function renderEvidenciasFotograficas(o) {
   const ev = o.evidencias || { fotoInicio: null, fotoFin: null, adicionales: [] };
   const adicionales = ev.adicionales || [];
+  const isClosed = (
+    o.estado === 'Completado' || 
+    o.estado === 'Cerrado' || 
+    o.estado === 'Cerrada' || 
+    o.estado === 'Finalizado' || 
+    o.estado === 'Refacciones pendientes' || 
+    !!o.firma_cliente_base64 || 
+    !!o.firma_tecnico_base64
+  );
   
   const tieneInicio = !!ev.fotoInicio;
   const tieneFin = !!ev.fotoFin;
@@ -8875,7 +8884,7 @@ function renderEvidenciasFotograficas(o) {
   }
 
   const renderTarjetaFoto = (titulo, tipo, url, obligatoria) => {
-    const isConsulta = currentSession.viewMode === 'consulta';
+    const isConsulta = currentSession.viewMode === 'consulta' || isClosed;
     const uploadBtn = isConsulta ? '' : `
       <label class="btn-primary" style="font-size:0.72rem; min-height:auto; padding:0.35rem 0.75rem; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem; margin-top:0.5rem;">
         <i data-lucide="upload" style="width:12px;height:12px;"></i> ${url ? 'Reemplazar' : 'Cargar Foto'}
@@ -8911,7 +8920,7 @@ function renderEvidenciasFotograficas(o) {
   };
 
   const renderAdicionalesHtml = () => {
-    const isConsulta = currentSession.viewMode === 'consulta';
+    const isConsulta = currentSession.viewMode === 'consulta' || isClosed;
     const uploadBtn = isConsulta ? '' : `
       <label style="display:flex; flex-shrink:0; width:100px; height:100px; border:2px dashed var(--border); border-radius:6px; background:var(--bg-body); flex-direction:column; gap:0.25rem; align-items:center; justify-content:center; cursor:pointer; color:var(--text-muted); transition:var(--transition); position:relative; box-shadow:0 2px 4px rgba(0,0,0,0.01); margin:0;" onmouseover="this.style.borderColor='var(--accent)';" onmouseout="this.style.borderColor='var(--border)';">
         <i data-lucide="plus" style="width:16px;height:16px;"></i>
@@ -8939,8 +8948,73 @@ function renderEvidenciasFotograficas(o) {
     `;
   };
 
+  // === VISTA DE IMPRESIÓN PARA EVIDENCIAS (FOTOS GRANDES Y LIMPIAS) ===
+  let printEvidenciasHtml = '';
+  if (tieneInicio || tieneFin || adicionales.length > 0) {
+    printEvidenciasHtml += `
+      <div style="display:flex; flex-direction:column; gap:1.5rem; margin-top:0.5rem;">
+        <div style="display:flex; gap:1.5rem; flex-wrap:wrap;">
+    `;
+
+    if (tieneInicio) {
+      printEvidenciasHtml += `
+        <div style="flex:1; min-width:280px; border:1px solid #d1d5db; border-radius:6px; padding:0.75rem; background:#f9fafb; text-align:center;">
+          <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.5rem; text-transform:uppercase;">Foto de Inicio (Entrada)</div>
+          <div style="height:220px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; display:flex; justify-content:center; align-items:center; overflow:hidden;">
+            <img src="${ev.fotoInicio}" style="max-width:100%; max-height:100%; object-fit:contain;" />
+          </div>
+        </div>
+      `;
+    }
+
+    if (tieneFin) {
+      printEvidenciasHtml += `
+        <div style="flex:1; min-width:280px; border:1px solid #d1d5db; border-radius:6px; padding:0.75rem; background:#f9fafb; text-align:center;">
+          <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.5rem; text-transform:uppercase;">Foto de Fin (Salida)</div>
+          <div style="height:220px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; display:flex; justify-content:center; align-items:center; overflow:hidden;">
+            <img src="${ev.fotoFin}" style="max-width:100%; max-height:100%; object-fit:contain;" />
+          </div>
+        </div>
+      `;
+    }
+
+    printEvidenciasHtml += `
+        </div>
+    `;
+
+    if (adicionales.length > 0) {
+      printEvidenciasHtml += `
+        <div style="margin-top:0.5rem;">
+          <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.75rem; text-transform:uppercase;">Evidencias Adicionales</div>
+          <div style="display:flex; flex-wrap:wrap; gap:1rem; justify-content:flex-start;">
+      `;
+
+      adicionales.forEach((url, idx) => {
+        printEvidenciasHtml += `
+          <div style="border:1px solid #d1d5db; border-radius:6px; padding:0.5rem; background:#f9fafb; text-align:center; width:200px;">
+            <div style="font-size:0.65rem; font-weight:600; color:#4b5563; margin-bottom:0.35rem;">Adicional ${idx + 1}</div>
+            <div style="height:140px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; display:flex; justify-content:center; align-items:center; overflow:hidden;">
+              <img src="${url}" style="max-width:100%; max-height:100%; object-fit:contain;" />
+            </div>
+          </div>
+        `;
+      });
+
+      printEvidenciasHtml += `
+          </div>
+        </div>
+      `;
+    }
+
+    printEvidenciasHtml += `
+      </div>
+    `;
+  } else {
+    printEvidenciasHtml = '<p style="color:#000; font-size:0.8rem; font-style:italic;">Sin fotos de evidencia cargadas.</p>';
+  }
+
   return `
-    <div style="margin-top:0.5rem;">
+    <div class="no-print" style="margin-top:0.5rem;">
       ${alertHtml}
       <div style="display:flex; flex-wrap:wrap; gap:1.25rem;">
         ${renderTarjetaFoto('FOTO DE INICIO (Entrada)', 'fotoInicio', ev.fotoInicio, true)}
@@ -8950,6 +9024,9 @@ function renderEvidenciasFotograficas(o) {
         <div style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Evidencias Adicionales (Opcionales)</div>
         ${renderAdicionalesHtml()}
       </div>
+    </div>
+    <div class="print-only">
+      ${printEvidenciasHtml}
     </div>
   `;
 }
@@ -8975,6 +9052,11 @@ window.subirEvidenciaFoto = async function(ordenId, tipo, inputEl) {
 
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
+
+  if (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || !!o.firma_cliente_base64 || !!o.firma_tecnico_base64) {
+    mostrarNotificacion('No se pueden modificar evidencias en una orden cerrada o firmada.', 'error');
+    return;
+  }
 
   if (window.mostrarNotificacion) {
     window.mostrarNotificacion('Comprimiendo y preparando imagen...', 'info');
@@ -9126,6 +9208,11 @@ window.eliminarEvidenciaFoto = async function(ordenId, tipo, url) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o || !o.evidencias) return;
 
+  if (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || !!o.firma_cliente_base64 || !!o.firma_tecnico_base64) {
+    mostrarNotificacion('No se pueden modificar evidencias en una orden cerrada o firmada.', 'error');
+    return;
+  }
+
   const confirmado = await window.confirmarAccion({
     titulo: 'Quitar Evidencia',
     mensaje: '¿Estás seguro de que deseas quitar esta foto de evidencia?',
@@ -9202,6 +9289,7 @@ function verDetalle(id) {
 
   const renderBitacora = (o) => {
     let html = '';
+    const isClosed = (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || !!o.firma_cliente_base64 || !!o.firma_tecnico_base64);
     const isTecnico = currentSession.viewMode === 'tecnico';
     const currentUser = usuarios.find(u => u.id === currentSession.userId);
     const miTecnicoNombre = currentUser ? currentUser.nombre : '';
@@ -9291,7 +9379,7 @@ function verDetalle(id) {
           horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(139, 92, 246, 0.1); color:#8b5cf6; padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="clock" style="width:12px;height:12px;"></i> ${b.entrada} - ${b.salida}</span>`;
         }
         
-        const btnReportar = ['tecnico', 'superadmin'].includes(currentSession.viewMode) ? `
+        const btnReportar = (['tecnico', 'superadmin'].includes(currentSession.viewMode) && !isClosed) ? `
           <div style="margin-top:0.6rem; text-align:right;">
             <button class="btn-primary" onclick="iniciarReporteDesdeAsignacion('${o.id}', '${b.id}')" style="font-size:0.75rem; padding:0.3rem 0.6rem; display:inline-flex; align-items:center; gap:0.3rem; background:#8b5cf6; border-color:#8b5cf6; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);">
               <i data-lucide="file-signature" style="width:12px; height:12px;"></i> Reportar Trabajo Realizado
@@ -9310,7 +9398,7 @@ function verDetalle(id) {
         } catch(e){}
 
         const esSupervisorOrAdmin = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
-        const actionButtons = esSupervisorOrAdmin ? `
+        const actionButtons = (esSupervisorOrAdmin && !isClosed) ? `
           <button class="action-btn" onclick="window.mostrarDetalleEventoAdministrativo('${b.id}')" style="margin-left:0.5rem;" title="Editar Asignación">
             <i data-lucide="edit-2"></i>
           </button>
@@ -9431,7 +9519,7 @@ function verDetalle(id) {
                     ${(b.tecnico || 'U').charAt(0).toUpperCase()}
                   </div>
                   <span style="font-size:0.85rem; font-weight:600; color:var(--text-primary);">${b.tecnico || 'Desconocido'}</span>
-                  ${['superadmin', 'admin'].includes(currentSession.viewMode) ? `<button class="action-btn" onclick="editarBitacora('${o.id}', '${b.id}')" title="Editar Bitácora" style="padding:0.15rem; margin-left:0.5rem;"><i data-lucide="pencil" style="width:12px;height:12px;"></i></button>` : ''}
+                  ${(['superadmin', 'admin'].includes(currentSession.viewMode) && !isClosed) ? `<button class="action-btn" onclick="editarBitacora('${o.id}', '${b.id}')" title="Editar Bitácora" style="padding:0.15rem; margin-left:0.5rem;"><i data-lucide="pencil" style="width:12px;height:12px;"></i></button>` : ''}
                 </div>
                 <div style="display:flex; align-items:center; gap:0.4rem;">
                   <span class="badge" style="background:rgba(16, 185, 129, 0.1); color:#10b981; border-radius:99px; padding:0.15rem 0.45rem; font-size:0.65rem; font-weight:700;">REPORTADO</span>
@@ -9462,10 +9550,92 @@ function verDetalle(id) {
     }
 
     const puedeLlenarBitacora = ['tecnico', 'superadmin'].includes(currentSession.viewMode);
-    if (o.estado !== 'Finalizado' && puedeLlenarBitacora) {
+    if (!isClosed && puedeLlenarBitacora) {
       html += `<div style="text-align:right; margin-top: 1rem;"><button class="btn-primary" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="abrirBitacora('${o.id}')"><i data-lucide="plus" style="width:14px;height:14px;"></i> Registrar Avance Diario</button></div>`;
     }
-    return html;
+    
+    // === VISTA DE IMPRESIÓN (TABLA COMPACTA) ===
+    let tableHtml = '';
+    if (items.length === 0) {
+      tableHtml = '<p style="color:#000; font-size:0.8rem; font-style:italic;">Sin registros en la bitácora.</p>';
+    } else {
+      const sorted = [...items].sort((a, b) => {
+        const dateA = a.fecha || '';
+        const dateB = b.fecha || '';
+        if (dateA !== dateB) return dateA.localeCompare(dateB);
+        const timeA = a.entrada || '';
+        const timeB = b.entrada || '';
+        return timeA.localeCompare(timeB);
+      });
+
+      tableHtml += `
+        <table class="bitacora-print-table" style="width:100%; border-collapse:collapse; font-size:0.7rem; margin-top:0.5rem; color:#000; border:1px solid #d1d5db;">
+          <thead>
+            <tr style="background:#f3f4f6; text-align:left; border-bottom:1.5px solid #9ca3af;">
+              <th style="padding:0.35rem 0.5rem; border:1px solid #d1d5db; font-weight:600; width:15%;">Fecha</th>
+              <th style="padding:0.35rem 0.5rem; border:1px solid #d1d5db; font-weight:600; width:20%;">Técnico</th>
+              <th style="padding:0.35rem 0.5rem; border:1px solid #d1d5db; font-weight:600; width:20%;">Horario</th>
+              <th style="padding:0.35rem 0.5rem; border:1px solid #d1d5db; font-weight:600; width:12%;">Estado</th>
+              <th style="padding:0.35rem 0.5rem; border:1px solid #d1d5db; font-weight:600; width:33%;">Actividad / Avances Reportados</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      sorted.forEach(b => {
+        let fFormateada = b.fecha;
+        try {
+          const dObj = new Date(b.fecha);
+          if (!isNaN(dObj)) {
+            fFormateada = dObj.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+            fFormateada = fFormateada.replace('.', '');
+          }
+        } catch(e){}
+
+        let hrsStr = '—';
+        if (b.entrada && b.salida) {
+          hrsStr = `${b.entrada} - ${b.salida}`;
+          if (b.realizado) {
+            try {
+              const [hE, mE] = b.entrada.split(':').map(Number);
+              const [hS, mS] = b.salida.split(':').map(Number);
+              let diff = (hS * 60 + mS) - (hE * 60 + mE);
+              if (diff < 0) diff += 24 * 60;
+              const hrs = Math.floor(diff / 60);
+              const mns = diff % 60;
+              hrsStr += ` (${hrs}h${mns > 0 ? ' ' + mns + 'm' : ''})`;
+            } catch(e){}
+          }
+        } else if (b.entrada || b.salida) {
+          hrsStr = `${b.entrada || '--:--'} - ${b.salida || '--:--'}`;
+        }
+
+        let estadoStr = b.realizado ? 'REPORTADO' : 'PROGRAMADO';
+        if (b.realizado && b.desviacion) {
+          estadoStr += ` (${b.desviacion})`;
+        }
+
+        tableHtml += `
+          <tr style="border-bottom:1px solid #e5e7eb;">
+            <td style="padding:0.35rem 0.5rem; border:1px solid #d1d5db; white-space:nowrap;">${fFormateada}</td>
+            <td style="padding:0.35rem 0.5rem; border:1px solid #d1d5db; font-weight:500;">${b.tecnico || '—'}</td>
+            <td style="padding:0.35rem 0.5rem; border:1px solid #d1d5db; white-space:nowrap;">${hrsStr}</td>
+            <td style="padding:0.35rem 0.5rem; border:1px solid #d1d5db; font-size:0.65rem; font-weight:600;">${estadoStr}</td>
+            <td style="padding:0.35rem 0.5rem; border:1px solid #d1d5db; white-space:pre-wrap; line-height:1.3;">${b.nota || '—'}</td>
+          </tr>
+        `;
+      });
+
+      tableHtml += `
+          </tbody>
+        </table>
+      `;
+    }
+
+    return `
+      <div class="no-print">${html}</div>
+      <div class="print-only">${tableHtml}</div>
+    `;
   };
 
   const field = (label, val) => `
@@ -10084,6 +10254,11 @@ function calcularRangoFechasLaboral(diasHabilAtras) {
 }
 
 function abrirBitacora(id) {
+  const o = ordenes.find(x => x.id === id);
+  if (o && (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || !!o.firma_cliente_base64 || !!o.firma_tecnico_base64)) {
+    mostrarNotificacion('No se pueden registrar avances en una orden cerrada o completada.', 'error');
+    return;
+  }
   const puedeLlenar = ['tecnico', 'superadmin'].includes(currentSession.viewMode);
   if (!puedeLlenar) {
     mostrarNotificacion('Solo los técnicos y superadmins pueden registrar avances o llenar la bitácora.', 'error');
@@ -10109,13 +10284,17 @@ function abrirBitacora(id) {
 }
 
 function iniciarReporteDesdeAsignacion(ordenId, bitacoraId) {
+  const o = ordenes.find(x => x.id === ordenId);
+  if (!o) return;
+  if (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || !!o.firma_cliente_base64 || !!o.firma_tecnico_base64) {
+    mostrarNotificacion('No se pueden registrar avances en una orden cerrada o completada.', 'error');
+    return;
+  }
   const puedeLlenar = ['tecnico', 'superadmin'].includes(currentSession.viewMode);
   if (!puedeLlenar) {
     mostrarNotificacion('Solo los técnicos y superadmins pueden registrar avances o llenar la bitácora.', 'error');
     return;
   }
-  const o = ordenes.find(x => x.id === ordenId);
-  if (!o) return;
   const b = o.bitacora?.find(x => x.id === bitacoraId);
   if (!b) return;
 
@@ -10148,6 +10327,10 @@ window.iniciarReporteDesdeAsignacion = iniciarReporteDesdeAsignacion;
 function editarBitacora(ordenId, bitacoraId) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
+  if (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || !!o.firma_cliente_base64 || !!o.firma_tecnico_base64) {
+    mostrarNotificacion('No se pueden editar avances en una orden cerrada o completada.', 'error');
+    return;
+  }
   const b = o.bitacora?.find(x => x.id === bitacoraId);
   if (!b) return;
 
@@ -10476,6 +10659,93 @@ function cerrarDetalle(e) {
   document.body.style.overflow = '';
 }
 
+async function generarBase64Pdf(ordenId) {
+  const original = document.getElementById('modal-detalle');
+  if (!original) return null;
+  
+  // Clonamos el elemento de detalle
+  const clone = original.cloneNode(true);
+  
+  // Limpiamos los botones y elementos de entrada que no deben ir en el PDF impreso
+  clone.querySelectorAll('.no-print, button, label, input, textarea, select').forEach(el => el.remove());
+  
+  // Quitamos clases que forzarían ocultamientos incorrectos
+  clone.querySelectorAll('.print-only').forEach(el => {
+    el.style.setProperty('display', 'block', 'important');
+  });
+  
+  // Ajustamos estilos del clon para que se renderice como un reporte de página completa
+  clone.style.width = '800px';
+  clone.style.maxHeight = 'none';
+  clone.style.overflow = 'visible';
+  clone.style.boxShadow = 'none';
+  clone.style.border = 'none';
+  clone.style.background = '#ffffff';
+  clone.style.padding = '20px';
+  
+  const tempContainer = document.createElement('div');
+  tempContainer.style.position = 'absolute';
+  tempContainer.style.left = '-9999px';
+  tempContainer.style.top = '-9999px';
+  tempContainer.style.background = '#ffffff';
+  tempContainer.appendChild(clone);
+  document.body.appendChild(tempContainer);
+
+  const opt = {
+    margin:       10,
+    filename:     `Reporte_Servicio_${ordenId}.pdf`,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true, letterRendering: true, logging: false },
+    jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' }
+  };
+
+  try {
+    // Si la librería html2pdf está disponible
+    if (typeof html2pdf === 'function') {
+      const pdfBase64 = await html2pdf().from(clone).set(opt).outputPdf('datauristring');
+      document.body.removeChild(tempContainer);
+      return pdfBase64.split(',')[1];
+    } else {
+      console.error('html2pdf library is not loaded');
+      document.body.removeChild(tempContainer);
+      return null;
+    }
+  } catch (err) {
+    console.error('Error generating PDF:', err);
+    if (tempContainer.parentNode) {
+      document.body.removeChild(tempContainer);
+    }
+    return null;
+  }
+}
+
+window.toggleCampoCorreo = function(campo) {
+  const row = document.getElementById(`row-correo-${campo}`);
+  if (row) {
+    row.style.display = row.style.display === 'none' ? 'flex' : 'none';
+  }
+};
+
+window.ejecutarComandoEditor = function(comando) {
+  document.execCommand(comando, false, null);
+  const editor = document.getElementById('correo-mensaje-editor');
+  if (editor) editor.focus();
+};
+
+window.abrirPaletaColor = function(e, tipo) {
+  if (tipo === 'foreColor') {
+    document.getElementById('editor-font-color').click();
+  } else {
+    document.getElementById('editor-bg-color').click();
+  }
+};
+
+window.ejecutarColorEditor = function(tipo, color) {
+  document.execCommand(tipo, false, color);
+  const editor = document.getElementById('correo-mensaje-editor');
+  if (editor) editor.focus();
+};
+
 function imprimirOrden() { window.print(); }
 
 function enviarCorreoOrden(ordenId) {
@@ -10490,15 +10760,86 @@ function enviarCorreoOrden(ordenId) {
   document.getElementById('correo-destinatario').value = destEmail || 'cliente@ejemplo.com';
   document.getElementById('correo-asunto').value = `Reporte de Servicio ${o.folio || ''} - ${o.cliente || ''}`;
   
-  // Mensaje por defecto
-  const defaultMsg = `Hola,\n\nAdjuntamos el reporte de servicio correspondiente a la orden de servicio folio ${o.folio || ''}.\n\nSaludos cordiales,\nEuro Representaciones`;
-  document.getElementById('correo-mensaje').value = defaultMsg;
+  // Limpiar campos CC y CCO
+  const ccEl = document.getElementById('correo-cc');
+  const ccoEl = document.getElementById('correo-cco');
+  if (ccEl) ccEl.value = '';
+  if (ccoEl) ccoEl.value = '';
+  
+  // Ocultar filas de CC y CCO por defecto
+  const rowCc = document.getElementById('row-correo-cc');
+  const rowCco = document.getElementById('row-correo-cco');
+  if (rowCc) rowCc.style.display = 'none';
+  if (rowCco) rowCco.style.display = 'none';
+
+  // Mensaje por defecto en HTML
+  const defaultMsgHtml = `Hola,<br><br>Adjuntamos el reporte de servicio correspondiente a la orden de servicio folio <strong>${o.folio || ''}</strong>.<br><br>Saludos cordiales,<br>Euro Representaciones`;
+  const editor = document.getElementById('correo-mensaje-editor');
+  if (editor) {
+    editor.innerHTML = defaultMsgHtml;
+  }
+  
+  const labelAdjunto = document.getElementById('adjunto-pdf-nombre');
+  if (labelAdjunto) {
+    labelAdjunto.textContent = `Reporte_Servicio_${o.folio || ordenId}.pdf`;
+  }
   
   const overlay = document.getElementById('modal-correo-overlay');
   if (overlay) {
     overlay.classList.add('open');
   }
   
+  // Resetear el visor
+  const frame = document.getElementById('correo-pdf-frame');
+  const spinner = document.getElementById('correo-pdf-loading');
+  if (frame && spinner) {
+    frame.style.display = 'none';
+    frame.src = '';
+    spinner.style.display = 'flex';
+    spinner.innerHTML = `
+      <div style="width: 32px; height: 32px; border: 3px solid rgba(255,255,255,0.2); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+      <span style="font-size: 0.75rem; font-weight: 600;">Generando vista previa del PDF...</span>
+    `;
+  }
+  
+  window._ultimoPdfGenerado = null;
+  
+  // Iniciar la generación en segundo plano
+  setTimeout(() => {
+    generarBase64Pdf(ordenId).then(base64Pdf => {
+      if (base64Pdf) {
+        window._ultimoPdfGenerado = base64Pdf;
+        
+        // Cargar en el frame
+        try {
+          const raw = window.atob(base64Pdf);
+          const rawLength = raw.length;
+          const uInt8Array = new Uint8Array(rawLength);
+          for (let i = 0; i < rawLength; ++i) {
+            uInt8Array[i] = raw.charCodeAt(i);
+          }
+          const blob = new Blob([uInt8Array], { type: 'application/pdf' });
+          const blobUrl = URL.createObjectURL(blob);
+          
+          if (frame && spinner) {
+            frame.src = blobUrl;
+            frame.style.display = 'block';
+            spinner.style.display = 'none';
+          }
+        } catch (blobErr) {
+          console.error('Error loading blob to frame:', blobErr);
+          if (spinner) {
+            spinner.innerHTML = '<span style="color:#ef4444; font-size:0.75rem;">Error al renderizar PDF</span>';
+          }
+        }
+      } else {
+        if (spinner) {
+          spinner.innerHTML = '<span style="color:#ef4444; font-size:0.75rem;">Error al generar reporte</span>';
+        }
+      }
+    });
+  }, 300);
+
   if (window.lucide) {
     window.lucide.createIcons();
   }
@@ -10509,6 +10850,15 @@ function cerrarModalCorreo() {
   if (overlay) {
     overlay.classList.remove('open');
   }
+  const frame = document.getElementById('correo-pdf-frame');
+  if (frame) {
+    frame.src = '';
+  }
+  const editor = document.getElementById('correo-mensaje-editor');
+  if (editor) {
+    editor.innerHTML = '';
+  }
+  window._ultimoPdfGenerado = null;
 }
 
 async function procesarEnviarCorreo(e) {
@@ -10516,8 +10866,12 @@ async function procesarEnviarCorreo(e) {
   
   const ordenId = document.getElementById('correo-orden-id').value;
   const destinatario = document.getElementById('correo-destinatario').value.trim();
+  const cc = document.getElementById('correo-cc').value.trim();
+  const bcc = document.getElementById('correo-cco').value.trim();
   const asunto = document.getElementById('correo-asunto').value.trim();
-  const mensaje = document.getElementById('correo-mensaje').value;
+  
+  const editor = document.getElementById('correo-mensaje-editor');
+  const mensajeHtml = editor ? editor.innerHTML : '';
   
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
@@ -10528,17 +10882,30 @@ async function procesarEnviarCorreo(e) {
   }
   
   const btnSubmit = document.getElementById('btn-enviar-correo-submit');
+  
+  let base64Pdf = window._ultimoPdfGenerado;
+  if (!base64Pdf) {
+    if (btnSubmit) {
+      btnSubmit.disabled = true;
+      btnSubmit.innerHTML = 'Generando PDF...';
+    }
+    mostrarNotificacion("Generando reporte PDF adjunto...", "info");
+    try {
+      base64Pdf = await generarBase64Pdf(ordenId);
+    } catch (pdfErr) {
+      console.error("Failed to generate PDF:", pdfErr);
+    }
+  }
+  
   if (btnSubmit) {
     btnSubmit.disabled = true;
     btnSubmit.innerHTML = 'Enviando...';
   }
+  mostrarNotificacion("Enviando correo con PDF adjunto...", "info");
   
-  mostrarNotificacion("Enviando correo, por favor espera...", "info");
-  
-  const mensajeHtml = mensaje.replace(/\n/g, '<br>');
   const htmlBody = `
     <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
-      <div style="margin-bottom: 20px; line-height: 1.5; font-size: 14px; color: #444; white-space: pre-wrap;">
+      <div style="margin-bottom: 20px; line-height: 1.5; font-size: 14px; color: #444;">
         ${mensajeHtml}
       </div>
       <div style="border-top: 2px solid #e8820c; padding-top: 20px; margin-top: 20px;">
@@ -10548,12 +10915,7 @@ async function procesarEnviarCorreo(e) {
         <p><strong>Equipo/Modelo:</strong> ${o.modelo || '—'} (Serie: ${o.serie || '—'})</p>
         <p><strong>Técnico Asignado:</strong> ${o.tecnico || '—'}</p>
         <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
-        <h3 style="color: #444;">Trabajos Realizados</h3>
-        <p>${(o.trabajos || 'Sin descripción').replace(/\n/g, '<br>')}</p>
-        <h3 style="color: #444;">Observaciones</h3>
-        <p>${(o.observaciones || '—').replace(/\n/g, '<br>')}</p>
-        <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
-        <p style="text-align: center; color: #777; font-size: 12px;">Para ver el reporte completo, consulte el portal de Eurorep.</p>
+        <p style="text-align: center; color: #777; font-size: 12px;">Se ha adjuntado el documento PDF oficial del reporte a este correo para su descarga y archivo.</p>
       </div>
     </div>
   `;
@@ -10569,6 +10931,24 @@ async function procesarEnviarCorreo(e) {
       }
     }
 
+    const payload = {
+      to: destinatario,
+      cc: cc || undefined,
+      bcc: bcc || undefined,
+      subject: asunto,
+      htmlBody: htmlBody
+    };
+
+    if (base64Pdf) {
+      payload.attachments = [
+        {
+          filename: `Reporte_Servicio_${o.folio || ordenId}.pdf`,
+          content: base64Pdf,
+          encoding: 'base64'
+        }
+      ];
+    }
+
     const response = await fetch('/api/send-email', {
       method: 'POST',
       headers: { 
@@ -10576,16 +10956,12 @@ async function procesarEnviarCorreo(e) {
         'Authorization': token ? `Bearer ${token}` : '',
         'X-Sapi-Client-Token': 'SapiSecuredClientToken'
       },
-      body: JSON.stringify({
-        to: destinatario,
-        subject: asunto,
-        htmlBody: htmlBody
-      })
+      body: JSON.stringify(payload)
     });
     
     const result = await response.json();
     if (response.ok) {
-      mostrarNotificacion("¡Correo enviado exitosamente!", "success");
+      mostrarNotificacion("¡Correo enviado exitosamente con reporte PDF adjunto!", "success");
       cerrarModalCorreo();
     } else {
       console.error(result);
@@ -11567,7 +11943,7 @@ function renderRefaccionesPendientes() {
   grid.innerHTML = '';
   
   const pendientes = [];
-  ordenes.forEach(o => {
+  getFilteredOrders().forEach(o => {
     if (o.ref_necesarias && o.ref_necesarias.length > 0) {
       o.ref_necesarias.forEach(ref => {
         // Encontrar marca
@@ -24916,6 +25292,11 @@ window.confirmarAccion = function(options = {}) {
 };
 
 window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId) {
+  const o = ordenes.find(x => x.id === ordenId);
+  if (o && (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || !!o.firma_cliente_base64 || !!o.firma_tecnico_base64)) {
+    mostrarNotificacion('No se pueden eliminar asignaciones en una orden cerrada o completada.', 'error');
+    return;
+  }
   if (!confirm("¿Estás seguro de que deseas eliminar esta asignación programada?")) return;
 
   // 1. Eliminar de la bitácora de la orden

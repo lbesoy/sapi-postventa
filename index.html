@@ -190,7 +190,7 @@
       }
     } else if (typeof window !== 'undefined') {
       // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
-      const currentAppVer = '1.3.219';
+      const currentAppVer = '1.3.224';
       const lastAppVer = localStorage.getItem('sapi_app_version');
       if (lastAppVer !== currentAppVer) {
         if ('serviceWorker' in navigator) {
@@ -233,7 +233,8 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <script src="https://js.live.net/v7.2/OneDrive.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=25" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <link rel="stylesheet" href="style.css?v=29" />
   <!-- PWA & Mobile Web App Capabilities -->
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="logo_transparent.png" type="image/png" />
@@ -378,7 +379,7 @@
         </div>
       </div>
 
-      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: var(--text-muted);" id="login-app-version">v1.3.219</div>
+      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: var(--text-muted);" id="login-app-version">v1.3.224</div>
     </div>
   </div>
 
@@ -1970,7 +1971,7 @@
                     <div class="toggle-label">Versión de la Aplicación</div>
                     <div class="toggle-sub">Versión actualmente cargada</div>
                   </div>
-                  <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); background: var(--bg-body); padding: 0.25rem 0.6rem; border: 1px solid var(--border); border-radius: 4px;" id="app-profile-version">v1.3.219</div>
+                  <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); background: var(--bg-body); padding: 0.25rem 0.6rem; border: 1px solid var(--border); border-radius: 4px;" id="app-profile-version">v1.3.224</div>
                 </div>
                 <div class="toggle-row" style="border-top: 1px dashed var(--border); padding-top: 0.85rem; margin-top: 0.25rem; flex-direction: column; align-items: stretch; gap: 0.5rem;">
                   <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -3073,7 +3074,7 @@
     </div>
 
     <!-- MODAL DETALLE DE CLIENTE -->
-    <div class="modal-overlay" id="modal-detalle-cliente-overlay" onclick="cerrarDetalleCliente(event)">
+    <div class="modal-overlay" id="modal-detalle-cliente-overlay" onclick="cerrarDetalleCliente(event)" style="z-index: 400;">
       <div class="modal" id="modal-detalle-cliente" style="max-width:800px;">
         <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
           <h2 id="detalle-cliente-title">Perfil del Cliente</h2>
@@ -3181,7 +3182,7 @@
     </div>
 
     <!-- MODAL DETALLE DE MÁQUINA (SERVICIOS) -->
-    <div class="modal-overlay" id="modal-detalle-maquina-overlay" onclick="cerrarDetalleMaquina(event)">
+    <div class="modal-overlay" id="modal-detalle-maquina-overlay" onclick="cerrarDetalleMaquina(event)" style="z-index: 400;">
       <div class="modal" id="modal-detalle-maquina" style="max-width:600px;">
         <div class="modal-header">
           <div id="detalle-maquina-title" style="flex:1;">Historial de Máquina</div>
@@ -3769,7 +3770,7 @@
   </div><!-- /app-wrapper -->
 
   <!-- MODAL DETALLE TÉCNICO -->
-  <div class="modal-overlay" id="modal-detalle-tecnico-overlay" onclick="cerrarDetalleTecnico(event)">
+  <div class="modal-overlay" id="modal-detalle-tecnico-overlay" onclick="cerrarDetalleTecnico(event)" style="z-index: 400;">
     <div class="modal" id="modal-detalle-tecnico" style="max-width: 700px; padding:0;">
       <div class="modal-header" style="border-bottom: 1px solid var(--border); padding: 1.25rem 1.5rem;">
         <h2 id="tecnico-detalle-title" style="display:flex; align-items:center; gap:0.5rem;"><i data-lucide="user"
@@ -5191,40 +5192,132 @@
   </div>
 
   <!-- MODAL REDACTAR CORREO -->
-  <div class="modal-overlay" id="modal-correo-overlay" onclick="if(event.target===this) cerrarModalCorreo()">
-    <div class="modal" style="max-width: 600px;">
-      <div class="modal-header">
-        <h2>Enviar Orden de Servicio</h2>
+  <div class="modal-overlay" id="modal-correo-overlay" style="z-index: 600;">
+    <div class="modal" style="max-width: 1100px; width: 90vw; height: 85vh; display: flex; flex-direction: column;">
+      <div class="modal-header" style="background: var(--bg-body); border-bottom: 1px solid var(--border); padding: 1rem 1.5rem; flex-shrink: 0;">
+        <h2 style="display: flex; align-items: center; gap: 0.5rem; color: var(--accent);">
+          <i data-lucide="mail"></i> Redactar y Enviar Correo
+        </h2>
         <button class="modal-close" onclick="cerrarModalCorreo()">✕</button>
       </div>
-      <div class="modal-body">
-        <form id="form-correo" onsubmit="procesarEnviarCorreo(event)">
-          <input type="hidden" id="correo-orden-id" />
-          <div class="form-group full-width" style="margin-bottom: 1rem;">
-            <label>Destinatario(s) * (separa con coma para múltiples correos)</label>
-            <input type="text" id="correo-destinatario" placeholder="cliente@ejemplo.com, supervisor@ejemplo.com" required />
+      <div class="modal-body" style="padding: 0; display: flex; overflow: hidden; flex: 1;">
+        <!-- Left Panel: Email Form (Gmail Style) -->
+        <div style="flex: 1; min-width: 350px; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--bg-body);">
+          <form id="form-correo" onsubmit="procesarEnviarCorreo(event)" style="display: flex; flex-direction: column; flex: 1; gap: 0;">
+            <input type="hidden" id="correo-orden-id" />
+            
+            <!-- Recipient: Para -->
+            <div style="display: flex; align-items: center; border-bottom: 1px solid var(--border); padding: 0.5rem 0;">
+              <span style="font-weight: 500; font-size: 0.88rem; color: var(--text-muted); width: 50px;">Para</span>
+              <input type="text" id="correo-destinatario" placeholder="cliente@ejemplo.com, supervisor@ejemplo.com" required style="flex: 1; border: none; background: transparent; padding: 0.25rem 0; outline: none; font-size: 0.88rem; color: var(--text-primary); min-width: 0;" />
+              <div style="display: flex; gap: 0.5rem; margin-left: 0.5rem; flex-shrink: 0;">
+                <button type="button" onclick="toggleCampoCorreo('cc')" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; cursor: pointer; padding: 0.2rem 0.4rem; border-radius: 4px; transition: all 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">Cc</button>
+                <button type="button" onclick="toggleCampoCorreo('cco')" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; cursor: pointer; padding: 0.2rem 0.4rem; border-radius: 4px; transition: all 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">Cco</button>
+              </div>
+            </div>
+
+            <!-- Recipient: Cc -->
+            <div id="row-correo-cc" style="display: none; align-items: center; border-bottom: 1px solid var(--border); padding: 0.5rem 0;">
+              <span style="font-weight: 500; font-size: 0.88rem; color: var(--text-muted); width: 50px;">Cc</span>
+              <input type="text" id="correo-cc" placeholder="correo-copia@ejemplo.com" style="flex: 1; border: none; background: transparent; padding: 0.25rem 0; outline: none; font-size: 0.88rem; color: var(--text-primary); min-width: 0;" />
+            </div>
+
+            <!-- Recipient: Cco -->
+            <div id="row-correo-cco" style="display: none; align-items: center; border-bottom: 1px solid var(--border); padding: 0.5rem 0;">
+              <span style="font-weight: 500; font-size: 0.88rem; color: var(--text-muted); width: 50px;">Cco</span>
+              <input type="text" id="correo-cco" placeholder="correo-copia-oculta@ejemplo.com" style="flex: 1; border: none; background: transparent; padding: 0.25rem 0; outline: none; font-size: 0.88rem; color: var(--text-primary); min-width: 0;" />
+            </div>
+
+            <!-- Subject: Asunto -->
+            <div style="display: flex; align-items: center; border-bottom: 1px solid var(--border); padding: 0.5rem 0; margin-bottom: 1rem;">
+              <span style="font-weight: 500; font-size: 0.88rem; color: var(--text-muted); width: 50px;">Asunto</span>
+              <input type="text" id="correo-asunto" placeholder="Asunto del correo" required style="flex: 1; border: none; background: transparent; padding: 0.25rem 0; outline: none; font-size: 0.88rem; color: var(--text-primary); min-width: 0;" />
+            </div>
+
+            <!-- Rich Text Editor Container -->
+            <div style="flex: 1; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-body); margin-bottom: 1rem;">
+              <!-- Toolbar -->
+              <div id="editor-toolbar" style="display: flex; flex-wrap: wrap; gap: 0.15rem; align-items: center; background: var(--bg-hover, #f8f9fa); border-bottom: 1px solid var(--border); padding: 0.4rem 0.5rem; flex-shrink: 0;">
+                <button type="button" class="toolbar-btn" onclick="ejecutarComandoEditor('bold')" title="Negrita" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; border-radius: 4px; color: var(--text-secondary); cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'"><i data-lucide="bold" style="width: 14px; height: 14px;"></i></button>
+                <button type="button" class="toolbar-btn" onclick="ejecutarComandoEditor('italic')" title="Cursiva" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; border-radius: 4px; color: var(--text-secondary); cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'"><i data-lucide="italic" style="width: 14px; height: 14px;"></i></button>
+                <button type="button" class="toolbar-btn" onclick="ejecutarComandoEditor('underline')" title="Subrayado" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; border-radius: 4px; color: var(--text-secondary); cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'"><i data-lucide="underline" style="width: 14px; height: 14px;"></i></button>
+                
+                <span style="height: 16px; width: 1px; background: var(--border); margin: 0 0.25rem;"></span>
+                
+                <input type="color" id="editor-font-color" style="display: none;" onchange="ejecutarColorEditor('foreColor', this.value)" />
+                <button type="button" class="toolbar-btn" onclick="abrirPaletaColor(event, 'foreColor')" title="Color de texto" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; border-radius: 4px; color: var(--text-secondary); cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'"><i data-lucide="palette" style="width: 14px; height: 14px;"></i></button>
+                
+                <input type="color" id="editor-bg-color" style="display: none;" onchange="ejecutarColorEditor('backColor', this.value)" />
+                <button type="button" class="toolbar-btn" onclick="abrirPaletaColor(event, 'backColor')" title="Color de resaltado" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; border-radius: 4px; color: var(--text-secondary); cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'"><i data-lucide="highlighter" style="width: 14px; height: 14px;"></i></button>
+                
+                <span style="height: 16px; width: 1px; background: var(--border); margin: 0 0.25rem;"></span>
+                
+                <button type="button" class="toolbar-btn" onclick="ejecutarComandoEditor('justifyLeft')" title="Alinear a la izquierda" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; border-radius: 4px; color: var(--text-secondary); cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'"><i data-lucide="align-left" style="width: 14px; height: 14px;"></i></button>
+                <button type="button" class="toolbar-btn" onclick="ejecutarComandoEditor('justifyCenter')" title="Alinear al centro" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; border-radius: 4px; color: var(--text-secondary); cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'"><i data-lucide="align-center" style="width: 14px; height: 14px;"></i></button>
+                <button type="button" class="toolbar-btn" onclick="ejecutarComandoEditor('justifyRight')" title="Alinear a la derecha" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; border-radius: 4px; color: var(--text-secondary); cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'"><i data-lucide="align-right" style="width: 14px; height: 14px;"></i></button>
+                
+                <span style="height: 16px; width: 1px; background: var(--border); margin: 0 0.25rem;"></span>
+                
+                <button type="button" class="toolbar-btn" onclick="ejecutarComandoEditor('insertUnorderedList')" title="Lista con viñetas" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; border-radius: 4px; color: var(--text-secondary); cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'"><i data-lucide="list" style="width: 14px; height: 14px;"></i></button>
+                <button type="button" class="toolbar-btn" onclick="ejecutarComandoEditor('insertOrderedList')" title="Lista numerada" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; border-radius: 4px; color: var(--text-secondary); cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'"><i data-lucide="list-ordered" style="width: 14px; height: 14px;"></i></button>
+                
+                <span style="height: 16px; width: 1px; background: var(--border); margin: 0 0.25rem;"></span>
+                
+                <button type="button" class="toolbar-btn" onclick="ejecutarComandoEditor('removeFormat')" title="Borrar formato" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; border-radius: 4px; color: var(--text-secondary); cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'"><i data-lucide="eraser" style="width: 14px; height: 14px;"></i></button>
+              </div>
+
+              <!-- Editable content area -->
+              <div id="correo-mensaje-editor" contenteditable="true" style="flex: 1; padding: 1rem; min-height: 220px; outline: none; overflow-y: auto; font-family: inherit; font-size: 0.92rem; line-height: 1.5; color: var(--text-primary); background: var(--bg-body);"></div>
+            </div>
+
+            <!-- SECCIÓN DE ARCHIVO ADJUNTO (PDF GENERADO AUTOMÁTICAMENTE) -->
+            <div style="border-top: 1px solid var(--border); padding-top: 0.75rem; margin-bottom: 1rem;">
+              <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.25rem;">
+                <i data-lucide="paperclip" style="width:14px; height:14px;"></i> Archivos Adjuntos (1)
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.75rem; background: var(--bg-body); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.8rem;">
+                <div style="width: 32px; height: 32px; border-radius: 6px; background: rgba(239, 68, 68, 0.1); display: flex; align-items: center; justify-content: center; color: #ef4444; flex-shrink: 0;">
+                  <i data-lucide="file-text" style="width: 18px; height: 18px;"></i>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="adjunto-pdf-nombre">Reporte_OS-26101.pdf</div>
+                  <div style="font-size: 0.65rem; color: var(--text-muted);">PDF de Reporte Técnico</div>
+                </div>
+                <div style="flex-shrink: 0;">
+                  <span style="font-size: 0.6rem; background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 600; display: flex; align-items: center; gap: 0.15rem;">
+                    <i data-lucide="check" style="width:8px; height:8px;"></i> Listo
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-actions" style="border-top: 1px solid var(--border); padding-top: 0.75rem; display: flex; justify-content: flex-end; gap: 0.75rem; flex-shrink: 0; margin-top: auto;">
+              <button type="button" class="btn-secondary" onclick="cerrarModalCorreo()">Cancelar</button>
+              <button type="submit" class="btn-primary" id="btn-enviar-correo-submit" style="background: #1a73e8; border-color: #1a73e8; color: white;">
+                <i data-lucide="send" class="btn-icon"></i> Enviar
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Right Panel: PDF Viewer -->
+        <div style="flex: 1; min-width: 350px; background: #525659; display: flex; flex-direction: column; position: relative;">
+          <div style="background: var(--bg-body); border-bottom: 1px solid var(--border); padding: 0.5rem 1rem; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;">
+            <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 0.35rem;">
+              <i data-lucide="eye" style="width: 14px; height: 14px; color: var(--accent);"></i> Vista Previa del PDF Adjunto
+            </div>
           </div>
-          <div class="form-group full-width" style="margin-bottom: 1rem;">
-            <label>Asunto *</label>
-            <input type="text" id="correo-asunto" placeholder="Asunto del correo" required />
+          <!-- Visor Frame -->
+          <div style="flex: 1; position: relative; height: 100%; width: 100%; display: flex; justify-content: center; align-items: center;">
+            <!-- Loading Indicator -->
+            <div id="correo-pdf-loading" style="position: absolute; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; color: #fff; z-index: 5;">
+              <div style="width: 32px; height: 32px; border: 3px solid rgba(255,255,255,0.2); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+              <span style="font-size: 0.75rem; font-weight: 600;">Generando vista previa del PDF...</span>
+            </div>
+            <iframe id="correo-pdf-frame" style="width: 100%; height: 100%; border: none; display: none;" src=""></iframe>
           </div>
-          <div class="form-group full-width" style="margin-bottom: 1rem;">
-            <label>Mensaje / Cuerpo del correo *</label>
-            <textarea id="correo-mensaje" rows="8" placeholder="Escribe tu mensaje personal aquí..." required></textarea>
-          </div>
-          <div style="background: var(--bg-hover); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 1.5rem; font-size: 0.8rem; color: var(--text-secondary);">
-            <i data-lucide="info" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; color:var(--accent);"></i>
-            <strong>Nota:</strong> Se anexará automáticamente el reporte de servicio estructurado (Folio, Cliente, Trabajos Realizados y Observaciones) al final de tu mensaje.
-          </div>
-          <div class="form-actions">
-            <button type="button" class="btn-secondary" onclick="cerrarModalCorreo()">Cancelar</button>
-            <button type="submit" class="btn-primary" id="btn-enviar-correo-submit">
-              <i data-lucide="send" class="btn-icon"></i> Enviar Correo
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
-    </div>
   </div>
   <!-- MODAL CONFIRMAR IMPORTACIÓN DE MOVIMIENTOS -->
   <div id="modal-importar-movimientos" class="modal-overlay" style="align-items:center; justify-content:center;">
@@ -5357,8 +5450,8 @@
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=219",
-        "app.js?v=219"
+        "supabaseSync.js?v=220",
+        "app.js?v=224"
       ];
       var index = 0;
       function loadNext() {

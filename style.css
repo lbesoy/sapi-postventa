@@ -1182,7 +1182,7 @@ body {
 @media print {
   @page { margin: 1.5cm; }
 
-  body { 
+  html, body {
     background: white !important; 
     margin: 0 !important; 
     padding: 0 !important; 
@@ -1194,20 +1194,55 @@ body {
     overflow: visible !important;
   }
 
+  /* Ocultar todos los elementos de primer nivel excepto el modal de detalle abierto */
+  body > *:not(.modal-overlay.open) {
+    display: none !important;
+  }
+
   .sidebar, .main-wrapper, .topbar, .content, .btn-primary, .btn-secondary,
-  .modal-header button, .form-actions, #detalle-header-actions { display: none !important; }
+  .modal-header button, .form-actions, #detalle-header-actions, .modal-close, .no-print { 
+    display: none !important; 
+  }
   
-  .modal-overlay { display: none !important; }
+  .modal-overlay { 
+    display: none !important; 
+  }
+  
   .modal-overlay.open { 
     display: block !important; 
-    position: static !important; 
+    position: absolute !important; 
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: auto !important;
     background: transparent !important; 
     backdrop-filter: none !important; 
     padding: 0 !important; 
+    margin: 0 !important;
+    border: none !important;
+    overflow: visible !important;
   }
   
-  .modal { box-shadow: none !important; border: none !important; max-height: none !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; }
-  .modal-body { padding: 0 !important; overflow: visible !important; height: auto !important; max-height: none !important; }
+  .modal { 
+    display: block !important;
+    position: relative !important;
+    box-shadow: none !important; 
+    border: none !important; 
+    max-height: none !important; 
+    width: 100% !important; 
+    max-width: 100% !important; 
+    margin: 0 !important; 
+    padding: 0 !important; 
+    animation: none !important;
+    transform: none !important;
+  }
+  
+  .modal-body { 
+    padding: 0 !important; 
+    overflow: visible !important; 
+    height: auto !important; 
+    max-height: none !important; 
+  }
   
   .print-only { display: block; }
   /* Signature print handling */
