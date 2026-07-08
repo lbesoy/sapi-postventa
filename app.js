@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.228'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.229'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -23889,10 +23889,23 @@ window.filterTelemetryLogs = function(filter) {
 };
 
 // Clear all telemetry logs
-window.clearTelemetryLogs = function() {
+window.clearTelemetryLogs = async function() {
   if (confirm('¿Estás seguro de que deseas limpiar todo el historial de telemetría?')) {
     localStorage.setItem('sapi_telemetry_events', '[]');
     window.renderTelemetryDashboard();
+    
+    if (window.supabaseClient) {
+      try {
+        const { error } = await window.supabaseClient.from('sapi_telemetry').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        if (error) {
+          console.error('[Telemetry] Error al limpiar logs en Supabase:', error);
+        } else {
+          console.log('[Telemetry] Historial de telemetría limpiado de Supabase exitosamente.');
+        }
+      } catch (e) {
+        console.error('[Telemetry] Excepción al limpiar logs en Supabase:', e);
+      }
+    }
   }
 };
 
@@ -23925,7 +23938,7 @@ window.renderTelemetryEventsFeed = function() {
   if (!container) return;
 
   const allEvents = JSON.parse(localStorage.getItem('sapi_telemetry_events') || '[]');
-  const events = allEvents.filter(e => !(e.action === 'Visualización de Módulo' && e.details?.modulo === 'telemetry'));
+  const events = allEvents.filter(e => e && e.action && !e.action.startsWith('Diag:') && !(e.action === 'Visualización de Módulo' && e.details?.modulo === 'telemetry'));
   const filter = window._currentTelemetryLogFilter;
   const activeMode = isTestModeActive();
 
@@ -24093,7 +24106,7 @@ window.renderTelemetryDashboard = function() {
   window.seedMockTelemetryData();
 
   const allEvents = JSON.parse(localStorage.getItem('sapi_telemetry_events') || '[]');
-  const events = allEvents.filter(e => !(e.action === 'Visualización de Módulo' && e.details?.modulo === 'telemetry'));
+  const events = allEvents.filter(e => e && e.action && !e.action.startsWith('Diag:') && !(e.action === 'Visualización de Módulo' && e.details?.modulo === 'telemetry'));
   const daysLimit = parseInt(document.getElementById('telemetry-time-range')?.value || '7');
   const activeMode = isTestModeActive();
 
