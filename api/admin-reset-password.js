@@ -52,9 +52,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Cliente normal de Supabase con el token del usuario que llama
+    // Cliente normal de Supabase con el token del usuario que llama en cabeceras globales
+    // para que las consultas (como leer roles) se ejecuten con su RLS de usuario autenticado
     const clientSupabase = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false }
+      auth: { persistSession: false },
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
     });
 
     // Validar token del usuario y obtener sus datos
@@ -71,7 +77,9 @@ export default async function handler(req, res) {
       .single();
 
     if (roleErr || !callerRoleData) {
-      return res.status(403).json({ error: 'Forbidden: Could not verify permissions' });
+      return res.status(403).json({ 
+        error: `Forbidden: Could not verify permissions. ${roleErr ? roleErr.message : 'No role data'}` 
+      });
     }
 
     const hasPermission = callerRoleData.rol === 'superadmin' || callerRoleData.rol === 'admin';
