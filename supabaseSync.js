@@ -29,12 +29,14 @@ window.saveCatalogOffline = async function(catalogKey, dataArray) {
         req.onerror = () => reject(req.error);
       });
       console.log(`[IndexedDB] Catálogo ${catalogKey} guardado con éxito.`);
-      // Eliminar de localStorage para evitar duplicidad y liberar espacio
-      // IMPORTANTE: Si la clave está redireccionada a IndexedDB por el puente de index.html, 
-      // llamar a localStorage.removeItem borraría los datos de IndexedDB. Así que lo omitimos.
       if (typeof localStorage !== 'undefined') {
-        const redirectedKeys = ['sapi_refacciones_db', 'eurorep_pedidos_sap', 'eurorep_cotizaciones_sap', 'sapi_tickets'];
-        if (!redirectedKeys.includes(catalogKey)) {
+        const redirectedKeys = ['sapi_refacciones_db', 'eurorep_pedidos_sap', 'eurorep_cotizaciones_sap', 'sapi_tickets', 'sapi_ordenes'];
+        if (redirectedKeys.includes(catalogKey)) {
+          if (typeof window.localStorageCache === 'undefined') {
+            window.localStorageCache = {};
+          }
+          window.localStorageCache[catalogKey] = JSON.stringify(dataArray);
+        } else {
           localStorage.removeItem(catalogKey);
         }
       }
@@ -1355,7 +1357,7 @@ async function _processSyncQueueInternal() {
               const { error: delRefErr } = await sb.from('orden_refacciones').delete().eq('orden_id', ordId);
               if (delRefErr) throw delRefErr;
               
-              const refaccionesDb = JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]');
+              const refaccionesDb = await window.loadRefaccionesLocal();
               const getRefId = (clave, descripcion) => {
                 let match = null;
                 if (clave) {
