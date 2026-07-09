@@ -190,7 +190,7 @@
       }
     } else if (typeof window !== 'undefined') {
       // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
-      const currentAppVer = '1.3.232';
+      const currentAppVer = '1.3.233';
       const lastAppVer = localStorage.getItem('sapi_app_version');
       if (lastAppVer !== currentAppVer) {
         if ('serviceWorker' in navigator) {
@@ -2511,7 +2511,7 @@
             <select id="pt-tecnico" class="form-select" required disabled>
               <option value="">Selecciona una fecha primero...</option>
             </select>
-            <small style="color:var(--text-muted);font-size:0.75rem;">Solo muestra técnicos sin bitácoras en esta fecha.</small>
+            <small style="color:var(--text-muted);font-size:0.75rem;">Solo muestra técnicos sin traslape de horario en esta fecha. Ingresa las horas para mayor precisión.</small>
           </div>
           <div class="form-group">
             <label>Orden de Servicio (Abierta)</label>
@@ -2522,11 +2522,11 @@
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
             <div class="form-group">
               <label>Hora Inicio Estimada</label>
-              <input type="time" id="pt-entrada" />
+              <input type="time" id="pt-entrada" onchange="actualizarTecnicosDisponibles()" />
             </div>
             <div class="form-group">
               <label>Hora Fin Estimada</label>
-              <input type="time" id="pt-salida" />
+              <input type="time" id="pt-salida" onchange="actualizarTecnicosDisponibles()" />
             </div>
           </div>
           <div style="margin-top:1.5rem; text-align:right;">
@@ -5467,8 +5467,8 @@
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=232",
-        "app.js?v=232"
+        "supabaseSync.js?v=233",
+        "app.js?v=233"
       ];
       var index = 0;
       function loadNext() {

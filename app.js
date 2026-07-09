@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.232'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.233'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -10117,8 +10117,30 @@ function abrirProgramarTecnico() {
   document.getElementById('modal-programar-tecnico-overlay').classList.add('open');
 }
 
+// Convierte "HH:MM" a minutos desde medianoche para comparación
+function horaAMinutos(hora) {
+  if (!hora) return null;
+  const [h, m] = hora.split(':').map(Number);
+  return h * 60 + m;
+}
+
+// Verifica si dos rangos de tiempo se traslapan
+// Retorna true si HAY traslape
+function hayTraslapoHorario(entrada1, salida1, entrada2, salida2) {
+  const e1 = horaAMinutos(entrada1);
+  const s1 = horaAMinutos(salida1);
+  const e2 = horaAMinutos(entrada2);
+  const s2 = horaAMinutos(salida2);
+  // Si algún rango no tiene hora definida, asumir traslape por precaución
+  if (e1 === null || s1 === null || e2 === null || s2 === null) return true;
+  // Hay traslape si los rangos se superponen
+  return e1 < s2 && e2 < s1;
+}
+
 function actualizarTecnicosDisponibles() {
   const fecha = document.getElementById('pt-fecha').value;
+  const entrada = document.getElementById('pt-entrada').value;
+  const salida = document.getElementById('pt-salida').value;
   const selectTec = document.getElementById('pt-tecnico');
   if (!fecha) {
     selectTec.innerHTML = '<option value="">Selecciona una fecha primero...</option>';
@@ -10126,22 +10148,30 @@ function actualizarTecnicosDisponibles() {
     return;
   }
 
-  // Filtrar técnicos ocupados en esa fecha
-  const tecnicosOcupados = new Set();
+  // Detectar técnicos con traslape de horario en esa fecha
+  const tecnicosConTraslape = new Set();
   ordenes.forEach(o => {
     if (o.bitacora && o.bitacora.length > 0) {
       o.bitacora.forEach(b => {
         if (b.fecha && b.fecha.startsWith(fecha) && b.tecnico) {
-          tecnicosOcupados.add(b.tecnico);
+          // Si hay horas en ambos lados, verificar traslape real
+          if (entrada && salida && b.entrada && b.salida) {
+            if (hayTraslapoHorario(entrada, salida, b.entrada, b.salida)) {
+              tecnicosConTraslape.add(b.tecnico);
+            }
+          } else {
+            // Sin horas definidas, bloquear por precaución (día completo)
+            tecnicosConTraslape.add(b.tecnico);
+          }
         }
       });
     }
   });
 
-  const disponibles = usuarios.filter(u => u.rol === 'tecnico' && !tecnicosOcupados.has(u.nombre) && u.activo !== false);
+  const disponibles = usuarios.filter(u => u.rol === 'tecnico' && !tecnicosConTraslape.has(u.nombre) && u.activo !== false);
   
   if (disponibles.length === 0) {
-    selectTec.innerHTML = '<option value="">Sin técnicos disponibles esta fecha</option>';
+    selectTec.innerHTML = '<option value="">Sin técnicos disponibles en ese horario</option>';
     selectTec.disabled = true;
   } else {
     selectTec.innerHTML = '<option value="">Selecciona un técnico disponible...</option>' + disponibles.map(u => `<option value="${u.nombre}">${u.nombre}</option>`).join('');
@@ -10159,6 +10189,26 @@ async function guardarProgramacionTecnico() {
   if (!fecha || !tecnico || !ordenId) {
     alert("Por favor completa los campos requeridos (Fecha, Técnico, Orden).");
     return;
+  }
+
+  // Validar traslape de horario antes de guardar
+  if (entrada && salida) {
+    for (const ord of ordenes) {
+      if (!ord.bitacora) continue;
+      for (const b of ord.bitacora) {
+        if (b.fecha && b.fecha.startsWith(fecha) && b.tecnico === tecnico && b.entrada && b.salida) {
+          if (hayTraslapoHorario(entrada, salida, b.entrada, b.salida)) {
+            const folioConflicto = ord.folio || ord.id.slice(0,8);
+            const horaConflicto = `${b.entrada} – ${b.salida}`;
+            mostrarNotificacion(
+              `⚠️ ${tecnico} ya tiene asignación en ese horario (${horaConflicto}) en la orden ${folioConflicto}. Elige otro horario.`,
+              'error'
+            );
+            return;
+          }
+        }
+      }
+    }
   }
 
   const oIndex = ordenes.findIndex(o => o.id === ordenId);
