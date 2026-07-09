@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.238'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.239'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -10000,12 +10000,7 @@ function guardarFirmaCanvas(ordenId, tipo) {
 
 async function limpiarFirma(ordenId, tipo) {
   try {
-    const confirmado = await window.confirmarAccion({
-      titulo: 'Borrar Firma',
-      mensaje: `¿Estás seguro de que deseas borrar la firma del ${tipo === 'tecnico' ? 'técnico' : 'cliente'}?`,
-      esPeligroso: true,
-      icono: 'eraser'
-    });
+    const confirmado = confirm(`¿Estás seguro de que deseas borrar la firma del ${tipo === 'tecnico' ? 'técnico' : 'cliente'}?`);
     if (!confirmado) return;
     const idx = ordenes.findIndex(o => o.id === ordenId);
     if (idx !== -1) {
@@ -25312,9 +25307,12 @@ window.guardarRefaccionesTicketDesdeUI = function(ticketId, transitionToRefaccio
 };
 
 window.confirmarAccion = function(options = {}) {
+  console.log('[confirmarAccion] Iniciando con options:', options);
   return new Promise((resolve) => {
     const modal = document.getElementById('modal-confirmacion-global');
+    console.log('[confirmarAccion] modal encontrado:', !!modal);
     if (!modal) {
+      console.log('[confirmarAccion] Fallback a confirm nativo');
       resolve(confirm(options.mensaje || '¿Estás seguro?'));
       return;
     }
@@ -25325,6 +25323,11 @@ window.confirmarAccion = function(options = {}) {
     const btnAccept = document.getElementById('modal-confirm-btn-accept');
     const iconContainer = document.getElementById('modal-confirm-icon-container');
     const modalContent = modal.querySelector('.modal');
+    
+    console.log('[confirmarAccion] Elementos encontrados:', {
+      titleEl: !!titleEl, messageEl: !!messageEl, btnCancel: !!btnCancel, 
+      btnAccept: !!btnAccept, modalContent: !!modalContent
+    });
     
     titleEl.textContent = options.titulo || 'Confirmación';
     messageEl.textContent = options.mensaje || '¿Estás seguro de realizar esta acción?';
