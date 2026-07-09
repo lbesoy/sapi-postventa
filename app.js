@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.239'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.240'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -10000,7 +10000,12 @@ function guardarFirmaCanvas(ordenId, tipo) {
 
 async function limpiarFirma(ordenId, tipo) {
   try {
-    const confirmado = confirm(`¿Estás seguro de que deseas borrar la firma del ${tipo === 'tecnico' ? 'técnico' : 'cliente'}?`);
+    const confirmado = await window.confirmarAccion({
+      titulo: 'Borrar Firma',
+      mensaje: `¿Estás seguro de que deseas borrar la firma del ${tipo === 'tecnico' ? 'técnico' : 'cliente'}?`,
+      esPeligroso: true,
+      icono: 'eraser'
+    });
     if (!confirmado) return;
     const idx = ordenes.findIndex(o => o.id === ordenId);
     if (idx !== -1) {
@@ -25307,103 +25312,119 @@ window.guardarRefaccionesTicketDesdeUI = function(ticketId, transitionToRefaccio
 };
 
 window.confirmarAccion = function(options = {}) {
-  console.log('[confirmarAccion] Iniciando con options:', options);
   return new Promise((resolve) => {
-    const modal = document.getElementById('modal-confirmacion-global');
-    console.log('[confirmarAccion] modal encontrado:', !!modal);
-    if (!modal) {
-      console.log('[confirmarAccion] Fallback a confirm nativo');
-      resolve(confirm(options.mensaje || '¿Estás seguro?'));
-      return;
+    // 1. Crear contenedor principal
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    // Forzamos estilos inline para asegurar que esté por encima de TODO
+    overlay.style.cssText = `
+      z-index: 9999999 !important;
+      display: flex !important;
+      position: fixed !important;
+      inset: 0 !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background: rgba(0,0,0,0.6) !important;
+      backdrop-filter: blur(6px) !important;
+      opacity: 0;
+      transition: opacity 0.25s ease-in-out;
+    `;
+
+    // 2. Determinar icono y colores
+    const iconName = options.esPeligroso ? (options.icono || 'alert-triangle') : (options.icono || 'help-circle');
+    const colorPrimario = options.esPeligroso ? 'var(--red, #ef4444)' : 'var(--accent, #E8820C)';
+    const colorFondoIcono = options.esPeligroso ? 'rgba(239,68,68,0.12)' : 'rgba(232,130,12,0.12)';
+    
+    // 3. Crear HTML interno
+    overlay.innerHTML = `
+      <div class="modal" style="
+        max-width: 440px; width: 92%; border-radius: 20px; background: var(--bg-card, #fff); 
+        color: var(--text-primary, #111); border: 1px solid var(--border, #eaeaea); 
+        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4); padding: 2rem; display: flex; 
+        flex-direction: column; gap: 1.25rem; transform: scale(0.9); 
+        transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        border-top: 4px solid ${colorPrimario};
+      ">
+        <div style="display:flex; gap:1rem; align-items:flex-start;">
+          <div style="background:${colorFondoIcono}; color:${colorPrimario}; border-radius:12px; width:48px; height:48px; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+            <i data-lucide="${iconName}" style="width:24px; height:24px;"></i>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:0.35rem; flex:1;">
+            <h3 style="margin:0; font-size:1.25rem; font-weight:700; color:var(--text-primary); font-family:var(--font-title, inherit); letter-spacing:-0.02em;">
+              ${options.titulo || 'Confirmación'}
+            </h3>
+            <p style="margin:0; color:var(--text-secondary); font-size:0.95rem; line-height:1.6; font-weight:400;">
+              ${options.mensaje || '¿Estás seguro de realizar esta acción?'}
+            </p>
+          </div>
+        </div>
+        <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:0.5rem; border-top:1px solid var(--border, #eaeaea); padding-top:1.25rem;">
+          <button type="button" class="btn-cancelar-dinamico" style="
+            margin:0; padding:0.6rem 1.25rem; height:auto; font-size:0.9rem; font-weight:600; 
+            border-radius:10px; transition: all 0.2s; background: var(--bg-hover, #f3f4f6); 
+            border: 1px solid var(--border, #e5e7eb); color: var(--text-primary, #374151); cursor: pointer;
+          ">${options.textoCancelar || 'Cancelar'}</button>
+          
+          <button type="button" class="btn-aceptar-dinamico" style="
+            margin:0; padding:0.6rem 1.25rem; height:auto; font-size:0.9rem; font-weight:600; 
+            border-radius:10px; transition: all 0.2s; background: ${colorPrimario}; 
+            border: 1px solid ${colorPrimario}; color: #ffffff; cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.15);
+          ">${options.textoAceptar || 'Aceptar'}</button>
+        </div>
+      </div>
+    `;
+
+    // 4. Agregar al DOM
+    document.body.appendChild(overlay);
+
+    // Renderizar iconos Lucide si existe la librería
+    if (window.lucide) {
+      window.lucide.createIcons({ root: overlay });
     }
-    
-    const titleEl = document.getElementById('modal-confirm-title');
-    const messageEl = document.getElementById('modal-confirm-message');
-    const btnCancel = document.getElementById('modal-confirm-btn-cancel');
-    const btnAccept = document.getElementById('modal-confirm-btn-accept');
-    const iconContainer = document.getElementById('modal-confirm-icon-container');
-    const modalContent = modal.querySelector('.modal');
-    
-    console.log('[confirmarAccion] Elementos encontrados:', {
-      titleEl: !!titleEl, messageEl: !!messageEl, btnCancel: !!btnCancel, 
-      btnAccept: !!btnAccept, modalContent: !!modalContent
-    });
-    
-    titleEl.textContent = options.titulo || 'Confirmación';
-    messageEl.textContent = options.mensaje || '¿Estás seguro de realizar esta acción?';
-    btnCancel.textContent = options.textoCancelar || 'Cancelar';
-    btnAccept.textContent = options.textoAceptar || 'Aceptar';
-    
-    // Configurar icono dinámico
-    if (iconContainer) {
-      const iconName = options.esPeligroso ? (options.icono || 'alert-triangle') : (options.icono || 'help-circle');
-      iconContainer.innerHTML = `<i id="modal-confirm-icon" data-lucide="${iconName}" style="width:24px; height:24px;"></i>`;
-    }
-    
-    // Configurar colores según tipo de confirmación
-    if (options.esPeligroso) {
-      btnAccept.style.background = 'var(--red, #ef4444)';
-      btnAccept.style.borderColor = 'var(--red, #ef4444)';
-      btnAccept.style.color = '#ffffff';
-      if (modalContent) modalContent.style.borderTop = '4px solid var(--red, #ef4444)';
-      if (iconContainer) {
-        iconContainer.style.background = 'rgba(239,68,68,0.12)';
-        iconContainer.style.color = '#ef4444';
-      }
-    } else {
-      btnAccept.style.background = 'var(--accent, #E8820C)';
-      btnAccept.style.borderColor = 'var(--accent, #E8820C)';
-      btnAccept.style.color = '#ffffff';
-      if (modalContent) modalContent.style.borderTop = '4px solid var(--accent, #E8820C)';
-      if (iconContainer) {
-        iconContainer.style.background = 'rgba(232,130,12,0.12)';
-        iconContainer.style.color = 'var(--accent, #E8820C)';
-      }
-    }
-    
+
+    const modalContent = overlay.querySelector('.modal');
+    const btnCancel = overlay.querySelector('.btn-cancelar-dinamico');
+    const btnAccept = overlay.querySelector('.btn-aceptar-dinamico');
+
+    // 5. Función de limpieza
     const cleanUp = () => {
-      modal.style.opacity = '0';
-      if (modalContent) {
-        modalContent.style.transform = 'scale(0.9)';
-      }
+      overlay.style.opacity = '0';
+      if (modalContent) modalContent.style.transform = 'scale(0.9)';
       setTimeout(() => {
-        modal.style.display = 'none';
-        modal.classList.remove('open');
-      }, 200);
-      btnCancel.onclick = null;
-      btnAccept.onclick = null;
+        if (overlay.parentNode) {
+          overlay.parentNode.removeChild(overlay);
+        }
+      }, 250);
     };
-    
+
+    // 6. Asignar eventos
     btnCancel.onclick = (e) => {
       e.stopPropagation();
       cleanUp();
       resolve(false);
     };
-    
+
     btnAccept.onclick = (e) => {
       e.stopPropagation();
       cleanUp();
       resolve(true);
     };
     
-    // Resetear estilos iniciales de animación
-    modal.style.opacity = '0';
-    if (modalContent) {
-      modalContent.style.transform = 'scale(0.9)';
-    }
-    
-    modal.style.display = 'flex';
-    setTimeout(() => {
-      modal.classList.add('open');
-      modal.style.opacity = '1';
-      if (modalContent) {
-        modalContent.style.transform = 'scale(1)';
+    // Si hacen clic en el fondo oscuro, se cierra y cancela (opcional, pero útil)
+    overlay.onclick = (e) => {
+      if(e.target === overlay) {
+        e.stopPropagation();
+        cleanUp();
+        resolve(false);
       }
-    }, 10);
-    
-    if (window.lucide) {
-      window.lucide.createIcons({ root: modal });
-    }
+    };
+
+    // 7. Animar entrada
+    requestAnimationFrame(() => {
+      overlay.style.opacity = '1';
+      if (modalContent) modalContent.style.transform = 'scale(1)';
+    });
   });
 };
 
