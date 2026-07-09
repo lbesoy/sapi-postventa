@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.235'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.236'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -10008,8 +10008,8 @@ async function limpiarFirma(ordenId, tipo) {
   if (!confirmado) return;
   const idx = ordenes.findIndex(o => o.id === ordenId);
   if (idx !== -1) {
-    if (tipo === 'tecnico') ordenes[idx].firma_tecnico_base64 = null;
-    else ordenes[idx].firma_cliente_base64 = null;
+    if (tipo === 'tecnico') ordenes[idx].firma_tecnico_base64 = '__DELETED__';
+    else ordenes[idx].firma_cliente_base64 = '__DELETED__';
     
     ordenes[idx].estado = calcularEstadoOrden(ordenes[idx]);
     
@@ -10045,7 +10045,7 @@ function calcularEstadoOrden(o) {
     
     const hasData = hasFalla || hasTrabajos || hasDictamen || hasCondiciones || hasObservaciones || hasPendientes || hasRefUtilizadas || hasPendingParts;
     
-    if (hasBitacora || hasData || o.firma_tecnico_base64) {
+    if (hasBitacora || hasData || (o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__')) {
       return 'En proceso';
     } else {
       return 'Pendiente';

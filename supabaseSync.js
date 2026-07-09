@@ -1427,11 +1427,11 @@ async function _processSyncQueueInternal() {
               try {
                 const { data: existingFirm } = await sb.from('orden_firmas').select('firma_tecnico_url, firma_cliente_url, nombre_firmante').eq('orden_id', ordId).maybeSingle();
                 if (existingFirm) {
-                  if (!firmaTecUrl && existingFirm.firma_tecnico_url) {
+                  if (firmaTecUrl !== '__DELETED__' && !firmaTecUrl && existingFirm.firma_tecnico_url) {
                     firmaTecUrl = existingFirm.firma_tecnico_url;
                     item.data.firma_tecnico_base64 = existingFirm.firma_tecnico_url;
                   }
-                  if (!firmaCliUrl && existingFirm.firma_cliente_url) {
+                  if (firmaCliUrl !== '__DELETED__' && !firmaCliUrl && existingFirm.firma_cliente_url) {
                     firmaCliUrl = existingFirm.firma_cliente_url;
                     item.data.firma_cliente_base64 = existingFirm.firma_cliente_url;
                   }
@@ -1462,13 +1462,13 @@ async function _processSyncQueueInternal() {
                 } catch (e){}
               }
 
-               if (firmaTecUrl || firmaCliUrl) {
+               if (firmaTecUrl || firmaCliUrl || firmaTecUrl === '__DELETED__' || firmaCliUrl === '__DELETED__') {
                 const firmaPayload = {
                   orden_id: ordId,
-                  firma_cliente_url: firmaCliUrl || null,
+                  firma_cliente_url: firmaCliUrl === '__DELETED__' ? null : (firmaCliUrl || null),
                   nombre_firmante: item.data.firma_cliente_nombre || null,
                   puesto_firmante: null,
-                  firma_tecnico_url: firmaTecUrl || null,
+                  firma_tecnico_url: firmaTecUrl === '__DELETED__' ? null : (firmaTecUrl || null),
                   fecha_firma: item.data.firma_cliente_fecha || item.data.firma_tecnico_fecha || new Date().toISOString()
                 };
                 const { error: upsertFirmErr } = await sb.from('orden_firmas').upsert(firmaPayload, { onConflict: 'orden_id' });
