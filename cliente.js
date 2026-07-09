@@ -2395,50 +2395,423 @@ function abrirDetalleOrdenCliente(id) {
 }
 
 // Descargar/Imprimir Reporte PDF de la Orden
+// Descargar/Imprimir Reporte PDF de la Orden
 async function abrirReportePdfCliente(e, orderId) {
   if (e) e.stopPropagation();
   
   // Asegurar que el modal está poblado con los datos de esta orden
   abrirDetalleOrdenCliente(orderId);
   
-  // Obtener el contenido del cuerpo del modal
-  const original = document.getElementById('modal-order-body');
-  if (!original) return;
-  
-  // Clonar el contenido
-  const clone = original.cloneNode(true);
-  
-  // Remover botones o elementos interactivos que no deben ir en el PDF
-  clone.querySelectorAll('button, select, input, textarea, .no-print').forEach(el => el.remove());
-  
-  // Ajustar estilos para la impresión en PDF (fondo blanco, texto oscuro)
-  clone.style.width = '780px';
-  clone.style.maxHeight = 'none';
-  clone.style.overflow = 'visible';
-  clone.style.boxShadow = 'none';
-  clone.style.border = 'none';
-  clone.style.background = '#ffffff';
-  clone.style.color = '#0f172a';
-  clone.style.padding = '24px';
-  clone.style.fontFamily = "'Outfit', 'Inter', sans-serif";
-  
-  // Forzar estilos de tema claro usando variables CSS
-  clone.style.setProperty('--bg-primary', '#ffffff');
-  clone.style.setProperty('--bg-secondary', '#ffffff');
-  clone.style.setProperty('--bg-card', '#ffffff');
-  clone.style.setProperty('--bg-hover', '#f8fafc');
-  clone.style.setProperty('--border', '#e2e8f0');
-  clone.style.setProperty('--text-primary', '#0f172a');
-  clone.style.setProperty('--text-secondary', '#334155');
-  clone.style.setProperty('--text-muted', '#64748b');
-  
-  // Corregir colores explícitos en los elementos descendientes
-  clone.querySelectorAll('*').forEach(el => {
-    el.style.color = '#0f172a';
-    if (el.tagName === 'STRONG' || el.tagName === 'TH') {
-      el.style.color = '#0a0e17';
+  const o = ordenes.find(x => x.id === orderId);
+  if (!o) return;
+
+  const formatFecha = (fStr) => {
+    if (!fStr) return '—';
+    if (fStr.includes('T')) {
+      const parts = fStr.split('T')[0].split('-');
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
-  });
+    return fStr;
+  };
+
+  const badgeEstado = (estado) => {
+    if (estado === 'En Proceso') return 'badge-proceso';
+    if (estado === 'Completado') return 'badge-completado';
+    return 'badge-pendiente';
+  };
+
+  const seccion = (title, content) => `
+    <div class="detalle-section">
+      <div class="detalle-section-title">${title}</div>
+      ${content}
+    </div>`;
+
+  const field = (label, val) => `
+    <div class="detalle-field">
+      <div class="detalle-label">${label}</div>
+      <div class="detalle-value">${val || '—'}</div>
+    </div>`;
+
+  const refTable = (items, hasPrice) => {
+    if (!items?.length) return '<p style="color:#64748b; font-size:0.82rem; margin:0;">Sin refacciones</p>';
+    return `<table class="detalle-ref-table">
+      <thead><tr>
+        <th>Descripción</th><th>Clave</th><th>Cant.</th>
+        ${hasPrice ? '<th>Precio</th>' : ''}
+      </tr></thead>
+      <tbody>${items.map(r => `<tr>
+        <td>${r.descripcion||'—'}</td>
+        <td>${r.clave||'—'}</td>
+        <td>${r.cantidad||'—'}</td>
+        ${hasPrice ? `<td>$${r.precio||'0'}</td>` : ''}
+      </tr>`).join('')}</tbody>
+    </table>`;
+  };
+
+  // Bitácora Diaria (Impresión)
+  let bitacoraHtml = '';
+  const bitacoraItems = [...(o.bitacora || [])];
+  if (bitacoraItems.length === 0) {
+    bitacoraHtml = '<p style="color:#64748b; font-size:0.8rem; font-style:italic; margin:0;">Sin registros en la bitácora.</p>';
+  } else {
+    const sortedBitacora = bitacoraItems.sort((a, b) => {
+      const dateA = a.fecha || '';
+      const dateB = b.fecha || '';
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      const timeA = a.entrada || '';
+      const timeB = b.entrada || '';
+      return timeA.localeCompare(timeB);
+    });
+
+    bitacoraHtml += `
+      <table class="bitacora-print-table" style="width:100%; border-collapse:collapse; font-size:0.75rem; margin-top:0.5rem; color:#0f172a; border:1px solid #e2e8f0;">
+        <thead>
+          <tr style="background:#f1f5f9; text-align:left; border-bottom:1.5px solid #cbd5e1; color:#64748b;">
+            <th style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; font-weight:600; width:15%; text-transform:uppercase; font-size:0.7rem;">Fecha</th>
+            <th style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; font-weight:600; width:20%; text-transform:uppercase; font-size:0.7rem;">Técnico</th>
+            <th style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; font-weight:600; width:20%; text-transform:uppercase; font-size:0.7rem;">Horario</th>
+            <th style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; font-weight:600; width:15%; text-transform:uppercase; font-size:0.7rem;">Estado</th>
+            <th style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; font-weight:600; width:30%; text-transform:uppercase; font-size:0.7rem;">Actividad / Avances Reportados</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    sortedBitacora.forEach(b => {
+      let fFormateada = b.fecha;
+      try {
+        const dObj = new Date(b.fecha);
+        if (!isNaN(dObj)) {
+          fFormateada = dObj.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+          fFormateada = fFormateada.replace('.', '');
+        }
+      } catch(e){}
+
+      let hrsStr = '—';
+      if (b.entrada && b.salida) {
+        hrsStr = `${b.entrada} - ${b.salida}`;
+        if (b.realizado) {
+          try {
+            const [hE, mE] = b.entrada.split(':').map(Number);
+            const [hS, mS] = b.salida.split(':').map(Number);
+            let diff = (hS * 60 + mS) - (hE * 60 + mE);
+            if (diff < 0) diff += 24 * 60;
+            const hrs = Math.floor(diff / 60);
+            const mns = diff % 60;
+            hrsStr += ` (${hrs}h${mns > 0 ? ' ' + mns + 'm' : ''})`;
+          } catch(e){}
+        }
+      } else if (b.entrada || b.salida) {
+        hrsStr = `${b.entrada || '--:--'} - ${b.salida || '--:--'}`;
+      }
+
+      let estadoStr = b.realizado ? 'REPORTADO' : 'PROGRAMADO';
+      if (b.realizado && b.desviacion) {
+        estadoStr += ` (${b.desviacion})`;
+      }
+
+      bitacoraHtml += `
+        <tr style="border-bottom:1px solid #e2e8f0;">
+          <td style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; white-space:nowrap;">${fFormateada}</td>
+          <td style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; font-weight:500;">${b.tecnico || '—'}</td>
+          <td style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; white-space:nowrap;">${hrsStr}</td>
+          <td style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; font-size:0.65rem; font-weight:600;">${estadoStr}</td>
+          <td style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; white-space:pre-wrap; line-height:1.3;">${b.nota || '—'}</td>
+        </tr>
+      `;
+    });
+
+    bitacoraHtml += `
+        </tbody>
+      </table>
+    `;
+  }
+
+  // Evidencias (Impresión)
+  const ev = o.evidencias || { fotoInicio: null, fotoFin: null, adicionales: [] };
+  const adicionales = ev.adicionales || [];
+  const tieneInicio = !!ev.fotoInicio;
+  const tieneFin = !!ev.fotoFin;
+
+  let printEvidenciasHtml = '';
+  if (tieneInicio || tieneFin || adicionales.length > 0) {
+    printEvidenciasHtml += `
+      <div style="display:flex; flex-direction:column; gap:1.5rem; margin-top:0.5rem;">
+        <div style="display:flex; gap:1.5rem; flex-wrap:wrap;">
+    `;
+
+    if (tieneInicio) {
+      printEvidenciasHtml += `
+        <div style="flex:1; min-width:280px; border:1px solid #d1d5db; border-radius:6px; padding:0.75rem; background:#f9fafb; text-align:center;">
+          <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.5rem; text-transform:uppercase;">Foto de Inicio (Entrada)</div>
+          <div style="height:220px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; display:flex; justify-content:center; align-items:center; overflow:hidden;">
+            <img src="${ev.fotoInicio}" style="max-width:100%; max-height:100%; object-fit:contain;" />
+          </div>
+        </div>
+      `;
+    }
+
+    if (tieneFin) {
+      printEvidenciasHtml += `
+        <div style="flex:1; min-width:280px; border:1px solid #d1d5db; border-radius:6px; padding:0.75rem; background:#f9fafb; text-align:center;">
+          <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.5rem; text-transform:uppercase;">Foto de Fin (Salida)</div>
+          <div style="height:220px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; display:flex; justify-content:center; align-items:center; overflow:hidden;">
+            <img src="${ev.fotoFin}" style="max-width:100%; max-height:100%; object-fit:contain;" />
+          </div>
+        </div>
+      `;
+    }
+
+    printEvidenciasHtml += `
+        </div>
+    `;
+
+    if (adicionales.length > 0) {
+      printEvidenciasHtml += `
+        <div style="margin-top:0.5rem;">
+          <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.75rem; text-transform:uppercase;">Evidencias Adicionales</div>
+          <div style="display:flex; flex-wrap:wrap; gap:1rem; justify-content:flex-start;">
+      `;
+
+      adicionales.forEach((url, idx) => {
+        printEvidenciasHtml += `
+          <div style="border:1px solid #d1d5db; border-radius:6px; padding:0.5rem; background:#f9fafb; text-align:center; width:200px;">
+            <div style="font-size:0.65rem; font-weight:600; color:#4b5563; margin-bottom:0.35rem;">Adicional ${idx + 1}</div>
+            <div style="height:140px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; display:flex; justify-content:center; align-items:center; overflow:hidden;">
+              <img src="${url}" style="max-width:100%; max-height:100%; object-fit:contain;" />
+            </div>
+          </div>
+        `;
+      });
+
+      printEvidenciasHtml += `
+          </div>
+        </div>
+      `;
+    }
+
+    printEvidenciasHtml += `
+      </div>
+    `;
+  } else {
+    printEvidenciasHtml = '<p style="color:#64748b; font-size:0.8rem; font-style:italic; margin:0;">Sin fotos de evidencia cargadas.</p>';
+  }
+
+  // Crear contenedor temporal para el renderizado del PDF
+  const clone = document.createElement('div');
+  clone.className = 'admin-pdf-render-container';
+
+  clone.innerHTML = `
+    <style>
+      .admin-pdf-render-container {
+        width: 800px;
+        background: #ffffff;
+        color: #0f172a;
+        padding: 20px;
+        font-family: 'Outfit', 'Inter', sans-serif;
+        box-sizing: border-box;
+        --accent: #e8820c;
+        --accent-light: rgba(232, 133, 10, 0.12);
+        --border: #e2e8f0;
+        --text-primary: #0f172a;
+        --text-secondary: #334155;
+        --text-muted: #64748b;
+        --bg-card: #f8fafc;
+      }
+      .admin-pdf-render-container .header {
+        text-align: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #e2e8f0;
+      }
+      .admin-pdf-render-container .header img {
+        height: 60px;
+        object-fit: contain;
+        margin-bottom: 0.5rem;
+      }
+      .admin-pdf-render-container .header h2 {
+        margin: 0;
+        font-size: 1.4rem;
+        color: #0f172a;
+      }
+      .admin-pdf-render-container .header p {
+        margin: 0;
+        font-size: 0.85rem;
+        color: #64748b;
+      }
+      .admin-pdf-render-container .detalle-section {
+        margin-bottom: 1.5rem;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      .admin-pdf-render-container .detalle-section-title {
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #e8820c;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .admin-pdf-render-container .detalle-grid {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 0.75rem !important;
+      }
+      .admin-pdf-render-container .detalle-grid > * {
+        flex: 1 1 180px !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      .admin-pdf-render-container .detalle-field {
+        background: #f8fafc;
+        border-radius: 6px;
+        padding: 0.65rem 0.85rem;
+        border: 1px solid #e2e8f0;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      .admin-pdf-render-container .detalle-label {
+        font-size: 0.72rem;
+        color: #64748b;
+        margin-bottom: 0.2rem;
+      }
+      .admin-pdf-render-container .detalle-value {
+        font-size: 0.9rem;
+        font-weight: 500;
+        word-break: break-word;
+        color: #0f172a;
+      }
+      .admin-pdf-render-container .detalle-ref-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+      }
+      .admin-pdf-render-container .detalle-ref-table th {
+        background: #f8fafc;
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+        font-size: 0.72rem;
+        color: #64748b;
+        text-transform: uppercase;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .admin-pdf-render-container .detalle-ref-table td {
+        padding: 0.5rem 0.75rem;
+        border-top: 1px solid #e2e8f0;
+        color: #0f172a;
+      }
+      .admin-pdf-render-container .badge {
+        display: inline-block;
+        padding: 0.15rem 0.45rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .admin-pdf-render-container .badge-proceso {
+        background: rgba(232, 133, 10, 0.12);
+        color: #e8820c;
+      }
+      .admin-pdf-render-container .badge-completado {
+        background: rgba(16, 185, 129, 0.12);
+        color: #10b981;
+      }
+      .admin-pdf-render-container .badge-pendiente {
+        background: rgba(239, 68, 68, 0.12);
+        color: #ef4444;
+      }
+      .admin-pdf-render-container .badge-servicio-preventivo { background: rgba(232, 133, 10, 0.12); color: #e8820c; }
+      .admin-pdf-render-container .badge-garantia { background: rgba(139, 92, 246, 0.12); color: #8b5cf6; }
+      .admin-pdf-render-container .badge-inspeccion { background: rgba(14, 165, 233, 0.12); color: #0ea5e9; }
+      .admin-pdf-render-container .badge-entrega-y-puesta-en-marcha { background: rgba(16, 185, 129, 0.12); color: #10b981; }
+      .admin-pdf-render-container .badge-pre-entrega { background: rgba(249, 115, 22, 0.12); color: #f97316; }
+      .admin-pdf-render-container .badge-entrega-refacciones { background: rgba(244, 63, 94, 0.12); color: #f43f5e; }
+      .admin-pdf-render-container .badge-otro { background: rgba(248, 250, 252, 1); color: #334155; }
+    </style>
+
+    <div class="header">
+      <img src="logo_transparent.png" alt="Eurorep Logo"/>
+      <h2>Orden de Servicio ${o.folio || ''}</h2>
+      <p>${formatFecha(o.fecha)}</p>
+    </div>
+
+    ${seccion('Información General', `
+      <div class="detalle-grid">
+        ${field('Folio', o.folio)} ${field('Pedido', o.pedido)} ${field('Fecha', formatFecha(o.fecha))}
+        ${field('Cliente', o.cliente)} ${field('Ubicación (Ticket)', o.ubicacion)} ${field('Ubicación en Sitio', o.ubicacion_sitio)} ${field('Operador', o.operador)}
+        ${field('No. ECO', o.eco)} ${field('Horómetro (Ticket)', o.horometro)} ${field('Horómetro Real', o.horometro_real)}
+        ${field('Marca', (() => { 
+          const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+          let m = o.marca || (o.equipo ? o.equipo.split(' ')[0] : '');
+          return MARCAS_RENDER[m.toUpperCase()] || m || '—';
+        })())} ${field('Modelo', o.modelo)} ${field('Serie', o.serie)}
+        ${field('ID Máquina', (() => {
+          const maq = (maquinariaDb || []).find(m => (o.maquinaria_id && m.id === o.maquinaria_id) || (o.serie && m.serie === o.serie) || (o.modelo && m.modelo === o.modelo && m.cliente === o.cliente));
+          return maq && (maq.idInterno || maq.id) ? `<span style="font-family:monospace; font-weight:600; color:#e8820c; background:rgba(232, 133, 10, 0.12); padding:0.15rem 0.4rem; border-radius:4px; border:1px solid rgba(232, 133, 10, 0.3);">${maq.idInterno || maq.id}</span>` : '—';
+        })())}
+        ${field('Técnico', o.tecnico)} ${field('Ticket Soporte', (() => { const t = (tickets || []).find(x => x.id === o.soporte); return t ? (t.folio || t.id.slice(0,8)) : o.soporte || null; })())}
+      </div>`)}
+
+    ${seccion('Kilómetros / Tipo', `
+      <div class="detalle-grid">
+        ${field('Origen → Trabajo', (o.km_ida != null && o.km_ida !== '') ? o.km_ida + ' km' : null)}
+        ${field('Trabajo → Origen', (o.km_vuelta != null && o.km_vuelta !== '') ? o.km_vuelta + ' km' : null)}
+        ${field('Total Km', (o.km_total != null && o.km_total !== '') ? o.km_total + ' km' : null)}
+        ${field('Tipo de Visita', `<span class="badge badge-${(o.tipo||'otro').toLowerCase().replace(/ /g, '-').replace('é','e').replace('í','i')}">${o.tipo}</span>`)}
+        ${field('Estado', `<span class="badge ${badgeEstado(o.estado)}">${o.estado}</span>`)}
+      </div>`)}
+
+    ${seccion('Diagnóstico y Trabajos', `
+      ${field('Falla reportada', o.falla)}
+      <div style="margin-top:0.5rem">${field('Trabajos realizados', o.trabajos)}</div>
+      <div style="margin-top:0.5rem">${field('Dictamen', o.dictamen)}</div>
+      <div style="margin-top:0.5rem">${field('Condiciones del equipo', o.condiciones)}</div>
+      <div style="margin-top:0.5rem">${field('Observaciones', o.observaciones)}</div>
+      <div style="margin-top:0.5rem">${field('Pendientes', o.pendientes)}</div>`)}
+
+    ${seccion('Refacciones Utilizadas', refTable(o.ref_utilizadas, true))}
+    ${seccion('Refacciones Necesarias', refTable(o.ref_necesarias, false))}
+
+    ${(o.noches || o.alimentacion || o.traslado_costo) ? seccion('Fecha de Servicio', `
+      <div class="detalle-grid">
+        ${field('No. Noches', o.noches)} ${field('Alimentación', o.alimentacion ? '$'+o.alimentacion : '')} ${field('Traslado', o.traslado_costo ? '$'+o.traslado_costo : '')}
+      </div>`) : ''}
+
+    ${seccion('Bitácora Diaria', bitacoraHtml)}
+    ${seccion('Evidencias Fotográficas', printEvidenciasHtml)}
+
+    ${seccion('Firmas de Conformidad', `
+      <div style="display:flex; flex-wrap:wrap; gap:2rem; margin-top:1rem; justify-content:center;">
+        <!-- TECNICO -->
+        <div style="flex:1; min-width:280px; max-width:350px; display:flex; flex-direction:column; align-items:center;">
+          <h4 style="margin-bottom:1rem; color:#0f172a; font-size:0.95rem; font-weight:600; text-align:center;">Firma del Técnico</h4>
+          ${o.firma_tecnico_base64 
+            ? `<div style="border:1px solid #e2e8f0; border-radius:8px; padding:1rem; background:white; width:100%; text-align:center; box-sizing:border-box;">
+                 <img src="${o.firma_tecnico_base64}" alt="Firma del técnico" style="max-width:100%; max-height:120px; display:block; margin:0 auto;"/>
+                 <p style="text-align:center; color:#0f172a; font-weight:600; font-size:0.85rem; margin-top:0.5rem; margin-bottom:0;">${o.firma_tecnico_nombre || o.tecnico || 'Técnico'}</p>
+                 ${o.firma_tecnico_fecha ? `<p style="text-align:center; color:#64748b; font-size:0.75rem; margin-top:0.25rem; margin-bottom:0;">${new Date(o.firma_tecnico_fecha).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'})}</p>` : ''}
+               </div>`
+            : `<p style="color:#64748b; font-size:0.85rem; font-style:italic; text-align:center;">Sin firma del técnico</p>`
+          }
+        </div>
+
+        <!-- CLIENTE -->
+        <div style="flex:1; min-width:280px; max-width:350px; display:flex; flex-direction:column; align-items:center;">
+          <h4 style="margin-bottom:1rem; color:#0f172a; font-size:0.95rem; font-weight:600; text-align:center;">Firma del Cliente</h4>
+          ${o.firma_cliente_base64 
+            ? `<div style="border:1px solid #e2e8f0; border-radius:8px; padding:1rem; background:white; width:100%; text-align:center; box-sizing:border-box;">
+                 <img src="${o.firma_cliente_base64}" alt="Firma del cliente" style="max-width:100%; max-height:120px; display:block; margin:0 auto;"/>
+                 <p style="text-align:center; color:#0f172a; font-weight:600; font-size:0.85rem; margin-top:0.5rem; margin-bottom:0;">${o.firma_cliente_nombre || o.cliente || 'Cliente'}</p>
+                 ${o.firma_cliente_fecha ? `<p style="text-align:center; color:#64748b; font-size:0.75rem; margin-top:0.25rem; margin-bottom:0;">${new Date(o.firma_cliente_fecha).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'})}</p>` : ''}
+               </div>`
+            : `<p style="color:#64748b; font-size:0.85rem; font-style:italic; text-align:center;">Sin firma del cliente</p>`
+          }
+        </div>
+      </div>
+    `)}
+  `;
 
   const tempContainer = document.createElement('div');
   tempContainer.style.position = 'absolute';
@@ -2447,18 +2820,16 @@ async function abrirReportePdfCliente(e, orderId) {
   tempContainer.style.background = '#ffffff';
   tempContainer.appendChild(clone);
   document.body.appendChild(tempContainer);
-  
-  const o = ordenes.find(x => x.id === orderId);
-  const folio = o ? (o.folio || orderId) : orderId;
-  
+
+  const folio = o.folio || orderId;
   const opt = {
-    margin:       12,
+    margin:       10,
     filename:     `Reporte_Servicio_${folio}.pdf`,
     image:        { type: 'jpeg', quality: 0.98 },
     html2canvas:  { scale: 2, useCORS: true, letterRendering: true, logging: false },
     jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' }
   };
-  
+
   try {
     if (typeof html2pdf === 'function') {
       showToast('Generando archivo PDF...', 'info');
