@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.237'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.238'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -9762,7 +9762,7 @@ function verDetalle(id) {
                  <p style="text-align:center; color:var(--text-primary); font-weight:600; font-size:0.85rem; margin-top:0.5rem; margin-bottom:0;">${o.firma_tecnico_nombre || o.tecnico || 'Técnico'}</p>
                  ${o.firma_tecnico_fecha ? `<p style="text-align:center; color:var(--text-muted); font-size:0.75rem; margin-top:0.25rem; margin-bottom:0;">${new Date(o.firma_tecnico_fecha).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'})}</p>` : ''}
                </div>
-               ${currentSession.viewMode === 'admin' || currentSession.viewMode === 'superadmin' ? `<button class="btn-secondary" onclick="limpiarFirma('${o.id}', 'tecnico')" style="font-size:0.8rem; margin-top:1rem;"><i data-lucide="eraser" style="width:14px;height:14px;"></i> Borrar firma (Admin)</button>` : ''}` 
+               ${currentSession.viewMode === 'admin' || currentSession.viewMode === 'superadmin' ? `<button class="btn-secondary" onclick="console.log('Borrando tecnico...'); limpiarFirma('${o.id}', 'tecnico')" style="font-size:0.8rem; margin-top:1rem;"><i data-lucide="eraser" style="width:14px;height:14px;"></i> Borrar firma (Admin)</button>` : ''}` 
             : (() => {
                 const ev = o.evidencias || {};
                 const tieneObligatorias = !!(ev.fotoInicio && ev.fotoFin);
@@ -9810,7 +9810,7 @@ function verDetalle(id) {
                  <p style="text-align:center; color:var(--text-primary); font-weight:600; font-size:0.85rem; margin-top:0.5rem; margin-bottom:0;">${o.firma_cliente_nombre || o.cliente || 'Cliente'}</p>
                  ${o.firma_cliente_fecha ? `<p style="text-align:center; color:var(--text-muted); font-size:0.75rem; margin-top:0.25rem; margin-bottom:0;">${new Date(o.firma_cliente_fecha).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'})}</p>` : ''}
                </div>
-               <button class="btn-secondary" onclick="limpiarFirma('${o.id}', 'cliente')" style="font-size:0.8rem; margin-top:1rem;"><i data-lucide="eraser" style="width:14px;height:14px;"></i> Volver a firmar</button>` 
+               ${currentSession.viewMode === 'admin' || currentSession.viewMode === 'superadmin' ? `<button class="btn-secondary" onclick="console.log('Borrando cliente...'); limpiarFirma('${o.id}', 'cliente')" style="font-size:0.8rem; margin-top:1rem;"><i data-lucide="eraser" style="width:14px;height:14px;"></i> Volver a firmar</button>` : `<button class="btn-secondary" onclick="limpiarFirma('${o.id}', 'cliente')" style="font-size:0.8rem; margin-top:1rem;"><i data-lucide="eraser" style="width:14px;height:14px;"></i> Volver a firmar</button>`}` 
             : ((!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') 
                ? `<div style="width:100%; text-align:center; padding: 2rem 1rem; border: 1px dashed var(--border); border-radius: 8px; color: var(--text-muted); font-size: 0.9rem;">
                     <i data-lucide="lock" style="width:24px;height:24px;margin-bottom:0.5rem;"></i><br>
@@ -9999,23 +9999,32 @@ function guardarFirmaCanvas(ordenId, tipo) {
 }
 
 async function limpiarFirma(ordenId, tipo) {
-  const confirmado = await window.confirmarAccion({
-    titulo: 'Borrar Firma',
-    mensaje: `¿Estás seguro de que deseas borrar la firma del ${tipo === 'tecnico' ? 'técnico' : 'cliente'}?`,
-    esPeligroso: true,
-    icono: 'eraser'
-  });
-  if (!confirmado) return;
-  const idx = ordenes.findIndex(o => o.id === ordenId);
-  if (idx !== -1) {
-    if (tipo === 'tecnico') ordenes[idx].firma_tecnico_base64 = '__DELETED__';
-    else ordenes[idx].firma_cliente_base64 = '__DELETED__';
-    
-    ordenes[idx].estado = calcularEstadoOrden(ordenes[idx]);
-    
-    safeSetJSON('sapi_ordenes', ordenes);
-    if (window.pushToSupabase) window.pushToSupabase('ordenes', ordenes[idx]);
-    verDetalle(ordenId); 
+  try {
+    const confirmado = await window.confirmarAccion({
+      titulo: 'Borrar Firma',
+      mensaje: `¿Estás seguro de que deseas borrar la firma del ${tipo === 'tecnico' ? 'técnico' : 'cliente'}?`,
+      esPeligroso: true,
+      icono: 'eraser'
+    });
+    if (!confirmado) return;
+    const idx = ordenes.findIndex(o => o.id === ordenId);
+    if (idx !== -1) {
+      if (tipo === 'tecnico') ordenes[idx].firma_tecnico_base64 = '__DELETED__';
+      else ordenes[idx].firma_cliente_base64 = '__DELETED__';
+      
+      ordenes[idx].estado = calcularEstadoOrden(ordenes[idx]);
+      
+      safeSetJSON('sapi_ordenes', ordenes);
+      if (window.pushToSupabase) window.pushToSupabase('ordenes', ordenes[idx]);
+      verDetalle(ordenId); 
+    }
+  } catch (err) {
+    console.error('Error en limpiarFirma:', err);
+    if (window.mostrarNotificacion) {
+      window.mostrarNotificacion('Error al borrar firma: ' + err.message, 'error');
+    } else {
+      alert('Error: ' + err.message);
+    }
   }
 }
 
