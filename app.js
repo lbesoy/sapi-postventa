@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.236'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.237'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -4889,7 +4889,7 @@ function renderTabla(ctx) {
 
   body.innerHTML = filtradas.map(o => {
     let orderCanEdit = canEdit;
-    if (o.firma_tecnico_base64 && !['superadmin', 'admin'].includes(currentSession.viewMode)) {
+    if ((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__') && !['superadmin', 'admin'].includes(currentSession.viewMode)) {
       orderCanEdit = false;
     }
     return `
@@ -8869,8 +8869,8 @@ function renderEvidenciasFotograficas(o) {
     o.estado === 'Cerrada' || 
     o.estado === 'Finalizado' || 
     o.estado === 'Refacciones pendientes' || 
-    !!o.firma_cliente_base64 || 
-    !!o.firma_tecnico_base64
+    (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__') || 
+    (!(!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') && o.firma_tecnico_base64 !== '__DELETED__')
   );
   
   const tieneInicio = !!ev.fotoInicio;
@@ -9069,7 +9069,7 @@ window.subirEvidenciaFoto = async function(ordenId, tipo, inputEl) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
 
-  if (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || !!o.firma_cliente_base64 || !!o.firma_tecnico_base64) {
+  if (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__') || (!(!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') && o.firma_tecnico_base64 !== '__DELETED__')) {
     mostrarNotificacion('No se pueden modificar evidencias en una orden cerrada o firmada.', 'error');
     return;
   }
@@ -9224,7 +9224,7 @@ window.eliminarEvidenciaFoto = async function(ordenId, tipo, url) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o || !o.evidencias) return;
 
-  if (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || !!o.firma_cliente_base64 || !!o.firma_tecnico_base64) {
+  if (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__') || (!(!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') && o.firma_tecnico_base64 !== '__DELETED__')) {
     mostrarNotificacion('No se pueden modificar evidencias en una orden cerrada o firmada.', 'error');
     return;
   }
@@ -9265,7 +9265,7 @@ function verDetalle(id) {
   
   const btnCompletar = document.getElementById('btn-completar-reporte');
   if (btnCompletar) {
-    if (currentSession.viewMode !== 'consulta' && !o.firma_tecnico_base64) {
+    if (currentSession.viewMode !== 'consulta' && (!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__')) {
       btnCompletar.style.display = 'flex';
       btnCompletar.setAttribute('onclick', `completarReporteDesdeDetalle('${id}')`);
     } else {
@@ -9305,7 +9305,7 @@ function verDetalle(id) {
 
   const renderBitacora = (o) => {
     let html = '';
-    const isClosed = (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || !!o.firma_cliente_base64 || !!o.firma_tecnico_base64);
+    const isClosed = (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__') || (!(!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') && o.firma_tecnico_base64 !== '__DELETED__'));
     const isTecnico = currentSession.viewMode === 'tecnico';
     const currentUser = usuarios.find(u => u.id === currentSession.userId);
     const miTecnicoNombre = currentUser ? currentUser.nombre : '';
@@ -9756,7 +9756,7 @@ function verDetalle(id) {
         <!-- TECNICO -->
         <div style="flex:1; min-width:300px; max-width:400px; display:flex; flex-direction:column; align-items:center;">
           <h4 style="margin-bottom:1rem; color:var(--text-primary); font-size:1rem;">Firma del Técnico</h4>
-          ${o.firma_tecnico_base64 
+          ${(o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__')
             ? `<div style="border:1px solid var(--border); border-radius:8px; padding:1rem; background:white; width:100%;">
                  <img src="${o.firma_tecnico_base64}" alt="Firma del técnico" style="max-width:100%; max-height:150px; display:block; margin:0 auto;"/>
                  <p style="text-align:center; color:var(--text-primary); font-weight:600; font-size:0.85rem; margin-top:0.5rem; margin-bottom:0;">${o.firma_tecnico_nombre || o.tecnico || 'Técnico'}</p>
@@ -9804,14 +9804,14 @@ function verDetalle(id) {
         <!-- CLIENTE -->
         <div style="flex:1; min-width:300px; max-width:400px; display:flex; flex-direction:column; align-items:center;">
           <h4 style="margin-bottom:1rem; color:var(--text-primary); font-size:1rem;">Firma del Cliente</h4>
-          ${o.firma_cliente_base64 
+          ${(o.firma_cliente_base64 && o.firma_cliente_base64 !== '__DELETED__')
             ? `<div style="border:1px solid var(--border); border-radius:8px; padding:1rem; background:white; width:100%;">
                  <img src="${o.firma_cliente_base64}" alt="Firma del cliente" style="max-width:100%; max-height:150px; display:block; margin:0 auto;"/>
                  <p style="text-align:center; color:var(--text-primary); font-weight:600; font-size:0.85rem; margin-top:0.5rem; margin-bottom:0;">${o.firma_cliente_nombre || o.cliente || 'Cliente'}</p>
                  ${o.firma_cliente_fecha ? `<p style="text-align:center; color:var(--text-muted); font-size:0.75rem; margin-top:0.25rem; margin-bottom:0;">${new Date(o.firma_cliente_fecha).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'})}</p>` : ''}
                </div>
                <button class="btn-secondary" onclick="limpiarFirma('${o.id}', 'cliente')" style="font-size:0.8rem; margin-top:1rem;"><i data-lucide="eraser" style="width:14px;height:14px;"></i> Volver a firmar</button>` 
-            : (!o.firma_tecnico_base64 
+            : ((!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') 
                ? `<div style="width:100%; text-align:center; padding: 2rem 1rem; border: 1px dashed var(--border); border-radius: 8px; color: var(--text-muted); font-size: 0.9rem;">
                     <i data-lucide="lock" style="width:24px;height:24px;margin-bottom:0.5rem;"></i><br>
                     El técnico debe firmar primero para habilitar la firma del cliente.
@@ -9837,8 +9837,8 @@ function verDetalle(id) {
   lucide.createIcons();
   
   setTimeout(() => {
-    if (!o.firma_tecnico_base64) inicializarCanvasFirma('tecnico');
-    if (o.firma_tecnico_base64 && !o.firma_cliente_base64) inicializarCanvasFirma('cliente');
+    if ((!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__')) inicializarCanvasFirma('tecnico');
+    if ((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__') && (!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__')) inicializarCanvasFirma('cliente');
   }, 100);
 }
 
@@ -10023,7 +10023,7 @@ async function limpiarFirma(ordenId, tipo) {
 // AUTOMATIZACIÓN DE ESTADOS
 // ==========================
 function calcularEstadoOrden(o) {
-  const isSignedByClient = !!o.firma_cliente_base64;
+  const isSignedByClient = (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__');
   const refNecesarias = o.ref_necesarias || [];
   const hasPendingParts = refNecesarias.length > 0;
   
@@ -10321,7 +10321,7 @@ function calcularRangoFechasLaboral(diasHabilAtras) {
 
 function abrirBitacora(id) {
   const o = ordenes.find(x => x.id === id);
-  if (o && (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || !!o.firma_cliente_base64 || !!o.firma_tecnico_base64)) {
+  if (o && (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__') || (!(!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') && o.firma_tecnico_base64 !== '__DELETED__'))) {
     mostrarNotificacion('No se pueden registrar avances en una orden cerrada o completada.', 'error');
     return;
   }
@@ -10352,7 +10352,7 @@ function abrirBitacora(id) {
 function iniciarReporteDesdeAsignacion(ordenId, bitacoraId) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
-  if (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || !!o.firma_cliente_base64 || !!o.firma_tecnico_base64) {
+  if (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__') || (!(!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') && o.firma_tecnico_base64 !== '__DELETED__')) {
     mostrarNotificacion('No se pueden registrar avances en una orden cerrada o completada.', 'error');
     return;
   }
@@ -10393,7 +10393,7 @@ window.iniciarReporteDesdeAsignacion = iniciarReporteDesdeAsignacion;
 function editarBitacora(ordenId, bitacoraId) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
-  if (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || !!o.firma_cliente_base64 || !!o.firma_tecnico_base64) {
+  if (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__') || (!(!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') && o.firma_tecnico_base64 !== '__DELETED__')) {
     mostrarNotificacion('No se pueden editar avances en una orden cerrada o completada.', 'error');
     return;
   }
@@ -10689,7 +10689,7 @@ function guardarNotaBitacora() {
 // AUTOMATIZACIÓN DE ESTADOS
 // ==========================
 function calcularEstadoOrden(o) {
-  const isSignedByClient = !!o.firma_cliente_base64;
+  const isSignedByClient = (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__');
   const refNecesarias = o.ref_necesarias || [];
   const hasPendingParts = refNecesarias.length > 0;
   
@@ -25397,7 +25397,7 @@ window.confirmarAccion = function(options = {}) {
 
 window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId) {
   const o = ordenes.find(x => x.id === ordenId);
-  if (o && (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || !!o.firma_cliente_base64 || !!o.firma_tecnico_base64)) {
+  if (o && (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__') || (!(!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') && o.firma_tecnico_base64 !== '__DELETED__'))) {
     mostrarNotificacion('No se pueden eliminar asignaciones en una orden cerrada o completada.', 'error');
     return;
   }
