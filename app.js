@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.233'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.234'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -1234,17 +1234,9 @@ async function iniciarSesionSubmit(e) {
     }
     const inputPass = document.getElementById('login-password').value;
     
-    // BACKDOOR TEMPORAL PARA DESARROLLADORES (Solo local)
-    const rawEmail = document.getElementById('login-email').value.trim().toLowerCase();
-    const cleanPass = inputPass.trim().toLowerCase();
-    if ((rawEmail === 'superadmin' && cleanPass === 'superadmin') || (rawEmail === 'admin' && cleanPass === 'admin')) {
-       currentSession = { userId: 'superadmin', viewMode: 'superadmin', nombre: 'Super Admin', realUserId: 'superadmin', realRol: 'superadmin' };
-       localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
-       window.trackTelemetryEvent('Inicio de Sesión', { metodo: 'Desarrollador/Backdoor' });
-       entrarApp({ id: 'superadmin', rol: 'superadmin', nombre: 'Super Admin' });
-       return;
-    }
-    
+
+    // Nota: acceso de desarrollo eliminado de producción por seguridad.
+
     if (!inputEmail || !inputPass) {
       errEl.textContent = 'Ingresa tu correo y contraseña.';
       errEl.style.color = 'var(--red)';
@@ -1374,15 +1366,24 @@ function volverSeleccion() {
 function cerrarSesion() {
   cerrarSesionModal();
   localStorage.removeItem('eurorep_session');
-  currentSession = { userId: 'superadmin', viewMode: 'superadmin' };
+  currentSession = null; // Limpiar sesión completamente
   
   if (window.supabaseClient) {
-    window.supabaseClient.auth.signOut();
+    window.supabaseClient.auth.signOut().then(() => {
+      document.getElementById('app-wrapper').classList.remove('visible');
+      document.getElementById('login-screen').classList.remove('hidden');
+      volverSeleccion();
+    }).catch(() => {
+      // Si falla signOut, forzar recarga limpia
+      document.getElementById('app-wrapper').classList.remove('visible');
+      document.getElementById('login-screen').classList.remove('hidden');
+      volverSeleccion();
+    });
+  } else {
+    document.getElementById('app-wrapper').classList.remove('visible');
+    document.getElementById('login-screen').classList.remove('hidden');
+    volverSeleccion();
   }
-  
-  document.getElementById('app-wrapper').classList.remove('visible');
-  document.getElementById('login-screen').classList.remove('hidden');
-  volverSeleccion();
 }
 
 // ===== MOBILE SIDEBAR TOGGLE =====
