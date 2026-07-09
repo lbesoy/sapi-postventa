@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.234'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.235'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -211,6 +211,27 @@ function safeGetJSON(key, defaultVal) {
   }
 }
 
+// Wrapper seguro para localStorage.setItem — maneja QuotaExceededError
+function safeSetJSON(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (e) {
+    if (e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014)) {
+      console.error(`[localStorage] Cuota excedida al guardar "${key}". Tamaño del valor: ${JSON.stringify(value)?.length || 0} chars.`, e);
+      if (typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion(
+          '⚠️ Almacenamiento local lleno. Algunos datos no pudieron guardarse localmente, pero se están sincronizando con la nube.',
+          'warning'
+        );
+      }
+    } else {
+      console.error(`[localStorage] Error al guardar "${key}":`, e);
+    }
+    return false;
+  }
+}
+
 function ensureBackdoorUsersFallback(users) {
   if (typeof window.ensureBackdoorUsers === 'function') {
     return window.ensureBackdoorUsers(users);
@@ -314,29 +335,7 @@ let tecnicosDb = safeGetJSON('sapi_tecnicos_db', []);
 let sitiosDb = safeGetJSON('sapi_sitios_db', []);
 let maquinariaDb = safeGetJSON('sapi_maquinaria_db', []);
 let gastos = safeGetJSON('sapi_gastos', []);
-// Seed default UBER RIDE approved expense to match screenshot
-if (gastos.length === 0 || !gastos.some(g => g.claraTxId === 'tx_clara_3')) {
-  gastos.push({
-    id: 'gasto_seed_1',
-    usuarioId: 'tech-user-123',
-    usuarioNombre: 'Octavio Rivero',
-    fecha: '2026-05-22',
-    metodo: 'Tarjeta Clara',
-    categoria: 'Otros',
-    descripcion: 'Transporte a planta - UBER RIDE',
-    monto: 68.95,
-    claraTxId: 'tx_clara_3',
-    evidencia: 'data:image/jpeg;base64,mockevidence...',
-    comprobantePdf: 'comprobante.pdf',
-    rfcEmisor: 'UBER120524ABC',
-    uuid: '4a2b9c7d-8e3f-4a0c-9b8d-7e6f5a4b3c2d',
-    estado: 'Aprobado',
-    comentario: '',
-    isTest: true,
-    _synced: true
-  });
-  localStorage.setItem('sapi_gastos', JSON.stringify(gastos));
-}
+
 
 let usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
 let currentSession = safeGetJSON('eurorep_session', null) || { userId: '', viewMode: 'consulta' };
@@ -454,7 +453,7 @@ window.migrarOrdenesExistentesMaquinaria = function() {
 
   if (modificados > 0) {
     console.log(`[App] Se migraron y corrigieron ${modificados} órdenes con datos de maquinaria.`);
-    localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+    safeSetJSON('sapi_ordenes', ordenes);
   }
 };
 
@@ -8792,7 +8791,7 @@ function guardarOrden(e) {
     const tIndex = tickets.findIndex(t => t.id === orden.soporte);
     if (tIndex >= 0 && tickets[tIndex].estado !== 'Cerrado') {
       tickets[tIndex].estado = 'Cerrado';
-      localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+      safeSetJSON('sapi_tickets', tickets);
       if (window.supabaseClient) {
         window.pushToSupabase('tickets', tickets[tIndex]);
       }
@@ -8802,7 +8801,7 @@ function guardarOrden(e) {
   }
 
   // Guardar siempre en local como respaldo
-  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  safeSetJSON('sapi_ordenes', ordenes);
 
   if (window.supabaseClient) {
     window.pushToSupabase('ordenes', orden);
@@ -8837,7 +8836,7 @@ async function eliminarOrden(id) {
   const folio = o ? o.folio : 'Desconocido';
 
   ordenes = ordenes.filter(o => o.id !== id);
-  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  safeSetJSON('sapi_ordenes', ordenes);
   
   if (window.deleteFromSupabase) {
     window.deleteFromSupabase('ordenes', id);
@@ -9200,7 +9199,7 @@ window.subirEvidenciaFoto = async function(ordenId, tipo, inputEl) {
       o.evidencias.adicionales.push(publicUrl);
     }
 
-    localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+    safeSetJSON('sapi_ordenes', ordenes);
     if (window.pushToSupabase) {
       await window.pushToSupabase('ordenes', o);
     }
@@ -9246,7 +9245,7 @@ window.eliminarEvidenciaFoto = async function(ordenId, tipo, url) {
     o.evidencias.adicionales = (o.evidencias.adicionales || []).filter(x => x !== url);
   }
 
-  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  safeSetJSON('sapi_ordenes', ordenes);
   if (window.pushToSupabase) {
     await window.pushToSupabase('ordenes', o);
   }
@@ -9974,7 +9973,7 @@ function guardarFirmaCanvas(ordenId, tipo) {
     ordenes[idx].estado = calcularEstadoOrden(ordenes[idx]);
     
     try {
-      localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+      safeSetJSON('sapi_ordenes', ordenes);
     } catch (err) {
       console.error(err);
       mostrarNotificacion('Error de almacenamiento local. La firma puede no guardarse si no hay espacio.', 'error');
@@ -10014,7 +10013,7 @@ async function limpiarFirma(ordenId, tipo) {
     
     ordenes[idx].estado = calcularEstadoOrden(ordenes[idx]);
     
-    localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+    safeSetJSON('sapi_ordenes', ordenes);
     if (window.pushToSupabase) window.pushToSupabase('ordenes', ordenes[idx]);
     verDetalle(ordenId); 
   }
@@ -10087,7 +10086,7 @@ function guardarAsignacionTecnicos() {
   o.tecnicosAsignados = selectedT;
   o.tecnico = selectedT.join(', ');
   
-  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  safeSetJSON('sapi_ordenes', ordenes);
   if (window.pushToSupabase) {
     window.pushToSupabase('ordenes', o);
   }
@@ -10282,7 +10281,7 @@ async function guardarProgramacionTecnico() {
     }
   } catch(e){}
 
-  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  safeSetJSON('sapi_ordenes', ordenes);
   if (window.pushToSupabase) {
     await window.pushToSupabase('ordenes', o);
   }
@@ -10666,7 +10665,7 @@ function guardarNotaBitacora() {
   
   o.estado = calcularEstadoOrden(o);
   
-  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  safeSetJSON('sapi_ordenes', ordenes);
   if (window.pushToSupabase) {
     window.pushToSupabase('ordenes', o);
   }
@@ -15072,7 +15071,7 @@ async function guardarTicket(e) {
   
   // Guardar SIEMPRE en local como respaldo (con try-catch para evitar que un PDF gigante rompa la subida a la nube)
   try {
-    localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+    safeSetJSON('sapi_tickets', tickets);
   } catch (err) {
     console.error('Error al guardar en localStorage (¿exceso de cuota por PDF?):', err);
     mostrarNotificacion('El archivo adjunto es muy pesado para la memoria local, pero intentaremos subirlo a la nube.', 'error');
@@ -15185,7 +15184,7 @@ async function guardarTicket(e) {
       };
 
       ordenes.unshift(nuevaOrden);
-      localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+      safeSetJSON('sapi_ordenes', ordenes);
       if (window.supabaseClient) {
         await window.pushToSupabase('ordenes', nuevaOrden);
       }
@@ -15216,7 +15215,7 @@ async function eliminarTicket(id) {
   const folio = t ? t.folio : 'Desconocido';
 
   tickets = tickets.filter(t => t.id !== id);
-  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  safeSetJSON('sapi_tickets', tickets);
   
   if (window.deleteFromSupabase) {
     window.deleteFromSupabase('tickets', id);
@@ -15754,7 +15753,7 @@ async function avanzarCotizacionTicket(id) {
   t.cotizacionesAdicionales = list;
   t.estado = 'Cotización';
 
-  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  safeSetJSON('sapi_tickets', tickets);
   if (window.supabaseClient) {
     await window.pushToSupabase('tickets', t);
   }
@@ -15827,7 +15826,7 @@ async function cerrarCotizacionTicket(id) {
   if (window.supabaseClient) {
     await window.pushToSupabase('tickets', t);
   }
-  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  safeSetJSON('sapi_tickets', tickets);
   
   if (aceptada === 'si') {
     const ordenExistente = ordenes.find(o => o.soporte === t.id);
@@ -15926,7 +15925,7 @@ async function cerrarCotizacionTicket(id) {
       };
 
       ordenes.unshift(nuevaOrden);
-      localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+      safeSetJSON('sapi_ordenes', ordenes);
       if (window.supabaseClient) {
         window.pushToSupabase('ordenes', nuevaOrden);
       }
@@ -16797,7 +16796,7 @@ window.guardarActividadCalendario = async function() {
           }
         }
 
-        localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+        safeSetJSON('sapi_ordenes', ordenes);
         if (window.pushToSupabase) {
           window.pushToSupabase('ordenes', o);
         }
@@ -21485,7 +21484,7 @@ window.eliminarGasto = async function(gastoId) {
   const monto = gObj ? gObj.monto : 0;
 
   gastos = gastos.filter(g => g.id !== gastoId);
-  localStorage.setItem('sapi_gastos', JSON.stringify(gastos));
+  safeSetJSON('sapi_gastos', gastos);
 
   const sb = window.supabaseClient;
   if (sb) {
@@ -21572,7 +21571,7 @@ window.guardarGasto = function(e) {
     }
   }
 
-  localStorage.setItem('sapi_gastos', JSON.stringify(gastos));
+  safeSetJSON('sapi_gastos', gastos);
 
   if (typeof window.pushToSupabase === 'function') {
     window.pushToSupabase('gastos', gasto);
@@ -21929,7 +21928,7 @@ window.cambiarOrdenGastoDetalle = function(nuevoFolio) {
   g.ordenFolio = nuevoFolio || null;
 
   // Actualizar localStorage
-  localStorage.setItem('sapi_gastos', JSON.stringify(gastos));
+  safeSetJSON('sapi_gastos', gastos);
 
   // Empujar a Supabase
   if (typeof window.pushToSupabase === 'function') {
@@ -21991,7 +21990,7 @@ window.procesarAprobacionGasto = function(isApproved) {
   g.estado = isApproved ? 'Aprobado' : 'Rechazado';
   g.comentariosAprobacion = comments || null;
 
-  localStorage.setItem('sapi_gastos', JSON.stringify(gastos));
+  safeSetJSON('sapi_gastos', gastos);
 
   if (typeof window.pushToSupabase === 'function') {
     window.pushToSupabase('gastos', g);
@@ -24804,8 +24803,8 @@ async function confirmarFusionClientes() {
 
     // 9. Guardar cambios en LocalStorage
     localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
-    localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
-    localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+    safeSetJSON('sapi_ordenes', ordenes);
+    safeSetJSON('sapi_tickets', tickets);
     localStorage.setItem('sapi_maquinaria_db', JSON.stringify(maquinariaDb));
     localStorage.setItem('sapi_sitios_db', JSON.stringify(sitiosDb));
 
@@ -25101,7 +25100,7 @@ window.regenerarOrdenesDesdeTickets = async function() {
     }
   }
 
-  localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+  safeSetJSON('sapi_ordenes', ordenes);
   console.log(`[Regenerar] Completado. Se crearon ${ordenes.length} órdenes.`);
   alert(`¡Proceso completado! Se eliminaron todas las órdenes anteriores y se regeneraron ${ordenes.length} órdenes secuenciales a partir de los tickets cerrados y aprobados.`);
   
@@ -25289,7 +25288,7 @@ window.guardarRefaccionesTicketDesdeUI = function(ticketId, transitionToRefaccio
     t.estado = 'Refacciones';
   }
   
-  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  safeSetJSON('sapi_tickets', tickets);
   if (window.pushToSupabase) window.pushToSupabase('tickets', t);
   
   if (transitionToRefacciones) {
@@ -25410,7 +25409,7 @@ window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId)
     const o = ordenes[oIndex];
     if (o.bitacora) {
       o.bitacora = o.bitacora.filter(b => b.id !== bitacoraId);
-      localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+      safeSetJSON('sapi_ordenes', ordenes);
       if (window.pushToSupabase) {
         await window.pushToSupabase('ordenes', o);
       }

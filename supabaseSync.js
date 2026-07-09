@@ -848,7 +848,9 @@ function processSyncQueue() {
 async function _processSyncQueueInternal() {
   if (_isProcessingQueue) {
     if (window._isSyncManualForced) {
-      alert('La sincronización ya está en progreso. Por favor, espera un momento...');
+      if (window.mostrarNotificacion) {
+        window.mostrarNotificacion('La sincronización ya está en progreso. Por favor, espera un momento...', 'warning');
+      }
     }
     return;
   }
@@ -1602,7 +1604,11 @@ async function _processSyncQueueInternal() {
                 window.mostrarNotificacion(`Error BD (${item.table}): ${error.message}`, 'error');
               }
               if (window._isSyncManualForced) {
-                alert('Error de Base de Datos al sincronizar ' + item.table + ' (' + item.action + '):\n\n' + error.message + '\n\nCódigo: ' + (error.code || 'N/A') + '\nDetalles: ' + (error.details || 'Ninguno'));
+                if (window.mostrarNotificacion) {
+                  window.mostrarNotificacion(`Error BD (${item.table} - ${item.action}): ${error.message} | Código: ${error.code || 'N/A'}`, 'error');
+                } else {
+                  console.error(`[Sync] Error BD: ${item.table} (${item.action}) - ${error.message}`);
+                }
               }
             }
 
@@ -1672,7 +1678,9 @@ async function _processSyncQueueInternal() {
       if (typeof window.cargarDatosDeSupabase === 'function') {
         window.cargarDatosDeSupabase().then(() => {
           if (window._isSyncManualForced) {
-            alert('¡Sincronización completada con éxito! Se sincronizaron ' + successCount + ' elemento(s) pendiente(s).');
+            if (window.mostrarNotificacion) {
+              window.mostrarNotificacion('¡Sincronización completada! Se sincronizaron ' + successCount + ' elemento(s) pendiente(s).', 'success');
+            }
           }
         }).catch(err => {
           console.error('[Sync] Error al recargar datos tras sincronización:', err);
@@ -1681,12 +1689,16 @@ async function _processSyncQueueInternal() {
       } else {
         window.dispatchEvent(new Event('supabase_datos_cargados'));
         if (window._isSyncManualForced) {
-          alert('¡Sincronización completada con éxito! Se sincronizaron ' + successCount + ' elemento(s) pendiente(s).');
+          if (window.mostrarNotificacion) {
+            window.mostrarNotificacion('¡Sincronización completada! Se sincronizaron ' + successCount + ' elemento(s) pendiente(s).', 'success');
+          }
         }
       }
     } else {
       if (window._isSyncManualForced && getSyncQueue().length > 0) {
-        alert('No se pudo subir ningún elemento. Revisa tu conexión a internet o los errores detallados en la consola del navegador.');
+        if (window.mostrarNotificacion) {
+          window.mostrarNotificacion('No se pudo subir ningún elemento. Revisa tu conexión a internet.', 'error');
+        }
       }
     }
   } finally {
@@ -1802,7 +1814,7 @@ window.forzarSincronizacionManual = function() {
           if (window.mostrarNotificacion) {
             window.mostrarNotificacion('Datos actualizados correctamente.', 'success');
           } else {
-            alert('Datos actualizados correctamente.');
+            window.mostrarNotificacion('Datos actualizados correctamente.', 'success');
           }
         }).catch(err => {
           console.error('[Sync] Error al descargar datos:', err);
@@ -1987,11 +1999,17 @@ window.verDetallesSincronizacion = function() {
       }
     } else {
       console.error('[Sync] No se encontró el modal con id modal-sync-detalles.');
-      alert('Error: No se encontró el modal en el documento. Asegúrate de forzar la recarga de la página (Cmd+Shift+R o Ctrl+F5).');
+      if (window.mostrarNotificacion) {
+        window.mostrarNotificacion('Error: No se encontró el modal de sincronización. Fuerza la recarga (Cmd+Shift+R).', 'error');
+      }
+      console.error('[Sync] No se encontró modal-sync-detalles en el documento.');
     }
   } catch (err) {
     console.error('[Sync] Error al abrir detalles de sincronización:', err);
-    alert('Excepción en verDetallesSincronizacion: ' + err.message);
+    if (window.mostrarNotificacion) {
+      window.mostrarNotificacion('Error al abrir detalles de sincronización: ' + err.message, 'error');
+    }
+    console.error('[Sync] Excepción en verDetallesSincronizacion:', err);
   }
 };
 
