@@ -235,7 +235,7 @@ CREATE TABLE IF NOT EXISTS public.calendario_eventos (
     fecha_inicio TIMESTAMP WITH TIME ZONE NOT NULL,
     fecha_fin TIMESTAMP WITH TIME ZONE,
     todo_el_dia BOOLEAN DEFAULT false,
-    tipo TEXT NOT NULL CHECK (tipo IN ('Junta', 'Capacitación', 'Vacaciones', 'Descanso', 'Otro', 'Servicio')),
+    tipo TEXT NOT NULL CHECK (tipo IN ('Junta', 'Capacitación', 'Vacaciones', 'Descanso', 'Otro', 'Servicio', 'Levantamiento')),
     tecnico_id UUID REFERENCES public.user_roles(id) ON DELETE CASCADE,
     tecnico_nombre TEXT,
     creado_por UUID REFERENCES public.user_roles(id) ON DELETE SET NULL,

@@ -2774,9 +2774,9 @@ async function abrirReportePdfCliente(e, orderId) {
     ${seccion('Refacciones Utilizadas', refTable(o.ref_utilizadas, true))}
     ${seccion('Refacciones Necesarias', refTable(o.ref_necesarias, false))}
 
-    ${(o.noches || o.alimentacion || o.traslado_costo) ? seccion('Fecha de Servicio', `
+    ${(o.noches || o.alimentacion || o.traslado_costo) ? seccion('Servicio', `
       <div class="detalle-grid">
-        ${field('No. Noches', o.noches)} ${field('Alimentación', o.alimentacion ? '$'+o.alimentacion : '')} ${field('Traslado', o.traslado_costo ? '$'+o.traslado_costo : '')}
+        ${field('No. Noches', o.noches)} ${field('Alimentación', o.alimentacion ? o.alimentacion : '')} ${field('Traslado', o.traslado_costo ? o.traslado_costo : '')}
       </div>`) : ''}
 
     ${seccion('Bitácora Diaria', bitacoraHtml)}

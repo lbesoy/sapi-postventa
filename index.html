@@ -954,6 +954,10 @@
               <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #ef4444; flex-shrink: 0;"></span>
               <span style="color: var(--text-primary); font-weight: 500;">Trabajo Realizado sin Asignación</span>
             </div>
+             <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #475569; flex-shrink: 0;"></span>
+              <span style="color: var(--text-primary); font-weight: 500;">Traslado</span>
+            </div>
           </div>
 
           <div id="calendar-container"
@@ -1554,8 +1558,8 @@
               <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Aquí se muestran todas las
                 refacciones marcadas como "Necesarias" en las Órdenes de Servicio.</p>
             </div>
-            <div id="ref-pendientes-grid" class="stat-grid"
-              style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
+            <div id="ref-pendientes-grid"
+              style="display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 1rem;">
               <!-- Fichas insertadas dinamicamente -->
             </div>
           </div>
@@ -2502,31 +2506,99 @@
           <button class="modal-close" onclick="document.getElementById('modal-programar-tecnico-overlay').classList.remove('open')">✕</button>
         </div>
         <div class="modal-body">
-          <div class="form-group">
-            <label>Fecha de Programación</label>
-            <input type="date" id="pt-fecha" onchange="actualizarTecnicosDisponibles()" required />
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:0.5rem;">
+            <div class="form-group">
+              <label><i data-lucide="calendar" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Fecha de Programación</label>
+              <input type="date" id="pt-fecha" onchange="actualizarTecnicosDisponibles()" required />
+            </div>
+            <div class="form-group">
+              <label><i data-lucide="tag" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Tipo de Asignación</label>
+              <select id="pt-tipo" class="form-select" required>
+                <option value="Servicio">Servicio</option>
+                <option value="Levantamiento">Levantamiento</option>
+                <option value="Capacitación">Capacitación</option>
+                <option value="Junta">Junta</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
           </div>
-          <div class="form-group">
-            <label>Técnico Disponible</label>
+
+          <div class="form-group" style="margin-bottom:1rem;">
+            <label><i data-lucide="file-text" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Orden de Servicio (Abierta)</label>
+            <div class="custom-combo" style="position:relative; width:100%;">
+              <div class="combo-box" tabindex="0" id="pt-orden-combo" onclick="toggleCombo('pt-orden')">
+                <span id="pt-orden-display" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:calc(100% - 20px);">Selecciona una orden...</span>
+                <i data-lucide="chevron-down" style="width:16px; height:16px;"></i>
+              </div>
+              <div class="combo-menu" id="pt-orden-menu">
+                <div class="combo-search">
+                  <i data-lucide="search" style="width:14px; height:14px; color:var(--text-muted);"></i>
+                  <input type="text" id="pt-orden-search" placeholder="Buscar..." oninput="filterCombo('pt-orden', this.value)" onclick="event.stopPropagation()">
+                </div>
+                <div class="combo-options" id="pt-orden-options">
+                  <div class="combo-option" style="color:var(--text-muted)">Cargando órdenes...</div>
+                </div>
+              </div>
+              <input type="hidden" id="pt-orden" required>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:1rem;">
+            <label><i data-lucide="user-check" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Técnico Disponible</label>
             <select id="pt-tecnico" class="form-select" required disabled>
               <option value="">Selecciona una fecha primero...</option>
             </select>
-            <small style="color:var(--text-muted);font-size:0.75rem;">Solo muestra técnicos sin traslape de horario en esta fecha. Ingresa las horas para mayor precisión.</small>
+            <small style="color:var(--text-muted);font-size:0.75rem; margin-top:0.25rem; display:block;">Solo muestra técnicos sin traslape de horario en esta fecha. Ingresa las horas para mayor precisión.</small>
           </div>
-          <div class="form-group">
-            <label>Orden de Servicio (Abierta)</label>
-            <select id="pt-orden" class="form-select" required>
-              <option value="">Selecciona una orden...</option>
-            </select>
-          </div>
+
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
             <div class="form-group">
-              <label>Hora Inicio Estimada</label>
+              <label><i data-lucide="clock" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Hora Inicio Estimada</label>
               <input type="time" id="pt-entrada" onchange="actualizarTecnicosDisponibles()" />
             </div>
             <div class="form-group">
-              <label>Hora Fin Estimada</label>
-              <input type="time" id="pt-salida" onchange="actualizarTecnicosDisponibles()" />
+              <label><i data-lucide="clock" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Hora Fin Estimada</label>
+              <input type="time" id="pt-salida" onchange="actualizarTecnicosDisponibles(); calcularLlegadaTraslados();" />
+            </div>
+          </div>
+          <button type="button" class="btn-secondary" id="btn-toggle-traslado" onclick="document.getElementById('traslado-section').style.display='block'; this.style.display='none';" style="margin-top: 1rem; width: 100%; justify-content: center; padding: 0.5rem;">
+            <i data-lucide="map" style="width: 14px; height: 14px; margin-right: 4px; display:inline-block; vertical-align:middle;"></i> Añadir Traslado (Opcional)
+          </button>
+          
+          <div id="traslado-section" style="display:none; margin-top:1rem; padding-top:1rem; border-top: 1px dashed var(--border);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Detalles de Traslado</span>
+              <button type="button" class="action-btn" onclick="document.getElementById('traslado-section').style.display='none'; document.getElementById('btn-toggle-traslado').style.display='flex'; document.getElementById('pt-fecha-inicio-traslado').value=''; document.getElementById('pt-hora-inicio').value=''; document.getElementById('pt-horas-traslado').value=''; document.getElementById('pt-fecha-fin-regreso-date').value=''; document.getElementById('pt-hora-fin-regreso').value=''; document.getElementById('pt-horas-regreso').value=''; calcularLlegadaTraslados();" title="Ocultar Traslado" style="font-size: 0.75rem; color: var(--text-muted);">
+                <i data-lucide="x" style="width: 14px; height: 14px;"></i> Ocultar
+              </button>
+            </div>
+            <div style="display:grid; grid-template-columns:3fr 2fr; gap:1rem;">
+              <div class="form-group">
+                <label>Inicio de traslado (Referencia)</label>
+                <div style="display:flex; gap:0.5rem;">
+                  <input type="date" id="pt-fecha-inicio-traslado" onchange="calcularLlegadaTraslados()" style="flex:1; padding: 0.2rem 0.5rem;" />
+                  <input type="time" id="pt-hora-inicio" onchange="calcularLlegadaTraslados()" style="flex:1;" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Horas de Traslado (Ida)</label>
+                <input type="number" id="pt-horas-traslado" step="0.5" min="0" placeholder="Ej. 1.5" oninput="calcularLlegadaTraslados()" />
+                <span id="pt-ref-llegada-ida" style="font-size:0.7rem; color:var(--text-muted); display:block; margin-top:0.25rem;"></span>
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns:3fr 2fr; gap:1rem; margin-top:1rem;">
+              <div class="form-group">
+                <label>Inicio de regreso (Referencia)</label>
+                <div style="display:flex; gap:0.5rem;">
+                  <input type="date" id="pt-fecha-fin-regreso-date" style="flex:1; padding: 0.2rem 0.5rem;" />
+                  <input type="time" id="pt-hora-fin-regreso" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Horas de Traslado (Regreso)</label>
+                <input type="number" id="pt-horas-regreso" step="0.5" min="0" placeholder="Ej. 1.5" oninput="calcularLlegadaTraslados()" />
+                <span id="pt-ref-llegada-regreso" style="font-size:0.7rem; color:var(--text-muted); display:block; margin-top:0.25rem;"></span>
+              </div>
             </div>
           </div>
           <div style="margin-top:1.5rem; text-align:right;">
@@ -2670,6 +2742,8 @@
                 <option value="Capacitación">Capacitación</option>
                 <option value="Vacaciones">Vacaciones</option>
                 <option value="Descanso">Descanso</option>
+                <option value="Levantamiento">Levantamiento</option>
+                <option value="Servicio">Servicio</option>
                 <option value="Otro">Otro</option>
               </select>
             </div>
@@ -5460,6 +5534,30 @@
       </div>
     </div>
   </div>
+  <!-- MODAL PIEZA PENDIENTE -->
+  <div id="modal-pieza-pendiente" class="modal-overlay" style="z-index:99999;" onclick="if(event.target === this) window.cerrarModalPiezaPendiente()">
+    <div class="modal" style="max-width:500px; width:90%; border-radius:16px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); box-shadow:var(--shadow-lg);">
+      <div class="modal-header">
+        <h2 style="margin:0; font-size:1.2rem; font-weight:700;">Detalle de Refacción</h2>
+        <button class="modal-close" onclick="window.cerrarModalPiezaPendiente()">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 1.5rem; display:flex; flex-direction:column; gap:1rem;">
+        <div id="modal-pieza-pendiente-info"></div>
+        <div>
+          <label class="form-label" style="font-weight:600; margin-bottom:0.5rem; display:block;">Estatus del Pedido</label>
+          <select id="modal-pieza-pendiente-estatus" class="form-select">
+            <option value="Por Pedir">Por Pedir</option>
+            <option value="En Tránsito / Pedido">En Tránsito</option>
+            <option value="Entregado al Técnico">Entregado</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-actions" style="border-top:1px solid var(--border); padding: 1.25rem 1.5rem; margin-top: 0; display:flex; gap:0.5rem; justify-content:flex-end;">
+        <button type="button" class="btn-secondary" onclick="window.cerrarModalPiezaPendiente()">Cancelar</button>
+        <button type="button" class="btn-primary" onclick="window.guardarEstatusModalPiezaPendiente()">Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     window.initLocalStorageIndexedDBBridge().then(function() {
@@ -5467,8 +5565,8 @@
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=240",
-        "app.js?v=240"
+        "supabaseSync.js?v=243",
+        "app.js?v=243"
       ];
       var index = 0;
       function loadNext() {

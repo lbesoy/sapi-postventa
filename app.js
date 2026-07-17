@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.240'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.253'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -6545,7 +6545,7 @@ function abrirModalCliente() {
               .map(u => `<option value="${u.id}">${u.nombre} (${ROLES[u.rol]?.label || u.rol})</option>`).join('');
   }
   if (selectTec) {
-    selectTec.innerHTML = usuarios.filter(u => u.rol === 'tecnico' && u.activo !== false)
+    selectTec.innerHTML = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false)
               .map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
   }
 
@@ -7591,7 +7591,7 @@ function renderTecnicos() {
   
   // Combine legacy technitians from orders with actual registered user technitians and SAP technitians
   const legacyTecs = getFilteredOrders().map(o => o.tecnico).filter(Boolean).map(formatNombreCorto);
-  const userTecs = usuarios.filter(u => u.rol === 'tecnico').map(u => formatNombreCorto(u.nombre));
+  const userTecs = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol)).map(u => formatNombreCorto(u.nombre));
   const sapTecs = tecnicosDb.map(t => formatNombreCorto(t.nombre)).filter(Boolean);
   
   let tecsArr = [];
@@ -10069,7 +10069,7 @@ function abrirAsignarTecnicos() {
   if (container) {
     container.innerHTML = '';
     const assigned = o.tecnicosAsignados || [];
-    usuarios.filter(u => u.rol === 'tecnico').forEach(u => {
+    usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol)).forEach(u => {
       const isChecked = assigned.includes(u.nombre);
       container.innerHTML += `
         <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; background: var(--bg-body); padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem;">
@@ -10115,13 +10115,39 @@ function abrirProgramarTecnico() {
   document.getElementById('pt-fecha').value = '';
   document.getElementById('pt-entrada').value = '';
   document.getElementById('pt-salida').value = '';
+  document.getElementById('pt-fecha-inicio-traslado').value = '';
+  document.getElementById('pt-hora-inicio').value = '';
+  document.getElementById('pt-horas-traslado').value = '';
+  document.getElementById('pt-fecha-fin-regreso-date').value = '';
+  document.getElementById('pt-hora-fin-regreso').value = '';
+  document.getElementById('pt-horas-regreso').value = '';
+  document.getElementById('pt-tipo').value = 'Servicio';
   document.getElementById('pt-tecnico').innerHTML = '<option value="">Selecciona una fecha primero...</option>';
   document.getElementById('pt-tecnico').disabled = true;
 
-  // Llenar dropdown de órdenes
-  const selectOrden = document.getElementById('pt-orden');
+  const btnToggleTraslado = document.getElementById('btn-toggle-traslado');
+  const sectionTraslado = document.getElementById('traslado-section');
+  if (btnToggleTraslado && sectionTraslado) {
+    btnToggleTraslado.style.display = 'flex';
+    sectionTraslado.style.display = 'none';
+  }
+
+  // Llenar dropdown de órdenes (custom combo)
+  const ptOrdenOptions = document.getElementById('pt-orden-options');
   const openOrds = getFilteredOrders().filter(o => o.estado !== 'Finalizado');
-  selectOrden.innerHTML = '<option value="">Selecciona una orden...</option>' + openOrds.map(o => `<option value="${o.id}">[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}</option>`).join('');
+  
+  if (openOrds.length === 0) {
+    ptOrdenOptions.innerHTML = '<div class="combo-option" style="color:var(--text-muted)">No hay órdenes abiertas</div>';
+  } else {
+    ptOrdenOptions.innerHTML = openOrds.map(o => {
+      const displayStr = `[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}`.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      const htmlStr = `[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}`.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return `<div class="combo-option" onclick="selectComboOption('pt-orden', '${o.id}', '${displayStr}')">${htmlStr}</div>`;
+    }).join('');
+  }
+  
+  document.getElementById('pt-orden-display').textContent = 'Selecciona una orden...';
+  document.getElementById('pt-orden').value = '';
 
   document.getElementById('modal-programar-tecnico-overlay').classList.add('open');
 }
@@ -10132,6 +10158,41 @@ function horaAMinutos(hora) {
   const [h, m] = hora.split(':').map(Number);
   return h * 60 + m;
 }
+
+window.calcularLlegadaTraslados = function() {
+  const formatTime = (totalMin) => {
+    let h = Math.floor(totalMin / 60) % 24;
+    const m = Math.floor(totalMin % 60);
+    const ampm = h >= 12 ? 'p.m.' : 'a.m.';
+    h = h % 12;
+    h = h ? h : 12;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')} ${ampm}`;
+  };
+
+  // Ida
+  const horaInicio = document.getElementById('pt-hora-inicio').value;
+  const horasTraslado = parseFloat(document.getElementById('pt-horas-traslado').value);
+  const refIda = document.getElementById('pt-ref-llegada-ida');
+  if (horaInicio && !isNaN(horasTraslado) && refIda) {
+    const min = horaAMinutos(horaInicio) + (horasTraslado * 60);
+    refIda.innerHTML = `<i data-lucide="clock" style="width:10px; height:10px; margin-right:2px; vertical-align:middle;"></i> Llegada estimada: <strong>${formatTime(min)}</strong>`;
+    if (window.lucide) lucide.createIcons({root: refIda.parentElement});
+  } else if (refIda) {
+    refIda.textContent = '';
+  }
+
+  // Regreso
+  const horaSalida = document.getElementById('pt-salida').value;
+  const horasRegreso = parseFloat(document.getElementById('pt-horas-regreso').value);
+  const refRegreso = document.getElementById('pt-ref-llegada-regreso');
+  if (horaSalida && !isNaN(horasRegreso) && refRegreso) {
+    const min = horaAMinutos(horaSalida) + (horasRegreso * 60);
+    refRegreso.innerHTML = `<i data-lucide="clock" style="width:10px; height:10px; margin-right:2px; vertical-align:middle;"></i> Llegada estimada: <strong>${formatTime(min)}</strong>`;
+    if (window.lucide) lucide.createIcons({root: refRegreso.parentElement});
+  } else if (refRegreso) {
+    refRegreso.textContent = '';
+  }
+};
 
 // Verifica si dos rangos de tiempo se traslapan
 // Retorna true si HAY traslape
@@ -10177,7 +10238,7 @@ function actualizarTecnicosDisponibles() {
     }
   });
 
-  const disponibles = usuarios.filter(u => u.rol === 'tecnico' && !tecnicosConTraslape.has(u.nombre) && u.activo !== false);
+  const disponibles = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && !tecnicosConTraslape.has(u.nombre) && u.activo !== false);
   
   if (disponibles.length === 0) {
     selectTec.innerHTML = '<option value="">Sin técnicos disponibles en ese horario</option>';
@@ -10194,10 +10255,28 @@ async function guardarProgramacionTecnico() {
   const ordenId = document.getElementById('pt-orden').value;
   const entrada = document.getElementById('pt-entrada').value;
   const salida = document.getElementById('pt-salida').value;
+  const fechaInicioTraslado = document.getElementById('pt-fecha-inicio-traslado').value;
+  const horaInicio = document.getElementById('pt-hora-inicio').value;
+  const horasTraslado = document.getElementById('pt-horas-traslado').value;
+  const fechaFinRegresoDate = document.getElementById('pt-fecha-fin-regreso-date').value;
+  const horaFinRegreso = document.getElementById('pt-hora-fin-regreso').value;
+  const horasRegreso = document.getElementById('pt-horas-regreso').value;
 
   if (!fecha || !tecnico || !ordenId) {
     alert("Por favor completa los campos requeridos (Fecha, Técnico, Orden).");
     return;
+  }
+
+  if (horaInicio && horasTraslado && entrada) {
+    const dEntrada = new Date(`${fecha}T${entrada}`);
+    const minLlegada = horaAMinutos(horaInicio) + (parseFloat(horasTraslado) * 60);
+    const dLlegada = new Date(`${fechaInicioTraslado || fecha}T00:00`);
+    dLlegada.setMinutes(dLlegada.getMinutes() + minLlegada);
+
+    if (dEntrada < dLlegada) {
+      alert("No se puede empezar el servicio antes de la llegada estimada del traslado de ida.");
+      return;
+    }
   }
 
   // Validar traslape de horario antes de guardar
@@ -10226,13 +10305,22 @@ async function guardarProgramacionTecnico() {
 
   if (!o.bitacora) o.bitacora = [];
   
+  const tipoAsignacion = document.getElementById('pt-tipo') ? document.getElementById('pt-tipo').value : 'Servicio';
+
   const nuevaEntrada = {
     id: crypto.randomUUID(),
     fecha: fecha,
     tecnico: tecnico,
+    tipo: tipoAsignacion,
     nota: "Programado por supervisor. Pendiente de llenado por el técnico.",
     entrada: entrada,
     salida: salida,
+    fecha_inicio_traslado: fechaInicioTraslado || null,
+    hora_inicio: horaInicio || null,
+    horas_traslado: horasTraslado ? parseFloat(horasTraslado) : null,
+    fecha_fin_regreso: fechaFinRegresoDate || null,
+    hora_fin_regreso: horaFinRegreso || null,
+    horas_regreso: horasRegreso ? parseFloat(horasRegreso) : null,
     realizado: false,
     asignadoPorName: obtenerNombreUsuarioActual(),
     asignadoPorId: currentSession.userId || null
@@ -12052,22 +12140,66 @@ function renderRefaccionesPendientes() {
     card.style.display = 'flex';
     card.style.flexDirection = 'column';
     card.style.alignItems = 'flex-start';
-    card.style.padding = '1.25rem';
+    card.style.padding = '1rem';
     card.style.position = 'relative';
+    card.style.cursor = 'pointer';
+    card.style.transition = 'transform 0.2s, box-shadow 0.2s';
+    card.onmouseover = () => { card.style.transform = 'translateY(-2px)'; card.style.boxShadow = 'var(--shadow-md)'; };
+    card.onmouseout = () => { card.style.transform = 'none'; card.style.boxShadow = 'var(--shadow)'; };
+
+    // Si ya está entregado, lo hacemos más sutil
+    if (p.estatusPedido === 'Entregado al Técnico') {
+      card.style.opacity = '0.75';
+    }
+
+    let badgeColor = 'var(--red, #ef4444)';
+    let badgeBg = 'rgba(239, 68, 68, 0.1)';
+    let badgeIcon = 'circle-dashed';
+    if (p.estatusPedido === 'En Tránsito / Pedido') {
+      badgeColor = 'var(--accent, #E8820C)';
+      badgeBg = 'rgba(232, 130, 12, 0.1)';
+      badgeIcon = 'truck';
+    } else if (p.estatusPedido === 'Entregado al Técnico') {
+      badgeColor = 'var(--green, #22c55e)';
+      badgeBg = 'rgba(34, 197, 94, 0.1)';
+      badgeIcon = 'check-circle-2';
+    }
     
+    const logoPath = getLogoMarca(p.marca);
+    const marcaRender = logoPath 
+      ? `<img src="${logoPath}" alt="${p.marca}" style="height:22px; object-fit:contain;" title="${p.marca}" onerror="this.onerror=null; this.outerHTML='<span>${p.marca}</span>';">`
+      : `<span>${p.marca}</span>`;
+      
+    const logoMaquinaPath = getLogoMarca(p.maquina);
+    const maquinaRenderIcon = logoMaquinaPath
+      ? `<img src="${logoMaquinaPath}" style="width:14px; height:14px; margin-top:2px; object-fit:contain;" />`
+      : `<i data-lucide="settings-2" style="width:14px;height:14px; margin-top:2px; color:var(--text-muted)"></i>`;
+
+    const safeDesc = p.descripcion.replace(/'/g, "\\'");
+    const safeClave = p.clave.replace(/'/g, "\\'");
+    const safeMarca = p.marca ? p.marca.replace(/'/g, "\\'") : '';
+    
+    card.onclick = function(e) {
+      if (e.target.closest('.status-badge')) return;
+      window.abrirModalPiezaPendienteNuevo(p.ordenId, p.clave, p.descripcion, p.estatusPedido, p.cantidad, p.marca);
+    };
+
     card.innerHTML = `
       <div style="width:100%; display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem;">
-        <span style="font-weight:800; font-size:1.15rem; color:var(--text-primary); display:flex; align-items:center; gap:0.4rem;">
+        <span style="font-weight:800; font-size:1.15rem; color:var(--text-primary); display:flex; align-items:center; gap:0.4rem; line-height:1.2;">
           <span style="background:var(--accent-light); color:var(--accent); padding:0.1rem 0.4rem; border-radius:4px; font-size:0.9rem;">${p.cantidad}x</span> 
-          ${p.marca}
+          ${p.descripcion}
         </span>
-        <span class="status-badge status-open" style="font-size:0.75rem; cursor:pointer;" onclick="editarOrden('${p.ordenId}')" title="Ver/Editar Orden">Orden #${p.ordenFolio || 'S/N'}</span>
+        <span class="status-badge status-open" style="font-size:0.75rem; cursor:pointer; white-space:nowrap; margin-left:0.5rem;" onclick="event.stopPropagation(); editarOrden('${p.ordenId}')" title="Ver/Editar Orden">Orden #${p.ordenFolio || 'S/N'}</span>
       </div>
-      <div style="font-weight:600; font-size:0.95rem; color:var(--accent); margin-bottom:0.25rem;">${p.descripcion}</div>
+      <div style="font-weight:600; font-size:0.95rem; color:var(--accent); margin-bottom:0.25rem; display:flex; align-items:center;">
+        ${marcaRender}
+      </div>
       <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:1rem; font-family:monospace;">Clave: ${p.clave}</div>
-      <div style="display:flex; flex-direction:column; gap:0.4rem; font-size:0.85rem; color:var(--text-secondary); width:100%; border-top: 1px dashed var(--border); padding-top: 0.75rem;">
+      
+      <div style="display:flex; flex-direction:column; gap:0.4rem; font-size:0.85rem; color:var(--text-secondary); width:100%; border-top: 1px dashed var(--border); padding-top: 0.75rem; margin-bottom: 1rem;">
         <div style="display:flex; align-items:flex-start; gap:0.5rem;">
-          <i data-lucide="settings-2" style="width:14px;height:14px; margin-top:2px; color:var(--text-muted)"></i> 
+          ${maquinaRenderIcon}
           <span style="line-height:1.3">${p.maquina}</span>
         </div>
         <div style="display:flex; align-items:flex-start; gap:0.5rem;">
@@ -12079,11 +12211,125 @@ function renderRefaccionesPendientes() {
           <span>${p.tecnico}</span>
         </div>
       </div>
+      
+      <div style="width: 100%; display: flex; align-items: center; justify-content: flex-end; margin-top: auto;">
+        <div style="display: flex; align-items: center; gap: 0.4rem; color: ${badgeColor}; background: ${badgeBg}; padding: 0.35rem 0.6rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
+          <i data-lucide="${badgeIcon}" style="width:14px; height:14px;"></i>
+          ${p.estatusPedido || 'Por Pedir'}
+        </div>
+      </div>
     `;
     grid.appendChild(card);
   });
   if (window.lucide) window.lucide.createIcons({ root: grid });
 }
+
+window.abrirModalPiezaPendienteNuevo = function(ordenId, clave, descripcion, estatusActual, cantidad, marca) {
+  const existing = document.getElementById('dynamic-modal-pieza');
+  if (existing) existing.remove();
+
+  let orden = null;
+  if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
+    orden = ordenes.find(o => o.id === ordenId);
+  }
+  const folioText = orden ? (orden.folio || 'S/N') : 'S/N';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'dynamic-modal-pieza';
+  overlay.className = 'modal-overlay open';
+  overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: flex !important; align-items: center; justify-content: center; z-index: 9999999 !important; padding: 1rem; box-sizing: border-box; mso-position: fixed;';
+  
+  overlay.onclick = (e) => {
+    if (e.target === overlay) overlay.remove();
+  };
+
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.style.cssText = 'max-width: 500px; width: 100%; border-radius: 16px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; overflow: hidden; font-family: inherit; margin: auto; z-index: 10000000;';
+
+  const header = document.createElement('div');
+  header.style.cssText = 'padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary);';
+  header.innerHTML = `
+    <h2 style="margin: 0; font-size: 1.15rem; font-weight: 700;">Detalle de Refacción</h2>
+    <button style="background: none; border: none; font-size: 1.25rem; cursor: pointer; color: var(--text-muted);" onclick="document.getElementById('dynamic-modal-pieza').remove()">✕</button>
+  `;
+
+  const body = document.createElement('div');
+  body.style.cssText = 'padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;';
+  
+  const statusSelected1 = (!estatusActual || estatusActual === 'Por Pedir') ? 'selected' : '';
+  const statusSelected2 = (estatusActual === 'En Tránsito / Pedido') ? 'selected' : '';
+  const statusSelected3 = (estatusActual === 'Entregado al Técnico') ? 'selected' : '';
+  
+  body.innerHTML = `
+    <div style="font-size:1.15rem; font-weight:800; color:var(--text-primary); margin-bottom:0.25rem;">${cantidad}x ${descripcion}</div>
+    <div style="font-size:0.95rem; color:var(--accent); font-weight:600; margin-bottom:0.5rem;">${marca || '-'}</div>
+    <div style="font-size:0.85rem; color:var(--text-muted); font-family:monospace; margin-bottom:0.25rem;">Clave: ${clave}</div>
+    <div style="font-size:0.85rem; color:var(--text-muted);">Orden #${folioText}</div>
+    
+    <div style="margin-top: 1rem;">
+      <label style="font-weight:600; margin-bottom:0.5rem; display:block; font-size:0.9rem;">Estatus del Pedido</label>
+      <select id="dynamic-modal-estatus" style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.95rem; outline: none; font-family: inherit;">
+        <option value="Por Pedir" ${statusSelected1}>Por Pedir</option>
+        <option value="En Tránsito / Pedido" ${statusSelected2}>En Tránsito / Pedido</option>
+        <option value="Entregado al Técnico" ${statusSelected3}>Entregado al Técnico</option>
+      </select>
+    </div>
+  `;
+
+  const footer = document.createElement('div');
+  footer.style.cssText = 'padding: 1.25rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem; background: var(--bg-body);';
+  footer.innerHTML = `
+    <button type="button" class="btn-secondary" style="margin:0; padding:0.6rem 1.25rem; border-radius:10px; cursor:pointer;" onclick="document.getElementById('dynamic-modal-pieza').remove()">Cancelar</button>
+    <button type="button" class="btn-primary" style="margin:0; padding:0.6rem 1.25rem; border-radius:10px; cursor:pointer; font-weight:600; background: var(--accent); color: #fff; border: none;" id="dynamic-modal-save">Guardar Cambios</button>
+  `;
+
+  modal.appendChild(header);
+  modal.appendChild(body);
+  modal.appendChild(footer);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  document.getElementById('dynamic-modal-save').onclick = async () => {
+    const nuevoEstatus = document.getElementById('dynamic-modal-estatus').value;
+    overlay.remove();
+    if (window.cambiarEstatusEnLinea) {
+      await window.cambiarEstatusEnLinea(ordenId, clave, descripcion, nuevoEstatus);
+    }
+  };
+};
+
+window.cambiarEstatusEnLinea = async function(ordenId, clave, descripcion, nuevoEstatus) {
+  if (typeof ordenes === 'undefined' || typeof window.pushToSupabase === 'undefined') {
+    alert("Error: datos de órdenes no disponibles en el entorno.");
+    return;
+  }
+  
+  const ordenIdx = ordenes.findIndex(o => o.id === ordenId);
+  if (ordenIdx === -1) {
+    alert("No se encontró la Orden de Servicio en memoria.");
+    return;
+  }
+  
+  const orden = ordenes[ordenIdx];
+  if (!orden.ref_necesarias || !Array.isArray(orden.ref_necesarias)) return;
+  
+  const ref = orden.ref_necesarias.find(r => r.clave === clave && r.descripcion === descripcion);
+  if (ref) {
+    ref.estatusPedido = nuevoEstatus;
+    
+    try {
+      await window.pushToSupabase('ordenes', orden);
+      renderRefaccionesPendientes();
+      if (typeof renderOrdenDetalle === 'function' && document.getElementById('detalle-orden-view')?.style.display !== 'none') {
+         renderOrdenDetalle(orden.id);
+      }
+    } catch(err) {
+      console.error("Error al cambiar estatus de pieza:", err);
+      alert("Hubo un error al guardar en la base de datos.");
+    }
+  }
+};
 
 let refaccionesCurrentPage = 1;
 const REFACCIONES_PAGE_SIZE = 50;
@@ -16363,6 +16609,8 @@ function renderCalendario() {
         let eventColor = '#ef4444'; // Rojo: Trabajo realizado sin asignación por defecto
         const esAsignacionPendiente = b.realizado === false || (b.nota && b.nota.includes('Programado por supervisor') && b.realizado !== true);
         
+
+
         if (esAsignacionPendiente) {
           eventColor = '#8b5cf6'; // Morado: Asignación programada (Pendiente)
         } else {
@@ -16402,9 +16650,10 @@ function renderCalendario() {
           startVal = `${dateStr}T${b.entrada}:00`;
         }
 
+        const tipoPrefix = b.tipo && b.tipo !== 'Servicio' ? `${b.tipo.substring(0,3)} | ` : '';
         const ev = {
           id: `bit-${b.id || Math.random()}`,
-          title: `${(b.tecnico || 'Téc').split(' ')[0]} | ${o.cliente}`,
+          title: `${tipoPrefix}${(b.tecnico || 'Téc').split(' ')[0]} | ${o.cliente}`,
           start: startVal,
           allDay: isAllDay,
           backgroundColor: eventColor,
@@ -16423,6 +16672,70 @@ function renderCalendario() {
         };
 
         if (endVal) ev.end = endVal;
+
+        // Renderizar bloque de traslado si existe hora de inicio y duración
+        if (b.hora_inicio && b.horas_traslado) {
+          try {
+            const idaDateStr = b.fecha_inicio_traslado || dateStr;
+            const startLlegada = new Date(`${idaDateStr}T${b.hora_inicio}:00`);
+            if (!isNaN(startLlegada.getTime())) {
+              startLlegada.setMinutes(startLlegada.getMinutes() + Math.round(parseFloat(b.horas_traslado) * 60));
+              const endStr = new Date(startLlegada.getTime() - (startLlegada.getTimezoneOffset() * 60000)).toISOString().substring(0,16)+':00';
+
+              eventos.push({
+                id: `bit-traslado-ida-${b.id || Math.random()}`,
+                title: `🚗 Ida - ${(b.tecnico || 'Téc').split(' ')[0]}`,
+                start: `${idaDateStr}T${b.hora_inicio}:00`,
+                end: endStr,
+                allDay: false,
+                backgroundColor: '#475569',
+                borderColor: '#475569',
+                textColor: '#ffffff',
+                extendedProps: {
+                  isBitacora: true,
+                  isTraslado: true,
+                  tipoTraslado: 'Ida',
+                  duracion: b.horas_traslado,
+                  ordenId: o.id,
+                  tecnico: b.tecnico,
+                  cliente: o.cliente
+                }
+              });
+            }
+          } catch(e) { console.error('Error en traslado ida:', e); }
+        }
+
+        // Renderizar bloque de regreso si existe hora de regreso y duración
+        if (b.hora_fin_regreso && b.horas_regreso) {
+          try {
+            const regresoDateStr = b.fecha_fin_regreso || dateStr;
+            const startRegreso = new Date(`${regresoDateStr}T${b.hora_fin_regreso}:00`);
+            if (!isNaN(startRegreso.getTime())) {
+              startRegreso.setMinutes(startRegreso.getMinutes() + Math.round(parseFloat(b.horas_regreso) * 60));
+              const endRegresoStr = new Date(startRegreso.getTime() - (startRegreso.getTimezoneOffset() * 60000)).toISOString().substring(0,16)+':00';
+
+              eventos.push({
+                id: `bit-traslado-regreso-${b.id || Math.random()}`,
+                title: `🚗 Regreso - ${(b.tecnico || 'Téc').split(' ')[0]}`,
+                start: `${regresoDateStr}T${b.hora_fin_regreso}:00`,
+                end: endRegresoStr,
+                allDay: false,
+                backgroundColor: '#475569',
+                borderColor: '#475569',
+                textColor: '#ffffff',
+                extendedProps: {
+                  isBitacora: true,
+                  isTraslado: true,
+                  tipoTraslado: 'Regreso',
+                  duracion: b.horas_regreso,
+                  ordenId: o.id,
+                  tecnico: b.tecnico,
+                  cliente: o.cliente
+                }
+              });
+            }
+          } catch(e) { console.error('Error en traslado regreso:', e); }
+        }
 
         eventos.push(ev);
       });
@@ -16448,11 +16761,14 @@ function renderCalendario() {
       if (e.tipo === 'Junta' || e.tipo === 'Capacitación') eventColor = '#8b5cf6'; // Morado: Asignación Programada
       else if (e.tipo === 'Vacaciones') eventColor = '#f59e0b'; // Naranja: Vacaciones
       else if (e.tipo === 'Descanso') eventColor = '#10b981'; // Verde: Descanso (Completado/Tiempo libre)
+      else if (e.tipo === 'Levantamiento') eventColor = '#ec4899'; // Rosa: Levantamiento
+      else if (e.tipo === 'Servicio') eventColor = '#eab308'; // Amarillo: Servicio
       else eventColor = '#3b82f6'; // Azul: Trabajo/Actividad sin asignación
 
+      const tecPrefix = e.tecnicoNombre ? `${e.tecnicoNombre.split(' ')[0]} | ` : '';
       eventos.push({
         id: e.id,
-        title: `${e.tipo} | ${e.titulo}`,
+        title: `${tecPrefix}${e.tipo} | ${e.titulo || ''}`,
         start: e.fechaInicio || e.start,
         end: e.fechaFin || e.end || null,
         allDay: e.todoElDia || e.allDay || false,
@@ -16632,7 +16948,7 @@ window.abrirRegistrarActividad = function() {
 
   // Llenar dropdown de técnicos
   const selectTec = document.getElementById('mra-tecnico');
-  const tecs = usuarios.filter(u => u.rol === 'tecnico' && u.activo !== false);
+  const tecs = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false);
   selectTec.innerHTML = '<option value="">Ninguno / Todos</option>' + tecs.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
 
   // Llenar dropdown de órdenes
@@ -16653,7 +16969,7 @@ window.mostrarDetalleEventoAdministrativo = function(eventId) {
 
   // Llenar dropdown de técnicos
   const selectTec = document.getElementById('mra-tecnico');
-  const tecs = usuarios.filter(u => u.rol === 'tecnico' && u.activo !== false);
+  const tecs = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false);
   selectTec.innerHTML = '<option value="">Ninguno / Todos</option>' + tecs.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
 
   // Llenar dropdown de órdenes
@@ -16899,11 +17215,22 @@ function mostrarPopupBitacora(info) {
   const folio = o ? (o.folio || 'Sin Folio') : 'Sin Folio';
 
   let horasStr = '';
-  if (p.entrada || p.salida) {
-    horasStr = `<p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Horario:</strong> ${p.entrada || '--:--'} a ${p.salida || '--:--'}</p>`;
+  const isTraslado = p.isTraslado;
+
+  if (isTraslado) {
+    const dObjEnd = info.event.end;
+    const endStrFormat = dObjEnd ? dObjEnd.toLocaleTimeString('es-MX', {hour: '2-digit', minute:'2-digit'}) : '--:--';
+    horasStr = `<div style="margin-top: 1rem;">
+                  <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Detalles de Traslado (${p.tipoTraslado}):</strong></p>
+                  <p style="margin:0 0 0.5rem 0; font-size:0.85rem; padding-left:1rem;">• Duración: ${p.duracion} horas</p>
+                  <p style="margin:0 0 0.5rem 0; font-size:0.85rem; padding-left:1rem;">• Salida: ${dObj.toLocaleTimeString('es-MX', {hour: '2-digit', minute:'2-digit'})}</p>
+                  <p style="margin:0 0 0.5rem 0; font-size:0.85rem; padding-left:1rem;">• Llegada estimada: ${endStrFormat}</p>
+                </div>`;
+  } else if (p.entrada || p.salida) {
+    horasStr = `<p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Horario de Servicio:</strong> ${p.entrada || '--:--'} a ${p.salida || '--:--'}</p>`;
   }
 
-  const bitacoraId = String(info.event.id || '').replace('bit-', '');
+  const bitacoraId = String(info.event.id || '').replace('bit-', '').replace('traslado-ida-', '').replace('traslado-regreso-', '');
   const b = o?.bitacora?.find(x => x.id === bitacoraId);
   const esAsignacionPendiente = b && (b.realizado === false || (b.nota && b.nota.includes('Programado por supervisor') && b.realizado !== true));
   const esSupervisorOrAdmin = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
@@ -16928,7 +17255,7 @@ function mostrarPopupBitacora(info) {
   overlay.innerHTML = `
     <div class="modal" style="max-width:450px; background:var(--bg-card); border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.15);">
       <div class="modal-header" style="border-bottom: 1px solid var(--border); padding: 1rem 1.5rem;">
-        <h3 id="modal-title" style="margin:0; font-size:1.1rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="calendar-check" style="color:var(--accent);"></i> Avance Diario</h3>
+        <h3 id="modal-title" style="margin:0; font-size:1.1rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="${isTraslado ? 'map' : 'calendar-check'}" style="color:var(--accent);"></i> ${isTraslado ? 'Detalles de Traslado' : 'Avance Diario'}</h3>
         <button class="close-btn" onclick="this.closest('.modal-overlay').remove()" style="background:none; border:none; cursor:pointer; color:var(--text-muted);"><i data-lucide="x"></i></button>
       </div>
       <div class="modal-body" style="padding:1.5rem;">
@@ -16939,7 +17266,7 @@ function mostrarPopupBitacora(info) {
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Cliente:</strong> ${p.cliente}</p>
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Ubicación:</strong> ${p.ubicacion}</p>
         ${horasStr}
-        <div style="margin-top:1rem; padding:1rem; background:var(--bg-body); border-radius:6px; font-size:0.85rem; border:1px solid var(--border); white-space:pre-wrap; line-height:1.5; color:var(--text-secondary); max-height:250px; overflow-y:auto;">${p.nota}</div>
+        ${!isTraslado ? `<div style="margin-top:1rem; padding:1rem; background:var(--bg-body); border-radius:6px; font-size:0.85rem; border:1px solid var(--border); white-space:pre-wrap; line-height:1.5; color:var(--text-secondary); max-height:250px; overflow-y:auto;">${p.nota}</div>` : ''}
         <div style="margin-top:1.5rem; text-align:right; display:flex; justify-content:flex-end;">
           ${actionButtonsHtml}
           <button class="btn-primary" onclick="this.closest('.modal-overlay').remove(); verDetalle('${p.ordenId}')">Ver Orden Completa</button>
@@ -18779,7 +19106,7 @@ window.renderGastos = function() {
       if (selectTecnico.options.length <= 1) {
         const uniqueTecnicos = new Set();
         usuarios.forEach(u => {
-          if (u.rol === 'tecnico') uniqueTecnicos.add(u.nombre);
+          if (['tecnico', 'supervisor'].includes(u.rol)) uniqueTecnicos.add(u.nombre);
         });
         tecnicosDb.forEach(t => {
           if (t.nombre) uniqueTecnicos.add(t.nombre);
@@ -24156,7 +24483,8 @@ window.renderTelemetryEventsFeed = function() {
       icon = 'trash-2';
       iconColor = 'var(--red)';
       iconBg = 'rgba(239,68,68,0.12)';
-      desc = `Eliminó la asignación de servicio folio <strong>${e.details?.folio || '-'}</strong>.`;
+      const descTecnico = e.details?.tecnico ? ` del técnico <strong>${e.details.tecnico}</strong> (Fecha: ${e.details?.fecha || ''})` : '';
+      desc = `Eliminó la asignación de servicio folio <strong>${e.details?.folio || '-'}</strong>${descTecnico}.`;
     } else if (e.action === 'Vinculación Orden en Detalle') {
       icon = 'link';
       iconColor = 'var(--accent)';
@@ -25438,9 +25766,11 @@ window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId)
 
   // 1. Eliminar de la bitácora de la orden
   const oIndex = ordenes.findIndex(o => o.id === ordenId);
+  let asignacionEliminada = null;
   if (oIndex > -1) {
     const o = ordenes[oIndex];
     if (o.bitacora) {
+      asignacionEliminada = o.bitacora.find(b => b.id === bitacoraId);
       o.bitacora = o.bitacora.filter(b => b.id !== bitacoraId);
       safeSetJSON('sapi_ordenes', ordenes);
       if (window.pushToSupabase) {
@@ -25461,7 +25791,12 @@ window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId)
   if (window.trackTelemetryEvent) {
     const o = oIndex > -1 ? ordenes[oIndex] : null;
     const folioStr = o ? (o.folio || 'Sin Folio') : 'Sin Folio';
-    window.trackTelemetryEvent('Eliminación de Asignación', { id: bitacoraId, folio: folioStr });
+    window.trackTelemetryEvent('Eliminación de Asignación', { 
+      id: bitacoraId, 
+      folio: folioStr,
+      tecnico: asignacionEliminada ? asignacionEliminada.tecnico : null,
+      fecha: asignacionEliminada ? asignacionEliminada.fecha : null
+    });
   }
 
   if (window.mostrarNotificacion) {

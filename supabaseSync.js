@@ -1354,7 +1354,11 @@ async function _processSyncQueueInternal() {
                     tecnico: dbTecnico || null,
                     nota: dbNota,
                     entrada: b.entrada || null,
-                    salida: b.salida || null
+                    salida: b.salida || null,
+                    hora_inicio: b.hora_inicio || null,
+                    horas_traslado: b.horas_traslado || null,
+                    hora_fin_regreso: b.hora_fin_regreso || null,
+                    horas_regreso: b.horas_regreso || null
                   };
                 });
                 const { error: upsertBitErr } = await sb.from('orden_bitacora').upsert(filasBitacora, { onConflict: 'id' });
@@ -1392,7 +1396,8 @@ async function _processSyncQueueInternal() {
                     refaccion_id: refId,
                     cantidad: parseInt(r.cantidad || r.cant || 1, 10),
                     precio_unitario: parseFloat(r.precio || r.precioUnitario || 0),
-                    estado: r.estado || 'Solicitado'
+                    estado: r.estado || 'Solicitado',
+                    estatus_pedido: r.estatusPedido || 'Por Pedir'
                   });
                 } else {
                   console.warn(`[Sync] No se encontró ID para la refacción necesaria: ${r.descripcion} (Clave: ${r.clave})`);
@@ -1407,7 +1412,8 @@ async function _processSyncQueueInternal() {
                     refaccion_id: refId,
                     cantidad: parseInt(r.cantidad || r.cant || 1, 10),
                     precio_unitario: parseFloat(r.precio || r.precioUnitario || 0),
-                    estado: r.estado || 'Utilizado'
+                    estado: r.estado || 'Utilizado',
+                    estatus_pedido: r.estatusPedido || null
                   });
                 } else {
                   console.warn(`[Sync] No se encontró ID para la refacción utilizada: ${r.descripcion} (Clave: ${r.clave})`);
@@ -2553,6 +2559,10 @@ window.cargarDatosDeSupabase = function() {
               nota: nota,
               entrada: b.entrada,
               salida: b.salida,
+              hora_inicio: b.hora_inicio,
+              horas_traslado: b.horas_traslado,
+              hora_fin_regreso: b.hora_fin_regreso,
+              horas_regreso: b.horas_regreso,
               realizado: realizado,
               programadoEntrada: programadoEntrada,
               programadoSalida: programadoSalida,
@@ -2578,7 +2588,9 @@ window.cargarDatosDeSupabase = function() {
               clave: refMeta.codigo || null,
               descripcion: refMeta.descripcion || 'Refacción',
               cantidad: r.cantidad || 1,
-              precio: r.precio_unitario || 0
+              precio: r.precio_unitario || 0,
+              estatusPedido: r.estatus_pedido || (r.estado === 'Necesaria' || r.estado === 'Solicitado' ? 'Por Pedir' : null),
+              estado: r.estado || null
             };
             
             if (r.estado === 'Necesaria' || r.estado === 'Solicitado') {
