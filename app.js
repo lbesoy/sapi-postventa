@@ -10033,7 +10033,8 @@ function verDetalle(id) {
       </div>
       ${o.reembolso_km ? `
         <div style="margin-top:1rem; padding:0.75rem; border:1px solid var(--accent); background:rgba(232, 130, 12, 0.08); border-radius:8px; text-align:center;">
-          <span style="color:var(--accent); font-weight:bold; font-size:1.1rem;"><i data-lucide="check-circle" style="width:20px;height:20px;vertical-align:middle;margin-right:8px;"></i>Aplica Reembolso de KM para esta Orden</span>
+          <span style="color:var(--accent); font-weight:bold; font-size:1.1rem; display:block;"><i data-lucide="check-circle" style="width:20px;height:20px;vertical-align:middle;margin-right:8px;"></i>Aplica Reembolso de KM para esta Orden</span>
+          <span style="color:var(--accent); font-size:0.95rem; font-weight:600; display:block; margin-top:0.4rem; opacity:0.9;"><i data-lucide="clock" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i>A la espera de traslado de regreso</span>
         </div>
       ` : `
         <div style="margin-top:1rem; padding:0.75rem; border:1px dashed var(--border); background:var(--bg-secondary); border-radius:8px; text-align:center;">
