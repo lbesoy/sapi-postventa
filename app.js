@@ -9839,12 +9839,12 @@ function verDetalle(id) {
             horasHtml = `<span style="font-size:0.7rem; color:var(--text-muted);"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:middle;"></i> ${b.entrada || '--:--'} a ${b.salida || '--:--'}</span>${desvHtml}`;
           } else if (b.horas_traslado || b.horas_regreso || isTrasladoRegreso) {
             const totalTraslado = (parseFloat(b.horas_traslado) || 0) + (parseFloat(b.horas_regreso) || 0);
-            horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(232, 130, 12, 0.1); color:var(--accent); padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="car" style="width:12px;height:12px;"></i> Traslado: ${totalTraslado.toFixed(1)}h</span>${desvHtml}`;
+            horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(71, 85, 105, 0.1); color:#475569; padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="car" style="width:12px;height:12px;"></i> Traslado: ${totalTraslado.toFixed(1)}h</span>${desvHtml}`;
           }
 
-          const borderColor = isTrasladoRegreso ? 'var(--accent)' : '#10b981';
-          const badgeBg = isTrasladoRegreso ? 'rgba(232, 130, 12, 0.1)' : 'rgba(16, 185, 129, 0.1)';
-          const badgeText = isTrasladoRegreso ? 'var(--accent)' : '#10b981';
+          const borderColor = isTrasladoRegreso ? '#475569' : '#10b981';
+          const badgeBg = isTrasladoRegreso ? 'rgba(71, 85, 105, 0.1)' : 'rgba(16, 185, 129, 0.1)';
+          const badgeText = isTrasladoRegreso ? '#475569' : '#10b981';
 
           return `
             <div style="background:var(--bg-body); border-left: 3px solid ${borderColor}; border-radius:4px; padding:0.75rem 1rem; margin-top:0.6rem;">
@@ -17637,7 +17637,7 @@ function renderCalendario() {
 
         const isTrasladoEvent = b.tipo === 'Traslado' || (b.nota && b.nota.toLowerCase().includes('traslado'));
         if (isTrasladoEvent && b.realizado) {
-          eventColor = '#e8820c'; // Naranja (var(--accent)) para traslados realizados
+          eventColor = '#475569'; // Gris pizarron (Slate) para traslados realizados
         }
 
         let isAllDay = true;
