@@ -8651,7 +8651,7 @@ function abrirFormulario(id, modoReporte = false) {
         .from('pdf_extracciones_ai')
         .select('extras, conceptos')
         .eq('ticket_id', soporteActual)
-        .order('created_at', { ascending: false })
+        .order('fecha_extraccion', { ascending: false })
         .limit(1)
         .then(({ data, error }) => {
           if (!error && data && data.length > 0) {
@@ -16370,7 +16370,7 @@ function verDetalleTicket(id) {
           .from('pdf_extracciones_ai')
           .select('*')
           .eq('ticket_id', t.id)
-          .order('created_at', { ascending: false })
+          .order('fecha_extraccion', { ascending: false })
           .limit(1);
           
         if (data && data.length > 0) {
@@ -16826,7 +16826,7 @@ async function cerrarCotizacionTicket(id) {
             .from('pdf_extracciones_ai')
             .select('conceptos')
             .eq('ticket_id', id)
-            .order('created_at', { ascending: false })
+            .order('fecha_extraccion', { ascending: false })
             .limit(1);
           if (dbEx && dbEx.length > 0 && dbEx[0].conceptos) {
             refUtilizadasExtraidas = dbEx[0].conceptos.map(c => {
@@ -26792,7 +26792,7 @@ function dispararInicializacionGlobal() {
                 .from('pdf_extracciones_ai')
                 .select('conceptos')
                 .eq('ticket_id', ord.soporte)
-                .order('created_at', { ascending: false })
+                .order('fecha_extraccion', { ascending: false })
                 .limit(1);
               if (dbEx && dbEx.length > 0 && dbEx[0].conceptos) {
                 ord.ref_utilizadas = dbEx[0].conceptos.map(c => {
