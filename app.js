@@ -9958,7 +9958,17 @@ function verDetalle(id) {
         ${field('Total Km', (o.km_total != null && o.km_total !== '') ? o.km_total + ' km' : null)}
         ${field('Tipo de Visita', `<span class="badge badge-${(o.tipo||'otro').toLowerCase().replace(/ /g, '-').replace('é','e').replace('í','i')}">${o.tipo}</span>`)}
         ${field('Estado', `<span class="badge ${badgeEstado(o.estado)}">${o.estado}</span>`)}
-      </div>`)}
+      </div>
+      ${o.reembolso_km ? `
+        <div style="margin-top:1rem; padding:0.75rem; border:1px solid var(--accent); background:rgba(232, 130, 12, 0.08); border-radius:8px; text-align:center;">
+          <span style="color:var(--accent); font-weight:bold; font-size:1.1rem;"><i data-lucide="check-circle" style="width:20px;height:20px;vertical-align:middle;margin-right:8px;"></i>Aplica Reembolso de KM para esta Orden</span>
+        </div>
+      ` : `
+        <div style="margin-top:1rem; padding:0.75rem; border:1px dashed var(--border); background:var(--bg-secondary); border-radius:8px; text-align:center;">
+          <span style="color:var(--text-muted); font-size:0.95rem;"><i data-lucide="x-circle" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i>No aplica Reembolso de KM</span>
+        </div>
+      `}
+    `)}
     ${seccion('Diagnóstico y Trabajos', `
       ${field('Falla reportada', o.falla)}
       <div style="margin-top:0.5rem">${field('Trabajos realizados', o.trabajos)}</div>
@@ -10055,15 +10065,6 @@ function verDetalle(id) {
         
       </div>
     `)}
-    ${o.reembolso_km ? `
-      <div style="margin-top:2rem; padding:1rem; border:1px solid var(--accent); background:rgba(232, 130, 12, 0.05); border-radius:8px; text-align:center;">
-        <span style="color:var(--accent); font-weight:bold; font-size:1.1rem;"><i data-lucide="check-circle" style="width:20px;height:20px;vertical-align:middle;margin-right:8px;"></i>Aplica Reembolso de KM para esta Orden</span>
-      </div>
-    ` : `
-      <div style="margin-top:2rem; padding:1rem; border:1px dashed var(--border); background:var(--bg-secondary); border-radius:8px; text-align:center;">
-        <span style="color:var(--text-muted); font-size:0.95rem;"><i data-lucide="x-circle" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i>No aplica Reembolso de KM</span>
-      </div>
-    `}
   `;
 
   document.getElementById('modal-detalle-overlay').classList.add('open');

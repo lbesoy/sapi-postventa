@@ -1945,6 +1945,12 @@ window.verDetallesSincronizacion = function() {
           headerEl.style.gap = '0.5rem';
           headerEl.style.fontSize = '0.7rem';
           headerEl.style.fontWeight = '700';
+          headerEl.style.justifyContent = 'space-between';
+          
+          const badgeContainer = document.createElement('div');
+          badgeContainer.style.display = 'flex';
+          badgeContainer.style.alignItems = 'center';
+          badgeContainer.style.gap = '0.5rem';
           
           const tableBadge = document.createElement('span');
           tableBadge.textContent = item.table;
@@ -1970,8 +1976,30 @@ window.verDetallesSincronizacion = function() {
           actionBadge.style.fontSize = '0.65rem';
           actionBadge.style.letterSpacing = '0.05em';
           
-          headerEl.appendChild(tableBadge);
-          headerEl.appendChild(actionBadge);
+          badgeContainer.appendChild(tableBadge);
+          badgeContainer.appendChild(actionBadge);
+          
+          const deleteBtn = document.createElement('button');
+          deleteBtn.innerHTML = '✕';
+          deleteBtn.style.background = 'transparent';
+          deleteBtn.style.border = 'none';
+          deleteBtn.style.color = 'var(--text-muted)';
+          deleteBtn.style.cursor = 'pointer';
+          deleteBtn.style.fontSize = '1rem';
+          deleteBtn.style.padding = '0 0.2rem';
+          deleteBtn.title = 'Eliminar este cambio pendiente (ignorar)';
+          deleteBtn.onclick = function() {
+            if (confirm('¿Estás seguro de que deseas ignorar y eliminar este cambio local? Los datos no se subirán a la nube.')) {
+              let currentQueue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+              currentQueue = currentQueue.filter(qItem => JSON.stringify(qItem) !== JSON.stringify(item));
+              localStorage.setItem('sapi_sync_queue', JSON.stringify(currentQueue));
+              window.verDetallesSincronizacion();
+              if (window.updateSyncStatusUI) window.updateSyncStatusUI();
+            }
+          };
+          
+          headerEl.appendChild(badgeContainer);
+          headerEl.appendChild(deleteBtn);
           
           const bodyEl = document.createElement('div');
           bodyEl.textContent = desc;
