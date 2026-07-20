@@ -9842,18 +9842,22 @@ function verDetalle(id) {
             horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(232, 130, 12, 0.1); color:var(--accent); padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="car" style="width:12px;height:12px;"></i> Traslado: ${totalTraslado.toFixed(1)}h</span>${desvHtml}`;
           }
 
+          const borderColor = isTrasladoRegreso ? 'var(--accent)' : '#10b981';
+          const badgeBg = isTrasladoRegreso ? 'rgba(232, 130, 12, 0.1)' : 'rgba(16, 185, 129, 0.1)';
+          const badgeText = isTrasladoRegreso ? 'var(--accent)' : '#10b981';
+
           return `
-            <div style="background:var(--bg-body); border-left: 3px solid #10b981; border-radius:4px; padding:0.75rem 1rem; margin-top:0.6rem;">
+            <div style="background:var(--bg-body); border-left: 3px solid ${borderColor}; border-radius:4px; padding:0.75rem 1rem; margin-top:0.6rem;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; flex-wrap:wrap; gap:0.5rem;">
                 <div style="display:flex; align-items:center; gap:0.5rem;">
-                  <div style="width:24px; height:24px; border-radius:50%; background:#10b981; color:white; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold;">
+                  <div style="width:24px; height:24px; border-radius:50%; background:${borderColor}; color:white; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold;">
                     ${(b.tecnico || 'U').charAt(0).toUpperCase()}
                   </div>
                   <span style="font-size:0.85rem; font-weight:600; color:var(--text-primary);">${b.tecnico || 'Desconocido'}</span>
                   ${(['superadmin', 'admin'].includes(currentSession.viewMode) && (!isClosed || isTrasladoRegreso)) ? `<button class="action-btn" onclick="editarBitacora('${o.id}', '${b.id}')" title="Editar Bitácora" style="padding:0.15rem; margin-left:0.5rem;"><i data-lucide="pencil" style="width:12px;height:12px;"></i></button>` : ''}
                 </div>
                 <div style="display:flex; align-items:center; gap:0.4rem;">
-                  <span class="badge" style="background:rgba(16, 185, 129, 0.1); color:#10b981; border-radius:99px; padding:0.15rem 0.45rem; font-size:0.65rem; font-weight:700;">REPORTADO</span>
+                  <span class="badge" style="background:${badgeBg}; color:${badgeText}; border-radius:99px; padding:0.15rem 0.45rem; font-size:0.65rem; font-weight:700;">REPORTADO</span>
                   ${horasHtml}
                 </div>
               </div>
