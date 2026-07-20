@@ -10047,21 +10047,26 @@ function verDetalle(id) {
       </div>
       ${o.reembolso_km ? `
         <div style="margin-top:1rem; display:flex; flex-direction:row; align-items:center; gap:1rem; flex-wrap:wrap;">
-          <div style="display:flex; flex-direction:column; gap:0.25rem; padding:0.5rem 0.75rem; border-left:3px solid var(--accent); background:rgba(232, 130, 12, 0.08); border-radius:0 6px 6px 0; width:fit-content;">
-            <div style="display:flex; align-items:center; gap:0.4rem; color:var(--accent); font-weight:700; font-size:0.85rem;">
-              <i data-lucide="check-circle" style="width:14px;height:14px;"></i>
-              Aplica Reembolso de KM
+          ${(() => {
+            const hasTrasladoRegreso = o.bitacora && o.bitacora.some(b => b.nota === 'Traslado de regreso desde el sitio de trabajo');
+            return `
+            <div style="display:flex; flex-direction:column; gap:0.25rem; padding:0.5rem 0.75rem; border-left:3px solid var(--accent); background:rgba(232, 130, 12, 0.08); border-radius:0 6px 6px 0; width:fit-content;">
+              <div style="display:flex; align-items:center; gap:0.4rem; color:var(--accent); font-weight:700; font-size:0.85rem;">
+                <i data-lucide="check-circle" style="width:14px;height:14px;"></i>
+                Aplica Reembolso de KM
+              </div>
+              <div style="display:flex; align-items:center; gap:0.4rem; color:var(--accent); font-size:0.75rem; font-weight:600; opacity:0.85;">
+                <i data-lucide="${hasTrasladoRegreso ? 'check-check' : 'clock'}" style="width:13px;height:13px;"></i>
+                ${hasTrasladoRegreso ? 'Traslado de regreso registrado' : 'A la espera de traslado de regreso'}
+              </div>
             </div>
-            <div style="display:flex; align-items:center; gap:0.4rem; color:var(--accent); font-size:0.75rem; font-weight:600; opacity:0.85;">
-              <i data-lucide="clock" style="width:13px;height:13px;"></i>
-              A la espera de traslado de regreso
-            </div>
-          </div>
-          ${(!(((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) && ['tecnico', 'superadmin'].includes(currentSession.viewMode)) ? `
-          <button class="btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.6rem; display:flex; align-items:center; gap:0.3rem;" onclick="abrirBitacora('${o.id}', 'Traslado de regreso desde el sitio de trabajo', true)">
-            <i data-lucide="plus" style="width:12px;height:12px;"></i> Registrar Regreso
-          </button>
-          ` : ''}
+            ${(!hasTrasladoRegreso && ['tecnico', 'superadmin'].includes(currentSession.viewMode)) ? `
+            <button class="btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.6rem; display:flex; align-items:center; gap:0.3rem;" onclick="abrirBitacora('${o.id}', 'Traslado de regreso desde el sitio de trabajo', true)">
+              <i data-lucide="plus" style="width:12px;height:12px;"></i> Registrar Regreso
+            </button>
+            ` : ''}
+            `;
+          })()}
         </div>
       ` : `
         <div style="margin-top:1rem; display:flex; align-items:center; gap:0.4rem; padding:0.4rem 0.6rem; border:1px solid var(--border); background:var(--bg-secondary); border-radius:6px; width:fit-content;">
@@ -10873,7 +10878,7 @@ function calcularRangoFechasLaboral(diasHabilAtras) {
 
 function abrirBitacora(id, defaultNote = '', isOnlyTraslado = false) {
   const o = ordenes.find(x => x.id === id);
-  if (o && (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado'))) {
+  if (o && !isOnlyTraslado && (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado'))) {
     mostrarNotificacion('No se pueden registrar avances en una orden cerrada o completada.', 'error');
     return;
   }
