@@ -3625,7 +3625,7 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
       title.textContent = `Desglose: Refacciones Faltantes`;
       thead.innerHTML = `<tr><th>Refacción</th><th>Cantidad</th><th>Folio Orden</th><th>Cliente</th><th>Técnico</th></tr>`;
       getFilteredOrders().forEach(o => {
-        if ((o.estado || '').toLowerCase() !== 'completado' && o.ref_necesarias && o.ref_necesarias.length > 0) {
+        if (!['completado', 'cerrada', 'cerrado'].includes((o.estado || '').toLowerCase()) && o.ref_necesarias && o.ref_necesarias.length > 0) {
           o.ref_necesarias.forEach(r => {
             const desc = r.descripcion || r.clave || 'N/A';
             const cant = r.cantidad || 1;
@@ -3643,7 +3643,7 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
       title.textContent = `Desglose: Resolución de Órdenes`;
       thead.innerHTML = `<tr><th>Folio</th><th>Cliente</th><th>Estado</th><th>Días de Resolución</th></tr>`;
       getFilteredOrders().forEach(o => {
-        if ((o.estado || '').toLowerCase() === 'completado') {
+        if (['completado', 'cerrada', 'cerrado'].includes((o.estado || '').toLowerCase())) {
           let fCreacion = new Date(o.fecha || 0);
           let fCierre = o.fechaFin ? new Date(o.fechaFin) : fCreacion;
           if (o.bitacora && o.bitacora.length > 0) {
@@ -3858,7 +3858,7 @@ function _renderStatsInternal() {
   const total = ordenesFilter.length;
   const proceso = ordenesFilter.filter(o => (o.estado || '').toLowerCase() === 'en proceso').length;
   const pendientes = ordenesFilter.filter(o => (o.estado || '').toLowerCase() === 'pendiente').length;
-  const completas = ordenesFilter.filter(o => (o.estado || '').toLowerCase() === 'completado').length;
+  const completas = ordenesFilter.filter(o => ['completado', 'cerrada', 'cerrado'].includes((o.estado || '').toLowerCase())).length;
   const refaccionesPendientes = ordenesFilter.filter(o => (o.estado || '').toLowerCase() === 'refacciones pendientes').length;
   const setStat = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
   setStat('stat-total', total);
@@ -4152,7 +4152,7 @@ function renderDashboardV2() {
   ordenesDash.forEach(o => {
     const estado = (o.estado || '').toLowerCase();
     
-    if (estado !== 'completado') {
+    if (!['completado', 'cerrada', 'cerrado'].includes(estado)) {
       if (o.ref_necesarias && Array.isArray(o.ref_necesarias)) {
         refFaltantes += o.ref_necesarias.length;
       }
@@ -4311,7 +4311,7 @@ function renderDashboardV2() {
     destroyChart('ord-estado');
     const ordPend = ordenesDash.filter(o => (o.estado||'').toLowerCase() === 'pendiente').length;
     const ordProc = ordenesDash.filter(o => (o.estado||'').toLowerCase() === 'en proceso').length;
-    const ordComp = ordenesDash.filter(o => (o.estado||'').toLowerCase() === 'completado').length;
+    const ordComp = ordenesDash.filter(o => ['completado', 'cerrada', 'cerrado'].includes((o.estado || '').toLowerCase())).length;
     const ordOtro = ordenesDash.length - ordPend - ordProc - ordComp;
     const ctxOE = document.getElementById('chart-ordenes-estado');
     if (ctxOE) _v2Charts['ord-estado'] = new Chart(ctxOE, {
@@ -4913,7 +4913,7 @@ function renderTabla(ctx) {
 
 function badgeEstado(estado) {
   if (estado === 'En Proceso') return 'badge-proceso';
-  if (estado === 'Completado') return 'badge-completado';
+  if ((estado === 'Completado' || estado === 'Cerrada' || estado === 'Cerrado')) return 'badge-completado';
   return 'badge-pendiente';
 }
 
@@ -5922,11 +5922,11 @@ function verDetalleCliente(nombre) {
         const t = item.obj;
         const ordenes = item.ordenesLigadas;
         const tClosed = t.estado === 'Cerrado';
-        const allOrdersClosed = ordenes.every(o => o.estado === 'Completado' || o.estado === 'Cerrado');
+        const allOrdersClosed = ordenes.every(o => (o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado');
         if (tClosed && allOrdersClosed) isClosed = true;
      } else {
         const o = item.obj;
-        if (o.estado === 'Completado' || o.estado === 'Cerrado') isClosed = true;
+        if ((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado') isClosed = true;
      }
      
      if (isClosed) cerrados.push(item);
@@ -6364,11 +6364,11 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
         const t = item.obj;
         const ordenes = item.ordenesLigadas;
         const tClosed = t.estado === 'Cerrado';
-        const allOrdersClosed = ordenes.every(o => o.estado === 'Completado' || o.estado === 'Cerrado');
+        const allOrdersClosed = ordenes.every(o => (o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado');
         if (tClosed && allOrdersClosed) isClosed = true;
      } else {
         const o = item.obj;
-        if (o.estado === 'Completado' || o.estado === 'Cerrado') isClosed = true;
+        if ((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado') isClosed = true;
      }
      
      if (isClosed) cerrados.push(item);
@@ -7625,16 +7625,16 @@ function renderTecnicos() {
     });
 
     const total = tOrdenes.length;
-    const comp = tOrdenes.filter(o => (o.estado || '').toLowerCase() === 'completado').length;
+    const comp = tOrdenes.filter(o => ['completado', 'cerrada', 'cerrado'].includes((o.estado || '').toLowerCase())).length;
     
     // Calcular Siguiente Orden y Último Completado usando el sistema de órdenes
     const ordenesAbiertas = tOrdenes
-      .filter(o => (o.estado || '').toLowerCase() !== 'completado')
+      .filter(o => !['completado', 'cerrada', 'cerrado'].includes((o.estado || '').toLowerCase()))
       .sort((a, b) => new Date(a.fecha) - new Date(b.fecha)); // la más antigua abierta primero
     const proxOrden = ordenesAbiertas.length > 0 ? ordenesAbiertas[0] : null;
     
     const ordenesCompletadas = tOrdenes
-      .filter(o => (o.estado || '').toLowerCase() === 'completado')
+      .filter(o => ['completado', 'cerrada', 'cerrado'].includes((o.estado || '').toLowerCase()))
       .sort((a, b) => new Date(b.fecha) - new Date(a.fecha)); // la más reciente completada primero
     const ultCompletada = ordenesCompletadas.length > 0 ? ordenesCompletadas[0] : null;
 
@@ -7693,16 +7693,16 @@ function renderTecnicos() {
       });
 
       const total = tOrdenes.length;
-      const comp = tOrdenes.filter(o => (o.estado || '').toLowerCase() === 'completado').length;
+      const comp = tOrdenes.filter(o => ['completado', 'cerrada', 'cerrado'].includes((o.estado || '').toLowerCase())).length;
 
       // Calcular Siguiente Orden y Último Completado usando el sistema de órdenes
       const ordenesAbiertas = tOrdenes
-        .filter(o => (o.estado || '').toLowerCase() !== 'completado')
+        .filter(o => !['completado', 'cerrada', 'cerrado'].includes((o.estado || '').toLowerCase()))
         .sort((a, b) => new Date(a.fecha) - new Date(b.fecha)); // la más antigua abierta primero
       const proxOrden = ordenesAbiertas.length > 0 ? ordenesAbiertas[0] : null;
       
       const ordenesCompletadas = tOrdenes
-        .filter(o => (o.estado || '').toLowerCase() === 'completado')
+        .filter(o => ['completado', 'cerrada', 'cerrado'].includes((o.estado || '').toLowerCase()))
         .sort((a, b) => new Date(b.fecha) - new Date(a.fecha)); // la más reciente completada primero
       const ultCompletada = ordenesCompletadas.length > 0 ? ordenesCompletadas[0] : null;
 
@@ -7776,12 +7776,12 @@ function verDetalleTecnico(nombre) {
   });
 
   const ordenesAbiertas = tOrdenes
-    .filter(o => (o.estado || '').toLowerCase() !== 'completado')
+    .filter(o => !['completado', 'cerrada', 'cerrado'].includes((o.estado || '').toLowerCase()))
     .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
   const proxOrden = ordenesAbiertas.length > 0 ? ordenesAbiertas[0] : null;
 
   const ordenesCompletadas = tOrdenes
-    .filter(o => (o.estado || '').toLowerCase() === 'completado')
+    .filter(o => ['completado', 'cerrada', 'cerrado'].includes((o.estado || '').toLowerCase()))
     .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
   const ultCompletada = ordenesCompletadas.length > 0 ? ordenesCompletadas[0] : null;
 
@@ -9059,7 +9059,7 @@ function renderEvidenciasFotograficas(o) {
   const ev = o.evidencias || { fotoInicio: null, fotoFin: null, adicionales: [] };
   const adicionales = ev.adicionales || [];
   const isClosed = (
-    o.estado === 'Completado' || 
+    (o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || 
     o.estado === 'Cerrado' || 
     o.estado === 'Cerrada' || 
     o.estado === 'Finalizado' || 
@@ -9264,7 +9264,7 @@ window.subirEvidenciaFoto = async function(ordenId, tipo, inputEl) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
 
-  if ((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) {
+  if (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) {
     mostrarNotificacion('No se pueden modificar evidencias en una orden cerrada o firmada.', 'error');
     return;
   }
@@ -9529,7 +9529,7 @@ window.eliminarEvidenciaFoto = async function(ordenId, tipo, url) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o || !o.evidencias) return;
 
-  if ((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) {
+  if (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) {
     mostrarNotificacion('No se pueden modificar evidencias en una orden cerrada o firmada.', 'error');
     return;
   }
@@ -9610,7 +9610,7 @@ function verDetalle(id) {
 
   const renderBitacora = (o) => {
     let html = '';
-    const isClosed = ((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado'));
+    const isClosed = (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado'));
     const isTecnico = currentSession.viewMode === 'tecnico';
     const currentUser = usuarios.find(u => u.id === currentSession.userId);
     const miTecnicoNombre = currentUser ? currentUser.nombre : '';
@@ -10057,7 +10057,7 @@ function verDetalle(id) {
               A la espera de traslado de regreso
             </div>
           </div>
-          ${(!((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) && ['tecnico', 'superadmin'].includes(currentSession.viewMode)) ? `
+          ${(!(((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) && ['tecnico', 'superadmin'].includes(currentSession.viewMode)) ? `
           <button class="btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.6rem; display:flex; align-items:center; gap:0.3rem;" onclick="abrirBitacora('${o.id}', 'Traslado de regreso desde el sitio de trabajo', true)">
             <i data-lucide="plus" style="width:12px;height:12px;"></i> Registrar Regreso
           </button>
@@ -10376,7 +10376,7 @@ function calcularEstadoOrden(o) {
     if (hasPendingParts) {
       return 'Refacciones pendientes';
     } else {
-      return 'Cerrada';
+      return 'Completado';
     }
   } else {
     const hasBitacora = o.bitacora && o.bitacora.length > 0;
@@ -10873,7 +10873,7 @@ function calcularRangoFechasLaboral(diasHabilAtras) {
 
 function abrirBitacora(id, defaultNote = '', isOnlyTraslado = false) {
   const o = ordenes.find(x => x.id === id);
-  if (o && ((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado'))) {
+  if (o && (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado'))) {
     mostrarNotificacion('No se pueden registrar avances en una orden cerrada o completada.', 'error');
     return;
   }
@@ -10955,7 +10955,7 @@ function abrirBitacora(id, defaultNote = '', isOnlyTraslado = false) {
 function iniciarReporteDesdeAsignacion(ordenId, bitacoraId) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
-  if ((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) {
+  if (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) {
     mostrarNotificacion('No se pueden registrar avances en una orden cerrada o completada.', 'error');
     return;
   }
@@ -10998,7 +10998,7 @@ window.iniciarReporteDesdeAsignacion = iniciarReporteDesdeAsignacion;
 function editarBitacora(ordenId, bitacoraId) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
-  if ((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) {
+  if (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) {
     mostrarNotificacion('No se pueden editar avances en una orden cerrada o completada.', 'error');
     return;
   }
@@ -11135,11 +11135,40 @@ function guardarNotaBitacora() {
   const isAdmin = ['superadmin', 'admin'].includes(currentSession.viewMode);
 
   if (!isAdmin) {
-    // Validar que esté dentro del rango hábil permitido (que ahora permite fines de semana si caen en el rango)
-    const rango = calcularRangoFechasLaboral(10);
-    if (fecha < rango.min || fecha > rango.max) {
-      mostrarNotificacion('La fecha seleccionada está fuera del rango permitido.', 'error');
-      return;
+    const isTraslado = document.getElementById('modal-bitacora-title')?.textContent === 'Registrar Traslado de Regreso';
+    if (isTraslado) {
+      let lastDateStr = o.firma_cliente_fecha || o.firma_tecnico_fecha;
+      if (!lastDateStr) {
+        if (o.bitacora && o.bitacora.length > 0) {
+          const validEntries = o.bitacora.filter(b => b.id !== window.currentBitacoraEntryId && b.tipo !== 'Aviso del Sistema');
+          if (validEntries.length > 0) {
+            validEntries.sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
+            lastDateStr = validEntries[0].fecha;
+          }
+        }
+      }
+      if (!lastDateStr) lastDateStr = o.fecha;
+      
+      if (lastDateStr) {
+        const dCierre = new Date(lastDateStr);
+        dCierre.setHours(0,0,0,0);
+        
+        const dSeleccionada = new Date(fecha + 'T00:00:00'); // Tratar la fecha seleccionada en local
+        const diffTime = dSeleccionada.getTime() - dCierre.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < 0 || diffDays > 2) {
+          mostrarNotificacion('La fecha del traslado no puede exceder los 2 días después de la firma o el último trabajo reportado.', 'error');
+          return;
+        }
+      }
+    } else {
+      // Validar que esté dentro del rango hábil permitido (que ahora permite fines de semana si caen en el rango)
+      const rango = calcularRangoFechasLaboral(10);
+      if (fecha < rango.min || fecha > rango.max) {
+        mostrarNotificacion('La fecha seleccionada está fuera del rango permitido.', 'error');
+        return;
+      }
     }
   }
   
@@ -11319,7 +11348,7 @@ function calcularEstadoOrden(o) {
     if (hasPendingParts) {
       return 'Refacciones pendientes';
     } else {
-      return 'Cerrada';
+      return 'Completado';
     }
   } else {
     const hasBitacora = o.bitacora && o.bitacora.length > 0;
@@ -26759,7 +26788,7 @@ window.confirmarAccion = function(options = {}) {
 
 window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId) {
   const o = ordenes.find(x => x.id === ordenId);
-  if (o && ((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado'))) {
+  if (o && (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado'))) {
     mostrarNotificacion('No se pueden eliminar asignaciones en una orden cerrada o completada.', 'error');
     return;
   }
