@@ -3424,9 +3424,9 @@ window.verDetallesSincronizacion = function() {
     
     if (queue.length === 0) {
       body.innerHTML = `
-        <div style="text-align:center; color:var(--text-muted, #6b7280); padding: 1rem;">
-          <p style="margin:0 0 1rem 0;">Todos tus cambios locales están guardados.</p>
-          <div style="font-size: 3rem; margin-bottom: 0.5rem;">✅</div>
+        <div style="text-align:center; color:var(--text-muted, #6b7280); padding: 2rem 1rem;">
+          <i data-lucide="check-circle" style="width:48px;height:48px;margin:0 auto 1rem auto;display:block;color:var(--green,#10b981);"></i>
+          <p style="margin:0; font-size:1.05rem; font-weight:500;">Todos tus cambios locales están guardados.</p>
         </div>
       `;
     } else {
@@ -3463,6 +3463,26 @@ window.verDetallesSincronizacion = function() {
           </div>
           <div style="font-size:0.85rem; font-weight:600; word-break:break-word;">${desc}</div>
         `;
+
+        if (item.lastError) {
+          const errEl = document.createElement('div');
+          errEl.style.fontSize = '0.72rem';
+          errEl.style.color = '#ef4444';
+          errEl.style.marginTop = '0.4rem';
+          errEl.style.fontWeight = '600';
+          errEl.style.background = 'rgba(239, 68, 68, 0.05)';
+          errEl.style.border = '1px solid rgba(239, 68, 68, 0.12)';
+          errEl.style.padding = '0.4rem 0.5rem';
+          errEl.style.borderRadius = '6px';
+          errEl.style.display = 'flex';
+          errEl.style.gap = '0.4rem';
+          errEl.style.alignItems = 'flex-start';
+          errEl.innerHTML = `
+            <i data-lucide="alert-triangle" style="width:14px;height:14px;flex-shrink:0;margin-top:0.1rem;"></i>
+            <span>Error: ${item.lastError} ${item.lastErrorCode ? `(Código: ${item.lastErrorCode})` : ''}</span>
+          `;
+          itemBox.appendChild(errEl);
+        }
         list.appendChild(itemBox);
       });
       body.appendChild(list);
