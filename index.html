@@ -234,7 +234,7 @@
   <script src="https://js.live.net/v7.2/OneDrive.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=51" />
+  <link rel="stylesheet" href="style.css?v=52" />
   <!-- PWA & Mobile Web App Capabilities -->
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="logo_transparent.png" type="image/png" />
@@ -2445,8 +2445,8 @@
                   <input type="number" id="f-traslado-costo" min="0" step="0.01" />
                 </div>
                 <div class="form-group" style="display:flex; align-items:center; gap:0.5rem; margin-top:1.5rem;">
-                  <input type="checkbox" id="f-reembolso-km" style="width:auto; height:auto; transform:scale(1.2);" />
-                  <label for="f-reembolso-km" style="margin:0;">¿Aplica Reembolso KM?</label>
+                  <input type="checkbox" id="f-reembolso-km" style="width:auto; height:auto; transform:scale(1.2);" disabled="disabled" />
+                  <label for="f-reembolso-km" style="margin:0; opacity:0.8;">¿Aplica Reembolso KM? <span style="font-size:0.75rem; color:var(--accent); font-weight:normal;">(Se auto-calcula desde el PDF del Ticket)</span></label>
                 </div>
               </div>
             </div>
