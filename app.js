@@ -8926,10 +8926,18 @@ async function guardarOrden(e) {
   // VALIDACIÓN: Refacciones utilizadas obligatorias con foto
   const refSinFoto = orden.ref_utilizadas.find(ref => !ref.fotoUrl && ref.descripcion);
   if (refSinFoto) {
-    const continuar = confirm(`⚠️ Falta la fotografía para la refacción: ${refSinFoto.descripcion}.\n\n¿Estás seguro de que deseas guardar la orden sin esta evidencia fotográfica?`);
-    if (!continuar) {
+    if (currentSession.viewMode === 'tecnico') {
+      if (window.mostrarNotificacion) {
+        window.mostrarNotificacion(`Es obligatorio subir la fotografía para la refacción: ${refSinFoto.descripcion}`, 'error');
+      }
       restoreBtn();
       return;
+    } else {
+      const continuar = confirm(`⚠️ Falta la fotografía para la refacción: ${refSinFoto.descripcion}.\n\n¿Estás seguro de que deseas guardar la orden sin esta evidencia fotográfica?`);
+      if (!continuar) {
+        restoreBtn();
+        return;
+      }
     }
   }
 
