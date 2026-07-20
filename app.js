@@ -8780,13 +8780,74 @@ function guardarOrdenes() {
   // Ya no se guardan en localStorage
 }
 
-function guardarOrden(e) {
+async function guardarOrden(e) {
   e.preventDefault();
+  
+  const btnGuardar = document.querySelector('#modal-reporte button[type="submit"]') || e.target.querySelector('button[type="submit"]');
+  if (btnGuardar) {
+    btnGuardar.disabled = true;
+    if (!btnGuardar.dataset.originalText) btnGuardar.dataset.originalText = btnGuardar.textContent;
+    btnGuardar.textContent = 'Guardando...';
+  }
+
+  const restoreBtn = () => {
+    if (btnGuardar) {
+      btnGuardar.disabled = false;
+      btnGuardar.textContent = btnGuardar.dataset.originalText;
+    }
+  };
+
   const tipo = document.querySelector('input[name="tipo"]:checked')?.value || 'Servicio';
   let tecnicosSeleccionados = [];
   const soporteIdGuardar = document.getElementById('f-soporte').value.trim();
   const oVieja = editandoId ? (ordenes.find(x => x.id === editandoId) || {}) : null;
+
+  // VALIDACIÓN: Avisar si cambiaron los días de hospedaje/alimentos vs ticket extraído
+  const inputNoches = Number(document.getElementById('f-noches')?.value || 0);
+  const inputAlimentacion = Number(document.getElementById('f-alimentacion')?.value || 0);
   
+  if (soporteIdGuardar && window.supabaseClient) {
+    try {
+      const { data, error } = await window.supabaseClient
+        .from('pdf_extracciones_ai')
+        .select('extras')
+        .eq('ticket_id', soporteIdGuardar)
+        .order('fecha_extraccion', { ascending: false })
+        .limit(1);
+
+      if (!error && data && data.length > 0) {
+        const ext = data[0].extras || [];
+        const viajeData = ext.find(x => x.isViajeData);
+        if (viajeData) {
+          const extHospedaje = Number(viajeData.num_hospedaje || 0);
+          const extAlimento = Number(viajeData.num_alimento || 0);
+          
+          let advertencias = [];
+          if (inputNoches !== extHospedaje) {
+            const dif = inputNoches - extHospedaje;
+            const diffText = dif > 0 ? `+${dif}` : `${dif}`;
+            advertencias.push(`- Noches/Hospedajes: Extraídas ${extHospedaje}, Capturadas ${inputNoches} (Cambio: ${diffText})`);
+          }
+          if (inputAlimentacion !== extAlimento) {
+            const dif = inputAlimentacion - extAlimento;
+            const diffText = dif > 0 ? `+${dif}` : `${dif}`;
+            advertencias.push(`- Alimentos: Extraídos ${extAlimento}, Capturados ${inputAlimentacion} (Cambio: ${diffText})`);
+          }
+          
+          if (advertencias.length > 0) {
+            const msj = `⚠️ ADVERTENCIA DE VIÁTICOS ⚠️\n\nHas modificado los viáticos respecto a lo que se extrajo automáticamente del Ticket:\n\n${advertencias.join('\n')}\n\n¿Estás seguro de que deseas guardar la orden con estos valores modificados?`;
+            if (!confirm(msj)) {
+              restoreBtn();
+              return; // Detiene el guardado
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Validation] Error al verificar viáticos:', err);
+    }
+  }
+
   if (oVieja && (oVieja.tecnicosAsignados?.length > 0 || oVieja.tecnico)) {
     tecnicosSeleccionados = oVieja.tecnicosAsignados || oVieja.tecnico.split(',').map(s => s.trim());
   } else if (soporteIdGuardar) {
@@ -8866,6 +8927,7 @@ function guardarOrden(e) {
     if (window.mostrarNotificacion) {
       window.mostrarNotificacion(`Es obligatorio subir la fotografía para la refacción: ${refSinFoto.descripcion}`, 'error');
     }
+    restoreBtn();
     return;
   }
 
@@ -8921,6 +8983,8 @@ function guardarOrden(e) {
     }
     window.trackTelemetryEvent(act, { folio: orden.folio, cliente: orden.cliente });
   }
+  
+  restoreBtn();
   cerrarFormulario();
   renderTabla();
   renderTabla('servicios');
