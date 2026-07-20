@@ -1295,11 +1295,11 @@ async function _processSyncQueueInternal() {
               estado: item.data.estado || null,
               tipo: item.data.tipo || null,
               tarjeta: item.data.tarjeta || null,
-              limite: item.data.limite !== undefined ? Number(item.data.limite) : 0,
-              saldo_utilizado: item.data.saldoUtilizado !== undefined ? Number(item.data.saldoUtilizado) : 0,
+              limite: (item.data.limite !== undefined && !isNaN(Number(item.data.limite))) ? Number(item.data.limite) : 0,
+              saldo_utilizado: (item.data.saldoUtilizado !== undefined && !isNaN(Number(item.data.saldoUtilizado))) ? Number(item.data.saldoUtilizado) : 0,
               ultima_actualizacion: item.data.ultimaActualizacion || null,
               donde_comprar: item.data.dondeComprar || null,
-              usuario_vinculado_id: item.data.usuarioVinculadoId || null
+              usuario_vinculado_id: (item.data.usuarioVinculadoId && item.data.usuarioVinculadoId.trim().length === 36) ? item.data.usuarioVinculadoId.trim() : null
             };
           } else {
             payload = item.data;
