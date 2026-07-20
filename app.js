@@ -13925,6 +13925,7 @@ window.autoExtraerDesdePdfPedido = async function(file, isModal = true, ticketId
       setTimeout(async () => {
         try {
           const origenDatos = isFileNameMatch ? 'Nombre de Archivo + SAP' : (isSapMatch ? 'Catálogo SAP' : 'PDF AI');
+          const finalTicketId = ticketId || (typeof editandoTicketId !== 'undefined' ? editandoTicketId : null);
           
           let extrasParaGuardar = [...extrasArticulos];
           if (detallesViaje) {
@@ -13932,11 +13933,11 @@ window.autoExtraerDesdePdfPedido = async function(file, isModal = true, ticketId
           }
           
           const insertData = {
-            ticket_id: ticketId || null,
+            ticket_id: finalTicketId || null,
             folio_sap: extractedDoc,
             monto_total: extractedMonto,
             cliente: detectedClientName,
-            ruta_servicio: extractedRuta,
+            ruta_servicio: cleanText,
             conceptos: mainArticulos,
             extras: extrasParaGuardar,
             origen_datos: origenDatos
@@ -13948,11 +13949,14 @@ window.autoExtraerDesdePdfPedido = async function(file, isModal = true, ticketId
             
           if (error) {
             console.error('[PDF Auto-Extract] Error guardando en Supabase (pdf_extracciones_ai):', error);
+            alert("Error al guardar extracción: " + JSON.stringify(error));
           } else {
             console.log('[PDF Auto-Extract] Datos guardados exitosamente en Supabase (pdf_extracciones_ai).');
+            alert("¡Extracción guardada con éxito en Ticket ID: " + insertData.ticket_id + "!");
           }
         } catch (dbErr) {
           console.error('[PDF Auto-Extract] Excepción guardando en Supabase:', dbErr);
+          alert("Excepción crítica al guardar: " + dbErr.message);
         }
       }, 500); // Pequeño retraso para no bloquear el renderizado de la UI
     }
