@@ -13949,14 +13949,11 @@ window.autoExtraerDesdePdfPedido = async function(file, isModal = true, ticketId
             
           if (error) {
             console.error('[PDF Auto-Extract] Error guardando en Supabase (pdf_extracciones_ai):', error);
-            alert("Error al guardar extracción: " + JSON.stringify(error));
           } else {
             console.log('[PDF Auto-Extract] Datos guardados exitosamente en Supabase (pdf_extracciones_ai).');
-            alert("¡Extracción guardada con éxito en Ticket ID: " + insertData.ticket_id + "!");
           }
         } catch (dbErr) {
           console.error('[PDF Auto-Extract] Excepción guardando en Supabase:', dbErr);
-          alert("Excepción crítica al guardar: " + dbErr.message);
         }
       }, 500); // Pequeño retraso para no bloquear el renderizado de la UI
     }
