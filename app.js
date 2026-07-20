@@ -1506,14 +1506,7 @@ function inicializarApp() {
     console.error('Error rendering Lucide icons:', err);
   }
   
-  try {
-    if (typeof window.repararTarjetasTransacciones === 'function') {
-      window.repararTarjetasTransacciones();
-    }
-  } catch (err) {
-    console.error('Error running repairing routine:', err);
-  }
-  
+
   try {
     if (typeof window.actualizarAlertaRechazos === 'function') {
       window.actualizarAlertaRechazos();
@@ -19579,7 +19572,7 @@ window.repararTarjetasTransacciones = function() {
         cardsModified = true;
       }
       // Si el id es card_XXX (con 3 dígitos), rellenar con cero
-      if (c.id && c.id.startsWith('card_') && c.id.length === 9) { // card_ + 3 digitos = 9 chars
+      if (c.id && c.id.startsWith('card_') && c.id.length === 8) { // card_ + 3 digitos = 8 chars
         const suffix = c.id.replace('card_', '');
         c.id = 'card_' + suffix.padStart(4, '0');
         cardsModified = true;

@@ -2095,6 +2095,17 @@ async function migrarDatosASupabase() {
 
 window._syncPromise = null;
 
+// LIMPIEZA DE EMERGENCIA: Quitar clara_cards de la cola
+try {
+  let q = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+  const oldLen = q.length;
+  q = q.filter(item => item.table !== 'clara_cards');
+  if (q.length !== oldLen) {
+    localStorage.setItem('sapi_sync_queue', JSON.stringify(q));
+    console.log('[Sync] Se eliminaron clara_cards atascadas de la cola.');
+  }
+} catch(e) {}
+
 window.cargarDatosDeSupabase = function() {
   if (window._syncPromise) {
     return window._syncPromise;
