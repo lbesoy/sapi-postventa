@@ -368,7 +368,7 @@ function ordenToRow(o) {
     'duracion', 'duracion_minutos', 'evidenciaBase64', 'evidencia_base_64', 'evidencia_url', 'bitacora', 'maquinaria_id', 'sitio_id',
     'ref_necesarias', 'ref_utilizadas', 'firma_tecnico_base64', 'firma_tecnico_nombre', 'firma_tecnico_fecha', 
     'firma_cliente_base64', 'firma_cliente_nombre', 'firma_cliente_fecha', 'evidencias',
-    'ubicacion_sitio', 'operador', 'noches', 'alimentacion', 'traslado_costo', 'reembolso_km'
+    'ubicacion_sitio', 'operador'
   ];
   knownKeys.forEach(k => delete customData[k]);
   
@@ -422,11 +422,7 @@ function ordenToRow(o) {
     evidencia_url: o.evidenciaBase64 || null,
     evidencias: o.evidencias || {},
     ubicacion_sitio: o.ubicacion_sitio || null,
-    operador: o.operador || null,
-    noches: o.noches || null,
-    alimentacion: o.alimentacion || null,
-    traslado_costo: o.traslado_costo || null,
-    reembolso_km: o.reembolso_km || false
+    operador: o.operador || null
   };
 }
 
@@ -3464,7 +3460,6 @@ window.verDetallesSincronizacion = function() {
               <span style="font-size:0.7rem; font-weight:700; background:rgba(232,130,12,0.1); color:var(--accent,#e8820c); padding:0.2rem 0.5rem; border-radius:6px; border:1px solid rgba(232,130,12,0.2);">${item.table || 'DESCONOCIDO'}</span>
               <span style="font-size:0.7rem; font-weight:700; background:#e5e7eb; color:#4b5563; padding:0.2rem 0.5rem; border-radius:6px;">${item.action || 'UPSERT'}</span>
             </div>
-            <button class="sapi-del-queue-btn" data-index="${index}" style="background:none; border:none; color:#ef4444; font-weight:bold; cursor:pointer; font-size:1.1rem; padding:0 5px;" title="Ignorar y borrar">✕</button>
           </div>
           <div style="font-size:0.85rem; font-weight:600; word-break:break-word;">${desc}</div>
         `;
