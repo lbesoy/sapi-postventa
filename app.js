@@ -9830,6 +9830,9 @@ function verDetalle(id) {
             horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(16, 185, 129, 0.1); color:#10b981; padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="clock" style="width:12px;height:12px;"></i> ${b.entrada} - ${b.salida} (${durStr})</span>${desvHtml}`;
           } else if (b.entrada || b.salida) {
             horasHtml = `<span style="font-size:0.7rem; color:var(--text-muted);"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:middle;"></i> ${b.entrada || '--:--'} a ${b.salida || '--:--'}</span>${desvHtml}`;
+          } else if (b.horas_traslado || b.horas_regreso) {
+            const totalTraslado = (parseFloat(b.horas_traslado) || 0) + (parseFloat(b.horas_regreso) || 0);
+            horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(232, 130, 12, 0.1); color:var(--accent); padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="car" style="width:12px;height:12px;"></i> Traslado: ${totalTraslado.toFixed(1)}h</span>${desvHtml}`;
           }
 
           return `
@@ -9929,6 +9932,9 @@ function verDetalle(id) {
           }
         } else if (b.entrada || b.salida) {
           hrsStr = `${b.entrada || '--:--'} - ${b.salida || '--:--'}`;
+        } else if (b.horas_traslado || b.horas_regreso) {
+          const totalTraslado = (parseFloat(b.horas_traslado) || 0) + (parseFloat(b.horas_regreso) || 0);
+          hrsStr = `Traslado: ${totalTraslado.toFixed(1)}h`;
         }
 
         let estadoStr = b.realizado ? 'REPORTADO' : 'PROGRAMADO';
@@ -10052,7 +10058,7 @@ function verDetalle(id) {
             </div>
           </div>
           ${(!((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) && ['tecnico', 'superadmin'].includes(currentSession.viewMode)) ? `
-          <button class="btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.6rem; display:flex; align-items:center; gap:0.3rem;" onclick="abrirBitacora('${o.id}', 'Traslado de regreso desde el sitio de trabajo')">
+          <button class="btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.6rem; display:flex; align-items:center; gap:0.3rem;" onclick="abrirBitacora('${o.id}', 'Traslado de regreso desde el sitio de trabajo', true)">
             <i data-lucide="plus" style="width:12px;height:12px;"></i> Registrar Regreso
           </button>
           ` : ''}
@@ -10865,7 +10871,7 @@ function calcularRangoFechasLaboral(diasHabilAtras) {
   };
 }
 
-function abrirBitacora(id, defaultNote = '') {
+function abrirBitacora(id, defaultNote = '', isOnlyTraslado = false) {
   const o = ordenes.find(x => x.id === id);
   if (o && ((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado'))) {
     mostrarNotificacion('No se pueden registrar avances en una orden cerrada o completada.', 'error');
@@ -10880,9 +10886,31 @@ function abrirBitacora(id, defaultNote = '') {
   window.currentBitacoraEntryId = null;
   const rango = calcularRangoFechasLaboral(10);
 
-  // Restaurar título por defecto del modal
+  // Lógica para mostrar/ocultar campos si es solo traslado
   const modalTitle = document.getElementById('modal-bitacora-title');
-  if (modalTitle) modalTitle.textContent = 'Registrar Avance Diario';
+  const grupoHoras = document.getElementById('grupo-bitacora-horas');
+  const grupoTraslados = document.getElementById('grupo-bitacora-traslados');
+  const colTrasladoIda = document.getElementById('col-traslado-ida');
+  const inputEntrada = document.getElementById('bitacora-entrada');
+  const inputSalida = document.getElementById('bitacora-salida');
+
+  if (isOnlyTraslado) {
+    if (modalTitle) modalTitle.textContent = 'Registrar Traslado de Regreso';
+    if (grupoHoras) grupoHoras.style.display = 'none';
+    if (colTrasladoIda) colTrasladoIda.style.display = 'none';
+    
+    // Quitar required de entrada y salida
+    if (inputEntrada) inputEntrada.removeAttribute('required');
+    if (inputSalida) inputSalida.removeAttribute('required');
+  } else {
+    if (modalTitle) modalTitle.textContent = 'Registrar Avance Diario';
+    if (grupoHoras) grupoHoras.style.display = 'flex';
+    if (colTrasladoIda) colTrasladoIda.style.display = 'block';
+    
+    // Poner required de entrada y salida
+    if (inputEntrada) inputEntrada.setAttribute('required', 'true');
+    if (inputSalida) inputSalida.setAttribute('required', 'true');
+  }
 
   const fechaInput = document.getElementById('bitacora-fecha');
   fechaInput.value = rango.max; // pre-selecciona el último día hábil (hoy o viernes si es fin de semana)
@@ -11082,9 +11110,17 @@ function guardarNotaBitacora() {
   const horasTraslado = document.getElementById('bitacora-horas-traslado').value;
   const horasRegreso = document.getElementById('bitacora-horas-regreso').value;
   
-  if (!fecha || !nota || !entrada || !salida) {
-    mostrarNotificacion('Todos los campos son obligatorios (fecha, nota, hora de entrada y hora de salida).', 'warning');
-    return;
+  const isTraslado = document.getElementById('modal-bitacora-title')?.textContent === 'Registrar Traslado de Regreso';
+  if (isTraslado) {
+    if (!fecha || !nota) {
+      mostrarNotificacion('La fecha y la nota son obligatorias.', 'warning');
+      return;
+    }
+  } else {
+    if (!fecha || !nota || !entrada || !salida) {
+      mostrarNotificacion('Todos los campos son obligatorios (fecha, nota, hora de entrada y hora de salida).', 'warning');
+      return;
+    }
   }
 
   const isAdmin = ['superadmin', 'admin'].includes(currentSession.viewMode);

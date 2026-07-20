@@ -2845,7 +2845,7 @@
             <label>Nota / Avance del día *</label>
             <textarea id="bitacora-nota" rows="4" placeholder="Describe el trabajo realizado..." required></textarea>
           </div>
-          <div class="form-group full-width" style="margin-top:0.75rem; display:flex; gap:1rem;">
+          <div class="form-group full-width" id="grupo-bitacora-horas" style="margin-top:0.75rem; display:flex; gap:1rem;">
             <div style="flex:1;">
               <label>Hora de Entrada *</label>
               <input type="time" id="bitacora-entrada" required />
@@ -2855,12 +2855,12 @@
               <input type="time" id="bitacora-salida" required />
             </div>
           </div>
-          <div class="form-group full-width" style="margin-top:0.75rem; display:flex; gap:1rem;">
-            <div style="flex:1;">
+          <div class="form-group full-width" id="grupo-bitacora-traslados" style="margin-top:0.75rem; display:flex; gap:1rem;">
+            <div style="flex:1;" id="col-traslado-ida">
               <label>Horas Traslado (Ida)</label>
               <input type="number" id="bitacora-horas-traslado" step="0.5" min="0" placeholder="Ej. 1.5" />
             </div>
-            <div style="flex:1;">
+            <div style="flex:1;" id="col-traslado-regreso">
               <label>Horas Traslado (Regreso)</label>
               <input type="number" id="bitacora-horas-regreso" step="0.5" min="0" placeholder="Ej. 1.5" />
             </div>
