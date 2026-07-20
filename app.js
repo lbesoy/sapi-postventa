@@ -10896,18 +10896,35 @@ function abrirBitacora(id, defaultNote = '', isOnlyTraslado = false) {
 
   if (isOnlyTraslado) {
     if (modalTitle) modalTitle.textContent = 'Registrar Traslado de Regreso';
-    if (grupoHoras) grupoHoras.style.display = 'none';
-    if (colTrasladoIda) colTrasladoIda.style.display = 'none';
     
-    // Quitar required de entrada y salida
-    if (inputEntrada) inputEntrada.removeAttribute('required');
-    if (inputSalida) inputSalida.removeAttribute('required');
+    // Ocultar grupo de traslados numéricos
+    if (grupoTraslados) grupoTraslados.style.display = 'none';
+    
+    // Mostrar grupo de horas y cambiar etiquetas
+    if (grupoHoras) grupoHoras.style.display = 'flex';
+    const lblEntrada = document.getElementById('lbl-bitacora-entrada');
+    const lblSalida = document.getElementById('lbl-bitacora-salida');
+    if (lblEntrada) lblEntrada.textContent = 'Hora de Salida *';
+    if (lblSalida) lblSalida.textContent = 'Hora de Llegada *';
+    
+    // Asegurar que sean requeridos
+    if (inputEntrada) inputEntrada.setAttribute('required', 'true');
+    if (inputSalida) inputSalida.setAttribute('required', 'true');
   } else {
     if (modalTitle) modalTitle.textContent = 'Registrar Avance Diario';
+    
+    // Mostrar ambos grupos
     if (grupoHoras) grupoHoras.style.display = 'flex';
+    if (grupoTraslados) grupoTraslados.style.display = 'flex';
     if (colTrasladoIda) colTrasladoIda.style.display = 'block';
     
-    // Poner required de entrada y salida
+    // Restaurar etiquetas originales
+    const lblEntrada = document.getElementById('lbl-bitacora-entrada');
+    const lblSalida = document.getElementById('lbl-bitacora-salida');
+    if (lblEntrada) lblEntrada.textContent = 'Hora de Entrada *';
+    if (lblSalida) lblSalida.textContent = 'Hora de Salida *';
+    
+    // Asegurar que sean requeridos
     if (inputEntrada) inputEntrada.setAttribute('required', 'true');
     if (inputSalida) inputSalida.setAttribute('required', 'true');
   }
@@ -11110,17 +11127,9 @@ function guardarNotaBitacora() {
   const horasTraslado = document.getElementById('bitacora-horas-traslado').value;
   const horasRegreso = document.getElementById('bitacora-horas-regreso').value;
   
-  const isTraslado = document.getElementById('modal-bitacora-title')?.textContent === 'Registrar Traslado de Regreso';
-  if (isTraslado) {
-    if (!fecha || !nota) {
-      mostrarNotificacion('La fecha y la nota son obligatorias.', 'warning');
-      return;
-    }
-  } else {
-    if (!fecha || !nota || !entrada || !salida) {
-      mostrarNotificacion('Todos los campos son obligatorios (fecha, nota, hora de entrada y hora de salida).', 'warning');
-      return;
-    }
+  if (!fecha || !nota || !entrada || !salida) {
+    mostrarNotificacion('Todos los campos son obligatorios (fecha, nota, hora de salida y hora de llegada).', 'warning');
+    return;
   }
 
   const isAdmin = ['superadmin', 'admin'].includes(currentSession.viewMode);
