@@ -17635,6 +17635,11 @@ function renderCalendario() {
           }
         }
 
+        const isTrasladoEvent = b.tipo === 'Traslado' || (b.nota && b.nota.toLowerCase().includes('traslado'));
+        if (isTrasladoEvent && b.realizado) {
+          eventColor = '#e8820c'; // Naranja (var(--accent)) para traslados realizados
+        }
+
         let isAllDay = true;
         let startVal = dateStr;
         let endVal = null;
@@ -17656,7 +17661,7 @@ function renderCalendario() {
           startVal = `${dateStr}T${b.entrada}:00`;
         }
 
-        const tipoPrefix = b.tipo && b.tipo !== 'Servicio' ? `${b.tipo.substring(0,3)} | ` : '';
+        const tipoPrefix = isTrasladoEvent ? (b.nota && b.nota.toLowerCase().includes('regreso') ? '🚗 Regreso - ' : '🚗 Ida - ') : (b.tipo && b.tipo !== 'Servicio' ? `${b.tipo.substring(0,3)} | ` : '');
         const ev = {
           id: `bit-${b.id || Math.random()}`,
           title: `${tipoPrefix}${(b.tecnico || 'Téc').split(' ')[0]} | ${o.cliente}`,
@@ -17682,7 +17687,7 @@ function renderCalendario() {
         const toLocalISO = (d) => new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().substring(0,16)+':00';
 
         // Renderizar bloque de traslado si existe duración
-        if (b.horas_traslado) {
+        if (b.horas_traslado && !isTrasladoEvent) {
           try {
             const idaDateStr = b.fecha_inicio_traslado || dateStr;
             let startLlegada;
@@ -17736,8 +17741,8 @@ function renderCalendario() {
           } catch(e) { console.error('Error en traslado ida:', e); }
         }
 
-        // Renderizar bloque de regreso si existe duración
-        if (b.horas_regreso) {
+        // Renderizar bloque de regreso si existe duración (solo si el bloque principal no es un traslado en sí mismo)
+        if (b.horas_regreso && !isTrasladoEvent) {
           try {
             const regresoDateStr = b.fecha_fin_regreso || dateStr;
             let startRegreso;
