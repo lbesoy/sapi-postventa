@@ -10048,9 +10048,13 @@ function verDetalle(id) {
     `)}
     ${o.reembolso_km ? `
       <div style="margin-top:2rem; padding:1rem; border:1px solid var(--accent); background:rgba(232, 130, 12, 0.05); border-radius:8px; text-align:center;">
-        <span style="color:var(--accent); font-weight:bold; font-size:1.1rem;">Se está considerando Reembolso de KM para esta orden de servicio.</span>
+        <span style="color:var(--accent); font-weight:bold; font-size:1.1rem;"><i data-lucide="check-circle" style="width:20px;height:20px;vertical-align:middle;margin-right:8px;"></i>Aplica Reembolso de KM para esta Orden</span>
       </div>
-    ` : ''}
+    ` : `
+      <div style="margin-top:2rem; padding:1rem; border:1px dashed var(--border); background:var(--bg-secondary); border-radius:8px; text-align:center;">
+        <span style="color:var(--text-muted); font-size:0.95rem;"><i data-lucide="x-circle" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i>No aplica Reembolso de KM</span>
+      </div>
+    `}
   `;
 
   document.getElementById('modal-detalle-overlay').classList.add('open');
