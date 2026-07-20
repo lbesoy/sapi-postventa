@@ -30,7 +30,8 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(require('path').join(__dirname, '..')));
 
 // Configuracion de SAP B1 Service Layer
@@ -587,16 +588,51 @@ app.post('/api/extract-pdf', async (req, res) => {
                             }
                         },
                         {
-                            text: `Extract the following fields from this quotation PDF:
-1. Document Number (Número de documento / Folio / Número de cotización). It's usually a 7-digit number (e.g. 1100001).
+                            text: `Extract the following fields from this quotation/order PDF:
+1. Document Number (Número de documento / Folio / Número de cotización / Pedido). It's usually a 7-digit number (e.g. 1100001) or similar format.
 2. Total Amount (Importe TOTAL / Total / Monto / Subtotal + Impuestos). It must be a decimal number representing the final total amount, e.g. 135043.49.
 3. Client Code (CardCode, e.g. CL029) or Client Name (e.g. Concretos Delese).
+4. Items table (Artículos / Partidas / Conceptos). Extract an array of items, where each item has the main columns:
+   - "descripcion" (Descripción)
+   - "cantidad" (Cantidad)
+   - "unidad_medida" (Unidad de medida)
+   - "x_surtir" (X surtir)
+   - "almacen" (Almacen)
+   - "precio" (Precio)
+   - "impuesto_porcentaje" (Impuesto %)
+   - "total" (Total)
+
+5. Travel Details (Detalles de Viaje / Logística). If the document mentions travel logistics (like locations for toll booths/KM, lodging, or food in the items), extract them into an object.
+   - "origen": The starting location (e.g. CDMX).
+   - "destino": The destination (e.g. Cerca de Nuevo Laredo).
+   - "num_hospedaje": Number of nights/lodging mentioned (e.g. 1 if "1 Hospedaje").
+   - "num_alimento": Number of food/meals mentioned (e.g. 1 if "1 Alimentos").
+   - "num_traslado": Number of transfers/tolls mentioned (e.g. 1 if "1 Traslado").
 
 Return a JSON object matching this structure:
 {
   "numero_cotizacion": "1100001",
   "monto": 135043.49,
-  "cliente": "Concretos Delese"
+  "cliente": "Concretos Delese",
+  "detalles_viaje": {
+    "origen": "CDMX",
+    "destino": "Cerca de Nuevo Laredo",
+    "num_hospedaje": 1,
+    "num_alimento": 1,
+    "num_traslado": 1
+  },
+  "articulos": [
+    {
+      "descripcion": "FILTRO DE ACEITE MOTOR...",
+      "cantidad": 1,
+      "unidad_medida": "H87",
+      "x_surtir": 0,
+      "almacen": "ARZ",
+      "precio": 391.33,
+      "impuesto_porcentaje": 16.00,
+      "total": 391.33
+    }
+  ]
 }`
                         }
                     ]
@@ -650,11 +686,11 @@ Return a JSON object matching this structure:
             try { fs.unlinkSync(tempFile); } catch(e) {}
             
             if (error) {
-                console.error('[Extract PDF API] Error:', error, stderr);
-                return res.status(500).json({ error: 'Failed to extract PDF text' });
+                console.error('[PDF Auto-Extract] pdf_extractor failed:', error);
+                return res.status(500).json({ error: 'Fallo al extraer el texto localmente.' });
             }
-            
-            res.json({ ai: false, text: stdout });
+            console.log('[PDF Auto-Extract] pdf_extractor raw output:', stdout);
+            return res.json({ ai: false, text: stdout });
         });
     } catch (err) {
         console.error('[Extract PDF API] Critical Error:', err);

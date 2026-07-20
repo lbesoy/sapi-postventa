@@ -368,7 +368,7 @@ function ordenToRow(o) {
     'duracion', 'duracion_minutos', 'evidenciaBase64', 'evidencia_base_64', 'evidencia_url', 'bitacora', 'maquinaria_id', 'sitio_id',
     'ref_necesarias', 'ref_utilizadas', 'firma_tecnico_base64', 'firma_tecnico_nombre', 'firma_tecnico_fecha', 
     'firma_cliente_base64', 'firma_cliente_nombre', 'firma_cliente_fecha', 'evidencias',
-    'ubicacion_sitio', 'operador'
+    'ubicacion_sitio', 'operador', 'noches', 'alimentacion', 'traslado_costo', 'reembolso_km'
   ];
   knownKeys.forEach(k => delete customData[k]);
   
@@ -422,7 +422,11 @@ function ordenToRow(o) {
     evidencia_url: o.evidenciaBase64 || null,
     evidencias: o.evidencias || {},
     ubicacion_sitio: o.ubicacion_sitio || null,
-    operador: o.operador || null
+    operador: o.operador || null,
+    noches: o.noches || null,
+    alimentacion: o.alimentacion || null,
+    traslado_costo: o.traslado_costo || null,
+    reembolso_km: o.reembolso_km || false
   };
 }
 
@@ -1357,8 +1361,11 @@ async function _processSyncQueueInternal() {
                     salida: b.salida || null,
                     hora_inicio: b.hora_inicio || null,
                     horas_traslado: b.horas_traslado || null,
+                    programado_horas_traslado: b.programadoHorasTraslado || null,
                     hora_fin_regreso: b.hora_fin_regreso || null,
-                    horas_regreso: b.horas_regreso || null
+                    horas_regreso: b.horas_regreso || null,
+                    programado_horas_regreso: b.programadoHorasRegreso || null,
+                    tipo: b.tipo || 'Servicio'
                   };
                 });
                 const { error: upsertBitErr } = await sb.from('orden_bitacora').upsert(filasBitacora, { onConflict: 'id' });
@@ -2561,8 +2568,11 @@ window.cargarDatosDeSupabase = function() {
               salida: b.salida,
               hora_inicio: b.hora_inicio,
               horas_traslado: b.horas_traslado,
+              programadoHorasTraslado: b.programado_horas_traslado,
               hora_fin_regreso: b.hora_fin_regreso,
               horas_regreso: b.horas_regreso,
+              programadoHorasRegreso: b.programado_horas_regreso,
+              tipo: b.tipo || 'Servicio',
               realizado: realizado,
               programadoEntrada: programadoEntrada,
               programadoSalida: programadoSalida,

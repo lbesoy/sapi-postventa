@@ -24,16 +24,37 @@ export default async function handler(req, res) {
               }
             },
             {
-              text: `Extract the following fields from this quotation PDF:
+              text: `Extract the following fields from this quotation/order PDF:
 1. Document Number (Número de documento / Folio / Número de cotización). It's usually a 7-digit number (e.g. 1100001).
-2. Total Amount (Importe TOTAL / Total / Monto / Subtotal + Impuestos). It must be a decimal number representing the final total amount, e.g. 135043.49.
-3. Client Code (CardCode, e.g. CL029) or Client Name (e.g. Concretos Delese).
+2. Total Amount (Importe TOTAL / Total / Monto / Subtotal + Impuestos). Decimal number, e.g. 135043.49.
+3. Client Code or Name (e.g. Concretos Delese).
+4. Items (Artículos/Conceptos). Extract each item from the main table, including description, quantity, unit, pending (x surtir), warehouse (almacén), unit price, tax %, and total.
+5. Travel Details (Detalles de Viaje / Logística). Look for keywords like "Viáticos", "Hospedaje", "Alimentos", "Origen", "Destino", "Ruta", "Traslado" in the items or text and infer travel logistics. Specifically extract num_hospedaje, num_alimento, and num_traslado if present.
 
-Return a JSON object matching this structure:
+Return a JSON object matching exactly this structure:
 {
   "numero_cotizacion": "1100001",
   "monto": 135043.49,
-  "cliente": "Concretos Delese"
+  "cliente": "Concretos Delese",
+  "detalles_viaje": {
+    "origen": "CDMX",
+    "destino": "Nuevo Laredo",
+    "num_hospedaje": 1,
+    "num_alimento": 2,
+    "num_traslado": 1
+  },
+  "articulos": [
+    {
+      "descripcion": "FILTRO DE ACEITE",
+      "cantidad": 1,
+      "unidad_medida": "H87",
+      "x_surtir": 0,
+      "almacen": "ARZ",
+      "precio": 391.33,
+      "impuesto_porcentaje": 16,
+      "total": 391.33
+    }
+  ]
 }`
             }
           ]

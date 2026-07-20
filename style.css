@@ -2396,3 +2396,16 @@ body.light-mode .badge-metodo-reembolso { background: rgba(100, 116, 139, 0.08);
   color: var(--text-muted);
 }
 
+
+/* Fix for stats grid labels visibility */
+.stat-card { min-height: 90px; overflow: visible !important; }
+.stat-label { display: block !important; white-space: normal !important; }
+
+/* Fix for tickets table overlap */
+.tickets-kanban-header { margin-bottom: 1rem !important; }
+.table-wrapper { margin-top: 1.5rem !important; }
+.stat-card { min-height: 120px !important; display: flex !important; align-items: center !important; }
+#view-tickets.active { display: flex !important; flex-direction: column !important; gap: 1.5rem !important; padding-top: 4.5rem !important; }
+.tickets-kanban-header { margin: 0 !important; }
+.table-wrapper { margin: 0 !important; }
+.table-wrapper { margin-top: 2rem !important; }

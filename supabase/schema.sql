@@ -166,6 +166,13 @@ CREATE TABLE IF NOT EXISTS public.orden_bitacora (
     nota TEXT NOT NULL,
     entrada TEXT, -- Formato 'HH:MM'
     salida TEXT,  -- Formato 'HH:MM'
+    hora_inicio TEXT, -- Formato 'HH:MM' (traslado ida)
+    horas_traslado NUMERIC,
+    programado_horas_traslado NUMERIC,
+    hora_fin_regreso TEXT, -- Formato 'HH:MM' (traslado regreso)
+    horas_regreso NUMERIC,
+    programado_horas_regreso NUMERIC,
+    tipo TEXT DEFAULT 'Servicio',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

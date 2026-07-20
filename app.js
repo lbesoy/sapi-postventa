@@ -861,7 +861,7 @@ function mostrarNotificacion(mensaje, tipo = 'success') {
   const container = document.getElementById('notificaciones-container') || (() => {
     const el = document.createElement('div');
     el.id = 'notificaciones-container';
-    el.style = 'position:fixed; bottom:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:10px;';
+    el.style = 'position:fixed; bottom:20px; right:20px; z-index:999999; display:flex; flex-direction:column; gap:10px;';
     document.body.appendChild(el);
     return el;
   })();
@@ -8143,7 +8143,17 @@ function agregarRef(section) {
     <input type="number" placeholder="Cant." class="ref-cant" style="width:50px; padding: 0.45rem 0.4rem; font-size:0.8rem;" min="1" value="1"/>`;
     
   if (section === 'utilizadas') {
-    html += `<input type="number" placeholder="Precio" class="ref-precio" style="width:70px; display:none; padding: 0.45rem 0.4rem; font-size:0.8rem;" step="0.01"/>`;
+    html += `<input type="number" placeholder="Precio" class="ref-precio" style="width:70px; display:none; padding: 0.45rem 0.4rem; font-size:0.8rem;" step="0.01"/>
+      <div class="ref-foto-container" style="display:flex; align-items:center; gap:0.25rem;">
+        <input type="file" accept="image/*" class="ref-foto-input" style="display:none;" onchange="subirFotoRefaccion(this)" />
+        <input type="hidden" class="ref-foto-url" value="" />
+        <button type="button" class="btn-icon-only ref-foto-btn" onclick="this.parentElement.querySelector('.ref-foto-input').click()" style="padding: 0.45rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; color: var(--text-muted); cursor: pointer;" title="Subir foto de refacción (Obligatorio)">
+          <i data-lucide="camera" style="width:16px;height:16px;"></i>
+        </button>
+        <div class="ref-foto-preview" style="display:none; color: #10b981; align-items:center; cursor:pointer;" title="Ver foto" onclick="previsualizarImagenCompleta(this.parentElement.querySelector('.ref-foto-url').value, 'Foto de Refacción')">
+          <i data-lucide="check-circle" style="width:18px;height:18px;"></i>
+        </div>
+      </div>`;
   }
   
   html += `<button type="button" class="btn-del-ref" onclick="eliminarRef(this)">✕</button>`;
@@ -8198,7 +8208,10 @@ function getRefacciones(section) {
       clave: row.querySelector('.ref-clave')?.value?.trim(),
       cantidad: row.querySelector('.ref-cant')?.value,
     };
-    if (section === 'utilizadas') item.precio = row.querySelector('.ref-precio')?.value;
+    if (section === 'utilizadas') {
+      item.precio = row.querySelector('.ref-precio')?.value;
+      item.fotoUrl = row.querySelector('.ref-foto-url')?.value || '';
+    }
     result.push(item);
   });
   return result;
@@ -8262,7 +8275,31 @@ function setRefacciones(section, items) {
     
     if (item.clave) row.querySelector('.ref-clave').value = item.clave;
     if (item.cantidad) row.querySelector('.ref-cant').value = item.cantidad;
-    if (section === 'utilizadas' && item.precio) row.querySelector('.ref-precio').value = item.precio;
+    if (section === 'utilizadas') {
+      if (item.precio) row.querySelector('.ref-precio').value = item.precio;
+      if (item.fotoUrl) {
+        row.querySelector('.ref-foto-url').value = item.fotoUrl;
+        row.querySelector('.ref-foto-btn').style.display = 'none';
+        row.querySelector('.ref-foto-preview').style.display = 'flex';
+      }
+    }
+    
+    if (item.isFromPdf) {
+      const delBtn = row.querySelector('.btn-del-ref');
+      if (delBtn) delBtn.style.display = 'none';
+      
+      // Bloquear edición
+      row.querySelector('.ref-clave')?.setAttribute('readonly', 'true');
+      row.querySelector('.ref-cant')?.setAttribute('readonly', 'true');
+      const combos = row.querySelectorAll('.combo-box');
+      combos.forEach(c => {
+        c.style.pointerEvents = 'none';
+        c.style.opacity = '0.7';
+      });
+      
+      // Add a small tooltip or indicator
+      row.setAttribute('title', 'Refacción extraída de PDF AI (No se puede eliminar ni editar)');
+    }
   });
 }
 
@@ -8429,6 +8466,10 @@ function abrirFormulario(id, modoReporte = false) {
       'modelo','serie','soporte','km-ida','km-vuelta','km-total',
       'falla','trabajos','dictamen','condiciones','observaciones','pendientes',
       'noches','alimentacion','traslado-costo'];
+    
+    // Checkbox especial
+    const elReembolso = document.getElementById('f-reembolso-km');
+    if (elReembolso) elReembolso.checked = !!o.reembolso_km;
     fields.forEach(f => {
       const el = document.getElementById('f-' + f);
       if (el && o[f.replace(/-/g,'_')] !== undefined) el.value = o[f.replace(/-/g,'_')];
@@ -8596,6 +8637,61 @@ function abrirFormulario(id, modoReporte = false) {
     if (existingBanner) existingBanner.remove();
   }
 
+  // ===== Lógica de Autollenado de "Fecha de Servicio" desde PDF Extraído =====
+  if (window.supabaseClient && soporteActual) {
+    const elNoches = document.getElementById('f-noches');
+    const elAlimento = document.getElementById('f-alimentacion');
+
+    const nocVal = elNoches ? elNoches.value : '';
+    const isNewOrEmpty = (!id || nocVal === '' || nocVal === '0');
+    console.log('[Auto-fill PDF] Evaluando ticket_id:', soporteActual, 'isNewOrEmpty:', isNewOrEmpty);
+    
+    if (isNewOrEmpty) {
+      window.supabaseClient
+        .from('pdf_extracciones_ai')
+        .select('extras, conceptos')
+        .eq('ticket_id', soporteActual)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .then(({ data, error }) => {
+          if (!error && data && data.length > 0) {
+            const ext = data[0].extras || [];
+            const viajeData = ext.find(x => x.isViajeData);
+            console.log('[Auto-fill PDF] Datos de logística encontrados:', viajeData);
+            if (viajeData) {
+              if (elNoches && (elNoches.value === '' || elNoches.value === '0')) {
+                 elNoches.value = viajeData.num_hospedaje || 0;
+                 console.log('[Auto-fill PDF] Llenado f-noches con:', viajeData.num_hospedaje);
+              }
+              if (elAlimento && (elAlimento.value === '' || elAlimento.value === '0')) {
+                 elAlimento.value = viajeData.num_alimento || 0;
+                 console.log('[Auto-fill PDF] Llenado f-alimentacion con:', viajeData.num_alimento);
+              }
+              const elTraslado = document.getElementById('f-traslado-costo');
+              if (elTraslado && (elTraslado.value === '' || elTraslado.value === '0')) {
+                 elTraslado.value = viajeData.num_traslado || 0;
+                 console.log('[Auto-fill PDF] Llenado f-traslado-costo con:', viajeData.num_traslado);
+              }
+            }
+            
+            // Auto-check Reembolso KM
+            const elReembolso = document.getElementById('f-reembolso-km');
+            if (elReembolso) {
+              const allItems = [...ext, ...(data[0].conceptos || [])];
+              const hasReembolso = allItems.some(x => !x.isViajeData && x.descripcion && x.descripcion.toLowerCase().includes('reembolso') && x.descripcion.toLowerCase().includes('km'));
+              if (hasReembolso) {
+                elReembolso.checked = true;
+                console.log('[Auto-fill PDF] Reembolso KM detectado y marcado.');
+              }
+            }
+          } else {
+             console.log('[Auto-fill PDF] No se encontró extracción en BD o hubo error', error);
+          }
+        })
+        .catch(err => console.warn('[Auto-fill PDF] Error:', err));
+    }
+  }
+
   document.getElementById('modal-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -8756,11 +8852,21 @@ function guardarOrden(e) {
     noches: document.getElementById('f-noches').value,
     alimentacion: document.getElementById('f-alimentacion').value,
     traslado_costo: document.getElementById('f-traslado-costo').value,
+    reembolso_km: document.getElementById('f-reembolso-km') ? document.getElementById('f-reembolso-km').checked : false,
     dias: getDiasData(),
     esPrueba: oVieja ? (oVieja.esPrueba || false) : isTestModeActive(),
     evidencias: oVieja ? (oVieja.evidencias || { fotoInicio: null, fotoFin: null, adicionales: [] }) : { fotoInicio: null, fotoFin: null, adicionales: [] }
   };
   
+  // VALIDACIÓN: Refacciones utilizadas obligatorias con foto
+  const refSinFoto = orden.ref_utilizadas.find(ref => !ref.fotoUrl && ref.descripcion);
+  if (refSinFoto) {
+    if (window.mostrarNotificacion) {
+      window.mostrarNotificacion(`Es obligatorio subir la fotografía para la refacción: ${refSinFoto.descripcion}`, 'error');
+    }
+    return;
+  }
+
   if (oVieja) {
     orden.bitacora = oVieja.bitacora;
     orden.firma_tecnico_base64 = oVieja.firma_tecnico_base64;
@@ -9069,7 +9175,7 @@ window.subirEvidenciaFoto = async function(ordenId, tipo, inputEl) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
 
-  if (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__') || (!(!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') && o.firma_tecnico_base64 !== '__DELETED__')) {
+  if ((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) {
     mostrarNotificacion('No se pueden modificar evidencias en una orden cerrada o firmada.', 'error');
     return;
   }
@@ -9220,11 +9326,121 @@ window.subirEvidenciaFoto = async function(ordenId, tipo, inputEl) {
   }
 };
 
+window.subirFotoRefaccion = async function(inputEl) {
+  const file = inputEl.files[0];
+  if (!file) return;
+
+  const container = inputEl.parentElement;
+  const btn = container.querySelector('.ref-foto-btn');
+  const preview = container.querySelector('.ref-foto-preview');
+  const urlHidden = container.querySelector('.ref-foto-url');
+
+  if (window.mostrarNotificacion) {
+    window.mostrarNotificacion('Comprimiendo y preparando imagen...', 'info');
+  }
+
+  const compressImage = (imageFile) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = (e) => reject(e);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onerror = (e) => reject(e);
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            const MAX_WIDTH = 1200;
+            if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            if (canvas.toBlob) {
+              canvas.toBlob((blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error("La compresión falló"));
+              }, 'image/jpeg', 0.85);
+            } else {
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+              const arr = dataUrl.split(','), mime = arr[0].match(/:(.*?);/)[1];
+              const bstr = atob(arr[1]);
+              let n = bstr.length;
+              const u8arr = new Uint8Array(n);
+              while(n--) { u8arr[n] = bstr.charCodeAt(n); }
+              resolve(new Blob([u8arr], {type:mime}));
+            }
+          } catch (err) { reject(err); }
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(imageFile);
+    });
+  };
+
+  const blobToBase64 = (blob) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  try {
+    const compressedBlob = await compressImage(file);
+    let publicUrl = null;
+    let savedOffline = false;
+
+    if (!navigator.onLine || !window.supabaseClient) {
+      publicUrl = await blobToBase64(compressedBlob);
+      savedOffline = true;
+    } else {
+      try {
+        if (window.mostrarNotificacion) window.mostrarNotificacion('Subiendo a la nube...', 'info');
+        const uniqueName = `refaccion_${Date.now()}_${Math.random().toString(36).substring(2,7)}.jpg`;
+        // Put in a general 'refacciones' path inside evidencias
+        const filePath = `refacciones/${uniqueName}`;
+        
+        const { data: uploadData, error: uploadErr } = await window.supabaseClient.storage
+          .from('evidencias')
+          .upload(filePath, compressedBlob, { cacheControl: '3600', upsert: true });
+
+        if (uploadErr) throw uploadErr;
+
+        const { data: urlData } = window.supabaseClient.storage
+          .from('evidencias')
+          .getPublicUrl(filePath);
+
+        publicUrl = urlData.publicUrl;
+      } catch (err) {
+        console.warn("Fallo subida directa:", err);
+        publicUrl = await blobToBase64(compressedBlob);
+        savedOffline = true;
+      }
+    }
+
+    urlHidden.value = publicUrl;
+    btn.style.display = 'none';
+    preview.style.display = 'flex';
+    
+    if (window.mostrarNotificacion) {
+      window.mostrarNotificacion(savedOffline ? 'Guardado localmente' : 'Foto de refacción lista', 'success');
+    }
+  } catch (err) {
+    console.error("Error al procesar foto de refacción:", err);
+    alert("Ocurrió un error al procesar la fotografía.");
+  }
+};
+
 window.eliminarEvidenciaFoto = async function(ordenId, tipo, url) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o || !o.evidencias) return;
 
-  if (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__') || (!(!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') && o.firma_tecnico_base64 !== '__DELETED__')) {
+  if ((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) {
     mostrarNotificacion('No se pueden modificar evidencias en una orden cerrada o firmada.', 'error');
     return;
   }
@@ -9305,7 +9521,7 @@ function verDetalle(id) {
 
   const renderBitacora = (o) => {
     let html = '';
-    const isClosed = (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__') || (!(!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') && o.firma_tecnico_base64 !== '__DELETED__'));
+    const isClosed = ((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado'));
     const isTecnico = currentSession.viewMode === 'tecnico';
     const currentUser = usuarios.find(u => u.id === currentSession.userId);
     const miTecnicoNombre = currentUser ? currentUser.nombre : '';
@@ -9830,6 +10046,11 @@ function verDetalle(id) {
         
       </div>
     `)}
+    ${o.reembolso_km ? `
+      <div style="margin-top:2rem; padding:1rem; border:1px solid var(--accent); background:rgba(232, 130, 12, 0.05); border-radius:8px; text-align:center;">
+        <span style="color:var(--accent); font-weight:bold; font-size:1.1rem;">Se está considerando Reembolso de KM para esta orden de servicio.</span>
+      </div>
+    ` : ''}
   `;
 
   document.getElementById('modal-detalle-overlay').classList.add('open');
@@ -10162,6 +10383,7 @@ function horaAMinutos(hora) {
 window.calcularLlegadaTraslados = function() {
   const formatTime = (totalMin) => {
     let h = Math.floor(totalMin / 60) % 24;
+    if (h < 0) h += 24;
     const m = Math.floor(totalMin % 60);
     const ampm = h >= 12 ? 'p.m.' : 'a.m.';
     h = h % 12;
@@ -10169,28 +10391,127 @@ window.calcularLlegadaTraslados = function() {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')} ${ampm}`;
   };
 
+  const toMin = (totalMin) => {
+    let h = Math.floor(totalMin / 60) % 24;
+    if (h < 0) h += 24;
+    const m = Math.floor(totalMin % 60);
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  };
+
   // Ida
-  const horaInicio = document.getElementById('pt-hora-inicio').value;
+  const elHoraInicio = document.getElementById('pt-hora-inicio');
+  const horaInicio = elHoraInicio.value;
   const horasTraslado = parseFloat(document.getElementById('pt-horas-traslado').value);
   const refIda = document.getElementById('pt-ref-llegada-ida');
-  if (horaInicio && !isNaN(horasTraslado) && refIda) {
-    const min = horaAMinutos(horaInicio) + (horasTraslado * 60);
-    refIda.innerHTML = `<i data-lucide="clock" style="width:10px; height:10px; margin-right:2px; vertical-align:middle;"></i> Llegada estimada: <strong>${formatTime(min)}</strong>`;
+  const horaEntradaServicio = document.getElementById('pt-entrada').value;
+
+  // Removed auto-fill per user request
+
+  const horaInicioFinal = elHoraInicio.value;
+  const fechaInicioTraslado = document.getElementById('pt-fecha-inicio-traslado').value;
+  const fechaServicio = document.getElementById('pt-fecha').value;
+
+  let isIdaInvalid = false;
+  let isRegresoInvalid = false;
+
+  if (refIda) {
+    let html = '';
+
+    // 1. Validar que el inicio no sea después de la entrada
+    if (horaEntradaServicio && fechaServicio && (fechaInicioTraslado || horaInicioFinal)) {
+       const dEntrada = new Date(`${fechaServicio}T${horaEntradaServicio}`);
+       const dInicioTraslado = new Date(`${fechaInicioTraslado || fechaServicio}T${horaInicioFinal || '00:00'}`);
+       
+       if (dInicioTraslado > dEntrada) {
+         html = `<span style="color:var(--red);"><i data-lucide="alert-triangle" style="width:10px; height:10px; margin-right:2px; vertical-align:middle;"></i> El traslado inicia después del servicio</span>`;
+         isIdaInvalid = true;
+         
+         if (!window._idaAlertaPop) {
+           window._idaAlertaPop = true;
+           mostrarNotificacion("Error: El traslado de ida no puede iniciar después de que comience el servicio.", "error");
+           setTimeout(() => { window._idaAlertaPop = false; }, 3000);
+         }
+       }
+    }
+
+    // 2. Si es válido y hay horas, calcular llegada
+    if (!isIdaInvalid && horaInicioFinal && !isNaN(horasTraslado)) {
+      const min = horaAMinutos(horaInicioFinal) + (horasTraslado * 60);
+      
+      if (horaEntradaServicio && fechaServicio) {
+         const dEntrada = new Date(`${fechaServicio}T${horaEntradaServicio}`);
+         const dLlegada = new Date(`${fechaInicioTraslado || fechaServicio}T00:00`);
+         dLlegada.setMinutes(dLlegada.getMinutes() + min);
+  
+         if (dLlegada > dEntrada) {
+           html = `<span style="color:var(--red);"><i data-lucide="alert-triangle" style="width:10px; height:10px; margin-right:2px; vertical-align:middle;"></i> Llega a las ${formatTime(min)} (Después de la entrada)</span>`;
+           isIdaInvalid = true;
+         } else {
+           html = `<span style="color:var(--green);"><i data-lucide="check-circle" style="width:10px; height:10px; margin-right:2px; vertical-align:middle;"></i> Llega a tiempo: <strong>${formatTime(min)}</strong></span>`;
+         }
+      } else {
+         html = `<i data-lucide="clock" style="width:10px; height:10px; margin-right:2px; vertical-align:middle;"></i> Llegada estimada: <strong>${formatTime(min)}</strong>`;
+      }
+    }
+
+    refIda.innerHTML = html;
     if (window.lucide) lucide.createIcons({root: refIda.parentElement});
-  } else if (refIda) {
-    refIda.textContent = '';
   }
 
   // Regreso
-  const horaSalida = document.getElementById('pt-salida').value;
+  const elHoraFinRegreso = document.getElementById('pt-hora-fin-regreso');
+  const horaFinRegreso = elHoraFinRegreso.value;
+  const horaSalidaServicio = document.getElementById('pt-salida').value;
   const horasRegreso = parseFloat(document.getElementById('pt-horas-regreso').value);
   const refRegreso = document.getElementById('pt-ref-llegada-regreso');
-  if (horaSalida && !isNaN(horasRegreso) && refRegreso) {
-    const min = horaAMinutos(horaSalida) + (horasRegreso * 60);
-    refRegreso.innerHTML = `<i data-lucide="clock" style="width:10px; height:10px; margin-right:2px; vertical-align:middle;"></i> Llegada estimada: <strong>${formatTime(min)}</strong>`;
+
+  // Removed auto-fill per user request
+
+  const horaFinRegresoFinal = elHoraFinRegreso.value;
+  const fechaFinRegresoDate = document.getElementById('pt-fecha-fin-regreso-date').value;
+
+  if (refRegreso) {
+    let html = '';
+
+    // 1. Validar que el regreso no inicie antes de la salida
+    if (horaSalidaServicio && fechaServicio && (fechaFinRegresoDate || horaFinRegresoFinal)) {
+       const dSalida = new Date(`${fechaServicio}T${horaSalidaServicio}`);
+       const dInicioRegreso = new Date(`${fechaFinRegresoDate || fechaServicio}T${horaFinRegresoFinal || '23:59'}`);
+       
+       if (dInicioRegreso < dSalida) {
+         html = `<span style="color:var(--red);"><i data-lucide="alert-triangle" style="width:10px; height:10px; margin-right:2px; vertical-align:middle;"></i> Inicia antes de terminar el servicio</span>`;
+         isRegresoInvalid = true;
+
+         if (!window._regresoAlertaPop) {
+           window._regresoAlertaPop = true;
+           mostrarNotificacion("Error: El traslado de regreso no puede iniciar antes de terminar el servicio.", "error");
+           setTimeout(() => { window._regresoAlertaPop = false; }, 3000);
+         }
+       }
+    }
+
+    // 2. Si es válido y hay horas, calcular llegada
+    if (!isRegresoInvalid && horaFinRegresoFinal && !isNaN(horasRegreso)) {
+      const min = horaAMinutos(horaFinRegresoFinal) + (horasRegreso * 60);
+      html = `<span style="color:var(--text-muted);"><i data-lucide="clock" style="width:10px; height:10px; margin-right:2px; vertical-align:middle;"></i> Llegada estimada: <strong>${formatTime(min)}</strong></span>`;
+    }
+
+    refRegreso.innerHTML = html;
     if (window.lucide) lucide.createIcons({root: refRegreso.parentElement});
-  } else if (refRegreso) {
-    refRegreso.textContent = '';
+  }
+
+  // Activar/desactivar botón Programar basado en validez
+  const btnProgramar = document.getElementById('btn-guardar-programacion');
+  if (btnProgramar) {
+    if (isIdaInvalid || isRegresoInvalid) {
+      btnProgramar.disabled = true;
+      btnProgramar.style.opacity = '0.5';
+      btnProgramar.style.cursor = 'not-allowed';
+    } else {
+      btnProgramar.disabled = false;
+      btnProgramar.style.opacity = '1';
+      btnProgramar.style.cursor = 'pointer';
+    }
   }
 };
 
@@ -10267,14 +10588,33 @@ async function guardarProgramacionTecnico() {
     return;
   }
 
-  if (horaInicio && horasTraslado && entrada) {
-    const dEntrada = new Date(`${fecha}T${entrada}`);
-    const minLlegada = horaAMinutos(horaInicio) + (parseFloat(horasTraslado) * 60);
-    const dLlegada = new Date(`${fechaInicioTraslado || fecha}T00:00`);
-    dLlegada.setMinutes(dLlegada.getMinutes() + minLlegada);
+  if (fechaInicioTraslado || horaInicio || horasTraslado) {
+    const dEntrada = new Date(`${fecha}T${entrada || '23:59'}`);
+    const dInicioTraslado = new Date(`${fechaInicioTraslado || fecha}T${horaInicio || '00:00'}`);
+    
+    if (dInicioTraslado > dEntrada) {
+      mostrarNotificacion("El inicio del traslado de ida no puede ser después de que comience el servicio.", "error");
+      return;
+    }
 
-    if (dEntrada < dLlegada) {
-      alert("No se puede empezar el servicio antes de la llegada estimada del traslado de ida.");
+    if (horaInicio && horasTraslado && entrada) {
+      const minLlegada = horaAMinutos(horaInicio) + (parseFloat(horasTraslado) * 60);
+      const dLlegada = new Date(`${fechaInicioTraslado || fecha}T00:00`);
+      dLlegada.setMinutes(dLlegada.getMinutes() + minLlegada);
+
+      if (dEntrada < dLlegada) {
+        mostrarNotificacion("No se puede empezar el servicio antes de la llegada estimada del traslado de ida.", "error");
+        return;
+      }
+    }
+  }
+
+  if (fechaFinRegresoDate || horaFinRegreso || horasRegreso) {
+    const dSalida = new Date(`${fecha}T${salida || '00:00'}`);
+    const dInicioRegreso = new Date(`${fechaFinRegresoDate || fecha}T${horaFinRegreso || '23:59'}`);
+    
+    if (dInicioRegreso < dSalida) {
+      mostrarNotificacion("No se puede iniciar el traslado de regreso antes de terminar el servicio.", "error");
       return;
     }
   }
@@ -10418,7 +10758,7 @@ function calcularRangoFechasLaboral(diasHabilAtras) {
 
 function abrirBitacora(id) {
   const o = ordenes.find(x => x.id === id);
-  if (o && (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__') || (!(!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') && o.firma_tecnico_base64 !== '__DELETED__'))) {
+  if (o && ((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado'))) {
     mostrarNotificacion('No se pueden registrar avances en una orden cerrada o completada.', 'error');
     return;
   }
@@ -10443,13 +10783,15 @@ function abrirBitacora(id) {
   document.getElementById('bitacora-nota').value = '';
   document.getElementById('bitacora-entrada').value = '';
   document.getElementById('bitacora-salida').value = '';
+  document.getElementById('bitacora-horas-traslado').value = '';
+  document.getElementById('bitacora-horas-regreso').value = '';
   document.getElementById('modal-bitacora-overlay').classList.add('open');
 }
 
 function iniciarReporteDesdeAsignacion(ordenId, bitacoraId) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
-  if (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__') || (!(!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') && o.firma_tecnico_base64 !== '__DELETED__')) {
+  if ((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) {
     mostrarNotificacion('No se pueden registrar avances en una orden cerrada o completada.', 'error');
     return;
   }
@@ -10482,6 +10824,8 @@ function iniciarReporteDesdeAsignacion(ordenId, bitacoraId) {
   document.getElementById('bitacora-nota').value = '';
   document.getElementById('bitacora-entrada').value = b.entrada || '';
   document.getElementById('bitacora-salida').value = b.salida || '';
+  document.getElementById('bitacora-horas-traslado').value = b.horas_traslado || '';
+  document.getElementById('bitacora-horas-regreso').value = b.horas_regreso || '';
   
   document.getElementById('modal-bitacora-overlay').classList.add('open');
 }
@@ -10490,7 +10834,7 @@ window.iniciarReporteDesdeAsignacion = iniciarReporteDesdeAsignacion;
 function editarBitacora(ordenId, bitacoraId) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
-  if (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__') || (!(!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') && o.firma_tecnico_base64 !== '__DELETED__')) {
+  if ((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) {
     mostrarNotificacion('No se pueden editar avances en una orden cerrada o completada.', 'error');
     return;
   }
@@ -10516,6 +10860,8 @@ function editarBitacora(ordenId, bitacoraId) {
   document.getElementById('bitacora-nota').value = b.nota || '';
   document.getElementById('bitacora-entrada').value = b.entrada || '';
   document.getElementById('bitacora-salida').value = b.salida || '';
+  document.getElementById('bitacora-horas-traslado').value = b.horas_traslado || '';
+  document.getElementById('bitacora-horas-regreso').value = b.horas_regreso || '';
   document.getElementById('modal-bitacora-overlay').classList.add('open');
 }
 
@@ -10614,6 +10960,8 @@ function guardarNotaBitacora() {
   const nota = document.getElementById('bitacora-nota').value.trim();
   const entrada = document.getElementById('bitacora-entrada').value;
   const salida = document.getElementById('bitacora-salida').value;
+  const horasTraslado = document.getElementById('bitacora-horas-traslado').value;
+  const horasRegreso = document.getElementById('bitacora-horas-regreso').value;
   
   if (!fecha || !nota || !entrada || !salida) {
     mostrarNotificacion('Todos los campos son obligatorios (fecha, nota, hora de entrada y hora de salida).', 'warning');
@@ -10699,6 +11047,8 @@ function guardarNotaBitacora() {
       o.bitacora[bIndex].nota = nota;
       o.bitacora[bIndex].entrada = entrada;
       o.bitacora[bIndex].salida = salida;
+      o.bitacora[bIndex].horas_traslado = horasTraslado ? parseFloat(horasTraslado) : null;
+      o.bitacora[bIndex].horas_regreso = horasRegreso ? parseFloat(horasRegreso) : null;
       o.bitacora[bIndex].realizado = true;
       actualizarEventoCalendarioDesdeBitacora(o, o.bitacora[bIndex]);
     }
@@ -10707,10 +11057,12 @@ function guardarNotaBitacora() {
     let progEntrada = '';
     let progSalida = '';
     let desviacionStr = null;
+    let bObjRef = null;
 
     if (esAsignacionPendiente) {
       const bObj = o.bitacora.find(x => x.id === window.currentBitacoraEntryId);
       if (bObj) {
+        bObjRef = bObj;
         progEntrada = bObj.entrada || '';
         progSalida = bObj.salida || '';
         
@@ -10754,7 +11106,16 @@ function guardarNotaBitacora() {
       realizado: true,
       programadoEntrada: progEntrada || null,
       programadoSalida: progSalida || null,
-      desviacion: desviacionStr || null
+      desviacion: desviacionStr || null,
+      programadoHorasTraslado: bObjRef ? bObjRef.horas_traslado : null,
+      programadoHorasRegreso: bObjRef ? bObjRef.horas_regreso : null,
+      fecha_inicio_traslado: bObjRef ? bObjRef.fecha_inicio_traslado : null,
+      hora_inicio: bObjRef ? bObjRef.hora_inicio : null,
+      fecha_fin_regreso: bObjRef ? bObjRef.fecha_fin_regreso : null,
+      hora_fin_regreso: bObjRef ? bObjRef.hora_fin_regreso : null,
+      horas_traslado: horasTraslado ? parseFloat(horasTraslado) : (bObjRef ? bObjRef.horas_traslado : null),
+      horas_regreso: horasRegreso ? parseFloat(horasRegreso) : (bObjRef ? bObjRef.horas_regreso : null),
+      tipo: bObjRef ? bObjRef.tipo : 'Servicio'
     };
     o.bitacora.push(nuevaEntrada);
     actualizarEventoCalendarioDesdeBitacora(o, nuevaEntrada);
@@ -13244,6 +13605,30 @@ window.autoExtraerDesdePdfPedido = async function(file, isModal = true, ticketId
   
   mostrarNotificacion('Analizando PDF de pedido...', 'info');
   
+  const tableContainerId = isModal ? 'pdf-pedido-extraction-table-container' : `quick-pdf-pedido-extraction-table-container-${ticketId}`;
+  const tableContainer = document.getElementById(tableContainerId);
+  if (tableContainer) {
+    tableContainer.style.display = 'block';
+    tableContainer.innerHTML = `
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:3rem; text-align:center; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; margin-top:1rem;">
+        <img src="logo_transparent.png" onerror="this.src='https://cdn-icons-png.flaticon.com/512/2885/2885417.png'" style="width:70px; height:70px; object-fit:contain; animation: pulse-opacity-pdf 1.5s ease-in-out infinite;" alt="Loading..." />
+        <div style="margin-top:1.5rem; color:var(--text-primary); font-weight:600; font-size:0.95rem;">
+          Analizando Documento...
+        </div>
+        <div style="margin-top:0.5rem; color:var(--text-muted); font-size:0.8rem;">
+          La Inteligencia Artificial está leyendo las partidas del pedido
+        </div>
+        <style>
+          @keyframes pulse-opacity-pdf {
+            0% { opacity: 0.3; transform: scale(0.9); }
+            50% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0.3; transform: scale(0.9); }
+          }
+        </style>
+      </div>
+    `;
+  }
+  
   try {
     const base64 = await new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -13258,6 +13643,10 @@ window.autoExtraerDesdePdfPedido = async function(file, isModal = true, ticketId
     let isSapMatch = false;
     let cleanText = '';
     let isFileNameMatch = false;
+    let extractedArticulos = [];
+    let detallesViaje = null;
+    let mainArticulos = [];
+    let extrasArticulos = [];
 
     if (file.name) {
       const fnMatch = file.name.match(/\b([123]10[0-9]{4})\b/) || file.name.match(/\b([0-9]{5,8})\b/);
@@ -13278,32 +13667,43 @@ window.autoExtraerDesdePdfPedido = async function(file, isModal = true, ticketId
       }
     }
 
-    if (!isFileNameMatch) {
+    // Call the extraction API in all cases so we can extract the articulos (conceptos)
+    let isAiExtracted = false;
+    try {
+      const response = await fetch('/api/extract-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64Data: base64 })
+      });
+      if (response.ok) {
+        const result = await response.json();
+        if (result.ai && result.data) {
+          isAiExtracted = true;
+          // If we already have doc/monto from SAP filename match, keep them, otherwise use AI data
+          extractedDoc = extractedDoc || result.data.numero_cotizacion || result.data.numero_pedido || null;
+          extractedMonto = extractedMonto || result.data.monto || null;
+          detectedClientName = detectedClientName || result.data.cliente || null;
+          detallesViaje = result.data.detalles_viaje || null;
+          extractedArticulos = result.data.articulos || [];
+          console.log('[PDF Auto-Extract Pedido] AI Extracted Data:', result.data);
+        } else if (result.text) {
+          cleanText = result.text.replace(/\s+/g, ' ').trim();
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[PDF Auto-Extract Pedido] Local backend extraction failed:', apiErr);
+    }
+
+    if (!cleanText && !isAiExtracted) {
       try {
-        const response = await fetch('/api/extract-pdf', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ base64Data: base64 })
-        });
-        if (response.ok) {
-          const result = await response.json();
-          if (result.text) {
-            cleanText = result.text.replace(/\s+/g, ' ').trim();
-          }
-        }
-      } catch (apiErr) {
-        console.warn('[PDF Auto-Extract Pedido] Local backend extraction failed:', apiErr);
+        const text = await window.extraerTextoPdf(base64);
+        cleanText = text.replace(/\s+/g, ' ').trim();
+      } catch (pdfjsErr) {
+        console.error('[PDF Auto-Extract Pedido] Browser PDF.js failed:', pdfjsErr);
       }
+    }
 
-      if (!cleanText) {
-        try {
-          const text = await window.extraerTextoPdf(base64);
-          cleanText = text.replace(/\s+/g, ' ').trim();
-        } catch (pdfjsErr) {
-          console.error('[PDF Auto-Extract Pedido] Browser PDF.js failed:', pdfjsErr);
-        }
-      }
-
+      console.log('[PDF Auto-Extract Pedido] cleanText raw content:', cleanText);
       console.log('[PDF Auto-Extract Pedido] Parsing text...');
       let detectedOrder = null;
       const orders = window._cachePedidosSap || [];
@@ -13335,27 +13735,62 @@ window.autoExtraerDesdePdfPedido = async function(file, isModal = true, ticketId
           }
         }
         if (maxMonto > 0) {
-          extractedMonto = maxMonto;
+          extractedMonto = extractedMonto || maxMonto;
+        }
+
+        // Fallback para extraer articulos si no usamos la API de AI (Gemini)
+        if (!extractedArticulos || extractedArticulos.length === 0) {
+          const itemRegex = /\b(\d{3})\s+(.*?)\s+(\d+(?:\.\d+)?)\s+([A-Za-z0-9]{1,5})\s+(\d+(?:\.\d+)?)\s+([A-Za-z0-9]{1,5})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\b/g;
+          let itemMatch;
+          while ((itemMatch = itemRegex.exec(cleanText)) !== null) {
+            extractedArticulos.push({
+              descripcion: itemMatch[2].trim(),
+              cantidad: parseFloat(itemMatch[3]),
+              unidad_medida: itemMatch[4],
+              x_surtir: parseFloat(itemMatch[5]),
+              almacen: itemMatch[6],
+              precio: parseFloat(itemMatch[7].replace(/,/g, '')),
+              impuesto_porcentaje: parseFloat(itemMatch[8].replace(/,/g, '')),
+              total: parseFloat(itemMatch[9].replace(/,/g, ''))
+            });
+          }
+          if (extractedArticulos.length > 0) {
+            console.log('[PDF Auto-Extract Pedido] Extraídos articulos con Regex fallback:', extractedArticulos);
+          }
         }
       }
-    }
 
     if (extractedDoc && !isSapMatch) {
       const matchInCache = (window._cachePedidosSap || []).find(o => o.numero_pedido === extractedDoc);
       if (matchInCache) {
         isSapMatch = true;
         extractedMonto = matchInCache.monto;
-        detectedClientName = matchInCache.cliente_nombre;
+        detectedClientName = detectedClientName || matchInCache.cliente_nombre;
       }
+    }
+
+    const extraKeywords = ['consumibles', 'asistencia', 'casetas', 'viaticos', 'viáticos', 'reembolso', 'km'];
+    if (extractedArticulos && extractedArticulos.length > 0) {
+      extractedArticulos.forEach(art => {
+        const desc = (art.descripcion || '').toLowerCase();
+        if (extraKeywords.some(kw => desc.includes(kw))) {
+          extrasArticulos.push(art);
+        } else {
+          mainArticulos.push(art);
+        }
+      });
     }
 
     window._lastPdfPedidoExtracted = {
       doc: extractedDoc,
       monto: extractedMonto,
       cliente: detectedClientName,
+      detallesViaje: detallesViaje,
       isFileNameMatch: isFileNameMatch,
       isSapMatch: isSapMatch,
-      cleanText: cleanText
+      cleanText: cleanText,
+      articulos: extractedArticulos,
+      mainArticulos: mainArticulos
     };
 
     if (isFileNameMatch) {
@@ -13369,14 +13804,63 @@ window.autoExtraerDesdePdfPedido = async function(file, isModal = true, ticketId
 
     const tableContainerId = isModal ? 'pdf-pedido-extraction-table-container' : `quick-pdf-pedido-extraction-table-container-${ticketId}`;
     const tableContainer = document.getElementById(tableContainerId);
-    if (tableContainer) {
+      if (tableContainer) {
+
+      let articulosHtml = '';
+      
+      // Helper function to generate table
+      const generateTable = (title, icon, items) => {
+        return `
+          <div style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+            <div style="font-weight:600; color:var(--text-secondary); margin-bottom: 0.5rem;">${icon} ${title} (${items.length})</div>
+            <div style="overflow-x:auto;">
+              <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.75rem;">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--border); color:var(--text-muted); white-space:nowrap;">
+                    <th style="padding:4px;">Descripción</th>
+                    <th style="padding:4px; text-align:center;">Cant</th>
+                    <th style="padding:4px; text-align:center;">UM</th>
+                    <th style="padding:4px; text-align:center;">X Surtir</th>
+                    <th style="padding:4px; text-align:center;">Almacén</th>
+                    <th style="padding:4px; text-align:right;">Precio</th>
+                    <th style="padding:4px; text-align:center;">Imp %</th>
+                    <th style="padding:4px; text-align:right;">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${items.length > 0 ? items.map(art => `
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+                      <td style="padding:4px;" title="${art.descripcion || ''}">${art.descripcion || '—'}</td>
+                      <td style="padding:4px; text-align:center; font-weight:600;">${art.cantidad || 0}</td>
+                      <td style="padding:4px; text-align:center;">${art.unidad_medida || '—'}</td>
+                      <td style="padding:4px; text-align:center;">${art.x_surtir || 0}</td>
+                      <td style="padding:4px; text-align:center;">${art.almacen || '—'}</td>
+                      <td style="padding:4px; text-align:right;">${art.precio ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(art.precio) : '—'}</td>
+                      <td style="padding:4px; text-align:center;">${art.impuesto_porcentaje || 0}%</td>
+                      <td style="padding:4px; text-align:right; font-weight:600;">${art.total ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(art.total) : '—'}</td>
+                    </tr>
+                  `).join('') : `
+                    <tr>
+                      <td colspan="8" style="padding:12px 4px; text-align:center; color:var(--text-muted); font-style:italic;">No se pudieron extraer datos de la tabla.</td>
+                    </tr>
+                  `}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      };
+
+      articulosHtml = generateTable('Refacciones Necesarias', '📦', mainArticulos) + 
+                      generateTable('Extras Extraídos', '📋', extrasArticulos);
+
       tableContainer.style.display = 'block';
       tableContainer.innerHTML = `
         <div class="pdf-data-table" style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:0.75rem; font-size:0.8rem; margin-top:0.5rem; display:flex; flex-direction:column; gap:0.5rem;">
           <div style="font-weight:600; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
             <span>📋 Datos Extraídos del Archivo</span>
             <span style="font-size:0.7rem; padding:2px 6px; border-radius:4px; ${isFileNameMatch ? 'background:rgba(16,185,129,0.1); color:#10b981;' : (isSapMatch ? 'background:rgba(16,185,129,0.1); color:#10b981;' : 'background:rgba(245,158,11,0.1); color:#f59e0b;')} font-weight:600;">
-              ${isFileNameMatch ? 'Nombre de Archivo + SAP' : (isSapMatch ? 'Coincidencia SAP' : 'Lectura de Texto')}
+              ${isFileNameMatch ? 'Nombre de Archivo + SAP' : (isSapMatch ? 'Coincidencia SAP' : 'Lectura AI/Texto')}
             </span>
           </div>
           <table style="width:100%; border-collapse:collapse; text-align:left;">
@@ -13391,15 +13875,41 @@ window.autoExtraerDesdePdfPedido = async function(file, isModal = true, ticketId
               <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
                 <td style="padding:6px 8px; font-weight:600;">Folio / Doc SAP</td>
                 <td style="padding:6px 8px; font-family:monospace; color:var(--text-primary);">${extractedDoc || '—'}</td>
-                <td style="padding:6px 8px;"><span style="font-size:0.7rem;">${isFileNameMatch ? 'Nombre del archivo' : 'Texto del PDF'}</span></td>
+                <td style="padding:6px 8px;"><span style="font-size:0.7rem;">${isFileNameMatch ? 'Nombre del archivo' : 'PDF AI'}</span></td>
               </tr>
               <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
                 <td style="padding:6px 8px; font-weight:600;">Monto Total</td>
                 <td style="padding:6px 8px; color:var(--text-primary); font-weight:600;">${extractedMonto ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(extractedMonto) : '—'}</td>
-                <td style="padding:6px 8px;"><span style="font-size:0.7rem;">${isSapMatch ? 'Catálogo SAP' : 'Texto del PDF'}</span></td>
+                <td style="padding:6px 8px;"><span style="font-size:0.7rem;">${isSapMatch ? 'Catálogo SAP' : 'PDF AI'}</span></td>
               </tr>
             </tbody>
           </table>
+          ${articulosHtml}
+          ${detallesViaje ? `
+          <div style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+            <div style="font-weight:600; color:var(--text-secondary); margin-bottom: 0.5rem;">✈️ Logística Extraída (Viáticos y Ruta)</div>
+            <div style="overflow-x:auto;">
+              <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.75rem;">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--border); color:var(--text-muted); white-space:nowrap;">
+                    <th style="padding:4px 8px; font-weight:500;">Origen</th>
+                    <th style="padding:4px 8px; font-weight:500;">Destino</th>
+                    <th style="padding:4px 8px; font-weight:500;">Hospedajes</th>
+                    <th style="padding:4px 8px; font-weight:500;">Alimentos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+                    <td style="padding:6px 8px;">${detallesViaje.origen || '—'}</td>
+                    <td style="padding:6px 8px;">${detallesViaje.destino || '—'}</td>
+                    <td style="padding:6px 8px;">${detallesViaje.num_hospedaje || 0}</td>
+                    <td style="padding:6px 8px;">${detallesViaje.num_alimento || 0}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          ` : ''}
         </div>
       `;
     }
@@ -13407,6 +13917,45 @@ window.autoExtraerDesdePdfPedido = async function(file, isModal = true, ticketId
     const clearBtnId = isModal ? 'btn-clear-pdf-pedido-modal' : `btn-clear-pdf-pedido-quick-${ticketId}`;
     const clearBtn = document.getElementById(clearBtnId);
     if (clearBtn) clearBtn.style.display = 'flex';
+
+    // ----------------------------------------------------
+    // GUARDAR EXTRACCIÓN EN SUPABASE
+    // ----------------------------------------------------
+    if (window.supabaseClient) {
+      setTimeout(async () => {
+        try {
+          const origenDatos = isFileNameMatch ? 'Nombre de Archivo + SAP' : (isSapMatch ? 'Catálogo SAP' : 'PDF AI');
+          
+          let extrasParaGuardar = [...extrasArticulos];
+          if (detallesViaje) {
+             extrasParaGuardar.push({ isViajeData: true, ...detallesViaje });
+          }
+          
+          const insertData = {
+            ticket_id: ticketId || null,
+            folio_sap: extractedDoc,
+            monto_total: extractedMonto,
+            cliente: detectedClientName,
+            ruta_servicio: extractedRuta,
+            conceptos: mainArticulos,
+            extras: extrasParaGuardar,
+            origen_datos: origenDatos
+          };
+          
+          const { error } = await window.supabaseClient
+            .from('pdf_extracciones_ai')
+            .insert([insertData]);
+            
+          if (error) {
+            console.error('[PDF Auto-Extract] Error guardando en Supabase (pdf_extracciones_ai):', error);
+          } else {
+            console.log('[PDF Auto-Extract] Datos guardados exitosamente en Supabase (pdf_extracciones_ai).');
+          }
+        } catch (dbErr) {
+          console.error('[PDF Auto-Extract] Excepción guardando en Supabase:', dbErr);
+        }
+      }, 500); // Pequeño retraso para no bloquear el renderizado de la UI
+    }
 
     if (window.validarPedidoConSAP) {
       window.validarPedidoConSAP(isModal, ticketId);
@@ -15547,6 +16096,7 @@ function verDetalleTicket(id) {
         ${t.pdfPedido ? field('PDF Pedido', `<div style="display:inline-flex; gap:0.25rem;"><button type="button" onclick="window.visualizarPdfOnDemand('${t.id}', 'pedido')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="eye" style="width:14px;height:14px;"></i> Ver</button><button type="button" onclick="window.descargarPdfOnDemand('${t.id}', 'pedido')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</button></div>`) : ''}
         ${t.tecnicosAsignados && t.tecnicosAsignados.length > 0 ? field('Técnicos Asignados', t.tecnicosAsignados.join(', ')) : ''}
       </div>
+      <div id="closed-pdf-extraction-${t.id}" style="margin-top: 1rem;"></div>
     </div>
     ` : ''}
 
@@ -15801,10 +16351,132 @@ function verDetalleTicket(id) {
     <div class="form-actions" style="border-top:2px dashed var(--border);padding-top:1rem;margin-top:0.5rem; justify-content:center;">
       <button class="btn-secondary" onclick="cerrarDetalleTicket()">Cerrar Vista</button>
       <button class="btn-primary" onclick="cerrarDetalleTicket();editarTicket('${t.id}')"><i data-lucide="pencil" style="width:16px;height:16px;"></i> Editar</button>
+      ${currentSession.viewMode === 'superadmin' ? `
+        <button class="btn-secondary" style="border-color:var(--accent); color:var(--accent);" onclick="forzarEstadoTicket('${t.id}')">
+          <i data-lucide="zap" style="width:16px;height:16px;margin-right:4px;"></i> Forzar Estado
+        </button>
+      ` : ''}
     </div>
   `;
   document.getElementById('modal-ticket-detalle-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
+  if (t.estado === 'Cerrado' && t.cotAceptada === 'si' && window.supabaseClient) {
+    setTimeout(async () => {
+      const container = document.getElementById(`closed-pdf-extraction-${t.id}`);
+      if (!container) return;
+      
+      try {
+        const { data, error } = await window.supabaseClient
+          .from('pdf_extracciones_ai')
+          .select('*')
+          .eq('ticket_id', t.id)
+          .order('fecha_extraccion', { ascending: false })
+          .limit(1);
+          
+        if (data && data.length > 0) {
+          const ex = data[0];
+          const mainArticulos = Array.isArray(ex.conceptos) ? ex.conceptos : [];
+          const extrasArticulos = Array.isArray(ex.extras) ? ex.extras : [];
+          
+          let logisticaHtml = '';
+          const logisticaObj = extrasArticulos.find(e => e.isViajeData);
+          if (logisticaObj) {
+            logisticaHtml = `
+              <div style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+                <div style="font-weight:600; color:var(--text-secondary); margin-bottom: 0.5rem;">✈️ Logística Extraída (Viáticos y Ruta)</div>
+                <div style="overflow-x:auto;">
+                  <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.75rem;">
+                    <thead>
+                      <tr style="border-bottom:1px solid var(--border); color:var(--text-muted); white-space:nowrap;">
+                        <th style="padding:4px;">Origen</th>
+                        <th style="padding:4px;">Destino</th>
+                        <th style="padding:4px;">Hospedajes</th>
+                        <th style="padding:4px;">Alimentos</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+                        <td style="padding:4px;" title="${logisticaObj.origen || ''}">${logisticaObj.origen || '—'}</td>
+                        <td style="padding:4px;" title="${logisticaObj.destino || ''}">${logisticaObj.destino || '—'}</td>
+                        <td style="padding:4px;">${logisticaObj.num_hospedaje || 0}</td>
+                        <td style="padding:4px;">${logisticaObj.num_alimento || 0}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            `;
+          } else if (ex.ruta_servicio) {
+             logisticaHtml = `
+              <div style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+                <div style="font-weight:600; color:var(--text-secondary); margin-bottom: 0.5rem;">✈️ Logística Extraída (Ruta)</div>
+                <div style="font-size:0.75rem; padding:0 8px;">${ex.ruta_servicio}</div>
+              </div>
+            `;
+          }
+
+          const generateTable = (title, icon, items) => {
+            const filteredItems = items.filter(i => !i.isViajeData);
+            if (filteredItems.length === 0) return '';
+            return `
+              <div style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+                <div style="font-weight:600; color:var(--text-secondary); margin-bottom: 0.5rem;">${icon} ${title} (${filteredItems.length})</div>
+                <div style="overflow-x:auto;">
+                  <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.75rem;">
+                    <thead>
+                      <tr style="border-bottom:1px solid var(--border); color:var(--text-muted); white-space:nowrap;">
+                        <th style="padding:4px;">Descripción</th>
+                        <th style="padding:4px; text-align:center;">Cant</th>
+                        <th style="padding:4px; text-align:center;">UM</th>
+                        <th style="padding:4px; text-align:center;">X Surtir</th>
+                        <th style="padding:4px; text-align:center;">Almacén</th>
+                        <th style="padding:4px; text-align:right;">Precio</th>
+                        <th style="padding:4px; text-align:center;">Imp %</th>
+                        <th style="padding:4px; text-align:right;">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${filteredItems.map(art => `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.02);">
+                          <td style="padding:4px;" title="${art.descripcion || ''}">${art.descripcion || '—'}</td>
+                          <td style="padding:4px; text-align:center; font-weight:600;">${art.cantidad || 0}</td>
+                          <td style="padding:4px; text-align:center;">${art.unidad_medida || '—'}</td>
+                          <td style="padding:4px; text-align:center;">${art.x_surtir || 0}</td>
+                          <td style="padding:4px; text-align:center;">${art.almacen || '—'}</td>
+                          <td style="padding:4px; text-align:right;">${art.precio ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(art.precio) : '—'}</td>
+                          <td style="padding:4px; text-align:center;">${art.impuesto_porcentaje || 0}%</td>
+                          <td style="padding:4px; text-align:right; font-weight:600;">${art.total ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(art.total) : '—'}</td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            `;
+          };
+
+          const allExtractedItems = [...mainArticulos, ...extrasArticulos];
+          const hasReembolsoKm = allExtractedItems.some(x => !x.isViajeData && x.descripcion && x.descripcion.toLowerCase().includes('reembolso') && x.descripcion.toLowerCase().includes('km'));
+
+          container.innerHTML = `
+            <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:0.75rem; font-size:0.8rem;">
+              <div style="font-weight:600; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+                <span>📋 Datos Históricos Extraídos del Archivo</span>
+                ${hasReembolsoKm ? `<span style="background:rgba(232, 130, 12, 0.1); color:var(--accent); padding:2px 8px; border-radius:12px; font-size:0.7rem; display:flex; align-items:center; gap:4px; border:1px solid rgba(232, 130, 12, 0.2);">Reembolso KM Detectado</span>` : ''}
+              </div>
+              ${generateTable('Refacciones Extraídas', '📦', mainArticulos)}
+              ${generateTable('Extras Extraídos', '📋', extrasArticulos)}
+              ${logisticaHtml}
+            </div>
+          `;
+          if (window.lucide) window.lucide.createIcons({ root: container });
+        }
+      } catch (err) {
+        console.error('Error fetching AI extraction:', err);
+      }
+    }, 100);
+  }
+
   if (t.estado === 'Abierto' && currentSession.viewMode !== 'empresa') {
     window.inicializarRefaccionesTicket(t.id, t.refaccionesSeleccionadas || []);
   }
@@ -16048,7 +16720,7 @@ async function cerrarCotizacionTicket(id) {
       tipoVisitaSeleccionado = selTipo;
     }
     
-    const bypass = window.isTemporaryNoQuotePeriodActive && window.isTemporaryNoQuotePeriodActive();
+    const bypass = (window.isTemporaryNoQuotePeriodActive && window.isTemporaryNoQuotePeriodActive()) || (window.currentSession && window.currentSession.viewMode === 'superadmin');
     if (!bypass) {
       if (!pedidoSAP) {
         mostrarNotificacion('Debes ingresar el Número de Pedido SAP.', 'warning');
@@ -16147,6 +16819,59 @@ async function cerrarCotizacionTicket(id) {
         newFolio = `[PRUEBA] ${newFolio}`;
       }
 
+      let refUtilizadasExtraidas = [];
+      if (window.supabaseClient) {
+        try {
+          const { data: dbEx } = await window.supabaseClient
+            .from('pdf_extracciones_ai')
+            .select('conceptos')
+            .eq('ticket_id', id)
+            .order('fecha_extraccion', { ascending: false })
+            .limit(1);
+          if (dbEx && dbEx.length > 0 && dbEx[0].conceptos) {
+            refUtilizadasExtraidas = dbEx[0].conceptos.map(c => {
+              let matchedClave = '';
+              const descUpper = (c.descripcion || '').trim().toUpperCase();
+              if (descUpper && typeof refaccionesDb !== 'undefined') {
+                const match = refaccionesDb.find(r => (r.descripcion || '').toUpperCase().trim() === descUpper);
+                if (match) matchedClave = match.codigo || match.id || '';
+              }
+              return {
+                descripcion: c.descripcion || '',
+                cantidad: (c.cantidad || 1).toString(),
+                clave: matchedClave,
+                isFromPdf: true
+              };
+            });
+          }
+        } catch(err) {}
+      }
+      if (refUtilizadasExtraidas.length === 0 && window._lastPdfPedidoExtracted && window._lastPdfPedidoExtracted.mainArticulos) {
+        refUtilizadasExtraidas = window._lastPdfPedidoExtracted.mainArticulos.map(c => {
+          let matchedClave = '';
+          const descUpper = (c.descripcion || '').trim().toUpperCase();
+          if (descUpper && typeof refaccionesDb !== 'undefined') {
+            const match = refaccionesDb.find(r => (r.descripcion || '').toUpperCase().trim() === descUpper);
+            if (match) matchedClave = match.codigo || match.id || '';
+          }
+          return {
+            descripcion: c.descripcion || '',
+            cantidad: (c.cantidad || 1).toString(),
+            clave: matchedClave,
+            isFromPdf: true
+          };
+        });
+      }
+
+      let refNecesariasManuales = [];
+      if (t.refaccionesSeleccionadas && t.refaccionesSeleccionadas.length > 0) {
+        refNecesariasManuales = t.refaccionesSeleccionadas.map(r => ({
+          descripcion: r.nombre || r.descripcion || '',
+          cantidad: (r.cantidad || 1).toString(),
+          clave: r.codigo || r.clave || ''
+        }));
+      }
+
       const nuevaOrden = {
         id: newFolio,
         fecha: getLocalDateString(),
@@ -16172,7 +16897,7 @@ async function cerrarCotizacionTicket(id) {
         falla: (t.asunto ? t.asunto + '\n' : '') + (t.descripcion || ''),
         trabajos: '', dictamen: '', condiciones: '',
         observaciones: '', pendientes: '',
-        ref_utilizadas: [], ref_necesarias: [],
+        ref_utilizadas: refUtilizadasExtraidas, ref_necesarias: refNecesariasManuales,
         factura_ref: '', factura_mo: '',
         noches: '', alimentacion: '', traslado_costo: '',
         dias: [],
@@ -16200,6 +16925,69 @@ function cerrarDetalleTicket(e) {
   document.getElementById('modal-ticket-detalle-overlay').classList.remove('open');
   document.body.style.overflow = '';
 }
+
+window.forzarEstadoTicket = async function(id) {
+  const t = tickets.find(x => x.id === id);
+  if (!t) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.style.zIndex = '99999';
+  
+  overlay.innerHTML = `
+    <div class="modal-content" style="max-width:400px; padding:1.5rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--border); padding-bottom:0.5rem;">
+        <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+          <i data-lucide="zap" style="color:var(--accent);"></i> Forzar Estado (Superadmin)
+        </h3>
+        <button class="close-btn" onclick="this.closest('.modal-overlay').remove()" style="background:none; border:none; cursor:pointer; color:var(--text-muted);">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      
+      <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
+        Cambiarás el estado del ticket <strong>${t.folio}</strong> saltando todas las validaciones.
+      </p>
+
+      <div class="form-group" style="margin-bottom:1.5rem;">
+        <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; margin-bottom:0.4rem; display:block;">Nuevo Estado:</label>
+        <select id="forzar-estado-select" style="width:100%; padding:0.6rem; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-secondary); color:var(--text-primary);">
+          <option value="Abierto" ${t.estado === 'Abierto' ? 'selected' : ''}>Abierto</option>
+          <option value="Refacciones" ${t.estado === 'Refacciones' ? 'selected' : ''}>Refacciones</option>
+          <option value="Cotización" ${t.estado === 'Cotización' ? 'selected' : ''}>Cotización</option>
+          <option value="Cerrado" ${t.estado === 'Cerrado' ? 'selected' : ''}>Cerrado</option>
+        </select>
+      </div>
+      
+      <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+        <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+        <button class="btn-primary" style="background:var(--accent); border-color:var(--accent);" id="btn-forzar-confirmar">Confirmar Cambio</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  if (window.lucide) window.lucide.createIcons({ root: overlay });
+
+  overlay.querySelector('#btn-forzar-confirmar').addEventListener('click', async () => {
+    const nuevoEstado = overlay.querySelector('#forzar-estado-select').value;
+    const btn = overlay.querySelector('#btn-forzar-confirmar');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="spin" data-lucide="loader"></i> Aplicando...';
+    if (window.lucide) window.lucide.createIcons({ root: btn });
+
+    t.estado = nuevoEstado;
+    if (window.supabaseClient) {
+      await window.pushToSupabase('tickets', t);
+    }
+    safeSetJSON('sapi_tickets', tickets);
+    mostrarNotificacion(`Estado del ticket forzado a ${nuevoEstado}`, 'success');
+    
+    overlay.remove();
+    cerrarDetalleTicket();
+    renderTickets();
+    updateTicketBadge();
+  });
+};
 
 // ===== HELPER: GENERAR ID INTERNO MÁQUINA =====
 function getSitioNombre(s) { return typeof s === 'string' ? s : (s?.nombre || ''); }
@@ -16673,23 +17461,48 @@ function renderCalendario() {
 
         if (endVal) ev.end = endVal;
 
-        // Renderizar bloque de traslado si existe hora de inicio y duración
-        if (b.hora_inicio && b.horas_traslado) {
+        const toLocalISO = (d) => new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().substring(0,16)+':00';
+
+        // Renderizar bloque de traslado si existe duración
+        if (b.horas_traslado) {
           try {
             const idaDateStr = b.fecha_inicio_traslado || dateStr;
-            const startLlegada = new Date(`${idaDateStr}T${b.hora_inicio}:00`);
-            if (!isNaN(startLlegada.getTime())) {
-              startLlegada.setMinutes(startLlegada.getMinutes() + Math.round(parseFloat(b.horas_traslado) * 60));
-              const endStr = new Date(startLlegada.getTime() - (startLlegada.getTimezoneOffset() * 60000)).toISOString().substring(0,16)+':00';
+            let startLlegada;
+            let endLlegada;
+            if (b.hora_inicio) {
+              const hInicioClean = b.hora_inicio.split(':').slice(0,2).join(':');
+              startLlegada = new Date(`${idaDateStr}T${hInicioClean}:00`);
+              if (!isNaN(startLlegada.getTime())) {
+                endLlegada = new Date(startLlegada.getTime() + Math.round(parseFloat(b.horas_traslado) * 60 * 60000));
+              }
+            } else if (b.entrada) {
+              endLlegada = new Date(`${idaDateStr}T${b.entrada}:00`);
+              if (!isNaN(endLlegada.getTime())) {
+                startLlegada = new Date(endLlegada.getTime() - Math.round(parseFloat(b.horas_traslado) * 60 * 60000));
+              }
+            }
 
+            if (startLlegada && endLlegada && !isNaN(startLlegada.getTime())) {
               eventos.push({
                 id: `bit-traslado-ida-${b.id || Math.random()}`,
-                title: `🚗 Ida - ${(b.tecnico || 'Téc').split(' ')[0]}`,
-                start: `${idaDateStr}T${b.hora_inicio}:00`,
-                end: endStr,
+                title: `🚗 Ida - ${(b.tecnico || 'Téc').split(' ')[0]} | ${o.folio || o.id.substring(0,8)}`,
+                start: toLocalISO(startLlegada),
+                end: toLocalISO(endLlegada),
                 allDay: false,
-                backgroundColor: '#475569',
-                borderColor: '#475569',
+                backgroundColor: (function() {
+                  if (b.realizado === false || (b.nota && b.nota.includes('Programado') && b.realizado !== true)) return '#8b5cf6';
+                  if (b.programadoHorasTraslado !== undefined && b.programadoHorasTraslado !== null) {
+                    return parseFloat(b.horas_traslado) === parseFloat(b.programadoHorasTraslado) ? '#10b981' : '#3b82f6';
+                  }
+                  return '#ef4444';
+                })(),
+                borderColor: (function() {
+                  if (b.realizado === false || (b.nota && b.nota.includes('Programado') && b.realizado !== true)) return '#8b5cf6';
+                  if (b.programadoHorasTraslado !== undefined && b.programadoHorasTraslado !== null) {
+                    return parseFloat(b.horas_traslado) === parseFloat(b.programadoHorasTraslado) ? '#10b981' : '#3b82f6';
+                  }
+                  return '#ef4444';
+                })(),
                 textColor: '#ffffff',
                 extendedProps: {
                   isBitacora: true,
@@ -16705,23 +17518,46 @@ function renderCalendario() {
           } catch(e) { console.error('Error en traslado ida:', e); }
         }
 
-        // Renderizar bloque de regreso si existe hora de regreso y duración
-        if (b.hora_fin_regreso && b.horas_regreso) {
+        // Renderizar bloque de regreso si existe duración
+        if (b.horas_regreso) {
           try {
             const regresoDateStr = b.fecha_fin_regreso || dateStr;
-            const startRegreso = new Date(`${regresoDateStr}T${b.hora_fin_regreso}:00`);
-            if (!isNaN(startRegreso.getTime())) {
-              startRegreso.setMinutes(startRegreso.getMinutes() + Math.round(parseFloat(b.horas_regreso) * 60));
-              const endRegresoStr = new Date(startRegreso.getTime() - (startRegreso.getTimezoneOffset() * 60000)).toISOString().substring(0,16)+':00';
+            let startRegreso;
+            let endRegreso;
+            if (b.hora_fin_regreso) {
+              const hRegresoClean = b.hora_fin_regreso.split(':').slice(0,2).join(':');
+              startRegreso = new Date(`${regresoDateStr}T${hRegresoClean}:00`);
+              if (!isNaN(startRegreso.getTime())) {
+                endRegreso = new Date(startRegreso.getTime() + Math.round(parseFloat(b.horas_regreso) * 60 * 60000));
+              }
+            } else if (b.salida) {
+              startRegreso = new Date(`${regresoDateStr}T${b.salida}:00`);
+              if (!isNaN(startRegreso.getTime())) {
+                endRegreso = new Date(startRegreso.getTime() + Math.round(parseFloat(b.horas_regreso) * 60 * 60000));
+              }
+            }
 
+            if (startRegreso && endRegreso && !isNaN(startRegreso.getTime())) {
               eventos.push({
                 id: `bit-traslado-regreso-${b.id || Math.random()}`,
-                title: `🚗 Regreso - ${(b.tecnico || 'Téc').split(' ')[0]}`,
-                start: `${regresoDateStr}T${b.hora_fin_regreso}:00`,
-                end: endRegresoStr,
+                title: `🚗 Regreso - ${(b.tecnico || 'Téc').split(' ')[0]} | ${o.folio || o.id.substring(0,8)}`,
+                start: toLocalISO(startRegreso),
+                end: toLocalISO(endRegreso),
                 allDay: false,
-                backgroundColor: '#475569',
-                borderColor: '#475569',
+                backgroundColor: (function() {
+                  if (b.realizado === false || (b.nota && b.nota.includes('Programado') && b.realizado !== true)) return '#8b5cf6';
+                  if (b.programadoHorasRegreso !== undefined && b.programadoHorasRegreso !== null) {
+                    return parseFloat(b.horas_regreso) === parseFloat(b.programadoHorasRegreso) ? '#10b981' : '#3b82f6';
+                  }
+                  return '#ef4444';
+                })(),
+                borderColor: (function() {
+                  if (b.realizado === false || (b.nota && b.nota.includes('Programado') && b.realizado !== true)) return '#8b5cf6';
+                  if (b.programadoHorasRegreso !== undefined && b.programadoHorasRegreso !== null) {
+                    return parseFloat(b.horas_regreso) === parseFloat(b.programadoHorasRegreso) ? '#10b981' : '#3b82f6';
+                  }
+                  return '#ef4444';
+                })(),
                 textColor: '#ffffff',
                 extendedProps: {
                   isBitacora: true,
@@ -25758,7 +26594,7 @@ window.confirmarAccion = function(options = {}) {
 
 window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId) {
   const o = ordenes.find(x => x.id === ordenId);
-  if (o && (o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.estado === 'Refacciones pendientes' || (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__') || (!(!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') && o.firma_tecnico_base64 !== '__DELETED__'))) {
+  if (o && ((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado'))) {
     mostrarNotificacion('No se pueden eliminar asignaciones en una orden cerrada o completada.', 'error');
     return;
   }
@@ -25938,6 +26774,64 @@ function dispararInicializacionGlobal() {
   } catch (err) {
     console.error('Error al inicializar recuperación de contraseña:', err);
   }
+
+  // Temporary cleanup and migration for OS-PRUEBA-002
+  setTimeout(async () => {
+    try {
+      if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
+        const ord = ordenes.find(o => o.id === '[PRUEBA] OS-PRUEBA-002');
+        if (ord) {
+          let updated = false;
+          if (ord.ref_necesarias && ord.ref_necesarias.length > 0) {
+            ord.ref_necesarias = [];
+            updated = true;
+          }
+          if (ord.soporte && window.supabaseClient) {
+            try {
+              const { data: dbEx } = await window.supabaseClient
+                .from('pdf_extracciones_ai')
+                .select('conceptos')
+                .eq('ticket_id', ord.soporte)
+                .order('fecha_extraccion', { ascending: false })
+                .limit(1);
+              if (dbEx && dbEx.length > 0 && dbEx[0].conceptos) {
+                ord.ref_utilizadas = dbEx[0].conceptos.map(c => {
+                  let matchedClave = '';
+                  const descUpper = (c.descripcion || '').trim().toUpperCase();
+                  if (descUpper && typeof refaccionesDb !== 'undefined') {
+                    const match = refaccionesDb.find(r => (r.descripcion || '').toUpperCase().trim() === descUpper);
+                    if (match) matchedClave = match.codigo || match.id || '';
+                  }
+                  return {
+                    descripcion: c.descripcion || '',
+                    cantidad: (c.cantidad || 1).toString(),
+                    clave: matchedClave,
+                    isFromPdf: true
+                  };
+                });
+                updated = true;
+              }
+            } catch(e){}
+          }
+          if (updated) {
+            if (typeof safeSetJSON === 'function') safeSetJSON('sapi_ordenes', ordenes);
+            if (window.supabaseClient && typeof window.pushToSupabase === 'function') {
+              window.pushToSupabase('ordenes', ord).catch(() => {});
+            }
+            console.log("OS-PRUEBA-002 migrada automáticamente a ref_utilizadas");
+            if (window.renderRefaccionesDashboard) window.renderRefaccionesDashboard();
+            if (typeof verDetalle === 'function') {
+              const modal = document.querySelector('.modal-overlay.open');
+              if (modal && modal.innerHTML.includes('OS-PRUEBA-002')) {
+                // re-render detail
+                verDetalle(ord.id);
+              }
+            }
+          }
+        }
+      }
+    } catch(e){}
+  }, 3000);
 }
 
 if (document.readyState === 'loading') {
