@@ -10040,13 +10040,20 @@ function verDetalle(id) {
         ${field('Estado', `<span class="badge ${badgeEstado(o.estado)}">${o.estado}</span>`)}
       </div>
       ${o.reembolso_km ? `
-        <div style="margin-top:1rem; padding:0.75rem; border:1px solid var(--accent); background:rgba(232, 130, 12, 0.08); border-radius:8px; text-align:center;">
-          <span style="color:var(--accent); font-weight:bold; font-size:1.1rem; display:block;"><i data-lucide="check-circle" style="width:20px;height:20px;vertical-align:middle;margin-right:8px;"></i>Aplica Reembolso de KM para esta Orden</span>
-          <span style="color:var(--accent); font-size:0.95rem; font-weight:600; display:block; margin-top:0.4rem; opacity:0.9;"><i data-lucide="clock" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i>A la espera de traslado de regreso</span>
+        <div style="margin-top:1rem; display:flex; flex-direction:column; gap:0.25rem; padding:0.5rem 0.75rem; border-left:3px solid var(--accent); background:rgba(232, 130, 12, 0.08); border-radius:0 6px 6px 0; width:fit-content;">
+          <div style="display:flex; align-items:center; gap:0.4rem; color:var(--accent); font-weight:700; font-size:0.85rem;">
+            <i data-lucide="check-circle" style="width:14px;height:14px;"></i>
+            Aplica Reembolso de KM
+          </div>
+          <div style="display:flex; align-items:center; gap:0.4rem; color:var(--accent); font-size:0.75rem; font-weight:600; opacity:0.85;">
+            <i data-lucide="clock" style="width:13px;height:13px;"></i>
+            A la espera de traslado de regreso
+          </div>
         </div>
       ` : `
-        <div style="margin-top:1rem; padding:0.75rem; border:1px dashed var(--border); background:var(--bg-secondary); border-radius:8px; text-align:center;">
-          <span style="color:var(--text-muted); font-size:0.95rem;"><i data-lucide="x-circle" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i>No aplica Reembolso de KM</span>
+        <div style="margin-top:1rem; display:flex; align-items:center; gap:0.4rem; padding:0.4rem 0.6rem; border:1px solid var(--border); background:var(--bg-secondary); border-radius:6px; width:fit-content;">
+          <i data-lucide="x-circle" style="width:13px;height:13px;color:var(--text-muted);"></i>
+          <span style="color:var(--text-muted); font-size:0.75rem; font-weight:500;">No aplica Reembolso de KM</span>
         </div>
       `}
     `)}
