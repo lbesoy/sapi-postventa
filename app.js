@@ -8839,6 +8839,8 @@ async function guardarOrden(e) {
             if (!confirm(msj)) {
               restoreBtn();
               return; // Detiene el guardado
+            } else {
+               window._viaticosWarningToSave = `⚠️ Se modificaron los viáticos manualmente respecto a los extraídos del Ticket. ${advertencias.join(' | ')}`;
             }
           }
         }
@@ -8932,7 +8934,7 @@ async function guardarOrden(e) {
   }
 
   if (oVieja) {
-    orden.bitacora = oVieja.bitacora;
+    orden.bitacora = oVieja.bitacora || [];
     orden.firma_tecnico_base64 = oVieja.firma_tecnico_base64;
     orden.firma_tecnico_nombre = oVieja.firma_tecnico_nombre;
     orden.firma_tecnico_fecha = oVieja.firma_tecnico_fecha;
@@ -8940,6 +8942,19 @@ async function guardarOrden(e) {
     orden.firma_cliente_nombre = oVieja.firma_cliente_nombre;
     orden.firma_cliente_fecha = oVieja.firma_cliente_fecha;
     orden.evidenciaBase64 = oVieja.evidenciaBase64 || oVieja.evidencia_base64;
+  } else {
+    orden.bitacora = [];
+  }
+
+  if (window._viaticosWarningToSave) {
+    orden.bitacora.push({
+      id: crypto.randomUUID(),
+      fecha: new Date().toISOString(),
+      tecnico: currentSession.viewMode === 'tecnico' ? (usuarios.find(u => u.id === currentSession.userId)?.nombre || 'Sistema') : 'Sistema',
+      tipo: 'Aviso del Sistema',
+      nota: window._viaticosWarningToSave
+    });
+    window._viaticosWarningToSave = null;
   }
   
   // Computar estado automático o manual si es superadmin
