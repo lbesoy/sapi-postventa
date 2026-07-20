@@ -1926,7 +1926,7 @@ window.verDetallesSincronizacion = function() {
           if (!item) return;
           let desc = 'Sin descripción';
           if (item.data) {
-            desc = item.data.descripcion || item.data.concepto || item.data.cliente || item.data.id || 'Sin descripción';
+            desc = item.data.folio || item.data.asunto || item.data.nombre || item.data.razon_social || item.data.descripcion || item.data.concepto || item.data.cliente || item.data.id || 'Sin descripción';
           }
           
           const itemEl = document.createElement('div');

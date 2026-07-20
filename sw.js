@@ -1,14 +1,14 @@
-const CACHE_NAME = 'eurorep-postventa-v286';
+const CACHE_NAME = 'eurorep-postventa-v287';
 const ASSETS = [
   '/',
   '/index.html',
-  '/app.js?v=46',
-  '/style.css?v=46',
+  '/app.js?v=47',
+  '/style.css?v=47',
   '/cliente',
-  '/cliente.css?v=46',
-  '/cliente.js?v=46',
-  '/supabaseSync.js?v=46',
-  '/supabaseClient.js?v=46',
+  '/cliente.css?v=47',
+  '/cliente.js?v=47',
+  '/supabaseSync.js?v=47',
+  '/supabaseClient.js?v=47',
   '/Logo_de_Clara.svg',
   'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
