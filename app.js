@@ -10040,15 +10040,22 @@ function verDetalle(id) {
         ${field('Estado', `<span class="badge ${badgeEstado(o.estado)}">${o.estado}</span>`)}
       </div>
       ${o.reembolso_km ? `
-        <div style="margin-top:1rem; display:flex; flex-direction:column; gap:0.25rem; padding:0.5rem 0.75rem; border-left:3px solid var(--accent); background:rgba(232, 130, 12, 0.08); border-radius:0 6px 6px 0; width:fit-content;">
-          <div style="display:flex; align-items:center; gap:0.4rem; color:var(--accent); font-weight:700; font-size:0.85rem;">
-            <i data-lucide="check-circle" style="width:14px;height:14px;"></i>
-            Aplica Reembolso de KM
+        <div style="margin-top:1rem; display:flex; flex-direction:row; align-items:center; gap:1rem; flex-wrap:wrap;">
+          <div style="display:flex; flex-direction:column; gap:0.25rem; padding:0.5rem 0.75rem; border-left:3px solid var(--accent); background:rgba(232, 130, 12, 0.08); border-radius:0 6px 6px 0; width:fit-content;">
+            <div style="display:flex; align-items:center; gap:0.4rem; color:var(--accent); font-weight:700; font-size:0.85rem;">
+              <i data-lucide="check-circle" style="width:14px;height:14px;"></i>
+              Aplica Reembolso de KM
+            </div>
+            <div style="display:flex; align-items:center; gap:0.4rem; color:var(--accent); font-size:0.75rem; font-weight:600; opacity:0.85;">
+              <i data-lucide="clock" style="width:13px;height:13px;"></i>
+              A la espera de traslado de regreso
+            </div>
           </div>
-          <div style="display:flex; align-items:center; gap:0.4rem; color:var(--accent); font-size:0.75rem; font-weight:600; opacity:0.85;">
-            <i data-lucide="clock" style="width:13px;height:13px;"></i>
-            A la espera de traslado de regreso
-          </div>
+          ${(!((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) && ['tecnico', 'superadmin'].includes(currentSession.viewMode)) ? `
+          <button class="btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.6rem; display:flex; align-items:center; gap:0.3rem;" onclick="abrirBitacora('${o.id}', 'Traslado de regreso desde el sitio de trabajo')">
+            <i data-lucide="plus" style="width:12px;height:12px;"></i> Registrar Regreso
+          </button>
+          ` : ''}
         </div>
       ` : `
         <div style="margin-top:1rem; display:flex; align-items:center; gap:0.4rem; padding:0.4rem 0.6rem; border:1px solid var(--border); background:var(--bg-secondary); border-radius:6px; width:fit-content;">
@@ -10858,7 +10865,7 @@ function calcularRangoFechasLaboral(diasHabilAtras) {
   };
 }
 
-function abrirBitacora(id) {
+function abrirBitacora(id, defaultNote = '') {
   const o = ordenes.find(x => x.id === id);
   if (o && ((o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado'))) {
     mostrarNotificacion('No se pueden registrar avances en una orden cerrada o completada.', 'error');
@@ -10882,11 +10889,21 @@ function abrirBitacora(id) {
   fechaInput.min = rango.min;
   fechaInput.max = rango.max;
 
-  document.getElementById('bitacora-nota').value = '';
+  document.getElementById('bitacora-nota').value = defaultNote || '';
   document.getElementById('bitacora-entrada').value = '';
   document.getElementById('bitacora-salida').value = '';
   document.getElementById('bitacora-horas-traslado').value = '';
   document.getElementById('bitacora-horas-regreso').value = '';
+  
+  if (defaultNote) {
+    const tipoSelect = document.getElementById('bitacora-tipo');
+    if (tipoSelect) {
+      Array.from(tipoSelect.options).forEach(opt => {
+        if (opt.value.toLowerCase().includes('traslado')) opt.selected = true;
+      });
+    }
+  }
+  
   document.getElementById('modal-bitacora-overlay').classList.add('open');
 }
 
