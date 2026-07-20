@@ -234,7 +234,7 @@
   <script src="https://js.live.net/v7.2/OneDrive.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=45" />
+  <link rel="stylesheet" href="style.css?v=46" />
   <!-- PWA & Mobile Web App Capabilities -->
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="logo_transparent.png" type="image/png" />
@@ -3613,7 +3613,7 @@
                   <div style="display:flex; flex-direction:column; gap:0.5rem; width:100%;">
                     <div style="display:flex; gap:0.5rem; align-items:center; width:100%;">
                       <label class="custom-file-upload" style="flex:1; margin:0;">
-                        <input type="file" id="t-cotizacion-pdf" accept="application/pdf" onchange="updateFileLabel(this); if(this.files[0]) window.autoExtraerDesdePdfCotizacion(this.files[0], true);" />
+                        <input type="file" id="t-cotizacion-pdf" accept="application/pdf" onchange="updateFileLabel(this); if(this.files[0]) window.autoExtraerDesdePdfCotizacion(this.files[0], true, window.soporteActual);" />
                         <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
                         <span class="file-label-text">Subir cotización en PDF</span>
                       </label>
@@ -3665,7 +3665,7 @@
                     <div style="display:flex; flex-direction:column; gap:0.5rem; width:100%;">
                       <div style="display:flex; gap:0.5rem; align-items:center; width:100%;">
                         <label class="custom-file-upload" style="flex:1; margin:0;">
-                          <input type="file" id="t-pedido-pdf" accept="application/pdf" onchange="updateFileLabel(this); if(this.files[0]) window.autoExtraerDesdePdfPedido(this.files[0], true);" />
+                          <input type="file" id="t-pedido-pdf" accept="application/pdf" onchange="updateFileLabel(this); if(this.files[0]) window.autoExtraerDesdePdfPedido(this.files[0], true, window.soporteActual);" />
                           <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
                           <span class="file-label-text">Subir pedido en PDF</span>
                         </label>
