@@ -9819,18 +9819,25 @@ function verDetalle(id) {
             }
           }
 
+          const isTrasladoRegreso = b.nota && b.nota.toLowerCase().includes('traslado de regreso');
           if (b.entrada && b.salida) {
             const [hE, mE] = b.entrada.split(':').map(Number);
             const [hS, mS] = b.salida.split(':').map(Number);
             let diff = (hS * 60 + mS) - (hE * 60 + mE);
             if (diff < 0) diff += 24 * 60; // Si pasa de medianoche
-            const hrs = Math.floor(diff / 60);
-            const mns = diff % 60;
-            const durStr = `${hrs}h ${mns > 0 ? mns + 'm' : ''}`.trim();
-            horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(16, 185, 129, 0.1); color:#10b981; padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="clock" style="width:12px;height:12px;"></i> ${b.entrada} - ${b.salida} (${durStr})</span>${desvHtml}`;
+            const diffH = (diff / 60).toFixed(1);
+            
+            if (isTrasladoRegreso) {
+              horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(232, 130, 12, 0.1); color:var(--accent); padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="car" style="width:12px;height:12px;"></i> ${b.entrada} - ${b.salida} (${diffH}h)</span>`;
+            } else {
+              const hrs = Math.floor(diff / 60);
+              const mns = diff % 60;
+              const durStr = `${hrs}h ${mns > 0 ? mns + 'm' : ''}`.trim();
+              horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(16, 185, 129, 0.1); color:#10b981; padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="clock" style="width:12px;height:12px;"></i> ${b.entrada} - ${b.salida} (${durStr})</span>${desvHtml}`;
+            }
           } else if (b.entrada || b.salida) {
             horasHtml = `<span style="font-size:0.7rem; color:var(--text-muted);"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:middle;"></i> ${b.entrada || '--:--'} a ${b.salida || '--:--'}</span>${desvHtml}`;
-          } else if (b.horas_traslado || b.horas_regreso) {
+          } else if (b.horas_traslado || b.horas_regreso || isTrasladoRegreso) {
             const totalTraslado = (parseFloat(b.horas_traslado) || 0) + (parseFloat(b.horas_regreso) || 0);
             horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(232, 130, 12, 0.1); color:var(--accent); padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="car" style="width:12px;height:12px;"></i> Traslado: ${totalTraslado.toFixed(1)}h</span>${desvHtml}`;
           }
@@ -9843,7 +9850,7 @@ function verDetalle(id) {
                     ${(b.tecnico || 'U').charAt(0).toUpperCase()}
                   </div>
                   <span style="font-size:0.85rem; font-weight:600; color:var(--text-primary);">${b.tecnico || 'Desconocido'}</span>
-                  ${(['superadmin', 'admin'].includes(currentSession.viewMode) && !isClosed) ? `<button class="action-btn" onclick="editarBitacora('${o.id}', '${b.id}')" title="Editar Bitácora" style="padding:0.15rem; margin-left:0.5rem;"><i data-lucide="pencil" style="width:12px;height:12px;"></i></button>` : ''}
+                  ${(['superadmin', 'admin'].includes(currentSession.viewMode) && (!isClosed || isTrasladoRegreso)) ? `<button class="action-btn" onclick="editarBitacora('${o.id}', '${b.id}')" title="Editar Bitácora" style="padding:0.15rem; margin-left:0.5rem;"><i data-lucide="pencil" style="width:12px;height:12px;"></i></button>` : ''}
                 </div>
                 <div style="display:flex; align-items:center; gap:0.4rem;">
                   <span class="badge" style="background:rgba(16, 185, 129, 0.1); color:#10b981; border-radius:99px; padding:0.15rem 0.45rem; font-size:0.65rem; font-weight:700;">REPORTADO</span>
@@ -11138,9 +11145,17 @@ function guardarNotaBitacora() {
   }
 
   const isAdmin = ['superadmin', 'admin'].includes(currentSession.viewMode);
+  const isTraslado = document.getElementById('modal-bitacora-title')?.textContent === 'Registrar Traslado de Regreso';
+  let hrsRegCalc = horasRegreso ? parseFloat(horasRegreso) : null;
+  if (isTraslado && entrada && salida) {
+    const [hE, mE] = entrada.split(':').map(Number);
+    const [hS, mS] = salida.split(':').map(Number);
+    let diff = (hS * 60 + mS) - (hE * 60 + mE);
+    if (diff < 0) diff += 24 * 60;
+    hrsRegCalc = parseFloat((diff / 60).toFixed(2));
+  }
 
   if (!isAdmin) {
-    const isTraslado = document.getElementById('modal-bitacora-title')?.textContent === 'Registrar Traslado de Regreso';
     if (isTraslado) {
       let lastDateStr = o.firma_cliente_fecha || o.firma_tecnico_fecha;
       if (!lastDateStr) {
@@ -11246,7 +11261,7 @@ function guardarNotaBitacora() {
       o.bitacora[bIndex].entrada = entrada;
       o.bitacora[bIndex].salida = salida;
       o.bitacora[bIndex].horas_traslado = horasTraslado ? parseFloat(horasTraslado) : null;
-      o.bitacora[bIndex].horas_regreso = horasRegreso ? parseFloat(horasRegreso) : null;
+      o.bitacora[bIndex].horas_regreso = hrsRegCalc !== null ? hrsRegCalc : (horasRegreso ? parseFloat(horasRegreso) : null);
       o.bitacora[bIndex].realizado = true;
       actualizarEventoCalendarioDesdeBitacora(o, o.bitacora[bIndex]);
     }
@@ -11312,8 +11327,8 @@ function guardarNotaBitacora() {
       fecha_fin_regreso: bObjRef ? bObjRef.fecha_fin_regreso : null,
       hora_fin_regreso: bObjRef ? bObjRef.hora_fin_regreso : null,
       horas_traslado: horasTraslado ? parseFloat(horasTraslado) : (bObjRef ? bObjRef.horas_traslado : null),
-      horas_regreso: horasRegreso ? parseFloat(horasRegreso) : (bObjRef ? bObjRef.horas_regreso : null),
-      tipo: bObjRef ? bObjRef.tipo : 'Servicio'
+      horas_regreso: hrsRegCalc !== null ? hrsRegCalc : (horasRegreso ? parseFloat(horasRegreso) : (bObjRef ? bObjRef.horas_regreso : null)),
+      tipo: bObjRef ? bObjRef.tipo : (isTraslado ? 'Traslado' : 'Servicio')
     };
     o.bitacora.push(nuevaEntrada);
     actualizarEventoCalendarioDesdeBitacora(o, nuevaEntrada);
