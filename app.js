@@ -8638,63 +8638,69 @@ function abrirFormulario(id, modoReporte = false) {
   }
 
   // ===== Lógica de Autollenado de "Fecha de Servicio" desde PDF Extraído =====
-  if (window.supabaseClient && soporteActual) {
-    const elNoches = document.getElementById('f-noches');
-    const elAlimento = document.getElementById('f-alimentacion');
-
-    const nocVal = elNoches ? elNoches.value : '';
-    const isNewOrEmpty = (!id || nocVal === '' || nocVal === '0');
-    console.log('[Auto-fill PDF] Evaluando ticket_id:', soporteActual, 'isNewOrEmpty:', isNewOrEmpty);
-    
-    if (isNewOrEmpty) {
-      window.supabaseClient
-        .from('pdf_extracciones_ai')
-        .select('extras, conceptos')
-        .eq('ticket_id', soporteActual)
-        .order('fecha_extraccion', { ascending: false })
-        .limit(1)
-        .then(({ data, error }) => {
-          if (!error && data && data.length > 0) {
-            const ext = data[0].extras || [];
-            const viajeData = ext.find(x => x.isViajeData);
-            console.log('[Auto-fill PDF] Datos de logística encontrados:', viajeData);
-            if (viajeData) {
-              if (elNoches && (elNoches.value === '' || elNoches.value === '0')) {
-                 elNoches.value = viajeData.num_hospedaje || 0;
-                 console.log('[Auto-fill PDF] Llenado f-noches con:', viajeData.num_hospedaje);
-              }
-              if (elAlimento && (elAlimento.value === '' || elAlimento.value === '0')) {
-                 elAlimento.value = viajeData.num_alimento || 0;
-                 console.log('[Auto-fill PDF] Llenado f-alimentacion con:', viajeData.num_alimento);
-              }
-              const elTraslado = document.getElementById('f-traslado-costo');
-              if (elTraslado && (elTraslado.value === '' || elTraslado.value === '0')) {
-                 elTraslado.value = viajeData.num_traslado || 0;
-                 console.log('[Auto-fill PDF] Llenado f-traslado-costo con:', viajeData.num_traslado);
-              }
-            }
-            
-            // Auto-check Reembolso KM
-            const elReembolso = document.getElementById('f-reembolso-km');
-            if (elReembolso) {
-              const allItems = [...ext, ...(data[0].conceptos || [])];
-              const hasReembolso = allItems.some(x => !x.isViajeData && x.descripcion && x.descripcion.toLowerCase().includes('reembolso') && x.descripcion.toLowerCase().includes('km'));
-              if (hasReembolso) {
-                elReembolso.checked = true;
-                console.log('[Auto-fill PDF] Reembolso KM detectado y marcado.');
-              }
-            }
-          } else {
-             console.log('[Auto-fill PDF] No se encontró extracción en BD o hubo error', error);
-          }
-        })
-        .catch(err => console.warn('[Auto-fill PDF] Error:', err));
-    }
+  if (soporteActual) {
+    window.autoFillFromPdfExtraction(soporteActual, !id);
   }
 
   document.getElementById('modal-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
+
+window.autoFillFromPdfExtraction = function(ticketId, force = false) {
+  if (!window.supabaseClient || !ticketId) return;
+
+  const elNoches = document.getElementById('f-noches');
+  const elAlimento = document.getElementById('f-alimentacion');
+  
+  const nocVal = elNoches ? elNoches.value : '';
+  const isNewOrEmpty = force || (nocVal === '' || nocVal === '0');
+  console.log('[Auto-fill PDF] Evaluando ticket_id:', ticketId, 'isNewOrEmpty:', isNewOrEmpty);
+  
+  if (isNewOrEmpty) {
+    window.supabaseClient
+      .from('pdf_extracciones_ai')
+      .select('extras, conceptos')
+      .eq('ticket_id', ticketId)
+      .order('fecha_extraccion', { ascending: false })
+      .limit(1)
+      .then(({ data, error }) => {
+        if (!error && data && data.length > 0) {
+          const ext = data[0].extras || [];
+          const viajeData = ext.find(x => x.isViajeData);
+          console.log('[Auto-fill PDF] Datos de logística encontrados:', viajeData);
+          if (viajeData) {
+            if (elNoches && (elNoches.value === '' || elNoches.value === '0')) {
+               elNoches.value = viajeData.num_hospedaje || 0;
+               console.log('[Auto-fill PDF] Llenado f-noches con:', viajeData.num_hospedaje);
+            }
+            if (elAlimento && (elAlimento.value === '' || elAlimento.value === '0')) {
+               elAlimento.value = viajeData.num_alimento || 0;
+               console.log('[Auto-fill PDF] Llenado f-alimentacion con:', viajeData.num_alimento);
+            }
+            const elTraslado = document.getElementById('f-traslado-costo');
+            if (elTraslado && (elTraslado.value === '' || elTraslado.value === '0')) {
+               elTraslado.value = viajeData.num_traslado || 0;
+               console.log('[Auto-fill PDF] Llenado f-traslado-costo con:', viajeData.num_traslado);
+            }
+          }
+          
+          // Auto-check Reembolso KM
+          const elReembolso = document.getElementById('f-reembolso-km');
+          if (elReembolso) {
+            const allItems = [...ext, ...(data[0].conceptos || [])];
+            const hasReembolso = allItems.some(x => !x.isViajeData && x.descripcion && x.descripcion.toLowerCase().includes('reembolso') && x.descripcion.toLowerCase().includes('km'));
+            if (hasReembolso) {
+              elReembolso.checked = true;
+              console.log('[Auto-fill PDF] Reembolso KM detectado y marcado.');
+            }
+          }
+        } else {
+           console.log('[Auto-fill PDF] No se encontró extracción en BD o hubo error', error);
+        }
+      })
+      .catch(err => console.warn('[Auto-fill PDF] Error:', err));
+  }
+};
 
 function onSoporteChange() {
   const soporteId = document.getElementById('f-soporte').value;
@@ -8742,6 +8748,9 @@ function onSoporteChange() {
       if (inHorometro && t.horometro && (!editandoId || !inHorometro.value)) {
         inHorometro.value = t.horometro;
       }
+      
+      // Auto-fill logística and Reembolso KM from PDF
+      window.autoFillFromPdfExtraction(t.id, true);
       
       // Técnicos se extraen en background durante el guardado
       
