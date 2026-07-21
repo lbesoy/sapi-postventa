@@ -79,7 +79,10 @@ function renderLevantamientos() {
 
 function window_abrirModalNuevoLevantamiento() {
   const id = (typeof uuidv4 === 'function') ? uuidv4() : crypto.randomUUID();
-  const folio = 'LEV-' + new Date().getFullYear().toString().slice(-2) + '-' + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  let folio = 'LEV-' + new Date().getFullYear().toString().slice(-2) + '-' + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  if (typeof isTestModeActive === 'function' && isTestModeActive()) {
+    folio = '[PRUEBA] ' + folio;
+  }
   
   const m = document.createElement('div');
   m.id = 'modal-nuevo-levantamiento';
