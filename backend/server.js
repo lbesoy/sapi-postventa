@@ -592,7 +592,7 @@ app.post('/api/extract-pdf', async (req, res) => {
 1. Document Number (Número de documento / Folio / Número de cotización / Pedido). It's usually a 7-digit number (e.g. 1100001) or similar format.
 2. Total Amount (Importe TOTAL / Total / Monto / Subtotal + Impuestos). It must be a decimal number representing the final total amount, e.g. 135043.49.
 3. Client Code (CardCode, e.g. CL029) or Client Name (e.g. Concretos Delese).
-4. Items table (Artículos / Partidas / Conceptos). Extract an array of items, where each item has the main columns:
+5. Items table (Artículos / Partidas / Conceptos). Extract an array of items, where each item has the main columns:
    - "descripcion" (Descripción)
    - "cantidad" (Cantidad)
    - "unidad_medida" (Unidad de medida)
@@ -601,6 +601,7 @@ app.post('/api/extract-pdf', async (req, res) => {
    - "precio" (Precio)
    - "impuesto_porcentaje" (Impuesto %)
    - "total" (Total)
+   CRITICAL: You MUST extract EVERY SINGLE item row from the table. Do NOT skip, summarize, or omit any items. Read all pages of the document to ensure 100% completeness.
 
 5. Travel Details (Detalles de Viaje / Logística). If the document mentions travel logistics (like locations for toll booths/KM, lodging, or food in the items), extract them into an object.
    - "origen": The starting location (e.g. CDMX).

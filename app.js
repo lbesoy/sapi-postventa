@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.255'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.263'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -742,6 +742,9 @@ window.addEventListener('supabase_datos_cargados', async () => {
     sitiosDb = safeGetJSON('sapi_sitios_db', []);
     tecnicosDb = safeGetJSON('sapi_tecnicos_db', []);
     gastos = safeGetJSON('sapi_gastos', []);
+    if (typeof window.levantamientos === 'undefined' || window.levantamientos) {
+      window.levantamientos = safeGetJSON('sapi_levantamientos', []);
+    }
     claraMockTxs = safeGetJSON('sapi_clara_mock_txs', claraMockTxs);
 
     usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
@@ -809,6 +812,9 @@ window.addEventListener('supabase_datos_cargados', async () => {
     }
     if (typeof renderCalendario === 'function' && document.getElementById('view-calendario')?.classList.contains('active')) {
       renderCalendario();
+    }
+    if (typeof renderLevantamientos === 'function' && document.getElementById('view-levantamientos')?.classList.contains('active')) {
+      renderLevantamientos();
     }
     
     // Re-aplicar rol para asegurar que el role-switcher se muestre si el usuario recién se descargó
@@ -1999,11 +2005,13 @@ function updateTopbarButtons(view, role) {
   const btnTicket = document.getElementById('btn-nuevo-ticket');
   const btnCliente = document.getElementById('btn-nuevo-cliente');
   const btnMaquina = document.getElementById('btn-agregar-maquina');
+  const btnLevantamiento = document.getElementById('btn-nuevo-levantamiento');
 
   if (btnOrden) btnOrden.style.display = 'none';
   if (btnTicket) btnTicket.style.display = 'none';
   if (btnCliente) btnCliente.style.display = 'none';
   if (btnMaquina) btnMaquina.style.display = 'none';
+  if (btnLevantamiento) btnLevantamiento.style.display = 'none';
 
   const allowedToCreateClientsAndMachines = ['superadmin', 'admin', 'supervisor'].includes(role);
 
@@ -2014,6 +2022,8 @@ function updateTopbarButtons(view, role) {
     if (btnMaquina && allowedToCreateClientsAndMachines) btnMaquina.style.display = '';
   } else if (view === 'servicios') {
     if (btnOrden && ['superadmin', 'admin', 'supervisor'].includes(role)) btnOrden.style.display = '';
+  } else if (view === 'levantamientos') {
+    if (btnLevantamiento && ['superadmin', 'admin', 'supervisor', 'tecnico'].includes(role)) btnLevantamiento.style.display = '';
   }
 }
 
@@ -8223,6 +8233,11 @@ function getRefacciones(section) {
       item.precio = row.querySelector('.ref-precio')?.value;
       item.fotoUrl = row.querySelector('.ref-foto-url')?.value || '';
     }
+    
+    if (row.hasAttribute('data-from-pdf')) {
+      item.isFromPdf = true;
+    }
+    
     result.push(item);
   });
   return result;
@@ -8296,6 +8311,7 @@ function setRefacciones(section, items) {
     }
     
     if (item.isFromPdf) {
+      row.setAttribute('data-from-pdf', 'true');
       const delBtn = row.querySelector('.btn-del-ref');
       if (delBtn) delBtn.style.display = 'none';
       
