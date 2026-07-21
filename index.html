@@ -379,7 +379,7 @@
         </div>
       </div>
 
-      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: var(--text-muted);" id="login-app-version">v1.3.256</div>
+      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: var(--text-muted);" id="login-app-version">v1.3.264</div>
     </div>
   </div>
 
@@ -452,7 +452,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version" id="app-sidebar-version">v1.3.256</div>
+          <div class="sidebar-version" id="app-sidebar-version">v1.3.264</div>
         </div>
       </div>
     </aside>
@@ -518,6 +518,8 @@
                 class="btn-icon"></i> <span class="btn-text">Nueva Orden</span></button>
             <button class="btn-primary btn-ticket-action" id="btn-nuevo-ticket" onclick="abrirTicket()"
               style="display:none;"><i data-lucide="plus" class="btn-icon"></i> <span class="btn-text">Nuevo Ticket</span></button>
+            <button class="btn-primary btn-lev-action" id="btn-nuevo-levantamiento" onclick="window.abrirModalNuevoLevantamiento()"
+              style="display:none;"><i data-lucide="plus" class="btn-icon"></i> <span class="btn-text">Nuevo Levantamiento</span></button>
             <button class="btn-secondary btn-cliente-action" id="btn-agregar-maquina"
               onclick="abrirModalAgregarMaquina()" style="display:none;"><i data-lucide="settings-2"
                 class="btn-icon"></i> <span class="btn-text">Agregar Máquina</span></button>
@@ -1999,7 +2001,7 @@
                     <div class="toggle-label">Versión de la Aplicación</div>
                     <div class="toggle-sub">Versión actualmente cargada</div>
                   </div>
-                  <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); background: var(--bg-body); padding: 0.25rem 0.6rem; border: 1px solid var(--border); border-radius: 4px;" id="app-profile-version">v1.3.256</div>
+                  <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); background: var(--bg-body); padding: 0.25rem 0.6rem; border: 1px solid var(--border); border-radius: 4px;" id="app-profile-version">v1.3.264</div>
                 </div>
                 <div class="toggle-row" style="border-top: 1px dashed var(--border); padding-top: 0.85rem; margin-top: 0.25rem; flex-direction: column; align-items: stretch; gap: 0.5rem;">
                   <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -2147,27 +2149,37 @@
 
         <!-- LEVANTAMIENTOS VIEW -->
         <div id="view-levantamientos" class="view">
-          <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem;">
-            <div>
-              <h2 style="font-size:1.5rem; margin-bottom:0.25rem;">Levantamientos de Campo</h2>
-              <p style="color:var(--text-secondary); margin:0;">Gestión de visitas técnicas de inspección sin flujo de cotización/pedido</p>
+          <div style="height: 3rem; width: 100%; flex-shrink: 0;"></div>
+          <div class="stats-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+            <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoLevantamientos('todos')">
+              <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="file-text"></i></div>
+              <div>
+                <div class="stat-label">Total</div>
+                <div class="stat-value" id="stat-lev-total">0</div>
+              </div>
             </div>
-            <button class="btn-primary" onclick="window.abrirModalNuevoLevantamiento()">
-              <i data-lucide="plus"></i> Nuevo Levantamiento
-            </button>
+            <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoLevantamientos('Pendiente')">
+              <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-circle"></i></div>
+              <div>
+                <div class="stat-label">Pendientes</div>
+                <div class="stat-value" id="stat-lev-pendientes">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoLevantamientos('Completado')">
+              <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle"></i></div>
+              <div>
+                <div class="stat-label">Completados</div>
+                <div class="stat-value" id="stat-lev-completados">0</div>
+              </div>
+            </div>
           </div>
           
-          <div class="filters-row" style="margin-bottom:1rem; display:flex; gap:0.5rem;">
-            <select id="filter-lev-estado" onchange="renderLevantamientos()" class="form-select">
-              <option value="todos">Todos los Estados</option>
-              <option value="Pendiente">Pendientes</option>
-              <option value="Completado">Completados</option>
-            </select>
-            <input type="text" id="search-levantamientos" placeholder="Buscar por folio, cliente, sitio..." oninput="renderLevantamientos()" style="flex:1;" />
+          <div style="margin-bottom:1rem; display:flex;">
+            <input type="text" id="search-levantamientos" placeholder="Buscar por folio, cliente, sitio..." oninput="renderLevantamientos()" style="flex:1; max-width: 400px; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px;" />
           </div>
 
           <div class="table-container">
-            <table>
+            <table class="orders-table" style="width:100%; border-collapse:collapse; text-align:left;">
               <thead>
                 <tr>
                   <th>Folio</th>
@@ -5631,8 +5643,8 @@
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
         "supabaseSync.js?v=252",
-        "app.js?v=256",
-        "levantamientos.js?v=256"
+        "app.js?v=264",
+        "levantamientos.js?v=264"
       ];
       var index = 0;
       function loadNext() {

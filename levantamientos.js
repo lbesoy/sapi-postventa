@@ -1,16 +1,37 @@
 // Lógica para Levantamientos de Campo
+let currentLevantamientosFilter = 'todos';
+
+window.setFiltroEstadoLevantamientos = function(estado) {
+  currentLevantamientosFilter = estado;
+  renderLevantamientos();
+};
+
 function renderLevantamientos() {
   const tbody = document.getElementById('levantamientos-table-body');
   if (!tbody) return;
   tbody.innerHTML = '';
   
-  const filterEstado = document.getElementById('filter-lev-estado')?.value || 'todos';
   const searchTerm = (document.getElementById('search-levantamientos')?.value || '').toLowerCase();
   
   let list = levantamientos || [];
   
-  if (filterEstado !== 'todos') {
-    list = list.filter(l => l.estado === filterEstado);
+  // Filter by Sandbox mode
+  if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+    const activeSandbox = isTestModeActive();
+    list = list.filter(l => isTestData(l) === activeSandbox);
+  }
+  
+  // Update stats before filtering
+  const total = list.length;
+  const pendientes = list.filter(l => l.estado !== 'Completado').length;
+  const completados = list.filter(l => l.estado === 'Completado').length;
+  
+  if (document.getElementById('stat-lev-total')) document.getElementById('stat-lev-total').textContent = total;
+  if (document.getElementById('stat-lev-pendientes')) document.getElementById('stat-lev-pendientes').textContent = pendientes;
+  if (document.getElementById('stat-lev-completados')) document.getElementById('stat-lev-completados').textContent = completados;
+  
+  if (currentLevantamientosFilter !== 'todos') {
+    list = list.filter(l => l.estado === currentLevantamientosFilter || (currentLevantamientosFilter === 'Pendiente' && l.estado !== 'Completado'));
   }
   
   if (searchTerm) {
@@ -32,15 +53,15 @@ function renderLevantamientos() {
   list.forEach(l => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td style="font-weight:600; color:var(--text-primary);">${l.folio || 'N/A'}</td>
-      <td>${l.cliente || 'No especificado'}</td>
-      <td>${l.sitio || 'No especificado'}</td>
-      <td>${l.solicitante || 'N/A'}</td>
-      <td>${l.fecha_esperada ? l.fecha_esperada.substring(0,10) : 'N/A'}</td>
-      <td>
+      <td data-label="Folio" style="font-weight:600; color:var(--text-primary);">${l.folio || 'N/A'}</td>
+      <td data-label="Cliente">${l.cliente || 'No especificado'}</td>
+      <td data-label="Sitio">${l.sitio || 'No especificado'}</td>
+      <td data-label="Solicitante">${l.solicitante || 'N/A'}</td>
+      <td data-label="Fecha Esperada">${l.fecha_esperada ? l.fecha_esperada.substring(0,10) : 'N/A'}</td>
+      <td data-label="Estado">
         <span style="font-size:0.75rem; font-weight:700; padding:0.25rem 0.6rem; border-radius:999px; ${l.estado === 'Completado' ? 'background:rgba(16, 185, 129, 0.1); color:#10b981;' : 'background:rgba(239, 68, 68, 0.1); color:#ef4444;'}">${l.estado || 'Pendiente'}</span>
       </td>
-      <td>
+      <td data-label="Acciones">
         <button class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.8rem;" onclick="verDetalleLevantamiento('${l.id}')">Ver Detalle</button>
       </td>
     `;
@@ -201,6 +222,30 @@ function verDetalleLevantamiento(id) {
         <label style="display:block; font-weight:600; margin-bottom:0.25rem;">Notas del Técnico</label>
         <textarea id="det-lev-notas" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border); min-height:80px;" ${isCompleted ? 'disabled' : ''}>${lev.notas_tecnico || ''}</textarea>
       </div>
+
+      <div style="margin-bottom:1.5rem;">
+        <label style="display:block; font-weight:600; margin-bottom:0.5rem;">Refacciones Necesarias</label>
+        <div id="det-lev-refacciones-list" style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:0.75rem;">
+          ${(lev.refacciones || []).map((r, i) => `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-body); padding:0.5rem 0.75rem; border:1px solid var(--border); border-radius:6px; font-size:0.8rem;">
+              <div><strong>${r.cantidad}x</strong> [${r.refaccion}] ${r.descripcion}</div>
+              ${!isCompleted ? `<button type="button" onclick="eliminarRefaccionLevantamiento('${id}', ${i})" style="color:var(--danger); background:none; border:none; cursor:pointer;"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>` : ''}
+            </div>
+          `).join('')}
+          ${(!lev.refacciones || lev.refacciones.length === 0) ? '<div style="font-size:0.8rem; color:var(--text-muted);">No se han agregado refacciones.</div>' : ''}
+        </div>
+        
+        ${!isCompleted ? `
+        <div style="display:flex; gap:0.5rem; align-items:center; background:var(--bg-body); padding:0.5rem; border-radius:6px; border:1px dashed var(--border);">
+          <select id="det-lev-nueva-ref" style="flex:1; padding:0.4rem; border-radius:4px; border:1px solid var(--border); font-size:0.8rem;">
+            <option value="">-- Seleccionar Refacción --</option>
+            ${(typeof refaccionesDb !== 'undefined' ? refaccionesDb : []).map(r => '<option value="' + (r.material || r.id) + '|' + (r.descripcion_material || r.nombre || '') + '">' + (r.material || r.id) + ' - ' + (r.descripcion_material || r.nombre || '') + '</option>').join('')}
+          </select>
+          <input type="number" id="det-lev-nueva-ref-cant" placeholder="Cant." min="1" value="1" style="width:70px; padding:0.4rem; border-radius:4px; border:1px solid var(--border); font-size:0.8rem;">
+          <button type="button" class="btn-secondary" onclick="agregarRefaccionLevantamiento('${id}')" style="padding:0.4rem 0.75rem; font-size:0.8rem;">Agregar</button>
+        </div>
+        ` : ''}
+      </div>
       
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <button type="button" class="btn-secondary" onclick="document.getElementById('modal-detalle-levantamiento').remove()">Cerrar</button>
@@ -209,7 +254,52 @@ function verDetalleLevantamiento(id) {
     </div>
   `;
   document.body.appendChild(m);
+  
+  if (!isCompleted && typeof window.initSearchableSelect === 'function') {
+    window.initSearchableSelect('det-lev-nueva-ref', 'Buscar refacción...');
+  }
 }
+
+window.agregarRefaccionLevantamiento = function(id) {
+  const lev = levantamientos.find(l => l.id === id);
+  if (!lev) return;
+  
+  const select = document.getElementById('det-lev-nueva-ref');
+  const cantInput = document.getElementById('det-lev-nueva-ref-cant');
+  
+  if (!select.value) {
+    alert('Por favor selecciona una refacción.');
+    return;
+  }
+  
+  const parts = select.value.split('|');
+  const ref = {
+    refaccion: parts[0],
+    descripcion: parts[1] || '',
+    cantidad: parseInt(cantInput.value) || 1
+  };
+  
+  lev.refacciones = lev.refacciones || [];
+  lev.refacciones.push(ref);
+  
+  if (typeof safeSetJSON === 'function') safeSetJSON('sapi_levantamientos', levantamientos);
+  
+  // Re-render modal details
+  document.getElementById('modal-detalle-levantamiento').remove();
+  verDetalleLevantamiento(id);
+};
+
+window.eliminarRefaccionLevantamiento = function(id, index) {
+  const lev = levantamientos.find(l => l.id === id);
+  if (!lev || !lev.refacciones) return;
+  
+  lev.refacciones.splice(index, 1);
+  if (typeof safeSetJSON === 'function') safeSetJSON('sapi_levantamientos', levantamientos);
+  
+  // Re-render modal details
+  document.getElementById('modal-detalle-levantamiento').remove();
+  verDetalleLevantamiento(id);
+};
 
 function actualizarLevantamiento(id, campo, valor) {
   const lev = levantamientos.find(l => l.id === id);
@@ -233,6 +323,13 @@ function completarLevantamiento(id) {
   lev.estado = 'Completado';
   
   if (typeof safeSetJSON === 'function') safeSetJSON('sapi_levantamientos', levantamientos);
+  if (window.supabaseClient && window.updateInSupabase) {
+    window.updateInSupabase('levantamientos', lev.id, { 
+      estado: lev.estado, 
+      notas_tecnico: lev.notas_tecnico,
+      refacciones: lev.refacciones || []
+    });
+  }
   if (window.supabaseClient && window.pushToSupabase) {
     window.pushToSupabase('levantamientos', lev);
   }
