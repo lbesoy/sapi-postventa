@@ -234,7 +234,7 @@
   <script src="https://js.live.net/v7.2/OneDrive.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=53" />
+  <link rel="stylesheet" href="style.css?v=54" />
   <!-- PWA & Mobile Web App Capabilities -->
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="logo_transparent.png" type="image/png" />
@@ -379,7 +379,7 @@
         </div>
       </div>
 
-      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: var(--text-muted);" id="login-app-version">v1.3.244</div>
+      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: var(--text-muted);" id="login-app-version">v1.3.256</div>
     </div>
   </div>
 
@@ -398,6 +398,10 @@
         <a href="#" class="nav-item" data-view="tickets" data-title="Tickets" id="nav-tickets">
           <span class="nav-icon"><i data-lucide="ticket"></i></span><span>Tickets</span>
           <span class="nav-badge" id="nav-badge-tickets"></span>
+        </a>
+        <a href="#" class="nav-item" data-view="levantamientos" data-title="Levantamientos" id="nav-levantamientos">
+          <span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span>Levantamientos</span>
+          <span class="nav-badge" id="nav-badge-levantamientos"></span>
         </a>
         <a href="#" class="nav-item" data-view="servicios" data-title="Órdenes de Servicio" id="nav-servicios">
           <span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span>Órdenes de Servicio</span>
@@ -448,7 +452,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version" id="app-sidebar-version">v1.3.244</div>
+          <div class="sidebar-version" id="app-sidebar-version">v1.3.256</div>
         </div>
       </div>
     </aside>
@@ -957,6 +961,10 @@
              <div style="display: flex; align-items: center; gap: 0.4rem;">
               <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #475569; flex-shrink: 0;"></span>
               <span style="color: var(--text-primary); font-weight: 500;">Traslado</span>
+            </div>
+             <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #d946ef; flex-shrink: 0;"></span>
+              <span style="color: var(--text-primary); font-weight: 500;">Levantamiento</span>
             </div>
           </div>
 
@@ -1991,7 +1999,7 @@
                     <div class="toggle-label">Versión de la Aplicación</div>
                     <div class="toggle-sub">Versión actualmente cargada</div>
                   </div>
-                  <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); background: var(--bg-body); padding: 0.25rem 0.6rem; border: 1px solid var(--border); border-radius: 4px;" id="app-profile-version">v1.3.244</div>
+                  <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); background: var(--bg-body); padding: 0.25rem 0.6rem; border: 1px solid var(--border); border-radius: 4px;" id="app-profile-version">v1.3.256</div>
                 </div>
                 <div class="toggle-row" style="border-top: 1px dashed var(--border); padding-top: 0.85rem; margin-top: 0.25rem; flex-direction: column; align-items: stretch; gap: 0.5rem;">
                   <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -2134,6 +2142,47 @@
               </div>
             </div>
 
+          </div>
+        </div>
+
+        <!-- LEVANTAMIENTOS VIEW -->
+        <div id="view-levantamientos" class="view">
+          <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem;">
+            <div>
+              <h2 style="font-size:1.5rem; margin-bottom:0.25rem;">Levantamientos de Campo</h2>
+              <p style="color:var(--text-secondary); margin:0;">Gestión de visitas técnicas de inspección sin flujo de cotización/pedido</p>
+            </div>
+            <button class="btn-primary" onclick="window.abrirModalNuevoLevantamiento()">
+              <i data-lucide="plus"></i> Nuevo Levantamiento
+            </button>
+          </div>
+          
+          <div class="filters-row" style="margin-bottom:1rem; display:flex; gap:0.5rem;">
+            <select id="filter-lev-estado" onchange="renderLevantamientos()" class="form-select">
+              <option value="todos">Todos los Estados</option>
+              <option value="Pendiente">Pendientes</option>
+              <option value="Completado">Completados</option>
+            </select>
+            <input type="text" id="search-levantamientos" placeholder="Buscar por folio, cliente, sitio..." oninput="renderLevantamientos()" style="flex:1;" />
+          </div>
+
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Folio</th>
+                  <th>Cliente</th>
+                  <th>Sitio</th>
+                  <th>Solicitante</th>
+                  <th>Fecha Esperada</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="levantamientos-table-body">
+                <!-- Se llena con JS -->
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -5582,7 +5631,8 @@
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
         "supabaseSync.js?v=252",
-        "app.js?v=244"
+        "app.js?v=256",
+        "levantamientos.js?v=256"
       ];
       var index = 0;
       function loadNext() {
