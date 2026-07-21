@@ -1520,7 +1520,9 @@ async function _processSyncQueueInternal() {
                       usuario_id: isValidUUID(activeUserId) ? activeUserId : null
                     };
                     const { error: upsertHoroErr } = await sb.from('maquinaria_horometros').upsert(horoPayload, { onConflict: 'id' });
-                    if (upsertHoroErr) throw upsertHoroErr;
+                    if (upsertHoroErr) {
+                      console.error('[Sync] Error upserting horometro (ignored):', upsertHoroErr);
+                    }
                   }
                 }
               }
