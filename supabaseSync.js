@@ -372,6 +372,16 @@ function ordenToRow(o) {
   ];
   knownKeys.forEach(k => delete customData[k]);
   
+  if (o.ref_utilizadas) {
+    const pdfFlags = {};
+    o.ref_utilizadas.forEach(r => {
+      if (r.isFromPdf) pdfFlags[r.descripcion] = true;
+    });
+    if (Object.keys(pdfFlags).length > 0) {
+      customData.pdfRefFlags = pdfFlags;
+    }
+  }
+  
   const notasJSON = JSON.stringify(customData);
 
   // Buscar sitio_id en localStorage
@@ -2525,6 +2535,21 @@ window.cargarDatosDeSupabase = function() {
       localStorage.setItem('sapi_maquinaria_db', JSON.stringify(mapped));
     }
 
+    // Levantamientos
+    try {
+      const { data: levantamientosDb, error: levErr } = await sb.from('levantamientos').select('*');
+      if (levantamientosDb && !levErr) {
+        localStorage.setItem('sapi_levantamientos', JSON.stringify(levantamientosDb));
+        if (typeof window.levantamientos !== 'undefined') {
+          window.levantamientos = levantamientosDb;
+        }
+      } else if (levErr) {
+        console.error('[Sync] Error loading levantamientos:', levErr);
+      }
+    } catch (e) {
+      console.error('[Sync] Exception loading levantamientos:', e);
+    }
+
     // Órdenes — mismo principio
     const { data: ordenes, error: ordenesError } = await sb.from('ordenes').select('*');
     window.lastSyncOrdsLength = ordenes ? ordenes.length : -1;
@@ -2674,6 +2699,15 @@ window.cargarDatosDeSupabase = function() {
         
         // Re-inyectar refacciones
         const refLink = refaccionesMap[ord.id] || { necesarias: [], utilizadas: [] };
+        
+        if (ord.pdfRefFlags) {
+          refLink.utilizadas.forEach(r => {
+            if (ord.pdfRefFlags[r.descripcion]) {
+              r.isFromPdf = true;
+            }
+          });
+        }
+        
         ord.ref_necesarias = refLink.necesarias;
         ord.ref_utilizadas = refLink.utilizadas;
         

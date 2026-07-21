@@ -601,7 +601,7 @@ app.post('/api/extract-pdf', async (req, res) => {
    - "precio" (Precio)
    - "impuesto_porcentaje" (Impuesto %)
    - "total" (Total)
-   CRITICAL: You MUST extract EVERY SINGLE item row from the table. Do NOT skip, summarize, or omit any items. Read all pages of the document to ensure 100% completeness.
+   CRITICAL: You MUST extract EVERY SINGLE item row from the table into this array. Do NOT skip, summarize, or omit any items. Even if an item is related to travel logistics, lodging, or food, you MUST STILL include it in the Items array. Read all pages of the document to ensure 100% completeness.
 
 5. Travel Details (Detalles de Viaje / Logística). If the document mentions travel logistics (like locations for toll booths/KM, lodging, or food in the items), extract them into an object.
    - "origen": The starting location (e.g. CDMX).
