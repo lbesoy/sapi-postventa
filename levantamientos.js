@@ -137,10 +137,13 @@ function window_abrirModalNuevoLevantamiento() {
 
       <div style="margin-bottom:1.5rem;">
         <label style="display:block; font-weight:600; margin-bottom:0.25rem;">Asignado A (Opcional)</label>
-        <select id="nl-asignado" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border);">
-          <option value="">-- Sin Asignar --</option>
-          ${(typeof usuarios !== 'undefined' ? usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false) : []).map(u => '<option value="' + u.nombre + '">' + u.nombre + '</option>').join('')}
-        </select>
+        <div id="nl-asignado" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem;">
+          ${(typeof usuarios !== 'undefined' ? usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false) : []).map(u => `
+            <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; font-size: 0.8rem;">
+              <input type="checkbox" value="${u.nombre}" class="nl-asignado-cb"> ${u.nombre}
+            </label>
+          `).join('')}
+        </div>
       </div>
       
       <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
@@ -218,11 +221,18 @@ function verDetalleLevantamiento(id) {
         <div><strong style="color:var(--text-secondary);font-size:0.8rem;">Fecha Esperada</strong><br>${lev.fecha_esperada || '-'}</div>
         <div style="grid-column: 1 / -1;">
           <strong style="color:var(--text-secondary);font-size:0.8rem;">Asignado A</strong><br>
-          ${isCompleted ? (lev.asignado_a || '-') : `
-            <select id="det-lev-asignado" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border); margin-top:0.25rem;" onchange="actualizarLevantamiento('${id}', 'asignado_a', this.value)">
-              <option value="">-- Sin Asignar --</option>
-              ${(typeof usuarios !== 'undefined' ? usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false) : []).map(u => '<option value="' + u.nombre + '" ' + (lev.asignado_a === u.nombre ? 'selected' : '') + '>' + u.nombre + '</option>').join('')}
-            </select>
+          ${isCompleted ? (lev.tecnico_asignado || '-') : `
+            <div id="det-lev-asignado-container" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; margin-top: 0.25rem;">
+              ${(typeof usuarios !== 'undefined' ? usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false) : []).map(u => {
+                const assignedList = (lev.tecnico_asignado || '').split(',').map(s => s.trim());
+                const isChecked = assignedList.includes(u.nombre);
+                return `
+                <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; font-size: 0.8rem;">
+                  <input type="checkbox" value="${u.nombre}" class="det-lev-asignado-cb" ${isChecked ? 'checked' : ''} onchange="actualizarAsignadosLevantamiento('${id}')"> ${u.nombre}
+                </label>
+                `;
+              }).join('')}
+            </div>
           `}
         </div>
       </div>
@@ -235,6 +245,27 @@ function verDetalleLevantamiento(id) {
       <div style="margin-bottom:1.5rem;">
         <label style="display:block; font-weight:600; margin-bottom:0.25rem;">Notas del Técnico</label>
         <textarea id="det-lev-notas" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border); min-height:80px;" ${isCompleted ? 'disabled' : ''}>${lev.notas_tecnico || ''}</textarea>
+      </div>
+
+      <div style="margin-bottom:1.5rem;">
+        <label style="display:block; font-weight:600; margin-bottom:0.5rem;">Evidencia Fotográfica</label>
+        ${!isCompleted ? `
+          <div style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:0.5rem;">
+            <input type="file" id="det-lev-ev1" accept="image/*" style="font-size:0.8rem;" />
+            <input type="file" id="det-lev-ev2" accept="image/*" style="font-size:0.8rem;" />
+            <input type="file" id="det-lev-ev3" accept="image/*" style="font-size:0.8rem;" />
+          </div>
+          <small style="color:var(--text-muted); font-size:0.75rem;">Las evidencias actuales se conservarán si no seleccionas nuevas.</small>
+        ` : ''}
+        ${lev.evidencias ? `
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
+            ${Object.entries(lev.evidencias).map(([k, url]) => `
+              <a href="${url}" target="_blank" style="display:block; width:80px; height:80px; border-radius:6px; overflow:hidden; border:1px solid var(--border);">
+                <img src="${url}" style="width:100%; height:100%; object-fit:cover;" title="${k}" />
+              </a>
+            `).join('')}
+          </div>
+        ` : '<div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.25rem;">No se han agregado evidencias.</div>'}
       </div>
 
       <div style="margin-bottom:1.5rem;">
@@ -324,10 +355,16 @@ function actualizarLevantamiento(id, campo, valor) {
   if (window.supabaseClient && window.updateInSupabase) {
     window.updateInSupabase('levantamientos', lev.id, { [campo]: valor });
   }
-  renderLevantamientos();
+  // No re-render here to avoid losing focus/state if they are typing or checking multiple boxes
 }
 
-function completarLevantamiento(id) {
+window.actualizarAsignadosLevantamiento = function(id) {
+  const checkboxes = Array.from(document.querySelectorAll('.det-lev-asignado-cb:checked'));
+  const asignados = checkboxes.map(cb => cb.value).join(', ');
+  actualizarLevantamiento(id, 'tecnico_asignado', asignados);
+};
+
+window.completarLevantamiento = async function(id) {
   const lev = levantamientos.find(l => l.id === id);
   if (!lev) return;
   
@@ -335,6 +372,27 @@ function completarLevantamiento(id) {
   
   lev.notas_tecnico = document.getElementById('det-lev-notas').value;
   lev.estado = 'Completado';
+  
+  // Read evidences if any
+  let filePromises = [];
+  const ev1 = document.getElementById('det-lev-ev1');
+  const ev2 = document.getElementById('det-lev-ev2');
+  const ev3 = document.getElementById('det-lev-ev3');
+  
+  if (!lev.evidencias) lev.evidencias = {};
+  if (!lev.evidencias_base64) lev.evidencias_base64 = {};
+
+  if (ev1 && ev1.files.length > 0) filePromises.push(readFileAsBase64(ev1.files[0]).then(b64 => { lev.evidencias_base64.evidencia1 = b64; }));
+  if (ev2 && ev2.files.length > 0) filePromises.push(readFileAsBase64(ev2.files[0]).then(b64 => { lev.evidencias_base64.evidencia2 = b64; }));
+  if (ev3 && ev3.files.length > 0) filePromises.push(readFileAsBase64(ev3.files[0]).then(b64 => { lev.evidencias_base64.evidencia3 = b64; }));
+  
+  if (filePromises.length > 0) {
+    try {
+      await Promise.all(filePromises);
+    } catch (e) {
+      console.error("Error reading evidence files:", e);
+    }
+  }
   
   if (typeof safeSetJSON === 'function') safeSetJSON('sapi_levantamientos', levantamientos);
   if (window.supabaseClient && window.updateInSupabase) {

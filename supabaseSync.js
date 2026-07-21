@@ -1309,6 +1309,23 @@ async function _processSyncQueueInternal() {
               donde_comprar: item.data.dondeComprar || null,
               usuario_vinculado_id: (item.data.usuarioVinculadoId && item.data.usuarioVinculadoId.trim().length === 36) ? item.data.usuarioVinculadoId.trim() : null
             };
+          } else if (item.table === 'levantamientos') {
+            payload = { ...item.data };
+            // Upload Base64 evidences if any
+            if (payload.evidencias_base64) {
+              if (!payload.evidencias) payload.evidencias = {};
+              for (const [k, v] of Object.entries(payload.evidencias_base64)) {
+                if (v && v.startsWith('data:')) {
+                  try {
+                    const url = await window.uploadBase64ToStorage(v, 'evidencias', `levantamientos/${payload.folio}_${k}.jpg`);
+                    if (url) payload.evidencias[k] = url;
+                  } catch (e) {
+                    console.error('[Sync] Error subiendo evidencia de levantamiento:', e);
+                  }
+                }
+              }
+              delete payload.evidencias_base64;
+            }
           } else {
             payload = item.data;
           }
