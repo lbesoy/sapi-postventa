@@ -1598,6 +1598,26 @@ async function _processSyncQueueInternal() {
               console.error('[Sync] Error al marcar gasto local como sincronizado:', lgErr);
             }
           }
+          if (item.table === 'levantamientos' && !error) {
+            try {
+              const localLev = JSON.parse(localStorage.getItem('sapi_levantamientos') || '[]');
+              const idx = localLev.findIndex(l => l.id === item.data.id);
+              if (idx > -1) {
+                localLev[idx]._synced = true;
+                localStorage.setItem('sapi_levantamientos', JSON.stringify(localLev));
+                if (typeof window.levantamientos !== 'undefined') {
+                  const globalIdx = window.levantamientos.findIndex(l => l.id === item.data.id);
+                  if (globalIdx > -1) window.levantamientos[globalIdx]._synced = true;
+                }
+                if (typeof window.renderLevantamientos === 'function') {
+                  window.renderLevantamientos();
+                }
+                console.log(`[Sync] Marcado levantamiento local como sincronizado (_synced: true) para ${item.data.id}`);
+              }
+            } catch (llErr) {
+              console.error('[Sync] Error al marcar levantamiento local como sincronizado:', llErr);
+            }
+          }
         } else if (item.action === 'delete') {
           const { error: deleteErr } = await sb.from(resTabla).delete().eq('id', item.data.id);
           error = deleteErr;
@@ -3415,8 +3435,9 @@ window.uploadBase64ToStorage = async function(base64Data, bucketName, filePath) 
     return null;
   }
 
-  // Sanitizar el filePath para evitar caracteres prohibidos en Supabase Storage (como [, ], *, ?)
-  const sanitizedPath = (filePath || '').replace(/[\[\]\*?]/g, '');
+  // Sanitizar el filePath para evitar caracteres prohibidos en Supabase Storage
+  let sanitizedPath = decodeURIComponent(filePath || ''); // Convertir %20 a espacios reales primero
+  sanitizedPath = sanitizedPath.replace(/[^a-zA-Z0-9_\-\/\.]/g, '_'); // Reemplazar TODO lo que no sea seguro por _
 
   try {
     const blob = await window.base64ToBlob(base64Data);

@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.264'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.267'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -793,7 +793,7 @@ window.addEventListener('supabase_datos_cargados', async () => {
       renderTickets();
       renderTickets('dash-tickets');
     }
-    if (typeof updateTicketBadge === 'function') updateTicketBadge();
+    if (typeof updateTicketBadge === 'function') updateTicketBadge(); updateOrdenesBadge();
     
     if (typeof renderMaquinaria === 'function' && document.getElementById('view-maquinaria')?.classList.contains('active')) {
       renderMaquinaria();
@@ -1661,7 +1661,7 @@ function inicializarApp() {
   }
   
   try {
-    updateTicketBadge();
+    updateTicketBadge(); updateOrdenesBadge();
   } catch (err) {
     console.error('Error calling updateTicketBadge:', err);
   }
@@ -1835,7 +1835,7 @@ function actualizarVistaActual() {
   try { renderDashboardTecnicos(); } catch(e){}
   try { renderTecnicos(); } catch(e){}
   try { renderCalendario(); } catch(e){}
-  try { updateTicketBadge(); } catch(e){}
+  try { updateTicketBadge(); updateOrdenesBadge(); } catch(e){}
   if (typeof window.renderGastos === 'function') {
     try { window.renderGastos(); } catch(e){}
   }
@@ -1889,6 +1889,13 @@ function applyRole(rolKey) {
     // Show/hide role switcher
     const roleSwitcher = document.getElementById('role-switcher');
     if (roleSwitcher) roleSwitcher.style.display = (currentSession.realRol === 'superadmin') ? 'flex' : 'none';
+
+    // Show/hide weekly report button (ONLY superadmin or admin)
+    const repSemBtn = document.getElementById('btn-reporte-semanal-tecnicos');
+    if (repSemBtn) {
+      const isAdmin = ['superadmin', 'admin'].includes(rolKey);
+      repSemBtn.style.display = isAdmin ? 'flex' : 'none';
+    }
 
     // Sync role selector in modal if present
     const roleSelectModal = document.getElementById('role-select-modal');
@@ -2069,7 +2076,7 @@ function switchMode(rolKey) {
   localStorage.setItem('eurorep_session', JSON.stringify(currentSession));
   applyRole(rolKey);
   reRenderActiveView();
-  try { updateTicketBadge(); } catch(e){}
+  try { updateTicketBadge(); updateOrdenesBadge(); } catch(e){}
 }
 
 // ===== CONFIG =====
@@ -6560,11 +6567,11 @@ function abrirModalCliente() {
   const selectSup = document.getElementById('cl-supervisor');
   const selectTec = document.getElementById('cl-tecnico');
   if (selectSup) {
-    selectSup.innerHTML = usuarios.filter(u => ['superadmin','admin','supervisor'].includes(u.rol) && u.activo !== false)
+    selectSup.innerHTML = usuarios.filter(u => ['superadmin','admin','supervisor'].includes(u.rol) && u.activo !== false && (isTestModeActive() || !isTestUser(u)))
               .map(u => `<option value="${u.id}">${u.nombre} (${ROLES[u.rol]?.label || u.rol})</option>`).join('');
   }
   if (selectTec) {
-    selectTec.innerHTML = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false)
+    selectTec.innerHTML = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false && (isTestModeActive() || !isTestUser(u)))
               .map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
   }
 
@@ -7610,7 +7617,7 @@ function renderTecnicos() {
   
   // Combine legacy technitians from orders with actual registered user technitians and SAP technitians
   const legacyTecs = getFilteredOrders().map(o => o.tecnico).filter(Boolean).map(formatNombreCorto);
-  const userTecs = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol)).map(u => formatNombreCorto(u.nombre));
+  const userTecs = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && (isTestModeActive() || !isTestUser(u))).map(u => formatNombreCorto(u.nombre));
   const sapTecs = tecnicosDb.map(t => formatNombreCorto(t.nombre)).filter(Boolean);
   
   let tecsArr = [];
@@ -7627,6 +7634,7 @@ function renderTecnicos() {
     .filter(t => !t.toUpperCase().includes('N/A') && t.trim() !== '')
     .filter(t => {
       const tecObj = tecnicosDb.find(x => formatNombreCorto(x.nombre) === t) || usuarios.find(u => formatNombreCorto(u.nombre) === t);
+      if (tecObj && !isTestModeActive() && isTestUser(tecObj)) return false;
       const tRol = (tecObj?.tipoUsuario || tecObj?.rol || '').toLowerCase();
       return !tRol.includes('consulta');
     })
@@ -8159,7 +8167,7 @@ function agregarRef(section) {
     </div>
 
     <input type="text" placeholder="Clave" class="ref-clave" style="width:70px; padding: 0.45rem 0.4rem; font-size:0.8rem;" readonly />
-    <input type="number" placeholder="Cant." class="ref-cant" style="width:50px; padding: 0.45rem 0.4rem; font-size:0.8rem;" min="1" value="1"/>`;
+    <input type="number" placeholder="Cant." class="ref-cant" style="width:50px; padding: 0.45rem 0.4rem; font-size:0.8rem;" min="0" value="1"/>`;
     
   if (section === 'utilizadas') {
     html += `<input type="number" placeholder="Precio" class="ref-precio" style="width:70px; display:none; padding: 0.45rem 0.4rem; font-size:0.8rem;" step="0.01"/>
@@ -8172,7 +8180,8 @@ function agregarRef(section) {
         <div class="ref-foto-preview" style="display:none; color: #10b981; align-items:center; cursor:pointer;" title="Ver foto" onclick="previsualizarImagenCompleta(this.parentElement.querySelector('.ref-foto-url').value, 'Foto de Refacción')">
           <i data-lucide="check-circle" style="width:18px;height:18px;"></i>
         </div>
-      </div>`;
+      </div>
+      <div class="ref-discrepancia-msg" style="flex-basis: 100%; width: 100%; font-size: 0.72rem; font-weight: 500; margin-top: 0.3rem; margin-bottom: 0.15rem; padding: 0.25rem 0.6rem; border-radius: 6px; display: none; align-items: center; gap: 0.35rem; transition: all 0.2s ease;"></div>`;
   }
   
   html += `<button type="button" class="btn-del-ref" onclick="eliminarRef(this)">✕</button>`;
@@ -8208,7 +8217,54 @@ function agregarRef(section) {
   
   // Popular el select de marca en esta nueva fila
   window.popularSelectMarcas(idComboMarca, idComboDesc);
+  
+  const cantInput = row.querySelector('.ref-cant');
+  if (cantInput) {
+    cantInput.addEventListener('input', () => {
+      window.actualizarFilaDiscrepanciaRefaccion(row);
+    });
+  }
 }
+
+window.actualizarFilaDiscrepanciaRefaccion = function(row) {
+  const cantInput = row.querySelector('.ref-cant');
+  if (!cantInput) return;
+  const cant = parseFloat(cantInput.value || 0);
+  
+  const fotoContainer = row.querySelector('.ref-foto-container');
+  if (fotoContainer) {
+    if (cant === 0) {
+      fotoContainer.style.setProperty('display', 'none', 'important');
+    } else {
+      fotoContainer.style.setProperty('display', 'flex', 'important');
+    }
+  }
+  
+  if (row.hasAttribute('data-from-pdf')) {
+    const originalCant = parseFloat(row.getAttribute('data-original-pdf-cantidad') || 0);
+    const diff = cant - originalCant;
+    const msgEl = row.querySelector('.ref-discrepancia-msg');
+    if (msgEl) {
+      if (diff !== 0) {
+        msgEl.style.display = 'inline-flex';
+        if (cant === 0) {
+          msgEl.style.background = '#fef2f2';
+          msgEl.style.border = '1px solid #fee2e2';
+          msgEl.style.color = '#dc2626';
+          msgEl.innerHTML = `<i data-lucide="alert-triangle" style="width:13px; height:13px; flex-shrink:0;"></i> <span>Discrepancia: No se utilizó (Original PDF: ${originalCant})</span>`;
+        } else {
+          msgEl.style.background = '#fffbeb';
+          msgEl.style.border = '1px solid #fef3c7';
+          msgEl.style.color = '#d97706';
+          msgEl.innerHTML = `<i data-lucide="info" style="width:13px; height:13px; flex-shrink:0;"></i> <span>Discrepancia PDF: ${diff > 0 ? '+' : ''}${diff} unidades (Original: ${originalCant} vs Reportado: ${cant})</span>`;
+        }
+        if (window.lucide) window.lucide.createIcons({ root: msgEl });
+      } else {
+        msgEl.style.display = 'none';
+      }
+    }
+  }
+};
 
 function eliminarRef(btn) {
   const row = btn.closest('.ref-row');
@@ -8234,6 +8290,9 @@ function getRefacciones(section) {
     
     if (row.hasAttribute('data-from-pdf')) {
       item.isFromPdf = true;
+      const originalCant = parseFloat(row.getAttribute('data-original-pdf-cantidad') || 0);
+      item.originalPdfCantidad = originalCant;
+      item.diferenciaCantidadPdf = item.cantidad - originalCant;
     }
     
     result.push(item);
@@ -8310,21 +8369,32 @@ function setRefacciones(section, items) {
     
     if (item.isFromPdf) {
       row.setAttribute('data-from-pdf', 'true');
+      const originalCant = item.originalPdfCantidad !== undefined ? item.originalPdfCantidad : (item.cantidad || 1);
+      row.setAttribute('data-original-pdf-cantidad', originalCant);
+      
       const delBtn = row.querySelector('.btn-del-ref');
       if (delBtn) delBtn.style.display = 'none';
       
-      // Bloquear edición
+      // Bloquear edición de clave y combos, pero permitir cantidad
       row.querySelector('.ref-clave')?.setAttribute('readonly', 'true');
-      row.querySelector('.ref-cant')?.setAttribute('readonly', 'true');
+      
+      const cantInput = row.querySelector('.ref-cant');
+      if (cantInput) {
+        cantInput.removeAttribute('readonly');
+        cantInput.setAttribute('min', '0');
+      }
+      
       const combos = row.querySelectorAll('.combo-box');
       combos.forEach(c => {
         c.style.pointerEvents = 'none';
         c.style.opacity = '0.7';
       });
       
-      // Add a small tooltip or indicator
-      row.setAttribute('title', 'Refacción extraída de PDF AI (No se puede eliminar ni editar)');
+      row.setAttribute('title', `Refacción extraída de PDF AI (Original: ${originalCant}. Se puede modificar la cantidad)`);
     }
+    
+    // Ejecutar validación inicial de discrepancia y visibilidad de foto
+    window.actualizarFilaDiscrepanciaRefaccion(row);
   });
 }
 
@@ -8955,8 +9025,8 @@ async function guardarOrden(e) {
     evidencias: oVieja ? (oVieja.evidencias || { fotoInicio: null, fotoFin: null, adicionales: [] }) : { fotoInicio: null, fotoFin: null, adicionales: [] }
   };
   
-  // VALIDACIÓN: Refacciones utilizadas obligatorias con foto
-  const refSinFoto = orden.ref_utilizadas.find(ref => !ref.fotoUrl && ref.descripcion);
+  // VALIDACIÓN: Refacciones utilizadas obligatorias con foto (omitir si cantidad es 0)
+  const refSinFoto = orden.ref_utilizadas.find(ref => !ref.fotoUrl && ref.descripcion && parseFloat(ref.cantidad || 0) > 0);
   if (refSinFoto) {
     if (currentSession.viewMode === 'tecnico') {
       if (window.mostrarNotificacion) {
@@ -9020,7 +9090,7 @@ async function guardarOrden(e) {
       if (window.supabaseClient) {
         window.pushToSupabase('tickets', tickets[tIndex]);
       }
-      updateTicketBadge();
+      updateTicketBadge(); updateOrdenesBadge();
       if (typeof renderTickets === 'function') renderTickets();
     }
   }
@@ -9642,7 +9712,7 @@ function verDetalle(id) {
 
   const renderBitacora = (o) => {
     let html = '';
-    const isClosed = (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado'));
+    const isClosed = (['completado', 'cerrada', 'cerrado', 'finalizado'].includes(String(o.estado || '').toLowerCase())) && (o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__');
     const isTecnico = currentSession.viewMode === 'tecnico';
     const currentUser = usuarios.find(u => u.id === currentSession.userId);
     const miTecnicoNombre = currentUser ? currentUser.nombre : '';
@@ -9732,7 +9802,7 @@ function verDetalle(id) {
           horasHtml = `<span style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(139, 92, 246, 0.1); color:#8b5cf6; padding:0.15rem 0.5rem; border-radius:12px; font-size:0.7rem; font-weight:600;"><i data-lucide="clock" style="width:12px;height:12px;"></i> ${b.entrada} - ${b.salida}</span>`;
         }
         
-        const btnReportar = (['tecnico', 'superadmin'].includes(currentSession.viewMode) && !isClosed) ? `
+        const btnReportar = (['tecnico', 'supervisor', 'superadmin', 'admin'].includes(currentSession.viewMode) && !isClosed) ? `
           <div style="margin-top:0.6rem; text-align:right;">
             <button class="btn-primary" onclick="iniciarReporteDesdeAsignacion('${o.id}', '${b.id}')" style="font-size:0.75rem; padding:0.3rem 0.6rem; display:inline-flex; align-items:center; gap:0.3rem; background:#8b5cf6; border-color:#8b5cf6; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);">
               <i data-lucide="file-signature" style="width:12px; height:12px;"></i> Reportar Trabajo Realizado
@@ -9916,7 +9986,7 @@ function verDetalle(id) {
       html += '</div>';
     }
 
-    const puedeLlenarBitacora = ['tecnico', 'superadmin'].includes(currentSession.viewMode);
+    const puedeLlenarBitacora = ['tecnico', 'supervisor', 'superadmin', 'admin'].includes(currentSession.viewMode);
     if (!isClosed && puedeLlenarBitacora) {
       html += `<div style="text-align:right; margin-top: 1rem;"><button class="btn-primary" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="abrirBitacora('${o.id}')"><i data-lucide="plus" style="width:14px;height:14px;"></i> Registrar Avance Diario</button></div>`;
     }
@@ -10103,7 +10173,7 @@ function verDetalle(id) {
                 ${hasTrasladoRegreso ? 'Traslado de regreso registrado' : 'A la espera de traslado de regreso'}
               </div>
             </div>
-            ${(!hasTrasladoRegreso && ['tecnico', 'superadmin'].includes(currentSession.viewMode)) ? `
+            ${(!hasTrasladoRegreso && ['tecnico', 'supervisor', 'superadmin', 'admin'].includes(currentSession.viewMode)) ? `
             <button class="btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.6rem; display:flex; align-items:center; gap:0.3rem;" onclick="abrirBitacora('${o.id}', 'Traslado de regreso desde el sitio de trabajo', true)">
               <i data-lucide="plus" style="width:12px;height:12px;"></i> Registrar Regreso
             </button>
@@ -10453,7 +10523,7 @@ function abrirAsignarTecnicos() {
   if (container) {
     container.innerHTML = '';
     const assigned = o.tecnicosAsignados || [];
-    usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol)).forEach(u => {
+    usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && (isTestModeActive() || !isTestUser(u))).forEach(u => {
       const isChecked = assigned.includes(u.nombre);
       container.innerHTML += `
         <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; background: var(--bg-body); padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem;">
@@ -10722,7 +10792,7 @@ function actualizarTecnicosDisponibles() {
     }
   });
 
-  const disponibles = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && !tecnicosConTraslape.has(u.nombre) && u.activo !== false);
+  const disponibles = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && !tecnicosConTraslape.has(u.nombre) && u.activo !== false && (isTestModeActive() || !isTestUser(u)));
   
   if (disponibles.length === 0) {
     selectTec.innerHTML = '<option value="">Sin técnicos disponibles en ese horario</option>';
@@ -10925,9 +10995,9 @@ function abrirBitacora(id, defaultNote = '', isOnlyTraslado = false) {
     mostrarNotificacion('No se pueden registrar avances en una orden cerrada o completada.', 'error');
     return;
   }
-  const puedeLlenar = ['tecnico', 'superadmin'].includes(currentSession.viewMode);
+  const puedeLlenar = ['tecnico', 'supervisor', 'superadmin', 'admin'].includes(currentSession.viewMode);
   if (!puedeLlenar) {
-    mostrarNotificacion('Solo los técnicos y superadmins pueden registrar avances o llenar la bitácora.', 'error');
+    mostrarNotificacion('Solo los técnicos, supervisores y superadmins pueden registrar avances o llenar la bitácora.', 'error');
     return;
   }
   window.currentBitacoraOrdenId = id;
@@ -11007,13 +11077,22 @@ function iniciarReporteDesdeAsignacion(ordenId, bitacoraId) {
     mostrarNotificacion('No se pueden registrar avances en una orden cerrada o completada.', 'error');
     return;
   }
-  const puedeLlenar = ['tecnico', 'superadmin'].includes(currentSession.viewMode);
+  const puedeLlenar = ['tecnico', 'supervisor', 'superadmin', 'admin'].includes(currentSession.viewMode);
   if (!puedeLlenar) {
-    mostrarNotificacion('Solo los técnicos y superadmins pueden registrar avances o llenar la bitácora.', 'error');
+    mostrarNotificacion('Solo los técnicos, supervisores y superadmins pueden registrar avances o llenar la bitácora.', 'error');
     return;
   }
   const b = o.bitacora?.find(x => x.id === bitacoraId);
   if (!b) return;
+
+  if (currentSession.viewMode === 'tecnico') {
+    const currentUser = usuarios.find(u => u.id === currentSession.userId);
+    const miTecnicoNombre = currentUser ? currentUser.nombre : '';
+    if (b.tecnico !== miTecnicoNombre) {
+      mostrarNotificacion('Solo puedes reportar tus propias asignaciones programadas.', 'error');
+      return;
+    }
+  }
 
   window.currentBitacoraOrdenId = ordenId;
   window.currentBitacoraEntryId = bitacoraId;
@@ -11160,9 +11239,9 @@ function actualizarEventoCalendarioDesdeBitacora(orden, bitacoraEntry) {
 }
 
 function guardarNotaBitacora() {
-  const puedeLlenar = ['tecnico', 'superadmin'].includes(currentSession.viewMode);
+  const puedeLlenar = ['tecnico', 'supervisor', 'superadmin', 'admin'].includes(currentSession.viewMode);
   if (!puedeLlenar) {
-    mostrarNotificacion('Solo los técnicos y superadmins pueden registrar avances o llenar la bitácora.', 'error');
+    mostrarNotificacion('Solo los técnicos, supervisores y superadmins pueden registrar avances o llenar la bitácora.', 'error');
     return;
   }
   const o = ordenes.find(x => x.id === window.currentBitacoraOrdenId);
@@ -11844,6 +11923,91 @@ function updateTicketBadge() {
   if (!badge) return;
   if (abiertos > 0) {
     badge.textContent = abiertos;
+    badge.classList.add('visible');
+  } else {
+    badge.classList.remove('visible');
+  }
+}
+
+function updateOrdenesBadge() {
+  let filtered = getFilteredOrders();
+  
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  
+  if (isEmpresa) {
+    let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+    if (nombreEmpresaLogged) {
+      nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
+      filtered = filtered.filter(o => {
+        const ocli = String(o.cliente || '').toLowerCase().trim();
+        return ocli === nombreEmpresaLogged;
+      });
+    } else {
+      filtered = [];
+    }
+  }
+
+  const userRole = currentSession.viewMode || '';
+  let tecFilter = '';
+  let supFilter = '';
+  if (userRole === 'tecnico') {
+    const isSuperadmin = (usuarios.find(u => u.id === currentSession.userId)?.rol === 'superadmin');
+    if (isSuperadmin && isTestModeActive()) {
+      tecFilter = '';
+    } else {
+      tecFilter = currentUser ? currentUser.nombre : '';
+    }
+  }
+  if (userRole === 'supervisor') {
+    const isLauraPaz = currentUser && (
+      String(currentUser.nombre).toLowerCase().trim() === 'laura paz' ||
+      String(currentUser.email).toLowerCase().trim().includes('laura.paz') ||
+      String(currentUser.email).toLowerCase().trim().includes('laurapaz')
+    );
+    if (isLauraPaz) {
+      supFilter = '';
+    } else {
+      supFilter = currentUser ? currentUser.nombre : '';
+    }
+  }
+
+  if (tecFilter || supFilter) {
+    const tecNameLower = tecFilter.toLowerCase().trim();
+    const supNameLower = supFilter.toLowerCase().trim();
+    
+    filtered = filtered.filter(o => {
+      let passTec = true;
+      let passSup = true;
+      
+      if (tecFilter && tecNameLower) {
+         let assigned = [];
+         if (o.tecnico_asignado) assigned = String(o.tecnico_asignado).split(',').map(s=>s.trim());
+         else if (o.tecnico) assigned = String(o.tecnico).split(',').map(s=>s.trim());
+         const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
+         passTec = assignedLower.includes(tecNameLower);
+      }
+      
+      if (supFilter && supNameLower) {
+         let passSupClient = false;
+         const cli = clientesDb.find(c => c.nombre === o.cliente);
+         if (cli) {
+            const supUser = usuarios.find(u => (u.nombre && u.nombre.toLowerCase().trim() === supNameLower) || u.id === supFilter);
+            const supId = supUser ? supUser.id : supFilter;
+            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
+         }
+         passSup = passSupClient;
+      }
+      
+      return passTec && passSup;
+    });
+  }
+
+  const activas = filtered.filter(o => o.estado === 'Pendiente' || o.estado === 'En Proceso').length;
+  const badge = document.getElementById('nav-badge-ordenes');
+  if (!badge) return;
+  if (activas > 0) {
+    badge.textContent = activas;
     badge.classList.add('visible');
   } else {
     badge.classList.remove('visible');
@@ -13538,7 +13702,7 @@ window.vincularNuevaCotizacion = async function(isModal = true, ticketId = null)
   mostrarNotificacion('Cotización vinculada correctamente.', 'success');
 };
 
-window.initSearchableSelect = function(selectId, placeholder = 'Escribe para buscar...') {
+window.initSearchableSelect = function(selectId, placeholder = 'Escribe para buscar...', allowCustom = false) {
   const originalSelect = document.getElementById(selectId);
   if (!originalSelect) return;
 
@@ -13607,6 +13771,8 @@ window.initSearchableSelect = function(selectId, placeholder = 'Escribe para bus
       const text = opt.textContent;
       const val = opt.value;
       
+      if (!val) return; // Hide placeholder option
+      
       // Filtrar por texto
       if (query && !text.toLowerCase().includes(query) && !val.toLowerCase().includes(query)) {
         return;
@@ -13633,6 +13799,45 @@ window.initSearchableSelect = function(selectId, placeholder = 'Escribe para bus
       };
       optionsContainer.appendChild(optionEl);
     });
+
+    if (allowCustom) {
+      if (query) {
+        const addOptionEl = document.createElement('div');
+        addOptionEl.className = 'custom-select-search-option';
+        addOptionEl.style.fontWeight = 'bold';
+        addOptionEl.style.color = 'var(--primary)';
+        addOptionEl.innerHTML = `+ Agregar y usar "${query}"`;
+        addOptionEl.onclick = (e) => {
+          e.stopPropagation();
+          
+          const newOpt = document.createElement('option');
+          newOpt.value = query;
+          newOpt.textContent = query;
+          originalSelect.appendChild(newOpt);
+          
+          originalSelect.value = query;
+          triggerLabel.textContent = query;
+          
+          const event = new Event('change', { bubbles: true });
+          originalSelect.dispatchEvent(event);
+          
+          dropdown.style.display = 'none';
+          wrapper.classList.remove('open');
+        };
+        optionsContainer.appendChild(addOptionEl);
+        count++;
+      } else {
+        const hintEl = document.createElement('div');
+        hintEl.className = 'custom-select-search-option';
+        hintEl.style.fontStyle = 'italic';
+        hintEl.style.color = 'var(--text-muted)';
+        hintEl.style.cursor = 'default';
+        hintEl.style.background = 'transparent';
+        hintEl.textContent = 'Escriba arriba para agregar un sitio nuevo...';
+        optionsContainer.appendChild(hintEl);
+        count++;
+      }
+    }
 
     if (count === 0) {
       const noResults = document.createElement('div');
@@ -16253,7 +16458,7 @@ async function guardarTicket(e) {
   cerrarTicket();
   renderTickets();
   renderStats();
-  updateTicketBadge();
+  updateTicketBadge(); updateOrdenesBadge();
 }
 
 async function eliminarTicket(id) {
@@ -16279,7 +16484,7 @@ async function eliminarTicket(id) {
   }
   renderTickets();
   renderStats();
-  updateTicketBadge();
+  updateTicketBadge(); updateOrdenesBadge();
 }
 
 // ===== DETALLE TICKET =====
@@ -16938,7 +17143,7 @@ async function avanzarCotizacionTicket(id) {
   cerrarDetalleTicket();
   renderTickets();
   renderStats();
-  updateTicketBadge();
+  updateTicketBadge(); updateOrdenesBadge();
 }
 
 async function cerrarCotizacionTicket(id) {
@@ -17167,7 +17372,7 @@ async function cerrarCotizacionTicket(id) {
   mostrarNotificacion('Ticket cerrado con éxito.', 'success');
   cerrarDetalleTicket();
   renderTickets();
-  updateTicketBadge();
+  updateTicketBadge(); updateOrdenesBadge();
 }
 
 function cerrarDetalleTicket(e) {
@@ -17235,7 +17440,7 @@ window.forzarEstadoTicket = async function(id) {
     overlay.remove();
     cerrarDetalleTicket();
     renderTickets();
-    updateTicketBadge();
+    updateTicketBadge(); updateOrdenesBadge();
   });
 };
 
@@ -17835,7 +18040,11 @@ function renderCalendario() {
 
   // Inject Levantamientos into calendar
   if (typeof levantamientos !== 'undefined' && Array.isArray(levantamientos)) {
+    const activeSandbox = typeof isTestModeActive === 'function' ? isTestModeActive() : false;
     levantamientos.forEach(lev => {
+      // Filtrar según el modo Sandbox activo
+      if (typeof isTestData === 'function' && isTestData(lev) !== activeSandbox) return;
+      
       // Filtrar por técnico si hay un filtro activo (y si está asignado)
       if (filtroTecnico && lev.asignado_a !== filtroTecnico) return;
       
@@ -18072,7 +18281,7 @@ window.abrirRegistrarActividad = function() {
 
   // Llenar dropdown de técnicos
   const selectTec = document.getElementById('mra-tecnico');
-  const tecs = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false);
+  const tecs = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false && (isTestModeActive() || !isTestUser(u)));
   selectTec.innerHTML = '<option value="">Ninguno / Todos</option>' + tecs.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
 
   // Llenar dropdown de órdenes
@@ -18093,7 +18302,7 @@ window.mostrarDetalleEventoAdministrativo = function(eventId) {
 
   // Llenar dropdown de técnicos
   const selectTec = document.getElementById('mra-tecnico');
-  const tecs = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false);
+  const tecs = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false && (isTestModeActive() || !isTestUser(u)));
   selectTec.innerHTML = '<option value="">Ninguno / Todos</option>' + tecs.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
 
   // Llenar dropdown de órdenes
@@ -26760,7 +26969,7 @@ window.guardarRefaccionesTicketDesdeUI = function(ticketId, transitionToRefaccio
   
   verDetalleTicket(ticketId);
   renderTickets();
-  updateTicketBadge();
+  updateTicketBadge(); updateOrdenesBadge();
 };
 
 window.confirmarAccion = function(options = {}) {

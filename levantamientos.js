@@ -51,12 +51,14 @@ function renderLevantamientos() {
   }
   
   list.forEach(l => {
+    const syncIcon = (l._synced === false) ? '<i data-lucide="cloud-off" style="width:14px;height:14px;color:var(--warning);margin-left:0.5rem;" title="Pendiente de sincronizar"></i>' : '';
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td data-label="Folio" style="font-weight:600; color:var(--text-primary);">${l.folio || 'N/A'}</td>
+      <td data-label="Folio" style="font-weight:600; color:var(--text-primary); display:flex; align-items:center;">${l.folio || 'N/A'} ${syncIcon}</td>
       <td data-label="Cliente">${l.cliente || 'No especificado'}</td>
       <td data-label="Sitio">${l.sitio || 'No especificado'}</td>
       <td data-label="Solicitante">${l.solicitante || 'N/A'}</td>
+      <td data-label="Asignado A">${l.tecnico_asignado || '-'}</td>
       <td data-label="Fecha Esperada">${l.fecha_esperada ? l.fecha_esperada.substring(0,10) : 'N/A'}</td>
       <td data-label="Estado">
         <span style="font-size:0.75rem; font-weight:700; padding:0.25rem 0.6rem; border-radius:999px; ${l.estado === 'Completado' ? 'background:rgba(16, 185, 129, 0.1); color:#10b981;' : 'background:rgba(239, 68, 68, 0.1); color:#ef4444;'}">${l.estado || 'Pendiente'}</span>
@@ -109,7 +111,7 @@ function window_abrirModalNuevoLevantamiento() {
       
       <div style="margin-bottom:1rem;">
         <label style="display:block; font-weight:600; margin-bottom:0.25rem;">Cliente *</label>
-        <select id="nl-cliente" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border);" required>
+        <select id="nl-cliente" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border);" required onchange="window.actualizarSitiosNuevoLevantamiento(this.value)">
           <option value="">Seleccione un cliente...</option>
           ${(typeof clientesDb !== 'undefined' ? clientesDb : []).map(c => '<option value="' + c.nombre + '">' + c.nombre + '</option>').join('')}
         </select>
@@ -117,7 +119,9 @@ function window_abrirModalNuevoLevantamiento() {
       
       <div style="margin-bottom:1rem;">
         <label style="display:block; font-weight:600; margin-bottom:0.25rem;">Sitio</label>
-        <input type="text" id="nl-sitio" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border);" placeholder="Ej. Planta Monterrey">
+        <select id="nl-sitio" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border);">
+          <option value="">Seleccione o busque un sitio...</option>
+        </select>
       </div>
       
       <div style="margin-bottom:1rem;">
@@ -136,11 +140,27 @@ function window_abrirModalNuevoLevantamiento() {
       </div>
 
       <div style="margin-bottom:1.5rem;">
-        <label style="display:block; font-weight:600; margin-bottom:0.25rem;">Asignado A (Opcional)</label>
-        <div id="nl-asignado" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem;">
-          ${(typeof usuarios !== 'undefined' ? usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false) : []).map(u => `
-            <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; font-size: 0.8rem;">
-              <input type="checkbox" value="${u.nombre}" class="nl-asignado-cb"> ${u.nombre}
+        <label style="display:flex; justify-content:space-between; align-items:center; font-weight:600; margin-bottom:0.5rem;">
+          Asignado A *
+          <div style="position:relative; width:200px;">
+            <i data-lucide="search" style="position:absolute; left:8px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--text-muted);"></i>
+            <input type="text" placeholder="Buscar técnico..." style="width:100%; padding:0.25rem 0.5rem 0.25rem 1.75rem; border-radius:4px; border:1px solid var(--border); font-size:0.75rem;" onkeyup="
+              const q = this.value.toLowerCase();
+              const container = document.getElementById('nl-asignado');
+              const labels = container.querySelectorAll('label');
+              labels.forEach(lbl => {
+                const text = lbl.textContent.toLowerCase();
+                if(text.includes(q)) lbl.style.display = 'inline-flex';
+                else lbl.style.display = 'none';
+              });
+            ">
+          </div>
+        </label>
+        <div id="nl-asignado" style="display:flex; flex-wrap:wrap; gap:0.5rem; max-height:120px; overflow-y:auto; padding:0.25rem;">
+          ${(typeof usuarios !== 'undefined' ? usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false && ((typeof isTestModeActive === 'function' && isTestModeActive()) || !(typeof isTestUser === 'function' && isTestUser(u)))) : []).map(u => `
+            <label style="display:inline-flex; align-items:center; padding:0.4rem 0.8rem; background:var(--bg-body); border:1px solid var(--border); border-radius:99px; cursor:pointer; font-size:0.8rem; transition:all 0.2s;" onmouseover="if(!this.querySelector('input').checked) this.style.borderColor='var(--primary)'" onmouseout="if(!this.querySelector('input').checked) this.style.borderColor='var(--border)'">
+              <input type="checkbox" value="${u.nombre}" class="nl-asignado-cb" style="display:none;" onchange="this.parentElement.style.borderColor = this.checked ? 'var(--primary)' : 'var(--border)'; this.parentElement.style.background = this.checked ? 'var(--primary-light, #e0e7ff)' : 'var(--bg-body)'; this.parentElement.style.color = this.checked ? 'var(--primary)' : 'inherit';">
+              ${u.nombre}
             </label>
           `).join('')}
         </div>
@@ -157,18 +177,50 @@ function window_abrirModalNuevoLevantamiento() {
   // Convert native select to custom searchable select
   if (typeof window.initSearchableSelect === 'function') {
     window.initSearchableSelect('nl-cliente', 'Buscar cliente...');
+    window.initSearchableSelect('nl-sitio', 'Buscar sitio...', true);
   }
 }
+
+window.actualizarSitiosNuevoLevantamiento = function(cliName) {
+  const sitSelect = document.getElementById('nl-sitio');
+  if (!sitSelect) return;
+  
+  sitSelect.innerHTML = '<option value="">Seleccione o busque un sitio...</option>';
+  
+  if (cliName && typeof sitiosDb !== 'undefined') {
+    const cliObj = (typeof clientesDb !== 'undefined' ? clientesDb.find(c => c.nombre === cliName) : null);
+    const cliId = cliObj ? cliObj.id : null;
+    const sit = sitiosDb.filter(s => s.cliente === cliName || s.cliente === cliId);
+    sit.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.nombre;
+      opt.textContent = s.nombre;
+      sitSelect.appendChild(opt);
+    });
+  }
+  
+  if (typeof window.initSearchableSelect === 'function') {
+    window.initSearchableSelect('nl-sitio', 'Buscar sitio...', true);
+  }
+};
 
 function guardarNuevoLevantamiento(id, folio) {
   const cliente = document.getElementById('nl-cliente').value;
   const descripcion = document.getElementById('nl-descripcion').value;
   
+  const checkboxes = Array.from(document.querySelectorAll('.nl-asignado-cb'));
+  const asignados = checkboxes.filter(cb => cb.checked).map(cb => cb.value).join(', ');
+
   if (!cliente || !descripcion) {
     alert('Cliente y Descripción son obligatorios');
     return;
   }
   
+  if (!asignados) {
+    alert('Debes asignar el levantamiento a por lo menos un técnico o supervisor');
+    return;
+  }
+
   const lev = {
     id,
     folio,
@@ -177,9 +229,11 @@ function guardarNuevoLevantamiento(id, folio) {
     solicitante: document.getElementById('nl-solicitante').value,
     descripcion,
     fecha_esperada: document.getElementById('nl-fecha').value,
-    asignado_a: document.getElementById('nl-asignado') ? document.getElementById('nl-asignado').value : '',
+    tecnico_asignado: asignados,
     estado: 'Pendiente',
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    _synced: false,
+    esPrueba: (typeof isTestModeActive === 'function' ? isTestModeActive() : false)
   };
   
   if (typeof levantamientos === 'undefined') window.levantamientos = [];
@@ -191,6 +245,7 @@ function guardarNuevoLevantamiento(id, folio) {
   
   document.getElementById('modal-nuevo-levantamiento').remove();
   renderLevantamientos();
+  if (window.lucide) window.lucide.createIcons();
   if (typeof mostrarNotificacion === 'function') mostrarNotificacion('Levantamiento creado', 'success');
 }
 
@@ -208,27 +263,45 @@ function verDetalleLevantamiento(id) {
   const isCompleted = lev.estado === 'Completado';
   
   m.innerHTML = `
-    <div style="background:var(--bg-card); padding:2rem; border-radius:12px; width:100%; max-width:600px; box-shadow:var(--shadow-lg); max-height:90vh; overflow-y:auto;">
-      <div style="display:flex; justify-content:space-between; margin-bottom:1rem; border-bottom:1px solid var(--border); padding-bottom:1rem;">
+    <div style="background:var(--bg-card); border-radius:12px; width:100%; max-width:600px; box-shadow:var(--shadow-lg); max-height:90vh; display:flex; flex-direction:column; overflow:hidden;">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding:1.5rem 2rem;">
         <h2 style="margin:0;">Levantamiento ${lev.folio}</h2>
         <span style="font-size:0.8rem; font-weight:700; padding:0.25rem 0.6rem; border-radius:999px; ${isCompleted ? 'background:rgba(16, 185, 129, 0.1); color:#10b981;' : 'background:rgba(239, 68, 68, 0.1); color:#ef4444;'}">${lev.estado}</span>
       </div>
       
+      <div style="padding:1.5rem 2rem; overflow-y:auto; flex:1;">
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.5rem;">
         <div><strong style="color:var(--text-secondary);font-size:0.8rem;">Cliente</strong><br>${lev.cliente}</div>
         <div><strong style="color:var(--text-secondary);font-size:0.8rem;">Sitio</strong><br>${lev.sitio || '-'}</div>
         <div><strong style="color:var(--text-secondary);font-size:0.8rem;">Solicitante</strong><br>${lev.solicitante || '-'}</div>
         <div><strong style="color:var(--text-secondary);font-size:0.8rem;">Fecha Esperada</strong><br>${lev.fecha_esperada || '-'}</div>
         <div style="grid-column: 1 / -1;">
-          <strong style="color:var(--text-secondary);font-size:0.8rem;">Asignado A</strong><br>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
+            <strong style="color:var(--text-secondary);font-size:0.8rem;">Asignado A</strong>
+            ${!isCompleted ? `
+            <div style="position:relative; width:150px;">
+              <i data-lucide="search" style="position:absolute; left:6px; top:50%; transform:translateY(-50%); width:12px; height:12px; color:var(--text-muted);"></i>
+              <input type="text" placeholder="Buscar..." style="width:100%; padding:0.2rem 0.5rem 0.2rem 1.5rem; border-radius:4px; border:1px solid var(--border); font-size:0.75rem;" onkeyup="
+                const q = this.value.toLowerCase();
+                const container = document.getElementById('det-lev-asignado-container');
+                const labels = container.querySelectorAll('label');
+                labels.forEach(lbl => {
+                  const text = lbl.textContent.toLowerCase();
+                  if(text.includes(q)) lbl.style.display = 'inline-flex';
+                  else lbl.style.display = 'none';
+                });
+              ">
+            </div>` : ''}
+          </div>
           ${isCompleted ? (lev.tecnico_asignado || '-') : `
-            <div id="det-lev-asignado-container" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; margin-top: 0.25rem;">
-              ${(typeof usuarios !== 'undefined' ? usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false) : []).map(u => {
+            <div id="det-lev-asignado-container" style="display:flex; flex-wrap:wrap; gap:0.5rem; max-height:120px; overflow-y:auto; padding:0.25rem;">
+              ${(typeof usuarios !== 'undefined' ? usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false && ((typeof isTestModeActive === 'function' && isTestModeActive()) || !(typeof isTestUser === 'function' && isTestUser(u)))) : []).map(u => {
                 const assignedList = (lev.tecnico_asignado || '').split(',').map(s => s.trim());
                 const isChecked = assignedList.includes(u.nombre);
                 return `
-                <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; font-size: 0.8rem;">
-                  <input type="checkbox" value="${u.nombre}" class="det-lev-asignado-cb" ${isChecked ? 'checked' : ''} onchange="actualizarAsignadosLevantamiento('${id}')"> ${u.nombre}
+                <label style="display:inline-flex; align-items:center; padding:0.4rem 0.8rem; background:${isChecked ? 'var(--primary-light, #e0e7ff)' : 'var(--bg-body)'}; color:${isChecked ? 'var(--primary)' : 'inherit'}; border:1px solid ${isChecked ? 'var(--primary)' : 'var(--border)'}; border-radius:99px; cursor:pointer; font-size:0.8rem; transition:all 0.2s;" onmouseover="if(!this.querySelector('input').checked) this.style.borderColor='var(--primary)'" onmouseout="if(!this.querySelector('input').checked) this.style.borderColor='var(--border)'">
+                  <input type="checkbox" value="${u.nombre}" class="det-lev-asignado-cb" ${isChecked ? 'checked' : ''} onchange="actualizarAsignadosLevantamiento('${id}'); this.parentElement.style.borderColor = this.checked ? 'var(--primary)' : 'var(--border)'; this.parentElement.style.background = this.checked ? 'var(--primary-light, #e0e7ff)' : 'var(--bg-body)'; this.parentElement.style.color = this.checked ? 'var(--primary)' : 'inherit';" style="display:none;"> 
+                  ${u.nombre}
                 </label>
                 `;
               }).join('')}
@@ -248,16 +321,30 @@ function verDetalleLevantamiento(id) {
       </div>
 
       <div style="margin-bottom:1.5rem;">
-        <label style="display:block; font-weight:600; margin-bottom:0.5rem;">Evidencia Fotográfica</label>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+          <label style="font-weight:600; margin:0;">Evidencia Fotográfica</label>
+          ${!isCompleted ? `
+          <button type="button" class="btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="agregarEvidenciaLevantamiento()">
+            <i data-lucide="plus" style="width:14px;height:14px;"></i> Añadir
+          </button>
+          ` : ''}
+        </div>
+        
         ${!isCompleted ? `
-          <div style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:0.5rem;">
-            <input type="file" id="det-lev-ev1" accept="image/*" style="font-size:0.8rem;" />
-            <input type="file" id="det-lev-ev2" accept="image/*" style="font-size:0.8rem;" />
-            <input type="file" id="det-lev-ev3" accept="image/*" style="font-size:0.8rem;" />
+          <div id="det-lev-ev-grid" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem; margin-bottom:0.5rem;">
+            ${[1, 2].map(i => `
+              <label style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1.5rem 1rem; border:2px dashed var(--border); border-radius:12px; cursor:pointer; background:var(--bg-body); transition:all 0.2s; position:relative; overflow:hidden;" onmouseover="if(!this.style.backgroundImage) { this.style.borderColor='var(--primary)'; this.style.background='var(--primary-light, #f8fafc)'; }" onmouseout="if(!this.style.backgroundImage) { this.style.borderColor='var(--border)'; this.style.background='var(--bg-body)'; }">
+                <i data-lucide="upload-cloud" style="width:24px; height:24px; color:var(--text-muted); margin-bottom:0.5rem; transition:color 0.2s;"></i>
+                <span style="font-size:0.75rem; color:var(--text-secondary); text-align:center; font-weight:500; line-height:1.2;">Seleccionar<br>Archivo ${i}</span>
+                <input type="file" class="det-lev-ev-file" accept="image/*" style="display:none;" onchange="window.handleEvidenciaFileChange(this, '${i}')">
+              </label>
+            `).join('')}
           </div>
-          <small style="color:var(--text-muted); font-size:0.75rem;">Las evidencias actuales se conservarán si no seleccionas nuevas.</small>
+          <small style="display:flex; align-items:center; gap:0.25rem; color:var(--text-muted); font-size:0.75rem; margin-top:0.5rem;">
+            <i data-lucide="info" style="width:12px; height:12px;"></i> Las evidencias actuales se conservarán. Puedes añadir tantas fotografías como necesites.
+          </small>
         ` : ''}
-        ${lev.evidencias ? `
+        ${lev.evidencias && Object.keys(lev.evidencias).length > 0 ? `
           <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
             ${Object.entries(lev.evidencias).map(([k, url]) => `
               <a href="${url}" target="_blank" style="display:block; width:80px; height:80px; border-radius:6px; overflow:hidden; border:1px solid var(--border);">
@@ -265,7 +352,7 @@ function verDetalleLevantamiento(id) {
               </a>
             `).join('')}
           </div>
-        ` : '<div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.25rem;">No se han agregado evidencias.</div>'}
+        ` : (isCompleted ? '<div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.25rem;">No se adjuntaron evidencias.</div>' : '')}
       </div>
 
       <div style="margin-bottom:1.5rem;">
@@ -292,7 +379,7 @@ function verDetalleLevantamiento(id) {
         ` : ''}
       </div>
       
-      <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:1rem 2rem; border-top:1px solid var(--border); background:var(--bg-card);">
         <button type="button" class="btn-secondary" onclick="document.getElementById('modal-detalle-levantamiento').remove()">Cerrar</button>
         ${!isCompleted ? `<button type="button" class="btn-primary" onclick="completarLevantamiento('${id}')">Completar y Generar Ticket</button>` : ''}
       </div>
@@ -304,6 +391,79 @@ function verDetalleLevantamiento(id) {
     window.initSearchableSelect('det-lev-nueva-ref', 'Buscar refacción...');
   }
 }
+
+window.agregarEvidenciaLevantamiento = function() {
+  const grid = document.getElementById('det-lev-ev-grid');
+  if (!grid) return;
+  const newIndex = grid.children.length + 1;
+  const newEv = document.createElement('label');
+  newEv.style.cssText = 'display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1.5rem 1rem; border:2px dashed var(--border); border-radius:12px; cursor:pointer; background:var(--bg-body); transition:all 0.2s; position:relative; overflow:hidden;';
+  newEv.onmouseover = function() { if(!this.style.backgroundImage) { this.style.borderColor='var(--primary)'; this.style.background='var(--primary-light, #f8fafc)'; } };
+  newEv.onmouseout = function() { if(!this.style.backgroundImage) { this.style.borderColor='var(--border)'; this.style.background='var(--bg-body)'; } };
+  newEv.innerHTML = `
+    <button type="button" onclick="event.preventDefault(); this.parentElement.remove();" style="position:absolute; top:4px; right:4px; background:rgba(255,255,255,0.8); border-radius:4px; padding:2px; border:none; color:var(--danger); cursor:pointer; z-index:10;"><i data-lucide="x" style="width:14px; height:14px;"></i></button>
+    <i data-lucide="upload-cloud" style="width:24px; height:24px; color:var(--text-muted); margin-bottom:0.5rem; transition:color 0.2s;"></i>
+    <span style="font-size:0.75rem; color:var(--text-secondary); text-align:center; font-weight:500; line-height:1.2;">Seleccionar<br>Archivo ${newIndex}</span>
+    <input type="file" class="det-lev-ev-file" accept="image/*" style="display:none;" onchange="window.handleEvidenciaFileChange(this, '${newIndex}')">
+  `;
+  grid.appendChild(newEv);
+  if (window.lucide) window.lucide.createIcons();
+};
+
+window.handleEvidenciaFileChange = function(input, indexStr) {
+  const file = input.files[0];
+  const label = input.parentElement;
+  
+  // Encontrar el span y el icono
+  let icon = null;
+  let span = null;
+  Array.from(label.children).forEach(c => {
+    if (c.tagName === 'I' || c.tagName === 'svg') icon = c;
+    if (c.tagName === 'SPAN') span = c;
+  });
+
+  // Borrar el botón de eliminar extra si ya lo habíamos creado
+  const oldDel = label.querySelector('.ev-del-extra-btn');
+  if (oldDel) oldDel.remove();
+
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      label.style.backgroundImage = `url(${e.target.result})`;
+      label.style.backgroundSize = 'cover';
+      label.style.backgroundPosition = 'center';
+      label.style.borderColor = 'var(--border)';
+      if (icon) icon.style.display = 'none';
+      if (span) span.style.display = 'none';
+      
+      // Si el label NO tiene un botón de cerrar por defecto (los primeros 2 no lo tienen)
+      if (!label.querySelector('button')) {
+        const delBtn = document.createElement('button');
+        delBtn.className = 'ev-del-extra-btn';
+        delBtn.type = 'button';
+        delBtn.innerHTML = '<i data-lucide="trash-2" style="width:14px; height:14px;"></i>';
+        delBtn.style.cssText = 'position:absolute; top:4px; right:4px; background:rgba(255,255,255,0.8); border-radius:4px; padding:2px; border:none; color:var(--danger); cursor:pointer; z-index:10;';
+        delBtn.onclick = (ev) => {
+          ev.preventDefault();
+          input.value = '';
+          label.style.backgroundImage = '';
+          if (icon) icon.style.display = '';
+          if (span) span.style.display = '';
+          span.innerHTML = 'Seleccionar<br>Archivo ' + indexStr;
+          delBtn.remove();
+        };
+        label.appendChild(delBtn);
+        if (window.lucide) window.lucide.createIcons();
+      }
+    };
+    reader.readAsDataURL(file);
+  } else {
+    label.style.backgroundImage = '';
+    if (icon) icon.style.display = '';
+    if (span) span.style.display = '';
+    if (span) span.innerHTML = 'Seleccionar<br>Archivo ' + indexStr;
+  }
+};
 
 window.agregarRefaccionLevantamiento = function(id) {
   const lev = levantamientos.find(l => l.id === id);
@@ -375,16 +535,32 @@ window.completarLevantamiento = async function(id) {
   
   // Read evidences if any
   let filePromises = [];
-  const ev1 = document.getElementById('det-lev-ev1');
-  const ev2 = document.getElementById('det-lev-ev2');
-  const ev3 = document.getElementById('det-lev-ev3');
+  const fileInputs = Array.from(document.querySelectorAll('.det-lev-ev-file'));
   
   if (!lev.evidencias) lev.evidencias = {};
   if (!lev.evidencias_base64) lev.evidencias_base64 = {};
+  
+  // Find the highest existing index to prevent overwriting
+  let highestExistingIndex = 0;
+  if (lev.evidencias) {
+    Object.keys(lev.evidencias).forEach(k => {
+      if (k.startsWith('foto_')) {
+        const num = parseInt(k.replace('foto_', ''), 10);
+        if (!isNaN(num) && num > highestExistingIndex) highestExistingIndex = num;
+      }
+    });
+  }
 
-  if (ev1 && ev1.files.length > 0) filePromises.push(readFileAsBase64(ev1.files[0]).then(b64 => { lev.evidencias_base64.evidencia1 = b64; }));
-  if (ev2 && ev2.files.length > 0) filePromises.push(readFileAsBase64(ev2.files[0]).then(b64 => { lev.evidencias_base64.evidencia2 = b64; }));
-  if (ev3 && ev3.files.length > 0) filePromises.push(readFileAsBase64(ev3.files[0]).then(b64 => { lev.evidencias_base64.evidencia3 = b64; }));
+  let nextIndex = highestExistingIndex + 1;
+
+  fileInputs.forEach(input => {
+    if (input.files && input.files.length > 0) {
+      const idx = nextIndex++;
+      filePromises.push(readFileAsBase64(input.files[0]).then(b64 => { 
+        lev.evidencias_base64[`foto_${idx}`] = b64; 
+      }));
+    }
+  });
   
   if (filePromises.length > 0) {
     try {
