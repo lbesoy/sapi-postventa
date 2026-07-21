@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.263'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.264'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -742,9 +742,7 @@ window.addEventListener('supabase_datos_cargados', async () => {
     sitiosDb = safeGetJSON('sapi_sitios_db', []);
     tecnicosDb = safeGetJSON('sapi_tecnicos_db', []);
     gastos = safeGetJSON('sapi_gastos', []);
-    if (typeof window.levantamientos === 'undefined' || window.levantamientos) {
-      window.levantamientos = safeGetJSON('sapi_levantamientos', []);
-    }
+    levantamientos = safeGetJSON('sapi_levantamientos', []);
     claraMockTxs = safeGetJSON('sapi_clara_mock_txs', claraMockTxs);
 
     usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
