@@ -79,10 +79,21 @@ function renderLevantamientos() {
 
 function window_abrirModalNuevoLevantamiento() {
   const id = (typeof uuidv4 === 'function') ? uuidv4() : crypto.randomUUID();
-  let folio = 'LEV-' + new Date().getFullYear().toString().slice(-2) + '-' + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-  if (typeof isTestModeActive === 'function' && isTestModeActive()) {
-    folio = '[PRUEBA] ' + folio;
-  }
+  
+  const isTest = (typeof isTestModeActive === 'function' && isTestModeActive());
+  const yearStr = new Date().getFullYear().toString().slice(-2);
+  const prefix = isTest ? `[PRUEBA] OL-${yearStr}` : `OL-${yearStr}`;
+  
+  const list = typeof levantamientos !== 'undefined' ? levantamientos : [];
+  const levantamientosDelAnio = list.filter(l => l.folio && l.folio.startsWith(prefix));
+  let maxConsecutivo = 0;
+  levantamientosDelAnio.forEach(l => {
+    const numStr = l.folio.substring(prefix.length);
+    const num = parseInt(numStr, 10);
+    if (!isNaN(num) && num > maxConsecutivo) maxConsecutivo = num;
+  });
+  const folio = `${prefix}${(maxConsecutivo + 1).toString().padStart(3, '0')}`;
+  
   
   const m = document.createElement('div');
   m.id = 'modal-nuevo-levantamiento';
