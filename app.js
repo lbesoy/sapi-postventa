@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.253'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.255'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -320,6 +320,7 @@ if (typeof localStorage !== 'undefined' && !localStorage.getItem('eurorep_ticket
   console.log('[Deduplicar] Limpieza inicial única de tickets locales realizada para evitar fantasmas.');
 }
 let tickets = safeGetJSON('sapi_tickets', []);
+let levantamientos = safeGetJSON('sapi_levantamientos', []);
 let clientesDb = safeGetJSON('sapi_clientes_db', []);
 let refaccionesDb = [];
 (async () => {
@@ -1113,23 +1114,23 @@ let ROLES = {
   superadmin: {
     label: 'Super Administrador',
     color: '#E8820C',
-    views: ['dashboard','servicios','calendario','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos','telemetry'],
+    views: ['dashboard','servicios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos','telemetry'],
     canSwitchRoles: true,
   },
   admin: {
     label: 'Administrador',
     color: '#4f8ef7',
-    views: ['dashboard','servicios','calendario','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos'],
+    views: ['dashboard','servicios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos'],
   },
   supervisor: {
     label: 'Supervisor',
     color: '#eab308',
-    views: ['dashboard','servicios','calendario','tickets','clientes','maquinaria','refacciones','tecnicos','preferencias','gastos'],
+    views: ['dashboard','servicios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','preferencias','gastos'],
   },
   tecnico: {
     label: 'Técnico / Instalador',
     color: '#10b981',
-    views: ['dashboard','servicios','calendario','tickets','preferencias','gastos'],
+    views: ['dashboard','servicios','calendario','levantamientos','tickets','preferencias','gastos'],
   },
   empresa: {
     label: 'Empresa / Cliente',
@@ -1145,7 +1146,7 @@ let ROLES = {
 
 const ROLES_LABELS = {
   dashboard: 'Dashboard', servicios: 'Órdenes de Servicio', calendario: 'Calendario',
-  tickets: 'Tickets', clientes: 'Clientes', maquinaria: 'Maquinaria', refacciones: 'Refacciones',
+  tickets: 'Tickets', levantamientos: 'Levantamientos', clientes: 'Clientes', maquinaria: 'Maquinaria', refacciones: 'Refacciones',
   sitios: 'Mis Sitios', tecnicos: 'Técnicos', config: 'Configuración',
   preferencias: 'Preferencias', gastos: 'Control de Gastos', telemetry: 'Monitoreo Telemetría'
 };
@@ -1174,19 +1175,34 @@ function cargarRolesDesdeStorage() {
   }
 
   // Garantizar siempre la protección del rol superadmin para evitar bloqueos de la vista de Configuración
+  let configChanged = false;
   if (ROLES.superadmin && Array.isArray(ROLES.superadmin.views)) {
     if (!ROLES.superadmin.views.includes('config')) {
       console.log('[Roles] Previniendo bloqueo: Asegurando vista de Configuración para el rol superadmin.');
       ROLES.superadmin.views.push('config');
-      
-      const configToSave = {
-        roles: ROLES,
-        migrated_v2: true
-      };
-      localStorage.setItem('sapi_roles_config', JSON.stringify(configToSave));
-      if (window.pushToSupabase) {
-        window.pushToSupabase('roles', configToSave);
+      configChanged = true;
+    }
+  }
+
+  // Garantizar vista de levantamientos para los roles principales tras la actualización
+  const rolesConLevantamientos = ['superadmin', 'admin', 'supervisor', 'tecnico'];
+  rolesConLevantamientos.forEach(rol => {
+    if (ROLES[rol] && Array.isArray(ROLES[rol].views)) {
+      if (!ROLES[rol].views.includes('levantamientos')) {
+        ROLES[rol].views.push('levantamientos');
+        configChanged = true;
       }
+    }
+  });
+
+  if (configChanged) {
+    const configToSave = {
+      roles: ROLES,
+      migrated_v2: true
+    };
+    localStorage.setItem('sapi_roles_config', JSON.stringify(configToSave));
+    if (window.pushToSupabase) {
+      window.pushToSupabase('roles', configToSave);
     }
   }
   
@@ -2021,6 +2037,7 @@ function reRenderActiveView() {
     }
     if (view === 'servicios') { renderTabla('servicios'); renderStats(); }
     if (view === 'tickets') { renderTickets(); renderStats(); }
+    if (view === 'levantamientos' && typeof renderLevantamientos === 'function') renderLevantamientos();
     if (view === 'tecnicos') {
       if (typeof renderTecnicos === 'function') renderTecnicos();
     }
@@ -3437,6 +3454,7 @@ function setupNav() {
         }
         if (view === 'servicios') { renderTabla('servicios'); renderStats(); }
         if (view === 'tickets') { renderTickets(); renderStats(); }
+        if (view === 'levantamientos' && typeof renderLevantamientos === 'function') renderLevantamientos();
         if (view === 'tecnicos') {
           if (typeof renderTecnicos === 'function') renderTecnicos();
         }
@@ -17801,6 +17819,37 @@ function renderCalendario() {
     }
   });
 
+  // Inject Levantamientos into calendar
+  if (typeof levantamientos !== 'undefined' && Array.isArray(levantamientos)) {
+    levantamientos.forEach(lev => {
+      // Filtrar por técnico si hay un filtro activo (y si está asignado)
+      if (filtroTecnico && lev.asignado_a !== filtroTecnico) return;
+      
+      // Filtrar por empresa si el usuario es empresa
+      if (isEmpresa && lev.cliente !== miEmpresa) return;
+
+      if (lev.fecha_esperada) {
+        eventos.push({
+          id: `lev-${lev.id}`,
+          title: `📋 Levantamiento | ${lev.cliente} | ${lev.asignado_a ? lev.asignado_a.split(' ')[0] : 'Sin Asignar'}`,
+          start: lev.fecha_esperada,
+          allDay: true,
+          backgroundColor: '#d946ef', // Fuchsia (distinct color for Levantamientos)
+          borderColor: '#d946ef',
+          textColor: '#ffffff',
+          extendedProps: {
+            isLevantamiento: true,
+            levantamientoId: lev.id,
+            cliente: lev.cliente,
+            descripcion: lev.descripcion,
+            asignado_a: lev.asignado_a || 'Sin Asignar',
+            estado: lev.estado
+          }
+        });
+      }
+    });
+  }
+
   // Inyectar eventos administrativos personalizados (Fase 9)
   try {
     const adminEvents = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
@@ -17938,6 +17987,8 @@ function renderCalendario() {
         mostrarPopupBitacora(info);
       } else if (info.event.extendedProps.isAdminEvent) {
         mostrarDetalleEventoAdministrativo(info.event.id);
+      } else if (info.event.extendedProps.isLevantamiento) {
+        if (typeof verDetalleLevantamiento === 'function') verDetalleLevantamiento(info.event.extendedProps.levantamientoId);
       } else {
         verDetalle(info.event.id);
       }

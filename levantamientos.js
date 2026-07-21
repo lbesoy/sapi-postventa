@@ -99,6 +99,14 @@ function window_abrirModalNuevoLevantamiento() {
         <label style="display:block; font-weight:600; margin-bottom:0.25rem;">Fecha Esperada</label>
         <input type="date" id="nl-fecha" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border);">
       </div>
+
+      <div style="margin-bottom:1.5rem;">
+        <label style="display:block; font-weight:600; margin-bottom:0.25rem;">Asignado A (Opcional)</label>
+        <select id="nl-asignado" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border);">
+          <option value="">-- Sin Asignar --</option>
+          ${(typeof usuarios !== 'undefined' ? usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false) : []).map(u => '<option value="' + u.nombre + '">' + u.nombre + '</option>').join('')}
+        </select>
+      </div>
       
       <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
         <button type="button" class="btn-secondary" onclick="document.getElementById('modal-nuevo-levantamiento').remove()">Cancelar</button>
@@ -131,6 +139,7 @@ function guardarNuevoLevantamiento(id, folio) {
     solicitante: document.getElementById('nl-solicitante').value,
     descripcion,
     fecha_esperada: document.getElementById('nl-fecha').value,
+    asignado_a: document.getElementById('nl-asignado') ? document.getElementById('nl-asignado').value : '',
     estado: 'Pendiente',
     created_at: new Date().toISOString()
   };
@@ -172,6 +181,15 @@ function verDetalleLevantamiento(id) {
         <div><strong style="color:var(--text-secondary);font-size:0.8rem;">Sitio</strong><br>${lev.sitio || '-'}</div>
         <div><strong style="color:var(--text-secondary);font-size:0.8rem;">Solicitante</strong><br>${lev.solicitante || '-'}</div>
         <div><strong style="color:var(--text-secondary);font-size:0.8rem;">Fecha Esperada</strong><br>${lev.fecha_esperada || '-'}</div>
+        <div style="grid-column: 1 / -1;">
+          <strong style="color:var(--text-secondary);font-size:0.8rem;">Asignado A</strong><br>
+          ${isCompleted ? (lev.asignado_a || '-') : `
+            <select id="det-lev-asignado" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border); margin-top:0.25rem;" onchange="actualizarLevantamiento('${id}', 'asignado_a', this.value)">
+              <option value="">-- Sin Asignar --</option>
+              ${(typeof usuarios !== 'undefined' ? usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false) : []).map(u => '<option value="' + u.nombre + '" ' + (lev.asignado_a === u.nombre ? 'selected' : '') + '>' + u.nombre + '</option>').join('')}
+            </select>
+          `}
+        </div>
       </div>
       
       <div style="margin-bottom:1.5rem;">
@@ -191,6 +209,18 @@ function verDetalleLevantamiento(id) {
     </div>
   `;
   document.body.appendChild(m);
+}
+
+function actualizarLevantamiento(id, campo, valor) {
+  const lev = levantamientos.find(l => l.id === id);
+  if (!lev) return;
+  
+  lev[campo] = valor;
+  if (typeof safeSetJSON === 'function') safeSetJSON('sapi_levantamientos', levantamientos);
+  if (window.supabaseClient && window.updateInSupabase) {
+    window.updateInSupabase('levantamientos', lev.id, { [campo]: valor });
+  }
+  renderLevantamientos();
 }
 
 function completarLevantamiento(id) {
