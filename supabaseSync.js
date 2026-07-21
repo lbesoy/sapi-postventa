@@ -366,7 +366,7 @@ function ordenToRow(o) {
   const knownKeys = [
     'id', 'folio', 'cliente', 'ubicacion', 'tipo', 'estado', 'fecha', 'fechaInicio', 'fechaFin', 
     'duracion', 'duracion_minutos', 'evidenciaBase64', 'evidencia_base_64', 'evidencia_url', 'bitacora', 'maquinaria_id', 'sitio_id',
-    'ref_necesarias', 'ref_utilizadas', 'firma_tecnico_base64', 'firma_tecnico_nombre', 'firma_tecnico_fecha', 
+    'firma_tecnico_base64', 'firma_tecnico_nombre', 'firma_tecnico_fecha', 
     'firma_cliente_base64', 'firma_cliente_nombre', 'firma_cliente_fecha', 'evidencias',
     'ubicacion_sitio', 'operador'
   ];
@@ -516,11 +516,9 @@ function rowToOrden(o) {
   };
   
   if (res.bitacora) delete res.bitacora;
-  if (res.ref_necesarias) delete res.ref_necesarias;
-  if (res.ref_utilizadas) delete res.ref_utilizadas;
   res.bitacora = [];
-  res.ref_necesarias = [];
-  res.ref_utilizadas = [];
+  res.ref_necesarias = extraData.ref_necesarias || [];
+  res.ref_utilizadas = extraData.ref_utilizadas || [];
 
   if (!res.ubicacion_sitio && extraData.ubicacion_sitio) res.ubicacion_sitio = extraData.ubicacion_sitio;
   if (!res.operador && extraData.operador) res.operador = extraData.operador;
@@ -2697,19 +2695,41 @@ window.cargarDatosDeSupabase = function() {
         const ord = rowToOrden(o);
         ord.bitacora = bitacorasMap[ord.id] || [];
         
-        // Re-inyectar refacciones
+        // Re-inyectar y fusionar refacciones
         const refLink = refaccionesMap[ord.id] || { necesarias: [], utilizadas: [] };
         
+        // Fusionar necesarias
+        refLink.necesarias.forEach(rl => {
+          const match = ord.ref_necesarias.find(ex => ex.descripcion === rl.descripcion);
+          if (match) {
+            match.estatusPedido = rl.estatusPedido;
+            match.estado = rl.estado;
+            match.clave = match.clave || rl.clave;
+          } else {
+            ord.ref_necesarias.push(rl);
+          }
+        });
+        
+        // Fusionar utilizadas
+        refLink.utilizadas.forEach(rl => {
+          const match = ord.ref_utilizadas.find(ex => ex.descripcion === rl.descripcion);
+          if (match) {
+            match.estatusPedido = rl.estatusPedido;
+            match.estado = rl.estado;
+            match.clave = match.clave || rl.clave;
+          } else {
+            ord.ref_utilizadas.push(rl);
+          }
+        });
+        
+        // Mantener las banderas de pdf
         if (ord.pdfRefFlags) {
-          refLink.utilizadas.forEach(r => {
+          ord.ref_utilizadas.forEach(r => {
             if (ord.pdfRefFlags[r.descripcion]) {
               r.isFromPdf = true;
             }
           });
         }
-        
-        ord.ref_necesarias = refLink.necesarias;
-        ord.ref_utilizadas = refLink.utilizadas;
         
         // Re-inyectar firmas
         const firmLink = firmasMap[ord.id] || {};
