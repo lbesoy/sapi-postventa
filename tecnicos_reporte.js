@@ -180,6 +180,7 @@
       // Obtener estatus de cada día
       const statuses = weekIsoDates.map(isoDate => {
         let conServicio = false;
+        let conVacaciones = false;
         let infoServicios = [];
         
         orders.forEach(o => {
@@ -221,12 +222,48 @@
             infoServicios.push(`${clienteText} (${folioText})`);
           }
         });
+
+        // Verificar vacaciones en el calendario
+        const calendarEvents = window._supaCalendarioEventos || [];
+        calendarEvents.forEach(e => {
+          if (e.tipo === 'Vacaciones') {
+            let isThisTec = false;
+            if (e.tecnicoNombre && formatNombreCorto(e.tecnicoNombre) === formatNombreCorto(tShort)) {
+              isThisTec = true;
+            } else if (e.tecnicoId) {
+              const matchedUser = usuarios.find(u => u.id === e.tecnicoId);
+              if (matchedUser && formatNombreCorto(matchedUser.nombre) === formatNombreCorto(tShort)) {
+                isThisTec = true;
+              }
+            }
+            
+            if (isThisTec) {
+              let eStart = e.fechaInicio || '';
+              if (eStart.includes('T')) eStart = eStart.split('T')[0];
+              let eEnd = e.fechaFin || '';
+              if (eEnd.includes('T')) eEnd = eEnd.split('T')[0];
+              if (!eEnd) eEnd = eStart;
+              
+              if (isoDate >= eStart && isoDate <= eEnd) {
+                conVacaciones = true;
+              }
+            }
+          }
+        });
         
-        return conServicio ? infoServicios.join(', ') : 'Sin servicio';
+        if (conServicio) {
+          if (conVacaciones) infoServicios.push('Vacaciones');
+          return { text: infoServicios.join(', '), isCon: true, isVac: conVacaciones };
+        } else if (conVacaciones) {
+          return { text: 'Vacaciones', isCon: false, isVac: true };
+        } else {
+          return { text: 'Sin servicio', isCon: false, isVac: false };
+        }
       });
       
-      const diasConServicio = statuses.filter(s => s !== 'Sin servicio').length;
-      if (diasConServicio === 0) {
+      const diasConServicio = statuses.filter(s => s.isCon).length;
+      const diasOcupados = statuses.filter(s => s.isCon || s.isVac).length;
+      if (diasOcupados === 0) {
         libresCount++;
       }
       
@@ -281,10 +318,18 @@
       tr.innerHTML = `
         <td style="font-weight:700; color:var(--text-primary); text-align:left;">${full}</td>
         ${statuses.map(s => {
-          const isCon = s !== 'Sin servicio';
-          const bg = isCon ? 'rgba(234, 179, 8, 0.15)' : 'transparent';
-          const fg = isCon ? 'var(--accent)' : 'var(--text-muted)';
-          return `<td style="background:${bg}; color:${fg}; font-weight:${isCon ? '700' : 'normal'}; text-align:center; font-size:${isCon ? '0.72rem' : '0.8rem'}; line-height: 1.2; padding: 0.4rem 0.25rem;">${s}</td>`;
+          const isCon = s.isCon;
+          const isVac = s.isVac;
+          let bg = 'transparent';
+          let fg = 'var(--text-muted)';
+          if (isCon) {
+            bg = 'rgba(234, 179, 8, 0.15)';
+            fg = 'var(--accent)';
+          } else if (isVac) {
+            bg = 'rgba(245, 158, 11, 0.15)';
+            fg = '#f59e0b';
+          }
+          return `<td style="background:${bg}; color:${fg}; font-weight:${(isCon || isVac) ? '700' : 'normal'}; text-align:center; font-size:${(isCon || isVac) ? '0.72rem' : '0.8rem'}; line-height: 1.2; padding: 0.4rem 0.25rem;">${s.text}</td>`;
         }).join('')}
         <td style="text-align:center; font-weight:600; color:${reporteEnviado === 'Sí' ? 'var(--green)' : 'var(--red)'};">${reporteEnviado}</td>
         <td style="text-align:center; font-weight:700;">${diasConServicio}</td>
