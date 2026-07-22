@@ -196,13 +196,17 @@
       // Obtener estatus de cada día
       const statuses = weekIsoDates.map(isoDate => {
         let conServicio = false;
+        let conProgramado = false;
         let conVacaciones = false;
-        let infoServicios = [];
+        let infoServiciosCompletados = [];
+        let infoServiciosProgramados = [];
         
         orders.forEach(o => {
           if (typeof isTestData === 'function' && isTestData(o) !== isTest) return;
           
           let matchesOrder = false;
+          let isCompleted = false;
+          
           // Verificar bitácora
           if (o.bitacora && Array.isArray(o.bitacora)) {
             o.bitacora.forEach(b => {
@@ -211,6 +215,10 @@
                 if (bDate.includes('T')) bDate = bDate.split('T')[0];
                 if (bDate === isoDate) {
                   matchesOrder = true;
+                  const esAsignacionPendiente = b.realizado === false || (b.nota && b.nota.includes('Programado') && b.realizado !== true);
+                  if (!esAsignacionPendiente) {
+                    isCompleted = true;
+                  }
                 }
               }
             });
@@ -232,10 +240,16 @@
           }
 
           if (matchesOrder) {
-            conServicio = true;
             const folioText = o.folio || 'Sin Folio';
             const clienteText = o.cliente || 'Sin Cliente';
-            infoServicios.push(`${clienteText} (${folioText})`);
+            const label = `${clienteText} (${folioText})`;
+            if (isCompleted) {
+              conServicio = true;
+              infoServiciosCompletados.push(label);
+            } else {
+              conProgramado = true;
+              infoServiciosProgramados.push(label);
+            }
           }
         });
 
@@ -268,17 +282,25 @@
         });
         
         if (conServicio) {
-          if (conVacaciones) infoServicios.push('Vacaciones');
-          return { text: infoServicios.join(', '), isCon: true, isVac: conVacaciones };
+          let parts = [...infoServiciosCompletados];
+          if (infoServiciosProgramados.length > 0) {
+            parts.push(...infoServiciosProgramados.map(p => `${p} (Prog)`));
+          }
+          if (conVacaciones) parts.push('Vacaciones');
+          return { text: parts.join(', '), isCon: true, isProg: false, isVac: conVacaciones };
+        } else if (conProgramado) {
+          let parts = [...infoServiciosProgramados];
+          if (conVacaciones) parts.push('Vacaciones');
+          return { text: parts.join(', '), isCon: false, isProg: true, isVac: conVacaciones };
         } else if (conVacaciones) {
-          return { text: 'Vacaciones', isCon: false, isVac: true };
+          return { text: 'Vacaciones', isCon: false, isProg: false, isVac: true };
         } else {
-          return { text: 'Sin servicio', isCon: false, isVac: false };
+          return { text: 'Sin servicio', isCon: false, isProg: false, isVac: false };
         }
       });
       
       const diasConServicio = statuses.filter(s => s.isCon).length;
-      const diasOcupados = statuses.filter(s => s.isCon || s.isVac).length;
+      const diasOcupados = statuses.filter(s => s.isCon || s.isProg || s.isVac).length;
       if (diasOcupados === 0) {
         libresCount++;
       }
@@ -335,17 +357,22 @@
         <td style="font-weight:700; color:var(--text-primary); text-align:left;">${full}</td>
         ${statuses.map(s => {
           const isCon = s.isCon;
+          const isProg = s.isProg;
           const isVac = s.isVac;
           let bg = 'transparent';
           let fg = 'var(--text-muted)';
           if (isCon) {
-            bg = 'rgba(234, 179, 8, 0.15)';
+            bg = 'rgba(234, 179, 8, 0.15)'; // Soft gold
             fg = 'var(--accent)';
+          } else if (isProg) {
+            bg = 'rgba(14, 165, 233, 0.15)'; // Soft blue
+            fg = '#0284c7';
           } else if (isVac) {
-            bg = 'rgba(245, 158, 11, 0.15)';
-            fg = '#f59e0b';
+            bg = 'rgba(139, 92, 246, 0.15)'; // Soft purple
+            fg = '#7c3aed';
           }
-          return `<td style="background:${bg}; color:${fg}; font-weight:${(isCon || isVac) ? '700' : 'normal'}; text-align:center; font-size:${(isCon || isVac) ? '0.72rem' : '0.8rem'}; line-height: 1.2; padding: 0.4rem 0.25rem;">${s.text}</td>`;
+          const hasState = isCon || isProg || isVac;
+          return `<td style="background:${bg}; color:${fg}; font-weight:${hasState ? '700' : 'normal'}; text-align:center; font-size:${hasState ? '0.72rem' : '0.8rem'}; line-height: 1.2; padding: 0.4rem 0.25rem;">${s.text}</td>`;
         }).join('')}
         <td style="text-align:center; font-weight:600; color:${reporteEnviado === 'Sí' ? 'var(--green)' : 'var(--red)'};">${reporteEnviado}</td>
         <td style="text-align:center; font-weight:700;">${diasConServicio}</td>
