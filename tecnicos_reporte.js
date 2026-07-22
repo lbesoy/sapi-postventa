@@ -41,6 +41,7 @@
           <div style="display:flex; align-items:center; gap:0.5rem;">
             <label style="font-size:0.85rem; font-weight:600;">Seleccionar Semana (Cualquier día de la semana):</label>
             <input type="date" id="rep-semana-fecha" value="${hoy.toISOString().split('T')[0]}" style="padding:0.35rem 0.5rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.85rem;" onchange="window.actualizarTablaReporteSemanal()">
+            <span id="rep-semana-numero" style="font-size:0.85rem; font-weight:700; color:var(--text-secondary); margin-left:0.25rem;"></span>
           </div>
           <div style="display:flex; align-items:center; gap:0.75rem;">
             <div id="rep-tecnicos-libres" style="font-size:0.85rem; font-weight:700; color:var(--accent); background:var(--accent-light); padding:0.3rem 0.6rem; border-radius:6px;">
@@ -118,6 +119,21 @@
     if (!fechaVal) return;
     
     const lunes = obtenerLunes(new Date(fechaVal + 'T00:00:00'));
+    
+    // Calcular número de semana
+    const obtenerSemanaAno = (fecha) => {
+      const d = new Date(Date.UTC(fecha.getFullYear(), fecha.getMonth(), fecha.getDate()));
+      const dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    };
+    const nSemana = obtenerSemanaAno(lunes);
+    const spanSemana = document.getElementById('rep-semana-numero');
+    if (spanSemana) {
+      spanSemana.textContent = `(Semana ${nSemana})`;
+    }
+    
     const diasSemana = [];
     for (let i = 0; i < 7; i++) {
       const next = new Date(lunes);
