@@ -57,18 +57,18 @@
             <table class="orders-table" id="tabla-reporte-semanal" style="width:100%;">
               <thead>
                 <tr id="rep-header-row">
-                  <th>Técnico</th>
-                  <th>Lunes</th>
-                  <th>Martes</th>
-                  <th>Miércoles</th>
-                  <th>Jueves</th>
-                  <th>Viernes</th>
-                  <th>Sábado</th>
-                  <th>Domingo</th>
-                  <th style="width:100px;">Reporte Enviado</th>
-                  <th style="width:80px;">Días con servicio</th>
-                  <th style="width:120px;">Pago sugerido ($)</th>
-                  <th>Observaciones</th>
+                  <th style="text-align:left;">Técnico</th>
+                  <th style="text-align:center;">Lunes</th>
+                  <th style="text-align:center;">Martes</th>
+                  <th style="text-align:center;">Miércoles</th>
+                  <th style="text-align:center;">Jueves</th>
+                  <th style="text-align:center;">Viernes</th>
+                  <th style="text-align:center;">Sábado</th>
+                  <th style="text-align:center;">Domingo</th>
+                  <th style="text-align:center; width:100px;">Reporte Enviado</th>
+                  <th style="text-align:center; width:80px;">Días con servicio</th>
+                  <th style="text-align:center; width:120px;">Pago sugerido ($)</th>
+                  <th style="text-align:center;">Observaciones</th>
                 </tr>
               </thead>
               <tbody id="rep-body-rows">
@@ -130,12 +130,12 @@
     const headerRow = document.getElementById('rep-header-row');
     if (headerRow) {
       headerRow.innerHTML = `
-        <th>Técnico</th>
-        ${diasSemana.map((d, idx) => `<th>${nombresDias[idx]}<br><span style="font-size:0.7rem; font-weight:normal; opacity:0.7;">${formatShortDate(d)}</span></th>`).join('')}
-        <th>Reporte Enviado</th>
-        <th>Días con servicio</th>
-        <th>Pago sugerido ($)</th>
-        <th>Observaciones</th>
+        <th style="text-align:left;">Técnico</th>
+        ${diasSemana.map((d, idx) => `<th style="text-align:center;">${nombresDias[idx]}<br><span style="font-size:0.7rem; font-weight:normal; opacity:0.7;">${formatShortDate(d)}</span></th>`).join('')}
+        <th style="text-align:center;">Reporte Enviado</th>
+        <th style="text-align:center;">Días con servicio</th>
+        <th style="text-align:center;">Pago sugerido ($)</th>
+        <th style="text-align:center;">Observaciones</th>
       `;
     }
     
@@ -152,7 +152,7 @@
     }
     
     const tecs = [...new Set(tecsArr)]
-      .filter(t => !t.toUpperCase().includes('N/A') && t.trim() !== '')
+      .filter(t => !t.toUpperCase().includes('N/A') && t.trim() !== '' && !['LAURA PAZ', 'ADRIAN FRANCO'].includes(t.toUpperCase()))
       .filter(t => {
         const tecObj = (typeof tecnicosDb !== 'undefined' ? tecnicosDb.find(x => formatNombreCorto(x.nombre) === t) : null) || usuarios.find(u => formatNombreCorto(u.nombre) === t);
         if (tecObj && !(typeof isTestModeActive === 'function' && isTestModeActive()) && (typeof isTestUser === 'function' && isTestUser(tecObj))) return false;
@@ -180,10 +180,12 @@
       // Obtener estatus de cada día
       const statuses = weekIsoDates.map(isoDate => {
         let conServicio = false;
+        let infoServicios = [];
         
         orders.forEach(o => {
           if (typeof isTestData === 'function' && isTestData(o) !== isTest) return;
           
+          let matchesOrder = false;
           // Verificar bitácora
           if (o.bitacora && Array.isArray(o.bitacora)) {
             o.bitacora.forEach(b => {
@@ -191,7 +193,7 @@
                 let bDate = b.fecha || '';
                 if (bDate.includes('T')) bDate = bDate.split('T')[0];
                 if (bDate === isoDate) {
-                  conServicio = true;
+                  matchesOrder = true;
                 }
               }
             });
@@ -208,15 +210,22 @@
               assigned = o.tecnico.split(',').map(s => formatNombreCorto(s.trim()));
             }
             if (assigned.includes(formatNombreCorto(tShort))) {
-              conServicio = true;
+              matchesOrder = true;
             }
+          }
+
+          if (matchesOrder) {
+            conServicio = true;
+            const folioText = o.folio || 'Sin Folio';
+            const clienteText = o.cliente || 'Sin Cliente';
+            infoServicios.push(`${clienteText} (${folioText})`);
           }
         });
         
-        return conServicio ? 'Con servicio' : 'Sin servicio';
+        return conServicio ? infoServicios.join(', ') : 'Sin servicio';
       });
       
-      const diasConServicio = statuses.filter(s => s === 'Con servicio').length;
+      const diasConServicio = statuses.filter(s => s !== 'Sin servicio').length;
       if (diasConServicio === 0) {
         libresCount++;
       }
@@ -272,10 +281,10 @@
       tr.innerHTML = `
         <td style="font-weight:700; color:var(--text-primary); text-align:left;">${full}</td>
         ${statuses.map(s => {
-          const isCon = s === 'Con servicio';
+          const isCon = s !== 'Sin servicio';
           const bg = isCon ? 'rgba(234, 179, 8, 0.15)' : 'transparent';
           const fg = isCon ? 'var(--accent)' : 'var(--text-muted)';
-          return `<td style="background:${bg}; color:${fg}; font-weight:${isCon ? '700' : 'normal'}; text-align:center;">${s}</td>`;
+          return `<td style="background:${bg}; color:${fg}; font-weight:${isCon ? '700' : 'normal'}; text-align:center; font-size:${isCon ? '0.72rem' : '0.8rem'}; line-height: 1.2; padding: 0.4rem 0.25rem;">${s}</td>`;
         }).join('')}
         <td style="text-align:center; font-weight:600; color:${reporteEnviado === 'Sí' ? 'var(--green)' : 'var(--red)'};">${reporteEnviado}</td>
         <td style="text-align:center; font-weight:700;">${diasConServicio}</td>

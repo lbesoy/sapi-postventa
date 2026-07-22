@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.274'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.281'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -1243,6 +1243,7 @@ window.applyRole = applyRole;
 cargarRolesDesdeStorage();
 
 // ===== LOGIN STATE =====
+window.iniciarSesionSubmit = iniciarSesionSubmit;
 async function iniciarSesionSubmit(e) {
   e.preventDefault();
   const errEl = document.getElementById('login-error');
@@ -8089,7 +8090,8 @@ window.actualizarDescripcionesCombo = function(comboIdMarca, comboIdDesc) {
   if (marcaSel) {
     const refsPorMarca = refaccionesDb.filter(r => r.marca === marcaSel).sort((a,b) => (a.descripcion||'').localeCompare(b.descripcion||''));
     refsPorMarca.forEach(r => {
-      html += `<div class="combo-option" onclick="window.seleccionarDescRefaccion(this, '${comboIdDesc}', '${r.id || r.codigo}', ${r.precio || 0})">${r.descripcion}</div>`;
+      const clave = r.id || r.codigo || '';
+      html += `<div class="combo-option" data-desc="${r.descripcion}" data-clave="${clave}" onclick="window.seleccionarDescRefaccion(this, '${comboIdDesc}', '${clave}', ${r.precio || 0})">${r.descripcion} ${clave ? `[${clave}]` : ''}</div>`;
     });
   } else {
     html = `<div class="combo-option" style="color:var(--text-muted)">Seleccione una marca primero</div>`;
@@ -8098,7 +8100,7 @@ window.actualizarDescripcionesCombo = function(comboIdMarca, comboIdDesc) {
 };
 
 window.seleccionarDescRefaccion = function(optionEl, comboIdDesc, clave, precio) {
-  const text = optionEl.textContent;
+  const text = optionEl.dataset.desc || optionEl.textContent;
   const comboMenu = optionEl.closest('.combo-menu');
   
   // Close the menu
@@ -10195,11 +10197,11 @@ function verDetalle(id) {
       <div style="margin-top:0.5rem">${field('Condiciones del equipo', o.condiciones)}</div>
       <div style="margin-top:0.5rem">${field('Observaciones', o.observaciones)}</div>
       <div style="margin-top:0.5rem">${field('Pendientes', o.pendientes)}</div>`)}
-    ${seccion('Refacciones Utilizadas', refTable(o.ref_utilizadas, true))}
+    ${seccion('Refacciones Utilizadas', refTable(o.ref_utilizadas, false))}
     ${seccion('Refacciones Necesarias', refTable(o.ref_necesarias, false))}
     ${(o.noches || o.alimentacion || o.traslado_costo) ? seccion('Fecha de Servicio', `
       <div class="detalle-grid">
-        ${field('No. Noches', o.noches)} ${field('Alimentación', o.alimentacion ? '$'+o.alimentacion : '')} ${field('Traslado', o.traslado_costo ? '$'+o.traslado_costo : '')}
+        ${field('No. Noches', o.noches)} ${field('Alimentación', o.alimentacion)} ${field('Traslado', o.traslado_costo)}
       </div>`) : ''}
     ${seccion('Bitácora Diaria', renderBitacora(o))}
     ${seccion('Evidencias Fotográficas', renderEvidenciasFotograficas(o))}

@@ -2771,7 +2771,7 @@ async function abrirReportePdfCliente(e, orderId) {
       <div style="margin-top:0.5rem">${field('Observaciones', o.observaciones)}</div>
       <div style="margin-top:0.5rem">${field('Pendientes', o.pendientes)}</div>`)}
 
-    ${seccion('Refacciones Utilizadas', refTable(o.ref_utilizadas, true))}
+    ${seccion('Refacciones Utilizadas', refTable(o.ref_utilizadas, false))}
     ${seccion('Refacciones Necesarias', refTable(o.ref_necesarias, false))}
 
     ${(o.noches || o.alimentacion || o.traslado_costo) ? seccion('Servicio', `
