@@ -145,9 +145,12 @@
       return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
     };
     const nSemana = obtenerSemanaAno(lunes);
+    const domingo = new Date(lunes);
+    domingo.setDate(lunes.getDate() + 6);
+    
     const spanSemana = document.getElementById('rep-semana-numero');
     if (spanSemana) {
-      spanSemana.textContent = `(Semana ${nSemana})`;
+      spanSemana.textContent = `(Semana ${nSemana}: del ${formatShortDate(lunes)} al ${formatShortDate(domingo)})`;
     }
     
     const diasSemana = [];
