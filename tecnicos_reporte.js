@@ -53,6 +53,22 @@
           </div>
         </div>
         
+        <div style="padding:0.75rem 1.5rem; background:rgba(255,255,255,0.01); border-bottom:1px solid var(--border); display:flex; gap:1.5rem; align-items:center; flex-wrap:wrap; font-size:0.75rem; font-weight:500; color:var(--text-secondary);">
+          <span style="font-weight:600; color:var(--text-muted);">Referencias:</span>
+          <div style="display:flex; align-items:center; gap:0.35rem;">
+            <span style="width:12px; height:12px; border-radius:3px; background:rgba(234, 179, 8, 0.15); border: 1px solid var(--accent); display:inline-block;"></span>
+            <span>Servicio Completado (Realizado)</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.35rem;">
+            <span style="width:12px; height:12px; border-radius:3px; background:rgba(14, 165, 233, 0.15); border: 1px solid #0284c7; display:inline-block;"></span>
+            <span>Servicio Programado (Pendiente)</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.35rem;">
+            <span style="width:12px; height:12px; border-radius:3px; background:rgba(139, 92, 246, 0.15); border: 1px solid #7c3aed; display:inline-block;"></span>
+            <span>Vacaciones</span>
+          </div>
+        </div>
+        
         <div style="flex:1; overflow-y:auto; padding:1.5rem;">
           <div class="table-wrapper" style="margin-top:0; border-radius:8px; border:1px solid var(--border);">
             <table class="orders-table" id="tabla-reporte-semanal" style="width:100%;">

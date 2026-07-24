@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.284'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.286'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -1441,44 +1441,55 @@ async function confirmarCrearUsuario() {
   errEl.textContent = 'Creando cuenta...';
   errEl.style.color = 'var(--text-secondary)';
 
-  const { data, error } = await window.supabaseClient.auth.signUp({
-    email: email,
-    password: pin,
-    options: {
-      data: {
-        nombre: nombre
+  try {
+    const { data, error } = await window.supabaseClient.auth.signUp({
+      email: email,
+      password: pin,
+      options: {
+        data: {
+          nombre: nombre
+        }
+      }
+    });
+
+    if (error) {
+      console.error('[SignUp] Error de Supabase:', error);
+      let msg = error.message;
+      if (!msg || msg === '{}' || typeof msg === 'object') {
+        msg = error.error_description || error.code || 'El usuario ya existe, el teléfono ya está registrado o el servicio de registro está temporalmente cerrado.';
+      }
+      errEl.textContent = msg;
+      errEl.style.color = 'var(--red)';
+      return;
+    }
+    
+    if (data?.user) {
+      const inputEmailRaw = document.getElementById('lc-email').value.trim();
+      const esCelularRaw = inputEmailRaw && !inputEmailRaw.includes('@');
+      const telefonoLimpio = esCelularRaw ? inputEmailRaw.replace(/\s+/g, '') : '';
+
+      // Asegurar que el registro de rol existe en user_roles en la nube con su celular inicial
+      const { error: roleErr } = await window.supabaseClient.from('user_roles').insert({
+        id: data.user.id,
+        nombre: nombre,
+        email: email,
+        telefono: telefonoLimpio,
+        rol: 'consulta',
+        activo: false
+      });
+      if (roleErr) {
+        console.warn('[SignUp] No se pudo asegurar el rol del usuario en user_roles:', roleErr.message);
       }
     }
-  });
-
-  if (error) {
-    errEl.textContent = error.message;
+    
+    volverSeleccion();
+    document.getElementById('login-error').textContent = 'Cuenta creada. Espera la aprobación de un Administrador.';
+    document.getElementById('login-error').style.color = 'var(--text-secondary)';
+  } catch (err) {
+    console.error('[SignUp] Excepción al registrar usuario:', err);
+    errEl.textContent = err.message || 'Error de red o conexión al registrar usuario.';
     errEl.style.color = 'var(--red)';
-    return;
   }
-  
-  if (data?.user) {
-    const inputEmailRaw = document.getElementById('lc-email').value.trim();
-    const esCelularRaw = inputEmailRaw && !inputEmailRaw.includes('@');
-    const telefonoLimpio = esCelularRaw ? inputEmailRaw.replace(/\s+/g, '') : '';
-
-    // Asegurar que el registro de rol existe en user_roles en la nube con su celular inicial
-    const { error: roleErr } = await window.supabaseClient.from('user_roles').insert({
-      id: data.user.id,
-      nombre: nombre,
-      email: email,
-      telefono: telefonoLimpio,
-      rol: 'consulta',
-      activo: false
-    });
-    if (roleErr) {
-      console.warn('[SignUp] No se pudo asegurar el rol del usuario en user_roles:', roleErr.message);
-    }
-  }
-  
-  volverSeleccion();
-  document.getElementById('login-error').textContent = 'Cuenta creada. Espera la aprobación de un Administrador.';
-  document.getElementById('login-error').style.color = 'var(--text-secondary)';
 }
 
 // ===== // Banderas globales
