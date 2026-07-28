@@ -92,7 +92,7 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.287'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.290'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -7366,8 +7366,10 @@ function guardarNuevaMaquina(e) {
   if (document.getElementById('modal-ticket')?.classList.contains('open')) {
     const tCli = document.getElementById('t-cliente').value;
     if (tCli === clienteSeleccionado) {
-      poblarMaquinasCliente('t-equipo', mName, tCli);
-      if (typeof onEquipoTicketChange === 'function') onEquipoTicketChange();
+      poblarMaquinasCliente('t-equipo', '', tCli);
+      if (window.agregarMaquinaChip) {
+        window.agregarMaquinaChip(mName);
+      }
     }
   }
   if (document.getElementById('view-servicios')?.classList.contains('active')) {
@@ -8616,11 +8618,24 @@ function abrirFormulario(id, modoReporte = false) {
   } else {
     // Nueva Orden
     poblarSoportesPorCliente('');
+    const ordSelectedEquiposContainer = document.getElementById('f-equipos-seleccionados');
+    if (ordSelectedEquiposContainer) ordSelectedEquiposContainer.innerHTML = '';
   }
   
   // Los técnicos se extraen automáticamente del ticket al guardar
+  const oSel = id ? ordenes.find(x => x.id === id) : null;
+  poblarMaquinasCliente('f-equipo', '', oSel ? oSel.cliente : '');
   
-  poblarMaquinasCliente('f-equipo', id ? ordenes.find(x => x.id === id)?.equipo : '', id ? ordenes.find(x => x.id === id)?.cliente : '');
+  const ordSelectedEquiposContainer = document.getElementById('f-equipos-seleccionados');
+  if (ordSelectedEquiposContainer) ordSelectedEquiposContainer.innerHTML = '';
+  
+  if (oSel && oSel.equipo) {
+    oSel.equipo.split(', ').forEach(eqName => {
+      if (eqName.trim() && window.agregarMaquinaChipOrden) {
+        window.agregarMaquinaChipOrden(eqName.trim());
+      }
+    });
+  }
   
   if (id) {
     const o = ordenes.find(x => x.id === id);
@@ -8994,6 +9009,54 @@ async function guardarOrden(e) {
     }
   }
 
+  let equipoVal = '';
+  const chips = Array.from(document.querySelectorAll('#f-equipos-seleccionados .maquina-chip')).map(c => c.getAttribute('data-value'));
+  if (chips.length > 0) {
+    equipoVal = chips.join(', ');
+  } else {
+    equipoVal = document.getElementById('f-equipo')?.value || '';
+  }
+
+  if (!equipoVal) {
+    mostrarNotificacion('Debe seleccionar al menos una máquina.', 'error');
+    restoreBtn();
+    return;
+  }
+
+  let marcasVal = '';
+  let maquinariaId = null;
+  const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+  const matchMaquina = (m, name) => {
+    const cleanId = m.idInterno || m.id || '';
+    const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+    const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+    const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+    const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+    return name === mName || name === cleanId || name === m.serie;
+  };
+
+  if (chips.length > 0) {
+    const marcasArr = [];
+    chips.forEach(cName => {
+      let maq = null;
+      clientesDb.forEach(c => {
+        if (c.maquinas) {
+          const found = c.maquinas.find(m => matchMaquina(m, cName));
+          if (found) maq = found;
+        }
+      });
+      if (!maq) maq = maquinariaDb.find(m => matchMaquina(m, cName));
+      if (maq) {
+        if (maq.marca) marcasArr.push(maq.marca);
+        if (!maquinariaId) maquinariaId = maq.id || null;
+      }
+    });
+    marcasVal = [...new Set(marcasArr)].join(', ');
+  } else {
+    marcasVal = document.getElementById('f-equipo')?.options[document.getElementById('f-equipo')?.selectedIndex]?.getAttribute('data-marca') || '';
+    maquinariaId = oVieja ? oVieja.maquinaria_id : null;
+  }
+
   const orden = {
     id: editandoId || folioVal,
     fecha: oVieja ? oVieja.fecha : getLocalDateString(),
@@ -9006,8 +9069,9 @@ async function guardarOrden(e) {
     eco: document.getElementById('f-eco').value.trim(),
     horometro: document.getElementById('f-horometro').value.trim(),
     horometro_real: document.getElementById('f-horometro-real').value.trim(),
-    equipo: document.getElementById('f-equipo')?.value || '',
-    marca: document.getElementById('f-equipo')?.options[document.getElementById('f-equipo')?.selectedIndex]?.getAttribute('data-marca') || '',
+    equipo: equipoVal,
+    marca: marcasVal,
+    maquinaria_id: maquinariaId,
     modelo: document.getElementById('f-modelo').value.trim(),
     serie: document.getElementById('f-serie').value.trim(),
     tecnico: tecnicosSeleccionados.join(', '),
@@ -15384,6 +15448,12 @@ function abrirTicket(id) {
   }
   editandoTicketId = id || null;
   document.getElementById('ticket-modal-title').textContent = id ? 'Editar Ticket' : 'Nuevo Ticket';
+  
+  const btnSubmit = document.getElementById('btn-submit-ticket');
+  if (btnSubmit) {
+    btnSubmit.innerHTML = id ? '<i data-lucide="save" class="btn-icon"></i> Guardar Cambios' : '<i data-lucide="save" class="btn-icon"></i> Emitir Ticket';
+  }
+
   document.getElementById('form-ticket').reset();
   
   const statusDiv = document.getElementById('t-sap-validation-status');
@@ -15511,8 +15581,9 @@ function abrirTicket(id) {
   });
   document.getElementById('t-sitio').value = '';
   document.getElementById('group-t-sitio').style.display = 'none';
-  
   poblarMaquinasCliente('t-equipo', '');
+  const selectedEquiposContainer = document.getElementById('t-equipos-seleccionados');
+  if (selectedEquiposContainer) selectedEquiposContainer.innerHTML = '';
 
   const selectAsignado = document.getElementById('t-asignado');
   if (selectAsignado) {
@@ -15604,7 +15675,14 @@ function abrirTicket(id) {
         selectComboOption('t-sitio', escapedSitio, escapedSitio, true);
       }
 
-      poblarMaquinasCliente('t-equipo', t.equipo, t.cliente);
+      poblarMaquinasCliente('t-equipo', '', t.cliente);
+      if (t.equipo) {
+        t.equipo.split(', ').forEach(eqName => {
+          if (eqName.trim()) {
+            window.agregarMaquinaChip(eqName.trim());
+          }
+        });
+      }
       
       const elCotSap = document.getElementById('t-cotizacion-sap');
       if (elCotSap) elCotSap.value = '';
@@ -15911,6 +15989,161 @@ function onEquipoTicketChange() {
   }
 }
 
+window.agregarMaquinaChip = function(maquinaName) {
+  if (!maquinaName) return;
+  const container = document.getElementById('t-equipos-seleccionados');
+  if (!container) return;
+  
+  // Evitar duplicados
+  const existing = Array.from(container.querySelectorAll('.maquina-chip')).some(c => c.getAttribute('data-value') === maquinaName);
+  if (existing) return;
+  
+  const chip = document.createElement('div');
+  chip.className = 'maquina-chip';
+  chip.setAttribute('data-value', maquinaName);
+  chip.style.cssText = `
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-hover, #f3f4f6);
+    border: 1px solid var(--border, #e5e7eb);
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-primary, #1f2937);
+    gap: 0.25rem;
+    box-shadow: var(--shadow-sm);
+  `;
+  chip.innerHTML = `
+    <span>${maquinaName}</span>
+    <span onclick="this.parentElement.remove()" style="cursor:pointer; font-weight:bold; color:var(--red, #ef4444); margin-left:4px; font-size:1.1rem; line-height:1;">&times;</span>
+  `;
+  container.appendChild(chip);
+};
+
+window.onEquipoTicketChangeMultiple = function() {
+  const select = document.getElementById('t-equipo');
+  if (!select) return;
+  const val = select.value;
+  if (!val) return;
+  
+  if (val === 'Otra / No registrada') {
+    onEquipoTicketChange(); // Abre modal de registro manual
+    return;
+  }
+  
+  window.agregarMaquinaChip(val);
+  select.value = ''; // Reset select to let them select more
+};
+
+window.actualizarCamposMaquinaOrden = function() {
+  const container = document.getElementById('f-equipos-seleccionados');
+  if (!container) return;
+  const chips = Array.from(container.querySelectorAll('.maquina-chip')).map(c => c.getAttribute('data-value'));
+  
+  if (chips.length === 0) {
+    document.getElementById('f-modelo').value = '';
+    document.getElementById('f-serie').value = '';
+    document.getElementById('f-eco').value = '';
+    return;
+  }
+  
+  const modelos = [];
+  const series = [];
+  const ecos = [];
+  
+  const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+  const matchMaquina = (m, name) => {
+    const cleanId = m.idInterno || m.id || '';
+    const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+    const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+    const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+    const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+    return name === mName || name === cleanId || name === m.serie;
+  };
+  
+  chips.forEach(cName => {
+    let maq = null;
+    clientesDb.forEach(c => {
+      if (c.maquinas) {
+        const found = c.maquinas.find(m => matchMaquina(m, cName));
+        if (found) maq = found;
+      }
+    });
+    if (!maq) maq = maquinariaDb.find(m => matchMaquina(m, cName));
+    
+    if (maq) {
+      if (maq.modelo) modelos.push(maq.modelo);
+      if (maq.serie) series.push(maq.serie);
+      if (maq.no_economico) ecos.push(maq.no_economico);
+    } else {
+      if (cName.includes('(SN: ')) {
+        const parts = cName.split('(SN: ');
+        const s = parts[1].replace(')', '').trim();
+        let left = parts[0].trim();
+        if (left.startsWith('[') && left.includes(']')) {
+          left = left.substring(left.indexOf(']') + 1).trim();
+        }
+        modelos.push(left);
+        series.push(s);
+      } else {
+        modelos.push(cName);
+      }
+    }
+  });
+  
+  document.getElementById('f-modelo').value = [...new Set(modelos)].join(', ');
+  document.getElementById('f-serie').value = [...new Set(series)].join(', ');
+  document.getElementById('f-eco').value = [...new Set(ecos)].join(', ');
+};
+
+window.agregarMaquinaChipOrden = function(maquinaName) {
+  if (!maquinaName) return;
+  const container = document.getElementById('f-equipos-seleccionados');
+  if (!container) return;
+  
+  const existing = Array.from(container.querySelectorAll('.maquina-chip')).some(c => c.getAttribute('data-value') === maquinaName);
+  if (existing) return;
+  
+  const chip = document.createElement('div');
+  chip.className = 'maquina-chip';
+  chip.setAttribute('data-value', maquinaName);
+  chip.style.cssText = `
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-hover, #f3f4f6);
+    border: 1px solid var(--border, #e5e7eb);
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-primary, #1f2937);
+    gap: 0.25rem;
+    box-shadow: var(--shadow-sm);
+  `;
+  chip.innerHTML = `
+    <span>${maquinaName}</span>
+    <span onclick="this.parentElement.remove(); window.actualizarCamposMaquinaOrden();" style="cursor:pointer; font-weight:bold; color:var(--red, #ef4444); margin-left:4px; font-size:1.1rem; line-height:1;">&times;</span>
+  `;
+  container.appendChild(chip);
+  window.actualizarCamposMaquinaOrden();
+};
+
+window.onEquipoOrdenChangeMultiple = function() {
+  const select = document.getElementById('f-equipo');
+  if (!select) return;
+  const val = select.value;
+  if (!val) return;
+  
+  if (val === 'Otra / No registrada') {
+    onEquipoOrdenChange();
+    return;
+  }
+  
+  window.agregarMaquinaChipOrden(val);
+  select.value = '';
+};
+
 // ===== CUSTOM COMBOBOX LOGIC =====
 function toggleCombo(id) {
   if (id === 'f-cliente') {
@@ -15993,7 +16226,11 @@ function selectComboOption(id, value, label, isInitial = false) {
     const sitDisplay = document.getElementById('t-sitio-display');
     const sitOptions = document.getElementById('t-sitio-options');
     
-    if (!isInitial) poblarMaquinasCliente('t-equipo', '', value);
+    if (!isInitial) {
+      poblarMaquinasCliente('t-equipo', '', value);
+      const selectedEquiposContainer = document.getElementById('t-equipos-seleccionados');
+      if (selectedEquiposContainer) selectedEquiposContainer.innerHTML = '';
+    }
     
     if (value && value !== 'Ninguno' && value !== 'Ninguno / Uso Interno') {
       if (sitGroup) sitGroup.style.display = 'block';
@@ -16020,6 +16257,8 @@ function selectComboOption(id, value, label, isInitial = false) {
     if (!isInitial) {
       poblarMaquinasCliente('f-equipo', '', value);
       poblarSoportesPorCliente(value, '');
+      const ordSelectedEquiposContainer = document.getElementById('f-equipos-seleccionados');
+      if (ordSelectedEquiposContainer) ordSelectedEquiposContainer.innerHTML = '';
     }
   }
 }
@@ -16123,7 +16362,10 @@ async function guardarTicket(e) {
     }
   }
   
-  if (!isEmpresa && (estado === 'Cotización' || estado === 'Cerrado')) {
+  const categoriaVal = document.getElementById('t-categoria')?.value || '';
+  const isGarantiaInterna = (categoriaVal === 'Garantía Interna' || t_existente?.categoria === 'Garantía Interna');
+  
+  if (!isEmpresa && (estado === 'Cotización' || estado === 'Cerrado') && !isGarantiaInterna) {
     // Si la lista de cotizaciones está vacía, intentar vincular los valores actuales de los inputs
     if (!window.editandoCotizaciones || window.editandoCotizaciones.length === 0) {
       const sapInputVal = document.getElementById('t-cotizacion-sap')?.value.trim();
@@ -16140,7 +16382,7 @@ async function guardarTicket(e) {
     }
   }
 
-  if (!isEmpresa && estado === 'Cerrado') {
+  if (!isEmpresa && estado === 'Cerrado' && !isGarantiaInterna) {
     const cotAceptada = document.querySelector('input[name="t-cot-aceptada"]:checked')?.value;
     const motivoRechazo = document.getElementById('t-motivo-rechazo')?.value.trim() || '';
     const pedidoSAP = document.getElementById('t-pedido-sap')?.value.trim() || '';
@@ -16209,6 +16451,19 @@ async function guardarTicket(e) {
     }
   }
 
+  let equipoVal = '';
+  const chips = Array.from(document.querySelectorAll('#t-equipos-seleccionados .maquina-chip')).map(c => c.getAttribute('data-value'));
+  if (chips.length > 0) {
+    equipoVal = chips.join(', ');
+  } else {
+    equipoVal = document.getElementById('t-equipo')?.value?.trim() || '';
+  }
+  
+  if (!equipoVal) {
+    mostrarNotificacion('Debe seleccionar al menos una máquina afectada.', 'error');
+    return;
+  }
+
   const ticket = {
     id: editandoTicketId || crypto.randomUUID(),
     folio: editandoTicketId ? t_existente?.folio : newFolio,
@@ -16227,7 +16482,7 @@ async function guardarTicket(e) {
     prioridad: document.getElementById('t-prioridad').value,
     asignado: document.getElementById('t-asignado').value.trim(),
     descripcion: document.getElementById('t-descripcion').value.trim(),
-    equipo: document.getElementById('t-equipo').value.trim(),
+    equipo: equipoVal,
     horometro: document.getElementById('t-horometro')?.value.trim() || '',
     notas: document.getElementById('t-notas').value.trim(),
     estado,
@@ -16366,7 +16621,7 @@ async function guardarTicket(e) {
       if (ticket.equipo) {
         const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
         
-        const matchMaquina = (m) => {
+        const matchMaquina = (m, name) => {
           const cleanId = m.idInterno || m.id || '';
           const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
           const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
@@ -16374,42 +16629,56 @@ async function guardarTicket(e) {
           const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
           
           return (
-            ticket.equipo === mName ||
-            ticket.equipo === cleanId ||
-            ticket.equipo === m.serie ||
-            ticket.equipo.includes(cleanId) ||
-            (m.serie && ticket.equipo.includes(m.serie))
+            name === mName ||
+            name === cleanId ||
+            name === m.serie ||
+            name.includes(cleanId) ||
+            (m.serie && name.includes(m.serie))
           );
         };
 
-        let maq = null;
-        clientesDb.forEach(c => {
-          if (c.maquinas) {
-            const found = c.maquinas.find(matchMaquina);
-            if (found) maq = found;
+        const eqNames = ticket.equipo.split(', ');
+        const modelosArr = [];
+        const seriesArr = [];
+        const marcasArr = [];
+        const ecosArr = [];
+
+        eqNames.forEach(eqName => {
+          let maq = null;
+          clientesDb.forEach(c => {
+            if (c.maquinas) {
+              const found = c.maquinas.find(m => matchMaquina(m, eqName));
+              if (found) maq = found;
+            }
+          });
+          if (!maq) maq = maquinariaDb.find(m => matchMaquina(m, eqName));
+
+          if (maq) {
+            if (maq.modelo) modelosArr.push(maq.modelo);
+            if (maq.serie) seriesArr.push(maq.serie);
+            if (maq.marca) marcasArr.push(maq.marca);
+            if (maq.no_economico) ecosArr.push(maq.no_economico);
+            if (!maquinariaId) maquinariaId = maq.id || null;
+          } else {
+            if (eqName.includes('(SN: ')) {
+              const parts = eqName.split('(SN: ');
+              const s = parts[1].replace(')', '').trim();
+              let left = parts[0].trim();
+              if (left.startsWith('[') && left.includes(']')) {
+                left = left.substring(left.indexOf(']') + 1).trim();
+              }
+              modelosArr.push(left);
+              seriesArr.push(s);
+            } else {
+              modelosArr.push(eqName);
+            }
           }
         });
-        if (!maq) maq = maquinariaDb.find(matchMaquina);
 
-        if (maq) {
-          modeloStr = maq.modelo || '';
-          serieStr = maq.serie || '';
-          marcaStr = maq.marca || '';
-          ecoStr = maq.no_economico || '';
-          maquinariaId = maq.id || null;
-        } else {
-          if (ticket.equipo.includes('(SN: ')) {
-            const parts = ticket.equipo.split('(SN: ');
-            serieStr = parts[1].replace(')', '').trim();
-            let left = parts[0].trim();
-            if (left.startsWith('[') && left.includes(']')) {
-              left = left.substring(left.indexOf(']') + 1).trim();
-            }
-            modeloStr = left;
-          } else {
-            modeloStr = ticket.equipo;
-          }
-        }
+        modeloStr = [...new Set(modelosArr)].join(', ');
+        serieStr = [...new Set(seriesArr)].join(', ');
+        marcaStr = [...new Set(marcasArr)].join(', ');
+        ecoStr = [...new Set(ecosArr)].join(', ');
       }
 
       let newFolio = generarFolioConsecutivo();
@@ -16568,7 +16837,15 @@ function verDetalleTicket(id) {
     </div>
     ` : ''}
 
-    ${t.estado === 'Abierto' && currentSession.viewMode !== 'empresa' ? `
+    ${t.estado === 'Abierto' && currentSession.viewMode !== 'empresa' ? (t.categoria === 'Garantía Interna' ? `
+    <div class="detalle-section" style="background: var(--bg-hover); padding: 1rem; border-radius: 8px; display:flex; flex-direction:column; gap:1rem; border: 1px solid var(--border);">
+      <div class="detalle-section-title" style="margin-bottom:0; color:var(--accent); display:flex; align-items:center; gap:0.5rem;"><i data-lucide="check-square"></i> Procesar Garantía Interna</div>
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:0.75rem; display:flex; flex-direction:column; gap:0.5rem;">
+        <p style="font-size:0.85rem; color:var(--text-secondary); margin:0;">Este ticket es de categoría <strong>Garantía Interna</strong>. No se requiere ingresar refacciones, cotización ni pedido SAP.</p>
+        <button type="button" class="btn-primary" style="background:var(--green); border-color:var(--green); margin-top:0.5rem; justify-content:center; display:inline-flex; align-items:center; gap:4px;" onclick="window.cerrarGarantiaInternaDirecto('${t.id}')"><i data-lucide="check-circle" style="width:16px;height:16px;"></i> Finalizar y Cerrar Ticket</button>
+      </div>
+    </div>
+    ` : `
     <div class="detalle-section" style="background: var(--bg-hover); padding: 1rem; border-radius: 8px; display:flex; flex-direction:column; gap:1rem;">
       <div class="detalle-section-title" style="margin-bottom:0; color:var(--accent); display:flex; align-items:center; gap:0.5rem;"><i data-lucide="settings"></i> Procesar Ticket: Selección de Refacciones</div>
       
@@ -16586,7 +16863,7 @@ function verDetalleTicket(id) {
         ` : ''}
       </div>
     </div>
-    ` : ''}
+    `) : ''}
 
     ${t.estado === 'Refacciones' && currentSession.viewMode !== 'empresa' ? `
     <div class="detalle-section" style="background: var(--bg-hover); padding: 1.25rem; border-radius: 8px; display:flex; flex-direction:column; gap:1.25rem; border: 1px solid var(--border);">
@@ -17162,10 +17439,15 @@ async function avanzarCotizacionTicket(id) {
 async function cerrarCotizacionTicket(id) {
   const t = tickets.find(x => x.id === id);
   if (!t) return;
-  const aceptada = document.querySelector(`input[name="quick-cot-acep-${id}"]:checked`)?.value;
-  if (!aceptada) {
-    mostrarNotificacion('Debes indicar si fue aceptada o rechazada.', 'warning');
-    return;
+  const isGarantiaInterna = t.categoria === 'Garantía Interna';
+  let aceptada = 'si';
+  if (!isGarantiaInterna) {
+    const selAcep = document.querySelector(`input[name="quick-cot-acep-${id}"]:checked`)?.value;
+    if (!selAcep) {
+      mostrarNotificacion('Debes indicar si fue aceptada o rechazada.', 'warning');
+      return;
+    }
+    aceptada = selAcep;
   }
   let motivo = '';
   let pedidoSAP = '';
@@ -17180,7 +17462,7 @@ async function cerrarCotizacionTicket(id) {
       return;
     }
   } else if (aceptada === 'si') {
-    pedidoSAP = document.getElementById(`quick-ped-sap-${id}`)?.value.trim();
+    pedidoSAP = document.getElementById(`quick-ped-sap-${id}`)?.value.trim() || '';
     const pdfUpload = document.getElementById(`quick-ped-pdf-${id}`)?.files.length > 0;
     
     const selTipo = document.getElementById(`quick-tipo-${id}`)?.value;
@@ -17188,7 +17470,7 @@ async function cerrarCotizacionTicket(id) {
       tipoVisitaSeleccionado = selTipo;
     }
     
-    const bypass = (window.isTemporaryNoQuotePeriodActive && window.isTemporaryNoQuotePeriodActive()) || (window.currentSession && window.currentSession.viewMode === 'superadmin');
+    const bypass = isGarantiaInterna || (window.isTemporaryNoQuotePeriodActive && window.isTemporaryNoQuotePeriodActive()) || (window.currentSession && window.currentSession.viewMode === 'superadmin');
     if (!bypass) {
       if (!pedidoSAP) {
         mostrarNotificacion('Debes ingresar el Número de Pedido SAP.', 'warning');
@@ -17893,12 +18175,12 @@ function renderCalendario() {
         let isAllDay = true;
         let startVal = dateStr;
         let endVal = null;
+        let endDateStr = dateStr;
 
         if (b.entrada && b.salida) {
           isAllDay = false;
           startVal = `${dateStr}T${b.entrada}:00`;
           
-          let endDateStr = dateStr;
           // Si cruza la medianoche (ej. entrada 20:00, salida 02:00)
           if (b.salida < b.entrada) {
             const dObj = new Date(dateStr + 'T00:00:00');
@@ -17994,7 +18276,20 @@ function renderCalendario() {
         // Renderizar bloque de regreso si existe duración (solo si el bloque principal no es un traslado en sí mismo)
         if (b.horas_regreso && !isTrasladoEvent) {
           try {
-            const regresoDateStr = b.fecha_fin_regreso || dateStr;
+            let orderEndDateStr = endDateStr;
+            if (!b.fecha_fin_regreso && o.bitacora && o.bitacora.length > 0) {
+               let maxD = new Date(endDateStr + 'T00:00:00');
+               o.bitacora.forEach(b2 => {
+                  if (!b2.fecha) return;
+                  const d2 = new Date(b2.fecha + 'T00:00:00');
+                  if (b2.entrada && b2.salida && b2.salida < b2.entrada) d2.setDate(d2.getDate() + 1);
+                  if (d2 > maxD) {
+                     maxD = d2;
+                     orderEndDateStr = d2.toISOString().split('T')[0];
+                  }
+               });
+            }
+            const regresoDateStr = b.fecha_fin_regreso || orderEndDateStr;
             let startRegreso;
             let endRegreso;
             if (b.hora_fin_regreso) {
@@ -26982,6 +27277,28 @@ window.guardarRefaccionesTicketDesdeUI = function(ticketId, transitionToRefaccio
   
   verDetalleTicket(ticketId);
   renderTickets();
+};
+
+window.cerrarGarantiaInternaDirecto = async function(id) {
+  const t = tickets.find(x => x.id === id);
+  if (!t) return;
+  
+  const confirmar = confirm('¿Estás seguro de que deseas finalizar y cerrar este ticket de Garantía Interna directamente?');
+  if (!confirmar) return;
+  
+  t.estado = 'Cerrado';
+  t.cotAceptada = 'si';
+  t.fechaCierre = new Date().toISOString();
+  
+  if (window.supabaseClient) {
+    await window.pushToSupabase('tickets', t);
+  }
+  safeSetJSON('sapi_tickets', tickets);
+  
+  mostrarNotificacion('Ticket de Garantía Interna cerrado con éxito.', 'success');
+  cerrarDetalleTicket();
+  renderTickets();
+  renderStats();
   updateTicketBadge(); updateOrdenesBadge();
 };
 

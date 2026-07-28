@@ -202,6 +202,7 @@ function padCard(val) {
   return digits ? digits.padStart(4, '0').slice(-4) : '';
 }
 
+window.ticketToRow = ticketToRow;
 function ticketToRow(t) {
   // Encontrar el ID del cliente por su nombre
   let clienteId = t.cliente || null;

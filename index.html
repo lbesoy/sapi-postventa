@@ -379,7 +379,7 @@
         </div>
       </div>
 
-      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: var(--text-muted);" id="login-app-version">v1.3.287</div>
+      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: var(--text-muted);" id="login-app-version">v1.3.290</div>
     </div>
   </div>
 
@@ -453,7 +453,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version" id="app-sidebar-version">v1.3.287</div>
+          <div class="sidebar-version" id="app-sidebar-version">v1.3.290</div>
         </div>
       </div>
     </aside>
@@ -2008,7 +2008,7 @@
                     <div class="toggle-label">Versión de la Aplicación</div>
                     <div class="toggle-sub">Versión actualmente cargada</div>
                   </div>
-                  <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); background: var(--bg-body); padding: 0.25rem 0.6rem; border: 1px solid var(--border); border-radius: 4px;" id="app-profile-version">v1.3.287</div>
+                  <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); background: var(--bg-body); padding: 0.25rem 0.6rem; border: 1px solid var(--border); border-radius: 4px;" id="app-profile-version">v1.3.290</div>
                 </div>
                 <div class="toggle-row" style="border-top: 1px dashed var(--border); padding-top: 0.85rem; margin-top: 0.25rem; flex-direction: column; align-items: stretch; gap: 0.5rem;">
                   <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -2352,7 +2352,8 @@
                 </div>
                 <div class="form-group full-width">
                   <label>Equipo / Máquina (Autocompletar)</label>
-                  <select id="f-equipo" onchange="onEquipoOrdenChange()">
+                  <div id="f-equipos-seleccionados" class="chips-container" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.5rem;"></div>
+                  <select id="f-equipo" onchange="window.onEquipoOrdenChangeMultiple()">
                     <option value="">Seleccione una máquina registrada...</option>
                     <option value="Otra / No registrada">Otra / Captura manual</option>
                   </select>
@@ -3534,9 +3535,10 @@
                 </div>
                 <div class="form-group full-width">
                   <label>Equipo / Máquina afectada *</label>
-                  <select id="t-equipo" onchange="onEquipoTicketChange()" required>
+                  <select id="t-equipo" onchange="window.onEquipoTicketChangeMultiple()">
                     <option value="">Seleccione una máquina registrada...</option>
                   </select>
+                  <div id="t-equipos-seleccionados" style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.5rem; width:100%;"></div>
                 </div>
                 <div class="form-group">
                   <label>Horómetro <span
@@ -3565,6 +3567,7 @@
                     <option>Servicio Técnico</option>
                     <option>Soporte</option>
                     <option>Garantía</option>
+                    <option>Garantía Interna</option>
                     <option>Solicitud de Información</option>
                     <option>Otro</option>
                   </select>
@@ -3752,7 +3755,7 @@
               style="margin-top:2rem; padding-top: 1rem; border-top: 2px dashed var(--border); justify-content: center; flex-direction: column; align-items: center; gap: 1rem;">
               <div style="display:flex; justify-content:center; gap: 0.5rem; width: 100%;">
                 <button type="button" class="btn-secondary" onclick="cerrarTicket()" style="flex:1;">Cancelar</button>
-                <button type="submit" class="btn-primary"
+                <button type="submit" class="btn-primary" id="btn-submit-ticket"
                   style="flex:1; background:var(--accent); color:#fff; border-color:var(--accent);"><i
                     data-lucide="save" class="btn-icon"></i> Emitir Ticket</button>
               </div>
@@ -5650,10 +5653,10 @@
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=287",
-        "app.js?v=287",
-        "levantamientos.js?v=287",
-        "tecnicos_reporte.js?v=287"
+        "supabaseSync.js?v=290",
+        "app.js?v=290",
+        "levantamientos.js?v=290",
+        "tecnicos_reporte.js?v=290"
       ];
       var index = 0;
       function loadNext() {
