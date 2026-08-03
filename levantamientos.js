@@ -511,9 +511,10 @@ function actualizarLevantamiento(id, campo, valor) {
   if (!lev) return;
   
   lev[campo] = valor;
+  lev._synced = false;
   if (typeof safeSetJSON === 'function') safeSetJSON('sapi_levantamientos', levantamientos);
-  if (window.supabaseClient && window.updateInSupabase) {
-    window.updateInSupabase('levantamientos', lev.id, { [campo]: valor });
+  if (window.supabaseClient && window.pushToSupabase) {
+    window.pushToSupabase('levantamientos', lev);
   }
   // No re-render here to avoid losing focus/state if they are typing or checking multiple boxes
 }
@@ -571,13 +572,6 @@ window.completarLevantamiento = async function(id) {
   }
   
   if (typeof safeSetJSON === 'function') safeSetJSON('sapi_levantamientos', levantamientos);
-  if (window.supabaseClient && window.updateInSupabase) {
-    window.updateInSupabase('levantamientos', lev.id, { 
-      estado: lev.estado, 
-      notas_tecnico: lev.notas_tecnico,
-      refacciones: lev.refacciones || []
-    });
-  }
   if (window.supabaseClient && window.pushToSupabase) {
     window.pushToSupabase('levantamientos', lev);
   }

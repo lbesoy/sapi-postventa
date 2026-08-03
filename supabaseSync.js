@@ -533,6 +533,88 @@ function rowToOrden(o) {
   return res;
 }
 
+window.levantamientoToRow = levantamientoToRow;
+function levantamientoToRow(l) {
+  // Encontrar el ID del cliente por su nombre
+  let clienteId = l.cliente || null;
+  try {
+    const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+    const match = clientes.find(c => c.nombre === l.cliente || c.id === l.cliente);
+    if (match) clienteId = match.id;
+  } catch (e) {}
+
+  // Encontrar el ID del sitio por su nombre
+  let sitioId = l.sitio || null;
+  try {
+    const sitios = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+    const match = sitios.find(s => s.cliente === clienteId && (s.nombre === l.sitio || s.direccion === l.sitio || s.id === l.sitio));
+    if (match) sitioId = match.id;
+  } catch (e) {}
+
+  // Encontrar el ID de la máquina por su serie o idInterno (si existe máquina en l)
+  let maquinaId = l.maquina || null;
+  try {
+    const maquinas = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
+    const match = maquinas.find(m => m.cliente === clienteId && (m.serie === l.maquina || m.idInterno === l.maquina || m.id === l.maquina));
+    if (match) maquinaId = match.id;
+  } catch (e) {}
+
+  const row = {
+    id: l.id,
+    folio: l.folio,
+    cliente: clienteId,
+    sitio: sitioId,
+    maquina: maquinaId,
+    solicitante: l.solicitante || null,
+    descripcion: l.descripcion || null,
+    fecha_esperada: l.fecha_esperada ? (l.fecha_esperada.length === 10 ? `${l.fecha_esperada}T12:00:00-06:00` : l.fecha_esperada) : null,
+    estado: l.estado || 'Pendiente',
+    tecnico_asignado: l.tecnico_asignado || null,
+    notas_tecnico: l.notas_tecnico || null,
+    evidencias: l.evidencias || {},
+    ticket_generado_id: l.ticket_generado_id || null,
+    created_at: l.created_at || new Date().toISOString(),
+    updated_at: l.updated_at || new Date().toISOString()
+  };
+
+  return row;
+}
+
+window.rowToLevantamiento = rowToLevantamiento;
+function rowToLevantamiento(r) {
+  let clienteNombre = r.cliente;
+  try {
+    const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+    const match = clientes.find(c => c.id === r.cliente);
+    if (match) clienteNombre = match.nombre;
+  } catch (e) {}
+
+  let sitioNombre = r.sitio;
+  try {
+    const sitios = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+    const match = sitios.find(s => s.id === r.sitio);
+    if (match) sitioNombre = match.nombre || match.direccion;
+  } catch (e) {}
+
+  return {
+    id: r.id,
+    _synced: true,
+    folio: r.folio,
+    cliente: clienteNombre,
+    sitio: sitioNombre,
+    solicitante: r.solicitante || null,
+    descripcion: r.descripcion || null,
+    fecha_esperada: r.fecha_esperada || null,
+    estado: r.estado || 'Pendiente',
+    tecnico_asignado: r.tecnico_asignado || null,
+    notas_tecnico: r.notas_tecnico || null,
+    evidencias: r.evidencias || {},
+    ticket_generado_id: r.ticket_generado_id || null,
+    created_at: r.created_at || null,
+    updated_at: r.updated_at || null
+  };
+}
+
 function isValidUUID(uuid) {
   if (typeof uuid !== 'string') return false;
   const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -754,6 +836,8 @@ window.pushToSupabase = async function(tabla, item) {
       row = window.ordenToRow(item);
     } else if (tabla === 'tickets' && typeof window.ticketToRow === 'function') {
       row = window.ticketToRow(item);
+    } else if (tabla === 'levantamientos' && typeof window.levantamientoToRow === 'function') {
+      row = window.levantamientoToRow(item);
     }
     
     // Upsert directo en la nube
@@ -1311,21 +1395,49 @@ async function _processSyncQueueInternal() {
               usuario_vinculado_id: (item.data.usuarioVinculadoId && item.data.usuarioVinculadoId.trim().length === 36) ? item.data.usuarioVinculadoId.trim() : null
             };
           } else if (item.table === 'levantamientos') {
-            payload = { ...item.data };
+            payload = levantamientoToRow(item.data);
             // Upload Base64 evidences if any
-            if (payload.evidencias_base64) {
+            if (item.data.evidencias_base64 && Object.keys(item.data.evidencias_base64).length > 0) {
+              let actualizoLocal = false;
+              const localLev = JSON.parse(localStorage.getItem('sapi_levantamientos') || '[]');
+              const idx = localLev.findIndex(l => l.id === item.data.id);
+
               if (!payload.evidencias) payload.evidencias = {};
-              for (const [k, v] of Object.entries(payload.evidencias_base64)) {
+              for (const [k, v] of Object.entries(item.data.evidencias_base64)) {
                 if (v && v.startsWith('data:')) {
                   try {
                     const url = await window.uploadBase64ToStorage(v, 'evidencias', `levantamientos/${payload.folio}_${k}.jpg`);
-                    if (url) payload.evidencias[k] = url;
+                    if (url) {
+                      payload.evidencias[k] = url;
+                      actualizoLocal = true;
+                    }
                   } catch (e) {
                     console.error('[Sync] Error subiendo evidencia de levantamiento:', e);
                   }
                 }
               }
-              delete payload.evidencias_base64;
+
+              if (actualizoLocal) {
+                // Actualizar item.data para que tenga las URLs de storage y no base64
+                item.data.evidencias = payload.evidencias;
+                delete item.data.evidencias_base64;
+
+                // Actualizar localStorage
+                if (idx > -1) {
+                  localLev[idx].evidencias = payload.evidencias;
+                  delete localLev[idx].evidencias_base64;
+                  localStorage.setItem('sapi_levantamientos', JSON.stringify(localLev));
+                }
+
+                // Actualizar estado global en memoria
+                if (typeof window.levantamientos !== 'undefined') {
+                  const globalIdx = window.levantamientos.findIndex(l => l.id === item.data.id);
+                  if (globalIdx > -1) {
+                    window.levantamientos[globalIdx].evidencias = payload.evidencias;
+                    delete window.levantamientos[globalIdx].evidencias_base64;
+                  }
+                }
+              }
             }
           } else {
             payload = item.data;
@@ -2568,9 +2680,10 @@ window.cargarDatosDeSupabase = function() {
     try {
       const { data: levantamientosDb, error: levErr } = await sb.from('levantamientos').select('*');
       if (levantamientosDb && !levErr) {
-        localStorage.setItem('sapi_levantamientos', JSON.stringify(levantamientosDb));
+        const mapped = levantamientosDb.map(rowToLevantamiento);
+        localStorage.setItem('sapi_levantamientos', JSON.stringify(mapped));
         if (typeof window.levantamientos !== 'undefined') {
-          window.levantamientos = levantamientosDb;
+          window.levantamientos = mapped;
         }
       } else if (levErr) {
         console.error('[Sync] Error loading levantamientos:', levErr);
