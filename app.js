@@ -9443,8 +9443,10 @@ window.subirEvidenciaFoto = async function(ordenId, tipo, inputEl) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
 
-  if (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) {
-    mostrarNotificacion('No se pueden modificar evidencias en una orden cerrada o firmada.', 'error');
+  const hasTecnicoFirma = o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__';
+  const hasClienteFirma = o.firma_cliente_base64 && o.firma_cliente_base64 !== '__DELETED__';
+  if (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado') || hasTecnicoFirma || hasClienteFirma) {
+    mostrarNotificacion('No se pueden modificar evidencias en una orden cerrada o con firmas.', 'error');
     return;
   }
 
@@ -9708,8 +9710,10 @@ window.eliminarEvidenciaFoto = async function(ordenId, tipo, url) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o || !o.evidencias) return;
 
-  if (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) {
-    mostrarNotificacion('No se pueden modificar evidencias en una orden cerrada o firmada.', 'error');
+  const hasTecnicoFirma = o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__';
+  const hasClienteFirma = o.firma_cliente_base64 && o.firma_cliente_base64 !== '__DELETED__';
+  if (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado') || hasTecnicoFirma || hasClienteFirma) {
+    mostrarNotificacion('No se pueden modificar evidencias en una orden cerrada o con firmas.', 'error');
     return;
   }
 
@@ -9795,16 +9799,15 @@ function verDetalle(id) {
     const miTecnicoNombre = currentUser ? currentUser.nombre : '';
 
     let items = [...(o.bitacora || [])];
-    if (isTecnico && miTecnicoNombre) {
-      items = items.filter(b => b.tecnico === miTecnicoNombre);
-    }
+    // Mostrar todo el historial de la orden sin ocultar las bitácoras registradas por otros compañeros de equipo
 
     // Unificación inteligente reactiva con eventos de calendario
     try {
       const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+      const normStr = s => (s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
       localEventos.forEach(ev => {
         if (ev.ordenId === o.id) {
-          if (isTecnico && miTecnicoNombre && ev.tecnicoNombre !== miTecnicoNombre) {
+          if (isTecnico && miTecnicoNombre && normStr(ev.tecnicoNombre) !== normStr(miTecnicoNombre)) {
             return;
           }
           // Extraer fecha local simple (YYYY-MM-DD)
@@ -10477,20 +10480,22 @@ function guardarFirmaCanvas(ordenId, tipo) {
   if (idx !== -1) {
     const fechaFirma = new Date().toISOString();
     
+    const ev = ordenes[idx].evidencias || {};
+    const oObj = ordenes[idx];
+    const tieneUbicacionSitio = !!(oObj.ubicacion_sitio && oObj.ubicacion_sitio.trim());
+    const tieneOperador = !!(oObj.operador && oObj.operador.trim());
+    const tieneObligatorias = !!(ev.fotoInicio && ev.fotoFin);
+    
+    if (!tieneObligatorias || !tieneUbicacionSitio || !tieneOperador) {
+      let faltantes = [];
+      if (!tieneUbicacionSitio) faltantes.push("Ubicación en Sitio");
+      if (!tieneOperador) faltantes.push("Operador");
+      if (!tieneObligatorias) faltantes.push("Fotos de Inicio y Fin");
+      mostrarNotificacion('Debes registrar: ' + faltantes.join(', ') + ' antes de guardar la firma.', 'error');
+      return;
+    }
+
     if (tipo === 'tecnico') {
-      const ev = ordenes[idx].evidencias || {};
-      const oObj = ordenes[idx];
-      const tieneUbicacionSitio = !!(oObj.ubicacion_sitio && oObj.ubicacion_sitio.trim());
-      const tieneOperador = !!(oObj.operador && oObj.operador.trim());
-      const tieneObligatorias = !!(ev.fotoInicio && ev.fotoFin);
-      if (!tieneObligatorias || !tieneUbicacionSitio || !tieneOperador) {
-        let faltantes = [];
-        if (!tieneUbicacionSitio) faltantes.push("Ubicación en Sitio");
-        if (!tieneOperador) faltantes.push("Operador");
-        if (!tieneObligatorias) faltantes.push("Fotos de Inicio y Fin");
-        mostrarNotificacion('Debes registrar: ' + faltantes.join(', ') + ' antes de guardar la firma.', 'error');
-        return;
-      }
       const currentUser = usuarios.find(u => u.id === currentSession.userId);
       ordenes[idx].firma_tecnico_base64 = base64Firma;
       ordenes[idx].firma_tecnico_nombre = currentUser ? currentUser.nombre : (currentSession.nombre || ordenes[idx].tecnico || 'Técnico');
@@ -11165,7 +11170,8 @@ function iniciarReporteDesdeAsignacion(ordenId, bitacoraId) {
   if (currentSession.viewMode === 'tecnico') {
     const currentUser = usuarios.find(u => u.id === currentSession.userId);
     const miTecnicoNombre = currentUser ? currentUser.nombre : '';
-    if (b.tecnico !== miTecnicoNombre) {
+    const normStr = s => (s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    if (normStr(b.tecnico) !== normStr(miTecnicoNombre)) {
       mostrarNotificacion('Solo puedes reportar tus propias asignaciones programadas.', 'error');
       return;
     }
@@ -27448,6 +27454,7 @@ window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId)
   localStorage.setItem('sapi_calendario_eventos', JSON.stringify(filtrados));
   
   if (window.deleteFromSupabase) {
+    window.deleteFromSupabase('orden_bitacora', bitacoraId);
     window.deleteFromSupabase('calendario_eventos', bitacoraId);
   }
 

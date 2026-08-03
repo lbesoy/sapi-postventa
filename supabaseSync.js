@@ -1340,15 +1340,6 @@ async function _processSyncQueueInternal() {
               
               // 1. SINCRONIZAR BITÁCORAS DE AVANCES
               const bitacorasMemoria = item.data.bitacora || [];
-              const { data: bitacorasSupa, error: selectBitErr } = await sb.from('orden_bitacora').select('id').eq('orden_id', ordId);
-              if (selectBitErr) throw selectBitErr;
-
-              const idsMemoria = bitacorasMemoria.map(b => b.id);
-              const idsABorrar = (bitacorasSupa || []).filter(b => !idsMemoria.includes(b.id)).map(b => b.id);
-              if (idsABorrar.length > 0) {
-                const { error: delBitErr } = await sb.from('orden_bitacora').delete().in('id', idsABorrar);
-                if (delBitErr) throw delBitErr;
-              }
               if (bitacorasMemoria.length > 0) {
                 const cleanFecha = (f) => {
                   if (!f) return new Date().toISOString();
