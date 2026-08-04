@@ -20,6 +20,26 @@ function renderLevantamientos() {
     const activeSandbox = isTestModeActive();
     list = list.filter(l => isTestData(l) === activeSandbox);
   }
+
+  // Filtrar por rol de técnico (solo ver levantamientos asignados a sí mismo)
+  const isTecnico = (typeof currentSession !== 'undefined' && currentSession.viewMode === 'tecnico');
+  let miNombreLower = '';
+  if (isTecnico && typeof currentSession !== 'undefined') {
+    let miNombre = currentSession.nombre || '';
+    if (!miNombre && typeof usuarios !== 'undefined') {
+      const u = usuarios.find(usr => usr.id === currentSession.userId);
+      if (u) miNombre = u.nombre || '';
+    }
+    miNombreLower = miNombre.trim().toLowerCase();
+  }
+
+  if (isTecnico && miNombreLower) {
+    list = list.filter(l => {
+      if (!l.tecnico_asignado) return false;
+      const asignados = l.tecnico_asignado.split(',').map(s => s.trim().toLowerCase());
+      return asignados.includes(miNombreLower);
+    });
+  }
   
   // Update stats before filtering
   const total = list.length;
@@ -73,7 +93,7 @@ function renderLevantamientos() {
   // Update badge in sidebar
   const badge = document.getElementById('nav-badge-levantamientos');
   if (badge) {
-    const pendientes = (levantamientos || []).filter(l => l.estado !== 'Completado').length;
+    const pendientes = list.filter(l => l.estado !== 'Completado').length;
     badge.textContent = pendientes > 0 ? pendientes : '';
     badge.style.display = pendientes > 0 ? 'inline-block' : 'none';
   }
