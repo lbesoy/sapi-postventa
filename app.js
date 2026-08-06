@@ -10295,7 +10295,11 @@ function verDetalle(id) {
           return MARCAS_RENDER[m.toUpperCase()] || m || '—';
         })())} ${field('Modelo', o.modelo)} ${field('Serie', o.serie)}
         ${field('ID Máquina', (() => {
-          const maq = maquinariaDb.find(m => (o.maquinaria_id && m.id === o.maquinaria_id) || (o.serie && m.serie === o.serie) || (o.modelo && m.modelo === o.modelo && m.cliente === o.cliente));
+          const maq = o.maquinaria_id 
+            ? maquinariaDb.find(m => m.id === o.maquinaria_id) 
+            : (o.serie 
+                ? maquinariaDb.find(m => m.serie === o.serie) 
+                : (o.modelo && o.cliente ? maquinariaDb.find(m => m.modelo === o.modelo && m.cliente === o.cliente) : null));
           return maq && (maq.idInterno || maq.id) ? `<span style="font-family:monospace; font-weight:600; color:var(--accent); background:var(--blue-light); padding:0.15rem 0.4rem; border-radius:4px; border:1px solid rgba(232, 133, 10, 0.3);">${maq.idInterno || maq.id}</span>` : '—';
         })())}
         ${field('Técnico', o.tecnico)} ${field('Ticket Soporte', (() => { const t = tickets.find(x => x.id === o.soporte); return t ? (t.folio || t.id.slice(0,8)) : o.soporte || null; })())}

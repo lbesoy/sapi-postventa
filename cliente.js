@@ -2409,8 +2409,11 @@ function abrirDetalleOrdenCliente(id) {
   let mBrand = o.marca || (o.equipo ? o.equipo.split(' ')[0] : '');
   const marcaText = MARCAS_RENDER[mBrand.toUpperCase()] || mBrand || '—';
 
-  // Buscar ID de maquinaria
-  const maq = (maquinariaDb || []).find(m => (o.maquinaria_id && m.id === o.maquinaria_id) || (o.serie && m.serie === o.serie) || (o.modelo && m.modelo === o.modelo && m.cliente === o.cliente));
+  const maq = o.maquinaria_id 
+    ? (maquinariaDb || []).find(m => m.id === o.maquinaria_id) 
+    : (o.serie 
+        ? (maquinariaDb || []).find(m => m.serie === o.serie) 
+        : (o.modelo && o.cliente ? (maquinariaDb || []).find(m => m.modelo === o.modelo && m.cliente === o.cliente) : null));
   const idMaquinaText = maq && (maq.idInterno || maq.id) ? maq.idInterno || maq.id : '—';
 
   // Buscar Ticket de Soporte de origen
@@ -2937,7 +2940,11 @@ async function abrirReportePdfCliente(e, orderId, soloVisualizar = false) {
           return MARCAS_RENDER[m.toUpperCase()] || m || '—';
         })(), 1)} ${field('Modelo', o.modelo, 1)} ${field('Serie', o.serie, 1)}
         ${field('ID Máquina', (() => {
-          const maq = (maquinariaDb || []).find(m => (o.maquinaria_id && m.id === o.maquinaria_id) || (o.serie && m.serie === o.serie) || (o.modelo && m.modelo === o.modelo && m.cliente === o.cliente));
+          const maq = o.maquinaria_id 
+            ? (maquinariaDb || []).find(m => m.id === o.maquinaria_id) 
+            : (o.serie 
+                ? (maquinariaDb || []).find(m => m.serie === o.serie) 
+                : (o.modelo && o.cliente ? (maquinariaDb || []).find(m => m.modelo === o.modelo && m.cliente === o.cliente) : null));
           return maq && (maq.idInterno || maq.id) ? `<span style="font-family:monospace; font-weight:600; color:#e8820c; background:rgba(232, 133, 10, 0.12); padding:0.15rem 0.4rem; border-radius:4px; border:1px solid rgba(232, 133, 10, 0.3);">${maq.idInterno || maq.id}</span>` : '—';
         })(), 1)}
         ${field('Técnico', o.tecnico, 1)}
