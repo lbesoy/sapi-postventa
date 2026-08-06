@@ -12499,11 +12499,6 @@ function renderTickets(ctx) {
       supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value || '';
     }
     
-    const debugEl = document.getElementById('tkt-debug-stats');
-    if (debugEl) {
-      debugEl.textContent = `[total=${tickets.length}, user="${currentUser?.nombre || 'null'}", mode="${currentSession.viewMode || 'null'}", supFilter="${supFilter}"]`;
-    }
-    
     if (tecFilter || supFilter) {
       const tecNameLower = tecFilter ? window.normStr(tecFilter) : '';
       const supNameLower = supFilter ? window.normStr(supFilter) : '';
@@ -12566,9 +12561,6 @@ function renderTickets(ctx) {
     }
     
     if (!filtered.length) {
-      if (debugEl) {
-        debugEl.textContent += ` [filtered=0]`;
-      }
       body.innerHTML = `<tr><td colspan="13" class="empty-state">No hay tickets${q||(!isDashView && ticketFiltroActivo!=='todos')?' que coincidan':' registrados'}.</td></tr>`;
       return;
     }
@@ -12609,10 +12601,6 @@ function renderTickets(ctx) {
       </tr>
       `;
     }).join('');
-    
-    if (debugEl) {
-      debugEl.textContent += ` [filtered=${filtered.length}]`;
-    }
     
     try { actualizarCabeceraOrdenacion(); } catch (e) {}
     lucide.createIcons();
