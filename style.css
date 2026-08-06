@@ -2407,6 +2407,7 @@ body.light-mode .badge-metodo-reembolso { background: rgba(100, 116, 139, 0.08);
 .table-wrapper { margin-top: 1.5rem !important; }
 .stat-card { min-height: 120px !important; display: flex !important; align-items: center !important; }
 #view-tickets.active { display: flex !important; flex-direction: column !important; gap: 1.5rem !important; padding-top: 4.5rem !important; }
+#view-tickets .table-wrapper { flex-shrink: 0 !important; }
 .tickets-kanban-header { margin: 0 !important; }
 .table-wrapper { margin: 0 !important; }
 .table-wrapper { margin-top: 2rem !important; }
