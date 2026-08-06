@@ -44,7 +44,7 @@ let tickets = [];
 let ordenes = [];
 
 let nombreEmpresaLogged = null;
-let currentTicketFiltro = 'abiertos';
+let currentTicketFiltro = 'todos';
 let currentTicketFiltroPrio = '';
 let currentTicketOrden = 'reciente';
 let selectedTicketPhotoBase64 = null;
@@ -576,9 +576,10 @@ function navegarA(targetView) {
   const titleMap = {
     'dashboard': 'Resumen',
     'maquinaria': 'Mis Equipos',
-    'tickets': 'Solicitudes',
+    'tickets': 'Tickets',
     'servicios': 'Órdenes de Servicio',
-    'sitios': 'Mis Sitios'
+    'sitios': 'Mis Sitios',
+    'soporte': 'Soporte'
   };
   
   const titleEl = document.getElementById('view-title');
@@ -646,7 +647,7 @@ function doRender() {
   // --- FILTRADO POR MODO SANDBOX ---
   const activeSandbox = isTestModeActive();
   const misEquiposFiltered = misEquipos.filter(m => isTestData(m) === activeSandbox);
-  const misTicketsFiltered = misTickets.filter(t => isTestData(t) === activeSandbox);
+  const misTicketsFiltered = misTickets.filter(t => isTestData(t) === activeSandbox && t.categoria !== 'Soporte General');
   const misOrdenesFiltered = misOrdenes.filter(o => isTestData(o) === activeSandbox);
 
   // --- RENDERIZAR METRICAS (KPIs) ---
@@ -716,6 +717,7 @@ function doRender() {
   renderTicketsSection(misSitios, misEquiposFiltered, misTicketsFiltered);
   renderServicesSection(misOrdenesFiltered);
   renderLocationsSection(misSitios, misEquiposFiltered);
+  renderGeneralSupportChatSection(misTicketsFiltered);
 }
 
 // 1. Dashboard UI
@@ -929,12 +931,14 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
   const comboSitios = document.getElementById('t-sitio');
   const comboEquipos = document.getElementById('t-equipo');
   
-  if (comboSitios && comboSitios.options.length <= 1) {
+  if (comboSitios) {
+    const selectedVal = comboSitios.value;
     const listOptions = misSitios.map(s => {
       const val = s.nombre || s.direccion || '';
       return `<option value="${val}">${val}</option>`;
     }).join('');
     comboSitios.innerHTML = `<option value="" disabled selected>Selecciona ubicación...</option>` + listOptions;
+    if (selectedVal) comboSitios.value = selectedVal;
   }
   
   if (comboEquipos && comboEquipos.options.length <= 1) {
@@ -954,12 +958,41 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
   const historyList = document.getElementById('tickets-history-list');
   if (!historyList) return;
 
-  // Filtrar y ordenar según controles activos
-  let filtered = [...misTickets];
+  // Filtrar y ordenar según controles activos (excluyendo tickets de chat de soporte general)
+  let filtered = misTickets.filter(t => t.categoria !== 'Soporte General');
   
-  // 1. Filtrar por estado abierto/todos
-  if (currentTicketFiltro === 'abiertos') {
-    filtered = filtered.filter(t => t.estado && t.estado.toLowerCase() !== 'cerrado');
+  // 1. Filtrar por estado/etapa correspondiente
+  if (currentTicketFiltro === 'reportado') {
+    filtered = filtered.filter(t => {
+      const asignadoVal = String(t.asignado || '').trim().toLowerCase();
+      const tieneTecnico = asignadoVal && asignadoVal !== 'sin asignar' && asignadoVal !== 'asignando...';
+      const estLower = String(t.estado || 'Abierto').toLowerCase().trim();
+      return !tieneTecnico && estLower !== 'cerrado';
+    });
+  } else if (currentTicketFiltro === 'asignado') {
+    filtered = []; // El estado "Asignado" ahora transiciona directamente a "En Curso"
+  } else if (currentTicketFiltro === 'en curso') {
+    filtered = filtered.filter(t => {
+      const asignadoVal = String(t.asignado || '').trim().toLowerCase();
+      const tieneTecnico = asignadoVal && asignadoVal !== 'sin asignar' && asignadoVal !== 'asignando...';
+      const estLower = String(t.estado || 'Abierto').toLowerCase().trim();
+      const tieneCotizacion = !!(t.cotizacionSAP || t.cotizacion_sap) || (estLower === 'cotización' || estLower === 'cotizacion' || estLower === 'cerrado');
+      return tieneTecnico && !tieneCotizacion;
+    });
+  } else if (currentTicketFiltro === 'cotizado') {
+    filtered = filtered.filter(t => {
+      const estLower = String(t.estado || 'Abierto').toLowerCase().trim();
+      const tieneCotizacion = !!(t.cotizacionSAP || t.cotizacion_sap) || (estLower === 'cotización' || estLower === 'cotizacion' || estLower === 'cerrado');
+      const cotAceptadaVal = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
+      const tienePedido = !!(t.pedidoSAP || t.pedido_sap) || cotAceptadaVal === 'si';
+      return tieneCotizacion && !tienePedido;
+    });
+  } else if (currentTicketFiltro === 'pedido') {
+    filtered = filtered.filter(t => {
+      const cotAceptadaVal = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
+      const tienePedido = !!(t.pedidoSAP || t.pedido_sap) || cotAceptadaVal === 'si';
+      return tienePedido;
+    });
   }
 
   // 2. Filtrar por prioridad
@@ -989,9 +1022,18 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
   });
 
   // Ajustar botones de filtro activos
-  const btnAbiertos = document.getElementById('btn-filtro-t-abiertos');
+  const btnReportado = document.getElementById('btn-filtro-t-reportado');
+  const btnAsignado = document.getElementById('btn-filtro-t-asignado');
+  const btnEnCurso = document.getElementById('btn-filtro-t-encurso');
+  const btnCotizado = document.getElementById('btn-filtro-t-cotizado');
+  const btnPedido = document.getElementById('btn-filtro-t-pedido');
   const btnTodos = document.getElementById('btn-filtro-t-todos');
-  if (btnAbiertos) btnAbiertos.className = currentTicketFiltro === 'abiertos' ? 'btn-primary' : 'btn-secondary';
+  
+  if (btnReportado) btnReportado.className = currentTicketFiltro === 'reportado' ? 'btn-primary' : 'btn-secondary';
+  if (btnAsignado) btnAsignado.className = currentTicketFiltro === 'asignado' ? 'btn-primary' : 'btn-secondary';
+  if (btnEnCurso) btnEnCurso.className = currentTicketFiltro === 'en curso' ? 'btn-primary' : 'btn-secondary';
+  if (btnCotizado) btnCotizado.className = currentTicketFiltro === 'cotizado' ? 'btn-primary' : 'btn-secondary';
+  if (btnPedido) btnPedido.className = currentTicketFiltro === 'pedido' ? 'btn-primary' : 'btn-secondary';
   if (btnTodos) btnTodos.className = currentTicketFiltro === 'todos' ? 'btn-primary' : 'btn-secondary';
 
   if (filtered.length === 0) {
@@ -1023,24 +1065,34 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
     };
     const iconHtml = catIcons[t.categoria] || '<i data-lucide="ticket" style="width:16px; height:16px; color:var(--accent); flex-shrink:0;"></i>';
 
-    // Determinar pasos activos para la mini línea de tiempo
+    // Determinar pasos activos para la mini línea de tiempo de 5 etapas
     let step1Class = 'active';
     let step2Class = '';
     let step3Class = '';
     let step4Class = '';
+    let step5Class = '';
 
-    if (est === 'cerrado' || est === 'finalizado') {
-      step1Class = 'active';
+    const asignadoVal = String(t.asignado || '').trim().toLowerCase();
+    const tieneTecnico = asignadoVal && asignadoVal !== 'sin asignar' && asignadoVal !== 'asignando...';
+    
+    const tieneTrabajoEnCurso = tieneTecnico && (est === 'en proceso' || est === 'refacciones' || est === 'cotización' || est === 'cotizacion' || est === 'cerrado');
+    const tieneCotizacion = !!(t.cotizacionSAP || t.cotizacion_sap) || (est === 'cotización' || est === 'cotizacion' || est === 'cerrado');
+    
+    const cotAceptadaVal = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
+    const tienePedido = !!(t.pedidoSAP || t.pedido_sap) || cotAceptadaVal === 'si';
+
+    if (tienePedido) {
       step2Class = 'active';
       step3Class = 'active';
       step4Class = 'active';
-    } else if (est === 'en proceso' || est === 'cotizacion' || est === 'refacciones') {
-      step1Class = 'active';
+      step5Class = 'active';
+    } else if (tieneCotizacion) {
       step2Class = 'active';
       step3Class = 'active';
-    } else if (t.asignado && t.asignado !== 'Asignando...') {
-      step1Class = 'active';
+      step4Class = 'active';
+    } else if (tieneTecnico) {
       step2Class = 'active';
+      step3Class = 'active';
     }
     
     html += `
@@ -1072,7 +1124,8 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
           <span class="ticket-progress-step ${step1Class}" style="${step1Class ? 'color:var(--text-primary); font-weight:600;' : ''}"><i data-lucide="send" style="width:10px; height:10px;"></i> Reportado</span>
           <span class="ticket-progress-step ${step2Class}" style="${step2Class ? 'color:var(--orange); font-weight:600;' : ''}"><i data-lucide="user" style="width:10px; height:10px;"></i> Asignado</span>
           <span class="ticket-progress-step ${step3Class}" style="${step3Class ? 'color:var(--accent); font-weight:600;' : ''}"><i data-lucide="clock" style="width:10px; height:10px;"></i> En Curso</span>
-          <span class="ticket-progress-step ${step4Class}" style="${step4Class ? 'color:var(--green); font-weight:600;' : ''}"><i data-lucide="check" style="width:10px; height:10px;"></i> Resuelto</span>
+          <span class="ticket-progress-step ${step4Class}" style="${step4Class ? 'color:#c084fc; font-weight:600;' : ''}"><i data-lucide="file-text" style="width:10px; height:10px;"></i> Cotizado</span>
+          <span class="ticket-progress-step ${step5Class}" style="${step5Class ? 'color:var(--green); font-weight:600;' : ''}"><i data-lucide="check-circle" style="width:10px; height:10px;"></i> Pedido</span>
         </div>
       </div>
     `;
@@ -1275,13 +1328,37 @@ function renderServicesSection(misOrdenes) {
     let html = '';
     misOrdenes.forEach(o => {
       const fechaFormat = safeFormatDate(o.fecha, { day:'numeric', month:'short', year:'numeric' }, 'N/A');
-      const est = String(o.estado || 'Pendiente').toLowerCase().trim();
       
+      // Encontrar programación futura en bitácora
+      const programado = (o.bitacora || [])
+        .filter(b => b.realizado === false || !b.realizado)
+        .sort((a, b) => new Date(`${a.fecha}T${a.entrada || '00:00'}`) - new Date(`${b.fecha}T${b.entrada || '00:00'}`))[0];
+
+      let est = String(o.estado || 'Pendiente').toLowerCase().trim();
+      let estadoText = o.estado || 'Pendiente';
+      
+      if (programado && (est === 'pendiente' || est === 'abierto')) {
+        est = 'programado';
+        estadoText = 'Programado';
+      }
+
       // Comprobar si hay PDF firmado
       const tieneReporte = !!(o.firma_cliente_base64 || o.evidenciaBase64 || o.firma_tecnico_base64);
       const actionBtn = tieneReporte ? 
         `<button class="btn-secondary" style="padding:0.35rem 0.6rem; font-size:0.8rem; margin:0;" onclick="abrirReportePdfCliente(event, '${o.id}')"><i data-lucide="file-text"></i> PDF</button>` : 
         `<span style="font-size:0.75rem; color:var(--text-muted);">Pendiente</span>`;
+
+      // Mostrar técnico programado y horario si aplica
+      let tecnicoColHtml = o.tecnico || 'Sin asignar';
+      if (programado) {
+        const fechaProgFormat = safeFormatDate(programado.fecha, { day:'numeric', month:'short' }, 'N/A');
+        tecnicoColHtml = `
+          <strong>${programado.tecnico}</strong>
+          <div style="font-size:0.72rem; color:var(--text-muted); display:flex; align-items:center; gap:0.25rem; margin-top:2px;">
+            <i data-lucide="calendar" style="width:12px; height:12px;"></i> ${fechaProgFormat} (${programado.entrada || ''} - ${programado.salida || ''})
+          </div>
+        `;
+      }
 
       html += `
         <tr onclick="abrirDetalleOrdenCliente('${o.id}')" style="cursor:pointer;">
@@ -1289,8 +1366,8 @@ function renderServicesSection(misOrdenes) {
           <td>${o.modelo || o.equipo || 'Maquinaria'}</td>
           <td>${o.tipo || 'Servicio'}</td>
           <td>${fechaFormat}</td>
-          <td>${o.tecnico || 'Sin asignar'}</td>
-          <td><span class="status-pill ${est}">${o.estado || 'Pendiente'}</span></td>
+          <td>${tecnicoColHtml}</td>
+          <td><span class="status-pill ${est}">${estadoText}</span></td>
           <td style="text-align:right;" onclick="event.stopPropagation()">${actionBtn}</td>
         </tr>
       `;
@@ -1370,7 +1447,14 @@ function renderLocationsSection(misSitios, misEquipos) {
     html += `
       <tr>
         <td><strong>${s.nombre || 'Sin nombre'}</strong></td>
-        <td><i data-lucide="map-pin" style="width:12px; height:12px; vertical-align:middle; color:var(--text-muted); margin-right:4px;"></i> ${s.direccion || 'Sin dirección registrada'}</td>
+        <td>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; width:100%;">
+            <span><i data-lucide="map-pin" style="width:12px; height:12px; vertical-align:middle; color:var(--text-muted); margin-right:4px;"></i> ${s.direccion || 'Sin dirección registrada'}</span>
+            <button class="btn-secondary" style="padding:0.25rem 0.45rem; font-size:0.7rem; display:inline-flex; align-items:center; gap:0.25rem; margin:0;" onclick="abrirEditarDireccionSitio('${s.id}', '${(s.nombre || '').replace(/'/g, "\\'")}', '${(s.direccion || '').replace(/'/g, "\\'")}')">
+              <i data-lucide="edit-2" style="width:10px; height:10px;"></i> Editar
+            </button>
+          </div>
+        </td>
         <td><div style="display:flex; flex-wrap:wrap;">${listEqs}</div></td>
       </tr>
     `;
@@ -1448,7 +1532,16 @@ function abrirDetalleTicketCliente(id) {
   const est = String(t.estado || 'Abierto').toLowerCase().trim();
   const fechaFormat = safeFormatDate(t.fechaCreacion, { day:'numeric', month:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' }, 'N/A');
   
-  // Calcular clases y textos detallados de la línea de tiempo de rastreo premium
+  // Calcular clases y textos detallados de la línea de tiempo de rastreo premium (5 etapas)
+  const asignadoValDetail = String(t.asignado || '').trim().toLowerCase();
+  const tieneTecnicoDetail = asignadoValDetail && asignadoValDetail !== 'sin asignar' && asignadoValDetail !== 'asignando...';
+  
+  const estLowerDetail = est.toLowerCase();
+  const tieneTrabajoEnCursoDetail = tieneTecnicoDetail && (estLowerDetail === 'en proceso' || estLowerDetail === 'refacciones' || estLowerDetail === 'cotización' || estLowerDetail === 'cotizacion' || estLowerDetail === 'cerrado');
+  const tieneCotizacionDetail = !!(t.cotizacionSAP || t.cotizacion_sap) || (estLowerDetail === 'cotización' || estLowerDetail === 'cotizacion' || estLowerDetail === 'cerrado');
+  const cotAceptadaValDetail = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
+  const tienePedidoDetail = !!(t.pedidoSAP || t.pedido_sap) || cotAceptadaValDetail === 'si';
+
   const steps = [
     {
       title: 'Reportado',
@@ -1458,65 +1551,29 @@ function abrirDetalleTicketCliente(id) {
     },
     {
       title: 'Asignado',
-      desc: t.asignado && t.asignado !== 'Asignando...' ? `Ingeniero asignado: ${t.asignado}` : 'Asignando el técnico idóneo para tu equipo...',
+      desc: tieneTecnicoDetail ? `Ingeniero asignado: ${t.asignado}` : 'Asignando el técnico idóneo para tu equipo...',
       time: '',
-      status: t.asignado && t.asignado !== 'Asignando...' ? 'completed' : 'active'
+      status: tieneTecnicoDetail ? 'completed' : 'active'
     },
     {
-      title: 'En Camino',
-      desc: 'El ingeniero se dirige hacia el sitio de trabajo con el equipamiento necesario.',
+      title: 'En Curso',
+      desc: tieneTrabajoEnCursoDetail ? 'Técnico trabajando en el diagnóstico o servicio.' : 'Pendiente de inicio de actividades.',
       time: '',
-      status: 'pending'
+      status: tieneTrabajoEnCursoDetail ? 'completed' : (tieneTecnicoDetail ? 'active' : 'pending')
     },
     {
-      title: 'En Sitio / Reparación',
-      desc: 'Técnico trabajando en la reparación/mantenimiento en tu frente de trabajo.',
+      title: 'Cotizado',
+      desc: tieneCotizacionDetail ? (t.cotizacionSAP ? `Cotización disponible: ${t.cotizacionSAP} ($${Number(t.montoCotizacion || 0).toLocaleString('es-MX')} MXN)` : 'Cotización generada y en revisión.') : 'Pendiente de cotización.',
       time: '',
-      status: 'pending'
+      status: tieneCotizacionDetail ? 'completed' : (tieneTrabajoEnCursoDetail ? 'active' : 'pending')
     },
     {
-      title: 'Terminado',
-      desc: 'El servicio ha concluido y el reporte técnico ha sido firmado y archivado.',
+      title: 'Pedido',
+      desc: tienePedidoDetail ? (t.pedidoSAP ? `Orden de pedido procesada en SAP: ${t.pedidoSAP}` : 'Cotización aprobada por el cliente. Iniciando surtido/pedido.') : 'Pendiente de aprobación de cotización/pedido.',
       time: '',
-      status: 'pending'
+      status: tienePedidoDetail ? 'completed' : (tieneCotizacionDetail ? 'active' : 'pending')
     }
   ];
-
-  const estLower = est.toLowerCase();
-  const ordenAsociada = ordenes.find(o => 
-    o.ticket_id === t.id || 
-    (t.folio && o.folio && o.folio.includes(t.folio)) ||
-    (t.folio && o.descripcion && o.descripcion.includes(t.folio))
-  );
-
-  if (ordenAsociada) {
-    const oEst = String(ordenAsociada.estado || '').toLowerCase().trim();
-    steps[1].status = 'completed';
-    steps[1].time = safeFormatDate(ordenAsociada.fecha, { day:'numeric', month:'short' }, '');
-    
-    if (oEst === 'en camino' || oEst === 'camino') {
-      steps[2].status = 'active';
-    } else if (oEst === 'en proceso' || oEst === 'proceso') {
-      steps[2].status = 'completed';
-      steps[3].status = 'active';
-    } else if (oEst === 'finalizado' || oEst === 'firmado' || estLower === 'cerrado' || estLower === 'finalizado') {
-      steps[2].status = 'completed';
-      steps[3].status = 'completed';
-      steps[4].status = 'completed';
-    } else {
-      steps[2].status = 'active';
-    }
-  } else {
-    if (estLower === 'cerrado' || estLower === 'finalizado') {
-      steps[1].status = 'completed';
-      steps[2].status = 'completed';
-      steps[3].status = 'completed';
-      steps[4].status = 'completed';
-    } else if (estLower === 'en proceso' || estLower === 'cotizacion' || estLower === 'refacciones') {
-      steps[1].status = 'completed';
-      steps[2].status = 'active';
-    }
-  }
 
   // Asegurar herencia de estados anteriores en la cadena
   let activeFound = false;
@@ -1551,13 +1608,61 @@ function abrirDetalleTicketCliente(id) {
   let cotizacionHtml = '';
   // Si tiene cotización y el estado es Cotización/Cerrado, mostrar detalles
   if (t.cotizacionSAP) {
+    let statusText = 'Pendiente de Aceptación';
+    let statusStyle = 'color:var(--orange);';
+    let actionGroupHtml = '';
+    
+    const cotAceptadaClean = String(t.cotAceptada || '').toLowerCase().trim();
+    
+    if (cotAceptadaClean === 'si') {
+      statusText = '<i data-lucide="check-circle" style="width:14px; height:14px; vertical-align:middle; display:inline-block; margin-right:4px;"></i> Aprobada';
+      statusStyle = 'color:var(--green);';
+    } else if (cotAceptadaClean === 'no') {
+      statusText = '<i data-lucide="x-circle" style="width:14px; height:14px; vertical-align:middle; display:inline-block; margin-right:4px;"></i> Rechazada';
+      statusStyle = 'color:var(--red);';
+      if (t.motivoRechazo) {
+        statusText += `
+          <div style="grid-column: span 2; margin-top: 0.5rem; font-size:0.8rem; color:var(--text-secondary); background:rgba(239, 68, 68, 0.05); padding:0.5rem; border-radius:6px; border:1px solid rgba(239, 68, 68, 0.15); font-weight:normal; text-transform:none;">
+            <strong>Motivo del rechazo:</strong> ${t.motivoRechazo}
+          </div>
+        `;
+      }
+    } else {
+      // Mostrar botones de aceptación/rechazo
+      actionGroupHtml = `
+        <!-- Cotización Actions -->
+        <div id="cotizacion-actions-group" style="display:flex; gap:0.5rem; margin-top:1rem; border-top:1px solid rgba(255,255,255,0.06); padding-top:1rem;">
+          <button type="button" class="btn-primary" style="flex:1; justify-content:center; padding:0.5rem; font-size:0.8rem;" onclick="responderCotizacionCliente('${t.id}', 'si')">
+            <i data-lucide="check-circle" style="width:14px; height:14px; vertical-align:middle; margin-right:4px;"></i> Aceptar Cotización
+          </button>
+          <button type="button" class="btn-secondary" style="flex:1; justify-content:center; padding:0.5rem; font-size:0.8rem; border-color:var(--red); color:var(--red); background:rgba(239, 68, 68, 0.05);" onclick="mostrarFormRechazoCotizacion()">
+            <i data-lucide="x-circle" style="width:14px; height:14px; vertical-align:middle; margin-right:4px;"></i> Rechazar
+          </button>
+        </div>
+        
+        <!-- Rechazo Form (Hidden by default) -->
+        <div id="rechazo-cotizacion-form" style="display:none; flex-direction:column; gap:0.5rem; margin-top:1rem; border-top:1px solid rgba(255,255,255,0.06); padding-top:1rem; text-align:left;">
+          <label style="font-size:0.8rem; font-weight:600; color:var(--red);">Motivo del Rechazo:</label>
+          <textarea id="cot-motivo-rechazo-input" placeholder="Indica el motivo del rechazo..." style="width:100%; min-height:60px; padding:0.5rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary); font-size:0.8rem; resize:vertical; outline:none;"></textarea>
+          <div style="display:flex; gap:0.5rem;">
+            <button type="button" class="btn-primary" style="flex:1; justify-content:center; padding:0.4rem; background:var(--red); border-color:var(--red); font-size:0.8rem;" onclick="responderCotizacionCliente('${t.id}', 'no')">
+              Confirmar Rechazo
+            </button>
+            <button type="button" class="btn-secondary" style="padding:0.4rem; font-size:0.8rem;" onclick="ocultarFormRechazoCotizacion()">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
     cotizacionHtml = `
       <div style="background:var(--accent-light); border:1px solid var(--accent); border-radius:var(--radius-md); padding:1rem; margin-top:1.5rem;">
         <h4 style="color:var(--accent); font-weight:700; font-size:0.95rem; margin-bottom:0.5rem;"><i data-lucide="file-text" style="width:16px; height:16px; vertical-align:middle; margin-right:4px;"></i> Cotización SAP Asociada</h4>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; font-size:0.85rem; margin-bottom:0.75rem;">
           <span>No. Cotización: <strong>${t.cotizacionSAP}</strong></span>
           <span>Monto: <strong>$${Number(t.montoCotizacion || 0).toLocaleString('es-MX')} MXN</strong></span>
-          <span>Aceptada: <strong>${t.cotAceptada === 'si' ? 'Sí' : (t.cotAceptada === 'no' ? 'No' : 'Pendiente de Aceptación')}</strong></span>
+          <span style="grid-column: span 2;">Aceptada: <strong style="${statusStyle}">${statusText}</strong></span>
           ${t.pedidoSAP ? `<span>Pedido SAP: <strong>${t.pedidoSAP}</strong></span>` : ''}
         </div>
         
@@ -1581,6 +1686,7 @@ function abrirDetalleTicketCliente(id) {
             </div>
           ` : ''}
         </div>
+        ${actionGroupHtml}
       </div>
     `;
   }
@@ -2040,7 +2146,18 @@ function abrirDetalleOrdenCliente(id) {
   
   if (title) title.textContent = `Orden de Servicio: ${o.folio || 'Detalle'}`;
   
-  const est = String(o.estado || 'Pendiente').toLowerCase().trim();
+  const programado = (o.bitacora || [])
+    .filter(b => b.realizado === false || !b.realizado)
+    .sort((a, b) => new Date(`${a.fecha}T${a.entrada || '00:00'}`) - new Date(`${b.fecha}T${b.entrada || '00:00'}`))[0];
+
+  let est = String(o.estado || 'Pendiente').toLowerCase().trim();
+  let estadoText = o.estado || 'Pendiente';
+  
+  if (programado && (est === 'pendiente' || est === 'abierto')) {
+    est = 'programado';
+    estadoText = 'Programado';
+  }
+
   const fechaFormat = safeFormatDate(o.fecha, { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }, 'N/A');
   const fechaFinFormat = safeFormatDate(o.fechaFin, { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }, 'En Proceso');
 
@@ -2346,12 +2463,31 @@ function abrirDetalleOrdenCliente(id) {
     `;
   }
 
+  // Layout de programación si existe
+  let programacionHtml = '';
+  if (programado) {
+    const fechaProg = safeFormatDate(programado.fecha, { day:'numeric', month:'long', year:'numeric' }, 'N/A');
+    programacionHtml = `
+      <div style="background:rgba(99, 102, 241, 0.08); border:1px solid rgba(99, 102, 241, 0.2); border-radius:var(--radius-md); padding:1rem; margin-bottom:1.5rem; font-size:0.85rem; line-height:1.5;">
+        <h4 style="font-size:0.9rem; font-weight:700; color:#818cf8; margin-bottom:0.5rem; display:flex; align-items:center; gap:0.4rem;">
+          <i data-lucide="calendar-days" style="width:16px; height:16px;"></i> Programación de Visita
+        </h4>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:0.5rem;">
+          <div><strong>Técnico Programado:</strong> ${programado.tecnico}</div>
+          <div><strong>Fecha Programada:</strong> ${fechaProg}</div>
+          <div><strong>Horario Estimado:</strong> ${programado.entrada || '—'} a ${programado.salida || '—'}</div>
+        </div>
+        ${programado.nota ? `<div style="margin-top:0.4rem; font-style:italic; color:var(--text-secondary); border-top: 1px dashed rgba(255, 255, 255, 0.05); padding-top: 0.4rem;">Nota: "${programado.nota}"</div>` : ''}
+      </div>
+    `;
+  }
+
   body.innerHTML = `
     <!-- Cabecera rápida de labores -->
     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:1rem; margin-bottom:1.5rem; background:var(--bg-hover); border:1px solid var(--border); border-radius:var(--radius-md); padding:1rem; font-size:0.85rem; line-height:1.4;">
       <div>
         <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Estado del Servicio</span>
-        <span class="status-pill ${est}">${o.estado || 'Pendiente'}</span>
+        <span class="status-pill ${est}">${estadoText}</span>
       </div>
       <div>
         <span style="color:var(--text-muted); font-size:0.72rem; display:block;">Tipo de Servicio</span>
@@ -2371,6 +2507,8 @@ function abrirDetalleOrdenCliente(id) {
       </div>
     </div>
     
+    ${programacionHtml}
+
     <!-- Información General -->
     ${infoGeneralHtml}
 
@@ -3011,3 +3149,227 @@ async function registrarClienteSubmit(e) {
     btn.disabled = false;
   }
 }
+
+// Funciones para Aceptación / Rechazo de Cotizaciones por el Cliente
+function mostrarFormRechazoCotizacion() {
+  const actionsGroup = document.getElementById('cotizacion-actions-group');
+  const formRechazo = document.getElementById('rechazo-cotizacion-form');
+  if (actionsGroup) actionsGroup.style.display = 'none';
+  if (formRechazo) formRechazo.style.display = 'flex';
+}
+
+function ocultarFormRechazoCotizacion() {
+  const actionsGroup = document.getElementById('cotizacion-actions-group');
+  const formRechazo = document.getElementById('rechazo-cotizacion-form');
+  if (actionsGroup) actionsGroup.style.display = 'flex';
+  if (formRechazo) formRechazo.style.display = 'none';
+}
+
+async function responderCotizacionCliente(ticketId, respuesta) {
+  const t = tickets.find(x => x.id === ticketId);
+  if (!t) return;
+
+  let motivo = null;
+  if (respuesta === 'no') {
+    const input = document.getElementById('cot-motivo-rechazo-input');
+    motivo = input ? input.value.trim() : '';
+    if (!motivo) {
+      showToast('Por favor, indica el motivo del rechazo.', 'warning');
+      return;
+    }
+  }
+
+  try {
+    showToast('Procesando respuesta...', 'info');
+
+    t.cotAceptada = respuesta;
+    t.motivoRechazo = respuesta === 'no' ? motivo : null;
+
+    // Sincronizar en la nube
+    await window.pushToSupabase('tickets', t);
+
+    // Actualizar localStorage y array global
+    localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+
+    showToast(respuesta === 'si' ? 'Cotización aceptada y aprobada con éxito.' : 'Cotización rechazada.', 'success');
+
+    // Re-renderizar
+    doRender();
+    
+    // Re-abrir modal con datos actualizados
+    abrirDetalleTicketCliente(ticketId);
+
+  } catch (err) {
+    console.error('[Responder Cotización Error]', err);
+    showToast('Error al procesar la respuesta: ' + (err.message || err), 'error');
+  }
+}
+
+// Abrir modal para editar dirección de sitio
+window.abrirEditarDireccionSitio = function(id, nombre, direccion) {
+  const modal = document.getElementById('modal-edit-sitio');
+  if (!modal) return;
+  
+  document.getElementById('edit-sitio-id').value = id || '';
+  document.getElementById('edit-sitio-nombre').value = nombre || '';
+  document.getElementById('edit-sitio-direccion').value = (direccion === 'Sin dirección registrada' ? '' : direccion) || '';
+  
+  modal.classList.add('open');
+  lucide.createIcons();
+};
+
+// Guardar la nueva dirección del sitio
+window.guardarDireccionSitio = async function(event) {
+  if (event) event.preventDefault();
+  
+  const id = document.getElementById('edit-sitio-id').value;
+  const direccion = document.getElementById('edit-sitio-direccion').value.trim();
+  
+  if (!id || !direccion) {
+    showToast('La dirección es obligatoria', 'error');
+    return;
+  }
+  
+  try {
+    // 1. Obtener la lista local de sitios
+    const localSitios = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+    const idx = localSitios.findIndex(s => s.id === id);
+    
+    if (idx === -1) {
+      showToast('No se encontró el sitio a editar', 'error');
+      return;
+    }
+    
+    // 2. Modificar la dirección del sitio
+    const sitioObj = localSitios[idx];
+    sitioObj.direccion = direccion;
+    
+    // 3. Guardar localmente
+    localStorage.setItem('sapi_sitios_db', JSON.stringify(localSitios));
+    
+    // Actualizar variable global sitiosDb
+    sitiosDb = localSitios;
+    
+    // 4. Empujar los cambios a Supabase en segundo plano
+    if (window.pushToSupabase) {
+      await window.pushToSupabase('sitios', sitioObj);
+    }
+    
+    // 5. Ocultar modal y redibujar vistas
+    cerrarModal('modal-edit-sitio');
+    doRender();
+    
+    showToast('Dirección de sitio guardada correctamente', 'success');
+  } catch (error) {
+    console.error('[Sitio] Error al guardar dirección:', error);
+    showToast('Ocurrió un error al guardar los cambios: ' + error.message, 'error');
+  }
+};
+
+
+
+// Renderizar sección de chat de soporte general
+function renderGeneralSupportChatSection(misTickets) {
+  const container = document.getElementById('general-support-chat-container');
+  if (!container) return;
+
+  // Buscar el ticket de soporte general del cliente
+  let chatTicket = misTickets.find(t => t.categoria === 'Soporte General');
+  
+  if (!chatTicket) {
+    // Si no existe, se creará al enviar el primer mensaje, por ahora mostramos estado vacío
+    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding: 2rem 0;">No hay mensajes en este chat de soporte. Escribe un mensaje abajo para iniciar.</div>`;
+    return;
+  }
+
+  const currentClientName = nombreEmpresaLogged || 'Cliente';
+
+  const listHtml = (chatTicket.comentariosClientes && chatTicket.comentariosClientes.length > 0)
+    ? chatTicket.comentariosClientes.map(c => {
+        const isMe = c.usuario === currentClientName || c.usuario === 'Cliente' || String(c.usuario || '').toLowerCase().includes(String(currentClientName).toLowerCase());
+        const alignStyle = isMe
+          ? 'align-self: flex-end; background: rgba(232, 130, 12, 0.08); border-left: 3px solid var(--accent);'
+          : 'align-self: flex-start; background: var(--bg-hover); border-left: 3px solid var(--border);';
+        
+        return `
+          <div style="max-width: 85%; padding: 0.6rem 0.8rem; border-radius: 8px; box-shadow: var(--shadow-sm); ${alignStyle}">
+            <div style="display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 0.25rem; align-items: center;">
+              <span style="font-weight: 700; font-size: 0.75rem; color: ${isMe ? 'var(--accent)' : 'var(--blue)'};">${c.usuario}</span>
+              <span style="font-size: 0.65rem; color: var(--text-muted); font-family: monospace;">${formatFechaHoraAmigable(c.fecha)}</span>
+            </div>
+            <div style="font-size: 0.85rem; white-space: pre-wrap; color: var(--text-primary); line-height: 1.35; font-family: inherit;">${c.texto}</div>
+          </div>
+        `;
+      }).join('')
+    : `<div style="text-align: center; color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding: 2rem 0;">No hay mensajes en este chat de soporte. Escribe un mensaje abajo para iniciar.</div>`;
+
+  container.innerHTML = listHtml;
+  container.scrollTop = container.scrollHeight;
+}
+
+// Enviar un mensaje en el chat de soporte general
+window.enviarMensajeSoporteGeneral = async function() {
+  const textarea = document.getElementById('general-support-chat-new-msg');
+  if (!textarea) return;
+  const text = textarea.value.trim();
+  if (!text) return;
+
+  const currentClientName = nombreEmpresaLogged || 'Cliente';
+
+  // Buscar o crear ticket de soporte general
+  let chatTicket = tickets.find(t => t.categoria === 'Soporte General' && (String(t.cliente || '').toLowerCase().trim() === nombreEmpresaLogged || String(t.solicitante || '').toLowerCase().trim() === nombreEmpresaLogged));
+  
+  if (!chatTicket) {
+    chatTicket = {
+      id: 'chat_' + Math.random().toString(36).substring(2, 15),
+      folio: 'SOP-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
+      fecha: new Date().toISOString(),
+      fechaCreacion: new Date().toISOString(),
+      asunto: 'Chat de Soporte General',
+      cliente: nombreEmpresaLogged,
+      solicitante: nombreEmpresaLogged,
+      categoria: 'Soporte General',
+      prioridad: 'Media',
+      estado: 'Abierto',
+      descripcion: 'Canal de comunicación directa con soporte de Eurorep.',
+      comentariosClientes: [],
+      comentariosInternos: [],
+      esPrueba: false
+    };
+    tickets.push(chatTicket);
+  }
+
+  const nuevoMensaje = {
+    usuario: currentClientName,
+    fecha: new Date().toISOString(),
+    texto: text
+  };
+
+  if (!chatTicket.comentariosClientes) {
+    chatTicket.comentariosClientes = [];
+  }
+  chatTicket.comentariosClientes.push(nuevoMensaje);
+
+  // Guardar localmente
+  try {
+    localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+  } catch (err) {
+    console.error('Error al guardar localmente:', err);
+  }
+
+  // Limpiar e inmediatamente re-renderizar
+  textarea.value = '';
+  doRender();
+
+  // Guardar en Supabase
+  if (window.supabaseClient) {
+    try {
+      await window.pushToSupabase('tickets', chatTicket);
+      showToast('Mensaje enviado a soporte.', 'success');
+    } catch (err) {
+      console.error('Error al guardar mensaje en Supabase:', err);
+      showToast('Error al enviar mensaje.', 'error');
+    }
+  }
+};
+

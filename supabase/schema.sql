@@ -66,6 +66,9 @@ CREATE TABLE public.tickets (
     pedido_sap TEXT,
     pdf_pedido TEXT,
     pdf_cotizacion TEXT,
+    comentarios_internos JSONB DEFAULT '[]'::jsonb,
+    comentarios_clientes JSONB DEFAULT '[]'::jsonb,
+    creado_por TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

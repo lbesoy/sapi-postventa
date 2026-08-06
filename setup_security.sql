@@ -35,6 +35,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
+CREATE OR REPLACE FUNCTION public.get_my_empresa()
+RETURNS text AS $$
+DECLARE
+  v_empresa text;
+BEGIN
+  SELECT empresa INTO v_empresa FROM public.user_roles WHERE id = auth.uid();
+  RETURN coalesce(v_empresa, '');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
 -- 2.5 Limpiar políticas previas para evitar conflictos de duplicación al re-ejecutar el script
 DROP POLICY IF EXISTS "Admins full access ordenes" ON public.ordenes;
 DROP POLICY IF EXISTS "Admins y Supervisores full access ordenes" ON public.ordenes;
@@ -43,6 +53,7 @@ DROP POLICY IF EXISTS "Técnicos pueden editar sus órdenes" ON public.ordenes;
 DROP POLICY IF EXISTS "Técnicos pueden insertar sus órdenes" ON public.ordenes;
 DROP POLICY IF EXISTS "Consulta read access ordenes" ON public.ordenes;
 DROP POLICY IF EXISTS "Clientes y Empresas read access ordenes" ON public.ordenes;
+DROP POLICY IF EXISTS "Clientes y Empresas read own ordenes" ON public.ordenes;
 
 
 DROP POLICY IF EXISTS "Admins full access tickets" ON public.tickets;
@@ -50,14 +61,20 @@ DROP POLICY IF EXISTS "Admins y Supervisores full access tickets" ON public.tick
 DROP POLICY IF EXISTS "Admins y Laura Paz full access tickets" ON public.tickets;
 DROP POLICY IF EXISTS "Supervisores own access tickets" ON public.tickets;
 DROP POLICY IF EXISTS "Consulta y Tecnicos read access tickets" ON public.tickets;
+DROP POLICY IF EXISTS "Técnicos pueden editar sus tickets asignados" ON public.tickets;
+DROP POLICY IF EXISTS "Clientes y Empresas read own tickets" ON public.tickets;
+DROP POLICY IF EXISTS "Clientes y Empresas insert own tickets" ON public.tickets;
+DROP POLICY IF EXISTS "Clientes y Empresas update own tickets" ON public.tickets;
 
 DROP POLICY IF EXISTS "Admins full access clientes" ON public.clientes;
 DROP POLICY IF EXISTS "Admins y Supervisores full access clientes" ON public.clientes;
 DROP POLICY IF EXISTS "Consulta y Tecnicos read access clientes" ON public.clientes;
+DROP POLICY IF EXISTS "Clientes y Empresas read own client" ON public.clientes;
 
 DROP POLICY IF EXISTS "Admins full access maquinaria" ON public.maquinaria;
 DROP POLICY IF EXISTS "Admins y Supervisores full access maquinaria" ON public.maquinaria;
 DROP POLICY IF EXISTS "Consulta y Tecnicos read access maquinaria" ON public.maquinaria;
+DROP POLICY IF EXISTS "Clientes y Empresas read own maquinaria" ON public.maquinaria;
 
 DROP POLICY IF EXISTS "Admins full access user_roles" ON public.user_roles;
 DROP POLICY IF EXISTS "Admins insert user_roles" ON public.user_roles;
@@ -103,6 +120,20 @@ CREATE POLICY "Supervisores own access tickets" ON public.tickets FOR ALL TO aut
   )
 );
 
+CREATE POLICY "Técnicos pueden editar sus tickets asignados" ON public.tickets FOR UPDATE TO authenticated USING (
+  public.get_my_role() = 'tecnico'
+  AND (
+    asignado = public.get_my_name()
+    OR asignado LIKE '%' || public.get_my_name() || '%'
+  )
+) WITH CHECK (
+  public.get_my_role() = 'tecnico'
+  AND (
+    asignado = public.get_my_name()
+    OR asignado LIKE '%' || public.get_my_name() || '%'
+  )
+);
+
 CREATE POLICY "Admins y Supervisores full access clientes" ON public.clientes FOR ALL TO authenticated USING (
   public.get_my_role() IN ('superadmin', 'admin', 'supervisor')
 ) WITH CHECK (
@@ -130,15 +161,32 @@ CREATE POLICY "Admins delete user_roles" ON public.user_roles FOR DELETE TO auth
 );
 
 CREATE POLICY "Consulta y Tecnicos read access clientes" ON public.clientes FOR SELECT TO authenticated USING (
-  public.get_my_role() IN ('tecnico', 'consulta', 'empresa', 'cliente', 'supervisor')
+  public.get_my_role() IN ('tecnico', 'consulta', 'supervisor')
+);
+
+CREATE POLICY "Clientes y Empresas read own client" ON public.clientes FOR SELECT TO authenticated USING (
+  public.get_my_role() IN ('empresa', 'cliente')
+  AND (
+    LOWER(nombre) = LOWER(public.get_my_empresa())
+    OR id = public.get_my_empresa()
+  )
 );
 
 CREATE POLICY "Consulta y Tecnicos read access maquinaria" ON public.maquinaria FOR SELECT TO authenticated USING (
-  public.get_my_role() IN ('tecnico', 'consulta', 'empresa', 'cliente', 'supervisor')
+  public.get_my_role() IN ('tecnico', 'consulta', 'supervisor')
+);
+
+CREATE POLICY "Clientes y Empresas read own maquinaria" ON public.maquinaria FOR SELECT TO authenticated USING (
+  public.get_my_role() IN ('empresa', 'cliente')
+  AND (
+    LOWER(cliente) IN (
+      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa()
+    )
+  )
 );
 
 CREATE POLICY "Consulta y Tecnicos read access tickets" ON public.tickets FOR SELECT TO authenticated USING (
-  public.get_my_role() IN ('tecnico', 'consulta', 'empresa', 'cliente')
+  public.get_my_role() IN ('tecnico', 'consulta')
   OR (
     public.get_my_role() = 'supervisor'
     AND (
@@ -146,6 +194,44 @@ CREATE POLICY "Consulta y Tecnicos read access tickets" ON public.tickets FOR SE
       OR asignado = public.get_my_name()
       OR solicitante = public.get_my_name()
     )
+  )
+);
+
+CREATE POLICY "Clientes y Empresas read own tickets" ON public.tickets FOR SELECT TO authenticated USING (
+  public.get_my_role() IN ('empresa', 'cliente')
+  AND (
+    LOWER(cliente) IN (
+      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa()
+    )
+    OR LOWER(solicitante) = LOWER(public.get_my_name())
+  )
+);
+
+CREATE POLICY "Clientes y Empresas insert own tickets" ON public.tickets FOR INSERT TO authenticated WITH CHECK (
+  public.get_my_role() IN ('empresa', 'cliente')
+  AND (
+    LOWER(cliente) IN (
+      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa()
+    )
+    OR LOWER(solicitante) = LOWER(public.get_my_name())
+  )
+);
+
+CREATE POLICY "Clientes y Empresas update own tickets" ON public.tickets FOR UPDATE TO authenticated USING (
+  public.get_my_role() IN ('empresa', 'cliente')
+  AND (
+    LOWER(cliente) IN (
+      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa()
+    )
+    OR LOWER(solicitante) = LOWER(public.get_my_name())
+  )
+) WITH CHECK (
+  public.get_my_role() IN ('empresa', 'cliente')
+  AND (
+    LOWER(cliente) IN (
+      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa()
+    )
+    OR LOWER(solicitante) = LOWER(public.get_my_name())
   )
 );
 
@@ -172,8 +258,13 @@ CREATE POLICY "Consulta read access ordenes" ON public.ordenes FOR SELECT TO aut
   public.get_my_role() = 'consulta'
 );
 
-CREATE POLICY "Clientes y Empresas read access ordenes" ON public.ordenes FOR SELECT TO authenticated USING (
+CREATE POLICY "Clientes y Empresas read own ordenes" ON public.ordenes FOR SELECT TO authenticated USING (
   public.get_my_role() IN ('empresa', 'cliente')
+  AND (
+    LOWER(cliente) IN (
+      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa()
+    )
+  )
 );
 
 -- 5. Crear Trigger para añadir automáticamente los usuarios nuevos a la tabla de roles
@@ -370,6 +461,8 @@ CREATE POLICY "Permitir select a publico en refacciones" ON public.refacciones F
 
 DROP POLICY IF EXISTS "Permitir select a publico en sitios" ON public.sitios;
 CREATE POLICY "Permitir select a publico en sitios" ON public.sitios FOR SELECT TO public USING (true);
+DROP POLICY IF EXISTS "Permitir todo a autenticados en sitios" ON public.sitios;
+CREATE POLICY "Permitir todo a autenticados en sitios" ON public.sitios FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- 11. Configuración de Políticas para Subtablas de Órdenes (orden_bitacora, orden_refacciones, orden_firmas)
 -- ========================================================

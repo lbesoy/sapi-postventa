@@ -249,7 +249,10 @@ function ticketToRow(t) {
     monto_cotizacion: (t.montoCotizacion !== undefined && t.montoCotizacion !== null) ? Number(t.montoCotizacion) : null,
     cot_aceptada: t.cotAceptada || null,
     motivo_rechazo: t.motivoRechazo || null,
-    pedido_sap: t.pedidoSAP || null
+    pedido_sap: t.pedidoSAP || null,
+    comentarios_internos: t.comentariosInternos || [],
+    comentarios_clientes: t.comentariosClientes || [],
+    creado_por: t.creadoPor || null
   };
 
   // Solo incluir campos PDF si tienen el Base64 real y no un marcador
@@ -327,6 +330,9 @@ function rowToTicket(t, idsWithPedido, idsWithCotizacion) {
     cotAceptada: t.cot_aceptada,
     motivoRechazo: t.motivo_rechazo,
     pedidoSAP: t.pedido_sap,
+    creadoPor: t.creado_por || null,
+    comentariosInternos: t.comentarios_internos || [],
+    comentariosClientes: t.comentarios_clientes || [],
     tecnicosAsignados: [], // Siempre vacío por diseño relacional de negocio
     pdfPedido: pdfPedidoVal,
     pdfCotizacion: pdfCotizacionVal,
@@ -2535,7 +2541,7 @@ window.cargarDatosDeSupabase = function() {
       if (resCot.data) idsWithCotizacion = new Set(resCot.data.map(x => x.id));
 
       // 2. Descargar columnas principales del ticket (excluyendo Base64 pesados de PDFs)
-      const columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, notas, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion';
+      const columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, notas, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion, comentarios_internos, creado_por, comentarios_clientes';
       const res = await sb.from('tickets').select(columns);
       ticketsDb = res.data;
       ticketsError = res.error;

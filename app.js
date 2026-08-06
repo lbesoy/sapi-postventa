@@ -1804,7 +1804,7 @@ function getFilteredOrders() {
 
 function getFilteredTickets() {
   const active = isTestModeActive();
-  return tickets.filter(t => isTestData(t) === active);
+  return tickets.filter(t => isTestData(t) === active && t.categoria !== 'Soporte General');
 }
 
 function isTestGasto(g) {
@@ -3488,6 +3488,9 @@ function setupNav() {
         if (view === 'gastos') {
           if (typeof renderGastos === 'function') renderGastos();
         }
+        if (view === 'chat-soporte') {
+          if (typeof renderChatSoporteEmpresa === 'function') renderChatSoporteEmpresa();
+        }
         if (view === 'refacciones') {
           if (typeof renderRefacciones === 'function') renderRefacciones();
         }
@@ -4808,7 +4811,9 @@ function renderTabla(ctx) {
       tecFilter = currentUser ? currentUser.nombre : '';
     }
   }
-  if (userRole === 'supervisor') supFilter = currentUser ? currentUser.nombre : '';
+  if (userRole === 'supervisor') {
+    supFilter = document.getElementById('filter-ord-supervisor')?.value || '';
+  }
   
   if (tecFilter || supFilter) {
     const tecNameLower = tecFilter ? tecFilter.toLowerCase().trim() : '';
@@ -12209,15 +12214,16 @@ function actualizarFiltrosPersonal() {
     
     selectsSupervisor.forEach(sel => { 
       if(sel) { 
-        const isLauraPaz = currentUser && (
-          String(currentUser.nombre).toLowerCase().trim() === 'laura paz' ||
-          String(currentUser.email).toLowerCase().trim().includes('laura.paz') ||
-          String(currentUser.email).toLowerCase().trim().includes('laurapaz')
-        );
-        const val = (isSupervisor && !isLauraPaz) ? userName : (isTecnico ? '' : sel.value); 
+        let val = sel.value;
+        const isFirstLoad = sel.options.length === 0;
+        if (isSupervisor && isFirstLoad) {
+          val = userName;
+        } else if (isTecnico) {
+          val = '';
+        }
         sel.innerHTML = supOptionsHtml; 
         sel.value = val; 
-        sel.disabled = (isSupervisor && !isLauraPaz) || isTecnico;
+        sel.disabled = isTecnico;
       } 
     });
   } catch (error) {
@@ -12297,7 +12303,7 @@ function renderTickets(ctx) {
     const q = (document.getElementById(searchId)?.value || '').toLowerCase();
     
     let filtered = getFilteredTickets().filter(t =>
-      t && (
+      t && t.categoria !== 'Soporte General' && (
         !q ||
         String(t.asunto||'').toLowerCase().includes(q) ||
         String(t.solicitante||'').toLowerCase().includes(q) ||
@@ -12407,16 +12413,7 @@ function renderTickets(ctx) {
       }
     }
     if (userRole === 'supervisor') {
-      const isLauraPaz = currentUser && (
-        String(currentUser.nombre).toLowerCase().trim() === 'laura paz' ||
-        String(currentUser.email).toLowerCase().trim().includes('laura.paz') ||
-        String(currentUser.email).toLowerCase().trim().includes('laurapaz')
-      );
-      if (isLauraPaz) {
-        supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value || '';
-      } else {
-        supFilter = currentUser ? currentUser.nombre : '';
-      }
+      supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value || '';
     }
     
     if (tecFilter || supFilter) {
@@ -16501,6 +16498,7 @@ async function guardarTicket(e) {
     pdfPedido: pdfPedidoBase64,
     pdfCotizacion: (window.editandoCotizaciones && window.editandoCotizaciones.length > 0) ? window.editandoCotizaciones[0].pdf : null,
     cotizacionesAdicionales: window.editandoCotizaciones || [],
+    comentariosInternos: t_existente ? (t_existente.comentariosInternos || []) : [],
     esPrueba: t_existente ? (t_existente.esPrueba || false) : isTestModeActive()
   };
 
@@ -16775,6 +16773,103 @@ async function eliminarTicket(id) {
   updateTicketBadge(); updateOrdenesBadge();
 }
 
+// ===== COMENTARIOS INTERNOS HELPER FUNCTIONS =====
+window.renderComentariosInternosHtml = function(t) {
+  if (['empresa', 'cliente'].includes(window.currentSession?.viewMode)) {
+    return '';
+  }
+
+  const currentUser = usuarios.find(u => u && u.id === window.currentSession?.userId);
+  const currentUserName = currentUser ? currentUser.nombre : '';
+
+  const listHtml = (t.comentariosInternos && t.comentariosInternos.length > 0)
+    ? t.comentariosInternos.map(c => {
+        const isMe = c.usuario === currentUserName;
+        const alignStyle = isMe
+          ? 'align-self: flex-end; background: rgba(232, 130, 12, 0.08); border-left: 3px solid var(--accent);'
+          : 'align-self: flex-start; background: var(--bg-card); border-left: 3px solid var(--border);';
+        
+        return `
+          <div style="max-width: 85%; padding: 0.6rem 0.8rem; border-radius: 8px; box-shadow: var(--shadow-sm); ${alignStyle}">
+            <div style="display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 0.25rem; align-items: center;">
+              <span style="font-weight: 700; font-size: 0.75rem; color: ${isMe ? 'var(--accent)' : 'var(--text-primary)'};">${c.usuario}</span>
+              <span style="font-size: 0.65rem; color: var(--text-muted); font-family: monospace;">${formatFechaHoraAmigable(c.fecha)}</span>
+            </div>
+            <div style="font-size: 0.85rem; white-space: pre-wrap; color: var(--text-primary); line-height: 1.35; font-family: inherit;">${c.texto}</div>
+          </div>
+        `;
+      }).join('')
+    : `<div style="text-align: center; color: var(--text-muted); font-style: italic; font-size: 0.8rem; padding: 1.5rem 0;">No hay comentarios de seguimiento registrados en este ticket.</div>`;
+
+  return `
+    <div class="detalle-section" style="border-top:1px dashed var(--border); padding-top:1.25rem; margin-top:1.5rem;">
+      <div class="detalle-section-title" style="display:flex; align-items:center; gap:0.5rem; text-transform: uppercase;"><i data-lucide="message-square" style="width:16px;height:16px;"></i> Seguimiento y Comentarios Internos</div>
+      
+      <!-- Caja de comentarios (Chat) -->
+      <div class="chat-container" style="max-height: 200px; overflow-y: auto; padding: 0.75rem; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+        ${listHtml}
+      </div>
+
+      <!-- Input para nuevo comentario -->
+      <div class="chat-input-wrapper" style="display: flex; gap: 0.5rem; align-items: stretch;">
+        <textarea id="chat-new-comment" placeholder="Escribe un comentario interno..." rows="2" style="flex: 1; resize: none; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+        <button type="button" class="btn-primary" onclick="window.agregarComentarioInterno('${t.id}')" style="background: var(--accent); border-color: var(--accent); border-radius: 8px; padding: 0 1rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem; cursor: pointer; font-weight: 600; font-size: 0.85rem; color: white;">
+          <i data-lucide="send" style="width: 14px; height: 14px;"></i> Enviar
+        </button>
+      </div>
+    </div>
+  `;
+};
+
+window.agregarComentarioInterno = async function(ticketId) {
+  const textarea = document.getElementById('chat-new-comment');
+  if (!textarea) return;
+  const text = textarea.value.trim();
+  if (!text) return;
+
+  const t = tickets.find(x => x.id === ticketId);
+  if (!t) {
+    mostrarNotificacion('Ticket no encontrado.', 'error');
+    return;
+  }
+
+  const currentUser = usuarios.find(u => u && u.id === window.currentSession?.userId);
+  const userName = currentUser ? currentUser.nombre : 'Usuario';
+
+  const nuevoComentario = {
+    usuario: userName,
+    fecha: new Date().toISOString(),
+    texto: text
+  };
+
+  if (!t.comentariosInternos) {
+    t.comentariosInternos = [];
+  }
+  t.comentariosInternos.push(nuevoComentario);
+
+  // Guardar localmente
+  try {
+    safeSetJSON('sapi_tickets', tickets);
+  } catch (err) {
+    console.error('Error al guardar sapi_tickets:', err);
+  }
+
+  // Guardar en Supabase
+  if (window.supabaseClient) {
+    try {
+      await window.pushToSupabase('tickets', t);
+      mostrarNotificacion('Comentario agregado.', 'success');
+    } catch (err) {
+      console.error('Error al guardar comentario en Supabase:', err);
+    }
+  }
+
+  // Refrescar detalle
+  verDetalleTicket(ticketId);
+};
+
+
+
 // ===== DETALLE TICKET =====
 function verDetalleTicket(id) {
   const t = tickets.find(x => x.id === id);
@@ -16797,6 +16892,7 @@ function verDetalleTicket(id) {
         ${field('Estado', `<span class="badge badge-${badgeTicketEstado(t)}">${t.estado === 'Cerrado' ? (t.cotAceptada === 'si' ? 'Cerrado (Aceptado)' : 'Cerrado (Rechazado)') : t.estado}</span>`)}
         ${!['empresa', 'cliente'].includes(currentSession.viewMode) ? field('Prioridad', `<span class="badge badge-${(t.prioridad||'media').toLowerCase()}">${t.prioridad}</span>`) : ''}
         ${field('Solicitante', t.solicitante)}
+        ${field('Creado por', t.creadoPor)}
         ${field('Área', t.area)}
         ${field('Categoría', t.categoria)}
         ${field('Asignado a', t.asignado)}
@@ -17086,6 +17182,8 @@ function verDetalleTicket(id) {
     </div>
     ` : ''}
 
+    ${window.renderComentariosInternosHtml(t)}
+
     <div style="display:flex; justify-content:center; gap: 4px; height: 35px; width: 80%; margin: 2rem auto 0.5rem auto; opacity: 0.2; color: var(--text-primary);">
       <div style="width:2px; background:currentColor;"></div><div style="width:4px; background:currentColor;"></div>
       <div style="width:1px; background:currentColor;"></div><div style="width:3px; background:currentColor;"></div>
@@ -17111,6 +17209,15 @@ function verDetalleTicket(id) {
   `;
   document.getElementById('modal-ticket-detalle-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
+  
+  // Auto-scroll chat to bottom
+  setTimeout(() => {
+    const chatContainer = document.querySelector('#modal-ticket-detalle .chat-container');
+    if (chatContainer) {
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+  }, 100);
+
   if (t.estado === 'Cerrado' && t.cotAceptada === 'si' && window.supabaseClient) {
     setTimeout(async () => {
       const container = document.getElementById(`closed-pdf-extraction-${t.id}`);
@@ -27588,6 +27695,196 @@ window.ejecutarDiagnosticoLocal = async function() {
     diagnosticEl.textContent = info;
   } catch (err) {
     diagnosticEl.textContent = `Error al ejecutar diagnóstico: ${err.message}\n${err.stack}`;
+  }
+};
+
+// ===== CHAT DE SOPORTE GENERAL (EMPRESA SIDE) =====
+let activeChatTicketId = null;
+
+window.renderChatSoporteEmpresa = function() {
+  const listContainer = document.getElementById('chat-client-list');
+  if (!listContainer) return;
+
+  const chatTickets = tickets.filter(t => t.categoria === 'Soporte General');
+
+  if (chatTickets.length === 0) {
+    listContainer.innerHTML = `
+      <div style="text-align:center; padding:2rem 1rem; color:var(--text-muted); font-size:0.85rem; font-style:italic;">
+        No hay chats de soporte activos.
+      </div>
+    `;
+    document.getElementById('chat-active-pane').innerHTML = `
+      <div style="flex:1; display:flex; align-items:center; justify-content:center; flex-direction:column; color:var(--text-muted); gap:0.5rem;">
+        <i data-lucide="message-square" style="width:48px; height:48px; opacity:0.5;"></i>
+        <p style="font-size:0.9rem; font-weight:500; margin:0;">No hay chats de soporte disponibles</p>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+
+  // Ordenar chats por la fecha del último mensaje
+  chatTickets.sort((a, b) => {
+    const lastA = a.comentariosClientes && a.comentariosClientes.length > 0 
+      ? new Date(a.comentariosClientes[a.comentariosClientes.length - 1].fecha) 
+      : new Date(a.fechaCreacion);
+    const lastB = b.comentariosClientes && b.comentariosClientes.length > 0 
+      ? new Date(b.comentariosClientes[b.comentariosClientes.length - 1].fecha) 
+      : new Date(b.fechaCreacion);
+    return lastB - lastA;
+  });
+
+  let listHtml = '';
+  chatTickets.forEach(t => {
+    const isSelected = t.id === activeChatTicketId;
+    const lastMsg = t.comentariosClientes && t.comentariosClientes.length > 0
+      ? t.comentariosClientes[t.comentariosClientes.length - 1]
+      : null;
+    
+    const previewText = lastMsg ? lastMsg.texto : 'Canal abierto';
+    const previewTime = lastMsg ? formatFechaHoraAmigable(lastMsg.fecha) : '';
+    const authorName = lastMsg ? lastMsg.usuario : '';
+    const displayAuthor = authorName ? `${authorName}: ` : '';
+
+    const bgStyle = isSelected ? 'background:rgba(232, 130, 12, 0.12); border-left:3px solid var(--accent);' : 'border-left:3px solid transparent;';
+    
+    listHtml += `
+      <div onclick="window.seleccionarChatTicket('${t.id}')" style="padding:1rem; cursor:pointer; display:flex; flex-direction:column; gap:0.25rem; border-bottom:1px solid var(--border); transition:all 0.2s; ${bgStyle}">
+        <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+          <span style="font-weight:700; font-size:0.9rem; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:180px;">${t.cliente || 'Cliente'}</span>
+          <span style="font-size:0.65rem; color:var(--text-muted);">${previewTime}</span>
+        </div>
+        <div style="font-size:0.8rem; color:var(--text-secondary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:280px; text-align:left;">
+          <span style="color:var(--text-muted);">${displayAuthor}</span>${previewText}
+        </div>
+      </div>
+    `;
+  });
+
+  listContainer.innerHTML = listHtml;
+
+  // Si hay un chat activo, renderizar el panel derecho
+  if (activeChatTicketId) {
+    const activeTicket = chatTickets.find(t => t.id === activeChatTicketId);
+    if (activeTicket) {
+      window.renderChatActivePane(activeTicket);
+    } else {
+      activeChatTicketId = null;
+    }
+  }
+
+  lucide.createIcons();
+};
+
+window.seleccionarChatTicket = function(ticketId) {
+  activeChatTicketId = ticketId;
+  window.renderChatSoporteEmpresa();
+};
+
+window.renderChatActivePane = function(t) {
+  const pane = document.getElementById('chat-active-pane');
+  if (!pane) return;
+
+  const currentUser = usuarios.find(u => u && u.id === window.currentSession?.userId);
+  const currentUserName = currentUser ? currentUser.nombre : 'Soporte';
+
+  const listHtml = (t.comentariosClientes && t.comentariosClientes.length > 0)
+    ? t.comentariosClientes.map(c => {
+        const isClient = c.usuario !== currentUserName && !usuarios.some(u => u.nombre === c.usuario);
+        const alignStyle = !isClient
+          ? 'align-self: flex-end; background: rgba(232, 130, 12, 0.08); border-left: 3px solid var(--accent);'
+          : 'align-self: flex-start; background: var(--bg-hover); border-left: 3px solid var(--border);';
+        
+        return `
+          <div style="max-width: 85%; padding: 0.6rem 0.8rem; border-radius: 8px; box-shadow: var(--shadow-sm); ${alignStyle}">
+            <div style="display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 0.25rem; align-items: center;">
+              <span style="font-weight: 700; font-size: 0.75rem; color: ${!isClient ? 'var(--accent)' : 'var(--blue)'};">${c.usuario}</span>
+              <span style="font-size: 0.65rem; color: var(--text-muted); font-family: monospace;">${formatFechaHoraAmigable(c.fecha)}</span>
+            </div>
+            <div style="font-size: 0.85rem; white-space: pre-wrap; color: var(--text-primary); line-height: 1.35; font-family: inherit;">${c.texto}</div>
+          </div>
+        `;
+      }).join('')
+    : `<div style="text-align: center; color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding: 2rem 0;">No hay mensajes registrados. Escribe una respuesta abajo para iniciar.</div>`;
+
+  pane.innerHTML = `
+    <!-- Header -->
+    <div style="padding:1rem; border-bottom:1px solid var(--border); background:var(--bg-hover); display:flex; justify-content:space-between; align-items:center;">
+      <div style="text-align:left;">
+        <h4 style="font-size:0.95rem; font-weight:700; color:var(--text-primary); margin:0;">${t.cliente || 'Cliente'}</h4>
+        <span style="font-size:0.75rem; color:var(--text-secondary);">Canal de Soporte General</span>
+      </div>
+      <button class="btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem; min-height:auto;" onclick="verDetalleTicket('${t.id}')">
+        <i data-lucide="eye" style="width:13px; height:13px; vertical-align:middle; margin-right:2px;"></i> Ver Ficha Ticket
+      </button>
+    </div>
+    
+    <!-- Messages Body -->
+    <div id="support-general-chat-messages-container" style="flex:1; overflow-y:auto; padding:1.25rem; display:flex; flex-direction:column; gap:0.75rem; background:var(--bg-primary); text-align:left;">
+      ${listHtml}
+    </div>
+    
+    <!-- Input Footer -->
+    <div style="padding:1rem; border-top:1px solid var(--border); background:var(--bg-hover); display:flex; gap:0.5rem; align-items:stretch;">
+      <textarea id="chat-new-general-support-msg" placeholder="Escribe un mensaje para el cliente..." rows="2" style="flex: 1; resize: none; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'" onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); window.enviarMensajeSoporteEmpresa('${t.id}'); }"></textarea>
+      <button type="button" class="btn-primary" onclick="window.enviarMensajeSoporteEmpresa('${t.id}')" style="background: var(--accent); border-color: var(--accent); border-radius: 8px; padding: 0 1.25rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem; cursor: pointer; font-weight: 600; font-size: 0.85rem; color: white;">
+        <i data-lucide="send" style="width: 14px; height: 14px;"></i> Enviar
+      </button>
+    </div>
+  `;
+
+  // Scroll to bottom
+  const container = document.getElementById('support-general-chat-messages-container');
+  if (container) container.scrollTop = container.scrollHeight;
+
+  lucide.createIcons();
+};
+
+window.enviarMensajeSoporteEmpresa = async function(ticketId) {
+  const textarea = document.getElementById('chat-new-general-support-msg');
+  if (!textarea) return;
+  const text = textarea.value.trim();
+  if (!text) return;
+
+  const t = tickets.find(x => x.id === ticketId);
+  if (!t) {
+    mostrarNotificacion('Ticket no encontrado.', 'error');
+    return;
+  }
+
+  const currentUser = usuarios.find(u => u && u.id === window.currentSession?.userId);
+  const userName = currentUser ? currentUser.nombre : 'Soporte';
+
+  const nuevoMensaje = {
+    usuario: userName,
+    fecha: new Date().toISOString(),
+    texto: text
+  };
+
+  if (!t.comentariosClientes) {
+    t.comentariosClientes = [];
+  }
+  t.comentariosClientes.push(nuevoMensaje);
+
+  // Guardar localmente
+  try {
+    safeSetJSON('sapi_tickets', tickets);
+  } catch (err) {
+    console.error('Error al guardar sapi_tickets:', err);
+  }
+
+  // Limpiar e inmediatamente re-renderizar
+  textarea.value = '';
+  window.renderChatSoporteEmpresa();
+
+  // Guardar en Supabase
+  if (window.supabaseClient) {
+    try {
+      await window.pushToSupabase('tickets', t);
+      mostrarNotificacion('Mensaje enviado al cliente.', 'success');
+    } catch (err) {
+      console.error('Error al guardar mensaje en Supabase:', err);
+    }
   }
 };
 
