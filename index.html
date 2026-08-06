@@ -2882,6 +2882,45 @@
             <label for="mra-todo-el-dia" style="margin:0; cursor:pointer; font-weight:600; font-size:0.85rem; color:var(--text-primary);">Todo el día</label>
           </div>
           
+          <button type="button" class="btn-secondary" id="mra-btn-toggle-traslado" onclick="document.getElementById('mra-traslado-section').style.display='block'; this.style.display='none';" style="margin-top: 1rem; width: 100%; justify-content: center; padding: 0.5rem; display: none; margin-bottom: 1rem;">
+            <i data-lucide="map" style="width: 14px; height: 14px; margin-right: 4px; display:inline-block; vertical-align:middle;"></i> Editar Traslado (Opcional)
+          </button>
+          
+          <div id="mra-traslado-section" style="display:none; margin-top:1rem; padding-top:1rem; border-top: 1px dashed var(--border); margin-bottom:1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Detalles de Traslado</span>
+              <button type="button" class="action-btn" onclick="document.getElementById('mra-traslado-section').style.display='none'; document.getElementById('mra-btn-toggle-traslado').style.display='flex'; document.getElementById('mra-fecha-inicio-traslado').value=''; document.getElementById('mra-hora-inicio').value=''; document.getElementById('mra-horas-traslado').value=''; document.getElementById('mra-fecha-fin-regreso-date').value=''; document.getElementById('mra-hora-fin-regreso').value=''; document.getElementById('mra-horas-regreso').value='';" title="Ocultar Traslado" style="font-size: 0.75rem; color: var(--text-muted); background:none; border:none; cursor:pointer;">
+                <i data-lucide="x" style="width: 14px; height: 14px;"></i> Ocultar
+              </button>
+            </div>
+            <div style="display:grid; grid-template-columns:3fr 2fr; gap:1rem;">
+              <div class="form-group">
+                <label>Inicio de traslado (Referencia)</label>
+                <div style="display:flex; gap:0.5rem;">
+                  <input type="date" id="mra-fecha-inicio-traslado" style="flex:1; padding: 0.2rem 0.5rem; border-radius:10px; border:1px solid var(--border); background:var(--bg-hover); color:var(--text-primary);" />
+                  <input type="time" id="mra-hora-inicio" style="flex:1; border-radius:10px; border:1px solid var(--border); background:var(--bg-hover); color:var(--text-primary);" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Horas de Traslado (Ida)</label>
+                <input type="number" id="mra-horas-traslado" step="0.5" min="0" placeholder="Ej. 1.5" style="border-radius:10px; padding:0.65rem 0.85rem; border:1px solid var(--border); background:var(--bg-hover); color:var(--text-primary); width:100%; box-sizing:border-box;" />
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns:3fr 2fr; gap:1rem; margin-top:1rem;">
+              <div class="form-group">
+                <label>Inicio de regreso (Referencia)</label>
+                <div style="display:flex; gap:0.5rem;">
+                  <input type="date" id="mra-fecha-fin-regreso-date" style="flex:1; padding: 0.2rem 0.5rem; border-radius:10px; border:1px solid var(--border); background:var(--bg-hover); color:var(--text-primary);" />
+                  <input type="time" id="mra-hora-fin-regreso" style="flex:1; border-radius:10px; border:1px solid var(--border); background:var(--bg-hover); color:var(--text-primary);" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Horas de Traslado (Regreso)</label>
+                <input type="number" id="mra-horas-regreso" step="0.5" min="0" placeholder="Ej. 1.5" style="border-radius:10px; padding:0.65rem 0.85rem; border:1px solid var(--border); background:var(--bg-hover); color:var(--text-primary); width:100%; box-sizing:border-box;" />
+              </div>
+            </div>
+          </div>
+          
           <div class="form-group">
             <label>Descripción / Notas</label>
             <textarea id="mra-descripcion" rows="3" placeholder="Detalles de la reunión o capacitación..." class="form-control" style="width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.8rem; background: var(--bg-hover); color: var(--text-primary); font-family: inherit; box-sizing: border-box; font-size:0.9rem; resize:vertical; transition: all 0.2s;"></textarea>

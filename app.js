@@ -52,10 +52,14 @@ window.cleanMojibake = function(str) {
   return fixed.trim();
 };
 
+window.normStr = function(s) {
+  return (s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+};
+
 // Registrar Service Worker para soporte PWA (sólo en producción, no en localhost)
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    window.addEventListener('load', () => {
+    const registerSW = () => {
       navigator.serviceWorker.register('/sw.js')
         .then(reg => {
           console.log('[PWA] Service Worker registrado con éxito:', reg.scope);
@@ -87,7 +91,13 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
           });
         }
       });
-    });
+    };
+
+    if (document.readyState === 'complete') {
+      registerSW();
+    } else {
+      window.addEventListener('load', registerSW);
+    }
   }
 }
 
@@ -1118,18 +1128,18 @@ let ROLES = {
   superadmin: {
     label: 'Super Administrador',
     color: '#E8820C',
-    views: ['dashboard','servicios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos','telemetry'],
+    views: ['dashboard','servicios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos','telemetry','chat-soporte'],
     canSwitchRoles: true,
   },
   admin: {
     label: 'Administrador',
     color: '#4f8ef7',
-    views: ['dashboard','servicios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos'],
+    views: ['dashboard','servicios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos','chat-soporte'],
   },
   supervisor: {
     label: 'Supervisor',
     color: '#eab308',
-    views: ['dashboard','servicios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','preferencias','gastos'],
+    views: ['dashboard','servicios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','preferencias','gastos','chat-soporte'],
   },
   tecnico: {
     label: 'Técnico / Instalador',
@@ -1152,7 +1162,8 @@ const ROLES_LABELS = {
   dashboard: 'Dashboard', servicios: 'Órdenes de Servicio', calendario: 'Calendario',
   tickets: 'Tickets', levantamientos: 'Levantamientos', clientes: 'Clientes', maquinaria: 'Maquinaria', refacciones: 'Refacciones',
   sitios: 'Mis Sitios', tecnicos: 'Técnicos', config: 'Configuración',
-  preferencias: 'Preferencias', gastos: 'Control de Gastos', telemetry: 'Monitoreo Telemetría'
+  preferencias: 'Preferencias', gastos: 'Control de Gastos', telemetry: 'Monitoreo Telemetría',
+  'chat-soporte': 'Chat de Soporte'
 };
 
 function cargarRolesDesdeStorage() {
@@ -1194,6 +1205,17 @@ function cargarRolesDesdeStorage() {
     if (ROLES[rol] && Array.isArray(ROLES[rol].views)) {
       if (!ROLES[rol].views.includes('levantamientos')) {
         ROLES[rol].views.push('levantamientos');
+        configChanged = true;
+      }
+    }
+  });
+
+  // Garantizar vista de chat-soporte para los roles principales tras la actualización
+  const rolesConChatSoporte = ['superadmin', 'admin', 'supervisor'];
+  rolesConChatSoporte.forEach(rol => {
+    if (ROLES[rol] && Array.isArray(ROLES[rol].views)) {
+      if (!ROLES[rol].views.includes('chat-soporte')) {
+        ROLES[rol].views.push('chat-soporte');
         configChanged = true;
       }
     }
@@ -1749,15 +1771,19 @@ function isTestData(item) {
       }
     } catch (e) {}
   
-  // Comprobar si el folio o asunto comienzan con [PRUEBA] o [TEST]
+  // Comprobar si el folio, asunto, título o descripción contienen [PRUEBA] o [TEST]
   const fieldsToCheckPrefix = [
     item.folio,
-    item.asunto
+    item.asunto,
+    item.titulo,
+    item.title,
+    item.descripcion,
+    item.description
   ];
   for (const field of fieldsToCheckPrefix) {
     if (field && typeof field === 'string') {
       const trimmed = field.trim().toUpperCase();
-      if (trimmed.startsWith('[PRUEBA]') || trimmed.startsWith('[TEST]')) {
+      if (trimmed.includes('[PRUEBA]') || trimmed.includes('[TEST]')) {
         return true;
       }
     }
@@ -3812,24 +3838,24 @@ function _renderStatsInternal() {
       const userRole = currentSession.viewMode || '';
       if (userRole === 'tecnico') {
         const tecName = currentUser ? currentUser.nombre : '';
-        const tecNameLower = tecName.toLowerCase().trim();
+        const tecNameLower = window.normStr(tecName);
         ordenesFilter = ordenesFilter.filter(o => {
           let assigned = [];
           if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
           else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
-          const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
+          const assignedLower = assigned.map(s => window.normStr(s));
           let isCreator = false;
           let isTkAssigned = false;
-          if (o.creadoPor && String(o.creadoPor).toLowerCase().trim() === tecNameLower) isCreator = true;
+          if (o.creadoPor && window.normStr(o.creadoPor) === tecNameLower) isCreator = true;
           if (o.soporte) {
             const tk = tickets.find(x => x.id === o.soporte);
             if (tk) {
-              if ((tk.solicitante && String(tk.solicitante).toLowerCase().trim() === tecNameLower) || 
-                  (tk.creadoPor && String(tk.creadoPor).toLowerCase().trim() === tecNameLower)) isCreator = true;
+              if ((tk.solicitante && window.normStr(tk.solicitante) === tecNameLower) || 
+                  (tk.creadoPor && window.normStr(tk.creadoPor) === tecNameLower)) isCreator = true;
               let tkAssigned = [];
               if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(resolveTecnicoNombre);
               else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
-              const tkAssignedLower = tkAssigned.map(s => String(s).toLowerCase().trim());
+              const tkAssignedLower = tkAssigned.map(s => window.normStr(s));
               if (tkAssignedLower.includes(tecNameLower)) isTkAssigned = true;
             }
           }
@@ -3840,37 +3866,41 @@ function _renderStatsInternal() {
           let assigned = [];
           if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
           else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
-          const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
+          const assignedLower = assigned.map(s => window.normStr(s));
           return assignedLower.includes(tecNameLower) || 
-                 (t.solicitante && String(t.solicitante).toLowerCase().trim() === tecNameLower) || 
-                 (t.creadoPor && String(t.creadoPor).toLowerCase().trim() === tecNameLower);
+                 (t.solicitante && window.normStr(t.solicitante) === tecNameLower) || 
+                 (t.creadoPor && window.normStr(t.creadoPor) === tecNameLower);
         });
       } else if (userRole === 'supervisor') {
         const supFilter = currentUser ? currentUser.nombre : '';
+        const supNameLower = window.normStr(supFilter);
         ordenesFilter = ordenesFilter.filter(o => {
           let passSupClient = false;
           const cli = clientesDb.find(c => c.nombre === o.cliente);
           if (cli) {
-            const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
+            const supUser = usuarios.find(u => u && ((u.nombre && window.normStr(u.nombre) === supNameLower) || u.id === supFilter));
             const supId = supUser ? supUser.id : supFilter;
-            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
+            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (window.normStr(cli.supervisorAsignado) === supNameLower) || (cli.supervisorAsignado === supFilter);
           }
           
           let assigned = [];
           if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
           else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
+          const assignedLower = assigned.map(s => window.normStr(s));
           
-          let passSupTicket = assigned.includes(supFilter);
+          let passSupTicket = assignedLower.includes(supNameLower);
           let isCreator = false;
-          if (o.creadoPor === supFilter) isCreator = true;
+          if (o.creadoPor && window.normStr(o.creadoPor) === supNameLower) isCreator = true;
           if (o.soporte) {
             const tk = tickets.find(x => x.id === o.soporte);
             if (tk) {
-              if (tk.solicitante === supFilter || tk.creadoPor === supFilter) isCreator = true;
+              if ((tk.solicitante && window.normStr(tk.solicitante) === supNameLower) || 
+                  (tk.creadoPor && window.normStr(tk.creadoPor) === supNameLower)) isCreator = true;
               let tkAssigned = [];
               if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(resolveTecnicoNombre);
               else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
-              if (tkAssigned.includes(supFilter)) passSupTicket = true;
+              const tkAssignedLower = tkAssigned.map(s => window.normStr(s));
+              if (tkAssignedLower.includes(supNameLower)) passSupTicket = true;
             }
           }
           return passSupClient || passSupTicket || isCreator;
@@ -3886,16 +3916,19 @@ function _renderStatsInternal() {
             let passSupClient = false;
             const cli = clientesDb.find(c => c.nombre === t.cliente);
             if (cli) {
-              const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
+              const supUser = usuarios.find(u => u && ((u.nombre && window.normStr(u.nombre) === supNameLower) || u.id === supFilter));
               const supId = supUser ? supUser.id : supFilter;
-              passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
+              passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (window.normStr(cli.supervisorAsignado) === supNameLower) || (cli.supervisorAsignado === supFilter);
             }
             
             let assigned = [];
             if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
             else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+            const assignedLower = assigned.map(s => window.normStr(s));
             
-            let passSupTicket = assigned.includes(supFilter) || t.solicitante === supFilter || t.creadoPor === supFilter;
+            let passSupTicket = assignedLower.includes(supNameLower) || 
+                                (t.solicitante && window.normStr(t.solicitante) === supNameLower) || 
+                                (t.creadoPor && window.normStr(t.creadoPor) === supNameLower);
             
             return passSupClient || passSupTicket;
           });
@@ -4816,8 +4849,8 @@ function renderTabla(ctx) {
   }
   
   if (tecFilter || supFilter) {
-    const tecNameLower = tecFilter ? tecFilter.toLowerCase().trim() : '';
-    const supNameLower = supFilter ? supFilter.toLowerCase().trim() : '';
+    const tecNameLower = tecFilter ? window.normStr(tecFilter) : '';
+    const supNameLower = supFilter ? window.normStr(supFilter) : '';
     
     filtradas = filtradas.filter(o => {
       let passTec = true;
@@ -4827,19 +4860,19 @@ function renderTabla(ctx) {
          let assigned = [];
          if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
          else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
-         const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
+         const assignedLower = assigned.map(s => window.normStr(s));
          let isCreator = false;
          let isTkAssigned = false;
-         if (o.creadoPor && String(o.creadoPor).toLowerCase().trim() === tecNameLower) isCreator = true;
+         if (o.creadoPor && window.normStr(o.creadoPor) === tecNameLower) isCreator = true;
          if (o.soporte) {
             const tk = tickets.find(x => x.id === o.soporte);
             if (tk) {
-               if ((tk.solicitante && String(tk.solicitante).toLowerCase().trim() === tecNameLower) || 
-                   (tk.creadoPor && String(tk.creadoPor).toLowerCase().trim() === tecNameLower)) isCreator = true;
+               if ((tk.solicitante && window.normStr(tk.solicitante) === tecNameLower) || 
+                   (tk.creadoPor && window.normStr(tk.creadoPor) === tecNameLower)) isCreator = true;
                let tkAssigned = [];
                if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(resolveTecnicoNombre);
                else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
-               const tkAssignedLower = tkAssigned.map(s => String(s).toLowerCase().trim());
+               const tkAssignedLower = tkAssigned.map(s => window.normStr(s));
                if (tkAssignedLower.includes(tecNameLower)) isTkAssigned = true;
             }
          }
@@ -4850,27 +4883,27 @@ function renderTabla(ctx) {
          let passSupClient = false;
          const cli = clientesDb.find(c => c.nombre === o.cliente);
          if (cli) {
-            const supUser = usuarios.find(u => (u.nombre && u.nombre.toLowerCase().trim() === supNameLower) || u.id === supFilter);
+            const supUser = usuarios.find(u => u && ((u.nombre && window.normStr(u.nombre) === supNameLower) || u.id === supFilter));
             const supId = supUser ? supUser.id : supFilter;
-            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
+            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (window.normStr(cli.supervisorAsignado) === supNameLower) || (cli.supervisorAsignado === supFilter);
          }
          
          let assigned = [];
          if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
          else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
-         const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
+         const assignedLower = assigned.map(s => window.normStr(s));
          
          let passSupTicket = assignedLower.includes(supNameLower);
          let isCreator = false;
          if (o.soporte) {
             const tk = tickets.find(x => x.id === o.soporte);
             if (tk) {
-               if ((tk.solicitante && String(tk.solicitante).toLowerCase().trim() === supNameLower) || 
-                   (tk.creadoPor && String(tk.creadoPor).toLowerCase().trim() === supNameLower)) isCreator = true;
+               if ((tk.solicitante && window.normStr(tk.solicitante) === supNameLower) || 
+                   (tk.creadoPor && window.normStr(tk.creadoPor) === supNameLower)) isCreator = true;
                let tkAssigned = [];
                if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(resolveTecnicoNombre);
                else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
-               const tkAssignedLower = tkAssigned.map(s => String(s).toLowerCase().trim());
+               const tkAssignedLower = tkAssigned.map(s => window.normStr(s));
                if (tkAssignedLower.includes(supNameLower)) passSupTicket = true;
             }
          }
@@ -8201,7 +8234,10 @@ function agregarRef(section) {
           <i data-lucide="check-circle" style="width:18px;height:18px;"></i>
         </div>
       </div>
-      <div class="ref-discrepancia-msg" style="flex-basis: 100%; width: 100%; font-size: 0.72rem; font-weight: 500; margin-top: 0.3rem; margin-bottom: 0.15rem; padding: 0.25rem 0.6rem; border-radius: 6px; display: none; align-items: center; gap: 0.35rem; transition: all 0.2s ease;"></div>`;
+      <div class="ref-discrepancia-msg" style="flex-basis: 100%; width: 100%; font-size: 0.72rem; font-weight: 500; margin-top: 0.3rem; margin-bottom: 0.15rem; padding: 0.25rem 0.6rem; border-radius: 6px; display: none; align-items: center; gap: 0.35rem; transition: all 0.2s ease;"></div>
+      <div class="ref-discrepancia-justificacion-container" style="flex-basis: 100%; width: 100%; display: none; margin-top: 0.25rem; margin-bottom: 0.25rem;">
+        <input type="text" class="ref-justificacion-discrepancia" placeholder="Explique el motivo de la discrepancia (Obligatorio)..." style="width: 100%; font-size: 0.75rem; padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; background: var(--bg-hover); color: var(--text-primary);" />
+      </div>`;
   }
   
   html += `<button type="button" class="btn-del-ref" onclick="eliminarRef(this)">✕</button>`;
@@ -8264,9 +8300,11 @@ window.actualizarFilaDiscrepanciaRefaccion = function(row) {
     const originalCant = parseFloat(row.getAttribute('data-original-pdf-cantidad') || 0);
     const diff = cant - originalCant;
     const msgEl = row.querySelector('.ref-discrepancia-msg');
+    const justEl = row.querySelector('.ref-discrepancia-justificacion-container');
     if (msgEl) {
       if (diff !== 0) {
         msgEl.style.display = 'inline-flex';
+        if (justEl) justEl.style.display = 'block';
         if (cant === 0) {
           msgEl.style.background = '#fef2f2';
           msgEl.style.border = '1px solid #fee2e2';
@@ -8281,6 +8319,11 @@ window.actualizarFilaDiscrepanciaRefaccion = function(row) {
         if (window.lucide) window.lucide.createIcons({ root: msgEl });
       } else {
         msgEl.style.display = 'none';
+        if (justEl) {
+          justEl.style.display = 'none';
+          const justInput = justEl.querySelector('.ref-justificacion-discrepancia');
+          if (justInput) justInput.value = '';
+        }
       }
     }
   }
@@ -8313,6 +8356,7 @@ function getRefacciones(section) {
       const originalCant = parseFloat(row.getAttribute('data-original-pdf-cantidad') || 0);
       item.originalPdfCantidad = originalCant;
       item.diferenciaCantidadPdf = item.cantidad - originalCant;
+      item.justificacion_discrepancia = row.querySelector('.ref-justificacion-discrepancia')?.value?.trim() || null;
     }
     
     result.push(item);
@@ -8411,6 +8455,10 @@ function setRefacciones(section, items) {
       });
       
       row.setAttribute('title', `Refacción extraída de PDF AI (Original: ${originalCant}. Se puede modificar la cantidad)`);
+      if (item.justificacion_discrepancia) {
+        const justInput = row.querySelector('.ref-justificacion-discrepancia');
+        if (justInput) justInput.value = item.justificacion_discrepancia;
+      }
     }
     
     // Ejecutar validación inicial de discrepancia y visibilidad de foto
@@ -9123,6 +9171,23 @@ async function guardarOrden(e) {
         return;
       }
     }
+  }
+
+  // VALIDACIÓN: Justificación de discrepancia obligatoria
+  const refConDiscrepanciaSinJustificar = orden.ref_utilizadas.find(ref => 
+    ref.isFromPdf && 
+    parseFloat(ref.cantidad || 0) !== parseFloat(ref.originalPdfCantidad || 0) && 
+    (!ref.justificacion_discrepancia || !ref.justificacion_discrepancia.trim())
+  );
+
+  if (refConDiscrepanciaSinJustificar) {
+    if (window.mostrarNotificacion) {
+      window.mostrarNotificacion(`Es obligatorio ingresar el motivo de la discrepancia para la refacción: ${refConDiscrepanciaSinJustificar.descripcion}`, 'error');
+    } else {
+      alert(`Es obligatorio ingresar el motivo de la discrepancia para la refacción: ${refConDiscrepanciaSinJustificar.descripcion}`);
+    }
+    restoreBtn();
+    return;
   }
 
   if (oVieja) {
@@ -11965,8 +12030,8 @@ function updateTicketBadge() {
   }
   
   if (tecFilter || supFilter) {
-    const tecNameLower = tecFilter ? tecFilter.toLowerCase().trim() : '';
-    const supNameLower = supFilter ? supFilter.toLowerCase().trim() : '';
+    const tecNameLower = tecFilter ? window.normStr(tecFilter) : '';
+    const supNameLower = supFilter ? window.normStr(supFilter) : '';
     filtered = filtered.filter(t => {
       let passTec = true;
       let passSup = true;
@@ -11975,29 +12040,29 @@ function updateTicketBadge() {
          let assigned = [];
          if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
          else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
-         const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
+         const assignedLower = assigned.map(s => window.normStr(s));
          passTec = assignedLower.includes(tecNameLower) || 
-                   (t.solicitante && String(t.solicitante).toLowerCase().trim() === tecNameLower) || 
-                   (t.creadoPor && String(t.creadoPor).toLowerCase().trim() === tecNameLower);
+                   (t.solicitante && window.normStr(t.solicitante) === tecNameLower) || 
+                   (t.creadoPor && window.normStr(t.creadoPor) === tecNameLower);
       }
       
       if (supFilter && supNameLower) {
          let passSupClient = false;
          const cli = clientesDb.find(c => c.nombre === t.cliente);
          if (cli) {
-            const supUser = usuarios.find(u => (u.nombre && u.nombre.toLowerCase().trim() === supNameLower) || u.id === supFilter);
+            const supUser = usuarios.find(u => u && ((u.nombre && window.normStr(u.nombre) === supNameLower) || u.id === supFilter));
             const supId = supUser ? supUser.id : supFilter;
-            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
+            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (window.normStr(cli.supervisorAsignado) === supNameLower) || (cli.supervisorAsignado === supFilter);
          }
          
          let assigned = [];
          if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
          else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
-         const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
+         const assignedLower = assigned.map(s => window.normStr(s));
          
          let passSupTicket = assignedLower.includes(supNameLower) || 
-                             (t.solicitante && String(t.solicitante).toLowerCase().trim() === supNameLower) || 
-                             (t.creadoPor && String(t.creadoPor).toLowerCase().trim() === supNameLower);
+                             (t.solicitante && window.normStr(t.solicitante) === supNameLower) || 
+                             (t.creadoPor && window.normStr(t.creadoPor) === supNameLower);
          
          passSup = passSupClient || passSupTicket;
       }
@@ -12061,8 +12126,8 @@ function updateOrdenesBadge() {
   }
 
   if (tecFilter || supFilter) {
-    const tecNameLower = tecFilter.toLowerCase().trim();
-    const supNameLower = supFilter.toLowerCase().trim();
+    const tecNameLower = tecFilter ? window.normStr(tecFilter) : '';
+    const supNameLower = supFilter ? window.normStr(supFilter) : '';
     
     filtered = filtered.filter(o => {
       let passTec = true;
@@ -12072,7 +12137,7 @@ function updateOrdenesBadge() {
          let assigned = [];
          if (o.tecnico_asignado) assigned = String(o.tecnico_asignado).split(',').map(s=>s.trim());
          else if (o.tecnico) assigned = String(o.tecnico).split(',').map(s=>s.trim());
-         const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
+         const assignedLower = assigned.map(s => window.normStr(s));
          passTec = assignedLower.includes(tecNameLower);
       }
       
@@ -12080,9 +12145,9 @@ function updateOrdenesBadge() {
          let passSupClient = false;
          const cli = clientesDb.find(c => c.nombre === o.cliente);
          if (cli) {
-            const supUser = usuarios.find(u => (u.nombre && u.nombre.toLowerCase().trim() === supNameLower) || u.id === supFilter);
+            const supUser = usuarios.find(u => u && ((u.nombre && window.normStr(u.nombre) === supNameLower) || u.id === supFilter));
             const supId = supUser ? supUser.id : supFilter;
-            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
+            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (window.normStr(cli.supervisorAsignado) === supNameLower) || (cli.supervisorAsignado === supFilter);
          }
          passSup = passSupClient;
       }
@@ -12205,8 +12270,15 @@ function actualizarFiltrosPersonal() {
     
     selectsTecnico.forEach(sel => { 
       if(sel) { 
-        const val = isTecnico ? userName : sel.value; 
+        let val = isTecnico ? userName : sel.value; 
         sel.innerHTML = tecOptionsHtml; 
+        if (val) {
+          const normalizedVal = window.normStr(val);
+          const matchedOption = Array.from(sel.options).find(opt => window.normStr(opt.value) === normalizedVal);
+          if (matchedOption) {
+            val = matchedOption.value;
+          }
+        }
         sel.value = val; 
         sel.disabled = isTecnico;
       } 
@@ -12215,13 +12287,20 @@ function actualizarFiltrosPersonal() {
     selectsSupervisor.forEach(sel => { 
       if(sel) { 
         let val = sel.value;
-        const isFirstLoad = sel.options.length === 0;
+        const isFirstLoad = sel.options.length <= 1;
         if (isSupervisor && isFirstLoad) {
           val = userName;
         } else if (isTecnico) {
           val = '';
         }
         sel.innerHTML = supOptionsHtml; 
+        if (val) {
+          const normalizedVal = window.normStr(val);
+          const matchedOption = Array.from(sel.options).find(opt => window.normStr(opt.value) === normalizedVal);
+          if (matchedOption) {
+            val = matchedOption.value;
+          }
+        }
         sel.value = val; 
         sel.disabled = isTecnico;
       } 
@@ -12417,8 +12496,8 @@ function renderTickets(ctx) {
     }
     
     if (tecFilter || supFilter) {
-      const tecNameLower = tecFilter ? tecFilter.toLowerCase().trim() : '';
-      const supNameLower = supFilter ? supFilter.toLowerCase().trim() : '';
+      const tecNameLower = tecFilter ? window.normStr(tecFilter) : '';
+      const supNameLower = supFilter ? window.normStr(supFilter) : '';
       
       filtered = filtered.filter(t => {
         if (!t) return false;
@@ -12429,29 +12508,29 @@ function renderTickets(ctx) {
            let assigned = [];
            if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
            else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
-           const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
+           const assignedLower = assigned.map(s => window.normStr(s));
            passTec = assignedLower.includes(tecNameLower) || 
-                     (t.solicitante && String(t.solicitante).toLowerCase().trim() === tecNameLower) || 
-                     (t.creadoPor && String(t.creadoPor).toLowerCase().trim() === tecNameLower);
+                     (t.solicitante && window.normStr(t.solicitante) === tecNameLower) || 
+                     (t.creadoPor && window.normStr(t.creadoPor) === tecNameLower);
         }
         
         if (supFilter && supNameLower) {
            let passSupClient = false;
            const cli = clientesDb.find(c => c && c.nombre === t.cliente);
            if (cli) {
-              const supUser = usuarios.find(u => u && ((u.nombre && u.nombre.toLowerCase().trim() === supNameLower) || u.id === supFilter));
+              const supUser = usuarios.find(u => u && ((u.nombre && window.normStr(u.nombre) === supNameLower) || u.id === supFilter));
               const supId = supUser ? supUser.id : supFilter;
-              passSupClient = (cli.supervisoresAsignados && Array.isArray(cli.supervisoresAsignados) && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (cli.supervisorAsignado === supFilter);
+              passSupClient = (cli.supervisoresAsignados && Array.isArray(cli.supervisoresAsignados) && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (window.normStr(cli.supervisorAsignado) === supNameLower) || (cli.supervisorAsignado === supFilter);
            }
            
            let assigned = [];
            if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(resolveTecnicoNombre);
            else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
-           const assignedLower = assigned.map(s => String(s).toLowerCase().trim());
+           const assignedLower = assigned.map(s => window.normStr(s));
            
            let passSupTicket = assignedLower.includes(supNameLower) || 
-                               (t.solicitante && String(t.solicitante).toLowerCase().trim() === supNameLower) || 
-                               (t.creadoPor && String(t.creadoPor).toLowerCase().trim() === supNameLower);
+                               (t.solicitante && window.normStr(t.solicitante) === supNameLower) || 
+                               (t.creadoPor && window.normStr(t.creadoPor) === supNameLower);
            
            passSup = passSupClient || passSupTicket;
         }
@@ -13979,7 +14058,13 @@ window.poblarCotizacionesDropdown = async function(isModal = true, ticketId = nu
   try {
     // Si no tenemos cache o está vacío, cargamos de supabase
     if (!window._cacheCotizacionesSap || window._cacheCotizacionesSap.length === 0) {
-      const { data, error } = await sb.from('cotizaciones_sap').select('*').order('numero_cotizacion', { ascending: false });
+      let data = [];
+      let error = null;
+      try {
+        data = await window.fetchTablePaginated('cotizaciones_sap', '*', 'numero_cotizacion', false);
+      } catch (err) {
+        error = err;
+      }
       if (!error && data) {
         window._cacheCotizacionesSap = data;
         await window.saveCatalogOffline('eurorep_cotizaciones_sap', data);
@@ -14046,7 +14131,13 @@ window.poblarPedidosDropdown = async function(isModal = true, ticketId = null, s
 
   try {
     if (!window._cachePedidosSap || window._cachePedidosSap.length === 0) {
-      const { data, error } = await sb.from('pedidos_sap').select('*').order('numero_pedido', { ascending: false });
+      let data = [];
+      let error = null;
+      try {
+        data = await window.fetchTablePaginated('pedidos_sap', '*', 'numero_pedido', false);
+      } catch (err) {
+        error = err;
+      }
       if (!error && data) {
         window._cachePedidosSap = data;
         await window.saveCatalogOffline('eurorep_pedidos_sap', data);
@@ -15764,6 +15855,53 @@ function abrirTicket(id) {
   document.body.style.overflow = 'hidden';
 }
 
+window.abrirTicketPreloaded = function(datos) {
+  // 1. Abrir ticket en modo creación
+  abrirTicket(null);
+  
+  // 2. Rellenar los campos con los datos
+  if (datos.asunto) {
+    document.getElementById('t-asunto').value = datos.asunto;
+  }
+  if (datos.solicitante) {
+    document.getElementById('t-solicitante').value = datos.solicitante;
+  }
+  if (datos.cliente) {
+    selectComboOption('t-cliente', datos.cliente, datos.cliente);
+  }
+  if (datos.sitio) {
+    const escapedSitio = datos.sitio.replace(/'/g, "\\'");
+    selectComboOption('t-sitio', escapedSitio, escapedSitio, true);
+  }
+  if (datos.descripcion) {
+    document.getElementById('t-descripcion').value = datos.descripcion;
+  }
+  if (datos.notas) {
+    document.getElementById('t-notas').value = datos.notas;
+  }
+  if (datos.prioridad) {
+    document.getElementById('t-prioridad').value = datos.prioridad;
+  }
+  if (datos.categoria) {
+    document.getElementById('t-categoria').value = datos.categoria;
+  }
+  
+  // 3. Seleccionar equipos (maquinaria) si vienen
+  if (datos.equipo) {
+    poblarMaquinasCliente('t-equipo', '', datos.cliente);
+    datos.equipo.split(', ').forEach(eqName => {
+      if (eqName.trim()) {
+        window.agregarMaquinaChip(eqName.trim());
+      }
+    });
+  }
+  
+  // 4. Inicializar refacciones si vienen
+  if (datos.refaccionesSeleccionadas && window.inicializarRefaccionesTicket) {
+    window.inicializarRefaccionesTicket(null, datos.refaccionesSeleccionadas);
+  }
+};
+
 function toggleResolucionTicket() {
   const estado = document.querySelector('input[name="t-estado"]:checked')?.value;
   const isCotizacion = estado === 'Cotización';
@@ -15806,6 +15944,7 @@ function cerrarTicket(e) {
   document.getElementById('t-cliente-combo')?.classList.remove('focus');
   document.body.style.overflow = '';
   editandoTicketId = null;
+  window._levantamientoDeOrigen = null;
 }
 
 // ===== HELPER MAQUINARIA Y TICKETS =====
@@ -16736,6 +16875,22 @@ async function guardarTicket(e) {
       mostrarNotificacion('Orden de servicio pre-cargada y generada.', 'success');
       if (typeof renderTabla === 'function') renderTabla('servicios');
     }
+  }
+  if (window._levantamientoDeOrigen) {
+    const lev = window._levantamientoDeOrigen;
+    lev.estado = 'Completado';
+    lev.ticket_generado_id = ticket.id;
+    lev._synced = false;
+    
+    if (typeof safeSetJSON === 'function') safeSetJSON('sapi_levantamientos', levantamientos);
+    if (window.supabaseClient && window.pushToSupabase) {
+      window.pushToSupabase('levantamientos', lev);
+    }
+    if (typeof renderLevantamientos === 'function') {
+      renderLevantamientos();
+    }
+    window._levantamientoDeOrigen = null;
+    mostrarNotificacion('Levantamiento completado y vinculado al ticket.', 'success');
   }
   if (window.trackTelemetryEvent) {
     const act = editandoTicketId ? 'Edición de Ticket' : 'Creación de Ticket';
@@ -18711,6 +18866,18 @@ window.abrirRegistrarActividad = function() {
   const activeOrds = getFilteredOrders().filter(o => o.estado !== 'Finalizado');
   selectOrden.innerHTML = '<option value="">Ninguna</option>' + activeOrds.map(o => `<option value="${o.id}">[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}</option>`).join('');
 
+  // Limpiar campos de traslado
+  if (document.getElementById('mra-fecha-inicio-traslado')) {
+    document.getElementById('mra-fecha-inicio-traslado').value = '';
+    document.getElementById('mra-hora-inicio').value = '';
+    document.getElementById('mra-horas-traslado').value = '';
+    document.getElementById('mra-fecha-fin-regreso-date').value = '';
+    document.getElementById('mra-hora-fin-regreso').value = '';
+    document.getElementById('mra-horas-regreso').value = '';
+    document.getElementById('mra-traslado-section').style.display = 'none';
+    document.getElementById('mra-btn-toggle-traslado').style.display = 'none';
+  }
+
   document.getElementById('modal-registrar-actividad-overlay').classList.add('open');
   if (window.lucide) {
     window.lucide.createIcons({ root: document.getElementById('modal-registrar-actividad') });
@@ -18752,6 +18919,39 @@ window.mostrarDetalleEventoAdministrativo = function(eventId) {
   document.getElementById('mra-inicio').value = cleanDateForInput(e.fechaInicio || e.start);
   document.getElementById('mra-fin').value = cleanDateForInput(e.fechaFin || e.end);
 
+  // Llenar campos de traslado si existen
+  if (document.getElementById('mra-fecha-inicio-traslado')) {
+    let bitacoraEntry = null;
+    if (e.ordenId) {
+      const ord = ordenes.find(o => o.id === e.ordenId);
+      if (ord && ord.bitacora) {
+        bitacoraEntry = ord.bitacora.find(b => b.id === e.id);
+      }
+    }
+    const hasTraslado = bitacoraEntry && (bitacoraEntry.horas_traslado || bitacoraEntry.horas_regreso || bitacoraEntry.fecha_inicio_traslado || bitacoraEntry.fecha_fin_regreso);
+    if (hasTraslado) {
+      document.getElementById('mra-fecha-inicio-traslado').value = bitacoraEntry.fecha_inicio_traslado || '';
+      document.getElementById('mra-hora-inicio').value = bitacoraEntry.hora_inicio || '';
+      document.getElementById('mra-horas-traslado').value = bitacoraEntry.horas_traslado || '';
+      document.getElementById('mra-fecha-fin-regreso-date').value = bitacoraEntry.fecha_fin_regreso || '';
+      document.getElementById('mra-hora-fin-regreso').value = bitacoraEntry.hora_fin_regreso || '';
+      document.getElementById('mra-horas-regreso').value = bitacoraEntry.horas_regreso || '';
+      
+      document.getElementById('mra-traslado-section').style.display = 'block';
+      document.getElementById('mra-btn-toggle-traslado').style.display = 'none';
+    } else {
+      document.getElementById('mra-fecha-inicio-traslado').value = '';
+      document.getElementById('mra-hora-inicio').value = '';
+      document.getElementById('mra-horas-traslado').value = '';
+      document.getElementById('mra-fecha-fin-regreso-date').value = '';
+      document.getElementById('mra-hora-fin-regreso').value = '';
+      document.getElementById('mra-horas-regreso').value = '';
+      
+      document.getElementById('mra-traslado-section').style.display = 'none';
+      document.getElementById('mra-btn-toggle-traslado').style.display = e.ordenId ? 'flex' : 'none';
+    }
+  }
+
   // Mostrar botón de eliminar solo para administradores y supervisores
   const isAdmin = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
   document.getElementById('mra-btn-eliminar').style.display = isAdmin ? 'inline-flex' : 'none';
@@ -18776,6 +18976,61 @@ window.guardarActividadCalendario = async function() {
   if (!titulo || !inicio) {
     alert("Por favor completa los campos requeridos (Título y Fecha de Inicio).");
     return;
+  }
+
+  // Get travel inputs if they exist
+  const mraFechaInicioTraslado = document.getElementById('mra-fecha-inicio-traslado') ? document.getElementById('mra-fecha-inicio-traslado').value : null;
+  const mraHoraInicio = document.getElementById('mra-hora-inicio') ? document.getElementById('mra-hora-inicio').value : null;
+  const mraHorasTraslado = document.getElementById('mra-horas-traslado') ? document.getElementById('mra-horas-traslado').value : null;
+  const mraFechaFinRegresoDate = document.getElementById('mra-fecha-fin-regreso-date') ? document.getElementById('mra-fecha-fin-regreso-date').value : null;
+  const mraHoraFinRegreso = document.getElementById('mra-hora-fin-regreso') ? document.getElementById('mra-hora-fin-regreso').value : null;
+  const mraHorasRegreso = document.getElementById('mra-horas-regreso') ? document.getElementById('mra-horas-regreso').value : null;
+
+  // Validations for travel times
+  if (ordenId && (mraFechaInicioTraslado || mraHoraInicio || mraHorasTraslado)) {
+    const fechaISO = inicio.substring(0, 10);
+    let entrada = '';
+    if (inicio) {
+      const dIni = new Date(inicio);
+      entrada = `${String(dIni.getHours()).padStart(2, '0')}:${String(dIni.getMinutes()).padStart(2, '0')}`;
+    }
+    const dEntrada = new Date(`${fechaISO}T${entrada || '23:59'}`);
+    const dInicioTraslado = new Date(`${mraFechaInicioTraslado || fechaISO}T${mraHoraInicio || '00:00'}`);
+    
+    if (dInicioTraslado > dEntrada) {
+      if (window.mostrarNotificacion) window.mostrarNotificacion("El inicio del traslado de ida no puede ser después de que comience el servicio.", "error");
+      else alert("El inicio del traslado de ida no puede ser después de que comience el servicio.");
+      return;
+    }
+
+    if (mraHoraInicio && mraHorasTraslado && entrada) {
+      const minLlegada = horaAMinutos(mraHoraInicio) + (parseFloat(mraHorasTraslado) * 60);
+      const dLlegada = new Date(`${mraFechaInicioTraslado || fechaISO}T00:00`);
+      dLlegada.setMinutes(dLlegada.getMinutes() + minLlegada);
+
+      if (dEntrada < dLlegada) {
+        if (window.mostrarNotificacion) window.mostrarNotificacion("No se puede empezar el servicio antes de la llegada estimada del traslado de ida.", "error");
+        else alert("No se puede empezar el servicio antes de la llegada estimada del traslado de ida.");
+        return;
+      }
+    }
+  }
+
+  if (ordenId && (mraFechaFinRegresoDate || mraHoraFinRegreso || mraHorasRegreso)) {
+    const fechaISO = inicio.substring(0, 10);
+    let salida = '';
+    if (fin) {
+      const dFin = new Date(fin);
+      salida = `${String(dFin.getHours()).padStart(2, '0')}:${String(dFin.getMinutes()).padStart(2, '0')}`;
+    }
+    const dSalida = new Date(`${fechaISO}T${salida || '00:00'}`);
+    const dInicioRegreso = new Date(`${mraFechaFinRegresoDate || fechaISO}T${mraHoraFinRegreso || '23:59'}`);
+    
+    if (dInicioRegreso < dSalida) {
+      if (window.mostrarNotificacion) window.mostrarNotificacion("No se puede iniciar el traslado de regreso antes de terminar el servicio.", "error");
+      else alert("No se puede iniciar el traslado de regreso antes de terminar el servicio.");
+      return;
+    }
   }
 
   let tecnicoNombre = null;
@@ -18848,6 +19103,12 @@ window.guardarActividadCalendario = async function() {
           nota: descripcion || "Programado por supervisor. Pendiente de llenado por el técnico.",
           entrada: entrada,
           salida: salida,
+          fecha_inicio_traslado: mraFechaInicioTraslado || null,
+          hora_inicio: mraHoraInicio || null,
+          horas_traslado: mraHorasTraslado ? parseFloat(mraHorasTraslado) : null,
+          fecha_fin_regreso: mraFechaFinRegresoDate || null,
+          hora_fin_regreso: mraHoraFinRegreso || null,
+          horas_regreso: mraHorasRegreso ? parseFloat(mraHorasRegreso) : null,
           realizado: false,
           asignadoPorName: activeUserName,
           asignadoPorId: activeUserId
@@ -26995,7 +27256,13 @@ async function confirmarFusionClientes() {
   if (sb) {
     (async () => {
       try {
-        const { data: supaOrds, error: fetchErr } = await sb.from('ordenes').select('*');
+        let supaOrds = [];
+        let fetchErr = null;
+        try {
+          supaOrds = await window.fetchTablePaginated('ordenes', '*');
+        } catch (err) {
+          fetchErr = err;
+        }
         if (!fetchErr && supaOrds && supaOrds.length > 0) {
           const sSeen = new Map();
           const sDupIds = [];
@@ -27706,7 +27973,8 @@ window.renderChatSoporteEmpresa = function() {
   const listContainer = document.getElementById('chat-client-list');
   if (!listContainer) return;
 
-  const chatTickets = tickets.filter(t => t.categoria === 'Soporte General');
+  const activeSandbox = isTestModeActive();
+  const chatTickets = tickets.filter(t => t.categoria === 'Soporte General' && isTestData(t) === activeSandbox);
 
   if (chatTickets.length === 0) {
     listContainer.innerHTML = `
@@ -27905,6 +28173,36 @@ function dispararInicializacionGlobal() {
     inicializarPasswordRecovery();
   } catch (err) {
     console.error('Error al inicializar recuperación de contraseña:', err);
+  }
+
+  // Listener para el campo de orden en el modal registrar actividad
+  try {
+    const mraOrden = document.getElementById('mra-orden');
+    if (mraOrden) {
+      mraOrden.addEventListener('change', function() {
+        const ordenId = this.value;
+        const btnToggle = document.getElementById('mra-btn-toggle-traslado');
+        const sectTraslado = document.getElementById('mra-traslado-section');
+        if (ordenId) {
+          if (sectTraslado && sectTraslado.style.display !== 'block') {
+            if (btnToggle) btnToggle.style.display = 'flex';
+          }
+        } else {
+          if (btnToggle) btnToggle.style.display = 'none';
+          if (sectTraslado) sectTraslado.style.display = 'none';
+          if (document.getElementById('mra-fecha-inicio-traslado')) {
+            document.getElementById('mra-fecha-inicio-traslado').value = '';
+            document.getElementById('mra-hora-inicio').value = '';
+            document.getElementById('mra-horas-traslado').value = '';
+            document.getElementById('mra-fecha-fin-regreso-date').value = '';
+            document.getElementById('mra-hora-fin-regreso').value = '';
+            document.getElementById('mra-horas-regreso').value = '';
+          }
+        }
+      });
+    }
+  } catch (err) {
+    console.error('Error al inicializar listener de mra-orden:', err);
   }
 
   // Temporary cleanup and migration for OS-PRUEBA-002

@@ -1,15 +1,21 @@
-const CACHE_NAME = 'eurorep-postventa-v293';
+const CACHE_NAME = 'eurorep-postventa-v294';
 const ASSETS = [
   '/',
   '/index.html',
-  '/app.js?v=53',
-  '/style.css?v=53',
+  '/app.js',
+  '/style.css',
   '/cliente',
-  '/cliente.css?v=53',
-  '/cliente.js?v=53',
-  '/supabaseSync.js?v=53',
-  '/supabaseClient.js?v=53',
+  '/cliente.html',
+  '/cliente.css',
+  '/cliente.js',
+  '/supabaseSync.js',
+  '/supabaseClient.js',
+  '/levantamientos.js',
+  '/tecnicos_reporte.js',
+  '/logo_transparent.png',
   '/Logo_de_Clara.svg',
+  'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
   'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
   'https://unpkg.com/lucide@latest/dist/umd/lucide.min.js',
@@ -67,8 +73,8 @@ self.addEventListener('fetch', e => {
         return response;
       })
       .catch(() => {
-        // Estrategia Offline Fallback en caché
-        return caches.match(e.request).then(cachedResponse => {
+        // Estrategia Offline Fallback en caché (ignorar parámetros de consulta como ?v=...)
+        return caches.match(e.request, { ignoreSearch: true }).then(cachedResponse => {
           if (cachedResponse) {
             return cachedResponse;
           }

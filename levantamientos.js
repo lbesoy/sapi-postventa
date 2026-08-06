@@ -81,7 +81,7 @@ function renderLevantamientos() {
       <td data-label="Asignado A">${l.tecnico_asignado || '-'}</td>
       <td data-label="Fecha Esperada">${l.fecha_esperada ? l.fecha_esperada.substring(0,10) : 'N/A'}</td>
       <td data-label="Estado">
-        <span style="font-size:0.75rem; font-weight:700; padding:0.25rem 0.6rem; border-radius:999px; ${l.estado === 'Completado' ? 'background:rgba(16, 185, 129, 0.1); color:#10b981;' : 'background:rgba(239, 68, 68, 0.1); color:#ef4444;'}">${l.estado || 'Pendiente'}</span>
+        <span style="font-size:0.75rem; font-weight:700; padding:0.25rem 0.6rem; border-radius:999px; ${l.estado === 'Completado' ? 'background:rgba(16, 185, 129, 0.1); color:#10b981;' : (l.estado === 'Realizado' ? 'background:rgba(245, 158, 11, 0.1); color:#f59e0b;' : 'background:rgba(239, 68, 68, 0.1); color:#ef4444;')}">${l.estado || 'Pendiente'}</span>
       </td>
       <td data-label="Acciones">
         <button class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.8rem;" onclick="verDetalleLevantamiento('${l.id}')">Ver Detalle</button>
@@ -145,6 +145,13 @@ function window_abrirModalNuevoLevantamiento() {
       </div>
       
       <div style="margin-bottom:1rem;">
+        <label style="display:block; font-weight:600; margin-bottom:0.25rem;">Máquina</label>
+        <select id="nl-maquina" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border);">
+          <option value="">Seleccione una máquina registrada...</option>
+        </select>
+      </div>
+      
+      <div style="margin-bottom:1rem;">
         <label style="display:block; font-weight:600; margin-bottom:0.25rem;">Solicitante</label>
         <input type="text" id="nl-solicitante" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border);" placeholder="Nombre de quien solicita">
       </div>
@@ -198,29 +205,54 @@ function window_abrirModalNuevoLevantamiento() {
   if (typeof window.initSearchableSelect === 'function') {
     window.initSearchableSelect('nl-cliente', 'Buscar cliente...');
     window.initSearchableSelect('nl-sitio', 'Buscar sitio...', true);
+    window.initSearchableSelect('nl-maquina', 'Buscar máquina...', true);
   }
 }
 
 window.actualizarSitiosNuevoLevantamiento = function(cliName) {
   const sitSelect = document.getElementById('nl-sitio');
-  if (!sitSelect) return;
-  
-  sitSelect.innerHTML = '<option value="">Seleccione o busque un sitio...</option>';
-  
-  if (cliName && typeof sitiosDb !== 'undefined') {
-    const cliObj = (typeof clientesDb !== 'undefined' ? clientesDb.find(c => c.nombre === cliName) : null);
-    const cliId = cliObj ? cliObj.id : null;
-    const sit = sitiosDb.filter(s => s.cliente === cliName || s.cliente === cliId);
-    sit.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s.nombre;
-      opt.textContent = s.nombre;
-      sitSelect.appendChild(opt);
-    });
+  if (sitSelect) {
+    sitSelect.innerHTML = '<option value="">Seleccione o busque un sitio...</option>';
+    if (cliName && typeof sitiosDb !== 'undefined') {
+      const cliObj = (typeof clientesDb !== 'undefined' ? clientesDb.find(c => c.nombre === cliName) : null);
+      const cliId = cliObj ? cliObj.id : null;
+      const sit = sitiosDb.filter(s => s.cliente === cliName || s.cliente === cliId);
+      sit.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.nombre;
+        opt.textContent = s.nombre;
+        sitSelect.appendChild(opt);
+      });
+    }
+    if (typeof window.initSearchableSelect === 'function') {
+      window.initSearchableSelect('nl-sitio', 'Buscar sitio...', true);
+    }
   }
-  
-  if (typeof window.initSearchableSelect === 'function') {
-    window.initSearchableSelect('nl-sitio', 'Buscar sitio...', true);
+
+  const maqSelect = document.getElementById('nl-maquina');
+  if (maqSelect) {
+    maqSelect.innerHTML = '<option value="">Seleccione una máquina registrada...</option>';
+    if (cliName && typeof clientesDb !== 'undefined') {
+      const cliObj = (typeof clientesDb !== 'undefined' ? clientesDb.find(c => c.nombre === cliName) : null);
+      if (cliObj && cliObj.maquinas) {
+        cliObj.maquinas.forEach(m => {
+          const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCNELIUS':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+          const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+          const cleanId = m.idInterno || m.id || '';
+          const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+          const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+          const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+          
+          const opt = document.createElement('option');
+          opt.value = m.id || m.serie || m.idInterno;
+          opt.textContent = mName;
+          maqSelect.appendChild(opt);
+        });
+      }
+    }
+    if (typeof window.initSearchableSelect === 'function') {
+      window.initSearchableSelect('nl-maquina', 'Buscar máquina...', true);
+    }
   }
 };
 
@@ -246,6 +278,7 @@ function guardarNuevoLevantamiento(id, folio) {
     folio,
     cliente,
     sitio: document.getElementById('nl-sitio').value,
+    maquina: document.getElementById('nl-maquina').value,
     solicitante: document.getElementById('nl-solicitante').value,
     descripcion,
     fecha_esperada: document.getElementById('nl-fecha').value,
@@ -281,24 +314,52 @@ function verDetalleLevantamiento(id) {
   m.style.alignItems = 'center'; m.style.justifyContent = 'center'; m.style.zIndex = '99999';
   
   const isCompleted = lev.estado === 'Completado';
-  
+  const isTecnico = (typeof currentSession !== 'undefined' && currentSession.viewMode === 'tecnico');
+  const canEdit = !isCompleted && !(isTecnico && lev.estado === 'Realizado');
+
+  // Resolver nombre completo de la máquina
+  let maqName = '-';
+  if (lev.maquina) {
+    try {
+      const maquinas = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
+      const m = maquinas.find(x => x.id === lev.maquina || x.serie === lev.maquina || x.idInterno === lev.maquina);
+      if (m) {
+        const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCNELIUS':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+        const cleanId = m.idInterno || m.id || '';
+        const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+        const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+        const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+        maqName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+      }
+    } catch(e) {}
+  }
+
+  // Estilo del Estado
+  let statusStyle = 'background:rgba(239, 68, 68, 0.1); color:#ef4444;';
+  if (lev.estado === 'Completado') {
+    statusStyle = 'background:rgba(16, 185, 129, 0.1); color:#10b981;';
+  } else if (lev.estado === 'Realizado') {
+    statusStyle = 'background:rgba(245, 158, 11, 0.1); color:#f59e0b;';
+  }
+
   m.innerHTML = `
     <div style="background:var(--bg-card); border-radius:12px; width:100%; max-width:600px; box-shadow:var(--shadow-lg); max-height:90vh; display:flex; flex-direction:column; overflow:hidden;">
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding:1.5rem 2rem;">
         <h2 style="margin:0;">Levantamiento ${lev.folio}</h2>
-        <span style="font-size:0.8rem; font-weight:700; padding:0.25rem 0.6rem; border-radius:999px; ${isCompleted ? 'background:rgba(16, 185, 129, 0.1); color:#10b981;' : 'background:rgba(239, 68, 68, 0.1); color:#ef4444;'}">${lev.estado}</span>
+        <span style="font-size:0.8rem; font-weight:700; padding:0.25rem 0.6rem; border-radius:999px; ${statusStyle}">${lev.estado || 'Pendiente'}</span>
       </div>
       
       <div style="padding:1.5rem 2rem; overflow-y:auto; flex:1;">
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.5rem;">
         <div><strong style="color:var(--text-secondary);font-size:0.8rem;">Cliente</strong><br>${lev.cliente}</div>
         <div><strong style="color:var(--text-secondary);font-size:0.8rem;">Sitio</strong><br>${lev.sitio || '-'}</div>
+        <div><strong style="color:var(--text-secondary);font-size:0.8rem;">Máquina</strong><br>${maqName}</div>
         <div><strong style="color:var(--text-secondary);font-size:0.8rem;">Solicitante</strong><br>${lev.solicitante || '-'}</div>
         <div><strong style="color:var(--text-secondary);font-size:0.8rem;">Fecha Esperada</strong><br>${lev.fecha_esperada || '-'}</div>
         <div style="grid-column: 1 / -1;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
             <strong style="color:var(--text-secondary);font-size:0.8rem;">Asignado A</strong>
-            ${!isCompleted ? `
+            ${canEdit ? `
             <div style="position:relative; width:150px;">
               <i data-lucide="search" style="position:absolute; left:6px; top:50%; transform:translateY(-50%); width:12px; height:12px; color:var(--text-muted);"></i>
               <input type="text" placeholder="Buscar..." style="width:100%; padding:0.2rem 0.5rem 0.2rem 1.5rem; border-radius:4px; border:1px solid var(--border); font-size:0.75rem;" onkeyup="
@@ -313,7 +374,7 @@ function verDetalleLevantamiento(id) {
               ">
             </div>` : ''}
           </div>
-          ${isCompleted ? (lev.tecnico_asignado || '-') : `
+          ${!canEdit ? (lev.tecnico_asignado || '-') : `
             <div id="det-lev-asignado-container" style="display:flex; flex-wrap:wrap; gap:0.5rem; max-height:120px; overflow-y:auto; padding:0.25rem;">
               ${(typeof usuarios !== 'undefined' ? usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && u.activo !== false && ((typeof isTestModeActive === 'function' && isTestModeActive()) || !(typeof isTestUser === 'function' && isTestUser(u)))) : []).map(u => {
                 const assignedList = (lev.tecnico_asignado || '').split(',').map(s => s.trim());
@@ -337,20 +398,20 @@ function verDetalleLevantamiento(id) {
       
       <div style="margin-bottom:1.5rem;">
         <label style="display:block; font-weight:600; margin-bottom:0.25rem;">Notas del Técnico</label>
-        <textarea id="det-lev-notas" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border); min-height:80px;" ${isCompleted ? 'disabled' : ''}>${lev.notas_tecnico || ''}</textarea>
+        <textarea id="det-lev-notas" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border); min-height:80px;" ${!canEdit ? 'disabled' : ''}>${lev.notas_tecnico || ''}</textarea>
       </div>
 
       <div style="margin-bottom:1.5rem;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
           <label style="font-weight:600; margin:0;">Evidencia Fotográfica</label>
-          ${!isCompleted ? `
+          ${canEdit ? `
           <button type="button" class="btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="agregarEvidenciaLevantamiento()">
             <i data-lucide="plus" style="width:14px;height:14px;"></i> Añadir
           </button>
           ` : ''}
         </div>
         
-        ${!isCompleted ? `
+        ${canEdit ? `
           <div id="det-lev-ev-grid" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem; margin-bottom:0.5rem;">
             ${[1, 2].map(i => `
               <label style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1.5rem 1rem; border:2px dashed var(--border); border-radius:12px; cursor:pointer; background:var(--bg-body); transition:all 0.2s; position:relative; overflow:hidden;" onmouseover="if(!this.style.backgroundImage) { this.style.borderColor='var(--primary)'; this.style.background='var(--primary-light, #f8fafc)'; }" onmouseout="if(!this.style.backgroundImage) { this.style.borderColor='var(--border)'; this.style.background='var(--bg-body)'; }">
@@ -372,7 +433,7 @@ function verDetalleLevantamiento(id) {
               </a>
             `).join('')}
           </div>
-        ` : (isCompleted ? '<div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.25rem;">No se adjuntaron evidencias.</div>' : '')}
+        ` : (!canEdit ? '<div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.25rem;">No se adjuntaron evidencias.</div>' : '')}
       </div>
 
       <div style="margin-bottom:1.5rem;">
@@ -381,13 +442,13 @@ function verDetalleLevantamiento(id) {
           ${(lev.refacciones || []).map((r, i) => `
             <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-body); padding:0.5rem 0.75rem; border:1px solid var(--border); border-radius:6px; font-size:0.8rem;">
               <div><strong>${r.cantidad}x</strong> [${r.refaccion}] ${r.descripcion}</div>
-              ${!isCompleted ? `<button type="button" onclick="eliminarRefaccionLevantamiento('${id}', ${i})" style="color:var(--danger); background:none; border:none; cursor:pointer;"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>` : ''}
+              ${canEdit ? `<button type="button" onclick="eliminarRefaccionLevantamiento('${id}', ${i})" style="color:var(--danger); background:none; border:none; cursor:pointer;"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>` : ''}
             </div>
           `).join('')}
           ${(!lev.refacciones || lev.refacciones.length === 0) ? '<div style="font-size:0.8rem; color:var(--text-muted);">No se han agregado refacciones.</div>' : ''}
         </div>
         
-        ${!isCompleted ? `
+        ${canEdit ? `
         <div style="display:flex; gap:0.5rem; align-items:center; background:var(--bg-body); padding:0.5rem; border-radius:6px; border:1px dashed var(--border);">
           <select id="det-lev-nueva-ref" style="flex:1; padding:0.4rem; border-radius:4px; border:1px solid var(--border); font-size:0.8rem;">
             <option value="">-- Seleccionar Refacción --</option>
@@ -401,13 +462,23 @@ function verDetalleLevantamiento(id) {
       
       <div style="display:flex; justify-content:space-between; align-items:center; padding:1rem 2rem; border-top:1px solid var(--border); background:var(--bg-card);">
         <button type="button" class="btn-secondary" onclick="document.getElementById('modal-detalle-levantamiento').remove()">Cerrar</button>
-        ${!isCompleted ? `<button type="button" class="btn-primary" onclick="completarLevantamiento('${id}')">Completar y Generar Ticket</button>` : ''}
+        ${
+          !isCompleted ? (
+            isTecnico ? (
+              lev.estado === 'Pendiente' ? `<button type="button" class="btn-primary" onclick="enviarARevisionLevantamiento('${id}')">Finalizar Levantamiento</button>` : ''
+            ) : (
+              lev.estado === 'Realizado' ? 
+                `<button type="button" class="btn-primary" onclick="completarLevantamiento('${id}')">Validar y Crear Ticket</button>` : 
+                `<button type="button" class="btn-primary" onclick="completarLevantamiento('${id}')">Completar y Generar Ticket</button>`
+            )
+          ) : ''
+        }
       </div>
     </div>
   `;
   document.body.appendChild(m);
   
-  if (!isCompleted && typeof window.initSearchableSelect === 'function') {
+  if (canEdit && typeof window.initSearchableSelect === 'function') {
     window.initSearchableSelect('det-lev-nueva-ref', 'Buscar refacción...');
   }
 }
@@ -508,6 +579,9 @@ window.agregarRefaccionLevantamiento = function(id) {
   lev.refacciones.push(ref);
   
   if (typeof safeSetJSON === 'function') safeSetJSON('sapi_levantamientos', levantamientos);
+  if (window.supabaseClient && window.pushToSupabase) {
+    window.pushToSupabase('levantamientos', lev);
+  }
   
   // Re-render modal details
   document.getElementById('modal-detalle-levantamiento').remove();
@@ -520,6 +594,9 @@ window.eliminarRefaccionLevantamiento = function(id, index) {
   
   lev.refacciones.splice(index, 1);
   if (typeof safeSetJSON === 'function') safeSetJSON('sapi_levantamientos', levantamientos);
+  if (window.supabaseClient && window.pushToSupabase) {
+    window.pushToSupabase('levantamientos', lev);
+  }
   
   // Re-render modal details
   document.getElementById('modal-detalle-levantamiento').remove();
@@ -549,10 +626,9 @@ window.completarLevantamiento = async function(id) {
   const lev = levantamientos.find(l => l.id === id);
   if (!lev) return;
   
-  if (!confirm('¿Estás seguro de completar este levantamiento? Se generará un ticket automáticamente para seguimiento y cierre.')) return;
+  if (!confirm('¿Estás seguro de completar este levantamiento? Se abrirá el formulario para crear un Ticket con la información precargada.')) return;
   
   lev.notas_tecnico = document.getElementById('det-lev-notas').value;
-  lev.estado = 'Completado';
   
   // Read evidences if any
   let filePromises = [];
@@ -596,44 +672,110 @@ window.completarLevantamiento = async function(id) {
     window.pushToSupabase('levantamientos', lev);
   }
   
-  // Generar Ticket Automático
-  const ticketId = (typeof uuidv4 === 'function') ? uuidv4() : crypto.randomUUID();
-  const ticketFolio = 'TCK-' + lev.folio;
-  const newTicket = {
-    id: ticketId,
-    folio: ticketFolio,
+  window._levantamientoDeOrigen = lev;
+
+  // Formatear datos para el ticket precargado
+  const datosTicket = {
     cliente: lev.cliente,
     sitio: lev.sitio,
-    solicitante: lev.solicitante,
+    solicitante: lev.solicitante || 'Sistema',
     asunto: 'Visita de Levantamiento - ' + lev.folio,
-    descripcion: lev.descripcion + '\\n\\nNotas: ' + lev.notas_tecnico,
-    categoria: 'Otro',
+    descripcion: lev.descripcion,
+    notas: 'Notas del técnico:\n' + lev.notas_tecnico,
     prioridad: 'Media',
-    estado: 'Cerrado (Aceptado)', // Para permitir generar orden de servicio
-    fecha: new Date().toISOString(),
-    fecha_creacion: new Date().toISOString(),
-    canal: 'Sistema',
-    notas: 'Ticket generado automáticamente desde módulo de Levantamientos.'
+    categoria: 'Otro',
+    refaccionesSeleccionadas: lev.refacciones || []
   };
+
+  // Resolver nombre completo de la máquina
+  if (lev.maquina) {
+    try {
+      const maquinas = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
+      const m = maquinas.find(x => x.id === lev.maquina || x.serie === lev.maquina || x.idInterno === lev.maquina);
+      if (m) {
+        const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+        const cleanId = m.idInterno || m.id || '';
+        const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+        const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+        const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+        datosTicket.equipo = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+      }
+    } catch (e) {}
+  }
+
+  // Cerrar modal actual
+  document.getElementById('modal-detalle-levantamiento').remove();
+
+  // Cambiar de vista a tickets
+  const navItem = document.querySelector('.nav-item[data-view="tickets"]');
+  if (navItem) {
+    navItem.click();
+  }
+
+  // Abrir modal de ticket precargado
+  if (typeof window.abrirTicketPreloaded === 'function') {
+    window.abrirTicketPreloaded(datosTicket);
+  }
+}
+
+window.enviarARevisionLevantamiento = async function(id) {
+  const lev = levantamientos.find(l => l.id === id);
+  if (!lev) return;
   
-  if (typeof tickets !== 'undefined') {
-    tickets.push(newTicket);
-    if (typeof safeSetJSON === 'function') safeSetJSON('sapi_tickets', tickets);
-    if (window.supabaseClient && window.pushToSupabase) {
-      window.pushToSupabase('tickets', newTicket);
+  if (!confirm('¿Estás seguro de finalizar este levantamiento y enviarlo a revisión? Ya no podrás editarlo.')) return;
+  
+  lev.notas_tecnico = document.getElementById('det-lev-notas').value;
+  lev.estado = 'Realizado';
+  lev._synced = false;
+  
+  // Read evidences if any
+  let filePromises = [];
+  const fileInputs = Array.from(document.querySelectorAll('.det-lev-ev-file'));
+  
+  if (!lev.evidencias) lev.evidencias = {};
+  if (!lev.evidencias_base64) lev.evidencias_base64 = {};
+  
+  let highestExistingIndex = 0;
+  if (lev.evidencias) {
+    Object.keys(lev.evidencias).forEach(k => {
+      if (k.startsWith('foto_')) {
+        const num = parseInt(k.replace('foto_', ''), 10);
+        if (!isNaN(num) && num > highestExistingIndex) highestExistingIndex = num;
+      }
+    });
+  }
+
+  let nextIndex = highestExistingIndex + 1;
+
+  fileInputs.forEach(input => {
+    if (input.files && input.files.length > 0) {
+      const idx = nextIndex++;
+      filePromises.push(readFileAsBase64(input.files[0]).then(b64 => { 
+        lev.evidencias_base64[`foto_${idx}`] = b64; 
+      }));
     }
-    if (typeof renderTickets === 'function') renderTickets();
-    if (typeof renderStats === 'function') renderStats();
-    if (typeof updateTicketBadge === 'function') updateTicketBadge();
+  });
+  
+  if (filePromises.length > 0) {
+    try {
+      await Promise.all(filePromises);
+    } catch (e) {
+      console.error("Error reading evidence files:", e);
+    }
+  }
+  
+  if (typeof safeSetJSON === 'function') safeSetJSON('sapi_levantamientos', levantamientos);
+  if (window.supabaseClient && window.pushToSupabase) {
+    await window.pushToSupabase('levantamientos', lev);
   }
   
   document.getElementById('modal-detalle-levantamiento').remove();
   renderLevantamientos();
   
   if (typeof mostrarNotificacion === 'function') {
-    mostrarNotificacion('Levantamiento completado. Ticket generado: ' + ticketFolio, 'success');
+    mostrarNotificacion('Levantamiento finalizado y enviado a revisión.', 'success');
   }
-}
+};
 
 // Hook it to window
 window.abrirModalNuevoLevantamiento = window_abrirModalNuevoLevantamiento;
@@ -641,3 +783,5 @@ window.renderLevantamientos = renderLevantamientos;
 window.verDetalleLevantamiento = verDetalleLevantamiento;
 window.completarLevantamiento = completarLevantamiento;
 window.guardarNuevoLevantamiento = guardarNuevoLevantamiento;
+window.enviarARevisionLevantamiento = window.enviarARevisionLevantamiento;
+

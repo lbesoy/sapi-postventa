@@ -1,3 +1,40 @@
+// --- Global Helper for Paginated Supabase Fetches ---
+window.fetchTablePaginated = async (tableName, selectQuery = '*', orderColumn = null, orderAscending = false, queryModifier = null, pageLimit = 1000) => {
+  const sb = window.supabaseClient;
+  if (!sb) {
+    console.error(`[Sync] Supabase client not initialized when fetching ${tableName}`);
+    return [];
+  }
+  let allData = [];
+  let fetchMore = true;
+  let page = 0;
+  while (fetchMore) {
+    let query = sb.from(tableName).select(selectQuery);
+    if (queryModifier) {
+      query = queryModifier(query);
+    }
+    if (orderColumn) {
+      query = query.order(orderColumn, { ascending: orderAscending });
+    }
+    const { data, error } = await query.range(page * pageLimit, (page + 1) * pageLimit - 1);
+    if (error) {
+      console.error(`[Sync] Error cargando ${tableName} página ${page}:`, error.message);
+      throw error;
+    }
+    if (data && data.length > 0) {
+      allData = allData.concat(data);
+      if (data.length < pageLimit) {
+        fetchMore = false;
+      } else {
+        page++;
+      }
+    } else {
+      fetchMore = false;
+    }
+  }
+  return allData;
+};
+
 // --- IndexedDB Helper for Refacciones (unlimited offline storage) ---
 window.getSapiIndexedDB = function() {
   return new Promise((resolve) => {
@@ -205,19 +242,29 @@ function padCard(val) {
 window.ticketToRow = ticketToRow;
 function ticketToRow(t) {
   // Encontrar el ID del cliente por su nombre
-  let clienteId = t.cliente || null;
+  let clienteId = null;
   try {
     const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
     const match = clientes.find(c => c.nombre === t.cliente || c.id === t.cliente);
-    if (match) clienteId = match.id;
+    if (match) {
+      clienteId = match.id;
+    } else if (t.cliente) {
+      const existById = clientes.find(c => c.id === t.cliente);
+      if (existById) clienteId = existById.id;
+    }
   } catch (e) {}
 
   // Encontrar el ID del sitio por su nombre
-  let sitioId = t.sitio || null;
+  let sitioId = null;
   try {
     const sitios = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
-    const match = sitios.find(s => s.cliente === clienteId && (s.nombre === t.sitio || s.direccion === t.sitio || s.id === t.sitio));
-    if (match) sitioId = match.id;
+    const match = sitios.find(s => (s.cliente === clienteId || s.cliente === t.cliente) && (s.nombre === t.sitio || s.direccion === t.sitio || s.id === t.sitio));
+    if (match) {
+      sitioId = match.id;
+    } else if (t.sitio) {
+      const existById = sitios.find(s => s.id === t.sitio);
+      if (existById) sitioId = existById.id;
+    }
   } catch (e) {}
 
   const baseNotas = t.notas || '';
@@ -542,28 +589,47 @@ function rowToOrden(o) {
 window.levantamientoToRow = levantamientoToRow;
 function levantamientoToRow(l) {
   // Encontrar el ID del cliente por su nombre
-  let clienteId = l.cliente || null;
+  let clienteId = null;
   try {
     const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
     const match = clientes.find(c => c.nombre === l.cliente || c.id === l.cliente);
-    if (match) clienteId = match.id;
+    if (match) {
+      clienteId = match.id;
+    } else if (l.cliente) {
+      const existById = clientes.find(c => c.id === l.cliente);
+      if (existById) clienteId = existById.id;
+    }
   } catch (e) {}
 
   // Encontrar el ID del sitio por su nombre
-  let sitioId = l.sitio || null;
+  let sitioId = null;
   try {
     const sitios = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
-    const match = sitios.find(s => s.cliente === clienteId && (s.nombre === l.sitio || s.direccion === l.sitio || s.id === l.sitio));
-    if (match) sitioId = match.id;
+    const match = sitios.find(s => (s.cliente === clienteId || s.cliente === l.cliente) && (s.nombre === l.sitio || s.direccion === l.sitio || s.id === l.sitio));
+    if (match) {
+      sitioId = match.id;
+    } else if (l.sitio) {
+      const existById = sitios.find(s => s.id === l.sitio);
+      if (existById) sitioId = existById.id;
+    }
   } catch (e) {}
 
   // Encontrar el ID de la máquina por su serie o idInterno (si existe máquina en l)
-  let maquinaId = l.maquina || null;
+  let maquinaId = null;
   try {
     const maquinas = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
-    const match = maquinas.find(m => m.cliente === clienteId && (m.serie === l.maquina || m.idInterno === l.maquina || m.id === l.maquina));
-    if (match) maquinaId = match.id;
+    const match = maquinas.find(m => (m.cliente === clienteId || m.cliente === l.cliente) && (m.serie === l.maquina || m.idInterno === l.maquina || m.id === l.maquina));
+    if (match) {
+      maquinaId = match.id;
+    } else if (l.maquina) {
+      const existById = maquinas.find(m => m.id === l.maquina);
+      if (existById) maquinaId = existById.id;
+    }
   } catch (e) {}
+
+  const baseNotas = l.notas_tecnico || '';
+  let finalNotas = baseNotas;
+  finalNotas = window.inyectarRefaccionesEnNotas(finalNotas, l.refacciones || []);
 
   const row = {
     id: l.id,
@@ -576,7 +642,7 @@ function levantamientoToRow(l) {
     fecha_esperada: l.fecha_esperada ? (l.fecha_esperada.length === 10 ? `${l.fecha_esperada}T12:00:00-06:00` : l.fecha_esperada) : null,
     estado: l.estado || 'Pendiente',
     tecnico_asignado: l.tecnico_asignado || null,
-    notas_tecnico: l.notas_tecnico || null,
+    notas_tecnico: finalNotas,
     evidencias: l.evidencias || {},
     ticket_generado_id: l.ticket_generado_id || null,
     created_at: l.created_at || new Date().toISOString(),
@@ -602,6 +668,8 @@ function rowToLevantamiento(r) {
     if (match) sitioNombre = match.nombre || match.direccion;
   } catch (e) {}
 
+  const extracted = window.extraerRefaccionesDeNotas(r.notas_tecnico);
+
   return {
     id: r.id,
     _synced: true,
@@ -613,7 +681,8 @@ function rowToLevantamiento(r) {
     fecha_esperada: r.fecha_esperada || null,
     estado: r.estado || 'Pendiente',
     tecnico_asignado: r.tecnico_asignado || null,
-    notas_tecnico: r.notas_tecnico || null,
+    notas_tecnico: extracted.notasLimpias,
+    refacciones: extracted.refacciones,
     evidencias: r.evidencias || {},
     ticket_generado_id: r.ticket_generado_id || null,
     created_at: r.created_at || null,
@@ -1196,7 +1265,12 @@ async function _processSyncQueueInternal() {
                                    
                 if (esColision) {
                   console.log(`[Sync] Colisión de folio detectada para ${finalId}. Calculando nuevo folio...`);
-                  const { data: todasLasOrd } = await sb.from('ordenes').select('folio');
+                  let todasLasOrd = [];
+                  try {
+                    todasLasOrd = await window.fetchTablePaginated('ordenes', 'folio');
+                  } catch (err) {
+                    console.error('[Sync] Error al descargar folios de órdenes para colisión:', err);
+                  }
                   const currentYear = new Date().getFullYear().toString().slice(-2);
                   const isTest = (finalFolio && (finalFolio.includes('PRUEBA') || finalFolio.includes('TEST')));
                   const prefix = isTest ? `OS-PRUEBA-` : `OS-${currentYear}`;
@@ -2323,7 +2397,13 @@ window.cargarDatosDeSupabase = function() {
     // Para evitar truncar el caché local debido a restricciones de RLS (que devuelven 0 o 1 fila del propio usuario)
     // solo sobreescribimos si obtenemos más de 1 usuario, o si somos admin/superadmin.
     try {
-      const { data: usuarios, error: usuariosErr } = await sb.from('user_roles').select('*');
+      let usuarios = null;
+      let usuariosErr = null;
+      try {
+        usuarios = await fetchTablePaginated('user_roles', '*');
+      } catch (err) {
+        usuariosErr = err;
+      }
       if (!usuariosErr && usuarios && usuarios.length > 0) {
         let isCurrentAdmin = false;
         try {
@@ -2359,7 +2439,13 @@ window.cargarDatosDeSupabase = function() {
     // Config, Saldos y Roles (Procesados de forma unificada e independiente)
     let saldosSap = {};
     try {
-      const { data: configDb, error: configErr } = await sb.from('config').select('*');
+      let configDb = null;
+      let configErr = null;
+      try {
+        configDb = await fetchTablePaginated('config', '*');
+      } catch (err) {
+        configErr = err;
+      }
       if (configErr) {
         console.error('[Sync] Error al descargar config de Supabase:', configErr.message);
       } else if (configDb && configDb.length > 0) {
@@ -2390,20 +2476,23 @@ window.cargarDatosDeSupabase = function() {
     }
 
     // Clientes (Reconstrucción Dinámica Normalizada)
-    const { data: clientes } = await sb.from('clientes').select('*');
+    let clientes = null;
+    try {
+      clientes = await fetchTablePaginated('clientes', '*');
+    } catch(e){}
     if (clientes && clientes.length > 0) {
-      const { data: sitiosDb } = await sb.from('sitios').select('*');
-      const { data: maqDb } = await sb.from('maquinaria').select('*');
+      let sitiosDb = [];
+      try { sitiosDb = await fetchTablePaginated('sitios', '*'); } catch(e){}
+      let maqDb = [];
+      try { maqDb = await fetchTablePaginated('maquinaria', '*'); } catch(e){}
       
       let cSups = [];
       let cTecs = [];
       try {
-        const { data: dSups } = await sb.from('cliente_supervisores').select('*');
-        if (dSups) cSups = dSups;
+        cSups = await fetchTablePaginated('cliente_supervisores', '*');
       } catch(e){}
       try {
-        const { data: dTecs } = await sb.from('cliente_tecnicos').select('*');
-        if (dTecs) cTecs = dTecs;
+        cTecs = await fetchTablePaginated('cliente_tecnicos', '*');
       } catch(e){}
 
       const localClientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
@@ -2534,17 +2623,15 @@ window.cargarDatosDeSupabase = function() {
     let idsWithCotizacion = new Set();
     try {
       // 1. Descargar IDs que tienen PDF de forma rápida (sin Base64)
-      const resPed = await sb.from('tickets').select('id').not('pdf_pedido', 'is', null);
-      if (resPed.data) idsWithPedido = new Set(resPed.data.map(x => x.id));
+      const dataPed = await fetchTablePaginated('tickets', 'id', null, false, q => q.not('pdf_pedido', 'is', null));
+      idsWithPedido = new Set(dataPed.map(x => x.id));
       
-      const resCot = await sb.from('tickets').select('id').not('pdf_cotizacion', 'is', null);
-      if (resCot.data) idsWithCotizacion = new Set(resCot.data.map(x => x.id));
+      const dataCot = await fetchTablePaginated('tickets', 'id', null, false, q => q.not('pdf_cotizacion', 'is', null));
+      idsWithCotizacion = new Set(dataCot.map(x => x.id));
 
       // 2. Descargar columnas principales del ticket (excluyendo Base64 pesados de PDFs)
       const columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, notas, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion, comentarios_internos, creado_por, comentarios_clientes';
-      const res = await sb.from('tickets').select(columns);
-      ticketsDb = res.data;
-      ticketsError = res.error;
+      ticketsDb = await fetchTablePaginated('tickets', columns);
     } catch (e) {
       ticketsError = e;
     }
@@ -2609,14 +2696,20 @@ window.cargarDatosDeSupabase = function() {
     }
 
     // Sitios
-    const { data: sitiosDb } = await sb.from('sitios').select('*');
+    let sitiosDb = [];
+    try {
+      sitiosDb = await fetchTablePaginated('sitios', '*');
+    } catch (e) {}
     if (sitiosDb && sitiosDb.length > 0) {
       const mapped = sitiosDb.map(s => ({ id: s.id, nombre: s.nombre, cliente: s.cliente, direccion: s.direccion, cp: s.cp, ciudad: s.ciudad, estado: s.estado, customData: s.custom_data }));
       localStorage.setItem('sapi_sitios_db', JSON.stringify(mapped));
     }
 
     // Maquinaria
-    const { data: maqDb } = await sb.from('maquinaria').select('*');
+    let maqDb = [];
+    try {
+      maqDb = await fetchTablePaginated('maquinaria', '*');
+    } catch (e) {}
     if (maqDb && maqDb.length > 0) {
       const mapped = maqDb.map(m => {
         let clienteNombre = m.cliente;
@@ -2684,7 +2777,13 @@ window.cargarDatosDeSupabase = function() {
 
     // Levantamientos
     try {
-      const { data: levantamientosDb, error: levErr } = await sb.from('levantamientos').select('*');
+      let levantamientosDb = null;
+      let levErr = null;
+      try {
+        levantamientosDb = await fetchTablePaginated('levantamientos', '*');
+      } catch (err) {
+        levErr = err;
+      }
       if (levantamientosDb && !levErr) {
         const mapped = levantamientosDb.map(rowToLevantamiento);
         localStorage.setItem('sapi_levantamientos', JSON.stringify(mapped));
@@ -2699,14 +2798,25 @@ window.cargarDatosDeSupabase = function() {
     }
 
     // Órdenes — mismo principio
-    const { data: ordenes, error: ordenesError } = await sb.from('ordenes').select('*');
+    let ordenes = null;
+    let ordenesError = null;
+    try {
+      ordenes = await fetchTablePaginated('ordenes', '*');
+    } catch (err) {
+      ordenesError = err;
+    }
     window.lastSyncOrdsLength = ordenes ? ordenes.length : -1;
     window.lastSyncOrdsError = ordenesError ? ordenesError.message : null;
     window.lastSyncTimestamp = new Date().toISOString();
     if (ordenes) {
       let bitacorasMap = {};
       try {
-        const { data: bitacorasDb } = await sb.from('orden_bitacora').select('*');
+        let bitacorasDb = [];
+        try {
+          bitacorasDb = await fetchTablePaginated('orden_bitacora', '*');
+        } catch (err) {
+          console.error('[Sync] Error al descargar orden_bitacora:', err);
+        }
         if (bitacorasDb && bitacorasDb.length > 0) {
           bitacorasDb.forEach(b => {
             if (!bitacorasMap[b.orden_id]) bitacorasMap[b.orden_id] = [];
@@ -2796,7 +2906,12 @@ window.cargarDatosDeSupabase = function() {
       // Descargar Refacciones Asociadas
       let refaccionesMap = {};
       try {
-        const { data: refsDb } = await sb.from('orden_refacciones').select('*, refacciones(codigo, descripcion)');
+        let refsDb = [];
+        try {
+          refsDb = await fetchTablePaginated('orden_refacciones', '*, refacciones(codigo, descripcion)');
+        } catch (refsErr) {
+          console.error('[Sync] Error al descargar orden_refacciones:', refsErr);
+        }
         if (refsDb && refsDb.length > 0) {
           refsDb.forEach(r => {
             if (!refaccionesMap[r.orden_id]) refaccionesMap[r.orden_id] = { necesarias: [], utilizadas: [] };
@@ -2825,7 +2940,12 @@ window.cargarDatosDeSupabase = function() {
       // Descargar Firmas Asociadas
       let firmasMap = {};
       try {
-        const { data: firmasDb } = await sb.from('orden_firmas').select('*');
+        let firmasDb = [];
+        try {
+          firmasDb = await fetchTablePaginated('orden_firmas', '*');
+        } catch (firmErr) {
+          console.error('[Sync] Error al descargar orden_firmas:', firmErr);
+        }
         if (firmasDb && firmasDb.length > 0) {
           firmasDb.forEach(f => {
             firmasMap[f.orden_id] = {
@@ -2965,7 +3085,13 @@ window.cargarDatosDeSupabase = function() {
     // La tabla config y roles ya se procesan arriba de forma segura al inicio de la sincronización.
     // Clara Transactions
     try {
-      const { data: claraDb, error: claraErr } = await sb.from('clara_transactions').select('*');
+      let claraDb = null;
+      let claraErr = null;
+      try {
+        claraDb = await fetchTablePaginated('clara_transactions', '*');
+      } catch (err) {
+        claraErr = err;
+      }
       if (!claraErr && claraDb) {
         const mappedClara = claraDb.map(row => ({
           id: row.id,
@@ -3029,7 +3155,13 @@ window.cargarDatosDeSupabase = function() {
 
     // Clara Cards
     try {
-      const { data: cardsDb, error: cardsErr } = await sb.from('clara_cards').select('*');
+      let cardsDb = null;
+      let cardsErr = null;
+      try {
+        cardsDb = await fetchTablePaginated('clara_cards', '*');
+      } catch (err) {
+        cardsErr = err;
+      }
       if (!cardsErr && cardsDb) {
         const mappedCards = cardsDb.map(row => ({
           id: row.id,
@@ -3075,7 +3207,13 @@ window.cargarDatosDeSupabase = function() {
     let mappedGastos = [];
 
     try {
-      const { data: gastosDb, error: gastosErr } = await sb.from('gastos').select('*');
+      let gastosDb = null;
+      let gastosErr = null;
+      try {
+        gastosDb = await fetchTablePaginated('gastos', '*');
+      } catch (err) {
+        gastosErr = err;
+      }
       if (!gastosErr && gastosDb && gastosDb.length > 0) {
         mappedGastos = gastosDb.map(rowToGasto);
       }
@@ -3124,7 +3262,13 @@ window.cargarDatosDeSupabase = function() {
     // Eventos de Calendario Administrativos (Fase 9)
     let mappedEventos = [];
     try {
-      const { data: eventosDb, error: eventosErr } = await sb.from('calendario_eventos').select('*');
+      let eventosDb = null;
+      let eventosErr = null;
+      try {
+        eventosDb = await fetchTablePaginated('calendario_eventos', '*');
+      } catch (err) {
+        eventosErr = err;
+      }
       if (!eventosErr && eventosDb && eventosDb.length > 0) {
         mappedEventos = eventosDb.map(rowToEvento);
       }
@@ -3192,7 +3336,13 @@ window.cargarDatosDeSupabase = function() {
 
     // Cotizaciones SAP (Caché en memoria y localStorage para autocompletar)
     try {
-      const { data: cotizaciones, error: cotizacionesErr } = await sb.from('cotizaciones_sap').select('*').order('numero_cotizacion', { ascending: false });
+      let cotizaciones = null;
+      let cotizacionesErr = null;
+      try {
+        cotizaciones = await fetchTablePaginated('cotizaciones_sap', '*', 'numero_cotizacion', false);
+      } catch (err) {
+        cotizacionesErr = err;
+      }
       if (!cotizacionesErr && cotizaciones) {
         window._cacheCotizacionesSap = cotizaciones;
         await window.saveCatalogOffline('eurorep_cotizaciones_sap', cotizaciones);
@@ -3203,7 +3353,13 @@ window.cargarDatosDeSupabase = function() {
 
     // Pedidos SAP (Caché en memoria y localStorage para autocompletar)
     try {
-      const { data: pedidos, error: pedidosErr } = await sb.from('pedidos_sap').select('*').order('numero_pedido', { ascending: false });
+      let pedidos = null;
+      let pedidosErr = null;
+      try {
+        pedidos = await fetchTablePaginated('pedidos_sap', '*', 'numero_pedido', false);
+      } catch (err) {
+        pedidosErr = err;
+      }
       if (!pedidosErr && pedidos) {
         window._cachePedidosSap = pedidos;
         await window.saveCatalogOffline('eurorep_pedidos_sap', pedidos);
@@ -3244,8 +3400,12 @@ function setupRealtime() {
       let isFallback = !payload || !payload.eventType;
 
       if (isFallback) {
-        const { data: dbData, error } = await window.supabaseClient.from(tableName).select('*');
-        if (error) throw error;
+        let dbData = [];
+        try {
+          dbData = await window.fetchTablePaginated(tableName, '*');
+        } catch (error) {
+          throw error;
+        }
         data = dbData || [];
       }
 

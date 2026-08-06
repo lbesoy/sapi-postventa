@@ -34,6 +34,29 @@ function safeFormatDate(fechaStr, options = { day:'numeric', month:'short' }, de
   }
 }
 
+function formatFechaHoraAmigable(dateStr) {
+  if (!dateStr) return '—';
+  if (dateStr.includes('T00:00:00')) {
+    const datePortion = dateStr.split('T')[0];
+    const parts = datePortion.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+  }
+  if (dateStr.includes('T')) {
+    const d = new Date(dateStr);
+    if (!isNaN(d)) {
+      const pad = (num) => String(num).padStart(2, '0');
+      return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+  }
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
+}
+
 // Variables globales para el estado local
 let currentSession = null;
 let usuarios = [];
@@ -717,7 +740,7 @@ function doRender() {
   renderTicketsSection(misSitios, misEquiposFiltered, misTicketsFiltered);
   renderServicesSection(misOrdenesFiltered);
   renderLocationsSection(misSitios, misEquiposFiltered);
-  renderGeneralSupportChatSection(misTicketsFiltered);
+  renderGeneralSupportChatSection();
 }
 
 // 1. Dashboard UI
@@ -1342,10 +1365,12 @@ function renderServicesSection(misOrdenes) {
         estadoText = 'Programado';
       }
 
-      // Comprobar si hay PDF firmado
       const tieneReporte = !!(o.firma_cliente_base64 || o.evidenciaBase64 || o.firma_tecnico_base64);
       const actionBtn = tieneReporte ? 
-        `<button class="btn-secondary" style="padding:0.35rem 0.6rem; font-size:0.8rem; margin:0;" onclick="abrirReportePdfCliente(event, '${o.id}')"><i data-lucide="file-text"></i> PDF</button>` : 
+        `<div style="display:flex; gap:0.25rem;">
+           <button class="btn-secondary" style="padding:0.35rem 0.6rem; font-size:0.8rem; margin:0; display:inline-flex; align-items:center; gap:0.25rem;" onclick="abrirReportePdfCliente(event, '${o.id}', true)" title="Ver PDF"><i data-lucide="eye" style="width:13px; height:13px;"></i> Ver</button>
+           <button class="btn-primary" style="padding:0.35rem 0.6rem; font-size:0.8rem; margin:0; display:inline-flex; align-items:center; gap:0.25rem;" onclick="abrirReportePdfCliente(event, '${o.id}', false)" title="Descargar PDF"><i data-lucide="download" style="width:13px; height:13px;"></i></button>
+         </div>` : 
         `<span style="font-size:0.75rem; color:var(--text-muted);">Pendiente</span>`;
 
       // Mostrar técnico programado y horario si aplica
@@ -1407,9 +1432,14 @@ function renderServicesSection(misOrdenes) {
               <div class="doc-subtitle" style="font-size:0.75rem; color:var(--text-secondary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${docSubtitle}</div>
               <div class="doc-meta">${docDate}</div>
             </div>
-            <button class="btn-doc-download" onclick="abrirReportePdfCliente(event, '${o.id}')" title="Descargar PDF">
-              <i data-lucide="download" style="width:14px; height:14px;"></i>
-            </button>
+            <div style="display:flex; gap:0.4rem;">
+              <button class="btn-doc-download" onclick="abrirReportePdfCliente(event, '${o.id}', true)" title="Ver PDF">
+                <i data-lucide="eye" style="width:14px; height:14px;"></i>
+              </button>
+              <button class="btn-doc-download" onclick="abrirReportePdfCliente(event, '${o.id}', false)" title="Descargar PDF">
+                <i data-lucide="download" style="width:14px; height:14px;"></i>
+              </button>
+            </div>
           </div>
         `;
       });
@@ -2162,13 +2192,22 @@ function abrirDetalleOrdenCliente(id) {
   const fechaFinFormat = safeFormatDate(o.fechaFin, { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }, 'En Proceso');
 
   // Sincronizar el botón de descargar PDF si la orden contiene evidencias/firmas
+  const btnView = document.getElementById('btn-view-pdf');
   const tieneReporte = !!(o.firma_cliente_base64 || o.evidenciaBase64 || o.firma_tecnico_base64);
   if (btnDownload) {
     if (tieneReporte) {
       btnDownload.style.display = 'inline-flex';
-      btnDownload.onclick = (e) => abrirReportePdfCliente(e, o.id);
+      btnDownload.onclick = (e) => abrirReportePdfCliente(e, o.id, false);
     } else {
       btnDownload.style.display = 'none';
+    }
+  }
+  if (btnView) {
+    if (tieneReporte) {
+      btnView.style.display = 'inline-flex';
+      btnView.onclick = (e) => abrirReportePdfCliente(e, o.id, true);
+    } else {
+      btnView.style.display = 'none';
     }
   }
 
@@ -2534,7 +2573,7 @@ function abrirDetalleOrdenCliente(id) {
 
 // Descargar/Imprimir Reporte PDF de la Orden
 // Descargar/Imprimir Reporte PDF de la Orden
-async function abrirReportePdfCliente(e, orderId) {
+async function abrirReportePdfCliente(e, orderId, soloVisualizar = false) {
   if (e) e.stopPropagation();
   
   // Asegurar que el modal está poblado con los datos de esta orden
@@ -2564,8 +2603,8 @@ async function abrirReportePdfCliente(e, orderId) {
       ${content}
     </div>`;
 
-  const field = (label, val) => `
-    <div class="detalle-field">
+  const field = (label, val, span = 1) => `
+    <div class="detalle-field col-span-${span}">
       <div class="detalle-label">${label}</div>
       <div class="detalle-value">${val || '—'}</div>
     </div>`;
@@ -2602,14 +2641,14 @@ async function abrirReportePdfCliente(e, orderId) {
     });
 
     bitacoraHtml += `
-      <table class="bitacora-print-table" style="width:100%; border-collapse:collapse; font-size:0.75rem; margin-top:0.5rem; color:#0f172a; border:1px solid #e2e8f0;">
+      <table class="bitacora-print-table" style="width:100%; border-collapse:collapse; font-size:0.75rem; margin-top:0.5rem; color:#334155;">
         <thead>
-          <tr style="background:#f1f5f9; text-align:left; border-bottom:1.5px solid #cbd5e1; color:#64748b;">
-            <th style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; font-weight:600; width:15%; text-transform:uppercase; font-size:0.7rem;">Fecha</th>
-            <th style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; font-weight:600; width:20%; text-transform:uppercase; font-size:0.7rem;">Técnico</th>
-            <th style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; font-weight:600; width:20%; text-transform:uppercase; font-size:0.7rem;">Horario</th>
-            <th style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; font-weight:600; width:15%; text-transform:uppercase; font-size:0.7rem;">Estado</th>
-            <th style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; font-weight:600; width:30%; text-transform:uppercase; font-size:0.7rem;">Actividad / Avances Reportados</th>
+          <tr style="background:#f8fafc; text-align:left; color:#475569;">
+            <th style="padding:0.6rem 0.75rem; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; font-weight:600; width:15%; text-transform:uppercase; font-size:0.68rem;">Fecha</th>
+            <th style="padding:0.6rem 0.75rem; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; font-weight:600; width:20%; text-transform:uppercase; font-size:0.68rem;">Técnico</th>
+            <th style="padding:0.6rem 0.75rem; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; font-weight:600; width:20%; text-transform:uppercase; font-size:0.68rem;">Horario</th>
+            <th style="padding:0.6rem 0.75rem; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; font-weight:600; width:15%; text-transform:uppercase; font-size:0.68rem;">Estado</th>
+            <th style="padding:0.6rem 0.75rem; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; font-weight:600; width:30%; text-transform:uppercase; font-size:0.68rem;">Actividad / Avances Reportados</th>
           </tr>
         </thead>
         <tbody>
@@ -2650,11 +2689,11 @@ async function abrirReportePdfCliente(e, orderId) {
 
       bitacoraHtml += `
         <tr style="border-bottom:1px solid #e2e8f0;">
-          <td style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; white-space:nowrap;">${fFormateada}</td>
-          <td style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; font-weight:500;">${b.tecnico || '—'}</td>
-          <td style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; white-space:nowrap;">${hrsStr}</td>
-          <td style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; font-size:0.65rem; font-weight:600;">${estadoStr}</td>
-          <td style="padding:0.45rem 0.6rem; border:1px solid #e2e8f0; white-space:pre-wrap; line-height:1.3;">${b.nota || '—'}</td>
+          <td style="padding:0.6rem 0.75rem; white-space:nowrap;">${fFormateada}</td>
+          <td style="padding:0.6rem 0.75rem; font-weight:500;">${b.tecnico || '—'}</td>
+          <td style="padding:0.6rem 0.75rem; white-space:nowrap;">${hrsStr}</td>
+          <td style="padding:0.6rem 0.75rem; font-size:0.7rem; font-weight:600;">${estadoStr}</td>
+          <td style="padding:0.6rem 0.75rem; white-space:pre-wrap; line-height:1.3; color:#334155;">${b.nota || '—'}</td>
         </tr>
       `;
     });
@@ -2674,13 +2713,13 @@ async function abrirReportePdfCliente(e, orderId) {
   let printEvidenciasHtml = '';
   if (tieneInicio || tieneFin || adicionales.length > 0) {
     printEvidenciasHtml += `
-      <div style="display:flex; flex-direction:column; gap:1.5rem; margin-top:0.5rem;">
-        <div style="display:flex; gap:1.5rem; flex-wrap:wrap;">
+      <div style="display:block; margin-top:0.5rem;">
+        <div style="display:block; text-align:left;">
     `;
 
     if (tieneInicio) {
       printEvidenciasHtml += `
-        <div style="flex:1; min-width:280px; border:1px solid #d1d5db; border-radius:6px; padding:0.75rem; background:#f9fafb; text-align:center;">
+        <div style="display:inline-block; vertical-align:top; width:330px; margin-right:1.5rem; margin-bottom:1.5rem; border:1px solid #d1d5db; border-radius:6px; padding:0.75rem; background:#f9fafb; text-align:center; page-break-inside:avoid; break-inside:avoid; box-sizing:border-box;">
           <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.5rem; text-transform:uppercase;">Foto de Inicio (Entrada)</div>
           <div style="height:220px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; display:flex; justify-content:center; align-items:center; overflow:hidden;">
             <img src="${ev.fotoInicio}" style="max-width:100%; max-height:100%; object-fit:contain;" />
@@ -2691,7 +2730,7 @@ async function abrirReportePdfCliente(e, orderId) {
 
     if (tieneFin) {
       printEvidenciasHtml += `
-        <div style="flex:1; min-width:280px; border:1px solid #d1d5db; border-radius:6px; padding:0.75rem; background:#f9fafb; text-align:center;">
+        <div style="display:inline-block; vertical-align:top; width:330px; margin-bottom:1.5rem; border:1px solid #d1d5db; border-radius:6px; padding:0.75rem; background:#f9fafb; text-align:center; page-break-inside:avoid; break-inside:avoid; box-sizing:border-box;">
           <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.5rem; text-transform:uppercase;">Foto de Fin (Salida)</div>
           <div style="height:220px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; display:flex; justify-content:center; align-items:center; overflow:hidden;">
             <img src="${ev.fotoFin}" style="max-width:100%; max-height:100%; object-fit:contain;" />
@@ -2706,14 +2745,14 @@ async function abrirReportePdfCliente(e, orderId) {
 
     if (adicionales.length > 0) {
       printEvidenciasHtml += `
-        <div style="margin-top:0.5rem;">
+        <div style="margin-top:1.5rem;">
           <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.75rem; text-transform:uppercase;">Evidencias Adicionales</div>
-          <div style="display:flex; flex-wrap:wrap; gap:1rem; justify-content:flex-start;">
+          <div style="display:block; text-align:left;">
       `;
 
       adicionales.forEach((url, idx) => {
         printEvidenciasHtml += `
-          <div style="border:1px solid #d1d5db; border-radius:6px; padding:0.5rem; background:#f9fafb; text-align:center; width:200px;">
+          <div style="display:inline-block; vertical-align:top; border:1px solid #d1d5db; border-radius:6px; padding:0.5rem; background:#f9fafb; text-align:center; width:210px; margin-right:1.2rem; margin-bottom:1.2rem; page-break-inside:avoid; break-inside:avoid; box-sizing:border-box;">
             <div style="font-size:0.65rem; font-weight:600; color:#4b5563; margin-bottom:0.35rem;">Adicional ${idx + 1}</div>
             <div style="height:140px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; display:flex; justify-content:center; align-items:center; overflow:hidden;">
               <img src="${url}" style="max-width:100%; max-height:100%; object-fit:contain;" />
@@ -2742,7 +2781,7 @@ async function abrirReportePdfCliente(e, orderId) {
   clone.innerHTML = `
     <style>
       .admin-pdf-render-container {
-        width: 800px;
+        width: 740px;
         background: #ffffff;
         color: #0f172a;
         padding: 20px;
@@ -2757,88 +2796,86 @@ async function abrirReportePdfCliente(e, orderId) {
         --bg-card: #f8fafc;
       }
       .admin-pdf-render-container .header {
-        text-align: center;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 2px solid #e2e8f0;
-      }
-      .admin-pdf-render-container .header img {
-        height: 60px;
-        object-fit: contain;
-        margin-bottom: 0.5rem;
-      }
-      .admin-pdf-render-container .header h2 {
-        margin: 0;
-        font-size: 1.4rem;
-        color: #0f172a;
-      }
-      .admin-pdf-render-container .header p {
-        margin: 0;
-        font-size: 0.85rem;
-        color: #64748b;
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 2px solid #e8820c;
       }
       .admin-pdf-render-container .detalle-section {
-        margin-bottom: 1.5rem;
+        margin-bottom: 2rem;
         page-break-inside: avoid;
         break-inside: avoid;
       }
       .admin-pdf-render-container .detalle-section-title {
-        font-size: 0.78rem;
+        font-size: 0.8rem;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: #e8820c;
-        margin-bottom: 0.75rem;
-        padding-bottom: 0.4rem;
-        border-bottom: 1px solid #e2e8f0;
+        letter-spacing: 0.05em;
+        color: #0f172a;
+        margin-bottom: 1rem;
+        padding: 0.35rem 0.6rem;
+        background: #f1f5f9;
+        border-left: 4px solid #e8820c;
       }
       .admin-pdf-render-container .detalle-grid {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 0.75rem !important;
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 0.6rem 1.5rem !important;
       }
-      .admin-pdf-render-container .detalle-grid > * {
-        flex: 1 1 180px !important;
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
+      .admin-pdf-render-container .col-span-1 { grid-column: span 1 !important; }
+      .admin-pdf-render-container .col-span-2 { grid-column: span 2 !important; }
+      .admin-pdf-render-container .col-span-3 { grid-column: span 3 !important; }
+      .admin-pdf-render-container .evidencias-inicio-fin-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 1.5rem !important;
+      }
+      .admin-pdf-render-container .evidencias-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 1rem !important;
       }
       .admin-pdf-render-container .detalle-field {
-        background: #f8fafc;
-        border-radius: 6px;
-        padding: 0.65rem 0.85rem;
-        border: 1px solid #e2e8f0;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 0.35rem;
         page-break-inside: avoid;
         break-inside: avoid;
       }
       .admin-pdf-render-container .detalle-label {
-        font-size: 0.72rem;
+        font-size: 0.65rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
         color: #64748b;
         margin-bottom: 0.2rem;
       }
       .admin-pdf-render-container .detalle-value {
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         font-weight: 500;
         word-break: break-word;
         color: #0f172a;
+        line-height: 1.3;
       }
       .admin-pdf-render-container .detalle-ref-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
+        margin-top: 0.5rem;
       }
       .admin-pdf-render-container .detalle-ref-table th {
         background: #f8fafc;
-        padding: 0.5rem 0.75rem;
+        padding: 0.6rem 0.75rem;
         text-align: left;
-        font-size: 0.72rem;
-        color: #64748b;
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: #475569;
         text-transform: uppercase;
-        border-bottom: 1px solid #e2e8f0;
+        border-top: 1px solid #cbd5e1;
+        border-bottom: 2px solid #cbd5e1;
       }
       .admin-pdf-render-container .detalle-ref-table td {
-        padding: 0.5rem 0.75rem;
-        border-top: 1px solid #e2e8f0;
-        color: #0f172a;
+        padding: 0.6rem 0.75rem;
+        border-bottom: 1px solid #e2e8f0;
+        color: #334155;
       }
       .admin-pdf-render-container .badge {
         display: inline-block;
@@ -2869,52 +2906,67 @@ async function abrirReportePdfCliente(e, orderId) {
       .admin-pdf-render-container .badge-otro { background: rgba(248, 250, 252, 1); color: #334155; }
     </style>
 
-    <div class="header">
-      <img src="logo_transparent.png" alt="Eurorep Logo"/>
-      <h2>Orden de Servicio ${o.folio || ''}</h2>
-      <p>${formatFecha(o.fecha)}</p>
+    <div class="header" style="display: flex; justify-content: space-between; align-items: flex-start;">
+      <div style="text-align: left;">
+        <img src="logo_transparent.png" alt="Eurorep Logo" style="height: 60px; object-fit: contain; margin-bottom: 0.5rem;" />
+        <div style="font-size: 0.75rem; color: #64748b; line-height: 1.4;">
+          <strong>EURO REPRESENTACIONES S.A. DE C.V.</strong><br>
+          Servicio Técnico Especializado en Maquinaria<br>
+          soporte@eurorep.mx | www.eurorep.mx
+        </div>
+      </div>
+      <div style="text-align: right;">
+        <h2 style="margin: 0; font-size: 1.4rem; color: #0f172a; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Orden de Servicio</h2>
+        <div style="font-size: 1.15rem; color: #e8820c; font-weight: 700; margin-top: 0.25rem;">${o.folio || ''}</div>
+        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+          <strong>Fecha Emisión:</strong> ${formatFecha(o.fecha)}
+        </div>
+      </div>
     </div>
 
     ${seccion('Información General', `
       <div class="detalle-grid">
-        ${field('Folio', o.folio)} ${field('Pedido', o.pedido)} ${field('Fecha', formatFecha(o.fecha))}
-        ${field('Cliente', o.cliente)} ${field('Ubicación (Ticket)', o.ubicacion)} ${field('Ubicación en Sitio', o.ubicacion_sitio)} ${field('Operador', o.operador)}
-        ${field('No. ECO', o.eco)} ${field('Horómetro (Ticket)', o.horometro)} ${field('Horómetro Real', o.horometro_real)}
+        ${field('Folio', o.folio, 1)} ${field('Pedido', o.pedido, 1)} ${field('Fecha', formatFecha(o.fecha), 1)}
+        ${field('Cliente', o.cliente, 2)} ${field('Ubicación (Ticket)', o.ubicacion, 1)}
+        ${field('Ubicación en Sitio', o.ubicacion_sitio, 3)}
+        ${field('Operador', o.operador, 1)} ${field('No. ECO', o.eco, 1)} ${field('Horómetro (Ticket)', o.horometro, 1)}
+        ${field('Horómetro Real', o.horometro_real, 1)}
         ${field('Marca', (() => { 
           const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
           let m = o.marca || (o.equipo ? o.equipo.split(' ')[0] : '');
           return MARCAS_RENDER[m.toUpperCase()] || m || '—';
-        })())} ${field('Modelo', o.modelo)} ${field('Serie', o.serie)}
+        })(), 1)} ${field('Modelo', o.modelo, 1)} ${field('Serie', o.serie, 1)}
         ${field('ID Máquina', (() => {
           const maq = (maquinariaDb || []).find(m => (o.maquinaria_id && m.id === o.maquinaria_id) || (o.serie && m.serie === o.serie) || (o.modelo && m.modelo === o.modelo && m.cliente === o.cliente));
           return maq && (maq.idInterno || maq.id) ? `<span style="font-family:monospace; font-weight:600; color:#e8820c; background:rgba(232, 133, 10, 0.12); padding:0.15rem 0.4rem; border-radius:4px; border:1px solid rgba(232, 133, 10, 0.3);">${maq.idInterno || maq.id}</span>` : '—';
-        })())}
-        ${field('Técnico', o.tecnico)} ${field('Ticket Soporte', (() => { const t = (tickets || []).find(x => x.id === o.soporte); return t ? (t.folio || t.id.slice(0,8)) : o.soporte || null; })())}
+        })(), 1)}
+        ${field('Técnico', o.tecnico, 1)}
+        ${field('Ticket Soporte', (() => { const t = (tickets || []).find(x => x.id === o.soporte); return t ? (t.folio || t.id.slice(0,8)) : o.soporte || null; })(), 3)}
       </div>`)}
 
     ${seccion('Kilómetros / Tipo', `
       <div class="detalle-grid">
-        ${field('Origen → Trabajo', (o.km_ida != null && o.km_ida !== '') ? o.km_ida + ' km' : null)}
-        ${field('Trabajo → Origen', (o.km_vuelta != null && o.km_vuelta !== '') ? o.km_vuelta + ' km' : null)}
-        ${field('Total Km', (o.km_total != null && o.km_total !== '') ? o.km_total + ' km' : null)}
-        ${field('Tipo de Visita', `<span class="badge badge-${(o.tipo||'otro').toLowerCase().replace(/ /g, '-').replace('é','e').replace('í','i')}">${o.tipo}</span>`)}
-        ${field('Estado', `<span class="badge ${badgeEstado(o.estado)}">${o.estado}</span>`)}
+        ${field('Origen → Trabajo', (o.km_ida != null && o.km_ida !== '') ? o.km_ida + ' km' : null, 1)}
+        ${field('Trabajo → Origen', (o.km_vuelta != null && o.km_vuelta !== '') ? o.km_vuelta + ' km' : null, 1)}
+        ${field('Total Km', (o.km_total != null && o.km_total !== '') ? o.km_total + ' km' : null, 1)}
+        ${field('Tipo de Visita', `<span class="badge badge-${(o.tipo||'otro').toLowerCase().replace(/ /g, '-').replace('é','e').replace('í','i')}">${o.tipo}</span>`, 2)}
+        ${field('Estado', `<span class="badge ${badgeEstado(o.estado)}">${o.estado}</span>`, 1)}
       </div>`)}
 
     ${seccion('Diagnóstico y Trabajos', `
-      ${field('Falla reportada', o.falla)}
-      <div style="margin-top:0.5rem">${field('Trabajos realizados', o.trabajos)}</div>
-      <div style="margin-top:0.5rem">${field('Dictamen', o.dictamen)}</div>
-      <div style="margin-top:0.5rem">${field('Condiciones del equipo', o.condiciones)}</div>
-      <div style="margin-top:0.5rem">${field('Observaciones', o.observaciones)}</div>
-      <div style="margin-top:0.5rem">${field('Pendientes', o.pendientes)}</div>`)}
+      ${field('Falla reportada', o.falla, 3)}
+      <div style="margin-top:0.5rem">${field('Trabajos realizados', o.trabajos, 3)}</div>
+      <div style="margin-top:0.5rem">${field('Dictamen', o.dictamen, 3)}</div>
+      <div style="margin-top:0.5rem">${field('Condiciones del equipo', o.condiciones, 3)}</div>
+      <div style="margin-top:0.5rem">${field('Observaciones', o.observaciones, 3)}</div>
+      <div style="margin-top:0.5rem">${field('Pendientes', o.pendientes, 3)}</div>`)}
 
     ${seccion('Refacciones Utilizadas', refTable(o.ref_utilizadas, false))}
     ${seccion('Refacciones Necesarias', refTable(o.ref_necesarias, false))}
 
     ${(o.noches || o.alimentacion || o.traslado_costo) ? seccion('Servicio', `
       <div class="detalle-grid">
-        ${field('No. Noches', o.noches)} ${field('Alimentación', o.alimentacion ? o.alimentacion : '')} ${field('Traslado', o.traslado_costo ? o.traslado_costo : '')}
+        ${field('No. Noches', o.noches, 1)} ${field('Alimentación', o.alimentacion ? o.alimentacion : '', 1)} ${field('Traslado', o.traslado_costo ? o.traslado_costo : '', 1)}
       </div>`) : ''}
 
     ${seccion('Bitácora Diaria', bitacoraHtml)}
@@ -2970,9 +3022,26 @@ async function abrirReportePdfCliente(e, orderId) {
 
   try {
     if (typeof html2pdf === 'function') {
-      showToast('Generando archivo PDF...', 'info');
-      await html2pdf().from(clone).set(opt).save();
-      document.body.removeChild(tempContainer);
+      if (soloVisualizar) {
+        showToast('Generando vista previa del PDF...', 'info');
+        const pdfBase64 = await html2pdf().from(clone).set(opt).outputPdf('datauristring');
+        const base64Data = pdfBase64.split(',')[1];
+        
+        const raw = window.atob(base64Data);
+        const rawLength = raw.length;
+        const array = new Uint8Array(new ArrayBuffer(rawLength));
+        for (let i = 0; i < rawLength; i++) {
+          array[i] = raw.charCodeAt(i);
+        }
+        const blob = new Blob([array], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        document.body.removeChild(tempContainer);
+      } else {
+        showToast('Generando archivo PDF...', 'info');
+        await html2pdf().from(clone).set(opt).save();
+        document.body.removeChild(tempContainer);
+      }
     } else {
       console.warn('html2pdf library is not loaded, calling window.print()');
       window.print();
@@ -3269,12 +3338,13 @@ window.guardarDireccionSitio = async function(event) {
 
 
 // Renderizar sección de chat de soporte general
-function renderGeneralSupportChatSection(misTickets) {
+function renderGeneralSupportChatSection() {
   const container = document.getElementById('general-support-chat-container');
   if (!container) return;
 
+  const activeSandbox = isTestModeActive();
   // Buscar el ticket de soporte general del cliente
-  let chatTicket = misTickets.find(t => t.categoria === 'Soporte General');
+  let chatTicket = tickets.find(t => t.categoria === 'Soporte General' && isTestData(t) === activeSandbox && (String(t.cliente || '').toLowerCase().trim() === nombreEmpresaLogged || String(t.solicitante || '').toLowerCase().trim() === nombreEmpresaLogged));
   
   if (!chatTicket) {
     // Si no existe, se creará al enviar el primer mensaje, por ahora mostramos estado vacío
@@ -3316,8 +3386,10 @@ window.enviarMensajeSoporteGeneral = async function() {
 
   const currentClientName = nombreEmpresaLogged || 'Cliente';
 
+  const activeSandbox = isTestModeActive();
+
   // Buscar o crear ticket de soporte general
-  let chatTicket = tickets.find(t => t.categoria === 'Soporte General' && (String(t.cliente || '').toLowerCase().trim() === nombreEmpresaLogged || String(t.solicitante || '').toLowerCase().trim() === nombreEmpresaLogged));
+  let chatTicket = tickets.find(t => t.categoria === 'Soporte General' && isTestData(t) === activeSandbox && (String(t.cliente || '').toLowerCase().trim() === nombreEmpresaLogged || String(t.solicitante || '').toLowerCase().trim() === nombreEmpresaLogged));
   
   if (!chatTicket) {
     chatTicket = {
@@ -3334,7 +3406,7 @@ window.enviarMensajeSoporteGeneral = async function() {
       descripcion: 'Canal de comunicación directa con soporte de Eurorep.',
       comentariosClientes: [],
       comentariosInternos: [],
-      esPrueba: false
+      esPrueba: activeSandbox
     };
     tickets.push(chatTicket);
   }
@@ -3372,4 +3444,41 @@ window.enviarMensajeSoporteGeneral = async function() {
     }
   }
 };
+
+// Registrar Service Worker para soporte PWA (sólo en producción, no en localhost)
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    const registerSW = () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => {
+          console.log('[PWA] Service Worker registrado con éxito desde Cliente Portal:', reg.scope);
+          
+          // Detectar actualizaciones e instalar inmediatamente
+          reg.addEventListener('updatefound', () => {
+            const installingWorker = reg.installing;
+            if (installingWorker) {
+              installingWorker.addEventListener('statechange', () => {
+                if (installingWorker.state === 'installed') {
+                  if (navigator.serviceWorker.controller) {
+                    console.log('[PWA] Nueva versión detectada e instalada. Recargando para aplicar cambios...');
+                    setTimeout(() => {
+                      window.location.reload();
+                    }, 500);
+                  }
+                }
+              });
+            }
+          });
+        })
+        .catch(err => console.error('[PWA] Error al registrar Service Worker desde Cliente Portal:', err));
+    };
+
+    if (document.readyState === 'complete') {
+      registerSW();
+    } else {
+      window.addEventListener('load', registerSW);
+    }
+  }
+}
+
 
