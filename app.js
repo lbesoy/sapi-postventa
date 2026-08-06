@@ -18467,7 +18467,8 @@ function renderCalendario() {
       if (typeof isTestData === 'function' && isTestData(lev) !== activeSandbox) return;
       
       // Filtrar por técnico si hay un filtro activo (y si está asignado)
-      if (filtroTecnico && lev.asignado_a !== filtroTecnico) return;
+      const asignadoVal = lev.tecnico_asignado || lev.asignado_a || null;
+      if (filtroTecnico && asignadoVal !== filtroTecnico) return;
       
       // Filtrar por empresa si el usuario es empresa
       if (isEmpresa && lev.cliente !== miEmpresa) return;
@@ -18475,7 +18476,7 @@ function renderCalendario() {
       if (lev.fecha_esperada) {
         eventos.push({
           id: `lev-${lev.id}`,
-          title: `📋 Levantamiento | ${lev.cliente} | ${lev.asignado_a ? lev.asignado_a.split(' ')[0] : 'Sin Asignar'}`,
+          title: `📋 Levantamiento | ${lev.cliente} | ${asignadoVal ? asignadoVal.split(' ')[0] : 'Sin Asignar'}`,
           start: lev.fecha_esperada,
           allDay: true,
           backgroundColor: '#d946ef', // Fuchsia (distinct color for Levantamientos)
@@ -18486,7 +18487,7 @@ function renderCalendario() {
             levantamientoId: lev.id,
             cliente: lev.cliente,
             descripcion: lev.descripcion,
-            asignado_a: lev.asignado_a || 'Sin Asignar',
+            asignado_a: asignadoVal || 'Sin Asignar',
             estado: lev.estado
           }
         });
