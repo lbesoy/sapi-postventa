@@ -42,7 +42,7 @@ window.getSapiIndexedDB = function() {
       resolve(null);
       return;
     }
-    const request = indexedDB.open('SapiOfflineDB', 1);
+    const request = indexedDB.open('SapiOfflineDB', 2);
     request.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains('catalogs')) {
@@ -245,11 +245,14 @@ function ticketToRow(t) {
   let clienteId = null;
   try {
     const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
-    const match = clientes.find(c => c.nombre === t.cliente || c.id === t.cliente);
+    const match = clientes.find(c => 
+      (c.nombre && t.cliente && String(c.nombre).toLowerCase().trim() === String(t.cliente).toLowerCase().trim()) ||
+      (c.id && t.cliente && String(c.id).toLowerCase().trim() === String(t.cliente).toLowerCase().trim())
+    );
     if (match) {
       clienteId = match.id;
     } else if (t.cliente) {
-      const existById = clientes.find(c => c.id === t.cliente);
+      const existById = clientes.find(c => String(c.id).toLowerCase().trim() === String(t.cliente).toLowerCase().trim());
       if (existById) clienteId = existById.id;
     }
   } catch (e) {}
@@ -317,7 +320,7 @@ function rowToTicket(t, idsWithPedido, idsWithCotizacion) {
   let clienteNombre = t.cliente;
   try {
     const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
-    const match = clientes.find(c => c.id === t.cliente);
+    const match = clientes.find(c => c.id && t.cliente && String(c.id).toLowerCase().trim() === String(t.cliente).toLowerCase().trim());
     if (match) clienteNombre = match.nombre;
   } catch (e) {}
 
@@ -2405,6 +2408,19 @@ window.cargarDatosDeSupabase = function() {
         usuariosErr = err;
       }
       if (!usuariosErr && usuarios && usuarios.length > 0) {
+        let cUsrs = [];
+        try {
+          cUsrs = await fetchTablePaginated('cliente_usuarios', '*');
+        } catch(e) {
+          console.warn('[Sync] No se pudo cargar cliente_usuarios:', e.message);
+        }
+
+        // Augment each user with their associated companies
+        usuarios = usuarios.map(u => {
+          const myCompanies = cUsrs.filter(cu => cu.usuario_id === u.id).map(cu => cu.cliente_id);
+          return { ...u, empresas: myCompanies };
+        });
+
         let isCurrentAdmin = false;
         try {
           const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');

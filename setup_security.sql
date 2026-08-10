@@ -169,6 +169,7 @@ CREATE POLICY "Clientes y Empresas read own client" ON public.clientes FOR SELEC
   AND (
     LOWER(nombre) = LOWER(public.get_my_empresa())
     OR id = public.get_my_empresa()
+    OR id IN (SELECT cliente_id FROM public.cliente_usuarios WHERE usuario_id = auth.uid())
   )
 );
 
@@ -180,7 +181,7 @@ CREATE POLICY "Clientes y Empresas read own maquinaria" ON public.maquinaria FOR
   public.get_my_role() IN ('empresa', 'cliente')
   AND (
     LOWER(cliente) IN (
-      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa()
+      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa() OR id IN (SELECT cliente_id FROM public.cliente_usuarios WHERE usuario_id = auth.uid())
     )
   )
 );
@@ -201,7 +202,7 @@ CREATE POLICY "Clientes y Empresas read own tickets" ON public.tickets FOR SELEC
   public.get_my_role() IN ('empresa', 'cliente')
   AND (
     LOWER(cliente) IN (
-      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa()
+      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa() OR id IN (SELECT cliente_id FROM public.cliente_usuarios WHERE usuario_id = auth.uid())
     )
     OR LOWER(solicitante) = LOWER(public.get_my_name())
   )
@@ -211,7 +212,7 @@ CREATE POLICY "Clientes y Empresas insert own tickets" ON public.tickets FOR INS
   public.get_my_role() IN ('empresa', 'cliente')
   AND (
     LOWER(cliente) IN (
-      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa()
+      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa() OR id IN (SELECT cliente_id FROM public.cliente_usuarios WHERE usuario_id = auth.uid())
     )
     OR LOWER(solicitante) = LOWER(public.get_my_name())
   )
@@ -221,7 +222,7 @@ CREATE POLICY "Clientes y Empresas update own tickets" ON public.tickets FOR UPD
   public.get_my_role() IN ('empresa', 'cliente')
   AND (
     LOWER(cliente) IN (
-      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa()
+      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa() OR id IN (SELECT cliente_id FROM public.cliente_usuarios WHERE usuario_id = auth.uid())
     )
     OR LOWER(solicitante) = LOWER(public.get_my_name())
   )
@@ -229,7 +230,7 @@ CREATE POLICY "Clientes y Empresas update own tickets" ON public.tickets FOR UPD
   public.get_my_role() IN ('empresa', 'cliente')
   AND (
     LOWER(cliente) IN (
-      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa()
+      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa() OR id IN (SELECT cliente_id FROM public.cliente_usuarios WHERE usuario_id = auth.uid())
     )
     OR LOWER(solicitante) = LOWER(public.get_my_name())
   )
@@ -262,7 +263,7 @@ CREATE POLICY "Clientes y Empresas read own ordenes" ON public.ordenes FOR SELEC
   public.get_my_role() IN ('empresa', 'cliente')
   AND (
     LOWER(cliente) IN (
-      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa()
+      SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa() OR id IN (SELECT cliente_id FROM public.cliente_usuarios WHERE usuario_id = auth.uid())
     )
   )
 );
@@ -466,6 +467,25 @@ CREATE POLICY "Permitir todo a autenticados en sitios" ON public.sitios FOR ALL 
 
 -- 11. Configuración de Políticas para Subtablas de Órdenes (orden_bitacora, orden_refacciones, orden_firmas)
 -- ========================================================
+CREATE TABLE IF NOT EXISTS public.cliente_usuarios (
+    cliente_id TEXT REFERENCES public.clientes(id) ON DELETE CASCADE,
+    usuario_id UUID REFERENCES public.user_roles(id) ON DELETE CASCADE,
+    PRIMARY KEY (cliente_id, usuario_id)
+);
+
+ALTER TABLE public.cliente_supervisores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cliente_tecnicos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cliente_usuarios ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Permitir todo a autenticados" ON public.cliente_supervisores;
+CREATE POLICY "Permitir todo a autenticados" ON public.cliente_supervisores FOR ALL TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Permitir todo a autenticados" ON public.cliente_tecnicos;
+CREATE POLICY "Permitir todo a autenticados" ON public.cliente_tecnicos FOR ALL TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Permitir todo a autenticados" ON public.cliente_usuarios;
+CREATE POLICY "Permitir todo a autenticados" ON public.cliente_usuarios FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
 ALTER TABLE public.orden_bitacora ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orden_refacciones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orden_firmas ENABLE ROW LEVEL SECURITY;

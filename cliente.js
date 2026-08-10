@@ -12,50 +12,9 @@ window.safeCreateIcons = function() {
 };
 
 // Variable segura para formatear fechas sin lanzar excepciones RangeError
-function safeFormatDate(fechaStr, options = { day:'numeric', month:'short' }, defaultVal = 'N/A') {
-  if (!fechaStr) return defaultVal;
-  
-  // Si la fecha es YYYY-MM-DD, añadir hora del mediodía local para evitar desfases de zona horaria
-  let cleanStr = String(fechaStr).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(cleanStr)) {
-    cleanStr += 'T12:00:00';
-  }
-  
-  const d = new Date(cleanStr);
-  if (isNaN(d.getTime())) return defaultVal;
-  try {
-    return d.toLocaleDateString('es-MX', options);
-  } catch(e) {
-    try {
-      return d.toLocaleString('es-MX');
-    } catch(e2) {
-      return defaultVal;
-    }
-  }
-}
 
-function formatFechaHoraAmigable(dateStr) {
-  if (!dateStr) return '—';
-  if (dateStr.includes('T00:00:00')) {
-    const datePortion = dateStr.split('T')[0];
-    const parts = datePortion.split('-');
-    if (parts.length === 3) {
-      return `${parts[2]}/${parts[1]}/${parts[0]}`;
-    }
-  }
-  if (dateStr.includes('T')) {
-    const d = new Date(dateStr);
-    if (!isNaN(d)) {
-      const pad = (num) => String(num).padStart(2, '0');
-      return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    }
-  }
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  }
-  return dateStr;
-}
+
+
 
 // Variables globales para el estado local
 let currentSession = null;
@@ -71,6 +30,7 @@ let currentTicketFiltro = 'todos';
 let currentTicketFiltroPrio = '';
 let currentTicketOrden = 'reciente';
 let selectedTicketPhotoBase64 = null;
+let currentMaquinariaFiltro = 'todos';
 
 // ===== SANDBOX / MODO PRUEBAS =====
 function isTestData(item) {
@@ -114,12 +74,7 @@ function isTestData(item) {
   return false;
 }
 
-function isTestUser(user) {
-  if (!user) return false;
-  const name = (user.nombre || '').toLowerCase();
-  const email = (user.email || '').toLowerCase();
-  return name.includes('prueba') || name.includes('test') || email.includes('prueba') || email.includes('test');
-}
+
 
 function isTestModeActive() {
   if (!currentSession) return false;
@@ -469,7 +424,15 @@ async function inicializarDatos() {
       nombreEmpresaLogged = '';
     }
   } else {
-    nombreEmpresaLogged = String(currentSession.empresa || currentSession.nombre).toLowerCase().trim();
+    const savedCliente = localStorage.getItem('client_selected_company');
+    if (savedCliente && clientesDb.some(c => String(c.nombre || '').toLowerCase().trim() === savedCliente.toLowerCase().trim())) {
+      nombreEmpresaLogged = savedCliente.toLowerCase().trim();
+    } else if (clientesDb.length > 0) {
+      nombreEmpresaLogged = String(clientesDb[0].nombre || '').toLowerCase().trim();
+      localStorage.setItem('client_selected_company', nombreEmpresaLogged);
+    } else {
+      nombreEmpresaLogged = String(currentSession.empresa || currentSession.nombre).toLowerCase().trim();
+    }
   }
 
   // 3. Rellenar Perfil de Sidebar
@@ -484,30 +447,37 @@ async function inicializarDatos() {
   if (avatar) avatar.textContent = uName.charAt(0).toUpperCase();
   if (nameEl) nameEl.textContent = uName;
 
-  if (isSuperAdmin) {
-    const dbClient = clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === nombreEmpresaLogged);
-    cName = dbClient ? dbClient.nombre : (nombreEmpresaLogged || 'Super Admin');
+  const dbClient = clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === nombreEmpresaLogged);
+  if (isSuperAdmin || clientesDb.length > 1) {
+    cName = dbClient ? dbClient.nombre : (nombreEmpresaLogged || (isSuperAdmin ? 'Super Admin' : 'Empresa'));
+  } else if (dbClient) {
+    cName = dbClient.nombre;
   }
 
   if (companyEl) companyEl.textContent = cName;
 
   if (headerComp) {
-    if (isSuperAdmin) {
-      let selectHtml = `<select id="superadmin-cliente-selector">`;
+    if (isSuperAdmin || clientesDb.length > 1) {
+      const selectId = isSuperAdmin ? 'superadmin-cliente-selector' : 'client-company-selector';
+      let selectHtml = `<select id="${selectId}">`;
       clientesDb.forEach(c => {
         const cNorm = String(c.nombre || '').toLowerCase().trim();
         const selectedAttr = (cNorm === nombreEmpresaLogged) ? 'selected' : '';
         selectHtml += `<option value="${cNorm}" ${selectedAttr}>${c.nombre}</option>`;
       });
       selectHtml += `</select>`;
-      headerComp.innerHTML = `Cliente: ${selectHtml}`;
+      headerComp.innerHTML = `${isSuperAdmin ? 'Cliente' : 'Empresa'}: ${selectHtml}`;
       
-      const selector = document.getElementById('superadmin-cliente-selector');
+      const selector = document.getElementById(selectId);
       if (selector) {
         selector.addEventListener('change', (e) => {
           const newClient = e.target.value;
           nombreEmpresaLogged = newClient;
-          localStorage.setItem('superadmin_selected_cliente', newClient);
+          if (isSuperAdmin) {
+            localStorage.setItem('superadmin_selected_cliente', newClient);
+          } else {
+            localStorage.setItem('client_selected_company', newClient);
+          }
           
           // Re-renderizar
           doRender();
@@ -693,11 +663,19 @@ function doRender() {
       
       const machinesInMaintenance = new Set();
       misOrdenesFiltered.filter(o => o.estado && !['finalizado', 'firmado'].includes(o.estado.toLowerCase())).forEach(o => {
-        const match = misEquiposFiltered.find(m => 
-          m.id === o.maquinaria_id || 
-          (m.idInterno && o.equipo && o.equipo.includes(m.idInterno)) ||
-          (m.serie && o.equipo && o.equipo.includes(m.serie))
-        );
+        const match = misEquiposFiltered.find(m => {
+          if (m.id === o.maquinaria_id) return true;
+          const equipoString = o.equipo || '';
+          const names = equipoString.split(',').map(n => n.trim()).filter(Boolean);
+          return names.some(name => {
+            return (
+              (m.idInterno && name.includes(`[${m.idInterno}]`)) ||
+              (m.serie && name.includes(`(SN: ${m.serie})`)) ||
+              name === m.idInterno ||
+              name === m.serie
+            );
+          });
+        });
         if (match) {
           machinesInMaintenance.add(match.id || match.idInterno || match.serie);
         }
@@ -822,6 +800,14 @@ function renderMachinerySection(misEquipos, misOrdenes) {
   const container = document.getElementById('machinery-container');
   if (!container) return;
 
+  const btnTodos = document.getElementById('btn-maq-filtro-todos');
+  const btnOperando = document.getElementById('btn-maq-filtro-operando');
+  const btnMantenimiento = document.getElementById('btn-maq-filtro-mantenimiento');
+  
+  if (btnTodos) btnTodos.className = currentMaquinariaFiltro === 'todos' ? 'btn-primary' : 'btn-secondary';
+  if (btnOperando) btnOperando.className = currentMaquinariaFiltro === 'operando' ? 'btn-primary' : 'btn-secondary';
+  if (btnMantenimiento) btnMantenimiento.className = currentMaquinariaFiltro === 'mantenimiento' ? 'btn-primary' : 'btn-secondary';
+
   if (misEquipos.length === 0) {
     container.innerHTML = `
       <div class="empty-state" style="grid-column: 1/-1;">
@@ -834,29 +820,58 @@ function renderMachinerySection(misEquipos, misOrdenes) {
     return;
   }
 
+  // Calculate dynamic status for each machine first
+  const machinesWithStatus = misEquipos.map(m => {
+    const ordenesMaquina = misOrdenes.filter(o => {
+      if (o.maquinaria_id === m.id) return true;
+      const equipoString = o.equipo || '';
+      const names = equipoString.split(',').map(n => n.trim()).filter(Boolean);
+      return names.some(name => {
+        return (
+          (m.idInterno && name.includes(`[${m.idInterno}]`)) ||
+          (m.serie && name.includes(`(SN: ${m.serie})`)) ||
+          name === m.idInterno ||
+          name === m.serie
+        );
+      });
+    });
+    const tieneServicioActivo = ordenesMaquina.some(o => o.estado && !['finalizado', 'firmado'].includes(o.estado.toLowerCase()));
+    const statusLabel = tieneServicioActivo ? 'En Mantenimiento' : 'Operando';
+    const statusClass = tieneServicioActivo ? 'proceso' : 'operando';
+    return { machine: m, statusLabel, statusClass, ordenesMaquina };
+  });
+
+  // Filter based on selected filter
+  const filtered = machinesWithStatus.filter(item => {
+    if (currentMaquinariaFiltro === 'operando') {
+      return item.statusLabel === 'Operando';
+    }
+    if (currentMaquinariaFiltro === 'mantenimiento') {
+      return item.statusLabel === 'En Mantenimiento';
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="grid-column: 1/-1;">
+        <i data-lucide="settings-2" style="width:48px; height:48px;"></i>
+        <p style="margin-top:0.75rem; font-weight:600; font-size:1.1rem;">No hay maquinaria en esta categoría</p>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+
   let html = '';
-  misEquipos.forEach(m => {
+  filtered.forEach(item => {
+    const m = item.machine;
+    const statusLabel = item.statusLabel;
+    const statusClass = item.statusClass;
+    const ordenesMaquina = item.ordenesMaquina;
     const codMarca = (m.marca || '').toLowerCase().trim();
     const logoImg = getLogoByBrand(codMarca);
     const marcaCompleta = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || 'Genérico';
-    
-    // Obtener órdenes de servicio históricas de esta máquina
-    const ordenesMaquina = misOrdenes.filter(o => 
-      o.maquinaria_id === m.id || 
-      (m.idInterno && o.equipo && o.equipo.includes(m.idInterno)) ||
-      (m.serie && o.equipo && o.equipo.includes(m.serie))
-    );
-
-    // Determinar estado de la máquina
-    let statusLabel = 'Operando';
-    let statusClass = 'operando';
-    
-    const tieneServicioActivo = ordenesMaquina.some(o => o.estado && !['finalizado', 'firmado'].includes(o.estado.toLowerCase()));
-    if (tieneServicioActivo) {
-      statusLabel = 'En Mantenimiento';
-      statusClass = 'proceso';
-    }
-
     const horometroVal = m.horometro || m.customData?.horometro || 0;
     const ubicacionVal = m.ubicacion || m.customData?.ubicacion || 'Sin Ubicación';
 
@@ -1010,7 +1025,7 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
       const tienePedido = !!(t.pedidoSAP || t.pedido_sap) || cotAceptadaVal === 'si';
       return tieneCotizacion && !tienePedido;
     });
-  } else if (currentTicketFiltro === 'pedido') {
+  } else if (currentTicketFiltro === 'cerrado') {
     filtered = filtered.filter(t => {
       const cotAceptadaVal = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
       const tienePedido = !!(t.pedidoSAP || t.pedido_sap) || cotAceptadaVal === 'si';
@@ -1049,14 +1064,14 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
   const btnAsignado = document.getElementById('btn-filtro-t-asignado');
   const btnEnCurso = document.getElementById('btn-filtro-t-encurso');
   const btnCotizado = document.getElementById('btn-filtro-t-cotizado');
-  const btnPedido = document.getElementById('btn-filtro-t-pedido');
+  const btnCerrado = document.getElementById('btn-filtro-t-cerrado');
   const btnTodos = document.getElementById('btn-filtro-t-todos');
   
   if (btnReportado) btnReportado.className = currentTicketFiltro === 'reportado' ? 'btn-primary' : 'btn-secondary';
   if (btnAsignado) btnAsignado.className = currentTicketFiltro === 'asignado' ? 'btn-primary' : 'btn-secondary';
   if (btnEnCurso) btnEnCurso.className = currentTicketFiltro === 'en curso' ? 'btn-primary' : 'btn-secondary';
   if (btnCotizado) btnCotizado.className = currentTicketFiltro === 'cotizado' ? 'btn-primary' : 'btn-secondary';
-  if (btnPedido) btnPedido.className = currentTicketFiltro === 'pedido' ? 'btn-primary' : 'btn-secondary';
+  if (btnCerrado) btnCerrado.className = currentTicketFiltro === 'cerrado' ? 'btn-primary' : 'btn-secondary';
   if (btnTodos) btnTodos.className = currentTicketFiltro === 'todos' ? 'btn-primary' : 'btn-secondary';
 
   if (filtered.length === 0) {
@@ -1160,6 +1175,11 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
 
 function filtrarHistorialTickets(filtro) {
   currentTicketFiltro = filtro;
+  doRender();
+}
+
+function filtrarMaquinariaEstado(filtro) {
+  currentMaquinariaFiltro = filtro;
   doRender();
 }
 
@@ -1346,7 +1366,7 @@ function renderServicesSection(misOrdenes) {
   if (!tbody) return;
 
   if (misOrdenes.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="text-align: center;">No hay órdenes de servicio registradas.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="text-align: center;">No hay órdenes de servicio registradas.</td></tr>`;
   } else {
     let html = '';
     misOrdenes.forEach(o => {
@@ -1385,9 +1405,18 @@ function renderServicesSection(misOrdenes) {
         `;
       }
 
+      let ticketFolioHtml = '<span style="color:var(--text-muted); font-size:0.8rem;">—</span>';
+      if (o.soporte) {
+        const tick = tickets.find(t => t.id === o.soporte);
+        if (tick) {
+          ticketFolioHtml = `<span style="font-family: monospace; font-weight:600; color:var(--accent);">${tick.folio || 'Soporte'}</span>`;
+        }
+      }
+
       html += `
         <tr onclick="abrirDetalleOrdenCliente('${o.id}')" style="cursor:pointer;">
           <td><strong>${o.folio || 'N/A'}</strong></td>
+          <td>${ticketFolioHtml}</td>
           <td>${o.modelo || o.equipo || 'Maquinaria'}</td>
           <td>${o.tipo || 'Servicio'}</td>
           <td>${fechaFormat}</td>
@@ -1517,7 +1546,7 @@ function reportarFallaDeMaquina(id, modelo, serie, ubicacion) {
     // Buscar la opción correspondiente
     for (let i = 0; i < comboEquipos.options.length; i++) {
       const optVal = comboEquipos.options[i].value;
-      if (optVal.includes(serie) || optVal.includes(id)) {
+      if ((id && optVal.includes(`[${id}]`)) || (serie && optVal.includes(`(SN: ${serie})`))) {
         comboEquipos.value = optVal;
         onTicketEquipoChange(optVal);
         break;

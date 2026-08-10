@@ -1,7 +1,10 @@
-const CACHE_NAME = 'eurorep-postventa-v296';
+const CACHE_NAME = 'eurorep-postventa-v299';
 const ASSETS = [
   '/',
   '/index.html',
+  '/localstorage-bridge.js',
+  '/theme-base.css',
+  '/utils.js',
   '/app.js',
   '/style.css',
   '/cliente',

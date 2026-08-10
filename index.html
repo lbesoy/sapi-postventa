@@ -2,155 +2,8 @@
 <html lang="es">
 
 <head>
+  <script src="localstorage-bridge.js?v=1"></script>
   <script>
-    // --- LOCALSTORAGE TO INDEXEDDB BRIDGE (QuotaExceededError Fix) ---
-    (function() {
-      window.localStorageCache = {};
-      window.localStorageCacheLoaded = false;
-      const originalGetItem = Storage.prototype.getItem;
-      const originalSetItem = Storage.prototype.setItem;
-      const originalRemoveItem = Storage.prototype.removeItem;
-      const originalClear = Storage.prototype.clear;
-      const redirectedKeys = ['sapi_refacciones_db', 'eurorep_pedidos_sap', 'eurorep_cotizaciones_sap', 'sapi_tickets', 'sapi_ordenes', 'sapi_levantamientos', 'sapi_sync_queue'];
-
-      window.initLocalStorageIndexedDBBridge = function() {
-        return new Promise((resolve) => {
-          if (typeof indexedDB === 'undefined') {
-            resolve();
-            return;
-          }
-          const request = indexedDB.open('SapiOfflineDB', 1);
-          request.onupgradeneeded = (e) => {
-            const db = e.target.result;
-            if (!db.objectStoreNames.contains('catalogs')) {
-              db.createObjectStore('catalogs', { keyPath: 'id' });
-            }
-          };
-          request.onerror = () => resolve();
-          request.onsuccess = (e) => {
-            const db = e.target.result;
-            const tx = db.transaction('catalogs', 'readonly');
-            const store = tx.objectStore('catalogs');
-            let completed = 0;
-            
-            redirectedKeys.forEach(key => {
-              const req = store.get(key);
-              req.onsuccess = () => {
-                if (req.result && req.result.data) {
-                  window.localStorageCache[key] = JSON.stringify(req.result.data);
-                  originalRemoveItem.call(localStorage, key);
-                } else {
-                  // MIGRACIÓN: Si existe en localStorage real pero no en IndexedDB
-                  const localVal = originalGetItem.call(localStorage, key);
-                  if (localVal) {
-                    window.localStorageCache[key] = localVal;
-                    try {
-                      const txWrite = db.transaction('catalogs', 'readwrite');
-                      const storeWrite = txWrite.objectStore('catalogs');
-                      storeWrite.put({ id: key, data: JSON.parse(localVal) });
-                      originalRemoveItem.call(localStorage, key);
-                      console.log(`[Bridge Migration] Migrado ${key} a IndexedDB y liberado localStorage.`);
-                    } catch (e) {
-                      console.error(`[Bridge Migration] Error migrando ${key}:`, e);
-                    }
-                  }
-                }
-                completed++;
-                if (completed === redirectedKeys.length) {
-                  window.localStorageCacheLoaded = true;
-                  resolve();
-                }
-              };
-              req.onerror = () => {
-                completed++;
-                if (completed === redirectedKeys.length) {
-                  window.localStorageCacheLoaded = true;
-                  resolve();
-                }
-              };
-            });
-          };
-        });
-      };
-
-      Storage.prototype.getItem = function(key) {
-        if (this === localStorage && redirectedKeys.includes(key)) {
-          if (key in window.localStorageCache) {
-            return window.localStorageCache[key];
-          }
-          return originalGetItem.call(this, key);
-        }
-        return originalGetItem.call(this, key);
-      };
-
-      Storage.prototype.setItem = function(key, value) {
-        if (this === localStorage && redirectedKeys.includes(key)) {
-          window.localStorageCache[key] = value;
-          originalRemoveItem.call(this, key);
-          (async () => {
-            try {
-              let parsedData = JSON.parse(value);
-              const db = await new Promise((res) => {
-                const req = indexedDB.open('SapiOfflineDB', 1);
-                req.onsuccess = (ev) => res(ev.target.result);
-                req.onerror = () => res(null);
-              });
-              if (db) {
-                const tx = db.transaction('catalogs', 'readwrite');
-                const store = tx.objectStore('catalogs');
-                store.put({ id: key, data: parsedData });
-              }
-            } catch (e) {
-              console.error('[IndexedDB Bridge] Error al guardar:', key, e);
-            }
-          })();
-          return;
-        }
-        return originalSetItem.call(this, key, value);
-      };
-
-      Storage.prototype.removeItem = function(key) {
-        if (this === localStorage && redirectedKeys.includes(key)) {
-          delete window.localStorageCache[key];
-          (async () => {
-            try {
-              const db = await new Promise((res) => {
-                const req = indexedDB.open('SapiOfflineDB', 1);
-                req.onsuccess = (ev) => res(ev.target.result);
-                req.onerror = () => res(null);
-              });
-              if (db) {
-                const tx = db.transaction('catalogs', 'readwrite');
-                const store = tx.objectStore('catalogs');
-                store.delete(key);
-              }
-            } catch (e) {}
-          })();
-        }
-        return originalRemoveItem.call(this, key);
-      };
-
-      Storage.prototype.clear = function() {
-        if (this === localStorage) {
-          window.localStorageCache = {};
-          (async () => {
-            try {
-              const db = await new Promise((res) => {
-                const req = indexedDB.open('SapiOfflineDB', 1);
-                req.onsuccess = (ev) => res(ev.target.result);
-                req.onerror = () => res(null);
-              });
-              if (db) {
-                const tx = db.transaction('catalogs', 'readwrite');
-                const store = tx.objectStore('catalogs');
-                store.clear();
-              }
-            } catch (e) {}
-          })();
-        }
-        return originalClear.call(this);
-      };
-    })();
 
     window.onerror = function(message, source, lineno, colno, error) {
       console.error("ERROR GLOBAL DETECTADO:", message, "\nArchivo:", source, "\nLínea:", lineno, "\nColumna:", colno, "\nError:", error);
@@ -224,16 +77,17 @@
   <meta name="description" content="Sistema de seguimiento de órdenes de servicio para Eurorep Refacciones" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js" defer></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-  <script src="https://js.live.net/v7.2/OneDrive.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" defer></script>
+  <script src="https://js.live.net/v7.2/OneDrive.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
+  <link rel="stylesheet" href="theme-base.css?v=1" />
   <link rel="stylesheet" href="style.css?v=56" />
   <!-- PWA & Mobile Web App Capabilities -->
   <link rel="manifest" href="manifest.json" />
@@ -498,7 +352,7 @@
             <!-- Floating Dropdown Menu -->
             <div id="notification-dropdown" class="notification-dropdown-menu" style="display:none; position:absolute; top:42px; right:0; width:320px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.5); z-index:1000; overflow:hidden; cursor:default;" onclick="event.stopPropagation()">
               <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02);">
-                <span style="font-weight:700; font-size:0.85rem; color:var(--text-primary); display:flex; align-items:center; gap:0.25rem;"><i data-lucide="bell-ring" style="width:14px; height:14px; color:var(--accent);"></i> Tickets Sin Asignar</span>
+                <span style="font-weight:700; font-size:0.85rem; color:var(--text-primary); display:flex; align-items:center; gap:0.25rem;"><i data-lucide="bell-ring" style="width:14px; height:14px; color:var(--accent);"></i> Notificaciones Activas</span>
                 <span id="notification-dropdown-count" style="font-size:0.7rem; background:rgba(232,130,12,0.15); color:var(--accent); padding:2px 6px; border-radius:10px; font-weight:600;">0</span>
               </div>
               <div id="notification-items-container" style="max-height:280px; overflow-y:auto; display:flex; flex-direction:column; padding:0.5rem 0;">
@@ -3700,7 +3554,7 @@
                           <span style="color:var(--text-secondary);">Es el medidor que registra las horas de trabajo de
                             la máquina (similar al odómetro de un auto). Necesitamos foto de la pantalla o reloj donde
                             se muestran los números.</span><br />
-                          <img src="horometro_ejemplo.png" alt="Ejemplo de Horómetro"
+                          <img src="horometro_ejemplo.jpg" alt="Ejemplo de Horómetro"
                             style="width:100%; border-radius:4px; margin-top:8px; border:1px solid var(--border);" />
                         </div>
                       </div>
@@ -3950,12 +3804,9 @@
               <div id="u-empresa-sugerida" style="font-size:0.85rem; color:var(--orange); margin-top:1rem; margin-bottom:1rem; display:none; padding: 0.75rem 1rem; background: rgba(232, 130, 12, 0.08); border-radius: var(--radius-sm); border: 1px dashed rgba(232, 130, 12, 0.3);"></div>
               <div id="u-empresa-container" class="form-group"
                 style="display:none; margin-top:1rem; padding-top:1rem; border-top:1px dashed var(--border);">
-                <label>Empresa Asociada * <span
-                    style="color:var(--text-muted);font-weight:normal;font-size:0.75rem;">(Escriba o seleccione una
-                    empresa del catálogo)</span></label>
-                <input type="text" id="u-empresa" list="u-empresa-list"
-                  placeholder="Seleccione o escriba la empresa..." />
-                <datalist id="u-empresa-list"></datalist>
+                <label>Empresas Asociadas * <span
+                    style="color:var(--text-muted);font-weight:normal;font-size:0.75rem;">(Seleccione una o más empresas)</span></label>
+                <select id="u-empresa" multiple size="5" style="height:auto;"></select>
               </div>
             </div>
             <div class="form-section">
@@ -5720,6 +5571,7 @@
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
         "supabaseSync.js?v=292",
+        "utils.js?v=1",
         "app.js?v=292",
         "levantamientos.js?v=292",
         "tecnicos_reporte.js?v=292"

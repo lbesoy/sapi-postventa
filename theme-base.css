@@ -1,0 +1,38 @@
+/* ===== EUROREP DESIGN SYSTEM - BASE THEME ===== */
+
+:root {
+  /* Brand Accent Colors */
+  --accent: #E8820C;
+  --accent-hover: #cf7009;
+  --accent-light: rgba(232, 130, 12, 0.12);
+
+  /* Status / Alert Colors */
+  --green: #10b981;
+  --green-light: rgba(16, 185, 129, 0.12);
+  --red: #ef4444;
+  --red-light: rgba(239, 68, 68, 0.12);
+  --orange: #f59e0b;
+  --orange-light: rgba(245, 158, 11, 0.12);
+}
+
+/* Light mode defaults shared between portals */
+body.light-mode {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #f1f5f9;
+  --border: #e2e8f0;
+  
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+
+  --accent: #E8820C;
+  --accent-hover: #cf7009;
+  --accent-light: rgba(232, 130, 12, 0.08);
+
+  --green: #059669;
+  --green-light: rgba(5, 150, 105, 0.08);
+  --red: #dc2626;
+  --red-light: rgba(220, 38, 38, 0.08);
+}

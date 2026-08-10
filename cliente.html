@@ -1,155 +1,8 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+  <script src="localstorage-bridge.js?v=1"></script>
   <script>
-    // --- LOCALSTORAGE TO INDEXEDDB BRIDGE (QuotaExceededError Fix) ---
-    (function() {
-      window.localStorageCache = {};
-      window.localStorageCacheLoaded = false;
-      const originalGetItem = Storage.prototype.getItem;
-      const originalSetItem = Storage.prototype.setItem;
-      const originalRemoveItem = Storage.prototype.removeItem;
-      const originalClear = Storage.prototype.clear;
-      const redirectedKeys = ['sapi_refacciones_db', 'eurorep_pedidos_sap', 'eurorep_cotizaciones_sap', 'sapi_tickets', 'sapi_ordenes', 'sapi_levantamientos', 'sapi_sync_queue'];
-
-      window.initLocalStorageIndexedDBBridge = function() {
-        return new Promise((resolve) => {
-          if (typeof indexedDB === 'undefined') {
-            resolve();
-            return;
-          }
-          const request = indexedDB.open('SapiOfflineDB', 1);
-          request.onupgradeneeded = (e) => {
-            const db = e.target.result;
-            if (!db.objectStoreNames.contains('catalogs')) {
-              db.createObjectStore('catalogs', { keyPath: 'id' });
-            }
-          };
-          request.onerror = () => resolve();
-          request.onsuccess = (e) => {
-            const db = e.target.result;
-            const tx = db.transaction('catalogs', 'readonly');
-            const store = tx.objectStore('catalogs');
-            let completed = 0;
-            
-            redirectedKeys.forEach(key => {
-              const req = store.get(key);
-              req.onsuccess = () => {
-                if (req.result && req.result.data) {
-                  window.localStorageCache[key] = JSON.stringify(req.result.data);
-                  originalRemoveItem.call(localStorage, key);
-                } else {
-                  // MIGRACIÓN: Si existe en localStorage real pero no en IndexedDB
-                  const localVal = originalGetItem.call(localStorage, key);
-                  if (localVal) {
-                    window.localStorageCache[key] = localVal;
-                    try {
-                      const txWrite = db.transaction('catalogs', 'readwrite');
-                      const storeWrite = txWrite.objectStore('catalogs');
-                      storeWrite.put({ id: key, data: JSON.parse(localVal) });
-                      originalRemoveItem.call(localStorage, key);
-                      console.log(`[Bridge Migration] Migrado ${key} a IndexedDB y liberado localStorage.`);
-                    } catch (e) {
-                      console.error(`[Bridge Migration] Error migrando ${key}:`, e);
-                    }
-                  }
-                }
-                completed++;
-                if (completed === redirectedKeys.length) {
-                  window.localStorageCacheLoaded = true;
-                  resolve();
-                }
-              };
-              req.onerror = () => {
-                completed++;
-                if (completed === redirectedKeys.length) {
-                  window.localStorageCacheLoaded = true;
-                  resolve();
-                }
-              };
-            });
-          };
-        });
-      };
-
-      Storage.prototype.getItem = function(key) {
-        if (this === localStorage && redirectedKeys.includes(key)) {
-          if (key in window.localStorageCache) {
-            return window.localStorageCache[key];
-          }
-          return originalGetItem.call(this, key);
-        }
-        return originalGetItem.call(this, key);
-      };
-
-      Storage.prototype.setItem = function(key, value) {
-        if (this === localStorage && redirectedKeys.includes(key)) {
-          window.localStorageCache[key] = value;
-          originalRemoveItem.call(this, key);
-          (async () => {
-            try {
-              let parsedData = JSON.parse(value);
-              const db = await new Promise((res) => {
-                const req = indexedDB.open('SapiOfflineDB', 1);
-                req.onsuccess = (ev) => res(ev.target.result);
-                req.onerror = () => res(null);
-              });
-              if (db) {
-                const tx = db.transaction('catalogs', 'readwrite');
-                const store = tx.objectStore('catalogs');
-                store.put({ id: key, data: parsedData });
-              }
-            } catch (e) {
-              console.error('[IndexedDB Bridge] Error al guardar:', key, e);
-            }
-          })();
-          return;
-        }
-        return originalSetItem.call(this, key, value);
-      };
-
-      Storage.prototype.removeItem = function(key) {
-        if (this === localStorage && redirectedKeys.includes(key)) {
-          delete window.localStorageCache[key];
-          (async () => {
-            try {
-              const db = await new Promise((res) => {
-                const req = indexedDB.open('SapiOfflineDB', 1);
-                req.onsuccess = (ev) => res(ev.target.result);
-                req.onerror = () => res(null);
-              });
-              if (db) {
-                const tx = db.transaction('catalogs', 'readwrite');
-                const store = tx.objectStore('catalogs');
-                store.delete(key);
-              }
-            } catch (e) {}
-          })();
-        }
-        return originalRemoveItem.call(this, key);
-      };
-
-      Storage.prototype.clear = function() {
-        if (this === localStorage) {
-          window.localStorageCache = {};
-          (async () => {
-            try {
-              const db = await new Promise((res) => {
-                const req = indexedDB.open('SapiOfflineDB', 1);
-                req.onsuccess = (ev) => res(ev.target.result);
-                req.onerror = () => res(null);
-              });
-              if (db) {
-                const tx = db.transaction('catalogs', 'readwrite');
-                const store = tx.objectStore('catalogs');
-                store.clear();
-              }
-            } catch (e) {}
-          })();
-        }
-        return originalClear.call(this);
-      };
-    })();
 
     // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
     (function() {
@@ -212,9 +65,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
   
   <!-- CSS -->
+  <link rel="stylesheet" href="theme-base.css?v=1" />
   <link rel="stylesheet" href="cliente.css?v=5" />
   
   <!-- Mobile & PWA Capabilites -->
@@ -466,6 +320,13 @@
 
         <!-- 2. MACHINERY VIEW -->
         <div id="view-maquinaria" class="view">
+          <!-- Filtros de Maquinaria -->
+          <div style="display:flex; gap:0.5rem; margin-bottom:1.5rem; align-items:center; flex-wrap:wrap;">
+            <span style="font-size:0.85rem; color:var(--text-muted); font-weight:600; margin-right:0.5rem;"><i data-lucide="filter" style="width:14px; height:14px; display:inline-block; vertical-align:middle; margin-right:3px;"></i> Filtrar Estado:</span>
+            <button class="btn-secondary active" id="btn-maq-filtro-todos" onclick="filtrarMaquinariaEstado('todos')" style="padding:0.4rem 0.8rem; font-size:0.8rem; border-radius:6px; min-height:32px; font-weight:600;">Todos</button>
+            <button class="btn-secondary" id="btn-maq-filtro-operando" onclick="filtrarMaquinariaEstado('operando')" style="padding:0.4rem 0.8rem; font-size:0.8rem; border-radius:6px; min-height:32px; font-weight:600;">En Operación</button>
+            <button class="btn-secondary" id="btn-maq-filtro-mantenimiento" onclick="filtrarMaquinariaEstado('mantenimiento')" style="padding:0.4rem 0.8rem; font-size:0.8rem; border-radius:6px; min-height:32px; font-weight:600;">En Mantenimiento</button>
+          </div>
           <div class="machinery-grid" id="machinery-container">
             <!-- JS Rendered Machinery -->
           </div>
@@ -562,7 +423,7 @@
                   <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px; display:none;" id="btn-filtro-t-asignado" onclick="filtrarHistorialTickets('asignado')">Asignados</button>
                   <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px;" id="btn-filtro-t-encurso" onclick="filtrarHistorialTickets('en curso')">En Curso</button>
                   <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px;" id="btn-filtro-t-cotizado" onclick="filtrarHistorialTickets('cotizado')">Cotizados</button>
-                  <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px;" id="btn-filtro-t-pedido" onclick="filtrarHistorialTickets('pedido')">Pedidos</button>
+                  <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px;" id="btn-filtro-t-cerrado" onclick="filtrarHistorialTickets('cerrado')">Cerrados</button>
                   <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px;" id="btn-filtro-t-todos" onclick="filtrarHistorialTickets('todos')">Todos</button>
                 </div>
                 
@@ -600,6 +461,7 @@
                 <thead>
                   <tr>
                     <th>Folio</th>
+                    <th>Ticket</th>
                     <th>Equipo</th>
                     <th>Tipo</th>
                     <th>Fecha</th>
@@ -775,6 +637,7 @@
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
         "supabaseSync.js?v=231",
+        "utils.js?v=1",
         "cliente.js?v=15"
       ];
       var index = 0;

@@ -8,54 +8,6 @@ let currentDesgSortCol = 'fecha';
 let currentDesgSortDir = 'asc';
 let currentDesgloseData = [];
 
-window.cleanMojibake = function(str) {
-  if (typeof str !== 'string' || !str) return str;
-
-  // 1. Try smart UTF-8 decode from character codes (bytes interpreted as Windows-1252/ISO-8859-1)
-  if (str.includes('Ã') || str.includes('Â') || str.includes('Âº') || str.includes('Â±')) {
-    try {
-      const bytes = new Uint8Array(str.length);
-      let valid = true;
-      for (let i = 0; i < str.length; i++) {
-        const code = str.charCodeAt(i);
-        if (code > 255) {
-          valid = false;
-          break;
-        }
-        bytes[i] = code;
-      }
-      if (valid) {
-        const decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-        return decoded.trim();
-      }
-    } catch (e) {
-      // Ignore error and fall back to replacements
-    }
-  }
-
-  // 2. Fallback replacements for common Spanish Mojibake patterns
-  let fixed = str;
-  const replacements = {
-    'Ã¡': 'á', 'Ã©': 'é', 'Ã­': 'í', 'Ã³': 'ó', 'Ãº': 'ú', 'Ã±': 'ñ',
-    'Ã': 'Á', 'Ã‰': 'É', 'Ã': 'Í', 'Ã“': 'Ó', 'Ãš': 'Ú', 'Ã‘': 'Ñ',
-    'Ã¼': 'ü', 'Ãœ': 'Ü',
-    'Ãa': 'ía', // Garcia correction
-    'Âº': 'º',
-    'Â±': '±',
-    'Â': ''
-  };
-
-  for (const [bad, good] of Object.entries(replacements)) {
-    fixed = fixed.split(bad).join(good);
-  }
-
-  return fixed.trim();
-};
-
-window.normStr = function(s) {
-  return (s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-};
-
 // Registrar Service Worker para soporte PWA (sólo en producción, no en localhost)
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
@@ -294,31 +246,7 @@ function formatFechaAmigable(dateStr) {
   return dateStr;
 }
 
-function formatFechaHoraAmigable(dateStr) {
-  if (!dateStr) return '—';
-  // Si contiene T00:00:00, es una fecha pura sin hora (guardada a medianoche UTC), evitamos el desfase
-  if (dateStr.includes('T00:00:00')) {
-    const datePortion = dateStr.split('T')[0];
-    const parts = datePortion.split('-');
-    if (parts.length === 3) {
-      return `${parts[2]}/${parts[1]}/${parts[0]}`;
-    }
-  }
-  // Si contiene T, es un timestamp completo y lo convertimos a la fecha y hora local del navegador
-  if (dateStr.includes('T')) {
-    const d = new Date(dateStr);
-    if (!isNaN(d)) {
-      const pad = (num) => String(num).padStart(2, '0');
-      return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    }
-  }
-  // Si es fecha corta YYYY-MM-DD
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    if (parts[0].length === 4) return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  }
-  return dateStr;
-}
+
 
 // ===== DATA =====
 let ordenes = safeGetJSON('sapi_ordenes', []);
@@ -390,18 +318,24 @@ window.migrarOrdenesExistentesMaquinaria = function() {
 
     const matchMaquina = (m) => {
       const cleanId = m.idInterno || m.id || '';
+      if (!cleanId) return false;
       const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
       const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
       const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
       const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
       
-      return (
-        t.equipo === mName ||
-        t.equipo === cleanId ||
-        t.equipo === m.serie ||
-        t.equipo.includes(cleanId) ||
-        (m.serie && t.equipo.includes(m.serie))
-      );
+      const equipoString = t.equipo || '';
+      const names = equipoString.split(',').map(n => n.trim()).filter(Boolean);
+      
+      return names.some(name => {
+        return (
+          name === mName ||
+          name === cleanId ||
+          name === m.serie ||
+          name.includes(`[${cleanId}]`) ||
+          (m.serie && name.includes(`(SN: ${m.serie})`))
+        );
+      });
     };
 
     let maq = null;
@@ -485,18 +419,24 @@ window.migrarUbicacionesMaquinariaDesdeTickets = function() {
 
     const matchMaquina = (m) => {
       const cleanId = m.idInterno || m.id || '';
+      if (!cleanId) return false;
       const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
       const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
       const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
       const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
       
-      return (
-        t.equipo === mName ||
-        t.equipo === cleanId ||
-        t.equipo === m.serie ||
-        t.equipo.includes(cleanId) ||
-        (m.serie && t.equipo.includes(m.serie))
-      );
+      const equipoString = t.equipo || '';
+      const names = equipoString.split(',').map(n => n.trim()).filter(Boolean);
+      
+      return names.some(name => {
+        return (
+          name === mName ||
+          name === cleanId ||
+          name === m.serie ||
+          name.includes(`[${cleanId}]`) ||
+          (m.serie && name.includes(`(SN: ${m.serie})`))
+        );
+      });
     };
 
     // Buscar en clientesDb (máquinas manuales)
@@ -583,18 +523,24 @@ window.recuperarMaquinariaDesdeTickets = function() {
 
     const matchMaquina = (m) => {
       const cleanId = m.idInterno || m.id || '';
+      if (!cleanId) return false;
       const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
       const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
       const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
       const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
       
-      return (
-        t.equipo === mName ||
-        t.equipo === cleanId ||
-        t.equipo === m.serie ||
-        t.equipo.includes(cleanId) ||
-        (m.serie && t.equipo.includes(m.serie))
-      );
+      const equipoString = t.equipo || '';
+      const names = equipoString.split(',').map(n => n.trim()).filter(Boolean);
+      
+      return names.some(name => {
+        return (
+          name === mName ||
+          name === cleanId ||
+          name === m.serie ||
+          name.includes(`[${cleanId}]`) ||
+          (m.serie && name.includes(`(SN: ${m.serie})`))
+        );
+      });
     };
 
     // 1. Verificar si la máquina ya existe en clientesDb
@@ -823,6 +769,9 @@ window.addEventListener('supabase_datos_cargados', async () => {
     }
     if (typeof renderLevantamientos === 'function' && document.getElementById('view-levantamientos')?.classList.contains('active')) {
       renderLevantamientos();
+    }
+    if (typeof renderChatSoporteEmpresa === 'function' && document.getElementById('view-chat-soporte')?.classList.contains('active')) {
+      renderChatSoporteEmpresa();
     }
     
     // Re-aplicar rol para asegurar que el role-switcher se muestre si el usuario recién se descargó
@@ -1792,12 +1741,7 @@ function isTestData(item) {
   return false;
 }
 
-function isTestUser(user) {
-  if (!user) return false;
-  const name = (user.nombre || '').toLowerCase();
-  const email = (user.email || '').toLowerCase();
-  return name.includes('prueba') || name.includes('test') || email.includes('prueba') || email.includes('test');
-}
+
 
 function isTestModeActive() {
   const user = usuarios.find(u => u.id === currentSession.userId);
@@ -3092,15 +3036,13 @@ function abrirModalUsuario(id) {
     uResetPassSection.style.display = id ? 'block' : 'none';
   }
 
-  // Rellenar datalist de empresas (clientesLegacy + clientesDb)
-  const legacyMap = new Map();
-  ordenes.forEach(o => { if (o.cliente) legacyMap.set(o.cliente, true); });
-  const datalist = document.getElementById('u-empresa-list');
-  const allEmps = [...new Set([...clientesDb.map(c=>c.nombre), ...Array.from(legacyMap.keys())])].sort();
-  if (datalist) datalist.innerHTML = allEmps.map(e => `<option value="${e}">`).join('');
-
+  // Rellenar select de empresas con los datos de clientesDb
   const uEmpresaContainer = document.getElementById('u-empresa-container');
   const uEmpresa = document.getElementById('u-empresa');
+  if (uEmpresa) {
+    uEmpresa.innerHTML = clientesDb.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+  }
+
   const uNombre = document.getElementById('u-nombre');
   const uEmail = document.getElementById('u-email');
   const uTelefono = document.getElementById('u-telefono');
@@ -3121,7 +3063,17 @@ function abrirModalUsuario(id) {
     if (uEmail) uEmail.value = u.email || '';
     if (uTelefono) uTelefono.value = u.telefono || '';
     if (uActivo) uActivo.checked = u.activo !== false;
-    if (uEmpresa) uEmpresa.value = u.empresa || '';
+    
+    if (uEmpresa) {
+      const assocEmpresas = u.empresas || [];
+      const legacyEmp = u.empresa ? u.empresa.toLowerCase().trim() : '';
+      Array.from(uEmpresa.options).forEach(opt => {
+        const valNorm = opt.value.toLowerCase().trim();
+        const textNorm = opt.text.toLowerCase().trim();
+        opt.selected = assocEmpresas.includes(opt.value) || 
+                       (legacyEmp && (valNorm === legacyEmp || textNorm === legacyEmp));
+      });
+    }
 
     // Mostrar sugerencia de empresa si la tiene
     const uEmpresaSugerida = document.getElementById('u-empresa-sugerida');
@@ -3256,7 +3208,7 @@ async function guardarUsuario(e) {
   // Seguridad extra para superadmin: no cambiar su rol ni desactivarlo
   const existingUser = editandoUserId ? usuarios.find(x => x.id === editandoUserId) : null;
   const rol = existingUser && existingUser.rol === 'superadmin' ? 'superadmin' : document.querySelector('input[name="u-rol"]:checked')?.value;
-  const empresa = uEmpresa ? uEmpresa.value.trim() : '';
+  const selectedEmpresas = uEmpresa ? Array.from(uEmpresa.selectedOptions || []).map(o => o.value) : [];
   const activo = existingUser && existingUser.rol === 'superadmin' ? true : document.getElementById('u-activo')?.checked;
 
   if (!rol) { alert('Selecciona un rol para el usuario.'); return; }
@@ -3273,10 +3225,16 @@ async function guardarUsuario(e) {
     console.error('Error al verificar sesión de Supabase Auth:', e);
   }
 
+  let firstEmpName = null;
+  if (selectedEmpresas.length > 0) {
+    const match = clientesDb.find(c => c.id === selectedEmpresas[0]);
+    firstEmpName = match ? match.nombre : selectedEmpresas[0];
+  }
+
   const updateData = { nombre, email, telefono, rol, activo: activo === true };
   if (rol === 'empresa' || rol === 'cliente') {
-    if (!empresa) { alert('La empresa asociada es obligatoria.'); return; }
-    updateData.empresa = empresa;
+    if (selectedEmpresas.length === 0) { alert('Selecciona al menos una empresa asociada.'); return; }
+    updateData.empresa = firstEmpName;
   } else {
     updateData.empresa = null;
   }
@@ -3299,10 +3257,35 @@ async function guardarUsuario(e) {
       return;
     }
 
+    // Actualizar relación en la tabla relacional cliente_usuarios
+    const { error: delErr } = await window.supabaseClient
+      .from('cliente_usuarios')
+      .delete()
+      .eq('usuario_id', editandoUserId);
+
+    if (delErr) {
+      console.warn('[Supabase] Error al limpiar empresas anteriores:', delErr.message);
+    } else if (selectedEmpresas.length > 0 && (rol === 'empresa' || rol === 'cliente')) {
+      const insertRows = selectedEmpresas.map(empId => ({
+        usuario_id: editandoUserId,
+        cliente_id: empId
+      }));
+      const { error: insErr } = await window.supabaseClient
+        .from('cliente_usuarios')
+        .insert(insertRows);
+      if (insErr) {
+        console.warn('[Supabase] Error al asociar empresas nuevas:', insErr.message);
+      }
+    }
+
     // Actualizar en el array local en memoria para refrescar la UI de inmediato
     const localUIndex = usuarios.findIndex(x => x.id === editandoUserId);
     if (localUIndex !== -1) {
-      usuarios[localUIndex] = { ...usuarios[localUIndex], ...updateData };
+      usuarios[localUIndex] = { 
+        ...usuarios[localUIndex], 
+        ...updateData,
+        empresas: selectedEmpresas 
+      };
       localStorage.setItem('eurorep_usuarios', JSON.stringify(usuarios));
     }
 
@@ -6032,7 +6015,7 @@ function verDetalleCliente(nombre) {
                  # ${t.folio || t.id.substring(0,8)} - ${formatDateOnly(t.fechaCreacion)}
                </div>
              </div>
-             <span class="badge badge-${badgeTicketEstado(t)}">${t.estado === 'Cerrado' ? (t.cotAceptada === 'si' ? 'Cerrado (Aceptado)' : 'Cerrado (Rechazado)') : (t.estado||'Abierto')}</span>
+             <span class="badge badge-${badgeTicketEstado(t)}">${getTicketEstadoLabel(t)}</span>
            </div>
            ${ordenes.map(o => `
              <div onclick="event.stopPropagation(); verDetalle('${o.id}')" style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px dashed var(--border); display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.6';" onmouseout="this.style.opacity='1';">
@@ -6506,7 +6489,7 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
                  # ${t.folio || t.id.substring(0,8)} - ${formatDateOnly(t.fechaCreacion)}
                </div>
              </div>
-             <span class="badge badge-${badgeTicketEstado(t)}">${t.estado === 'Cerrado' ? (t.cotAceptada === 'si' ? 'Cerrado (Aceptado)' : 'Cerrado (Rechazado)') : (t.estado||'Abierto')}</span>
+             <span class="badge badge-${badgeTicketEstado(t)}">${getTicketEstadoLabel(t)}</span>
            </div>
            ${ordenes.map(o => `
              <div onclick="event.stopPropagation(); verDetalle('${o.id}')" style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px dashed var(--border); display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.6';" onmouseout="this.style.opacity='1';">
@@ -12589,7 +12572,7 @@ function renderTickets(ctx) {
         </td>
         <td data-label="Área" style="white-space:nowrap;">${t.area||'—'}</td>
         <td data-label="Prioridad" class="col-prioridad" style="white-space:nowrap; display: ${isEmpresa ? 'none' : ''};"><span class="badge badge-${String(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
-        <td data-label="Estado" style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t)}">${t.estado === 'Cerrado' ? (t.cotAceptada === 'si' ? 'Cerrado (Aceptado)' : 'Cerrado (Rechazado)') : (t.estado||'—')}</span></td>
+        <td data-label="Estado" style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t)}">${getTicketEstadoLabel(t)}</span></td>
         <td data-label="Cotización SAP" style="white-space:nowrap; font-family: monospace;">${t.cotizacionSAP||'—'}</td>
         <td data-label="Monto" style="white-space:nowrap; font-weight: 600;">${(t.montoCotizacion !== undefined && t.montoCotizacion !== null) ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(t.montoCotizacion) : '—'}</td>
         <td data-label="Pedido SAP" style="white-space:nowrap; font-family: monospace;">${t.pedidoSAP||'—'}</td>
@@ -12615,11 +12598,33 @@ function renderTickets(ctx) {
 
 function badgeTicketEstado(tOrEstado) {
   const estado = typeof tOrEstado === 'object' ? tOrEstado.estado : tOrEstado;
-  if (typeof tOrEstado === 'object' && tOrEstado.estado === 'Cerrado') {
-    return tOrEstado.cotAceptada === 'si' ? 'cerrado-aprobado' : 'cerrado-rechazado';
+  if (typeof tOrEstado === 'object') {
+    if (tOrEstado.estado === 'Cerrado') {
+      return tOrEstado.cotAceptada === 'si' ? 'cerrado-aprobado' : 'cerrado-rechazado';
+    }
+    if (tOrEstado.estado === 'Cotización') {
+      if (tOrEstado.cotAceptada === 'no' || tOrEstado.cotAceptada === 'rechazada') {
+        return 'cerrado-rechazado';
+      }
+      if (tOrEstado.cotAceptada === 'si' || tOrEstado.cotAceptada === 'aprobada') {
+        return 'cerrado-aprobado';
+      }
+    }
   }
   const map = { 'Abierto':'abierto', 'Cotización':'en-proceso', 'Refacciones':'refacciones', 'Cerrado':'cerrado' };
   return map[estado] || 'abierto';
+}
+
+function getTicketEstadoLabel(t) {
+  if (!t) return '—';
+  if (t.estado === 'Cerrado') {
+    return t.cotAceptada === 'si' ? 'Cerrado (Aceptado)' : 'Cerrado (Rechazado)';
+  }
+  if (t.estado === 'Cotización') {
+    if (t.cotAceptada === 'si' || t.cotAceptada === 'aprobada') return 'Cotización (Aprobada)';
+    if (t.cotAceptada === 'no' || t.cotAceptada === 'rechazada') return 'Cotización (Rechazada)';
+  }
+  return t.estado || 'Abierto';
 }
 
 // ===== MAQUINARIA VIEW =====
@@ -15388,47 +15393,117 @@ window.updateNotificationBell = function() {
   // Filtrar según el modo Sandbox activo
   const filteredTickets = getFilteredTickets();
   
+  // 1. Tickets sin asignar
   const unassigned = filteredTickets.filter(t => {
     const asignadoClean = String(t.asignado || '').trim().toLowerCase();
     const estadoClean = String(t.estado || '').trim().toLowerCase();
     return (asignadoClean === 'sin asignar' || asignadoClean === '') && (estadoClean !== 'cerrado' && estadoClean !== 'finalizado');
   });
 
+  // 2. Pedidos pendientes (cotización aceptada por el cliente pero sin número de pedido SAP registrado)
+  const pendingOrders = filteredTickets.filter(t => {
+    const cotAceptadaVal = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
+    const tienePedido = !!(t.pedidoSAP || t.pedido_sap);
+    const estadoClean = String(t.estado || '').trim().toLowerCase();
+    return (cotAceptadaVal === 'si' || cotAceptadaVal === 'aprobada') && !tienePedido && (estadoClean !== 'cerrado' && estadoClean !== 'finalizado');
+  });
+
+  // 3. Cotizaciones rechazadas (cotización rechazada por el cliente y aún sin cerrar por el supervisor)
+  const rejectedQuotes = filteredTickets.filter(t => {
+    const cotAceptadaVal = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
+    const estadoClean = String(t.estado || '').trim().toLowerCase();
+    return (cotAceptadaVal === 'no' || cotAceptadaVal === 'rechazada') && (estadoClean !== 'cerrado' && estadoClean !== 'finalizado');
+  });
+
+  const totalNotifications = unassigned.length + pendingOrders.length + rejectedQuotes.length;
+
   if (badge) {
-    if (unassigned.length > 0) {
-      badge.textContent = unassigned.length;
+    if (totalNotifications > 0) {
+      badge.textContent = totalNotifications;
       badge.style.display = 'flex';
     } else {
       badge.style.display = 'none';
     }
   }
   if (dropCount) {
-    dropCount.textContent = unassigned.length;
+    dropCount.textContent = totalNotifications;
   }
 
   if (container) {
-    if (unassigned.length === 0) {
-      container.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:0.75rem; padding:1.5rem; font-style:italic;">Todos los tickets están asignados.</div>`;
+    if (totalNotifications === 0) {
+      container.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:0.75rem; padding:1.5rem; font-style:italic;">No hay notificaciones pendientes.</div>`;
     } else {
       let html = '';
-      unassigned.forEach(t => {
-        const prioColor = t.prioridad === 'Alta' ? 'var(--red)' : (t.prioridad === 'Baja' ? 'var(--blue)' : 'var(--orange)');
-        const fechaFormat = t.fecha ? new Date(t.fecha).toLocaleDateString('es-MX', { day:'numeric', month:'short' }) : 'Reciente';
-        
-        html += `
-          <div style="padding:0.6rem 1rem; border-bottom:1px solid rgba(255,255,255,0.02); display:flex; flex-direction:column; gap:0.2rem; cursor:pointer; transition:background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="window.abrirTicketDesdeNotification('${t.id}')">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-weight:700; font-size:0.78rem; color:var(--text-primary);">${t.folio || 'N/A'}</span>
-              <span style="background:${prioColor}15; color:${prioColor}; border:1px solid ${prioColor}30; padding:0.1rem 0.35rem; border-radius:4px; font-size:0.6rem; font-weight:600;">${t.prioridad || 'Media'}</span>
+      
+      // Renderizar Tickets Sin Asignar
+      if (unassigned.length > 0) {
+        html += `<div style="padding:0.4rem 1rem; font-size:0.7rem; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid rgba(255,255,255,0.03); background:rgba(255,255,255,0.01); display:flex; align-items:center; gap:0.25rem;"><i data-lucide="user-minus" style="width:12px; height:12px;"></i> Sin Asignar (${unassigned.length})</div>`;
+        unassigned.forEach(t => {
+          const prioColor = t.prioridad === 'Alta' ? 'var(--red)' : (t.prioridad === 'Baja' ? 'var(--blue)' : 'var(--orange)');
+          const fechaFormat = t.fecha ? new Date(t.fecha).toLocaleDateString('es-MX', { day:'numeric', month:'short' }) : 'Reciente';
+          
+          html += `
+            <div style="padding:0.6rem 1rem; border-bottom:1px solid rgba(255,255,255,0.02); display:flex; flex-direction:column; gap:0.2rem; cursor:pointer; transition:background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="window.abrirTicketDesdeNotification('${t.id}')">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:700; font-size:0.78rem; color:var(--text-primary);">${t.folio || 'N/A'}</span>
+                <span style="background:${prioColor}15; color:${prioColor}; border:1px solid ${prioColor}30; padding:0.1rem 0.35rem; border-radius:4px; font-size:0.6rem; font-weight:600;">${t.prioridad || 'Media'}</span>
+              </div>
+              <span style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.asunto || 'Sin asunto'}</span>
+              <div style="display:flex; justify-content:space-between; font-size:0.65rem; color:var(--text-muted);">
+                <span>Cliente: ${t.cliente || 'Genérico'}</span>
+                <span>${fechaFormat}</span>
+              </div>
             </div>
-            <span style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.asunto || 'Sin asunto'}</span>
-            <div style="display:flex; justify-content:space-between; font-size:0.65rem; color:var(--text-muted);">
-              <span>Cliente: ${t.cliente || 'Genérico'}</span>
-              <span>${fechaFormat}</span>
+          `;
+        });
+      }
+
+      // Renderizar Pedidos Pendientes
+      if (pendingOrders.length > 0) {
+        html += `<div style="padding:0.4rem 1rem; font-size:0.7rem; font-weight:700; color:var(--green); text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid rgba(255,255,255,0.03); background:rgba(255,255,255,0.01); display:flex; align-items:center; gap:0.25rem; margin-top:0.4rem;"><i data-lucide="shopping-cart" style="width:12px; height:12px;"></i> Pedidos Pendientes (${pendingOrders.length})</div>`;
+        pendingOrders.forEach(t => {
+          const fechaFormat = t.fecha ? new Date(t.fecha).toLocaleDateString('es-MX', { day:'numeric', month:'short' }) : 'Reciente';
+          const cotNum = t.cotizacionSAP || t.cotizacion_sap || 'N/A';
+          
+          html += `
+            <div style="padding:0.6rem 1rem; border-bottom:1px solid rgba(255,255,255,0.02); display:flex; flex-direction:column; gap:0.2rem; cursor:pointer; transition:background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="window.abrirTicketDesdeNotification('${t.id}')">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:700; font-size:0.78rem; color:var(--text-primary);">${t.folio || 'N/A'}</span>
+                <span style="background:rgba(16,185,129,0.1); color:var(--green); border:1px solid rgba(16,185,129,0.2); padding:0.1rem 0.35rem; border-radius:4px; font-size:0.6rem; font-weight:600;">Cotización Aprobada</span>
+              </div>
+              <span style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Cot. SAP: ${cotNum} – ${t.asunto || 'Sin asunto'}</span>
+              <div style="display:flex; justify-content:space-between; font-size:0.65rem; color:var(--text-muted);">
+                <span>Cliente: ${t.cliente || 'Genérico'}</span>
+                <span>${fechaFormat}</span>
+              </div>
             </div>
-          </div>
-        `;
-      });
+          `;
+        });
+      }
+
+      // Renderizar Cotizaciones Rechazadas
+      if (rejectedQuotes.length > 0) {
+        html += `<div style="padding:0.4rem 1rem; font-size:0.7rem; font-weight:700; color:var(--red); text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid rgba(255,255,255,0.03); background:rgba(255,255,255,0.01); display:flex; align-items:center; gap:0.25rem; margin-top:0.4rem;"><i data-lucide="x-circle" style="width:12px; height:12px;"></i> Cotizaciones Rechazadas (${rejectedQuotes.length})</div>`;
+        rejectedQuotes.forEach(t => {
+          const fechaFormat = t.fecha ? new Date(t.fecha).toLocaleDateString('es-MX', { day:'numeric', month:'short' }) : 'Reciente';
+          const cotNum = t.cotizacionSAP || t.cotizacion_sap || 'N/A';
+          
+          html += `
+            <div style="padding:0.6rem 1rem; border-bottom:1px solid rgba(255,255,255,0.02); display:flex; flex-direction:column; gap:0.2rem; cursor:pointer; transition:background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="window.abrirTicketDesdeNotification('${t.id}')">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:700; font-size:0.78rem; color:var(--text-primary);">${t.folio || 'N/A'}</span>
+                <span style="background:rgba(239,68,68,0.1); color:var(--red); border:1px solid rgba(239,68,68,0.2); padding:0.1rem 0.35rem; border-radius:4px; font-size:0.6rem; font-weight:600;">Cotización Rechazada</span>
+              </div>
+              <span style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Cot. SAP: ${cotNum} – ${t.asunto || 'Sin asunto'}</span>
+              <div style="display:flex; justify-content:space-between; font-size:0.65rem; color:var(--text-muted);">
+                <span>Cliente: ${t.cliente || 'Genérico'}</span>
+                <span>${fechaFormat}</span>
+              </div>
+            </div>
+          `;
+        });
+      }
+
       container.innerHTML = html;
       if (window.lucide) lucide.createIcons();
     }
@@ -15443,7 +15518,11 @@ window.abrirTicketDesdeNotification = function(ticketId) {
   if (navItem) {
     navItem.click();
   }
-  abrirTicket(ticketId);
+  if (typeof verDetalleTicket === 'function') {
+    verDetalleTicket(ticketId);
+  } else {
+    abrirTicket(ticketId);
+  }
 };
 
 window.abrirOrdenDesdePerfil = function(id) {
@@ -16651,18 +16730,24 @@ async function guardarTicket(e) {
     
     const matchMaquina = (m) => {
       const cleanId = m.idInterno || m.id || '';
+      if (!cleanId) return false;
       const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
       const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
       const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
       const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
       
-      return (
-        ticket.equipo === mName ||
-        ticket.equipo === cleanId ||
-        ticket.equipo === m.serie ||
-        ticket.equipo.includes(cleanId) ||
-        (m.serie && ticket.equipo.includes(m.serie))
-      );
+      const equipoString = ticket.equipo || '';
+      const names = equipoString.split(',').map(n => n.trim()).filter(Boolean);
+      
+      return names.some(name => {
+        return (
+          name === mName ||
+          name === cleanId ||
+          name === m.serie ||
+          name.includes(`[${cleanId}]`) ||
+          (m.serie && name.includes(`(SN: ${m.serie})`))
+        );
+      });
     };
 
     let maqModificada = false;
@@ -17033,6 +17118,7 @@ window.agregarComentarioInterno = async function(ticketId) {
 function verDetalleTicket(id) {
   const t = tickets.find(x => x.id === id);
   if (!t) return;
+  const isDecisionLocked = ['si', 'aprobada', 'no', 'rechazada'].includes(String(t.cotAceptada || '').toLowerCase().trim());
   document.getElementById('ticket-detalle-title').textContent = `Ticket ${t.folio}`;
   const field = (label, val) => `
     <div class="detalle-field">
@@ -17048,7 +17134,7 @@ function verDetalleTicket(id) {
         ${t.cliente ? field('Cliente', `${t.cliente}${t.sitio ? ` (Sitio: ${t.sitio})` : ''}`) : ''}
         ${field('Canal', t.canal ? ({correo:'Correo',whatsapp:'WhatsApp',telefono:'Llamada Tel.'}[t.canal]||t.canal) : '—')}
         ${field('Contacto', t.contacto)}
-        ${field('Estado', `<span class="badge badge-${badgeTicketEstado(t)}">${t.estado === 'Cerrado' ? (t.cotAceptada === 'si' ? 'Cerrado (Aceptado)' : 'Cerrado (Rechazado)') : t.estado}</span>`)}
+        ${field('Estado', `<span class="badge badge-${badgeTicketEstado(t)}">${getTicketEstadoLabel(t)}</span>`)}
         ${!['empresa', 'cliente'].includes(currentSession.viewMode) ? field('Prioridad', `<span class="badge badge-${(t.prioridad||'media').toLowerCase()}">${t.prioridad}</span>`) : ''}
         ${field('Solicitante', t.solicitante)}
         ${field('Creado por', t.creadoPor)}
@@ -17283,21 +17369,24 @@ function verDetalleTicket(id) {
       </div>
 
       <div class="form-group full-width" style="margin-bottom:0; border-top: 1px dashed var(--border); padding-top: 1rem;">
-        <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; display:block; margin-bottom:0.5rem;">¿El cliente aceptó la cotización?</label>
+        <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; display:flex; align-items:center; gap:0.35rem; margin-bottom:0.5rem;">
+          ¿El cliente aceptó la cotización?
+          ${isDecisionLocked ? `<span style="font-size:0.72rem; color:var(--green); font-weight:600; display:inline-flex; align-items:center; gap:3px; background:rgba(16,185,129,0.1); padding:1px 6px; border-radius:4px;"><i data-lucide="info" style="width:11px;height:11px;"></i> Definido por el cliente</span>` : ''}
+        </label>
         <div style="display:flex; gap:1rem; margin-top:0.5rem; margin-bottom: 0.75rem;">
-          <label style="cursor:pointer; display:flex; align-items:center; gap:0.25rem; font-size:0.85rem; font-weight:500; color:var(--text-primary);">
-            <input type="radio" name="quick-cot-acep-${t.id}" value="si" onchange="document.getElementById('quick-motivo-${t.id}').style.display='none'; document.getElementById('quick-pedido-${t.id}').style.display='block';"> 
+          <label style="cursor:${isDecisionLocked ? 'not-allowed' : 'pointer'}; display:flex; align-items:center; gap:0.25rem; font-size:0.85rem; font-weight:500; color:var(--text-primary); ${isDecisionLocked ? 'opacity:0.7;' : ''}">
+            <input type="radio" name="quick-cot-acep-${t.id}" value="si" ${t.cotAceptada === 'si' || t.cotAceptada === 'aprobada' ? 'checked' : ''} ${isDecisionLocked ? 'disabled' : ''} onchange="document.getElementById('quick-motivo-${t.id}').style.display='none'; document.getElementById('quick-pedido-${t.id}').style.display='block';"> 
             <i data-lucide="check-circle" style="width:16px;height:16px;color:var(--green);"></i> Sí, aprobada
           </label>
-          <label style="cursor:pointer; display:flex; align-items:center; gap:0.25rem; font-size:0.85rem; font-weight:500; color:var(--text-primary);">
-            <input type="radio" name="quick-cot-acep-${t.id}" value="no" onchange="document.getElementById('quick-motivo-${t.id}').style.display='block'; document.getElementById('quick-pedido-${t.id}').style.display='none';"> 
+          <label style="cursor:${isDecisionLocked ? 'not-allowed' : 'pointer'}; display:flex; align-items:center; gap:0.25rem; font-size:0.85rem; font-weight:500; color:var(--text-primary); ${isDecisionLocked ? 'opacity:0.7;' : ''}">
+            <input type="radio" name="quick-cot-acep-${t.id}" value="no" ${t.cotAceptada === 'no' || t.cotAceptada === 'rechazada' ? 'checked' : ''} ${isDecisionLocked ? 'disabled' : ''} onchange="document.getElementById('quick-motivo-${t.id}').style.display='block'; document.getElementById('quick-pedido-${t.id}').style.display='none';"> 
             <i data-lucide="x-circle" style="width:16px;height:16px;color:var(--red);"></i> No, rechazada
           </label>
         </div>
-        <div id="quick-motivo-${t.id}" style="display:none; margin-bottom:0.75rem;">
-          <textarea id="quick-motivo-text-${t.id}" rows="2" placeholder="Especifica el motivo por el cual fue rechazada..."></textarea>
+        <div id="quick-motivo-${t.id}" style="display: ${t.cotAceptada === 'no' || t.cotAceptada === 'rechazada' ? 'block' : 'none'}; margin-bottom:0.75rem;">
+          <textarea id="quick-motivo-text-${t.id}" rows="2" placeholder="Especifica el motivo por el cual fue rechazada..." ${isDecisionLocked ? 'disabled style="background:rgba(255,255,255,0.01); color:var(--text-secondary); cursor:not-allowed;"' : ''}>${t.motivoRechazo || ''}</textarea>
         </div>
-        <div id="quick-pedido-${t.id}" style="display:none; margin-bottom:0.75rem;">
+        <div id="quick-pedido-${t.id}" style="display: ${t.cotAceptada === 'si' || t.cotAceptada === 'aprobada' ? 'block' : 'none'}; margin-bottom:0.75rem;">
           <div class="form-group full-width">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
               <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; margin:0;">No. Pedido SAP *</label>
@@ -17791,18 +17880,24 @@ async function cerrarCotizacionTicket(id) {
         
         const matchMaquina = (m) => {
           const cleanId = m.idInterno || m.id || '';
+          if (!cleanId) return false;
           const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
           const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
           const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
           const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
           
-          return (
-            t.equipo === mName ||
-            t.equipo === cleanId ||
-            t.equipo === m.serie ||
-            t.equipo.includes(cleanId) ||
-            (m.serie && t.equipo.includes(m.serie))
-          );
+          const equipoString = t.equipo || '';
+          const names = equipoString.split(',').map(n => n.trim()).filter(Boolean);
+          
+          return names.some(name => {
+            return (
+              name === mName ||
+              name === cleanId ||
+              name === m.serie ||
+              name.includes(`[${cleanId}]`) ||
+              (m.serie && name.includes(`(SN: ${m.serie})`))
+            );
+          });
         };
 
         let maq = null;
@@ -27369,18 +27464,24 @@ window.regenerarOrdenesDesdeTickets = async function() {
     if (t.equipo) {
       const matchMaquina = (m) => {
         const cleanId = m.idInterno || m.id || '';
+        if (!cleanId) return false;
         const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
         const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
         const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
         const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
         
-        return (
-          t.equipo === mName ||
-          t.equipo === cleanId ||
-          t.equipo === m.serie ||
-          t.equipo.includes(cleanId) ||
-          (m.serie && t.equipo.includes(m.serie))
-        );
+        const equipoString = t.equipo || '';
+        const names = equipoString.split(',').map(n => n.trim()).filter(Boolean);
+        
+        return names.some(name => {
+          return (
+            name === mName ||
+            name === cleanId ||
+            name === m.serie ||
+            name.includes(`[${cleanId}]`) ||
+            (m.serie && name.includes(`(SN: ${m.serie})`))
+          );
+        });
       };
 
       let maq = null;

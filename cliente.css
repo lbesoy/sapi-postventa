@@ -7,19 +7,10 @@
   --bg-card: #172036;
   --bg-hover: #1e2946;
   --border: #243254;
-  --accent: #E8820C;
-  --accent-hover: #cf7009;
-  --accent-light: rgba(232, 130, 12, 0.12);
   --accent-glow: rgba(232, 130, 12, 0.3);
   
-  --green: #10b981;
-  --green-light: rgba(16, 185, 129, 0.12);
-  --red: #ef4444;
-  --red-light: rgba(239, 68, 68, 0.12);
   --blue: #3b82f6;
   --blue-light: rgba(59, 130, 246, 0.12);
-  --orange: #f59e0b;
-  --orange-light: rgba(245, 158, 11, 0.12);
   --gray: #64748b;
   --gray-light: rgba(100, 116, 139, 0.12);
 
@@ -50,28 +41,14 @@
 
 /* Light Mode support */
 body.light-mode {
-  --bg-primary: #f8fafc;
-  --bg-secondary: #ffffff;
-  --bg-card: #ffffff;
-  --bg-hover: #f1f5f9;
-  --border: #e2e8f0;
-  --accent: #E8820C;
-  --accent-hover: #cf7009;
   --accent-light: rgba(232, 130, 12, 0.08);
   --accent-glow: rgba(232, 130, 12, 0.15);
   
-  --green: #059669;
-  --green-light: rgba(5, 150, 105, 0.08);
-  --red: #dc2626;
-  --red-light: rgba(220, 38, 38, 0.08);
   --blue: #2563eb;
   --blue-light: rgba(37, 99, 235, 0.08);
   --orange: #d97706;
   --orange-light: rgba(217, 119, 6, 0.08);
   
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
   --shadow: 0 10px 25px -10px rgba(15, 23, 42, 0.08);
   --shadow-sm: 0 4px 12px -2px rgba(15, 23, 42, 0.04);
   
