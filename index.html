@@ -3804,9 +3804,12 @@
               <div id="u-empresa-sugerida" style="font-size:0.85rem; color:var(--orange); margin-top:1rem; margin-bottom:1rem; display:none; padding: 0.75rem 1rem; background: rgba(232, 130, 12, 0.08); border-radius: var(--radius-sm); border: 1px dashed rgba(232, 130, 12, 0.3);"></div>
               <div id="u-empresa-container" class="form-group"
                 style="display:none; margin-top:1rem; padding-top:1rem; border-top:1px dashed var(--border);">
-                <label>Empresas Asociadas * <span
+                <label style="margin-bottom:0.5rem; display:block;">Empresas Asociadas * <span
                     style="color:var(--text-muted);font-weight:normal;font-size:0.75rem;">(Seleccione una o más empresas)</span></label>
-                <select id="u-empresa" multiple size="5" style="height:auto;"></select>
+                <input type="text" id="u-empresa-search" placeholder="🔍 Buscar empresa..." style="margin-bottom:0.5rem; padding:0.5rem; width:100%; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary);" />
+                <div id="u-empresa-checkboxes" style="max-height:180px; overflow-y:auto; border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-md); background:var(--bg-hover); display:flex; flex-direction:column; gap:0.5rem;">
+                  <!-- Checkboxes populated dynamically -->
+                </div>
               </div>
             </div>
             <div class="form-section">

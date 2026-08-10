@@ -31,6 +31,9 @@ let currentTicketFiltroPrio = '';
 let currentTicketOrden = 'reciente';
 let selectedTicketPhotoBase64 = null;
 let currentMaquinariaFiltro = 'todos';
+let currentServiciosFiltro = 'todos';
+let currentServiciosFiltroTipo = '';
+let currentServiciosOrden = 'reciente';
 
 // ===== SANDBOX / MODO PRUEBAS =====
 function isTestData(item) {
@@ -372,6 +375,8 @@ async function cerrarSesionCliente() {
     await window.supabaseClient.auth.signOut().catch(() => {});
   }
   localStorage.removeItem('eurorep_session');
+  localStorage.removeItem('superadmin_simulated_user_id');
+  localStorage.removeItem('superadmin_selected_cliente');
   currentSession = null;
   nombreEmpresaLogged = null;
   
@@ -400,6 +405,38 @@ function cargarDatosLocales() {
   }
 }
 
+// Helper para obtener nombres de empresas (en minúsculas y sin espacios) asociadas a la sesión actual
+function getAllowedCompanyNames() {
+  const isSuperAdmin = (currentSession && (currentSession.realRol === 'superadmin' || currentSession.viewMode === 'superadmin'));
+  const simUserId = isSuperAdmin ? (localStorage.getItem('superadmin_simulated_user_id') || '') : '';
+  const simUser = simUserId ? usuarios.find(u => u.id === simUserId) : null;
+  
+  if (isSuperAdmin && !simUser) {
+    // Si es superadmin y no simula a nadie, tiene acceso a todas las empresas
+    return clientesDb.map(c => String(c.nombre || '').toLowerCase().trim());
+  }
+
+  const userToCheck = simUser || currentSession;
+  if (!userToCheck) return [];
+
+  const assocEmpresas = userToCheck.empresas || [];
+  const legacyEmp = userToCheck.empresa ? userToCheck.empresa.toLowerCase().trim() : '';
+
+  const names = [];
+  clientesDb.forEach(c => {
+    const valNorm = c.id.toLowerCase().trim();
+    const textNorm = c.nombre.toLowerCase().trim();
+    if (assocEmpresas.includes(c.id) || (legacyEmp && (valNorm === legacyEmp || textNorm === legacyEmp))) {
+      names.push(textNorm);
+    }
+  });
+
+  if (names.length === 0 && legacyEmp) {
+    names.push(legacyEmp);
+  }
+  return names;
+}
+
 async function inicializarDatos() {
   // 1. Intentar descargar datos frescos de la nube en segundo plano (no bloqueante)
   if (window.cargarDatosDeSupabase) {
@@ -412,23 +449,53 @@ async function inicializarDatos() {
   cargarDatosLocales();
 
   const isSuperAdmin = (currentSession && (currentSession.realRol === 'superadmin' || currentSession.viewMode === 'superadmin'));
-  
+  const simUserId = isSuperAdmin ? (localStorage.getItem('superadmin_simulated_user_id') || '') : '';
+  const simUser = simUserId ? usuarios.find(u => u.id === simUserId) : null;
+
+  let allowedClients = [...clientesDb];
+
+  if (!isSuperAdmin && currentSession) {
+    const assocEmpresas = currentSession.empresas || [];
+    const legacyEmp = currentSession.empresa ? currentSession.empresa.toLowerCase().trim() : '';
+    allowedClients = clientesDb.filter(c => {
+      const valNorm = c.id.toLowerCase().trim();
+      const textNorm = c.nombre.toLowerCase().trim();
+      return assocEmpresas.includes(c.id) || (legacyEmp && (valNorm === legacyEmp || textNorm === legacyEmp));
+    });
+  }
+
   if (isSuperAdmin) {
+    if (simUser) {
+      const assocEmpresas = simUser.empresas || [];
+      const legacyEmp = simUser.empresa ? simUser.empresa.toLowerCase().trim() : '';
+      allowedClients = clientesDb.filter(c => {
+        const valNorm = c.id.toLowerCase().trim();
+        const textNorm = c.nombre.toLowerCase().trim();
+        return assocEmpresas.includes(c.id) || (legacyEmp && (valNorm === legacyEmp || textNorm === legacyEmp));
+      });
+    }
+
     const savedCliente = localStorage.getItem('superadmin_selected_cliente');
-    if (savedCliente) {
+    if (savedCliente && (savedCliente === 'todos' || allowedClients.some(c => String(c.nombre || '').toLowerCase().trim() === savedCliente.toLowerCase().trim()))) {
       nombreEmpresaLogged = savedCliente.toLowerCase().trim();
-    } else if (clientesDb.length > 0) {
-      nombreEmpresaLogged = String(clientesDb[0].nombre || '').toLowerCase().trim();
+    } else if (allowedClients.length > 1) {
+      nombreEmpresaLogged = 'todos';
+      localStorage.setItem('superadmin_selected_cliente', 'todos');
+    } else if (allowedClients.length === 1) {
+      nombreEmpresaLogged = String(allowedClients[0].nombre || '').toLowerCase().trim();
       localStorage.setItem('superadmin_selected_cliente', nombreEmpresaLogged);
     } else {
       nombreEmpresaLogged = '';
     }
   } else {
     const savedCliente = localStorage.getItem('client_selected_company');
-    if (savedCliente && clientesDb.some(c => String(c.nombre || '').toLowerCase().trim() === savedCliente.toLowerCase().trim())) {
+    if (savedCliente && (savedCliente === 'todos' || allowedClients.some(c => String(c.nombre || '').toLowerCase().trim() === savedCliente.toLowerCase().trim()))) {
       nombreEmpresaLogged = savedCliente.toLowerCase().trim();
-    } else if (clientesDb.length > 0) {
-      nombreEmpresaLogged = String(clientesDb[0].nombre || '').toLowerCase().trim();
+    } else if (allowedClients.length > 1) {
+      nombreEmpresaLogged = 'todos';
+      localStorage.setItem('client_selected_company', 'todos');
+    } else if (allowedClients.length === 1) {
+      nombreEmpresaLogged = String(allowedClients[0].nombre || '').toLowerCase().trim();
       localStorage.setItem('client_selected_company', nombreEmpresaLogged);
     } else {
       nombreEmpresaLogged = String(currentSession.empresa || currentSession.nombre).toLowerCase().trim();
@@ -440,14 +507,27 @@ async function inicializarDatos() {
   const nameEl = document.getElementById('sidebar-name');
   const companyEl = document.getElementById('sidebar-empresa');
   const headerComp = document.getElementById('header-company-name');
+  
+  const maqSearchInput = document.getElementById('maq-search-input');
+  if (maqSearchInput) maqSearchInput.value = '';
+  const tktSearchInput = document.getElementById('tkt-search-input');
+  if (tktSearchInput) tktSearchInput.value = '';
+  const srvSearchInput = document.getElementById('srv-search-input');
+  if (srvSearchInput) srvSearchInput.value = '';
 
-  const uName = currentSession.nombre || 'Cliente';
+  const uName = simUser ? simUser.nombre : (currentSession.nombre || 'Cliente');
   let cName = currentSession.empresa || 'Empresa';
 
   if (avatar) avatar.textContent = uName.charAt(0).toUpperCase();
-  if (nameEl) nameEl.textContent = uName;
+  if (nameEl) {
+    if (simUser) {
+      nameEl.innerHTML = `<span style="color:var(--accent); font-weight:600;">${simUser.nombre}</span> <span style="font-size:0.7rem; opacity:0.8;">(Simulado)</span>`;
+    } else {
+      nameEl.textContent = uName;
+    }
+  }
 
-  const dbClient = clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === nombreEmpresaLogged);
+  const dbClient = allowedClients.find(c => String(c.nombre || '').toLowerCase().trim() === nombreEmpresaLogged);
   if (isSuperAdmin || clientesDb.length > 1) {
     cName = dbClient ? dbClient.nombre : (nombreEmpresaLogged || (isSuperAdmin ? 'Super Admin' : 'Empresa'));
   } else if (dbClient) {
@@ -457,34 +537,107 @@ async function inicializarDatos() {
   if (companyEl) companyEl.textContent = cName;
 
   if (headerComp) {
-    if (isSuperAdmin || clientesDb.length > 1) {
-      const selectId = isSuperAdmin ? 'superadmin-cliente-selector' : 'client-company-selector';
-      let selectHtml = `<select id="${selectId}">`;
-      clientesDb.forEach(c => {
+    if (isSuperAdmin) {
+      // 1. Selector de Usuarios
+      let userSelectHtml = `<select id="superadmin-user-selector" style="padding:0.4rem 0.5rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); font-size:0.8rem; font-weight:600; outline:none; cursor:pointer;">`;
+      userSelectHtml += `<option value="">[Sin simular usuario - Ver Todo]</option>`;
+      
+      const sortedUsers = [...usuarios].filter(usr => usr.nombre && (usr.rol === 'empresa' || usr.rol === 'cliente')).sort((a,b) => (a.nombre || '').localeCompare(b.nombre || ''));
+      sortedUsers.forEach(usr => {
+        const isCurrent = usr.id === simUserId ? 'selected' : '';
+        const roleLabel = usr.rol ? ` (${usr.rol})` : '';
+        userSelectHtml += `<option value="${usr.id}" ${isCurrent}>${usr.nombre}${roleLabel}</option>`;
+      });
+      userSelectHtml += `</select>`;
+
+      // 2. Selector de Empresas
+      let clientSelectHtml = `<select id="superadmin-cliente-selector" style="padding:0.4rem 0.5rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); font-size:0.8rem; font-weight:600; outline:none; cursor:pointer;">`;
+      if (allowedClients.length === 0) {
+        clientSelectHtml += `<option value="">Sin empresas asociadas</option>`;
+      } else {
+        if (allowedClients.length > 1) {
+          const selectedAttr = (nombreEmpresaLogged === 'todos') ? 'selected' : '';
+          clientSelectHtml += `<option value="todos" ${selectedAttr}>[Todos - Vista General]</option>`;
+        }
+        allowedClients.forEach(c => {
+          const cNorm = String(c.nombre || '').toLowerCase().trim();
+          const selectedAttr = (cNorm === nombreEmpresaLogged) ? 'selected' : '';
+          clientSelectHtml += `<option value="${cNorm}" ${selectedAttr}>${c.nombre}</option>`;
+        });
+      }
+      clientSelectHtml += `</select>`;
+
+      headerComp.innerHTML = `
+        <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:0.35rem; font-size:0.8rem; color:var(--text-secondary);">
+            <i data-lucide="user" style="width:14px; height:14px;"></i> Usuario: ${userSelectHtml}
+          </div>
+          <div style="display:flex; align-items:center; gap:0.35rem; font-size:0.8rem; color:var(--text-secondary);">
+            <i data-lucide="building-2" style="width:14px; height:14px;"></i> Cliente: ${clientSelectHtml}
+          </div>
+        </div>
+      `;
+
+      // Event Listeners
+      const userSel = document.getElementById('superadmin-user-selector');
+      if (userSel) {
+        userSel.addEventListener('change', (e) => {
+          const newUserId = e.target.value;
+          localStorage.setItem('superadmin_simulated_user_id', newUserId);
+          
+          // Reset de selección de cliente para recalcular la primera permitida
+          localStorage.removeItem('superadmin_selected_cliente');
+          nombreEmpresaLogged = '';
+          
+          inicializarDatos();
+          showToast(newUserId ? 'Simulando perfil de usuario' : 'Restablecida simulación de usuario', 'info');
+        });
+      }
+
+      const clientSel = document.getElementById('superadmin-cliente-selector');
+      if (clientSel) {
+        clientSel.addEventListener('change', (e) => {
+          const newClient = e.target.value;
+          nombreEmpresaLogged = newClient;
+          localStorage.setItem('superadmin_selected_cliente', newClient);
+          
+          doRender();
+          
+          const dbClient = allowedClients.find(c => String(c.nombre || '').toLowerCase().trim() === newClient);
+          const cNameDisplay = dbClient ? dbClient.nombre : (newClient === 'todos' ? 'Todas las empresas' : newClient);
+          if (companyEl) companyEl.textContent = cNameDisplay;
+          
+          showToast(`Cargando vista de: ${cNameDisplay}`, 'info');
+        });
+      }
+      
+      try { lucide.createIcons(); } catch(err) {}
+
+    } else if (allowedClients.length > 1) {
+      const selectId = 'client-company-selector';
+      let selectHtml = `<select id="${selectId}" style="padding:0.4rem 0.5rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); font-size:0.8rem; font-weight:600; outline:none; cursor:pointer;">`;
+      const selectedAttr = (nombreEmpresaLogged === 'todos') ? 'selected' : '';
+      selectHtml += `<option value="todos" ${selectedAttr}>[Todos - Vista General]</option>`;
+      
+      allowedClients.forEach(c => {
         const cNorm = String(c.nombre || '').toLowerCase().trim();
         const selectedAttr = (cNorm === nombreEmpresaLogged) ? 'selected' : '';
         selectHtml += `<option value="${cNorm}" ${selectedAttr}>${c.nombre}</option>`;
       });
       selectHtml += `</select>`;
-      headerComp.innerHTML = `${isSuperAdmin ? 'Cliente' : 'Empresa'}: ${selectHtml}`;
-      
+      headerComp.innerHTML = `Empresa: ${selectHtml}`;
+
       const selector = document.getElementById(selectId);
       if (selector) {
         selector.addEventListener('change', (e) => {
           const newClient = e.target.value;
           nombreEmpresaLogged = newClient;
-          if (isSuperAdmin) {
-            localStorage.setItem('superadmin_selected_cliente', newClient);
-          } else {
-            localStorage.setItem('client_selected_company', newClient);
-          }
+          localStorage.setItem('client_selected_company', newClient);
           
-          // Re-renderizar
           doRender();
           
-          // Actualizar textos
-          const dbClient = clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === newClient);
-          const cNameDisplay = dbClient ? dbClient.nombre : newClient;
+          const dbClient = allowedClients.find(c => String(c.nombre || '').toLowerCase().trim() === newClient);
+          const cNameDisplay = dbClient ? dbClient.nombre : (newClient === 'todos' ? 'Todas las empresas' : newClient);
           if (companyEl) companyEl.textContent = cNameDisplay;
           
           showToast(`Cargando vista de: ${cNameDisplay}`, 'info');
@@ -567,7 +720,7 @@ function navegarA(targetView) {
 
   // 3. Modificar título en header
   const titleMap = {
-    'dashboard': 'Resumen',
+    'dashboard': 'Dashboard',
     'maquinaria': 'Mis Equipos',
     'tickets': 'Tickets',
     'servicios': 'Órdenes de Servicio',
@@ -591,12 +744,34 @@ function doRender() {
   if (!nombreEmpresaLogged) return;
 
   // --- FILTRADOS DE SEGURIDAD ESTRICTOS POR CLIENTE ---
+  const allowedNames = getAllowedCompanyNames();
+  const allowedIds = clientesDb
+    .filter(c => allowedNames.includes(String(c.nombre || '').toLowerCase().trim()))
+    .map(c => c.id);
+
   // Obtener equipos del cliente
-  const misEquipos = maquinariaDb.filter(m => String(m.cliente || '').toLowerCase().trim() === nombreEmpresaLogged);
-  const clienteObj = clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === nombreEmpresaLogged);
+  const misEquipos = maquinariaDb.filter(m => {
+    const mCli = String(m.cliente || '').toLowerCase().trim();
+    if (nombreEmpresaLogged === 'todos') {
+      return allowedNames.includes(mCli);
+    }
+    return mCli === nombreEmpresaLogged;
+  });
+  
+  const clienteObj = nombreEmpresaLogged === 'todos' ? null : clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === nombreEmpresaLogged);
   
   // Agregar también máquinas incrustadas en el objeto cliente por si no están en maquinariaDb
-  if (clienteObj && clienteObj.maquinas) {
+  if (nombreEmpresaLogged === 'todos') {
+    clientesDb.filter(c => allowedNames.includes(String(c.nombre || '').toLowerCase().trim())).forEach(cli => {
+      if (cli.maquinas) {
+        cli.maquinas.forEach(m => {
+          if (!misEquipos.some(x => x.id === m.id || (m.idInterno && x.idInterno === m.idInterno))) {
+            misEquipos.push({ ...m, cliente: cli.nombre });
+          }
+        });
+      }
+    });
+  } else if (clienteObj && clienteObj.maquinas) {
     clienteObj.maquinas.forEach(m => {
       if (!misEquipos.some(x => x.id === m.id || (m.idInterno && x.idInterno === m.idInterno))) {
         misEquipos.push({ ...m, cliente: clienteObj.nombre });
@@ -605,8 +780,26 @@ function doRender() {
   }
 
   // Sitios del cliente
-  const misSitios = sitiosDb.filter(s => String(s.cliente || '').toLowerCase().trim() === nombreEmpresaLogged || (clienteObj && s.cliente === clienteObj.id));
-  if (clienteObj && clienteObj.sitios) {
+  const misSitios = sitiosDb.filter(s => {
+    const sCli = String(s.cliente || '').toLowerCase().trim();
+    if (nombreEmpresaLogged === 'todos') {
+      return allowedNames.includes(sCli) || allowedIds.includes(s.cliente);
+    }
+    return sCli === nombreEmpresaLogged || (clienteObj && s.cliente === clienteObj.id);
+  });
+
+  if (nombreEmpresaLogged === 'todos') {
+    clientesDb.filter(c => allowedNames.includes(String(c.nombre || '').toLowerCase().trim())).forEach(cli => {
+      if (cli.sitios) {
+        cli.sitios.forEach(s => {
+          const sName = s.nombre || s.direccion || '';
+          if (sName && !misSitios.some(x => x.nombre === sName || x.id === s.id)) {
+            misSitios.push({ ...s, cliente: cli.nombre });
+          }
+        });
+      }
+    });
+  } else if (clienteObj && clienteObj.sitios) {
     clienteObj.sitios.forEach(s => {
       const sName = s.nombre || s.direccion || '';
       if (sName && !misSitios.some(x => x.nombre === sName || x.id === s.id)) {
@@ -619,6 +812,9 @@ function doRender() {
   const misTickets = tickets.filter(t => {
     const tcli = String(t.cliente || '').toLowerCase().trim();
     const tsol = String(t.solicitante || '').toLowerCase().trim();
+    if (nombreEmpresaLogged === 'todos') {
+      return allowedNames.includes(tcli) || allowedNames.includes(tsol);
+    }
     return tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged;
   });
 
@@ -631,8 +827,15 @@ function doRender() {
       if (tick) {
         const tcli = String(tick.cliente || '').toLowerCase().trim();
         const tsol = String(tick.solicitante || '').toLowerCase().trim();
-        if (tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged) fromTicket = true;
+        if (nombreEmpresaLogged === 'todos') {
+          if (allowedNames.includes(tcli) || allowedNames.includes(tsol)) fromTicket = true;
+        } else {
+          if (tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged) fromTicket = true;
+        }
       }
+    }
+    if (nombreEmpresaLogged === 'todos') {
+      return allowedNames.includes(ocli) || fromTicket;
     }
     return ocli === nombreEmpresaLogged || fromTicket;
   });
@@ -841,14 +1044,42 @@ function renderMachinerySection(misEquipos, misOrdenes) {
     return { machine: m, statusLabel, statusClass, ordenesMaquina };
   });
 
-  // Filter based on selected filter
+  const searchInput = document.getElementById('maq-search-input');
+  const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+  // Filter based on selected filter and search term
   const filtered = machinesWithStatus.filter(item => {
-    if (currentMaquinariaFiltro === 'operando') {
-      return item.statusLabel === 'Operando';
+    const m = item.machine;
+    
+    // 1. Filtrar por Estado
+    if (currentMaquinariaFiltro === 'operando' && item.statusLabel !== 'Operando') {
+      return false;
     }
-    if (currentMaquinariaFiltro === 'mantenimiento') {
-      return item.statusLabel === 'En Mantenimiento';
+    if (currentMaquinariaFiltro === 'mantenimiento' && item.statusLabel !== 'En Mantenimiento') {
+      return false;
     }
+    
+    // 2. Filtrar por buscador
+    if (q) {
+      const id = String(m.id || '').toLowerCase();
+      const idInterno = String(m.idInterno || '').toLowerCase();
+      const serie = String(m.serie || '').toLowerCase();
+      const modelo = String(m.modelo || '').toLowerCase();
+      const marca = String(m.marca || '').toLowerCase();
+      const ubicacion = String(m.ubicacion || m.customData?.ubicacion || '').toLowerCase();
+      const cliente = String(m.cliente || '').toLowerCase();
+      
+      return (
+        id.includes(q) ||
+        idInterno.includes(q) ||
+        serie.includes(q) ||
+        modelo.includes(q) ||
+        marca.includes(q) ||
+        ubicacion.includes(q) ||
+        cliente.includes(q)
+      );
+    }
+    
     return true;
   });
 
@@ -999,6 +1230,49 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
   // Filtrar y ordenar según controles activos (excluyendo tickets de chat de soporte general)
   let filtered = misTickets.filter(t => t.categoria !== 'Soporte General');
   
+  // Calcular contadores de cada etapa de tickets
+  const ticketsForCounts = misTickets.filter(t => t.categoria !== 'Soporte General');
+  
+  let countTktTodos = ticketsForCounts.length;
+  let countTktReportado = 0;
+  let countTktAsignado = 0;
+  let countTktEnCurso = 0;
+  let countTktCotizado = 0;
+  let countTktCerrado = 0;
+
+  ticketsForCounts.forEach(t => {
+    const asignadoVal = String(t.asignado || '').trim().toLowerCase();
+    const tieneTecnico = asignadoVal && asignadoVal !== 'sin asignar' && asignadoVal !== 'asignando...';
+    const estLower = String(t.estado || 'Abierto').toLowerCase().trim();
+    const tieneCotizacion = !!(t.cotizacionSAP || t.cotizacion_sap) || (estLower === 'cotización' || estLower === 'cotizacion' || estLower === 'cerrado');
+    const cotAceptadaVal = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
+    const tienePedido = !!(t.pedidoSAP || t.pedido_sap) || cotAceptadaVal === 'si';
+
+    if (tienePedido) {
+      countTktCerrado++;
+    } else if (tieneCotizacion) {
+      countTktCotizado++;
+    } else if (tieneTecnico) {
+      countTktEnCurso++;
+    } else {
+      countTktReportado++;
+    }
+  });
+
+  const cntTReportado = document.getElementById('cnt-tkt-reportado');
+  const cntTAsignado = document.getElementById('cnt-tkt-asignado');
+  const cntTEnCurso = document.getElementById('cnt-tkt-encurso');
+  const cntTCotizado = document.getElementById('cnt-tkt-cotizado');
+  const cntTCerrado = document.getElementById('cnt-tkt-cerrado');
+  const cntTTodos = document.getElementById('cnt-tkt-todos');
+
+  if (cntTReportado) cntTReportado.textContent = countTktReportado;
+  if (cntTAsignado) cntTAsignado.textContent = countTktAsignado;
+  if (cntTEnCurso) cntTEnCurso.textContent = countTktEnCurso;
+  if (cntTCotizado) cntTCotizado.textContent = countTktCotizado;
+  if (cntTCerrado) cntTCerrado.textContent = countTktCerrado;
+  if (cntTTodos) cntTTodos.textContent = countTktTodos;
+  
   // 1. Filtrar por estado/etapa correspondiente
   if (currentTicketFiltro === 'reportado') {
     filtered = filtered.filter(t => {
@@ -1036,6 +1310,31 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
   // 2. Filtrar por prioridad
   if (currentTicketFiltroPrio) {
     filtered = filtered.filter(t => String(t.prioridad || '').toLowerCase() === currentTicketFiltroPrio.toLowerCase());
+  }
+
+  // 2b. Filtrar por buscador
+  const searchInput = document.getElementById('tkt-search-input');
+  const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  if (q) {
+    filtered = filtered.filter(t => {
+      const folio = String(t.folio || '').toLowerCase();
+      const asunto = String(t.asunto || '').toLowerCase();
+      const desc = String(t.descripcion || '').toLowerCase();
+      const modelo = String(t.modelo || '').toLowerCase();
+      const serie = String(t.serie || '').toLowerCase();
+      const cat = String(t.categoria || '').toLowerCase();
+      const cliente = String(t.cliente || '').toLowerCase();
+      
+      return (
+        folio.includes(q) ||
+        asunto.includes(q) ||
+        desc.includes(q) ||
+        modelo.includes(q) ||
+        serie.includes(q) ||
+        cat.includes(q) ||
+        cliente.includes(q)
+      );
+    });
   }
 
   // 3. Ordenar
@@ -1365,11 +1664,169 @@ function renderServicesSection(misOrdenes) {
   const tbody = document.getElementById('services-table-body');
   if (!tbody) return;
 
-  if (misOrdenes.length === 0) {
+  // Calcular contadores sobre la lista completa de órdenes permitidas (misOrdenes)
+  let countTodos = misOrdenes.length;
+  let countPendiente = 0;
+  let countProceso = 0;
+  let countRefacciones = 0;
+  let countFinalizado = 0;
+
+  misOrdenes.forEach(o => {
+    let est = String(o.estado || 'Pendiente').toLowerCase().trim();
+    
+    // Encontrar programación futura en bitácora
+    const programado = (o.bitacora || [])
+      .filter(b => b.realizado === false || !b.realizado)
+      .sort((a, b) => new Date(`${a.fecha}T${a.entrada || '00:00'}`) - new Date(`${b.fecha}T${b.entrada || '00:00'}`))[0];
+
+    if (programado && (est === 'pendiente' || est === 'abierto' || est === 'open')) {
+      est = 'programado';
+    }
+
+    const isPend = ['pendiente', 'abierto', 'open', 'falla', 'reportado', 'breakdown', 'programado'].includes(est);
+    const isProc = ['en proceso', 'ejecucion', 'proceso', 'in-progress', 'cotizacion', 'cotización'].includes(est);
+    const isRef = ['refacciones', 'refacciones pendientes'].includes(est);
+    const isComp = ['finalizado', 'firmado', 'cerrado', 'completado', 'closed', 'cerrada', 'signed'].includes(est);
+
+    if (isPend) {
+      countPendiente++;
+    } else if (isProc) {
+      countProceso++;
+    } else if (isRef) {
+      countRefacciones++;
+    } else if (isComp) {
+      countFinalizado++;
+    } else {
+      // Fallback para cualquier estado no previsto
+      countPendiente++;
+    }
+  });
+
+  const cntTodos = document.getElementById('cnt-srv-todos');
+  const cntPendiente = document.getElementById('cnt-srv-pendiente');
+  const cntProceso = document.getElementById('cnt-srv-proceso');
+  const cntRefacciones = document.getElementById('cnt-srv-refacciones');
+  const cntFinalizado = document.getElementById('cnt-srv-finalizado');
+
+  if (cntTodos) cntTodos.textContent = countTodos;
+  if (cntPendiente) cntPendiente.textContent = countPendiente;
+  if (cntProceso) cntProceso.textContent = countProceso;
+  if (cntRefacciones) cntRefacciones.textContent = countRefacciones;
+  if (cntFinalizado) cntFinalizado.textContent = countFinalizado;
+
+  // Filtrar y ordenar según controles activos
+  let filtered = [...misOrdenes];
+
+  // 1. Filtrar por Estado
+  if (currentServiciosFiltro !== 'todos') {
+    filtered = filtered.filter(o => {
+      let est = String(o.estado || 'Pendiente').toLowerCase().trim();
+      
+      // Encontrar programación futura en bitácora
+      const programado = (o.bitacora || [])
+        .filter(b => b.realizado === false || !b.realizado)
+        .sort((a, b) => new Date(`${a.fecha}T${a.entrada || '00:00'}`) - new Date(`${b.fecha}T${b.entrada || '00:00'}`))[0];
+
+      if (programado && (est === 'pendiente' || est === 'abierto' || est === 'open')) {
+        est = 'programado';
+      }
+
+      const isPend = ['pendiente', 'abierto', 'open', 'falla', 'reportado', 'breakdown', 'programado'].includes(est);
+      const isProc = ['en proceso', 'ejecucion', 'proceso', 'in-progress', 'cotizacion', 'cotización'].includes(est);
+      const isRef = ['refacciones', 'refacciones pendientes'].includes(est);
+      const isComp = ['finalizado', 'firmado', 'cerrado', 'completado', 'closed', 'cerrada', 'signed'].includes(est);
+
+      if (currentServiciosFiltro === 'pendiente') {
+        return isPend || (!isProc && !isRef && !isComp);
+      }
+      if (currentServiciosFiltro === 'proceso') {
+        return isProc;
+      }
+      if (currentServiciosFiltro === 'refacciones') {
+        return isRef;
+      }
+      if (currentServiciosFiltro === 'finalizado') {
+        return isComp;
+      }
+      return true;
+    });
+  }
+
+  // 2. Filtrar por Tipo de Servicio
+  if (currentServiciosFiltroTipo) {
+    filtered = filtered.filter(o => {
+      const tipo = String(o.tipo || '').toLowerCase().trim();
+      return tipo.includes(currentServiciosFiltroTipo.toLowerCase());
+    });
+  }
+
+  // 3. Filtrar por buscador
+  const searchInput = document.getElementById('srv-search-input');
+  const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  if (q) {
+    filtered = filtered.filter(o => {
+      const folio = String(o.folio || '').toLowerCase();
+      const equipo = String(o.equipo || o.modelo || '').toLowerCase();
+      const tipo = String(o.tipo || '').toLowerCase();
+      const tecnico = String(o.tecnico || '').toLowerCase();
+      const estado = String(o.estado || '').toLowerCase();
+      
+      return (
+        folio.includes(q) ||
+        equipo.includes(q) ||
+        tipo.includes(q) ||
+        tecnico.includes(q) ||
+        estado.includes(q)
+      );
+    });
+  }
+
+  // 4. Ordenación
+  filtered.sort((a, b) => {
+    if (currentServiciosOrden === 'reciente') {
+      const da = a.fecha ? new Date(a.fecha).getTime() : 0;
+      const db = b.fecha ? new Date(b.fecha).getTime() : 0;
+      return db - da; // Más nuevo primero
+    } else if (currentServiciosOrden === 'antiguo') {
+      const da = a.fecha ? new Date(a.fecha).getTime() : 0;
+      const db = b.fecha ? new Date(b.fecha).getTime() : 0;
+      return da - db; // Más antiguo primero
+    } else if (currentServiciosOrden === 'folio') {
+      return String(a.folio || '').localeCompare(String(b.folio || ''));
+    }
+    return 0;
+  });
+
+  // Ajustar estilos activos en las tarjetas del Grid KPI
+  const cards = {
+    todos: document.getElementById('card-srv-todos'),
+    pendiente: document.getElementById('card-srv-pendiente'),
+    proceso: document.getElementById('card-srv-proceso'),
+    refacciones: document.getElementById('card-srv-refacciones'),
+    finalizado: document.getElementById('card-srv-finalizado')
+  };
+
+  Object.keys(cards).forEach(key => {
+    const card = cards[key];
+    if (!card) return;
+    if (currentServiciosFiltro === key) {
+      card.style.setProperty('transform', 'scale(1.025)', 'important');
+      card.style.setProperty('box-shadow', 'var(--shadow-md)', 'important');
+      card.style.setProperty('border-color', 'var(--accent)', 'important');
+      card.style.setProperty('background', 'rgba(255, 255, 255, 0.04)', 'important');
+    } else {
+      card.style.setProperty('transform', 'none', 'important');
+      card.style.setProperty('box-shadow', 'none', 'important');
+      card.style.setProperty('border-color', 'var(--border)', 'important');
+      card.style.setProperty('background', 'var(--bg-card)', 'important');
+    }
+  });
+
+  if (filtered.length === 0) {
     tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="text-align: center;">No hay órdenes de servicio registradas.</td></tr>`;
   } else {
     let html = '';
-    misOrdenes.forEach(o => {
+    filtered.forEach(o => {
       const fechaFormat = safeFormatDate(o.fecha, { day:'numeric', month:'short', year:'numeric' }, 'N/A');
       
       // Encontrar programación futura en bitácora
@@ -1429,54 +1886,19 @@ function renderServicesSection(misOrdenes) {
     tbody.innerHTML = html;
   }
 
-  // --- RENDERIZAR CUADRÍCULA DE DOCUMENTOS / REPORTES PDF ---
-  const docsContainer = document.getElementById('document-downloads-container');
-  if (docsContainer) {
-    const ordenesConDocumento = misOrdenes.filter(o => 
-      o.firma_cliente_base64 || o.firma_tecnico_base64 || o.evidenciaBase64 || String(o.estado || '').toLowerCase() === 'finalizado'
-    );
-
-    if (ordenesConDocumento.length === 0) {
-      docsContainer.innerHTML = `
-        <div class="empty-state" style="grid-column: 1/-1; padding: 1.5rem; border:1px dashed var(--border); border-radius:var(--radius-md);">
-          <i data-lucide="file-text" style="width:32px; height:32px; color:var(--text-muted);"></i>
-          <p style="font-size:0.85rem; color:var(--text-secondary); margin-top:0.5rem;">No tienes reportes PDF o cotizaciones firmadas listas para descargar.</p>
-        </div>
-      `;
-    } else {
-      let docsHtml = '';
-      ordenesConDocumento.forEach(o => {
-        const docDate = safeFormatDate(o.fecha, { day:'numeric', month:'short', year:'numeric' }, 'Reciente');
-        const docFolio = o.folio || `Servicio #${o.id.slice(0,6)}`;
-        const docTitle = `Reporte Técnico ${docFolio}`;
-        const docSubtitle = `${o.tipo || 'Servicio'} – ${o.modelo || o.equipo || 'Equipo'}`;
-
-        docsHtml += `
-          <div class="doc-download-card">
-            <div class="doc-icon">
-              <i data-lucide="file-text"></i>
-            </div>
-            <div class="doc-info">
-              <div class="doc-title">${docTitle}</div>
-              <div class="doc-subtitle" style="font-size:0.75rem; color:var(--text-secondary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${docSubtitle}</div>
-              <div class="doc-meta">${docDate}</div>
-            </div>
-            <div style="display:flex; gap:0.4rem;">
-              <button class="btn-doc-download" onclick="abrirReportePdfCliente(event, '${o.id}', true)" title="Ver PDF">
-                <i data-lucide="eye" style="width:14px; height:14px;"></i>
-              </button>
-              <button class="btn-doc-download" onclick="abrirReportePdfCliente(event, '${o.id}', false)" title="Descargar PDF">
-                <i data-lucide="download" style="width:14px; height:14px;"></i>
-              </button>
-            </div>
-          </div>
-        `;
-      });
-      docsContainer.innerHTML = docsHtml;
-    }
-  }
 
   lucide.createIcons();
+}
+
+function filtrarServiciosEstado(filtro) {
+  currentServiciosFiltro = filtro;
+  doRender();
+}
+
+function onServiciosFiltroChange() {
+  currentServiciosFiltroTipo = document.getElementById('servicios-filtro-tipo')?.value || '';
+  currentServiciosOrden = document.getElementById('servicios-ordenar')?.value || 'reciente';
+  doRender();
 }
 
 // 5. Locations UI
@@ -3377,6 +3799,26 @@ window.guardarDireccionSitio = async function(event) {
 function renderGeneralSupportChatSection() {
   const container = document.getElementById('general-support-chat-container');
   if (!container) return;
+
+  const btn = document.getElementById('general-support-chat-send-btn');
+  const textarea = document.getElementById('general-support-chat-new-msg');
+
+  if (nombreEmpresaLogged === 'todos') {
+    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding: 2rem 0;">Por favor, selecciona una empresa específica en la parte superior para chatear con soporte.</div>`;
+    if (btn) btn.disabled = true;
+    if (textarea) {
+      textarea.disabled = true;
+      textarea.value = '';
+      textarea.placeholder = "Selecciona una empresa específica para chatear...";
+    }
+    return;
+  }
+
+  if (btn) btn.disabled = false;
+  if (textarea) {
+    textarea.disabled = false;
+    textarea.placeholder = "Escribe tu mensaje para soporte técnico aquí...";
+  }
 
   const activeSandbox = isTestModeActive();
   // Buscar el ticket de soporte general del cliente

@@ -2960,22 +2960,34 @@ function renderUsuariosList() {
       return;
     }
 
-    list.innerHTML = filtered.map(u => `
-      <div class="usuario-row-full" style="${u.activo === false ? 'opacity: 0.6;' : ''}">
-        <div class="usuario-avatar" style="background:${ROLE_COLORS[u.rol]||'var(--accent)'};">${(u.nombre||'?')[0].toUpperCase()}</div>
-        <div class="usuario-info">
-          <div class="usuario-name">${u.nombre} ${u.activo === false ? '<span style="color:var(--red); font-size:0.7rem;">(Inactivo / Pendiente)</span>' : ''}</div>
-          <div class="usuario-email">${u.email || ''} ${u.empresa ? `| ${u.empresa}` : ''}</div>
+    list.innerHTML = filtered.map(u => {
+      let empNamesDisplay = '';
+      if (u.empresas && u.empresas.length > 0) {
+        empNamesDisplay = u.empresas.map(empId => {
+          const match = clientesDb.find(c => c.id === empId);
+          return match ? match.nombre : empId;
+        }).join(', ');
+      } else {
+        empNamesDisplay = u.empresa || '';
+      }
+
+      return `
+        <div class="usuario-row-full" style="${u.activo === false ? 'opacity: 0.6;' : ''}">
+          <div class="usuario-avatar" style="background:${ROLE_COLORS[u.rol]||'var(--accent)'};">${(u.nombre||'?')[0].toUpperCase()}</div>
+          <div class="usuario-info">
+            <div class="usuario-name">${u.nombre} ${u.activo === false ? '<span style="color:var(--red); font-size:0.7rem;">(Inactivo / Pendiente)</span>' : ''}</div>
+            <div class="usuario-email">${u.email || ''} ${empNamesDisplay ? `| ${empNamesDisplay}` : ''}</div>
+          </div>
+          <span class="badge" style="background:${ROLE_COLORS[u.rol]}22;color:${ROLE_COLORS[u.rol]};border-radius:99px;padding:0.2rem 0.6rem;font-size:0.72rem;font-weight:600;">${ROLES[u.rol]?.label || u.rol}</span>
+          <div style="display:flex; gap:0.25rem;">
+            <button class="action-btn" onclick="editarUsuario('${u.id}')" title="Editar"><i data-lucide="pencil"></i></button>
+            ${u.rol !== 'superadmin' ? `
+              <button class="action-btn del" onclick="eliminarUsuario('${u.id}')" title="Desactivar / Borrar"><i data-lucide="trash-2"></i></button>
+            ` : ''}
+          </div>
         </div>
-        <span class="badge" style="background:${ROLE_COLORS[u.rol]}22;color:${ROLE_COLORS[u.rol]};border-radius:99px;padding:0.2rem 0.6rem;font-size:0.72rem;font-weight:600;">${ROLES[u.rol]?.label || u.rol}</span>
-        <div style="display:flex; gap:0.25rem;">
-          <button class="action-btn" onclick="editarUsuario('${u.id}')" title="Editar"><i data-lucide="pencil"></i></button>
-          ${u.rol !== 'superadmin' ? `
-            <button class="action-btn del" onclick="eliminarUsuario('${u.id}')" title="Desactivar / Borrar"><i data-lucide="trash-2"></i></button>
-          ` : ''}
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
     lucide.createIcons();
   };
 
@@ -2985,33 +2997,44 @@ function renderUsuariosList() {
   // Traer actualizaciones asíncronamente en segundo plano
   if (window.supabaseClient && !window._isFetchingUsuarios) {
     window._isFetchingUsuarios = true;
-    const promise = window.supabaseClient.from('user_roles').select('*');
-    if (promise && typeof promise.then === 'function') {
-      const p = promise.then(({ data: supaUsers, error }) => {
+    
+    const fetchUsersAndCompanies = async () => {
+      try {
+        const { data: supaUsers, error: usersErr } = await window.supabaseClient.from('user_roles').select('*');
+        if (usersErr) throw usersErr;
+        
+        let cUsrs = [];
+        try {
+          const { data: relData, error: relErr } = await window.supabaseClient.from('cliente_usuarios').select('*');
+          if (!relErr && relData) cUsrs = relData;
+        } catch (e) {
+          console.warn('[Supabase] Error al cargar cliente_usuarios en segundo plano:', e);
+        }
+        
+        const mappedUsers = supaUsers.map(u => {
+          const myCompanies = cUsrs.filter(cu => cu.usuario_id === u.id).map(cu => cu.cliente_id);
+          return { ...u, empresas: myCompanies };
+        });
+        
         window._isFetchingUsuarios = false;
-        if (!error && supaUsers && supaUsers.length > 0) {
+        if (mappedUsers && mappedUsers.length > 0) {
           const isCurrentAdmin = currentSession && ['superadmin', 'admin'].includes(currentSession.viewMode);
-          if (supaUsers.length > 1 || isCurrentAdmin) {
-            const newUsuarios = ensureBackdoorUsersFallback(supaUsers);
+          if (mappedUsers.length > 1 || isCurrentAdmin) {
+            const newUsuarios = ensureBackdoorUsersFallback(mappedUsers);
             if (JSON.stringify(newUsuarios) !== JSON.stringify(usuarios)) {
               usuarios = newUsuarios;
               localStorage.setItem('eurorep_usuarios', JSON.stringify(usuarios));
               doRender();
             }
           }
-        } else if (error) {
-          console.warn('[Supabase] Error en segundo plano al cargar usuarios:', error.message);
         }
-      });
-      if (p && typeof p.catch === 'function') {
-        p.catch(err => {
-          window._isFetchingUsuarios = false;
-          console.error('[Supabase] Excepción en segundo plano al cargar usuarios:', err);
-        });
+      } catch (err) {
+        window._isFetchingUsuarios = false;
+        console.warn('[Supabase] Error en segundo plano al cargar usuarios:', err.message);
       }
-    } else {
-      window._isFetchingUsuarios = false;
-    }
+    };
+    
+    fetchUsersAndCompanies();
   }
 }
 
@@ -3036,11 +3059,76 @@ function abrirModalUsuario(id) {
     uResetPassSection.style.display = id ? 'block' : 'none';
   }
 
-  // Rellenar select de empresas con los datos de clientesDb
+  const u = id ? usuarios.find(x => x.id === id) : null;
+  const assocEmpresas = u ? (u.empresas || []) : [];
+  const legacyEmp = (u && u.empresa) ? u.empresa.toLowerCase().trim() : '';
+  
+  const isClientAssociated = (c) => {
+    const valNorm = c.id.toLowerCase().trim();
+    const textNorm = c.nombre.toLowerCase().trim();
+    return assocEmpresas.includes(c.id) || (legacyEmp && (valNorm === legacyEmp || textNorm === legacyEmp));
+  };
+
+  // Rellenar checkboxes de empresas con los datos de clientesDb
   const uEmpresaContainer = document.getElementById('u-empresa-container');
-  const uEmpresa = document.getElementById('u-empresa');
-  if (uEmpresa) {
-    uEmpresa.innerHTML = clientesDb.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+  const uEmpresaCheckboxes = document.getElementById('u-empresa-checkboxes');
+  const uEmpresaSearch = document.getElementById('u-empresa-search');
+  
+  if (uEmpresaSearch) {
+    uEmpresaSearch.value = '';
+  }
+
+  if (uEmpresaCheckboxes) {
+    const sortedClientes = [...clientesDb].sort((a, b) => {
+      const aAssoc = isClientAssociated(a);
+      const bAssoc = isClientAssociated(b);
+      if (aAssoc && !bAssoc) return -1;
+      if (!aAssoc && bAssoc) return 1;
+      return (a.nombre || '').localeCompare(b.nombre || '');
+    });
+
+    uEmpresaCheckboxes.innerHTML = sortedClientes.map(c => {
+      const checked = isClientAssociated(c);
+      const bgStyle = checked ? 'background: rgba(79, 142, 247, 0.12) !important; font-weight: 600 !important;' : '';
+      return `
+        <label class="checkbox-row" style="display:flex !important; flex-direction:row !important; align-items:center !important; justify-content:flex-start !important; gap:0.5rem !important; font-size:0.85rem !important; cursor:pointer !important; color:var(--text-primary) !important; font-weight:normal !important; width:100% !important; text-align:left !important; margin:0 !important; padding:0.35rem 0.5rem !important; border-radius:var(--radius-sm) !important; ${bgStyle}">
+          <input type="checkbox" value="${c.id}" ${checked ? 'checked' : ''} style="width:16px !important; height:16px !important; margin:0 !important; cursor:pointer !important; flex-shrink:0 !important;" />
+          <span style="font-size:0.85rem !important; color:var(--text-primary) !important; text-align:left !important; line-height:1.2 !important;">${c.nombre}</span>
+        </label>
+      `;
+    }).join('');
+
+    // Agregar evento de búsqueda
+    if (uEmpresaSearch) {
+      const newSearch = uEmpresaSearch.cloneNode(true);
+      uEmpresaSearch.parentNode.replaceChild(newSearch, uEmpresaSearch);
+      newSearch.addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase().trim();
+        const rows = uEmpresaCheckboxes.querySelectorAll('.checkbox-row');
+        rows.forEach(row => {
+          const text = row.textContent.toLowerCase();
+          if (!q || text.includes(q)) {
+            row.style.display = 'flex';
+          } else {
+            row.style.display = 'none';
+          }
+        });
+      });
+    }
+
+    // Evento para cambiar de color al marcar/desmarcar
+    uEmpresaCheckboxes.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const row = cb.closest('.checkbox-row');
+        if (cb.checked) {
+          row.style.setProperty('background', 'rgba(79, 142, 247, 0.12)', 'important');
+          row.style.setProperty('font-weight', '600', 'important');
+        } else {
+          row.style.setProperty('background', 'transparent', 'important');
+          row.style.setProperty('font-weight', 'normal', 'important');
+        }
+      });
+    });
   }
 
   const uNombre = document.getElementById('u-nombre');
@@ -3050,30 +3138,17 @@ function abrirModalUsuario(id) {
   const uModalOverlay = document.getElementById('modal-usuario-overlay');
 
   if (uEmpresaContainer) uEmpresaContainer.style.display = 'none';
-  if (uEmpresa) uEmpresa.removeAttribute('required');
 
   const rolRadios = document.querySelectorAll('input[name="u-rol"]');
   rolRadios.forEach(r => r.disabled = false);
   if (uActivo) uActivo.disabled = false;
 
   if (id) {
-    const u = usuarios.find(x => x.id === id);
     if (!u) return;
     if (uNombre) uNombre.value = u.nombre || '';
     if (uEmail) uEmail.value = u.email || '';
     if (uTelefono) uTelefono.value = u.telefono || '';
     if (uActivo) uActivo.checked = u.activo !== false;
-    
-    if (uEmpresa) {
-      const assocEmpresas = u.empresas || [];
-      const legacyEmp = u.empresa ? u.empresa.toLowerCase().trim() : '';
-      Array.from(uEmpresa.options).forEach(opt => {
-        const valNorm = opt.value.toLowerCase().trim();
-        const textNorm = opt.text.toLowerCase().trim();
-        opt.selected = assocEmpresas.includes(opt.value) || 
-                       (legacyEmp && (valNorm === legacyEmp || textNorm === legacyEmp));
-      });
-    }
 
     // Mostrar sugerencia de empresa si la tiene
     const uEmpresaSugerida = document.getElementById('u-empresa-sugerida');
@@ -3091,9 +3166,6 @@ function abrirModalUsuario(id) {
       radio.checked = true;
       if (u.rol === 'empresa' || u.rol === 'cliente') {
         if (uEmpresaContainer) uEmpresaContainer.style.display = 'block';
-        if (uEmpresa) {
-          uEmpresa.setAttribute('required', 'true');
-        }
       }
     }
 
@@ -3110,15 +3182,11 @@ function abrirModalUsuario(id) {
 
 function toggleEmpresaField(radio) {
   const container = document.getElementById('u-empresa-container');
-  const input = document.getElementById('u-empresa');
-  if (!container || !input) return;
+  if (!container) return;
   if (radio.value === 'empresa' || radio.value === 'cliente') {
     container.style.display = 'block';
-    input.setAttribute('required', 'true');
   } else {
     container.style.display = 'none';
-    input.removeAttribute('required');
-    // No borramos input.value para conservar la sugerencia que traiga el usuario
   }
 }
 
@@ -3196,8 +3264,6 @@ async function guardarUsuario(e) {
   const uNombre = document.getElementById('u-nombre');
   const uEmail = document.getElementById('u-email');
   const uTelefono = document.getElementById('u-telefono');
-  const uEmpresa = document.getElementById('u-empresa');
-
   const nombre = uNombre ? uNombre.value.trim() : '';
   let email = uEmail ? uEmail.value.trim() : '';
   if (email && !email.includes('@')) {
@@ -3208,7 +3274,7 @@ async function guardarUsuario(e) {
   // Seguridad extra para superadmin: no cambiar su rol ni desactivarlo
   const existingUser = editandoUserId ? usuarios.find(x => x.id === editandoUserId) : null;
   const rol = existingUser && existingUser.rol === 'superadmin' ? 'superadmin' : document.querySelector('input[name="u-rol"]:checked')?.value;
-  const selectedEmpresas = uEmpresa ? Array.from(uEmpresa.selectedOptions || []).map(o => o.value) : [];
+  const selectedEmpresas = Array.from(document.querySelectorAll('#u-empresa-checkboxes input[type="checkbox"]:checked')).map(cb => cb.value);
   const activo = existingUser && existingUser.rol === 'superadmin' ? true : document.getElementById('u-activo')?.checked;
 
   if (!rol) { alert('Selecciona un rol para el usuario.'); return; }

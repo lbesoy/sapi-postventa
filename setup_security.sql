@@ -2,6 +2,9 @@
 CREATE TABLE IF NOT EXISTS public.user_roles (
     id uuid REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
     nombre text,
+    email text,
+    telefono text,
+    empresa text,
     rol text NOT NULL DEFAULT 'consulta',
     activo boolean DEFAULT false
 );
@@ -272,8 +275,22 @@ CREATE POLICY "Clientes y Empresas read own ordenes" ON public.ordenes FOR SELEC
 CREATE OR REPLACE FUNCTION public.handle_new_user() 
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.user_roles (id, nombre, rol, activo)
-  VALUES (new.id, new.raw_user_meta_data->>'nombre', 'consulta', false);
+  INSERT INTO public.user_roles (id, nombre, email, telefono, rol, empresa, activo)
+  VALUES (
+    new.id, 
+    coalesce(new.raw_user_meta_data->>'nombre', ''), 
+    new.email, 
+    coalesce(new.phone, new.raw_user_meta_data->>'telefono', ''),
+    coalesce(new.raw_user_meta_data->>'rol', 'consulta'), 
+    new.raw_user_meta_data->>'empresa', 
+    false
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    nombre = EXCLUDED.nombre,
+    email = EXCLUDED.email,
+    telefono = EXCLUDED.telefono,
+    rol = EXCLUDED.rol,
+    empresa = EXCLUDED.empresa;
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
