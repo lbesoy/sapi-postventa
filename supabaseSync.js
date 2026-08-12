@@ -1972,7 +1972,37 @@ function updateSyncStatusUI() {
       iconEl.setAttribute('data-lucide', 'wifi-off');
       iconEl.style.animation = 'none';
     }
-    if (textEl) textEl.textContent = 'Sin conexión';
+    
+    // Leer y formatear la última vez que se sincronizó
+    const lastSyncStr = localStorage.getItem('sapi_last_sync_timestamp') || window.lastSyncTimestamp;
+    let lastSyncFormatted = '';
+    if (lastSyncStr) {
+      try {
+        const d = new Date(lastSyncStr);
+        lastSyncFormatted = ' (' + d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) + ')';
+      } catch (e) {}
+    }
+
+    if (textEl) textEl.textContent = 'Sin conexión' + lastSyncFormatted;
+    
+    // Tooltip informativo
+    let tooltipMsg = 'Cuando está fuera de línea se podrá ver a qué hora fue la última vez que se sincronizó.';
+    if (lastSyncStr) {
+      try {
+        const d = new Date(lastSyncStr);
+        const fullDate = d.toLocaleString('es-MX', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+        tooltipMsg = 'Cuando está fuera de línea se podrá ver a qué hora fue la última vez que se sincronizó. Última sincronización: ' + fullDate;
+      } catch (e) {}
+    }
+    container.setAttribute('title', tooltipMsg);
+
     if (badgeEl) {
       if (pendingCount > 0) {
         badgeEl.textContent = pendingCount;
@@ -1988,6 +2018,7 @@ function updateSyncStatusUI() {
 
   const showOnlineUI = () => {
     container.classList.remove('status-offline');
+    container.setAttribute('title', 'Sincronización con Supabase. Clic para ver detalles.');
     if (pendingCount > 0) {
       container.classList.add('status-syncing');
       if (iconEl) {
@@ -2824,6 +2855,7 @@ window.cargarDatosDeSupabase = function() {
     window.lastSyncOrdsLength = ordenes ? ordenes.length : -1;
     window.lastSyncOrdsError = ordenesError ? ordenesError.message : null;
     window.lastSyncTimestamp = new Date().toISOString();
+    localStorage.setItem('sapi_last_sync_timestamp', window.lastSyncTimestamp);
     if (ordenes) {
       let bitacorasMap = {};
       try {
@@ -3878,6 +3910,49 @@ window.verDetallesSincronizacion = function() {
         list.appendChild(itemBox);
       });
       body.appendChild(list);
+    }
+
+    // Agregar offline banner si aplica
+    const isOffline = !navigator.onLine && !window.isConnectionVerifiedOnline;
+    if (isOffline) {
+      const lastSyncStr = localStorage.getItem('sapi_last_sync_timestamp') || window.lastSyncTimestamp;
+      let lastSyncFormatted = 'Nunca';
+      if (lastSyncStr) {
+        try {
+          const d = new Date(lastSyncStr);
+          lastSyncFormatted = d.toLocaleString('es-MX', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+          });
+        } catch (e) {
+          lastSyncFormatted = lastSyncStr;
+        }
+      }
+      
+      const offlineBanner = document.createElement('div');
+      offlineBanner.style.marginBottom = '1.25rem';
+      offlineBanner.style.padding = '0.85rem 1rem';
+      offlineBanner.style.borderRadius = '10px';
+      offlineBanner.style.backgroundColor = 'rgba(232, 130, 12, 0.05)';
+      offlineBanner.style.border = '1px solid rgba(232, 130, 12, 0.2)';
+      offlineBanner.style.fontSize = '0.85rem';
+      offlineBanner.style.color = 'var(--text-secondary, #4b5563)';
+      offlineBanner.style.display = 'flex';
+      offlineBanner.style.gap = '0.5rem';
+      offlineBanner.style.alignItems = 'flex-start';
+      offlineBanner.innerHTML = `
+        <i data-lucide="wifi-off" style="width:16px; height:16px; color:var(--accent,#e8820c); flex-shrink:0; margin-top:0.1rem;"></i>
+        <div>
+          <span style="font-weight:600; color:var(--text-primary,#111827);">Modo fuera de línea</span>
+          <div style="margin-top:0.2rem;">Cuando está fuera de línea se podrá ver a qué hora fue la última vez que se sincronizó.</div>
+          <div style="margin-top:0.4rem; font-size:0.78rem; font-weight:700; color:var(--accent,#e8820c);">Última sincronización: ${lastSyncFormatted}</div>
+        </div>
+      `;
+      body.insertBefore(offlineBanner, body.firstChild);
     }
     
     const footer = document.createElement('div');
