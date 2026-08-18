@@ -13720,9 +13720,13 @@ function actualizarMapaMaquinaria(filteredData) {
 
     let popupContentHtml = `<div style="font-family:'Inter',sans-serif; min-width:200px;">`;
     if (count === 1) {
+      const logo = getLogoMarca(mainMaq.marca);
       popupContentHtml += `
         <div style="text-align:center;">
-          <div style="font-weight:600; font-size:0.9rem;">${mainMaq.modelo}</div>
+          <div style="display:flex; align-items:center; justify-content:center; gap:0.4rem; margin-bottom:0.25rem;">
+            ${logo ? `<img src="${logo}" style="width:16px; height:16px; object-fit:contain; border-radius:50%; border:1px solid #ddd; background:white;" onerror="this.style.display='none';"/>` : ''}
+            <span style="font-weight:600; font-size:0.9rem;">${mainMaq.modelo}</span>
+          </div>
           <div style="font-size:0.75rem; color:#666;">SN: ${mainMaq.serie}</div>
           <div style="margin-top:0.4rem; padding-top:0.4rem; border-top:1px solid #ddd; font-size:0.8rem;">
             <strong>${mainMaq.cliente}</strong><br>
@@ -13736,11 +13740,17 @@ function actualizarMapaMaquinaria(filteredData) {
           ${count} Máquinas en este Sitio
         </div>
         <div style="max-height:150px; overflow-y:auto; display:flex; flex-direction:column; gap:0.4rem; padding-right:5px; margin-bottom:0.4rem;">
-          ${g.maquinas.map(m => `
-            <div style="font-size:0.78rem; border-bottom:1px dashed #eee; padding-bottom:0.25rem;">
-              <strong style="color:var(--text-primary);">${m.modelo}</strong> <span style="font-size:0.7rem; color:#777;">(SN: ${m.serie})</span>
-            </div>
-          `).join('')}
+          ${g.maquinas.map(m => {
+            const logo = getLogoMarca(m.marca);
+            return `
+              <div style="font-size:0.78rem; border-bottom:1px dashed #eee; padding-bottom:0.25rem; display:flex; align-items:center; gap:0.4rem;">
+                ${logo ? `<img src="${logo}" style="width:16px; height:16px; object-fit:contain; border-radius:50%; border:1px solid #ddd; background:white;" onerror="this.style.display='none';"/>` : ''}
+                <div style="flex:1;">
+                  <strong style="color:var(--text-primary);">${m.modelo}</strong> <span style="font-size:0.7rem; color:#777;">(SN: ${m.serie})</span>
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
         <div style="margin-top:0.4rem; font-size:0.75rem; color:#555; border-top:1px solid #ddd; padding-top:0.4rem;">
           <strong>Cliente:</strong> ${mainMaq.cliente}<br>
