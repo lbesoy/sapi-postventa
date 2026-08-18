@@ -11430,6 +11430,24 @@ function renderCalendarioSemanalModal(baseFechaStr) {
   const inputFecha = document.getElementById('pt-fecha');
   if (inputFecha) inputFecha.value = mondayStr;
 
+  if (!window.weeklyDayBlocks) {
+    window.weeklyDayBlocks = {};
+    for (let i = 0; i <= 6; i++) {
+      window.weeklyDayBlocks[i] = [{
+        id: `${i}-0`,
+        tipo: 'Servicio',
+        ordenId: '',
+        entrada: '',
+        salida: '',
+        idaHora: '',
+        idaHoras: '',
+        regresoHora: '',
+        regresoHoras: '',
+        trasladoOpen: false
+      }];
+    }
+  }
+
   const sundayDate = new Date(mondayDate);
   sundayDate.setDate(mondayDate.getDate() + 6);
   
@@ -11481,8 +11499,7 @@ function renderCalendarioSemanalModal(baseFechaStr) {
     const cb = document.getElementById(`pt-rep-${dayIdx}`);
     return cb ? cb.checked : false;
   });
-
-  const detailsContainer = document.getElementById('pt-detalles-dias-container');
+const detailsContainer = document.getElementById('pt-detalles-dias-container');
   const detailsList = document.getElementById('pt-detalles-dias-list');
   const listWrapper = document.getElementById('pt-detalles-dias-list-wrapper');
   
@@ -11493,17 +11510,53 @@ function renderCalendarioSemanalModal(baseFechaStr) {
       const mismaOrdenCb = document.getElementById('pt-usar-misma-orden');
       const mismaOrden = mismaOrdenCb ? mismaOrdenCb.checked : true;
       listWrapper.style.display = mismaOrden ? 'none' : 'flex';
+      
+      const mainOrderGroup = document.getElementById('pt-grupo-orden-principal');
+      if (mainOrderGroup) {
+        mainOrderGroup.style.display = mismaOrden ? 'block' : 'none';
+      }
+      const mainTypeGroup = document.getElementById('pt-grupo-tipo-principal');
+      if (mainTypeGroup) {
+        mainTypeGroup.style.display = mismaOrden ? 'block' : 'none';
+      }
+      const mainHoursGroup = document.getElementById('pt-grupo-horario-principal');
+      if (mainHoursGroup) {
+        mainHoursGroup.style.display = mismaOrden ? 'grid' : 'none';
+      }
 
-      // Preservar valores seleccionados actualmente
-      const preservedValues = {};
+      // Preservar valores seleccionados actualmente en window.weeklyDayBlocks
       activeDays.forEach(dayIdx => {
-        const sel = document.getElementById(`pt-orden-dia-${dayIdx}`);
-        if (sel) preservedValues[dayIdx] = sel.value;
+        const blocks = window.weeklyDayBlocks[dayIdx] || [];
+        blocks.forEach((block, blockIdx) => {
+          const sel = document.getElementById(`pt-orden-dia-${dayIdx}-${blockIdx}`);
+          if (sel) block.ordenId = sel.value;
+          const selTipo = document.getElementById(`pt-tipo-dia-${dayIdx}-${blockIdx}`);
+          if (selTipo) block.tipo = selTipo.value;
+          const selEntrada = document.getElementById(`pt-entrada-dia-${dayIdx}-${blockIdx}`);
+          if (selEntrada) block.entrada = selEntrada.value;
+          const selSalida = document.getElementById(`pt-salida-dia-${dayIdx}-${blockIdx}`);
+          if (selSalida) block.salida = selSalida.value;
+          
+          const selIdaHora = document.getElementById(`pt-traslado-ida-hora-dia-${dayIdx}-${blockIdx}`);
+          if (selIdaHora) block.idaHora = selIdaHora.value;
+          const selIdaHoras = document.getElementById(`pt-traslado-ida-horas-dia-${dayIdx}-${blockIdx}`);
+          if (selIdaHoras) block.idaHoras = selIdaHoras.value;
+          const selRegresoHora = document.getElementById(`pt-traslado-regreso-hora-dia-${dayIdx}-${blockIdx}`);
+          if (selRegresoHora) block.regresoHora = selRegresoHora.value;
+          const selRegresoHoras = document.getElementById(`pt-traslado-regreso-horas-dia-${dayIdx}-${blockIdx}`);
+          if (selRegresoHoras) block.regresoHoras = selRegresoHoras.value;
+          
+          const container = document.getElementById(`pt-traslado-dia-container-${dayIdx}-${blockIdx}`);
+          if (container) block.trasladoOpen = (container.style.display !== 'none');
+        });
       });
 
       // Obtener órdenes abiertas
       const openOrds = getFilteredOrders().filter(o => o.estado !== 'Finalizado');
       const mainOrdenId = document.getElementById('pt-orden').value;
+      const mainTipo = document.getElementById('pt-tipo').value || 'Servicio';
+      const mainEntrada = document.getElementById('pt-entrada').value || '';
+      const mainSalida = document.getElementById('pt-salida').value || '';
 
       detailsList.innerHTML = activeDays.map(dayIdx => {
         const targetDate = new Date(mondayDate);
@@ -11512,56 +11565,184 @@ function renderCalendarioSemanalModal(baseFechaStr) {
         
         const dateStr = `${diasNombres[dayIdx]} ${targetDate.getDate()} de ${targetDate.toLocaleDateString('es-MX', { month: 'short' })}`;
         
-        const dayOptionsHtml = openOrds.map(o => {
-          const displayStr = `[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}`.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-          const htmlStr = `[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}`.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          return `<div class="combo-option" style="padding: 0.35rem 0.5rem; font-size: 0.75rem;" onclick="selectComboOption('pt-orden-dia-${dayIdx}', '${o.id}', '${displayStr}')">${htmlStr}</div>`;
+        const blocks = window.weeklyDayBlocks[dayIdx] || [];
+        
+        const blocksHtml = blocks.map((block, blockIdx) => {
+          const dayOptionsHtml = openOrds.map(o => {
+            const displayStr = `[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}`.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const htmlStr = `[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}`.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return `<div class="combo-option" style="padding: 0.35rem 0.5rem; font-size: 0.75rem;" onclick="selectComboOption('pt-orden-dia-${dayIdx}-${blockIdx}', '${o.id}', '${displayStr}')">${htmlStr}</div>`;
+          }).join('');
+
+          const deleteBtnHtml = blockIdx > 0 
+            ? `<a href="#" onclick="window.quitarActividadSemanal(${dayIdx}, ${blockIdx}); return false;" style="font-size:0.7rem; color:var(--red); text-decoration:underline; font-weight:600;">Quitar</a>` 
+            : '';
+
+          return `
+            <div class="pt-dia-bloque" style="${blockIdx > 0 ? 'margin-top:0.6rem; padding-top:0.6rem; border-top:1px dashed var(--border);' : ''}">
+              <div style="display:flex; align-items:center; gap:0.5rem; justify-content:space-between; margin-bottom:0.25rem;">
+                <span style="font-size:0.7rem; font-weight:600; color:var(--text-secondary);">Actividad #${blockIdx + 1}</span>
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                  ${deleteBtnHtml}
+                  <select id="pt-tipo-dia-${dayIdx}-${blockIdx}" class="form-select" onchange="window.onTipoDiaChange(${dayIdx}, ${blockIdx})" style="font-size:0.75rem; padding:0.2rem 0.4rem; width:125px; height:28px;">
+                    <option value="Servicio">Servicio</option>
+                    <option value="Levantamiento">Levantamiento</option>
+                    <option value="Capacitación">Capacitación</option>
+                    <option value="Traslado">Traslado</option>
+                    <option value="Junta">Junta</option>
+                    <option value="Vacaciones">Vacaciones</option>
+                    <option value="Descanso">Descanso</option>
+                    <option value="Otro">Otro</option>
+                  </select>
+                </div>
+              </div>
+              <div id="pt-horas-dia-container-${dayIdx}-${blockIdx}" style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.25rem;">
+                <div style="display:flex; align-items:center; gap:0.25rem; flex:1;">
+                  <span style="font-size:0.7rem; color:var(--text-muted); white-space:nowrap;">Entrada:</span>
+                  <input type="time" id="pt-entrada-dia-${dayIdx}-${blockIdx}" class="form-control" onchange="actualizarTecnicosDisponibles()" style="font-size:0.75rem; padding:0.15rem 0.3rem; height:26px; width:100%;">
+                </div>
+                <div style="display:flex; align-items:center; gap:0.25rem; flex:1;">
+                  <span style="font-size:0.7rem; color:var(--text-muted); white-space:nowrap;">Salida:</span>
+                  <input type="time" id="pt-salida-dia-${dayIdx}-${blockIdx}" class="form-control" onchange="actualizarTecnicosDisponibles()" style="font-size:0.75rem; padding:0.15rem 0.3rem; height:26px; width:100%;">
+                </div>
+              </div>
+              
+              <a href="#" id="pt-traslado-dia-link-${dayIdx}-${blockIdx}" onclick="window.toggleTrasladoDia(${dayIdx}, ${blockIdx}); return false;" style="font-size:0.7rem; color:var(--accent); text-decoration:underline; display:none; margin-top:0.1rem; align-self:flex-start;">+ Traslado (Opcional)</a>
+              
+              <div id="pt-traslado-dia-container-${dayIdx}-${blockIdx}" style="display:none; margin-top:0.25rem; border-top:1px dashed var(--border); padding-top:0.25rem; flex-direction:column; gap:0.25rem;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.25rem; align-items:center;">
+                  <span style="font-size:0.68rem; font-weight:600; color:var(--text-secondary);">Ida Hora:</span>
+                  <span style="font-size:0.68rem; font-weight:600; color:var(--text-secondary);">Ida Hrs:</span>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.25rem;">
+                  <input type="time" id="pt-traslado-ida-hora-dia-${dayIdx}-${blockIdx}" class="form-control" style="font-size:0.75rem; padding:0.15rem; height:24px; width:100%;">
+                  <input type="number" id="pt-traslado-ida-horas-dia-${dayIdx}-${blockIdx}" step="0.5" min="0" placeholder="Ej. 1.5" class="form-control" style="font-size:0.75rem; padding:0.15rem; height:24px; width:100%;">
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.25rem; align-items:center; margin-top:0.15rem;">
+                  <span style="font-size:0.68rem; font-weight:600; color:var(--text-secondary);">Regreso Hora:</span>
+                  <span style="font-size:0.68rem; font-weight:600; color:var(--text-secondary);">Regreso Hrs:</span>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.25rem;">
+                  <input type="time" id="pt-traslado-regreso-hora-dia-${dayIdx}-${blockIdx}" class="form-control" style="font-size:0.75rem; padding:0.15rem; height:24px; width:100%;">
+                  <input type="number" id="pt-traslado-regreso-horas-dia-${dayIdx}-${blockIdx}" step="0.5" min="0" placeholder="Ej. 1.5" class="form-control" style="font-size:0.75rem; padding:0.15rem; height:24px; width:100%;">
+                </div>
+              </div>
+              
+              <div id="pt-orden-dia-${dayIdx}-${blockIdx}-container" style="position:relative; width:100%; margin-top: 0.25rem;">
+                <input type="hidden" id="pt-orden-dia-${dayIdx}-${blockIdx}" value="">
+                <div class="combo-box" tabindex="0" id="pt-orden-dia-${dayIdx}-${blockIdx}-combo" onclick="toggleCombo('pt-orden-dia-${dayIdx}-${blockIdx}')" style="font-size:0.75rem; padding:0.25rem 0.5rem; display:flex; justify-content:space-between; align-items:center; height:28px;">
+                  <span id="pt-orden-dia-${dayIdx}-${blockIdx}-display" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:calc(100% - 15px);">Selecciona una orden...</span>
+                  <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="combo-menu" id="pt-orden-dia-${dayIdx}-${blockIdx}-menu" style="left:0; right:0; width:auto; max-height:220px;">
+                  <div class="combo-search" style="padding:0.25rem 0.4rem;">
+                    <input type="text" id="pt-orden-dia-${dayIdx}-${blockIdx}-search" placeholder="Buscar..." oninput="filterCombo('pt-orden-dia-${dayIdx}-${blockIdx}', this.value)" onclick="event.stopPropagation()" style="font-size:0.75rem; padding:0.15rem 0.3rem;">
+                  </div>
+                  <div class="combo-options" id="pt-orden-dia-${dayIdx}-${blockIdx}-options" style="max-height:160px; padding:0.15rem;">
+                    ${dayOptionsHtml}
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
         }).join('');
 
         return `
-          <div style="display:flex; align-items:center; gap:0.5rem; justify-content:space-between; background:rgba(255,255,255,0.01); border:1px solid var(--border); padding:0.4rem 0.5rem; border-radius:var(--radius-sm);">
-            <span style="font-size:0.78rem; font-weight:600; color:var(--text-primary); flex-shrink:0; width:110px;">${dateStr}</span>
-            <div style="position:relative; flex:1; min-width:0;">
-              <div class="combo-box" tabindex="0" id="pt-orden-dia-${dayIdx}-combo" onclick="toggleCombo('pt-orden-dia-${dayIdx}')" style="font-size:0.75rem; padding:0.25rem 0.5rem; display:flex; justify-content:space-between; align-items:center;">
-                <span id="pt-orden-dia-${dayIdx}-display" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:calc(100% - 15px);">Selecciona una orden...</span>
-                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </div>
-              <div class="combo-menu" id="pt-orden-dia-${dayIdx}-menu" style="left:0; right:0; width:auto; max-height:220px;">
-                <div class="combo-search" style="padding:0.25rem 0.4rem;">
-                  <input type="text" id="pt-orden-dia-${dayIdx}-search" placeholder="Buscar..." oninput="filterCombo('pt-orden-dia-${dayIdx}', this.value)" onclick="event.stopPropagation()" style="font-size:0.75rem; padding:0.15rem 0.3rem;">
-                </div>
-                <div class="combo-options" id="pt-orden-dia-${dayIdx}-options" style="max-height:160px; padding:0.15rem;">
-                  ${dayOptionsHtml}
-                </div>
-              </div>
-              <input type="hidden" id="pt-orden-dia-${dayIdx}">
+          <div style="display:flex; flex-direction:column; gap:0.4rem; background:rgba(255,255,255,0.01); border:1px solid var(--border); padding:0.6rem; border-radius:var(--radius-sm);">
+            <div style="display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); padding-bottom:0.25rem; margin-bottom:0.25rem;">
+              <span style="font-size:0.8rem; font-weight:700; color:var(--text-primary);">${dateStr}</span>
+              <a href="#" onclick="window.agregarActividadSemanal(${dayIdx}); return false;" style="font-size:0.72rem; color:var(--accent); font-weight:600; text-decoration:none;">+ Añadir Actividad</a>
             </div>
+            ${blocksHtml}
           </div>
         `;
       }).join('');
       
-      // Restaurar valores
+      // Restaurar valores e inicializar visibilidades
       activeDays.forEach(dayIdx => {
-        let targetId = '';
-        if (preservedValues[dayIdx] && openOrds.some(o => o.id === preservedValues[dayIdx])) {
-          targetId = preservedValues[dayIdx];
-        } else if (mainOrdenId) {
-          targetId = mainOrdenId;
-        }
-
-        if (targetId) {
-          const matchingOrd = openOrds.find(o => o.id === targetId);
-          if (matchingOrd) {
-            const displayStr = `[${matchingOrd.folio || 'S/N'}] ${matchingOrd.cliente} - ${matchingOrd.tipo}`;
-            selectComboOption(`pt-orden-dia-${dayIdx}`, targetId, displayStr, true);
+        const blocks = window.weeklyDayBlocks[dayIdx] || [];
+        blocks.forEach((block, blockIdx) => {
+          const selTipo = document.getElementById(`pt-tipo-dia-${dayIdx}-${blockIdx}`);
+          if (selTipo) {
+            if (block.tipo) {
+              selTipo.value = block.tipo;
+            } else {
+              selTipo.value = mainTipo;
+            }
           }
-        }
+          
+          const selEntrada = document.getElementById(`pt-entrada-dia-${dayIdx}-${blockIdx}`);
+          if (selEntrada) {
+            if (block.entrada) {
+              selEntrada.value = block.entrada;
+            } else if (mainEntrada) {
+              selEntrada.value = mainEntrada;
+            }
+          }
+          
+          const selSalida = document.getElementById(`pt-salida-dia-${dayIdx}-${blockIdx}`);
+          if (selSalida) {
+            if (block.salida) {
+              selSalida.value = block.salida;
+            } else if (mainSalida) {
+              selSalida.value = mainSalida;
+            }
+          }
+          
+          const selIdaHora = document.getElementById(`pt-traslado-ida-hora-dia-${dayIdx}-${blockIdx}`);
+          if (selIdaHora && block.idaHora !== undefined) selIdaHora.value = block.idaHora;
+          const selIdaHoras = document.getElementById(`pt-traslado-ida-horas-dia-${dayIdx}-${blockIdx}`);
+          if (selIdaHoras && block.idaHoras !== undefined) selIdaHoras.value = block.idaHoras;
+          const selRegresoHora = document.getElementById(`pt-traslado-regreso-hora-dia-${dayIdx}-${blockIdx}`);
+          if (selRegresoHora && block.regresoHora !== undefined) selRegresoHora.value = block.regresoHora;
+          const selRegresoHoras = document.getElementById(`pt-traslado-regreso-horas-dia-${dayIdx}-${blockIdx}`);
+          if (selRegresoHoras && block.regresoHoras !== undefined) selRegresoHoras.value = block.regresoHoras;
+          
+          const container = document.getElementById(`pt-traslado-dia-container-${dayIdx}-${blockIdx}`);
+          if (container && block.trasladoOpen) {
+            container.style.display = 'flex';
+          }
+          
+          let targetId = '';
+          if (block.ordenId && openOrds.some(o => o.id === block.ordenId)) {
+            targetId = block.ordenId;
+          } else if (mainOrdenId) {
+            targetId = mainOrdenId;
+          }
+
+          if (targetId) {
+            const matchingOrd = openOrds.find(o => o.id === targetId);
+            if (matchingOrd) {
+              const displayStr = `[${matchingOrd.folio || 'S/N'}] ${matchingOrd.cliente} - ${matchingOrd.tipo}`;
+              const hiddenVal = document.getElementById(`pt-orden-dia-${dayIdx}-${blockIdx}`);
+              if (hiddenVal) hiddenVal.value = targetId;
+              const display = document.getElementById(`pt-orden-dia-${dayIdx}-${blockIdx}-display`);
+              if (display) display.textContent = displayStr;
+            }
+          }
+          
+          // Trigger type change to toggle layout visibility (link and order dropdown)
+          window.onTipoDiaChange(dayIdx, blockIdx);
+        });
       });
       
     } else {
       detailsContainer.style.display = 'none';
       listWrapper.style.display = 'none';
       detailsList.innerHTML = '';
+      
+      const mainOrderGroup = document.getElementById('pt-grupo-orden-principal');
+      if (mainOrderGroup) {
+        mainOrderGroup.style.display = 'block';
+      }
+      const mainTypeGroup = document.getElementById('pt-grupo-tipo-principal');
+      if (mainTypeGroup) {
+        mainTypeGroup.style.display = 'block';
+      }
+      const mainHoursGroup = document.getElementById('pt-grupo-horario-principal');
+      if (mainHoursGroup) {
+        mainHoursGroup.style.display = 'grid';
+      }
     }
   }
 }
@@ -11576,8 +11757,213 @@ window.toggleDiaSemanaModal = function(dayIdx) {
   actualizarTecnicosDisponibles();
 };
 
+window.agregarActividadSemanal = function(dayIdx) {
+  const activeDays = [0, 1, 2, 3, 4, 5, 6].filter(idx => document.getElementById(`pt-rep-${idx}`)?.checked);
+  activeDays.forEach(idx => {
+    const blocks = window.weeklyDayBlocks[idx] || [];
+    blocks.forEach((block, blockIdx) => {
+      const sel = document.getElementById(`pt-orden-dia-${idx}-${blockIdx}`);
+      if (sel) block.ordenId = sel.value;
+      const selTipo = document.getElementById(`pt-tipo-dia-${idx}-${blockIdx}`);
+      if (selTipo) block.tipo = selTipo.value;
+      const selEntrada = document.getElementById(`pt-entrada-dia-${idx}-${blockIdx}`);
+      if (selEntrada) block.entrada = selEntrada.value;
+      const selSalida = document.getElementById(`pt-salida-dia-${idx}-${blockIdx}`);
+      if (selSalida) block.salida = selSalida.value;
+      
+      const selIdaHora = document.getElementById(`pt-traslado-ida-hora-dia-${idx}-${blockIdx}`);
+      if (selIdaHora) block.idaHora = selIdaHora.value;
+      const selIdaHoras = document.getElementById(`pt-traslado-ida-horas-dia-${idx}-${blockIdx}`);
+      if (selIdaHoras) block.idaHoras = selIdaHoras.value;
+      const selRegresoHora = document.getElementById(`pt-traslado-regreso-hora-dia-${idx}-${blockIdx}`);
+      if (selRegresoHora) block.regresoHora = selRegresoHora.value;
+      const selRegresoHoras = document.getElementById(`pt-traslado-regreso-horas-dia-${idx}-${blockIdx}`);
+      if (selRegresoHoras) block.regresoHoras = selRegresoHoras.value;
+      
+      const container = document.getElementById(`pt-traslado-dia-container-${idx}-${blockIdx}`);
+      if (container) block.trasladoOpen = (container.style.display !== 'none');
+    });
+  });
+
+  if (!window.weeklyDayBlocks[dayIdx]) {
+    window.weeklyDayBlocks[dayIdx] = [];
+  }
+  const nextSeq = window.weeklyDayBlocks[dayIdx].length;
+  window.weeklyDayBlocks[dayIdx].push({
+    id: `${dayIdx}-${nextSeq}`,
+    tipo: 'Servicio',
+    ordenId: '',
+    entrada: document.getElementById('pt-entrada')?.value || '',
+    salida: document.getElementById('pt-salida')?.value || '',
+    idaHora: '',
+    idaHoras: '',
+    regresoHora: '',
+    regresoHoras: '',
+    trasladoOpen: false
+  });
+
+  const baseFechaStr = document.getElementById('pt-fecha').value;
+  renderCalendarioSemanalModal(baseFechaStr);
+  actualizarTecnicosDisponibles();
+};
+
+window.quitarActividadSemanal = function(dayIdx, blockIdx) {
+  const activeDays = [0, 1, 2, 3, 4, 5, 6].filter(idx => document.getElementById(`pt-rep-${idx}`)?.checked);
+  activeDays.forEach(idx => {
+    const blocks = window.weeklyDayBlocks[idx] || [];
+    blocks.forEach((block, bIdx) => {
+      const sel = document.getElementById(`pt-orden-dia-${idx}-${bIdx}`);
+      if (sel) block.ordenId = sel.value;
+      const selTipo = document.getElementById(`pt-tipo-dia-${idx}-${bIdx}`);
+      if (selTipo) block.tipo = selTipo.value;
+      const selEntrada = document.getElementById(`pt-entrada-dia-${idx}-${bIdx}`);
+      if (selEntrada) block.entrada = selEntrada.value;
+      const selSalida = document.getElementById(`pt-salida-dia-${idx}-${bIdx}`);
+      if (selSalida) block.salida = selSalida.value;
+      
+      const selIdaHora = document.getElementById(`pt-traslado-ida-hora-dia-${idx}-${bIdx}`);
+      if (selIdaHora) block.idaHora = selIdaHora.value;
+      const selIdaHoras = document.getElementById(`pt-traslado-ida-horas-dia-${idx}-${bIdx}`);
+      if (selIdaHoras) block.idaHoras = selIdaHoras.value;
+      const selRegresoHora = document.getElementById(`pt-traslado-regreso-hora-dia-${idx}-${bIdx}`);
+      if (selRegresoHora) block.regresoHora = selRegresoHora.value;
+      const selRegresoHoras = document.getElementById(`pt-traslado-regreso-horas-dia-${idx}-${bIdx}`);
+      if (selRegresoHoras) block.regresoHoras = selRegresoHoras.value;
+      
+      const container = document.getElementById(`pt-traslado-dia-container-${idx}-${bIdx}`);
+      if (container) block.trasladoOpen = (container.style.display !== 'none');
+    });
+  });
+
+  if (window.weeklyDayBlocks[dayIdx] && window.weeklyDayBlocks[dayIdx].length > blockIdx) {
+    window.weeklyDayBlocks[dayIdx].splice(blockIdx, 1);
+  }
+
+  const baseFechaStr = document.getElementById('pt-fecha').value;
+  renderCalendarioSemanalModal(baseFechaStr);
+  actualizarTecnicosDisponibles();
+};
+
 window.onOrdenDiaChange = function(dayIdx) {
   // Placeholder en caso de requerir validaciones adicionales al cambiar orden por día
+};
+
+window.toggleTrasladoDia = function(dayIdx, blockIdx) {
+  const container = document.getElementById(`pt-traslado-dia-container-${dayIdx}-${blockIdx}`);
+  if (container) {
+    const isHidden = (container.style.display === 'none');
+    container.style.display = isHidden ? 'flex' : 'none';
+  }
+};
+
+window.toggleMainTraslado = function() {
+  const container = document.getElementById('pt-main-traslado-container');
+  if (container) {
+    const isHidden = (container.style.display === 'none');
+    container.style.display = isHidden ? 'flex' : 'none';
+  }
+};
+
+window.onTipoDiaChange = function(dayIdx, blockIdx) {
+  const selTipo = document.getElementById(`pt-tipo-dia-${dayIdx}-${blockIdx}`);
+  if (selTipo) {
+    const valTipo = selTipo.value;
+    const sinOrden = ['Junta', 'Vacaciones', 'Descanso'].includes(valTipo);
+    const orderContainer = document.getElementById(`pt-orden-dia-${dayIdx}-${blockIdx}-container`);
+    if (orderContainer) {
+      orderContainer.style.display = sinOrden ? 'none' : 'block';
+    }
+
+    const isFullDay = ['Vacaciones', 'Descanso'].includes(valTipo);
+    const hoursContainer = document.getElementById(`pt-horas-dia-container-${dayIdx}-${blockIdx}`);
+    if (hoursContainer) {
+      hoursContainer.style.display = isFullDay ? 'none' : 'flex';
+    }
+    if (isFullDay) {
+      const elEnt = document.getElementById(`pt-entrada-dia-${dayIdx}-${blockIdx}`);
+      if (elEnt) elEnt.value = '';
+      const elSal = document.getElementById(`pt-salida-dia-${dayIdx}-${blockIdx}`);
+      if (elSal) elSal.value = '';
+      if (window.weeklyDayBlocks && window.weeklyDayBlocks[dayIdx] && window.weeklyDayBlocks[dayIdx][blockIdx]) {
+        window.weeklyDayBlocks[dayIdx][blockIdx].entrada = '';
+        window.weeklyDayBlocks[dayIdx][blockIdx].salida = '';
+      }
+    }
+
+    const isClientType = ['Servicio', 'Levantamiento', 'Capacitación'].includes(valTipo);
+    const trasladoLink = document.getElementById(`pt-traslado-dia-link-${dayIdx}-${blockIdx}`);
+    if (trasladoLink) {
+      trasladoLink.style.display = isClientType ? 'inline-block' : 'none';
+    }
+    if (!isClientType) {
+      const trasladoContainer = document.getElementById(`pt-traslado-dia-container-${dayIdx}-${blockIdx}`);
+      if (trasladoContainer) {
+        trasladoContainer.style.display = 'none';
+      }
+      const elIdaHora = document.getElementById(`pt-traslado-ida-hora-dia-${dayIdx}-${blockIdx}`);
+      if (elIdaHora) elIdaHora.value = '';
+      const elIdaHoras = document.getElementById(`pt-traslado-ida-horas-dia-${dayIdx}-${blockIdx}`);
+      if (elIdaHoras) elIdaHoras.value = '';
+      const elRegresoHora = document.getElementById(`pt-traslado-regreso-hora-dia-${dayIdx}-${blockIdx}`);
+      if (elRegresoHora) elRegresoHora.value = '';
+      const elRegresoHoras = document.getElementById(`pt-traslado-regreso-horas-dia-${dayIdx}-${blockIdx}`);
+      if (elRegresoHoras) elRegresoHoras.value = '';
+    }
+  }
+};
+
+window.onTipoPrincipalChange = function() {
+  const mainTipo = document.getElementById('pt-tipo').value || 'Servicio';
+  const mismaOrdenCb = document.getElementById('pt-usar-misma-orden');
+  const mismaOrden = mismaOrdenCb ? mismaOrdenCb.checked : true;
+  
+  const mainOrderGroup = document.getElementById('pt-grupo-orden-principal');
+  if (mainOrderGroup) {
+    const sinOrden = ['Junta', 'Vacaciones', 'Descanso'].includes(mainTipo);
+    mainOrderGroup.style.display = (mismaOrden && !sinOrden) ? 'block' : 'none';
+  }
+
+  const mainHoursGroup = document.getElementById('pt-grupo-horario-principal');
+  const isFullDay = ['Vacaciones', 'Descanso'].includes(mainTipo);
+  if (mainHoursGroup) {
+    mainHoursGroup.style.display = (mismaOrden && !isFullDay) ? 'grid' : 'none';
+  }
+  if (isFullDay) {
+    const mainEnt = document.getElementById('pt-entrada');
+    if (mainEnt) mainEnt.value = '';
+    const mainSal = document.getElementById('pt-salida');
+    if (mainSal) mainSal.value = '';
+  }
+
+  const isClientType = ['Servicio', 'Levantamiento', 'Capacitación'].includes(mainTipo);
+  const mainTrasladoLink = document.getElementById('pt-main-traslado-link');
+  if (mainTrasladoLink) {
+    mainTrasladoLink.style.display = (mismaOrden && isClientType) ? 'inline-block' : 'none';
+  }
+  if (!isClientType || !mismaOrden) {
+    const mainTrasladoContainer = document.getElementById('pt-main-traslado-container');
+    if (mainTrasladoContainer) mainTrasladoContainer.style.display = 'none';
+    const mainIdaHora = document.getElementById('pt-main-traslado-ida-hora');
+    if (mainIdaHora) mainIdaHora.value = '';
+    const mainIdaHoras = document.getElementById('pt-main-traslado-ida-horas');
+    if (mainIdaHoras) mainIdaHoras.value = '';
+    const mainRegresoHora = document.getElementById('pt-main-traslado-regreso-hora');
+    if (mainRegresoHora) mainRegresoHora.value = '';
+    const mainRegresoHoras = document.getElementById('pt-main-traslado-regreso-horas');
+    if (mainRegresoHoras) mainRegresoHoras.value = '';
+  }
+
+  for (let i = 0; i <= 6; i++) {
+    const blocks = window.weeklyDayBlocks[i] || [];
+    blocks.forEach((block, blockIdx) => {
+      block.tipo = mainTipo;
+      const selTipo = document.getElementById(`pt-tipo-dia-${i}-${blockIdx}`);
+      if (selTipo) {
+        selTipo.value = mainTipo;
+        window.onTipoDiaChange(i, blockIdx);
+      }
+    });
+  }
 };
 
 window.toggleMismaOrden = function() {
@@ -11587,6 +11973,43 @@ window.toggleMismaOrden = function() {
   if (listWrapper) {
     listWrapper.style.display = mismaOrden ? 'none' : 'flex';
   }
+  
+  const mainTipo = document.getElementById('pt-tipo').value || 'Servicio';
+  const sinOrden = ['Junta', 'Vacaciones', 'Descanso'].includes(mainTipo);
+
+  const mainOrderGroup = document.getElementById('pt-grupo-orden-principal');
+  if (mainOrderGroup) {
+    mainOrderGroup.style.display = (mismaOrden && !sinOrden) ? 'block' : 'none';
+  }
+  const mainTypeGroup = document.getElementById('pt-grupo-tipo-principal');
+  if (mainTypeGroup) {
+    mainTypeGroup.style.display = mismaOrden ? 'block' : 'none';
+  }
+  const mainHoursGroup = document.getElementById('pt-grupo-horario-principal');
+  const isFullDay = ['Vacaciones', 'Descanso'].includes(mainTipo);
+  if (mainHoursGroup) {
+    mainHoursGroup.style.display = (mismaOrden && !isFullDay) ? 'grid' : 'none';
+  }
+
+  const isClientType = ['Servicio', 'Levantamiento', 'Capacitación'].includes(mainTipo);
+  const mainTrasladoLink = document.getElementById('pt-main-traslado-link');
+  if (mainTrasladoLink) {
+    mainTrasladoLink.style.display = (mismaOrden && isClientType) ? 'inline-block' : 'none';
+  }
+  if (!mismaOrden || !isClientType) {
+    const mainTrasladoContainer = document.getElementById('pt-main-traslado-container');
+    if (mainTrasladoContainer) mainTrasladoContainer.style.display = 'none';
+    const mainIdaHora = document.getElementById('pt-main-traslado-ida-hora');
+    if (mainIdaHora) mainIdaHora.value = '';
+    const mainIdaHoras = document.getElementById('pt-main-traslado-ida-horas');
+    if (mainIdaHoras) mainIdaHoras.value = '';
+    const mainRegresoHora = document.getElementById('pt-main-traslado-regreso-hora');
+    if (mainRegresoHora) mainRegresoHora.value = '';
+    const mainRegresoHoras = document.getElementById('pt-main-traslado-regreso-horas');
+    if (mainRegresoHoras) mainRegresoHoras.value = '';
+  }
+
+  actualizarTecnicosDisponibles();
 };
 
 window.navegarSemana = function(weeksOffset) {
@@ -11636,6 +12059,7 @@ window.seleccionarDiasSemana = function(opcion) {
 
 // ===== PROGRAMAR TÉCNICOS DESDE CALENDARIO =====
 function abrirProgramarTecnico() {
+  window.weeklyDayBlocks = null;
   const todayStr = getLocalDateString();
   const todayDayIdx = obtenerDiaDeSemanaLocal(todayStr);
   
@@ -11654,23 +12078,21 @@ function abrirProgramarTecnico() {
 
   document.getElementById('pt-entrada').value = '';
   document.getElementById('pt-salida').value = '';
-  document.getElementById('pt-fecha-inicio-traslado').value = '';
-  document.getElementById('pt-hora-inicio').value = '';
-  document.getElementById('pt-horas-traslado').value = '';
-  document.getElementById('pt-fecha-fin-regreso-date').value = '';
-  document.getElementById('pt-hora-fin-regreso').value = '';
-  document.getElementById('pt-horas-regreso').value = '';
   document.getElementById('pt-tipo').value = 'Servicio';
   
+  const mainTrasladoContainer = document.getElementById('pt-main-traslado-container');
+  if (mainTrasladoContainer) mainTrasladoContainer.style.display = 'none';
+  const mainIdaHora = document.getElementById('pt-main-traslado-ida-hora');
+  if (mainIdaHora) mainIdaHora.value = '';
+  const mainIdaHoras = document.getElementById('pt-main-traslado-ida-horas');
+  if (mainIdaHoras) mainIdaHoras.value = '';
+  const mainRegresoHora = document.getElementById('pt-main-traslado-regreso-hora');
+  if (mainRegresoHora) mainRegresoHora.value = '';
+  const mainRegresoHoras = document.getElementById('pt-main-traslado-regreso-horas');
+  if (mainRegresoHoras) mainRegresoHoras.value = '';
+
   // Actualizar técnicos de inmediato para la fecha seleccionada
   actualizarTecnicosDisponibles();
-
-  const btnToggleTraslado = document.getElementById('btn-toggle-traslado');
-  const sectionTraslado = document.getElementById('traslado-section');
-  if (btnToggleTraslado && sectionTraslado) {
-    btnToggleTraslado.style.display = 'flex';
-    sectionTraslado.style.display = 'none';
-  }
 
   // Llenar dropdown de órdenes (custom combo)
   const ptOrdenOptions = document.getElementById('pt-orden-options');
@@ -11719,6 +12141,7 @@ window.calcularLlegadaTraslados = function() {
 
   // Ida
   const elHoraInicio = document.getElementById('pt-hora-inicio');
+  if (!elHoraInicio) return;
   const horaInicio = elHoraInicio.value;
   const horasTraslado = parseFloat(document.getElementById('pt-horas-traslado').value);
   const refIda = document.getElementById('pt-ref-llegada-ida');
@@ -11876,25 +12299,96 @@ function actualizarTecnicosDisponibles() {
 
   // Detectar técnicos con traslape de horario en cualquiera de las fechas
   const tecnicosConTraslape = new Set();
-  ordenes.forEach(o => {
-    if (o.bitacora && o.bitacora.length > 0) {
-      o.bitacora.forEach(b => {
-        if (b.fecha && b.tecnico) {
-          const matchFecha = fechasAValidar.some(f => b.fecha.startsWith(f));
-          if (matchFecha) {
-            // Si hay horas en ambos lados, verificar traslape real
-            if (entrada && salida && b.entrada && b.salida) {
-              if (hayTraslapoHorario(entrada, salida, b.entrada, b.salida)) {
-                tecnicosConTraslape.add(b.tecnico);
+  const mismaOrdenCb = document.getElementById('pt-usar-misma-orden');
+  const mismaOrden = mismaOrdenCb ? mismaOrdenCb.checked : true;
+  const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+
+  fechasAValidar.forEach(f => {
+    const dayIdx = obtenerDiaDeSemanaLocal(f);
+    
+    const schedulesToValidate = [];
+    if (mismaOrden) {
+      schedulesToValidate.push({
+        entrada: entrada || null,
+        salida: salida || null
+      });
+    } else {
+      const blocks = window.weeklyDayBlocks[dayIdx] || [];
+      blocks.forEach((block, blockIdx) => {
+        const blockEntrada = document.getElementById(`pt-entrada-dia-${dayIdx}-${blockIdx}`)?.value || '';
+        const blockSalida = document.getElementById(`pt-salida-dia-${dayIdx}-${blockIdx}`)?.value || '';
+        schedulesToValidate.push({
+          entrada: blockEntrada || null,
+          salida: blockSalida || null
+        });
+      });
+    }
+
+    schedulesToValidate.forEach(sched => {
+      const ent = sched.entrada;
+      const sal = sched.salida;
+
+      // 1. Validar contra bitácora de órdenes
+      ordenes.forEach(o => {
+        if (o.bitacora && o.bitacora.length > 0) {
+          o.bitacora.forEach(b => {
+            if (b.fecha && b.fecha.startsWith(f) && b.tecnico) {
+              const hasExistingTimes = b.entrada && b.salida;
+              if (ent && sal) {
+                if (hasExistingTimes) {
+                  if (hayTraslapoHorario(ent, sal, b.entrada, b.salida)) {
+                    tecnicosConTraslape.add(b.tecnico);
+                  }
+                } else {
+                  // Registro existente sin horario (ocupa todo el día)
+                  tecnicosConTraslape.add(b.tecnico);
+                }
+              } else {
+                // El modal no tiene horas capturadas aún
+                if (!hasExistingTimes) {
+                  // Registro existente sin horario (ocupa todo el día)
+                  tecnicosConTraslape.add(b.tecnico);
+                }
+              }
+            }
+          });
+        }
+      });
+
+      // 2. Validar contra eventos administrativos sin ordenId
+      localEventos.forEach(ev => {
+        if (!ev.ordenId && ev.tecnicoNombre && ev.start) {
+          const evStartDate = new Date(ev.start);
+          const evY = evStartDate.getFullYear();
+          const evM = String(evStartDate.getMonth() + 1).padStart(2, '0');
+          const evD = String(evStartDate.getDate()).padStart(2, '0');
+          const evFecha = `${evY}-${evM}-${evD}`;
+          
+          if (evFecha === f) {
+            const evEntrada = String(evStartDate.getHours()).padStart(2, '0') + ':' + String(evStartDate.getMinutes()).padStart(2, '0');
+            const evEndDate = ev.end ? new Date(ev.end) : null;
+            const isTodoElDia = ev.todoElDia || ev.allDay || !evEndDate;
+            
+            if (ent && sal) {
+              if (!isTodoElDia && evEndDate) {
+                const evSalida = String(evEndDate.getHours()).padStart(2, '0') + ':' + String(evEndDate.getMinutes()).padStart(2, '0');
+                if (hayTraslapoHorario(ent, sal, evEntrada, evSalida)) {
+                  tecnicosConTraslape.add(ev.tecnicoNombre);
+                }
+              } else {
+                // Ocupa todo el día
+                tecnicosConTraslape.add(ev.tecnicoNombre);
               }
             } else {
-              // Sin horas definidas, bloquear por precaución (día completo)
-              tecnicosConTraslape.add(b.tecnico);
+              // El modal no tiene horas capturadas aún
+              if (isTodoElDia) {
+                tecnicosConTraslape.add(ev.tecnicoNombre);
+              }
             }
           }
         }
       });
-    }
+    });
   });
 
   const disponibles = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && !tecnicosConTraslape.has(u.nombre) && u.activo !== false && (isTestModeActive() || !isTestUser(u)));
@@ -11918,15 +12412,19 @@ async function guardarProgramacionTecnico() {
   const ordenId = document.getElementById('pt-orden').value;
   const entrada = document.getElementById('pt-entrada').value;
   const salida = document.getElementById('pt-salida').value;
-  const fechaInicioTraslado = document.getElementById('pt-fecha-inicio-traslado').value;
-  const horaInicio = document.getElementById('pt-hora-inicio').value;
-  const horasTraslado = document.getElementById('pt-horas-traslado').value;
-  const fechaFinRegresoDate = document.getElementById('pt-fecha-fin-regreso-date').value;
-  const horaFinRegreso = document.getElementById('pt-hora-fin-regreso').value;
-  const horasRegreso = document.getElementById('pt-horas-regreso').value;
+  const mismaOrdenCb = document.getElementById('pt-usar-misma-orden');
+  const mismaOrden = mismaOrdenCb ? mismaOrdenCb.checked : true;
 
-  if (!fecha || !tecnico || !ordenId) {
-    alert("Por favor completa los campos requeridos (Fecha, Técnico, Orden).");
+  const mainTipoVal = document.getElementById('pt-tipo').value || 'Servicio';
+  const isClientTypeVal = ['Servicio', 'Levantamiento', 'Capacitación'].includes(mainTipoVal);
+
+  const horaInicio = (mismaOrden && isClientTypeVal) ? (document.getElementById('pt-main-traslado-ida-hora')?.value || '') : '';
+  const horasTraslado = (mismaOrden && isClientTypeVal) ? (document.getElementById('pt-main-traslado-ida-horas')?.value || '') : '';
+  const horaFinRegreso = (mismaOrden && isClientTypeVal) ? (document.getElementById('pt-main-traslado-regreso-hora')?.value || '') : '';
+  const horasRegreso = (mismaOrden && isClientTypeVal) ? (document.getElementById('pt-main-traslado-regreso-horas')?.value || '') : '';
+
+  if (!fecha || !tecnico) {
+    alert("Por favor completa los campos requeridos (Fecha, Técnico).");
     return;
   }
 
@@ -11936,6 +12434,51 @@ async function guardarProgramacionTecnico() {
     const cb = document.getElementById(`pt-rep-${i}`);
     if (cb && cb.checked) {
       selectedDays.push(i);
+    }
+  }
+
+  // Validar orden(es) requerida(s) y horario(s)
+  if (mismaOrden) {
+    const mainTipo = document.getElementById('pt-tipo').value || 'Servicio';
+    const sinOrden = ['Junta', 'Vacaciones', 'Descanso'].includes(mainTipo);
+    if (!sinOrden && !ordenId) {
+      alert("Por favor selecciona la orden de servicio principal.");
+      return;
+    }
+    const isFullDay = ['Vacaciones', 'Descanso'].includes(mainTipo);
+    if (!isFullDay && (!entrada || !salida)) {
+      alert("Por favor completa las horas de entrada y salida.");
+      return;
+    }
+  } else {
+    if (selectedDays.length === 0) {
+      alert("Por favor selecciona al menos un día de la semana.");
+      return;
+    }
+    for (const dayIdx of selectedDays) {
+      const blocks = window.weeklyDayBlocks[dayIdx] || [];
+      if (blocks.length === 0) {
+        alert("Cada día activo debe tener al menos una actividad.");
+        return;
+      }
+      for (let blockIdx = 0; blockIdx < blocks.length; blockIdx++) {
+        const valTipo = document.getElementById(`pt-tipo-dia-${dayIdx}-${blockIdx}`)?.value || 'Servicio';
+        const sinOrden = ['Junta', 'Vacaciones', 'Descanso'].includes(valTipo);
+        if (!sinOrden) {
+          const valDia = document.getElementById(`pt-orden-dia-${dayIdx}-${blockIdx}`)?.value;
+          if (!valDia) {
+            alert(`Por favor selecciona una orden para la actividad #${blockIdx + 1} del día.`);
+            return;
+          }
+        }
+        const isFullDay = ['Vacaciones', 'Descanso'].includes(valTipo);
+        const entVal = document.getElementById(`pt-entrada-dia-${dayIdx}-${blockIdx}`)?.value;
+        const salVal = document.getElementById(`pt-salida-dia-${dayIdx}-${blockIdx}`)?.value;
+        if (!isFullDay && (!entVal || !salVal)) {
+          alert(`Por favor completa las horas de entrada y salida para la actividad #${blockIdx + 1} del día.`);
+          return;
+        }
+      }
     }
   }
 
@@ -11949,53 +12492,214 @@ async function guardarProgramacionTecnico() {
   // Validaciones de tiempo para cada día que incluye traslados
   for (const f of fehasAGuardar) {
     const isBaseDate = (f === fecha);
-    const targetTrasladoDate = (fechaInicioTraslado === fecha) ? f : fechaInicioTraslado;
-    const targetRegresoDate = (fechaFinRegresoDate === fecha) ? f : fechaFinRegresoDate;
+    const dayIdx = obtenerDiaDeSemanaLocal(f);
 
-    if (targetTrasladoDate || horaInicio || horasTraslado) {
-      const dEntrada = new Date(`${f}T${entrada || '23:59'}`);
-      const dInicioTraslado = new Date(`${targetTrasladoDate || f}T${horaInicio || '00:00'}`);
-      
-      if (dInicioTraslado > dEntrada) {
-        mostrarNotificacion(`El inicio del traslado de ida no puede ser después de que comience el servicio (${f}).`, "error");
-        return;
+    if (mismaOrden) {
+      const mainTipo = document.getElementById('pt-tipo').value || 'Servicio';
+      const isFullDay = ['Vacaciones', 'Descanso'].includes(mainTipo);
+      if (isFullDay) continue;
+
+      let specificEntrada = entrada;
+      let specificSalida = salida;
+
+      let fInicioTraslado = null;
+      let hInicio = null;
+      let hTraslado = null;
+      let fFinRegreso = null;
+      let hFinRegreso = null;
+      let hRegreso = null;
+
+      if (horaInicio || horasTraslado) {
+        fInicioTraslado = f;
+        hInicio = horaInicio || null;
+        hTraslado = horasTraslado ? parseFloat(horasTraslado) : null;
+      }
+      if (horaFinRegreso || horasRegreso) {
+        fFinRegreso = f;
+        hFinRegreso = horaFinRegreso || null;
+        hRegreso = horasRegreso ? parseFloat(horasRegreso) : null;
       }
 
-      if (horaInicio && horasTraslado && entrada) {
-        const minLlegada = horaAMinutos(horaInicio) + (parseFloat(horasTraslado) * 60);
-        const dLlegada = new Date(`${targetTrasladoDate || f}T00:00`);
-        dLlegada.setMinutes(dLlegada.getMinutes() + minLlegada);
-
-        if (dEntrada < dLlegada) {
-          mostrarNotificacion(`No se puede empezar el servicio antes de la llegada estimada del traslado de ida (${f}).`, "error");
+      if (fInicioTraslado || hInicio || hTraslado) {
+        const dEntrada = new Date(`${f}T${specificEntrada || '23:59'}`);
+        const dInicioTraslado = new Date(`${fInicioTraslado || f}T${hInicio || '00:00'}`);
+        if (dInicioTraslado > dEntrada) {
+          mostrarNotificacion(`El inicio del traslado de ida no puede ser después de que comience el servicio (${f}).`, "error");
+          return;
+        }
+        if (hInicio && hTraslado && specificEntrada) {
+          const minLlegada = horaAMinutos(hInicio) + (hTraslado * 60);
+          const dLlegada = new Date(`${fInicioTraslado || f}T00:00`);
+          dLlegada.setMinutes(dLlegada.getMinutes() + minLlegada);
+          if (dEntrada < dLlegada) {
+            mostrarNotificacion(`No se puede empezar el servicio antes de la llegada estimada del traslado de ida (${f}).`, "error");
+            return;
+          }
+        }
+      }
+      if (fFinRegreso || hFinRegreso || hRegreso) {
+        const dSalida = new Date(`${f}T${specificSalida || '00:00'}`);
+        const dInicioRegreso = new Date(`${fFinRegreso || f}T${hFinRegreso || '23:59'}`);
+        if (dInicioRegreso < dSalida) {
+          mostrarNotificacion(`No se puede iniciar el traslado de regreso antes de terminar el servicio (${f}).`, "error");
           return;
         }
       }
-    }
+    } else {
+      const blocks = window.weeklyDayBlocks[dayIdx] || [];
+      for (let blockIdx = 0; blockIdx < blocks.length; blockIdx++) {
+        const specificTipo = document.getElementById(`pt-tipo-dia-${dayIdx}-${blockIdx}`)?.value || 'Servicio';
+        const specificEntrada = document.getElementById(`pt-entrada-dia-${dayIdx}-${blockIdx}`)?.value;
+        const specificSalida = document.getElementById(`pt-salida-dia-${dayIdx}-${blockIdx}`)?.value;
 
-    if (targetRegresoDate || horaFinRegreso || horasRegreso) {
-      const dSalida = new Date(`${f}T${salida || '00:00'}`);
-      const dInicioRegreso = new Date(`${targetRegresoDate || f}T${horaFinRegreso || '23:59'}`);
-      
-      if (dInicioRegreso < dSalida) {
-        mostrarNotificacion(`No se puede iniciar el traslado de regreso antes de terminar el servicio (${f}).`, "error");
-        return;
+        let fInicioTraslado = null;
+        let hInicio = null;
+        let hTraslado = null;
+        let fFinRegreso = null;
+        let hFinRegreso = null;
+        let hRegreso = null;
+
+        const isClientType = ['Servicio', 'Levantamiento', 'Capacitación'].includes(specificTipo);
+        if (isClientType) {
+          const valIdaHora = document.getElementById(`pt-traslado-ida-hora-dia-${dayIdx}-${blockIdx}`)?.value;
+          const valIdaHoras = document.getElementById(`pt-traslado-ida-horas-dia-${dayIdx}-${blockIdx}`)?.value;
+          const valRegresoHora = document.getElementById(`pt-traslado-regreso-hora-dia-${dayIdx}-${blockIdx}`)?.value;
+          const valRegresoHoras = document.getElementById(`pt-traslado-regreso-horas-dia-${dayIdx}-${blockIdx}`)?.value;
+
+          if (valIdaHora || valIdaHoras) {
+            fInicioTraslado = f;
+            hInicio = valIdaHora || null;
+            hTraslado = valIdaHoras ? parseFloat(valIdaHoras) : null;
+          }
+          if (valRegresoHora || valRegresoHoras) {
+            fFinRegreso = f;
+            hFinRegreso = valRegresoHora || null;
+            hRegreso = valRegresoHoras ? parseFloat(valRegresoHoras) : null;
+          }
+        }
+
+        if (fInicioTraslado || hInicio || hTraslado) {
+          const dEntrada = new Date(`${f}T${specificEntrada || '23:59'}`);
+          const dInicioTraslado = new Date(`${fInicioTraslado || f}T${hInicio || '00:00'}`);
+          if (dInicioTraslado > dEntrada) {
+            mostrarNotificacion(`El inicio del traslado de ida no puede ser después de que comience el servicio (${f}, Actividad #${blockIdx + 1}).`, "error");
+            return;
+          }
+          if (hInicio && hTraslado && specificEntrada) {
+            const minLlegada = horaAMinutos(hInicio) + (hTraslado * 60);
+            const dLlegada = new Date(`${fInicioTraslado || f}T00:00`);
+            dLlegada.setMinutes(dLlegada.getMinutes() + minLlegada);
+            if (dEntrada < dLlegada) {
+              mostrarNotificacion(`No se puede empezar el servicio antes de la llegada estimada del traslado de ida (${f}, Actividad #${blockIdx + 1}).`, "error");
+              return;
+            }
+          }
+        }
+        if (fFinRegreso || hFinRegreso || hRegreso) {
+          const dSalida = new Date(`${f}T${specificSalida || '00:00'}`);
+          const dInicioRegreso = new Date(`${fFinRegreso || f}T${hFinRegreso || '23:59'}`);
+          if (dInicioRegreso < dSalida) {
+            mostrarNotificacion(`No se puede iniciar el traslado de regreso antes de terminar el servicio (${f}, Actividad #${blockIdx + 1}).`, "error");
+            return;
+          }
+        }
       }
     }
   }
 
   // Validar traslape de horario consolidado antes de guardar
   const conflictos = [];
-  if (entrada && salida) {
-    for (const f of fehasAGuardar) {
-      for (const ord of ordenes) {
-        if (!ord.bitacora) continue;
-        for (const b of ord.bitacora) {
-          if (b.fecha && b.fecha.startsWith(f) && b.tecnico === tecnico && b.entrada && b.salida) {
-            if (hayTraslapoHorario(entrada, salida, b.entrada, b.salida)) {
-              const folioConflicto = ord.folio || ord.id.slice(0,8);
-              const horaConflicto = `${b.entrada} – ${b.salida}`;
-              conflictos.push(`${f}: orden ${folioConflicto} (${horaConflicto})`);
+  const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+
+  for (const f of fehasAGuardar) {
+    const dayIdx = obtenerDiaDeSemanaLocal(f);
+    if (mismaOrden) {
+      if (entrada && salida) {
+        // 1. Verificar traslapes en bitácoras de órdenes
+        for (const ord of ordenes) {
+          if (!ord.bitacora) continue;
+          for (const b of ord.bitacora) {
+            if (b.fecha && b.fecha.startsWith(f) && b.tecnico === tecnico && b.entrada && b.salida) {
+              if (hayTraslapoHorario(entrada, salida, b.entrada, b.salida)) {
+                const folioConflicto = ord.folio || ord.id.slice(0,8);
+                const horaConflicto = `${b.entrada} – ${b.salida}`;
+                conflictos.push(`${f}: orden ${folioConflicto} (${horaConflicto})`);
+              }
+            }
+          }
+        }
+
+        // 2. Verificar traslapes en eventos administrativos (sin ordenId)
+        for (const ev of localEventos) {
+          if (!ev.ordenId && ev.tecnicoNombre === tecnico && ev.start) {
+            const evStartDate = new Date(ev.start);
+            const evY = evStartDate.getFullYear();
+            const evM = String(evStartDate.getMonth() + 1).padStart(2, '0');
+            const evD = String(evStartDate.getDate()).padStart(2, '0');
+            const evFecha = `${evY}-${evM}-${evD}`;
+            
+            if (evFecha === f) {
+              const evEntrada = String(evStartDate.getHours()).padStart(2, '0') + ':' + String(evStartDate.getMinutes()).padStart(2, '0');
+              const evEndDate = ev.end ? new Date(ev.end) : null;
+              if (evEndDate) {
+                const evSalida = String(evEndDate.getHours()).padStart(2, '0') + ':' + String(evEndDate.getMinutes()).padStart(2, '0');
+                if (hayTraslapoHorario(entrada, salida, evEntrada, evSalida)) {
+                  conflictos.push(`${f}: evento interno "${ev.tipo}" (${evEntrada} – ${evSalida})`);
+                }
+              }
+            }
+          }
+        }
+      }
+    } else {
+      const blocks = window.weeklyDayBlocks[dayIdx] || [];
+      for (let i = 0; i < blocks.length; i++) {
+        const ent1 = document.getElementById(`pt-entrada-dia-${dayIdx}-${i}`)?.value || '';
+        const sal1 = document.getElementById(`pt-salida-dia-${dayIdx}-${i}`)?.value || '';
+        
+        if (ent1 && sal1) {
+          // A. Verificar traslapes entre bloques del mismo día
+          for (let j = i + 1; j < blocks.length; j++) {
+            const ent2 = document.getElementById(`pt-entrada-dia-${dayIdx}-${j}`)?.value || '';
+            const sal2 = document.getElementById(`pt-salida-dia-${dayIdx}-${j}`)?.value || '';
+            if (ent2 && sal2 && hayTraslapoHorario(ent1, sal1, ent2, sal2)) {
+              conflictos.push(`${f}: Conflicto interno entre bloques (${ent1} – ${sal1} y ${ent2} – ${sal2})`);
+            }
+          }
+
+          // B. Verificar traslapes en bitácoras de órdenes
+          for (const ord of ordenes) {
+            if (!ord.bitacora) continue;
+            for (const b of ord.bitacora) {
+              if (b.fecha && b.fecha.startsWith(f) && b.tecnico === tecnico && b.entrada && b.salida) {
+                if (hayTraslapoHorario(ent1, sal1, b.entrada, b.salida)) {
+                  const folioConflicto = ord.folio || ord.id.slice(0,8);
+                  const horaConflicto = `${b.entrada} – ${b.salida}`;
+                  conflictos.push(`${f}: orden ${folioConflicto} (${horaConflicto}) se traslapa con la actividad de ${ent1} – ${sal1}`);
+                }
+              }
+            }
+          }
+
+          // C. Verificar traslapes en eventos administrativos (sin ordenId)
+          for (const ev of localEventos) {
+            if (!ev.ordenId && ev.tecnicoNombre === tecnico && ev.start) {
+              const evStartDate = new Date(ev.start);
+              const evY = evStartDate.getFullYear();
+              const evM = String(evStartDate.getMonth() + 1).padStart(2, '0');
+              const evD = String(evStartDate.getDate()).padStart(2, '0');
+              const evFecha = `${evY}-${evM}-${evD}`;
+              
+              if (evFecha === f) {
+                const evEntrada = String(evStartDate.getHours()).padStart(2, '0') + ':' + String(evStartDate.getMinutes()).padStart(2, '0');
+                const evEndDate = ev.end ? new Date(ev.end) : null;
+                if (evEndDate) {
+                  const evSalida = String(evEndDate.getHours()).padStart(2, '0') + ':' + String(evEndDate.getMinutes()).padStart(2, '0');
+                  if (hayTraslapoHorario(ent1, sal1, evEntrada, evSalida)) {
+                    conflictos.push(`${f}: evento interno "${ev.tipo}" (${evEntrada} – ${evSalida}) se traslapa con la actividad de ${ent1} – ${sal1}`);
+                  }
+                }
+              }
             }
           }
         }
@@ -12012,110 +12716,120 @@ async function guardarProgramacionTecnico() {
   }
 
   const tipoAsignacion = document.getElementById('pt-tipo') ? document.getElementById('pt-tipo').value : 'Servicio';
-  const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
   const modifiedOrders = new Set();
 
-  for (const f of fehasAGuardar) {
-    const isBaseDate = (f === fecha);
-    
-    // Buscar la orden específica de este día
-    const dayIdx = obtenerDiaDeSemanaLocal(f);
-    const mismaOrdenCb = document.getElementById('pt-usar-misma-orden');
-    const mismaOrden = mismaOrdenCb ? mismaOrdenCb.checked : true;
-    
-    let specificOrdenId = ordenId;
-    if (!mismaOrden) {
-      const selDia = document.getElementById(`pt-orden-dia-${dayIdx}`);
-      if (selDia && selDia.value) {
-        specificOrdenId = selDia.value;
+  async function guardarBloqueAsignacion(f, specificTipo, specificOrdenId, specificEntrada, specificSalida, isBaseDate, dayIdx, blockIdx) {
+    const sinOrden = ['Junta', 'Vacaciones', 'Descanso'].includes(specificTipo);
+    let o = null;
+    let nuevaEntradaId = crypto.randomUUID();
+
+    if (!sinOrden) {
+      o = ordenes.find(ord => ord.id === specificOrdenId);
+      if (o) {
+        if (!o.bitacora) o.bitacora = [];
+        
+        let fInicioTraslado = null;
+        let hInicio = null;
+        let hTraslado = null;
+        let fFinRegreso = null;
+        let hFinRegreso = null;
+        let hRegreso = null;
+
+        const isClientType = ['Servicio', 'Levantamiento', 'Capacitación'].includes(specificTipo);
+        if (isClientType) {
+          if (blockIdx !== null) {
+            const valIdaHora = document.getElementById(`pt-traslado-ida-hora-dia-${dayIdx}-${blockIdx}`)?.value;
+            const valIdaHoras = document.getElementById(`pt-traslado-ida-horas-dia-${dayIdx}-${blockIdx}`)?.value;
+            const valRegresoHora = document.getElementById(`pt-traslado-regreso-hora-dia-${dayIdx}-${blockIdx}`)?.value;
+            const valRegresoHoras = document.getElementById(`pt-traslado-regreso-horas-dia-${dayIdx}-${blockIdx}`)?.value;
+
+            if (valIdaHora || valIdaHoras) {
+              fInicioTraslado = f;
+              hInicio = valIdaHora || null;
+              hTraslado = valIdaHoras ? parseFloat(valIdaHoras) : null;
+            }
+            if (valRegresoHora || valRegresoHoras) {
+              fFinRegreso = f;
+              hFinRegreso = valRegresoHora || null;
+              hRegreso = valRegresoHoras ? parseFloat(valRegresoHoras) : null;
+            }
+          } else {
+            const valIdaHora = document.getElementById('pt-main-traslado-ida-hora')?.value;
+            const valIdaHoras = document.getElementById('pt-main-traslado-ida-horas')?.value;
+            const valRegresoHora = document.getElementById('pt-main-traslado-regreso-hora')?.value;
+            const valRegresoHoras = document.getElementById('pt-main-traslado-regreso-horas')?.value;
+
+            if (valIdaHora || valIdaHoras) {
+              fInicioTraslado = f;
+              hInicio = valIdaHora || null;
+              hTraslado = valIdaHoras ? parseFloat(valIdaHoras) : null;
+            }
+            if (valRegresoHora || valRegresoHoras) {
+              fFinRegreso = f;
+              hFinRegreso = valRegresoHora || null;
+              hRegreso = valRegresoHoras ? parseFloat(valRegresoHoras) : null;
+            }
+          }
+        }
+
+        const nuevaEntrada = {
+          id: nuevaEntradaId,
+          fecha: f,
+          tecnico: tecnico,
+          tipo: specificTipo,
+          nota: "Programado por supervisor. Pendiente de llenado por el técnico.",
+          entrada: specificEntrada,
+          salida: specificSalida,
+          fecha_inicio_traslado: fInicioTraslado,
+          hora_inicio: hInicio,
+          horas_traslado: hTraslado,
+          fecha_fin_regreso: fFinRegreso,
+          hora_fin_regreso: hFinRegreso,
+          horas_regreso: hRegreso,
+          realizado: false,
+          asignadoPorName: obtenerNombreUsuarioActual(),
+          asignadoPorId: currentSession.userId || null
+        };
+
+        o.bitacora.push(nuevaEntrada);
+
+        if (!o.tecnicosAsignados) o.tecnicosAsignados = [];
+        if (!o.tecnicosAsignados.includes(tecnico)) {
+          o.tecnicosAsignados.push(tecnico);
+        }
+        
+        modifiedOrders.add(o);
       }
     }
-    
-    const o = ordenes.find(ord => ord.id === specificOrdenId);
-    if (!o) continue;
-    
-    if (!o.bitacora) o.bitacora = [];
-    
-    // Mapear traslado si corresponde
-    let fInicioTraslado = null;
-    let hInicio = null;
-    let hTraslado = null;
-    if (fechaInicioTraslado) {
-      if (fechaInicioTraslado === f || (fechaInicioTraslado === fecha && isBaseDate)) {
-        fInicioTraslado = f;
-        hInicio = horaInicio;
-        hTraslado = horasTraslado ? parseFloat(horasTraslado) : null;
-      }
-    }
-    
-    let fFinRegreso = null;
-    let hFinRegreso = null;
-    let hRegreso = null;
-    if (fechaFinRegresoDate) {
-      if (fechaFinRegresoDate === f || (fechaFinRegresoDate === fecha && isBaseDate)) {
-        fFinRegreso = f;
-        hFinRegreso = horaFinRegreso;
-        hRegreso = horasRegreso ? parseFloat(horasRegreso) : null;
-      }
-    }
 
-    const nuevaEntrada = {
-      id: crypto.randomUUID(),
-      fecha: f,
-      tecnico: tecnico,
-      tipo: tipoAsignacion,
-      nota: "Programado por supervisor. Pendiente de llenado por el técnico.",
-      entrada: entrada,
-      salida: salida,
-      fecha_inicio_traslado: fInicioTraslado,
-      hora_inicio: hInicio,
-      horas_traslado: hTraslado,
-      fecha_fin_regreso: fFinRegreso,
-      hora_fin_regreso: hFinRegreso,
-      horas_regreso: hRegreso,
-      realizado: false,
-      asignadoPorName: obtenerNombreUsuarioActual(),
-      asignadoPorId: currentSession.userId || null
-    };
-
-    o.bitacora.push(nuevaEntrada);
-
-    // Asegurar que el técnico está en la lista de asignados globalmente
-    if (!o.tecnicosAsignados) o.tecnicosAsignados = [];
-    if (!o.tecnicosAsignados.includes(tecnico)) {
-      o.tecnicosAsignados.push(tecnico);
-    }
-    
-    modifiedOrders.add(o);
-
-    // Crear y guardar evento de calendario asociado para sincronía perfecta
     try {
       const usr = usuarios.find(u => u.nombre === tecnico);
       const tecnicoId = usr ? usr.id : null;
 
-      const entradaHora = entrada || '08:00';
-      const salidaHora = salida || '18:00';
+      const entradaHora = specificEntrada || '08:00';
+      const salidaHora = specificSalida || '18:00';
 
       const inicioISO = `${f}T${entradaHora}:00`;
       const finISO = `${f}T${salidaHora}:00`;
 
+      const isTodoElDiaType = ['Vacaciones', 'Descanso'].includes(specificTipo);
       const eventoObj = {
-        id: nuevaEntrada.id,
-        titulo: `Servicio: ${o.cliente}`,
-        tipo: 'Servicio',
+        id: nuevaEntradaId,
+        titulo: sinOrden ? `${specificTipo}: ${tecnico}` : `${specificTipo}: ${(o && o.cliente) || 'Cliente'}`,
+        tipo: specificTipo,
         tecnicoId: tecnicoId,
         tecnicoNombre: tecnico,
-        ordenId: o.id,
+        ordenId: sinOrden ? null : (o ? o.id : null),
         fechaInicio: new Date(inicioISO).toISOString(),
         start: new Date(inicioISO).toISOString(),
         fechaFin: new Date(finISO).toISOString(),
         end: new Date(finISO).toISOString(),
-        todoElDia: false,
-        allDay: false,
-        descripcion: nuevaEntrada.nota,
+        todoElDia: isTodoElDiaType,
+        allDay: isTodoElDiaType,
+        descripcion: sinOrden ? `Evento administrativo: ${specificTipo}` : "Programado por supervisor. Pendiente de llenado por el técnico.",
         creadoPor: currentSession.userId || null,
         creadoPorNombre: obtenerNombreUsuarioActual(),
-        color: '#8b5cf6'
+        color: (specificTipo === 'Vacaciones') ? '#f59e0b' : (specificTipo === 'Descanso' ? '#10b981' : '#3b82f6')
       };
 
       const idx = localEventos.findIndex(x => x.id === eventoObj.id);
@@ -12130,7 +12844,27 @@ async function guardarProgramacionTecnico() {
     } catch(e){}
 
     if (window.trackTelemetryEvent) {
-      window.trackTelemetryEvent('Creación de Asignación', { tecnico, fecha: f, folio: o.folio || 'Sin Folio' });
+      window.trackTelemetryEvent('Creación de Asignación', { tecnico, fecha: f, folio: sinOrden ? 'Sin Orden' : ((o && o.folio) || 'Sin Folio') });
+    }
+  }
+
+  for (const f of fehasAGuardar) {
+    const isBaseDate = (f === fecha);
+    const dayIdx = obtenerDiaDeSemanaLocal(f);
+    
+    if (mismaOrden) {
+      await guardarBloqueAsignacion(f, tipoAsignacion, ordenId, entrada, salida, isBaseDate, dayIdx, null);
+    } else {
+      const blocks = window.weeklyDayBlocks[dayIdx] || [];
+      for (let blockIdx = 0; blockIdx < blocks.length; blockIdx++) {
+        const block = blocks[blockIdx];
+        const specificTipo = document.getElementById(`pt-tipo-dia-${dayIdx}-${blockIdx}`)?.value || 'Servicio';
+        const specificOrdenId = document.getElementById(`pt-orden-dia-${dayIdx}-${blockIdx}`)?.value || '';
+        const specificEntrada = document.getElementById(`pt-entrada-dia-${dayIdx}-${blockIdx}`)?.value || '';
+        const specificSalida = document.getElementById(`pt-salida-dia-${dayIdx}-${blockIdx}`)?.value || '';
+        
+        await guardarBloqueAsignacion(f, specificTipo, specificOrdenId, specificEntrada, specificSalida, isBaseDate, dayIdx, blockIdx);
+      }
     }
   }
 
@@ -16666,6 +17400,49 @@ window.generarNotificacionInterna = function(ticket, asignadoAnterior, asignadoN
   }
 };
 
+window.generarNotificacionComentarioInterno = function(ticket, comentario) {
+  let allNotifications = [];
+  try {
+    allNotifications = JSON.parse(localStorage.getItem('sapi_internal_notifications')) || [];
+  } catch(e) {}
+
+  const currentUser = usuarios.find(u => u && u.id === window.currentSession?.userId);
+  const currentUserName = currentUser ? currentUser.nombre : 'Usuario';
+  
+  // Si el comentario lo escribió el usuario actual, NO generar notificación
+  if (comentario.usuario === currentUserName) return;
+
+  // Evitar duplicados
+  const exists = allNotifications.some(n => 
+    n.ticketId === ticket.id && 
+    n.tipo === 'comentario' && 
+    n.comentarioFecha === comentario.fecha &&
+    n.usuario === comentario.usuario
+  );
+  if (exists) return;
+
+  const newNotif = {
+    id: crypto.randomUUID(),
+    tipo: 'comentario',
+    ticketId: ticket.id,
+    ticketFolio: ticket.folio || '',
+    ticketAsunto: ticket.asunto || '',
+    fecha: new Date().toISOString(),
+    usuario: comentario.usuario,
+    comentarioTexto: comentario.texto,
+    comentarioFecha: comentario.fecha,
+    leida: false,
+    esPrueba: !!ticket.esPrueba
+  };
+
+  allNotifications.unshift(newNotif);
+  localStorage.setItem('sapi_internal_notifications', JSON.stringify(allNotifications));
+  
+  if (window.updateInternalNotificationBell) {
+    window.updateInternalNotificationBell();
+  }
+};
+
 window.updateInternalNotificationBell = function() {
   const bell = document.getElementById('internal-notification-bell-container');
   if (bell) {
@@ -16719,12 +17496,21 @@ window.updateInternalNotificationBell = function() {
               <span style="font-size:0.65rem; color:var(--text-muted);">${fechaFormat}</span>
             </div>
             <span style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${n.ticketAsunto || 'Sin asunto'}</span>
-            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:0.1rem; line-height:1.2;">
-              Responsable: <span style="color:var(--text-primary); font-weight:500;">${n.asignadoAnterior}</span> → <span style="color:#8b5cf6; font-weight:700;">${n.asignadoNuevo}</span>
-            </div>
-            <div style="font-size:0.65rem; color:var(--text-muted); margin-top:0.1rem;">
-              Modificado por: <strong>${n.usuario}</strong>
-            </div>
+            ${n.tipo === 'comentario' ? `
+              <div style="font-size:0.7rem; color:var(--text-muted); margin-top:0.1rem; line-height:1.2; font-style:italic; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                "${n.comentarioTexto || ''}"
+              </div>
+              <div style="font-size:0.65rem; color:var(--text-muted); margin-top:0.1rem;">
+                Comentado por: <strong style="color:#8b5cf6;">${n.usuario}</strong>
+              </div>
+            ` : `
+              <div style="font-size:0.7rem; color:var(--text-muted); margin-top:0.1rem; line-height:1.2;">
+                Responsable: <span style="color:var(--text-primary); font-weight:500;">${n.asignadoAnterior || 'Sin asignar'}</span> → <span style="color:#8b5cf6; font-weight:700;">${n.asignadoNuevo || 'Sin asignar'}</span>
+              </div>
+              <div style="font-size:0.65rem; color:var(--text-muted); margin-top:0.1rem;">
+                Modificado por: <strong>${n.usuario}</strong>
+              </div>
+            `}
             ${isUnread ? `<span style="position:absolute; right:8px; bottom:8px; width:6px; height:6px; border-radius:50%; background:#8b5cf6;"></span>` : ''}
           </div>
         `;

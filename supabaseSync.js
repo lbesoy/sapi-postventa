@@ -3496,14 +3496,52 @@ function setupRealtime() {
             const ticket = rowToTicket(payload.new);
             const idx = current.findIndex(t => t.id === ticket.id);
             if (idx > -1) {
+              const oldTicket = current[idx];
+              // Comparar comentarios internos nuevos para notificaciones
+              if (ticket.comentariosInternos && ticket.comentariosInternos.length > 0) {
+                const oldComments = oldTicket.comentariosInternos || [];
+                ticket.comentariosInternos.forEach(c => {
+                  const alreadyExists = oldComments.some(oc => oc.fecha === c.fecha && oc.usuario === c.usuario);
+                  if (!alreadyExists) {
+                    if (typeof window.generarNotificacionComentarioInterno === 'function') {
+                      window.generarNotificacionComentarioInterno(ticket, c);
+                    }
+                  }
+                });
+              }
               current[idx] = ticket;
             } else {
+              // Si es un ticket nuevo y trae comentarios, notificarlos
+              if (ticket.comentariosInternos && ticket.comentariosInternos.length > 0) {
+                ticket.comentariosInternos.forEach(c => {
+                  if (typeof window.generarNotificacionComentarioInterno === 'function') {
+                    window.generarNotificacionComentarioInterno(ticket, c);
+                  }
+                });
+              }
               current.unshift(ticket);
             }
             mapped = current;
           }
         } else {
+          // Fallback (carga completa de la tabla)
+          const current = window._supaTickets || JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
           mapped = data.map(rowToTicket);
+          
+          mapped.forEach(ticket => {
+            const oldTicket = current.find(t => t.id === ticket.id);
+            if (oldTicket && ticket.comentariosInternos && ticket.comentariosInternos.length > 0) {
+              const oldComments = oldTicket.comentariosInternos || [];
+              ticket.comentariosInternos.forEach(c => {
+                const alreadyExists = oldComments.some(oc => oc.fecha === c.fecha && oc.usuario === c.usuario);
+                if (!alreadyExists) {
+                  if (typeof window.generarNotificacionComentarioInterno === 'function') {
+                    window.generarNotificacionComentarioInterno(ticket, c);
+                  }
+                }
+              });
+            }
+          });
         }
         localStorage.setItem('sapi_tickets', JSON.stringify(mapped));
         window._supaTickets = mapped;
