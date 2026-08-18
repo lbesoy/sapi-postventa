@@ -424,11 +424,13 @@ function verDetalleLevantamiento(id) {
         ${canEdit ? `
           <div id="det-lev-ev-grid" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem; margin-bottom:0.5rem;">
             ${[1, 2].map(i => `
-              <label style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1.5rem 1rem; border:2px dashed var(--border); border-radius:12px; cursor:pointer; background:var(--bg-body); transition:all 0.2s; position:relative; overflow:hidden;" onmouseover="if(!this.style.backgroundImage) { this.style.borderColor='var(--primary)'; this.style.background='var(--primary-light, #f8fafc)'; }" onmouseout="if(!this.style.backgroundImage) { this.style.borderColor='var(--border)'; this.style.background='var(--bg-body)'; }">
-                <i data-lucide="upload-cloud" style="width:24px; height:24px; color:var(--text-muted); margin-bottom:0.5rem; transition:color 0.2s;"></i>
-                <span style="font-size:0.75rem; color:var(--text-secondary); text-align:center; font-weight:500; line-height:1.2;">Seleccionar<br>Archivo ${i}</span>
-                <input type="file" class="det-lev-ev-file" accept="image/*" style="display:none;" onchange="window.handleEvidenciaFileChange(this, '${i}')">
-              </label>
+              <div style="position:relative;">
+                <label style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1.5rem 1rem; border:2px dashed var(--border); border-radius:12px; cursor:pointer; background:var(--bg-body); transition:all 0.2s;" onmouseover="if(!this.style.backgroundImage) { this.style.borderColor='var(--primary)'; this.style.background='var(--primary-light, #f8fafc)'; }" onmouseout="if(!this.style.backgroundImage) { this.style.borderColor='var(--border)'; this.style.background='var(--bg-body)'; }">
+                  <i data-lucide="upload-cloud" style="width:24px; height:24px; color:var(--text-muted); margin-bottom:0.5rem; transition:color 0.2s;"></i>
+                  <span style="font-size:0.75rem; color:var(--text-secondary); text-align:center; font-weight:500; line-height:1.2;">Seleccionar<br>Archivo ${i}</span>
+                  <input type="file" class="det-lev-ev-file" accept="image/*" style="display:none;" onchange="window.handleEvidenciaFileChange(this, '${i}')">
+                </label>
+              </div>
             `).join('')}
           </div>
           <small style="display:flex; align-items:center; gap:0.25rem; color:var(--text-muted); font-size:0.75rem; margin-top:0.5rem;">
@@ -497,15 +499,15 @@ window.agregarEvidenciaLevantamiento = function() {
   const grid = document.getElementById('det-lev-ev-grid');
   if (!grid) return;
   const newIndex = grid.children.length + 1;
-  const newEv = document.createElement('label');
-  newEv.style.cssText = 'display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1.5rem 1rem; border:2px dashed var(--border); border-radius:12px; cursor:pointer; background:var(--bg-body); transition:all 0.2s; position:relative; overflow:hidden;';
-  newEv.onmouseover = function() { if(!this.style.backgroundImage) { this.style.borderColor='var(--primary)'; this.style.background='var(--primary-light, #f8fafc)'; } };
-  newEv.onmouseout = function() { if(!this.style.backgroundImage) { this.style.borderColor='var(--border)'; this.style.background='var(--bg-body)'; } };
+  const newEv = document.createElement('div');
+  newEv.style.position = 'relative';
   newEv.innerHTML = `
-    <button type="button" onclick="event.preventDefault(); event.stopPropagation(); this.parentElement.remove();" style="position:absolute; top:4px; right:4px; background:rgba(255,255,255,0.8); border-radius:4px; padding:2px; border:none; color:var(--danger); cursor:pointer; z-index:10;"><i data-lucide="x" style="width:14px; height:14px;"></i></button>
-    <i data-lucide="upload-cloud" style="width:24px; height:24px; color:var(--text-muted); margin-bottom:0.5rem; transition:color 0.2s;"></i>
-    <span style="font-size:0.75rem; color:var(--text-secondary); text-align:center; font-weight:500; line-height:1.2;">Seleccionar<br>Archivo ${newIndex}</span>
-    <input type="file" class="det-lev-ev-file" accept="image/*" style="display:none;" onchange="window.handleEvidenciaFileChange(this, '${newIndex}')">
+    <label style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1.5rem 1rem; border:2px dashed var(--border); border-radius:12px; cursor:pointer; background:var(--bg-body); transition:all 0.2s; position:relative; overflow:hidden;" onmouseover="if(!this.style.backgroundImage) { this.style.borderColor='var(--primary)'; this.style.background='var(--primary-light, #f8fafc)'; }" onmouseout="if(!this.style.backgroundImage) { this.style.borderColor='var(--border)'; this.style.background='var(--bg-body)'; }">
+      <i data-lucide="upload-cloud" style="width:24px; height:24px; color:var(--text-muted); margin-bottom:0.5rem; transition:color 0.2s;"></i>
+      <span style="font-size:0.75rem; color:var(--text-secondary); text-align:center; font-weight:500; line-height:1.2;">Seleccionar<br>Archivo ${newIndex}</span>
+      <input type="file" class="det-lev-ev-file" accept="image/*" style="display:none;" onchange="window.handleEvidenciaFileChange(this, '${newIndex}')">
+    </label>
+    <button type="button" onclick="this.parentElement.remove();" style="position:absolute; top:4px; right:4px; background:rgba(255,255,255,0.8); border-radius:4px; padding:2px; border:none; color:var(--danger); cursor:pointer; z-index:10;"><i data-lucide="x" style="width:14px; height:14px;"></i></button>
   `;
   grid.appendChild(newEv);
   if (window.lucide) window.lucide.createIcons();
@@ -514,6 +516,7 @@ window.agregarEvidenciaLevantamiento = function() {
 window.handleEvidenciaFileChange = function(input, indexStr) {
   const file = input.files[0];
   const label = input.parentElement;
+  const container = label.parentElement;
   
   // Encontrar el span y el icono
   let icon = null;
@@ -524,7 +527,7 @@ window.handleEvidenciaFileChange = function(input, indexStr) {
   });
 
   // Borrar el botón de eliminar extra si ya lo habíamos creado
-  const oldDel = label.querySelector('.ev-del-extra-btn');
+  const oldDel = container.querySelector('.ev-del-extra-btn');
   if (oldDel) oldDel.remove();
 
   if (file) {
@@ -537,16 +540,14 @@ window.handleEvidenciaFileChange = function(input, indexStr) {
       if (icon) icon.style.display = 'none';
       if (span) span.style.display = 'none';
       
-      // Si el label NO tiene un botón de cerrar por defecto (los primeros 2 no lo tienen)
-      if (!label.querySelector('button')) {
+      // Si el container NO tiene un botón de cerrar
+      if (!container.querySelector('button')) {
         const delBtn = document.createElement('button');
         delBtn.className = 'ev-del-extra-btn';
         delBtn.type = 'button';
         delBtn.innerHTML = '<i data-lucide="trash-2" style="width:14px; height:14px;"></i>';
         delBtn.style.cssText = 'position:absolute; top:4px; right:4px; background:rgba(255,255,255,0.8); border-radius:4px; padding:2px; border:none; color:var(--danger); cursor:pointer; z-index:10;';
-        delBtn.onclick = (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
+        delBtn.onclick = () => {
           input.value = '';
           label.style.backgroundImage = '';
           if (icon) icon.style.display = '';
@@ -554,7 +555,7 @@ window.handleEvidenciaFileChange = function(input, indexStr) {
           span.innerHTML = 'Seleccionar<br>Archivo ' + indexStr;
           delBtn.remove();
         };
-        label.appendChild(delBtn);
+        container.appendChild(delBtn);
         if (window.lucide) window.lucide.createIcons();
       }
     };
