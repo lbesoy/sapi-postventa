@@ -11427,14 +11427,17 @@ function renderCalendarioSemanalModal(baseFechaStr) {
   const mM = String(mondayDate.getMonth() + 1).padStart(2, '0');
   const mD = String(mondayDate.getDate()).padStart(2, '0');
   const mondayStr = `${mY}-${mM}-${mD}`;
-  document.getElementById('pt-fecha').value = mondayStr;
+  const inputFecha = document.getElementById('pt-fecha');
+  if (inputFecha) inputFecha.value = mondayStr;
 
   const sundayDate = new Date(mondayDate);
   sundayDate.setDate(mondayDate.getDate() + 6);
   
   const options = { month: 'short', day: 'numeric' };
   const labelText = `Semana del ${mondayDate.toLocaleDateString('es-MX', options)} al ${sundayDate.toLocaleDateString('es-MX', { ...options, year: 'numeric' })}`;
-  document.getElementById('pt-semana-label').textContent = labelText;
+  
+  const labelEl = document.getElementById('pt-semana-label');
+  if (labelEl) labelEl.textContent = labelText;
 
   const grid = document.getElementById('pt-calendario-semanal-grid');
   if (!grid) return;
