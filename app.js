@@ -11393,9 +11393,262 @@ function guardarAsignacionTecnicos() {
   }
 }
 
+// ===== HELPERS Y MÉTODOS PARA ASIGNACIÓN SEMANAL =====
+function obtenerDiaDeSemanaLocal(fechaStr) {
+  if (!fechaStr) return -1;
+  const [year, month, day] = fechaStr.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
+  return d.getDay(); // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
+}
+
+function calcularFechaParaDiaDeSemana(baseFechaStr, targetDayIndex) {
+  const [year, month, day] = baseFechaStr.split('-').map(Number);
+  const baseDate = new Date(year, month - 1, day);
+  const baseDay = baseDate.getDay();
+  const diff = targetDayIndex - baseDay;
+  const targetDate = new Date(year, month - 1, day + diff);
+  
+  const y = targetDate.getFullYear();
+  const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+  const d = String(targetDate.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function renderCalendarioSemanalModal(baseFechaStr) {
+  const [year, month, day] = baseFechaStr.split('-').map(Number);
+  const baseDate = new Date(year, month - 1, day);
+  const baseDay = baseDate.getDay();
+  
+  // Encontrar el lunes (día 1) de la semana correspondiente
+  const diffToMonday = 1 - (baseDay === 0 ? 7 : baseDay);
+  const mondayDate = new Date(year, month - 1, day + diffToMonday);
+  
+  const mY = mondayDate.getFullYear();
+  const mM = String(mondayDate.getMonth() + 1).padStart(2, '0');
+  const mD = String(mondayDate.getDate()).padStart(2, '0');
+  const mondayStr = `${mY}-${mM}-${mD}`;
+  document.getElementById('pt-fecha').value = mondayStr;
+
+  const sundayDate = new Date(mondayDate);
+  sundayDate.setDate(mondayDate.getDate() + 6);
+  
+  const options = { month: 'short', day: 'numeric' };
+  const labelText = `Semana del ${mondayDate.toLocaleDateString('es-MX', options)} al ${sundayDate.toLocaleDateString('es-MX', { ...options, year: 'numeric' })}`;
+  document.getElementById('pt-semana-label').textContent = labelText;
+
+  const grid = document.getElementById('pt-calendario-semanal-grid');
+  if (!grid) return;
+  
+  grid.innerHTML = '';
+  const diasNombres = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const orderOfDays = [1, 2, 3, 4, 5, 6, 0];
+  
+  orderOfDays.forEach(dayIdx => {
+    const targetDate = new Date(mondayDate);
+    const diff = dayIdx === 0 ? 6 : dayIdx - 1;
+    targetDate.setDate(mondayDate.getDate() + diff);
+    
+    const dateNum = targetDate.getDate();
+    const dayName = diasNombres[dayIdx];
+    
+    const cb = document.getElementById(`pt-rep-${dayIdx}`);
+    const isChecked = cb ? cb.checked : false;
+    
+    const todayStr = getLocalDateString();
+    const targetStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth()+1).padStart(2,'0')}-${String(targetDate.getDate()).padStart(2,'0')}`;
+    const isToday = (todayStr === targetStr);
+
+    const card = document.createElement('div');
+    card.className = `pt-dia-card ${isChecked ? 'active' : ''} ${isToday ? 'today' : ''}`;
+    card.setAttribute('onclick', `toggleDiaSemanaModal(${dayIdx})`);
+    
+    card.innerHTML = `
+      <div style="font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: var(--text-secondary);">${dayName}</div>
+      <div style="font-size: 1.1rem; font-weight: 700; margin: 0.15rem 0; color: ${isChecked ? 'var(--accent)' : 'var(--text-primary)'};">${dateNum}</div>
+      <div style="font-size: 0.55rem; font-weight: 600; padding: 0.1rem 0.2rem; border-radius: 3px; background: ${isChecked ? 'var(--accent-light)' : 'rgba(255,255,255,0.03)'}; color: ${isChecked ? 'var(--accent)' : 'var(--text-muted)'}; text-align: center;">
+        ${isChecked ? 'Sí' : 'No'}
+      </div>
+    `;
+    
+    grid.appendChild(card);
+  });
+
+  // Generar lista de personalización de orden por día
+  const activeDays = orderOfDays.filter(dayIdx => {
+    const cb = document.getElementById(`pt-rep-${dayIdx}`);
+    return cb ? cb.checked : false;
+  });
+
+  const detailsContainer = document.getElementById('pt-detalles-dias-container');
+  const detailsList = document.getElementById('pt-detalles-dias-list');
+  const listWrapper = document.getElementById('pt-detalles-dias-list-wrapper');
+  
+  if (detailsContainer && detailsList && listWrapper) {
+    if (activeDays.length > 0) {
+      detailsContainer.style.display = 'block';
+      
+      const mismaOrdenCb = document.getElementById('pt-usar-misma-orden');
+      const mismaOrden = mismaOrdenCb ? mismaOrdenCb.checked : true;
+      listWrapper.style.display = mismaOrden ? 'none' : 'flex';
+
+      // Preservar valores seleccionados actualmente
+      const preservedValues = {};
+      activeDays.forEach(dayIdx => {
+        const sel = document.getElementById(`pt-orden-dia-${dayIdx}`);
+        if (sel) preservedValues[dayIdx] = sel.value;
+      });
+
+      // Obtener órdenes abiertas
+      const openOrds = getFilteredOrders().filter(o => o.estado !== 'Finalizado');
+      const mainOrdenId = document.getElementById('pt-orden').value;
+
+      detailsList.innerHTML = activeDays.map(dayIdx => {
+        const targetDate = new Date(mondayDate);
+        const diff = dayIdx === 0 ? 6 : dayIdx - 1;
+        targetDate.setDate(mondayDate.getDate() + diff);
+        
+        const dateStr = `${diasNombres[dayIdx]} ${targetDate.getDate()} de ${targetDate.toLocaleDateString('es-MX', { month: 'short' })}`;
+        
+        const dayOptionsHtml = openOrds.map(o => {
+          const displayStr = `[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}`.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          const htmlStr = `[${o.folio || 'S/N'}] ${o.cliente} - ${o.tipo}`.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          return `<div class="combo-option" style="padding: 0.35rem 0.5rem; font-size: 0.75rem;" onclick="selectComboOption('pt-orden-dia-${dayIdx}', '${o.id}', '${displayStr}')">${htmlStr}</div>`;
+        }).join('');
+
+        return `
+          <div style="display:flex; align-items:center; gap:0.5rem; justify-content:space-between; background:rgba(255,255,255,0.01); border:1px solid var(--border); padding:0.4rem 0.5rem; border-radius:var(--radius-sm);">
+            <span style="font-size:0.78rem; font-weight:600; color:var(--text-primary); flex-shrink:0; width:110px;">${dateStr}</span>
+            <div style="position:relative; flex:1; min-width:0;">
+              <div class="combo-box" tabindex="0" id="pt-orden-dia-${dayIdx}-combo" onclick="toggleCombo('pt-orden-dia-${dayIdx}')" style="font-size:0.75rem; padding:0.25rem 0.5rem; display:flex; justify-content:space-between; align-items:center;">
+                <span id="pt-orden-dia-${dayIdx}-display" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:calc(100% - 15px);">Selecciona una orden...</span>
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </div>
+              <div class="combo-menu" id="pt-orden-dia-${dayIdx}-menu" style="left:0; right:0; width:auto; max-height:220px;">
+                <div class="combo-search" style="padding:0.25rem 0.4rem;">
+                  <input type="text" id="pt-orden-dia-${dayIdx}-search" placeholder="Buscar..." oninput="filterCombo('pt-orden-dia-${dayIdx}', this.value)" onclick="event.stopPropagation()" style="font-size:0.75rem; padding:0.15rem 0.3rem;">
+                </div>
+                <div class="combo-options" id="pt-orden-dia-${dayIdx}-options" style="max-height:160px; padding:0.15rem;">
+                  ${dayOptionsHtml}
+                </div>
+              </div>
+              <input type="hidden" id="pt-orden-dia-${dayIdx}">
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      // Restaurar valores
+      activeDays.forEach(dayIdx => {
+        let targetId = '';
+        if (preservedValues[dayIdx] && openOrds.some(o => o.id === preservedValues[dayIdx])) {
+          targetId = preservedValues[dayIdx];
+        } else if (mainOrdenId) {
+          targetId = mainOrdenId;
+        }
+
+        if (targetId) {
+          const matchingOrd = openOrds.find(o => o.id === targetId);
+          if (matchingOrd) {
+            const displayStr = `[${matchingOrd.folio || 'S/N'}] ${matchingOrd.cliente} - ${matchingOrd.tipo}`;
+            selectComboOption(`pt-orden-dia-${dayIdx}`, targetId, displayStr, true);
+          }
+        }
+      });
+      
+    } else {
+      detailsContainer.style.display = 'none';
+      listWrapper.style.display = 'none';
+      detailsList.innerHTML = '';
+    }
+  }
+}
+
+window.toggleDiaSemanaModal = function(dayIdx) {
+  const cb = document.getElementById(`pt-rep-${dayIdx}`);
+  if (cb) {
+    cb.checked = !cb.checked;
+  }
+  const baseFechaStr = document.getElementById('pt-fecha').value;
+  renderCalendarioSemanalModal(baseFechaStr);
+  actualizarTecnicosDisponibles();
+};
+
+window.onOrdenDiaChange = function(dayIdx) {
+  // Placeholder en caso de requerir validaciones adicionales al cambiar orden por día
+};
+
+window.toggleMismaOrden = function() {
+  const mismaOrdenCb = document.getElementById('pt-usar-misma-orden');
+  const mismaOrden = mismaOrdenCb ? mismaOrdenCb.checked : true;
+  const listWrapper = document.getElementById('pt-detalles-dias-list-wrapper');
+  if (listWrapper) {
+    listWrapper.style.display = mismaOrden ? 'none' : 'flex';
+  }
+};
+
+window.navegarSemana = function(weeksOffset) {
+  const baseFechaStr = document.getElementById('pt-fecha').value;
+  const [year, month, day] = baseFechaStr.split('-').map(Number);
+  const baseDate = new Date(year, month - 1, day);
+  baseDate.setDate(baseDate.getDate() + (weeksOffset * 7));
+  
+  const y = baseDate.getFullYear();
+  const m = String(baseDate.getMonth() + 1).padStart(2, '0');
+  const d = String(baseDate.getDate()).padStart(2, '0');
+  const newDateStr = `${y}-${m}-${d}`;
+  
+  // Limpiar selección de repetición y dejar Lunes marcado por defecto en la nueva semana
+  for (let i = 0; i <= 6; i++) {
+    const cb = document.getElementById(`pt-rep-${i}`);
+    if (cb) cb.checked = (i === 1);
+  }
+  
+  renderCalendarioSemanalModal(newDateStr);
+  actualizarTecnicosDisponibles();
+};
+
+window.seleccionarDiasSemana = function(opcion) {
+  const fechaVal = document.getElementById('pt-fecha').value;
+  if (!fechaVal && opcion !== 'ninguno') {
+    mostrarNotificacion("Selecciona una fecha de programación primero para definir la semana.", "warning");
+    return;
+  }
+  
+  for (let i = 0; i <= 6; i++) {
+    const cb = document.getElementById(`pt-rep-${i}`);
+    if (cb) {
+      if (opcion === 'todos') {
+        cb.checked = (i >= 1 && i <= 5);
+      } else if (opcion === 'todos-sab') {
+        cb.checked = (i >= 1 && i <= 6);
+      } else if (opcion === 'ninguno') {
+        const dayIndex = obtenerDiaDeSemanaLocal(fechaVal);
+        cb.checked = (i === dayIndex);
+      }
+    }
+  }
+  renderCalendarioSemanalModal(fechaVal);
+  actualizarTecnicosDisponibles();
+};
+
 // ===== PROGRAMAR TÉCNICOS DESDE CALENDARIO =====
 function abrirProgramarTecnico() {
-  document.getElementById('pt-fecha').value = '';
+  const todayStr = getLocalDateString();
+  const todayDayIdx = obtenerDiaDeSemanaLocal(todayStr);
+  
+  // Activar por defecto el día de la semana actual
+  for (let i = 0; i <= 6; i++) {
+    const cb = document.getElementById(`pt-rep-${i}`);
+    if (cb) cb.checked = (i === todayDayIdx);
+  }
+
+  // Renderizar la semana correspondiente a hoy
+  renderCalendarioSemanalModal(todayStr);
+
+  const mismaOrdenCb = document.getElementById('pt-usar-misma-orden');
+  if (mismaOrdenCb) mismaOrdenCb.checked = true;
+  toggleMismaOrden();
+
   document.getElementById('pt-entrada').value = '';
   document.getElementById('pt-salida').value = '';
   document.getElementById('pt-fecha-inicio-traslado').value = '';
@@ -11405,8 +11658,9 @@ function abrirProgramarTecnico() {
   document.getElementById('pt-hora-fin-regreso').value = '';
   document.getElementById('pt-horas-regreso').value = '';
   document.getElementById('pt-tipo').value = 'Servicio';
-  document.getElementById('pt-tecnico').innerHTML = '<option value="">Selecciona una fecha primero...</option>';
-  document.getElementById('pt-tecnico').disabled = true;
+  
+  // Actualizar técnicos de inmediato para la fecha seleccionada
+  actualizarTecnicosDisponibles();
 
   const btnToggleTraslado = document.getElementById('btn-toggle-traslado');
   const sectionTraslado = document.getElementById('traslado-section');
@@ -11601,20 +11855,39 @@ function actualizarTecnicosDisponibles() {
     return;
   }
 
-  // Detectar técnicos con traslape de horario en esa fecha
+  // Obtener días seleccionados
+  const selectedDays = [];
+  for (let i = 0; i <= 6; i++) {
+    const cb = document.getElementById(`pt-rep-${i}`);
+    if (cb && cb.checked) {
+      selectedDays.push(i);
+    }
+  }
+
+  let fechasAValidar = [];
+  if (selectedDays.length > 0) {
+    fechasAValidar = selectedDays.map(dayIndex => calcularFechaParaDiaDeSemana(fecha, dayIndex));
+  } else {
+    fechasAValidar = [fecha];
+  }
+
+  // Detectar técnicos con traslape de horario en cualquiera de las fechas
   const tecnicosConTraslape = new Set();
   ordenes.forEach(o => {
     if (o.bitacora && o.bitacora.length > 0) {
       o.bitacora.forEach(b => {
-        if (b.fecha && b.fecha.startsWith(fecha) && b.tecnico) {
-          // Si hay horas en ambos lados, verificar traslape real
-          if (entrada && salida && b.entrada && b.salida) {
-            if (hayTraslapoHorario(entrada, salida, b.entrada, b.salida)) {
+        if (b.fecha && b.tecnico) {
+          const matchFecha = fechasAValidar.some(f => b.fecha.startsWith(f));
+          if (matchFecha) {
+            // Si hay horas en ambos lados, verificar traslape real
+            if (entrada && salida && b.entrada && b.salida) {
+              if (hayTraslapoHorario(entrada, salida, b.entrada, b.salida)) {
+                tecnicosConTraslape.add(b.tecnico);
+              }
+            } else {
+              // Sin horas definidas, bloquear por precaución (día completo)
               tecnicosConTraslape.add(b.tecnico);
             }
-          } else {
-            // Sin horas definidas, bloquear por precaución (día completo)
-            tecnicosConTraslape.add(b.tecnico);
           }
         }
       });
@@ -11624,10 +11897,14 @@ function actualizarTecnicosDisponibles() {
   const disponibles = usuarios.filter(u => ['tecnico', 'supervisor'].includes(u.rol) && !tecnicosConTraslape.has(u.nombre) && u.activo !== false && (isTestModeActive() || !isTestUser(u)));
   
   if (disponibles.length === 0) {
-    selectTec.innerHTML = '<option value="">Sin técnicos disponibles en ese horario</option>';
+    selectTec.innerHTML = '<option value="">Sin técnicos disponibles en ese horario/días</option>';
     selectTec.disabled = true;
   } else {
+    const currentVal = selectTec.value;
     selectTec.innerHTML = '<option value="">Selecciona un técnico disponible...</option>' + disponibles.map(u => `<option value="${u.nombre}">${u.nombre}</option>`).join('');
+    if (currentVal && disponibles.some(d => d.nombre === currentVal)) {
+      selectTec.value = currentVal;
+    }
     selectTec.disabled = false;
   }
 }
@@ -11650,143 +11927,223 @@ async function guardarProgramacionTecnico() {
     return;
   }
 
-  if (fechaInicioTraslado || horaInicio || horasTraslado) {
-    const dEntrada = new Date(`${fecha}T${entrada || '23:59'}`);
-    const dInicioTraslado = new Date(`${fechaInicioTraslado || fecha}T${horaInicio || '00:00'}`);
-    
-    if (dInicioTraslado > dEntrada) {
-      mostrarNotificacion("El inicio del traslado de ida no puede ser después de que comience el servicio.", "error");
-      return;
+  // Obtener días seleccionados
+  const selectedDays = [];
+  for (let i = 0; i <= 6; i++) {
+    const cb = document.getElementById(`pt-rep-${i}`);
+    if (cb && cb.checked) {
+      selectedDays.push(i);
+    }
+  }
+
+  let fehasAGuardar = [];
+  if (selectedDays.length > 0) {
+    fehasAGuardar = selectedDays.map(dayIndex => calcularFechaParaDiaDeSemana(fecha, dayIndex));
+  } else {
+    fehasAGuardar = [fecha];
+  }
+
+  // Validaciones de tiempo para cada día que incluye traslados
+  for (const f of fehasAGuardar) {
+    const isBaseDate = (f === fecha);
+    const targetTrasladoDate = (fechaInicioTraslado === fecha) ? f : fechaInicioTraslado;
+    const targetRegresoDate = (fechaFinRegresoDate === fecha) ? f : fechaFinRegresoDate;
+
+    if (targetTrasladoDate || horaInicio || horasTraslado) {
+      const dEntrada = new Date(`${f}T${entrada || '23:59'}`);
+      const dInicioTraslado = new Date(`${targetTrasladoDate || f}T${horaInicio || '00:00'}`);
+      
+      if (dInicioTraslado > dEntrada) {
+        mostrarNotificacion(`El inicio del traslado de ida no puede ser después de que comience el servicio (${f}).`, "error");
+        return;
+      }
+
+      if (horaInicio && horasTraslado && entrada) {
+        const minLlegada = horaAMinutos(horaInicio) + (parseFloat(horasTraslado) * 60);
+        const dLlegada = new Date(`${targetTrasladoDate || f}T00:00`);
+        dLlegada.setMinutes(dLlegada.getMinutes() + minLlegada);
+
+        if (dEntrada < dLlegada) {
+          mostrarNotificacion(`No se puede empezar el servicio antes de la llegada estimada del traslado de ida (${f}).`, "error");
+          return;
+        }
+      }
     }
 
-    if (horaInicio && horasTraslado && entrada) {
-      const minLlegada = horaAMinutos(horaInicio) + (parseFloat(horasTraslado) * 60);
-      const dLlegada = new Date(`${fechaInicioTraslado || fecha}T00:00`);
-      dLlegada.setMinutes(dLlegada.getMinutes() + minLlegada);
-
-      if (dEntrada < dLlegada) {
-        mostrarNotificacion("No se puede empezar el servicio antes de la llegada estimada del traslado de ida.", "error");
+    if (targetRegresoDate || horaFinRegreso || horasRegreso) {
+      const dSalida = new Date(`${f}T${salida || '00:00'}`);
+      const dInicioRegreso = new Date(`${targetRegresoDate || f}T${horaFinRegreso || '23:59'}`);
+      
+      if (dInicioRegreso < dSalida) {
+        mostrarNotificacion(`No se puede iniciar el traslado de regreso antes de terminar el servicio (${f}).`, "error");
         return;
       }
     }
   }
 
-  if (fechaFinRegresoDate || horaFinRegreso || horasRegreso) {
-    const dSalida = new Date(`${fecha}T${salida || '00:00'}`);
-    const dInicioRegreso = new Date(`${fechaFinRegresoDate || fecha}T${horaFinRegreso || '23:59'}`);
-    
-    if (dInicioRegreso < dSalida) {
-      mostrarNotificacion("No se puede iniciar el traslado de regreso antes de terminar el servicio.", "error");
-      return;
-    }
-  }
-
-  // Validar traslape de horario antes de guardar
+  // Validar traslape de horario consolidado antes de guardar
+  const conflictos = [];
   if (entrada && salida) {
-    for (const ord of ordenes) {
-      if (!ord.bitacora) continue;
-      for (const b of ord.bitacora) {
-        if (b.fecha && b.fecha.startsWith(fecha) && b.tecnico === tecnico && b.entrada && b.salida) {
-          if (hayTraslapoHorario(entrada, salida, b.entrada, b.salida)) {
-            const folioConflicto = ord.folio || ord.id.slice(0,8);
-            const horaConflicto = `${b.entrada} – ${b.salida}`;
-            mostrarNotificacion(
-              `⚠️ ${tecnico} ya tiene asignación en ese horario (${horaConflicto}) en la orden ${folioConflicto}. Elige otro horario.`,
-              'error'
-            );
-            return;
+    for (const f of fehasAGuardar) {
+      for (const ord of ordenes) {
+        if (!ord.bitacora) continue;
+        for (const b of ord.bitacora) {
+          if (b.fecha && b.fecha.startsWith(f) && b.tecnico === tecnico && b.entrada && b.salida) {
+            if (hayTraslapoHorario(entrada, salida, b.entrada, b.salida)) {
+              const folioConflicto = ord.folio || ord.id.slice(0,8);
+              const horaConflicto = `${b.entrada} – ${b.salida}`;
+              conflictos.push(`${f}: orden ${folioConflicto} (${horaConflicto})`);
+            }
           }
         }
       }
     }
   }
 
-  const oIndex = ordenes.findIndex(o => o.id === ordenId);
-  if (oIndex === -1) return;
-  const o = ordenes[oIndex];
+  if (conflictos.length > 0) {
+    mostrarNotificacion(
+      `⚠️ ${tecnico} ya tiene asignación en ese horario en los siguientes días:\n` + conflictos.map(c => `• ${c}`).join('\n'),
+      'error'
+    );
+    return;
+  }
 
-  if (!o.bitacora) o.bitacora = [];
-  
   const tipoAsignacion = document.getElementById('pt-tipo') ? document.getElementById('pt-tipo').value : 'Servicio';
+  const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+  const modifiedOrders = new Set();
 
-  const nuevaEntrada = {
-    id: crypto.randomUUID(),
-    fecha: fecha,
-    tecnico: tecnico,
-    tipo: tipoAsignacion,
-    nota: "Programado por supervisor. Pendiente de llenado por el técnico.",
-    entrada: entrada,
-    salida: salida,
-    fecha_inicio_traslado: fechaInicioTraslado || null,
-    hora_inicio: horaInicio || null,
-    horas_traslado: horasTraslado ? parseFloat(horasTraslado) : null,
-    fecha_fin_regreso: fechaFinRegresoDate || null,
-    hora_fin_regreso: horaFinRegreso || null,
-    horas_regreso: horasRegreso ? parseFloat(horasRegreso) : null,
-    realizado: false,
-    asignadoPorName: obtenerNombreUsuarioActual(),
-    asignadoPorId: currentSession.userId || null
-  };
-  
-  o.bitacora.push(nuevaEntrada);
+  for (const f of fehasAGuardar) {
+    const isBaseDate = (f === fecha);
+    
+    // Buscar la orden específica de este día
+    const dayIdx = obtenerDiaDeSemanaLocal(f);
+    const mismaOrdenCb = document.getElementById('pt-usar-misma-orden');
+    const mismaOrden = mismaOrdenCb ? mismaOrdenCb.checked : true;
+    
+    let specificOrdenId = ordenId;
+    if (!mismaOrden) {
+      const selDia = document.getElementById(`pt-orden-dia-${dayIdx}`);
+      if (selDia && selDia.value) {
+        specificOrdenId = selDia.value;
+      }
+    }
+    
+    const o = ordenes.find(ord => ord.id === specificOrdenId);
+    if (!o) continue;
+    
+    if (!o.bitacora) o.bitacora = [];
+    
+    // Mapear traslado si corresponde
+    let fInicioTraslado = null;
+    let hInicio = null;
+    let hTraslado = null;
+    if (fechaInicioTraslado) {
+      if (fechaInicioTraslado === f || (fechaInicioTraslado === fecha && isBaseDate)) {
+        fInicioTraslado = f;
+        hInicio = horaInicio;
+        hTraslado = horasTraslado ? parseFloat(horasTraslado) : null;
+      }
+    }
+    
+    let fFinRegreso = null;
+    let hFinRegreso = null;
+    let hRegreso = null;
+    if (fechaFinRegresoDate) {
+      if (fechaFinRegresoDate === f || (fechaFinRegresoDate === fecha && isBaseDate)) {
+        fFinRegreso = f;
+        hFinRegreso = horaFinRegreso;
+        hRegreso = horasRegreso ? parseFloat(horasRegreso) : null;
+      }
+    }
 
-  // Asegurar que el técnico está en la lista de asignados globalmente
-  if (!o.tecnicosAsignados) o.tecnicosAsignados = [];
-  if (!o.tecnicosAsignados.includes(tecnico)) {
-    o.tecnicosAsignados.push(tecnico);
+    const nuevaEntrada = {
+      id: crypto.randomUUID(),
+      fecha: f,
+      tecnico: tecnico,
+      tipo: tipoAsignacion,
+      nota: "Programado por supervisor. Pendiente de llenado por el técnico.",
+      entrada: entrada,
+      salida: salida,
+      fecha_inicio_traslado: fInicioTraslado,
+      hora_inicio: hInicio,
+      horas_traslado: hTraslado,
+      fecha_fin_regreso: fFinRegreso,
+      hora_fin_regreso: hFinRegreso,
+      horas_regreso: hRegreso,
+      realizado: false,
+      asignadoPorName: obtenerNombreUsuarioActual(),
+      asignadoPorId: currentSession.userId || null
+    };
+
+    o.bitacora.push(nuevaEntrada);
+
+    // Asegurar que el técnico está en la lista de asignados globalmente
+    if (!o.tecnicosAsignados) o.tecnicosAsignados = [];
+    if (!o.tecnicosAsignados.includes(tecnico)) {
+      o.tecnicosAsignados.push(tecnico);
+    }
+    
+    modifiedOrders.add(o);
+
+    // Crear y guardar evento de calendario asociado para sincronía perfecta
+    try {
+      const usr = usuarios.find(u => u.nombre === tecnico);
+      const tecnicoId = usr ? usr.id : null;
+
+      const entradaHora = entrada || '08:00';
+      const salidaHora = salida || '18:00';
+
+      const inicioISO = `${f}T${entradaHora}:00`;
+      const finISO = `${f}T${salidaHora}:00`;
+
+      const eventoObj = {
+        id: nuevaEntrada.id,
+        titulo: `Servicio: ${o.cliente}`,
+        tipo: 'Servicio',
+        tecnicoId: tecnicoId,
+        tecnicoNombre: tecnico,
+        ordenId: o.id,
+        fechaInicio: new Date(inicioISO).toISOString(),
+        start: new Date(inicioISO).toISOString(),
+        fechaFin: new Date(finISO).toISOString(),
+        end: new Date(finISO).toISOString(),
+        todoElDia: false,
+        allDay: false,
+        descripcion: nuevaEntrada.nota,
+        creadoPor: currentSession.userId || null,
+        creadoPorNombre: obtenerNombreUsuarioActual(),
+        color: '#8b5cf6'
+      };
+
+      const idx = localEventos.findIndex(x => x.id === eventoObj.id);
+      if (idx > -1) {
+        localEventos[idx] = eventoObj;
+      } else {
+        localEventos.push(eventoObj);
+      }
+      if (window.pushToSupabase) {
+        window.pushToSupabase('calendario_eventos', eventoObj);
+      }
+    } catch(e){}
+
+    if (window.trackTelemetryEvent) {
+      window.trackTelemetryEvent('Creación de Asignación', { tecnico, fecha: f, folio: o.folio || 'Sin Folio' });
+    }
+  }
+
+  // Actualizar técnicos asignados string en cada orden modificada
+  for (const o of modifiedOrders) {
     o.tecnico = o.tecnicosAsignados.join(', ');
   }
 
-  // Crear y guardar evento de calendario asociado para sincronía perfecta bidireccional
-  try {
-    const usr = usuarios.find(u => u.nombre === tecnico);
-    const tecnicoId = usr ? usr.id : null;
-
-    const entradaHora = entrada || '08:00';
-    const salidaHora = salida || '18:00';
-
-    const inicioISO = `${fecha}T${entradaHora}:00`;
-    const finISO = `${fecha}T${salidaHora}:00`;
-
-    const eventoObj = {
-      id: nuevaEntrada.id,
-      titulo: `Servicio: ${o.cliente}`,
-      tipo: 'Servicio',
-      tecnicoId: tecnicoId,
-      tecnicoNombre: tecnico,
-      ordenId: o.id,
-      fechaInicio: new Date(inicioISO).toISOString(),
-      start: new Date(inicioISO).toISOString(),
-      fechaFin: new Date(finISO).toISOString(),
-      end: new Date(finISO).toISOString(),
-      todoElDia: false,
-      allDay: false,
-      descripcion: nuevaEntrada.nota,
-      creadoPor: currentSession.userId || null,
-      creadoPorNombre: obtenerNombreUsuarioActual(),
-      color: '#8b5cf6'
-    };
-
-    const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
-    const idx = localEventos.findIndex(x => x.id === eventoObj.id);
-    if (idx > -1) {
-      localEventos[idx] = eventoObj;
-    } else {
-      localEventos.push(eventoObj);
-    }
-    localStorage.setItem('sapi_calendario_eventos', JSON.stringify(localEventos));
-    if (window.pushToSupabase) {
-      window.pushToSupabase('calendario_eventos', eventoObj);
-    }
-  } catch(e){}
+  localStorage.setItem('sapi_calendario_eventos', JSON.stringify(localEventos));
 
   safeSetJSON('sapi_ordenes', ordenes);
+  
   if (window.pushToSupabase) {
-    await window.pushToSupabase('ordenes', o);
-  }
-
-  if (window.trackTelemetryEvent) {
-    window.trackTelemetryEvent('Creación de Asignación', { tecnico, fecha, folio: o.folio || 'Sin Folio' });
+    for (const o of modifiedOrders) {
+      await window.pushToSupabase('ordenes', o);
+    }
   }
 
   mostrarNotificacion('Asignación programada con éxito', 'success');
@@ -17555,6 +17912,13 @@ function selectComboOption(id, value, label, isInitial = false) {
       const ordSelectedEquiposContainer = document.getElementById('f-equipos-seleccionados');
       if (ordSelectedEquiposContainer) ordSelectedEquiposContainer.innerHTML = '';
     }
+  } else if (id === 'pt-orden') {
+    for (let i = 0; i <= 6; i++) {
+      const sel = document.getElementById(`pt-orden-dia-${i}`);
+      if (sel) {
+        selectComboOption(`pt-orden-dia-${i}`, value, label, true);
+      }
+    }
   }
 }
 
@@ -18052,8 +18416,11 @@ async function guardarTicket(e) {
     lev._synced = false;
     
     if (typeof safeSetJSON === 'function') safeSetJSON('sapi_levantamientos', levantamientos);
-    if (window.supabaseClient && window.pushToSupabase) {
-      window.pushToSupabase('levantamientos', lev);
+    if (window.supabaseClient) {
+      // Actualizar solo el estado y el id del ticket generado en Supabase para no sobreescribir las evidencias
+      await window.supabaseClient.from('levantamientos')
+        .update({ estado: 'Completado', ticket_generado_id: ticket.id })
+        .eq('id', lev.id);
     }
     if (typeof renderLevantamientos === 'function') {
       renderLevantamientos();

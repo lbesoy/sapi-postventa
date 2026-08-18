@@ -709,6 +709,18 @@ window.completarLevantamiento = async function(id) {
   
   window._levantamientoDeOrigen = lev;
 
+  // Mapear refacciones para adaptarlas al formato que espera app.js (agregarFilaRefaccionTicket)
+  const refaccionesDb = typeof window.refaccionesDb !== 'undefined' ? window.refaccionesDb : JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]');
+  const refaccionesMapeadas = (lev.refacciones || []).map(r => {
+    const dbRef = refaccionesDb.find(x => x.codigo === r.refaccion);
+    return {
+      marca: dbRef ? dbRef.marca : '',
+      nombre: r.descripcion || '',
+      codigo: r.refaccion,
+      cantidad: r.cantidad || 1
+    };
+  });
+
   // Formatear datos para el ticket precargado
   const datosTicket = {
     cliente: lev.cliente,
@@ -719,7 +731,7 @@ window.completarLevantamiento = async function(id) {
     notas: 'Notas del técnico:\n' + lev.notas_tecnico,
     prioridad: 'Media',
     categoria: 'Otro',
-    refaccionesSeleccionadas: lev.refacciones || []
+    refaccionesSeleccionadas: refaccionesMapeadas
   };
 
   // Resolver nombre completo de la máquina
