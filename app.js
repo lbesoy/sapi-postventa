@@ -13699,7 +13699,7 @@ function actualizarMapaMaquinaria(filteredData) {
     
     const uniqueBrands = [...new Set(g.maquinas.map(m => (m.marca || '').toLowerCase().trim()))];
     const isMultiBrand = uniqueBrands.length > 1;
-    const logoPath = isMultiBrand ? 'logo_transparent.png' : getLogoMarca(mainMaq.marca);
+    const logoPath = isMultiBrand ? 'https://cdn-icons-png.flaticon.com/512/1000/1000109.png' : getLogoMarca(mainMaq.marca);
     
     const badgeHtml = count > 1 ? `
       <div style="position:absolute; top:-5px; right:-5px; background:var(--red, #ef4444); color:white; border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:0.65rem; font-weight:bold; border:1.5px solid white; z-index:10;">
