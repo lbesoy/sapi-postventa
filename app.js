@@ -13699,7 +13699,7 @@ function actualizarMapaMaquinaria(filteredData) {
     
     const uniqueBrands = [...new Set(g.maquinas.map(m => (m.marca || '').toLowerCase().trim()))];
     const isMultiBrand = uniqueBrands.length > 1;
-    const logoPath = isMultiBrand ? 'https://cdn-icons-png.flaticon.com/512/1000/1000109.png' : getLogoMarca(mainMaq.marca);
+    const logoPath = isMultiBrand ? '' : getLogoMarca(mainMaq.marca);
     
     const badgeHtml = count > 1 ? `
       <div style="position:absolute; top:-5px; right:-5px; background:var(--red, #ef4444); color:white; border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:0.65rem; font-weight:bold; border:1.5px solid white; z-index:10;">
@@ -13707,15 +13707,23 @@ function actualizarMapaMaquinaria(filteredData) {
       </div>
     ` : '';
     
+    const innerPinHtml = isMultiBrand ? `
+      <div style="background:white; border-radius:50%; padding:3px; box-shadow:0 3px 6px rgba(0,0,0,0.3); width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:2px solid var(--accent); position:relative; z-index:2; color:var(--accent);">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        ${badgeHtml}
+      </div>
+      <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid var(--accent); position:absolute; bottom:-7px; left:50%; transform:translateX(-50%); z-index:1;"></div>
+    ` : `
+      <div style="background:white; border-radius:50%; padding:3px; box-shadow:0 3px 6px rgba(0,0,0,0.3); width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:2px solid var(--accent); position:relative; z-index:2;">
+        <img src="${logoPath}" style="width:100%; height:100%; object-fit:contain; border-radius:50%;" onerror="this.src='logo_transparent.png'"/>
+        ${badgeHtml}
+      </div>
+      <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid var(--accent); position:absolute; bottom:-7px; left:50%; transform:translateX(-50%); z-index:1;"></div>
+    `;
+
     const customIcon = L.divIcon({
       className: 'custom-map-pin',
-      html: `
-        <div style="background:white; border-radius:50%; padding:3px; box-shadow:0 3px 6px rgba(0,0,0,0.3); width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:2px solid var(--accent); position:relative; z-index:2;">
-          <img src="${logoPath}" style="width:100%; height:100%; object-fit:contain; border-radius:50%;" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1000/1000109.png'"/>
-          ${badgeHtml}
-        </div>
-        <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid var(--accent); position:absolute; bottom:-7px; left:50%; transform:translateX(-50%); z-index:1;"></div>
-      `,
+      html: innerPinHtml,
       iconSize: [42, 50],
       iconAnchor: [21, 50],
       popupAnchor: [0, -50]
