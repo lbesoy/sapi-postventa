@@ -4556,6 +4556,166 @@ function renderDashboardV2() {
     console.error("Error al renderizar gráficas V2:", e);
   }
 
+  // --- Calcular Disponibilidad Global de la Flota (Dashboard Admin) ---
+  try {
+    const badgeEl = document.getElementById('v2-overall-availability-badge');
+    const ringContainerEl = document.getElementById('v2-overall-availability-ring-container');
+    const textEl = document.getElementById('v2-overall-availability-text');
+    const descEl = document.getElementById('v2-overall-availability-desc');
+    const opCountEl = document.getElementById('v2-overall-operating-count');
+    const maintCountEl = document.getElementById('v2-overall-maintenance-count');
+    const maintSectionEl = document.getElementById('v2-overall-maintenance-list-section');
+    const maintBodyEl = document.getElementById('v2-overall-maintenance-list-body');
+
+    if (badgeEl || textEl || opCountEl) {
+      const activeMachines = maquinariaDash || [];
+      let totalMachines = [...activeMachines];
+
+      if (!isEmpresa || !nombreEmpresaLogged) {
+        // Agregar manuales de clientesDb a totalMachines
+        clientesDb.forEach(c => {
+          if (c.maquinas) {
+            c.maquinas.forEach(m => {
+              const isDuplicate = totalMachines.some(sm => sm.idInterno === m.idInterno || sm.serie === m.serie);
+              if (!isDuplicate) {
+                totalMachines.push({
+                  id: m.idInterno,
+                  idInterno: m.idInterno,
+                  serie: m.serie || 'N/A',
+                  marca: m.marca || '',
+                  modelo: m.modelo || 'Sin Modelo',
+                  cliente: c.nombre,
+                  ubicacion: m.ubicacion || 'N/A'
+                });
+              }
+            });
+          }
+        });
+      }
+
+      // Filtrar por rol supervisor si aplica
+      if (currentSession.viewMode === 'supervisor') {
+        const supFilter = currentUser ? currentUser.nombre : '';
+        const supUser = usuarios.find(u => u.nombre === supFilter || u.id === supFilter);
+        const supId = supUser ? supUser.id : supFilter;
+        
+        const supClients = clientesDb.filter(c => 
+          (c.supervisoresAsignados && c.supervisoresAsignados.includes(supId)) || 
+          (c.supervisorAsignado === supId) || 
+          (c.supervisorAsignado === supFilter)
+        ).map(c => c.nombre);
+
+        totalMachines = totalMachines.filter(m => supClients.includes(m.cliente));
+      }
+
+      const activeOrders = ordenesDash.filter(o => {
+        const est = (o.estado || '').toLowerCase().trim();
+        return est && !['completado', 'cerrada', 'cerrado'].includes(est);
+      });
+
+      const machinesInMaint = [];
+      const maintMachineIdsOrSeries = new Set();
+
+      activeOrders.forEach(o => {
+        const match = totalMachines.find(m => {
+          if (m.id === o.maquinaria_id || m.idInterno === o.maquinaria_id || m.id === o.maquina || m.idInterno === o.maquina) return true;
+          const equipoString = o.equipo || '';
+          const names = equipoString.split(',').map(n => n.trim()).filter(Boolean);
+          return names.some(name => {
+            return (
+              (m.idInterno && name.includes(`[${m.idInterno}]`)) ||
+              (m.serie && name.includes(`(SN: ${m.serie})`)) ||
+              name === m.idInterno ||
+              name === m.serie
+            );
+          });
+        });
+        if (match) {
+          const idKey = match.id || match.idInterno || match.serie;
+          if (!maintMachineIdsOrSeries.has(idKey)) {
+            maintMachineIdsOrSeries.add(idKey);
+            machinesInMaint.push({
+              maquina: match,
+              orden: o
+            });
+          }
+        }
+      });
+
+      const totalCount = totalMachines.length;
+      const maintCount = machinesInMaint.length;
+      const opCount = Math.max(0, totalCount - maintCount);
+      const availabilityPercent = totalCount > 0 ? Math.round((opCount / totalCount) * 100) : 100;
+
+      if (badgeEl) {
+        badgeEl.textContent = `${availabilityPercent}% Disponibilidad`;
+        if (availabilityPercent === 100) {
+          badgeEl.style.background = 'rgba(16, 185, 129, 0.15)';
+          badgeEl.style.color = '#10b981';
+        } else if (availabilityPercent >= 80) {
+          badgeEl.style.background = 'rgba(245, 158, 11, 0.15)';
+          badgeEl.style.color = '#f59e0b';
+        } else {
+          badgeEl.style.background = 'rgba(239, 68, 68, 0.15)';
+          badgeEl.style.color = '#ef4444';
+        }
+      }
+
+      if (textEl) textEl.textContent = `${opCount} / ${totalCount} Equipos`;
+
+      if (descEl) {
+        if (totalCount === 0) {
+          descEl.textContent = 'No hay equipos registrados.';
+        } else if (availabilityPercent === 100) {
+          descEl.textContent = 'Toda la flota está operativa y disponible.';
+        } else if (availabilityPercent >= 80) {
+          descEl.textContent = 'La mayor parte de la flota está operativa.';
+        } else {
+          descEl.textContent = 'Se requiere atención en varios equipos.';
+        }
+      }
+
+      if (opCountEl) opCountEl.textContent = opCount;
+      if (maintCountEl) maintCountEl.textContent = maintCount;
+
+      if (ringContainerEl) {
+        ringContainerEl.innerHTML = `
+          <div style="width: 64px; height: 64px; border-radius: 50%; background: conic-gradient(var(--green, #10b981) 0% ${availabilityPercent}%, var(--bg-hover, #1f2937) ${availabilityPercent}% 100%); display: flex; align-items: center; justify-content: center; position: relative;">
+            <div style="width: 52px; height: 52px; border-radius: 50%; background: var(--bg-secondary, #111827); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: var(--text-primary);">
+              <span>${availabilityPercent}%</span>
+              <span style="font-size:0.55rem; color:var(--text-muted); font-weight:normal;">DISP</span>
+            </div>
+          </div>
+        `;
+      }
+
+      if (maintSectionEl && maintBodyEl) {
+        if (maintCount > 0) {
+          maintSectionEl.style.display = 'block';
+          maintBodyEl.innerHTML = machinesInMaint.map(item => {
+            const m = item.maquina;
+            const o = item.orden;
+            const est = (o.estado || '').toLowerCase();
+            const col = est === 'pendiente' ? '#ef4444' : est === 'en proceso' ? '#E8820C' : '#10b981';
+            return `
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:0.6rem; font-weight:600; color:var(--text-primary);">${m.marca || ''} ${m.modelo || 'Sin Modelo'} <span style="font-weight:normal; font-size:0.7rem; color:var(--text-muted); font-family:monospace;">(ID: ${m.idInterno || m.serie})</span></td>
+                <td style="padding:0.6rem; color:var(--text-muted);">${m.cliente || 'N/A'}</td>
+                <td style="padding:0.6rem; color:var(--text-muted);"><span style="font-weight:600; color:var(--text-primary);">${o.folio || ''}</span> - ${o.asunto || o.tipo || ''}</td>
+                <td style="padding:0.6rem; text-align:right;"><span style="font-size:0.7rem; font-weight:600; color:${col}; background:${col}22; padding:0.25rem 0.5rem; border-radius:999px;">${o.estado || ''}</span></td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          maintSectionEl.style.display = 'none';
+          maintBodyEl.innerHTML = '';
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Error al calcular disponibilidad de flota:", err);
+  }
+
   if (window.lucide) lucide.createIcons();
 }
 
@@ -5973,6 +6133,55 @@ function verDetalleCliente(nombre) {
   });
 
   if (allClientMachines.length > 0) {
+    // Calcular Disponibilidad de la Flota para este cliente específico
+    const activeClientOrders = ordenes.filter(o => o.cliente === nombre && o.estado && !['completado', 'cerrada', 'cerrado'].includes(o.estado.toLowerCase().trim()));
+    const clientMachinesInMaint = new Set();
+    activeClientOrders.forEach(o => {
+      const match = allClientMachines.find(m => {
+        if (m.idInterno === o.maquinaria_id || m.uniqueId === o.maquinaria_id || m.idInterno === o.maquina || m.uniqueId === o.maquina) return true;
+        const equipoString = o.equipo || '';
+        const names = equipoString.split(',').map(n => n.trim()).filter(Boolean);
+        return names.some(name => {
+          return (
+            (m.idInterno && name.includes(`[${m.idInterno}]`)) ||
+            (m.serie && name.includes(`(SN: ${m.serie})`)) ||
+            name === m.idInterno ||
+            name === m.serie
+          );
+        });
+      });
+      if (match) {
+        clientMachinesInMaint.add(match.idInterno || match.uniqueId || match.serie);
+      }
+    });
+
+    const clientTotal = allClientMachines.length;
+    const clientMaint = clientMachinesInMaint.size;
+    const clientOp = Math.max(0, clientTotal - clientMaint);
+    const clientAvailability = clientTotal > 0 ? Math.round((clientOp / clientTotal) * 100) : 100;
+
+    let ringColor = 'var(--green, #10b981)';
+    if (clientAvailability < 80) ringColor = 'var(--red, #ef4444)';
+    else if (clientAvailability < 100) ringColor = 'var(--orange, #E8820C)';
+
+    html += `
+      <div style="background: var(--bg-hover); padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border); display: flex; align-items: center; gap: 1.5rem; margin-top: 1.5rem;">
+        <div style="width: 64px; height: 64px; border-radius: 50%; background: conic-gradient(${ringColor} 0% ${clientAvailability}%, var(--bg-body, #1f2937) ${clientAvailability}% 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative;">
+          <div style="width: 52px; height: 52px; border-radius: 50%; background: var(--bg-card, #111827); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: var(--text-primary);">
+            <span>${clientAvailability}%</span>
+            <span style="font-size:0.55rem; color:var(--text-muted); font-weight:normal;">DISP</span>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; letter-spacing:0.5px;">Disponibilidad de la Flota</div>
+          <div style="font-size:1.1rem; font-weight:700; color:var(--text-primary); margin-top:0.15rem;">${clientOp} / ${clientTotal} Equipos Operativos</div>
+          <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.1rem;">
+            ${clientMaint > 0 ? `Hay ${clientMaint} equipo(s) fuera de servicio por mantenimiento activo.` : 'Todos los equipos del cliente operan normalmente.'}
+          </div>
+        </div>
+      </div>
+    `;
+
     html += `
       <div style="margin-top: 1.5rem;">
         <h3 style="font-size:1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);"><i data-lucide="settings-2" style="width:18px;height:18px;color:var(--text-muted);"></i> Maquinaria Registrada</h3>
