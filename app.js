@@ -13662,6 +13662,8 @@ function actualizarMapaMaquinaria(filteredData) {
   let bounds = [];
   let plotted = 0;
   
+  const groups = {};
+  
   filteredData.forEach(m => {
     // Buscar Latitud y Longitud en customData
     let lat = null, lng = null;
@@ -13679,41 +13681,85 @@ function actualizarMapaMaquinaria(filteredData) {
     if (!lng && m.longitud) lng = parseFloat(m.longitud);
     
     if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
-      const logoPath = getLogoMarca(m.marca);
-      
-      const customIcon = L.divIcon({
-        className: 'custom-map-pin',
-        html: `
-          <div style="background:white; border-radius:50%; padding:3px; box-shadow:0 3px 6px rgba(0,0,0,0.3); width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:2px solid var(--accent); position:relative; z-index:2;">
-            <img src="${logoPath}" style="width:100%; height:100%; object-fit:contain; border-radius:50%;" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1000/1000109.png'"/>
-          </div>
-          <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid var(--accent); position:absolute; bottom:-7px; left:50%; transform:translateX(-50%); z-index:1;"></div>
-        `,
-        iconSize: [42, 50],
-        iconAnchor: [21, 50],
-        popupAnchor: [0, -50]
-      });
+      const key = `${lat.toFixed(6)}_${lng.toFixed(6)}`;
+      if (!groups[key]) {
+        groups[key] = {
+          lat,
+          lng,
+          maquinas: []
+        };
+      }
+      groups[key].maquinas.push(m);
+    }
+  });
+  
+  Object.values(groups).forEach(g => {
+    const mainMaq = g.maquinas[0];
+    const count = g.maquinas.length;
+    const logoPath = getLogoMarca(mainMaq.marca);
+    
+    const badgeHtml = count > 1 ? `
+      <div style="position:absolute; top:-5px; right:-5px; background:var(--red, #ef4444); color:white; border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:0.65rem; font-weight:bold; border:1.5px solid white; z-index:10;">
+        ${count}
+      </div>
+    ` : '';
+    
+    const customIcon = L.divIcon({
+      className: 'custom-map-pin',
+      html: `
+        <div style="background:white; border-radius:50%; padding:3px; box-shadow:0 3px 6px rgba(0,0,0,0.3); width:36px; height:36px; display:flex; align-items:center; justify-content:center; border:2px solid var(--accent); position:relative; z-index:2;">
+          <img src="${logoPath}" style="width:100%; height:100%; object-fit:contain; border-radius:50%;" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1000/1000109.png'"/>
+          ${badgeHtml}
+        </div>
+        <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid var(--accent); position:absolute; bottom:-7px; left:50%; transform:translateX(-50%); z-index:1;"></div>
+      `,
+      iconSize: [42, 50],
+      iconAnchor: [21, 50],
+      popupAnchor: [0, -50]
+    });
 
-      const marker = L.marker([lat, lng], { icon: customIcon }).bindPopup(`
-        <div style="font-family:'Inter',sans-serif; text-align:center;">
-          <div style="font-weight:600; font-size:0.9rem;">${m.modelo}</div>
-          <div style="font-size:0.75rem; color:#666;">SN: ${m.serie}</div>
+    let popupContentHtml = `<div style="font-family:'Inter',sans-serif; min-width:200px;">`;
+    if (count === 1) {
+      popupContentHtml += `
+        <div style="text-align:center;">
+          <div style="font-weight:600; font-size:0.9rem;">${mainMaq.modelo}</div>
+          <div style="font-size:0.75rem; color:#666;">SN: ${mainMaq.serie}</div>
           <div style="margin-top:0.4rem; padding-top:0.4rem; border-top:1px solid #ddd; font-size:0.8rem;">
-            <strong>${m.cliente}</strong><br>
-            ${m.ubicacion !== 'N/A' ? m.ubicacion : ''}
+            <strong>${mainMaq.cliente}</strong><br>
+            ${mainMaq.ubicacion !== 'N/A' ? mainMaq.ubicacion : ''}
           </div>
         </div>
-      `);
-      
-      marker.on('dblclick', function() {
-        maqMap.flyTo([lat, lng], 18, { animate: true, duration: 1.5 });
-      });
-
-      marker.addTo(maqMap);
-      maqMapMarkers.push(marker);
-      bounds.push([lat, lng]);
-      plotted++;
+      `;
+    } else {
+      popupContentHtml += `
+        <div style="font-weight:700; font-size:0.85rem; border-bottom:1px solid #ddd; padding-bottom:0.3rem; margin-bottom:0.4rem; color:var(--accent);">
+          ${count} Máquinas en este Sitio
+        </div>
+        <div style="max-height:150px; overflow-y:auto; display:flex; flex-direction:column; gap:0.4rem; padding-right:5px; margin-bottom:0.4rem;">
+          ${g.maquinas.map(m => `
+            <div style="font-size:0.78rem; border-bottom:1px dashed #eee; padding-bottom:0.25rem;">
+              <strong style="color:var(--text-primary);">${m.modelo}</strong> <span style="font-size:0.7rem; color:#777;">(SN: ${m.serie})</span>
+            </div>
+          `).join('')}
+        </div>
+        <div style="margin-top:0.4rem; font-size:0.75rem; color:#555; border-top:1px solid #ddd; padding-top:0.4rem;">
+          <strong>Cliente:</strong> ${mainMaq.cliente}<br>
+          ${mainMaq.ubicacion !== 'N/A' ? `<strong>Ubicación:</strong> ${mainMaq.ubicacion}` : ''}
+        </div>
+      `;
     }
+    popupContentHtml += `</div>`;
+
+    const marker = L.marker([g.lat, g.lng], { icon: customIcon }).bindPopup(popupContentHtml);
+    
+    marker.on('dblclick', function() {
+      maqMap.flyTo([g.lat, g.lng], 18, { animate: true, duration: 1.5 });
+    });
+
+    marker.addTo(maqMap);
+    maqMapMarkers.push(marker);
+    bounds.push([g.lat, g.lng]);
+    plotted++;
   });
   
   if (bounds.length > 0) {
@@ -19573,10 +19619,24 @@ function renderCalendario() {
           startVal = `${dateStr}T${b.entrada}:00`;
         }
 
+        let maqSuffix = '';
+        if (o.modelo) {
+          maqSuffix = ` | ${o.modelo}`;
+          if (o.eco || o.maquinaria_id) {
+            const idVal = o.eco || o.maquinaria_id;
+            if (idVal && idVal.length < 15) {
+              maqSuffix += ` (${idVal})`;
+            }
+          }
+        } else if (o.equipo) {
+          const eqClean = o.equipo.split(']')[1] || o.equipo;
+          maqSuffix = ` | ${eqClean.split('(SN')[0].trim()}`;
+        }
+
         const tipoPrefix = isTrasladoEvent ? (b.nota && b.nota.toLowerCase().includes('regreso') ? '🚗 Regreso - ' : '🚗 Ida - ') : (b.tipo && b.tipo !== 'Servicio' ? `${b.tipo.substring(0,3)} | ` : '');
         const ev = {
           id: `bit-${b.id || Math.random()}`,
-          title: `${tipoPrefix}${(b.tecnico || 'Téc').split(' ')[0]} | ${o.cliente}`,
+          title: `${tipoPrefix}${(b.tecnico || 'Téc').split(' ')[0]} | ${o.cliente}${maqSuffix}`,
           start: startVal,
           allDay: isAllDay,
           backgroundColor: eventColor,
@@ -19587,6 +19647,7 @@ function renderCalendario() {
             tecnico: b.tecnico || 'Desconocido',
             cliente: o.cliente,
             ubicacion: o.ubicacion || 'Sin ubicación',
+            equipo: o.equipo || o.modelo || 'N/A',
             nota: b.nota,
             entrada: b.entrada,
             salida: b.salida,
@@ -19646,7 +19707,9 @@ function renderCalendario() {
                   duracion: b.horas_traslado,
                   ordenId: o.id,
                   tecnico: b.tecnico,
-                  cliente: o.cliente
+                  cliente: o.cliente,
+                  ubicacion: o.ubicacion || 'Sin ubicación',
+                  equipo: o.equipo || o.modelo || 'N/A'
                 }
               });
             }
@@ -19714,7 +19777,9 @@ function renderCalendario() {
                   duracion: b.horas_regreso,
                   ordenId: o.id,
                   tecnico: b.tecnico,
-                  cliente: o.cliente
+                  cliente: o.cliente,
+                  ubicacion: o.ubicacion || 'Sin ubicación',
+                  equipo: o.equipo || o.modelo || 'N/A'
                 }
               });
             }
@@ -20392,6 +20457,7 @@ function mostrarPopupBitacora(info) {
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Técnico:</strong> ${p.tecnico}</p>
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Asignado por:</strong> ${asignador}</p>
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Cliente:</strong> ${p.cliente}</p>
+        <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Maquinaria:</strong> ${p.equipo || 'N/A'}</p>
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Ubicación:</strong> ${p.ubicacion}</p>
         ${horasStr}
         ${!isTraslado ? `<div style="margin-top:1rem; padding:1rem; background:var(--bg-body); border-radius:6px; font-size:0.85rem; border:1px solid var(--border); white-space:pre-wrap; line-height:1.5; color:var(--text-secondary); max-height:250px; overflow-y:auto;">${p.nota}</div>` : ''}
