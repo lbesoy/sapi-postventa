@@ -358,7 +358,7 @@ window.migrarOrdenesExistentesMaquinaria = function() {
       serieStr = maq.serie || serieStr;
       marcaStr = maq.marca || marcaStr;
       ecoStr = maq.no_economico || ecoStr;
-      maquinariaId = maq.id || maquinariaId;
+      maquinariaId = maq.id || maq.idInterno || maquinariaId;
     } else {
       if (t.equipo.includes('(SN: ')) {
         const parts = t.equipo.split('(SN: ');
@@ -5993,6 +5993,9 @@ function verDetalleCliente(nombre) {
                   <button class="action-btn" onclick="event.stopPropagation(); abrirModalMoverMaquina('${nombre.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Cambiar Sitio" style="padding:0.25rem; width:auto; height:auto;">
                     <i data-lucide="map-pin" style="width:16px;height:16px;"></i>
                   </button>
+                  <button class="action-btn" onclick="event.stopPropagation(); abrirModalTraspasarMaquina('${nombre.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Traspasar Maquinaria" style="padding:0.25rem; width:auto; height:auto; color:#8b5cf6;">
+                    <i data-lucide="arrow-right-left" style="width:16px;height:16px;"></i>
+                  </button>
                 </div>
               </div>
               <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; font-size:0.85rem; color:var(--text-muted); margin-top:0.25rem;">
@@ -6481,6 +6484,30 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
      }
   });
 
+  // Buscar la máquina correspondiente en base de datos para obtener su bitácora
+  let maquinaOb = maquinariaDb.find(m => m.idInterno === idInterno || m.id === idInterno || m.serie === idInterno);
+  if (!maquinaOb) {
+    for (const c of clientesDb) {
+      if (c.maquinas) {
+        const found = c.maquinas.find(m => m.idInterno === idInterno || m.id === idInterno || m.serie === idInterno);
+        if (found) {
+          maquinaOb = found;
+          break;
+        }
+      }
+    }
+  }
+
+  if (maquinaOb && maquinaOb.customData && Array.isArray(maquinaOb.customData.bitacora)) {
+    maquinaOb.customData.bitacora.forEach(log => {
+      historial.push({
+        tipo: 'bitacora_traspaso',
+        fechaStr: log.fecha,
+        obj: log
+      });
+    });
+  }
+
   historial.sort((a, b) => {
      let d1 = a.fechaStr ? new Date(a.fechaStr) : new Date(0);
      let d2 = b.fechaStr ? new Date(b.fechaStr) : new Date(0);
@@ -6498,6 +6525,8 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
         const tClosed = t.estado === 'Cerrado';
         const allOrdersClosed = ordenes.every(o => (o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado');
         if (tClosed && allOrdersClosed) isClosed = true;
+     } else if (item.tipo === 'bitacora_traspaso') {
+        isClosed = false;
      } else {
         const o = item.obj;
         if ((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado') isClosed = true;
@@ -6506,6 +6535,19 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
      if (isClosed) cerrados.push(item);
      else activos.push(item);
   });
+
+  // Resolve latest horometer
+  let horometroVal = maquinaOb?.horometro || maquinaOb?.customData?.horometro || '';
+  if (!horometroVal) {
+    const snMatch = serie && serie !== 'N/A' ? `(SN: ${serie})` : null;
+    const sortedOrdenes = [...maqOrdenes].sort((a, b) => new Date(b.fecha || 0).getTime() - new Date(a.fecha || 0).getTime());
+    const ordenConHorometro = sortedOrdenes.find(o => o.horometro_real || o.horometro);
+    if (ordenConHorometro) {
+      horometroVal = ordenConHorometro.horometro_real || ordenConHorometro.horometro;
+    }
+  }
+  const horometroStr = horometroVal && horometroVal !== 'N/A' ? `${Number(horometroVal).toLocaleString()} h` : 'N/A';
+  const traspasosCount = historial.filter(item => item.tipo === 'bitacora_traspaso').length;
 
   let html = '';
   
@@ -6517,24 +6559,32 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
         <div style="font-weight:500;">${serie || 'N/A'}</div>
       </div>
       <div>
-        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Último Servicio</div>
-        <div style="font-weight:500;">${ultimaFechaStr}</div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Horómetro Actual</div>
+        <div style="font-weight:600; color:var(--text-primary);">${horometroStr}</div>
       </div>
       <div>
         <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Cliente</div>
         <div style="font-weight:500;">${cliente || 'N/A'}</div>
       </div>
       <div>
-        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Siguiente Servicio</div>
-        <div style="font-weight:600; color:var(--orange);">${siguienteServicioStr}</div>
-      </div>
-      <div>
         <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Sitio / Ubicación</div>
         <div style="font-weight:500;">${ubicacion || 'N/A'}</div>
       </div>
       <div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Último Servicio</div>
+        <div style="font-weight:500;">${ultimaFechaStr}</div>
+      </div>
+      <div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Siguiente Servicio</div>
+        <div style="font-weight:600; color:var(--orange);">${siguienteServicioStr}</div>
+      </div>
+      <div>
         <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Servicios Totales</div>
-        <div style="font-weight:600; color:var(--accent); font-size:1.1rem;">${historial.length}</div>
+        <div style="font-weight:500; color:var(--accent); font-weight:600;">${historial.filter(item => item.tipo !== 'bitacora_traspaso').length}</div>
+      </div>
+      <div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Traspasos Históricos</div>
+        <div style="font-weight:600; color:#8b5cf6;">${traspasosCount}</div>
       </div>
     </div>
   `;
@@ -6571,6 +6621,26 @@ function verServiciosMaquina(idInterno, serie, marca, modelo, cliente, ubicacion
                 <span class="badge badge-${o.estado==='Pendiente'?'pendiente':o.estado==='En Proceso'?'proceso':'completado'}" style="font-size:0.7rem; padding:0.2rem 0.4rem;">${o.estado||'Pendiente'}</span>
              </div>
            `).join('')}
+         </div>
+       `;
+     } else if (item.tipo === 'bitacora_traspaso') {
+       const log = item.obj;
+       return `
+         <div style="border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); margin-bottom:0.5rem; background:rgba(139,92,246,0.05); display:flex; justify-content:space-between; align-items:center;">
+           <div>
+             <div style="display:flex; align-items:center; gap:0.4rem;">
+               <i data-lucide="arrow-right-left" style="width:14px;height:14px;color:#8b5cf6;"></i>
+               <span style="font-weight:600; color:var(--text-primary); font-size:0.9rem;">Traspaso de Empresa</span>
+             </div>
+             <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.3rem;">
+               De <span style="font-weight:600; color:var(--text-primary);">${log.clienteAnterior}</span> a <span style="font-weight:600; color:var(--text-primary);">${log.clienteNuevo}</span>
+               ${log.sitioAnterior && log.sitioNuevo && log.sitioAnterior !== log.sitioNuevo ? `<br/><span style="font-size:0.72rem; color:var(--text-muted);">Sitio: ${log.sitioAnterior} → ${log.sitioNuevo}</span>` : ''}
+             </div>
+             <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">
+               Realizado por <strong>${log.usuario}</strong> el ${formatDateOnly(log.fecha)}
+             </div>
+           </div>
+           <span class="badge" style="background:rgba(139,92,246,0.15); color:#8b5cf6; border:1px solid rgba(139,92,246,0.3); font-size:0.7rem; padding:0.2rem 0.4rem; font-weight:700;">TRASPASO</span>
          </div>
        `;
      } else {
@@ -6805,6 +6875,9 @@ function abrirModalAgregarMaquina() {
   const select = document.getElementById('am-cliente');
   select.removeAttribute('disabled');
   document.getElementById('am-venta').disabled = false;
+  
+  const helperText = document.getElementById('am-cliente-helper-text');
+  if (helperText) helperText.style.display = 'none';
   
   const btnEliminar = document.getElementById('btn-eliminar-maquina');
   if (btnEliminar) btnEliminar.style.display = 'none';
@@ -7090,10 +7163,16 @@ function editarMaquina(clienteNombre, idInterno) {
   }
   
   select.value = clienteNombre;
-  if (currentSession.viewMode === 'superadmin') {
+  const isAllowed = currentSession.viewMode === 'superadmin' || currentSession.viewMode === 'admin';
+  if (isAllowed) {
     select.removeAttribute('disabled');
   } else {
     select.setAttribute('disabled', 'true');
+  }
+
+  const helperText = document.getElementById('am-cliente-helper-text');
+  if (helperText) {
+    helperText.style.display = isAllowed ? 'block' : 'none';
   }
   
   const selectUbicacion = document.getElementById('am-ubicacion-select');
@@ -7118,11 +7197,50 @@ function editarMaquina(clienteNombre, idInterno) {
     selectUbicacion.parentNode.replaceChild(newSelectUbicacion, selectUbicacion);
     
     newSelectUbicacion.addEventListener('change', function() {
+      const latInput = document.getElementById('am-latitud');
+      const lonInput = document.getElementById('am-longitud');
+      
       if (this.value === 'otra') {
         inputOtraUbicacion.style.display = 'block';
         inputOtraUbicacion.focus();
+        if (latInput) latInput.value = '';
+        if (lonInput) lonInput.value = '';
       } else {
         inputOtraUbicacion.style.display = 'none';
+        
+        if (latInput && lonInput) {
+          latInput.value = '';
+          lonInput.value = '';
+          
+          const sitioName = this.value;
+          const sitioDbOb = sitiosDb.find(s => s.nombre === sitioName);
+          let foundLat = null; let foundLon = null;
+          if (sitioDbOb) {
+            foundLat = sitioDbOb.latitud || sitioDbOb.lat;
+            foundLon = sitioDbOb.longitud || sitioDbOb.lon || sitioDbOb.lng;
+            if (sitioDbOb.customData) {
+              const keys = Object.keys(sitioDbOb.customData);
+              const kLat = keys.find(k => k.toLowerCase() === 'latitud' || k.toLowerCase() === 'lat' || k.toLowerCase() === 'u_latitud');
+              const kLon = keys.find(k => k.toLowerCase() === 'longitud' || k.toLowerCase() === 'lon' || k.toLowerCase() === 'lng' || k.toLowerCase() === 'u_longitud');
+              if (kLat && sitioDbOb.customData[kLat] && !foundLat) foundLat = sitioDbOb.customData[kLat];
+              if (kLon && sitioDbOb.customData[kLon] && !foundLon) foundLon = sitioDbOb.customData[kLon];
+            }
+          }
+          
+          if (!foundLat || !foundLon) {
+            const cliObj = clientesDb.find(c => c.nombre === document.getElementById('am-cliente').value);
+            if (cliObj && cliObj.sitios) {
+              const localSitio = cliObj.sitios.find(s => getSitioNombre(s) === sitioName);
+              if (localSitio && typeof localSitio === 'object') {
+                if (localSitio.latitud) foundLat = localSitio.latitud;
+                if (localSitio.longitud) foundLon = localSitio.longitud;
+              }
+            }
+          }
+          
+          if (foundLat) latInput.value = foundLat;
+          if (foundLon) lonInput.value = foundLon;
+        }
       }
     });
     
@@ -7353,6 +7471,35 @@ function guardarNuevaMaquina(e) {
     }
   }
 
+  const isTransfer = editandoMaquinaId && editandoMaquinaCliente && clienteSeleccionado !== editandoMaquinaCliente;
+  let transferEvent = null;
+  if (isTransfer) {
+    const currentUser = usuarios.find(u => u.id === currentSession.userId);
+    const currentUserName = currentUser ? currentUser.nombre : 'Administrador';
+
+    let oldUbicacion = 'Sin Ubicación';
+    let maqOldObj = maquinariaDb.find(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
+    if (!maqOldObj && editandoMaquinaCliente) {
+      const cOld = clientesDb.find(c => c.nombre === editandoMaquinaCliente);
+      if (cOld && cOld.maquinas) {
+        maqOldObj = cOld.maquinas.find(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
+      }
+    }
+    if (maqOldObj) {
+      oldUbicacion = maqOldObj.ubicacion || 'Sin Ubicación';
+    }
+
+    transferEvent = {
+      fecha: new Date().toISOString(),
+      usuario: currentUserName,
+      tipo: 'traspaso',
+      clienteAnterior: editandoMaquinaCliente,
+      clienteNuevo: clienteSeleccionado,
+      sitioAnterior: oldUbicacion,
+      sitioNuevo: ubicacion || 'Sin Ubicación'
+    };
+  }
+
   if (editandoMaquinaId && editandoMaquinaCliente) {
     const maqDbIdx = maquinariaDb.findIndex(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
     
@@ -7383,6 +7530,11 @@ function guardarNuevaMaquina(e) {
         maquinariaDb[maqDbIdx].customData.empresasVinculadas = linkedCompanies;
         maquinariaDb[maqDbIdx].customData.clientesAdicionales = linkedCompanies;
         
+        if (transferEvent) {
+          if (!maquinariaDb[maqDbIdx].customData.bitacora) maquinariaDb[maqDbIdx].customData.bitacora = [];
+          maquinariaDb[maqDbIdx].customData.bitacora.unshift(transferEvent);
+        }
+
         localStorage.setItem('sapi_maquinaria_db', JSON.stringify(maquinariaDb));
         if (window.pushToSupabase) window.pushToSupabase('maquinaria', maquinariaDb[maqDbIdx]);
     } else {
@@ -7403,6 +7555,12 @@ function guardarNuevaMaquina(e) {
             empresasVinculadas: linkedCompanies,
             clientesAdicionales: linkedCompanies
           };
+          
+          if (transferEvent) {
+            if (!maquinaDatos.customData.bitacora) maquinaDatos.customData.bitacora = [];
+            maquinaDatos.customData.bitacora.unshift(transferEvent);
+          }
+
           clienteObj.maquinas.push(maquinaDatos);
           if (window.pushToSupabase) window.pushToSupabase('maquinaria', { ...maquinaDatos, cliente: clienteObj.id });
         } else {
@@ -7421,6 +7579,15 @@ function guardarNuevaMaquina(e) {
             if (window.pushToSupabase) window.pushToSupabase('maquinaria', { ...clienteObj.maquinas[maquinaIdx], cliente: clienteObj.id });
           }
         }
+    }
+
+    if (isTransfer) {
+      if (typeof mostrarNotificacion === 'function') {
+        mostrarNotificacion(`El traspaso de la maquinaria se ha registrado exitosamente.`, 'success');
+      }
+      if (document.getElementById('modal-detalle-cliente-overlay').classList.contains('open')) {
+        verDetalleCliente(editandoMaquinaCliente);
+      }
     }
   } else {
     const idInterno = generarIdInternoMaquina(marca, venta || anio);
@@ -7612,6 +7779,227 @@ function guardarMoverMaquina(e) {
     alert('No se pudo encontrar la máquina para mover.');
   }
 }
+
+// ===== MODAL TRASPASAR MÁQUINA DE CLIENTE (TRASPASO) =====
+window.abrirModalTraspasarMaquina = function(clienteNombre, idInterno) {
+  const form = document.getElementById('form-traspasar-maquina');
+  if (form) form.reset();
+  
+  document.getElementById('tm-idInterno').value = idInterno;
+  document.getElementById('tm-cliente-origen').value = clienteNombre;
+  
+  // Buscar máquina
+  let maquina = null;
+  const clienteObj = clientesDb.find(c => c.nombre === clienteNombre);
+  if (clienteObj && clienteObj.maquinas) {
+    maquina = clienteObj.maquinas.find(m => m.idInterno === idInterno || m.id === idInterno || m.serie === idInterno);
+  }
+  if (!maquina) {
+    maquina = maquinariaDb.find(m => m.idInterno === idInterno || m.id === idInterno || m.serie === idInterno);
+  }
+
+  const infoEl = document.getElementById('tm-maquina-info');
+  const metaEl = document.getElementById('tm-maquina-meta');
+  
+  if (maquina) {
+    if (infoEl) infoEl.textContent = `${maquina.marca || ''} ${maquina.modelo || 'Sin Modelo'}`;
+    if (metaEl) metaEl.textContent = `Serie: ${maquina.serie || 'N/A'} | ID: ${maquina.idInterno || maquina.id || 'N/A'}`;
+  } else {
+    if (infoEl) infoEl.textContent = 'Máquina no encontrada';
+    if (metaEl) metaEl.textContent = `ID: ${idInterno}`;
+  }
+
+  // Cargar clientes en select
+  const selectCliente = document.getElementById('tm-cliente-destino');
+  if (selectCliente) {
+    selectCliente.innerHTML = '<option value="" disabled selected>Selecciona el nuevo cliente...</option>';
+    
+    // Todos los clientes de clientesDb excepto el cliente actual
+    const otrosClientes = clientesDb.filter(c => c.nombre !== clienteNombre).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    otrosClientes.forEach(c => {
+      const option = document.createElement('option');
+      option.value = c.nombre;
+      option.textContent = c.nombre;
+      selectCliente.appendChild(option);
+    });
+  }
+
+  // Limpiar ubicaciones de destino
+  const selectUbi = document.getElementById('tm-ubicacion-destino');
+  if (selectUbi) {
+    selectUbi.innerHTML = '<option value="">Selecciona el sitio de destino...</option>';
+  }
+
+  lucide.createIcons();
+  document.getElementById('modal-traspasar-maquina-overlay').classList.add('open');
+};
+
+window.cerrarModalTraspasarMaquina = function(e) {
+  if (e && e.target !== document.getElementById('modal-traspasar-maquina-overlay')) return;
+  document.getElementById('modal-traspasar-maquina-overlay').classList.remove('open');
+};
+
+window.cargarSitiosParaTraspaso = function(clienteDestinoNombre) {
+  const selectUbi = document.getElementById('tm-ubicacion-destino');
+  if (!selectUbi) return;
+  
+  selectUbi.innerHTML = '<option value="">Selecciona el sitio de destino...</option>';
+  
+  const clienteObj = clientesDb.find(c => c.nombre === clienteDestinoNombre);
+  if (clienteObj) {
+    const sitios = getNombresDeSitiosParaCliente(clienteObj);
+    sitios.forEach(sn => {
+      const option = document.createElement('option');
+      option.value = sn;
+      option.textContent = sn;
+      selectUbi.appendChild(option);
+    });
+  }
+};
+
+window.guardarTraspasarMaquina = function(e) {
+  e.preventDefault();
+  const idInterno = document.getElementById('tm-idInterno').value;
+  const clienteOrigen = document.getElementById('tm-cliente-origen').value;
+  const clienteDestino = document.getElementById('tm-cliente-destino').value;
+  const sitioDestino = document.getElementById('tm-ubicacion-destino').value;
+  
+  if (!clienteDestino || !sitioDestino) {
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion('Por favor completa todos los campos del traspaso.', 'error');
+    } else {
+      alert('Por favor completa todos los campos del traspaso.');
+    }
+    return;
+  }
+
+  // Encontrar el usuario de sesión para la bitácora
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const currentUserName = currentUser ? currentUser.nombre : 'Administrador';
+
+  // Buscar sitio destino id
+  const destClientObj = clientesDb.find(c => c.nombre === clienteDestino);
+  let sitioId = null;
+  if (destClientObj) {
+    const existSitio = sitiosDb.find(s => s.cliente === destClientObj.id && s.nombre === sitioDestino);
+    if (existSitio) {
+      sitioId = existSitio.id;
+    }
+  }
+
+  let maquina = null;
+  let machineFound = false;
+
+  // Evento de traspaso para la bitácora
+  const transferEvent = {
+    fecha: new Date().toISOString(),
+    usuario: currentUserName,
+    tipo: 'traspaso',
+    clienteAnterior: clienteOrigen,
+    clienteNuevo: clienteDestino,
+    sitioAnterior: '',
+    sitioNuevo: sitioDestino
+  };
+
+  // 1. Buscar en maquinariaDb (máquinas de SAP/Supabase)
+  const maqSapIdx = maquinariaDb.findIndex(m => m.id === idInterno || m.idInterno === idInterno || m.serie === idInterno);
+  if (maqSapIdx >= 0) {
+    maquina = maquinariaDb[maqSapIdx];
+    transferEvent.sitioAnterior = maquina.ubicacion || 'Sin Ubicación';
+    
+    // Actualizar datos
+    maquina.cliente = clienteDestino;
+    maquina.ubicacion = sitioDestino;
+    maquina.sitio_id = sitioId;
+
+    if (!maquina.customData) maquina.customData = {};
+    maquina.customData.ubicacion = sitioDestino;
+
+    // Heredar coordenadas del sitio destino si están registradas
+    const sitioDestObj = sitiosDb.find(s => s.nombre === sitioDestino && destClientObj && s.cliente === destClientObj.id);
+    if (sitioDestObj) {
+      maquina.latitud = sitioDestObj.latitud || sitioDestObj.lat || null;
+      maquina.longitud = sitioDestObj.longitud || sitioDestObj.lon || sitioDestObj.lng || null;
+      maquina.customData.latitud = maquina.latitud;
+      maquina.customData.longitud = maquina.longitud;
+    }
+
+    // Inicializar e inyectar en bitácora
+    if (!maquina.customData.bitacora) maquina.customData.bitacora = [];
+    maquina.customData.bitacora.unshift(transferEvent);
+
+    localStorage.setItem('sapi_maquinaria_db', JSON.stringify(maquinariaDb));
+    if (window.pushToSupabase) {
+      window.pushToSupabase('maquinaria', maquina);
+    }
+    machineFound = true;
+  } else {
+    // 2. Buscar en las máquinas manuales del cliente
+    const clienteOrigObj = clientesDb.find(c => c.nombre === clienteOrigen);
+    if (clienteOrigObj && clienteOrigObj.maquinas) {
+      const maqManualIdx = clienteOrigObj.maquinas.findIndex(m => m.idInterno === idInterno || m.id === idInterno || m.serie === idInterno);
+      if (maqManualIdx >= 0) {
+        maquina = { ...clienteOrigObj.maquinas[maqManualIdx] };
+        transferEvent.sitioAnterior = maquina.ubicacion || 'Sin Ubicación';
+        
+        // Remover de cliente origen
+        clienteOrigObj.maquinas.splice(maqManualIdx, 1);
+        if (window.pushToSupabase) {
+          window.pushToSupabase('clientes', clienteOrigObj);
+        }
+
+        // Actualizar datos de máquina
+        maquina.ubicacion = sitioDestino;
+        maquina.sitio_id = sitioId;
+
+        // Heredar coordenadas del sitio destino si están registradas
+        const sitioDestObj = sitiosDb.find(s => s.nombre === sitioDestino && destClientObj && s.cliente === destClientObj.id);
+        if (sitioDestObj) {
+          maquina.latitud = sitioDestObj.latitud || sitioDestObj.lat || null;
+          maquina.longitud = sitioDestObj.longitud || sitioDestObj.lon || sitioDestObj.lng || null;
+        }
+
+        if (!maquina.customData) maquina.customData = {};
+        maquina.customData.ubicacion = sitioDestino;
+
+        // Inicializar e inyectar en bitácora
+        if (!maquina.customData.bitacora) maquina.customData.bitacora = [];
+        maquina.customData.bitacora.unshift(transferEvent);
+
+        // Agregar a cliente destino
+        if (destClientObj) {
+          if (!destClientObj.maquinas) destClientObj.maquinas = [];
+          destClientObj.maquinas.push(maquina);
+          localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+          if (window.pushToSupabase) {
+            window.pushToSupabase('clientes', destClientObj);
+            window.pushToSupabase('maquinaria', { ...maquina, cliente: destClientObj.id });
+          }
+        }
+        machineFound = true;
+      }
+    }
+  }
+
+  if (machineFound) {
+    window.cerrarModalTraspasarMaquina();
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion(`El traspaso de la maquinaria se ha registrado exitosamente.`, 'success');
+    } else {
+      alert(`El traspaso de la maquinaria se ha registrado exitosamente.`);
+    }
+    
+    // Re-renderizar vistas activas
+    if (document.getElementById('modal-detalle-cliente-overlay').classList.contains('open')) {
+      verDetalleCliente(clienteOrigen);
+    }
+    if (document.getElementById('view-maquinaria').classList.contains('active')) {
+      renderMaquinaria();
+    }
+  } else {
+    alert('No se pudo encontrar la máquina para realizar el traspaso.');
+  }
+};
 
 // ===== CONFIG PERMISOS ROLES =====
 function renderPermisosRoles() {
@@ -9150,7 +9538,7 @@ async function guardarOrden(e) {
       if (!maq) maq = maquinariaDb.find(m => matchMaquina(m, cName));
       if (maq) {
         if (maq.marca) marcasArr.push(maq.marca);
-        if (!maquinariaId) maquinariaId = maq.id || null;
+        if (!maquinariaId) maquinariaId = maq.id || maq.idInterno || null;
       }
     });
     marcasVal = [...new Set(marcasArr)].join(', ');
@@ -10344,11 +10732,38 @@ function verDetalle(id) {
           return MARCAS_RENDER[m.toUpperCase()] || m || '—';
         })())} ${field('Modelo', o.modelo)} ${field('Serie', o.serie)}
         ${field('ID Máquina', (() => {
-          const maq = o.maquinaria_id 
-            ? maquinariaDb.find(m => m.id === o.maquinaria_id) 
-            : (o.serie 
-                ? maquinariaDb.find(m => m.serie === o.serie) 
-                : (o.modelo && o.cliente ? maquinariaDb.find(m => m.modelo === o.modelo && m.cliente === o.cliente) : null));
+          let maq = null;
+          if (o.maquinaria_id) {
+            maq = maquinariaDb.find(m => m.id === o.maquinaria_id || m.idInterno === o.maquinaria_id);
+            if (!maq) {
+              clientesDb.forEach(c => {
+                if (c.maquinas) {
+                  const found = c.maquinas.find(m => m.id === o.maquinaria_id || m.idInterno === o.maquinaria_id);
+                  if (found) maq = found;
+                }
+              });
+            }
+          } else if (o.serie) {
+            maq = maquinariaDb.find(m => m.serie === o.serie);
+            if (!maq) {
+              clientesDb.forEach(c => {
+                if (c.maquinas) {
+                  const found = c.maquinas.find(m => m.serie === o.serie);
+                  if (found) maq = found;
+                }
+              });
+            }
+          } else if (o.modelo && o.cliente) {
+            maq = maquinariaDb.find(m => m.modelo === o.modelo && m.cliente === o.cliente);
+            if (!maq) {
+              clientesDb.forEach(c => {
+                if (c.maquinas && c.nombre === o.cliente) {
+                  const found = c.maquinas.find(m => m.modelo === o.modelo);
+                  if (found) maq = found;
+                }
+              });
+            }
+          }
           return maq && (maq.idInterno || maq.id) ? `<span style="font-family:monospace; font-weight:600; color:var(--accent); background:var(--blue-light); padding:0.15rem 0.4rem; border-radius:4px; border:1px solid rgba(232, 133, 10, 0.3);">${maq.idInterno || maq.id}</span>` : '—';
         })())}
         ${field('Técnico', o.tecnico)} ${field('Ticket Soporte', (() => { const t = tickets.find(x => x.id === o.soporte); return t ? (t.folio || t.id.slice(0,8)) : o.soporte || null; })())}
@@ -12770,6 +13185,27 @@ function renderMaquinaria() {
       const isLinked = Array.isArray(linked) && linked.some(c => String(c).toLowerCase().trim() === nombreEmpresaLogged);
       if (mcli !== nombreEmpresaLogged && !isLinked) return;
     }
+
+    // Resolve latest horometer
+    let horometroVal = m.horometro || m.customData?.horometro || '';
+    if (!horometroVal) {
+      const snMatch = m.serie && m.serie !== 'N/A' ? `(SN: ${m.serie})` : null;
+      const maqOrdenes = ordenes.filter(o => 
+        o.maquina === m.idInterno || 
+        (m.serie && m.serie !== 'N/A' && o.maquina === m.serie) || 
+        o.serie === m.idInterno || 
+        (m.serie && m.serie !== 'N/A' && o.serie === m.serie) || 
+        (snMatch && o.equipo && o.equipo.includes(snMatch)) || 
+        (o.equipo && o.equipo.includes(m.idInterno)) ||
+        (o.equipo && o.equipo === m.idInterno)
+      );
+      const sortedOrdenes = [...maqOrdenes].sort((a, b) => new Date(b.fecha || 0).getTime() - new Date(a.fecha || 0).getTime());
+      const ordenConHorometro = sortedOrdenes.find(o => o.horometro_real || o.horometro);
+      if (ordenConHorometro) {
+        horometroVal = ordenConHorometro.horometro_real || ordenConHorometro.horometro;
+      }
+    }
+
     allMachines.push({
       cliente: m.cliente || 'N/A',
       idInterno: m.idInterno || m.id || m.serie || 'N/A',
@@ -12780,6 +13216,7 @@ function renderMaquinaria() {
       serie: m.serie || 'N/A',
       numeroEconomico: m.numeroEconomico || m.customData?.numeroEconomico || 'N/A',
       numeroMotor: m.numeroMotor || m.customData?.numeroMotor || 'N/A',
+      horometro: horometroVal || 'N/A',
       anio: m.anio || 'N/A',
       venta: m.venta || m.customData?.venta || '',
       ubicacion: m.ubicacion || m.customData?.ubicacion || m.cliente || 'N/A',
@@ -12798,6 +13235,26 @@ function renderMaquinaria() {
         
         if (isEmpresa && String(c.nombre).toLowerCase().trim() !== nombreEmpresaLogged && !isLinked) return; // Filtro de seguridad
         
+        // Resolve latest horometer
+        let horometroVal = m.horometro || m.customData?.horometro || '';
+        if (!horometroVal) {
+          const snMatch = m.serie && m.serie !== 'N/A' ? `(SN: ${m.serie})` : null;
+          const maqOrdenes = ordenes.filter(o => 
+            o.maquina === m.idInterno || 
+            (m.serie && m.serie !== 'N/A' && o.maquina === m.serie) || 
+            o.serie === m.idInterno || 
+            (m.serie && m.serie !== 'N/A' && o.serie === m.serie) || 
+            (snMatch && o.equipo && o.equipo.includes(snMatch)) || 
+            (o.equipo && o.equipo.includes(m.idInterno)) ||
+            (o.equipo && o.equipo === m.idInterno)
+          );
+          const sortedOrdenes = [...maqOrdenes].sort((a, b) => new Date(b.fecha || 0).getTime() - new Date(a.fecha || 0).getTime());
+          const ordenConHorometro = sortedOrdenes.find(o => o.horometro_real || o.horometro);
+          if (ordenConHorometro) {
+            horometroVal = ordenConHorometro.horometro_real || ordenConHorometro.horometro;
+          }
+        }
+
         // En base a que la maquinaria es 100% manual y no viene de SAP,
         // no ocultamos por serie duplicada para evitar que pruebas o errores de capa 8
         // hagan pensar al usuario que la máquina se borró.
@@ -12814,6 +13271,7 @@ function renderMaquinaria() {
               serie: m.serie || 'N/A',
               numeroEconomico: m.numeroEconomico || 'N/A',
               numeroMotor: m.numeroMotor || 'N/A',
+              horometro: horometroVal || 'N/A',
               anio: m.anio || 'N/A',
               venta: m.venta || '',
               ubicacion: m.ubicacion || 'N/A',
@@ -12870,9 +13328,9 @@ function renderMaquinaria() {
       let valA = a[currentMaqSortCol] || '';
       let valB = b[currentMaqSortCol] || '';
       
-      if (currentMaqSortCol === 'anio') {
-        valA = parseInt(valA) || 0;
-        valB = parseInt(valB) || 0;
+      if (currentMaqSortCol === 'anio' || currentMaqSortCol === 'horometro') {
+        valA = parseFloat(valA) || 0;
+        valB = parseFloat(valB) || 0;
         return currentMaqSortDir === 'asc' ? valA - valB : valB - valA;
       } else {
         valA = valA.toString().toLowerCase();
@@ -12885,7 +13343,7 @@ function renderMaquinaria() {
   }
 
   // Actualizar iconos rehaciendo las etiquetas <i>
-  ['tipo', 'marca', 'modelo', 'serie', 'numeroEconomico', 'numeroMotor', 'anio', 'cliente'].forEach(col => {
+  ['tipo', 'marca', 'modelo', 'serie', 'numeroEconomico', 'numeroMotor', 'horometro', 'anio', 'cliente'].forEach(col => {
     const icon = document.getElementById('sort-icon-' + col);
     if (icon) {
       const isCurrent = currentMaqSortCol === col;
@@ -12913,7 +13371,7 @@ function renderMaquinaria() {
   }
 
   if (filtered.length === 0) {
-    const colspan = (isEmpresa ? 8 : 9) + (configData.mappings?.maquinaria?.customCols?.length || 0);
+    const colspan = (isEmpresa ? 10 : 11) + (configData.mappings?.maquinaria?.customCols?.length || 0);
     body.innerHTML = `<tr><td colspan="${colspan}" class="empty-state">No se encontró maquinaria.</td></tr>`;
     actualizarMapaMaquinaria(filtered);
     return;
@@ -12942,6 +13400,7 @@ function renderMaquinaria() {
       <td data-label="Serie">${m.serie}</td>
       <td data-label="No. Económico">${m.numeroEconomico && m.numeroEconomico !== 'N/A' ? m.numeroEconomico : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}</td>
       <td data-label="No. Motor">${m.numeroMotor && m.numeroMotor !== 'N/A' ? m.numeroMotor : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}</td>
+      <td data-label="Horómetro">${m.horometro && m.horometro !== 'N/A' ? `${Number(m.horometro).toLocaleString()} h` : '<span style="font-size:0.85rem; color:var(--text-muted);">N/A</span>'}</td>
       <td data-label="Año">${m.anio}</td>
       <td data-label="Cliente / Ubicación">
         <div style="font-weight:500;">${m.cliente}</div>
@@ -12966,6 +13425,9 @@ function renderMaquinaria() {
           </button>
           <button class="action-btn" onclick="event.stopPropagation(); abrirModalMoverMaquina('${m.cliente.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Mover de Sitio">
             <i data-lucide="map-pin"></i>
+          </button>
+          <button class="action-btn" onclick="event.stopPropagation(); abrirModalTraspasarMaquina('${m.cliente.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Traspasar Maquinaria" style="color:#8b5cf6;">
+            <i data-lucide="arrow-right-left"></i>
           </button>
           ` : ''}
         </div>
@@ -13471,7 +13933,6 @@ function renderRefacciones(resetPage = false) {
   lucide.createIcons();
 }
 
-
 function renderSitios() {
   const body = document.getElementById('tabla-body-sitios');
   if (!body) return;
@@ -13481,7 +13942,7 @@ function renderSitios() {
   const isAdmin = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
   
   if (!isEmpresa && !isAdmin) {
-    body.innerHTML = `<tr><td colspan="5" class="empty-state">No tienes permisos para ver Sitios.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="empty-state">No tienes permisos para ver Sitios.</td></tr>`;
     return;
   }
   
@@ -13498,8 +13959,71 @@ function renderSitios() {
     sitiosList = sitios;
   }
   
+  // 1. Aplicar filtro de búsqueda
+  const q = (document.getElementById('search-sitios')?.value || '').toLowerCase().trim();
+  if (q) {
+    sitiosList = sitiosList.filter(s => {
+      const isObj = typeof s === 'object' && s !== null;
+      const sNombre = (isObj ? s.nombre : s || '').toLowerCase();
+      const sCp = (isObj && s.cp ? s.cp : '').toLowerCase();
+      const sCiudad = (isObj && s.ciudad ? s.ciudad : '').toLowerCase();
+      const sEstado = (isObj && s.estado ? s.estado : '').toLowerCase();
+      const sDireccion = (isObj && s.direccion ? s.direccion : '').toLowerCase();
+      
+      let sClienteNombre = '';
+      if (isObj && s.cliente) {
+        sClienteNombre = s.cliente.toLowerCase();
+        const cliFound = (clientesDb || []).find(c => c.id === s.cliente || c.idInterno === s.cliente || c.rfc === s.cliente);
+        if (cliFound && cliFound.nombre) sClienteNombre += ' ' + cliFound.nombre.toLowerCase();
+      }
+
+      return sNombre.includes(q) || sCp.includes(q) || sCiudad.includes(q) || sEstado.includes(q) || sDireccion.includes(q) || sClienteNombre.includes(q);
+    });
+  }
+
+  // 2. Aplicar ordenamiento
+  const sortVal = document.getElementById('sort-sitios')?.value || 'nombre-asc';
+  sitiosList.sort((a, b) => {
+    const isObjA = typeof a === 'object' && a !== null;
+    const isObjB = typeof b === 'object' && b !== null;
+    
+    const valA_nombre = (isObjA ? a.nombre : a || '').toString().toLowerCase().trim();
+    const valB_nombre = (isObjB ? b.nombre : b || '').toString().toLowerCase().trim();
+
+    // Obtener nombres de clientes para ordenar si aplica
+    let valA_cliente = '';
+    if (isObjA && a.cliente) {
+      const cli = (clientesDb || []).find(c => c.id === a.cliente || c.idInterno === a.cliente || c.nombre === a.cliente);
+      valA_cliente = cli ? cli.nombre.toLowerCase() : a.cliente.toLowerCase();
+    }
+    let valB_cliente = '';
+    if (isObjB && b.cliente) {
+      const cli = (clientesDb || []).find(c => c.id === b.cliente || c.idInterno === b.cliente || c.nombre === b.cliente);
+      valB_cliente = cli ? cli.nombre.toLowerCase() : b.cliente.toLowerCase();
+    }
+
+    const valA_cp = (isObjA && a.cp ? a.cp : '').toString().toLowerCase().trim();
+    const valB_cp = (isObjB && b.cp ? b.cp : '').toString().toLowerCase().trim();
+
+    if (sortVal === 'nombre-asc') return valA_nombre.localeCompare(valB_nombre);
+    if (sortVal === 'nombre-desc') return valB_nombre.localeCompare(valA_nombre);
+    if (sortVal === 'cliente-asc') return valA_cliente.localeCompare(valB_cliente);
+    if (sortVal === 'cliente-desc') return valB_cliente.localeCompare(valA_cliente);
+    if (sortVal === 'cp-asc') {
+      const cpA = parseInt(valA_cp, 10) || 0;
+      const cpB = parseInt(valB_cp, 10) || 0;
+      return cpA - cpB;
+    }
+    if (sortVal === 'cp-desc') {
+      const cpA = parseInt(valA_cp, 10) || 0;
+      const cpB = parseInt(valB_cp, 10) || 0;
+      return cpB - cpA;
+    }
+    return 0;
+  });
+
   if (!sitiosList || sitiosList.length === 0) {
-    body.innerHTML = `<tr><td colspan="5" class="empty-state">No se encontraron sitios registrados.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="empty-state">No se encontraron sitios que coincidan con la búsqueda.</td></tr>`;
     return;
   }
   
@@ -13511,7 +14035,6 @@ function renderSitios() {
     const sEstado = isObj && s.estado ? s.estado : '';
     const sDireccion = isObj && s.direccion ? s.direccion : '';
     
-    // Si es admin, mostramos el ID y el BPCode (cliente)
     const sId = isObj && s.id ? s.id : '-';
     let sCliente = isObj && s.cliente ? s.cliente : '-';
     
@@ -13539,6 +14062,39 @@ function renderSitios() {
 
     const sLoc = [ciudadFinal, estadoFinal].filter(Boolean).join(', ') || 'N/A';
 
+    let clientNames = [];
+    if (isObj && s.cliente) {
+      clientNames.push(s.cliente);
+      const cliObj = (clientesDb || []).find(c => c.id === s.cliente || c.idInterno === s.cliente || c.nombre === s.cliente);
+      if (cliObj) {
+        clientNames.push(cliObj.nombre);
+        if (cliObj.id) clientNames.push(cliObj.id);
+      }
+    }
+    const sIdVal = isObj && s.id ? s.id : null;
+    const maquinasSitio = (maquinariaDb || []).filter(m => {
+      if (sIdVal && m.sitio_id && m.sitio_id === sIdVal) return true;
+      const matchesName = sNombre && (m.ubicacion === sNombre || m.sitio === sNombre);
+      if (!matchesName) return false;
+      if (clientNames.length > 0) {
+        return clientNames.includes(m.cliente);
+      }
+      return true;
+    });
+
+    let maquinasDisplay = '<span style="color:var(--text-muted); font-size:0.85rem;">—</span>';
+    if (maquinasSitio.length > 0) {
+      maquinasDisplay = `<div style="display:flex; flex-wrap:wrap; gap:4px; max-width:250px;">` +
+        maquinasSitio.map(m => {
+          const cleanId = m.idInterno || m.id || '';
+          const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+          const prefix = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+          const name = `${prefix}${m.marca || ''} ${m.modelo || ''}`.trim();
+          return `<span class="badge" style="background:rgba(232, 133, 10, 0.12); color:var(--accent); border:1px solid rgba(232, 133, 10, 0.2); font-weight:600; font-size:0.75rem; padding:0.15rem 0.4rem; border-radius:4px;" title="Serie: ${m.serie || 'N/A'}">${name}</span>`;
+        }).join('') +
+      `</div>`;
+    }
+
     return `
     <tr>
       <td style="font-weight:500;">
@@ -13554,6 +14110,7 @@ function renderSitios() {
       <td>${sClienteDisplay}</td>
       <td><span class="badge" style="background:var(--bg-hover);color:var(--text-muted);">${cpFinal}</span></td>
       <td><span style="font-size:0.9rem; color:var(--text-secondary);">${sLoc}</span></td>
+      <td>${maquinasDisplay}</td>
       <td>
         ${!isAdmin ? `<button class="action-btn" onclick="renombrarSitioEmpresa('${idx}')" title="Renombrar Sitio"><i data-lucide="pencil"></i></button>` : `<button class="action-btn" onclick="abrirDetalleSitio('${sNombre.replace(/'/g, "\\'")}')" title="Ver detalles"><i data-lucide="eye"></i></button>`}
       </td>
@@ -15421,6 +15978,173 @@ window.syncSapCotizacionManual = function(ticketId = null) {
   sincronizarConGitHub('cotizaciones', btn);
 };
 
+// ===== INTERNAL NOTIFICATION BELL =====
+window.toggleInternalNotificationDropdown = function(event) {
+  if (event) event.stopPropagation();
+  const dd = document.getElementById('internal-notification-dropdown');
+  if (dd) {
+    const isHidden = dd.style.display === 'none' || dd.style.display === '';
+    dd.style.display = isHidden ? 'block' : 'none';
+  }
+};
+
+document.addEventListener('click', function(e) {
+  const dd = document.getElementById('internal-notification-dropdown');
+  const bell = document.getElementById('internal-notification-bell-container');
+  if (dd && bell && !bell.contains(e.target)) {
+    dd.style.display = 'none';
+  }
+});
+
+window.generarNotificacionInterna = function(ticket, asignadoAnterior, asignadoNuevo) {
+  const normOld = String(asignadoAnterior || '').trim().toLowerCase();
+  const normNew = String(asignadoNuevo || '').trim().toLowerCase();
+  if (normOld === normNew) return; // Sin cambios reales
+
+  let allNotifications = [];
+  try {
+    allNotifications = JSON.parse(localStorage.getItem('sapi_internal_notifications')) || [];
+  } catch(e) {}
+
+  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const currentUserName = currentUser ? currentUser.nombre : 'Usuario';
+
+  const newNotif = {
+    id: crypto.randomUUID(),
+    ticketId: ticket.id,
+    ticketFolio: ticket.folio || '',
+    ticketAsunto: ticket.asunto || '',
+    fecha: new Date().toISOString(),
+    usuario: currentUserName,
+    asignadoAnterior: asignadoAnterior || 'Sin asignar',
+    asignadoNuevo: asignadoNuevo || 'Sin asignar',
+    leida: false,
+    esPrueba: !!ticket.esPrueba
+  };
+
+  allNotifications.unshift(newNotif);
+  localStorage.setItem('sapi_internal_notifications', JSON.stringify(allNotifications));
+  
+  if (window.updateInternalNotificationBell) {
+    window.updateInternalNotificationBell();
+  }
+};
+
+window.updateInternalNotificationBell = function() {
+  const bell = document.getElementById('internal-notification-bell-container');
+  if (bell) {
+    if (currentSession.viewMode === 'tecnico') {
+      bell.style.display = 'none';
+      return;
+    } else {
+      bell.style.display = 'flex';
+    }
+  }
+
+  const badge = document.getElementById('internal-notification-badge');
+  const dropCount = document.getElementById('internal-notification-dropdown-count');
+  const container = document.getElementById('internal-notification-items-container');
+
+  let allNotifications = [];
+  try {
+    allNotifications = JSON.parse(localStorage.getItem('sapi_internal_notifications')) || [];
+  } catch(e) {}
+
+  const isTest = isTestModeActive();
+  const filtered = allNotifications.filter(n => !!n.esPrueba === isTest);
+  const unreadCount = filtered.filter(n => !n.leida).length;
+
+  if (badge) {
+    if (unreadCount > 0) {
+      badge.textContent = unreadCount;
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  if (dropCount) {
+    dropCount.textContent = unreadCount;
+  }
+
+  if (container) {
+    if (filtered.length === 0) {
+      container.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:0.75rem; padding:1.5rem; font-style:italic;">No hay notificaciones internas.</div>`;
+    } else {
+      let html = '';
+      filtered.forEach(n => {
+        const fechaFormat = n.fecha ? new Date(n.fecha).toLocaleDateString('es-MX', { day:'numeric', month:'short', hour:'numeric', minute:'2-digit' }) : 'Reciente';
+        const isUnread = !n.leida;
+        
+        html += `
+          <div style="padding:0.6rem 1rem; border-bottom:1px solid rgba(255,255,255,0.02); display:flex; flex-direction:column; gap:0.2rem; cursor:pointer; transition:background 0.2s; position:relative; ${isUnread ? 'background:rgba(139,92,246,0.03);' : ''}" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='${isUnread ? 'rgba(139,92,246,0.03)' : 'transparent'}'" onclick="window.verTicketYMarcarInternaLeida('${n.ticketId}', '${n.id}')">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:700; font-size:0.78rem; color:var(--text-primary);">${n.ticketFolio || 'Ticket'}</span>
+              <span style="font-size:0.65rem; color:var(--text-muted);">${fechaFormat}</span>
+            </div>
+            <span style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${n.ticketAsunto || 'Sin asunto'}</span>
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:0.1rem; line-height:1.2;">
+              Responsable: <span style="color:var(--text-primary); font-weight:500;">${n.asignadoAnterior}</span> → <span style="color:#8b5cf6; font-weight:700;">${n.asignadoNuevo}</span>
+            </div>
+            <div style="font-size:0.65rem; color:var(--text-muted); margin-top:0.1rem;">
+              Modificado por: <strong>${n.usuario}</strong>
+            </div>
+            ${isUnread ? `<span style="position:absolute; right:8px; bottom:8px; width:6px; height:6px; border-radius:50%; background:#8b5cf6;"></span>` : ''}
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+  }
+};
+
+window.verTicketYMarcarInternaLeida = function(ticketId, notificationId) {
+  // Marcar como leída
+  let allNotifications = [];
+  try {
+    allNotifications = JSON.parse(localStorage.getItem('sapi_internal_notifications')) || [];
+  } catch(e) {}
+
+  allNotifications = allNotifications.map(n => {
+    if (n.id === notificationId) n.leida = true;
+    return n;
+  });
+  localStorage.setItem('sapi_internal_notifications', JSON.stringify(allNotifications));
+
+  window.updateInternalNotificationBell();
+
+  // Cerrar dropdown
+  const dd = document.getElementById('internal-notification-dropdown');
+  if (dd) dd.style.display = 'none';
+
+  // Ir a pestaña de tickets
+  const navItem = document.querySelector('.nav-item[data-view="tickets"]');
+  if (navItem) navItem.click();
+
+  // Abrir detalle del ticket
+  if (typeof verDetalleTicket === 'function') {
+    verDetalleTicket(ticketId);
+  } else {
+    abrirTicket(ticketId);
+  }
+};
+
+window.marcarTodasInternasLeidas = function() {
+  let allNotifications = [];
+  try {
+    allNotifications = JSON.parse(localStorage.getItem('sapi_internal_notifications')) || [];
+  } catch(e) {}
+
+  const isTest = isTestModeActive();
+  allNotifications = allNotifications.map(n => {
+    if (!!n.esPrueba === isTest) n.leida = true;
+    return n;
+  });
+  localStorage.setItem('sapi_internal_notifications', JSON.stringify(allNotifications));
+
+  window.updateInternalNotificationBell();
+};
+
 // ===== NOTIFICATION BELL (TICKETS SIN ASIGNAR) =====
 window.toggleNotificationDropdown = function(event) {
   if (event) event.stopPropagation();
@@ -15440,6 +16164,10 @@ document.addEventListener('click', function(e) {
 });
 
 window.updateNotificationBell = function() {
+  if (window.updateInternalNotificationBell) {
+    try { window.updateInternalNotificationBell(); } catch(e) {}
+  }
+
   const bell = document.getElementById('notification-bell-container');
   if (bell) {
     if (currentSession.viewMode === 'tecnico') {
@@ -16888,6 +17616,16 @@ async function guardarTicket(e) {
       }
     }
   }
+
+  // Detectar cambio de responsable para notificaciones internas
+  const oldAsignado = t_existente ? (t_existente.asignado || 'Sin asignar') : 'Sin asignar';
+  const newAsignado = ticket.asignado || 'Sin asignar';
+  if (String(oldAsignado).trim().toLowerCase() !== String(newAsignado).trim().toLowerCase()) {
+    if (typeof window.generarNotificacionInterna === 'function') {
+      window.generarNotificacionInterna(ticket, oldAsignado, newAsignado);
+    }
+  }
+
   if (editandoTicketId) {
     tickets = tickets.map(t => t.id === editandoTicketId ? ticket : t);
   } else {
@@ -16956,7 +17694,7 @@ async function guardarTicket(e) {
             if (maq.serie) seriesArr.push(maq.serie);
             if (maq.marca) marcasArr.push(maq.marca);
             if (maq.no_economico) ecosArr.push(maq.no_economico);
-            if (!maquinariaId) maquinariaId = maq.id || null;
+            if (!maquinariaId) maquinariaId = maq.id || maq.idInterno || null;
           } else {
             if (eqName.includes('(SN: ')) {
               const parts = eqName.split('(SN: ');
@@ -17980,7 +18718,7 @@ async function cerrarCotizacionTicket(id) {
           serieStr = maq.serie || '';
           marcaStr = maq.marca || '';
           ecoStr = maq.no_economico || '';
-          maquinariaId = maq.id || null;
+          maquinariaId = maq.id || maq.idInterno || null;
         } else {
           if (t.equipo.includes('(SN: ')) {
             const parts = t.equipo.split('(SN: ');
@@ -27564,7 +28302,7 @@ window.regenerarOrdenesDesdeTickets = async function() {
         serieStr = maq.serie || '';
         marcaStr = maq.marca || '';
         ecoStr = maq.no_economico || '';
-        maquinariaId = maq.id || null;
+        maquinariaId = maq.id || maq.idInterno || null;
       } else {
         if (t.equipo.includes('(SN: ')) {
           const parts = t.equipo.split('(SN: ');

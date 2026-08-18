@@ -66,29 +66,39 @@ function renderLevantamientos() {
   list.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
   
   if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 2rem; color: var(--text-muted);">No hay levantamientos que coincidan con la búsqueda.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: var(--text-muted);">No hay levantamientos que coincidan con la búsqueda.</td></tr>`;
     return;
   }
   
   list.forEach(l => {
     const syncIcon = (l._synced === false) ? '<i data-lucide="cloud-off" style="width:14px;height:14px;color:var(--warning);margin-left:0.5rem;" title="Pendiente de sincronizar"></i>' : '';
     const tr = document.createElement('tr');
+    
+    let badgeClass = 'badge-pendiente';
+    if (l.estado === 'Completado') {
+      badgeClass = 'badge-completado';
+    } else if (l.estado === 'Realizado') {
+      badgeClass = 'badge-proceso';
+    }
+    
     tr.innerHTML = `
-      <td data-label="Folio" style="font-weight:600; color:var(--text-primary); display:flex; align-items:center;">${l.folio || 'N/A'} ${syncIcon}</td>
+      <td data-label="Acciones" style="white-space:nowrap; width:60px;">
+        <div style="display:flex;gap:0.25rem;">
+          <button class="action-btn" onclick="verDetalleLevantamiento('${l.id}')" title="Ver Detalle"><i data-lucide="eye"></i></button>
+        </div>
+      </td>
+      <td data-label="Folio"><strong>${l.folio || 'N/A'}</strong> ${syncIcon}</td>
       <td data-label="Cliente">${l.cliente || 'No especificado'}</td>
       <td data-label="Sitio">${l.sitio || 'No especificado'}</td>
       <td data-label="Solicitante">${l.solicitante || 'N/A'}</td>
       <td data-label="Asignado A">${l.tecnico_asignado || '-'}</td>
       <td data-label="Fecha Esperada">${l.fecha_esperada ? l.fecha_esperada.substring(0,10) : 'N/A'}</td>
-      <td data-label="Estado">
-        <span style="font-size:0.75rem; font-weight:700; padding:0.25rem 0.6rem; border-radius:999px; ${l.estado === 'Completado' ? 'background:rgba(16, 185, 129, 0.1); color:#10b981;' : (l.estado === 'Realizado' ? 'background:rgba(245, 158, 11, 0.1); color:#f59e0b;' : 'background:rgba(239, 68, 68, 0.1); color:#ef4444;')}">${l.estado || 'Pendiente'}</span>
-      </td>
-      <td data-label="Acciones">
-        <button class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.8rem;" onclick="verDetalleLevantamiento('${l.id}')">Ver Detalle</button>
-      </td>
+      <td data-label="Estado"><span class="badge ${badgeClass}">${l.estado || 'Pendiente'}</span></td>
     `;
     tbody.appendChild(tr);
   });
+  
+  if (window.lucide) window.lucide.createIcons();
   
   // Update badge in sidebar
   const badge = document.getElementById('nav-badge-levantamientos');

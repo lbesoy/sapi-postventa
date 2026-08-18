@@ -180,8 +180,13 @@
         <a href="#" class="nav-item" data-target="sitios">
           <i data-lucide="map-pin"></i> <span>Mis Sitios</span>
         </a>
+        <a href="#" class="nav-item" data-target="envios">
+          <i data-lucide="truck"></i> <span>Envíos</span>
+          <span class="nav-badge visible" style="background:var(--bg-hover); color:var(--text-muted); font-size:0.65rem; border:1px solid var(--border); padding:0.05rem 0.3rem;">Pronto</span>
+        </a>
         <a href="#" class="nav-item" data-target="soporte">
           <i data-lucide="message-square"></i> <span>Soporte</span>
+          <span class="nav-badge" id="nav-badge-soporte-cliente"></span>
         </a>
       </nav>
       <div class="sidebar-footer">
@@ -428,13 +433,15 @@
               <!-- Filtros y Ordenación del Historial -->
               <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem; background:rgba(255,255,255,0.02); border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-sm); align-items:center;">
                 <!-- Filtro de Estado (Botones) -->
-                <div style="display:flex; flex-wrap:wrap; gap:0.25rem;">
-                  <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px;" id="btn-filtro-t-reportado" onclick="filtrarHistorialTickets('reportado')">Reportados <span style="background:rgba(255,255,255,0.15); border-radius:4px; padding:1px 5px; font-size:0.7rem; margin-left:3px; font-weight:700; color:inherit;" id="cnt-tkt-reportado">0</span></button>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:0.35rem; width:100%;">
+                  <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px; display:inline-flex; justify-content:center; align-items:center; gap:0.25rem; white-space:nowrap; width:100%;" id="btn-filtro-t-reportado" onclick="filtrarHistorialTickets('reportado')">Reportados <span style="background:rgba(255,255,255,0.15); border-radius:4px; padding:1px 5px; font-size:0.7rem; margin-left:3px; font-weight:700; color:inherit;" id="cnt-tkt-reportado">0</span></button>
                   <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px; display:none;" id="btn-filtro-t-asignado" onclick="filtrarHistorialTickets('asignado')">Asignados <span style="background:rgba(255,255,255,0.15); border-radius:4px; padding:1px 5px; font-size:0.7rem; margin-left:3px; font-weight:700; color:inherit;" id="cnt-tkt-asignado">0</span></button>
-                  <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px;" id="btn-filtro-t-encurso" onclick="filtrarHistorialTickets('en curso')">En Curso <span style="background:rgba(255,255,255,0.15); border-radius:4px; padding:1px 5px; font-size:0.7rem; margin-left:3px; font-weight:700; color:inherit;" id="cnt-tkt-encurso">0</span></button>
-                  <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px;" id="btn-filtro-t-cotizado" onclick="filtrarHistorialTickets('cotizado')">Cotizados <span style="background:rgba(255,255,255,0.15); border-radius:4px; padding:1px 5px; font-size:0.7rem; margin-left:3px; font-weight:700; color:inherit;" id="cnt-tkt-cotizado">0</span></button>
-                  <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px;" id="btn-filtro-t-cerrado" onclick="filtrarHistorialTickets('cerrado')">Cerrados <span style="background:rgba(255,255,255,0.15); border-radius:4px; padding:1px 5px; font-size:0.7rem; margin-left:3px; font-weight:700; color:inherit;" id="cnt-tkt-cerrado">0</span></button>
-                  <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px;" id="btn-filtro-t-todos" onclick="filtrarHistorialTickets('todos')">Todos <span style="background:rgba(255,255,255,0.15); border-radius:4px; padding:1px 5px; font-size:0.7rem; margin-left:3px; font-weight:700; color:inherit;" id="cnt-tkt-todos">0</span></button>
+                  <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px; display:inline-flex; justify-content:center; align-items:center; gap:0.25rem; white-space:nowrap; width:100%;" id="btn-filtro-t-encurso" onclick="filtrarHistorialTickets('en curso')">En Curso <span style="background:rgba(255,255,255,0.15); border-radius:4px; padding:1px 5px; font-size:0.7rem; margin-left:3px; font-weight:700; color:inherit;" id="cnt-tkt-encurso">0</span></button>
+                  <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px; display:inline-flex; justify-content:center; align-items:center; gap:0.25rem; white-space:nowrap; width:100%;" id="btn-filtro-t-cotizado" onclick="filtrarHistorialTickets('cotizado')">Cotizados <span style="background:rgba(255,255,255,0.15); border-radius:4px; padding:1px 5px; font-size:0.7rem; margin-left:3px; font-weight:700; color:inherit;" id="cnt-tkt-cotizado">0</span></button>
+                  <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px; display:inline-flex; justify-content:center; align-items:center; gap:0.25rem; white-space:nowrap; width:100%;" id="btn-filtro-t-proceso" onclick="filtrarHistorialTickets('proceso')">En Proceso <span style="background:rgba(255,255,255,0.15); border-radius:4px; padding:1px 5px; font-size:0.7rem; margin-left:3px; font-weight:700; color:inherit;" id="cnt-tkt-proceso">0</span></button>
+                  <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px; display:inline-flex; justify-content:center; align-items:center; gap:0.25rem; white-space:nowrap; width:100%;" id="btn-filtro-t-servicio" onclick="filtrarHistorialTickets('servicio')">Orden de Servicio <span style="background:rgba(255,255,255,0.15); border-radius:4px; padding:1px 5px; font-size:0.7rem; margin-left:3px; font-weight:700; color:inherit;" id="cnt-tkt-servicio">0</span></button>
+                  <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px; display:inline-flex; justify-content:center; align-items:center; gap:0.25rem; white-space:nowrap; width:100%;" id="btn-filtro-t-cerrado" onclick="filtrarHistorialTickets('cerrado')">Cerrados <span style="background:rgba(255,255,255,0.15); border-radius:4px; padding:1px 5px; font-size:0.7rem; margin-left:3px; font-weight:700; color:inherit;" id="cnt-tkt-cerrado">0</span></button>
+                  <button class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; border-radius:6px; min-height:32px; display:inline-flex; justify-content:center; align-items:center; gap:0.25rem; white-space:nowrap; width:100%;" id="btn-filtro-t-todos" onclick="filtrarHistorialTickets('todos')">Todos <span style="background:rgba(255,255,255,0.15); border-radius:4px; padding:1px 5px; font-size:0.7rem; margin-left:3px; font-weight:700; color:inherit;" id="cnt-tkt-todos">0</span></button>
                 </div>
                 
                 <!-- Filtro por Prioridad (Dropdown) -->
@@ -623,6 +630,34 @@
               <button type="button" class="btn-primary" onclick="window.enviarMensajeSoporteGeneral()" style="border-radius: 8px; padding: 0 1.5rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem; cursor: pointer;">
                 <i data-lucide="send" style="width: 14px; height: 14px;"></i> Enviar
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. ENVIOS VIEW (PRONTO) -->
+        <div id="view-envios" class="view">
+          <div class="section-card" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:4rem 2rem; text-align:center; min-height:450px;">
+            <div style="background:rgba(232, 130, 12, 0.08); border-radius:50%; padding:2rem; margin-bottom:1.5rem; display:inline-flex; align-items:center; justify-content:center; color:var(--accent);">
+              <i data-lucide="truck" style="width:64px; height:64px;"></i>
+            </div>
+            <h2 class="section-title" style="margin-bottom:0.75rem; font-size:1.6rem; font-weight:800; color:var(--text-primary);">Módulo de Envíos y Logística</h2>
+            <span style="background:var(--accent); color:white; font-size:0.75rem; font-weight:700; padding:0.25rem 0.75rem; border-radius:999px; margin-bottom:1.5rem; display:inline-block;">PRÓXIMAMENTE</span>
+            <p style="font-size:1rem; color:var(--text-secondary); max-width:550px; line-height:1.5; margin:0 auto 2rem;">
+              Estamos desarrollando esta sección para que muy pronto puedas realizar el rastreo en tiempo real de tus pedidos de refacciones, consultar guías de transporte, ver tiempos estimados de entrega y verificar el estado de tus despachos directamente desde tu portal.
+            </p>
+            <div style="display:flex; gap:1rem; flex-wrap:wrap; justify-content:center;">
+              <div style="background:var(--bg-primary); border:1px solid var(--border); padding:1rem 1.5rem; border-radius:8px; display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; color:var(--text-secondary);">
+                <i data-lucide="package" style="width:18px; height:18px; color:var(--accent);"></i>
+                Rastreo de Refacciones
+              </div>
+              <div style="background:var(--bg-primary); border:1px solid var(--border); padding:1rem 1.5rem; border-radius:8px; display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; color:var(--text-secondary);">
+                <i data-lucide="map" style="width:18px; height:18px; color:var(--accent);"></i>
+                Guías de Paquetería
+              </div>
+              <div style="background:var(--bg-primary); border:1px solid var(--border); padding:1rem 1.5rem; border-radius:8px; display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; color:var(--text-secondary);">
+                <i data-lucide="calendar" style="width:18px; height:18px; color:var(--accent);"></i>
+                Fechas Estimadas
+              </div>
             </div>
           </div>
         </div>

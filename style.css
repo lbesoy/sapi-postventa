@@ -464,6 +464,7 @@ body {
   border-radius: var(--radius); padding: 1.25rem 1.5rem;
   display: flex; align-items: center; gap: 1rem;
   transition: var(--transition);
+  min-width: 0;
 }
 .stat-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
 .stat-icon { font-size: 1.5rem; padding: 0.65rem; border-radius: var(--radius-sm); }
@@ -562,7 +563,7 @@ body {
 .card-person {
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 1.25rem;
-  transition: var(--transition);
+  transition: var(--transition); position: relative;
 }
 .card-person:hover { border-color: var(--accent); }
 .card-person-name { font-weight: 600; margin-bottom: 0.3rem; }
@@ -1588,6 +1589,15 @@ body {
 .dashboard-grid.grid-2 {
   grid-template-columns: repeat(2, 1fr);
 }
+.dashboard-grid.grid-6 {
+  grid-template-columns: repeat(6, 1fr);
+}
+
+@media screen and (max-width: 1200px) {
+  .dashboard-grid.grid-6 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
 
 @media screen and (max-width: 1024px) {
   .dashboard-grid.grid-4,
@@ -1721,7 +1731,8 @@ body {
     align-items: center;
   }
 
-  .dashboard-grid.grid-3 {
+  .dashboard-grid.grid-3,
+  .dashboard-grid.grid-6 {
     grid-template-columns: repeat(2, 1fr);
   }
   .dashboard-grid.grid-4,
@@ -1935,7 +1946,8 @@ body {
   .dashboard-grid.grid-2,
   .dashboard-grid.grid-3,
   .dashboard-grid.grid-4,
-  .dashboard-grid.grid-5 {
+  .dashboard-grid.grid-5,
+  .dashboard-grid.grid-6 {
     grid-template-columns: 1fr;
   }
 
@@ -2397,4 +2409,109 @@ body.light-mode .badge-metodo-reembolso { background: rgba(100, 116, 139, 0.08);
 }
 .checkbox-row:hover {
   background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ===== FLEET HEALTH KPI BANNER ===== */
+.fleet-kpi-container {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.fleet-health-section {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex: 1;
+}
+
+.fleet-progress-ring {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: var(--shadow-sm);
+  background: conic-gradient(var(--green) 0% 100%, var(--bg-hover) 100%);
+  flex-shrink: 0;
+}
+
+.fleet-progress-ring::after {
+  content: '';
+  width: 60px;
+  height: 60px;
+  background: var(--bg-secondary);
+  border-radius: 50%;
+  position: absolute;
+}
+
+.fleet-progress-val {
+  position: relative;
+  z-index: 2;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.fleet-progress-val span {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 2px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.fleet-health-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.fleet-health-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.fleet-health-desc {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.fleet-status-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border-left: 1px solid var(--border);
+  padding-left: 1.5rem;
+  min-width: 140px;
+}
+
+.fleet-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.fleet-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
 }

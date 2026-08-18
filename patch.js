@@ -110,39 +110,40 @@ window.verDetallesSincronizacion = function() {
       body.appendChild(list);
     }
 
-    // Agregar offline banner si aplica
+    // Agregar banner de estado de sincronización (Online/Offline)
     const isOffline = !navigator.onLine && !window.isConnectionVerifiedOnline;
-    if (isOffline) {
-      const lastSyncStr = localStorage.getItem('sapi_last_sync_timestamp') || window.lastSyncTimestamp;
-      let lastSyncFormatted = 'Nunca';
-      if (lastSyncStr) {
-        try {
-          const d = new Date(lastSyncStr);
-          lastSyncFormatted = d.toLocaleString('es-MX', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-          });
-        } catch (e) {
-          lastSyncFormatted = lastSyncStr;
-        }
+    const lastSyncStr = localStorage.getItem('sapi_last_sync_timestamp') || window.lastSyncTimestamp;
+    let lastSyncFormatted = 'Nunca';
+    if (lastSyncStr) {
+      try {
+        const d = new Date(lastSyncStr);
+        lastSyncFormatted = d.toLocaleString('es-MX', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+      } catch (e) {
+        lastSyncFormatted = lastSyncStr;
       }
-      
-      const offlineBanner = document.createElement('div');
-      offlineBanner.style.marginBottom = '1.25rem';
-      offlineBanner.style.padding = '0.85rem 1rem';
-      offlineBanner.style.borderRadius = '10px';
-      offlineBanner.style.backgroundColor = 'rgba(232, 130, 12, 0.05)';
-      offlineBanner.style.border = '1px solid rgba(232, 130, 12, 0.2)';
-      offlineBanner.style.fontSize = '0.85rem';
-      offlineBanner.style.color = 'var(--text-secondary, #4b5563)';
-      offlineBanner.style.display = 'flex';
-      offlineBanner.style.gap = '0.5rem';
-      offlineBanner.style.alignItems = 'flex-start';
-      offlineBanner.innerHTML = `
+    }
+
+    const statusBanner = document.createElement('div');
+    statusBanner.style.marginBottom = '1.25rem';
+    statusBanner.style.padding = '0.85rem 1rem';
+    statusBanner.style.borderRadius = '10px';
+    statusBanner.style.fontSize = '0.85rem';
+    statusBanner.style.color = 'var(--text-secondary, #4b5563)';
+    statusBanner.style.display = 'flex';
+    statusBanner.style.gap = '0.5rem';
+    statusBanner.style.alignItems = 'flex-start';
+
+    if (isOffline) {
+      statusBanner.style.backgroundColor = 'rgba(232, 130, 12, 0.05)';
+      statusBanner.style.border = '1px solid rgba(232, 130, 12, 0.2)';
+      statusBanner.innerHTML = `
         <i data-lucide="wifi-off" style="width:16px; height:16px; color:var(--accent,#e8820c); flex-shrink:0; margin-top:0.1rem;"></i>
         <div>
           <span style="font-weight:600; color:var(--text-primary,#111827);">Modo fuera de línea</span>
@@ -150,8 +151,19 @@ window.verDetallesSincronizacion = function() {
           <div style="margin-top:0.4rem; font-size:0.78rem; font-weight:700; color:var(--accent,#e8820c);">Última sincronización: ${lastSyncFormatted}</div>
         </div>
       `;
-      body.insertBefore(offlineBanner, body.firstChild);
+    } else {
+      statusBanner.style.backgroundColor = 'rgba(16, 185, 129, 0.05)';
+      statusBanner.style.border = '1px solid rgba(16, 185, 129, 0.2)';
+      statusBanner.innerHTML = `
+        <i data-lucide="wifi" style="width:16px; height:16px; color:var(--green,#10b981); flex-shrink:0; margin-top:0.1rem;"></i>
+        <div>
+          <span style="font-weight:600; color:var(--text-primary,#111827);">Conectado a Supabase</span>
+          <div style="margin-top:0.2rem;">El sistema se encuentra sincronizado en tiempo real.</div>
+          <div style="margin-top:0.4rem; font-size:0.78rem; font-weight:700; color:var(--green,#10b981);">Última sincronización: ${lastSyncFormatted}</div>
+        </div>
+      `;
     }
+    body.insertBefore(statusBanner, body.firstChild);
     
     const footer = document.createElement('div');
     footer.style.padding = '1rem 1.5rem';

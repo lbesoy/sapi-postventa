@@ -26,6 +26,7 @@ let tickets = [];
 let ordenes = [];
 
 let nombreEmpresaLogged = null;
+const CLOSED_ORDER_STATUSES = ['finalizado', 'firmado', 'cerrado', 'completado', 'closed', 'cerrada', 'signed'];
 let currentTicketFiltro = 'todos';
 let currentTicketFiltroPrio = '';
 let currentTicketOrden = 'reciente';
@@ -38,7 +39,20 @@ let currentServiciosOrden = 'reciente';
 // ===== SANDBOX / MODO PRUEBAS =====
 function isTestData(item) {
   if (!item) return false;
+
+  // Si es una orden, intentar heredar del ticket vinculado
+  if (item.soporte) {
+    const t = (window.tickets || tickets || []).find(x => x.id === item.soporte || x.folio === item.soporte);
+    if (t) {
+      const isTestTkt = t.esPrueba === true || t.isTest === true ||
+                        (t.folio && (t.folio.toUpperCase().includes('PRUEBA') || t.folio.toUpperCase().includes('TEST'))) ||
+                        (t.asunto && (t.asunto.toUpperCase().includes('PRUEBA') || t.asunto.toUpperCase().includes('TEST')));
+      return isTestTkt;
+    }
+  }
+
   if (item.esPrueba === true || item.isTest === true) return true;
+  
   try {
     let notesObj = null;
     if (typeof item.notas === 'string') {
@@ -79,14 +93,66 @@ function isTestData(item) {
 
 
 
+function isTestUserAccount(user) {
+  if (!user) return false;
+  if (typeof window.isTestUser === 'function') {
+    return window.isTestUser(user);
+  }
+  const name = (user.nombre || '').toLowerCase();
+  const email = (user.email || '').toLowerCase();
+  return name.includes('prueba') || name.includes('test') || email.includes('prueba') || email.includes('test');
+}
+
 function isTestModeActive() {
   if (!currentSession) return false;
-  const isPrueba1 = currentSession && (
-    String(currentSession.nombre || '').toLowerCase().trim() === 'prueba1' ||
-    String(currentSession.email || '').toLowerCase().trim() === 'prueba1@prueba.com'
-  );
-  return isPrueba1;
+  
+  const isSuperAdmin = (currentSession.realRol === 'superadmin' || currentSession.viewMode === 'superadmin');
+  const simUserId = isSuperAdmin ? (localStorage.getItem('superadmin_simulated_user_id') || '') : '';
+  const simUser = simUserId ? usuarios.find(u => u.id === simUserId) : null;
+  const user = simUser || currentSession;
+  
+  // Si no es cuenta de pruebas y tampoco es SuperAdmin, nunca está en sandbox
+  if (!isTestUserAccount(user) && !isSuperAdmin) return false;
+  
+  // Si es cuenta de pruebas o SuperAdmin, respetar localStorage si está definido
+  const testModeLocal = localStorage.getItem('eurorep_cliente_test_mode');
+  if (testModeLocal === 'true') return true;
+  if (testModeLocal === 'false') return false;
+  
+  // Si no hay localStorage, las cuentas de prueba inician en true (sandbox) y los superadmins en false (producción)
+  if (isTestUserAccount(user)) return true;
+  return false;
 }
+
+window.sincronizarSandboxToggle = function() {
+  const sbToggle = document.getElementById('sandbox-mode-toggle');
+  const sbContainer = document.querySelector('.sandbox-toggle-container');
+  if (!sbContainer) return;
+
+  if (!currentSession) {
+    sbContainer.style.display = 'none';
+    return;
+  }
+
+  const isSuperAdmin = (currentSession.realRol === 'superadmin' || currentSession.viewMode === 'superadmin');
+  const simUserId = isSuperAdmin ? (localStorage.getItem('superadmin_simulated_user_id') || '') : '';
+  const simUser = simUserId ? usuarios.find(u => u.id === simUserId) : null;
+  const user = simUser || currentSession;
+
+  const isTestAcc = isTestUserAccount(user) || isSuperAdmin;
+  
+  if (isTestAcc) {
+    sbContainer.style.display = 'flex';
+    if (sbToggle) {
+      sbToggle.checked = isTestModeActive();
+      sbToggle.disabled = false; // ¡Habilitado para que el usuario pueda alternarlo!
+      sbContainer.removeAttribute('title');
+      sbContainer.style.opacity = '1';
+    }
+  } else {
+    sbContainer.style.display = 'none';
+  }
+};
 
 function toggleClientSandboxMode(checked) {
   localStorage.setItem('eurorep_cliente_test_mode', checked ? 'true' : 'false');
@@ -225,26 +291,8 @@ async function verificarSesionCliente() {
         await inicializarDatos();
         
         // Sincronizar switch de Sandbox
-        const sbToggle = document.getElementById('sandbox-mode-toggle');
-        const sbContainer = document.querySelector('.sandbox-toggle-container');
-        
-        const isPrueba1 = currentSession && (
-          String(currentSession.nombre || '').toLowerCase().trim() === 'prueba1' ||
-          String(currentSession.email || '').toLowerCase().trim() === 'prueba1@prueba.com'
-        );
-
-        if (sbContainer) {
-          if (isPrueba1) {
-            sbContainer.style.display = 'flex';
-            if (sbToggle) {
-              sbToggle.checked = true; // Prueba1 siempre está en Sandbox
-              sbToggle.disabled = true;
-              sbContainer.title = "Los usuarios de prueba están fijos en el Sandbox";
-              sbContainer.style.opacity = '0.7';
-            }
-          } else {
-            sbContainer.style.display = 'none';
-          }
+        if (typeof window.sincronizarSandboxToggle === 'function') {
+          window.sincronizarSandboxToggle();
         }
 
         loader.classList.add('fade-out');
@@ -589,7 +637,11 @@ async function inicializarDatos() {
           localStorage.removeItem('superadmin_selected_cliente');
           nombreEmpresaLogged = '';
           
-          inicializarDatos();
+          inicializarDatos().then(() => {
+            if (typeof window.sincronizarSandboxToggle === 'function') {
+              window.sincronizarSandboxToggle();
+            }
+          });
           showToast(newUserId ? 'Simulando perfil de usuario' : 'Restablecida simulación de usuario', 'info');
         });
       }
@@ -725,6 +777,7 @@ function navegarA(targetView) {
     'tickets': 'Tickets',
     'servicios': 'Órdenes de Servicio',
     'sitios': 'Mis Sitios',
+    'envios': 'Envíos',
     'soporte': 'Soporte'
   };
   
@@ -734,6 +787,12 @@ function navegarA(targetView) {
   // Desplazar arriba
   const viewContainer = document.querySelector('.views-container');
   if (viewContainer) viewContainer.scrollTop = 0;
+
+  if (targetView === 'soporte') {
+    try {
+      markClientChatAsRead();
+    } catch(e) {}
+  }
 
   // Renderizar de nuevo por si se actualizaron datos
   doRender();
@@ -749,16 +808,16 @@ function doRender() {
     .filter(c => allowedNames.includes(String(c.nombre || '').toLowerCase().trim()))
     .map(c => c.id);
 
+  const clienteObj = nombreEmpresaLogged === 'todos' ? null : clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === nombreEmpresaLogged);
+
   // Obtener equipos del cliente
   const misEquipos = maquinariaDb.filter(m => {
     const mCli = String(m.cliente || '').toLowerCase().trim();
     if (nombreEmpresaLogged === 'todos') {
-      return allowedNames.includes(mCli);
+      return allowedNames.includes(mCli) || allowedIds.includes(m.cliente);
     }
-    return mCli === nombreEmpresaLogged;
+    return mCli === nombreEmpresaLogged || (clienteObj && m.cliente === clienteObj.id);
   });
-  
-  const clienteObj = nombreEmpresaLogged === 'todos' ? null : clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === nombreEmpresaLogged);
   
   // Agregar también máquinas incrustadas en el objeto cliente por si no están en maquinariaDb
   if (nombreEmpresaLogged === 'todos') {
@@ -813,9 +872,9 @@ function doRender() {
     const tcli = String(t.cliente || '').toLowerCase().trim();
     const tsol = String(t.solicitante || '').toLowerCase().trim();
     if (nombreEmpresaLogged === 'todos') {
-      return allowedNames.includes(tcli) || allowedNames.includes(tsol);
+      return allowedNames.includes(tcli) || allowedNames.includes(tsol) || allowedIds.includes(t.cliente);
     }
-    return tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged;
+    return tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged || (clienteObj && t.cliente === clienteObj.id);
   });
 
   // Ordenes del cliente
@@ -828,16 +887,16 @@ function doRender() {
         const tcli = String(tick.cliente || '').toLowerCase().trim();
         const tsol = String(tick.solicitante || '').toLowerCase().trim();
         if (nombreEmpresaLogged === 'todos') {
-          if (allowedNames.includes(tcli) || allowedNames.includes(tsol)) fromTicket = true;
+          if (allowedNames.includes(tcli) || allowedNames.includes(tsol) || allowedIds.includes(tick.cliente)) fromTicket = true;
         } else {
-          if (tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged) fromTicket = true;
+          if (tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged || (clienteObj && tick.cliente === clienteObj.id)) fromTicket = true;
         }
       }
     }
     if (nombreEmpresaLogged === 'todos') {
-      return allowedNames.includes(ocli) || fromTicket;
+      return allowedNames.includes(ocli) || allowedIds.includes(o.cliente) || fromTicket;
     }
-    return ocli === nombreEmpresaLogged || fromTicket;
+    return ocli === nombreEmpresaLogged || (clienteObj && o.cliente === clienteObj.id) || fromTicket;
   });
 
   // --- FILTRADO POR MODO SANDBOX ---
@@ -848,7 +907,7 @@ function doRender() {
 
   // --- RENDERIZAR METRICAS (KPIs) ---
   const activeTicketsCount = misTicketsFiltered.filter(t => t.estado && t.estado.toLowerCase() !== 'cerrado').length;
-  const activeServicesCount = misOrdenesFiltered.filter(o => o.estado && !['finalizado', 'firmado'].includes(o.estado.toLowerCase())).length;
+  const activeServicesCount = misOrdenesFiltered.filter(o => o.estado && !CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase())).length;
 
   const kpiEquipos = document.getElementById('kpi-equipos');
   const kpiTickets = document.getElementById('kpi-tickets');
@@ -865,9 +924,9 @@ function doRender() {
       fleetKpiEl.style.display = 'flex';
       
       const machinesInMaintenance = new Set();
-      misOrdenesFiltered.filter(o => o.estado && !['finalizado', 'firmado'].includes(o.estado.toLowerCase())).forEach(o => {
+      misOrdenesFiltered.filter(o => o.estado && !CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase())).forEach(o => {
         const match = misEquiposFiltered.find(m => {
-          if (m.id === o.maquinaria_id) return true;
+          if (m.id === o.maquinaria_id || m.idInterno === o.maquinaria_id || m.id === o.maquina || m.idInterno === o.maquina) return true;
           const equipoString = o.equipo || '';
           const names = equipoString.split(',').map(n => n.trim()).filter(Boolean);
           return names.some(name => {
@@ -922,6 +981,7 @@ function doRender() {
   renderServicesSection(misOrdenesFiltered);
   renderLocationsSection(misSitios, misEquiposFiltered);
   renderGeneralSupportChatSection();
+  try { window.updateClientSidebarChatBadge(); } catch(e) {}
 }
 
 // 1. Dashboard UI
@@ -929,7 +989,7 @@ function renderDashboardSection(misOrdenes, activeServicesCount) {
   const container = document.getElementById('active-services-list');
   if (!container) return;
 
-  const activeOrders = misOrdenes.filter(o => o.estado && !['finalizado', 'firmado'].includes(o.estado.toLowerCase()));
+  const activeOrders = misOrdenes.filter(o => o.estado && !CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
 
   if (activeOrders.length === 0) {
     container.innerHTML = `
@@ -1026,7 +1086,7 @@ function renderMachinerySection(misEquipos, misOrdenes) {
   // Calculate dynamic status for each machine first
   const machinesWithStatus = misEquipos.map(m => {
     const ordenesMaquina = misOrdenes.filter(o => {
-      if (o.maquinaria_id === m.id) return true;
+      if (o.maquinaria_id === m.id || o.maquinaria_id === m.idInterno || o.maquina === m.id || o.maquina === m.idInterno) return true;
       const equipoString = o.equipo || '';
       const names = equipoString.split(',').map(n => n.trim()).filter(Boolean);
       return names.some(name => {
@@ -1038,7 +1098,7 @@ function renderMachinerySection(misEquipos, misOrdenes) {
         );
       });
     });
-    const tieneServicioActivo = ordenesMaquina.some(o => o.estado && !['finalizado', 'firmado'].includes(o.estado.toLowerCase()));
+    const tieneServicioActivo = ordenesMaquina.some(o => o.estado && !CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
     const statusLabel = tieneServicioActivo ? 'En Mantenimiento' : 'Operando';
     const statusClass = tieneServicioActivo ? 'proceso' : 'operando';
     return { machine: m, statusLabel, statusClass, ordenesMaquina };
@@ -1103,7 +1163,13 @@ function renderMachinerySection(misEquipos, misOrdenes) {
     const codMarca = (m.marca || '').toLowerCase().trim();
     const logoImg = getLogoByBrand(codMarca);
     const marcaCompleta = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || 'Genérico';
-    const horometroVal = m.horometro || m.customData?.horometro || 0;
+    let horometroVal = m.horometro || m.customData?.horometro || 0;
+    const ordenConHorometro = [...ordenesMaquina]
+      .sort((a, b) => new Date(b.fecha || 0).getTime() - new Date(a.fecha || 0).getTime())
+      .find(o => o.horometro_real || o.horometro);
+    if (ordenConHorometro) {
+      horometroVal = ordenConHorometro.horometro_real || ordenConHorometro.horometro;
+    }
     const ubicacionVal = m.ubicacion || m.customData?.ubicacion || 'Sin Ubicación';
 
     // Calcular progreso al siguiente mantenimiento preventivo (250h cycle)
@@ -1238,6 +1304,8 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
   let countTktAsignado = 0;
   let countTktEnCurso = 0;
   let countTktCotizado = 0;
+  let countTktProceso = 0;
+  let countTktServicio = 0;
   let countTktCerrado = 0;
 
   ticketsForCounts.forEach(t => {
@@ -1246,10 +1314,23 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
     const estLower = String(t.estado || 'Abierto').toLowerCase().trim();
     const tieneCotizacion = !!(t.cotizacionSAP || t.cotizacion_sap) || (estLower === 'cotización' || estLower === 'cotizacion' || estLower === 'cerrado');
     const cotAceptadaVal = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
-    const tienePedido = !!(t.pedidoSAP || t.pedido_sap) || cotAceptadaVal === 'si';
+    const tienePedido = !!(t.pedidoSAP || t.pedido_sap);
 
-    if (tienePedido) {
+    // Buscar ordenes ligadas por ID o Folio
+    const ordenesTicket = ordenes.filter(o => o.soporte === t.id || o.soporte === t.folio);
+    const tieneOrdenes = ordenesTicket.length > 0;
+    const todasOrdenesCerradas = !tieneOrdenes || ordenesTicket.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
+    const enServicio = tieneOrdenes && !todasOrdenesCerradas;
+
+    const esCerrado = (estLower === 'cerrado') || ((tienePedido || tieneOrdenes) && todasOrdenesCerradas);
+    const esServicio = (enServicio || tienePedido) && !esCerrado;
+
+    if (esCerrado) {
       countTktCerrado++;
+    } else if (esServicio) {
+      countTktServicio++;
+    } else if (cotAceptadaVal === 'si') {
+      countTktProceso++;
     } else if (tieneCotizacion) {
       countTktCotizado++;
     } else if (tieneTecnico) {
@@ -1263,6 +1344,8 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
   const cntTAsignado = document.getElementById('cnt-tkt-asignado');
   const cntTEnCurso = document.getElementById('cnt-tkt-encurso');
   const cntTCotizado = document.getElementById('cnt-tkt-cotizado');
+  const cntTProceso = document.getElementById('cnt-tkt-proceso');
+  const cntTServicio = document.getElementById('cnt-tkt-servicio');
   const cntTCerrado = document.getElementById('cnt-tkt-cerrado');
   const cntTTodos = document.getElementById('cnt-tkt-todos');
 
@@ -1270,6 +1353,8 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
   if (cntTAsignado) cntTAsignado.textContent = countTktAsignado;
   if (cntTEnCurso) cntTEnCurso.textContent = countTktEnCurso;
   if (cntTCotizado) cntTCotizado.textContent = countTktCotizado;
+  if (cntTProceso) cntTProceso.textContent = countTktProceso;
+  if (cntTServicio) cntTServicio.textContent = countTktServicio;
   if (cntTCerrado) cntTCerrado.textContent = countTktCerrado;
   if (cntTTodos) cntTTodos.textContent = countTktTodos;
   
@@ -1279,7 +1364,17 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
       const asignadoVal = String(t.asignado || '').trim().toLowerCase();
       const tieneTecnico = asignadoVal && asignadoVal !== 'sin asignar' && asignadoVal !== 'asignando...';
       const estLower = String(t.estado || 'Abierto').toLowerCase().trim();
-      return !tieneTecnico && estLower !== 'cerrado';
+      const cotAceptadaVal = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
+      const tienePedido = !!(t.pedidoSAP || t.pedido_sap);
+      const ordenesTicket = ordenes.filter(o => o.soporte === t.id || o.soporte === t.folio);
+      const tieneOrdenes = ordenesTicket.length > 0;
+      const todasOrdenesCerradas = !tieneOrdenes || ordenesTicket.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
+      const enServicio = tieneOrdenes && !todasOrdenesCerradas;
+
+      const esCerrado = (tienePedido || tieneOrdenes) && todasOrdenesCerradas;
+      const esServicio = (enServicio || tienePedido) && !esCerrado;
+
+      return !tieneTecnico && estLower !== 'cerrado' && cotAceptadaVal !== 'si' && !esCerrado && !esServicio;
     });
   } else if (currentTicketFiltro === 'asignado') {
     filtered = []; // El estado "Asignado" ahora transiciona directamente a "En Curso"
@@ -1289,21 +1384,71 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
       const tieneTecnico = asignadoVal && asignadoVal !== 'sin asignar' && asignadoVal !== 'asignando...';
       const estLower = String(t.estado || 'Abierto').toLowerCase().trim();
       const tieneCotizacion = !!(t.cotizacionSAP || t.cotizacion_sap) || (estLower === 'cotización' || estLower === 'cotizacion' || estLower === 'cerrado');
-      return tieneTecnico && !tieneCotizacion;
+      const cotAceptadaVal = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
+      const tienePedido = !!(t.pedidoSAP || t.pedido_sap);
+      const ordenesTicket = ordenes.filter(o => o.soporte === t.id || o.soporte === t.folio);
+      const tieneOrdenes = ordenesTicket.length > 0;
+      const todasOrdenesCerradas = !tieneOrdenes || ordenesTicket.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
+      const enServicio = tieneOrdenes && !todasOrdenesCerradas;
+
+      const esCerrado = (tienePedido || tieneOrdenes) && todasOrdenesCerradas;
+      const esServicio = (enServicio || tienePedido) && !esCerrado;
+
+      return tieneTecnico && !tieneCotizacion && cotAceptadaVal !== 'si' && !esCerrado && !esServicio;
     });
   } else if (currentTicketFiltro === 'cotizado') {
     filtered = filtered.filter(t => {
       const estLower = String(t.estado || 'Abierto').toLowerCase().trim();
       const tieneCotizacion = !!(t.cotizacionSAP || t.cotizacion_sap) || (estLower === 'cotización' || estLower === 'cotizacion' || estLower === 'cerrado');
       const cotAceptadaVal = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
-      const tienePedido = !!(t.pedidoSAP || t.pedido_sap) || cotAceptadaVal === 'si';
-      return tieneCotizacion && !tienePedido;
+      const tienePedido = !!(t.pedidoSAP || t.pedido_sap);
+      const ordenesTicket = ordenes.filter(o => o.soporte === t.id || o.soporte === t.folio);
+      const tieneOrdenes = ordenesTicket.length > 0;
+      const todasOrdenesCerradas = !tieneOrdenes || ordenesTicket.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
+      const enServicio = tieneOrdenes && !todasOrdenesCerradas;
+
+      const esCerrado = (tienePedido || tieneOrdenes) && todasOrdenesCerradas;
+      const esServicio = (enServicio || tienePedido) && !esCerrado;
+
+      return tieneCotizacion && cotAceptadaVal !== 'si' && !esCerrado && !esServicio;
+    });
+  } else if (currentTicketFiltro === 'proceso') {
+    filtered = filtered.filter(t => {
+      const cotAceptadaVal = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
+      const tienePedido = !!(t.pedidoSAP || t.pedido_sap);
+      const ordenesTicket = ordenes.filter(o => o.soporte === t.id || o.soporte === t.folio);
+      const tieneOrdenes = ordenesTicket.length > 0;
+      const todasOrdenesCerradas = !tieneOrdenes || ordenesTicket.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
+      const enServicio = tieneOrdenes && !todasOrdenesCerradas;
+
+      const esCerrado = (tienePedido || tieneOrdenes) && todasOrdenesCerradas;
+      const esServicio = (enServicio || tienePedido) && !esCerrado;
+
+      return cotAceptadaVal === 'si' && !esCerrado && !esServicio;
+    });
+  } else if (currentTicketFiltro === 'servicio') {
+    filtered = filtered.filter(t => {
+      const tienePedido = !!(t.pedidoSAP || t.pedido_sap);
+      const ordenesTicket = ordenes.filter(o => o.soporte === t.id || o.soporte === t.folio);
+      const tieneOrdenes = ordenesTicket.length > 0;
+      const todasOrdenesCerradas = !tieneOrdenes || ordenesTicket.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
+      const enServicio = tieneOrdenes && !todasOrdenesCerradas;
+
+      const esCerrado = (tienePedido || tieneOrdenes) && todasOrdenesCerradas;
+      const esServicio = (enServicio || tienePedido) && !esCerrado;
+
+      return esServicio;
     });
   } else if (currentTicketFiltro === 'cerrado') {
     filtered = filtered.filter(t => {
-      const cotAceptadaVal = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
-      const tienePedido = !!(t.pedidoSAP || t.pedido_sap) || cotAceptadaVal === 'si';
-      return tienePedido;
+      const tienePedido = !!(t.pedidoSAP || t.pedido_sap);
+      const ordenesTicket = ordenes.filter(o => o.soporte === t.id || o.soporte === t.folio);
+      const tieneOrdenes = ordenesTicket.length > 0;
+      const todasOrdenesCerradas = !tieneOrdenes || ordenesTicket.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
+
+      const esCerrado = (tienePedido || tieneOrdenes) && todasOrdenesCerradas;
+
+      return esCerrado;
     });
   }
 
@@ -1363,6 +1508,8 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
   const btnAsignado = document.getElementById('btn-filtro-t-asignado');
   const btnEnCurso = document.getElementById('btn-filtro-t-encurso');
   const btnCotizado = document.getElementById('btn-filtro-t-cotizado');
+  const btnProceso = document.getElementById('btn-filtro-t-proceso');
+  const btnServicio = document.getElementById('btn-filtro-t-servicio');
   const btnCerrado = document.getElementById('btn-filtro-t-cerrado');
   const btnTodos = document.getElementById('btn-filtro-t-todos');
   
@@ -1370,6 +1517,8 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
   if (btnAsignado) btnAsignado.className = currentTicketFiltro === 'asignado' ? 'btn-primary' : 'btn-secondary';
   if (btnEnCurso) btnEnCurso.className = currentTicketFiltro === 'en curso' ? 'btn-primary' : 'btn-secondary';
   if (btnCotizado) btnCotizado.className = currentTicketFiltro === 'cotizado' ? 'btn-primary' : 'btn-secondary';
+  if (btnProceso) btnProceso.className = currentTicketFiltro === 'proceso' ? 'btn-primary' : 'btn-secondary';
+  if (btnServicio) btnServicio.className = currentTicketFiltro === 'servicio' ? 'btn-primary' : 'btn-secondary';
   if (btnCerrado) btnCerrado.className = currentTicketFiltro === 'cerrado' ? 'btn-primary' : 'btn-secondary';
   if (btnTodos) btnTodos.className = currentTicketFiltro === 'todos' ? 'btn-primary' : 'btn-secondary';
 
@@ -1402,12 +1551,13 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
     };
     const iconHtml = catIcons[t.categoria] || '<i data-lucide="ticket" style="width:16px; height:16px; color:var(--accent); flex-shrink:0;"></i>';
 
-    // Determinar pasos activos para la mini línea de tiempo de 5 etapas
+    // Determinar pasos activos para la mini línea de tiempo de 6 etapas
     let step1Class = 'active';
     let step2Class = '';
     let step3Class = '';
     let step4Class = '';
     let step5Class = '';
+    let step6Class = '';
 
     const asignadoVal = String(t.asignado || '').trim().toLowerCase();
     const tieneTecnico = asignadoVal && asignadoVal !== 'sin asignar' && asignadoVal !== 'asignando...';
@@ -1416,20 +1566,50 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
     const tieneCotizacion = !!(t.cotizacionSAP || t.cotizacion_sap) || (est === 'cotización' || est === 'cotizacion' || est === 'cerrado');
     
     const cotAceptadaVal = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
-    const tienePedido = !!(t.pedidoSAP || t.pedido_sap) || cotAceptadaVal === 'si';
+    const tienePedido = !!(t.pedidoSAP || t.pedido_sap);
 
-    if (tienePedido) {
+    const ordenesTicket = ordenes.filter(o => o.soporte === t.id || o.soporte === t.folio);
+    const tieneOrdenes = ordenesTicket.length > 0;
+    const todasOrdenesCerradas = !tieneOrdenes || ordenesTicket.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
+    const enServicio = tieneOrdenes && !todasOrdenesCerradas;
+
+    const esCerrado = (est === 'cerrado') || ((tienePedido || tieneOrdenes) && todasOrdenesCerradas);
+    const esServicio = (enServicio || tienePedido) && !esCerrado;
+
+    // Asignación secuencial de clases activas
+    if (esCerrado) {
       step2Class = 'active';
       step3Class = 'active';
       step4Class = 'active';
       step5Class = 'active';
-    } else if (tieneCotizacion) {
+      step6Class = 'active';
+    } else if (esServicio) {
       step2Class = 'active';
       step3Class = 'active';
       step4Class = 'active';
-    } else if (tieneTecnico) {
+      step5Class = 'active';
+    } else if (cotAceptadaVal === 'si') {
       step2Class = 'active';
       step3Class = 'active';
+      step4Class = 'active';
+    } else if (tieneCotizacion) {
+      step2Class = 'active';
+      step3Class = 'active';
+    } else if (tieneTecnico) {
+      step2Class = 'active';
+    }
+    
+    let displayEstado = t.estado || 'Abierto';
+    let displayEstClass = est;
+    if (esCerrado) {
+      displayEstado = 'Cerrado';
+      displayEstClass = 'cerrado';
+    } else if (esServicio) {
+      displayEstado = 'Orden de Servicio';
+      displayEstClass = 'programado';
+    } else if (cotAceptadaVal === 'si') {
+      displayEstado = 'En Proceso';
+      displayEstClass = 'proceso';
     }
     
     html += `
@@ -1438,7 +1618,7 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
           <h4 style="margin:0; font-size:0.95rem; font-weight:700; display:flex; align-items:center; gap:0.4rem; color:var(--text-primary);">
             ${iconHtml} ${t.asunto || 'Sin Asunto'}
           </h4>
-          <span class="status-pill ${est}">${t.estado || 'Abierto'}</span>
+          <span class="status-pill ${displayEstClass}">${displayEstado}</span>
         </div>
         
         <p style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
@@ -1459,10 +1639,11 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
 
         <div class="ticket-progress-mini">
           <span class="ticket-progress-step ${step1Class}" style="${step1Class ? 'color:var(--text-primary); font-weight:600;' : ''}"><i data-lucide="send" style="width:10px; height:10px;"></i> Reportado</span>
-          <span class="ticket-progress-step ${step2Class}" style="${step2Class ? 'color:var(--orange); font-weight:600;' : ''}"><i data-lucide="user" style="width:10px; height:10px;"></i> Asignado</span>
-          <span class="ticket-progress-step ${step3Class}" style="${step3Class ? 'color:var(--accent); font-weight:600;' : ''}"><i data-lucide="clock" style="width:10px; height:10px;"></i> En Curso</span>
-          <span class="ticket-progress-step ${step4Class}" style="${step4Class ? 'color:#c084fc; font-weight:600;' : ''}"><i data-lucide="file-text" style="width:10px; height:10px;"></i> Cotizado</span>
-          <span class="ticket-progress-step ${step5Class}" style="${step5Class ? 'color:var(--green); font-weight:600;' : ''}"><i data-lucide="check-circle" style="width:10px; height:10px;"></i> Pedido</span>
+          <span class="ticket-progress-step ${step2Class}" style="${step2Class ? 'color:var(--orange); font-weight:600;' : ''}"><i data-lucide="clock" style="width:10px; height:10px;"></i> En Curso</span>
+          <span class="ticket-progress-step ${step3Class}" style="${step3Class ? 'color:#a855f7; font-weight:600;' : ''}"><i data-lucide="file-text" style="width:10px; height:10px;"></i> Cotizado</span>
+          <span class="ticket-progress-step ${step4Class}" style="${step4Class ? 'color:#f59e0b; font-weight:600;' : ''}"><i data-lucide="refresh-cw" style="width:10px; height:10px;"></i> En Proceso</span>
+          <span class="ticket-progress-step ${step5Class}" style="${step5Class ? 'color:#06b6d4; font-weight:600;' : ''}"><i data-lucide="truck" style="width:10px; height:10px;"></i> Orden de Servicio</span>
+          <span class="ticket-progress-step ${step6Class}" style="${step6Class ? 'color:var(--green); font-weight:600;' : ''}"><i data-lucide="check-circle" style="width:10px; height:10px;"></i> Cerrado</span>
         </div>
       </div>
     `;
@@ -2021,7 +2202,27 @@ function abrirDetalleTicketCliente(id) {
   const tieneTrabajoEnCursoDetail = tieneTecnicoDetail && (estLowerDetail === 'en proceso' || estLowerDetail === 'refacciones' || estLowerDetail === 'cotización' || estLowerDetail === 'cotizacion' || estLowerDetail === 'cerrado');
   const tieneCotizacionDetail = !!(t.cotizacionSAP || t.cotizacion_sap) || (estLowerDetail === 'cotización' || estLowerDetail === 'cotizacion' || estLowerDetail === 'cerrado');
   const cotAceptadaValDetail = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
-  const tienePedidoDetail = !!(t.pedidoSAP || t.pedido_sap) || cotAceptadaValDetail === 'si';
+  const tienePedidoDetail = !!(t.pedidoSAP || t.pedido_sap);
+  const ordenesTicketDetail = ordenes.filter(o => o.soporte === t.id || o.soporte === t.folio);
+  const tieneOrdenesDetail = ordenesTicketDetail.length > 0;
+  const todasOrdenesCerradasDetail = !tieneOrdenesDetail || ordenesTicketDetail.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
+  const enServicioDetail = tieneOrdenesDetail && !todasOrdenesCerradasDetail;
+
+  const esCerradoDetail = (estLowerDetail === 'cerrado') || ((tienePedidoDetail || tieneOrdenesDetail) && todasOrdenesCerradasDetail);
+  const esServicioDetail = (enServicioDetail || tienePedidoDetail) && !esCerradoDetail;
+
+  let detailEstado = t.estado || 'Abierto';
+  let detailEstClass = est;
+  if (esCerradoDetail) {
+    detailEstado = 'Cerrado';
+    detailEstClass = 'cerrado';
+  } else if (esServicioDetail) {
+    detailEstado = 'Orden de Servicio';
+    detailEstClass = 'programado';
+  } else if (cotAceptadaValDetail === 'si') {
+    detailEstado = 'En Proceso';
+    detailEstClass = 'proceso';
+  }
 
   const steps = [
     {
@@ -2031,39 +2232,48 @@ function abrirDetalleTicketCliente(id) {
       status: 'completed'
     },
     {
-      title: 'Asignado',
-      desc: tieneTecnicoDetail ? `Ingeniero asignado: ${t.asignado}` : 'Asignando el técnico idóneo para tu equipo...',
+      title: 'En Curso',
+      desc: tieneTecnicoDetail ? `Técnico asignado: ${t.asignado}` : 'Asignando el técnico idóneo para tu equipo...',
       time: '',
       status: tieneTecnicoDetail ? 'completed' : 'active'
-    },
-    {
-      title: 'En Curso',
-      desc: tieneTrabajoEnCursoDetail ? 'Técnico trabajando en el diagnóstico o servicio.' : 'Pendiente de inicio de actividades.',
-      time: '',
-      status: tieneTrabajoEnCursoDetail ? 'completed' : (tieneTecnicoDetail ? 'active' : 'pending')
     },
     {
       title: 'Cotizado',
       desc: tieneCotizacionDetail ? (t.cotizacionSAP ? `Cotización disponible: ${t.cotizacionSAP} ($${Number(t.montoCotizacion || 0).toLocaleString('es-MX')} MXN)` : 'Cotización generada y en revisión.') : 'Pendiente de cotización.',
       time: '',
-      status: tieneCotizacionDetail ? 'completed' : (tieneTrabajoEnCursoDetail ? 'active' : 'pending')
+      status: tieneCotizacionDetail ? 'completed' : (tieneTecnicoDetail ? 'active' : 'pending')
     },
     {
-      title: 'Pedido',
-      desc: tienePedidoDetail ? (t.pedidoSAP ? `Orden de pedido procesada en SAP: ${t.pedidoSAP}` : 'Cotización aprobada por el cliente. Iniciando surtido/pedido.') : 'Pendiente de aprobación de cotización/pedido.',
+      title: 'En Proceso',
+      desc: (cotAceptadaValDetail === 'si') ? 'Cotización aprobada por el cliente. En proceso de asignación de Pedido SAP.' : 'Pendiente de aceptación de cotización.',
       time: '',
-      status: tienePedidoDetail ? 'completed' : (tieneCotizacionDetail ? 'active' : 'pending')
+      status: (cotAceptadaValDetail === 'si') ? 'completed' : (tieneCotizacionDetail ? 'active' : 'pending')
+    },
+    {
+      title: 'Orden de Servicio',
+      desc: tienePedidoDetail ? (tieneOrdenesDetail ? 'Orden de servicio en ejecución por el técnico.' : 'Pedido SAP procesado. Programando técnico.') : 'Pendiente de asignación de Pedido SAP.',
+      time: '',
+      status: tienePedidoDetail ? 'completed' : (cotAceptadaValDetail === 'si' ? 'active' : 'pending')
+    },
+    {
+      title: 'Cerrado',
+      desc: esCerradoDetail ? 'Servicio finalizado y reporte firmado.' : 'Pendiente de cierre de servicio.',
+      time: '',
+      status: esCerradoDetail ? 'completed' : (esServicioDetail ? 'active' : 'pending')
     }
   ];
 
   // Asegurar herencia de estados anteriores en la cadena
-  let activeFound = false;
+  let activeFoundState = null; // can be 'completed', 'active', or null
   for (let i = steps.length - 1; i >= 0; i--) {
-    if (steps[i].status === 'completed' || steps[i].status === 'active') {
-      activeFound = true;
-    }
-    if (activeFound && steps[i].status === 'pending') {
+    if (activeFoundState === 'completed' || activeFoundState === 'active') {
       steps[i].status = 'completed';
+    }
+    
+    if (steps[i].status === 'completed') {
+      activeFoundState = 'completed';
+    } else if (steps[i].status === 'active' && activeFoundState !== 'completed') {
+      activeFoundState = 'active';
     }
   }
 
@@ -2113,12 +2323,32 @@ function abrirDetalleTicketCliente(id) {
       actionGroupHtml = `
         <!-- Cotización Actions -->
         <div id="cotizacion-actions-group" style="display:flex; gap:0.5rem; margin-top:1rem; border-top:1px solid rgba(255,255,255,0.06); padding-top:1rem;">
-          <button type="button" class="btn-primary" style="flex:1; justify-content:center; padding:0.5rem; font-size:0.8rem;" onclick="responderCotizacionCliente('${t.id}', 'si')">
+          <button type="button" class="btn-primary" style="flex:1; justify-content:center; padding:0.5rem; font-size:0.8rem;" onclick="window.mostrarFormAceptacionCotizacion()">
             <i data-lucide="check-circle" style="width:14px; height:14px; vertical-align:middle; margin-right:4px;"></i> Aceptar Cotización
           </button>
           <button type="button" class="btn-secondary" style="flex:1; justify-content:center; padding:0.5rem; font-size:0.8rem; border-color:var(--red); color:var(--red); background:rgba(239, 68, 68, 0.05);" onclick="mostrarFormRechazoCotizacion()">
             <i data-lucide="x-circle" style="width:14px; height:14px; vertical-align:middle; margin-right:4px;"></i> Rechazar
           </button>
+        </div>
+        
+        <!-- Aceptación Form (Hidden by default) -->
+        <div id="aceptacion-cotizacion-form" style="display:none; flex-direction:column; gap:0.6rem; margin-top:1rem; border-top:1px solid rgba(255,255,255,0.06); padding-top:1rem; text-align:left;">
+          <label style="font-size:0.8rem; font-weight:600; color:var(--green);">Subir Orden de Compra (PDF, Opcional):</label>
+          <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.25rem;">
+            <input type="file" id="cot-pdf-pedido-input" accept=".pdf" style="display:none;" onchange="window.handleCotPdfPedidoSelected(this)" />
+            <button type="button" class="btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.7rem; cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;" onclick="document.getElementById('cot-pdf-pedido-input').click()">
+              <i data-lucide="upload" style="width:13px; height:13px;"></i> Seleccionar PDF
+            </button>
+            <span id="cot-pdf-pedido-filename" style="font-size:0.75rem; color:var(--text-muted); font-style:italic; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:200px;">Ningún archivo seleccionado</span>
+          </div>
+          <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
+            <button type="button" class="btn-primary" style="flex:1; justify-content:center; padding:0.4rem; background:var(--green); border-color:var(--green); font-size:0.8rem; display:inline-flex; align-items:center; gap:0.25rem;" onclick="window.responderCotizacionConPedidoCliente('${t.id}')">
+              <i data-lucide="check-circle" style="width:13px; height:13px;"></i> Confirmar y Aceptar
+            </button>
+            <button type="button" class="btn-secondary" style="padding:0.4rem; font-size:0.8rem;" onclick="window.ocultarFormAceptacionCotizacion()">
+              Cancelar
+            </button>
+          </div>
         </div>
         
         <!-- Rechazo Form (Hidden by default) -->
@@ -2159,7 +2389,7 @@ function abrirDetalleTicketCliente(id) {
           ` : ''}
           ${t.pdfPedido ? `
             <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:0.5rem; background:rgba(255,255,255,0.05); border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
-              <span style="font-size:0.8rem; font-weight:600;"><i data-lucide="shopping-cart" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; color:var(--accent);"></i> Archivo de Pedido</span>
+              <span style="font-size:0.8rem; font-weight:600;"><i data-lucide="file-text" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; color:var(--accent);"></i> Orden de Compra</span>
               <div style="display:flex; gap:0.35rem;">
                 <button type="button" class="btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.6rem; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;" onclick="visualizarTicketPdf('${t.id}', 'pedido')"><i data-lucide="eye" style="width:13px; height:13px;"></i> Ver</button>
                 <button type="button" class="btn-primary" style="font-size:0.75rem; padding:0.35rem 0.6rem; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;" onclick="descargarTicketPdf('${t.id}', 'pedido')"><i data-lucide="download" style="width:13px; height:13px;"></i> Descargar</button>
@@ -2197,7 +2427,7 @@ function abrirDetalleTicketCliente(id) {
       </div>
       <div>
         <span style="color:var(--text-muted); font-size:0.75rem; display:block;">Estado</span>
-        <span class="status-pill ${est}">${t.estado || 'Abierto'}</span>
+        <span class="status-pill ${detailEstClass}">${detailEstado}</span>
       </div>
       <div>
         <span style="color:var(--text-muted); font-size:0.75rem; display:block;">Equipo</span>
@@ -2860,11 +3090,40 @@ function abrirDetalleOrdenCliente(id) {
   let mBrand = o.marca || (o.equipo ? o.equipo.split(' ')[0] : '');
   const marcaText = MARCAS_RENDER[mBrand.toUpperCase()] || mBrand || '—';
 
-  const maq = o.maquinaria_id 
-    ? (maquinariaDb || []).find(m => m.id === o.maquinaria_id) 
-    : (o.serie 
-        ? (maquinariaDb || []).find(m => m.serie === o.serie) 
-        : (o.modelo && o.cliente ? (maquinariaDb || []).find(m => m.modelo === o.modelo && m.cliente === o.cliente) : null));
+  let maq = null;
+  const mDb = maquinariaDb || [];
+  const cDb = clientesDb || [];
+  if (o.maquinaria_id) {
+    maq = mDb.find(m => m.id === o.maquinaria_id || m.idInterno === o.maquinaria_id);
+    if (!maq) {
+      cDb.forEach(c => {
+        if (c.maquinas) {
+          const found = c.maquinas.find(m => m.id === o.maquinaria_id || m.idInterno === o.maquinaria_id);
+          if (found) maq = found;
+        }
+      });
+    }
+  } else if (o.serie) {
+    maq = mDb.find(m => m.serie === o.serie);
+    if (!maq) {
+      cDb.forEach(c => {
+        if (c.maquinas) {
+          const found = c.maquinas.find(m => m.serie === o.serie);
+          if (found) maq = found;
+        }
+      });
+    }
+  } else if (o.modelo && o.cliente) {
+    maq = mDb.find(m => m.modelo === o.modelo && m.cliente === o.cliente);
+    if (!maq) {
+      cDb.forEach(c => {
+        if (c.maquinas && c.nombre === o.cliente) {
+          const found = c.maquinas.find(m => m.modelo === o.modelo);
+          if (found) maq = found;
+        }
+      });
+    }
+  }
   const idMaquinaText = maq && (maq.idInterno || maq.id) ? maq.idInterno || maq.id : '—';
 
   // Buscar Ticket de Soporte de origen
@@ -3391,11 +3650,40 @@ async function abrirReportePdfCliente(e, orderId, soloVisualizar = false) {
           return MARCAS_RENDER[m.toUpperCase()] || m || '—';
         })(), 1)} ${field('Modelo', o.modelo, 1)} ${field('Serie', o.serie, 1)}
         ${field('ID Máquina', (() => {
-          const maq = o.maquinaria_id 
-            ? (maquinariaDb || []).find(m => m.id === o.maquinaria_id) 
-            : (o.serie 
-                ? (maquinariaDb || []).find(m => m.serie === o.serie) 
-                : (o.modelo && o.cliente ? (maquinariaDb || []).find(m => m.modelo === o.modelo && m.cliente === o.cliente) : null));
+          let maq = null;
+          const mDb = maquinariaDb || [];
+          const cDb = clientesDb || [];
+          if (o.maquinaria_id) {
+            maq = mDb.find(m => m.id === o.maquinaria_id || m.idInterno === o.maquinaria_id);
+            if (!maq) {
+              cDb.forEach(c => {
+                if (c.maquinas) {
+                  const found = c.maquinas.find(m => m.id === o.maquinaria_id || m.idInterno === o.maquinaria_id);
+                  if (found) maq = found;
+                }
+              });
+            }
+          } else if (o.serie) {
+            maq = mDb.find(m => m.serie === o.serie);
+            if (!maq) {
+              cDb.forEach(c => {
+                if (c.maquinas) {
+                  const found = c.maquinas.find(m => m.serie === o.serie);
+                  if (found) maq = found;
+                }
+              });
+            }
+          } else if (o.modelo && o.cliente) {
+            maq = mDb.find(m => m.modelo === o.modelo && m.cliente === o.cliente);
+            if (!maq) {
+              cDb.forEach(c => {
+                if (c.maquinas && c.nombre === o.cliente) {
+                  const found = c.maquinas.find(m => m.modelo === o.modelo);
+                  if (found) maq = found;
+                }
+              });
+            }
+          }
           return maq && (maq.idInterno || maq.id) ? `<span style="font-family:monospace; font-weight:600; color:#e8820c; background:rgba(232, 133, 10, 0.12); padding:0.15rem 0.4rem; border-radius:4px; border:1px solid rgba(232, 133, 10, 0.3);">${maq.idInterno || maq.id}</span>` : '—';
         })(), 1)}
         ${field('Técnico', o.tecnico, 1)}
@@ -3678,10 +3966,90 @@ async function registrarClienteSubmit(e) {
 }
 
 // Funciones para Aceptación / Rechazo de Cotizaciones por el Cliente
+window.mostrarFormAceptacionCotizacion = function() {
+  const actionsGroup = document.getElementById('cotizacion-actions-group');
+  const formAceptacion = document.getElementById('aceptacion-cotizacion-form');
+  const formRechazo = document.getElementById('rechazo-cotizacion-form');
+  if (actionsGroup) actionsGroup.style.display = 'none';
+  if (formRechazo) formRechazo.style.display = 'none';
+  if (formAceptacion) formAceptacion.style.display = 'flex';
+};
+
+window.ocultarFormAceptacionCotizacion = function() {
+  const actionsGroup = document.getElementById('cotizacion-actions-group');
+  const formAceptacion = document.getElementById('aceptacion-cotizacion-form');
+  if (actionsGroup) actionsGroup.style.display = 'flex';
+  if (formAceptacion) formAceptacion.style.display = 'none';
+  
+  // Limpiar inputs
+  const fileInput = document.getElementById('cot-pdf-pedido-input');
+  if (fileInput) fileInput.value = '';
+  const filenameSpan = document.getElementById('cot-pdf-pedido-filename');
+  if (filenameSpan) filenameSpan.textContent = 'Ningún archivo seleccionado';
+  window.selectedPedidoPdfBase64 = null;
+};
+
+window.handleCotPdfPedidoSelected = function(input) {
+  const filenameSpan = document.getElementById('cot-pdf-pedido-filename');
+  if (!input.files || input.files.length === 0) {
+    if (filenameSpan) filenameSpan.textContent = 'Ningún archivo seleccionado';
+    window.selectedPedidoPdfBase64 = null;
+    return;
+  }
+  
+  const file = input.files[0];
+  if (file.type !== 'application/pdf') {
+    showToast('Solo se permiten archivos en formato PDF.', 'error');
+    input.value = '';
+    if (filenameSpan) filenameSpan.textContent = 'Ningún archivo seleccionado';
+    window.selectedPedidoPdfBase64 = null;
+    return;
+  }
+
+  if (file.size > 5 * 1024 * 1024) { // 5MB limit
+    showToast('El archivo es demasiado grande (máximo 5MB).', 'error');
+    input.value = '';
+    if (filenameSpan) filenameSpan.textContent = 'Ningún archivo seleccionado';
+    window.selectedPedidoPdfBase64 = null;
+    return;
+  }
+
+  if (filenameSpan) filenameSpan.textContent = file.name;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    window.selectedPedidoPdfBase64 = e.target.result;
+  };
+  reader.onerror = function() {
+    showToast('Error al leer el archivo PDF.', 'error');
+    window.selectedPedidoPdfBase64 = null;
+  };
+  reader.readAsDataURL(file);
+};
+
+window.responderCotizacionConPedidoCliente = async function(ticketId) {
+  const t = tickets.find(x => x.id === ticketId);
+  if (!t) return;
+  
+  if (window.selectedPedidoPdfBase64) {
+    t.pdfPedido = window.selectedPedidoPdfBase64;
+  } else {
+    t.pdfPedido = null;
+  }
+  
+  // Limpiar el estado de selección antes del renderizado
+  window.selectedPedidoPdfBase64 = null;
+  
+  // Continuar con la aceptación regular
+  await responderCotizacionCliente(ticketId, 'si');
+};
+
 function mostrarFormRechazoCotizacion() {
   const actionsGroup = document.getElementById('cotizacion-actions-group');
   const formRechazo = document.getElementById('rechazo-cotizacion-form');
+  const formAceptacion = document.getElementById('aceptacion-cotizacion-form');
   if (actionsGroup) actionsGroup.style.display = 'none';
+  if (formAceptacion) formAceptacion.style.display = 'none';
   if (formRechazo) formRechazo.style.display = 'flex';
 }
 
@@ -3792,8 +4160,70 @@ window.guardarDireccionSitio = async function(event) {
     showToast('Ocurrió un error al guardar los cambios: ' + error.message, 'error');
   }
 };
+function getClientChatUnreadCount() {
+  const activeSandbox = isTestModeActive();
+  const chatTicket = tickets.find(t => t.categoria === 'Soporte General' && isTestData(t) === activeSandbox && (String(t.cliente || '').toLowerCase().trim() === nombreEmpresaLogged || String(t.solicitante || '').toLowerCase().trim() === nombreEmpresaLogged));
+  
+  if (!chatTicket || !chatTicket.comentariosClientes || chatTicket.comentariosClientes.length === 0) return 0;
+  
+  // Si la vista actual es la de soporte, entonces el usuario está leyendo, por lo que el count es 0
+  const activeViewEl = document.getElementById('view-soporte');
+  if (activeViewEl && activeViewEl.classList.contains('active')) {
+    return 0;
+  }
+  
+  let lastOpenedMap = {};
+  try {
+    lastOpenedMap = JSON.parse(localStorage.getItem('sapi_client_chat_last_opened') || '{}');
+  } catch(e) {}
+  
+  const lastOpenedStr = lastOpenedMap[chatTicket.id];
+  const lastOpened = lastOpenedStr ? new Date(lastOpenedStr).getTime() : 0;
+  
+  const currentClientName = nombreEmpresaLogged || 'Cliente';
+  
+  let unreadCount = 0;
+  chatTicket.comentariosClientes.forEach(c => {
+    const isMe = c.usuario === currentClientName || c.usuario === 'Cliente' || String(c.usuario || '').toLowerCase().includes(String(currentClientName).toLowerCase());
+    if (!isMe) {
+      const msgTime = new Date(c.fecha).getTime();
+      if (msgTime > lastOpened) {
+        unreadCount++;
+      }
+    }
+  });
+  
+  return unreadCount;
+}
 
+function markClientChatAsRead() {
+  const activeSandbox = isTestModeActive();
+  const chatTicket = tickets.find(t => t.categoria === 'Soporte General' && isTestData(t) === activeSandbox && (String(t.cliente || '').toLowerCase().trim() === nombreEmpresaLogged || String(t.solicitante || '').toLowerCase().trim() === nombreEmpresaLogged));
+  
+  if (!chatTicket) return;
+  
+  try {
+    let lastOpenedMap = JSON.parse(localStorage.getItem('sapi_client_chat_last_opened') || '{}');
+    lastOpenedMap[chatTicket.id] = new Date().toISOString();
+    localStorage.setItem('sapi_client_chat_last_opened', JSON.stringify(lastOpenedMap));
+  } catch(e) {}
+}
 
+window.updateClientSidebarChatBadge = function() {
+  const badge = document.getElementById('nav-badge-soporte-cliente');
+  if (!badge) return;
+  
+  const unreadCount = getClientChatUnreadCount();
+  
+  if (unreadCount > 0) {
+    badge.textContent = unreadCount;
+    badge.style.display = 'inline-block';
+    badge.classList.add('visible');
+  } else {
+    badge.style.display = 'none';
+    badge.classList.remove('visible');
+  }
+};
 
 // Renderizar sección de chat de soporte general
 function renderGeneralSupportChatSection() {
@@ -3824,7 +4254,10 @@ function renderGeneralSupportChatSection() {
   // Buscar el ticket de soporte general del cliente
   let chatTicket = tickets.find(t => t.categoria === 'Soporte General' && isTestData(t) === activeSandbox && (String(t.cliente || '').toLowerCase().trim() === nombreEmpresaLogged || String(t.solicitante || '').toLowerCase().trim() === nombreEmpresaLogged));
   
-  if (!chatTicket) {
+  if (chatTicket) {
+    markClientChatAsRead();
+    try { window.updateClientSidebarChatBadge(); } catch(e) {}
+  } else {
     // Si no existe, se creará al enviar el primer mensaje, por ahora mostramos estado vacío
     container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-style: italic; font-size: 0.85rem; padding: 2rem 0;">No hay mensajes en este chat de soporte. Escribe un mensaje abajo para iniciar.</div>`;
     return;
@@ -3872,10 +4305,10 @@ window.enviarMensajeSoporteGeneral = async function() {
   if (!chatTicket) {
     chatTicket = {
       id: 'chat_' + Math.random().toString(36).substring(2, 15),
-      folio: 'SOP-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
+      folio: activeSandbox ? 'PRUEBA-SOP-' + Math.random().toString(36).substring(2, 6).toUpperCase() : 'SOP-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
       fecha: new Date().toISOString(),
       fechaCreacion: new Date().toISOString(),
-      asunto: 'Chat de Soporte General',
+      asunto: activeSandbox ? '[PRUEBA] Chat de Soporte General' : 'Chat de Soporte General',
       cliente: nombreEmpresaLogged,
       solicitante: nombreEmpresaLogged,
       categoria: 'Soporte General',
@@ -3884,13 +4317,19 @@ window.enviarMensajeSoporteGeneral = async function() {
       descripcion: 'Canal de comunicación directa con soporte de Eurorep.',
       comentariosClientes: [],
       comentariosInternos: [],
-      esPrueba: activeSandbox
+      esPrueba: activeSandbox,
+      notas: activeSandbox ? JSON.stringify({ esPrueba: true }) : ''
     };
     tickets.push(chatTicket);
   }
 
+  const activeUser = simUser || currentSession;
+  const userName = activeUser ? activeUser.nombre : 'Cliente';
+  const companyCapitalized = activeUser ? (activeUser.empresa || activeUser.nombre) : 'Cliente';
+  const commentAuthor = `${companyCapitalized} (${userName})`;
+
   const nuevoMensaje = {
-    usuario: currentClientName,
+    usuario: commentAuthor,
     fecha: new Date().toISOString(),
     texto: text
   };
@@ -3909,6 +4348,7 @@ window.enviarMensajeSoporteGeneral = async function() {
 
   // Limpiar e inmediatamente re-renderizar
   textarea.value = '';
+  markClientChatAsRead();
   doRender();
 
   // Guardar en Supabase
