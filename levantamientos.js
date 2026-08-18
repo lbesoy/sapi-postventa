@@ -502,7 +502,7 @@ window.agregarEvidenciaLevantamiento = function() {
   newEv.onmouseover = function() { if(!this.style.backgroundImage) { this.style.borderColor='var(--primary)'; this.style.background='var(--primary-light, #f8fafc)'; } };
   newEv.onmouseout = function() { if(!this.style.backgroundImage) { this.style.borderColor='var(--border)'; this.style.background='var(--bg-body)'; } };
   newEv.innerHTML = `
-    <button type="button" onclick="event.preventDefault(); this.parentElement.remove();" style="position:absolute; top:4px; right:4px; background:rgba(255,255,255,0.8); border-radius:4px; padding:2px; border:none; color:var(--danger); cursor:pointer; z-index:10;"><i data-lucide="x" style="width:14px; height:14px;"></i></button>
+    <button type="button" onclick="event.preventDefault(); event.stopPropagation(); this.parentElement.remove();" style="position:absolute; top:4px; right:4px; background:rgba(255,255,255,0.8); border-radius:4px; padding:2px; border:none; color:var(--danger); cursor:pointer; z-index:10;"><i data-lucide="x" style="width:14px; height:14px;"></i></button>
     <i data-lucide="upload-cloud" style="width:24px; height:24px; color:var(--text-muted); margin-bottom:0.5rem; transition:color 0.2s;"></i>
     <span style="font-size:0.75rem; color:var(--text-secondary); text-align:center; font-weight:500; line-height:1.2;">Seleccionar<br>Archivo ${newIndex}</span>
     <input type="file" class="det-lev-ev-file" accept="image/*" style="display:none;" onchange="window.handleEvidenciaFileChange(this, '${newIndex}')">
@@ -546,6 +546,7 @@ window.handleEvidenciaFileChange = function(input, indexStr) {
         delBtn.style.cssText = 'position:absolute; top:4px; right:4px; background:rgba(255,255,255,0.8); border-radius:4px; padding:2px; border:none; color:var(--danger); cursor:pointer; z-index:10;';
         delBtn.onclick = (ev) => {
           ev.preventDefault();
+          ev.stopPropagation();
           input.value = '';
           label.style.backgroundImage = '';
           if (icon) icon.style.display = '';
@@ -564,6 +565,25 @@ window.handleEvidenciaFileChange = function(input, indexStr) {
     if (span) span.style.display = '';
     if (span) span.innerHTML = 'Seleccionar<br>Archivo ' + indexStr;
   }
+};
+
+window.renderRefaccionesLevantamientoList = function(id) {
+  const lev = levantamientos.find(l => l.id === id);
+  const container = document.getElementById('det-lev-refacciones-list');
+  if (!container || !lev) return;
+  
+  const isCompleted = lev.estado === 'Completado';
+  const isTecnico = (typeof currentSession !== 'undefined' && currentSession.viewMode === 'tecnico');
+  const canEdit = !isCompleted && !(isTecnico && lev.estado === 'Realizado');
+
+  container.innerHTML = (lev.refacciones || []).map((r, i) => `
+    <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-body); padding:0.5rem 0.75rem; border:1px solid var(--border); border-radius:6px; font-size:0.8rem;">
+      <div><strong>${r.cantidad}x</strong> [${r.refaccion}] ${r.descripcion}</div>
+      ${canEdit ? `<button type="button" onclick="eliminarRefaccionLevantamiento('${id}', ${i})" style="color:var(--danger); background:none; border:none; cursor:pointer;"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>` : ''}
+    </div>
+  `).join('') + ((!lev.refacciones || lev.refacciones.length === 0) ? '<div style="font-size:0.8rem; color:var(--text-muted);">No se han agregado refacciones.</div>' : '');
+  
+  if (window.lucide) window.lucide.createIcons();
 };
 
 window.agregarRefaccionLevantamiento = function(id) {
@@ -593,9 +613,14 @@ window.agregarRefaccionLevantamiento = function(id) {
     window.pushToSupabase('levantamientos', lev);
   }
   
-  // Re-render modal details
-  document.getElementById('modal-detalle-levantamiento').remove();
-  verDetalleLevantamiento(id);
+  // Reset input fields in the DOM instead of re-rendering the whole modal
+  if (select) select.value = '';
+  if (cantInput) cantInput.value = '1';
+  if (typeof window.initSearchableSelect === 'function') {
+    window.initSearchableSelect('det-lev-nueva-ref', 'Buscar refacción...');
+  }
+  
+  window.renderRefaccionesLevantamientoList(id);
 };
 
 window.eliminarRefaccionLevantamiento = function(id, index) {
@@ -608,9 +633,8 @@ window.eliminarRefaccionLevantamiento = function(id, index) {
     window.pushToSupabase('levantamientos', lev);
   }
   
-  // Re-render modal details
-  document.getElementById('modal-detalle-levantamiento').remove();
-  verDetalleLevantamiento(id);
+  // Update refacciones list HTML in DOM instead of re-rendering the whole modal
+  window.renderRefaccionesLevantamientoList(id);
 };
 
 function actualizarLevantamiento(id, campo, valor) {
