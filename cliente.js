@@ -1322,7 +1322,7 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
     const todasOrdenesCerradas = !tieneOrdenes || ordenesTicket.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
     const enServicio = tieneOrdenes && !todasOrdenesCerradas;
 
-    const esCerrado = (estLower === 'cerrado') || ((tienePedido || tieneOrdenes) && todasOrdenesCerradas);
+    const esCerrado = tieneOrdenes ? todasOrdenesCerradas : (estLower === 'cerrado');
     const esServicio = (enServicio || tienePedido) && !esCerrado;
 
     if (esCerrado) {
@@ -1371,7 +1371,7 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
       const todasOrdenesCerradas = !tieneOrdenes || ordenesTicket.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
       const enServicio = tieneOrdenes && !todasOrdenesCerradas;
 
-      const esCerrado = (tienePedido || tieneOrdenes) && todasOrdenesCerradas;
+      const esCerrado = tieneOrdenes ? todasOrdenesCerradas : (estLower === 'cerrado');
       const esServicio = (enServicio || tienePedido) && !esCerrado;
 
       return !tieneTecnico && estLower !== 'cerrado' && cotAceptadaVal !== 'si' && !esCerrado && !esServicio;
@@ -1391,7 +1391,7 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
       const todasOrdenesCerradas = !tieneOrdenes || ordenesTicket.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
       const enServicio = tieneOrdenes && !todasOrdenesCerradas;
 
-      const esCerrado = (tienePedido || tieneOrdenes) && todasOrdenesCerradas;
+      const esCerrado = tieneOrdenes ? todasOrdenesCerradas : (estLower === 'cerrado');
       const esServicio = (enServicio || tienePedido) && !esCerrado;
 
       return tieneTecnico && !tieneCotizacion && cotAceptadaVal !== 'si' && !esCerrado && !esServicio;
@@ -1407,13 +1407,14 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
       const todasOrdenesCerradas = !tieneOrdenes || ordenesTicket.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
       const enServicio = tieneOrdenes && !todasOrdenesCerradas;
 
-      const esCerrado = (tienePedido || tieneOrdenes) && todasOrdenesCerradas;
+      const esCerrado = tieneOrdenes ? todasOrdenesCerradas : (estLower === 'cerrado');
       const esServicio = (enServicio || tienePedido) && !esCerrado;
 
       return tieneCotizacion && cotAceptadaVal !== 'si' && !esCerrado && !esServicio;
     });
   } else if (currentTicketFiltro === 'proceso') {
     filtered = filtered.filter(t => {
+      const estLower = String(t.estado || 'Abierto').toLowerCase().trim();
       const cotAceptadaVal = String(t.cotAceptada || t.cot_aceptada || '').trim().toLowerCase();
       const tienePedido = !!(t.pedidoSAP || t.pedido_sap);
       const ordenesTicket = ordenes.filter(o => o.soporte === t.id || o.soporte === t.folio);
@@ -1421,32 +1422,34 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
       const todasOrdenesCerradas = !tieneOrdenes || ordenesTicket.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
       const enServicio = tieneOrdenes && !todasOrdenesCerradas;
 
-      const esCerrado = (tienePedido || tieneOrdenes) && todasOrdenesCerradas;
+      const esCerrado = tieneOrdenes ? todasOrdenesCerradas : (estLower === 'cerrado');
       const esServicio = (enServicio || tienePedido) && !esCerrado;
 
       return cotAceptadaVal === 'si' && !esCerrado && !esServicio;
     });
   } else if (currentTicketFiltro === 'servicio') {
     filtered = filtered.filter(t => {
+      const estLower = String(t.estado || 'Abierto').toLowerCase().trim();
       const tienePedido = !!(t.pedidoSAP || t.pedido_sap);
       const ordenesTicket = ordenes.filter(o => o.soporte === t.id || o.soporte === t.folio);
       const tieneOrdenes = ordenesTicket.length > 0;
       const todasOrdenesCerradas = !tieneOrdenes || ordenesTicket.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
       const enServicio = tieneOrdenes && !todasOrdenesCerradas;
 
-      const esCerrado = (tienePedido || tieneOrdenes) && todasOrdenesCerradas;
+      const esCerrado = tieneOrdenes ? todasOrdenesCerradas : (estLower === 'cerrado');
       const esServicio = (enServicio || tienePedido) && !esCerrado;
 
       return esServicio;
     });
   } else if (currentTicketFiltro === 'cerrado') {
     filtered = filtered.filter(t => {
+      const estLower = String(t.estado || 'Abierto').toLowerCase().trim();
       const tienePedido = !!(t.pedidoSAP || t.pedido_sap);
       const ordenesTicket = ordenes.filter(o => o.soporte === t.id || o.soporte === t.folio);
       const tieneOrdenes = ordenesTicket.length > 0;
       const todasOrdenesCerradas = !tieneOrdenes || ordenesTicket.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
 
-      const esCerrado = (tienePedido || tieneOrdenes) && todasOrdenesCerradas;
+      const esCerrado = tieneOrdenes ? todasOrdenesCerradas : (estLower === 'cerrado');
 
       return esCerrado;
     });
@@ -1573,7 +1576,7 @@ function renderTicketsSection(misSitios, misEquipos, misTickets) {
     const todasOrdenesCerradas = !tieneOrdenes || ordenesTicket.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
     const enServicio = tieneOrdenes && !todasOrdenesCerradas;
 
-    const esCerrado = (est === 'cerrado') || ((tienePedido || tieneOrdenes) && todasOrdenesCerradas);
+    const esCerrado = tieneOrdenes ? todasOrdenesCerradas : (est === 'cerrado');
     const esServicio = (enServicio || tienePedido) && !esCerrado;
 
     // Asignación secuencial de clases activas
@@ -2208,7 +2211,7 @@ function abrirDetalleTicketCliente(id) {
   const todasOrdenesCerradasDetail = !tieneOrdenesDetail || ordenesTicketDetail.every(o => o.estado && CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase()));
   const enServicioDetail = tieneOrdenesDetail && !todasOrdenesCerradasDetail;
 
-  const esCerradoDetail = (estLowerDetail === 'cerrado') || ((tienePedidoDetail || tieneOrdenesDetail) && todasOrdenesCerradasDetail);
+  const esCerradoDetail = tieneOrdenesDetail ? todasOrdenesCerradasDetail : (estLowerDetail === 'cerrado');
   const esServicioDetail = (enServicioDetail || tienePedidoDetail) && !esCerradoDetail;
 
   let detailEstado = t.estado || 'Abierto';
