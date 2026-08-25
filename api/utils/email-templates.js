@@ -114,3 +114,43 @@ export function getTemplateForStage(stage, ticket, cliente) {
 
   return { subject, html: fullHtml };
 }
+
+export function getTemplateForInternalComment(ticket, comment, recipientName) {
+  const folio = ticket.folio || 'N/A';
+  const asuntoOriginal = ticket.asunto || 'Solicitud de Servicio';
+  
+  const subject = `Nuevo Comentario Interno - Ticket ${folio}: ${asuntoOriginal}`;
+  const bodyHtml = `
+    <p>Hola <strong>${recipientName}</strong>,</p>
+    <p>Se ha registrado un nuevo <strong>comentario interno</strong> en el ticket con folio <strong>${folio}</strong>.</p>
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 15px; margin: 15px 0;">
+      <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #64748b;">
+        <strong>Autor:</strong> ${comment.usuario || 'Sistema'} | 
+        <strong>Fecha:</strong> ${comment.fecha ? new Date(comment.fecha).toLocaleString('es-MX', { timeZone: 'America/Mexico_City' }) : 'N/A'}
+      </p>
+      <div style="color: #475569; font-size: 0.95rem; white-space: pre-wrap; line-height: 1.5; font-style: italic;">
+        ${comment.texto || ''}
+      </div>
+    </div>
+    <p>Puedes ingresar al sistema EuroRep para dar seguimiento.</p>
+  `;
+
+  // Estructura y diseño premium responsivo (Eurorep)
+  const fullHtml = `
+    <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 25px; border-radius: 8px; background-color: #ffffff;">
+      <div style="text-align: center; border-bottom: 2px solid #e8820c; padding-bottom: 15px; margin-bottom: 20px;">
+        <h1 style="color: #1e293b; font-size: 20px; margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">Portal de Servicio Posventa</h1>
+        <span style="color: #e8820c; font-weight: bold; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Euro Representaciones</span>
+      </div>
+      <div style="line-height: 1.6; font-size: 15px; color: #475569;">
+        ${bodyHtml}
+      </div>
+      <div style="border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 25px; text-align: center; color: #94a3b8; font-size: 11px; line-height: 1.4;">
+        <p>Este es un correo automático referente al folio <strong>${folio}</strong>.</p>
+        <p>© ${new Date().getFullYear()} Euro Representaciones. Todos los derechos reservados.</p>
+      </div>
+    </div>
+  `;
+
+  return { subject, html: fullHtml };
+}

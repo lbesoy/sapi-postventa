@@ -17,3 +17,7 @@ backend/debug_sap.js
 backend/delete_all.js
 backend/pdf_extractor
 
+# Exclusión de perfil local de Chrome para generación de capturas
+manuales/chrome_profile/
+
+

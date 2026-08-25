@@ -188,6 +188,9 @@
           <i data-lucide="message-square"></i> <span>Soporte</span>
           <span class="nav-badge" id="nav-badge-soporte-cliente"></span>
         </a>
+        <a href="#" class="nav-item" data-target="preferencias">
+          <i data-lucide="sliders"></i> <span>Preferencias</span>
+        </a>
       </nav>
       <div class="sidebar-footer">
         <div class="user-badge">
@@ -657,6 +660,45 @@
               <div style="background:var(--bg-primary); border:1px solid var(--border); padding:1rem 1.5rem; border-radius:8px; display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; color:var(--text-secondary);">
                 <i data-lucide="calendar" style="width:18px; height:18px; color:var(--accent);"></i>
                 Fechas Estimadas
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 8. PREFERENCIAS VIEW -->
+        <div id="view-preferencias" class="view">
+          <div class="stats-grid" style="grid-template-columns: 1fr; max-width: 600px; margin: 0 auto;">
+            <div class="config-card" style="background:var(--bg-card); border:1px solid var(--border); padding:1.5rem; border-radius:12px; margin-top:1.5rem;">
+              <div class="config-card-header" style="display:flex; gap:1rem; align-items:center; border-bottom:1px dashed var(--border); padding-bottom:1rem; margin-bottom:1rem; text-align:left;">
+                <div class="config-card-icon" style="background:rgba(16, 185, 129, 0.1); color:#10b981; display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:8px;">
+                  <i data-lucide="sliders"></i>
+                </div>
+                <div>
+                  <div class="config-card-title" style="font-weight:700; font-size:1.1rem; color:var(--text-primary);">Preferencias y Ayuda</div>
+                  <div class="config-card-sub" style="font-size:0.85rem; color:var(--text-secondary);">Ajustes de cuenta y manuales oficiales</div>
+                </div>
+              </div>
+              
+              <div style="display:flex; flex-direction:column; gap:1.25rem; margin-top:1rem; text-align:left;">
+                <!-- Manuales de Ayuda -->
+                <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                  <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary);">Manual de Ayuda y Uso</div>
+                  <div style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.25rem; line-height:1.4;">Descarga la guía oficial para clientes en formato PDF para aprender a reportar fallas y autorizar cotizaciones:</div>
+                  <a href="manuales/manual_cliente.pdf" target="_blank" class="btn-primary" style="text-align: center; text-decoration: none; font-size: 0.85rem; padding: 0.5rem 1rem; display: flex; align-items: center; justify-content: center; gap: 0.4rem; cursor: pointer; border-radius: 6px; background: var(--primary); color: white; border: none; font-weight: 600; width:100%; box-sizing:border-box;">
+                    <i data-lucide="download" style="width:15px; height:15px;"></i> Descargar Manual de Cliente (PDF)
+                  </a>
+                </div>
+                
+                <!-- Temas -->
+                <div style="border-top:1px dashed var(--border); padding-top:1rem; display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary);">Modo Oscuro / Claro</div>
+                    <div style="font-size:0.8rem; color:var(--text-secondary);">Cambia el aspecto visual del portal</div>
+                  </div>
+                  <button class="btn-secondary" onclick="toggleTheme()" style="padding:0.4rem 0.8rem; border-radius:6px; font-size:0.8rem; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); cursor:pointer;">
+                    Cambiar Tema
+                  </button>
+                </div>
               </div>
             </div>
           </div>

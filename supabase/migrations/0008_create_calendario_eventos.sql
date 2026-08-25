@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS public.calendario_eventos (
     fecha_inicio TIMESTAMP WITH TIME ZONE NOT NULL,
     fecha_fin TIMESTAMP WITH TIME ZONE,
     todo_el_dia BOOLEAN DEFAULT false,
-    tipo TEXT NOT NULL CHECK (tipo IN ('Junta', 'Capacitación', 'Vacaciones', 'Descanso', 'Otro', 'Servicio', 'Levantamiento')),
+    tipo TEXT NOT NULL CHECK (tipo IN ('Junta', 'Capacitación', 'Vacaciones', 'Descanso', 'Otro', 'Servicio', 'Levantamiento', 'Traslado')),
     tecnico_id UUID REFERENCES public.user_roles(id) ON DELETE CASCADE,
     tecnico_nombre TEXT,
     creado_por UUID REFERENCES public.user_roles(id) ON DELETE SET NULL,
@@ -19,10 +19,12 @@ CREATE TABLE IF NOT EXISTS public.calendario_eventos (
 ALTER TABLE public.calendario_eventos ENABLE ROW LEVEL SECURITY;
 
 -- Políticas de lectura: Todos los usuarios autenticados pueden ver los eventos
+DROP POLICY IF EXISTS "Permitir select de eventos a autenticados" ON public.calendario_eventos;
 CREATE POLICY "Permitir select de eventos a autenticados" 
 ON public.calendario_eventos FOR SELECT TO authenticated USING (true);
 
 -- Políticas de escritura para administradores y supervisores
+DROP POLICY IF EXISTS "Admins y Supervisores full access eventos" ON public.calendario_eventos;
 CREATE POLICY "Admins y Supervisores full access eventos" 
 ON public.calendario_eventos FOR ALL TO authenticated USING (
     (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
@@ -31,6 +33,7 @@ ON public.calendario_eventos FOR ALL TO authenticated USING (
 );
 
 -- Habilitar a los técnicos a registrar o gestionar sus propios eventos (e.g. solicitar vacaciones/descansos)
+DROP POLICY IF EXISTS "Tecnicos pueden gestionar sus propios eventos" ON public.calendario_eventos;
 CREATE POLICY "Tecnicos pueden gestionar sus propios eventos" 
 ON public.calendario_eventos FOR ALL TO authenticated USING (
     tecnico_id = auth.uid()

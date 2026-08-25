@@ -39,7 +39,8 @@ BEGIN
             0
         ) INTO next_num
         FROM public.tickets
-        WHERE folio LIKE prefix || '%';
+        WHERE folio LIKE prefix || '%'
+          AND SUBSTRING(folio FROM LENGTH(prefix) + 1) ~ '^[0-9]+$';
 
         -- Set the new sequential folio number
         NEW.folio := prefix || LPAD((next_num + 1)::TEXT, 3, '0');

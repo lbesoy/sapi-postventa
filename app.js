@@ -1,4 +1,40 @@
-let currentMaqSortCol = 'reciente';
+window.agregarMaquinaChip = function(maquinaName) {
+  if (!maquinaName) return;
+  const container = document.getElementById('t-equipos-seleccionados');
+  if (!container) return;
+  
+  // Evitar duplicados
+  const existing = Array.from(container.querySelectorAll('.maquina-chip')).some(c => c.getAttribute('data-value') === maquinaName);
+  if (existing) return;
+  
+  const currentTicket = editandoTicketId ? tickets.find(x => x.id === editandoTicketId) : null;
+  const isRefTicket = currentTicket && currentTicket.folio && currentTicket.folio.endsWith('-A');
+
+  const chip = document.createElement('div');
+  chip.className = 'maquina-chip';
+  chip.setAttribute('data-value', maquinaName);
+  chip.style.cssText = `
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-hover, #f3f4f6);
+    border: 1px solid var(--border, #e5e7eb);
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-primary, #1f2937);
+    gap: 0.25rem;
+    box-shadow: var(--shadow-sm);
+  `;
+  
+  const deleteBtn = isRefTicket ? '' : `<span onclick="this.parentElement.remove()" style="cursor:pointer; font-weight:bold; color:var(--red, #ef4444); margin-left:4px; font-size:1.1rem; line-height:1;">&times;</span>`;
+
+  chip.innerHTML = `
+    <span>${maquinaName}</span>
+    ${deleteBtn}
+  `;
+  container.appendChild(chip);
+};let currentMaqSortCol = 'reciente';
 let currentMaqSortDir = 'desc';
 let currentCliSortCol = 'reciente';
 let currentCliSortDir = 'desc';
@@ -44,6 +80,112 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
         }
       });
     };
+
+window.generarTicketsRefaccionesFaltantes = async function() {
+  console.log('[App] Iniciando escaneo y generación de tickets de refacciones faltantes para órdenes...');
+  let creados = 0;
+  
+  for (const o of ordenes) {
+    const refNecesarias = o.ref_necesarias || [];
+    if (refNecesarias.length === 0) continue;
+    
+    // Calcular el targetFolio correspondiente
+    let baseFolio = o.folio || '';
+    let parentTicketId = o.soporte || null;
+    let ticketPadre = parentTicketId ? tickets.find(t => t.id === parentTicketId) : null;
+    
+    let prefix = '';
+    let cleanFolio = baseFolio.trim();
+    if (cleanFolio.startsWith('[PRUEBA] ')) {
+      prefix = '[PRUEBA] ';
+      cleanFolio = cleanFolio.replace('[PRUEBA] ', '').trim();
+    } else if (cleanFolio.startsWith('[TEST] ')) {
+      prefix = '[TEST] ';
+      cleanFolio = cleanFolio.replace('[TEST] ', '').trim();
+    }
+    
+    if (!cleanFolio.toUpperCase().startsWith('TKT-')) {
+      cleanFolio = 'TKT-' + cleanFolio;
+    }
+    
+    const targetFolio = cleanFolio.endsWith('-A') ? `${prefix}${cleanFolio}` : `${prefix}${cleanFolio}-A`;
+    
+    // Verificar si ya existe un ticket local con este folio
+    let ticketExistente = tickets.find(t => t.folio === targetFolio);
+    if (ticketExistente) continue; // Ya existe, no hacemos nada
+    
+    // Crear el ticket autogenerado desde la orden
+    console.log(`[App] Generando ticket faltante ${targetFolio} para la orden ${o.folio}...`);
+    
+    const now = new Date().toISOString();
+    const refaccionesMapeadas = refNecesarias.map(r => ({
+      marca: r.marca || '',
+      codigo: r.clave || r.codigo || 'S/C',
+      clave: r.clave || r.codigo || 'S/C',
+      nombre: r.descripcion || r.nombre || 'Sin Descripción',
+      descripcion: r.descripcion || r.nombre || 'Sin Descripción',
+      cantidad: r.cantidad || 1,
+      estatusPedido: r.estatusPedido || 'Por Pedir'
+    }));
+
+    const ticket = {
+      id: crypto.randomUUID(),
+      folio: targetFolio,
+      fecha: now,
+      fechaCreacion: now,
+      fechaCierre: null,
+      canal: 'sistema',
+      contacto: '',
+      asunto: `Refacciones para ${baseFolio}`,
+      cliente: o.cliente,
+      sitio: o.ubicacion || o.ubicacion_sitio || '',
+      solicitante: o.creadoPor || o.tecnico || 'Sistema',
+      creadoPor: o.creadoPor || o.tecnico || 'Sistema',
+      area: ticketPadre ? (ticketPadre.area || 'Operaciones') : 'Operaciones',
+      categoria: 'Refacción',
+      prioridad: ticketPadre ? (ticketPadre.prioridad || 'Media') : 'Media',
+      asignado: o.tecnico || '',
+      descripcion: `Ticket de refacciones por pedir generado de la Orden de Servicio ${o.folio}.`,
+      equipo: o.equipo,
+      notas: '',
+      refaccionesSeleccionadas: refaccionesMapeadas,
+      cotizacionesAdicionales: [],
+      estado: 'Refacciones',
+      cotizacionSAP: '',
+      montoCotizacion: null,
+      cotAceptada: '',
+      motivoRechazo: '',
+      pedidoSAP: '',
+      comentariosInternos: [],
+      comentariosClientes: [],
+      tecnicosAsignados: [],
+      pdfPedido: null,
+      pdfCotizacion: null,
+      esPrueba: o.esPrueba || false
+    };
+    
+    tickets.unshift(ticket);
+    creados++;
+    
+    if (window.supabaseClient) {
+      try {
+        await window.pushToSupabase('tickets', ticket);
+      } catch (err) {
+        console.error(`[App] Error al sincronizar ticket faltante con Supabase:`, err);
+      }
+    }
+  }
+  
+  if (creados > 0) {
+    console.log(`[App] Se generaron ${creados} tickets de refacciones faltantes.`);
+    safeSetJSON('sapi_tickets', tickets);
+    if (typeof renderTickets === 'function') {
+      renderTickets();
+      renderTickets('dash-tickets');
+    }
+    if (typeof updateTicketBadge === 'function') updateTicketBadge(); updateOrdenesBadge();
+  }
+};
 
     if (document.readyState === 'complete') {
       registerSW();
@@ -259,6 +401,8 @@ if (typeof localStorage !== 'undefined' && !localStorage.getItem('eurorep_ticket
 }
 let tickets = safeGetJSON('sapi_tickets', []);
 let levantamientos = safeGetJSON('sapi_levantamientos', []);
+let ideasFallasDb = safeGetJSON('sapi_ideas_fallas', []);
+window.ideasFallasDb = ideasFallasDb;
 let clientesDb = safeGetJSON('sapi_clientes_db', []);
 let refaccionesDb = [];
 (async () => {
@@ -266,6 +410,7 @@ let refaccionesDb = [];
     refaccionesDb = await window.loadRefaccionesLocal();
     console.log(`[App] Catálogo de refacciones cargado desde IndexedDB (${refaccionesDb.length} registros).`);
     if (typeof renderRefacciones === 'function') renderRefacciones();
+    if (typeof renderRefaccionesPendientes === 'function') renderRefaccionesPendientes();
   } catch (err) {
     console.error('[App] Error al inicializar refacciones desde IndexedDB:', err);
   }
@@ -699,6 +844,8 @@ window.addEventListener('supabase_datos_cargados', async () => {
     tecnicosDb = safeGetJSON('sapi_tecnicos_db', []);
     gastos = safeGetJSON('sapi_gastos', []);
     levantamientos = safeGetJSON('sapi_levantamientos', []);
+    ideasFallasDb = safeGetJSON('sapi_ideas_fallas', []);
+    window.ideasFallasDb = ideasFallasDb;
     claraMockTxs = safeGetJSON('sapi_clara_mock_txs', claraMockTxs);
 
     usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
@@ -710,21 +857,74 @@ window.addEventListener('supabase_datos_cargados', async () => {
     const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
     const isAdmin = ['superadmin', 'admin'].includes(session.viewMode || session.rol);
     
-    if (isAdmin && !sessionStorage.getItem('eurorep_migrations_executed')) {
-      sessionStorage.setItem('eurorep_migrations_executed', 'true');
-      console.log('[App] Iniciando migraciones heredadas únicas de la sesión para administrador...');
-
-      // Ejecutar migración para rellenar datos de maquinaria perdidos en órdenes previas
-      window.migrarOrdenesExistentesMaquinaria();
-
-      // Ejecutar migración para rellenar ubicaciones de maquinaria perdidas desde tickets
-      if (typeof window.migrarUbicacionesMaquinariaDesdeTickets === 'function') {
-        window.migrarUbicacionesMaquinariaDesdeTickets();
+    if (isAdmin) {
+      if (!sessionStorage.getItem('eurorep_migrations_executed')) {
+        sessionStorage.setItem('eurorep_migrations_executed', 'true');
+        console.log('[App] Iniciando migraciones heredadas únicas de la sesión para administrador...');
+        window.migrarOrdenesExistentesMaquinaria();
+        if (typeof window.migrarUbicacionesMaquinariaDesdeTickets === 'function') {
+          window.migrarUbicacionesMaquinariaDesdeTickets();
+        }
+        if (typeof window.recuperarMaquinariaDesdeTickets === 'function') {
+          window.recuperarMaquinariaDesdeTickets();
+        }
       }
+      
+      if (!sessionStorage.getItem('eurorep_ref_tickets_migrated_v9')) {
+        sessionStorage.setItem('eurorep_ref_tickets_migrated_v9', 'true');
+        
+        let modifiedAny = false;
+        tickets = tickets.map(t => {
+          if (t && t.folio && t.folio.endsWith('-A')) {
+            const originalFolio = t.folio.replace('-A', '');
+            const parentTicket = tickets.find(x => x.folio === originalFolio);
+            let assocOrder = null;
+            if (parentTicket) {
+              assocOrder = ordenes.find(o => o.soporte === parentTicket.id);
+            }
+            if (!assocOrder) {
+              let cleanOrdFolio = originalFolio;
+              if (cleanOrdFolio.startsWith('[PRUEBA] ')) cleanOrdFolio = cleanOrdFolio.replace('[PRUEBA] ', '');
+              if (cleanOrdFolio.startsWith('[TEST] ')) cleanOrdFolio = cleanOrdFolio.replace('[TEST] ', '');
+              if (cleanOrdFolio.startsWith('TKT-')) cleanOrdFolio = cleanOrdFolio.replace('TKT-', '');
+              cleanOrdFolio = cleanOrdFolio.trim();
+              assocOrder = ordenes.find(o => {
+                let ofol = o.folio || '';
+                if (ofol.startsWith('[PRUEBA] ')) ofol = ofol.replace('[PRUEBA] ', '');
+                if (ofol.startsWith('[TEST] ')) ofol = ofol.replace('[TEST] ', '');
+                return ofol.trim() === cleanOrdFolio;
+              });
+            }
+            
+            if (assocOrder && assocOrder.folio) {
+              const newAsunto = `Refacciones para ${assocOrder.folio}`;
+              if (t.asunto !== newAsunto) {
+                t.asunto = newAsunto;
+                modifiedAny = true;
+                if (window.supabaseClient) {
+                  window.pushToSupabase('tickets', t).catch(err => {
+                    console.error("[Migration v9] Error syncing ticket:", err);
+                  });
+                }
+              }
+            }
+          }
+          return t;
+        });
+        
+        if (modifiedAny) {
+          try {
+            safeSetJSON('sapi_tickets', tickets);
+          } catch(e) {}
+          if (typeof renderTickets === 'function') {
+            renderTickets();
+            renderTickets('dash-tickets');
+          }
+        }
 
-      // Ejecutar recuperación de maquinaria desaparecida desde los tickets
-      if (typeof window.recuperarMaquinariaDesdeTickets === 'function') {
-        window.recuperarMaquinariaDesdeTickets();
+        if (typeof window.generarTicketsRefaccionesFaltantes === 'function') {
+          await window.generarTicketsRefaccionesFaltantes();
+        }
       }
     }
 
@@ -757,8 +957,9 @@ window.addEventListener('supabase_datos_cargados', async () => {
     if (typeof renderSitios === 'function' && document.getElementById('view-sitios')?.classList.contains('active')) {
       renderSitios();
     }
-    if (typeof renderRefacciones === 'function' && document.getElementById('view-refacciones')?.classList.contains('active')) {
-      renderRefacciones();
+    if (document.getElementById('view-refacciones')?.classList.contains('active')) {
+      if (typeof renderRefacciones === 'function') renderRefacciones();
+      if (typeof renderRefaccionesPendientes === 'function') renderRefaccionesPendientes();
     }
     if (typeof renderGastos === 'function' && document.getElementById('view-gastos')?.classList.contains('active')) {
       renderGastos();
@@ -1639,6 +1840,7 @@ function inicializarApp() {
   
   try {
     renderRefacciones();
+    if (typeof renderRefaccionesPendientes === 'function') renderRefaccionesPendientes();
   } catch (err) {
     console.error('Error calling renderRefacciones:', err);
   }
@@ -1871,6 +2073,12 @@ function applyRole(rolKey) {
     // Show/hide role switcher
     const roleSwitcher = document.getElementById('role-switcher');
     if (roleSwitcher) roleSwitcher.style.display = (currentSession.realRol === 'superadmin') ? 'flex' : 'none';
+
+    // Show/hide Ideas y Fallas card (only for superadmins)
+    const cardIdeasFallas = document.getElementById('card-ideas-fallas');
+    if (cardIdeasFallas) {
+      cardIdeasFallas.style.display = (currentSession.realRol === 'superadmin') ? 'block' : 'none';
+    }
 
     // Show/hide weekly report button (ONLY superadmin or admin)
     const repSemBtn = document.getElementById('btn-reporte-semanal-tecnicos');
@@ -2139,7 +2347,275 @@ function cargarConfig() {
     inputOdForceMock.checked = odForceMock;
     setTimeout(() => { window.toggleOneDriveDemoMode(); }, 0);
   }
+  
+  if (currentSession && currentSession.realRol === 'superadmin') {
+    renderIdeasFallas();
+  }
 }
+
+// ─── IDEAS Y FALLAS MODULE ──────────────────────────────────────────────────
+let editandoIdeaFallaId = null;
+
+function abrirModalIdeaFalla(id = null) {
+  editandoIdeaFallaId = id || null;
+  const modalTitle = document.getElementById('idea-falla-modal-title');
+  const formEl = document.getElementById('form-idea-falla');
+  const estadoContainer = document.getElementById('if-estado-container');
+
+  if (formEl) formEl.reset();
+
+  if (id) {
+    if (modalTitle) modalTitle.textContent = 'Editar Registro';
+    if (estadoContainer) estadoContainer.style.display = 'block';
+
+    const item = ideasFallasDb.find(x => x.id === id);
+    if (item) {
+      const radio = document.querySelector(`input[name="if-tipo"][value="${item.tipo}"]`);
+      if (radio) radio.checked = true;
+      
+      const tituloInput = document.getElementById('if-titulo');
+      if (tituloInput) tituloInput.value = item.titulo || '';
+
+      const descTextarea = document.getElementById('if-descripcion');
+      if (descTextarea) descTextarea.value = item.descripcion || '';
+
+      const estadoSelect = document.getElementById('if-estado');
+      if (estadoSelect) estadoSelect.value = item.estado || 'Pendiente';
+    }
+  } else {
+    if (modalTitle) modalTitle.textContent = 'Reportar Idea / Falla';
+    if (estadoContainer) estadoContainer.style.display = 'none';
+  }
+
+  const modalOverlay = document.getElementById('modal-idea-falla-overlay');
+  if (modalOverlay) modalOverlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  lucide.createIcons();
+}
+
+function cerrarModalIdeaFalla(e) {
+  const modalOverlay = document.getElementById('modal-idea-falla-overlay');
+  if (e && e.target !== modalOverlay) return;
+  if (modalOverlay) modalOverlay.classList.remove('open');
+  document.body.style.overflow = '';
+  editandoIdeaFallaId = null;
+}
+
+async function guardarIdeaFalla(e) {
+  if (e) e.preventDefault();
+
+  const tipo = document.querySelector('input[name="if-tipo"]:checked')?.value || 'Idea';
+  const titulo = document.getElementById('if-titulo')?.value || '';
+  const descripcion = document.getElementById('if-descripcion')?.value || '';
+  const estado = editandoIdeaFallaId ? (document.getElementById('if-estado')?.value || 'Pendiente') : 'Pendiente';
+
+  if (!titulo.trim()) {
+    alert('Por favor introduce un título válido.');
+    return;
+  }
+
+  const user = usuarios.find(u => u.id === currentSession.userId);
+  const userNombre = user ? user.nombre : (currentSession.nombre || 'SuperAdmin');
+
+  let item;
+  if (editandoIdeaFallaId) {
+    const idx = ideasFallasDb.findIndex(x => x.id === editandoIdeaFallaId);
+    if (idx > -1) {
+      ideasFallasDb[idx] = {
+        ...ideasFallasDb[idx],
+        tipo,
+        titulo,
+        descripcion,
+        estado,
+        updated_at: new Date().toISOString()
+      };
+      item = ideasFallasDb[idx];
+    }
+  } else {
+    item = {
+      id: 'IF-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+      tipo,
+      titulo,
+      descripcion,
+      estado,
+      creado_por: userNombre,
+      creado_por_id: currentSession.userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    ideasFallasDb.push(item);
+  }
+
+  localStorage.setItem('sapi_ideas_fallas', JSON.stringify(ideasFallasDb));
+  renderIdeasFallas();
+  cerrarModalIdeaFalla();
+
+  if (window.pushToSupabase) {
+    try {
+      await window.pushToSupabase('ideas_fallas', item);
+      if (typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion('Registro guardado y sincronizado con éxito.', 'success');
+      }
+    } catch (err) {
+      console.error('[IdeasFallas] Error al sincronizar con Supabase:', err);
+    }
+  }
+}
+
+async function cambiarEstadoIdeaFalla(id, nuevoEstado) {
+  const item = ideasFallasDb.find(x => x.id === id);
+  if (!item) return;
+
+  item.estado = nuevoEstado;
+  item.updated_at = new Date().toISOString();
+
+  localStorage.setItem('sapi_ideas_fallas', JSON.stringify(ideasFallasDb));
+  renderIdeasFallas();
+
+  if (window.pushToSupabase) {
+    try {
+      await window.pushToSupabase('ideas_fallas', item);
+      if (typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion('Estado actualizado y sincronizado.', 'success');
+      }
+    } catch (err) {
+      console.error('[IdeasFallas] Error al cambiar estado en Supabase:', err);
+    }
+  }
+}
+
+async function eliminarIdeaFalla(id) {
+  if (!confirm('¿Estás seguro de que deseas eliminar este registro de Ideas/Fallas?')) {
+    return;
+  }
+
+  const idx = ideasFallasDb.findIndex(x => x.id === id);
+  if (idx > -1) {
+    ideasFallasDb.splice(idx, 1);
+  }
+
+  localStorage.setItem('sapi_ideas_fallas', JSON.stringify(ideasFallasDb));
+  renderIdeasFallas();
+
+  if (window.deleteFromSupabase) {
+    try {
+      await window.deleteFromSupabase('ideas_fallas', id);
+      if (typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion('Registro eliminado de la base de datos.', 'success');
+      }
+    } catch (err) {
+      console.error('[IdeasFallas] Error al eliminar de Supabase:', err);
+    }
+  }
+}
+
+function renderIdeasFallas() {
+  const tbody = document.getElementById('tabla-ideas-fallas-body');
+  if (!tbody) return;
+
+  const query = (document.getElementById('busqueda-idea-falla')?.value || '').toLowerCase().trim();
+  const filtroTipo = document.getElementById('filtro-tipo-idea-falla')?.value || 'todos';
+  const filtroEstado = document.getElementById('filtro-estado-idea-falla')?.value || 'todos';
+
+  const filtrados = ideasFallasDb.filter(item => {
+    // Buscar coincidencia en título y descripción
+    const matchQuery = !query || 
+      (item.titulo || '').toLowerCase().includes(query) || 
+      (item.descripcion || '').toLowerCase().includes(query);
+
+    // Filtrar por tipo
+    const matchTipo = filtroTipo === 'todos' || item.tipo === filtroTipo;
+
+    // Filtrar por estado
+    const matchEstado = filtroEstado === 'todos' || item.estado === filtroEstado;
+
+    return matchQuery && matchTipo && matchEstado;
+  });
+
+  // Ordenar por fecha de creación descendente
+  filtrados.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  if (filtrados.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" style="text-align:center; padding:2rem; color:var(--text-muted);">
+          No se encontraron registros de Ideas y Fallas.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtrados.map(item => {
+    // Colores y tags para tipos
+    const tagColor = item.tipo === 'Idea' ? 'background:rgba(16, 185, 129, 0.12); color:#10b981;' : 'background:rgba(239, 68, 68, 0.12); color:#ef4444;';
+    const tagEmoji = item.tipo === 'Idea' ? '💡' : '🐛';
+
+    // Badge de estado
+    let badgeStyle = 'background: rgba(245, 158, 11, 0.12); color: #f59e0b;'; // Pendiente (amber)
+    let estadoLabel = item.estado || 'Pendiente';
+    if (item.estado === 'En Progreso') {
+      badgeStyle = 'background: rgba(59, 130, 246, 0.12); color: #3b82f6;'; // En Progreso (blue)
+    } else if (item.estado === 'Resuelto') {
+      badgeStyle = 'background: rgba(16, 185, 129, 0.12); color: #10b981;'; // Resuelto (green)
+    } else if (item.estado === 'Rechazado') {
+      badgeStyle = 'background: rgba(239, 68, 68, 0.12); color: #ef4444;'; // Rechazado (red)
+    }
+
+    // Formatear fecha
+    const fecha = item.created_at ? new Date(item.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+
+    return `
+      <tr style="border-bottom: 1px solid var(--border);">
+        <td>
+          <span style="display:inline-flex; align-items:center; gap:0.35rem; padding:0.25rem 0.6rem; border-radius:var(--radius-sm); font-size:0.75rem; font-weight:600; ${tagColor}">
+            ${tagEmoji} ${item.tipo}
+          </span>
+        </td>
+        <td>
+          <div style="font-weight:600; color:var(--text-primary); margin-bottom:0.15rem;">${item.titulo}</div>
+          <div style="font-size:0.8rem; color:var(--text-secondary); white-space:pre-wrap; max-width: 500px;">${item.descripcion || '<span style="font-style:italic;color:var(--text-muted);">Sin descripción</span>'}</div>
+        </td>
+        <td>
+          <div style="font-size:0.85rem; font-weight:500;">${item.creado_por || 'Sistema'}</div>
+          <div style="font-size:0.75rem; color:var(--text-muted);">${fecha}</div>
+        </td>
+        <td>
+          <span class="badge" style="font-size:0.75rem; ${badgeStyle}">${estadoLabel}</span>
+        </td>
+        <td style="text-align:right; white-space:nowrap;">
+          <div style="display:inline-flex; align-items:center; gap:0.4rem;">
+            <select style="font-size:0.75rem; padding:0.25rem 0.4rem; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-card); color:var(--text-primary); outline:none; cursor:pointer;"
+              onchange="cambiarEstadoIdeaFalla('${item.id}', this.value)">
+              <option value="Pendiente" ${item.estado === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+              <option value="En Progreso" ${item.estado === 'En Progreso' ? 'selected' : ''}>En Progreso</option>
+              <option value="Resuelto" ${item.estado === 'Resuelto' ? 'selected' : ''}>Resuelto</option>
+              <option value="Rechazado" ${item.estado === 'Rechazado' ? 'selected' : ''}>Rechazado</option>
+            </select>
+            <button class="action-btn" title="Editar" onclick="abrirModalIdeaFalla('${item.id}')"
+              style="padding:0.25rem; background:none; border:none; cursor:pointer; color:var(--text-secondary); display:inline-flex; align-items:center; justify-content:center;">
+              <i data-lucide="edit" style="width:16px; height:16px;"></i>
+            </button>
+            <button class="action-btn" title="Eliminar" onclick="eliminarIdeaFalla('${item.id}')"
+              style="padding:0.25rem; background:none; border:none; cursor:pointer; color:var(--text-secondary); display:inline-flex; align-items:center; justify-content:center;">
+              <i data-lucide="trash-2" style="width:16px; height:16px;"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  lucide.createIcons();
+}
+
+// Exponer funciones al objeto global window para que funcionen los onclicks del HTML
+window.abrirModalIdeaFalla = abrirModalIdeaFalla;
+window.cerrarModalIdeaFalla = cerrarModalIdeaFalla;
+window.guardarIdeaFalla = guardarIdeaFalla;
+window.cambiarEstadoIdeaFalla = cambiarEstadoIdeaFalla;
+window.eliminarIdeaFalla = eliminarIdeaFalla;
+window.renderIdeasFallas = renderIdeasFallas;
 
 // ── Sync SAP vía GitHub Actions (funciona desde cualquier dispositivo) ────────
 // El workflow corre en servidores de GitHub (Azure) que SÍ pueden llegar a SAP.
@@ -3568,6 +4044,7 @@ function setupNav() {
         }
         if (view === 'refacciones') {
           if (typeof renderRefacciones === 'function') renderRefacciones();
+          if (typeof renderRefaccionesPendientes === 'function') renderRefaccionesPendientes();
         }
         if (view === 'dashboard') {
           renderStats();
@@ -5164,7 +5641,7 @@ function renderTabla(ctx) {
   const body = document.getElementById(bodyId);
   if (!body) return;
   if (!filtradas.length) {
-    body.innerHTML = `<tr><td colspan="9" class="empty-state">No hay órdenes${q ? ' que coincidan' : ' registradas'}.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="10" class="empty-state">No hay órdenes${q ? ' que coincidan' : ' registradas'}.</td></tr>`;
     return;
   }
   const isConsulta = currentSession.viewMode === 'consulta';
@@ -5174,9 +5651,12 @@ function renderTabla(ctx) {
 
   body.innerHTML = filtradas.map(o => {
     let orderCanEdit = canEdit;
-    if ((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__') && !['superadmin', 'admin'].includes(currentSession.viewMode)) {
+    if (((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__') || o.cierre_papel_pdf) && !['superadmin', 'admin'].includes(currentSession.viewMode)) {
       orderCanEdit = false;
     }
+    const ticketAsoc = o.soporte ? tickets.find(x => x.id === o.soporte) : null;
+    const ticketHtml = ticketAsoc ? `<a href="#" onclick="editarTicket('${ticketAsoc.id}'); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;">${ticketAsoc.folio}</a>` : '-';
+    
     return `
     <tr>
       <td data-label="Acciones" style="white-space:nowrap; width:60px;">
@@ -5186,6 +5666,7 @@ function renderTabla(ctx) {
         </div>
       </td>
       <td data-label="Folio"><strong>${o.folio||'-'}</strong></td>
+      <td data-label="Ticket">${ticketHtml}</td>
       <td data-label="Cliente">${o.cliente||'-'}</td>
       <td data-label="Ubicación">${o.ubicacion||'-'}</td>
       <td data-label="Modelo">${o.modelo||'-'}</td>
@@ -9588,8 +10069,8 @@ function onSoporteChange() {
 
 function editarOrden(id) {
   const o = ordenes.find(x => x.id === id);
-  if (o && o.firma_tecnico_base64 && !['superadmin', 'admin'].includes(currentSession.viewMode)) {
-    mostrarNotificacion('Esta orden ya fue firmada. Solo administradores pueden editarla.', 'error');
+  if (o && (((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__') || o.cierre_papel_pdf)) && !['superadmin', 'admin'].includes(currentSession.viewMode)) {
+    mostrarNotificacion('Esta orden ya fue firmada o cerrada en papel. Solo administradores pueden editarla.', 'error');
     return;
   }
   abrirFormulario(id);
@@ -9894,6 +10375,14 @@ async function guardarOrden(e) {
   if (window.supabaseClient) {
     window.pushToSupabase('ordenes', orden);
   }
+  
+  if (typeof window.crearOActualizarTicketRefacciones === 'function') {
+    try {
+      await window.crearOActualizarTicketRefacciones(orden);
+    } catch (err) {
+      console.error('[App] Error al generar/actualizar el ticket de refacciones:', err);
+    }
+  }
   if (window.trackTelemetryEvent) {
     let act = editandoId ? 'Edición de Orden' : 'Creación de Orden';
     if (editandoId && currentSession.viewMode === 'tecnico') {
@@ -9959,6 +10448,7 @@ function renderEvidenciasFotograficas(o) {
     o.estado === 'Cerrada' || 
     o.estado === 'Finalizado' || 
     o.estado === 'Refacciones pendientes' || 
+    o.cierre_papel_pdf ||
     (!(!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && o.firma_cliente_base64 !== '__DELETED__') || 
     (!(!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__') && o.firma_tecnico_base64 !== '__DELETED__')
   );
@@ -10161,7 +10651,7 @@ window.subirEvidenciaFoto = async function(ordenId, tipo, inputEl) {
 
   const hasTecnicoFirma = o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__';
   const hasClienteFirma = o.firma_cliente_base64 && o.firma_cliente_base64 !== '__DELETED__';
-  if (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado') || hasTecnicoFirma || hasClienteFirma) {
+  if (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.cierre_papel_pdf) || hasTecnicoFirma || hasClienteFirma) {
     mostrarNotificacion('No se pueden modificar evidencias en una orden cerrada o con firmas.', 'error');
     return;
   }
@@ -10428,7 +10918,7 @@ window.eliminarEvidenciaFoto = async function(ordenId, tipo, url) {
 
   const hasTecnicoFirma = o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__';
   const hasClienteFirma = o.firma_cliente_base64 && o.firma_cliente_base64 !== '__DELETED__';
-  if (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado') || hasTecnicoFirma || hasClienteFirma) {
+  if (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.cierre_papel_pdf) || hasTecnicoFirma || hasClienteFirma) {
     mostrarNotificacion('No se pueden modificar evidencias en una orden cerrada o con firmas.', 'error');
     return;
   }
@@ -10467,9 +10957,22 @@ function verDetalle(id) {
   if (!o) return;
   document.getElementById('detalle-title').textContent = `Orden ${o.folio || o.id.slice(0,8)}`;
   
+  const btnCierrePapel = document.getElementById('btn-cierre-papel');
+  if (btnCierrePapel) {
+    const isAllowedRole = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
+    const orderClosed = ['completado', 'cerrada', 'cerrado', 'finalizado'].includes(String(o.estado || '').toLowerCase()) || o.cierre_papel_pdf;
+    if (isAllowedRole && !orderClosed) {
+      btnCierrePapel.style.display = 'flex';
+      btnCierrePapel.setAttribute('onclick', `abrirCierrePapel('${id}')`);
+    } else {
+      btnCierrePapel.style.display = 'none';
+    }
+  }
+
   const btnCompletar = document.getElementById('btn-completar-reporte');
   if (btnCompletar) {
-    if (currentSession.viewMode !== 'consulta' && (!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__')) {
+    const hasCierrePapel = !!o.cierre_papel_pdf;
+    if (currentSession.viewMode !== 'consulta' && !hasCierrePapel && (!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__')) {
       btnCompletar.style.display = 'flex';
       btnCompletar.setAttribute('onclick', `completarReporteDesdeDetalle('${id}')`);
     } else {
@@ -10509,7 +11012,7 @@ function verDetalle(id) {
 
   const renderBitacora = (o) => {
     let html = '';
-    const isClosed = (['completado', 'cerrada', 'cerrado', 'finalizado'].includes(String(o.estado || '').toLowerCase())) && (o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__');
+    const isClosed = (['completado', 'cerrada', 'cerrado', 'finalizado'].includes(String(o.estado || '').toLowerCase())) && ((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__') || o.cierre_papel_pdf);
     const isTecnico = currentSession.viewMode === 'tecnico';
     const currentUser = usuarios.find(u => u.id === currentSession.userId);
     const miTecnicoNombre = currentUser ? currentUser.nombre : '';
@@ -11031,7 +11534,107 @@ function verDetalle(id) {
     ${seccion('Bitácora Diaria', renderBitacora(o))}
     ${seccion('Evidencias Fotográficas', renderEvidenciasFotograficas(o))}
     
-    ${seccion('Firmas de Conformidad', `
+    ${o.cierre_papel_pdf ? (() => {
+      let tecnicosHorasHtml = '';
+      if (o.cierre_papel_tecnicos_horas && o.cierre_papel_tecnicos_horas.length > 0) {
+        let rowsHtml = o.cierre_papel_tecnicos_horas.map(item => {
+          const horasVal = item.horas !== undefined && item.horas !== '' ? `${item.horas} hrs` : '—';
+          const trayectosVal = item.trayectos !== undefined && item.trayectos !== '' ? `${item.trayectos} tray.` : '—';
+          const idaVal = item.ida !== undefined && item.ida !== '' ? `${item.ida} hrs` : '—';
+          const regresoVal = item.regreso !== undefined && item.regreso !== '' ? `${item.regreso} hrs` : '—';
+          
+          let fechaVal = '—';
+          if (item.fecha_inicio && item.fecha_fin && item.fecha_inicio !== item.fecha_fin) {
+            const pIni = item.fecha_inicio.split('-');
+            const pFin = item.fecha_fin.split('-');
+            const fIniFormateada = pIni.length === 3 ? `${pIni[2]}/${pIni[1]}` : item.fecha_inicio;
+            const fFinFormateada = pFin.length === 3 ? `${pFin[2]}/${pFin[1]}/${pFin[0]}` : item.fecha_fin;
+            fechaVal = `${fIniFormateada} al ${fFinFormateada}`;
+          } else {
+            const rawFecha = item.fecha_inicio || item.fecha || item.dias;
+            if (rawFecha && rawFecha !== '') {
+              if (rawFecha.includes('-')) {
+                const parts = rawFecha.split('-');
+                if (parts.length === 3) {
+                  fechaVal = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                } else {
+                  fechaVal = rawFecha;
+                }
+              } else {
+                fechaVal = rawFecha;
+              }
+            }
+          }
+          
+          return `
+            <tr style="border-bottom:1px solid rgba(79, 70, 229, 0.1);">
+              <td style="padding:0.5rem; font-weight:600; color:var(--text-primary); text-align:left;">${item.tecnico}</td>
+              <td style="padding:0.5rem; text-align:center; font-weight:700; color:var(--accent);">${horasVal}</td>
+              <td style="padding:0.5rem; text-align:center; font-weight:700; color:var(--accent);">${fechaVal}</td>
+              <td style="padding:0.5rem; text-align:center; font-weight:700; color:var(--accent);">${idaVal}</td>
+              <td style="padding:0.5rem; text-align:center; font-weight:700; color:var(--accent);">${regresoVal}</td>
+              <td style="padding:0.5rem; text-align:center; font-weight:700; color:var(--accent);">${trayectosVal}</td>
+            </tr>
+          `;
+        }).join('');
+        
+        tecnicosHorasHtml = `
+          <div style="margin-top:0.75rem;">
+            <strong style="font-size:0.85rem; color:var(--text-primary); display:block; margin-bottom:0.25rem;">Personal de Trabajo Detallado:</strong>
+            <div style="border:1px solid rgba(79, 70, 229, 0.15); border-radius:8px; overflow:hidden;">
+              <table style="width:100%; border-collapse:collapse; font-size:0.85rem; background:rgba(255,255,255,0.01);">
+                <thead>
+                  <tr style="background:rgba(79, 70, 229, 0.08); text-align:left; color:#4f46e5; font-weight:700; font-size:0.8rem; border-bottom:1px solid rgba(79, 70, 229, 0.15);">
+                    <th style="padding:0.5rem; text-align:left; width: 32%;">Técnico</th>
+                    <th style="padding:0.5rem; text-align:center; width: 12%;">Horas</th>
+                    <th style="padding:0.5rem; text-align:center; width: 18%;">Fecha</th>
+                    <th style="padding:0.5rem; text-align:center; width: 12%;">Ida</th>
+                    <th style="padding:0.5rem; text-align:center; width: 12%;">Regreso</th>
+                    <th style="padding:0.5rem; text-align:center; width: 14%;">Trayectos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rowsHtml}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }
+      
+      return seccion('Cierre de Orden en Papel', `
+        <div style="background:rgba(79, 70, 229, 0.04); border:1px solid rgba(79, 70, 229, 0.15); border-radius:12px; padding:1.25rem; display:flex; flex-direction:column; gap:0.75rem; margin-top:1rem; width:100%; box-sizing:border-box;">
+          <div style="display:flex; align-items:center; gap:0.5rem; color:#4f46e5; font-weight:700; font-size:1rem; border-bottom:1px solid rgba(79, 70, 229, 0.15); padding-bottom:0.4rem; margin-bottom:0.2rem;">
+            <i data-lucide="file-check" style="width:18px; height:18px;"></i>
+            Esta orden fue cerrada físicamente (formato papel)
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:0.75rem; font-size:0.85rem;">
+            <div><strong>Autorizado por:</strong> ${o.cierre_papel_usuario || '—'}</div>
+            <div><strong>Fecha de cierre:</strong> ${o.cierre_papel_fecha ? new Date(o.cierre_papel_fecha).toLocaleString('es-MX', {dateStyle: 'medium', timeStyle: 'short'}) : '—'}</div>
+          </div>
+          <div style="font-size:0.85rem; margin-top:0.25rem; background:var(--bg-secondary); padding:0.6rem; border-radius:6px; border-left:4px solid #4f46e5;">
+            <strong>Justificación / Motivo:</strong><br>
+            <span style="font-style:italic; color:var(--text-secondary); display:block; margin-top:0.2rem;">${o.cierre_papel_motivo || '—'}</span>
+          </div>
+          
+          ${tecnicosHorasHtml}
+          
+          <div style="margin-top:0.4rem; display:flex; flex-direction:column; gap:0.5rem;">
+            <div style="display:flex; gap:0.5rem;">
+              <a href="${o.cierre_papel_pdf}" target="_blank" class="btn-primary" style="display:inline-flex; align-items:center; gap:0.35rem; text-decoration:none; background:#4f46e5; border-color:#4f46e5; color:white; padding:0.4rem 0.8rem; border-radius:6px; font-size:0.8rem; font-weight:600;">
+                <i data-lucide="external-link" style="width:14px;height:14px;"></i> Abrir PDF
+              </a>
+              <button class="btn-secondary" onclick="document.getElementById('cp-pdf-iframe-container').style.display = document.getElementById('cp-pdf-iframe-container').style.display === 'none' ? 'block' : 'none';" style="display:inline-flex; align-items:center; gap:0.35rem; font-size:0.8rem; padding:0.4rem 0.8rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer;">
+                <i data-lucide="eye" style="width:14px;height:14px;"></i> Vista Previa
+              </button>
+            </div>
+            <div id="cp-pdf-iframe-container" style="display:none; margin-top:0.5rem; border:1px solid var(--border); border-radius:8px; overflow:hidden; background:white;">
+              <iframe src="${o.cierre_papel_pdf}" style="width:100%; height:550px; border:none; display:block;"></iframe>
+            </div>
+          </div>
+        </div>
+      `);
+    })() : seccion('Firmas de Conformidad', `
       <div style="display:flex; flex-wrap:wrap; gap:2rem; margin-top:1rem; justify-content:center;">
         
         <!-- TECNICO -->
@@ -11118,10 +11721,426 @@ function verDetalle(id) {
   lucide.createIcons();
   
   setTimeout(() => {
-    if ((!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__')) inicializarCanvasFirma('tecnico');
-    if ((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__') && (!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__')) inicializarCanvasFirma('cliente');
+    if (!o.cierre_papel_pdf) {
+      if ((!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__')) inicializarCanvasFirma('tecnico');
+      if ((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__') && (!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__')) inicializarCanvasFirma('cliente');
+    }
   }, 100);
 }
+
+window.agregarRenglonTecnicoCierre = function(tecnicoNombre = '', horas = '', fecha_inicio = '', fecha_fin = '', trayectos = '', ida = '', regreso = '', existingId = '') {
+  const container = document.getElementById('cp-tecnicos-lista');
+  if (!container) return;
+  const rowId = existingId || ('cp-' + crypto.randomUUID());
+  const div = document.createElement('div');
+  div.id = rowId;
+  div.style.display = 'flex';
+  div.style.gap = '0.35rem';
+  div.style.alignItems = 'center';
+  div.style.marginBottom = '0.25rem';
+  
+  let options = '<option value="">-- Seleccionar Técnico --</option>';
+  const sortedUsers = [...usuarios].sort((a,b) => a.nombre.localeCompare(b.nombre));
+  sortedUsers.forEach(u => {
+    const selected = u.nombre === tecnicoNombre ? 'selected' : '';
+    options += `<option value="${u.nombre}" ${selected}>${u.nombre}</option>`;
+  });
+  
+  div.innerHTML = `
+    <select class="cp-tecnico-select" required style="flex:2; min-width:130px; padding:0.4rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary); font-size:0.85rem;">
+      ${options}
+    </select>
+    <input type="number" class="cp-tecnico-horas" step="0.5" min="0" value="${horas}" placeholder="Hrs/Día" required style="flex:1; min-width:60px; padding:0.4rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary); font-size:0.85rem;" title="Horas Trabajadas por Día" />
+    <input type="date" class="cp-tecnico-fecha-inicio" value="${fecha_inicio}" required style="flex:1.8; min-width:115px; padding:0.4rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary); font-size:0.85rem;" title="Fecha de Inicio" />
+    <input type="date" class="cp-tecnico-fecha-fin" value="${fecha_fin}" style="flex:1.8; min-width:115px; padding:0.4rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary); font-size:0.85rem;" title="Fecha de Fin (Opcional)" />
+    <input type="number" class="cp-tecnico-ida" step="0.5" min="0" value="${ida}" placeholder="Ida" required style="flex:1; min-width:60px; padding:0.4rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary); font-size:0.85rem;" title="Ida (Horas de Traslado)" />
+    <input type="number" class="cp-tecnico-regreso" step="0.5" min="0" value="${regreso}" placeholder="Regreso" required style="flex:1; min-width:60px; padding:0.4rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary); font-size:0.85rem;" title="Regreso (Horas de Retorno)" />
+    <input type="number" class="cp-tecnico-trayectos" step="0.5" min="0" value="${trayectos}" placeholder="Tray." required style="flex:1.2; min-width:75px; padding:0.4rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary); font-size:0.85rem;" title="Número de Trayectos" />
+    <div style="display:flex; gap:0.25rem; flex-shrink:0;">
+      <button type="button" onclick="window.agregarRenglonTecnicoCierre(document.querySelector('#${rowId} .cp-tecnico-select').value)" class="action-btn" style="padding:0.35rem; display:inline-flex; align-items:center; justify-content:center; background:rgba(79, 70, 229, 0.08); color:#4f46e5; border:1px solid rgba(79, 70, 229, 0.15);" title="Copiar técnico"><i data-lucide="copy" style="width:14px; height:14px;"></i></button>
+      <button type="button" onclick="document.getElementById('${rowId}').remove()" class="action-btn del" style="padding:0.35rem; display:inline-flex; align-items:center; justify-content:center;" title="Eliminar"><i data-lucide="trash-2" style="width:14px; height:14px;"></i></button>
+    </div>
+  `;
+  container.appendChild(div);
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+};
+
+window.abrirCierrePapel = function(ordenId) {
+  const o = ordenes.find(x => x.id === ordenId);
+  if (!o) return;
+  
+  // Guardar ID
+  document.getElementById('cp-orden-id').value = ordenId;
+  
+  // Resetear el formulario
+  document.getElementById('form-cierre-papel').reset();
+  
+  // Limpiar lista de técnicos y pre-poblar
+  const container = document.getElementById('cp-tecnicos-lista');
+  if (container) container.innerHTML = '';
+  
+  let tecnicosLista = [];
+  if (o.cierre_papel_tecnicos_horas && o.cierre_papel_tecnicos_horas.length > 0) {
+    tecnicosLista = o.cierre_papel_tecnicos_horas.map(item => ({
+      id: item.id || ('cp-' + crypto.randomUUID()),
+      tecnico: item.tecnico,
+      horas: item.horas,
+      fecha_inicio: item.fecha_inicio || item.fecha || item.dias || '',
+      fecha_fin: item.fecha_fin || item.fecha_inicio || item.fecha || item.dias || '',
+      trayectos: item.trayectos,
+      ida: item.ida !== undefined ? item.ida : '',
+      regreso: item.regreso !== undefined ? item.regreso : ''
+    }));
+  } else if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) {
+    tecnicosLista = o.tecnicosAsignados.map(t => ({ id: 'cp-' + crypto.randomUUID(), tecnico: t, horas: '', fecha_inicio: '', fecha_fin: '', trayectos: '', ida: '', regreso: '' }));
+  } else if (o.tecnico) {
+    tecnicosLista = o.tecnico.split(',').map(t => t.trim()).filter(Boolean).map(t => ({ id: 'cp-' + crypto.randomUUID(), tecnico: t, horas: '', fecha_inicio: '', fecha_fin: '', trayectos: '', ida: '', regreso: '' }));
+  }
+  
+  tecnicosLista.forEach(item => {
+    window.agregarRenglonTecnicoCierre(item.tecnico, item.horas, item.fecha_inicio, item.fecha_fin, item.trayectos, item.ida, item.regreso, item.id);
+  });
+  
+  // Abrir modal
+  document.getElementById('modal-cierre-papel-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  lucide.createIcons();
+};
+
+window.cerrarCierrePapel = function(e) {
+  if (e && e.target !== document.getElementById('modal-cierre-papel-overlay') && e.target !== document.querySelector('#modal-cierre-papel .modal-close') && e.target.tagName !== 'BUTTON') {
+    if (e.target.closest('#modal-cierre-papel')) return;
+  }
+  document.getElementById('modal-cierre-papel-overlay').classList.remove('open');
+  if (!document.getElementById('modal-detalle-overlay').classList.contains('open')) {
+    document.body.style.overflow = '';
+  }
+};
+
+window.confirmarCierrePapel = async function(e) {
+  e.preventDefault();
+  
+  const ordenId = document.getElementById('cp-orden-id').value;
+  const o = ordenes.find(x => x.id === ordenId);
+  if (!o) return;
+  
+  const fileInput = document.getElementById('cp-pdf-file');
+  const file = fileInput.files[0];
+  if (!file) {
+    mostrarNotificacion('Por favor, seleccione un archivo PDF.', 'warning');
+    return;
+  }
+  
+  const nuevoEstado = document.getElementById('cp-estado').value;
+  const motivo = document.getElementById('cp-motivo').value.trim();
+  if (motivo.length < 5) {
+    mostrarNotificacion('Por favor, ingrese un motivo de al menos 5 caracteres.', 'warning');
+    return;
+  }
+
+  const rows = document.querySelectorAll('#cp-tecnicos-lista > div');
+  const tecnicosHoras = [];
+  let isInvalid = false;
+  for (const row of rows) {
+    const rowId = row.id;
+    const tecnicoSelect = row.querySelector('.cp-tecnico-select');
+    const horasInput = row.querySelector('.cp-tecnico-horas');
+    const fechaInicioInput = row.querySelector('.cp-tecnico-fecha-inicio');
+    const fechaFinInput = row.querySelector('.cp-tecnico-fecha-fin');
+    const trayectosInput = row.querySelector('.cp-tecnico-trayectos');
+    const idaInput = row.querySelector('.cp-tecnico-ida');
+    const regresoInput = row.querySelector('.cp-tecnico-regreso');
+    
+    if (tecnicoSelect && horasInput && fechaInicioInput && fechaFinInput && trayectosInput && idaInput && regresoInput) {
+      const tecnico = tecnicoSelect.value;
+      const horasVal = horasInput.value.trim();
+      const fechaInicioVal = fechaInicioInput.value.trim();
+      const fechaFinVal = fechaFinInput.value.trim() || fechaInicioVal;
+      const trayectosVal = trayectosInput.value.trim();
+      const idaVal = idaInput.value.trim();
+      const regresoVal = regresoInput.value.trim();
+      
+      const hasAnyVal = horasVal || fechaInicioVal || fechaFinInput.value.trim() || trayectosVal || idaVal || regresoVal;
+      
+      if (!tecnico && hasAnyVal) {
+        mostrarNotificacion('Debe seleccionar un técnico para los datos ingresados.', 'warning');
+        isInvalid = true;
+        break;
+      }
+      if (tecnico && (!horasVal || !fechaInicioVal || !trayectosVal || !idaVal || !regresoVal)) {
+        mostrarNotificacion('Debe ingresar las horas, la fecha de inicio, la ida, el regreso y los trayectos para el técnico seleccionado.', 'warning');
+        isInvalid = true;
+        break;
+      }
+      
+      if (tecnico && horasVal && fechaInicioVal && trayectosVal && idaVal && regresoVal) {
+        const hrs = parseFloat(horasVal);
+        const trs = parseFloat(trayectosVal);
+        const ida = parseFloat(idaVal);
+        const regreso = parseFloat(regresoVal);
+        
+        if (isNaN(hrs) || hrs < 0 || isNaN(trs) || trs < 0 || isNaN(ida) || ida < 0 || isNaN(regreso) || regreso < 0) {
+          mostrarNotificacion('Los valores de horas, ida, regreso y trayectos deben ser números mayores o iguales a cero.', 'warning');
+          isInvalid = true;
+          break;
+        }
+        
+        if (new Date(fechaFinVal) < new Date(fechaInicioVal)) {
+          mostrarNotificacion('La fecha de fin no puede ser anterior a la fecha de inicio.', 'warning');
+          isInvalid = true;
+          break;
+        }
+        
+        tecnicosHoras.push({
+          id: rowId,
+          tecnico,
+          horas: hrs,
+          fecha_inicio: fechaInicioVal,
+          fecha_fin: fechaFinVal,
+          trayectos: trs,
+          ida,
+          regreso
+        });
+      }
+    }
+  }
+  if (isInvalid) return;
+  
+  const btnSubmit = e.target.querySelector('button[type="submit"]');
+  let originalBtnText = '';
+  if (btnSubmit) {
+    originalBtnText = btnSubmit.innerHTML;
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<i class="rotating" data-lucide="loader-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i> Guardando...';
+    lucide.createIcons();
+  }
+  
+  let publicUrl = null;
+  const timestamp = Date.now();
+  const uniqueName = `cierre_papel_${timestamp}_${Math.random().toString(36).substring(2,7)}.pdf`;
+  const filePath = `ordenes/${ordenId}/${uniqueName}`;
+  
+  if (!navigator.onLine || !window.supabaseClient) {
+    try {
+      mostrarNotificacion('Guardando archivo localmente (Modo Offline)...', 'info');
+      const blobToBase64 = (blob) => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+      };
+      publicUrl = await blobToBase64(file);
+    } catch (err) {
+      console.error(err);
+      mostrarNotificacion('Fallo al procesar el archivo en modo offline.', 'error');
+      if (btnSubmit) {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = originalBtnText;
+        lucide.createIcons();
+      }
+      return;
+    }
+  } else {
+    try {
+      mostrarNotificacion('Subiendo PDF a Supabase Storage...', 'info');
+      const { data: uploadData, error: uploadErr } = await window.supabaseClient.storage
+        .from('evidencias')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+        
+      if (uploadErr) throw uploadErr;
+      
+      const { data: urlData } = window.supabaseClient.storage
+        .from('evidencias')
+        .getPublicUrl(filePath);
+        
+      publicUrl = urlData.publicUrl;
+    } catch (err) {
+      console.warn("Fallo la subida directa a Supabase. Guardando offline:", err);
+      try {
+        const blobToBase64 = (blob) => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+          });
+        };
+        publicUrl = await blobToBase64(file);
+      } catch (baseErr) {
+        console.error(baseErr);
+        mostrarNotificacion('Error al guardar el archivo localmente.', 'error');
+        if (btnSubmit) {
+          btnSubmit.disabled = false;
+          btnSubmit.innerHTML = originalBtnText;
+          lucide.createIcons();
+        }
+        return;
+      }
+    }
+  }
+  
+  const idx = ordenes.findIndex(x => x.id === ordenId);
+  if (idx !== -1) {
+    const currentUser = usuarios.find(u => u.id === currentSession.userId);
+    const usuarioNombre = currentUser ? currentUser.nombre : (currentSession.nombre || 'Supervisor');
+    
+    ordenes[idx].cierre_papel_pdf = publicUrl;
+    ordenes[idx].cierre_papel_motivo = motivo;
+    ordenes[idx].cierre_papel_usuario = usuarioNombre;
+    ordenes[idx].cierre_papel_fecha = new Date().toISOString();
+    ordenes[idx].cierre_papel_tecnicos_horas = tecnicosHoras;
+    ordenes[idx].estado = nuevoEstado;
+
+    // Sincronizar con la bitácora para reflejar en el calendario
+    if (!ordenes[idx].bitacora) ordenes[idx].bitacora = [];
+
+    // Expandir cada rango en entradas de un día individuales
+    const obtenerFechasEnRango = (inicio, fin) => {
+      const fechas = [];
+      let current = new Date(inicio + 'T00:00:00');
+      const end = new Date(fin + 'T00:00:00');
+      while (current <= end) {
+        const y = current.getFullYear();
+        const m = String(current.getMonth() + 1).padStart(2, '0');
+        const d = String(current.getDate()).padStart(2, '0');
+        fechas.push(`${y}-${m}-${d}`);
+        current.setDate(current.getDate() + 1);
+      }
+      return fechas;
+    };
+
+    const expandedEntries = [];
+    tecnicosHoras.forEach(row => {
+      const fechas = obtenerFechasEnRango(row.fecha_inicio, row.fecha_fin);
+      fechas.forEach(f => {
+        expandedEntries.push({
+          id: `${row.id}-${f}`,
+          tecnico: row.tecnico,
+          horas: row.horas,
+          fecha: f,
+          trayectos: row.trayectos,
+          ida: row.ida,
+          regreso: row.regreso
+        });
+      });
+    });
+
+    // Filtrar entradas obsoletas de cierre en papel en o.bitacora
+    ordenes[idx].bitacora = ordenes[idx].bitacora.filter(b => {
+      if (b.cierre_papel) {
+        return expandedEntries.some(ee => ee.id === b.id);
+      }
+      return true;
+    });
+
+    // Limpiar eventos eliminados del calendario
+    try {
+      const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+      const updatedEventos = [];
+      for (const ev of localEventos) {
+        if (ev.ordenId === ordenId && ev.id) {
+          const cleanEvId = String(ev.id).replace('bit-', '');
+          const isPaperClosureEvent = cleanEvId.startsWith('cp-');
+          if (isPaperClosureEvent) {
+            const stillExists = ordenes[idx].bitacora.some(b => b.id === cleanEvId || b.id === ev.id || `bit-${b.id}` === ev.id);
+            if (!stillExists) {
+              if (window.deleteFromSupabase) {
+                window.deleteFromSupabase('calendario_eventos', ev.id);
+              }
+              if (window.deleteFromSupabase) {
+                window.deleteFromSupabase('calendario_eventos', `bit-traslado-ida-${cleanEvId}`);
+                window.deleteFromSupabase('calendario_eventos', `bit-traslado-regreso-${cleanEvId}`);
+              }
+              continue;
+            }
+          }
+        }
+        updatedEventos.push(ev);
+      }
+      localStorage.setItem('sapi_calendario_eventos', JSON.stringify(updatedEventos));
+    } catch (e) {
+      console.error('Error al limpiar eventos del calendario:', e);
+    }
+
+    // Crear/actualizar entradas y actualizar calendario
+    expandedEntries.forEach(ee => {
+      let bEntry = ordenes[idx].bitacora.find(b => b.id === ee.id);
+      
+      const entrada = '08:00';
+      const baseHour = 8;
+      const totalHours = parseFloat(ee.horas);
+      const endHour = baseHour + totalHours;
+      const endHH = Math.floor(endHour).toString().padStart(2, '0');
+      const endMM = Math.round((endHour % 1) * 60).toString().padStart(2, '0');
+      const salida = `${endHH}:${endMM}`;
+      
+      if (bEntry) {
+        bEntry.fecha = ee.fecha;
+        bEntry.tecnico = ee.tecnico;
+        bEntry.realizado = true;
+        bEntry.entrada = entrada;
+        bEntry.salida = salida;
+        bEntry.horas_traslado = ee.ida || null;
+        bEntry.horas_regreso = ee.regreso || null;
+        if (!bEntry.nota || !bEntry.nota.includes('Cierre en papel')) {
+          bEntry.nota = `Cierre en papel: ${motivo}. ` + (bEntry.nota || '');
+        }
+        bEntry.cierre_papel = true;
+      } else {
+        bEntry = {
+          id: ee.id,
+          fecha: ee.fecha,
+          tecnico: ee.tecnico,
+          tipo: 'Servicio',
+          nota: `Cierre en papel: ${motivo}`,
+          entrada: entrada,
+          salida: salida,
+          horas_traslado: ee.ida || null,
+          horas_regreso: ee.regreso || null,
+          realizado: true,
+          cierre_papel: true,
+          asignadoPorName: usuarioNombre,
+          asignadoPorId: currentSession.userId || null
+        };
+        ordenes[idx].bitacora.push(bEntry);
+      }
+      
+      if (typeof actualizarEventoCalendarioDesdeBitacora === 'function') {
+        actualizarEventoCalendarioDesdeBitacora(ordenes[idx], bEntry);
+      }
+    });
+
+    try {
+      safeSetJSON('sapi_ordenes', ordenes);
+    } catch (err) {
+      console.error(err);
+      mostrarNotificacion('Error al guardar en almacenamiento local.', 'error');
+    }
+    
+    if (window.pushToSupabase) {
+      window.pushToSupabase('ordenes', ordenes[idx]).catch(err => {
+        console.error('Error al sincronizar con la nube:', err);
+      });
+    }
+    
+    mostrarNotificacion('Orden cerrada correctamente.', 'success');
+    
+    cerrarCierrePapel();
+    verDetalle(ordenId);
+    
+    try {
+      renderTabla();
+      renderTabla('servicios');
+    } catch (e) {
+      console.error('Error al refrescar tablas:', e);
+    }
+  }
+};
 
 // ===== LOGICA DEL CANVAS DE FIRMA =====
 let canvasesFirma = {
@@ -11225,6 +12244,10 @@ function guardarFirmaCanvas(ordenId, tipo) {
   
   const idx = ordenes.findIndex(o => o.id === ordenId);
   if (idx !== -1) {
+    if (ordenes[idx].cierre_papel_pdf) {
+      mostrarNotificacion('No se pueden registrar firmas en una orden cerrada en papel.', 'error');
+      return;
+    }
     const fechaFirma = new Date().toISOString();
     
     const ev = ordenes[idx].evidencias || {};
@@ -11292,6 +12315,10 @@ async function limpiarFirma(ordenId, tipo) {
     if (!confirmado) return;
     const idx = ordenes.findIndex(o => o.id === ordenId);
     if (idx !== -1) {
+      if (ordenes[idx].cierre_papel_pdf) {
+        mostrarNotificacion('No se pueden modificar firmas en una orden cerrada en papel.', 'error');
+        return;
+      }
       if (tipo === 'tecnico') ordenes[idx].firma_tecnico_base64 = '__DELETED__';
       else ordenes[idx].firma_cliente_base64 = '__DELETED__';
       
@@ -12914,7 +13941,7 @@ function calcularRangoFechasLaboral(diasHabilAtras) {
 
 function abrirBitacora(id, defaultNote = '', isOnlyTraslado = false) {
   const o = ordenes.find(x => x.id === id);
-  if (o && !isOnlyTraslado && (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado'))) {
+  if (o && !isOnlyTraslado && (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.cierre_papel_pdf))) {
     mostrarNotificacion('No se pueden registrar avances en una orden cerrada o completada.', 'error');
     return;
   }
@@ -13049,7 +14076,7 @@ window.iniciarReporteDesdeAsignacion = iniciarReporteDesdeAsignacion;
 function editarBitacora(ordenId, bitacoraId) {
   const o = ordenes.find(x => x.id === ordenId);
   if (!o) return;
-  if (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado')) {
+  if (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado' || o.cierre_papel_pdf)) {
     mostrarNotificacion('No se pueden editar avances en una orden cerrada o completada.', 'error');
     return;
   }
@@ -13170,6 +14197,10 @@ function guardarNotaBitacora() {
   }
   const o = ordenes.find(x => x.id === window.currentBitacoraOrdenId);
   if (!o) return;
+  if (o.cierre_papel_pdf) {
+    mostrarNotificacion('No se pueden registrar avances en una orden cerrada o completada.', 'error');
+    return;
+  }
   
   const fecha = document.getElementById('bitacora-fecha').value;
   const nota = document.getElementById('bitacora-nota').value.trim();
@@ -14380,6 +15411,20 @@ function renderTickets(ctx) {
   }
 }
 
+window.esTicketEnTransito = function(t) {
+  if (!t || typeof t !== 'object') return false;
+  const envios = t.envios || [];
+  if (envios.length > 0) {
+    const anyInTransit = envios.some(env => env.parts && env.parts.length > 0 && !env.llego);
+    if (anyInTransit) return true;
+  }
+  const parts = t.refaccionesSeleccionadas || [];
+  if (parts.length > 0) {
+    return parts.some(p => p.estatusPedido === 'En Tránsito / Pedido');
+  }
+  return false;
+};
+
 function badgeTicketEstado(tOrEstado) {
   const estado = typeof tOrEstado === 'object' ? tOrEstado.estado : tOrEstado;
   if (typeof tOrEstado === 'object') {
@@ -14392,6 +15437,11 @@ function badgeTicketEstado(tOrEstado) {
       }
       if (tOrEstado.cotAceptada === 'si' || tOrEstado.cotAceptada === 'aprobada') {
         return 'cerrado-aprobado';
+      }
+    }
+    if (tOrEstado.estado === 'Refacciones' || (tOrEstado.folio && tOrEstado.folio.endsWith('-A'))) {
+      if (window.esTicketEnTransito(tOrEstado)) {
+        return 'en-transito';
       }
     }
   }
@@ -14407,6 +15457,11 @@ function getTicketEstadoLabel(t) {
   if (t.estado === 'Cotización') {
     if (t.cotAceptada === 'si' || t.cotAceptada === 'aprobada') return 'Cotización (Aprobada)';
     if (t.cotAceptada === 'no' || t.cotAceptada === 'rechazada') return 'Cotización (Rechazada)';
+  }
+  if (t.estado === 'Refacciones' || (t.folio && t.folio.endsWith('-A'))) {
+    if (window.esTicketEnTransito(t)) {
+      return 'En Tránsito';
+    }
   }
   return t.estado || 'Abierto';
 }
@@ -14929,155 +15984,810 @@ function switchRefTab(tab) {
   }
 }
 
-function renderRefaccionesPendientes() {
-  const grid = document.getElementById('ref-pendientes-grid');
-  if (!grid) return;
-  grid.innerHTML = '';
-  
-  const pendientes = [];
-  getFilteredOrders().forEach(o => {
-    if (o.ref_necesarias && o.ref_necesarias.length > 0) {
-      o.ref_necesarias.forEach(ref => {
-        // Encontrar marca
-        let foundMarca = '';
-        if (ref.clave) {
-          const match = refaccionesDb.find(r => r.id === ref.clave || r.codigo === ref.clave);
-          if (match) foundMarca = match.marca;
-        }
-        if (!foundMarca && ref.descripcion) {
-          const match = refaccionesDb.find(r => r.descripcion === ref.descripcion);
-          if (match) foundMarca = match.marca;
-        }
-        
-        const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
-        
-        pendientes.push({
-          ordenId: o.id,
-          ordenFolio: o.folio,
-          tecnico: o.tecnicoResponsable || o.tecnico || 'Desconocido',
-          maquina: o.maquina || 'Sin Asignar',
-          sitio: o.sitio || o.ubicacion || 'Desconocido',
-          marca: MARCAS_RENDER[(foundMarca || '').toUpperCase()] || foundMarca || 'S/M',
-          descripcion: ref.descripcion || 'Sin Descripción',
-          cantidad: ref.cantidad || 1,
-          clave: ref.clave || 'S/C',
-          fecha: o.fecha || null
-        });
-      });
-    }
-  });
-  
-  pendientes.sort((a,b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
-  
-  if (pendientes.length === 0) {
-    grid.innerHTML = '<div style="color:var(--text-muted); padding:1rem; grid-column: 1/-1;">No hay refacciones pendientes solicitadas en las Órdenes de Servicio actuales.</div>';
+window.crearOActualizarTicketRefacciones = async function(orden) {
+  const refNecesarias = orden.ref_necesarias || [];
+  if (refNecesarias.length === 0) return;
+
+  let parentTicketId = orden.soporte || null;
+  let ticketPadre = parentTicketId ? tickets.find(t => t.id === parentTicketId || t.folio === parentTicketId) : null;
+
+  let baseFolio = ticketPadre ? ticketPadre.folio : (orden.folio || '');
+
+  if (!baseFolio) {
+    console.warn("[crearOActualizarTicketRefacciones] No se encontró folio base para la orden o ticket.");
     return;
   }
+
+  let prefix = '';
+  let cleanFolio = baseFolio.trim();
+  if (cleanFolio.startsWith('[PRUEBA] ')) {
+    prefix = '[PRUEBA] ';
+    cleanFolio = cleanFolio.replace('[PRUEBA] ', '').trim();
+  } else if (cleanFolio.startsWith('[TEST] ')) {
+    prefix = '[TEST] ';
+    cleanFolio = cleanFolio.replace('[TEST] ', '').trim();
+  }
   
-  pendientes.forEach(p => {
-    const card = document.createElement('div');
-    card.className = 'stat-card';
-    card.style.display = 'flex';
-    card.style.flexDirection = 'column';
-    card.style.alignItems = 'flex-start';
-    card.style.padding = '1rem';
-    card.style.position = 'relative';
-    card.style.cursor = 'pointer';
-    card.style.transition = 'transform 0.2s, box-shadow 0.2s';
-    card.onmouseover = () => { card.style.transform = 'translateY(-2px)'; card.style.boxShadow = 'var(--shadow-md)'; };
-    card.onmouseout = () => { card.style.transform = 'none'; card.style.boxShadow = 'var(--shadow)'; };
-
-    // Si ya está entregado, lo hacemos más sutil
-    if (p.estatusPedido === 'Entregado al Técnico') {
-      card.style.opacity = '0.75';
+  if (!cleanFolio.toUpperCase().startsWith('TKT-')) {
+    cleanFolio = 'TKT-' + cleanFolio;
+  }
+  
+  const targetFolio = cleanFolio.endsWith('-A') ? `${prefix}${cleanFolio}` : `${prefix}${cleanFolio}-A`;
+  
+  // Resolución robusta de ticketPadre eliminando sufijo -A en el targetFolio si es necesario
+  if (!ticketPadre && targetFolio) {
+    let cleanTarget = targetFolio.replace('[PRUEBA] ', '').replace('[TEST] ', '').trim();
+    if (cleanTarget.endsWith('-A')) {
+      const baseParentFolio = cleanTarget.slice(0, -2);
+      ticketPadre = tickets.find(t => {
+        let f = t.folio || '';
+        f = f.replace('[PRUEBA] ', '').replace('[TEST] ', '').trim();
+        return f === baseParentFolio;
+      });
     }
+  }
 
-    let badgeColor = 'var(--red, #ef4444)';
-    let badgeBg = 'rgba(239, 68, 68, 0.1)';
-    let badgeIcon = 'circle-dashed';
-    if (p.estatusPedido === 'En Tránsito / Pedido') {
-      badgeColor = 'var(--accent, #E8820C)';
-      badgeBg = 'rgba(232, 130, 12, 0.1)';
-      badgeIcon = 'truck';
-    } else if (p.estatusPedido === 'Entregado al Técnico') {
-      badgeColor = 'var(--green, #22c55e)';
-      badgeBg = 'rgba(34, 197, 94, 0.1)';
-      badgeIcon = 'check-circle-2';
+  console.log(`[DEBUG RefAcc] Orden: ${orden.folio}, Soporte: ${orden.soporte}, TargetFolio: ${targetFolio}, Tickets totales: ${tickets.length}`);
+  if (ticketPadre) {
+    console.log(`[DEBUG RefAcc] Padre encontrado: ${ticketPadre.folio}, Solicitante padre: ${ticketPadre.solicitante}`);
+  } else {
+    console.log(`[DEBUG RefAcc] Padre NO encontrado.`);
+  }
+
+  let ticketExistente = tickets.find(t => t.folio === targetFolio);
+  const now = new Date().toISOString();
+
+  const refaccionesMapeadas = refNecesarias.map(r => ({
+    marca: r.marca || '',
+    codigo: r.clave || r.codigo || 'S/C',
+    clave: r.clave || r.codigo || 'S/C',
+    nombre: r.descripcion || r.nombre || 'Sin Descripción',
+    descripcion: r.descripcion || r.nombre || 'Sin Descripción',
+    cantidad: r.cantidad || 1,
+    estatusPedido: r.estatusPedido || 'Por Pedir'
+  }));
+
+  const ticket = {
+    id: ticketExistente ? ticketExistente.id : crypto.randomUUID(),
+    folio: targetFolio,
+    fecha: ticketExistente ? ticketExistente.fecha : now,
+    fechaCreacion: ticketExistente ? ticketExistente.fechaCreacion : now,
+    fechaCierre: ticketExistente ? ticketExistente.fechaCierre : null,
+    canal: ticketExistente ? ticketExistente.canal : 'sistema',
+    contacto: ticketExistente ? ticketExistente.contacto : '',
+    asunto: `Refacciones para ${orden.folio || ''}`,
+    cliente: orden.cliente,
+    sitio: orden.ubicacion || orden.ubicacion_sitio || '',
+    solicitante: ticketPadre ? ticketPadre.solicitante : (orden.creadoPor || orden.tecnico || 'Sistema'),
+    creadoPor: ticketPadre ? (ticketPadre.creadoPor || ticketPadre.solicitante) : (orden.creadoPor || orden.tecnico || 'Sistema'),
+    area: ticketPadre ? (ticketPadre.area || 'Operaciones') : 'Operaciones',
+    categoria: 'Refacción',
+    prioridad: ticketPadre ? (ticketPadre.prioridad || 'Media') : 'Media',
+    asignado: (ticketExistente && ticketExistente.asignado && ticketExistente.asignado !== orden.tecnico) ? ticketExistente.asignado : 'Adrian Franco',
+    descripcion: `Ticket de refacciones por pedir generado de la Orden de Servicio ${orden.folio}.`,
+    equipo: orden.equipo,
+    horometro: orden.horometro_real || orden.horometro || (ticketExistente ? ticketExistente.horometro : ''),
+    notas: ticketExistente ? ticketExistente.notes || ticketExistente.notas : '',
+    refaccionesSeleccionadas: refaccionesMapeadas,
+    cotizacionesAdicionales: ticketExistente ? (ticketExistente.cotizacionesAdicionales || []) : [],
+    estado: ticketExistente ? ticketExistente.estado : 'Refacciones',
+    cotizacionSAP: ticketExistente ? ticketExistente.cotizacionSAP : '',
+    montoCotizacion: ticketExistente ? ticketExistente.montoCotizacion : null,
+    cotAceptada: ticketExistente ? ticketExistente.cotAceptada : '',
+    motivoRechazo: ticketExistente ? ticketExistente.motivoRechazo : '',
+    pedidoSAP: ticketExistente ? ticketExistente.pedidoSAP : '',
+    comentariosInternos: ticketExistente ? (ticketExistente.comentariosInternos || []) : [],
+    comentariosClientes: ticketExistente ? (ticketExistente.comentariosClientes || []) : [],
+    tecnicosAsignados: ticketExistente ? (ticketExistente.tecnicosAsignados || []) : [],
+    pdfPedido: ticketExistente ? ticketExistente.pdfPedido : null,
+    pdfCotizacion: ticketExistente ? ticketExistente.pdfCotizacion : null,
+    esPrueba: orden.esPrueba || false
+  };
+
+  if (ticketExistente) {
+    tickets = tickets.map(t => t.id === ticket.id ? ticket : t);
+  } else {
+    tickets.unshift(ticket);
+  }
+
+  try {
+    safeSetJSON('sapi_tickets', tickets);
+  } catch (err) {
+    console.error('Error al guardar sapi_tickets en localStorage:', err);
+  }
+
+  if (window.supabaseClient) {
+    try {
+      await window.pushToSupabase('tickets', ticket);
+    } catch (err) {
+      console.error(`[crearOActualizarTicketRefacciones] Error al sincronizar ticket con Supabase:`, err);
     }
-    
-    const logoPath = getLogoMarca(p.marca);
-    const marcaRender = logoPath 
-      ? `<img src="${logoPath}" alt="${p.marca}" style="height:22px; object-fit:contain;" title="${p.marca}" onerror="this.onerror=null; this.outerHTML='<span>${p.marca}</span>';">`
-      : `<span>${p.marca}</span>`;
-      
-    const logoMaquinaPath = getLogoMarca(p.maquina);
-    const maquinaRenderIcon = logoMaquinaPath
-      ? `<img src="${logoMaquinaPath}" style="width:14px; height:14px; margin-top:2px; object-fit:contain;" />`
-      : `<i data-lucide="settings-2" style="width:14px;height:14px; margin-top:2px; color:var(--text-muted)"></i>`;
+  }
 
-    const safeDesc = p.descripcion.replace(/'/g, "\\'");
-    const safeClave = p.clave.replace(/'/g, "\\'");
-    const safeMarca = p.marca ? p.marca.replace(/'/g, "\\'") : '';
-    
-    card.onclick = function(e) {
-      if (e.target.closest('.status-badge')) return;
-      window.abrirModalPiezaPendienteNuevo(p.ordenId, p.clave, p.descripcion, p.estatusPedido, p.cantidad, p.marca);
-    };
+  if (typeof updateTicketBadge === 'function') updateTicketBadge();
+  if (typeof renderTickets === 'function') {
+    renderTickets();
+    renderTickets('dash-tickets');
+  }
+};
 
-    card.innerHTML = `
-      <div style="width:100%; display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem;">
-        <span style="font-weight:800; font-size:1.15rem; color:var(--text-primary); display:flex; align-items:center; gap:0.4rem; line-height:1.2;">
-          <span style="background:var(--accent-light); color:var(--accent); padding:0.1rem 0.4rem; border-radius:4px; font-size:0.9rem;">${p.cantidad}x</span> 
-          ${p.descripcion}
-        </span>
-        <span class="status-badge status-open" style="font-size:0.75rem; cursor:pointer; white-space:nowrap; margin-left:0.5rem;" onclick="event.stopPropagation(); editarOrden('${p.ordenId}')" title="Ver/Editar Orden">Orden #${p.ordenFolio || 'S/N'}</span>
-      </div>
-      <div style="font-weight:600; font-size:0.95rem; color:var(--accent); margin-bottom:0.25rem; display:flex; align-items:center;">
-        ${marcaRender}
-      </div>
-      <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:1rem; font-family:monospace;">Clave: ${p.clave}</div>
-      
-      <div style="display:flex; flex-direction:column; gap:0.4rem; font-size:0.85rem; color:var(--text-secondary); width:100%; border-top: 1px dashed var(--border); padding-top: 0.75rem; margin-bottom: 1rem;">
-        <div style="display:flex; align-items:flex-start; gap:0.5rem;">
-          ${maquinaRenderIcon}
-          <span style="line-height:1.3">${p.maquina}</span>
-        </div>
-        <div style="display:flex; align-items:flex-start; gap:0.5rem;">
-          <i data-lucide="map-pin" style="width:14px;height:14px; margin-top:2px; color:var(--text-muted)"></i> 
-          <span style="line-height:1.3">${p.sitio}</span>
-        </div>
-        <div style="display:flex; align-items:center; gap:0.5rem;">
-          <i data-lucide="user" style="width:14px;height:14px; color:var(--text-muted)"></i> 
-          <span>${p.tecnico}</span>
-        </div>
-      </div>
-      
-      <div style="width: 100%; display: flex; align-items: center; justify-content: flex-end; margin-top: auto;">
-        <div style="display: flex; align-items: center; gap: 0.4rem; color: ${badgeColor}; background: ${badgeBg}; padding: 0.35rem 0.6rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
-          <i data-lucide="${badgeIcon}" style="width:14px; height:14px;"></i>
-          ${p.estatusPedido || 'Por Pedir'}
-        </div>
-      </div>
-    `;
-    grid.appendChild(card);
+let refaccionesViewMode = localStorage.getItem('sapi_ref_view_mode') || 'table';
+
+window.setRefaccionesViewMode = function(mode) {
+  refaccionesViewMode = mode;
+  localStorage.setItem('sapi_ref_view_mode', mode);
+  renderRefaccionesPendientes();
+};
+
+function renderRefaccionesPendientes() {
+  const grid = document.getElementById('ref-pendientes-grid');
+  const tableContainer = document.getElementById('ref-pendientes-table-container');
+  const tableBody = document.getElementById('ref-pendientes-table-body');
+  const piecesContainer = document.getElementById('ref-pendientes-pieces-container');
+  const piecesBody = document.getElementById('ref-pendientes-pieces-body');
+  const btnTable = document.getElementById('btn-ref-view-table');
+  const btnPieces = document.getElementById('btn-ref-view-pieces');
+
+  if (!tableContainer) return;
+
+  // Toggle dynamic container display and update active class/styles
+  if (refaccionesViewMode === 'pieces') {
+    if (piecesContainer) piecesContainer.style.display = 'block';
+    if (tableContainer) tableContainer.style.display = 'none';
+    if (grid) grid.style.display = 'none';
+    
+    if (btnPieces) {
+      btnPieces.classList.add('active');
+      btnPieces.style.background = 'var(--bg-card)';
+      btnPieces.style.color = 'var(--text-primary)';
+      btnPieces.style.fontWeight = '600';
+      btnPieces.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+    }
+    if (btnTable) {
+      btnTable.classList.remove('active');
+      btnTable.style.background = 'transparent';
+      btnTable.style.color = 'var(--text-muted)';
+      btnTable.style.fontWeight = '500';
+      btnTable.style.boxShadow = 'none';
+    }
+  } else {
+    if (piecesContainer) piecesContainer.style.display = 'none';
+    if (tableContainer) tableContainer.style.display = 'block';
+    if (grid) grid.style.display = 'none';
+    
+    if (btnPieces) {
+      btnPieces.classList.remove('active');
+      btnPieces.style.background = 'transparent';
+      btnPieces.style.color = 'var(--text-muted)';
+      btnPieces.style.fontWeight = '500';
+      btnPieces.style.boxShadow = 'none';
+    }
+    if (btnTable) {
+      btnTable.classList.add('active');
+      btnTable.style.background = 'var(--bg-card)';
+      btnTable.style.color = 'var(--text-primary)';
+      btnTable.style.fontWeight = '600';
+      btnTable.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+    }
+  }
+
+  if (grid) grid.innerHTML = '';
+  if (tableBody) tableBody.innerHTML = '';
+  if (piecesBody) piecesBody.innerHTML = '';
+  
+  const currentUser = usuarios.find(u => u && u.id === currentSession.userId);
+  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  
+  window.obtenerOrdenAsociadaATicketRefacciones = function(t) {
+    if (!t || !t.folio) return null;
+    const originalFolio = t.folio.replace('-A', '');
+    const parentTicket = tickets.find(x => x.folio === originalFolio);
+    if (parentTicket) {
+      return ordenes.find(o => o.soporte === parentTicket.id);
+    }
+    let cleanOrdFolio = originalFolio;
+    if (cleanOrdFolio.startsWith('[PRUEBA] ')) cleanOrdFolio = cleanOrdFolio.replace('[PRUEBA] ', '');
+    if (cleanOrdFolio.startsWith('[TEST] ')) cleanOrdFolio = cleanOrdFolio.replace('[TEST] ', '');
+    if (cleanOrdFolio.startsWith('TKT-')) cleanOrdFolio = cleanOrdFolio.replace('TKT-', '');
+    cleanOrdFolio = cleanOrdFolio.trim();
+    return ordenes.find(o => {
+      let ofol = o.folio || '';
+      if (ofol.startsWith('[PRUEBA] ')) ofol = ofol.replace('[PRUEBA] ', '');
+      if (ofol.startsWith('[TEST] ')) ofol = ofol.replace('[TEST] ', '');
+      return ofol.trim() === cleanOrdFolio;
+    });
+  };
+
+  let rawTickets = getFilteredTickets().filter(t => t && t.categoria === 'Refacción' && t.estado !== 'Cerrado' && t.folio && t.folio.endsWith('-A'));
+  
+  // 1. Filtrar solo aquellos tickets que tengan una orden en estado "Refacciones pendientes"
+  let refTickets = rawTickets.filter(t => {
+    const assocOrder = window.obtenerOrdenAsociadaATicketRefacciones(t);
+    if (!assocOrder) return false;
+    const orderState = String(assocOrder.estado || '').toLowerCase().trim();
+    if (orderState !== 'refacciones pendientes') return false;
+    t._asocOrder = assocOrder; // Guardar referencia para desduplicar
+    return true;
   });
-  if (window.lucide) window.lucide.createIcons({ root: grid });
+
+  // 2. Desduplicar por id de orden asociada (prefeiendo el ticket que tenga refacciones reales registradas)
+  const orderTicketsMap = new Map();
+  refTickets.forEach(t => {
+    const orderId = t._asocOrder.id;
+    const existing = orderTicketsMap.get(orderId);
+    if (!existing) {
+      orderTicketsMap.set(orderId, t);
+    } else {
+      const existingCount = (existing.refaccionesSeleccionadas || []).length;
+      const currentCount = (t.refaccionesSeleccionadas || []).length;
+      if (currentCount > existingCount) {
+        orderTicketsMap.set(orderId, t);
+      }
+    }
+  });
+  refTickets = Array.from(orderTicketsMap.values());
+
+  if (isEmpresa) {
+    let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+    if (nombreEmpresaLogged) {
+      nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
+      refTickets = refTickets.filter(t => {
+        if (!t) return false;
+        const tcli = String(t.cliente || '').toLowerCase().trim();
+        const tsol = String(t.solicitante || '').toLowerCase().trim();
+        return tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged;
+      });
+    } else {
+      refTickets = [];
+    }
+  }
+
+  const userRole = currentSession.viewMode || '';
+  if (userRole === 'tecnico') {
+    const tecName = currentUser ? currentUser.nombre : '';
+    if (tecName && !isTestModeActive()) {
+      refTickets = refTickets.filter(t => {
+        const assigned = (t.asignado || '').split(',').map(s => s.trim());
+        return assigned.includes(tecName) || (t.tecnicosAsignados && t.tecnicosAsignados.includes(tecName));
+      });
+    }
+  }
+
+  refTickets.sort((a, b) => new Date(b.fechaCreacion || b.fecha || 0) - new Date(a.fechaCreacion || a.fecha || 0));
+
+  if (refTickets.length === 0) {
+    if (refaccionesViewMode === 'cards') {
+      grid.innerHTML = '<div style="color:var(--text-muted); padding:1rem; grid-column: 1/-1;">No hay tickets de refacciones pendientes en este momento.</div>';
+    } else {
+      if (tableBody) {
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:2rem; font-style:italic;">No hay tickets de refacciones pendientes en este momento.</td></tr>';
+      }
+    }
+    return;
+  }
+
+  if (refaccionesViewMode === 'cards') {
+    refTickets.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'stat-card';
+      card.style.display = 'flex';
+      card.style.flexDirection = 'column';
+      card.style.alignItems = 'flex-start';
+      card.style.padding = '1.25rem';
+      card.style.position = 'relative';
+      card.style.cursor = 'pointer';
+      card.style.transition = 'transform 0.2s, box-shadow 0.2s';
+      card.onmouseover = () => { card.style.transform = 'translateY(-2px)'; card.style.boxShadow = 'var(--shadow-md)'; };
+      card.onmouseout = () => { card.style.transform = 'none'; card.style.boxShadow = 'var(--shadow)'; };
+
+      card.onclick = () => {
+        editarTicket(t.id);
+      };
+
+      let badgeColor = 'var(--accent, #E8820C)';
+      let badgeBg = 'rgba(232, 130, 12, 0.1)';
+      if (t.estado === 'Cotización') {
+        badgeColor = 'var(--accent-light, #2563eb)';
+        badgeBg = 'rgba(37, 99, 235, 0.1)';
+      } else if (t.estado === 'Abierto') {
+        badgeColor = 'var(--blue, #3b82f6)';
+        badgeBg = 'rgba(59, 130, 246, 0.1)';
+      } else if (t.estado === 'Refacciones' || (t.folio && t.folio.endsWith('-A'))) {
+        if (window.esTicketEnTransito(t)) {
+          badgeColor = '#3b82f6';
+          badgeBg = 'rgba(59, 130, 246, 0.1)';
+        }
+      }
+
+      const originalFolio = t.folio.replace('-A', '');
+      const parentTicket = tickets.find(x => x.folio === originalFolio);
+      let parentOrder = null;
+      if (!parentTicket) {
+        let cleanOrdFolio = originalFolio;
+        if (cleanOrdFolio.startsWith('[PRUEBA] ')) cleanOrdFolio = cleanOrdFolio.replace('[PRUEBA] ', '');
+        if (cleanOrdFolio.startsWith('[TEST] ')) cleanOrdFolio = cleanOrdFolio.replace('[TEST] ', '');
+        if (cleanOrdFolio.startsWith('TKT-')) cleanOrdFolio = cleanOrdFolio.replace('TKT-', '');
+        cleanOrdFolio = cleanOrdFolio.trim();
+
+        parentOrder = ordenes.find(o => {
+          let ofol = o.folio || '';
+          if (ofol.startsWith('[PRUEBA] ')) ofol = ofol.replace('[PRUEBA] ', '');
+          if (ofol.startsWith('[TEST] ')) ofol = ofol.replace('[TEST] ', '');
+          return ofol.trim() === cleanOrdFolio;
+        });
+      }
+
+      const parts = t.refaccionesSeleccionadas || [];
+      let partsHtml = '';
+      if (parts.length > 0) {
+        partsHtml = `
+          <div style="width: 100%; margin-top: 0.5rem; margin-bottom: 0.75rem;">
+            <div style="font-size:0.8rem; font-weight:700; color:var(--text-secondary); margin-bottom:0.4rem; text-transform:uppercase; letter-spacing:0.5px;">Piezas Solicitadas:</div>
+            <div style="display:flex; flex-direction:column; gap:0.4rem;">
+              ${parts.map(p => {
+                let pStatusColor = '#ef4444';
+                let pStatusBg = 'rgba(239, 68, 68, 0.1)';
+                if (p.estatusPedido === 'En Tránsito / Pedido') {
+                  pStatusColor = '#e8820c';
+                  pStatusBg = 'rgba(232, 130, 12, 0.1)';
+                } else if (p.estatusPedido === 'Entregado al Técnico') {
+                  pStatusColor = '#22c55e';
+                  pStatusBg = 'rgba(34, 197, 94, 0.1)';
+                }
+                const pMarca = p.marca || '';
+                let brandName = {
+                  'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM',
+                  'MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS',
+                  'TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM',
+                  'POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG',
+                  'HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
+                }[String(pMarca).toUpperCase()] || pMarca || '';
+                let detailsText = `Clave: ${p.clave || p.codigo} ${brandName ? `(${brandName})` : ''}`;
+                let extraInfo = [];
+                if (p.proveedor) extraInfo.push(`Prov: ${p.proveedor}`);
+                if (p.precio) {
+                  const val = parseFloat(p.precio);
+                  if (!isNaN(val)) {
+                    extraInfo.push(`Precio: $${val.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+                  } else {
+                    extraInfo.push(`Precio: $${p.precio}`);
+                  }
+                }
+                if (extraInfo.length > 0) {
+                  detailsText += ` | ${extraInfo.join(' | ')}`;
+                }
+
+                let miniProgressHtml = '';
+
+                return `
+                  <div style="background:var(--bg-secondary); padding:0.4rem 0.6rem; border-radius:6px; font-size:0.85rem; border:1px solid var(--border); display: flex; flex-direction: column; gap: 2px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                      <span style="font-weight:600; color:var(--text-primary);">
+                        <span style="color:var(--accent); font-weight:700; margin-right:4px;">${p.cantidad}x</span> 
+                        ${p.descripcion || p.nombre}
+                        <span style="font-size:0.75rem; color:var(--text-muted); font-family:monospace; display:block; margin-top:2px;">${detailsText}</span>
+                      </span>
+                      <span class="status-badge" style="font-size:0.7rem; font-weight:700; color:${pStatusColor}; background:${pStatusBg}; padding:2px 6px; border-radius:4px; white-space:nowrap; border: 1px solid ${pStatusColor}33; cursor:pointer;" onclick="event.stopPropagation(); window.abrirModalPiezaPendienteTicket('${t.id}', '${p.clave || p.codigo}', '${p.descripcion || p.nombre}', '${p.estatusPedido || 'Por Pedir'}', ${p.cantidad}, '${p.marca || ''}')">
+                        ${p.estatusPedido || 'Por Pedir'}
+                      </span>
+                    </div>
+                    ${miniProgressHtml}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      } else {
+        partsHtml = `<div style="font-size:0.85rem; color:var(--text-muted); font-style:italic; margin: 0.5rem 0;">Ninguna pieza registrada.</div>`;
+      }
+
+      card.innerHTML = `
+        <div style="width:100%; display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem;">
+          <span style="font-weight:800; font-size:1.15rem; color:var(--text-primary); display:flex; align-items:center; gap:0.5rem;">
+            <span style="background:var(--accent-light); color:var(--accent); padding:0.15rem 0.4rem; border-radius:6px; font-size:0.8rem; font-family:monospace;">${t.folio}</span> 
+          </span>
+          <span class="status-badge" style="font-size:0.75rem; font-weight:700; color:${badgeColor}; background:${badgeBg}; border:1px solid ${badgeColor}33; padding:0.25rem 0.5rem; border-radius:6px;">
+            ${getTicketEstadoLabel(t)}
+          </span>
+        </div>
+        
+        <div style="font-size:0.95rem; font-weight:700; color:var(--text-primary); margin-bottom:0.5rem;">
+          ${t.asunto || 'Ticket de Refacciones'}
+        </div>
+        
+        ${partsHtml}
+
+        <div style="display:flex; flex-direction:column; gap:0.4rem; font-size:0.85rem; color:var(--text-secondary); width:100%; border-top: 1px dashed var(--border); padding-top: 0.75rem; margin-top:0.5rem;">
+          <div style="display:flex; align-items:flex-start; gap:0.5rem;">
+            <i data-lucide="building" style="width:14px;height:14px; margin-top:2px; color:var(--text-muted)"></i>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <span style="font-weight:600; line-height:1.3; color:var(--text-primary);">${t.cliente}</span>
+              ${parentOrder ? `
+              <div style="font-size:0.75rem; color:var(--text-secondary); display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="event.stopPropagation(); verDetalle('${parentOrder.id}')">
+                <i data-lucide="file-text" style="width:11px; height:11px; color:var(--text-muted)"></i>
+                <span>OS: <span style="text-decoration:underline; font-weight:600; color:var(--text-primary);">${parentOrder.folio}</span></span>
+              </div>` : ''}
+              ${parentTicket ? `
+              <div style="font-size:0.75rem; color:var(--text-secondary); display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="event.stopPropagation(); editarTicket('${parentTicket.id}')">
+                <i data-lucide="link" style="width:11px; height:11px; color:var(--text-muted)"></i>
+                <span>Original: <span style="text-decoration:underline; font-weight:600; color:var(--text-primary);">${parentTicket.folio}</span></span>
+              </div>` : ''}
+            </div>
+          </div>
+          <div style="display:flex; align-items:flex-start; gap:0.5rem;">
+            <i data-lucide="map-pin" style="width:14px;height:14px; margin-top:2px; color:var(--text-muted)"></i> 
+            <span style="line-height:1.3">${t.sitio || 'Sin sitio'}</span>
+          </div>
+          ${t.equipo ? `
+          <div style="display:flex; align-items:flex-start; gap:0.5rem;">
+            <i data-lucide="settings-2" style="width:14px;height:14px; margin-top:2px; color:var(--text-muted)"></i> 
+            <span style="line-height:1.3">${t.equipo}</span>
+          </div>` : ''}
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <i data-lucide="user" style="width:14px;height:14px; color:var(--text-muted)"></i> 
+            <span>Asignado: ${t.asignado || 'Sin asignar'}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; color:var(--text-muted);">
+            <i data-lucide="calendar" style="width:12px;height:12px;"></i>
+            <span>Creado: ${new Date(t.fechaCreacion || t.fecha).toLocaleDateString()}</span>
+          </div>
+        </div>
+      `;
+      
+      grid.appendChild(card);
+    });
+    if (window.lucide) window.lucide.createIcons({ root: grid });
+  } else {
+    refTickets.forEach(t => {
+      const originalFolio = t.folio.replace('-A', '');
+      const parentTicket = tickets.find(x => x.folio === originalFolio);
+      
+      const parentOrder = t._asocOrder || window.obtenerOrdenAsociadaATicketRefacciones(t);
+
+      const parentLink = `
+        <div style="display:flex; flex-direction:column; gap:2px; margin-top:4px; align-items:flex-start;">
+          ${parentOrder ? `
+          <div style="font-size:0.72rem; color:var(--text-secondary); display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="event.stopPropagation(); verDetalle('${parentOrder.id}')">
+            <i data-lucide="file-text" style="width:11px; height:11px; color:var(--text-muted);"></i>
+            <span>OS: <span style="text-decoration:underline; font-weight:600; color:var(--text-primary);">${parentOrder.folio}</span></span>
+          </div>` : ''}
+          ${parentTicket ? `
+          <div style="font-size:0.72rem; color:var(--text-secondary); display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="event.stopPropagation(); editarTicket('${parentTicket.id}')">
+            <i data-lucide="link" style="width:11px; height:11px; color:var(--text-muted);"></i>
+            <span>Original: <span style="text-decoration:underline; font-weight:600; color:var(--text-primary);">${parentTicket.folio}</span></span>
+          </div>` : ''}
+        </div>
+      `;
+
+      const parts = t.refaccionesSeleccionadas || [];
+      let partsHtml = '';
+      if (parts.length > 0) {
+        partsHtml = `
+          <div style="display:flex; flex-direction:column; gap:0.35rem;">
+            ${parts.map(p => {
+              let pStatusColor = '#ef4444';
+              let pStatusBg = 'rgba(239, 68, 68, 0.1)';
+              if (p.estatusPedido === 'En Tránsito / Pedido') {
+                pStatusColor = '#e8820c';
+                pStatusBg = 'rgba(232, 130, 12, 0.1)';
+              } else if (p.estatusPedido === 'Entregado al Técnico') {
+                pStatusColor = '#22c55e';
+                pStatusBg = 'rgba(34, 197, 94, 0.1)';
+              }
+              const pMarca = p.marca || '';
+              let brandName = {
+                'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM',
+                'MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS',
+                'TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM',
+                'POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG',
+                'HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
+              }[String(pMarca).toUpperCase()] || pMarca || '';
+              
+              let detailsText = `Clave: ${p.clave || p.codigo} ${brandName ? `(${brandName})` : ''}`;
+              let extraInfo = [];
+              if (p.proveedor) extraInfo.push(`Prov: ${p.proveedor}`);
+              if (p.precio) {
+                const val = parseFloat(p.precio);
+                if (!isNaN(val)) {
+                  extraInfo.push(`Precio: $${val.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+                } else {
+                  extraInfo.push(`Precio: $${p.precio}`);
+                }
+              }
+               if (extraInfo.length > 0) {
+                 detailsText += ` | ${extraInfo.join(' | ')}`;
+               }
+
+               let miniProgressHtml = '';
+
+               return `
+                 <div style="background:var(--bg-secondary); padding:0.25rem 0.5rem; border-radius:4px; font-size:0.8rem; border:1px solid var(--border); width: 100%; max-width: 450px; display: flex; flex-direction: column; gap: 2px;">
+                   <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; width: 100%;">
+                     <span style="font-weight:500; color:var(--text-primary);">
+                       <span style="color:var(--accent); font-weight:700; margin-right:4px;">${p.cantidad}x</span> 
+                       ${p.descripcion || p.nombre}
+                       <span style="font-size:0.7rem; color:var(--text-muted); font-family:monospace; display:block; margin-top:1px;">${detailsText}</span>
+                     </span>
+                     <span class="status-badge" style="font-size:0.65rem; font-weight:700; color:${pStatusColor}; background:${pStatusBg}; padding:1px 5px; border-radius:3px; white-space:nowrap; border: 1px solid ${pStatusColor}33; cursor:pointer;" onclick="event.stopPropagation(); window.abrirModalPiezaPendienteTicket('${t.id}', '${p.clave || p.codigo}', '${p.descripcion || p.nombre}', '${p.estatusPedido || 'Por Pedir'}', ${p.cantidad}, '${p.marca || ''}')">
+                       ${p.estatusPedido || 'Por Pedir'}
+                     </span>
+                   </div>
+                   ${miniProgressHtml}
+                 </div>
+               `;
+            }).join('')}
+          </div>
+        `;
+      } else {
+        partsHtml = `<span style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">Ninguna pieza registrada.</span>`;
+      }
+
+      let badgeColor = 'var(--accent, #E8820C)';
+      let badgeBg = 'rgba(232, 130, 12, 0.1)';
+      if (t.estado === 'Cotización') {
+        badgeColor = 'var(--accent-light, #2563eb)';
+        badgeBg = 'rgba(37, 99, 235, 0.1)';
+      } else if (t.estado === 'Abierto') {
+        badgeColor = 'var(--blue, #3b82f6)';
+        badgeBg = 'rgba(59, 130, 246, 0.1)';
+      } else if (t.estado === 'Refacciones' || (t.folio && t.folio.endsWith('-A'))) {
+        if (window.esTicketEnTransito(t)) {
+          badgeColor = '#3b82f6';
+          badgeBg = 'rgba(59, 130, 246, 0.1)';
+        }
+      }
+
+      const row = document.createElement('tr');
+      row.style.borderBottom = '1px solid var(--border)';
+      row.style.color = 'var(--text-primary)';
+      row.style.fontSize = '0.85rem';
+      row.style.cursor = 'pointer';
+      
+      row.onclick = () => {
+        editarTicket(t.id);
+      };
+
+      row.innerHTML = `
+        <td style="padding:0.75rem 0.5rem; text-align:center;">
+          <button class="btn-primary" style="padding:0.25rem 0.5rem; font-size:0.75rem; border-radius:4px; display:inline-flex; align-items:center; gap:0.25rem; border:none; cursor:pointer;" onclick="event.stopPropagation(); editarTicket('${t.id}')">
+            <i data-lucide="eye" style="width:12px; height:12px;"></i> Ver
+          </button>
+        </td>
+        <td style="padding:0.75rem 0.5rem; font-family:monospace; font-weight:700;">
+          <div style="display:flex; flex-direction:column; gap:0.25rem; align-items:flex-start;">
+            <span style="background:var(--accent-light); color:var(--accent); padding:0.15rem 0.4rem; border-radius:4px; font-size:0.78rem;">${t.folio}</span>
+          </div>
+        </td>
+        <td style="padding:0.75rem 0.5rem; font-weight:600; line-height:1.2;">
+          ${t.asunto || 'Ticket de Refacciones'}
+        </td>
+        <td style="padding:0.75rem 0.5rem; font-weight:500;">
+          <div>${t.cliente}</div>
+          ${parentLink}
+        </td>
+        <td style="padding:0.75rem 0.5rem; font-size:0.8rem; color:var(--text-secondary); line-height:1.3;">
+          <div><i data-lucide="map-pin" style="width:11px; height:11px; vertical-align:middle; margin-right:3px; color:var(--text-muted);"></i> ${t.sitio || 'Sin sitio'}</div>
+          ${t.equipo ? `<div style="margin-top:2px;"><i data-lucide="settings-2" style="width:11px; height:11px; vertical-align:middle; margin-right:3px; color:var(--text-muted);"></i> ${t.equipo}</div>` : ''}
+        </td>
+        <td style="padding:0.75rem 0.5rem; text-align:center;">
+          <span class="status-badge" style="font-size:0.72rem; font-weight:700; color:${badgeColor}; background:${badgeBg}; border:1px solid ${badgeColor}33; padding:0.2rem 0.4rem; border-radius:4px; display:inline-block;">
+            ${getTicketEstadoLabel(t)}
+          </span>
+        </td>
+        <td style="padding:0.75rem 0.5rem; vertical-align:middle;">
+          ${partsHtml}
+        </td>
+        <td style="padding:0.75rem 0.5rem; text-align:center; font-size:0.8rem; color:var(--text-muted);">
+          ${new Date(t.fechaCreacion || t.fecha).toLocaleDateString()}
+        </td>
+      `;
+      tableBody.appendChild(row);
+    });
+    if (window.lucide) window.lucide.createIcons({ root: tableContainer });
+  }
 }
 
-window.abrirModalPiezaPendienteNuevo = function(ordenId, clave, descripcion, estatusActual, cantidad, marca) {
+window.actualizarEstatusPiezaEnTicketYOrden = async function(ticketId, clave, descripcion, nuevoEstatus, extraData = {}) {
+  const ticket = tickets.find(t => t.id === ticketId);
+  if (!ticket) return;
+
+  let partsUpdated = false;
+  if (ticket.refaccionesSeleccionadas) {
+    const ref = ticket.refaccionesSeleccionadas.find(r => (r.clave === clave || r.codigo === clave) && (r.descripcion === descripcion || r.nombre === descripcion));
+    if (ref) {
+      ref.estatusPedido = nuevoEstatus;
+      if (extraData.guiaPedido !== undefined) ref.guiaPedido = extraData.guiaPedido;
+      if (extraData.precio !== undefined) ref.precio = extraData.precio;
+      if (extraData.proveedor !== undefined) ref.proveedor = extraData.proveedor;
+      if (extraData.paqueteria !== undefined) ref.paqueteria = extraData.paqueteria;
+      if (extraData.fechaPedido !== undefined) ref.fechaPedido = extraData.fechaPedido;
+      if (extraData.fechaEstimada !== undefined) ref.fechaEstimada = extraData.fechaEstimada;
+      if (extraData.marca !== undefined) ref.marca = extraData.marca;
+      partsUpdated = true;
+    }
+  }
+
+  if (!partsUpdated) return;
+
+  const originalFolio = ticket.folio.replace('-A', '');
+  const parentTicket = tickets.find(t => t.folio === originalFolio);
+  
+  let orden = null;
+  if (parentTicket) {
+    orden = ordenes.find(o => o.soporte === parentTicket.id);
+  }
+  if (!orden) {
+    let cleanOrdFolio = originalFolio;
+    if (cleanOrdFolio.startsWith('[PRUEBA] ')) cleanOrdFolio = cleanOrdFolio.replace('[PRUEBA] ', '');
+    if (cleanOrdFolio.startsWith('[TEST] ')) cleanOrdFolio = cleanOrdFolio.replace('[TEST] ', '');
+    if (cleanOrdFolio.startsWith('TKT-')) cleanOrdFolio = cleanOrdFolio.replace('TKT-', '');
+    cleanOrdFolio = cleanOrdFolio.trim();
+
+    orden = ordenes.find(o => {
+      let ofol = o.folio || '';
+      if (ofol.startsWith('[PRUEBA] ')) ofol = ofol.replace('[PRUEBA] ', '');
+      if (ofol.startsWith('[TEST] ')) ofol = ofol.replace('[TEST] ', '');
+      return ofol.trim() === cleanOrdFolio;
+    });
+  }
+
+  if (orden && orden.ref_necesarias) {
+    const oRef = orden.ref_necesarias.find(r => (r.clave === clave || r.codigo === clave) && (r.descripcion === descripcion || r.nombre === descripcion));
+    if (oRef) {
+      oRef.estatusPedido = nuevoEstatus;
+      if (extraData.guiaPedido !== undefined) oRef.guiaPedido = extraData.guiaPedido;
+      if (extraData.precio !== undefined) oRef.precio = extraData.precio;
+      if (extraData.proveedor !== undefined) oRef.proveedor = extraData.proveedor;
+      if (extraData.paqueteria !== undefined) oRef.paqueteria = extraData.paqueteria;
+      if (extraData.fechaPedido !== undefined) oRef.fechaPedido = extraData.fechaPedido;
+      if (extraData.fechaEstimada !== undefined) oRef.fechaEstimada = extraData.fechaEstimada;
+      if (extraData.marca !== undefined) oRef.marca = extraData.marca;
+      if (window.supabaseClient) {
+        try {
+          await window.pushToSupabase('ordenes', orden);
+        } catch (err) {
+          console.error("Error al sincronizar orden en Supabase:", err);
+        }
+      }
+    }
+    safeSetJSON('sapi_ordenes', ordenes);
+  }
+
+  safeSetJSON('sapi_tickets', tickets);
+  if (window.supabaseClient) {
+    try {
+      await window.pushToSupabase('tickets', ticket);
+    } catch (err) {
+      console.error("Error al sincronizar ticket en Supabase:", err);
+    }
+  }
+
+  renderRefaccionesPendientes();
+  
+  // Si el detalle del ticket está abierto, refrescarlo para mostrar el cambio
+  const detalleView = document.getElementById('detalle-ticket-view');
+  if (detalleView && detalleView.style.display !== 'none') {
+    verDetalleTicket(ticketId);
+  }
+
+  // Si el modal de edición de ticket está abierto para este ticket, refrescar su listado inferior de refacciones
+  if (typeof editandoTicketId !== 'undefined' && editandoTicketId === ticketId) {
+    const refBottomPiezasList = document.getElementById('ref-bottom-piezas-list');
+    if (refBottomPiezasList) {
+      refBottomPiezasList.innerHTML = '';
+      const parts = ticket.refaccionesSeleccionadas || [];
+      if (parts.length > 0) {
+        parts.forEach(p => {
+          const itemDiv = document.createElement('div');
+          itemDiv.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.4rem 0.6rem;
+            font-size: 0.85rem;
+          `;
+          
+          let pStatusColor = '#ef4444';
+          let pStatusBg = 'rgba(239, 68, 68, 0.1)';
+          if (p.estatusPedido === 'En Tránsito / Pedido') {
+            pStatusColor = '#e8820c';
+            pStatusBg = 'rgba(232, 130, 12, 0.1)';
+          } else if (p.estatusPedido === 'Entregado al Técnico') {
+            pStatusColor = '#22c55e';
+            pStatusBg = 'rgba(34, 197, 94, 0.1)';
+          }
+          
+          let detailsHtml = `(Clave: ${p.clave || p.codigo || 'S/C'})`;
+          let extraInfo = [];
+          if (p.proveedor) extraInfo.push(`Prov: ${p.proveedor}`);
+          if (p.precio) {
+            const val = parseFloat(p.precio);
+            if (!isNaN(val)) {
+              extraInfo.push(`Precio: $${val.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+            } else {
+              extraInfo.push(`Precio: $${p.precio}`);
+            }
+          }
+          if (extraInfo.length > 0) {
+            detailsHtml += ` • ${extraInfo.join(' | ')}`;
+          }
+
+          let miniProgressHtml = '';
+
+          itemDiv.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+              <span style="font-weight: 500; color: var(--text-primary);">
+                <span style="color: var(--accent); font-weight: 700; margin-right: 4px;">${p.cantidad || p.qty || 1}x</span> 
+                ${p.descripcion || p.nombre || 'Sin Descripción'}
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace; display: inline-block; margin-left: 8px;">${detailsHtml}</span>
+              </span>
+              <span class="status-badge" style="font-size: 0.7rem; font-weight: 700; color: ${pStatusColor}; background: ${pStatusBg}; padding: 2px 6px; border-radius: 4px; border: 1px solid ${pStatusColor}33; cursor: pointer;" onclick="event.stopPropagation(); window.abrirModalPiezaPendienteTicket('${ticketId}', '${p.clave || p.codigo}', '${p.descripcion || p.nombre}', '${p.estatusPedido || 'Por Pedir'}', ${p.cantidad || 1}, '${p.marca || ''}')">
+                ${p.estatusPedido || 'Por Pedir'}
+              </span>
+            </div>
+            ${miniProgressHtml}
+          `;
+          refBottomPiezasList.appendChild(itemDiv);
+        });
+      } else {
+        refBottomPiezasList.innerHTML = '<span style="color: var(--text-muted); font-style: italic; font-size: 0.85rem;">Ninguna refacción registrada.</span>';
+      }
+    }
+  }
+};
+
+window.abrirModalPiezaPendienteTicket = function(ticketId, clave, descripcion, estatusActual, cantidad, marca) {
   const existing = document.getElementById('dynamic-modal-pieza');
   if (existing) existing.remove();
 
-  let orden = null;
-  if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
-    orden = ordenes.find(o => o.id === ordenId);
+  const ticket = tickets.find(t => t.id === ticketId);
+  const folioText = ticket ? (ticket.folio || 'S/N') : 'S/N';
+
+  let existingGuia = '';
+  let existingPrecio = '';
+  let existingProveedor = '';
+  let existingPaqueteria = '';
+  let existingFechaPedido = '';
+  let existingFechaEstimada = '';
+  let existingMarca = marca || '';
+  if (ticket && ticket.refaccionesSeleccionadas) {
+    const ref = ticket.refaccionesSeleccionadas.find(r => (r.clave === clave || r.codigo === clave) && (r.descripcion === descripcion || r.nombre === descripcion));
+    if (ref) {
+      existingGuia = ref.guiaPedido || '';
+      existingPrecio = ref.precio || '';
+      existingProveedor = ref.proveedor || '';
+      existingPaqueteria = ref.paqueteria || '';
+      existingFechaPedido = ref.fechaPedido || '';
+      existingFechaEstimada = ref.fechaEstimada || '';
+      if (!existingMarca) existingMarca = ref.marca || '';
+    }
   }
-  const folioText = orden ? (orden.folio || 'S/N') : 'S/N';
+
+  if (!existingFechaPedido && ticket && (estatusActual === 'En Tránsito / Pedido' || estatusActual === 'Entregado al Técnico')) {
+    const tDate = ticket.fecha_creacion || ticket.created_at;
+    if (tDate) {
+      existingFechaPedido = new Date(tDate).toISOString().split('T')[0];
+    } else {
+      existingFechaPedido = new Date().toISOString().split('T')[0];
+    }
+  }
+
+  const displayBrand = {
+    'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM',
+    'MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS',
+    'TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM',
+    'POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG',
+    'HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
+  }[String(existingMarca).toUpperCase()] || existingMarca || 'Sin Marca';
 
   const overlay = document.createElement('div');
   overlay.id = 'dynamic-modal-pieza';
   overlay.className = 'modal-overlay open';
-  overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: flex !important; align-items: center; justify-content: center; z-index: 9999999 !important; padding: 1rem; box-sizing: border-box; mso-position: fixed;';
+  overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: flex !important; align-items: center; justify-content: center; z-index: 9999999 !important; padding: 1rem; box-sizing: border-box;';
   
   overlay.onclick = (e) => {
     if (e.target === overlay) overlay.remove();
@@ -15085,35 +16795,67 @@ window.abrirModalPiezaPendienteNuevo = function(ordenId, clave, descripcion, est
 
   const modal = document.createElement('div');
   modal.className = 'modal';
-  modal.style.cssText = 'max-width: 500px; width: 100%; border-radius: 16px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; overflow: hidden; font-family: inherit; margin: auto; z-index: 10000000;';
+  modal.style.cssText = 'max-width: 550px; width: 100%; border-radius: 16px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; overflow: hidden; font-family: inherit; margin: auto; z-index: 10000000;';
 
   const header = document.createElement('div');
   header.style.cssText = 'padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary);';
   header.innerHTML = `
-    <h2 style="margin: 0; font-size: 1.15rem; font-weight: 700;">Detalle de Refacción</h2>
+    <h2 style="margin: 0; font-size: 1.15rem; font-weight: 700;">Detalle de Refacción (Ticket)</h2>
     <button style="background: none; border: none; font-size: 1.25rem; cursor: pointer; color: var(--text-muted);" onclick="document.getElementById('dynamic-modal-pieza').remove()">✕</button>
   `;
 
   const body = document.createElement('div');
   body.style.cssText = 'padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;';
   
-  const statusSelected1 = (!estatusActual || estatusActual === 'Por Pedir') ? 'selected' : '';
-  const statusSelected2 = (estatusActual === 'En Tránsito / Pedido') ? 'selected' : '';
-  const statusSelected3 = (estatusActual === 'Entregado al Técnico') ? 'selected' : '';
-  
   body.innerHTML = `
     <div style="font-size:1.15rem; font-weight:800; color:var(--text-primary); margin-bottom:0.25rem;">${cantidad}x ${descripcion}</div>
-    <div style="font-size:0.95rem; color:var(--accent); font-weight:600; margin-bottom:0.5rem;">${marca || '-'}</div>
+    <div id="dynamic-modal-marca-display" style="font-size:0.95rem; color:var(--accent); font-weight:700; margin-bottom:0.5rem;">Marca: ${displayBrand}</div>
     <div style="font-size:0.85rem; color:var(--text-muted); font-family:monospace; margin-bottom:0.25rem;">Clave: ${clave}</div>
-    <div style="font-size:0.85rem; color:var(--text-muted);">Orden #${folioText}</div>
+    <div style="font-size:0.85rem; color:var(--text-muted);">Ticket #${folioText}</div>
     
-    <div style="margin-top: 1rem;">
-      <label style="font-weight:600; margin-bottom:0.5rem; display:block; font-size:0.9rem;">Estatus del Pedido</label>
-      <select id="dynamic-modal-estatus" style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.95rem; outline: none; font-family: inherit;">
-        <option value="Por Pedir" ${statusSelected1}>Por Pedir</option>
-        <option value="En Tránsito / Pedido" ${statusSelected2}>En Tránsito / Pedido</option>
-        <option value="Entregado al Técnico" ${statusSelected3}>Entregado al Técnico</option>
-      </select>
+    <div style="margin-top: 0.5rem;">
+      <label style="font-weight:600; margin-bottom:0.4rem; display:block; font-size:0.9rem;">Marca de Refacción</label>
+      <input type="text" id="dynamic-modal-marca" list="brands-datalist" value="${existingMarca}" placeholder="E.j. PTZ, SCH, ETP" style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.95rem; outline: none; font-family: inherit; box-sizing: border-box;">
+      <datalist id="brands-datalist">
+          <option value="ETP">ESSER TWIN PIPES</option>
+          <option value="BCR">BCR</option>
+          <option value="PTZ">PUTZMEISTER</option>
+          <option value="SCH">SCHWING</option>
+          <option value="CIF">CIFA</option>
+          <option value="MTM">MTM</option>
+          <option value="MCN">MCNELIUS</option>
+          <option value="LON">LONDON</option>
+          <option value="CAS">CASAGRANDE</option>
+          <option value="OTM">OTRAS MARCAS</option>
+          <option value="CNF">CONFORMS</option>
+          <option value="TFB">TEUFELBERGER</option>
+          <option value="RBC">REBEL CRUSHER</option>
+          <option value="RBM">RUBBLE MASTER</option>
+          <option value="FIO">FIORI</option>
+          <option value="EVE">EVERDIGM</option>
+          <option value="POR">PORTAFILL</option>
+          <option value="SIM">SIMEM</option>
+          <option value="TUR">TURBOSOL</option>
+          <option value="MBC">MB CUCHARAS</option>
+          <option value="DOR">DORNER</option>
+          <option value="KNK">KINGKONG</option>
+          <option value="HYU">HYUNDAI EVERDIGM</option>
+          <option value="HER">HERRAMIENTA</option>
+          <option value="EBS">EBOSS</option>
+          <option value="RCR">RUBBLE CRUSHER</option>
+        </datalist>
+      </div>
+    </div>
+
+    <div style="margin-top: 0.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+      <div>
+        <label style="font-weight:600; margin-bottom:0.4rem; display:block; font-size:0.9rem;">Proveedor</label>
+        <input type="text" id="dynamic-modal-proveedor" value="${existingProveedor}" placeholder="Escribe el proveedor" style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.95rem; outline: none; font-family: inherit; box-sizing: border-box;">
+      </div>
+      <div>
+        <label style="font-weight:600; margin-bottom:0.4rem; display:block; font-size:0.9rem;">Precio ($)</label>
+        <input type="number" step="any" id="dynamic-modal-precio" value="${existingPrecio}" placeholder="Costo" style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.95rem; outline: none; font-family: inherit; box-sizing: border-box;">
+      </div>
     </div>
   `;
 
@@ -15130,43 +16872,83 @@ window.abrirModalPiezaPendienteNuevo = function(ordenId, clave, descripcion, est
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
+
+
+  document.getElementById('dynamic-modal-marca').oninput = () => {
+    const val = document.getElementById('dynamic-modal-marca').value.trim();
+    const displayBrand = {
+      'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM',
+      'MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS',
+      'TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM',
+      'POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG',
+      'HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
+    }[val.toUpperCase()] || val || 'Sin Marca';
+    document.getElementById('dynamic-modal-marca-display').innerHTML = `Marca: ${displayBrand}`;
+  };
+
   document.getElementById('dynamic-modal-save').onclick = async () => {
-    const nuevoEstatus = document.getElementById('dynamic-modal-estatus').value;
+    const nuevoEstatus = estatusActual || 'Por Pedir';
+    const nuevoProveedor = document.getElementById('dynamic-modal-proveedor').value.trim();
+    const nuevoPrecio = document.getElementById('dynamic-modal-precio').value.trim();
+    const nuevaMarca = document.getElementById('dynamic-modal-marca').value.trim();
+
     overlay.remove();
-    if (window.cambiarEstatusEnLinea) {
-      await window.cambiarEstatusEnLinea(ordenId, clave, descripcion, nuevoEstatus);
-    }
+    await window.actualizarEstatusPiezaEnTicketYOrden(ticketId, clave, descripcion, nuevoEstatus, {
+      proveedor: nuevoProveedor,
+      paqueteria: '',
+      guiaPedido: '',
+      precio: nuevoPrecio,
+      fechaPedido: '',
+      fechaEstimada: '',
+      marca: nuevaMarca
+    });
   };
 };
 
+// Wrappers legados para compatibilidad
+window.abrirModalPiezaPendienteNuevo = function(ordenId, clave, descripcion, estatusActual, cantidad, marca) {
+  const orden = ordenes.find(o => o.id === ordenId || o.folio === ordenId);
+  if (orden) {
+    let baseFolio = orden.folio;
+    if (orden.soporte) {
+      const parentTicket = tickets.find(t => t.id === orden.soporte);
+      if (parentTicket && parentTicket.folio) baseFolio = parentTicket.folio;
+    }
+    const targetFolio = baseFolio.endsWith('-A') ? baseFolio : `${baseFolio}-A`;
+    const ticket = tickets.find(t => t.folio === targetFolio);
+    if (ticket) {
+      window.abrirModalPiezaPendienteTicket(ticket.id, clave, descripcion, estatusActual, cantidad, marca);
+      return;
+    }
+  }
+  window.abrirModalPiezaPendienteTicket(null, clave, descripcion, estatusActual, cantidad, marca);
+};
+
 window.cambiarEstatusEnLinea = async function(ordenId, clave, descripcion, nuevoEstatus) {
-  if (typeof ordenes === 'undefined' || typeof window.pushToSupabase === 'undefined') {
-    alert("Error: datos de órdenes no disponibles en el entorno.");
-    return;
+  const orden = ordenes.find(o => o.id === ordenId || o.folio === ordenId);
+  if (!orden) return;
+  
+  let baseFolio = orden.folio;
+  if (orden.soporte) {
+    const parentTicket = tickets.find(t => t.id === orden.soporte);
+    if (parentTicket && parentTicket.folio) baseFolio = parentTicket.folio;
   }
-  
-  const ordenIdx = ordenes.findIndex(o => o.id === ordenId);
-  if (ordenIdx === -1) {
-    alert("No se encontró la Orden de Servicio en memoria.");
-    return;
-  }
-  
-  const orden = ordenes[ordenIdx];
-  if (!orden.ref_necesarias || !Array.isArray(orden.ref_necesarias)) return;
-  
-  const ref = orden.ref_necesarias.find(r => r.clave === clave && r.descripcion === descripcion);
-  if (ref) {
-    ref.estatusPedido = nuevoEstatus;
-    
-    try {
-      await window.pushToSupabase('ordenes', orden);
-      renderRefaccionesPendientes();
-      if (typeof renderOrdenDetalle === 'function' && document.getElementById('detalle-orden-view')?.style.display !== 'none') {
-         renderOrdenDetalle(orden.id);
+  const targetFolio = baseFolio.endsWith('-A') ? baseFolio : `${baseFolio}-A`;
+  const ticket = tickets.find(t => t.folio === targetFolio);
+  if (ticket) {
+    await window.actualizarEstatusPiezaEnTicketYOrden(ticket.id, clave, descripcion, nuevoEstatus);
+  } else {
+    if (!orden.ref_necesarias || !Array.isArray(orden.ref_necesarias)) return;
+    const ref = orden.ref_necesarias.find(r => (r.clave === clave || r.codigo === clave) && (r.descripcion === descripcion || r.nombre === descripcion));
+    if (ref) {
+      ref.estatusPedido = nuevoEstatus;
+      try {
+        await window.pushToSupabase('ordenes', orden);
+        safeSetJSON('sapi_ordenes', ordenes);
+        renderRefaccionesPendientes();
+      } catch (err) {
+        console.error(err);
       }
-    } catch(err) {
-      console.error("Error al cambiar estatus de pieza:", err);
-      alert("Hubo un error al guardar en la base de datos.");
     }
   }
 };
@@ -15599,12 +17381,25 @@ function updateFileLabel(input) {
     input.parentElement.style.color = 'var(--accent)';
     input.parentElement.style.background = 'var(--accent-light)';
   } else {
-    // Si es cotización o pedido en PDF, poner el texto por defecto correcto
-    const defaultText = input.id.includes('cotizacion') ? 'Subir cotización en PDF' : 'Subir pedido en PDF';
+    // Si es cotización, pedido o destino en PDF, poner el texto por defecto correcto
+    let defaultText = 'Subir PDF';
+    if (input.id.includes('cotizacion')) {
+      defaultText = 'Subir cotización en PDF';
+    } else if (input.id.includes('pedido')) {
+      defaultText = 'Subir pedido en PDF';
+    }
     textSpan.textContent = defaultText;
     input.parentElement.style.borderColor = 'var(--border)';
-    input.parentElement.style.color = 'var(--text-muted)';
-    input.parentElement.style.background = 'rgba(255,255,255,0.02)';
+    input.parentElement.style.color = 'var(--text-secondary)';
+    input.parentElement.style.background = 'var(--bg-primary)';
+  }
+
+  if (input.id === 'ref-destino-pdf-file') {
+    const verBtn = document.getElementById('btn-ver-destino-pdf');
+    if (verBtn) {
+      verBtn.style.display = isSelected ? 'inline-flex' : 'none';
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
   }
 
   // Controlar visibilidad del botón de limpiar/basura si existe
@@ -17833,6 +19628,375 @@ window.renderServiciosProgramadosTecnico = function() {
   }
 };
 
+window.renderTicketRefaccionesList = function(t) {
+  const refPartsBottom = document.getElementById('ref-ticket-parts-bottom');
+  const refBottomPiezasList = document.getElementById('ref-bottom-piezas-list');
+  if (refPartsBottom && refBottomPiezasList) {
+    refPartsBottom.style.display = 'block';
+    refBottomPiezasList.innerHTML = '';
+    const parts = t.refaccionesSeleccionadas || [];
+    if (parts.length > 0) {
+      parts.forEach(p => {
+        const itemDiv = document.createElement('div');
+        itemDiv.style.cssText = `
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          background: var(--bg-primary);
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          padding: 0.4rem 0.6rem;
+          font-size: 0.85rem;
+        `;
+        
+        let pStatusColor = '#ef4444';
+        let pStatusBg = 'rgba(239, 68, 68, 0.1)';
+        if (p.estatusPedido === 'En Tránsito / Pedido') {
+          pStatusColor = '#e8820c';
+          pStatusBg = 'rgba(232, 130, 12, 0.1)';
+        } else if (p.estatusPedido === 'Entregado al Técnico') {
+          pStatusColor = '#22c55e';
+          pStatusBg = 'rgba(34, 197, 94, 0.1)';
+        }
+        
+        let detailsHtml = `(Clave: ${p.clave || p.codigo || 'S/C'})`;
+        let extraInfo = [];
+        if (p.proveedor) extraInfo.push(`Prov: ${p.proveedor}`);
+        if (p.precio) {
+          const val = parseFloat(p.precio);
+          if (!isNaN(val)) {
+            extraInfo.push(`Precio: $${val.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+          } else {
+            extraInfo.push(`Precio: $${p.precio}`);
+          }
+        }
+        if (extraInfo.length > 0) {
+          detailsHtml += ` • ${extraInfo.join(' | ')}`;
+        }
+
+        itemDiv.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <span style="font-weight: 500; color: var(--text-primary);">
+              <span style="color: var(--accent); font-weight: 700; margin-right: 4px;">${p.cantidad || p.qty || 1}x</span> 
+              ${p.descripcion || p.nombre || 'Sin Descripción'}
+              <span style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace; display: inline-block; margin-left: 8px;">${detailsHtml}</span>
+            </span>
+            <span class="status-badge" style="font-size: 0.7rem; font-weight: 700; color: ${pStatusColor}; background: ${pStatusBg}; padding: 2px 6px; border-radius: 4px; border: 1px solid ${pStatusColor}33; cursor: pointer;" onclick="event.stopPropagation(); window.abrirModalPiezaPendienteTicket('${t.id}', '${p.clave || p.codigo}', '${p.descripcion || p.nombre}', '${p.estatusPedido || 'Por Pedir'}', ${p.cantidad || 1}, '${p.marca || ''}')">
+              ${p.estatusPedido || 'Por Pedir'}
+            </span>
+          </div>
+        `;
+        refBottomPiezasList.appendChild(itemDiv);
+      });
+    } else {
+      refBottomPiezasList.innerHTML = '<span style="color: var(--text-muted); font-style: italic; font-size: 0.85rem;">Ninguna refacción registrada.</span>';
+    }
+  }
+};
+
+window.obtenerEnviosDesdeDOM = function() {
+  const container = document.getElementById('envios-container');
+  if (!container) return [];
+
+  const cards = container.querySelectorAll('.envio-card');
+  const envios = [];
+
+  cards.forEach(card => {
+    const id = card.getAttribute('data-id');
+    const paqueteria = card.querySelector('.envio-paqueteria').value.trim();
+    const guiaPedido = card.querySelector('.envio-guia').value.trim();
+    const fechaPedido = card.querySelector('.envio-fecha-pedido').value;
+    const fechaEntrega = card.querySelector('.envio-fecha-entrega').value;
+    const llego = card.querySelector('.envio-llego')?.checked || false;
+    const fechaLlegada = card.querySelector('.envio-fecha-llegada')?.value || '';
+
+    const parts = [];
+    const checkboxes = card.querySelectorAll('.envio-part-checkbox:checked');
+    checkboxes.forEach(cb => {
+      parts.push({
+        clave: cb.getAttribute('data-clave'),
+        descripcion: cb.getAttribute('data-desc')
+      });
+    });
+
+    envios.push({
+      id,
+      paqueteria,
+      guiaPedido,
+      fechaPedido,
+      fechaEntrega,
+      llego,
+      fechaLlegada,
+      parts
+    });
+  });
+
+  return envios;
+};
+
+window.actualizarVisibilidadDestinoPiezas = function(t) {
+  let allEntregadas = false;
+  if (t.refaccionesSeleccionadas && t.refaccionesSeleccionadas.length > 0) {
+    allEntregadas = t.refaccionesSeleccionadas.every(p => p.estatusPedido === 'Entregado al Técnico');
+  }
+
+  const destContainer = document.getElementById('ref-ticket-destination-fields');
+  const selectDest = document.getElementById('ref-destino-piezas');
+
+  if (destContainer) {
+    if (allEntregadas) {
+      destContainer.style.display = 'block';
+      if (selectDest && selectDest.value === '') {
+        selectDest.value = t.destinoPiezas || '';
+      }
+    } else {
+      destContainer.style.display = 'none';
+      if (selectDest) selectDest.value = '';
+    }
+  }
+};
+
+window.actualizarEstatusRefaccionesDesdeGuias = function(t) {
+  const envios = window.obtenerEnviosDesdeDOM();
+  if (t.refaccionesSeleccionadas) {
+    t.refaccionesSeleccionadas.forEach(p => {
+      const pClave = p.clave || p.codigo || '';
+      const pDesc = p.descripcion || p.nombre || '';
+
+      // Find all guides that contain this part
+      const matchingEnvios = envios.filter(env => 
+        env.parts && env.parts.some(ep => ep.clave === pClave && ep.descripcion === pDesc)
+      );
+
+      if (matchingEnvios.length > 0) {
+        // If at least one matching guide has llego === true
+        const anyArrived = matchingEnvios.some(env => env.llego);
+        if (anyArrived) {
+          p.estatusPedido = 'Entregado al Técnico';
+        } else {
+          p.estatusPedido = 'En Tránsito / Pedido';
+        }
+      } else {
+        // Not in any guide
+        p.estatusPedido = 'Por Pedir';
+      }
+    });
+  }
+  window.renderTicketRefaccionesList(t);
+  window.actualizarVisibilidadDestinoPiezas(t);
+};
+
+window.renderEnvioCards = function(t) {
+  const container = document.getElementById('envios-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  let envios = t.envios || [];
+  
+  // Backward compatibility: if envios is empty but legacy single shipment info exists, initialize
+  if (envios.length === 0 && (t.paqueteria || t.guiaPedido || t.fechaPedido || t.fechaEntrega)) {
+    envios.push({
+      id: Math.random().toString(36).substring(2, 9),
+      paqueteria: t.paqueteria || '',
+      guiaPedido: t.guiaPedido || '',
+      fechaPedido: t.fechaPedido || '',
+      fechaEntrega: t.fechaEntrega || '',
+      llego: false,
+      fechaLlegada: '',
+      parts: (t.refaccionesSeleccionadas || []).map(p => ({
+        clave: p.clave || p.codigo || '',
+        descripcion: p.descripcion || p.nombre || ''
+      }))
+    });
+  }
+
+  // If still empty, push one empty one so there is at least one input fields set visible
+  if (envios.length === 0) {
+    envios.push({
+      id: Math.random().toString(36).substring(2, 9),
+      paqueteria: '',
+      guiaPedido: '',
+      fechaPedido: '',
+      fechaEntrega: '',
+      llego: false,
+      fechaLlegada: '',
+      parts: []
+    });
+  }
+
+  t.envios = envios;
+
+  envios.forEach((envio, index) => {
+    const card = document.createElement('div');
+    card.className = 'envio-card';
+    card.setAttribute('data-id', envio.id);
+    card.style.cssText = 'background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; position: relative; display: flex; flex-direction: column; gap: 0.75rem; width: 100%; box-sizing: border-box;';
+    
+    // Checkbox items for all parts in the ticket
+    const ticketParts = t.refaccionesSeleccionadas || [];
+    let partsCheckboxesHtml = '';
+    if (ticketParts.length > 0) {
+      partsCheckboxesHtml = ticketParts.map(p => {
+        const pClave = p.clave || p.codigo || '';
+        const pDesc = p.descripcion || p.nombre || '';
+        const isChecked = envio.parts && envio.parts.some(ep => ep.clave === pClave && ep.descripcion === pDesc);
+        const checkedAttr = isChecked ? 'checked' : '';
+        return `
+          <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 0.85rem; color: var(--text-primary); cursor: pointer; user-select: none; padding: 2px 0;">
+            <input type="checkbox" class="envio-part-checkbox" data-clave="${pClave}" data-desc="${pDesc}" ${checkedAttr} style="margin-top: 3px;" />
+            <span><strong style="color: var(--accent);">${p.cantidad || p.qty || 1}x</strong> ${pDesc} <span style="color: var(--text-muted); font-size: 0.75rem; font-family: monospace;">(${pClave})</span></span>
+          </label>
+        `;
+      }).join('');
+    } else {
+      partsCheckboxesHtml = '<span style="color: var(--text-muted); font-style: italic; font-size: 0.8rem;">No hay refacciones en este ticket.</span>';
+    }
+
+    card.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.25rem; flex-wrap: wrap; gap: 8px;">
+        <span style="font-weight: 700; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Guía / Envío #${index + 1}</span>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <label style="display: flex; align-items: center; gap: 4px; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none; margin-bottom: 0;">
+            <input type="checkbox" class="envio-llego" ${envio.llego ? 'checked' : ''} style="margin-top: 2px;" />
+            <span>¿Ya Llegó?</span>
+          </label>
+          <div class="envio-fecha-llegada-container" style="display: ${envio.llego ? 'flex' : 'none'}; align-items: center; gap: 4px;">
+            <span style="font-size: 0.75rem; color: var(--text-muted);">el:</span>
+            <input type="date" class="envio-fecha-llegada" value="${envio.fechaLlegada || ''}" style="padding: 0.25rem; font-size: 0.8rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-family: inherit;" />
+          </div>
+          <button type="button" class="btn-delete-envio" style="background: none; border: none; color: #ef4444; cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.8rem; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.05);">
+            <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i> Eliminar
+          </button>
+        </div>
+      </div>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; display: block;">Paquetería</label>
+          <input type="text" class="envio-paqueteria" value="${envio.paqueteria || ''}" placeholder="E.j. DHL, FedEx, RedPack" style="width: 100%; box-sizing: border-box; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-family: inherit;" />
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; display: block;">Guía de Pedido</label>
+          <input type="text" class="envio-guia" value="${envio.guiaPedido || ''}" placeholder="Número de Guía" style="width: 100%; box-sizing: border-box; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-family: inherit;" />
+        </div>
+      </div>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; display: block;">Fecha de Pedido</label>
+          <input type="date" class="envio-fecha-pedido" value="${envio.fechaPedido || ''}" style="width: 100%; box-sizing: border-box; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-family: inherit;" />
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; display: block;">Fecha de Entrega</label>
+          <input type="date" class="envio-fecha-entrega" value="${envio.fechaEntrega || ''}" style="width: 100%; box-sizing: border-box; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-family: inherit;" />
+        </div>
+      </div>
+      
+      <div class="envio-time-text" style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); background: var(--bg-secondary); padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--border);">
+        <i data-lucide="clock" style="width: 14px; height: 14px; color: var(--accent);"></i>
+        <span>El tiempo se calculará al ingresar las fechas.</span>
+      </div>
+
+      <div style="border-top: 1px solid var(--border); padding-top: 0.5rem; margin-top: 0.25rem;">
+        <label style="font-weight: 700; font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 0.4rem;">Refacciones en este envío:</label>
+        <div class="envio-parts-list" style="display: flex; flex-direction: column; gap: 4px; max-height: 120px; overflow-y: auto; padding: 2px;">
+          ${partsCheckboxesHtml}
+        </div>
+      </div>
+    `;
+
+    // Event listener for delete button
+    card.querySelector('.btn-delete-envio').onclick = () => {
+      t.envios = t.envios.filter(x => x.id !== envio.id);
+      window.renderEnvioCards(t);
+      window.actualizarEstatusRefaccionesDesdeGuias(t);
+    };
+
+    // Calculate time helper
+    const updateTime = () => {
+      const fPedido = card.querySelector('.envio-fecha-pedido').value;
+      const fEntrega = card.querySelector('.envio-fecha-entrega').value;
+      const textSpan = card.querySelector('.envio-time-text span');
+      if (!textSpan) return;
+
+      let parts = [];
+      if (fPedido) {
+        const reqDate = new Date(fPedido);
+        reqDate.setHours(0,0,0,0);
+        const hoy = new Date();
+        hoy.setHours(0,0,0,0);
+        const diffTranscurrido = Math.floor((hoy.getTime() - reqDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffTranscurrido >= 0) {
+          parts.push(`Transcurrido: <strong style="color: var(--accent);">${diffTranscurrido}d</strong>`);
+        }
+      }
+
+      if (fEntrega) {
+        const estDate = new Date(fEntrega);
+        estDate.setHours(0,0,0,0);
+        const hoy = new Date();
+        hoy.setHours(0,0,0,0);
+        const diffFaltante = Math.ceil((estDate.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffFaltante > 0) {
+          parts.push(`Faltan: <strong style="color: var(--text-primary);">${diffFaltante}d</strong>`);
+        } else if (diffFaltante === 0) {
+          parts.push(`<span style="color: #f97316; font-weight: 700;">¡Se entrega HOY!</span>`);
+        } else {
+          parts.push(`<span style="color: #ef4444; font-weight: 700;">⚠️ Atrasado: ${Math.abs(diffFaltante)}d</span>`);
+        }
+      }
+
+      if (parts.length > 0) {
+        textSpan.innerHTML = parts.join(' | ');
+      } else {
+        textSpan.innerHTML = 'El tiempo se calculará al ingresar las fechas.';
+      }
+    };
+
+    card.querySelector('.envio-fecha-pedido').onchange = updateTime;
+    card.querySelector('.envio-fecha-entrega').onchange = updateTime;
+    updateTime();
+
+    // Listen to changes to auto update refacciones statuses
+    card.querySelectorAll('.envio-part-checkbox').forEach(cb => {
+      cb.onchange = () => {
+        window.actualizarEstatusRefaccionesDesdeGuias(t);
+      };
+    });
+
+    const chkLlego = card.querySelector('.envio-llego');
+    const fLlegadaContainer = card.querySelector('.envio-fecha-llegada-container');
+    const fLlegadaInput = card.querySelector('.envio-fecha-llegada');
+
+    if (chkLlego) {
+      chkLlego.onchange = () => {
+        if (chkLlego.checked) {
+          fLlegadaContainer.style.display = 'flex';
+          if (!fLlegadaInput.value) {
+            const offset = new Date().getTimezoneOffset();
+            const localDate = new Date(new Date().getTime() - (offset * 60 * 1000));
+            fLlegadaInput.value = localDate.toISOString().split('T')[0];
+          }
+        } else {
+          fLlegadaContainer.style.display = 'none';
+          fLlegadaInput.value = '';
+        }
+        window.actualizarEstatusRefaccionesDesdeGuias(t);
+      };
+    }
+
+    if (fLlegadaInput) {
+      fLlegadaInput.onchange = () => {
+        window.actualizarEstatusRefaccionesDesdeGuias(t);
+      };
+    }
+
+    container.appendChild(card);
+  });
+
+  if (window.lucide) window.lucide.createIcons({ root: container });
+};
+
 // ===== TICKET FORM =====
 function abrirTicket(id) {
   if (!id && currentSession.viewMode === 'consulta') {
@@ -17929,6 +20093,26 @@ function abrirTicket(id) {
       el.parentElement.style.background = hasPdf ? 'var(--accent-light)' : 'rgba(255,255,255,0.02)';
     }
   });
+
+  const destPiezasEl = document.getElementById('ref-destino-piezas');
+  if (destPiezasEl) destPiezasEl.value = '';
+
+  const destPrecioEl = document.getElementById('ref-destino-precio');
+  if (destPrecioEl) destPrecioEl.value = '';
+
+  const destPdfInput = document.getElementById('ref-destino-pdf-file');
+  if (destPdfInput) destPdfInput.value = '';
+
+  const destPdfSpan = destPdfInput?.parentElement?.querySelector('.file-label-text');
+  if (destPdfSpan) {
+    destPdfSpan.textContent = 'Subir PDF';
+    const parentLabel = destPdfSpan.parentElement;
+    parentLabel.style.borderColor = 'var(--border)';
+    parentLabel.style.color = 'var(--text-secondary)';
+    parentLabel.style.background = 'var(--bg-primary)';
+  }
+  const destPdfVerBtn = document.getElementById('btn-ver-destino-pdf');
+  if (destPdfVerBtn) destPdfVerBtn.style.display = 'none';
   
   // Llenar el combo de clientes
   const comboOptions = document.getElementById('t-cliente-options');
@@ -18094,6 +20278,28 @@ function abrirTicket(id) {
       
       const elMotivo = document.getElementById('t-motivo-rechazo');
       if (elMotivo) elMotivo.value = t.motivoRechazo || '';
+
+      const destPiezasEl = document.getElementById('ref-destino-piezas');
+      if (destPiezasEl) destPiezasEl.value = t.destinoPiezas || '';
+
+      const destPrecioEl = document.getElementById('ref-destino-precio');
+      if (destPrecioEl) destPrecioEl.value = t.destinoPrecio || '';
+
+      const destPdfInput = document.getElementById('ref-destino-pdf-file');
+      const destPdfSpan = destPdfInput?.parentElement?.querySelector('.file-label-text');
+      const hasDestinoPdf = !!t.destinoPdfUrl;
+      const destPdfVerBtn = document.getElementById('btn-ver-destino-pdf');
+
+      if (destPdfSpan) {
+        destPdfSpan.textContent = hasDestinoPdf ? 'PDF guardado (Sube para reemplazar)' : 'Subir PDF';
+        const parentLabel = destPdfSpan.parentElement;
+        parentLabel.style.borderColor = hasDestinoPdf ? 'var(--accent)' : 'var(--border)';
+        parentLabel.style.color = hasDestinoPdf ? 'var(--accent)' : 'var(--text-secondary)';
+        parentLabel.style.background = hasDestinoPdf ? 'var(--accent-light)' : 'var(--bg-primary)';
+      }
+      if (destPdfVerBtn) {
+        destPdfVerBtn.style.display = hasDestinoPdf ? 'inline-flex' : 'none';
+      }
     }
   }
 
@@ -18149,6 +20355,154 @@ function abrirTicket(id) {
 
   toggleResolucionTicket();
   toggleMotivoRechazo();
+
+  // Control de campos y cabecera para Tickets de Refacciones (-A)
+  const isRefTicket = t && t.folio && t.folio.endsWith('-A');
+  const refHeader = document.getElementById('ref-ticket-info-header');
+  const refShippingFields = document.getElementById('ref-ticket-shipping-fields');
+
+  if (isRefTicket) {
+    if (refShippingFields) {
+      refShippingFields.style.display = 'block';
+      window.renderEnvioCards(t);
+
+      const btnAdd = document.getElementById('btn-add-envio');
+      if (btnAdd) {
+        btnAdd.onclick = () => {
+          const envios = t.envios || [];
+          envios.push({
+            id: Math.random().toString(36).substring(2, 9),
+            paqueteria: '',
+            guiaPedido: '',
+            fechaPedido: '',
+            fechaEntrega: '',
+            parts: []
+          });
+          t.envios = envios;
+          window.renderEnvioCards(t);
+        };
+      }
+    }
+    if (refHeader) {
+      refHeader.style.display = 'block';
+      document.getElementById('ref-info-cliente').textContent = t.cliente || 'Ninguno';
+      document.getElementById('ref-info-sitio').textContent = t.sitio || 'Ninguno';
+      document.getElementById('ref-info-solicitante').textContent = t.solicitante || 'Sistema';
+      document.getElementById('ref-info-horometro').textContent = (t.horometro && t.horometro !== 'N/A') ? `${t.horometro} h` : 'Ninguno';
+      
+      const elRefInfoCat = document.getElementById('ref-info-categoria');
+      if (elRefInfoCat) {
+        elRefInfoCat.textContent = t.categoria || 'Refacción';
+      }
+
+      // Populate Service Order client signature date
+      const elRefCierre = document.getElementById('ref-info-fechacierre');
+      if (elRefCierre) {
+        let signatureDateStr = 'Pendiente';
+        const assocOrder = window.obtenerOrdenAsociadaATicketRefacciones(t);
+        if (assocOrder && assocOrder.firma_cliente_fecha) {
+          signatureDateStr = new Date(assocOrder.firma_cliente_fecha).toLocaleDateString();
+        }
+        elRefCierre.textContent = signatureDateStr;
+      }
+
+      // Populate machinery badges
+      const refInfoMaq = document.getElementById('ref-info-maquinaria');
+      if (refInfoMaq) {
+        refInfoMaq.innerHTML = '';
+        if (t.equipo) {
+          t.equipo.split(', ').forEach(eqName => {
+            if (eqName.trim()) {
+              const badge = document.createElement('span');
+              badge.style.cssText = `
+                background: rgba(232, 130, 12, 0.08);
+                color: var(--accent);
+                border: 1px solid rgba(232, 130, 12, 0.2);
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-weight: 600;
+                font-size: 0.78rem;
+              `;
+              badge.textContent = eqName.trim();
+              refInfoMaq.appendChild(badge);
+            }
+          });
+        } else {
+          refInfoMaq.innerHTML = '<span style="color: var(--text-muted); font-style: italic;">Ninguno</span>';
+        }
+      }
+    }
+
+    // Populate parts list in the bottom container
+    window.renderTicketRefaccionesList(t);
+    window.actualizarVisibilidadDestinoPiezas(t);
+
+    // Hide input groups and generation section
+    if (document.getElementById('group-t-cliente')) document.getElementById('group-t-cliente').style.display = 'none';
+    if (document.getElementById('group-t-sitio')) document.getElementById('group-t-sitio').style.display = 'none';
+    if (document.getElementById('group-t-solicitante')) document.getElementById('group-t-solicitante').style.display = 'none';
+    if (document.getElementById('group-t-maquinaria')) document.getElementById('group-t-maquinaria').style.display = 'none';
+    if (document.getElementById('group-t-horometro')) document.getElementById('group-t-horometro').style.display = 'none';
+    if (document.getElementById('group-t-categoria')) document.getElementById('group-t-categoria').style.display = 'none';
+    if (document.getElementById('section-t-origen')) document.getElementById('section-t-origen').style.display = 'none';
+    
+    // Hide status section for parts tickets
+    if (document.getElementById('section-t-estado')) document.getElementById('section-t-estado').style.display = 'none';
+
+    // Force category to 'Refacción' and disable selection
+    const catSelect = document.getElementById('t-categoria');
+    if (catSelect) {
+      catSelect.value = 'Refacción';
+      catSelect.disabled = true;
+    }
+  } else {
+    if (refHeader) refHeader.style.display = 'none';
+    if (document.getElementById('ref-ticket-shipping-fields')) {
+      document.getElementById('ref-ticket-shipping-fields').style.display = 'none';
+    }
+    if (document.getElementById('ref-ticket-destination-fields')) {
+      document.getElementById('ref-ticket-destination-fields').style.display = 'none';
+    }
+    const refPartsBottom = document.getElementById('ref-ticket-parts-bottom');
+    if (refPartsBottom) refPartsBottom.style.display = 'none';
+
+    // Restore input groups and generation section
+    if (document.getElementById('group-t-cliente')) {
+      const isEmpresa = currentSession.viewMode === 'empresa';
+      document.getElementById('group-t-cliente').style.display = isEmpresa ? 'none' : 'block';
+    }
+    if (document.getElementById('group-t-solicitante')) {
+      document.getElementById('group-t-solicitante').style.display = 'block';
+    }
+    if (document.getElementById('group-t-maquinaria')) {
+      document.getElementById('group-t-maquinaria').style.display = 'block';
+    }
+    if (document.getElementById('group-t-horometro')) {
+      document.getElementById('group-t-horometro').style.display = 'block';
+    }
+    if (document.getElementById('group-t-categoria')) {
+      document.getElementById('group-t-categoria').style.display = 'block';
+    }
+    if (document.getElementById('section-t-origen')) {
+      const isEmpresa = currentSession.viewMode === 'empresa';
+      document.getElementById('section-t-origen').style.display = isEmpresa ? 'none' : 'block';
+    }
+    
+    // Restore status section
+    if (document.getElementById('section-t-estado')) {
+      const isEmpresa = currentSession.viewMode === 'empresa';
+      document.getElementById('section-t-estado').style.display = (id && !isEmpresa) ? 'block' : 'none';
+    }
+
+    // Enable category selector
+    const catSelect = document.getElementById('t-categoria');
+    if (catSelect) {
+      catSelect.disabled = false;
+    }
+
+    const selectEq = document.getElementById('t-equipo');
+    if (selectEq) selectEq.style.display = 'block';
+  }
 
   document.getElementById('modal-ticket-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
@@ -18430,37 +20784,7 @@ function onEquipoTicketChange() {
   }
 }
 
-window.agregarMaquinaChip = function(maquinaName) {
-  if (!maquinaName) return;
-  const container = document.getElementById('t-equipos-seleccionados');
-  if (!container) return;
-  
-  // Evitar duplicados
-  const existing = Array.from(container.querySelectorAll('.maquina-chip')).some(c => c.getAttribute('data-value') === maquinaName);
-  if (existing) return;
-  
-  const chip = document.createElement('div');
-  chip.className = 'maquina-chip';
-  chip.setAttribute('data-value', maquinaName);
-  chip.style.cssText = `
-    display: inline-flex;
-    align-items: center;
-    background: var(--bg-hover, #f3f4f6);
-    border: 1px solid var(--border, #e5e7eb);
-    padding: 0.25rem 0.6rem;
-    border-radius: 6px;
-    font-size: 0.78rem;
-    font-weight: 500;
-    color: var(--text-primary, #1f2937);
-    gap: 0.25rem;
-    box-shadow: var(--shadow-sm);
-  `;
-  chip.innerHTML = `
-    <span>${maquinaName}</span>
-    <span onclick="this.parentElement.remove()" style="cursor:pointer; font-weight:bold; color:var(--red, #ef4444); margin-left:4px; font-size:1.1rem; line-height:1;">&times;</span>
-  `;
-  container.appendChild(chip);
-};
+
 
 window.onEquipoTicketChangeMultiple = function() {
   const select = document.getElementById('t-equipo');
@@ -18912,6 +21236,60 @@ async function guardarTicket(e) {
     return;
   }
 
+  let enviosVal = [];
+  let paqueteriaVal = '';
+  let guiaVal = '';
+  let fPedidoVal = '';
+  let fEntregaVal = '';
+
+  let destinoPdfUrl = t_existente ? t_existente.destinoPdfUrl : '';
+  const isRefTicket = t_existente && t_existente.folio && t_existente.folio.endsWith('-A');
+  if (isRefTicket || (document.getElementById('ref-ticket-shipping-fields') && document.getElementById('ref-ticket-shipping-fields').style.display !== 'none')) {
+    enviosVal = window.obtenerEnviosDesdeDOM();
+    for (let i = 0; i < enviosVal.length; i++) {
+      if (enviosVal[i].llego && !enviosVal[i].fechaLlegada) {
+        mostrarNotificacion(`Debe seleccionar la fecha en la que fue entregada la Guía/Envío #${i + 1}`, 'error');
+        return;
+      }
+    }
+    const destContainer = document.getElementById('ref-ticket-destination-fields');
+    const selectDest = document.getElementById('ref-destino-piezas');
+    if (destContainer && destContainer.style.display !== 'none') {
+      if (selectDest && !selectDest.value) {
+        mostrarNotificacion('Debe seleccionar si las piezas entregadas serán instaladas o enviadas al cliente.', 'error');
+        return;
+      }
+    }
+    const first = enviosVal[0] || {};
+    paqueteriaVal = first.paqueteria || '';
+    guiaVal = first.guiaPedido || '';
+    fPedidoVal = first.fechaPedido || '';
+    fEntregaVal = first.fechaEntrega || '';
+
+    const destinoPdfInput = document.getElementById('ref-destino-pdf-file');
+    if (destinoPdfInput && destinoPdfInput.files.length > 0) {
+      try {
+        const file = destinoPdfInput.files[0];
+        const base64 = await readFileAsBase64(file);
+        mostrarNotificacion('Subiendo PDF de destino...', 'info');
+        const filename = `destino_${editandoTicketId || crypto.randomUUID()}_${Date.now()}.pdf`;
+        const fullPath = `tickets/destino_pdf/${filename}`;
+        const publicUrl = await window.uploadBase64ToStorage(base64, 'evidencias', fullPath);
+        if (publicUrl) {
+          destinoPdfUrl = publicUrl;
+        } else {
+          throw new Error('No se pudo subir el archivo PDF.');
+        }
+      } catch (e) {
+        console.error('[Destino PDF Upload] Error:', e);
+        mostrarNotificacion('Falla al subir PDF de destino: ' + e.message, 'error');
+        return;
+      }
+    }
+  }
+
+  const destinoPrecioVal = document.getElementById('ref-destino-precio')?.value || '';
+
   const ticket = {
     id: editandoTicketId || crypto.randomUUID(),
     folio: editandoTicketId ? t_existente?.folio : newFolio,
@@ -18944,7 +21322,16 @@ async function guardarTicket(e) {
     pdfCotizacion: (window.editandoCotizaciones && window.editandoCotizaciones.length > 0) ? window.editandoCotizaciones[0].pdf : null,
     cotizacionesAdicionales: window.editandoCotizaciones || [],
     comentariosInternos: t_existente ? (t_existente.comentariosInternos || []) : [],
-    esPrueba: t_existente ? (t_existente.esPrueba || false) : isTestModeActive()
+    esPrueba: t_existente ? (t_existente.esPrueba || false) : isTestModeActive(),
+    refaccionesSeleccionadas: t_existente ? (t_existente.refaccionesSeleccionadas || []) : [],
+    guiaPedido: guiaVal,
+    paqueteria: paqueteriaVal,
+    fechaPedido: fPedidoVal,
+    fechaEntrega: fEntregaVal,
+    envios: enviosVal,
+    destinoPiezas: document.getElementById('ref-destino-piezas')?.value || '',
+    destinoPrecio: destinoPrecioVal,
+    destinoPdfUrl: destinoPdfUrl
   };
 
   // Actualizar ubicación de la máquina si es N/A o vacía
@@ -19225,6 +21612,9 @@ async function guardarTicket(e) {
   renderTickets();
   renderStats();
   updateTicketBadge(); updateOrdenesBadge();
+  if (typeof renderRefaccionesPendientes === 'function') {
+    renderRefaccionesPendientes();
+  }
 }
 
 async function eliminarTicket(id) {
@@ -19325,27 +21715,30 @@ window.agregarComentarioInterno = async function(ticketId) {
   if (!t.comentariosInternos) {
     t.comentariosInternos = [];
   }
-  t.comentariosInternos.push(nuevoComentario);
 
-  // Guardar localmente
-  try {
-    safeSetJSON('sapi_tickets', tickets);
-  } catch (err) {
-    console.error('Error al guardar sapi_tickets:', err);
-  }
-
-  // Guardar en Supabase
   if (window.supabaseClient) {
     try {
-      await window.pushToSupabase('tickets', t);
+      const tClone = JSON.parse(JSON.stringify(t));
+      if (!tClone.comentariosInternos) tClone.comentariosInternos = [];
+      tClone.comentariosInternos.push(nuevoComentario);
+      
+      await window.pushToSupabase('tickets', tClone);
+      
+      t.comentariosInternos.push(nuevoComentario);
+      safeSetJSON('sapi_tickets', tickets);
       mostrarNotificacion('Comentario agregado.', 'success');
+      
+      verDetalleTicket(ticketId);
     } catch (err) {
       console.error('Error al guardar comentario en Supabase:', err);
+      mostrarNotificacion('Error al guardar el comentario. Verifica tus permisos o conexión.', 'error');
     }
+  } else {
+    t.comentariosInternos.push(nuevoComentario);
+    safeSetJSON('sapi_tickets', tickets);
+    mostrarNotificacion('Comentario guardado localmente.', 'success');
+    verDetalleTicket(ticketId);
   }
-
-  // Refrescar detalle
-  verDetalleTicket(ticketId);
 };
 
 
@@ -19461,9 +21854,10 @@ function verDetalleTicket(id) {
               <thead>
                 <tr style="border-bottom:1.5px solid var(--border); text-align:left; color:var(--text-muted); font-weight:600; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">
                   <th style="padding:0.5rem 0.25rem; width:15%;">Marca</th>
-                  <th style="padding:0.5rem 0.25rem; width:55%;">Descripción</th>
-                  <th style="padding:0.5rem 0.25rem; width:18%;">Clave</th>
-                  <th style="padding:0.5rem 0.25rem; width:12%; text-align:center;">Cant.</th>
+                  <th style="padding:0.5rem 0.25rem; width:40%;">Descripción</th>
+                  <th style="padding:0.5rem 0.25rem; width:15%;">Clave</th>
+                  <th style="padding:0.5rem 0.25rem; width:10%; text-align:center;">Cant.</th>
+                  <th style="padding:0.5rem 0.25rem; width:20%; text-align:center;">Estatus</th>
                 </tr>
               </thead>
               <tbody>
@@ -19475,12 +21869,31 @@ function verDetalleTicket(id) {
                     'POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG',
                     'HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
                   }[String(ref.marca).toUpperCase()] || ref.marca || '—';
+                  
+                  let pStatusColor = '#ef4444';
+                  let pStatusBg = 'rgba(239, 68, 68, 0.1)';
+                  if (ref.estatusPedido === 'En Tránsito / Pedido') {
+                    pStatusColor = '#e8820c';
+                    pStatusBg = 'rgba(232, 130, 12, 0.1)';
+                  } else if (ref.estatusPedido === 'Entregado al Técnico') {
+                    pStatusColor = '#22c55e';
+                    pStatusBg = 'rgba(34, 197, 94, 0.1)';
+                  }
+                  
+                  const safeClave = (ref.clave || ref.codigo || 'S/C').replace(/'/g, "\\'");
+                  const safeNombre = (ref.descripcion || ref.nombre || 'Sin Descripción').replace(/'/g, "\\'");
+                  
                   return `
                     <tr style="border-bottom:1px solid var(--border); color:var(--text-primary);">
                       <td style="padding:0.6rem 0.25rem; font-weight:600; color:var(--orange);">${brandName}</td>
-                      <td style="padding:0.6rem 0.25rem; line-height:1.3; font-weight:500;">${ref.nombre || '—'}</td>
-                      <td style="padding:0.6rem 0.25rem; font-family:monospace; font-size:0.8rem; color:var(--text-secondary);">${ref.codigo || '—'}</td>
+                      <td style="padding:0.6rem 0.25rem; line-height:1.3; font-weight:500;">${ref.nombre || ref.descripcion || '—'}</td>
+                      <td style="padding:0.6rem 0.25rem; font-family:monospace; font-size:0.8rem; color:var(--text-secondary);">${ref.codigo || ref.clave || '—'}</td>
                       <td style="padding:0.6rem 0.25rem; text-align:center; font-weight:700; color:var(--text-primary);">${ref.cantidad || 1}</td>
+                      <td style="padding:0.6rem 0.25rem; text-align:center;">
+                        <span class="status-badge" style="font-size:0.7rem; font-weight:700; color:${pStatusColor}; background:${pStatusBg}; padding:2px 6px; border-radius:4px; white-space:nowrap; border: 1px solid ${pStatusColor}33; cursor:pointer;" onclick="event.stopPropagation(); window.abrirModalPiezaPendienteTicket('${t.id}', '${safeClave}', '${safeNombre}', '${ref.estatusPedido || 'Por Pedir'}', ${ref.cantidad || 1}, '${ref.marca || ''}')">
+                          ${ref.estatusPedido || 'Por Pedir'}
+                        </span>
+                      </td>
                     </tr>
                   `;
                 }).join('')}
@@ -19573,9 +21986,10 @@ function verDetalleTicket(id) {
               <thead>
                 <tr style="border-bottom:1.5px solid var(--border); text-align:left; color:var(--text-muted); font-weight:600; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">
                   <th style="padding:0.5rem 0.25rem; width:15%;">Marca</th>
-                  <th style="padding:0.5rem 0.25rem; width:55%;">Descripción</th>
-                  <th style="padding:0.5rem 0.25rem; width:18%;">Clave</th>
-                  <th style="padding:0.5rem 0.25rem; width:12%; text-align:center;">Cant.</th>
+                  <th style="padding:0.5rem 0.25rem; width:40%;">Descripción</th>
+                  <th style="padding:0.5rem 0.25rem; width:15%;">Clave</th>
+                  <th style="padding:0.5rem 0.25rem; width:10%; text-align:center;">Cant.</th>
+                  <th style="padding:0.5rem 0.25rem; width:20%; text-align:center;">Estatus</th>
                 </tr>
               </thead>
               <tbody>
@@ -19587,12 +22001,31 @@ function verDetalleTicket(id) {
                     'POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG',
                     'HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
                   }[String(ref.marca).toUpperCase()] || ref.marca || '—';
+                  
+                  let pStatusColor = '#ef4444';
+                  let pStatusBg = 'rgba(239, 68, 68, 0.1)';
+                  if (ref.estatusPedido === 'En Tránsito / Pedido') {
+                    pStatusColor = '#e8820c';
+                    pStatusBg = 'rgba(232, 130, 12, 0.1)';
+                  } else if (ref.estatusPedido === 'Entregado al Técnico') {
+                    pStatusColor = '#22c55e';
+                    pStatusBg = 'rgba(34, 197, 94, 0.1)';
+                  }
+                  
+                  const safeClave = (ref.clave || ref.codigo || 'S/C').replace(/'/g, "\\'");
+                  const safeNombre = (ref.descripcion || ref.nombre || 'Sin Descripción').replace(/'/g, "\\'");
+                  
                   return `
                     <tr style="border-bottom:1px solid var(--border); color:var(--text-primary);">
                       <td style="padding:0.6rem 0.25rem; font-weight:600; color:var(--orange);">${brandName}</td>
-                      <td style="padding:0.6rem 0.25rem; line-height:1.3; font-weight:500;">${ref.nombre || '—'}</td>
-                      <td style="padding:0.6rem 0.25rem; font-family:monospace; font-size:0.8rem; color:var(--text-secondary);">${ref.codigo || '—'}</td>
+                      <td style="padding:0.6rem 0.25rem; line-height:1.3; font-weight:500;">${ref.nombre || ref.descripcion || '—'}</td>
+                      <td style="padding:0.6rem 0.25rem; font-family:monospace; font-size:0.8rem; color:var(--text-secondary);">${ref.codigo || ref.clave || '—'}</td>
                       <td style="padding:0.6rem 0.25rem; text-align:center; font-weight:700; color:var(--text-primary);">${ref.cantidad || 1}</td>
+                      <td style="padding:0.6rem 0.25rem; text-align:center;">
+                        <span class="status-badge" style="font-size:0.7rem; font-weight:700; color:${pStatusColor}; background:${pStatusBg}; padding:2px 6px; border-radius:4px; white-space:nowrap; border: 1px solid ${pStatusColor}33; cursor:pointer;" onclick="event.stopPropagation(); window.abrirModalPiezaPendienteTicket('${t.id}', '${safeClave}', '${safeNombre}', '${ref.estatusPedido || 'Por Pedir'}', ${ref.cantidad || 1}, '${ref.marca || ''}')">
+                          ${ref.estatusPedido || 'Por Pedir'}
+                        </span>
+                      </td>
                     </tr>
                   `;
                 }).join('')}
@@ -19929,6 +22362,44 @@ window.visualizarPdfOnDemand = async function(ticketId, tipo) {
   } catch (err) {
     console.error('[PDF View] Error:', err);
     mostrarNotificacion('Error al cargar el archivo: ' + err.message, 'error');
+  }
+};
+
+window.visualizarDestinoPdfActual = function() {
+  const currentTicketId = window.soporteActual;
+  if (!currentTicketId) return;
+  const t = tickets.find(x => x.id === currentTicketId);
+  if (!t || !t.destinoPdfUrl) {
+    const fileInput = document.getElementById('ref-destino-pdf-file');
+    if (fileInput && fileInput.files.length > 0) {
+      const fileURL = URL.createObjectURL(fileInput.files[0]);
+      window.open(fileURL, '_blank');
+    } else {
+      mostrarNotificacion('No hay ningún PDF cargado.', 'warning');
+    }
+    return;
+  }
+  
+  if (t.destinoPdfUrl.startsWith('data:')) {
+    let base64Pure = t.destinoPdfUrl;
+    if (t.destinoPdfUrl.startsWith('data:')) {
+      base64Pure = t.destinoPdfUrl.split(',')[1];
+    }
+    try {
+      const byteCharacters = atob(base64Pure);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/pdf' });
+      const fileURL = URL.createObjectURL(blob);
+      window.open(fileURL, '_blank');
+    } catch (e) {
+      window.open(t.destinoPdfUrl, '_blank');
+    }
+  } else {
+    window.open(t.destinoPdfUrl, '_blank');
   }
 };
 
@@ -30494,27 +32965,31 @@ window.enviarMensajeSoporteEmpresa = async function(ticketId) {
   if (!t.comentariosClientes) {
     t.comentariosClientes = [];
   }
-  t.comentariosClientes.push(nuevoMensaje);
 
-  // Guardar localmente
-  try {
-    safeSetJSON('sapi_tickets', tickets);
-  } catch (err) {
-    console.error('Error al guardar sapi_tickets:', err);
-  }
-
-  // Limpiar e inmediatamente re-renderizar
-  textarea.value = '';
-  window.renderChatSoporteEmpresa();
-
-  // Guardar en Supabase
   if (window.supabaseClient) {
     try {
-      await window.pushToSupabase('tickets', t);
+      const tClone = JSON.parse(JSON.stringify(t));
+      if (!tClone.comentariosClientes) tClone.comentariosClientes = [];
+      tClone.comentariosClientes.push(nuevoMensaje);
+      
+      await window.pushToSupabase('tickets', tClone);
+      
+      t.comentariosClientes.push(nuevoMensaje);
+      safeSetJSON('sapi_tickets', tickets);
       mostrarNotificacion('Mensaje enviado al cliente.', 'success');
+      
+      textarea.value = '';
+      window.renderChatSoporteEmpresa();
     } catch (err) {
       console.error('Error al guardar mensaje en Supabase:', err);
+      mostrarNotificacion('Error al enviar el mensaje. Verifica tus permisos o conexión.', 'error');
     }
+  } else {
+    t.comentariosClientes.push(nuevoMensaje);
+    safeSetJSON('sapi_tickets', tickets);
+    mostrarNotificacion('Mensaje guardado localmente.', 'success');
+    textarea.value = '';
+    window.renderChatSoporteEmpresa();
   }
 };
 

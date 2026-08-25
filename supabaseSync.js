@@ -275,6 +275,25 @@ function ticketToRow(t) {
   finalNotas = window.inyectarCotizacionesEnNotas(finalNotas, t.cotizacionesAdicionales || []);
   finalNotas = window.inyectarRefaccionesEnNotas(finalNotas, t.refaccionesSeleccionadas || []);
 
+  let prefix = '';
+  if (t.horometro) prefix += `[H:${t.horometro}]\n`;
+  if (t.destinoPiezas) prefix += `[U:${t.destinoPiezas}]\n`;
+  if (t.destinoPrecio) prefix += `[Y:${t.destinoPrecio}]\n`;
+  if (t.destinoPdfUrl) prefix += `[Z:${t.destinoPdfUrl}]\n`;
+  if (t.envios && t.envios.length > 0) {
+    prefix += `[S:${JSON.stringify(t.envios)}]\n`;
+    const first = t.envios[0] || {};
+    if (first.paqueteria) prefix += `[P:${first.paqueteria}]\n`;
+    if (first.guiaPedido) prefix += `[G:${first.guiaPedido}]\n`;
+    if (first.fechaPedido) prefix += `[D:${first.fechaPedido}]\n`;
+    if (first.fechaEntrega) prefix += `[E:${first.fechaEntrega}]\n`;
+  } else {
+    if (t.guiaPedido) prefix += `[G:${t.guiaPedido}]\n`;
+    if (t.paqueteria) prefix += `[P:${t.paqueteria}]\n`;
+    if (t.fechaPedido) prefix += `[D:${t.fechaPedido}]\n`;
+    if (t.fechaEntrega) prefix += `[E:${t.fechaEntrega}]\n`;
+  }
+
   const row = {
     id: t.id,
     folio: t.folio,
@@ -293,7 +312,7 @@ function ticketToRow(t) {
     asignado: t.asignado || null,
     descripcion: t.descripcion || null,
     equipo: t.equipo || null,
-    notas: (t.horometro ? `[H:${t.horometro}]\n` : '') + finalNotas,
+    notas: prefix + finalNotas,
     estado: t.estado || null,
     cotizacion_sap: t.cotizacionSAP || null,
     monto_cotizacion: (t.montoCotizacion !== undefined && t.montoCotizacion !== null) ? Number(t.montoCotizacion) : null,
@@ -389,12 +408,67 @@ function rowToTicket(t, idsWithPedido, idsWithCotizacion) {
     esPrueba: t.es_prueba || (t.folio && t.folio.includes('PRUEBA')) || (t.asunto && t.asunto.startsWith('[PRUEBA]')) || false
   };
   
-  if (obj.notas && obj.notas.startsWith('[H:')) {
-    const endIdx = obj.notas.indexOf(']\n');
-    if (endIdx > -1) {
-      obj.horometro = obj.notas.substring(3, endIdx);
-      obj.notas = obj.notas.substring(endIdx + 2);
+  obj.horometro = '';
+  obj.guiaPedido = '';
+  obj.paqueteria = '';
+  obj.fechaPedido = '';
+  obj.fechaEntrega = '';
+  obj.destinoPiezas = '';
+  obj.destinoPrecio = '';
+  obj.destinoPdfUrl = '';
+  obj.envios = [];
+  
+  if (obj.notas) {
+    let remainingNotes = obj.notas;
+    let matched = true;
+    while (remainingNotes && remainingNotes.startsWith('[')) {
+      const endIdx = remainingNotes.indexOf(']\n');
+      if (endIdx === -1) break;
+      const tag = remainingNotes.substring(1, 3);
+      const val = remainingNotes.substring(3, endIdx);
+      if (tag === 'H:') {
+        obj.horometro = val;
+      } else if (tag === 'U:') {
+        obj.destinoPiezas = val;
+      } else if (tag === 'Y:') {
+        obj.destinoPrecio = val;
+      } else if (tag === 'Z:') {
+        obj.destinoPdfUrl = val;
+      } else if (tag === 'G:') {
+        obj.guiaPedido = val;
+      } else if (tag === 'P:') {
+        obj.paqueteria = val;
+      } else if (tag === 'D:') {
+        obj.fechaPedido = val;
+      } else if (tag === 'E:') {
+        obj.fechaEntrega = val;
+      } else if (tag === 'S:') {
+        try {
+          obj.envios = JSON.parse(val);
+        } catch (e) {
+          obj.envios = [];
+        }
+      } else {
+        break;
+      }
+      remainingNotes = remainingNotes.substring(endIdx + 2);
     }
+    obj.notas = remainingNotes;
+  }
+
+  // Fallback migration to shipments if legacy single shipment info exists but no envios
+  if ((!obj.envios || obj.envios.length === 0) && (obj.paqueteria || obj.guiaPedido || obj.fechaPedido || obj.fechaEntrega)) {
+    obj.envios = [{
+      id: Math.random().toString(36).substring(2, 9),
+      paqueteria: obj.paqueteria || '',
+      guiaPedido: obj.guiaPedido || '',
+      fechaPedido: obj.fechaPedido || '',
+      fechaEntrega: obj.fechaEntrega || '',
+      parts: (obj.refaccionesSeleccionadas || []).map(p => ({
+        clave: p.clave || p.codigo || '',
+        descripcion: p.descripcion || p.nombre || ''
+      }))
+    }];
   }
 
   // Clasificar de forma retroactiva como de prueba si contiene comentarios/mensajes de prueba
@@ -437,7 +511,9 @@ function ordenToRow(o) {
     'duracion', 'duracion_minutos', 'evidenciaBase64', 'evidencia_base_64', 'evidencia_url', 'bitacora', 'maquinaria_id', 'sitio_id',
     'firma_tecnico_base64', 'firma_tecnico_nombre', 'firma_tecnico_fecha', 
     'firma_cliente_base64', 'firma_cliente_nombre', 'firma_cliente_fecha', 'evidencias',
-    'ubicacion_sitio', 'operador'
+    'ubicacion_sitio', 'operador',
+    'cierre_papel_pdf', 'cierre_papel_motivo', 'cierre_papel_usuario', 'cierre_papel_fecha',
+    'cierre_papel_tecnicos_horas'
   ];
   knownKeys.forEach(k => delete customData[k]);
   
@@ -501,7 +577,12 @@ function ordenToRow(o) {
     evidencia_url: o.evidenciaBase64 || null,
     evidencias: o.evidencias || {},
     ubicacion_sitio: o.ubicacion_sitio || null,
-    operador: o.operador || null
+    operador: o.operador || null,
+    cierre_papel_pdf: o.cierre_papel_pdf || null,
+    cierre_papel_motivo: o.cierre_papel_motivo || null,
+    cierre_papel_usuario: o.cierre_papel_usuario || null,
+    cierre_papel_fecha: o.cierre_papel_fecha || null,
+    cierre_papel_tecnicos_horas: o.cierre_papel_tecnicos_horas || null
   };
 }
 
@@ -581,6 +662,11 @@ function rowToOrden(o) {
     firma_cliente_base64: null,
     ubicacion_sitio: o.ubicacion_sitio || null,
     operador: o.operador || null,
+    cierre_papel_pdf: o.cierre_papel_pdf || null,
+    cierre_papel_motivo: o.cierre_papel_motivo || null,
+    cierre_papel_usuario: o.cierre_papel_usuario || null,
+    cierre_papel_fecha: o.cierre_papel_fecha || null,
+    cierre_papel_tecnicos_horas: o.cierre_papel_tecnicos_horas || null,
     ...extraData
   };
   
@@ -907,7 +993,7 @@ window.pushToSupabase = async function(tabla, item) {
   // Determinar si la operación debe ser ONLINE-ONLY (directa a Supabase sin encolar offline)
   let isOnlineOnly = false;
   
-  if (tabla === 'tickets') {
+  if (tabla === 'tickets' || tabla === 'ideas_fallas') {
     isOnlineOnly = true;
   }
 
@@ -971,7 +1057,7 @@ window.deleteFromSupabase = async function(tabla, id) {
   // Determinar si la operación debe ser ONLINE-ONLY
   let isOnlineOnly = false;
   
-  if (tabla === 'tickets') {
+  if (tabla === 'tickets' || tabla === 'ideas_fallas') {
     isOnlineOnly = true;
   }
 
@@ -3443,6 +3529,29 @@ window.cargarDatosDeSupabase = function() {
       }
     } catch (errPed) {
       console.warn('[Sync] Error al cargar pedidos_sap:', errPed);
+    }
+
+    // Ideas y Fallas (Solo Superadmins)
+    try {
+      const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
+      const isSuper = session && (session.realRol === 'superadmin' || session.viewMode === 'superadmin');
+      if (isSuper) {
+        let ideasFallas = null;
+        let ideasFallasErr = null;
+        try {
+          ideasFallas = await fetchTablePaginated('ideas_fallas', '*');
+        } catch (err) {
+          ideasFallasErr = err;
+        }
+        if (!ideasFallasErr && ideasFallas) {
+          localStorage.setItem('sapi_ideas_fallas', JSON.stringify(ideasFallas));
+          if (typeof window.ideasFallasDb !== 'undefined') {
+            window.ideasFallasDb = ideasFallas;
+          }
+        }
+      }
+    } catch (errIf) {
+      console.warn('[Sync] Error al cargar ideas_fallas:', errIf);
     }
 
   } catch (error) {

@@ -773,7 +773,7 @@
 
         <!-- SERVICIOS VIEW -->
         <div id="view-servicios" class="view">
-          <div class="stats-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(5, 1fr);">
+          <div class="stats-grid-5" style="margin-bottom: 1.5rem;">
             <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('')">
               <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="file-text"></i></div>
               <div>
@@ -1502,14 +1502,71 @@
           </div> <!-- End ref-tab-catalogo -->
 
           <div id="ref-tab-pendientes" style="display:none;">
-            <div class="section-header" style="margin-bottom: 1.5rem;">
-              <h2>Piezas por Pedir (Necesarias)</h2>
-              <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Aquí se muestran todas las
-                refacciones marcadas como "Necesarias" en las Órdenes de Servicio.</p>
+            <div class="section-header" style="margin-bottom: 1.5rem; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+              <div>
+                <h2>Tickets de Refacciones (Solicitudes de Técnicos)</h2>
+                <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Aquí se listan y gestionan las solicitudes grupales de refacciones generadas automáticamente desde las órdenes de servicio. Puedes cambiar el estatus de cada pieza haciendo clic en su etiqueta.</p>
+              </div>
+              <div class="view-toggle" style="display:flex; gap:0.5rem; background: var(--bg-hover); padding: 0.3rem; border-radius: var(--radius-md); border: 1px solid var(--border); width: fit-content;">
+                <button class="btn-secondary active" id="btn-ref-view-table" onclick="window.setRefaccionesViewMode('table')"
+                  style="padding:0.35rem 0.75rem; border:none; background:var(--bg-card); box-shadow:0 1px 3px rgba(0,0,0,0.1); color:var(--text-primary); font-weight:600; font-size:0.8rem; display:flex; align-items:center; gap:0.35rem; cursor:pointer;">
+                  <i data-lucide="list" style="width:14px;height:14px;"></i>
+                  Tabla de Tickets
+                </button>
+                <button class="btn-secondary" id="btn-ref-view-pieces" onclick="window.setRefaccionesViewMode('pieces')"
+                  style="padding:0.35rem 0.75rem; border:none; background:transparent; color:var(--text-muted); font-weight:500; font-size:0.8rem; display:flex; align-items:center; gap:0.35rem; cursor:pointer;">
+                  <i data-lucide="wrench" style="width:14px;height:14px;"></i>
+                  Vista por Piezas
+                </button>
+              </div>
             </div>
-            <div id="ref-pendientes-grid"
-              style="display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 1rem;">
-              <!-- Fichas insertadas dinamicamente -->
+            
+            <div id="ref-pendientes-grid" style="display: none;">
+              <!-- Deprecated/hidden grid container -->
+            </div>
+
+            <div id="ref-pendientes-pieces-container" style="display:none; margin-top: 1rem;">
+              <div class="table-wrapper">
+                <table class="orders-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 80px; text-align:center;">Acción</th>
+                      <th style="width: 150px;">Ticket / Relación</th>
+                      <th style="width: 250px;">Refacción</th>
+                      <th style="width: 155px;">Clave / Marca</th>
+                      <th style="width: 220px;">Empresa / Cliente</th>
+                      <th style="width: 200px;">Equipo / Sitio</th>
+                      <th style="width: 160px; text-align:center;">Estado Pieza</th>
+                      <th style="width: 120px; text-align:center;">Fecha Solicitud</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ref-pendientes-pieces-body">
+                    <!-- Filas de piezas insertadas dinamicamente -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div id="ref-pendientes-table-container" style="display:none; margin-top: 1rem;">
+              <div class="table-wrapper">
+                <table class="orders-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 80px; text-align:center;">Acción</th>
+                      <th style="width: 140px;">Ticket</th>
+                      <th style="width: 250px;">Asunto</th>
+                      <th style="width: 220px;">Empresa / Cliente</th>
+                      <th style="width: 200px;">Equipo / Sitio</th>
+                      <th style="width: 150px; text-align:center;">Estado Ticket</th>
+                      <th>Refacciones Solicitadas</th>
+                      <th style="width: 120px; text-align:center;">Fecha</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ref-pendientes-table-body">
+                    <!-- Filas insertadas dinamicamente -->
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div> <!-- End view-refacciones -->
@@ -1900,7 +1957,65 @@
               </div>
             </div>
 
+            <!-- Ideas y Fallas (Solo Superadmins) -->
+            <div class="config-card" id="card-ideas-fallas" style="grid-column: 1 / -1; display: none; margin-top: 1.25rem;">
+              <div class="config-card-header">
+                <div class="config-card-icon" style="background:rgba(232, 130, 12, 0.12); color:#E8820C;">
+                  <i data-lucide="lightbulb"></i>
+                </div>
+                <div style="flex:1;">
+                  <div class="config-card-title">Ideas y Fallas del Sistema</div>
+                  <div class="config-card-sub">Gestión de propuestas de mejoras y reporte de fallas / bugs</div>
+                </div>
+                <button class="btn-primary" style="display:flex;align-items:center;gap:0.4rem;" onclick="abrirModalIdeaFalla()">
+                  <i data-lucide="plus-circle" class="btn-icon"></i> Reportar
+                </button>
+              </div>
 
+              <!-- Filtros -->
+              <div class="filters-bar" style="margin-top: 1.25rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 200px; position: relative; display: flex; align-items: center;">
+                  <i data-lucide="search" style="position: absolute; left: 0.75rem; width: 1rem; height: 1rem; color: var(--text-muted);"></i>
+                  <input type="text" id="busqueda-idea-falla" placeholder="Buscar por título o descripción..." onkeyup="renderIdeasFallas()"
+                    style="width: 100%; padding: 0.6rem 1rem 0.6rem 2.25rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; background: var(--bg-card); color: var(--text-primary); outline: none; transition: border-color 0.2s;"
+                    onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+                </div>
+                <select id="filtro-tipo-idea-falla" class="view-filter"
+                  style="width: 160px; padding: 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; background: var(--bg-card); color: var(--text-primary); outline: none; transition: border-color 0.2s;"
+                  onchange="renderIdeasFallas()" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+                  <option value="todos">Todos los tipos</option>
+                  <option value="Idea">Ideas / Mejoras</option>
+                  <option value="Falla">Fallas / Bugs</option>
+                </select>
+                <select id="filtro-estado-idea-falla" class="view-filter"
+                  style="width: 160px; padding: 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; background: var(--bg-card); color: var(--text-primary); outline: none; transition: border-color 0.2s;"
+                  onchange="renderIdeasFallas()" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+                  <option value="todos">Todos los estados</option>
+                  <option value="Pendiente">Pendiente</option>
+                  <option value="En Progreso">En Progreso</option>
+                  <option value="Resuelto">Resuelto</option>
+                  <option value="Rechazado">Rechazado</option>
+                </select>
+              </div>
+
+              <!-- Listado -->
+              <div class="table-wrapper" style="margin-top:1.25rem;">
+                <table class="orders-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 110px;">Tipo</th>
+                      <th>Registro</th>
+                      <th style="width: 180px;">Reportado por</th>
+                      <th style="width: 130px;">Estado</th>
+                      <th style="width: 100px; text-align: right;">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tabla-ideas-fallas-body">
+                    <!-- Renderizado dinámico -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
           </div>
         </div>
@@ -1973,6 +2088,68 @@
                     <button class="btn-secondary" onclick="window.ejecutarDiagnosticoLocal()" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; cursor: pointer; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-card); color: var(--text-primary);">Ejecutar Diagnóstico</button>
                   </div>
                   <div id="diagnostic-results" style="display: none; background: var(--bg-body); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; font-family: monospace; font-size: 0.7rem; color: var(--text-muted); white-space: pre-wrap; margin-top: 0.25rem; line-height: 1.3; text-align: left;">
+                  </div>
+                </div>
+                <div class="toggle-row" style="border-top: 1px dashed var(--border); padding-top: 0.85rem; margin-top: 0.25rem; flex-direction: column; align-items: stretch; gap: 0.4rem;">
+                  <div class="toggle-label">Manuales de Ayuda y Uso</div>
+                  <div class="toggle-sub">Descarga las guías de uso oficiales en formato PDF:</div>
+                  <div class="manuals-grid">
+                    
+                    <a href="manuales/manual_flujo_completo.pdf" target="_blank" class="manual-download-card featured">
+                      <div class="manual-card-icon">
+                        <i data-lucide="git-branch" style="width:16px; height:16px;"></i>
+                      </div>
+                      <div class="manual-card-info">
+                        <div class="manual-card-title">Flujo Completo</div>
+                        <div class="manual-card-sub">Ciclo completo del sistema</div>
+                      </div>
+                      <i data-lucide="download" class="manual-card-download-icon"></i>
+                    </a>
+                    
+                    <a href="manuales/manual_administrador.pdf" target="_blank" class="manual-download-card">
+                      <div class="manual-card-icon">
+                        <i data-lucide="user-cog" style="width:16px; height:16px;"></i>
+                      </div>
+                      <div class="manual-card-info">
+                        <div class="manual-card-title">Administrador</div>
+                        <div class="manual-card-sub">Gestión, calendario y roles</div>
+                      </div>
+                      <i data-lucide="download" class="manual-card-download-icon"></i>
+                    </a>
+                    
+                    <a href="manuales/manual_tecnico.pdf" target="_blank" class="manual-download-card">
+                      <div class="manual-card-icon">
+                        <i data-lucide="wrench" style="width:16px; height:16px;"></i>
+                      </div>
+                      <div class="manual-card-info">
+                        <div class="manual-card-title">Técnico de Campo</div>
+                        <div class="manual-card-sub">Órdenes, bitácoras y offline</div>
+                      </div>
+                      <i data-lucide="download" class="manual-card-download-icon"></i>
+                    </a>
+                    
+                    <a href="manuales/manual_gastos.pdf" target="_blank" class="manual-download-card">
+                      <div class="manual-card-icon">
+                        <i data-lucide="credit-card" style="width:16px; height:16px;"></i>
+                      </div>
+                      <div class="manual-card-info">
+                        <div class="manual-card-title">Control de Gastos</div>
+                        <div class="manual-card-sub">Viáticos y conciliación Clara</div>
+                      </div>
+                      <i data-lucide="download" class="manual-card-download-icon"></i>
+                    </a>
+                    
+                    <a href="manuales/manual_tecnico_desarrollador.pdf" target="_blank" class="manual-download-card" style="grid-column: span 2;">
+                      <div class="manual-card-icon">
+                        <i data-lucide="code-2" style="width:16px; height:16px;"></i>
+                      </div>
+                      <div class="manual-card-info">
+                        <div class="manual-card-title">Sistemas y Desarrollador</div>
+                        <div class="manual-card-sub">Estructura técnica, base de datos y APIs</div>
+                      </div>
+                      <i data-lucide="download" class="manual-card-download-icon"></i>
+                    </a>
+                    
                   </div>
                 </div>
               </div>
@@ -2530,6 +2707,9 @@
         <div class="modal-header">
           <h2 id="detalle-title">Orden de Servicio</h2>
           <div style="display:flex;gap:0.5rem;align-items:center;" id="detalle-header-actions">
+            <button class="btn-primary" id="btn-cierre-papel"
+              style="display:none; font-size:0.8rem;padding:0.4rem 0.8rem;align-items:center;gap:0.35rem;background:#4f46e5;border-color:#4f46e5;color:#fff;"
+              onclick="abrirCierrePapel()"><i data-lucide="file-text" class="btn-icon"></i> Cierre en Papel</button>
             <button class="btn-primary" id="btn-completar-reporte"
               style="display:none; font-size:0.8rem;padding:0.4rem 0.8rem;align-items:center;gap:0.35rem;"
               onclick="completarReporteDesdeDetalle()"><i data-lucide="file-edit" class="btn-icon"></i> Llenar Reporte
@@ -2550,6 +2730,52 @@
       </div>
     </div>
 
+    <!-- MODAL CIERRE EN PAPEL -->
+    <div class="modal-overlay" id="modal-cierre-papel-overlay" onclick="cerrarCierrePapel(event)" style="z-index: 600;">
+      <div class="modal" id="modal-cierre-papel" style="max-width: 780px;">
+        <div class="modal-header">
+          <h2>Cierre de Orden en Papel</h2>
+          <button class="modal-close" onclick="cerrarCierrePapel()">✕</button>
+        </div>
+        <div class="modal-body">
+          <form id="form-cierre-papel" onsubmit="confirmarCierrePapel(event)">
+            <input type="hidden" id="cp-orden-id" />
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Archivo PDF Escaneado *</label>
+              <input type="file" id="cp-pdf-file" accept="application/pdf" required style="width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary);" />
+              <small style="color:var(--text-muted); font-size:0.75rem; display:block; margin-top:0.25rem;">Suba el reporte en formato PDF firmado físicamente en campo.</small>
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Estado de la Orden *</label>
+              <select id="cp-estado" required style="width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary);">
+                <option value="Completado">Completado</option>
+                <option value="Refacciones pendientes">Refacciones pendientes</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">
+                Personal de Trabajo (Horas, Fecha, Ida, Regreso, Trayectos)
+                <button type="button" class="btn-primary" onclick="agregarRenglonTecnicoCierre()" style="font-size:0.75rem; padding:0.25rem 0.5rem; display:inline-flex; align-items:center; gap:0.2rem; background:var(--accent); border:none; height:auto;">
+                  <i data-lucide="plus" style="width:12px; height:12px;"></i> Agregar
+                </button>
+              </label>
+              <div id="cp-tecnicos-lista" style="display:flex; flex-direction:column; gap:0.5rem; max-height:180px; overflow-y:auto; padding:0.4rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary);">
+                <!-- Dynamic rows of technicians will be appended here -->
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 1.5rem;">
+              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Motivo de Cierre en Papel (¿Por qué no es digital?) *</label>
+              <textarea id="cp-motivo" placeholder="Ej. El cliente no cuenta con firma digital / Error de red en zona de trabajo / Orden antigua cerrada físicamente..." required rows="4" style="width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary); resize:vertical; box-sizing:border-box; font-family:inherit;"></textarea>
+            </div>
+            <div class="form-actions" style="display:flex; justify-content:flex-end; gap:0.5rem;">
+              <button type="button" class="btn-secondary" onclick="cerrarCierrePapel()">Cancelar</button>
+              <button type="submit" class="btn-primary"><i data-lucide="check-circle" class="btn-icon"></i> Guardar Cierre</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <!-- MODAL PROGRAMAR TECNICO (CALENDARIO) -->
     <div class="modal-overlay" id="modal-programar-tecnico-overlay" onclick="if(event.target===this) this.classList.remove('open')">
       <div class="modal" id="modal-programar-tecnico" style="max-width:500px;">
@@ -2558,17 +2784,134 @@
           <button class="modal-close" onclick="document.getElementById('modal-programar-tecnico-overlay').classList.remove('open')">✕</button>
         </div>
         <div class="modal-body">
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:0.5rem;">
-            <div class="form-group">
-              <label><i data-lucide="calendar" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Fecha de Programación</label>
-              <input type="date" id="pt-fecha" onchange="actualizarTecnicosDisponibles()" required />
+          <!-- CALENDARIO DE LA SEMANA / WEEK PREVIEW -->
+          <div class="form-group full-width" style="margin-bottom:1rem; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.75rem; background: rgba(255,255,255,0.01);">
+            <style>
+              .pt-dia-card {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                background: var(--bg-body);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-md);
+                padding: 0.5rem 0.15rem;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                user-select: none;
+                text-align: center;
+                box-sizing: border-box;
+                min-width: 0;
+              }
+              .pt-dia-card:hover {
+                border-color: var(--accent);
+                background: rgba(255,255,255,0.02);
+                transform: translateY(-1px);
+              }
+              .pt-dia-card.active {
+                border-color: var(--accent);
+                background: var(--accent-light);
+                box-shadow: 0 0 0 1px var(--accent);
+              }
+              .pt-dia-card.today {
+                box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);
+              }
+              .pt-dia-card.today:not(.active) {
+                border-color: var(--text-muted);
+              }
+              @media (max-width: 480px) {
+                .pt-dia-card {
+                  padding: 0.35rem 0.1rem;
+                }
+                .pt-dia-card div {
+                  font-size: 85% !important;
+                }
+              }
+            </style>
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+              <label style="font-weight:600; margin:0; font-size:0.8rem; color:var(--text-primary);"><i data-lucide="calendar-range" style="width:14px; height:14px; margin-right:4px; vertical-align:middle; color:var(--accent);"></i> Calendario de la Semana</label>
+              
+              <!-- Quick Select Buttons inside Header -->
+              <div style="display:flex; gap:0.25rem;">
+                <button type="button" class="btn-secondary" style="font-size:0.68rem; padding:0.25rem 0.4rem; height:auto; line-height:1;" onclick="seleccionarDiasSemana('todos')">Lun-Vie</button>
+                <button type="button" class="btn-secondary" style="font-size:0.68rem; padding:0.25rem 0.4rem; height:auto; line-height:1;" onclick="seleccionarDiasSemana('todos-sab')">Lun-Sáb</button>
+                <button type="button" class="btn-secondary" style="font-size:0.68rem; padding:0.25rem 0.4rem; height:auto; line-height:1;" onclick="seleccionarDiasSemana('ninguno')">Ninguno</button>
+              </div>
             </div>
+
+            <!-- Week Navigator -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; background:rgba(255,255,255,0.02); border:1px solid var(--border); padding:0.4rem 0.6rem; border-radius:var(--radius-sm);">
+              <button type="button" class="action-btn" onclick="navegarSemana(-1)" style="padding:0.2rem; display:flex; align-items:center; justify-content:center; border-radius:3px;">
+                <i data-lucide="chevron-left" style="width:14px; height:14px;"></i>
+              </button>
+              <span id="pt-semana-label" style="font-size:0.78rem; font-weight:600; color:var(--text-primary);">Semana...</span>
+              <button type="button" class="action-btn" onclick="navegarSemana(1)" style="padding:0.2rem; display:flex; align-items:center; justify-content:center; border-radius:3px;">
+                <i data-lucide="chevron-right" style="width:14px; height:14px;"></i>
+              </button>
+            </div>
+            
+            <!-- Horizontal 7-Day Calendar Grid -->
+            <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:0.3rem; width:100%;">
+              <div id="pt-calendario-semanal-grid" style="display:contents;">
+                <!-- Dynamically generated Day Cards -->
+              </div>
+            </div>
+            
+            <small style="color:var(--text-muted);font-size:0.72rem; margin-top:0.5rem; display:block;">Haz clic en los días para seleccionarlos. Se crearán asignaciones independientes para cada día activo.</small>
+          </div>
+
+          <div class="form-group" style="margin-bottom:1rem;">
+            <label><i data-lucide="user-check" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Técnico Disponible</label>
+            <select id="pt-tecnico" class="form-select" required disabled>
+              <option value="">Selecciona una fecha primero...</option>
+            </select>
+            <small style="color:var(--text-muted);font-size:0.75rem; margin-top:0.25rem; display:block;">Solo muestra técnicos sin traslape de horario en esta fecha. Ingresa las horas para mayor precisión.</small>
+          </div>
+
+          <!-- DETALLE DE ÓRDENES POR DÍA -->
+          <div id="pt-detalles-dias-container" class="form-group full-width" style="margin-bottom: 1rem; display: none; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.75rem; background: rgba(255,255,255,0.01);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap; gap:0.5rem;">
+              <label style="font-weight:600; margin:0; font-size:0.8rem; color:var(--text-primary);">
+                <i data-lucide="list-checks" style="width:14px; height:14px; margin-right:4px; vertical-align:middle; color:var(--accent);"></i> Distribución de Órdenes
+              </label>
+              
+              <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.75rem; cursor:pointer; font-weight:normal; margin:0; color:var(--text-secondary);">
+                <input type="checkbox" id="pt-usar-misma-orden" onchange="toggleMismaOrden()" checked style="width:13px; height:13px; margin:0;" />
+                Misma orden todos los días
+              </label>
+            </div>
+            
+            <div id="pt-detalles-dias-list-wrapper" style="display:none; border-top: 1px dashed var(--border); padding-top: 0.75rem; margin-top: 0.5rem; flex-direction:column; gap:0.5rem;">
+              <div id="pt-detalles-dias-list" style="display:flex; flex-direction:column; gap:0.5rem;">
+                <!-- Filas dinámicas generadas en JS -->
+              </div>
+              <small style="color:var(--text-muted);font-size:0.72rem; margin-top:0.25rem; display:block;">Puedes asignar una orden de servicio diferente para cada día activo de la semana.</small>
+            </div>
+          </div>
+
+          <!-- Hidden Inputs and checkboxes to maintain compatibility -->
+          <input type="hidden" id="pt-fecha" required />
+          <div style="display:none;">
+            <input type="checkbox" id="pt-rep-1" value="1" onchange="actualizarTecnicosDisponibles()"/>
+            <input type="checkbox" id="pt-rep-2" value="2" onchange="actualizarTecnicosDisponibles()"/>
+            <input type="checkbox" id="pt-rep-3" value="3" onchange="actualizarTecnicosDisponibles()"/>
+            <input type="checkbox" id="pt-rep-4" value="4" onchange="actualizarTecnicosDisponibles()"/>
+            <input type="checkbox" id="pt-rep-5" value="5" onchange="actualizarTecnicosDisponibles()"/>
+            <input type="checkbox" id="pt-rep-6" value="6" onchange="actualizarTecnicosDisponibles()"/>
+            <input type="checkbox" id="pt-rep-0" value="0" onchange="actualizarTecnicosDisponibles()"/>
+          </div>
+
+
+
+          <div style="display:grid; grid-template-columns:1fr; gap:1rem; margin-bottom:0.5rem;" id="pt-grupo-tipo-principal">
             <div class="form-group">
               <label><i data-lucide="tag" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Tipo de Asignación</label>
-              <select id="pt-tipo" class="form-select" required>
+              <select id="pt-tipo" class="form-select" required onchange="onTipoPrincipalChange()">
                 <option value="Servicio">Servicio</option>
                 <option value="Levantamiento">Levantamiento</option>
                 <option value="Capacitación">Capacitación</option>
+                <option value="Traslado">Traslado</option>
                 <option value="Junta">Junta</option>
                 <option value="Vacaciones">Vacaciones</option>
                 <option value="Descanso">Descanso</option>
@@ -2577,7 +2920,7 @@
             </div>
           </div>
 
-          <div class="form-group" style="margin-bottom:1rem;">
+          <div class="form-group" id="pt-grupo-orden-principal" style="margin-bottom:1rem;">
             <label><i data-lucide="file-text" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Orden de Servicio (Abierta)</label>
             <div class="custom-combo" style="position:relative; width:100%;">
               <div class="combo-box" tabindex="0" id="pt-orden-combo" onclick="toggleCombo('pt-orden')">
@@ -2597,15 +2940,9 @@
             </div>
           </div>
 
-          <div class="form-group" style="margin-bottom:1rem;">
-            <label><i data-lucide="user-check" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Técnico Disponible</label>
-            <select id="pt-tecnico" class="form-select" required disabled>
-              <option value="">Selecciona una fecha primero...</option>
-            </select>
-            <small style="color:var(--text-muted);font-size:0.75rem; margin-top:0.25rem; display:block;">Solo muestra técnicos sin traslape de horario en esta fecha. Ingresa las horas para mayor precisión.</small>
-          </div>
 
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;" id="pt-grupo-horario-principal">
             <div class="form-group">
               <label><i data-lucide="clock" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Hora Inicio Estimada</label>
               <input type="time" id="pt-entrada" onchange="actualizarTecnicosDisponibles()" />
@@ -2615,44 +2952,26 @@
               <input type="time" id="pt-salida" onchange="actualizarTecnicosDisponibles(); calcularLlegadaTraslados();" />
             </div>
           </div>
-          <button type="button" class="btn-secondary" id="btn-toggle-traslado" onclick="document.getElementById('traslado-section').style.display='block'; this.style.display='none';" style="margin-top: 1rem; width: 100%; justify-content: center; padding: 0.5rem;">
-            <i data-lucide="map" style="width: 14px; height: 14px; margin-right: 4px; display:inline-block; vertical-align:middle;"></i> Añadir Traslado (Opcional)
-          </button>
+
+          <a href="#" id="pt-main-traslado-link" onclick="window.toggleMainTraslado(); return false;" style="font-size:0.75rem; color:var(--accent); text-decoration:underline; display:none; margin-top:0.5rem; align-self:flex-start;">+ Traslado (Opcional)</a>
           
-          <div id="traslado-section" style="display:none; margin-top:1rem; padding-top:1rem; border-top: 1px dashed var(--border);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-              <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Detalles de Traslado</span>
-              <button type="button" class="action-btn" onclick="document.getElementById('traslado-section').style.display='none'; document.getElementById('btn-toggle-traslado').style.display='flex'; document.getElementById('pt-fecha-inicio-traslado').value=''; document.getElementById('pt-hora-inicio').value=''; document.getElementById('pt-horas-traslado').value=''; document.getElementById('pt-fecha-fin-regreso-date').value=''; document.getElementById('pt-hora-fin-regreso').value=''; document.getElementById('pt-horas-regreso').value=''; calcularLlegadaTraslados();" title="Ocultar Traslado" style="font-size: 0.75rem; color: var(--text-muted);">
-                <i data-lucide="x" style="width: 14px; height: 14px;"></i> Ocultar
-              </button>
+          <div id="pt-main-traslado-container" style="display:none; margin-top:0.75rem; border-top:1px dashed var(--border); padding-top:0.75rem; flex-direction:column; gap:0.5rem;">
+            <div style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.25rem;">Traslado Homogéneo para la Semana</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; align-items:center;">
+              <span style="font-size:0.7rem; font-weight:600; color:var(--text-secondary);">Ida Hora:</span>
+              <span style="font-size:0.7rem; font-weight:600; color:var(--text-secondary);">Ida Hrs:</span>
             </div>
-            <div style="display:grid; grid-template-columns:3fr 2fr; gap:1rem;">
-              <div class="form-group">
-                <label>Inicio de traslado (Referencia)</label>
-                <div style="display:flex; gap:0.5rem;">
-                  <input type="date" id="pt-fecha-inicio-traslado" onchange="calcularLlegadaTraslados()" style="flex:1; padding: 0.2rem 0.5rem;" />
-                  <input type="time" id="pt-hora-inicio" onchange="calcularLlegadaTraslados()" style="flex:1;" />
-                </div>
-              </div>
-              <div class="form-group">
-                <label>Horas de Traslado (Ida)</label>
-                <input type="number" id="pt-horas-traslado" step="0.5" min="0" placeholder="Ej. 1.5" oninput="calcularLlegadaTraslados()" />
-                <span id="pt-ref-llegada-ida" style="font-size:0.7rem; color:var(--text-muted); display:block; margin-top:0.25rem;"></span>
-              </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+              <input type="time" id="pt-main-traslado-ida-hora" class="form-control" style="font-size:0.75rem; padding:0.3rem 0.5rem; height:30px; width:100%;">
+              <input type="number" id="pt-main-traslado-ida-horas" step="0.5" min="0" placeholder="Ej. 1.5" class="form-control" style="font-size:0.75rem; padding:0.3rem 0.5rem; height:30px; width:100%;">
             </div>
-            <div style="display:grid; grid-template-columns:3fr 2fr; gap:1rem; margin-top:1rem;">
-              <div class="form-group">
-                <label>Inicio de regreso (Referencia)</label>
-                <div style="display:flex; gap:0.5rem;">
-                  <input type="date" id="pt-fecha-fin-regreso-date" style="flex:1; padding: 0.2rem 0.5rem;" />
-                  <input type="time" id="pt-hora-fin-regreso" />
-                </div>
-              </div>
-              <div class="form-group">
-                <label>Horas de Traslado (Regreso)</label>
-                <input type="number" id="pt-horas-regreso" step="0.5" min="0" placeholder="Ej. 1.5" oninput="calcularLlegadaTraslados()" />
-                <span id="pt-ref-llegada-regreso" style="font-size:0.7rem; color:var(--text-muted); display:block; margin-top:0.25rem;"></span>
-              </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; align-items:center; margin-top:0.25rem;">
+              <span style="font-size:0.7rem; font-weight:600; color:var(--text-secondary);">Regreso Hora:</span>
+              <span style="font-size:0.7rem; font-weight:600; color:var(--text-secondary);">Regreso Hrs:</span>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+              <input type="time" id="pt-main-traslado-regreso-hora" class="form-control" style="font-size:0.75rem; padding:0.3rem 0.5rem; height:30px; width:100%;">
+              <input type="number" id="pt-main-traslado-regreso-horas" step="0.5" min="0" placeholder="Ej. 1.5" class="form-control" style="font-size:0.75rem; padding:0.3rem 0.5rem; height:30px; width:100%;">
             </div>
           </div>
           <div style="margin-top:1.5rem; text-align:right;">
@@ -3498,6 +3817,44 @@
         <div class="modal-body">
           <form id="form-ticket" onsubmit="guardarTicket(event)">
 
+            <!-- INFORMACIÓN GENERAL (SOLO PARA TICKET -A) -->
+            <div id="ref-ticket-info-header" style="display:none; margin-bottom: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; box-shadow: var(--shadow-sm);">
+              <div style="font-weight: 700; font-size: 0.95rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 6px; border-bottom: 1px dashed var(--border); padding-bottom: 0.5rem;">
+                <i data-lucide="info" style="width: 16px; height: 16px;"></i> Información General (Sincronizada con Orden)
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; font-size: 0.85rem;">
+                <div>
+                  <span style="color: var(--text-muted); display: block; margin-bottom: 2px;">Cliente / Empresa:</span>
+                  <strong id="ref-info-cliente" style="color: var(--text-primary); font-size: 0.9rem;"></strong>
+                </div>
+                <div>
+                  <span style="color: var(--text-muted); display: block; margin-bottom: 2px;">Sitio / Sucursal:</span>
+                  <strong id="ref-info-sitio" style="color: var(--text-primary); font-size: 0.9rem;"></strong>
+                </div>
+                <div>
+                  <span style="color: var(--text-muted); display: block; margin-bottom: 2px;">Solicitante:</span>
+                  <strong id="ref-info-solicitante" style="color: var(--text-primary); font-size: 0.9rem;"></strong>
+                </div>
+                <div>
+                  <span style="color: var(--text-muted); display: block; margin-bottom: 2px;">Horómetro:</span>
+                  <strong id="ref-info-horometro" style="color: var(--text-primary); font-size: 0.9rem;"></strong>
+                </div>
+                <div>
+                  <span style="color: var(--text-muted); display: block; margin-bottom: 2px;">Categoría:</span>
+                  <strong id="ref-info-categoria" style="color: var(--text-primary); font-size: 0.9rem;">Refacción</strong>
+                </div>
+                <div>
+                  <span style="color: var(--text-muted); display: block; margin-bottom: 2px;">Fecha Firma Cliente:</span>
+                  <strong id="ref-info-fechacierre" style="color: var(--text-primary); font-size: 0.9rem;">Pendiente</strong>
+                </div>
+                <div>
+                  <span style="color: var(--text-muted); display: block; margin-bottom: 2px;">Maquinaria / Equipo:</span>
+                  <div id="ref-info-maquinaria" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;"></div>
+                </div>
+              </div>
+            </div>
+
+
             <!-- ORIGEN DEL TICKET -->
             <div class="form-section" id="section-t-origen">
               <div class="form-section-title"><i data-lucide="message-circle-question" class="section-icon"></i> ¿Cómo
@@ -3601,19 +3958,19 @@
                     </div>
                   </div>
                 </div>
-                <div class="form-group full-width">
+                <div class="form-group full-width" id="group-t-maquinaria">
                   <label>Equipo / Máquina afectada *</label>
                   <select id="t-equipo" onchange="window.onEquipoTicketChangeMultiple()">
                     <option value="">Seleccione una máquina registrada...</option>
                   </select>
                   <div id="t-equipos-seleccionados" style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.5rem; width:100%;"></div>
                 </div>
-                <div class="form-group">
+                <div class="form-group" id="group-t-horometro">
                   <label>Horómetro <span
                       style="font-size:0.7rem; color:var(--text-muted); font-weight:normal;">(Opcional)</span></label>
                   <input type="number" id="t-horometro" placeholder="Ej. 1250" step="any" />
                 </div>
-                <div class="form-group">
+                <div class="form-group" id="group-t-solicitante">
                   <label>Solicitante *</label>
                   <input type="text" id="t-solicitante" placeholder="Nombre de quien solicita" required />
                 </div>
@@ -3628,7 +3985,7 @@
                     <option>Otro</option>
                   </select>
                 </div>
-                <div class="form-group">
+                <div class="form-group" id="group-t-categoria">
                   <label>Categoría *</label>
                   <select id="t-categoria" required>
                     <option>Refacción</option>
@@ -3821,6 +4178,61 @@
               </div>
             </div>
 
+            <!-- LISTADO DE REFACCIONES AL FINAL (SOLO PARA TICKET -A) -->
+            <div id="ref-ticket-parts-bottom" style="display:none; grid-column: 1 / -1; margin-top: 1.5rem; border-top: 1px dashed var(--border); padding-top: 1rem; width: 100%;">
+              <label style="font-weight: 700; font-size: 0.9rem; color: var(--text-secondary); display: block; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="package" style="width: 16px; height: 16px; color: var(--accent);"></i> Refacciones Solicitadas
+              </label>
+              <div id="ref-bottom-piezas-list" style="display: flex; flex-direction: column; gap: 6px; margin-top: 0.5rem;"></div>
+            </div>
+
+            <!-- ENVÍO Y SEGUIMIENTO (SOLO PARA TICKET -A) -->
+            <div id="ref-ticket-shipping-fields" style="display:none; grid-column: 1 / -1; margin-top: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; box-shadow: var(--shadow-sm); width: 100%; box-sizing: border-box;">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--border); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                <div style="font-weight: 700; font-size: 0.95rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                  <i data-lucide="truck" style="width: 16px; height: 16px;"></i> Datos de Envío y Seguimiento
+                </div>
+                <button type="button" id="btn-add-envio" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: 6px; display: flex; align-items: center; gap: 4px; font-weight: 600; border: none; cursor: pointer; background: var(--accent); color: #fff;">
+                  <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Agregar Guía
+                </button>
+              </div>
+              <div id="envios-container" style="display: flex; flex-direction: column; gap: 1rem;"></div>
+            </div>
+
+            <!-- DESTINO DE REFACCIONES ENTREGADAS (SOLO PARA TICKET -A, CONDICIONAL) -->
+            <div id="ref-ticket-destination-fields" style="display:none; grid-column: 1 / -1; margin-top: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; box-shadow: var(--shadow-sm); width: 100%; box-sizing: border-box;">
+              <div style="font-weight: 700; font-size: 0.95rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; border-bottom: 1px dashed var(--border); padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
+                <i data-lucide="help-circle" style="width: 16px; height: 16px;"></i> Destino de las Refacciones
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block;">Las piezas entregadas serán:</label>
+                  <select id="ref-destino-piezas" style="width: 100%; box-sizing: border-box; padding: 0.55rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-family: inherit;">
+                    <option value="">-- Selecciona una opción --</option>
+                    <option value="Instaladas">Instaladas por el técnico</option>
+                    <option value="Enviadas al Cliente">Enviadas al cliente</option>
+                  </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block;">Precio ($):</label>
+                  <input type="number" step="0.01" id="ref-destino-precio" placeholder="0.00" style="width: 100%; box-sizing: border-box; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-family: inherit;" />
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block;">Documento PDF:</label>
+                  <div style="display: flex; gap: 0.5rem; align-items: center; height: 38px;">
+                    <label class="btn-secondary" style="margin: 0; padding: 0.5rem 0.75rem; font-size: 0.8rem; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-secondary); height: 100%; box-sizing: border-box; transition: var(--transition);">
+                      <i data-lucide="upload" style="width: 14px; height: 14px;"></i>
+                      <span class="file-label-text">Subir PDF</span>
+                      <input type="file" id="ref-destino-pdf-file" accept="application/pdf" style="display: none;" onchange="updateFileLabel(this)" />
+                    </label>
+                    <button type="button" id="btn-ver-destino-pdf" class="btn-secondary" style="margin: 0; padding: 0.5rem; font-size: 0.8rem; display: none; align-items: center; justify-content: center; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-secondary); border-radius: 6px; cursor: pointer; height: 100%; width: 38px; box-sizing: border-box; transition: var(--transition);" onclick="window.visualizarDestinoPdfActual()">
+                      <i data-lucide="eye" style="width: 14px; height: 14px;"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="form-actions"
               style="margin-top:2rem; padding-top: 1rem; border-top: 2px dashed var(--border); justify-content: center; flex-direction: column; align-items: center; gap: 1rem;">
               <div style="display:flex; justify-content:center; gap: 0.5rem; width: 100%;">
@@ -3874,7 +4286,64 @@
       </div>
     </div>
 
+    <!-- MODAL IDEAS Y FALLAS -->
+    <div class="modal-overlay" id="modal-idea-falla-overlay" onclick="cerrarModalIdeaFalla(event)">
+      <div class="modal" style="max-width:500px;">
+        <div class="modal-header">
+          <h2 id="idea-falla-modal-title">Reportar Idea / Falla</h2>
+          <button class="modal-close" onclick="cerrarModalIdeaFalla()">✕</button>
+        </div>
+        <div class="modal-body">
+          <form id="form-idea-falla" onsubmit="guardarIdeaFalla(event)">
+            <div class="form-section">
+              <div class="form-section-title"><i data-lucide="help-circle" class="section-icon"></i> Detalles del Registro</div>
+              <div class="form-grid" style="grid-template-columns: 1fr;">
+                
+                <div class="form-group">
+                  <label>Tipo *</label>
+                  <div style="display:flex; gap:1.5rem; margin-top:0.35rem;">
+                    <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-weight:normal; font-size:0.9rem; color:var(--text-primary);">
+                      <input type="radio" name="if-tipo" value="Idea" checked style="width:16px; height:16px; margin:0;" />
+                      💡 Idea / Mejora
+                    </label>
+                    <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-weight:normal; font-size:0.9rem; color:var(--text-primary);">
+                      <input type="radio" name="if-tipo" value="Falla" style="width:16px; height:16px; margin:0;" />
+                      🐛 Falla / Bug
+                    </label>
+                  </div>
+                </div>
 
+                <div class="form-group">
+                  <label>Título *</label>
+                  <input type="text" id="if-titulo" placeholder="Ej. Filtro por técnico en gastos" required style="width:100%;" />
+                </div>
+
+                <div class="form-group">
+                  <label>Descripción / Detalles</label>
+                  <textarea id="if-descripcion" placeholder="Explica detalladamente la idea o el problema..." rows="4" style="width:100%; font-family:inherit; resize:vertical;"></textarea>
+                </div>
+
+                <div class="form-group" id="if-estado-container" style="display:none;">
+                  <label>Estado</label>
+                  <select id="if-estado" class="view-filter" style="width:100%; margin:0;">
+                    <option value="Pendiente">Pendiente</option>
+                    <option value="En Progreso">En Progreso</option>
+                    <option value="Resuelto">Resuelto</option>
+                    <option value="Rechazado">Rechazado</option>
+                  </select>
+                </div>
+
+              </div>
+            </div>
+            
+            <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
+              <button type="button" class="btn-secondary" onclick="cerrarModalIdeaFalla()">Cancelar</button>
+              <button type="submit" class="btn-primary">Guardar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
 
     <!-- MODAL USUARIO -->
     <div class="modal-overlay" id="modal-usuario-overlay" onclick="cerrarModalUsuario(event)">
@@ -4042,6 +4511,12 @@
       <div class="modal-body">
         <form id="form-agregar-sitio" onsubmit="guardarSitioCliente(event)">
           <input type="hidden" id="s-cliente-nombre" />
+          <div class="form-group" id="s-cliente-group" style="display:none; margin-bottom:0.75rem;">
+            <label>Empresa / Cliente *</label>
+            <select id="s-cliente-select" class="form-select" style="width:100%; height:38px; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); font-size:0.85rem; padding:0 0.5rem; outline:none; cursor:pointer;">
+              <option value="">Selecciona un cliente...</option>
+            </select>
+          </div>
           <div class="form-group">
             <label>Nombre del Sitio *</label>
             <input type="text" id="s-sitio-nombre" placeholder="Ej. Planta Norte, Bodega 3, etc." required />

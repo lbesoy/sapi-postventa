@@ -36,6 +36,11 @@ CREATE TABLE public.ordenes (
     evidencias JSONB DEFAULT '{}'::jsonb,
     ubicacion_sitio TEXT,
     operador TEXT,
+    cierre_papel_pdf TEXT,
+    cierre_papel_motivo TEXT,
+    cierre_papel_usuario TEXT,
+    cierre_papel_fecha TIMESTAMP WITH TIME ZONE,
+    cierre_papel_tecnicos_horas JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -245,7 +250,7 @@ CREATE TABLE IF NOT EXISTS public.calendario_eventos (
     fecha_inicio TIMESTAMP WITH TIME ZONE NOT NULL,
     fecha_fin TIMESTAMP WITH TIME ZONE,
     todo_el_dia BOOLEAN DEFAULT false,
-    tipo TEXT NOT NULL CHECK (tipo IN ('Junta', 'Capacitación', 'Vacaciones', 'Descanso', 'Otro', 'Servicio', 'Levantamiento')),
+    tipo TEXT NOT NULL CHECK (tipo IN ('Junta', 'Capacitación', 'Vacaciones', 'Descanso', 'Otro', 'Servicio', 'Levantamiento', 'Traslado')),
     tecnico_id UUID REFERENCES public.user_roles(id) ON DELETE CASCADE,
     tecnico_nombre TEXT,
     creado_por UUID REFERENCES public.user_roles(id) ON DELETE SET NULL,
@@ -255,12 +260,15 @@ CREATE TABLE IF NOT EXISTS public.calendario_eventos (
 );
 
 ALTER TABLE public.calendario_eventos ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Permitir select de eventos a autenticados" ON public.calendario_eventos;
 CREATE POLICY "Permitir select de eventos a autenticados" ON public.calendario_eventos FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Admins y Supervisores full access eventos" ON public.calendario_eventos;
 CREATE POLICY "Admins y Supervisores full access eventos" ON public.calendario_eventos FOR ALL TO authenticated USING (
     (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
 ) WITH CHECK (
     (SELECT rol FROM public.user_roles WHERE id = auth.uid()) IN ('superadmin', 'admin', 'supervisor')
 );
+DROP POLICY IF EXISTS "Tecnicos pueden gestionar sus propios eventos" ON public.calendario_eventos;
 CREATE POLICY "Tecnicos pueden gestionar sus propios eventos" ON public.calendario_eventos FOR ALL TO authenticated USING (
     tecnico_id = auth.uid()
 ) WITH CHECK (

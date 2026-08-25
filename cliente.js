@@ -778,7 +778,8 @@ function navegarA(targetView) {
     'servicios': 'Órdenes de Servicio',
     'sitios': 'Mis Sitios',
     'envios': 'Envíos',
-    'soporte': 'Soporte'
+    'soporte': 'Soporte',
+    'preferencias': 'Preferencias'
   };
   
   const titleEl = document.getElementById('view-title');
