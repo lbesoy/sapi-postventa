@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
-import { getTemplateForStage, getTemplateForInternalComment, STAGES } from './utils/email-templates.js';
+import { getTemplateForStage, getTemplateForInternalComment, getTemplateForExternalComment, STAGES } from './utils/email-templates.js';
 
 export default async function handler(req, res) {
   // CORS y cabeceras
@@ -24,9 +24,10 @@ export default async function handler(req, res) {
   if (!record) return res.status(400).json({ error: 'Missing webhook record data' });
 
   try {
-    // 2. Determinar si se agregó un comentario interno o si hay cambio de etapa relevante
+    // 2. Determinar si se agregó un comentario interno, comentario externo o si hay cambio de etapa relevante
     let stage = null;
     let isInternalComment = false;
+    let isExternalComment = false;
     let latestComment = null;
 
     if (type === 'UPDATE' && old_record) {
@@ -36,9 +37,16 @@ export default async function handler(req, res) {
         isInternalComment = true;
         latestComment = newComments[newComments.length - 1];
       }
+
+      const oldExtComments = old_record.comentarios_clientes || [];
+      const newExtComments = record.comentarios_clientes || [];
+      if (newExtComments.length > oldExtComments.length) {
+        isExternalComment = true;
+        latestComment = newExtComments[newExtComments.length - 1];
+      }
     }
 
-    if (!isInternalComment) {
+    if (!isInternalComment && !isExternalComment) {
       if (type === 'INSERT') {
         stage = STAGES.REPORTADO;
       } else if (type === 'UPDATE' && old_record) {
@@ -73,8 +81,8 @@ export default async function handler(req, res) {
       }
     }
 
-    // Si no es una transición relevante ni un comentario interno, ignorar
-    if (!stage && !isInternalComment) {
+    // Si no es una transición relevante ni un comentario, ignorar
+    if (!stage && !isInternalComment && !isExternalComment) {
       return res.status(200).json({ success: true, message: 'No relevant stage change or comment detected.' });
     }
 
@@ -128,6 +136,78 @@ export default async function handler(req, res) {
       const template = getTemplateForInternalComment(record, latestComment, 'Equipo EuroRep');
       subject = template.subject;
       html = template.html;
+
+    } else if (isExternalComment) {
+      const authorName = latestComment ? latestComment.usuario : null;
+
+      // Determinar si el mensaje fue enviado por personal de soporte o por el cliente
+      let isSentByStaff = true;
+      if (authorName) {
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('rol')
+          .eq('nombre', authorName)
+          .maybeSingle();
+
+        if (roleData && (roleData.rol === 'cliente' || roleData.rol === 'empresa' || roleData.rol === 'cliente-consultor')) {
+          isSentByStaff = false;
+        } else if (!roleData) {
+          // Si no está registrado en user_roles, asumimos que es el cliente (nombre empresa)
+          isSentByStaff = false;
+        }
+      }
+
+      if (isSentByStaff) {
+        // Personal envía -> Notificar al cliente
+        const { data: cliente, error: cliErr } = await supabase
+          .from('clientes')
+          .select('nombre, email')
+          .eq('id', record.cliente)
+          .single();
+
+        if (cliErr || !cliente || !cliente.email) {
+          return res.status(200).json({ success: true, message: 'Notification skipped: Client has no email.' });
+        }
+
+        emailsToNotify.push(cliente.email);
+        const template = getTemplateForExternalComment(record, latestComment, true, cliente.nombre || 'Cliente');
+        subject = template.subject;
+        html = template.html;
+      } else {
+        // Cliente envía -> Notificar a staff (técnico y administradores/supervisores)
+        if (record.asignado) {
+          const { data: tecRole } = await supabase
+            .from('user_roles')
+            .select('nombre, email')
+            .eq('nombre', record.asignado)
+            .maybeSingle();
+          if (tecRole && tecRole.email) {
+            emailsToNotify.push(tecRole.email);
+          }
+        }
+
+        const { data: admins } = await supabase
+          .from('user_roles')
+          .select('nombre, email')
+          .in('rol', ['superadmin', 'admin', 'supervisor'])
+          .eq('activo', true);
+
+        if (admins) {
+          admins.forEach(adm => {
+            if (adm.email && !emailsToNotify.includes(adm.email)) {
+              emailsToNotify.push(adm.email);
+            }
+          });
+        }
+
+        if (emailsToNotify.length === 0) {
+          return res.status(200).json({ success: true, message: 'Notification skipped: No staff found to notify for client message.' });
+        }
+
+        const template = getTemplateForExternalComment(record, latestComment, false, 'Equipo EuroRep');
+        subject = template.subject;
+        html = template.html;
+      }
 
     } else {
       // Obtener los datos del cliente

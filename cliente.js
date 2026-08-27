@@ -103,6 +103,15 @@ function isTestUserAccount(user) {
   return name.includes('prueba') || name.includes('test') || email.includes('prueba') || email.includes('test');
 }
 
+function getActiveRole() {
+  if (!currentSession) return '';
+  const isSuperAdmin = (currentSession.realRol === 'superadmin' || currentSession.viewMode === 'superadmin');
+  const simUserId = isSuperAdmin ? (localStorage.getItem('superadmin_simulated_user_id') || '') : '';
+  const simUser = simUserId ? usuarios.find(u => u.id === simUserId) : null;
+  const user = simUser || currentSession;
+  return String(user.rol || user.viewMode || '').toLowerCase().trim();
+}
+
 function isTestModeActive() {
   if (!currentSession) return false;
   
@@ -245,8 +254,8 @@ async function verificarSesionCliente() {
         return;
       }
 
-      // Si es empresa, cliente o superadmin, permitir el paso
-      if (rol === 'empresa' || rol === 'cliente' || rol === 'superadmin') {
+      // Si es empresa, cliente, cliente-consultor o superadmin, permitir el paso
+      if (rol === 'empresa' || rol === 'cliente' || rol === 'cliente-consultor' || rol === 'superadmin') {
         currentSession = sessionObj;
         
         // Validar que la sesión en Supabase esté activa si estamos online
@@ -366,7 +375,7 @@ async function iniciarSesionCliente(e) {
     }
 
     const rol = String(roleData.rol || '').toLowerCase().trim();
-    if (!['empresa', 'cliente', 'superadmin'].includes(rol)) {
+    if (!['empresa', 'cliente', 'cliente-consultor', 'superadmin'].includes(rol)) {
       // Si tiene otro rol, mandarlo al index.html
       currentSession = {
         userId: data.user.id,
@@ -590,7 +599,7 @@ async function inicializarDatos() {
       let userSelectHtml = `<select id="superadmin-user-selector" style="padding:0.4rem 0.5rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); font-size:0.8rem; font-weight:600; outline:none; cursor:pointer;">`;
       userSelectHtml += `<option value="">[Sin simular usuario - Ver Todo]</option>`;
       
-      const sortedUsers = [...usuarios].filter(usr => usr.nombre && (usr.rol === 'empresa' || usr.rol === 'cliente')).sort((a,b) => (a.nombre || '').localeCompare(b.nombre || ''));
+      const sortedUsers = [...usuarios].filter(usr => usr.nombre && (usr.rol === 'empresa' || usr.rol === 'cliente' || usr.rol === 'cliente-consultor')).sort((a,b) => (a.nombre || '').localeCompare(b.nombre || ''));
       sortedUsers.forEach(usr => {
         const isCurrent = usr.id === simUserId ? 'selected' : '';
         const roleLabel = usr.rol ? ` (${usr.rol})` : '';
@@ -983,6 +992,27 @@ function doRender() {
   renderLocationsSection(misSitios, misEquiposFiltered);
   renderGeneralSupportChatSection();
   try { window.updateClientSidebarChatBadge(); } catch(e) {}
+
+  // --- APLICAR RESTRICCIONES DE CLIENTE CONSULTOR ---
+  if (getActiveRole() === 'cliente-consultor') {
+    const btnReportarDashboard = document.getElementById('btn-reportar-falla-dashboard');
+    if (btnReportarDashboard) btnReportarDashboard.style.display = 'none';
+    
+    const btnReportarMobile = document.getElementById('btn-reportar-falla-mobile');
+    if (btnReportarMobile) btnReportarMobile.style.display = 'none';
+    
+    const formNuevoTicket = document.getElementById('container-nuevo-ticket-form');
+    if (formNuevoTicket) formNuevoTicket.style.display = 'none';
+  } else {
+    const btnReportarDashboard = document.getElementById('btn-reportar-falla-dashboard');
+    if (btnReportarDashboard) btnReportarDashboard.style.display = '';
+    
+    const btnReportarMobile = document.getElementById('btn-reportar-falla-mobile');
+    if (btnReportarMobile) btnReportarMobile.style.display = '';
+    
+    const formNuevoTicket = document.getElementById('container-nuevo-ticket-form');
+    if (formNuevoTicket) formNuevoTicket.style.display = '';
+  }
 }
 
 // 1. Dashboard UI
@@ -1236,11 +1266,13 @@ function renderMachinerySection(misEquipos, misOrdenes) {
           </details>
           
           <!-- Acciones de Falla -->
+          ${getActiveRole() === 'cliente-consultor' ? '' : `
           <div class="machine-actions" style="padding:1rem 1.25rem; border-top:1px solid var(--border); display:flex; background:var(--bg-hover);">
             <button class="btn-primary" onclick="reportarFallaDeMaquina('${m.idInterno || m.id}', '${m.modelo || ''}', '${m.serie || ''}', '${m.ubicacion || ''}')" style="width:100%; display:flex; align-items:center; justify-content:center; gap:0.5rem; font-size:0.85rem; padding:0.6rem;">
               <i data-lucide="alert-triangle" style="width:14px; height:14px;"></i> Reportar Falla
             </button>
           </div>
+          `}
         </div>
       </div>
     `;
@@ -1731,6 +1763,11 @@ function eliminarFotoTicketPreview() {
 // Enviar creación de Ticket
 async function crearTicketCliente(e) {
   e.preventDefault();
+  
+  if (getActiveRole() === 'cliente-consultor') {
+    showToast('Tu cuenta tiene perfil de consulta. No tienes permisos para crear tickets.', 'error');
+    return;
+  }
   
   if (!window.supabaseClient) {
     showToast('No hay conexión activa con la base de datos.', 'error');
@@ -2421,6 +2458,42 @@ function abrirDetalleTicketCliente(id) {
     `;
   }
 
+    const listHtml = (t.comentariosClientes && t.comentariosClientes.length > 0)
+      ? t.comentariosClientes.map(c => {
+          const isMe = c.usuario !== 'Soporte' && c.usuario !== 'EuroRep' && !usuarios.some(u => u.nombre === c.usuario);
+          const alignStyle = isMe
+            ? 'align-self: flex-end; background: rgba(232, 130, 12, 0.08); border-left: 3px solid var(--accent);'
+            : 'align-self: flex-start; background: var(--bg-card); border-left: 3px solid var(--border);';
+          
+          return `
+            <div style="max-width: 85%; padding: 0.6rem 0.8rem; border-radius: 8px; box-shadow: var(--shadow-sm); ${alignStyle}">
+              <div style="display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 0.25rem; align-items: center;">
+                <span style="font-weight: 700; font-size: 0.75rem; color: ${isMe ? 'var(--accent)' : 'var(--text-primary)'};">${c.usuario}</span>
+                <span style="font-size: 0.65rem; color: var(--text-muted); font-family: monospace;">${formatFechaHoraAmigable(c.fecha)}</span>
+              </div>
+              <div style="font-size: 0.85rem; white-space: pre-wrap; color: var(--text-primary); line-height: 1.35; font-family: inherit;">${c.texto}</div>
+            </div>
+          `;
+        }).join('')
+      : `<div style="text-align: center; color: var(--text-muted); font-style: italic; font-size: 0.8rem; padding: 1.5rem 0;">No hay mensajes registrados.</div>`;
+
+    const commentsHtml = `
+      <div class="detalle-section" style="border-top:1px dashed var(--border); padding-top:1.25rem; margin-top:1.5rem; text-align: left;">
+        <div class="detalle-section-title" style="display:flex; align-items:center; gap:0.5rem; text-transform: uppercase; font-size:0.9rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.5rem;"><i data-lucide="message-square" style="width:16px;height:16px;"></i> Comentarios y Mensajes</div>
+        
+        <div class="chat-container" style="max-height: 200px; overflow-y: auto; padding: 0.75rem; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+          ${listHtml}
+        </div>
+
+        <div class="chat-input-wrapper" style="display: flex; gap: 0.5rem; align-items: stretch;">
+          <textarea id="chat-new-comment-externo" placeholder="Escribe un mensaje..." rows="2" style="flex: 1; resize: none; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+          <button type="button" class="btn-primary" onclick="window.agregarComentarioExterno('${t.id}')" style="background: var(--accent); border-color: var(--accent); border-radius: 8px; padding: 0 1rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem; cursor: pointer; font-weight: 600; font-size: 0.85rem; color: white;">
+            <i data-lucide="send" style="width: 14px; height: 14px;"></i> Enviar
+          </button>
+        </div>
+      </div>
+    `;
+
   body.innerHTML = `
     ${trackerHtml}
     
@@ -2462,6 +2535,7 @@ function abrirDetalleTicketCliente(id) {
 
     ${photoHtml}
     ${cotizacionHtml}
+    ${commentsHtml}
   `;
 
   abrirModal('modal-ticket');
@@ -4402,5 +4476,56 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
     }
   }
 }
+
+window.agregarComentarioExterno = async function(ticketId) {
+  const textarea = document.getElementById('chat-new-comment-externo');
+  if (!textarea) return;
+  const text = textarea.value.trim();
+  if (!text) return;
+
+  const t = tickets.find(x => x.id === ticketId);
+  if (!t) {
+    showToast('Ticket no encontrado.', 'error');
+    return;
+  }
+
+  const currentUser = usuarios.find(u => u && u.id === window.currentSession?.userId);
+  const userName = currentUser ? currentUser.nombre : (window.nombreEmpresaLogged || window.currentSession?.nombre || 'Cliente');
+
+  const nuevoMensaje = {
+    usuario: userName,
+    fecha: new Date().toISOString(),
+    texto: text
+  };
+
+  if (!t.comentariosClientes) {
+    t.comentariosClientes = [];
+  }
+
+  if (window.supabaseClient) {
+    try {
+      const tClone = JSON.parse(JSON.stringify(t));
+      if (!tClone.comentariosClientes) tClone.comentariosClientes = [];
+      tClone.comentariosClientes.push(nuevoMensaje);
+      
+      await window.pushToSupabase('tickets', tClone);
+      
+      t.comentariosClientes.push(nuevoMensaje);
+      localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+      showToast('Comentario enviado.', 'success');
+      
+      // Refrescar modal de detalle en cliente
+      abrirDetalleTicketCliente(ticketId);
+    } catch (err) {
+      console.error('Error al guardar comentario en Supabase:', err);
+      showToast('Error al guardar el comentario. Verifica tu conexión.', 'error');
+    }
+  } else {
+    t.comentariosClientes.push(nuevoMensaje);
+    localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+    showToast('Comentario guardado localmente.', 'success');
+    abrirDetalleTicketCliente(ticketId);
+  }
+};
 
 

@@ -168,7 +168,7 @@ CREATE POLICY "Consulta y Tecnicos read access clientes" ON public.clientes FOR 
 );
 
 CREATE POLICY "Clientes y Empresas read own client" ON public.clientes FOR SELECT TO authenticated USING (
-  public.get_my_role() IN ('empresa', 'cliente')
+  public.get_my_role() IN ('empresa', 'cliente', 'cliente-consultor')
   AND (
     LOWER(nombre) = LOWER(public.get_my_empresa())
     OR id = public.get_my_empresa()
@@ -181,7 +181,7 @@ CREATE POLICY "Consulta y Tecnicos read access maquinaria" ON public.maquinaria 
 );
 
 CREATE POLICY "Clientes y Empresas read own maquinaria" ON public.maquinaria FOR SELECT TO authenticated USING (
-  public.get_my_role() IN ('empresa', 'cliente')
+  public.get_my_role() IN ('empresa', 'cliente', 'cliente-consultor')
   AND (
     LOWER(cliente) IN (
       SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa() OR id IN (SELECT cliente_id FROM public.cliente_usuarios WHERE usuario_id = auth.uid())
@@ -202,7 +202,7 @@ CREATE POLICY "Consulta y Tecnicos read access tickets" ON public.tickets FOR SE
 );
 
 CREATE POLICY "Clientes y Empresas read own tickets" ON public.tickets FOR SELECT TO authenticated USING (
-  public.get_my_role() IN ('empresa', 'cliente')
+  public.get_my_role() IN ('empresa', 'cliente', 'cliente-consultor')
   AND (
     LOWER(cliente) IN (
       SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa() OR id IN (SELECT cliente_id FROM public.cliente_usuarios WHERE usuario_id = auth.uid())
@@ -263,7 +263,7 @@ CREATE POLICY "Consulta read access ordenes" ON public.ordenes FOR SELECT TO aut
 );
 
 CREATE POLICY "Clientes y Empresas read own ordenes" ON public.ordenes FOR SELECT TO authenticated USING (
-  public.get_my_role() IN ('empresa', 'cliente')
+  public.get_my_role() IN ('empresa', 'cliente', 'cliente-consultor')
   AND (
     LOWER(cliente) IN (
       SELECT LOWER(id) FROM public.clientes WHERE LOWER(nombre) = LOWER(public.get_my_empresa()) OR id = public.get_my_empresa() OR id IN (SELECT cliente_id FROM public.cliente_usuarios WHERE usuario_id = auth.uid())

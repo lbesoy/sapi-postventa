@@ -314,7 +314,7 @@
                 </p>
               </div>
               <div style="display:flex; flex-direction:column; gap:0.75rem;">
-                <button class="btn-primary" onclick="abrirReportarFallaRapida()" style="justify-content:center;">
+                <button class="btn-primary" id="btn-reportar-falla-dashboard" onclick="abrirReportarFallaRapida()" style="justify-content:center;">
                   <i data-lucide="alert-triangle"></i> Reportar una Falla de Equipo
                 </button>
                 <a href="https://wa.me/525512345678" target="_blank" class="btn-secondary" style="justify-content:center; text-decoration:none;">
@@ -355,7 +355,7 @@
           <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:2rem; align-items:start;">
             
             <!-- Ticket Creation Form -->
-            <div class="section-card">
+            <div class="section-card" id="container-nuevo-ticket-form">
               <div class="form-header">
                 <h2 class="section-title" style="margin-bottom:0.25rem;"><i data-lucide="plus-circle" class="title-icon"></i> Nueva Solicitud</h2>
                 <p class="section-subtitle">Reporta incidencias o solicita soporte técnico para tus equipos.</p>
@@ -717,7 +717,7 @@
         <i data-lucide="settings-2"></i>
         <span>Equipos</span>
       </a>
-      <a href="#" class="mobile-nav-item fab-btn" data-target="tickets" onclick="abrirReportarFallaRapidaMobile(event)">
+      <a href="#" class="mobile-nav-item fab-btn" id="btn-reportar-falla-mobile" data-target="tickets" onclick="abrirReportarFallaRapidaMobile(event)">
         <i data-lucide="alert-triangle"></i>
         <span>Reportar</span>
       </a>

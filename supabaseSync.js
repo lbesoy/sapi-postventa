@@ -2536,7 +2536,7 @@ window.cargarDatosDeSupabase = function() {
     try {
       const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
       const rol = String(session.viewMode || '').toLowerCase().trim();
-      if (['empresa', 'cliente'].includes(rol)) {
+      if (['empresa', 'cliente', 'cliente-consultor'].includes(rol)) {
         isClientOrEmpresa = true;
       }
     } catch (e) {}

@@ -17,6 +17,7 @@ Para facilitar la consulta, hemos dividido la documentación en manuales especí
 | **Administrador / Supervisor** | Panel de Control Web (`index.html`) | 📙 [Manual del Administrador](file:///Users/pablobesoytrigueros/Library/CloudStorage/Dropbox/DESARROLLOS/Eurorep/manuales/manual_administrador.md) | Asignar tickets a técnicos, coordinar el calendario de campo, auditar reportes, controlar catálogos, generar reportes semanales de nómina y sincronizar con SAP B1. |
 | **Todo el Personal (Gastos)** | Módulo de Finanzas | 📕 [Manual de Control de Gastos](file:///Users/pablobesoytrigueros/Library/CloudStorage/Dropbox/DESARROLLOS/Eurorep/manuales/manual_gastos.md) | Registrar viáticos, subir comprobantes, vincular tarjetas corporativas Clara y realizar la conciliación automatizada. |
 | **Equipo de TI / Sistemas** | Código Fuente y Base de Datos | 📓 [Manual Técnico para Desarrolladores](file:///Users/pablobesoytrigueros/Library/CloudStorage/Dropbox/DESARROLLOS/Eurorep/manuales/manual_tecnico_desarrollador.md) | Arquitectura, funcionamiento del script de sincronización con SAP, middleware API, y políticas de seguridad (RLS) en Supabase. |
+| **Cualquier Rol / Gestión** | Ciclo de Vida y Estatus | 🎫 [Manual de Gestión de Tickets](file:///Users/pablobesoytrigueros/Library/CloudStorage/Dropbox/DESARROLLOS/Eurorep/manuales/manual_tickets.md) | Conocer cómo se crean los tickets, los Tickets-A de refacciones de campo, sus 6 etapas/estatus (Reportado, En Curso, Cotizado, En Proceso, Orden de Servicio, Cerrado), y los detonantes de transición. |
 
 ---
 

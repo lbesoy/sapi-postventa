@@ -13,7 +13,8 @@ manuals = [
     {"md": "manual_administrador.md", "pdf": "manual_administrador.pdf", "title": "Manual del Administrador - SAPI Postventa"},
     {"md": "manual_gastos.md", "pdf": "manual_gastos.pdf", "title": "Manual de Control de Gastos - SAPI Postventa"},
     {"md": "manual_tecnico_desarrollador.md", "pdf": "manual_tecnico_desarrollador.pdf", "title": "Manual de Referencia Técnica - SAPI Postventa"},
-    {"md": "manual_flujo_completo.md", "pdf": "manual_flujo_completo.pdf", "title": "Manual de Flujo Completo del Sistema - SAPI Postventa"}
+    {"md": "manual_flujo_completo.md", "pdf": "manual_flujo_completo.pdf", "title": "Manual de Flujo Completo del Sistema - SAPI Postventa"},
+    {"md": "manual_tickets.md", "pdf": "manual_tickets.pdf", "title": "Manual de Gestión de Tickets - SAPI Postventa"}
 ]
 
 # Estilos CSS para el PDF con los colores corporativos de Eurorep

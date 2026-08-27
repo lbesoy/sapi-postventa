@@ -1495,7 +1495,7 @@ async function iniciarSesionSubmit(e) {
 }
 
 function entrarApp(user) {
-  if (user && (user.rol === 'empresa' || user.rol === 'cliente')) {
+  if (user && (user.rol === 'empresa' || user.rol === 'cliente' || user.rol === 'cliente-consultor')) {
     console.log('[Auth] Redirigiendo cliente al Portal de Clientes (cliente)...');
     window.location.href = 'cliente';
     return;
@@ -2080,6 +2080,12 @@ function applyRole(rolKey) {
       cardIdeasFallas.style.display = (currentSession.realRol === 'superadmin') ? 'block' : 'none';
     }
 
+    // Show/hide merge machinery button (only for superadmins)
+    const btnMaqFusionar = document.getElementById('btn-maq-fusionar');
+    if (btnMaqFusionar) {
+      btnMaqFusionar.style.display = (currentSession.realRol === 'superadmin') ? 'flex' : 'none';
+    }
+
     // Show/hide weekly report button (ONLY superadmin or admin)
     const repSemBtn = document.getElementById('btn-reporte-semanal-tecnicos');
     if (repSemBtn) {
@@ -2124,11 +2130,11 @@ function applyRole(rolKey) {
     // Ocultar pestaña de Técnicos en el Dashboard para empresas/clientes
     const btnDashTecnicos = document.getElementById('btn-dash-tecnicos');
     if (btnDashTecnicos) {
-      btnDashTecnicos.style.display = ['empresa', 'cliente'].includes(rolKey) ? 'none' : 'inline-block';
+      btnDashTecnicos.style.display = ['empresa', 'cliente', 'cliente-consultor'].includes(rolKey) ? 'none' : 'inline-block';
     }
 
     // Ocultar campo y columna de Prioridad para empresas/clientes
-    const isCliente = ['empresa', 'cliente'].includes(rolKey);
+    const isCliente = ['empresa', 'cliente', 'cliente-consultor'].includes(rolKey);
     document.querySelectorAll('.col-prioridad, .col-asignado').forEach(el => el.style.display = isCliente ? 'none' : '');
     const groupPrioridad = document.getElementById('group-t-prioridad');
     if (groupPrioridad) {
@@ -2152,7 +2158,7 @@ function applyRole(rolKey) {
     
     const sessionRole = document.getElementById('session-role');
     if (sessionRole) {
-      const isClientRole = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+      const isClientRole = ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
       if (isClientRole && currentSession.empresa) {
         sessionRole.textContent = currentSession.empresa;
       } else {
@@ -2161,7 +2167,7 @@ function applyRole(rolKey) {
     }
 
     // Rename Maquinaria text if Empresa
-    const isEmpresa = rolKey === 'empresa';
+    const isEmpresa = ['empresa', 'cliente-consultor'].includes(rolKey);
     const navMaquinariaText = document.getElementById('nav-maquinaria-text');
     if (navMaquinariaText) navMaquinariaText.textContent = isEmpresa ? 'Mis máquinas' : 'Maquinaria';
 
@@ -2379,6 +2385,9 @@ function abrirModalIdeaFalla(id = null) {
       const descTextarea = document.getElementById('if-descripcion');
       if (descTextarea) descTextarea.value = item.descripcion || '';
 
+      const prioridadSelect = document.getElementById('if-prioridad');
+      if (prioridadSelect) prioridadSelect.value = item.prioridad || 'Media';
+
       const estadoSelect = document.getElementById('if-estado');
       if (estadoSelect) estadoSelect.value = item.estado || 'Pendiente';
     }
@@ -2407,6 +2416,7 @@ async function guardarIdeaFalla(e) {
   const tipo = document.querySelector('input[name="if-tipo"]:checked')?.value || 'Idea';
   const titulo = document.getElementById('if-titulo')?.value || '';
   const descripcion = document.getElementById('if-descripcion')?.value || '';
+  const prioridad = document.getElementById('if-prioridad')?.value || 'Media';
   const estado = editandoIdeaFallaId ? (document.getElementById('if-estado')?.value || 'Pendiente') : 'Pendiente';
 
   if (!titulo.trim()) {
@@ -2426,6 +2436,7 @@ async function guardarIdeaFalla(e) {
         tipo,
         titulo,
         descripcion,
+        prioridad,
         estado,
         updated_at: new Date().toISOString()
       };
@@ -2437,6 +2448,7 @@ async function guardarIdeaFalla(e) {
       tipo,
       titulo,
       descripcion,
+      prioridad,
       estado,
       creado_por: userNombre,
       creado_por_id: currentSession.userId,
@@ -2515,6 +2527,7 @@ function renderIdeasFallas() {
 
   const query = (document.getElementById('busqueda-idea-falla')?.value || '').toLowerCase().trim();
   const filtroTipo = document.getElementById('filtro-tipo-idea-falla')?.value || 'todos';
+  const filtroPrioridad = document.getElementById('filtro-prioridad-idea-falla')?.value || 'todos';
   const filtroEstado = document.getElementById('filtro-estado-idea-falla')?.value || 'todos';
 
   const filtrados = ideasFallasDb.filter(item => {
@@ -2526,10 +2539,13 @@ function renderIdeasFallas() {
     // Filtrar por tipo
     const matchTipo = filtroTipo === 'todos' || item.tipo === filtroTipo;
 
+    // Filtrar por prioridad
+    const matchPrioridad = filtroPrioridad === 'todos' || item.prioridad === filtroPrioridad;
+
     // Filtrar por estado
     const matchEstado = filtroEstado === 'todos' || item.estado === filtroEstado;
 
-    return matchQuery && matchTipo && matchEstado;
+    return matchQuery && matchTipo && matchPrioridad && matchEstado;
   });
 
   // Ordenar por fecha de creación descendente
@@ -2538,7 +2554,7 @@ function renderIdeasFallas() {
   if (filtrados.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="5" style="text-align:center; padding:2rem; color:var(--text-muted);">
+        <td colspan="6" style="text-align:center; padding:2rem; color:var(--text-muted);">
           No se encontraron registros de Ideas y Fallas.
         </td>
       </tr>
@@ -2562,6 +2578,9 @@ function renderIdeasFallas() {
       badgeStyle = 'background: rgba(239, 68, 68, 0.12); color: #ef4444;'; // Rechazado (red)
     }
 
+    // Prioridad del elemento
+    const prioVal = item.prioridad || 'Media';
+
     // Formatear fecha
     const fecha = item.created_at ? new Date(item.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
 
@@ -2574,7 +2593,16 @@ function renderIdeasFallas() {
         </td>
         <td>
           <div style="font-weight:600; color:var(--text-primary); margin-bottom:0.15rem;">${item.titulo}</div>
-          <div style="font-size:0.8rem; color:var(--text-secondary); white-space:pre-wrap; max-width: 500px;">${item.descripcion || '<span style="font-style:italic;color:var(--text-muted);">Sin descripción</span>'}</div>
+          <div style="font-size:0.8rem; color:var(--text-secondary); white-space:pre-wrap; max-width: 450px;">${item.descripcion || '<span style="font-style:italic;color:var(--text-muted);">Sin descripción</span>'}</div>
+        </td>
+        <td>
+          <select style="font-size:0.75rem; padding:0.25rem 0.4rem; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-card); color:var(--text-primary); outline:none; cursor:pointer;"
+            onchange="cambiarPrioridadIdeaFalla('${item.id}', this.value)">
+            <option value="Baja" ${prioVal === 'Baja' ? 'selected' : ''}>Baja</option>
+            <option value="Media" ${prioVal === 'Media' ? 'selected' : ''}>Media</option>
+            <option value="Alta" ${prioVal === 'Alta' ? 'selected' : ''}>Alta</option>
+            <option value="Crítica" ${prioVal === 'Crítica' ? 'selected' : ''}>Crítica</option>
+          </select>
         </td>
         <td>
           <div style="font-size:0.85rem; font-weight:500;">${item.creado_por || 'Sistema'}</div>
@@ -2609,11 +2637,34 @@ function renderIdeasFallas() {
   lucide.createIcons();
 }
 
+async function cambiarPrioridadIdeaFalla(id, nuevaPrioridad) {
+  const item = ideasFallasDb.find(x => x.id === id);
+  if (!item) return;
+
+  item.prioridad = nuevaPrioridad;
+  item.updated_at = new Date().toISOString();
+
+  localStorage.setItem('sapi_ideas_fallas', JSON.stringify(ideasFallasDb));
+  renderIdeasFallas();
+
+  if (window.pushToSupabase) {
+    try {
+      await window.pushToSupabase('ideas_fallas', item);
+      if (typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion('Prioridad actualizada y sincronizada.', 'success');
+      }
+    } catch (err) {
+      console.error('[IdeasFallas] Error al cambiar prioridad en Supabase:', err);
+    }
+  }
+}
+
 // Exponer funciones al objeto global window para que funcionen los onclicks del HTML
 window.abrirModalIdeaFalla = abrirModalIdeaFalla;
 window.cerrarModalIdeaFalla = cerrarModalIdeaFalla;
 window.guardarIdeaFalla = guardarIdeaFalla;
 window.cambiarEstadoIdeaFalla = cambiarEstadoIdeaFalla;
+window.cambiarPrioridadIdeaFalla = cambiarPrioridadIdeaFalla;
 window.eliminarIdeaFalla = eliminarIdeaFalla;
 window.renderIdeasFallas = renderIdeasFallas;
 
@@ -3640,7 +3691,7 @@ function abrirModalUsuario(id) {
     const radio = document.querySelector(`input[name="u-rol"][value="${u.rol}"]`);
     if (radio) {
       radio.checked = true;
-      if (u.rol === 'empresa' || u.rol === 'cliente') {
+      if (u.rol === 'empresa' || u.rol === 'cliente' || u.rol === 'cliente-consultor') {
         if (uEmpresaContainer) uEmpresaContainer.style.display = 'block';
       }
     }
@@ -3659,7 +3710,7 @@ function abrirModalUsuario(id) {
 function toggleEmpresaField(radio) {
   const container = document.getElementById('u-empresa-container');
   if (!container) return;
-  if (radio.value === 'empresa' || radio.value === 'cliente') {
+  if (radio.value === 'empresa' || radio.value === 'cliente' || radio.value === 'cliente-consultor') {
     container.style.display = 'block';
   } else {
     container.style.display = 'none';
@@ -3774,7 +3825,7 @@ async function guardarUsuario(e) {
   }
 
   const updateData = { nombre, email, telefono, rol, activo: activo === true };
-  if (rol === 'empresa' || rol === 'cliente') {
+  if (rol === 'empresa' || rol === 'cliente' || rol === 'cliente-consultor') {
     if (selectedEmpresas.length === 0) { alert('Selecciona al menos una empresa asociada.'); return; }
     updateData.empresa = firstEmpName;
   } else {
@@ -3807,7 +3858,7 @@ async function guardarUsuario(e) {
 
     if (delErr) {
       console.warn('[Supabase] Error al limpiar empresas anteriores:', delErr.message);
-    } else if (selectedEmpresas.length > 0 && (rol === 'empresa' || rol === 'cliente')) {
+    } else if (selectedEmpresas.length > 0 && (rol === 'empresa' || rol === 'cliente' || rol === 'cliente-consultor')) {
       const insertRows = selectedEmpresas.map(empId => ({
         usuario_id: editandoUserId,
         cliente_id: empId
@@ -3884,6 +3935,7 @@ function abrirSesionModal() {
             <option value="supervisor" ${currentSession.viewMode === 'supervisor' ? 'selected' : ''}>Supervisor</option>
             <option value="tecnico" ${currentSession.viewMode === 'tecnico' ? 'selected' : ''}>Técnico</option>
             <option value="empresa" ${currentSession.viewMode === 'empresa' ? 'selected' : ''}>Empresa</option>
+            <option value="cliente-consultor" ${currentSession.viewMode === 'cliente-consultor' ? 'selected' : ''}>Cliente Consultor</option>
             <option value="consulta" ${currentSession.viewMode === 'consulta' ? 'selected' : ''}>Consulta</option>
           </select>
           <div style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-muted); font-size: 0.85rem;">▼</div>
@@ -4079,7 +4131,7 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
   tbody.innerHTML = '';
   
   // Obtenemos los filtros base (si es cliente)
-  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   let nombreEmpresaLogged = null;
   if (isEmpresa && currentUser) {
@@ -4291,7 +4343,7 @@ function _renderStatsInternal() {
   let ordenesFilter = getFilteredOrders();
   let ticketsFilter = getFilteredTickets();
 
-  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   const hasEmpresa = currentUser ? !!(currentUser.empresa && String(currentUser.empresa).trim() !== '') : false;
 
@@ -4607,7 +4659,7 @@ function renderDashboardV2() {
   const el = document.getElementById('v2-fecha-hoy');
   if (el) el.textContent = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
-  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   let nombreEmpresaLogged = null;
   if (isEmpresa && currentUser) {
@@ -5498,7 +5550,7 @@ function renderTabla(ctx) {
   let supFilter = document.getElementById('filter-ord-supervisor')?.value;
   
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
-  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
   
   if (isEmpresa) {
     let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
@@ -6203,7 +6255,7 @@ function renderClientes() {
   
   // Incluir usuarios que son empresas o clientes, agrupándolos por su empresa
   usuarios.forEach(u => {
-    if (u.rol === 'empresa' || u.rol === 'cliente') {
+    if (u.rol === 'empresa' || u.rol === 'cliente' || u.rol === 'cliente-consultor') {
       const nomEmpresa = u.empresa || u.nombre; // Fallback for old users
       if (!mergedClientes.find(c => (c.nombre || '').toLowerCase() === (nomEmpresa || '').toLowerCase())) {
         mergedClientes.push({ nombre: nomEmpresa, id: u.id, ubicacion: 'Usuario registrado' });
@@ -7721,6 +7773,153 @@ function cerrarModalAgregarMaquina(e) {
   editandoMaquinaId = null;
   editandoMaquinaCliente = null;
 }
+
+// ===== FUSIONAR MAQUINARIAS HELPER FUNCTIONS (Solo Superadmins) =====
+window.abrirModalFusionarMaquinas = function() {
+  const modalOverlay = document.getElementById('modal-fusionar-maquinas-overlay');
+  const selOrigen = document.getElementById('fm-maquina-origen');
+  const selDestino = document.getElementById('fm-maquina-destino');
+  const checkboxConfirm = document.getElementById('fm-confirmar');
+  const formEl = document.getElementById('form-fusionar-maquinas');
+
+  if (formEl) formEl.reset();
+
+  if (selOrigen && selDestino) {
+    // Limpiar opciones anteriores
+    selOrigen.innerHTML = '<option value="">Selecciona la máquina a eliminar...</option>';
+    selDestino.innerHTML = '<option value="">Selecciona la máquina a conservar...</option>';
+
+    // Ordenar maquinariaDb por marca/modelo
+    const sortedMaq = [...maquinariaDb].sort((a, b) => {
+      const brandA = (a.marca || '').toLowerCase();
+      const brandB = (b.marca || '').toLowerCase();
+      if (brandA !== brandB) return brandA.localeCompare(brandB);
+      return (a.modelo || '').toLowerCase().localeCompare((b.modelo || '').toLowerCase());
+    });
+
+    // Rellenar las opciones
+    sortedMaq.forEach(m => {
+      const brand = m.marca || 'Sin Marca';
+      const model = m.modelo || 'Sin Modelo';
+      const serial = m.serie || 'Sin Serie';
+      const eco = m.numeroEconomico && m.numeroEconomico !== 'N/A' ? ` [Eco: ${m.numeroEconomico}]` : '';
+      const cli = m.cliente || 'Sin Cliente';
+      const label = `[${brand}] ${model} - ${serial}${eco} (Cliente: ${cli})`;
+      
+      const opt1 = document.createElement('option');
+      opt1.value = m.id;
+      opt1.textContent = label;
+      selOrigen.appendChild(opt1);
+
+      const opt2 = document.createElement('option');
+      opt2.value = m.id;
+      opt2.textContent = label;
+      selDestino.appendChild(opt2);
+    });
+  }
+
+  if (modalOverlay) modalOverlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  lucide.createIcons();
+};
+
+window.cerrarModalFusionarMaquinas = function(e) {
+  const modalOverlay = document.getElementById('modal-fusionar-maquinas-overlay');
+  if (e && e.target !== modalOverlay) return;
+  if (modalOverlay) modalOverlay.classList.remove('open');
+  document.body.style.overflow = '';
+};
+
+window.fusionarMaquinarias = async function(e) {
+  if (e) e.preventDefault();
+
+  const idOrigen = document.getElementById('fm-maquina-origen')?.value;
+  const idDestino = document.getElementById('fm-maquina-destino')?.value;
+  const confirmed = document.getElementById('fm-confirmar')?.checked;
+
+  if (!idOrigen || !idDestino) {
+    mostrarNotificacion('Por favor selecciona ambas maquinarias.', 'warning');
+    return;
+  }
+
+  if (idOrigen === idDestino) {
+    mostrarNotificacion('La máquina origen y destino no pueden ser la misma.', 'warning');
+    return;
+  }
+
+  if (!confirmed) {
+    mostrarNotificacion('Por favor confirma la advertencia de fusión.', 'warning');
+    return;
+  }
+
+  const maquinaOrigen = maquinariaDb.find(m => m.id === idOrigen);
+  const maquinaDestino = maquinariaDb.find(m => m.id === idDestino);
+
+  if (!maquinaOrigen || !maquinaDestino) {
+    mostrarNotificacion('No se pudo encontrar una de las maquinarias seleccionadas.', 'error');
+    return;
+  }
+
+  const confirmMsg = `¿Estás completamente seguro de que deseas fusionar:\n\n` +
+                     `❌ ELIMINAR: [${maquinaOrigen.marca}] ${maquinaOrigen.modelo} (Serie: ${maquinaOrigen.serie})\n` +
+                     `➡️ CONSERVAR EN: [${maquinaDestino.marca}] ${maquinaDestino.modelo} (Serie: ${maquinaDestino.serie})?\n\n` +
+                     `Esta acción moverá todas las órdenes de servicio, horómetros y levantamientos asociados en la base de datos de producción.`;
+
+  if (!confirm(confirmMsg)) {
+    return;
+  }
+
+  mostrarNotificacion('Iniciando fusión de maquinarias...', 'info');
+
+  if (window.supabaseClient) {
+    try {
+      // Llamar a la función RPC en Supabase
+      const { error } = await window.supabaseClient.rpc('fusionar_maquinarias', {
+        maquina_origen_id: idOrigen,
+        maquina_destino_id: idDestino
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      mostrarNotificacion('Fusión completada con éxito en Supabase.', 'success');
+      cerrarModalFusionarMaquinas();
+
+      // Recargar datos desde la nube
+      window._syncPromise = null;
+      if (typeof window.cargarDatosDeSupabase === 'function') {
+        await window.cargarDatosDeSupabase();
+      }
+    } catch (err) {
+      console.error('Error al fusionar maquinarias:', err);
+      mostrarNotificacion('Error al fusionar maquinarias: ' + (err.message || err), 'error');
+    }
+  } else {
+    // Fallback local
+    ordenes.forEach(o => {
+      if (o.maquinaria_id === idOrigen) {
+        o.maquinaria_id = idDestino;
+      }
+    });
+    
+    levantamientos.forEach(l => {
+      if (l.maquina === idOrigen) {
+        l.maquina = idDestino;
+      }
+    });
+    
+    maquinariaDb = maquinariaDb.filter(m => m.id !== idOrigen);
+
+    safeSetJSON('sapi_ordenes', ordenes);
+    safeSetJSON('sapi_levantamientos', levantamientos);
+    safeSetJSON('sapi_maquinaria_db', maquinariaDb);
+
+    mostrarNotificacion('Fusión completada localmente (Modo Offline).', 'success');
+    cerrarModalFusionarMaquinas();
+    renderMaquinaria();
+  }
+};
 
 function toggleVentaTercero() {
   const isTercero = document.getElementById('am-venta-tercero').checked;
@@ -14791,7 +14990,7 @@ function updateTicketBadge() {
   let filtered = getFilteredTickets();
   
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
-  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
   
   if (isEmpresa) {
     let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
@@ -14888,7 +15087,7 @@ function updateOrdenesBadge() {
   let filtered = getFilteredOrders();
   
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
-  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
   
   if (isEmpresa) {
     let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
@@ -15261,7 +15460,7 @@ function renderTickets(ctx) {
     });
     
     const currentUser = usuarios.find(u => u && u.id === currentSession.userId);
-    const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+    const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
   
     let tecFilter = '';
     let supFilter = '';
@@ -15526,7 +15725,7 @@ function renderMaquinaria() {
   const q = (document.getElementById('search-maquinaria')?.value || '').toLowerCase();
   
   // Si es rol empresa, solo vemos las suyas (usando el nombre del user logueado)
-  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
   if (nombreEmpresaLogged) nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
@@ -16176,7 +16375,7 @@ function renderRefaccionesPendientes() {
   if (piecesBody) piecesBody.innerHTML = '';
   
   const currentUser = usuarios.find(u => u && u.id === currentSession.userId);
-  const isEmpresa = ['empresa', 'cliente'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
   
   window.obtenerOrdenAsociadaATicketRefacciones = function(t) {
     if (!t || !t.folio) return null;
@@ -21643,18 +21842,40 @@ async function eliminarTicket(id) {
   updateTicketBadge(); updateOrdenesBadge();
 }
 
-// ===== COMENTARIOS INTERNOS HELPER FUNCTIONS =====
+// ===== COMENTARIOS INTERNOS Y EXTERNOS HELPER FUNCTIONS =====
 window.renderComentariosInternosHtml = function(t) {
-  if (['empresa', 'cliente'].includes(window.currentSession?.viewMode)) {
-    return '';
-  }
-
+  const isClientView = ['empresa', 'cliente', 'cliente-consultor'].includes(window.currentSession?.viewMode);
+  
   const currentUser = usuarios.find(u => u && u.id === window.currentSession?.userId);
   const currentUserName = currentUser ? currentUser.nombre : '';
 
-  const listHtml = (t.comentariosInternos && t.comentariosInternos.length > 0)
-    ? t.comentariosInternos.map(c => {
-        const isMe = c.usuario === currentUserName;
+  // 1. Renderizar lista de comentarios internos (para staff)
+  let listInternosHtml = '';
+  if (!isClientView) {
+    listInternosHtml = (t.comentariosInternos && t.comentariosInternos.length > 0)
+      ? t.comentariosInternos.map(c => {
+          const isMe = c.usuario === currentUserName;
+          const alignStyle = isMe
+            ? 'align-self: flex-end; background: rgba(232, 130, 12, 0.08); border-left: 3px solid var(--accent);'
+            : 'align-self: flex-start; background: var(--bg-card); border-left: 3px solid var(--border);';
+          
+          return `
+            <div style="max-width: 85%; padding: 0.6rem 0.8rem; border-radius: 8px; box-shadow: var(--shadow-sm); ${alignStyle}">
+              <div style="display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 0.25rem; align-items: center;">
+                <span style="font-weight: 700; font-size: 0.75rem; color: ${isMe ? 'var(--accent)' : 'var(--text-primary)'};">${c.usuario}</span>
+                <span style="font-size: 0.65rem; color: var(--text-muted); font-family: monospace;">${formatFechaHoraAmigable(c.fecha)}</span>
+              </div>
+              <div style="font-size: 0.85rem; white-space: pre-wrap; color: var(--text-primary); line-height: 1.35; font-family: inherit;">${c.texto}</div>
+            </div>
+          `;
+        }).join('')
+      : `<div style="text-align: center; color: var(--text-muted); font-style: italic; font-size: 0.8rem; padding: 1.5rem 0;">No hay comentarios de seguimiento registrados en este ticket.</div>`;
+  }
+
+  // 2. Renderizar lista de comentarios externos (clientes)
+  const listClientesHtml = (t.comentariosClientes && t.comentariosClientes.length > 0)
+    ? t.comentariosClientes.map(c => {
+        const isMe = c.usuario === currentUserName || c.usuario === 'Soporte' || c.usuario === 'EuroRep';
         const alignStyle = isMe
           ? 'align-self: flex-end; background: rgba(232, 130, 12, 0.08); border-left: 3px solid var(--accent);'
           : 'align-self: flex-start; background: var(--bg-card); border-left: 3px solid var(--border);';
@@ -21669,26 +21890,117 @@ window.renderComentariosInternosHtml = function(t) {
           </div>
         `;
       }).join('')
-    : `<div style="text-align: center; color: var(--text-muted); font-style: italic; font-size: 0.8rem; padding: 1.5rem 0;">No hay comentarios de seguimiento registrados en este ticket.</div>`;
+    : `<div style="text-align: center; color: var(--text-muted); font-style: italic; font-size: 0.8rem; padding: 1.5rem 0;">No hay comentarios de cliente registrados en este ticket.</div>`;
+
+  if (isClientView) {
+    // Si es vista cliente, mostrar únicamente los externos
+    return `
+      <div class="detalle-section" style="border-top:1px dashed var(--border); padding-top:1.25rem; margin-top:1.5rem;">
+        <div class="detalle-section-title" style="display:flex; align-items:center; gap:0.5rem; text-transform: uppercase;"><i data-lucide="message-square" style="width:16px;height:16px;"></i> Comentarios y Mensajes</div>
+        
+        <div class="chat-container" style="max-height: 200px; overflow-y: auto; padding: 0.75rem; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+          ${listClientesHtml}
+        </div>
+
+        <div class="chat-input-wrapper" style="display: flex; gap: 0.5rem; align-items: stretch;">
+          <textarea id="chat-new-comment-externo" placeholder="Escribe un mensaje para soporte..." rows="2" style="flex: 1; resize: none; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+          <button type="button" class="btn-primary" onclick="window.agregarComentarioExterno('${t.id}')" style="background: var(--accent); border-color: var(--accent); border-radius: 8px; padding: 0 1rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem; cursor: pointer; font-weight: 600; font-size: 0.85rem; color: white;">
+            <i data-lucide="send" style="width: 14px; height: 14px;"></i> Enviar
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  // Vista staff: Mostrar interfaz con pestañas
+  const activeTab = window._activeCommentTab || 'internos';
+  const isInternosActive = activeTab === 'internos';
+  
+  const tabInternosBtnStyle = isInternosActive
+    ? 'color: var(--accent); border-bottom: 2px solid var(--accent); font-weight: 700;'
+    : 'color: var(--text-muted); border-bottom: 2px solid transparent; font-weight: 600;';
+    
+  const tabExternosBtnStyle = !isInternosActive
+    ? 'color: var(--accent); border-bottom: 2px solid var(--accent); font-weight: 700;'
+    : 'color: var(--text-muted); border-bottom: 2px solid transparent; font-weight: 600;';
+
+  const containerInternosDisplay = isInternosActive ? 'block' : 'none';
+  const containerExternosDisplay = !isInternosActive ? 'block' : 'none';
 
   return `
     <div class="detalle-section" style="border-top:1px dashed var(--border); padding-top:1.25rem; margin-top:1.5rem;">
-      <div class="detalle-section-title" style="display:flex; align-items:center; gap:0.5rem; text-transform: uppercase;"><i data-lucide="message-square" style="width:16px;height:16px;"></i> Seguimiento y Comentarios Internos</div>
-      
-      <!-- Caja de comentarios (Chat) -->
-      <div class="chat-container" style="max-height: 200px; overflow-y: auto; padding: 0.75rem; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
-        ${listHtml}
+      <!-- Cabecera de Pestañas -->
+      <div class="comments-tab-header" style="display: flex; border-bottom: 1px solid var(--border); margin-bottom: 1rem; gap: 1rem;">
+        <button type="button" id="tab-btn-internos" onclick="window.switchCommentTab('internos')" style="background: none; border: none; padding: 0.5rem 1rem; ${tabInternosBtnStyle} font-size: 0.85rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 0.35rem; outline: none;">
+          <i data-lucide="lock" style="width:14px; height:14px;"></i> Comentarios Internos
+        </button>
+        <button type="button" id="tab-btn-externos" onclick="window.switchCommentTab('externos')" style="background: none; border: none; padding: 0.5rem 1rem; ${tabExternosBtnStyle} font-size: 0.85rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 0.35rem; outline: none;">
+          <i data-lucide="message-square" style="width:14px; height:14px;"></i> Visibles para Cliente
+        </button>
       </div>
 
-      <!-- Input para nuevo comentario -->
-      <div class="chat-input-wrapper" style="display: flex; gap: 0.5rem; align-items: stretch;">
-        <textarea id="chat-new-comment" placeholder="Escribe un comentario interno..." rows="2" style="flex: 1; resize: none; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
-        <button type="button" class="btn-primary" onclick="window.agregarComentarioInterno('${t.id}')" style="background: var(--accent); border-color: var(--accent); border-radius: 8px; padding: 0 1rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem; cursor: pointer; font-weight: 600; font-size: 0.85rem; color: white;">
-          <i data-lucide="send" style="width: 14px; height: 14px;"></i> Enviar
-        </button>
+      <!-- Contenedor Comentarios Internos -->
+      <div id="comments-container-internos" style="display: ${containerInternosDisplay};">
+        <div class="chat-container" style="max-height: 200px; overflow-y: auto; padding: 0.75rem; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+          ${listInternosHtml}
+        </div>
+        <div class="chat-input-wrapper" style="display: flex; gap: 0.5rem; align-items: stretch;">
+          <textarea id="chat-new-comment" placeholder="Escribe un comentario interno..." rows="2" style="flex: 1; resize: none; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+          <button type="button" class="btn-primary" onclick="window.agregarComentarioInterno('${t.id}')" style="background: var(--accent); border-color: var(--accent); border-radius: 8px; padding: 0 1rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem; cursor: pointer; font-weight: 600; font-size: 0.85rem; color: white;">
+            <i data-lucide="send" style="width: 14px; height: 14px;"></i> Enviar
+          </button>
+        </div>
+      </div>
+
+      <!-- Contenedor Comentarios Externos -->
+      <div id="comments-container-externos" style="display: ${containerExternosDisplay};">
+        <div class="chat-container" style="max-height: 200px; overflow-y: auto; padding: 0.75rem; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+          ${listClientesHtml}
+        </div>
+        <div class="chat-input-wrapper" style="display: flex; gap: 0.5rem; align-items: stretch;">
+          <textarea id="chat-new-comment-externo" placeholder="Escribe un comentario visible para el cliente..." rows="2" style="flex: 1; resize: none; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+          <button type="button" class="btn-primary" onclick="window.agregarComentarioExterno('${t.id}')" style="background: var(--accent); border-color: var(--accent); border-radius: 8px; padding: 0 1rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem; cursor: pointer; font-weight: 600; font-size: 0.85rem; color: white;">
+            <i data-lucide="send" style="width: 14px; height: 14px;"></i> Enviar
+          </button>
+        </div>
       </div>
     </div>
   `;
+};
+
+window.switchCommentTab = function(tab) {
+  const btnInternos = document.getElementById('tab-btn-internos');
+  const btnExternos = document.getElementById('tab-btn-externos');
+  const contInternos = document.getElementById('comments-container-internos');
+  const contExternos = document.getElementById('comments-container-externos');
+  
+  if (!btnInternos || !btnExternos || !contInternos || !contExternos) return;
+  
+  if (tab === 'internos') {
+    btnInternos.style.color = 'var(--accent)';
+    btnInternos.style.borderBottom = '2px solid var(--accent)';
+    btnInternos.style.fontWeight = '700';
+    
+    btnExternos.style.color = 'var(--text-muted)';
+    btnExternos.style.borderBottom = '2px solid transparent';
+    btnExternos.style.fontWeight = '600';
+    
+    contInternos.style.display = 'block';
+    contExternos.style.display = 'none';
+    window._activeCommentTab = 'internos';
+  } else {
+    btnExternos.style.color = 'var(--accent)';
+    btnExternos.style.borderBottom = '2px solid var(--accent)';
+    btnExternos.style.fontWeight = '700';
+    
+    btnInternos.style.color = 'var(--text-muted)';
+    btnInternos.style.borderBottom = '2px solid transparent';
+    btnInternos.style.fontWeight = '600';
+    
+    contInternos.style.display = 'none';
+    contExternos.style.display = 'block';
+    window._activeCommentTab = 'externos';
+  }
 };
 
 window.agregarComentarioInterno = async function(ticketId) {
@@ -21741,6 +22053,70 @@ window.agregarComentarioInterno = async function(ticketId) {
   }
 };
 
+window.agregarComentarioExterno = async function(ticketId) {
+  const textarea = document.getElementById('chat-new-comment-externo');
+  if (!textarea) return;
+  const text = textarea.value.trim();
+  if (!text) return;
+
+  const t = tickets.find(x => x.id === ticketId);
+  if (!t) {
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion('Ticket no encontrado.', 'error');
+    } else {
+      alert('Ticket no encontrado.');
+    }
+    return;
+  }
+
+  const currentUser = usuarios.find(u => u && u.id === window.currentSession?.userId);
+  const userName = currentUser ? currentUser.nombre : (window.nombreEmpresaLogged || window.currentSession?.nombre || 'Soporte');
+
+  const nuevoMensaje = {
+    usuario: userName,
+    fecha: new Date().toISOString(),
+    texto: text
+  };
+
+  if (!t.comentariosClientes) {
+    t.comentariosClientes = [];
+  }
+
+  if (window.supabaseClient) {
+    try {
+      const tClone = JSON.parse(JSON.stringify(t));
+      if (!tClone.comentariosClientes) tClone.comentariosClientes = [];
+      tClone.comentariosClientes.push(nuevoMensaje);
+      
+      await window.pushToSupabase('tickets', tClone);
+      
+      t.comentariosClientes.push(nuevoMensaje);
+      safeSetJSON('sapi_tickets', tickets);
+      if (typeof mostrarNotificacion === 'function') {
+        mostrarNotificacion('Comentario externo enviado.', 'success');
+      }
+      
+      if (typeof verDetalleTicket === 'function') {
+        verDetalleTicket(ticketId);
+      }
+    } catch (err) {
+      console.error('Error al guardar comentario en Supabase:', err);
+      if (typeof mostrarNotificacion === 'function') {
+        mostrarNotificacion('Error al guardar el comentario. Verifica tus permisos o conexión.', 'error');
+      }
+    }
+  } else {
+    t.comentariosClientes.push(nuevoMensaje);
+    safeSetJSON('sapi_tickets', tickets);
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion('Comentario guardado localmente.', 'success');
+    }
+    if (typeof verDetalleTicket === 'function') {
+      verDetalleTicket(ticketId);
+    }
+  }
+};
+
 
 
 // ===== DETALLE TICKET =====
@@ -21764,7 +22140,7 @@ function verDetalleTicket(id) {
         ${field('Canal', t.canal ? ({correo:'Correo',whatsapp:'WhatsApp',telefono:'Llamada Tel.'}[t.canal]||t.canal) : '—')}
         ${field('Contacto', t.contacto)}
         ${field('Estado', `<span class="badge badge-${badgeTicketEstado(t)}">${getTicketEstadoLabel(t)}</span>`)}
-        ${!['empresa', 'cliente'].includes(currentSession.viewMode) ? field('Prioridad', `<span class="badge badge-${(t.prioridad||'media').toLowerCase()}">${t.prioridad}</span>`) : ''}
+        ${!['empresa', 'cliente', 'cliente-consultor'].includes(currentSession.viewMode) ? field('Prioridad', `<span class="badge badge-${(t.prioridad||'media').toLowerCase()}">${t.prioridad}</span>`) : ''}
         ${field('Solicitante', t.solicitante)}
         ${field('Creado por', t.creadoPor)}
         ${field('Área', t.area)}
@@ -31610,7 +31986,7 @@ function obtenerTodosLosClientes() {
   const merged = [...clientesDb];
   
   usuarios.forEach(u => {
-    if (u.rol === 'empresa' || u.rol === 'cliente') {
+    if (u.rol === 'empresa' || u.rol === 'cliente' || u.rol === 'cliente-consultor') {
       const nomEmpresa = u.empresa || u.nombre;
       if (!merged.find(c => (c.nombre || '').toLowerCase() === (nomEmpresa || '').toLowerCase())) {
         merged.push({ nombre: nomEmpresa, id: u.id, ubicacion: 'Usuario registrado' });
