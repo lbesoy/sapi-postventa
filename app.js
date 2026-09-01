@@ -974,6 +974,10 @@ window.addEventListener('supabase_datos_cargados', async () => {
     if (typeof renderChatSoporteEmpresa === 'function' && document.getElementById('view-chat-soporte')?.classList.contains('active')) {
       renderChatSoporteEmpresa();
     }
+    if (document.getElementById('view-preferencias')?.classList.contains('active')) {
+      if (typeof renderServiciosProgramadosTecnico === 'function') renderServiciosProgramadosTecnico();
+      if (typeof renderIdeasFallas === 'function') renderIdeasFallas();
+    }
     
     // Re-aplicar rol para asegurar que el role-switcher se muestre si el usuario recién se descargó
     if (currentSession && currentSession.viewMode) {
@@ -2029,6 +2033,9 @@ function actualizarVistaActual() {
   if (typeof window.renderTelemetryDashboard === 'function') {
     try { window.renderTelemetryDashboard(); } catch(e){}
   }
+  if (typeof renderIdeasFallas === 'function') {
+    try { renderIdeasFallas(); } catch(e){}
+  }
 }
 
 window.toggleTestMode = toggleTestMode;
@@ -2074,10 +2081,10 @@ function applyRole(rolKey) {
     const roleSwitcher = document.getElementById('role-switcher');
     if (roleSwitcher) roleSwitcher.style.display = (currentSession.realRol === 'superadmin') ? 'flex' : 'none';
 
-    // Show/hide Ideas y Fallas card (only for superadmins)
+    // Show Ideas y Fallas card in preferencias for all roles
     const cardIdeasFallas = document.getElementById('card-ideas-fallas');
     if (cardIdeasFallas) {
-      cardIdeasFallas.style.display = (currentSession.realRol === 'superadmin') ? 'block' : 'none';
+      cardIdeasFallas.style.display = 'block';
     }
 
     // Show/hide merge machinery button (only for superadmins)
@@ -2091,6 +2098,13 @@ function applyRole(rolKey) {
     if (repSemBtn) {
       const isAdmin = ['superadmin', 'admin'].includes(rolKey);
       repSemBtn.style.display = isAdmin ? 'flex' : 'none';
+    }
+
+    // Show/hide Automatizaciones y Plantillas subtab button (ONLY superadmin or admin)
+    const btnSubtabAuto = document.getElementById('btn-subtab-automatizaciones');
+    if (btnSubtabAuto) {
+      const isAdmin = ['superadmin', 'admin'].includes(rolKey);
+      btnSubtabAuto.style.display = isAdmin ? 'flex' : 'none';
     }
 
     // Sync role selector in modal if present
@@ -2220,7 +2234,13 @@ function updateTopbarButtons(view, role) {
     if (btnTicket && !['consulta', 'tecnico'].includes(role)) btnTicket.style.display = '';
   } else if (view === 'clientes') {
     if (btnCliente && allowedToCreateClientsAndMachines) btnCliente.style.display = '';
-    if (btnMaquina && allowedToCreateClientsAndMachines) btnMaquina.style.display = '';
+    const portalTab = document.getElementById('btn-tab-cli-portal');
+    const isPortalActive = portalTab && portalTab.classList.contains('active');
+    if (btnMaquina && allowedToCreateClientsAndMachines && !isPortalActive) {
+      btnMaquina.style.display = '';
+    } else if (btnMaquina) {
+      btnMaquina.style.display = 'none';
+    }
   } else if (view === 'servicios') {
     if (btnOrden && ['superadmin', 'admin', 'supervisor'].includes(role)) btnOrden.style.display = '';
   } else if (view === 'levantamientos') {
@@ -2257,6 +2277,10 @@ function reRenderActiveView() {
     }
     if (view === 'dashboard') {
       renderStats();
+    }
+    if (view === 'preferencias') {
+      if (typeof renderServiciosProgramadosTecnico === 'function') renderServiciosProgramadosTecnico();
+      if (typeof renderIdeasFallas === 'function') renderIdeasFallas();
     }
   } catch (err) {
     console.error(`Error re-rendering active view "${view}" after role switch:`, err);
@@ -2354,7 +2378,7 @@ function cargarConfig() {
     setTimeout(() => { window.toggleOneDriveDemoMode(); }, 0);
   }
   
-  if (currentSession && currentSession.realRol === 'superadmin') {
+  if (typeof renderIdeasFallas === 'function') {
     renderIdeasFallas();
   }
 }
@@ -2362,7 +2386,43 @@ function cargarConfig() {
 // ─── IDEAS Y FALLAS MODULE ──────────────────────────────────────────────────
 let editandoIdeaFallaId = null;
 
+function puedeEditarIdeaFalla(item) {
+  if (!item) return false;
+  if (!currentSession) return false;
+  
+  // Superadmin en la vista activa tiene permisos completos de edición
+  if (currentSession.viewMode === 'superadmin') return true;
+  
+  const currentUserId = currentSession.userId;
+  const user = usuarios.find(u => u.id === currentUserId);
+  const currentUserName = (user ? user.nombre : (currentSession.nombre || '')).trim().toLowerCase();
+  
+  // 1. Comparar por ID de usuario creador
+  if (item.creado_por_id && currentUserId && String(item.creado_por_id) === String(currentUserId)) {
+    return true;
+  }
+  
+  // 2. Comparar por nombre de usuario creador (para compatibilidad)
+  const itemAuthorName = (item.creado_por || '').trim().toLowerCase();
+  if (currentUserName && itemAuthorName && currentUserName === itemAuthorName) {
+    return true;
+  }
+  
+  return false;
+}
+
 function abrirModalIdeaFalla(id = null) {
+  const isSuperadmin = (currentSession && currentSession.viewMode === 'superadmin');
+  
+  if (id) {
+    const item = ideasFallasDb.find(x => x.id === id);
+    if (!item) return;
+    if (!puedeEditarIdeaFalla(item)) {
+      alert('Acceso denegado: Solo puedes editar los registros de ideas o fallas creados por ti.');
+      return;
+    }
+  }
+
   editandoIdeaFallaId = id || null;
   const modalTitle = document.getElementById('idea-falla-modal-title');
   const formEl = document.getElementById('form-idea-falla');
@@ -2372,7 +2432,7 @@ function abrirModalIdeaFalla(id = null) {
 
   if (id) {
     if (modalTitle) modalTitle.textContent = 'Editar Registro';
-    if (estadoContainer) estadoContainer.style.display = 'block';
+    if (estadoContainer) estadoContainer.style.display = isSuperadmin ? 'block' : 'none';
 
     const item = ideasFallasDb.find(x => x.id === id);
     if (item) {
@@ -2417,7 +2477,7 @@ async function guardarIdeaFalla(e) {
   const titulo = document.getElementById('if-titulo')?.value || '';
   const descripcion = document.getElementById('if-descripcion')?.value || '';
   const prioridad = document.getElementById('if-prioridad')?.value || 'Media';
-  const estado = editandoIdeaFallaId ? (document.getElementById('if-estado')?.value || 'Pendiente') : 'Pendiente';
+  const isSuperadmin = (currentSession && currentSession.viewMode === 'superadmin');
 
   if (!titulo.trim()) {
     alert('Por favor introduce un título válido.');
@@ -2425,19 +2485,29 @@ async function guardarIdeaFalla(e) {
   }
 
   const user = usuarios.find(u => u.id === currentSession.userId);
-  const userNombre = user ? user.nombre : (currentSession.nombre || 'SuperAdmin');
+  const userNombre = user ? user.nombre : (currentSession.nombre || 'Usuario');
 
   let item;
   if (editandoIdeaFallaId) {
     const idx = ideasFallasDb.findIndex(x => x.id === editandoIdeaFallaId);
     if (idx > -1) {
+      const existingItem = ideasFallasDb[idx];
+      if (!puedeEditarIdeaFalla(existingItem)) {
+        alert('Acceso denegado: Solo puedes editar los registros creados por ti.');
+        return;
+      }
+
+      const nuevoEstado = isSuperadmin && document.getElementById('if-estado')
+        ? (document.getElementById('if-estado').value || existingItem.estado || 'Pendiente')
+        : (existingItem.estado || 'Pendiente');
+
       ideasFallasDb[idx] = {
-        ...ideasFallasDb[idx],
+        ...existingItem,
         tipo,
         titulo,
         descripcion,
         prioridad,
-        estado,
+        estado: nuevoEstado,
         updated_at: new Date().toISOString()
       };
       item = ideasFallasDb[idx];
@@ -2449,9 +2519,10 @@ async function guardarIdeaFalla(e) {
       titulo,
       descripcion,
       prioridad,
-      estado,
+      estado: 'Pendiente',
       creado_por: userNombre,
-      creado_por_id: currentSession.userId,
+      creado_por_id: currentSession.userId || currentSession.realUserId,
+      orden: ideasFallasDb.length,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -2475,6 +2546,13 @@ async function guardarIdeaFalla(e) {
 }
 
 async function cambiarEstadoIdeaFalla(id, nuevoEstado) {
+  const isSuperadmin = (currentSession && currentSession.viewMode === 'superadmin');
+  if (!isSuperadmin) {
+    alert('Acceso denegado: Solo los superadministradores pueden cambiar el estado de una idea o falla.');
+    renderIdeasFallas();
+    return;
+  }
+
   const item = ideasFallasDb.find(x => x.id === id);
   if (!item) return;
 
@@ -2497,6 +2575,12 @@ async function cambiarEstadoIdeaFalla(id, nuevoEstado) {
 }
 
 async function eliminarIdeaFalla(id) {
+  const isSuperadmin = (currentSession && currentSession.viewMode === 'superadmin');
+  if (!isSuperadmin) {
+    alert('Acceso denegado: Solo los superadministradores pueden eliminar registros de ideas y fallas.');
+    return;
+  }
+
   if (!confirm('¿Estás seguro de que deseas eliminar este registro de Ideas/Fallas?')) {
     return;
   }
@@ -2525,6 +2609,8 @@ function renderIdeasFallas() {
   const tbody = document.getElementById('tabla-ideas-fallas-body');
   if (!tbody) return;
 
+  const isSuperadmin = (currentSession && currentSession.viewMode === 'superadmin');
+
   const query = (document.getElementById('busqueda-idea-falla')?.value || '').toLowerCase().trim();
   const filtroTipo = document.getElementById('filtro-tipo-idea-falla')?.value || 'todos';
   const filtroPrioridad = document.getElementById('filtro-prioridad-idea-falla')?.value || 'todos';
@@ -2548,13 +2634,20 @@ function renderIdeasFallas() {
     return matchQuery && matchTipo && matchPrioridad && matchEstado;
   });
 
-  // Ordenar por fecha de creación descendente
-  filtrados.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  // Ordenar por orden de priorización (campo orden) y luego por fecha descendente
+  filtrados.sort((a, b) => {
+    const ordenA = a.orden !== undefined ? a.orden : 999999;
+    const ordenB = b.orden !== undefined ? b.orden : 999999;
+    if (ordenA !== ordenB) {
+      return ordenA - ordenB;
+    }
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
 
   if (filtrados.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" style="text-align:center; padding:2rem; color:var(--text-muted);">
+        <td colspan="7" style="text-align:center; padding:2rem; color:var(--text-muted);">
           No se encontraron registros de Ideas y Fallas.
         </td>
       </tr>
@@ -2562,7 +2655,9 @@ function renderIdeasFallas() {
     return;
   }
 
-  tbody.innerHTML = filtrados.map(item => {
+  tbody.innerHTML = filtrados.map((item, idx) => {
+    const canEdit = puedeEditarIdeaFalla(item);
+
     // Colores y tags para tipos
     const tagColor = item.tipo === 'Idea' ? 'background:rgba(16, 185, 129, 0.12); color:#10b981;' : 'background:rgba(239, 68, 68, 0.12); color:#ef4444;';
     const tagEmoji = item.tipo === 'Idea' ? '💡' : '🐛';
@@ -2584,50 +2679,77 @@ function renderIdeasFallas() {
     // Formatear fecha
     const fecha = item.created_at ? new Date(item.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
 
+    const dragAttrs = isSuperadmin 
+      ? `draggable="true" 
+         ondragstart="window.handleDragStart(event, '${item.id}')" 
+         ondragover="window.handleDragOver(event)" 
+         ondragenter="window.handleDragEnter(event, this)" 
+         ondragleave="window.handleDragLeave(event, this)" 
+         ondrop="window.handleDrop(event, '${item.id}')" 
+         style="border-bottom: 1px solid var(--border-light, #f1f5f9); transition: background-color 0.15s; cursor: grab;"`
+      : `style="border-bottom: 1px solid var(--border-light, #f1f5f9); transition: background-color 0.15s;"`;
+
     return `
-      <tr style="border-bottom: 1px solid var(--border);">
-        <td>
+      <tr ${dragAttrs}
+          class="idea-falla-row"
+          onmouseover="this.style.backgroundColor='var(--bg-hover, #f8fafc)'" 
+          onmouseout="this.style.backgroundColor='transparent'">
+        <td style="text-align: center; vertical-align: middle; padding: 0.85rem 0.5rem;">
+          <div style="display: inline-flex; align-items: center; gap: 0.35rem; ${isSuperadmin ? 'cursor: grab;' : ''} color: var(--text-muted);">
+            <span style="font-weight: 700; color: var(--text-primary); font-size: 0.82rem; background: var(--bg-hover, #e2e8f0); padding: 0.15rem 0.4rem; border-radius: 4px; min-width: 22px; display: inline-block; text-align: center;">${idx + 1}</span>
+            ${isSuperadmin ? '<i data-lucide="grip-vertical" style="width: 14px; height: 14px; opacity: 0.7;"></i>' : ''}
+          </div>
+        </td>
+        <td style="padding: 0.85rem 1rem; vertical-align: middle;">
           <span style="display:inline-flex; align-items:center; gap:0.35rem; padding:0.25rem 0.6rem; border-radius:var(--radius-sm); font-size:0.75rem; font-weight:600; ${tagColor}">
             ${tagEmoji} ${item.tipo}
           </span>
         </td>
-        <td>
-          <div style="font-weight:600; color:var(--text-primary); margin-bottom:0.15rem;">${item.titulo}</div>
+        <td style="padding: 0.85rem 1rem; vertical-align: middle;">
+          <div style="font-weight:600; color:var(--text-primary); margin-bottom:0.15rem; font-size: 0.88rem;">${item.titulo}</div>
           <div style="font-size:0.8rem; color:var(--text-secondary); white-space:pre-wrap; max-width: 450px;">${item.descripcion || '<span style="font-style:italic;color:var(--text-muted);">Sin descripción</span>'}</div>
         </td>
-        <td>
-          <select style="font-size:0.75rem; padding:0.25rem 0.4rem; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-card); color:var(--text-primary); outline:none; cursor:pointer;"
-            onchange="cambiarPrioridadIdeaFalla('${item.id}', this.value)">
+        <td style="padding: 0.85rem 1rem; vertical-align: middle;">
+          <select ${canEdit ? '' : 'disabled'} style="font-size: 0.78rem; font-weight: 600; padding: 0.3rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); color: var(--text-primary); outline: none; ${canEdit ? 'cursor: pointer;' : 'cursor: default; opacity: 0.9;'} transition: border-color 0.15s;"
+            onchange="cambiarPrioridadIdeaFalla('${item.id}', this.value)"
+            onfocus="this.style.borderColor='var(--accent)'" 
+            onblur="this.style.borderColor='var(--border)'">
             <option value="Baja" ${prioVal === 'Baja' ? 'selected' : ''}>Baja</option>
             <option value="Media" ${prioVal === 'Media' ? 'selected' : ''}>Media</option>
             <option value="Alta" ${prioVal === 'Alta' ? 'selected' : ''}>Alta</option>
             <option value="Crítica" ${prioVal === 'Crítica' ? 'selected' : ''}>Crítica</option>
           </select>
         </td>
-        <td>
-          <div style="font-size:0.85rem; font-weight:500;">${item.creado_por || 'Sistema'}</div>
+        <td style="padding: 0.85rem 1rem; vertical-align: middle;">
+          <div style="font-size:0.85rem; font-weight:500; color: var(--text-primary);">${item.creado_por || 'Sistema'}</div>
           <div style="font-size:0.75rem; color:var(--text-muted);">${fecha}</div>
         </td>
-        <td>
-          <span class="badge" style="font-size:0.75rem; ${badgeStyle}">${estadoLabel}</span>
+        <td style="padding: 0.85rem 1rem; vertical-align: middle;">
+          <select ${isSuperadmin ? '' : 'disabled'} onchange="cambiarEstadoIdeaFalla('${item.id}', this.value)" 
+                  style="font-size: 0.72rem; font-weight: 700; padding: 0.25rem 0.55rem; border-radius: 20px; outline: none; ${isSuperadmin ? 'cursor: pointer;' : 'cursor: default; opacity: 0.9;'} border: 1px solid transparent; text-align: center; ${badgeStyle} transition: all 0.2s;">
+            <option value="Pendiente" ${item.estado === 'Pendiente' ? 'selected' : ''} style="background: var(--bg-card); color: var(--text-primary);">Pendiente</option>
+            <option value="En Progreso" ${item.estado === 'En Progreso' ? 'selected' : ''} style="background: var(--bg-card); color: var(--text-primary);">En Progreso</option>
+            <option value="Resuelto" ${item.estado === 'Resuelto' ? 'selected' : ''} style="background: var(--bg-card); color: var(--text-primary);">Resuelto</option>
+            <option value="Rechazado" ${item.estado === 'Rechazado' ? 'selected' : ''} style="background: var(--bg-card); color: var(--text-primary);">Rechazado</option>
+          </select>
         </td>
-        <td style="text-align:right; white-space:nowrap;">
-          <div style="display:inline-flex; align-items:center; gap:0.4rem;">
-            <select style="font-size:0.75rem; padding:0.25rem 0.4rem; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-card); color:var(--text-primary); outline:none; cursor:pointer;"
-              onchange="cambiarEstadoIdeaFalla('${item.id}', this.value)">
-              <option value="Pendiente" ${item.estado === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
-              <option value="En Progreso" ${item.estado === 'En Progreso' ? 'selected' : ''}>En Progreso</option>
-              <option value="Resuelto" ${item.estado === 'Resuelto' ? 'selected' : ''}>Resuelto</option>
-              <option value="Rechazado" ${item.estado === 'Rechazado' ? 'selected' : ''}>Rechazado</option>
-            </select>
-            <button class="action-btn" title="Editar" onclick="abrirModalIdeaFalla('${item.id}')"
-              style="padding:0.25rem; background:none; border:none; cursor:pointer; color:var(--text-secondary); display:inline-flex; align-items:center; justify-content:center;">
-              <i data-lucide="edit" style="width:16px; height:16px;"></i>
-            </button>
-            <button class="action-btn" title="Eliminar" onclick="eliminarIdeaFalla('${item.id}')"
-              style="padding:0.25rem; background:none; border:none; cursor:pointer; color:var(--text-secondary); display:inline-flex; align-items:center; justify-content:center;">
-              <i data-lucide="trash-2" style="width:16px; height:16px;"></i>
-            </button>
+        <td style="padding: 0.85rem 1rem; vertical-align: middle; text-align: right; white-space: nowrap;">
+          <div style="display: inline-flex; gap: 0.35rem; align-items: center;">
+            ${canEdit ? `
+              <button class="action-btn" title="Editar" onclick="abrirModalIdeaFalla('${item.id}')"
+                style="padding: 0.35rem; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; color: var(--text-secondary); display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s;">
+                <i data-lucide="edit" style="width: 14px; height: 14px;"></i>
+              </button>
+            ` : ''}
+            ${isSuperadmin ? `
+              <button class="action-btn del" title="Eliminar" onclick="eliminarIdeaFalla('${item.id}')"
+                style="padding: 0.35rem; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; color: var(--red); display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s;">
+                <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+              </button>
+            ` : ''}
+            ${!canEdit && !isSuperadmin ? `
+              <span style="color: var(--text-muted); font-size: 0.75rem; font-style: italic; padding: 0.2rem 0.5rem;">Solo lectura</span>
+            ` : ''}
           </div>
         </td>
       </tr>
@@ -2640,6 +2762,12 @@ function renderIdeasFallas() {
 async function cambiarPrioridadIdeaFalla(id, nuevaPrioridad) {
   const item = ideasFallasDb.find(x => x.id === id);
   if (!item) return;
+
+  if (!puedeEditarIdeaFalla(item)) {
+    alert('Acceso denegado: Solo puedes modificar la prioridad de tus propios registros.');
+    renderIdeasFallas();
+    return;
+  }
 
   item.prioridad = nuevaPrioridad;
   item.updated_at = new Date().toISOString();
@@ -2659,7 +2787,84 @@ async function cambiarPrioridadIdeaFalla(id, nuevaPrioridad) {
   }
 }
 
+// --- Drag & Drop Prioritization ---
+let draggedId = null;
+
+window.handleDragStart = function(e, id) {
+  const isSuperadmin = (currentSession && currentSession.viewMode === 'superadmin');
+  if (!isSuperadmin) return;
+  draggedId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', id);
+};
+
+window.handleDragOver = function(e) {
+  const isSuperadmin = (currentSession && currentSession.viewMode === 'superadmin');
+  if (!isSuperadmin) return false;
+  if (e.preventDefault) {
+    e.preventDefault();
+  }
+  e.dataTransfer.dropEffect = 'move';
+  return false;
+};
+
+window.handleDragEnter = function(e, row) {
+  const isSuperadmin = (currentSession && currentSession.viewMode === 'superadmin');
+  if (!isSuperadmin) return;
+  row.style.borderTop = '2px solid var(--accent)';
+};
+
+window.handleDragLeave = function(e, row) {
+  const isSuperadmin = (currentSession && currentSession.viewMode === 'superadmin');
+  if (!isSuperadmin) return;
+  row.style.borderTop = '';
+};
+
+window.handleDrop = async function(e, targetId) {
+  const isSuperadmin = (currentSession && currentSession.viewMode === 'superadmin');
+  if (!isSuperadmin) return;
+
+  e.stopPropagation();
+  e.preventDefault();
+  
+  const row = e.currentTarget;
+  if (row) row.style.borderTop = '';
+  
+  if (draggedId === targetId) return;
+  
+  const dragIdx = ideasFallasDb.findIndex(x => x.id === draggedId);
+  const targetIdx = ideasFallasDb.findIndex(x => x.id === targetId);
+  
+  if (dragIdx === -1 || targetIdx === -1) return;
+  
+  const temp = ideasFallasDb[dragIdx];
+  ideasFallasDb.splice(dragIdx, 1);
+  ideasFallasDb.splice(targetIdx, 0, temp);
+  
+  // Recalculate order indices
+  ideasFallasDb.forEach((item, idx) => {
+    item.orden = idx;
+  });
+  
+  localStorage.setItem('sapi_ideas_fallas', JSON.stringify(ideasFallasDb));
+  renderIdeasFallas();
+  
+  if (window.pushToSupabase) {
+    try {
+      for (const item of ideasFallasDb) {
+        await window.pushToSupabase('ideas_fallas', item);
+      }
+      if (typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion('Orden de priorización actualizado y sincronizado en la nube.', 'success');
+      }
+    } catch (err) {
+      console.error('[IdeasFallas] Error al sincronizar nuevo orden con Supabase:', err);
+    }
+  }
+};
+
 // Exponer funciones al objeto global window para que funcionen los onclicks del HTML
+window.puedeEditarIdeaFalla = puedeEditarIdeaFalla;
 window.abrirModalIdeaFalla = abrirModalIdeaFalla;
 window.cerrarModalIdeaFalla = cerrarModalIdeaFalla;
 window.guardarIdeaFalla = guardarIdeaFalla;
@@ -3459,6 +3664,9 @@ function eliminarTecnicoConfig(i) {
 
 // ===== USUARIOS CRUD =====
 function renderUsuariosList() {
+  if (typeof renderPortalUsuariosList === 'function') {
+    renderPortalUsuariosList();
+  }
   const list = document.getElementById('usuarios-list');
   if (!list) return;
 
@@ -3466,7 +3674,8 @@ function renderUsuariosList() {
   const filterRole = document.getElementById('filtro-rol-usuario')?.value || 'todos';
 
   const doRender = () => {
-    let filtered = usuarios;
+    let filtered = [...usuarios];
+    filtered.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }));
     
     if (filterRole !== 'todos') {
       filtered = filtered.filter(u => u.rol === filterRole);
@@ -3507,7 +3716,7 @@ function renderUsuariosList() {
           </div>
           <span class="badge" style="background:${ROLE_COLORS[u.rol]}22;color:${ROLE_COLORS[u.rol]};border-radius:99px;padding:0.2rem 0.6rem;font-size:0.72rem;font-weight:600;">${ROLES[u.rol]?.label || u.rol}</span>
           <div style="display:flex; gap:0.25rem;">
-            <button class="action-btn" onclick="editarUsuario('${u.id}')" title="Editar"><i data-lucide="pencil"></i></button>
+            <button class="action-btn" onclick="window._modalUsuarioContexto = 'config'; editarUsuario('${u.id}')" title="Editar"><i data-lucide="pencil"></i></button>
             ${u.rol !== 'superadmin' ? `
               <button class="action-btn del" onclick="eliminarUsuario('${u.id}')" title="Desactivar / Borrar"><i data-lucide="trash-2"></i></button>
             ` : ''}
@@ -3669,6 +3878,30 @@ function abrirModalUsuario(id) {
   const rolRadios = document.querySelectorAll('input[name="u-rol"]');
   rolRadios.forEach(r => r.disabled = false);
   if (uActivo) uActivo.disabled = false;
+
+  // Filter roles based on context (Portal context only shows 'empresa' and 'cliente-consultor')
+  const userContext = window._modalUsuarioContexto || 'config';
+  const rolCards = document.querySelectorAll('.rol-card');
+  rolCards.forEach(card => {
+    const radio = card.querySelector('input[name="u-rol"]');
+    if (!radio) return;
+    
+    if (userContext === 'portal') {
+      const isPortalRole = ['empresa', 'cliente-consultor'].includes(radio.value);
+      card.style.display = isPortalRole ? 'block' : 'none';
+    } else {
+      card.style.display = 'block';
+    }
+  });
+
+  // Default value for portal mode when creating a new user
+  if (userContext === 'portal' && !id) {
+    const radioEmpresa = document.querySelector('input[name="u-rol"][value="empresa"]');
+    if (radioEmpresa) {
+      radioEmpresa.checked = true;
+      if (uEmpresaContainer) uEmpresaContainer.style.display = 'block';
+    }
+  }
 
   if (id) {
     if (!u) return;
@@ -4105,6 +4338,9 @@ function setupNav() {
         if (view === 'preferencias') {
           if (typeof renderServiciosProgramadosTecnico === 'function') {
             renderServiciosProgramadosTecnico();
+          }
+          if (typeof renderIdeasFallas === 'function') {
+            renderIdeasFallas();
           }
         }
       } catch (err) {
@@ -15555,6 +15791,19 @@ function renderTickets(ctx) {
     
     if (isDashView && !q) {
       filtered = filtered.slice(0, 8);
+    }
+    
+    // Actualizar contador de tickets filtrados y título de página
+    const countEl = document.getElementById('tkt-filtered-count');
+    if (countEl && !isDashView && !isV2) {
+      countEl.textContent = `${filtered.length} ticket${filtered.length === 1 ? '' : 's'}`;
+    }
+    const viewTicketsEl = document.getElementById('view-tickets');
+    if (viewTicketsEl && viewTicketsEl.classList.contains('active') && !isDashView && !isV2) {
+      const pageTitleEl = document.getElementById('page-title');
+      if (pageTitleEl) {
+        pageTitleEl.textContent = `Tickets (${filtered.length})`;
+      }
     }
     
     if (!filtered.length) {
@@ -33377,6 +33626,13 @@ function dispararInicializacionGlobal() {
     console.error('Error al inicializar la app:', err);
   }
   try {
+    if (typeof window.cargarConfiguracionesNube === 'function') {
+      window.cargarConfiguracionesNube();
+    }
+  } catch (err) {
+    console.error('Error al cargar configuraciones de la nube:', err);
+  }
+  try {
     inicializarTableResizersEvent();
   } catch (err) {
     console.error('Error al inicializar resizer de tablas:', err);
@@ -33475,6 +33731,1091 @@ function dispararInicializacionGlobal() {
     } catch(e){}
   }, 3000);
 }
+
+window.setClientesSubView = function(subView) {
+  const btnCatalogo = document.getElementById('btn-tab-cli-catalogo');
+  const btnPortal = document.getElementById('btn-tab-cli-portal');
+  const cntCatalogo = document.getElementById('clientes-catalogo-container');
+  const cntPortal = document.getElementById('clientes-portal-container');
+  
+  if (!btnCatalogo || !btnPortal || !cntCatalogo || !cntPortal) return;
+  
+  if (subView === 'catalogo') {
+    btnCatalogo.classList.add('active');
+    btnCatalogo.style.background = 'var(--accent)';
+    btnCatalogo.style.color = '#fff';
+    btnCatalogo.style.borderColor = 'var(--accent)';
+    
+    btnPortal.classList.remove('active');
+    btnPortal.style.background = 'var(--bg-card)';
+    btnPortal.style.color = 'var(--text-primary)';
+    btnPortal.style.borderColor = 'var(--border)';
+    
+    cntCatalogo.style.display = 'block';
+    cntPortal.style.display = 'none';
+  } else {
+    btnPortal.classList.add('active');
+    btnPortal.style.background = 'var(--accent)';
+    btnPortal.style.color = '#fff';
+    btnPortal.style.borderColor = 'var(--accent)';
+    
+    btnCatalogo.classList.remove('active');
+    btnCatalogo.style.background = 'var(--bg-card)';
+    btnCatalogo.style.color = 'var(--text-primary)';
+    btnCatalogo.style.borderColor = 'var(--border)';
+    
+    cntCatalogo.style.display = 'none';
+    cntPortal.style.display = 'block';
+    
+    renderPortalUsuariosList();
+  }
+  
+  if (currentSession && typeof updateTopbarButtons === 'function') {
+    updateTopbarButtons('clientes', currentSession.viewMode);
+  }
+};
+
+window.renderPortalUsuariosList = function() {
+  const tbody = document.getElementById('clientes-portal-table-body');
+  if (!tbody) return;
+  
+  // Populate company select dropdown dynamically
+  const selectEmpresa = document.getElementById('filtro-empresa-usuario-portal');
+  if (selectEmpresa) {
+    const currentSelected = selectEmpresa.value;
+    selectEmpresa.innerHTML = '<option value="todas">Todas las Empresas</option>';
+    const sortedClientes = [...clientesDb].sort((a,b) => (a.nombre || '').localeCompare(b.nombre || ''));
+    sortedClientes.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.nombre;
+      selectEmpresa.appendChild(opt);
+    });
+    if (Array.from(selectEmpresa.options).some(o => o.value === currentSelected)) {
+      selectEmpresa.value = currentSelected;
+    }
+  }
+
+  const searchText = (document.getElementById('busqueda-usuario-portal')?.value || '').toLowerCase().trim();
+  const filterEstado = document.getElementById('filtro-estado-usuario-portal')?.value || 'todos';
+  const filterRol = document.getElementById('filtro-rol-usuario-portal')?.value || 'todos';
+  const filterEmpresa = selectEmpresa?.value || 'todas';
+  
+  // Filter portal users (client-related roles only) and sort alphabetically
+  let portalUsers = usuarios.filter(u => ['empresa', 'cliente', 'cliente-consultor'].includes(u.rol));
+  portalUsers.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }));
+  
+  // Apply Search
+  if (searchText) {
+    portalUsers = portalUsers.filter(u => 
+      (u.nombre && u.nombre.toLowerCase().includes(searchText)) || 
+      (u.email && u.email.toLowerCase().includes(searchText)) ||
+      (u.empresa && u.empresa.toLowerCase().includes(searchText))
+    );
+  }
+  
+  // Apply Estado Filter
+  if (filterEstado === 'activos') {
+    portalUsers = portalUsers.filter(u => u.activo !== false);
+  } else if (filterEstado === 'pendientes') {
+    portalUsers = portalUsers.filter(u => u.activo === false);
+  }
+  
+  // Apply Rol Filter
+  if (filterRol !== 'todos') {
+    portalUsers = portalUsers.filter(u => u.rol === filterRol);
+  }
+  
+  // Apply Empresa Filter
+  if (filterEmpresa !== 'todas') {
+    portalUsers = portalUsers.filter(u => {
+      if (u.empresas && u.empresas.length > 0) {
+        return u.empresas.includes(filterEmpresa);
+      }
+      return u.empresa && (u.empresa === filterEmpresa || u.empresa.toLowerCase() === filterEmpresa.toLowerCase());
+    });
+  }
+  
+  if (portalUsers.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.85rem;">
+          No se encontraron usuarios del portal de clientes.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+  
+  const ROLE_LABELS = {
+    'empresa': 'Cliente',
+    'cliente': 'Cliente',
+    'cliente-consultor': 'Cliente Consultor'
+  };
+  
+  const ROLE_COLORS = {
+    'empresa': '#8b5cf6',
+    'cliente': '#8b5cf6',
+    'cliente-consultor': '#ec4899'
+  };
+  
+  tbody.innerHTML = portalUsers.map(u => {
+    // Resolve Associated Companies Display as modern chips/tags
+    let empHtml = '';
+    let empNamesDisplay = '';
+    
+    if (u.empresas && u.empresas.length > 0) {
+      empNamesDisplay = u.empresas.map(empId => {
+        const match = clientesDb.find(c => c.id === empId);
+        return match ? match.nombre : empId;
+      }).join(', ');
+      
+      empHtml = u.empresas.map(empId => {
+        const match = clientesDb.find(c => c.id === empId);
+        const name = match ? match.nombre : empId;
+        return `<span style="display: inline-flex; align-items: center; background: var(--bg-hover, #f1f5f9); border: 1px solid var(--border, #e2e8f0); border-radius: 6px; padding: 0.15rem 0.45rem; font-size: 0.72rem; color: var(--text-primary); font-weight: 600; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0.1rem;" title="${name}">${name}</span>`;
+      }).join('');
+    } else {
+      const fallbackName = u.empresa || 'Ninguna';
+      empNamesDisplay = fallbackName;
+      empHtml = `<span style="display: inline-flex; align-items: center; background: rgba(232, 130, 12, 0.08); border: 1px solid rgba(232, 130, 12, 0.15); border-radius: 6px; padding: 0.15rem 0.45rem; font-size: 0.72rem; color: var(--orange, #e8820c); font-weight: 600; margin: 0.1rem;" title="${fallbackName}">${fallbackName}</span>`;
+    }
+    
+    const isPending = (u.activo === false);
+    const badgeColor = isPending ? 'background: rgba(239, 68, 68, 0.08); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2);' : 'background: rgba(16, 185, 129, 0.08); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2);';
+    const badgeText = isPending ? 'Pendiente' : 'Activo';
+    
+    // Actions HTML
+    const approveBtn = isPending ? `
+      <button class="action-btn" onclick="aprobarUsuarioPortal('${u.id}')" title="Aprobar Acceso" style="color: #10b981; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.15); border-radius: var(--radius-sm); padding: 0.3rem 0.5rem; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;">
+        <i data-lucide="check" style="width:14px;height:14px;"></i>
+      </button>
+    ` : '';
+    
+    return `
+      <tr style="border-bottom: 1px solid var(--border-light, #f1f5f9); transition: background-color 0.15s;" onmouseover="this.style.backgroundColor='var(--bg-hover, #f8fafc)'" onmouseout="this.style.backgroundColor='transparent'">
+        <td style="padding: 0.85rem 1rem; vertical-align: middle;">
+          <div style="display: flex; align-items: center; gap: 0.65rem;">
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: ${ROLE_COLORS[u.rol] || 'var(--accent)'}; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+              ${(u.nombre || '?')[0].toUpperCase()}
+            </div>
+            <div style="font-weight: 600; color: var(--text-primary); font-size: 0.88rem;">${u.nombre || 'Sin Nombre'}</div>
+          </div>
+        </td>
+        <td style="padding: 0.85rem 1rem; vertical-align: middle; color: var(--text-secondary); font-family: monospace; font-size: 0.82rem;">
+          ${u.email || ''}
+        </td>
+        <td style="padding: 0.85rem 1rem; vertical-align: middle;">
+          <span class="badge" style="background: ${ROLE_COLORS[u.rol]}12; color: ${ROLE_COLORS[u.rol]}; border-radius: 20px; padding: 0.25rem 0.65rem; font-size: 0.72rem; font-weight: 700; border: 1px solid ${ROLE_COLORS[u.rol]}22; letter-spacing: 0.3px;">
+            ${ROLE_LABELS[u.rol] || u.rol}
+          </span>
+        </td>
+        <td style="padding: 0.85rem 1rem; vertical-align: middle; line-height: 1.45;">
+          <div style="display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center;" title="${empNamesDisplay}">
+            ${empHtml}
+          </div>
+        </td>
+        <td style="padding: 0.85rem 1rem; vertical-align: middle; text-align: center;">
+          <span style="display: inline-flex; align-items: center; justify-content: center; padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; ${badgeColor} letter-spacing: 0.3px;">
+            ${badgeText}
+          </span>
+        </td>
+        <td style="padding: 0.85rem 1rem; vertical-align: middle; text-align: center;">
+          <div style="display: flex; gap: 0.35rem; justify-content: center; align-items: center;">
+            ${approveBtn}
+            <button class="action-btn" onclick="window._modalUsuarioContexto = 'portal'; editarUsuario('${u.id}')" title="Editar" style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; padding: 0.35rem; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;">
+              <i data-lucide="pencil" style="width:14px;height:14px; color: var(--text-secondary);"></i>
+            </button>
+            <button class="action-btn del" onclick="eliminarUsuario('${u.id}')" title="Borrar" style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; padding: 0.35rem; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;">
+              <i data-lucide="trash-2" style="width:14px;height:14px; color: var(--red);"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+  
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    lucide.createIcons();
+  }
+};
+
+window.aprobarUsuarioPortal = async function(id) {
+  if (!confirm('¿Estás seguro de que deseas aprobar el acceso a este usuario del portal?')) return;
+  if (!window.supabaseClient) {
+    alert('No hay conexión con Supabase');
+    return;
+  }
+  
+  try {
+    const { error } = await window.supabaseClient
+      .from('user_roles')
+      .update({ activo: true })
+      .eq('id', id);
+      
+    if (error) throw error;
+    
+    // Update local cache
+    const match = usuarios.find(u => u.id === id);
+    if (match) {
+      match.activo = true;
+      localStorage.setItem('eurorep_usuarios', JSON.stringify(usuarios));
+      
+      // Trigger Automation
+      if (typeof window.ejecutarAutomatizacion === 'function') {
+        window.ejecutarAutomatizacion('Activación de usuario en panel', {
+          email: match.email,
+          nombre_usuario: match.nombre,
+          nombre_cliente: match.empresa || 'Cliente',
+          link: window.location.origin + '/cliente'
+        });
+      }
+    }
+    
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion('Usuario aprobado con éxito', 'success');
+    } else {
+      alert('Usuario aprobado con éxito');
+    }
+    
+    renderPortalUsuariosList();
+    
+    // Also refresh the general user list if the function exists
+    if (typeof renderUsuariosList === 'function') {
+      renderUsuariosList();
+    }
+  } catch (err) {
+    console.error('Error approving user:', err);
+    alert('Error al aprobar usuario: ' + err.message);
+  }
+};
+
+// ===== AUTOMACIONES Y PLANTILLAS =====
+
+// Datos iniciales / cargados de localStorage
+let defaultTemplates = [
+  {
+    id: "welcome",
+    nombre: "Bienvenida y Activación de Cuenta",
+    asunto: "¡Bienvenido a SAPI Postventa de Eurorep!",
+    cuerpo: "Hola {{nombre_usuario}},\n\nTu cuenta en el Portal de Clientes de Eurorep ha sido activada con éxito.\n\nYa puedes acceder para consultar tus equipos, dar seguimiento a tus tickets y autorizar cotizaciones.\n\nAcceder al portal: {{link}}\n\nSaludos,\nEquipo de Postventa Eurorep"
+  },
+  {
+    id: "new_quote",
+    nombre: "Nueva Cotización SAP Disponible",
+    asunto: "Cotización SAP Lista para Aprobación - Folio {{folio_ticket}}",
+    cuerpo: "Hola {{nombre_cliente}},\n\nHemos cargado la cotización correspondiente al ticket {{folio_ticket}} por un monto de {{monto_cotizacion}}.\n\nTe solicitamos ingresar al portal para revisar el PDF adjunto y aprobar o rechazar la propuesta comercial.\n\nEnlace del ticket: {{link}}\n\nSaludos,\nPostventa Eurorep"
+  },
+  {
+    id: "os_completed",
+    nombre: "Orden de Servicio Completada",
+    asunto: "Reporte de Servicio de Campo Completado - OS {{folio_os}}",
+    cuerpo: "Hola {{nombre_cliente}},\n\nEl servicio técnico en campo para tu equipo {{marca_modelo}} (SN: {{serie}}) ha sido completado y firmado de conformidad.\n\nSe ha generado el reporte técnico oficial y se ha guardado en tu carpeta compartida de OneDrive.\n\nSaludos,\nServicio Técnico Eurorep"
+  },
+  {
+    id: "new_comment",
+    nombre: "Notificación de Comentario Nuevo",
+    asunto: "Nuevo mensaje en Ticket {{folio_ticket}}",
+    cuerpo: "Hola {{nombre_usuario}},\n\nSe ha registrado un nuevo comentario en el ticket {{folio_ticket}}:\n\n\"{{comentario}}\"\n\nResponder en el portal: {{link}}\n\nSaludos,\nSoporte Eurorep"
+  },
+  {
+    id: "new_internal_ticket",
+    nombre: "Notificación de Nuevo Ticket Registrado (Interno)",
+    asunto: "Eurorep SAPI - Se ha registrado un nuevo Ticket: {{folio_ticket}}",
+    cuerpo: "Hola {{nombre_cliente}},\n\nQueremos informarte que nuestro equipo técnico interno ha registrado un nuevo ticket de servicio bajo tu cuenta:\n\nDetalles del Ticket:\n- Folio: {{folio_ticket}}\n- Estatus actual: {{estatus_ticket}}\n\nPuedes dar seguimiento a esta solicitud, agregar comentarios o adjuntar evidencias a través de nuestro portal de clientes.\n\nAcceder al ticket: {{link}}\n\nSaludos,\nEquipo de Postventa Eurorep"
+  }
+];
+
+let defaultRules = [
+  {
+    id: "rule_welcome",
+    nombre: "Enviar correo de bienvenida al activar usuario",
+    evento: "Activación de usuario en panel",
+    plantillaId: "welcome",
+    destinatario: "Usuario registrado",
+    activo: true
+  },
+  {
+    id: "rule_quote",
+    nombre: "Notificar al cliente sobre cotización SAP",
+    evento: "Carga de Cotización SAP en ticket",
+    plantillaId: "new_quote",
+    destinatario: "Contactos de la empresa",
+    activo: true
+  },
+  {
+    id: "rule_os",
+    nombre: "Enviar reporte técnico PDF al finalizar servicio",
+    evento: "Finalización y firma de Orden de Servicio",
+    plantillaId: "os_completed",
+    destinatario: "Contactos de la empresa + Técnico",
+    activo: true
+  },
+  {
+    id: "rule_comment",
+    nombre: "Enviar notificación de nuevo comentario",
+    evento: "Comentario guardado en chat del ticket",
+    plantillaId: "new_comment",
+    destinatario: "Contraparte del ticket (Cliente o Staff)",
+    activo: true
+  },
+  {
+    id: "rule_internal_ticket",
+    nombre: "Notificar al cliente sobre ticket creado por staff",
+    evento: "Nuevo ticket registrado por equipo interno",
+    plantillaId: "new_internal_ticket",
+    destinatario: "Contactos de la empresa",
+    activo: true
+  }
+];
+
+// Inicializar memoria intermedia con valores por defecto
+let emailTemplates = [...defaultTemplates];
+let automationRules = [...defaultRules];
+
+// Guardar copia local en localStorage como respaldo/fallback
+function saveTemplatesToLocal() {
+  localStorage.setItem('sapi_email_templates', JSON.stringify(emailTemplates));
+}
+function saveRulesToLocal() {
+  localStorage.setItem('sapi_automation_rules', JSON.stringify(automationRules));
+}
+
+// Saber si la base de datos de Supabase tiene activada la sincronización
+window.isCloudSyncActive = function() {
+  return window.supabaseClient && !document.getElementById('supa-table-warning');
+};
+
+// Mostrar alerta visual con SQL si faltan tablas
+function mostrarAdvertenciaTablasNube() {
+  const container = document.getElementById('portal-automatizaciones-subcontent');
+  if (!container) return;
+  if (document.getElementById('supa-table-warning')) return;
+  
+  const warningDiv = document.createElement('div');
+  warningDiv.id = 'supa-table-warning';
+  warningDiv.style = 'background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2); border-radius:8px; padding:1.25rem; margin-bottom:1.5rem; display:flex; flex-direction:column; gap:0.5rem; font-family:inherit;';
+  
+  warningDiv.innerHTML = `
+    <div style="display:flex; align-items:center; gap:0.5rem; color:#ef4444; font-weight:700; font-size:0.85rem;">
+      <span style="font-size:1.1rem; line-height:1;">⚠️</span> 
+      <span>Persistencia en la Nube Inactiva (Faltan Tablas en Supabase)</span>
+    </div>
+    <p style="margin:0; font-size:0.75rem; color:var(--text-secondary); line-height:1.4;">
+      Para que todos los colaboradores compartan las mismas plantillas y reglas en tiempo real, ingresa al <strong>SQL Editor</strong> de tu panel de Supabase y ejecuta el siguiente script:
+    </p>
+    <pre style="margin:0.25rem 0 0 0; background:var(--bg-hover, #f3f4f6); border:1px solid var(--border); border-radius:6px; padding:0.75rem; font-family:monospace; font-size:0.72rem; color:var(--text-primary); overflow-x:auto; user-select:all; line-height:1.3; max-height:220px; overflow-y:auto;">
+-- 1. Crear tabla de plantillas de correo
+CREATE TABLE IF NOT EXISTS sapi_email_templates (
+  id TEXT PRIMARY KEY,
+  nombre TEXT NOT NULL,
+  asunto TEXT NOT NULL,
+  cuerpo TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 2. Crear tabla de reglas de automatización
+CREATE TABLE IF NOT EXISTS sapi_automation_rules (
+  id TEXT PRIMARY KEY,
+  nombre TEXT NOT NULL,
+  evento TEXT NOT NULL,
+  "plantillaId" TEXT REFERENCES sapi_email_templates(id) ON DELETE CASCADE,
+  destinatario TEXT NOT NULL,
+  activo BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 3. Habilitar seguridad de fila (RLS)
+ALTER TABLE sapi_email_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sapi_automation_rules ENABLE ROW LEVEL SECURITY;
+
+-- 4. Crear políticas públicas/autenticadas
+CREATE POLICY "Acceso total a autenticados" ON sapi_email_templates FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Acceso total a autenticados" ON sapi_automation_rules FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    </pre>
+  `;
+  
+  container.insertBefore(warningDiv, container.firstChild);
+}
+
+// Cargar configuraciones de Supabase o fallback a localStorage
+window.cargarConfiguracionesNube = async function() {
+  if (!window.supabaseClient) {
+    emailTemplates = safeGetJSON('sapi_email_templates', defaultTemplates);
+    automationRules = safeGetJSON('sapi_automation_rules', defaultRules);
+    renderAutomationRules();
+    renderEmailTemplates();
+    return;
+  }
+  
+  try {
+    // 1. Cargar plantillas de Supabase
+    const { data: templatesData, error: tErr } = await window.supabaseClient
+      .from('sapi_email_templates')
+      .select('*');
+      
+    if (tErr) {
+      if (tErr.code === 'P0001' || tErr.message.includes('relation') || tErr.message.includes('does not exist')) {
+        throw new Error('TABLES_NOT_CREATED');
+      }
+      throw tErr;
+    }
+    
+    // 2. Cargar reglas de Supabase
+    const { data: rulesData, error: rErr } = await window.supabaseClient
+      .from('sapi_automation_rules')
+      .select('*');
+      
+    if (rErr) throw rErr;
+    
+    // Si la base de datos está vacía, inicializarla con los valores por defecto
+    if (!templatesData || templatesData.length === 0) {
+      console.log('[Automation] Inicializando Supabase con plantillas por defecto...');
+      await window.supabaseClient.from('sapi_email_templates').insert(defaultTemplates);
+      emailTemplates = [...defaultTemplates];
+    } else {
+      emailTemplates = templatesData;
+    }
+    
+    if (!rulesData || rulesData.length === 0) {
+      console.log('[Automation] Inicializando Supabase con reglas por defecto...');
+      await window.supabaseClient.from('sapi_automation_rules').insert(defaultRules);
+      automationRules = [...defaultRules];
+    } else {
+      automationRules = rulesData;
+    }
+    
+    console.log('[Automation] Datos cargados correctamente desde Supabase');
+    
+  } catch (err) {
+    if (err.message === 'TABLES_NOT_CREATED') {
+      console.warn('[Automation] Faltan tablas en la nube. Usando persistencia local (localStorage).');
+      emailTemplates = safeGetJSON('sapi_email_templates', defaultTemplates);
+      automationRules = safeGetJSON('sapi_automation_rules', defaultRules);
+      mostrarAdvertenciaTablasNube();
+    } else {
+      console.error('[Automation] Error al sincronizar con la nube:', err);
+      emailTemplates = safeGetJSON('sapi_email_templates', defaultTemplates);
+      automationRules = safeGetJSON('sapi_automation_rules', defaultRules);
+    }
+  }
+  
+  renderAutomationRules();
+  renderEmailTemplates();
+};
+
+// Navegación de Sub-Vistas del Portal
+window.setPortalSubView = function(viewId) {
+  const btnUsr = document.getElementById('btn-subtab-usuarios');
+  const btnAuto = document.getElementById('btn-subtab-automatizaciones');
+  const cntUsr = document.getElementById('portal-usuarios-subcontent');
+  const cntAuto = document.getElementById('portal-automatizaciones-subcontent');
+  
+  if (!btnUsr || !btnAuto || !cntUsr || !cntAuto) return;
+  
+  const userRole = currentSession?.viewMode || currentSession?.rol || '';
+  const isSuperOrAdmin = ['superadmin', 'admin'].includes(userRole);
+  
+  if (viewId === 'automatizaciones' && !isSuperOrAdmin) {
+    alert('Acceso denegado: Solo los administradores y superadministradores pueden configurar automatizaciones.');
+    return;
+  }
+  
+  if (viewId === 'usuarios') {
+    btnUsr.classList.add('active');
+    btnUsr.style.background = 'var(--accent-light)';
+    btnUsr.style.borderColor = 'var(--accent)';
+    btnUsr.style.color = 'var(--accent)';
+    
+    btnAuto.classList.remove('active');
+    btnAuto.style.background = 'var(--bg-card)';
+    btnAuto.style.borderColor = 'var(--border)';
+    btnAuto.style.color = 'var(--text-primary)';
+    
+    cntUsr.style.display = 'block';
+    cntAuto.style.display = 'none';
+    renderPortalUsuariosList();
+  } else {
+    btnAuto.classList.add('active');
+    btnAuto.style.background = 'var(--accent-light)';
+    btnAuto.style.borderColor = 'var(--accent)';
+    btnAuto.style.color = 'var(--accent)';
+    
+    btnUsr.classList.remove('active');
+    btnUsr.style.background = 'var(--bg-card)';
+    btnUsr.style.borderColor = 'var(--border)';
+    btnUsr.style.color = 'var(--text-primary)';
+    
+    cntUsr.style.display = 'none';
+    cntAuto.style.display = 'block';
+    
+    renderAutomationRules();
+    renderEmailTemplates();
+  }
+  
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    lucide.createIcons();
+  }
+};
+
+// Renderizar Reglas
+window.renderAutomationRules = function() {
+  const list = document.getElementById('automation-rules-list');
+  if (!list) return;
+  
+  if (automationRules.length === 0) {
+    list.innerHTML = `<div style="text-align:center; padding:1.5rem; color:var(--text-muted); font-size:0.8rem; background:var(--bg-hover); border-radius:8px;">No hay reglas de automatización creadas.</div>`;
+    return;
+  }
+  
+  list.innerHTML = automationRules.map(r => {
+    const template = emailTemplates.find(t => t.id === r.plantillaId);
+    const templateName = template ? template.nombre : 'Ninguna';
+    
+    return `
+      <div style="background:var(--bg-primary); border:1px solid var(--border); border-radius:8px; padding:0.75rem 1rem; display:flex; justify-content:space-between; align-items:center; gap:1rem;">
+        <div style="flex:1;">
+          <div style="font-weight:600; font-size:0.85rem; color:var(--text-primary); margin-bottom:0.15rem; display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+            <span>${r.nombre}</span>
+            <span style="font-size:0.65rem; font-weight:600; padding:0.1rem 0.35rem; border-radius:4px; background:rgba(232, 130, 12, 0.08); color:var(--orange); border:1px solid rgba(232, 130, 12, 0.15);">
+              ${r.evento}
+            </span>
+          </div>
+          <div style="font-size:0.75rem; color:var(--text-muted);">
+            Envia plantilla: <span style="font-weight:500; color:var(--text-secondary); font-style:italic;">${templateName}</span> | Destinatario: <span style="font-weight:500;">${r.destinatario}</span>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.5rem; flex-shrink:0;">
+          <label class="switch-toggle" style="position:relative; display:inline-block; width:34px; height:20px; margin:0;">
+            <input type="checkbox" ${r.activo ? 'checked' : ''} onchange="toggleReglaActiva('${r.id}')" style="opacity:0; width:0; height:0;">
+            <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:${r.activo ? 'var(--accent)' : '#ccc'}; transition:.2s; border-radius:20px;">
+              <span style="position:absolute; content:''; height:14px; width:14px; left:3px; bottom:3px; background-color:white; transition:.2s; border-radius:50%; transform:${r.activo ? 'translateX(14px)' : 'none'};"></span>
+            </span>
+          </label>
+          <button class="action-btn" onclick="abrirModalAutoRegla('${r.id}')" title="Editar Regla" style="padding:0.3rem 0.5rem; border:1px solid var(--border); border-radius:4px; display:inline-flex; align-items:center; background:var(--bg-card); cursor:pointer;"><i data-lucide="pencil" style="width:14px;height:14px;color:var(--text-secondary);"></i></button>
+          <button class="action-btn del" onclick="eliminarAutoRegla('${r.id}')" title="Eliminar Regla" style="padding:0.3rem 0.5rem; border:1px solid var(--border); border-radius:4px; display:inline-flex; align-items:center; background:var(--bg-card); cursor:pointer;"><i data-lucide="trash-2" style="width:14px;height:14px;color:var(--red);"></i></button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    lucide.createIcons();
+  }
+};
+
+// Renderizar Plantillas (Machotes)
+window.renderEmailTemplates = function() {
+  const list = document.getElementById('email-templates-list');
+  if (!list) return;
+  
+  if (emailTemplates.length === 0) {
+    list.innerHTML = `<div style="text-align:center; padding:1.5rem; color:var(--text-muted); font-size:0.8rem; background:var(--bg-hover); border-radius:8px;">No hay plantillas de correo creadas.</div>`;
+    return;
+  }
+  
+  list.innerHTML = emailTemplates.map(t => {
+    return `
+      <div style="background:var(--bg-primary); border:1px solid var(--border); border-radius:8px; padding:0.75rem 1rem; display:flex; justify-content:space-between; align-items:center; gap:1rem;">
+        <div style="flex:1; overflow:hidden;">
+          <div style="font-weight:600; font-size:0.85rem; color:var(--text-primary); margin-bottom:0.15rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            ${t.nombre}
+          </div>
+          <div style="font-size:0.75rem; color:var(--text-muted); font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${t.asunto}">
+            Asunto: ${t.asunto}
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.5rem; flex-shrink:0;">
+          <button class="action-btn" onclick="abrirModalAutoPlantilla('${t.id}')" title="Editar Plantilla" style="padding:0.3rem 0.5rem; border:1px solid var(--border); border-radius:4px; display:inline-flex; align-items:center; background:var(--bg-card); cursor:pointer;"><i data-lucide="pencil" style="width:14px;height:14px;color:var(--text-secondary);"></i></button>
+          <button class="action-btn del" onclick="eliminarAutoPlantilla('${t.id}')" title="Eliminar Plantilla" style="padding:0.3rem 0.5rem; border:1px solid var(--border); border-radius:4px; display:inline-flex; align-items:center; background:var(--bg-card); cursor:pointer;"><i data-lucide="trash-2" style="width:14px;height:14px;color:var(--red);"></i></button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    lucide.createIcons();
+  }
+};
+
+// Toggle Regla Activa
+window.toggleReglaActiva = function(id) {
+  const match = automationRules.find(r => r.id === id);
+  if (match) {
+    match.activo = !match.activo;
+    saveRulesToLocal();
+    renderAutomationRules();
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion('Regla de automatización actualizada', 'success');
+    }
+  }
+};
+
+// --- Modals Plantilla ---
+window.abrirModalAutoPlantilla = function(id = '') {
+  const overlay = document.getElementById('modal-auto-plantilla-overlay');
+  const inner = document.getElementById('modal-auto-plantilla-inner');
+  const title = document.getElementById('auto-plantilla-modal-title');
+  
+  if (!overlay || !inner) return;
+  
+  document.getElementById('form-auto-plantilla').reset();
+  document.getElementById('ap-id').value = id;
+  
+  if (id) {
+    title.textContent = 'Editar Plantilla de Correo';
+    const match = emailTemplates.find(t => t.id === id);
+    if (match) {
+      document.getElementById('ap-nombre').value = match.nombre;
+      document.getElementById('ap-asunto').value = match.asunto;
+      document.getElementById('ap-cuerpo').value = match.cuerpo;
+    }
+  } else {
+    title.textContent = 'Crear Nueva Plantilla';
+  }
+  
+  // Update live preview initial state
+  actualizarVistaPreviaEmail();
+  
+  overlay.style.display = 'flex';
+  setTimeout(() => {
+    overlay.style.opacity = '1';
+    inner.style.opacity = '1';
+    inner.style.transform = 'translateY(0)';
+  }, 50);
+};
+
+window.cerrarModalAutoPlantilla = function() {
+  const overlay = document.getElementById('modal-auto-plantilla-overlay');
+  const inner = document.getElementById('modal-auto-plantilla-inner');
+  if (!overlay || !inner) return;
+  
+  overlay.style.opacity = '0';
+  inner.style.opacity = '0';
+  inner.style.transform = 'translateY(20px)';
+  setTimeout(() => { overlay.style.display = 'none'; }, 200);
+};
+
+window.insertarMergeTag = function(tag) {
+  const txt = document.getElementById('ap-cuerpo');
+  if (!txt) return;
+  
+  const start = txt.selectionStart;
+  const end = txt.selectionEnd;
+  const currentVal = txt.value;
+  txt.value = currentVal.substring(0, start) + tag + currentVal.substring(end);
+  txt.focus();
+  txt.selectionStart = txt.selectionEnd = start + tag.length;
+  
+  actualizarVistaPreviaEmail();
+};
+
+window.guardarAutoPlantilla = async function(e) {
+  e.preventDefault();
+  const id = document.getElementById('ap-id').value;
+  const nombre = document.getElementById('ap-nombre').value.trim();
+  const asunto = document.getElementById('ap-asunto').value.trim();
+  const cuerpo = document.getElementById('ap-cuerpo').value.trim();
+  
+  const targetId = id || 'template_' + Date.now();
+  const item = { id: targetId, nombre, asunto, cuerpo };
+  
+  if (window.isCloudSyncActive()) {
+    try {
+      const { error } = await window.supabaseClient
+        .from('sapi_email_templates')
+        .upsert(item);
+      if (error) throw error;
+    } catch (dbErr) {
+      console.error('[Automation] Error al guardar plantilla en la nube:', dbErr);
+      if (typeof mostrarNotificacion === 'function') {
+        mostrarNotificacion('Error al guardar en la nube. Guardando localmente...', 'warning');
+      }
+    }
+  }
+  
+  const idx = emailTemplates.findIndex(t => t.id === targetId);
+  if (idx !== -1) {
+    emailTemplates[idx] = item;
+  } else {
+    emailTemplates.push(item);
+  }
+  
+  saveTemplatesToLocal();
+  cerrarModalAutoPlantilla();
+  renderEmailTemplates();
+  if (typeof mostrarNotificacion === 'function') {
+    mostrarNotificacion('Plantilla de correo guardada con éxito', 'success');
+  }
+};
+
+window.eliminarAutoPlantilla = async function(id) {
+  if (!confirm('¿Estás seguro de que deseas eliminar esta plantilla de correo?')) return;
+  
+  if (window.isCloudSyncActive()) {
+    try {
+      const { error } = await window.supabaseClient
+        .from('sapi_email_templates')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    } catch (dbErr) {
+      console.error('[Automation] Error al eliminar plantilla de la nube:', dbErr);
+    }
+  }
+  
+  emailTemplates = emailTemplates.filter(t => t.id !== id);
+  saveTemplatesToLocal();
+  renderEmailTemplates();
+};
+
+// --- Modals Regla ---
+window.abrirModalAutoRegla = function(id = '') {
+  const overlay = document.getElementById('modal-auto-regla-overlay');
+  const inner = document.getElementById('modal-auto-regla-inner');
+  const title = document.getElementById('auto-regla-modal-title');
+  const comboPlantilla = document.getElementById('ar-plantilla');
+  
+  if (!overlay || !inner || !comboPlantilla) return;
+  
+  // Llenar combo de plantillas
+  comboPlantilla.innerHTML = emailTemplates.map(t => `<option value="${t.id}">${t.nombre}</option>`).join('');
+  
+  document.getElementById('form-auto-regla').reset();
+  document.getElementById('ar-id').value = id;
+  document.getElementById('ar-activo').checked = true;
+  
+  if (id) {
+    title.textContent = 'Editar Regla de Automatización';
+    const match = automationRules.find(r => r.id === id);
+    if (match) {
+      document.getElementById('ar-nombre').value = match.nombre;
+      document.getElementById('ar-evento').value = match.evento;
+      document.getElementById('ar-plantilla').value = match.plantillaId;
+      document.getElementById('ar-destinatario').value = match.destinatario;
+      document.getElementById('ar-activo').checked = match.activo;
+    }
+  } else {
+    title.textContent = 'Crear Nueva Regla';
+  }
+  
+  overlay.style.display = 'flex';
+  setTimeout(() => {
+    overlay.style.opacity = '1';
+    inner.style.opacity = '1';
+    inner.style.transform = 'translateY(0)';
+  }, 50);
+};
+
+window.cerrarModalAutoRegla = function() {
+  const overlay = document.getElementById('modal-auto-regla-overlay');
+  const inner = document.getElementById('modal-auto-regla-inner');
+  if (!overlay || !inner) return;
+  
+  overlay.style.opacity = '0';
+  inner.style.opacity = '0';
+  inner.style.transform = 'translateY(20px)';
+  setTimeout(() => { overlay.style.display = 'none'; }, 200);
+};
+
+window.guardarAutoRegla = async function(e) {
+  e.preventDefault();
+  const id = document.getElementById('ar-id').value;
+  const nombre = document.getElementById('ar-nombre').value.trim();
+  const evento = document.getElementById('ar-evento').value;
+  const plantillaId = document.getElementById('ar-plantilla').value;
+  const destinatario = document.getElementById('ar-destinatario').value;
+  const activo = document.getElementById('ar-activo').checked;
+  
+  const targetId = id || 'rule_' + Date.now();
+  const item = { id: targetId, nombre, evento, plantillaId, destinatario, activo };
+  
+  if (window.isCloudSyncActive()) {
+    try {
+      const { error } = await window.supabaseClient
+        .from('sapi_automation_rules')
+        .upsert(item);
+      if (error) throw error;
+    } catch (dbErr) {
+      console.error('[Automation] Error al guardar regla en la nube:', dbErr);
+      if (typeof mostrarNotificacion === 'function') {
+        mostrarNotificacion('Error al guardar en la nube. Guardando localmente...', 'warning');
+      }
+    }
+  }
+  
+  const idx = automationRules.findIndex(r => r.id === targetId);
+  if (idx !== -1) {
+    automationRules[idx] = item;
+  } else {
+    automationRules.push(item);
+  }
+  
+  saveRulesToLocal();
+  cerrarModalAutoRegla();
+  renderAutomationRules();
+  if (typeof mostrarNotificacion === 'function') {
+    mostrarNotificacion('Regla de automatización guardada con éxito', 'success');
+  }
+};
+
+window.eliminarAutoRegla = async function(id) {
+  if (!confirm('¿Estás seguro de que deseas eliminar esta regla de automatización?')) return;
+  
+  if (window.isCloudSyncActive()) {
+    try {
+      const { error } = await window.supabaseClient
+        .from('sapi_automation_rules')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    } catch (dbErr) {
+      console.error('[Automation] Error al eliminar regla de la nube:', dbErr);
+    }
+  }
+  
+  automationRules = automationRules.filter(r => r.id !== id);
+  saveRulesToLocal();
+  renderAutomationRules();
+};
+
+window.obtenerHtmlPlantillaProfesional = function(cuerpoEmail) {
+  const logoUrl = window.location.origin + '/logo_transparent.png';
+  return `
+    <div style="background-color: #f1f5f9; padding: 20px 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
+        <!-- Header con Logo -->
+        <div style="padding: 18px 24px; background-color: #ffffff; border-bottom: 4px solid #e8820c; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+          <img src="${logoUrl}" alt="Eurorep Logo" style="height: 38px; width: auto; object-fit: contain; display: block;" />
+          <span style="font-size: 0.75rem; font-weight: 700; color: #64748b; letter-spacing: 1px; text-transform: uppercase;">SAPI Postventa</span>
+        </div>
+        
+        <!-- Contenido principal -->
+        <div style="padding: 30px 24px; font-size: 14.5px; line-height: 1.6; color: #334155;">
+          ${cuerpoEmail}
+        </div>
+        
+        <!-- Footer -->
+        <div style="padding: 20px 24px; background-color: #f8fafc; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11.5px; color: #64748b; line-height: 1.5;">
+          <p style="margin: 0 0 6px 0; font-weight: 600; color: #475569;">Euro Representaciones S.A. de C.V.</p>
+          <p style="margin: 0 0 12px 0;">Servicio Técnico Autorizado, Refacciones y Renta de Maquinaria</p>
+          <div style="margin-bottom: 12px;">
+            <a href="${window.location.origin}/cliente" target="_blank" style="color: #e8820c; text-decoration: none; font-weight: 600; margin: 0 8px;">Portal de Clientes</a> | 
+            <a href="https://eurorep.mx" target="_blank" style="color: #e8820c; text-decoration: none; font-weight: 600; margin: 0 8px;">Sitio Web Oficial</a>
+          </div>
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 12px 0;" />
+          <p style="margin: 0; font-size: 10.5px; color: #94a3b8;">
+            Este es un correo electrónico automático generado por el sistema SAPI Postventa.<br />
+            Por favor no respondas directamente a este mensaje. Si requieres asistencia, contáctanos a soporte@eurorep.mx
+          </p>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+window.actualizarVistaPreviaEmail = function() {
+  const asuntoInput = document.getElementById('ap-asunto')?.value || '';
+  const cuerpoInput = document.getElementById('ap-cuerpo')?.value || '';
+  
+  const previewAsunto = document.getElementById('email-preview-asunto');
+  const previewCuerpo = document.getElementById('email-preview-cuerpo');
+  
+  if (!previewAsunto || !previewCuerpo) return;
+  
+  // Mock data replacement dictionary
+  const mockData = {
+    '{{nombre_usuario}}': '<strong>Ing. Alejandro Gómez</strong>',
+    '{{nombre_cliente}}': '<strong>ICA CONSTRUCTORA, S.A. DE C.V.</strong>',
+    '{{folio_ticket}}': '<strong style="color:var(--accent);">TKT-26045-A</strong>',
+    '{{monto_cotizacion}}': '<strong style="color:#10b981;">$14,580.00 MXN</strong>',
+    '{{folio_os}}': '<strong>OS-26045</strong>',
+    '{{marca_modelo}}': '<strong>GENIE GS-1930</strong>',
+    '{{serie}}': '<strong>GS3015A-12345</strong>',
+    '{{link}}': '<a href="#" onclick="return false;" style="display:inline-block; padding:0.5rem 1rem; background:var(--accent); color:white; text-decoration:none; border-radius:6px; font-weight:600; font-size:0.8rem; margin:0.5rem 0;">Ir al Portal de Clientes</a>',
+    '{{comentario}}': '<em style="color:var(--text-secondary); background:var(--bg-hover); padding:0.5rem; display:block; border-left:3px solid var(--accent); margin:0.5rem 0;">"Estimados, favor de confirmar si las refacciones ya vienen en camino."</em>',
+    '{{estatus_ticket}}': '<strong style="color:var(--orange);">En Proceso</strong>',
+    '{{fecha_visita}}': '<strong>28 de Agosto, 2026 a las 10:00 AM</strong>',
+    '{{tecnico_nombre}}': '<strong>Ing. Luis Gress</strong>',
+    '{{maquinaria}}': '<strong>GENIE GS-1930 (Serie: GS3015A-12345)</strong>',
+    '{{categoria_ticket}}': '<strong>Soporte Técnico / Correctivo</strong>',
+    '{{solicitante}}': '<strong>Ing. Alejandro Gómez</strong>',
+    '{{descripcion_ticket}}': '<em style="color:var(--text-secondary); display:block; padding-left:0.5rem; border-left:2px solid var(--border);">"La plataforma no enciende, marca código de error OL en el control."</em>',
+    '{{asunto_ticket}}': '<strong>Falla de encendido en plataforma GS-1930</strong>'
+  };
+  
+  let renderedAsunto = asuntoInput;
+  let renderedCuerpo = cuerpoInput;
+
+  // Replace mock data
+  for (const [key, value] of Object.entries(mockData)) {
+    const escapedKey = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const regex = new RegExp(escapedKey, 'g');
+    renderedAsunto = renderedAsunto.replace(regex, key.replace('{{', '').replace('}}', '').toUpperCase());
+    renderedCuerpo = renderedCuerpo.replace(regex, value);
+  }
+  
+  // Convert newlines to HTML breaks
+  renderedCuerpo = renderedCuerpo.replace(/\n/g, '<br>');
+  
+  previewAsunto.textContent = renderedAsunto || '(Sin Asunto)';
+  previewCuerpo.innerHTML = window.obtenerHtmlPlantillaProfesional(
+    renderedCuerpo || '<span style="color:var(--text-muted); font-style:italic;">Escribe el cuerpo del correo en el editor para ver la vista previa...</span>'
+  );
+};
+
+window.formatText = function(action) {
+  const txt = document.getElementById('ap-cuerpo');
+  if (!txt) return;
+  
+  const start = txt.selectionStart;
+  const end = txt.selectionEnd;
+  const selectedText = txt.value.substring(start, end);
+  let replacement = '';
+  
+  switch(action) {
+    case 'bold':
+      replacement = `<strong>${selectedText || 'texto en negrita'}</strong>`;
+      break;
+    case 'italic':
+      replacement = `<em>${selectedText || 'texto en cursiva'}</em>`;
+      break;
+    case 'underline':
+      replacement = `<u style="text-decoration:underline;">${selectedText || 'texto subrayado'}</u>`;
+      break;
+    case 'h2':
+      replacement = `<h2 style="font-size:1.25rem; font-weight:700; color:var(--text-primary); margin-top:1rem; margin-bottom:0.5rem;">${selectedText || 'Título'}</h2>`;
+      break;
+    case 'h3':
+      replacement = `<h3 style="font-size:1.1rem; font-weight:600; color:var(--text-primary); margin-top:0.75rem; margin-bottom:0.35rem;">${selectedText || 'Subtítulo'}</h3>`;
+      break;
+    case 'p':
+      replacement = `<p style="margin-bottom:0.75rem;">${selectedText || 'Párrafo de texto...'}</p>`;
+      break;
+    case 'ul':
+      replacement = `<ul style="padding-left:1.25rem; margin-bottom:0.75rem; list-style-type:disc;">\n  <li>${selectedText || 'Elemento 1'}</li>\n  <li>Elemento 2</li>\n</ul>`;
+      break;
+    case 'link':
+      const url = prompt('Ingresa la URL del enlace:', 'https://');
+      if (url === null) return;
+      const anchorText = selectedText || prompt('Texto del enlace:', 'Haz clic aquí');
+      if (anchorText === null) return;
+      replacement = `<a href="${url}" target="_blank" style="color:var(--accent); text-decoration:underline; font-weight:600;">${anchorText}</a>`;
+      break;
+    case 'image':
+      const imageUrl = prompt('Ingresa la URL de la imagen:', 'https://');
+      if (imageUrl === null) return;
+      replacement = `<img src="${imageUrl}" alt="Imagen" style="max-width:100%; height:auto; border-radius:6px; margin:0.5rem 0;" />`;
+      break;
+  }
+  
+  const currentVal = txt.value;
+  txt.value = currentVal.substring(0, start) + replacement + currentVal.substring(end);
+  txt.focus();
+  txt.selectionStart = txt.selectionEnd = start + replacement.length;
+  
+  actualizarVistaPreviaEmail();
+};
+
+window.ejecutarAutomatizacion = async function(evento, contexto) {
+  try {
+    const rules = safeGetJSON('sapi_automation_rules', defaultRules);
+    const templates = safeGetJSON('sapi_email_templates', defaultTemplates);
+    
+    // Find active rules for this trigger event
+    const activeRules = rules.filter(r => r.evento === evento && r.activo === true);
+    if (activeRules.length === 0) return;
+    
+    console.log(`[Automation] Ejecutando ${activeRules.length} reglas activas para el evento "${evento}"...`);
+    
+    // Get authorization token
+    let token = '';
+    if (window.supabaseClient && window.supabaseClient.auth) {
+      try {
+        const { data: sessionData } = await window.supabaseClient.auth.getSession();
+        token = sessionData?.session?.access_token || '';
+      } catch (authErr) {
+        console.warn('Could not read Supabase session token:', authErr);
+      }
+    }
+    
+    for (const rule of activeRules) {
+      const template = templates.find(t => t.id === rule.plantillaId);
+      if (!template) {
+        console.warn(`[Automation] No se encontró la plantilla ${rule.plantillaId} para la regla ${rule.nombre}`);
+        continue;
+      }
+      
+      // Determine recipient email
+      let toEmail = contexto.email || contexto.destinatario || '';
+      if (!toEmail) {
+        console.warn('[Automation] No se proporcionó correo del destinatario');
+        continue;
+      }
+      
+      // Interpolate Asunto
+      let subject = template.asunto;
+      // Interpolate Cuerpo
+      let body = template.cuerpo;
+      
+      const placeholders = {
+        '{{nombre_usuario}}': contexto.nombre_usuario || contexto.nombre || 'Usuario',
+        '{{nombre_cliente}}': contexto.nombre_cliente || contexto.cliente || 'Cliente',
+        '{{folio_ticket}}': contexto.folio_ticket || contexto.ticket || '',
+        '{{monto_cotizacion}}': contexto.monto_cotizacion || '',
+        '{{folio_os}}': contexto.folio_os || '',
+        '{{marca_modelo}}': contexto.marca_modelo || '',
+        '{{serie}}': contexto.serie || '',
+        '{{link}}': contexto.link || window.location.origin + '/cliente',
+        '{{comentario}}': contexto.comentario || '',
+        '{{estatus_ticket}}': contexto.estatus_ticket || '',
+        '{{fecha_visita}}': contexto.fecha_visita || '',
+        '{{tecnico_nombre}}': contexto.tecnico_nombre || '',
+        '{{maquinaria}}': contexto.maquinaria || '',
+        '{{categoria_ticket}}': contexto.categoria_ticket || '',
+        '{{solicitante}}': contexto.solicitante || '',
+        '{{descripcion_ticket}}': contexto.descripcion_ticket || '',
+        '{{asunto_ticket}}': contexto.asunto_ticket || ''
+      };
+      
+      for (const [key, value] of Object.entries(placeholders)) {
+        const targetStr = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const regex = new RegExp(targetStr, 'g');
+        subject = subject.replace(regex, value);
+        body = body.replace(regex, value);
+      }
+      
+      // Convert body breaks
+      body = body.replace(/\n/g, '<br>');
+      
+      const payload = {
+        to: toEmail,
+        subject: subject,
+        htmlBody: window.obtenerHtmlPlantillaProfesional(body)
+      };
+      
+      // Dispatch email request
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+          'X-Sapi-Client-Token': 'SapiSecuredClientToken'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (response.ok) {
+        console.log(`[Automation] Correo enviado con éxito para la regla "${rule.nombre}" a ${toEmail}`);
+      } else {
+        const errJson = await response.json().catch(() => ({}));
+        console.error(`[Automation] Error enviando correo para la regla "${rule.nombre}":`, errJson);
+      }
+    }
+  } catch (err) {
+    console.error('[Automation] Error general al ejecutar automatización:', err);
+  }
+};
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', dispararInicializacionGlobal);

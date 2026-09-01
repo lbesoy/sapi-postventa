@@ -718,7 +718,17 @@ async function inicializarDatos() {
       btnAdmin.className = 'btn-go-admin';
       btnAdmin.style.marginBottom = '0.5rem';
       btnAdmin.innerHTML = `<i data-lucide="arrow-left-right"></i> <span>Volver a Admin</span>`;
-      btnAdmin.onclick = () => { window.location.href = 'index.html'; };
+      btnAdmin.onclick = () => {
+        try {
+          const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
+          if (session.realRol) {
+            session.viewMode = session.realRol;
+            localStorage.setItem('eurorep_session', JSON.stringify(session));
+          }
+          localStorage.removeItem('superadmin_simulated_user_id');
+        } catch (e) {}
+        window.location.href = 'index.html';
+      };
       
       const logoutBtn = sidebarFooter.querySelector('.btn-logout');
       if (logoutBtn) {

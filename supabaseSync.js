@@ -1017,7 +1017,15 @@ window.pushToSupabase = async function(tabla, item) {
     }
     
     // Upsert directo en la nube
-    const { error } = await sb.from(tabla).upsert(row);
+    let { error } = await sb.from(tabla).upsert(row);
+    if (error && tabla === 'ideas_fallas' && (error.message.includes('prioridad') || error.message.includes('orden') || error.message.includes('schema cache'))) {
+      console.warn('[Direct Push] Columnas de prioridad/orden no encontradas en Supabase ideas_fallas. Reintentando sin ellas...');
+      const fallbackRow = { ...row };
+      delete fallbackRow.prioridad;
+      delete fallbackRow.orden;
+      const resFallback = await sb.from(tabla).upsert(fallbackRow);
+      error = resFallback.error;
+    }
     if (error) {
       console.error(`[Direct Push] Error al guardar en ${tabla}:`, error.message);
       if (typeof window.mostrarNotificacion === 'function') {
