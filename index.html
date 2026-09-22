@@ -43,7 +43,7 @@
       }
     } else if (typeof window !== 'undefined') {
       // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
-      const currentAppVer = '1.3.240';
+      const currentAppVer = '1.3.295';
       const lastAppVer = localStorage.getItem('sapi_app_version');
       if (lastAppVer !== currentAppVer) {
         if ('serviceWorker' in navigator) {
@@ -87,8 +87,8 @@
   <script src="https://js.live.net/v7.2/OneDrive.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
-  <link rel="stylesheet" href="theme-base.css?v=1" />
-  <link rel="stylesheet" href="style.css?v=56" />
+  <link rel="stylesheet" href="theme-base.css?v=2" />
+  <link rel="stylesheet" href="style.css?v=58" />
   <!-- PWA & Mobile Web App Capabilities -->
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="logo_transparent.png" type="image/png" />
@@ -233,7 +233,7 @@
         </div>
       </div>
 
-      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: var(--text-muted);" id="login-app-version">v1.3.290</div>
+      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: var(--text-muted);" id="login-app-version">v1.3.295</div>
     </div>
   </div>
 
@@ -251,15 +251,19 @@
         </a>
         <a href="#" class="nav-item" data-view="tickets" data-title="Tickets" id="nav-tickets">
           <span class="nav-icon"><i data-lucide="ticket"></i></span><span>Tickets</span>
-          <span class="nav-badge" id="nav-badge-tickets"></span>
+          <span class="nav-badge" id="nav-badge-tickets" style="display:none;"></span>
         </a>
         <a href="#" class="nav-item" data-view="levantamientos" data-title="Levantamientos" id="nav-levantamientos">
           <span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span>Levantamientos</span>
-          <span class="nav-badge" id="nav-badge-levantamientos"></span>
+          <span class="nav-badge" id="nav-badge-levantamientos" style="display:none;"></span>
         </a>
         <a href="#" class="nav-item" data-view="servicios" data-title="Órdenes de Servicio" id="nav-servicios">
           <span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span>Órdenes de Servicio</span>
-          <span class="nav-badge" id="nav-badge-ordenes"></span>
+          <span class="nav-badge" id="nav-badge-ordenes" style="display:none;"></span>
+        </a>
+        <a href="#" class="nav-item" data-view="envios" data-title="Envíos" id="nav-envios">
+          <span class="nav-icon"><i data-lucide="truck"></i></span><span>Envíos</span>
+          <span class="nav-badge" id="nav-badge-envios" style="display:none;"></span>
         </a>
         <a href="#" class="nav-item" data-view="calendario" data-title="Calendario" id="nav-calendario">
           <span class="nav-icon"><i data-lucide="calendar"></i></span><span>Calendario</span>
@@ -309,7 +313,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version" id="app-sidebar-version">v1.3.290</div>
+          <div class="sidebar-version" id="app-sidebar-version">v1.3.295</div>
         </div>
       </div>
     </aside>
@@ -400,7 +404,6 @@
             <button class="btn-secondary btn-cliente-action" id="btn-agregar-maquina"
               onclick="abrirModalAgregarMaquina()" style="display:none;"><i data-lucide="settings-2"
                 class="btn-icon"></i> <span class="btn-text">Agregar Máquina</span></button>
-
           </div>
         </div>
       </header>
@@ -417,7 +420,7 @@
             style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem;">
             <h2 style="margin:0; font-size:1.4rem;">Panel Principal</h2>
             <!-- Date Filter Dropdown -->
-            <div style="display:flex; align-items:center; gap:0.5rem; margin-left:auto;">
+            <div id="dash-date-filter-container" style="display:flex; align-items:center; gap:0.5rem; margin-left:auto;">
               <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Periodo:</span>
               <select id="dash-date-filter" onchange="onDashFilterChange()" style="padding:0.4rem 1.75rem 0.4rem 0.75rem; border-radius:8px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); font-size:0.85rem; font-weight:600; cursor:pointer; outline:none; appearance:none; -webkit-appearance:none; background-image:url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23a0aec0%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E'); background-repeat:no-repeat; background-position:right%2010px%20top%2050%25; background-size:8px%20auto; min-width:130px; transition: border-color 0.2s;">
                 <option value="all" selected>Histórico</option>
@@ -432,6 +435,12 @@
                 style="padding:0.4rem 1rem; border:none; background:var(--bg-card); box-shadow:0 1px 3px rgba(0,0,0,0.1); color:var(--text-primary); font-weight:600;">Resumen General</button>
               <button class="btn-secondary" id="btn-dash-tecnicos" onclick="setDashView('tecnicos')"
                 style="padding:0.4rem 1rem; border:none; background:transparent; color:var(--text-muted); font-weight:500;">Técnicos</button>
+              <button class="btn-secondary" id="btn-dash-junta" onclick="setDashView('junta')"
+                style="padding:0.4rem 1rem; border:none; background:transparent; color:var(--text-muted); font-weight:500; display:inline-flex; align-items:center; gap:0.35rem;">
+                <i data-lucide="presentation" style="width:14px;height:14px;color:var(--accent);"></i>
+                <span>Revisión de Juntas</span>
+                <span class="junta-btn-count" id="dash-tab-badge-junta" style="background:rgba(232,130,12,0.15); color:var(--accent); display:none;">0</span>
+              </button>
             </div>
           </div>
           
@@ -766,6 +775,311 @@
             </div>
 
           </div><!-- /dash-content-v2 -->
+
+          <!-- ===== DASHBOARD REVISIÓN DE JUNTAS Y PENDIENTES ===== -->
+          <div id="dash-content-junta" style="display:none; flex-direction:column; gap:1.25rem;">
+            
+            <!-- SUB- HEADER PANEL JUNTA -->
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.75rem; border-bottom:1px solid var(--border); padding-bottom:0.85rem;">
+              <div>
+                <div style="display:flex; align-items:center; gap:0.6rem;">
+                  <h3 style="margin:0; font-size:1.2rem; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:0.5rem;">
+                    <i data-lucide="presentation" style="width:20px;height:20px;color:var(--accent);"></i> Panel de Revisión de Juntas y Pendientes
+                  </h3>
+                  <span id="junta-badge-total-header" style="background:var(--accent); color:white; font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:999px;">0 pendientes</span>
+                </div>
+                <p style="margin:0.25rem 0 0 0; font-size:0.85rem; color:var(--text-muted);">Consolidado operativo para juntas semanales: impacto financiero, cuellos de botella, ronda de técnicos y acuerdos inmediatos.</p>
+              </div>
+              <div style="display:flex; gap:0.5rem; align-items:center;">
+                <button type="button" class="btn-secondary" id="btn-junta-fullscreen-toggle" onclick="window.toggleFullscreenJunta()" style="font-size:0.82rem; padding:0.45rem 0.65rem; display:inline-flex; align-items:center; justify-content:center;" title="Modo Proyector / Pantalla Completa">
+                  <i data-lucide="maximize-2" id="icon-junta-fullscreen" style="width:16px; height:16px;"></i>
+                </button>
+                <button type="button" class="btn-secondary" onclick="window.renderJuntaRevision()" style="display:flex; align-items:center; gap:0.4rem; font-size:0.82rem; padding:0.45rem 0.75rem;">
+                  <i data-lucide="refresh-cw" style="width:14px;height:14px;"></i> Actualizar
+                </button>
+              </div>
+            </div>
+
+            <!-- KPI METRICS RIBBON (CLICKABLE) -->
+            <div class="junta-kpi-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.75rem; margin-bottom: 0.25rem;">
+              
+              <!-- KPI 1: TOTAL -->
+              <div class="junta-kpi-card active" id="kpi-card-todos" onclick="window.setJuntaTipoFiltro('todos')" style="cursor: pointer; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.35rem; position: relative; transition: all 0.2s ease;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Total Pendientes</span>
+                  <i data-lucide="layers" style="width: 16px; height: 16px; color: var(--accent);"></i>
+                </div>
+                <div style="display: flex; align-items: baseline; gap: 0.5rem;">
+                  <span id="junta-kpi-total" style="font-size: 1.6rem; font-weight: 800; color: var(--text-primary); line-height: 1;">0</span>
+                  <span id="junta-kpi-total-sub" style="font-size: 0.75rem; color: var(--text-muted);">activos</span>
+                </div>
+              </div>
+
+              <!-- KPI 2: TICKETS -->
+              <div class="junta-kpi-card" id="kpi-card-ticket" onclick="window.setJuntaTipoFiltro('ticket')" style="cursor: pointer; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.35rem; position: relative; transition: all 0.2s ease;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #8b5cf6; letter-spacing: 0.05em;">Tickets Pendientes</span>
+                  <i data-lucide="ticket" style="width: 16px; height: 16px; color: #8b5cf6;"></i>
+                </div>
+                <div style="display: flex; align-items: baseline; gap: 0.5rem;">
+                  <span id="junta-kpi-tickets" style="font-size: 1.6rem; font-weight: 800; color: #8b5cf6; line-height: 1;">0</span>
+                  <span id="junta-kpi-tickets-sub" style="font-size: 0.72rem; color: var(--text-muted);">0 +15 días</span>
+                </div>
+              </div>
+
+              <!-- KPI 3: ÓRDENES -->
+              <div class="junta-kpi-card" id="kpi-card-orden" onclick="window.setJuntaTipoFiltro('orden')" style="cursor: pointer; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.35rem; position: relative; transition: all 0.2s ease;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #10b981; letter-spacing: 0.05em;">Órdenes de Servicio</span>
+                  <i data-lucide="clipboard-list" style="width: 16px; height: 16px; color: #10b981;"></i>
+                </div>
+                <div style="display: flex; align-items: baseline; gap: 0.5rem;">
+                  <span id="junta-kpi-ordenes" style="font-size: 1.6rem; font-weight: 800; color: #10b981; line-height: 1;">0</span>
+                  <span id="junta-kpi-ordenes-sub" style="font-size: 0.72rem; color: var(--text-muted);">0 sin firma</span>
+                </div>
+              </div>
+
+              <!-- KPI 4: ENVÍOS -->
+              <div class="junta-kpi-card" id="kpi-card-envio" onclick="window.setJuntaTipoFiltro('envio')" style="cursor: pointer; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.35rem; position: relative; transition: all 0.2s ease;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #f59e0b; letter-spacing: 0.05em;">Envíos / Guías</span>
+                  <i data-lucide="truck" style="width: 16px; height: 16px; color: #f59e0b;"></i>
+                </div>
+                <div style="display: flex; align-items: baseline; gap: 0.5rem;">
+                  <span id="junta-kpi-envios" style="font-size: 1.6rem; font-weight: 800; color: #f59e0b; line-height: 1;">0</span>
+                  <span id="junta-kpi-envios-sub" style="font-size: 0.72rem; color: var(--text-muted);">0 sin guía</span>
+                </div>
+              </div>
+
+              <!-- KPI 5: LEVANTAMIENTOS -->
+              <div class="junta-kpi-card" id="kpi-card-levantamiento" onclick="window.setJuntaTipoFiltro('levantamiento')" style="cursor: pointer; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.35rem; position: relative; transition: all 0.2s ease;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #06b6d4; letter-spacing: 0.05em;">Levantamientos</span>
+                  <i data-lucide="clipboard-check" style="width: 16px; height: 16px; color: #06b6d4;"></i>
+                </div>
+                <div style="display: flex; align-items: baseline; gap: 0.5rem;">
+                  <span id="junta-kpi-levantamientos" style="font-size: 1.6rem; font-weight: 800; color: #06b6d4; line-height: 1;">0</span>
+                  <span id="junta-kpi-levantamientos-sub" style="font-size: 0.72rem; color: var(--text-muted);">0 por realizar</span>
+                </div>
+              </div>
+
+              <!-- KPI 6: ALERTA > 7 DÍAS -->
+              <div class="junta-kpi-card" id="kpi-card-alertas" onclick="window.setJuntaAntiguedadFiltro('alerta_7')" style="cursor: pointer; background: linear-gradient(135deg, rgba(239,68,68,0.08) 0%, rgba(239,68,68,0.02) 100%); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.35rem; position: relative; transition: all 0.2s ease;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #ef4444; letter-spacing: 0.05em;">Alerta (>7 Días)</span>
+                  <i data-lucide="alert-triangle" style="width: 16px; height: 16px; color: #ef4444;"></i>
+                </div>
+                <div style="display: flex; align-items: baseline; gap: 0.5rem;">
+                  <span id="junta-kpi-criticos" style="font-size: 1.6rem; font-weight: 800; color: #ef4444; line-height: 1;">0</span>
+                  <span id="junta-kpi-criticos-sub" style="font-size: 0.72rem; color: #ef4444;">rezagos críticos</span>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- FILA DE IMPACTO FINANCIERO Y OPERATIVO (OPCIÓN 2) -->
+            <div class="junta-financial-ribbon" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem; margin-bottom: 0.5rem;">
+              
+              <div class="junta-fin-card" style="background: linear-gradient(135deg, rgba(16,185,129,0.08) 0%, var(--bg-card) 100%); border: 1px solid rgba(16,185,129,0.25); border-radius: 12px; padding: 0.85rem 1.1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+                <div style="display: flex; flex-direction: column; gap: 0.2rem;">
+                  <div style="font-size: 0.74rem; font-weight: 700; color: #10b981; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
+                    <i data-lucide="badge-dollar-sign" style="width: 15px; height: 15px;"></i> Monto Cotizado en Espera
+                  </div>
+                  <div id="junta-fin-cotizaciones" style="font-size: 1.45rem; font-weight: 800; color: var(--text-primary); font-family: monospace; letter-spacing: -0.5px;">$0.00 MXN</div>
+                  <div id="junta-fin-cotizaciones-sub" style="font-size: 0.74rem; color: var(--text-muted);">0 cotizaciones abiertas esperando OC/Autorización</div>
+                </div>
+                <div style="background: rgba(16,185,129,0.12); color: #10b981; width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                  <i data-lucide="receipt" style="width: 22px; height: 22px;"></i>
+                </div>
+              </div>
+
+              <div class="junta-fin-card" style="background: linear-gradient(135deg, rgba(232,130,12,0.08) 0%, var(--bg-card) 100%); border: 1px solid rgba(232,130,12,0.25); border-radius: 12px; padding: 0.85rem 1.1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+                <div style="display: flex; flex-direction: column; gap: 0.2rem;">
+                  <div style="font-size: 0.74rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
+                    <i data-lucide="file-signature" style="width: 15px; height: 15px;"></i> Órdenes Pendientes de Firma
+                  </div>
+                  <div id="junta-fin-ordenes" style="font-size: 1.45rem; font-weight: 800; color: var(--text-primary); font-family: monospace; letter-spacing: -0.5px;">0 órdenes</div>
+                  <div id="junta-fin-ordenes-sub" style="font-size: 0.74rem; color: var(--text-muted);">Detenidas para validación y facturación</div>
+                </div>
+                <div style="background: rgba(232,130,12,0.12); color: var(--accent); width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                  <i data-lucide="edit" style="width: 22px; height: 22px;"></i>
+                </div>
+              </div>
+
+              <div class="junta-fin-card" style="background: linear-gradient(135deg, rgba(236,72,153,0.08) 0%, var(--bg-card) 100%); border: 1px solid rgba(236,72,153,0.25); border-radius: 12px; padding: 0.85rem 1.1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+                <div style="display: flex; flex-direction: column; gap: 0.2rem;">
+                  <div style="font-size: 0.74rem; font-weight: 700; color: #ec4899; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
+                    <i data-lucide="package-search" style="width: 15px; height: 15px;"></i> Refacciones Requeridas
+                  </div>
+                  <div id="junta-fin-refacciones" style="font-size: 1.45rem; font-weight: 800; color: var(--text-primary); font-family: monospace; letter-spacing: -0.5px;">0 piezas</div>
+                  <div id="junta-fin-refacciones-sub" style="font-size: 0.74rem; color: var(--text-muted);">Esperando llegada de compras / proveedor</div>
+                </div>
+                <div style="background: rgba(236,72,153,0.12); color: #ec4899; width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                  <i data-lucide="boxes" style="width: 22px; height: 22px;"></i>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- DIAGNÓSTICO DE CAUSAS RAÍZ / CUELLOS DE BOTELLA SISTÉMICOS (OPCIÓN 5) -->
+            <div id="junta-bottleneck-analytics-box" class="junta-analytics-card" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 0.9rem 1.1rem; margin-bottom: 0.5rem; transition: all 0.2s ease;">
+              <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="window.toggleJuntaAnalytics()">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <div style="width: 28px; height: 28px; border-radius: 6px; background: rgba(232,130,12,0.15); color: var(--accent); display: flex; align-items: center; justify-content: center;">
+                    <i data-lucide="bar-chart-3" style="width: 16px; height: 16px;"></i>
+                  </div>
+                  <div>
+                    <span style="font-size: 0.88rem; font-weight: 700; color: var(--text-primary);">Diagnóstico de Causas Raíz y Cuellos de Botella</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">(Haz clic en una causa para filtrar los casos asociados)</span>
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; font-weight: 600; color: var(--accent);">
+                  <span id="junta-analytics-toggle-text">Ver Diagnóstico</span>
+                  <i data-lucide="chevron-down" id="icon-junta-analytics-chevron" style="width: 15px; height: 15px;"></i>
+                </div>
+              </div>
+
+              <!-- Contenedor desplegable de barras -->
+              <div id="junta-bottleneck-bars-container" style="display: none; margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.85rem; display: flex; flex-direction: column; gap: 0.65rem;">
+                <!-- Renderizado dinámico desde app.js -->
+              </div>
+            </div>
+
+            <!-- TABLA DE RESPONSABLES CON MÁS PENDIENTES -->
+            <div id="junta-responsables-table-box" class="junta-analytics-card" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 0.9rem 1.1rem; margin-bottom: 0.5rem; transition: all 0.2s ease;">
+              <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="window.toggleJuntaResponsablesTable()">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <div style="width: 28px; height: 28px; border-radius: 6px; background: rgba(79,142,247,0.15); color: #4f8ef7; display: flex; align-items: center; justify-content: center;">
+                    <i data-lucide="users" style="width: 16px; height: 16px;"></i>
+                  </div>
+                  <div>
+                    <span style="font-size: 0.88rem; font-weight: 700; color: var(--text-primary);">Tabla de Responsables con Más Pendientes</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">(Haz clic en un responsable para filtrar sus casos)</span>
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; font-weight: 600; color: #4f8ef7;">
+                  <span id="junta-resp-table-toggle-text">Ocultar Tabla</span>
+                  <i data-lucide="chevron-up" id="icon-junta-resp-table-chevron" style="width: 15px; height: 15px;"></i>
+                </div>
+              </div>
+
+              <!-- Contenedor de la tabla de responsables -->
+              <div id="junta-responsables-table-container" style="display: block; margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.85rem; overflow-x: auto;">
+                <!-- Renderizado dinámico desde app.js -->
+              </div>
+            </div>
+
+            <!-- CHIP DE FILTRO DE CAUSA ACTIVO -->
+            <div id="junta-causa-active-badge" style="display: none; align-items: center; gap: 0.5rem; background: rgba(232,130,12,0.12); border: 1px solid var(--accent); padding: 0.4rem 0.85rem; border-radius: 8px; font-size: 0.8rem; color: var(--text-primary); margin-bottom: 0.25rem;">
+              <span>Filtrado por causa raíz: <strong id="junta-causa-active-text" style="color: var(--accent);">—</strong></span>
+              <button type="button" onclick="window.juntaFiltrarPorCausa('todos')" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; font-weight: bold; margin-left: auto;">✕ Quitar Filtro</button>
+            </div>
+
+            <!-- CHIP DE FILTRO DE RESPONSABLE ACTIVO -->
+            <div id="junta-resp-active-badge" style="display: none; align-items: center; gap: 0.5rem; background: rgba(79,142,247,0.12); border: 1px solid #4f8ef7; padding: 0.4rem 0.85rem; border-radius: 8px; font-size: 0.8rem; color: var(--text-primary); margin-bottom: 0.25rem;">
+              <span>Filtrado por responsable: <strong id="junta-resp-active-text" style="color: #4f8ef7;">—</strong></span>
+              <button type="button" onclick="window.quitarFiltroResponsableJunta()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; font-weight: bold; margin-left: auto;">✕ Quitar Filtro</button>
+            </div>
+
+            <!-- CONTROL PANEL / FILTERS -->
+            <div class="junta-filter-bar" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; display: flex; flex-direction: column; gap: 0.85rem; box-shadow: var(--shadow-sm);">
+              
+              <!-- FILA 1: PÍLDORAS DE TIPO + SELECTOR DE MODO DE VISTA (OPCIÓN 3) -->
+              <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem;">
+                
+                <!-- SELECTOR DE VISTA: TARJETAS VS RONDA DE RESPONSABLES -->
+                <div class="junta-viewmode-toggle" style="display: flex; background: var(--bg-hover); padding: 0.25rem; border-radius: 8px; border: 1px solid var(--border); gap: 0.25rem;">
+                  <button type="button" id="junta-mode-tarjetas" class="junta-mode-btn active" onclick="window.setJuntaViewMode('tarjetas')" style="border: none; border-radius: 6px; padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
+                    <i data-lucide="layout-grid" style="width: 13px; height: 13px;"></i> <span>Vista Tarjetas</span>
+                  </button>
+                  <button type="button" id="junta-mode-responsables" class="junta-mode-btn" onclick="window.setJuntaViewMode('responsables')" style="border: none; border-radius: 6px; padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
+                    <i data-lucide="users" style="width: 13px; height: 13px;"></i> <span>Ronda por Responsable</span>
+                  </button>
+                </div>
+
+                <!-- PÍLDORAS DE TIPO -->
+                <div class="junta-pills-container" style="display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center;">
+                  <button type="button" class="junta-type-btn active" id="pill-junta-todos" data-tipo="todos" onclick="window.setJuntaTipoFiltro('todos')">Todos <span class="junta-btn-count" id="count-pill-todos">0</span></button>
+                  <button type="button" class="junta-type-btn" id="pill-junta-ticket" data-tipo="ticket" onclick="window.setJuntaTipoFiltro('ticket')"><i data-lucide="ticket" style="width:13px;height:13px;"></i> Tickets <span class="junta-btn-count" id="count-pill-ticket">0</span></button>
+                  <button type="button" class="junta-type-btn" id="pill-junta-orden" data-tipo="orden" onclick="window.setJuntaTipoFiltro('orden')"><i data-lucide="clipboard-list" style="width:13px;height:13px;"></i> Órdenes <span class="junta-btn-count" id="count-pill-orden">0</span></button>
+                  <button type="button" class="junta-type-btn" id="pill-junta-envio" data-tipo="envio" onclick="window.setJuntaTipoFiltro('envio')"><i data-lucide="truck" style="width:13px;height:13px;"></i> Envíos <span class="junta-btn-count" id="count-pill-envio">0</span></button>
+                  <button type="button" class="junta-type-btn" id="pill-junta-cotizacion" data-tipo="cotizacion" onclick="window.setJuntaTipoFiltro('cotizacion')"><i data-lucide="receipt" style="width:13px;height:13px;"></i> Cotizaciones <span class="junta-btn-count" id="count-pill-cotizacion">0</span></button>
+                  <button type="button" class="junta-type-btn" id="pill-junta-levantamiento" data-tipo="levantamiento" onclick="window.setJuntaTipoFiltro('levantamiento')"><i data-lucide="clipboard-check" style="width:13px;height:13px;"></i> Levantamientos <span class="junta-btn-count" id="count-pill-levantamiento">0</span></button>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <button type="button" id="junta-urgente-toggle-btn" class="junta-urgente-btn" onclick="window.toggleJuntaUrgenteFiltro()" style="border: 1px solid var(--border); background: var(--bg-hover); color: var(--text-secondary); border-radius: 8px; padding: 0.4rem 0.75rem; font-size: 0.78rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; transition: all 0.15s ease;">
+                    <i data-lucide="flame" style="width: 14px; height: 14px;"></i> <span>Solo Urgentes / Alta Prioridad</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- FILA 2: FILTROS MULTI-CRITERIO Y BÚSQUEDA -->
+              <div style="display: grid; grid-template-columns: 2fr 1.3fr 1.3fr 1.3fr 1.6fr; gap: 0.65rem; align-items: center;" class="junta-filters-grid">
+                
+                <!-- BUSCADOR EN VIVO -->
+                <div style="position: relative;">
+                  <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--text-muted); pointer-events: none;"></i>
+                  <input type="text" id="junta-search-input" placeholder="Buscar folio, cliente, técnico, falla, notas..." oninput="window.aplicarFiltrosJunta()" style="width: 100%; padding: 0.5rem 0.65rem 0.5rem 2rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-hover); color: var(--text-primary); font-size: 0.85rem;" />
+                </div>
+
+                <!-- FILTRO CLIENTE -->
+                <div>
+                  <select id="junta-filter-cliente" onchange="window.aplicarFiltrosJunta()" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-hover); color: var(--text-primary); font-size: 0.82rem;">
+                    <option value="todos">Todos los Clientes</option>
+                  </select>
+                </div>
+
+                <!-- FILTRO RESPONSABLE -->
+                <div>
+                  <select id="junta-filter-responsable" onchange="window.aplicarFiltrosJunta()" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-hover); color: var(--text-primary); font-size: 0.82rem;">
+                    <option value="todos">Todos los Responsables</option>
+                  </select>
+                </div>
+
+                <!-- FILTRO ANTIGÜEDAD -->
+                <div>
+                  <select id="junta-filter-antiguedad" onchange="window.aplicarFiltrosJunta()" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-hover); color: var(--text-primary); font-size: 0.82rem;">
+                    <option value="todos">Cualquier Antigüedad</option>
+                    <option value="hoy">Hoy / Recientes</option>
+                    <option value="mayor_3">&gt; 3 Días</option>
+                    <option value="alerta_7">&gt; 7 Días (Alerta)</option>
+                    <option value="critico_14">&gt; 14 Días (Crítico)</option>
+                  </select>
+                </div>
+
+                <!-- ORDENAR POR -->
+                <div>
+                  <select id="junta-sort-by" onchange="window.aplicarFiltrosJunta()" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--accent); background: var(--bg-hover); color: var(--text-primary); font-size: 0.82rem; font-weight: 600;">
+                    <option value="antiguedad_desc">⏳ Más antiguos primero (Mayor rezago)</option>
+                    <option value="antiguedad_asc">🆕 Más recientes primero</option>
+                    <option value="prioridad">🚨 Mayor prioridad primero</option>
+                    <option value="cliente">🏢 Cliente (A - Z)</option>
+                    <option value="responsable">👤 Responsable (A - Z)</option>
+                  </select>
+                </div>
+
+              </div>
+
+            </div>
+
+            <!-- CONTADOR RESULTADOS Y RESET -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 0.25rem;">
+              <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 0.4rem;">
+                <span>Mostrando:</span>
+                <span id="junta-items-count-label" style="color: var(--accent); font-weight: 700;">0 elementos</span>
+              </div>
+              <button type="button" onclick="window.resetFiltrosJunta()" class="btn-text-action" style="font-size: 0.78rem; color: var(--text-muted); background: none; border: none; cursor: pointer; text-decoration: underline;">
+                Restablecer Filtros
+              </button>
+            </div>
+
+            <!-- CONTENEDOR DE TARJETAS O GRUPOS DE RESPONSABLES -->
+            <div id="junta-cards-container" class="junta-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 0.85rem;">
+              <!-- Renderizado dinámico desde app.js -->
+            </div>
+
+          </div><!-- /dash-content-junta -->
           
           <!-- /dash-v1 -->
 
@@ -814,13 +1128,19 @@
             <h2>Todas las Órdenes</h2>
             <div style="display:flex; gap:0.5rem; flex-wrap:nowrap; align-items:center; flex:1; justify-content:flex-end;">
               <div class="search-bar" style="width:100%; max-width:400px; margin:0;">
-                <input type="text" id="search-servicios" placeholder="Buscar..." oninput="filtrarOrdenes('servicios')" />
+                <input type="text" id="search-servicios" placeholder="Buscar por Folio, Ticket, Cliente, Ubicación..." oninput="filtrarOrdenes('servicios')" autocomplete="off" />
               </div>
               <button class="action-btn" onclick="regenerarOrdenesDesdeTickets()"
                 id="btn-regenerar-ordenes"
                 title="Regenerar Órdenes desde Tickets Cerrados"
                 style="height:38px; display:none; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--orange, #f59e0b); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
                 <i data-lucide="refresh-cw" class="btn-icon" style="width:14px;height:14px;"></i> Regenerar Órdenes
+              </button>
+              <button class="action-btn" onclick="window.abrirModalDepurarOrdenes()"
+                id="btn-depurar-ordenes-ref"
+                title="Depurar Órdenes de Refacciones y Garantías (Superadmin)"
+                style="height:38px; display:none; align-items:center; gap:0.4rem; padding:0 0.75rem; background:rgba(234, 88, 12, 0.1); border:1px solid rgba(234, 88, 12, 0.3); border-radius:var(--radius-sm); color:var(--accent, #ea580c); cursor:pointer; font-size:0.8rem; font-weight:600; white-space:nowrap;">
+                <i data-lucide="trash-2" class="btn-icon" style="width:14px;height:14px;"></i> Depurar Órdenes (<span id="badge-count-ordenes-ref">0</span>)
               </button>
             </div>
           </div>
@@ -844,6 +1164,101 @@
               <tbody id="tabla-body-servicios">
                 <tr>
                   <td colspan="10" class="empty-state">Sin órdenes aún.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ENVIOS VIEW -->
+        <!-- ENVIOS VIEW -->
+        <div id="view-envios" class="view">
+          <!-- Stats Grid -->
+          <div class="stats-grid-5" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 1.5rem;">
+            <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('filter-envios-estado').value='todos'; window.renderEnvios();">
+              <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="package"></i></div>
+              <div>
+                <div class="stat-label">Total Guías</div>
+                <div class="stat-value" id="stat-envios-total">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('filter-envios-estado').value='En Preparación'; window.renderEnvios();">
+              <div class="stat-icon" style="background:rgba(234,179,8,0.12);color:#eab308;"><i data-lucide="clock"></i></div>
+              <div>
+                <div class="stat-label">En Preparación</div>
+                <div class="stat-value" id="stat-envios-preparando">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('filter-envios-estado').value='En Tránsito'; window.renderEnvios();">
+              <div class="stat-icon" style="background:rgba(14,165,233,0.12);color:#0ea5e9;"><i data-lucide="navigation"></i></div>
+              <div>
+                <div class="stat-label">En Tránsito</div>
+                <div class="stat-value" id="stat-envios-transito">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('filter-envios-estado').value='Entregado'; window.renderEnvios();">
+              <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle-2"></i></div>
+              <div>
+                <div class="stat-label">Entregados</div>
+                <div class="stat-value" id="stat-envios-entregados">0</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section Controls & Filter Bar -->
+          <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+            <h2>Control de Envíos y Guías de Entrega</h2>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; flex:1; justify-content:flex-end;">
+              <div class="search-bar" style="width:100%; max-width:320px; margin:0;">
+                <input type="text" id="search-envios" placeholder="Buscar por guía, ticket, cliente, pieza..." oninput="window.renderEnvios()" autocomplete="off" />
+              </div>
+
+              <select id="filter-envios-estado" class="form-select" onchange="window.renderEnvios()" style="min-width:140px; height:38px;">
+                <option value="todos">Todos los Estados</option>
+                <option value="En Preparación">En Preparación</option>
+                <option value="En Tránsito">En Tránsito</option>
+                <option value="Entregado">Entregados</option>
+              </select>
+
+              <select id="filter-envios-paqueteria" class="form-select" onchange="window.renderEnvios()" style="min-width:150px; height:38px;">
+                <option value="todas">Todas las Paqueterías</option>
+                <option value="DHL">DHL</option>
+                <option value="FedEx">FedEx</option>
+                <option value="Estafeta">Estafeta</option>
+                <option value="Paquetexpress">Paquetexpress</option>
+                <option value="Redpack">Redpack</option>
+                <option value="Castores">Castores</option>
+                <option value="Tresguerras">Tresguerras</option>
+                <option value="Propio">Transporte Propio</option>
+              </select>
+
+              <button type="button" class="btn-primary" onclick="window.abrirModalNuevoEnvio()" style="height:38px; display:inline-flex; align-items:center; gap:0.4rem; padding:0 0.85rem; font-size:0.85rem; white-space:nowrap;">
+                <i data-lucide="plus" style="width:15px; height:15px;"></i> <span>+ Nueva Guía</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Tabla de Envíos -->
+          <div class="table-wrapper">
+            <table id="tabla-envios" class="orders-table">
+              <thead>
+                <tr>
+                  <th style="width: 75px; text-align:center;">Acciones</th>
+                  <th style="white-space:nowrap;">No. de Guía</th>
+                  <th style="white-space:nowrap;">Paquetería</th>
+                  <th style="white-space:nowrap;">Ticket</th>
+                  <th style="white-space:nowrap;">Cliente</th>
+                  <th style="white-space:nowrap;">Destino</th>
+                  <th>Refacciones / Contenido</th>
+                  <th style="white-space:nowrap;">Fecha Envío</th>
+                  <th style="white-space:nowrap;">Fecha Entrega</th>
+                  <th style="white-space:nowrap;">Estatus</th>
+                  <th style="width: 50px; text-align:center;">PDF</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-body-envios">
+                <tr>
+                  <td colspan="11" class="empty-state">Cargando envíos...</td>
                 </tr>
               </tbody>
             </table>
@@ -1246,6 +1661,9 @@
 
           <!-- CONTENEDOR 1: CATÁLOGO SAP -->
           <div id="clientes-catalogo-container">
+            <!-- INDICADOR KPI DISPONIBILIDAD DE FLOTA -->
+            <div id="cli-kpis-flota-container" style="margin-bottom: 1.25rem;"></div>
+
             <div class="section-header"
               style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
               <h2>Catálogo de Clientes</h2>
@@ -1462,6 +1880,9 @@
 
         <!-- MAQUINARIA VIEW -->
         <div id="view-maquinaria" class="view">
+          <!-- INDICADOR KPI DISPONIBILIDAD DE FLOTA MAQUINARIA -->
+          <div id="maq-kpis-flota-container" style="margin-bottom: 1.25rem;"></div>
+
           <div class="section-header"
             style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
             <h2>Catálogo de Maquinaria</h2>
@@ -1512,6 +1933,11 @@
               <button class="action-btn" id="btn-maq-fusionar" onclick="abrirModalFusionarMaquinas()"
                 style="display:none; height:38px; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--accent-light); border:1px solid var(--accent); color:var(--accent); border-radius:var(--radius-sm); font-size:0.85rem; font-weight:500; cursor:pointer;">
                 <i data-lucide="git-merge" style="width:16px;height:16px;"></i> Fusionar
+              </button>
+              <button class="action-btn" id="btn-maq-kits-servicio" onclick="window.abrirModalKitsServicio()"
+                title="Ver y Gestionar Machotes de Mantenimiento Preventivo (250h, 500h, 1000h)"
+                style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.85rem; background:rgba(37,99,235,0.08); border:1px solid rgba(37,99,235,0.25); color:#2563eb; border-radius:var(--radius-sm); font-size:0.85rem; font-weight:600; cursor:pointer; white-space:nowrap; transition:all 0.2s;">
+                <i data-lucide="package" style="width:16px;height:16px;"></i> Machotes de Servicio
               </button>
               <button class="action-btn" onclick="abrirModalAgregarMaquina()"
                 style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--accent); color:white; border-radius:var(--radius-sm); font-size:0.85rem; font-weight:500; border:none; cursor:pointer;">
@@ -2099,7 +2525,7 @@
 
         <!-- ===== VISTA PREFERENCIAS (GLOBAL) ===== -->
         <div class="view" id="view-preferencias">
-          <div style="max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem;">
+          <div style="width: 100%; display: flex; flex-direction: column; gap: 1.5rem;">
 
             <div class="config-card">
               <div class="config-card-header">
@@ -2154,7 +2580,7 @@
                     <div class="toggle-label">Versión de la Aplicación</div>
                     <div class="toggle-sub">Versión actualmente cargada</div>
                   </div>
-                  <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); background: var(--bg-body); padding: 0.25rem 0.6rem; border: 1px solid var(--border); border-radius: 4px;" id="app-profile-version">v1.3.293</div>
+                  <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); background: var(--bg-body); padding: 0.25rem 0.6rem; border: 1px solid var(--border); border-radius: 4px;" id="app-profile-version">v1.3.295</div>
                 </div>
                 <div class="toggle-row" style="border-top: 1px dashed var(--border); padding-top: 0.85rem; margin-top: 0.25rem; flex-direction: column; align-items: stretch; gap: 0.5rem;">
                   <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -2216,7 +2642,18 @@
                       <i data-lucide="download" class="manual-card-download-icon"></i>
                     </a>
                     
-                    <a href="manuales/manual_tecnico_desarrollador.pdf" target="_blank" class="manual-download-card" style="grid-column: span 2;">
+                    <a href="manuales/diagrama_flujo.html" target="_blank" class="manual-download-card featured" style="border-color: rgba(139, 92, 246, 0.4); background: rgba(139, 92, 246, 0.05);">
+                      <div class="manual-card-icon" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6;">
+                        <i data-lucide="network" style="width:16px; height:16px;"></i>
+                      </div>
+                      <div class="manual-card-info">
+                        <div class="manual-card-title" style="color:#a78bfa; font-weight:700;">Diagrama de Flujo del Proceso</div>
+                        <div class="manual-card-sub">Mapa interactivo: Euro SAPI vs. Portal Clientes</div>
+                      </div>
+                      <i data-lucide="external-link" class="manual-card-download-icon" style="color:#8b5cf6;"></i>
+                    </a>
+                    
+                    <a href="manuales/manual_tecnico_desarrollador.pdf" target="_blank" class="manual-download-card">
                       <div class="manual-card-icon">
                         <i data-lucide="code-2" style="width:16px; height:16px;"></i>
                       </div>
@@ -2228,6 +2665,361 @@
                     </a>
                     
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Depuración de Órdenes de Refacciones / Garantías (Superadmin) -->
+            <div class="config-card" id="card-superadmin-depuracion" style="display:none; border: 1px solid rgba(234, 88, 12, 0.3); background: rgba(234, 88, 12, 0.03);">
+              <div class="config-card-header">
+                <div class="config-card-icon" style="background:rgba(234, 88, 12, 0.15); color:var(--accent, #ea580c);">
+                  <i data-lucide="trash-2"></i>
+                </div>
+                <div style="flex:1;">
+                  <div class="config-card-title" style="display:flex; align-items:center; gap:0.5rem;">
+                    Depuración de Órdenes (Refacciones y Garantías)
+                    <span class="badge" style="background:var(--accent); color:#fff; font-size:0.7rem; padding:2px 8px; border-radius:10px; font-weight:700;">Solo Superadmin</span>
+                  </div>
+                  <div class="config-card-sub">Consulta las órdenes de servicio generadas históricamente por tickets de venta de refacciones o garantías y elimínalas selectiva o masivamente.</div>
+                </div>
+                <button class="btn-primary" onclick="window.abrirModalDepurarOrdenes()" style="display:flex; align-items:center; gap:0.4rem; font-size:0.8rem; background:var(--accent); border-color:var(--accent); font-weight:600;">
+                  <i data-lucide="list-filter" style="width:14px; height:14px;"></i> Abrir Depurador (<span id="badge-count-pref-ref">0</span>)
+                </button>
+              </div>
+            </div>
+
+            <!-- ===== DIAGRAMA DE FLUJO INTERACTIVO (PREFERENCIAS) ===== -->
+            <div class="config-card" id="card-diagrama-flujo" style="display: none;">
+              <div class="config-card-header" style="border-bottom: 1px dashed var(--border); padding-bottom: 0.85rem;">
+                <div class="config-card-icon" style="background:rgba(139, 92, 246, 0.15); color:#8b5cf6;">
+                  <i data-lucide="git-fork"></i>
+                </div>
+                <div style="flex:1;">
+                  <div class="config-card-title">Diagrama de Flujo del Proceso</div>
+                  <div class="config-card-sub">Interacción entre Euro SAPI (Portal Interno) y el Portal de Clientes</div>
+                </div>
+                <div style="display:flex; gap:0.4rem;">
+                  <button class="btn-primary" onclick="window.abrirModalDiagramaFlujo()" style="display:flex; align-items:center; gap:0.4rem; font-size:0.8rem; padding:0.4rem 0.8rem;">
+                    <i data-lucide="maximize-2" style="width:14px; height:14px;"></i> Expandir
+                  </button>
+                </div>
+              </div>
+
+              <!-- Toolbar con filtros de ruta -->
+              <div class="flowchart-toolbar" style="border-radius:8px 8px 0 0; margin-top:1rem;">
+                <div class="flowchart-filters">
+                  <button class="flowchart-filter-btn active" onclick="window.filtrarRutaDiagrama('all', this)">Todos los Pasos</button>
+                  <button class="flowchart-filter-btn" onclick="window.filtrarRutaDiagrama('con_portal', this)">Estándar (Con Portal)</button>
+                  <button class="flowchart-filter-btn" onclick="window.filtrarRutaDiagrama('sin_portal', this)">Estándar (Sin Portal)</button>
+                  <button class="flowchart-filter-btn" onclick="window.filtrarRutaDiagrama('levantamiento', this)">Levantamiento</button>
+                  <button class="flowchart-filter-btn" onclick="window.filtrarRutaDiagrama('garantia', this)">Garantía Interna</button>
+                  <button class="flowchart-filter-btn" onclick="window.filtrarRutaDiagrama('subticket', this)">Refacciones en OS</button>
+                </div>
+                <div class="flowchart-actions">
+                  <button class="flowchart-btn-tool" onclick="window.toggleSimbologiaFlujo()">
+                    <i data-lucide="info" style="width:13px; height:13px;"></i> Simbología
+                  </button>
+                </div>
+              </div>
+
+              <!-- Leyenda desplegable -->
+              <div class="flowchart-legend" id="flowchart-legend-box" style="display:none;">
+                <div class="flowchart-legend-item"><span class="flowchart-legend-dot" style="background:#8b5cf6;"></span><b>Euro SAPI:</b> Portal Interno</div>
+                <div class="flowchart-legend-item"><span class="flowchart-legend-dot" style="background:#3b82f6;"></span><b>Portal Clientes:</b> Solicitud y Aprobación</div>
+                <div class="flowchart-legend-item"><span class="flowchart-legend-dot" style="background:#eab308;"></span><b>Correo:</b> Notificación Automática</div>
+                <div class="flowchart-legend-item"><span class="flowchart-legend-dot" style="background:#10b981;"></span><b>Aprobado:</b> Pedido y Cierre Exitoso</div>
+                <div class="flowchart-legend-item"><span class="flowchart-legend-dot" style="background:#ef4444;"></span><b>Rechazo:</b> Obligatorio ¿Por qué?</div>
+                <div class="flowchart-legend-item"><span class="flowchart-legend-dot" style="background:#14b8a6;"></span><b>Servicio:</b> OS en Campo</div>
+                <div class="flowchart-legend-item"><span class="flowchart-legend-dot" style="background:#f97316;"></span><b>Subticket:</b> TKT-26XXX-A</div>
+              </div>
+
+              <!-- Canvas / Grid del Diagrama -->
+              <div class="flowchart-body" id="flowchart-main-content">
+                <div class="flowchart-columns-grid">
+                  
+                  <!-- COLUMNA 1: EURO SAPI (PORTAL INTERNO) -->
+                  <div class="flowchart-lane lane-internal">
+                    <div class="flowchart-lane-header">
+                      <i data-lucide="building-2" style="width:18px; height:18px;"></i>
+                      <span>Euro SAPI (Portal Interno)</span>
+                    </div>
+
+                    <!-- Nivel 0: Entrada por Levantamiento de Campo -->
+                    <div class="flowchart-step-box step-levantamiento">
+                      <div class="flowchart-card-node node-cyan">
+                        <div class="node-title-row">
+                          <span class="node-title"><i data-lucide="clipboard-check" style="width:14px; height:14px; color:#06b6d4;"></i> 1. Levantamiento Previo en Campo</span>
+                          <span class="node-badge" style="background:rgba(6,182,212,0.18); color:#06b6d4; font-weight:700;">Diagnóstico</span>
+                        </div>
+                        <div class="node-desc">Visita técnica previa en sitio cuando no se conocen las fallas ni refacciones necesarias.</div>
+                        <div class="node-items-list">
+                          • Se envía técnico a diagnosticar y tomar fotografías<br>
+                          • Se capturan las piezas requeridas en el reporte<br>
+                          • <b>Supervisor valida ➔ Detona creación del Ticket comercial</b>
+                        </div>
+                      </div>
+                      <div class="flow-connector-v">
+                        <div class="connector-line" style="border-color:#06b6d4;"></div>
+                        <i data-lucide="arrow-down" style="width:12px; height:12px; color:#06b6d4;"></i>
+                      </div>
+                    </div>
+
+                    <!-- Nivel 1: Entrada Directa y Creación de Ticket -->
+                    <div class="flowchart-step-box step-entrada step-llamada-directa">
+                      <div class="flowchart-card-node node-purple">
+                        <div class="node-title-row">
+                          <span class="node-title"><i data-lucide="phone-call" style="width:14px; height:14px; color:#8b5cf6;"></i> Llamada, WhatsApp o Correo Directo</span>
+                          <span class="node-badge badge-purple">Sin Portal</span>
+                        </div>
+                        <div class="node-desc"><b>Flujo Tradicional / Sin Portal:</b> Captura directa del reporte por el equipo interno de Eurorep en Euro SAPI.</div>
+                      </div>
+
+                      <div class="flow-connector-v">
+                        <div class="connector-line"></div>
+                        <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                      </div>
+                    </div>
+
+                    <div class="flowchart-step-box step-entrada">
+                      <div class="flowchart-card-node node-purple">
+                        <div class="node-title-row">
+                          <span class="node-title"><i data-lucide="user-check" style="width:14px; height:14px; color:#8b5cf6;"></i> Asignado a Supervisor</span>
+                          <span class="node-badge badge-purple">Mesa de Ayuda</span>
+                        </div>
+                        <div class="node-desc">Asignación al supervisor correspondiente para coordinar cotización y refacciones.</div>
+                      </div>
+
+                      <div class="flow-connector-v">
+                        <div class="connector-line"></div>
+                        <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                      </div>
+
+                      <div class="flowchart-card-node node-purple">
+                        <div class="node-title-row">
+                          <span class="node-title"><i data-lucide="ticket" style="width:14px; height:14px; color:#8b5cf6;"></i> Ticket Creado</span>
+                          <span class="node-badge badge-purple">Activo</span>
+                        </div>
+                        <div class="node-desc">Clasificación del tipo de requerimiento:</div>
+                        <div class="node-items-list">
+                          • <b>Servicio</b> / <b>Puesta en marcha</b> / <b>Soporte</b> (➔ Genera OS)<br>
+                          • <b>Garantía</b> / <b>Refacciones</b> (➔ Genera Guía de Envío)
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Nivel 2: Cotización y Refacciones -->
+                    <div class="flowchart-step-box step-cotizacion">
+                      <div class="flow-connector-v">
+                        <div class="connector-line"></div>
+                        <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                      </div>
+
+                      <div class="flowchart-card-node node-purple">
+                        <div class="node-title-row">
+                          <span class="node-title"><i data-lucide="clock" style="width:14px; height:14px; color:#8b5cf6;"></i> Pendiente de Refacciones</span>
+                          <span class="node-badge badge-purple">Diagnóstico</span>
+                        </div>
+                        <div class="node-desc">Se determinan y colocan las refacciones necesarias en el ticket.</div>
+                      </div>
+
+                      <div class="flow-connector-v">
+                        <div class="connector-line"></div>
+                        <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                      </div>
+
+                      <div class="flowchart-card-node node-purple">
+                        <div class="node-title-row">
+                          <span class="node-title"><i data-lucide="calculator" style="width:14px; height:14px; color:#8b5cf6;"></i> Se Realiza Cotización</span>
+                          <span class="node-badge badge-purple">Presupuesto</span>
+                        </div>
+                        <div class="node-desc">Se calcula precio de piezas y mano de obra para enviar al cliente.</div>
+                      </div>
+
+                      <!-- Rechazo de cotización -->
+                      <div class="flowchart-card-node node-red" style="margin-top:0.35rem; padding:0.6rem 0.75rem;">
+                        <div class="node-title" style="font-size:0.75rem; color:#ef4444;"><i data-lucide="x-circle" style="width:12px; height:12px;"></i> Si se Rechaza Cotización</div>
+                        <div class="node-desc" style="font-size:0.72rem; margin-top:0.2rem;">Captura obligatoria de motivo <b>¿Por qué?</b> ➔ Estado: <b>Cerrado</b></div>
+                      </div>
+
+                      <div class="flow-connector-v">
+                        <div class="connector-line"></div>
+                        <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                      </div>
+
+                      <div class="flowchart-card-node node-green">
+                        <div class="node-title-row">
+                          <span class="node-title"><i data-lucide="file-check" style="width:14px; height:14px; color:#10b981;"></i> Aceptado con Pedido</span>
+                          <span class="node-badge badge-green">Validado</span>
+                        </div>
+                        <div class="node-desc">Requisitos validados para avanzar:</div>
+                        <div class="node-items-list">
+                          • <b>Con Portal:</b> El cliente aprueba en línea y adjunta su Orden de Compra.<br>
+                          • <b>Sin Portal:</b> El cliente envía la OC por correo/WA y el supervisor la carga en Euro SAPI.
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Nivel 3: Bifurcación tras Pedido (Servicio vs. Garantía / Refacciones) -->
+                    <div class="flowchart-step-box step-os">
+                      <div class="flow-connector-v">
+                        <div class="connector-line"></div>
+                        <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                      </div>
+
+                      <!-- RUTA A: SERVICIO / PUESTA EN MARCHA (GENERA ORDEN DE SERVICIO EN CAMPO) -->
+                      <div class="flowchart-card-node node-teal">
+                        <div class="node-title-row">
+                          <span class="node-title"><i data-lucide="clipboard-list" style="width:14px; height:14px; color:#14b8a6;"></i> Si es Servicio: ORDEN DE SERVICIO (OS)</span>
+                          <span class="node-badge badge-teal">Técnicos en Campo</span>
+                        </div>
+                        <div class="node-desc">Ejecución presencial en sitio:</div>
+                        <div class="node-items-list">
+                          • <b>Pendiente:</b> Programación de técnicos y precarga de piezas.<br>
+                          • <b>En Curso:</b> Bitácoras diarias, reporte general y firmas de conformidad.
+                        </div>
+
+                        <!-- Evaluación de refacciones en campo (Exclusivo de OS) -->
+                        <div style="margin-top:0.6rem; padding-top:0.5rem; border-top:1px dashed rgba(20,184,166,0.3);">
+                          <div style="font-size:0.75rem; font-weight:600; color:var(--text-primary); margin-bottom:0.3rem;">¿Refacciones Extra en Campo?</div>
+                          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.4rem;">
+                            <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:6px; padding:0.4rem 0.5rem;">
+                              <div style="color:#10b981; font-weight:700; font-size:0.72rem;">NO (Resuelto)</div>
+                              <div style="font-size:0.68rem; color:var(--text-secondary);"><b>OS Cerrada:</b> Reporte técnico final con firmas.</div>
+                            </div>
+                            <div class="step-subticket" style="background:rgba(249,115,22,0.1); border:1px solid rgba(249,115,22,0.3); border-radius:6px; padding:0.4rem 0.5rem;">
+                              <div style="color:#f97316; font-weight:700; font-size:0.72rem;">SÍ ➔ TKT-26XXX-A</div>
+                              <div style="font-size:0.68rem; color:var(--text-secondary);"><b>Subticket Hijo:</b> Refacciones extra y cotización.</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="flow-connector-v">
+                        <div class="connector-line"></div>
+                        <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                      </div>
+
+                      <!-- RUTA B: GARANTÍA O REFACCIONES (NUNCA GENERA OS EN CAMPO, GENERA GUÍA DE ENVÍO) -->
+                      <div class="flowchart-card-node node-teal step-garantia" style="border-color:rgba(14,165,233,0.6); background:rgba(14,165,233,0.08);">
+                        <div class="node-title-row">
+                          <span class="node-title"><i data-lucide="truck" style="width:14px; height:14px; color:#0ea5e9;"></i> Si es Garantía o Refacciones: GUÍA DE ENVÍO</span>
+                          <span class="node-badge" style="background:rgba(14,165,233,0.2); color:#0ea5e9;">Despacho de Piezas</span>
+                        </div>
+                        <div class="node-desc"><b>No genera Orden de Servicio en campo.</b> Despacho directo de piezas:</div>
+                        <div class="node-items-list">
+                          • <b>Paquetería y No. de Guía:</b> Asignación de empresa y código de rastreo.<br>
+                          • <b>Despacho y Envío:</b> Se notifica al cliente y se envían las refacciones.<br>
+                          • <b>Cierre:</b> Estado <b>Entregado / Cerrado</b> con comprobante de paquetería.
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  <!-- COLUMNA 2: PORTAL CLIENTES -->
+                  <div class="flowchart-lane lane-client">
+                    <div class="flowchart-lane-header">
+                      <i data-lucide="globe" style="width:18px; height:18px;"></i>
+                      <span>Portal Clientes</span>
+                    </div>
+
+                    <!-- Nivel 1: Solicitud -->
+                    <div class="flowchart-step-box step-portal-entrada">
+                      <div class="flowchart-card-node node-blue">
+                        <div class="node-title-row">
+                          <span class="node-title"><i data-lucide="file-plus" style="width:14px; height:14px; color:#3b82f6;"></i> Reportado / Solicitado</span>
+                          <span class="node-badge badge-blue">Portal</span>
+                        </div>
+                        <div class="node-desc">El cliente reporta una falla o solicita un servicio desde su panel web.</div>
+                      </div>
+
+                      <div class="flow-connector-bridge bridge-to-internal">
+                        <i data-lucide="arrow-left" style="width:14px; height:14px; color:#8b5cf6;"></i>
+                        <span>Entra a Euro SAPI para Asignación</span>
+                      </div>
+
+                      <div class="flowchart-card-node node-yellow">
+                        <div class="node-title-row">
+                          <span class="node-title"><i data-lucide="mail" style="width:14px; height:14px; color:#eab308;"></i> En Curso (Correo)</span>
+                          <span class="node-badge badge-yellow">Notificación</span>
+                        </div>
+                        <div class="node-desc">Correo automático confirmando recepción y asignación del ticket.</div>
+                      </div>
+                    </div>
+
+                    <!-- Nivel 2: Revisión de Cotización -->
+                    <div class="flowchart-step-box" style="margin-top:2.5rem;">
+                      <div class="flowchart-card-node node-yellow">
+                        <div class="node-title-row">
+                          <span class="node-title"><i data-lucide="mail" style="width:14px; height:14px; color:#eab308;"></i> Cotización Recibida (Correo)</span>
+                          <span class="node-badge badge-yellow">Notificación</span>
+                        </div>
+                        <div class="node-desc">Se notifica que el presupuesto de piezas y mano de obra está disponible.</div>
+                      </div>
+
+                      <div class="flow-connector-v">
+                        <div class="connector-line"></div>
+                        <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                      </div>
+
+                      <div class="flowchart-card-node node-blue">
+                        <div class="node-title-row">
+                          <span class="node-title"><i data-lucide="check-square" style="width:14px; height:14px; color:#3b82f6;"></i> Acepta o Rechaza</span>
+                          <span class="node-badge badge-blue">Decisión</span>
+                        </div>
+                        <div class="node-desc">El cliente evalúa la cotización desde su portal:</div>
+                        <div class="node-items-list">
+                          • <b>Rechaza:</b> Ingresa motivo obligatorio <i>¿Por qué?</i> ➔ Estado <b>Cerrado</b>.<br>
+                          • <b>Acepta:</b> Adjunta su <b>Orden de Compra (PDF + No. Pedido)</b>.
+                        </div>
+                      </div>
+
+                      <div class="flow-connector-bridge bridge-to-internal">
+                        <i data-lucide="arrow-left" style="width:14px; height:14px; color:#10b981;"></i>
+                        <span>Transfiere Pedido PDF a Euro SAPI</span>
+                      </div>
+
+                      <div class="flowchart-card-node node-yellow">
+                        <div class="node-title-row">
+                          <span class="node-title"><i data-lucide="mail" style="width:14px; height:14px; color:#eab308;"></i> En Proceso (Correo)</span>
+                          <span class="node-badge badge-yellow">Notificación</span>
+                        </div>
+                        <div class="node-desc">Aviso automático de que el pedido fue recibido y está en programación.</div>
+                      </div>
+                    </div>
+
+                    <!-- Nivel 3: Notificación según tipo -->
+                    <div class="flowchart-step-box" style="margin-top:2.5rem;">
+                      <div class="flowchart-card-node node-yellow">
+                        <div class="node-title-row">
+                          <span class="node-title"><i data-lucide="mail" style="width:14px; height:14px; color:#eab308;"></i> Notificación según Tipo (Correo)</span>
+                          <span class="node-badge badge-yellow">Notificación</span>
+                        </div>
+                        <div class="node-desc">Envío automático según el tipo de solicitud:</div>
+                        <div class="node-items-list">
+                          • <b>Si es Servicio:</b> Aviso de OS programada y técnicos asignados.<br>
+                          • <b>Si es Garantía o Refacciones:</b> Guía de paquetería y código de rastreo.
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Nivel 4: Cierre y Documentos -->
+                    <div class="flowchart-step-box" style="margin-top:4rem;">
+                      <div class="flowchart-card-node node-green">
+                        <div class="node-title-row">
+                          <span class="node-title"><i data-lucide="file-badge" style="width:14px; height:14px; color:#10b981;"></i> Cerrado en Portal</span>
+                          <span class="node-badge badge-green">Documentación</span>
+                        </div>
+                        <div class="node-desc">Disponibilidad inmediata de los entregables:</div>
+                        <div class="node-items-list">
+                          • <b>Consulta y descarga</b> del PDF de la Orden de Servicio.<br>
+                          • <b>Envío por correo</b> del reporte final con bitácoras y firmas.
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+
                 </div>
               </div>
             </div>
@@ -2249,7 +3041,7 @@
             </div>
 
             <!-- Ideas y Fallas del Sistema -->
-            <div class="config-card" id="card-ideas-fallas" style="display:block;">
+            <div class="config-card" id="card-ideas-fallas" style="grid-column: 1 / -1; display: block;">
               <div class="config-card-header">
                 <div class="config-card-icon" style="background:rgba(232, 130, 12, 0.12); color:#E8820C;">
                   <i data-lucide="lightbulb"></i>
@@ -2263,23 +3055,84 @@
                 </button>
               </div>
 
+              <!-- Recuadros KPI -->
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.85rem; margin-top: 1.25rem;">
+                <div id="card-kpi-if-ideas" onclick="window.filtrarIdeaFallaPorKpi('tipo', 'Idea')"
+                     style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem 1rem; display: flex; align-items: center; gap: 0.85rem; box-shadow: var(--shadow-sm); cursor: pointer; transition: all 0.2s;">
+                  <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(16, 185, 129, 0.12); color: #10b981; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i data-lucide="lightbulb" style="width: 20px; height: 20px;"></i>
+                  </div>
+                  <div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Ideas / Mejoras</div>
+                    <div style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary);" id="kpi-if-ideas">0</div>
+                  </div>
+                </div>
+
+                <div id="card-kpi-if-fallas" onclick="window.filtrarIdeaFallaPorKpi('tipo', 'Falla')"
+                     style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem 1rem; display: flex; align-items: center; gap: 0.85rem; box-shadow: var(--shadow-sm); cursor: pointer; transition: all 0.2s;">
+                  <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(239, 68, 68, 0.12); color: #ef4444; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i data-lucide="bug" style="width: 20px; height: 20px;"></i>
+                  </div>
+                  <div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Fallas / Bugs</div>
+                    <div style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary);" id="kpi-if-fallas">0</div>
+                  </div>
+                </div>
+
+                <div id="card-kpi-if-pendientes" onclick="window.filtrarIdeaFallaPorKpi('estado', 'pendientes_en_curso')"
+                     style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem 1rem; display: flex; align-items: center; gap: 0.85rem; box-shadow: var(--shadow-sm); cursor: pointer; transition: all 0.2s;">
+                  <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(245, 158, 11, 0.12); color: #f59e0b; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i data-lucide="clock" style="width: 20px; height: 20px;"></i>
+                  </div>
+                  <div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Pendientes / En Curso</div>
+                    <div style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary);" id="kpi-if-pendientes">0</div>
+                  </div>
+                </div>
+
+                <div id="card-kpi-if-completados" onclick="window.filtrarIdeaFallaPorKpi('estado', 'Resuelto')"
+                     style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem 1rem; display: flex; align-items: center; gap: 0.85rem; box-shadow: var(--shadow-sm); cursor: pointer; transition: all 0.2s;">
+                  <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(16, 185, 129, 0.12); color: #10b981; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i data-lucide="check-circle-2" style="width: 20px; height: 20px;"></i>
+                  </div>
+                  <div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Completados</div>
+                    <div style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary);" id="kpi-if-completados">0</div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Filtros -->
               <div class="filters-bar" style="margin-top: 1.25rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                <div style="flex: 1; min-width: 200px; position: relative; display: flex; align-items: center;">
+                <div style="flex: 2; min-width: 220px; position: relative; display: flex; align-items: center;">
                   <i data-lucide="search" style="position: absolute; left: 0.75rem; width: 1rem; height: 1rem; color: var(--text-muted);"></i>
-                  <input type="text" id="busqueda-idea-falla" placeholder="Buscar por título o descripción..." onkeyup="renderIdeasFallas()"
-                    style="width: 100%; padding: 0.6rem 1rem 0.6rem 2.25rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; background: var(--bg-card); color: var(--text-primary); outline: none; transition: border-color 0.2s;"
+                  <input type="text" id="busqueda-idea-falla" placeholder="Buscar por título, descripción o módulo..." onkeyup="renderIdeasFallas()"
+                    style="width: 100%; padding: 0.55rem 1rem 0.55rem 2.25rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; font-size: 0.85rem; background: var(--bg-card); color: var(--text-primary); outline: none; transition: border-color 0.2s;"
                     onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
                 </div>
+                <select id="filtro-modulo-idea-falla" class="view-filter"
+                  style="flex: 1; min-width: 140px; padding: 0.55rem 0.65rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; font-size: 0.82rem; background: var(--bg-card); color: var(--text-primary); outline: none; transition: border-color 0.2s;"
+                  onchange="renderIdeasFallas()" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+                  <option value="todos">Todos los módulos</option>
+                  <option value="Tickets">Tickets</option>
+                  <option value="Levantamientos">Levantamientos</option>
+                  <option value="Órdenes">Órdenes</option>
+                  <option value="Clientes">Clientes / SAP</option>
+                  <option value="Gastos">Gastos / Clara</option>
+                  <option value="Portal">Portal Clientes</option>
+                  <option value="Calendario">Calendario</option>
+                  <option value="UI">UI / Interfaz</option>
+                  <option value="General">General</option>
+                </select>
                 <select id="filtro-tipo-idea-falla" class="view-filter"
-                  style="width: 150px; padding: 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; background: var(--bg-card); color: var(--text-primary); outline: none; transition: border-color 0.2s;"
+                  style="flex: 1; min-width: 130px; padding: 0.55rem 0.65rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; font-size: 0.82rem; background: var(--bg-card); color: var(--text-primary); outline: none; transition: border-color 0.2s;"
                   onchange="renderIdeasFallas()" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
                   <option value="todos">Todos los tipos</option>
                   <option value="Idea">Ideas / Mejoras</option>
                   <option value="Falla">Fallas / Bugs</option>
                 </select>
                 <select id="filtro-prioridad-idea-falla" class="view-filter"
-                  style="width: 150px; padding: 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; background: var(--bg-card); color: var(--text-primary); outline: none; transition: border-color 0.2s;"
+                  style="flex: 1; min-width: 140px; padding: 0.55rem 0.65rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; font-size: 0.82rem; background: var(--bg-card); color: var(--text-primary); outline: none; transition: border-color 0.2s;"
                   onchange="renderIdeasFallas()" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
                   <option value="todos">Todas las prioridades</option>
                   <option value="Baja">Prioridad Baja</option>
@@ -2288,28 +3141,31 @@
                   <option value="Crítica">Prioridad Crítica</option>
                 </select>
                 <select id="filtro-estado-idea-falla" class="view-filter"
-                  style="width: 150px; padding: 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; background: var(--bg-card); color: var(--text-primary); outline: none; transition: border-color 0.2s;"
+                  style="flex: 1; min-width: 160px; padding: 0.55rem 0.65rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; font-size: 0.82rem; background: var(--bg-card); color: var(--text-primary); outline: none; transition: border-color 0.2s;"
                   onchange="renderIdeasFallas()" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
-                  <option value="todos">Todos los estados</option>
+                  <option value="pendientes_en_curso" selected>Pendientes / En Curso</option>
+                  <option value="todos">Todas las etapas (Histórico)</option>
                   <option value="Pendiente">Pendiente</option>
-                  <option value="En Progreso">En Progreso</option>
+                  <option value="En Análisis">En Análisis</option>
+                  <option value="En Desarrollo">En Desarrollo</option>
+                  <option value="En Pruebas">En Pruebas</option>
                   <option value="Resuelto">Resuelto</option>
                   <option value="Rechazado">Rechazado</option>
                 </select>
               </div>
 
               <!-- Listado -->
-              <div class="table-wrapper" style="margin-top:1.25rem; border:1px solid var(--border); border-radius:8px; overflow-x:auto; background:var(--bg-card); box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-                <table class="orders-table" style="width:100%; border-collapse:collapse; text-align:left; font-size:0.85rem;">
+              <div class="table-wrapper" style="margin-top:1.25rem; border:1px solid var(--border); border-radius:8px; overflow-x:auto; background:var(--bg-card); box-shadow:var(--shadow-sm);">
+                <table id="tabla-ideas-fallas" style="width:100%; border-collapse:collapse; text-align:left; font-size:0.84rem; table-layout:fixed; min-width:1020px;">
                   <thead>
-                    <tr style="background:var(--bg-hover, #f8fafc); border-bottom:2px solid var(--border);">
-                      <th style="width: 60px; text-align: center; padding: 0.75rem 0.5rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">#</th>
-                      <th style="width: 110px; padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Tipo</th>
-                      <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Registro</th>
-                      <th style="width: 120px; padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Prioridad</th>
-                      <th style="width: 180px; padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Reportado por</th>
-                      <th style="width: 130px; padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Estado</th>
-                      <th style="width: 100px; padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: right;">Acciones</th>
+                    <tr style="background:var(--bg-body); border-bottom:1px solid var(--border);">
+                      <th style="width: 44px; text-align: center; padding: 0.75rem 0.5rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px;">#</th>
+                      <th style="width: 125px; padding: 0.75rem 0.6rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px;">Tipo / Módulo</th>
+                      <th style="padding: 0.75rem 1rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px;">Registro y Detalles</th>
+                      <th style="width: 110px; padding: 0.75rem 0.5rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px; text-align: center;">Prioridad</th>
+                      <th style="width: 165px; padding: 0.75rem 0.6rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px;">Reportado por</th>
+                      <th style="width: 145px; padding: 0.75rem 0.5rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px; text-align: center;">Estado</th>
+                      <th style="width: 80px; padding: 0.75rem 0.6rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px; text-align: right;">Acciones</th>
                     </tr>
                   </thead>
                   <tbody id="tabla-ideas-fallas-body">
@@ -2571,12 +3427,200 @@
               <button class="filter-btn" data-filter="Cerrado" onclick="filtrarTickets(this)">Cerrados</button>
             </div>
             <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
-              <select id="filter-tkt-supervisor" onchange="renderTickets()" class="form-select col-asignado">
-                <option value="">Cualquier Supervisor</option>
-              </select>
-              <span id="tkt-filtered-count" style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); white-space: nowrap; margin: 0 0.25rem;"></span>
+              <div class="tipo-filter-dropdown" style="position: relative; display: inline-block;">
+                <button type="button" id="btn-tkt-tipo-filter" onclick="window.toggleTipoFilterMenu(event)" class="form-select" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.65rem; font-size: 0.8rem; height: 38px; border-radius: 8px; user-select: none; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); transition: all 0.2s;">
+                  <i data-lucide="tag" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
+                  <span id="label-tkt-tipo-filter" style="font-weight: 500;">Todos los Tipos</span>
+                  <i data-lucide="chevron-down" style="width: 12px; height: 12px; opacity: 0.6; flex-shrink: 0;"></i>
+                </button>
+                <div id="menu-tkt-tipo-filter" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; min-width: 240px; max-width: 280px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 30px -5px rgba(0,0,0,0.18); padding: 0.6rem; z-index: 1050;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; padding: 0 0.2rem;">
+                    <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Tipo / Categoría</span>
+                    <button type="button" onclick="window.setTicketTipoFilter('')" style="background: none; border: none; color: var(--accent); font-size: 0.72rem; font-weight: 600; cursor: pointer; padding: 0;">Limpiar</button>
+                  </div>
+                  <div id="tipo-filter-options-list" style="display: flex; flex-direction: column; gap: 2px; max-height: 280px; overflow-y: auto; padding-right: 2px;">
+                    <!-- Opciones de tipo dinámicas -->
+                  </div>
+                </div>
+                <select id="filter-tkt-tipo" onchange="renderTickets()" style="display: none;">
+                  <option value="">Todos los Tipos</option>
+                </select>
+              </div>
+
+              <div class="sup-filter-dropdown col-asignado" style="position: relative; display: inline-block;">
+                <button type="button" id="btn-tkt-sup-filter" onclick="window.toggleSupervisorFilterMenu(event)" class="form-select" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.65rem; font-size: 0.8rem; height: 38px; border-radius: 8px; user-select: none; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); transition: all 0.2s;">
+                  <i data-lucide="user" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
+                  <span id="label-tkt-sup-filter" style="font-weight: 500;">Cualquier Supervisor</span>
+                  <i data-lucide="chevron-down" style="width: 12px; height: 12px; opacity: 0.6; flex-shrink: 0;"></i>
+                </button>
+                <div id="menu-tkt-sup-filter" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; min-width: 240px; max-width: 280px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 30px -5px rgba(0,0,0,0.18); padding: 0.6rem; z-index: 1050;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; padding: 0 0.2rem;">
+                    <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Supervisor Asignado</span>
+                    <button type="button" onclick="window.setTicketSupervisorFilter('')" style="background: none; border: none; color: var(--accent); font-size: 0.72rem; font-weight: 600; cursor: pointer; padding: 0;">Limpiar</button>
+                  </div>
+                  <div id="sup-filter-options-list" style="display: flex; flex-direction: column; gap: 2px; max-height: 280px; overflow-y: auto; padding-right: 2px;">
+                    <!-- Opciones de supervisor dinámicas -->
+                  </div>
+                </div>
+                <select id="filter-tkt-supervisor" onchange="renderTickets()" style="display: none;">
+                  <option value="">Cualquier Supervisor</option>
+                </select>
+              </div>
+              <div class="antiguedad-filter-dropdown" style="position: relative; display: inline-block;">
+                <button type="button" id="btn-antiguedad-filter" onclick="window.toggleAntiguedadFilterMenu(event)" class="form-select" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.65rem; font-size: 0.8rem; height: 38px; border-radius: 8px; user-select: none; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); transition: all 0.2s;">
+                  <i data-lucide="clock" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
+                  <span id="label-antiguedad-filter">Antigüedad</span>
+                  <i data-lucide="chevron-down" style="width: 12px; height: 12px; opacity: 0.6; flex-shrink: 0;"></i>
+                </button>
+                <div id="menu-antiguedad-filter" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; min-width: 230px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15); padding: 0.6rem; z-index: 1050;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; padding: 0 0.2rem;">
+                    <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Rango de Días</span>
+                    <button type="button" onclick="window.setAntiguedadFilter('')" style="background: none; border: none; color: var(--accent); font-size: 0.72rem; font-weight: 600; cursor: pointer; padding: 0;">Limpiar</button>
+                  </div>
+                  <div style="display: flex; gap: 3px; background: var(--bg-hover); padding: 3px; border-radius: 6px; margin-bottom: 0.5rem;">
+                    <button type="button" id="tab-antiguedad-mod" class="antiguedad-mode-btn" onclick="window.cambiarModoAntiguedad('mod')" style="flex: 1; padding: 0.3rem 0.4rem; font-size: 0.75rem; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; background: var(--bg-card); color: var(--accent); box-shadow: var(--shadow-sm); transition: all 0.15s;">Última Modif.</button>
+                    <button type="button" id="tab-antiguedad-crea" class="antiguedad-mode-btn" onclick="window.cambiarModoAntiguedad('crea')" style="flex: 1; padding: 0.3rem 0.4rem; font-size: 0.75rem; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.15s;">Creación</button>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <button type="button" class="antiguedad-opt-row" data-rango="" onclick="window.setAntiguedadRango('')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: var(--bg-hover); color: var(--accent); font-size: 0.8rem; font-weight: 600; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <span>Todas las fechas</span>
+                      <i data-lucide="check" style="width: 13px; height: 13px;" class="antiguedad-check"></i>
+                    </button>
+                    <button type="button" class="antiguedad-opt-row" data-rango="1_7" onclick="window.setAntiguedadRango('1_7')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <span>1 a 7 días</span>
+                      <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="antiguedad-check"></i>
+                    </button>
+                    <button type="button" class="antiguedad-opt-row" data-rango="8_15" onclick="window.setAntiguedadRango('8_15')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <span>8 a 15 días</span>
+                      <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="antiguedad-check"></i>
+                    </button>
+                    <button type="button" class="antiguedad-opt-row" data-rango="gt_15" onclick="window.setAntiguedadRango('gt_15')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <span>Más de 15 días</span>
+                      <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="antiguedad-check"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="sort-filter-dropdown" style="position: relative; display: inline-block;">
+                <button type="button" id="btn-sort-tickets" onclick="window.toggleSortMenu(event)" class="form-select" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.65rem; font-size: 0.8rem; height: 38px; border-radius: 8px; user-select: none; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); transition: all 0.2s;">
+                  <i data-lucide="arrow-up-down" style="width: 14px; height: 14px; flex-shrink: 0; color: var(--accent);"></i>
+                  <span id="label-sort-tickets" style="font-weight: 500;">Folio (Mayor)</span>
+                  <i data-lucide="chevron-down" style="width: 12px; height: 12px; opacity: 0.6; flex-shrink: 0;"></i>
+                </button>
+                <div id="menu-sort-tickets" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; min-width: 260px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 30px -5px rgba(0,0,0,0.18); padding: 0.6rem; z-index: 1050;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; padding: 0 0.2rem;">
+                    <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Ordenar por</span>
+                    <div style="display: flex; gap: 2px; background: var(--bg-hover); padding: 2px; border-radius: 6px;">
+                      <button type="button" id="btn-sort-dir-desc" onclick="window.setSortDirection('desc')" style="padding: 0.2rem 0.45rem; font-size: 0.72rem; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; background: var(--bg-card); color: var(--accent); box-shadow: var(--shadow-sm); transition: all 0.15s;">↓ Desc</button>
+                      <button type="button" id="btn-sort-dir-asc" onclick="window.setSortDirection('asc')" style="padding: 0.2rem 0.45rem; font-size: 0.72rem; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.15s;">↑ Asc</button>
+                    </div>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 2px; max-height: 290px; overflow-y: auto; padding-right: 2px;">
+                    <button type="button" class="sort-opt-row" data-col="folio" onclick="window.seleccionarColumnaOrden('folio')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: var(--bg-hover); color: var(--accent); font-size: 0.8rem; font-weight: 600; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="hash" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Folio</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">Mayor a Menor</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="fecha-mod" onclick="window.seleccionarColumnaOrden('fecha-mod')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="clock" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Última Modif.</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">Más reciente</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="fecha" onclick="window.seleccionarColumnaOrden('fecha')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="calendar" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Fecha Creación</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">Más reciente</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="monto" onclick="window.seleccionarColumnaOrden('monto')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="dollar-sign" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Monto Cotización</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">Mayor a Menor</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="prioridad" onclick="window.seleccionarColumnaOrden('prioridad')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="alert-circle" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Prioridad</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">Alta a Baja</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="comentario" onclick="window.seleccionarColumnaOrden('comentario')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="message-square" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Último Comentario</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">Más reciente</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="asunto" onclick="window.seleccionarColumnaOrden('asunto')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="file-text" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Asunto</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">A → Z</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="solicitante" onclick="window.seleccionarColumnaOrden('solicitante')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="user" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Solicitante / Empresa</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">A → Z</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="estado" onclick="window.seleccionarColumnaOrden('estado')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="activity" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Estado</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">A → Z</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="tipo" onclick="window.seleccionarColumnaOrden('tipo')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="tag" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Tipo</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">A → Z</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
               <div class="search-bar" style="margin:0;">
-                <input type="text" id="search-tickets" placeholder="Buscar ticket..." oninput="renderTickets()" />
+                <input type="text" id="search-tickets" placeholder="Buscar ticket..." oninput="renderTickets()" style="width: 180px; height: 38px; padding: 0.4rem 0.75rem; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary);" />
               </div>
             </div>
           </div>
@@ -2585,17 +3629,19 @@
               <thead>
                 <tr>
                   <th style="width: 60px;">Acciones</th>
-                  <th id="th-ord-folio" onclick="ordenarTicketsPor('folio')" style="cursor:pointer; user-select:none;">#</th>
-                  <th id="th-ord-asunto" onclick="ordenarTicketsPor('asunto')" style="cursor:pointer; user-select:none;">Asunto</th>
-                  <th id="th-ord-solicitante" onclick="ordenarTicketsPor('solicitante')" style="cursor:pointer; user-select:none;">Solicitante / Empresa</th>
-                  <th id="th-ord-area" onclick="ordenarTicketsPor('area')" style="cursor:pointer; user-select:none;">Área</th>
-                  <th id="th-ord-prioridad" onclick="ordenarTicketsPor('prioridad')" class="col-prioridad" style="cursor:pointer; user-select:none;">Prioridad</th>
-                  <th id="th-ord-estado" onclick="ordenarTicketsPor('estado')" style="cursor:pointer; user-select:none;">Estado</th>
-                  <th id="th-ord-cotizacion" onclick="ordenarTicketsPor('cotizacion')" style="cursor:pointer; user-select:none;">Cotización SAP</th>
-                  <th id="th-ord-monto-cotizacion" onclick="ordenarTicketsPor('monto')" style="cursor:pointer; user-select:none;">Monto</th>
-                  <th id="th-ord-pedido" onclick="ordenarTicketsPor('pedido')" style="cursor:pointer; user-select:none;">Pedido SAP</th>
-                  <th id="th-ord-asignado" onclick="ordenarTicketsPor('asignado')" class="col-asignado" style="cursor:pointer; user-select:none;">Asignado</th>
-                  <th id="th-ord-fecha" onclick="ordenarTicketsPor('fecha')" style="cursor:pointer; user-select:none;">Fecha</th>
+                  <th id="th-ord-folio" onclick="ordenarTicketsPor('folio')" style="min-width: 140px; width: 145px; white-space: nowrap; cursor:pointer; user-select:none;">#</th>
+                  <th id="th-ord-asunto" onclick="ordenarTicketsPor('asunto')" style="min-width: 170px; cursor:pointer; user-select:none;">Asunto</th>
+                  <th id="th-ord-solicitante" onclick="ordenarTicketsPor('solicitante')" style="min-width: 160px; cursor:pointer; user-select:none;">Solicitante / Empresa</th>
+                  <th id="th-ord-area" onclick="ordenarTicketsPor('area')" style="width: 90px; cursor:pointer; user-select:none;">Área</th>
+                  <th id="th-ord-prioridad" onclick="ordenarTicketsPor('prioridad')" class="col-prioridad" style="width: 85px; cursor:pointer; user-select:none;">Prioridad</th>
+                  <th id="th-ord-estado" onclick="ordenarTicketsPor('estado')" style="width: 105px; cursor:pointer; user-select:none;">Estado</th>
+                  <th id="th-ord-comentario" onclick="ordenarTicketsPor('comentario')" class="col-comentario-interno" style="min-width: 220px; max-width: 320px; cursor:pointer; user-select:none;">Último Comentario</th>
+                  <th id="th-ord-cotizacion" onclick="ordenarTicketsPor('cotizacion')" style="width: 115px; cursor:pointer; user-select:none;">Cotización SAP</th>
+                  <th id="th-ord-monto-cotizacion" onclick="ordenarTicketsPor('monto')" style="width: 95px; cursor:pointer; user-select:none;">Monto</th>
+                  <th id="th-ord-pedido" onclick="ordenarTicketsPor('pedido')" style="width: 105px; cursor:pointer; user-select:none;">Pedido SAP</th>
+                  <th id="th-ord-asignado" onclick="ordenarTicketsPor('asignado')" class="col-asignado" style="width: 120px; max-width: 130px; cursor:pointer; user-select:none;">Asignado</th>
+                  <th id="th-ord-fecha" onclick="ordenarTicketsPor('fecha')" style="width: 125px; cursor:pointer; user-select:none;">Fecha Creación</th>
+                  <th id="th-ord-fecha-modificacion" onclick="ordenarTicketsPor('fecha-modificacion')" style="width: 135px; cursor:pointer; user-select:none;">Última Modif.</th>
                   <th style="width: 40px; text-align:center;"></th>
                 </tr>
               </thead>
@@ -4171,6 +5217,10 @@
                   <strong id="ref-info-fechacierre" style="color: var(--text-primary); font-size: 0.9rem;">Pendiente</strong>
                 </div>
                 <div>
+                  <span style="color: var(--text-muted); display: block; margin-bottom: 2px;">Orden de Servicio:</span>
+                  <div id="ref-info-orden-btn-container" style="margin-top: 4px;"></div>
+                </div>
+                <div>
                   <span style="color: var(--text-muted); display: block; margin-bottom: 2px;">Maquinaria / Equipo:</span>
                   <div id="ref-info-maquinaria" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;"></div>
                 </div>
@@ -4310,7 +5360,7 @@
                 </div>
                 <div class="form-group" id="group-t-categoria">
                   <label>Categoría *</label>
-                  <select id="t-categoria" required>
+                  <select id="t-categoria" onchange="window.alCambiarCategoriaTicket()" required>
                     <option>Refacción</option>
                     <option>Servicio Técnico</option>
                     <option>Soporte</option>
@@ -4336,6 +5386,53 @@
                   <select id="t-asignado">
                     <option value="">Sin asignar</option>
                   </select>
+                </div>
+              </div>
+
+              <!-- OPCIÓN DE KITS / MACHOTES DE SERVICIO PREVENTIVO (SOLO PARA SERVICIO TÉCNICO) -->
+              <div class="form-group full-width" id="group-t-kit-servicio" style="display:none; background:rgba(37,99,235,0.04); border:1px solid rgba(37,99,235,0.25); border-left:4px solid #2563eb; border-radius:8px; padding:0.85rem 1rem; margin-top:0.6rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.45rem;">
+                  <label style="font-weight:700; color:#2563eb; font-size:0.82rem; margin:0; display:flex; align-items:center; gap:5px;">
+                    <i data-lucide="package" style="width:15px; height:15px;"></i> Kit / Machote de Servicio Preventivo
+                  </label>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:0.72rem; color:var(--text-muted);">Solo disponible en Servicio Técnico</span>
+                    <button type="button" class="btn-secondary" onclick="window.abrirModalKitsDesdeTicket()" style="padding:0.25rem 0.55rem; font-size:0.75rem; display:inline-flex; align-items:center; gap:4px; border-radius:6px; white-space:nowrap;" title="Ver catálogo completo de machotes de servicio">
+                      <i data-lucide="external-link" style="width:12px; height:12px;"></i> Catálogo
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Campo oculto para compatibilidad con guardarTicket y validaciones -->
+                <input type="hidden" id="t-kit-servicio-select" value="" />
+
+                <!-- Selector personalizado con buscador e interfaz interactiva -->
+                <div class="custom-kit-picker" id="custom-kit-picker" style="position:relative; width:100%;">
+                  <!-- Botón disparador (Trigger) -->
+                  <div class="custom-kit-trigger" id="custom-kit-trigger" onclick="window.toggleMenuMachotesTicket(event)" style="background:var(--bg-body); border:1px solid var(--border); border-radius:6px; padding:0.45rem 0.75rem; cursor:pointer; display:flex; justify-content:space-between; align-items:center; transition:all 0.15s ease; user-select:none; min-height:38px;">
+                    <div id="custom-kit-trigger-content" style="display:flex; align-items:center; gap:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">
+                      <span style="color:var(--text-muted); font-size:0.85rem;">-- Sin Machote (Servicio Técnico Manual) --</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:8px;">
+                      <span id="btn-limpiar-kit-ticket" onclick="window.limpiarMachoteTicket(event)" style="display:none; color:var(--text-muted); cursor:pointer; padding:0 4px; font-size:1.15rem; line-height:1; font-weight:bold;" title="Quitar machote">&times;</span>
+                      <i data-lucide="chevron-down" id="custom-kit-chevron" style="width:15px; height:15px; color:var(--text-muted); transition:transform 0.2s ease;"></i>
+                    </div>
+                  </div>
+
+                  <!-- Menú Desplegable Personalizado -->
+                  <div class="custom-kit-dropdown-menu" id="custom-kit-dropdown-menu" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.3), 0 8px 10px -6px rgba(0,0,0,0.2); z-index:1200; overflow:hidden; max-height:360px;">
+                    <!-- Buscador interno -->
+                    <div style="padding:0.5rem 0.75rem; border-bottom:1px solid var(--border); background:var(--bg-body); display:flex; align-items:center; gap:6px;">
+                      <i data-lucide="search" style="width:14px; height:14px; color:var(--text-muted); flex-shrink:0;"></i>
+                      <input type="text" id="custom-kit-search-input" oninput="window.filtrarMachotesTicketCustom(this.value)" placeholder="Buscar machote por modelo, marca o refacción..." style="width:100%; border:none; background:transparent; font-size:0.83rem; color:var(--text-primary); outline:none; padding:2px 0;" autocomplete="off" />
+                    </div>
+                    <!-- Lista de opciones desplazable -->
+                    <div id="custom-kit-options-list" style="overflow-y:auto; max-height:290px; padding:0.25rem 0;">
+                    </div>
+                  </div>
+                </div>
+
+                <div id="t-kit-servicio-preview" style="display:none; margin-top:0.6rem; padding:0.6rem 0.75rem; background:var(--bg-card); border:1px dashed var(--border); border-radius:6px; font-size:0.78rem; line-height:1.45;">
                 </div>
               </div>
               <div class="form-group full-width" style="margin-top:0.5rem;">
@@ -4627,11 +5724,11 @@
                   <div style="display:flex; gap:1.5rem; margin-top:0.35rem;">
                     <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-weight:normal; font-size:0.9rem; color:var(--text-primary);">
                       <input type="radio" name="if-tipo" value="Idea" checked style="width:16px; height:16px; margin:0;" />
-                      💡 Idea / Mejora
+                      Idea / Mejora
                     </label>
                     <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-weight:normal; font-size:0.9rem; color:var(--text-primary);">
                       <input type="radio" name="if-tipo" value="Falla" style="width:16px; height:16px; margin:0;" />
-                      🐛 Falla / Bug
+                      Falla / Bug
                     </label>
                   </div>
                 </div>
@@ -4647,6 +5744,39 @@
                 </div>
 
                 <div class="form-group">
+                  <label style="display:flex; align-items:center; justify-content:space-between;">
+                    <span>Archivos y Capturas Adjuntas</span>
+                    <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">Imágenes, PDF, documentos</span>
+                  </label>
+                  <div style="border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 1rem; text-align: center; background: var(--bg-hover, #f8fafc); cursor: pointer; transition: border-color 0.2s;"
+                       onclick="document.getElementById('if-file-input').click()"
+                       ondragover="event.preventDefault(); this.style.borderColor='var(--accent)';"
+                       ondragleave="this.style.borderColor='var(--border)';"
+                       ondrop="window.handleIfFilesDrop(event)">
+                    <i data-lucide="paperclip" style="width: 22px; height: 22px; color: var(--text-secondary); margin-bottom: 0.25rem;"></i>
+                    <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Haz clic o arrastra capturas/archivos aquí</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted);">Soporta capturas JPG, PNG, PDF, Excel, Word</div>
+                    <input type="file" id="if-file-input" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" style="display:none;" onchange="window.handleIfFilesSelect(event)">
+                  </div>
+                  <div id="if-archivos-preview" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.6rem;"></div>
+                </div>
+
+                <div class="form-group">
+                  <label>Módulo / Etiqueta del Sistema *</label>
+                  <select id="if-modulo" class="view-filter" style="width:100%; margin:0;">
+                    <option value="General" selected>General / Sistema</option>
+                    <option value="Tickets">Tickets</option>
+                    <option value="Levantamientos">Levantamientos</option>
+                    <option value="Órdenes">Órdenes de Servicio</option>
+                    <option value="Clientes">Clientes / SAP</option>
+                    <option value="Gastos">Gastos / Clara</option>
+                    <option value="Portal">Portal Clientes</option>
+                    <option value="Calendario">Calendario</option>
+                    <option value="UI">UI / Interfaz</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
                   <label>Prioridad *</label>
                   <select id="if-prioridad" class="view-filter" style="width:100%; margin:0;">
                     <option value="Baja">Baja</option>
@@ -4657,13 +5787,20 @@
                 </div>
 
                 <div class="form-group" id="if-estado-container" style="display:none;">
-                  <label>Estado</label>
-                  <select id="if-estado" class="view-filter" style="width:100%; margin:0;">
+                  <label>Etapa / Estado</label>
+                  <select id="if-estado" class="view-filter" style="width:100%; margin:0;" onchange="toggleIfResolucionInput()">
                     <option value="Pendiente">Pendiente</option>
-                    <option value="En Progreso">En Progreso</option>
+                    <option value="En Análisis">En Análisis</option>
+                    <option value="En Desarrollo">En Desarrollo</option>
+                    <option value="En Pruebas">En Pruebas</option>
                     <option value="Resuelto">Resuelto</option>
                     <option value="Rechazado">Rechazado</option>
                   </select>
+                </div>
+
+                <div class="form-group" id="if-resolucion-container" style="display:none;">
+                  <label style="color:#10b981; font-weight:700;">Explicación / Conclusión de la Solución</label>
+                  <textarea id="if-resolucion" placeholder="Explica detalladamente cómo se resolvió esta idea o falla..." rows="3" style="width:100%; font-family:inherit; resize:vertical; border-color:rgba(16,185,129,0.4);"></textarea>
                 </div>
 
               </div>
@@ -4672,6 +5809,40 @@
             <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
               <button type="button" class="btn-secondary" onclick="cerrarModalIdeaFalla()">Cancelar</button>
               <button type="submit" class="btn-primary">Guardar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL CONCLUSIÓN / RESOLUCIÓN IDEAS Y FALLAS -->
+    <div class="modal-overlay" id="modal-resolucion-idea-falla-overlay" onclick="window.cerrarModalResolucionIdeaFalla(event)">
+      <div class="modal" style="max-width:500px;">
+        <div class="modal-header" style="background: rgba(16, 185, 129, 0.08); border-bottom: 1px solid rgba(16, 185, 129, 0.2);">
+          <h2 style="display:flex; align-items:center; gap:0.5rem; color:#10b981; margin:0; font-size:1.1rem;">
+            <i data-lucide="check-circle-2" style="width:20px; height:20px;"></i>
+            <span>Conclusión y Solución</span>
+          </h2>
+          <button class="modal-close" onclick="window.cerrarModalResolucionIdeaFalla()">✕</button>
+        </div>
+        <div class="modal-body">
+          <form id="form-resolucion-idea-falla" onsubmit="window.guardarResolucionIdeaFalla(event)">
+            <input type="hidden" id="if-res-id" />
+            <div class="form-group" style="margin-bottom:1rem; text-align:left;">
+              <label style="font-size:0.88rem; font-weight:700; color:var(--text-primary); display:block; margin-bottom:0.2rem;">
+                Explicación / Conclusión de la Solución *
+              </label>
+              <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem; line-height:1.35;">
+                Describe cómo se resolvió esta idea o falla para que quede registrada como referencia futura.
+              </div>
+              <textarea id="if-res-explicacion" rows="4" required placeholder="Ej. Se ajustó el algoritmo en backend y se actualizó la interfaz de usuario..."
+                style="width:100%; font-family:inherit; padding:0.6rem; border:1px solid var(--border); border-radius:6px; background:var(--bg-card); color:var(--text-primary); resize:vertical; outline:none; font-size:0.88rem;"></textarea>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.25rem;">
+              <button type="button" class="btn-secondary" onclick="window.cerrarModalResolucionIdeaFalla()">Cancelar</button>
+              <button type="submit" class="btn-primary" style="background:#10b981; border-color:#10b981;">
+                <i data-lucide="check" style="width:16px; height:16px;"></i> Guardar y Marcar Resuelto
+              </button>
             </div>
           </form>
         </div>
@@ -4848,6 +6019,30 @@
               </div>
               <div id="u-reset-pass-error" class="pin-error" style="text-align:left;margin-top:0.5rem;font-size:0.8rem;"></div>
             </div>
+            <!-- SECCIÓN: Fusionar Cuenta (Solo cuando se edita un usuario existente por Administradores) -->
+            <div class="form-section" id="u-fusion-section" style="display:none; border-top: 1px dashed var(--border); padding-top: 1rem; margin-top: 1.5rem; background: rgba(232, 130, 12, 0.04); border-radius: var(--radius-md); padding: 1rem; border: 1px dashed rgba(232, 130, 12, 0.35);">
+              <div class="form-section-title" style="color:var(--orange, #E8820C);"><i data-lucide="git-merge" class="section-icon"></i> Fusionar Esta Cuenta con Otra</div>
+              <p style="color:var(--text-secondary);font-size:0.78rem;margin-top:0.25rem;line-height:1.4;">
+                Transfiere todo el historial (órdenes de servicio, tickets, bitácoras, gastos, calendario y accesos) de <strong id="u-fusion-origen-label" style="color:var(--text-primary);">este usuario</strong> a otra cuenta y elimina este registro duplicado.
+              </p>
+              
+              <div style="margin-top:0.85rem;">
+                <label style="display:block; font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.35rem;">Cuenta destino receptora (conservará todo el historial) *</label>
+                <select id="u-fusion-destino-select" class="form-input" onchange="window.onCambioFusionDestinoModal()" style="width:100%; border-radius:var(--radius-md); padding:0.65rem 0.85rem; background:var(--bg-hover); color:var(--text-primary); border:1px solid var(--border); font-size:0.85rem;">
+                  <option value="">-- Selecciona el usuario destino --</option>
+                </select>
+              </div>
+
+              <div id="u-fusion-preview-box" style="display:none; margin-top:0.75rem; padding:0.75rem 1rem; border-radius:var(--radius-sm); background:rgba(232, 130, 12, 0.08); border:1px solid rgba(232, 130, 12, 0.25); font-size:0.8rem; line-height:1.4; color:var(--text-primary);">
+                <div id="u-fusion-preview-text"></div>
+              </div>
+
+              <div style="margin-top:0.85rem; display:flex; justify-content:flex-end;">
+                <button type="button" id="btn-ejecutar-fusion-modal" class="btn-secondary" onclick="window.ejecutarFusionDesdeEditarUsuario(event)" style="border-color:var(--orange, #E8820C); color:var(--orange, #E8820C); font-weight:600; display:inline-flex; align-items:center; gap:0.4rem; padding:0.6rem 1.1rem; font-size:0.82rem;">
+                  <i data-lucide="git-merge" style="width:15px; height:15px;"></i> Transferir Historial y Fusionar
+                </button>
+              </div>
+            </div>
             <div class="form-actions">
               <button type="button" class="btn-secondary" onclick="cerrarModalUsuario()">Cancelar</button>
               <button type="submit" class="btn-primary"><i data-lucide="save" class="btn-icon"></i> Guardar
@@ -5021,6 +6216,578 @@
             </tfoot>
           </table>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DIAGRAMA DE FLUJO INTERACTIVO (PANTALLA COMPLETA) -->
+  <div id="modal-diagrama-flujo-overlay" class="modal-overlay" style="z-index: 999999; display: none;" onclick="window.cerrarModalDiagramaFlujo(event)">
+    <div class="modal" style="max-width: 1200px; width: 95vw; height: 90vh; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+      <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <div style="background:rgba(139, 92, 246, 0.15); color:#8b5cf6; padding:0.4rem; border-radius:6px; display:flex;">
+            <i data-lucide="git-fork" style="width:18px; height:18px;"></i>
+          </div>
+          <div>
+            <h3 style="font-size:1.05rem; margin:0; font-weight:700; color:var(--text-primary);">Diagrama de Flujo del Proceso</h3>
+            <div style="font-size:0.75rem; color:var(--text-secondary);">Euro SAPI (Portal Interno) vs. Portal de Clientes</div>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <!-- Controles de Zoom -->
+          <div style="display:flex; align-items:center; background:var(--bg-body); border:1px solid var(--border); border-radius:6px; padding:0.2rem 0.4rem; gap:0.3rem;">
+            <button type="button" onclick="window.zoomDiagramaFlujo(-0.1)" class="flowchart-btn-tool" style="padding:0.2rem 0.4rem;" title="Reducir zoom"><i data-lucide="minus" style="width:12px; height:12px;"></i></button>
+            <span id="diagrama-zoom-label" style="font-size:0.72rem; font-weight:600; min-width:35px; text-align:center; color:var(--text-primary);">100%</span>
+            <button type="button" onclick="window.zoomDiagramaFlujo(0.1)" class="flowchart-btn-tool" style="padding:0.2rem 0.4rem;" title="Aumentar zoom"><i data-lucide="plus" style="width:12px; height:12px;"></i></button>
+            <button type="button" onclick="window.resetZoomDiagramaFlujo()" class="flowchart-btn-tool" style="padding:0.2rem 0.4rem; font-size:0.7rem;" title="Restablecer">100%</button>
+          </div>
+
+          <button type="button" class="modal-close" onclick="window.cerrarModalDiagramaFlujo(event)" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:1.4rem; padding:0.25rem 0.5rem; line-height: 1;">✕</button>
+        </div>
+      </div>
+
+      <div class="modal-body" style="flex: 1; overflow: auto; padding: 1.5rem; background: var(--bg-primary);">
+        <div id="flowchart-modal-content" style="transition:transform 0.15s ease-out; transform-origin: top center;">
+          <!-- Se inyecta dinámicamente el contenido del diagrama -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DEPURADOR DE ÓRDENES DE REFACCIONES Y GARANTÍAS (SUPERADMIN) -->
+  <div id="modal-depurar-ordenes-overlay" class="modal-overlay" style="z-index: 999999; display: none;" onclick="window.cerrarModalDepurarOrdenes(event)">
+    <div class="modal" style="max-width: 1250px; width: 95vw; height: 90vh; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+      
+      <!-- Modal Header -->
+      <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <div style="background:rgba(234, 88, 12, 0.15); color:var(--accent, #ea580c); padding:0.5rem; border-radius:8px; display:flex;">
+            <i data-lucide="trash-2" style="width:20px; height:20px;"></i>
+          </div>
+          <div>
+            <h3 style="font-size:1.1rem; margin:0; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:0.5rem;">
+              Depurador de Órdenes de Servicio
+              <span style="font-size:0.72rem; font-weight:600; background:var(--accent); color:#fff; padding:2px 8px; border-radius:12px;">Solo Superadmin</span>
+            </h3>
+            <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
+              Órdenes generadas automáticamente por tickets de Refacciones / Garantías que no requieren servicio presencial en campo.
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="modal-close" onclick="window.cerrarModalDepurarOrdenes(event)" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:1.4rem; padding:0.25rem 0.5rem; line-height: 1;">✕</button>
+      </div>
+
+      <!-- Stats Bar -->
+      <div style="padding: 0.75rem 1.5rem; background: var(--bg-body); border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; flex-shrink: 0;">
+        <div style="display:flex; align-items:center; gap:1.25rem;">
+          <div style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; font-weight:600; color:var(--text-primary);">
+            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#ea580c;"></span>
+            Refacciones: <span id="depurar-stat-ref" style="color:var(--accent); font-weight:700;">0</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; font-weight:600; color:var(--text-primary);">
+            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#0ea5e9;"></span>
+            Garantías: <span id="depurar-stat-gar" style="color:#0ea5e9; font-weight:700;">0</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; font-weight:600; color:var(--text-primary);">
+            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#10b981;"></span>
+            Seleccionadas: <span id="depurar-stat-selected" style="color:#10b981; font-weight:700;">0</span>
+          </div>
+        </div>
+
+        <!-- Acciones Masivas -->
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <button class="btn-secondary" onclick="window.exportarDepuradorAExcel()" style="display:flex; align-items:center; gap:0.4rem; font-size:0.8rem; padding:0.35rem 0.75rem; background:#10b981; color:#ffffff; border-color:#10b981; font-weight:600; cursor:pointer;" title="Exportar la lista actual de órdenes a Excel (.xlsx)">
+            <i data-lucide="file-spreadsheet" style="width:14px; height:14px;"></i> Exportar a Excel
+          </button>
+          <button id="btn-depurar-delete-selected" class="btn-secondary" onclick="window.eliminarSeleccionadasDepurador()" disabled style="display:flex; align-items:center; gap:0.4rem; font-size:0.8rem; padding:0.35rem 0.75rem; color:var(--danger, #ef4444); border-color:rgba(239,68,68,0.3); opacity:0.5; cursor:not-allowed;">
+            <i data-lucide="trash" style="width:14px; height:14px;"></i> Eliminar Seleccionadas (<span id="btn-depurar-del-count">0</span>)
+          </button>
+          <button class="btn-primary" onclick="window.eliminarTodasPendientesRefacciones()" style="display:flex; align-items:center; gap:0.4rem; font-size:0.8rem; padding:0.35rem 0.75rem; background:#ef4444; border-color:#ef4444;">
+            <i data-lucide="zap" style="width:14px; height:14px;"></i> Eliminar Todas las Pendientes de Refacción
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Controls Bar -->
+      <div style="padding: 0.6rem 1.5rem; background: var(--bg-card); border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; flex-shrink: 0;">
+        <div style="display:flex; align-items:center; gap:0.5rem; flex:1; max-width:400px;">
+          <div class="search-bar" style="width:100%; margin:0;">
+            <input type="text" id="depurar-search-input" placeholder="Buscar por Folio OS, Ticket, Cliente, Asunto..." oninput="window.filtrarTablaDepurador()" style="font-size:0.85rem;" />
+          </div>
+        </div>
+
+        <!-- Category & Status Filters -->
+        <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:0.3rem;">
+            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">Tipo:</span>
+            <select id="depurar-filter-categoria" onchange="window.filtrarTablaDepurador()" style="font-size:0.8rem; padding:0.25rem 0.5rem; border:1px solid var(--border); border-radius:6px; background:var(--bg-body); color:var(--text-primary);">
+              <option value="all">Todas (Refacciones y Garantías)</option>
+              <option value="refaccion">Solo Refacciones</option>
+              <option value="garantia">Solo Garantías</option>
+            </select>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:0.3rem;">
+            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">Estatus OS:</span>
+            <select id="depurar-filter-estado" onchange="window.filtrarTablaDepurador()" style="font-size:0.8rem; padding:0.25rem 0.5rem; border:1px solid var(--border); border-radius:6px; background:var(--bg-body); color:var(--text-primary);">
+              <option value="all">Todos los estados</option>
+              <option value="Pendiente">Pendiente</option>
+              <option value="En proceso">En proceso</option>
+              <option value="Refacciones pendientes">Refacciones pendientes</option>
+              <option value="Completado">Completado</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table Body -->
+      <div class="modal-body" style="flex: 1; overflow: auto; padding: 0; background: var(--bg-primary);">
+        <table class="orders-table" style="width:100%; border-collapse: collapse; font-size:0.82rem;">
+          <thead style="position:sticky; top:0; z-index:10; background:var(--bg-secondary); border-bottom:1px solid var(--border);">
+            <tr>
+              <th style="width:40px; text-align:center; padding:0.6rem 0.4rem;">
+                <input type="checkbox" id="depurar-check-all" onchange="window.toggleDepurarCheckAll(this.checked)" style="cursor:pointer;" />
+              </th>
+              <th style="padding:0.6rem 0.75rem; text-align:left;">Folio OS</th>
+              <th style="padding:0.6rem 0.75rem; text-align:left;">Estatus OS</th>
+              <th style="padding:0.6rem 0.75rem; text-align:left;">Fecha OS</th>
+              <th style="padding:0.6rem 0.75rem; text-align:left;">Cliente</th>
+              <th style="padding:0.6rem 0.75rem; text-align:left;">Ticket Origen</th>
+              <th style="padding:0.6rem 0.75rem; text-align:left;">Categoría Ticket</th>
+              <th style="padding:0.6rem 0.75rem; text-align:left;">Asunto del Ticket</th>
+              <th style="width:70px; text-align:center; padding:0.6rem 0.5rem;">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="depurar-tabla-body">
+            <tr>
+              <td colspan="9" style="text-align:center; padding:2rem; color:var(--text-muted);">
+                Cargando órdenes...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Footer Info -->
+      <div style="padding: 0.6rem 1.5rem; background: var(--bg-secondary); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size:0.78rem; color:var(--text-muted); flex-shrink: 0;">
+        <span>ℹ️ Al eliminar una orden de servicio, el ticket comercial correspondiente permanecerá intacto en el sistema.</span>
+        <button class="btn-secondary" onclick="window.cerrarModalDepurarOrdenes(event)" style="font-size:0.8rem; padding:0.3rem 0.75rem;">Cerrar</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL: KITS DE SERVICIO PREVENTIVO POR MAQUINARIA (250h, 500h, 1000h) -->
+  <div id="modal-kits-servicio-overlay" class="modal-overlay" style="z-index: 999999; display: none;" onclick="window.cerrarModalKitsServicio(event)">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width: 1280px; width: 95vw; height: 90vh; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 12px 48px rgba(0,0,0,0.45);">
+      
+      <!-- Modal Header -->
+      <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <div style="background:rgba(37, 99, 235, 0.12); color:#2563eb; padding:0.55rem; border-radius:10px; display:flex; align-items:center; justify-content:center;">
+            <i data-lucide="package" style="width:22px; height:22px;"></i>
+          </div>
+          <div>
+            <h3 style="font-size:1.15rem; margin:0; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+              Machotes de Servicio Preventivo por Maquinaria
+              <span style="font-size:0.72rem; font-weight:600; background:rgba(37,99,235,0.12); color:#2563eb; border:1px solid rgba(37,99,235,0.25); padding:2px 8px; border-radius:12px;">250h • 500h • 1000h</span>
+              <span id="kit-modal-mode-badge" style="font-size:0.72rem; font-weight:700; padding:2px 8px; border-radius:12px; background:rgba(16,185,129,0.12); color:#059669; border:1px solid rgba(16,185,129,0.3);">Modo Real</span>
+            </h3>
+            <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
+              Catálogo de plantillas y machotes oficiales de refacciones para servicios preventivos por modelo y horómetro.
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <button type="button" class="btn-primary" onclick="window.abrirModalFormularioKit()" style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.82rem; padding:0.4rem 0.85rem; font-weight:600; background:#2563eb; border:none; border-radius:6px; color:#fff; cursor:pointer;">
+            <i data-lucide="plus" style="width:14px; height:14px;"></i> Nuevo Machote
+          </button>
+          <button type="button" id="btn-toggle-manual-kits" class="btn-secondary" onclick="window.toggleManualMachotes()" style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.8rem; padding:0.4rem 0.75rem; border-radius:6px; cursor:pointer;" title="Ver guía rápida de cómo agregar y gestionar machotes">
+            <i data-lucide="book-open" style="width:13px; height:13px;"></i> Mini Manual
+          </button>
+          <button type="button" class="btn-secondary" onclick="window.restablecerKitsOficiales()" style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.8rem; padding:0.4rem 0.75rem; border-radius:6px; cursor:pointer;" title="Restaura los machotes estándar oficiales de fábrica para la flota Eurorep">
+            <i data-lucide="rotate-ccw" style="width:13px; height:13px;"></i> Restablecer Oficiales
+          </button>
+          <button type="button" class="btn-secondary" onclick="window.exportarKitsAExcel()" style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.8rem; padding:0.4rem 0.75rem; background:#10b981; color:#fff; border-color:#10b981; border-radius:6px; font-weight:600; cursor:pointer;" title="Exportar catálogo completo de machotes a Excel (.xlsx)">
+            <i data-lucide="file-spreadsheet" style="width:13px; height:13px;"></i> Excel
+          </button>
+          <button type="button" class="modal-close" onclick="window.cerrarModalKitsServicio(event)" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:1.4rem; padding:0.25rem 0.5rem; line-height: 1; margin-left:0.4rem;">✕</button>
+        </div>
+      </div>
+
+      <!-- Filter Toolbar -->
+      <div style="padding: 0.75rem 1.5rem; background: var(--bg-body); border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; flex-shrink: 0;">
+        <div style="display:flex; align-items:center; gap:0.85rem; flex-wrap: wrap;">
+          
+          <!-- Selector de Marca -->
+          <div style="display:flex; align-items:center; gap:0.35rem;">
+            <label for="filter-kit-marca" style="font-size:0.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Marca:</label>
+            <select id="filter-kit-marca" onchange="window.alCambiarFiltroMarcaKits()" style="font-size:0.82rem; padding:0.35rem 0.65rem; border:1px solid var(--border); border-radius:6px; background:var(--bg-card); color:var(--text-primary); font-weight:600; min-width:160px; outline:none;">
+              <option value="all">Todas las Marcas</option>
+            </select>
+          </div>
+
+          <!-- Selector de Modelo -->
+          <div style="display:flex; align-items:center; gap:0.35rem;">
+            <label for="filter-kit-modelo" style="font-size:0.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Modelo / Equipo:</label>
+            <select id="filter-kit-modelo" onchange="window.filtrarKitsServicio()" style="font-size:0.82rem; padding:0.35rem 0.65rem; border:1px solid var(--border); border-radius:6px; background:var(--bg-card); color:var(--text-primary); font-weight:600; min-width:180px; outline:none;">
+              <option value="all">Todos los Modelos</option>
+            </select>
+          </div>
+
+          <!-- Selector de Intervalo (Pills) -->
+          <div class="kit-interval-pills" style="display:flex; gap:0.3rem; background:var(--bg-card); padding:3px; border-radius:8px; border:1px solid var(--border);">
+            <button type="button" class="kit-interval-btn active" data-hours="all" onclick="window.setKitFiltroHoras('all', this)" style="border:none; background:transparent; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:600; color:var(--text-primary); cursor:pointer; transition:all 0.2s;">
+              Todos (<span id="kit-stat-total">0</span>)
+            </button>
+            <button type="button" class="kit-interval-btn" data-hours="250" onclick="window.setKitFiltroHoras('250', this)" style="border:none; background:transparent; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:600; color:var(--text-secondary); cursor:pointer; transition:all 0.2s;">
+              250h (<span id="kit-stat-250">0</span>)
+            </button>
+            <button type="button" class="kit-interval-btn" data-hours="500" onclick="window.setKitFiltroHoras('500', this)" style="border:none; background:transparent; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:600; color:var(--text-secondary); cursor:pointer; transition:all 0.2s;">
+              500h (<span id="kit-stat-500">0</span>)
+            </button>
+            <button type="button" class="kit-interval-btn" data-hours="1000" onclick="window.setKitFiltroHoras('1000', this)" style="border:none; background:transparent; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:600; color:var(--text-secondary); cursor:pointer; transition:all 0.2s;">
+              1000h (<span id="kit-stat-1000">0</span>)
+            </button>
+          </div>
+        </div>
+
+        <!-- Buscador en tiempo real -->
+        <div style="display:flex; align-items:center; gap:0.5rem; flex:1; max-width:340px;">
+          <div class="search-bar" style="width:100%; margin:0;">
+            <input type="text" id="search-kit-input" placeholder="Buscar refaccion, codigo SAP o modelo..." oninput="window.filtrarKitsServicio()" style="font-size:0.85rem; padding:0.4rem 0.75rem; width:100%; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary);" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Body (Cards Container) -->
+      <div id="kits-servicio-container" style="flex: 1; overflow-y: auto; padding: 1.5rem; background: var(--bg-primary);">
+        
+        <!-- PANEL DESPLEGABLE: MINI MANUAL DE MACHOTES -->
+        <div id="panel-manual-machotes" style="display: none; background: var(--bg-card); border: 1px solid var(--border); border-left: 4px solid #2563eb; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 4px 16px rgba(0,0,0,0.05);">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
+            <div style="display:flex; align-items:center; gap:0.65rem;">
+              <div style="background: rgba(37,99,235,0.1); color: #2563eb; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                <i data-lucide="book-open" style="width: 18px; height: 18px;"></i>
+              </div>
+              <div>
+                <h4 style="margin: 0; font-size: 1.02rem; font-weight: 700; color: var(--text-primary);">Mini Manual: ¿Cómo Agregar y Gestionar Machotes de Servicio?</h4>
+                <p style="margin: 2px 0 0 0; font-size: 0.78rem; color: var(--text-muted);">Guía paso a paso para estructurar plantillas de mantenimiento preventivo por horómetro y sincronizarlas en Supabase.</p>
+              </div>
+            </div>
+            <button type="button" onclick="window.toggleManualMachotes(false)" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.1rem; padding:2px 6px;" title="Cerrar Manual">✕</button>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.9rem;">
+            
+            <!-- Paso 1 -->
+            <div style="background: var(--bg-body); border: 1px solid var(--border); border-radius: 9px; padding: 0.85rem 1rem;">
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+                <span style="background:#2563eb; color:#fff; font-size:0.72rem; font-weight:800; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;">1</span>
+                <h5 style="margin:0; font-size:0.85rem; font-weight:700; color:var(--text-primary);">Crear Machote</h5>
+              </div>
+              <p style="margin:0; font-size:0.78rem; color:var(--text-secondary); line-height:1.45;">
+                Haz clic en el botón superior <strong>«+ Nuevo Machote»</strong> para abrir el formulario de configuración.
+              </p>
+            </div>
+
+            <!-- Paso 2 -->
+            <div style="background: var(--bg-body); border: 1px solid var(--border); border-radius: 9px; padding: 0.85rem 1rem;">
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+                <span style="background:#2563eb; color:#fff; font-size:0.72rem; font-weight:800; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;">2</span>
+                <h5 style="margin:0; font-size:0.85rem; font-weight:700; color:var(--text-primary);">Marca, Modelo y Horas</h5>
+              </div>
+              <p style="margin:0; font-size:0.78rem; color:var(--text-secondary); line-height:1.45;">
+                Selecciona la <strong>Marca</strong> (Rubble Master, Fiori, etc.), escribe el <strong>Modelo</strong> y elige el intervalo (<strong>250h, 500h, 1000h</strong>).
+              </p>
+            </div>
+
+            <!-- Paso 3 -->
+            <div style="background: var(--bg-body); border: 1px solid var(--border); border-radius: 9px; padding: 0.85rem 1rem;">
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+                <span style="background:#2563eb; color:#fff; font-size:0.72rem; font-weight:800; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;">3</span>
+                <h5 style="margin:0; font-size:0.85rem; font-weight:700; color:var(--text-primary);">Buscador de Claves SAP</h5>
+              </div>
+              <p style="margin:0; font-size:0.78rem; color:var(--text-secondary); line-height:1.45;">
+                En la sección de refacciones escribe la <strong>Clave SAP</strong> o descripción. Selecciónala de la lista de autocompletado e indica la cantidad.
+              </p>
+            </div>
+
+            <!-- Paso 4 -->
+            <div style="background: var(--bg-body); border: 1px solid var(--border); border-radius: 9px; padding: 0.85rem 1rem;">
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+                <span style="background:#2563eb; color:#fff; font-size:0.72rem; font-weight:800; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;">4</span>
+                <h5 style="margin:0; font-size:0.85rem; font-weight:700; color:var(--text-primary);">Guardar y Sincronizar</h5>
+              </div>
+              <p style="margin:0; font-size:0.78rem; color:var(--text-secondary); line-height:1.45;">
+                Guarda los cambios. El machote quedará disponible de inmediato y sincronizado en la nube (Supabase).
+              </p>
+            </div>
+
+          </div>
+
+          <!-- Barra de Consejos y Atajos -->
+          <div style="margin-top: 0.85rem; padding: 0.6rem 0.85rem; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.65rem;">
+            <div style="display:flex; align-items:center; gap:0.5rem; font-size:0.77rem; color:var(--text-secondary);">
+              <i data-lucide="zap" style="width:14px; height:14px; color:#d97706; flex-shrink:0;"></i>
+              <span><strong>Atajos:</strong> Usa <strong>«Copiar Machote»</strong> para WhatsApp/correo técnico o el icono de duplicar para derivar un machote a otro intervalo.</span>
+            </div>
+            <div style="display:flex; gap:0.5rem;">
+              <button type="button" class="btn-primary" onclick="window.abrirModalFormularioKit()" style="font-size:0.75rem; padding:0.3rem 0.75rem; background:#2563eb; border:none; border-radius:6px; color:#fff; cursor:pointer;">
+                + Crear Machote Ahora
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="kits-servicio-grid" style="display: flex; flex-direction: column; gap: 1.75rem;">
+          <!-- Renderizado dinamico de tarjetas de kits agrupadas por marca -->
+        </div>
+      </div>
+
+      <!-- Footer Info -->
+      <div style="padding: 0.6rem 1.5rem; background: var(--bg-secondary); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size:0.78rem; color:var(--text-muted); flex-shrink: 0;">
+        <span>Nota: Haz clic en <strong>«Copiar Machote»</strong> en cualquier tarjeta para copiar la plantilla estructurada lista para enviar por WhatsApp o correo técnico.</span>
+        <button class="btn-secondary btn-cancelar-modal" onclick="window.cerrarModalKitsServicio(event)" style="font-size:0.8rem; padding:0.3rem 0.75rem;">Cerrar</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SUBMODAL: FORMULARIO CREAR / EDITAR KIT DE SERVICIO -->
+  <div id="modal-editar-kit-overlay" class="modal-overlay" style="z-index: 1000000; display: none;" onclick="window.cerrarModalFormularioKit(event)">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width: 840px; width: 95vw; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+      
+      <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <div style="background:rgba(37, 99, 235, 0.12); color:#2563eb; padding:0.45rem; border-radius:8px; display:flex;">
+            <i data-lucide="edit-3" style="width:18px; height:18px;"></i>
+          </div>
+          <h3 id="modal-kit-form-titulo" style="font-size:1.1rem; margin:0; font-weight:700; color:var(--text-primary);">Nuevo Machote de Servicio Preventivo</h3>
+        </div>
+        <button type="button" class="modal-close" onclick="window.cerrarModalFormularioKit(event)" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:1.4rem; padding:0.25rem 0.5rem; line-height: 1;">✕</button>
+      </div>
+
+      <div style="flex:1; overflow-y:auto; padding: 1.25rem 1.5rem; display:flex; flex-direction:column; gap:1rem;">
+        <input type="hidden" id="kit-form-id" value="" />
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+          <div>
+            <label style="display:block; font-size:0.75rem; font-weight:600; color:var(--text-muted); margin-bottom:0.3rem;">Modelo de Maquinaria Compatible *</label>
+            <select id="kit-form-modelo" onchange="window.alCambiarModeloKit(this.value)" style="width:100%; padding:0.5rem 0.75rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.85rem; font-weight:600; cursor:pointer;" required>
+              <option value="">Seleccionar Modelo...</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block; font-size:0.75rem; font-weight:600; color:var(--text-muted); margin-bottom:0.3rem;">Marca del Fabricante *</label>
+            <select id="kit-form-marca" onchange="window.alCambiarMarcaKit(this.value)" style="width:100%; padding:0.5rem 0.75rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.85rem; font-weight:600; cursor:pointer;" required>
+              <option value="">Seleccionar Marca...</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:1rem;">
+          <div>
+            <label style="display:block; font-size:0.75rem; font-weight:600; color:var(--text-muted); margin-bottom:0.3rem;">Nombre del Machote *</label>
+            <input type="text" id="kit-form-nombre" placeholder="ej. Machote Preventivo 250h - RM120X" style="width:100%; padding:0.45rem 0.75rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.85rem;" required />
+          </div>
+          <div>
+            <label style="display:block; font-size:0.75rem; font-weight:600; color:var(--text-muted); margin-bottom:0.3rem;">Intervalo de Horas *</label>
+            <select id="kit-form-intervalo" onchange="window.alCambiarIntervaloKit(this.value)" style="width:100%; padding:0.45rem 0.75rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.85rem; font-weight:600;">
+              <option value="250">250 Horas (Servicio Preventivo Menor)</option>
+              <option value="500">500 Horas (Servicio Preventivo Intermedio)</option>
+              <option value="1000">1000 Horas (Servicio Preventivo Mayor)</option>
+              <option value="2000">2000 Horas (Servicio Completo / General)</option>
+              <option value="custom">Otro Intervalo Personalizado</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label style="display:block; font-size:0.75rem; font-weight:600; color:var(--text-muted); margin-bottom:0.3rem;">Descripcion y Alcance del Mantenimiento</label>
+          <textarea id="kit-form-descripcion" rows="2" placeholder="Reemplazo de filtros de motor, inspeccion de bandas y toma de muestra de fluidos..." style="width:100%; padding:0.45rem 0.75rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.85rem; resize:vertical;"></textarea>
+        </div>
+
+        <!-- Seccion de Refacciones del Machote -->
+        <div class="form-section" style="margin-top:0.25rem; border-top:1px solid var(--border); padding-top:0.85rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+            <div>
+              <div class="form-section-title" style="margin:0; display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; font-weight:700; color:var(--text-primary);">
+                <i data-lucide="settings" style="width:16px; height:16px; color:#2563eb;"></i> Refacciones y Consumibles
+              </div>
+              <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px;">Selecciona la marca y la refacción del catálogo oficial SAP o ingresa refacciones del machote.</div>
+            </div>
+          </div>
+
+          <!-- Encabezados de columnas de refacciones -->
+          <div style="display:grid; grid-template-columns: 140px 1fr 115px 55px 28px; gap:0.5rem; font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em; padding: 0.35rem 0.2rem; border-bottom:1px solid var(--border); margin-bottom:0.4rem; align-items:center;">
+            <div>Marca</div>
+            <div>Descripción de Refacción</div>
+            <div style="text-align:center;">Clave</div>
+            <div style="text-align:center;">Cant.</div>
+            <div></div>
+          </div>
+
+          <!-- Lista de refacciones (idéntica a Órdenes de Servicio y Tickets) -->
+          <div id="ref-kit-list" class="refacciones-list" style="display:flex; flex-direction:column; gap:0.35rem; min-height:60px;">
+            <!-- Filas dinámicas insertadas con window.agregarFilaPiezaKit -->
+          </div>
+
+          <div style="margin-top:0.6rem;">
+            <button type="button" class="btn-add-ref" onclick="event.preventDefault(); event.stopPropagation(); window.agregarFilaPiezaKit();" style="display:inline-flex; align-items:center; gap:0.35rem; font-weight:600; cursor:pointer;">
+              <i data-lucide="plus" style="width:14px;height:14px;"></i> + Agregar Refacción
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer" style="padding: 0.75rem 1.5rem; background: var(--bg-secondary); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button type="button" class="btn-secondary btn-cancelar-modal" onclick="window.cerrarModalFormularioKit(event)" style="font-size:0.85rem; padding:0.4rem 1rem;">Cancelar</button>
+        <button type="button" class="btn-primary" onclick="window.guardarKitServicio()" style="font-size:0.85rem; padding:0.4rem 1.25rem; font-weight:600; background:#2563eb; color:#fff; border:none; border-radius:6px; cursor:pointer;">Guardar Machote</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL: CREAR / EDITAR GUÍA DE ENVÍO Y PAQUETERÍA -->
+  <div id="modal-envio-overlay" class="modal-overlay" style="z-index: 99999; display: none;" onclick="window.cerrarModalEnvio(event)">
+    <div class="modal" style="max-width: 680px; width: 95vw; max-height: 90vh; overflow-y: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+      <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <div style="background:rgba(234, 88, 12, 0.15); color:var(--accent); padding:0.4rem; border-radius:6px; display:flex;">
+            <i data-lucide="truck" style="width:18px; height:18px;"></i>
+          </div>
+          <h3 style="font-size:1.05rem; margin:0; font-weight:700; color:var(--text-primary);">Gestión de Guía de Envío</h3>
+        </div>
+        <button type="button" class="modal-close" onclick="window.cerrarModalEnvio(event)" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:1.3rem;">✕</button>
+      </div>
+
+      <form id="form-envio" onsubmit="window.guardarModalEnvio(event)" style="padding: 1.25rem 1.5rem;">
+        <input type="hidden" id="envio-modal-id" value="" />
+        <input type="hidden" id="envio-modal-ticket-id" value="" />
+
+        <!-- Sección 1: Ticket y Destinatario -->
+        <div style="margin-bottom: 1rem;">
+          <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Ticket Comercial Asociado *</label>
+          <select id="envio-input-ticket" class="form-select" onchange="window.onCambioTicketEnvio(this.value)" required style="width:100%;">
+            <option value="">-- Seleccionar Ticket Comercial --</option>
+          </select>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem; margin-bottom: 1rem;">
+          <div>
+            <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Cliente</label>
+            <input type="text" id="envio-input-cliente" class="form-input" placeholder="Nombre de la empresa o cliente" readonly style="background:var(--bg-body); cursor:not-allowed;" />
+          </div>
+          <div>
+            <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Sitio / Ubicación de Entrega</label>
+            <input type="text" id="envio-input-destino" class="form-input" placeholder="Sitio o dirección de entrega" />
+          </div>
+        </div>
+
+        <!-- Sección 2: Transportista y Guía -->
+        <div style="border-top:1px solid var(--border); padding-top:1rem; margin-bottom:1rem;">
+          <div style="font-size:0.85rem; font-weight:700; color:var(--text-primary); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.4rem;">
+            <i data-lucide="package" style="width:14px; height:14px; color:var(--accent);"></i> Datos de la Paquetería
+          </div>
+          
+          <div style="display:grid; grid-template-columns: 1fr 1.2fr; gap:0.75rem; margin-bottom:0.75rem;">
+            <div>
+              <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Empresa de Paquetería *</label>
+              <select id="envio-input-paqueteria" class="form-select" onchange="window.onCambioPaqueteriaEnvio()" style="width:100%;">
+                <option value="DHL">DHL Express</option>
+                <option value="FedEx">FedEx</option>
+                <option value="Estafeta">Estafeta</option>
+                <option value="Paquetexpress">Paquetexpress</option>
+                <option value="Redpack">Redpack</option>
+                <option value="Castores">Transportes Castores</option>
+                <option value="Tresguerras">Tresguerras</option>
+                <option value="Sendex">Sendex</option>
+                <option value="UPS">UPS</option>
+                <option value="Transporte Propio">Transporte Propio (Eurorep)</option>
+                <option value="Otra">Otra Paquetería</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Número de Guía / Tracking *</label>
+              <input type="text" id="envio-input-guia" class="form-input" placeholder="Ej: 3948271049" oninput="window.onCambioPaqueteriaEnvio()" required />
+            </div>
+          </div>
+
+          <div>
+            <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Enlace directo de Rastreo (URL)</label>
+            <input type="url" id="envio-input-url-rastreo" class="form-input" placeholder="https://www.dhl.com/tracking..." />
+          </div>
+        </div>
+
+        <!-- Sección 3: Fechas y Estatus -->
+        <div style="border-top:1px solid var(--border); padding-top:1rem; margin-bottom:1rem;">
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
+            <div>
+              <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Fecha de Embarque / Envío</label>
+              <input type="date" id="envio-input-fecha-envio" class="form-input" />
+            </div>
+            <div>
+              <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Fecha Estimada de Entrega</label>
+              <input type="date" id="envio-input-fecha-entrega" class="form-input" />
+            </div>
+          </div>
+
+          <div style="background:var(--bg-body); padding:0.75rem; border-radius:8px; border:1px solid var(--border); display:flex; flex-direction:column; gap:0.5rem;">
+            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; font-weight:700; cursor:pointer; color:var(--text-primary); margin:0;">
+              <input type="checkbox" id="envio-input-llego" onchange="window.onToggleLlegoEnvio(this.checked)" style="width:16px; height:16px; cursor:pointer;" />
+              <span>Marcar este envío como Entregado / Recibido</span>
+            </label>
+            <div id="envio-container-fecha-llegada" style="display:none; padding-left:1.5rem; margin-top:0.25rem;">
+              <label style="display:block; font-size:0.78rem; font-weight:600; margin-bottom:0.25rem; color:var(--text-secondary);">Fecha Real de Entrega</label>
+              <input type="date" id="envio-input-fecha-llegada" class="form-input" style="max-width:200px;" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección 4: Refacciones Incluidas -->
+        <div style="border-top:1px solid var(--border); padding-top:1rem; margin-bottom:1rem;">
+          <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Refacciones incluidas en este paquete</label>
+          <div id="envio-parts-selection">
+            <div style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">Selecciona un ticket para ver sus refacciones asociadas.</div>
+          </div>
+        </div>
+
+        <!-- Sección 5: Notas -->
+        <div style="margin-bottom:1.25rem;">
+          <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Notas u Observaciones del Despacho</label>
+          <textarea id="envio-input-notas" class="form-input" rows="2" placeholder="Observaciones adicionales, paquete consolidado, persona que recibe, etc."></textarea>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem; border-top:1px solid var(--border); padding-top:1rem;">
+          <button type="button" class="btn-secondary" onclick="window.cerrarModalEnvio(event)">Cancelar</button>
+          <button type="submit" class="btn-primary" style="display:inline-flex; align-items:center; gap:0.4rem;">
+            <i data-lucide="check"></i> <span>Guardar Guía de Envío</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: DETALLE VISUAL DE GUÍA DE ENVÍO -->
+  <div id="modal-detalle-envio-overlay" class="modal-overlay" style="z-index: 99999; display: none;" onclick="window.cerrarDetalleEnvio(event)">
+    <div class="modal" style="max-width: 620px; width: 95vw; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+      <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <div style="background:rgba(234, 88, 12, 0.15); color:var(--accent); padding:0.4rem; border-radius:6px; display:flex;">
+            <i data-lucide="package-search" style="width:18px; height:18px;"></i>
+          </div>
+          <h3 id="detalle-envio-title" style="font-size:1.05rem; margin:0; font-weight:700; color:var(--text-primary);">Detalle del Envío</h3>
+        </div>
+        <button type="button" class="modal-close" onclick="window.cerrarDetalleEnvio(event)" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:1.3rem;">✕</button>
+      </div>
+
+      <div id="detalle-envio-body" style="padding: 1.25rem 1.5rem;">
+        <!-- Contenido dinámico -->
       </div>
     </div>
   </div>
@@ -6535,6 +8302,8 @@
     </div>
   </div>
 
+
+
   <!-- MODAL CONFIRMACIÓN PERSONALIZADO -->
   <div id="modal-confirmacion-global" class="modal-overlay" style="z-index:999999; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(6px); transition: opacity 0.25s ease-in-out;">
     <div class="modal" style="max-width:440px; width:92%; border-radius:20px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4); padding:2rem; display:flex; flex-direction:column; gap:1.25rem; transform:scale(0.9); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); border-top: 4px solid var(--accent, #E8820C);">
@@ -6578,17 +8347,128 @@
     </div>
   </div>
 
+
   <script>
+    // ============================================================
+    // DIAGRAMA DE FLUJO INTERACTIVO (GLOBAL HELPER)
+    // ============================================================
+    window.currentRutaDiagrama = 'all';
+
+    window.abrirModalDiagramaFlujo = function() {
+      const modal = document.getElementById('modal-diagrama-flujo-overlay');
+      const mainContent = document.getElementById('flowchart-main-content');
+      const modalContent = document.getElementById('flowchart-modal-content');
+      if (modal && mainContent && modalContent) {
+        modalContent.innerHTML = mainContent.innerHTML;
+        modal.style.display = 'flex';
+        modal.classList.add('open');
+        if (window.lucide) lucide.createIcons();
+        if (window.currentRutaDiagrama) {
+          window.filtrarRutaDiagrama(window.currentRutaDiagrama);
+        }
+      }
+    };
+
+    window.cerrarModalDiagramaFlujo = function(e) {
+      if (e && e.target && !e.target.classList.contains('modal-overlay') && !e.target.classList.contains('modal-close') && !e.target.closest('.modal-close')) return;
+      const modal = document.getElementById('modal-diagrama-flujo-overlay');
+      if (modal) {
+        modal.classList.remove('open');
+        modal.style.display = 'none';
+      }
+    };
+
+    window.zoomDiagramaFlujo = function(delta) {
+      const content = document.getElementById('flowchart-modal-content');
+      if (!content) return;
+      window.currentDiagramZoom = Math.max(0.6, Math.min(1.8, (window.currentDiagramZoom || 1) + delta));
+      content.style.transform = `scale(${window.currentDiagramZoom})`;
+      content.style.transformOrigin = 'top center';
+      const label = document.getElementById('diagrama-zoom-label');
+      if (label) label.textContent = `${Math.round(window.currentDiagramZoom * 100)}%`;
+    };
+
+    window.resetZoomDiagramaFlujo = function() {
+      const content = document.getElementById('flowchart-modal-content');
+      if (!content) return;
+      window.currentDiagramZoom = 1;
+      content.style.transform = 'scale(1)';
+      const label = document.getElementById('diagrama-zoom-label');
+      if (label) label.textContent = '100%';
+    };
+
+    window.toggleSimbologiaFlujo = function() {
+      const legend = document.getElementById('flowchart-legend-box');
+      if (legend) {
+        legend.style.display = legend.style.display === 'none' ? 'flex' : 'none';
+      }
+    };
+
+    window.filtrarRutaDiagrama = function(ruta, btn) {
+      window.currentRutaDiagrama = ruta || 'all';
+      if (btn) {
+        document.querySelectorAll('.flowchart-filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+
+      const container = document.getElementById('flowchart-main-content');
+      const modalContainer = document.getElementById('flowchart-modal-content');
+      
+      [container, modalContainer].forEach(root => {
+        if (!root) return;
+        
+        // Restablecer visibilidad completa de todos los elementos
+        root.querySelectorAll('*').forEach(el => {
+          el.classList.remove('flowchart-step-hidden');
+          if (el.style.display === 'none') {
+            el.style.removeProperty('display');
+          }
+          if (el.style.opacity) el.style.removeProperty('opacity');
+          if (el.style.filter) el.style.removeProperty('filter');
+        });
+
+        const grid = root.querySelector('.flowchart-columns-grid');
+        if (grid) grid.style.gridTemplateColumns = '';
+
+        const ocultar = (selector) => {
+          root.querySelectorAll(selector).forEach(el => {
+            el.classList.add('flowchart-step-hidden');
+            el.style.setProperty('display', 'none', 'important');
+          });
+        };
+
+        if (ruta === 'con_portal') {
+          // Flujo Estándar con Portal de Clientes: Ocultar Levantamiento previo, Llamada/WhatsApp y Subtickets
+          ocultar('.step-levantamiento, .step-llamada-directa, .step-subticket');
+        } else if (ruta === 'sin_portal') {
+          // Flujo Estándar Sin Portal de Clientes: Ocultar Levantamiento previo, Subtickets y todo el panel del Portal de Clientes
+          ocultar('.lane-client, .bridge-to-internal, .step-levantamiento, .step-portal-entrada, .step-subticket');
+          if (grid) grid.style.gridTemplateColumns = '1fr';
+        } else if (ruta === 'levantamiento') {
+          // Flujo Levantamiento
+          ocultar('.step-llamada-directa, .step-portal-entrada, .lane-client, .step-garantia, .step-subticket');
+          if (grid) grid.style.gridTemplateColumns = '1fr';
+        } else if (ruta === 'garantia') {
+          // Flujo Garantía
+          ocultar('.step-levantamiento, .step-cotizacion, .step-os, .step-subticket');
+        } else if (ruta === 'subticket') {
+          // Subticket de refacciones extra generado en campo
+          ocultar('.step-levantamiento, .step-llamada-directa, .step-portal-entrada, .lane-client, .step-garantia');
+          if (grid) grid.style.gridTemplateColumns = '1fr';
+        }
+      });
+    };
+
     window.initLocalStorageIndexedDBBridge().then(function() {
       var scripts = [
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=293",
-        "utils.js?v=1",
-        "app.js?v=293",
-        "levantamientos.js?v=293",
-        "tecnicos_reporte.js?v=293"
+        "supabaseSync.js?v=309",
+        "utils.js?v=7",
+        "app.js?v=361",
+        "levantamientos.js?v=306",
+        "tecnicos_reporte.js?v=303"
       ];
       var index = 0;
       function loadNext() {

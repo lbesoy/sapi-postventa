@@ -7,7 +7,7 @@
     // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
     (function() {
       if (typeof window !== 'undefined') {
-        const currentAppVer = '1.3.210';
+        const currentAppVer = '1.3.295';
         const lastAppVer = localStorage.getItem('sapi_app_version');
         if (lastAppVer !== currentAppVer) {
           if ('serviceWorker' in navigator) {
@@ -180,7 +180,7 @@
         <a href="#" class="nav-item" data-target="sitios">
           <i data-lucide="map-pin"></i> <span>Mis Sitios</span>
         </a>
-        <a href="#" class="nav-item" data-target="envios">
+        <a href="#" class="nav-item" data-target="envios" style="display: none !important;">
           <i data-lucide="truck"></i> <span>Envíos</span>
           <span class="nav-badge visible" style="background:var(--bg-hover); color:var(--text-muted); font-size:0.65rem; border:1px solid var(--border); padding:0.05rem 0.3rem;">Pronto</span>
         </a>
@@ -361,6 +361,14 @@
                 <p class="section-subtitle">Reporta incidencias o solicita soporte técnico para tus equipos.</p>
               </div>
               <form id="form-nuevo-ticket" onsubmit="crearTicketCliente(event)">
+                <!-- Empresa / Razón Social (Visible cuando tiene múltiples empresas y está en Vista General) -->
+                <div class="form-group" id="t-empresa-group" style="display:none; margin-bottom:1rem;">
+                  <label for="t-empresa"><i data-lucide="building-2"></i> Empresa / Razón Social *</label>
+                  <select id="t-empresa" onchange="onTicketEmpresaChange(this.value)">
+                    <option value="" disabled selected>Selecciona empresa...</option>
+                  </select>
+                </div>
+
                 <!-- Grid de Dos Columnas para campos clave -->
                 <div class="form-grid-2">
                   <div class="form-group">
@@ -689,6 +697,15 @@
                   </a>
                 </div>
                 
+                <!-- Diagrama de Flujo del Proceso -->
+                <div style="border-top:1px dashed var(--border); padding-top:1rem; display:flex; flex-direction:column; gap:0.5rem;">
+                  <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary);">Diagrama de Flujo del Servicio</div>
+                  <div style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.25rem; line-height:1.4;">Conoce cómo interactúa tu portal con nuestro equipo técnico desde el reporte hasta la entrega de la orden de servicio:</div>
+                  <a href="manuales/diagrama_flujo.html" target="_blank" class="btn-secondary" style="text-align:center; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.4rem; padding:0.5rem 1rem; border-radius:6px; font-size:0.85rem; font-weight:600; width:100%; border:1px solid rgba(139,92,246,0.4); background:rgba(139,92,246,0.06); color:#a78bfa; cursor:pointer; box-sizing:border-box;">
+                    <i data-lucide="network" style="width:15px; height:15px;"></i> Abrir Diagrama de Flujo del Proceso
+                  </a>
+                </div>
+
                 <!-- Temas -->
                 <div style="border-top:1px dashed var(--border); padding-top:1rem; display:flex; justify-content:space-between; align-items:center;">
                   <div>
@@ -802,19 +819,237 @@
     </div>
   </div>
 
+  <!-- MODAL: DIAGRAMA DE FLUJO INTERACTIVO (PANTALLA COMPLETA) -->
+  <div id="modal-diagrama-flujo-overlay" class="modal-overlay" onclick="cerrarModalDiagramaFlujo(event)">
+    <div class="modal-container" style="max-width: 1100px; width: 95vw; height: 88vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 12px; background: var(--bg-card);">
+      <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <div style="background:rgba(139, 92, 246, 0.15); color:#8b5cf6; padding:0.4rem; border-radius:6px; display:flex;">
+            <i data-lucide="network" style="width:18px; height:18px;"></i>
+          </div>
+          <div>
+            <h3 style="font-size:1.05rem; margin:0; font-weight:700; color:var(--text-primary);">Diagrama de Flujo del Servicio</h3>
+            <div style="font-size:0.75rem; color:var(--text-secondary);">Interacción: Portal Clientes ⟷ Euro SAPI (Equipo Técnico)</div>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <div style="display:flex; align-items:center; background:var(--bg-body); border:1px solid var(--border); border-radius:6px; padding:0.2rem 0.4rem; gap:0.3rem;">
+            <button onclick="zoomDiagramaFlujo(-0.1)" class="flowchart-btn-tool" style="padding:0.2rem 0.4rem;" title="Reducir zoom"><i data-lucide="minus" style="width:12px; height:12px;"></i></button>
+            <span id="diagrama-zoom-label" style="font-size:0.72rem; font-weight:600; min-width:35px; text-align:center; color:var(--text-primary);">100%</span>
+            <button onclick="zoomDiagramaFlujo(0.1)" class="flowchart-btn-tool" style="padding:0.2rem 0.4rem;" title="Aumentar zoom"><i data-lucide="plus" style="width:12px; height:12px;"></i></button>
+            <button onclick="resetZoomDiagramaFlujo()" class="flowchart-btn-tool" style="padding:0.2rem 0.4rem; font-size:0.7rem;" title="Restablecer">100%</button>
+          </div>
+
+          <button class="btn-close-modal" onclick="cerrarModalDiagramaFlujo()" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.25rem; padding:0.25rem 0.5rem;"><i data-lucide="x"></i></button>
+        </div>
+      </div>
+
+      <div class="modal-body" style="flex: 1; overflow: auto; padding: 1.5rem; background: var(--bg-primary);">
+        <div id="flowchart-modal-content" style="transition:transform 0.15s ease-out; transform-origin: top center;">
+          
+          <div class="flowchart-columns-grid">
+            <!-- COLUMNA 1: EURO SAPI (PORTAL INTERNO) -->
+            <div class="flowchart-lane lane-internal">
+              <div class="flowchart-lane-header">
+                <i data-lucide="building-2" style="width:18px; height:18px;"></i>
+                <span>Euro SAPI (Equipo Técnico y Operaciones)</span>
+              </div>
+
+              <div class="flowchart-step-box">
+                <div class="flowchart-card-node node-gray">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="search" style="width:14px; height:14px; color:#64748b;"></i> Levantamiento Previo</span>
+                    <span class="node-badge" style="background:rgba(100,116,139,0.2); color:#94a3b8;">Opcional</span>
+                  </div>
+                  <div class="node-desc">Inspección previa en sitio para diagnóstico y levantamiento de piezas.</div>
+                </div>
+
+                <div class="flowchart-card-node node-purple">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="user-check" style="width:14px; height:14px; color:#8b5cf6;"></i> Asignado a Supervisor</span>
+                    <span class="node-badge badge-purple">Atención</span>
+                  </div>
+                  <div class="node-desc">Se revisa la solicitud del cliente y se programa el diagnóstico.</div>
+                </div>
+
+                <div class="flow-connector-v">
+                  <div class="connector-line"></div>
+                  <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                </div>
+
+                <div class="flowchart-card-node node-purple">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="calculator" style="width:14px; height:14px; color:#8b5cf6;"></i> Cotización de Refacciones</span>
+                    <span class="node-badge badge-purple">Presupuesto</span>
+                  </div>
+                  <div class="node-desc">Se cotizan las piezas necesarias y se envían formalmente al cliente.</div>
+                </div>
+
+                <div class="flow-connector-v">
+                  <div class="connector-line"></div>
+                  <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                </div>
+
+                <div class="flowchart-card-node node-green">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="file-check" style="width:14px; height:14px; color:#10b981;"></i> Aceptado con Pedido</span>
+                    <span class="node-badge badge-green">Validado</span>
+                  </div>
+                  <div class="node-desc">Se valida la Orden de Compra (PDF + No. Pedido) para programar el servicio.</div>
+                </div>
+
+                <div class="flow-connector-v">
+                  <div class="connector-line"></div>
+                  <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                </div>
+
+                <div class="flowchart-card-node node-teal">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="clipboard-list" style="width:14px; height:14px; color:#14b8a6;"></i> Servicio: Ejecución de OS en Campo</span>
+                    <span class="node-badge badge-teal">Presencial</span>
+                  </div>
+                  <div class="node-desc">Técnicos acuden al sitio, realizan trabajos, bitácoras diarias y firma de conformidad.</div>
+                </div>
+
+                <div class="flowchart-card-node node-teal" style="margin-top:0.35rem; border-color:rgba(14,165,233,0.6); background:rgba(14,165,233,0.08);">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="truck" style="width:14px; height:14px; color:#0ea5e9;"></i> Garantía / Refacciones: Guía de Envío</span>
+                    <span class="node-badge" style="background:rgba(14,165,233,0.2); color:#0ea5e9;">Despacho</span>
+                  </div>
+                  <div class="node-desc">Se genera guía de paquetería y se despachan las refacciones directamente al cliente.</div>
+                </div>
+
+                <div class="flow-connector-v">
+                  <div class="connector-line"></div>
+                  <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                </div>
+
+                <div class="flowchart-card-node node-green">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="check-circle-2" style="width:14px; height:14px; color:#10b981;"></i> Cierre y Emisión de Reporte</span>
+                    <span class="node-badge badge-green">Finalizado</span>
+                  </div>
+                  <div class="node-desc">Generación de reporte técnico final de OS o comprobante de entrega de piezas/garantía.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- COLUMNA 2: PORTAL CLIENTES -->
+            <div class="flowchart-lane lane-client">
+              <div class="flowchart-lane-header">
+                <i data-lucide="globe" style="width:18px; height:18px;"></i>
+                <span>Tu Portal de Clientes</span>
+              </div>
+
+              <div class="flowchart-step-box">
+                <div class="flowchart-card-node node-blue">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="file-plus" style="width:14px; height:14px; color:#3b82f6;"></i> 1. Reportar Falla / Servicio</span>
+                    <span class="node-badge badge-blue">Tus Acciones</span>
+                  </div>
+                  <div class="node-desc">Registras tu requerimiento seleccionando tu máquina y tipo de solicitud (Servicio, Garantía o Refacciones).</div>
+                </div>
+
+                <div class="flowchart-card-node node-yellow">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="mail" style="width:14px; height:14px; color:#eab308;"></i> Notificación: En Curso</span>
+                    <span class="node-badge badge-yellow">Correo</span>
+                  </div>
+                  <div class="node-desc">Recibes confirmación de que tu ticket fue asignado a un supervisor.</div>
+                </div>
+
+                <div class="flowchart-card-node node-yellow" style="margin-top:1.5rem;">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="mail" style="width:14px; height:14px; color:#eab308;"></i> Notificación: Cotización Lista</span>
+                    <span class="node-badge badge-yellow">Correo</span>
+                  </div>
+                  <div class="node-desc">Aviso de que tu cotización está disponible para revisión y aprobación.</div>
+                </div>
+
+                <div class="flowchart-card-node node-blue">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="check-square" style="width:14px; height:14px; color:#3b82f6;"></i> 2. Aceptación y Orden de Compra</span>
+                    <span class="node-badge badge-blue">Tus Acciones</span>
+                  </div>
+                  <div class="node-desc">Autorizas la cotización adjuntando tu Orden de Compra (PDF y No. de Pedido).</div>
+                </div>
+
+                <div class="flowchart-card-node node-yellow" style="margin-top:1.5rem;">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="mail" style="width:14px; height:14px; color:#eab308;"></i> Notificación: OS Programada o Guía de Envío</span>
+                    <span class="node-badge badge-yellow">Correo</span>
+                  </div>
+                  <div class="node-desc">Recibes técnicos y fecha programada (Servicio) o guía de paquetería (Garantía o Refacciones).</div>
+                </div>
+
+                <div class="flowchart-card-node node-green" style="margin-top:2rem;">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="file-badge" style="width:14px; height:14px; color:#10b981;"></i> 3. Consulta y Descarga de OS</span>
+                    <span class="node-badge badge-green">Documentación</span>
+                  </div>
+                  <div class="node-desc">Descarga el reporte técnico en PDF desde tu portal y recíbelo por correo.</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toast-container"></div>
 
   <!-- JS DEPENDENCIES -->
   <script>
+    window.abrirModalDiagramaFlujo = function() {
+      const modal = document.getElementById('modal-diagrama-flujo-overlay');
+      if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('open');
+        if (window.lucide) lucide.createIcons();
+      }
+    };
+
+    window.cerrarModalDiagramaFlujo = function(e) {
+      if (e && e.target && !e.target.classList.contains('modal-overlay') && !e.target.classList.contains('btn-close-modal') && !e.target.closest('.btn-close-modal')) return;
+      const modal = document.getElementById('modal-diagrama-flujo-overlay');
+      if (modal) {
+        modal.classList.remove('open');
+        modal.style.display = 'none';
+      }
+    };
+
+    window.zoomDiagramaFlujo = function(delta) {
+      const content = document.getElementById('flowchart-modal-content');
+      if (!content) return;
+      window.currentDiagramZoomCliente = Math.max(0.6, Math.min(1.8, (window.currentDiagramZoomCliente || 1) + delta));
+      content.style.transform = `scale(${window.currentDiagramZoomCliente})`;
+      content.style.transformOrigin = 'top center';
+      const label = document.getElementById('diagrama-zoom-label');
+      if (label) label.textContent = `${Math.round(window.currentDiagramZoomCliente * 100)}%`;
+    };
+
+    window.resetZoomDiagramaFlujo = function() {
+      const content = document.getElementById('flowchart-modal-content');
+      if (!content) return;
+      window.currentDiagramZoomCliente = 1;
+      content.style.transform = 'scale(1)';
+      const label = document.getElementById('diagrama-zoom-label');
+      if (label) label.textContent = '100%';
+    };
+
     window.initLocalStorageIndexedDBBridge().then(function() {
       var scripts = [
         "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=293",
-        "utils.js?v=1",
-        "cliente.js?v=16"
+        "supabaseSync.js?v=307",
+        "utils.js?v=3",
+        "cliente.js?v=21"
       ];
       var index = 0;
       function loadNext() {

@@ -40,18 +40,7 @@ let currentServiciosOrden = 'reciente';
 function isTestData(item) {
   if (!item) return false;
 
-  // Si es una orden, intentar heredar del ticket vinculado
-  if (item.soporte) {
-    const t = (window.tickets || tickets || []).find(x => x.id === item.soporte || x.folio === item.soporte);
-    if (t) {
-      const isTestTkt = t.esPrueba === true || t.isTest === true ||
-                        (t.folio && (t.folio.toUpperCase().includes('PRUEBA') || t.folio.toUpperCase().includes('TEST'))) ||
-                        (t.asunto && (t.asunto.toUpperCase().includes('PRUEBA') || t.asunto.toUpperCase().includes('TEST')));
-      return isTestTkt;
-    }
-  }
-
-  if (item.esPrueba === true || item.isTest === true) return true;
+  if (item.esPrueba === true || item.isTest === true || item.es_prueba === true) return true;
   
   try {
     let notesObj = null;
@@ -63,31 +52,66 @@ function isTestData(item) {
     } else {
       notesObj = item.notas;
     }
-    if (notesObj && (notesObj.esPrueba === true || notesObj.isTest === true)) {
+    if (notesObj && (notesObj.esPrueba === true || notesObj.isTest === true || notesObj.es_prueba === true)) {
       return true;
     }
   } catch (e) {}
   
-  const fieldsToCheckPrefix = [
+  const fieldsToCheck = [
     item.folio,
     item.asunto,
+    item.titulo,
+    item.title,
+    item.descripcion,
+    item.description,
     item.serie,
     item.modelo,
-    item.id
+    item.ordenFolio,
+    item.ordenId,
+    item.id,
+    item.soporte,
+    item.numero_orden,
+    item.cliente
   ];
-  for (const field of fieldsToCheckPrefix) {
+  for (const field of fieldsToCheck) {
     if (field && typeof field === 'string') {
-      const trimmed = field.trim().toUpperCase();
+      const upper = field.trim().toUpperCase();
       if (
-        trimmed.startsWith('[PRUEBA]') || 
-        trimmed.startsWith('[TEST]') || 
-        trimmed.startsWith('PRUEBA') || 
-        trimmed.startsWith('TEST')
+        upper.includes('[PRUEBA]') || 
+        upper.includes('[TEST]') || 
+        upper.includes('OS-PRUEBA') || 
+        upper.includes('TKT-PRUEBA') || 
+        upper.includes('LEV-PRUEBA') ||
+        upper.startsWith('TEST-') ||
+        upper.startsWith('PRUEBA-') ||
+        upper === 'CLIENTE PRUEBA' ||
+        upper === 'CLIENTE DE PRUEBA' ||
+        upper === 'TEST CLIENT'
       ) {
         return true;
       }
     }
   }
+
+  const folioUpper = String(item.folio || '').trim().toUpperCase();
+  if (/^TKT-OS00\d+/i.test(folioUpper) || /^OS-PRUEBA/i.test(folioUpper) || /^TKT-PRUEBA/i.test(folioUpper)) {
+    return true;
+  }
+
+  if (item.soporte) {
+    const t = (window.tickets || tickets || []).find(x => x && (x.id === item.soporte || x.folio === item.soporte));
+    if (t && (t.esPrueba === true || t.isTest === true || (t.folio && t.folio.toUpperCase().includes('PRUEBA')) || /^TKT-OS00\d+/i.test(String(t.folio || '')))) {
+      return true;
+    }
+  }
+
+  if (item.ordenId && typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
+    const assocOrd = ordenes.find(o => o && o.id === item.ordenId);
+    if (assocOrd && (assocOrd.esPrueba === true || assocOrd.isTest === true || (assocOrd.folio && assocOrd.folio.toUpperCase().includes('PRUEBA')))) {
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -413,6 +437,9 @@ async function iniciarSesionCliente(e) {
     loader.classList.remove('fade-out');
     
     await inicializarDatos();
+    if (window.setupRealtime) {
+      window.setupRealtime();
+    }
     
     loader.classList.add('fade-out');
     loader.style.display = 'none';
@@ -428,6 +455,12 @@ async function iniciarSesionCliente(e) {
 
 // Cerrar sesión
 async function cerrarSesionCliente() {
+  if (window.supabaseRealtimeChannel && window.supabaseClient) {
+    try {
+      window.supabaseClient.removeChannel(window.supabaseRealtimeChannel);
+      window.supabaseRealtimeChannel = null;
+    } catch (e) {}
+  }
   if (window.supabaseClient) {
     await window.supabaseClient.auth.signOut().catch(() => {});
   }
@@ -1306,30 +1339,73 @@ function renderMachinerySection(misEquipos, misOrdenes) {
 // 3. Tickets UI & Logic
 function renderTicketsSection(misSitios, misEquipos, misTickets) {
   // Rellenar combos del formulario de ticket
+  const comboEmpresa = document.getElementById('t-empresa');
+  const groupEmpresa = document.getElementById('t-empresa-group');
   const comboSitios = document.getElementById('t-sitio');
   const comboEquipos = document.getElementById('t-equipo');
-  
-  if (comboSitios) {
-    const selectedVal = comboSitios.value;
-    const listOptions = misSitios.map(s => {
-      const val = s.nombre || s.direccion || '';
-      return `<option value="${val}">${val}</option>`;
+
+  const allowedNames = getAllowedCompanyNames();
+  const allowedClients = clientesDb.filter(c => allowedNames.includes(String(c.nombre || '').toLowerCase().trim()));
+  const isVistaGeneral = nombreEmpresaLogged === 'todos';
+  const tieneMultiplesEmpresas = allowedClients.length > 1;
+
+  if (isVistaGeneral && tieneMultiplesEmpresas && groupEmpresa && comboEmpresa) {
+    groupEmpresa.style.display = 'block';
+    comboEmpresa.required = true;
+
+    const currentEmpresaVal = comboEmpresa.value;
+    const listEmpresas = allowedClients.map(c => {
+      return `<option value="${c.nombre}">${c.nombre}</option>`;
     }).join('');
-    comboSitios.innerHTML = `<option value="" disabled selected>Selecciona ubicación...</option>` + listOptions;
-    if (selectedVal) comboSitios.value = selectedVal;
-  }
-  
-  if (comboEquipos && comboEquipos.options.length <= 1) {
-    const listOptions = misEquipos.map(m => {
-      const codMarca = (m.marca || '').toUpperCase();
-      const mFullName = MARCAS_RENDER[codMarca] || m.marca || 'Equipo';
-      const cleanId = m.idInterno || m.id || '';
-      const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
-      const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
-      const text = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
-      return `<option value="${text}">${text}</option>`;
-    }).join('');
-    comboEquipos.innerHTML = `<option value="" disabled selected>Selecciona equipo...</option><option value="Otra / No registrada">Otra / No registrada</option>` + listOptions;
+
+    comboEmpresa.innerHTML = `<option value="" disabled ${!currentEmpresaVal ? 'selected' : ''}>Selecciona empresa...</option>` + listEmpresas;
+
+    if (currentEmpresaVal && allowedClients.some(c => c.nombre === currentEmpresaVal)) {
+      comboEmpresa.value = currentEmpresaVal;
+      onTicketEmpresaChange(currentEmpresaVal);
+    } else {
+      if (comboSitios) {
+        comboSitios.innerHTML = `<option value="" disabled selected>Selecciona primero una empresa...</option>`;
+      }
+      if (comboEquipos) {
+        comboEquipos.innerHTML = `<option value="" disabled selected>Selecciona primero una empresa...</option><option value="Otra / No registrada">Otra / No registrada</option>`;
+      }
+    }
+  } else {
+    if (groupEmpresa) groupEmpresa.style.display = 'none';
+    if (comboEmpresa) {
+      comboEmpresa.required = false;
+      comboEmpresa.value = '';
+    }
+
+    if (comboSitios) {
+      const selectedVal = comboSitios.value;
+      const listOptions = misSitios.map(s => {
+        const val = s.nombre || s.direccion || '';
+        return `<option value="${val}">${val}</option>`;
+      }).join('');
+      comboSitios.innerHTML = `<option value="" disabled selected>Selecciona ubicación...</option>` + listOptions;
+      if (selectedVal && misSitios.some(s => (s.nombre || s.direccion) === selectedVal)) {
+        comboSitios.value = selectedVal;
+      }
+    }
+
+    if (comboEquipos) {
+      const selectedVal = comboEquipos.value;
+      const listOptions = misEquipos.map(m => {
+        const codMarca = (m.marca || '').toUpperCase();
+        const mFullName = MARCAS_RENDER[codMarca] || m.marca || 'Equipo';
+        const cleanId = m.idInterno || m.id || '';
+        const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+        const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+        const text = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+        return `<option value="${text}">${text}</option>`;
+      }).join('');
+      comboEquipos.innerHTML = `<option value="" disabled selected>Selecciona equipo...</option><option value="Otra / No registrada">Otra / No registrada</option>` + listOptions;
+      if (selectedVal) {
+        comboEquipos.value = selectedVal;
+      }
+    }
   }
 
   // Renderizar historial de tickets
@@ -1715,6 +1791,94 @@ function onHistorialFiltroChange() {
   doRender();
 }
 
+// Acción de cambiar de empresa en formulario de ticket (cuando está en Vista General con múltiples empresas)
+window.onTicketEmpresaChange = function(empresaNombre) {
+  const comboSitios = document.getElementById('t-sitio');
+  const comboEquipos = document.getElementById('t-equipo');
+  if (!comboSitios || !comboEquipos) return;
+
+  if (!empresaNombre) {
+    comboSitios.innerHTML = `<option value="" disabled selected>Selecciona primero una empresa...</option>`;
+    comboEquipos.innerHTML = `<option value="" disabled selected>Selecciona primero una empresa...</option><option value="Otra / No registrada">Otra / No registrada</option>`;
+    onTicketEquipoChange('');
+    return;
+  }
+
+  const norm = String(empresaNombre).toLowerCase().trim();
+  const cliObj = clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === norm);
+  const cliId = cliObj ? cliObj.id : null;
+  const activeSandbox = isTestModeActive();
+
+  // 1. Sitios de la empresa seleccionada
+  const sitiosEmpresa = [];
+  sitiosDb.forEach(s => {
+    const sCli = String(s.cliente || '').toLowerCase().trim();
+    if (sCli === norm || (cliId && s.cliente === cliId)) {
+      const sName = s.nombre || s.direccion || '';
+      if (sName && !sitiosEmpresa.some(x => x.nombre === sName || x.id === s.id)) {
+        sitiosEmpresa.push({ ...s, cliente: empresaNombre });
+      }
+    }
+  });
+  if (cliObj && cliObj.sitios) {
+    cliObj.sitios.forEach(s => {
+      const sName = s.nombre || s.direccion || '';
+      if (sName && !sitiosEmpresa.some(x => x.nombre === sName || x.id === s.id)) {
+        sitiosEmpresa.push({ ...s, cliente: cliObj.nombre });
+      }
+    });
+  }
+
+  const prevSitio = comboSitios.value;
+  const sitiosHtml = sitiosEmpresa.map(s => {
+    const val = s.nombre || s.direccion || '';
+    return `<option value="${val}">${val}</option>`;
+  }).join('');
+  comboSitios.innerHTML = `<option value="" disabled selected>Selecciona ubicación...</option>` + sitiosHtml;
+  if (prevSitio && sitiosEmpresa.some(s => (s.nombre || s.direccion) === prevSitio)) {
+    comboSitios.value = prevSitio;
+  }
+
+  // 2. Equipos de la empresa seleccionada
+  const equiposEmpresa = [];
+  maquinariaDb.forEach(m => {
+    const mCli = String(m.cliente || '').toLowerCase().trim();
+    const matchCli = mCli === norm || (cliId && m.cliente === cliId);
+    if (matchCli && isTestData(m) === activeSandbox) {
+      if (!equiposEmpresa.some(x => x.id === m.id || (m.idInterno && x.idInterno === m.idInterno))) {
+        equiposEmpresa.push({ ...m, cliente: empresaNombre });
+      }
+    }
+  });
+  if (cliObj && cliObj.maquinas) {
+    cliObj.maquinas.forEach(m => {
+      if (isTestData(m) === activeSandbox) {
+        if (!equiposEmpresa.some(x => x.id === m.id || (m.idInterno && x.idInterno === m.idInterno))) {
+          equiposEmpresa.push({ ...m, cliente: cliObj.nombre });
+        }
+      }
+    });
+  }
+
+  const prevEquipo = comboEquipos.value;
+  const equiposHtml = equiposEmpresa.map(m => {
+    const codMarca = (m.marca || '').toUpperCase();
+    const mFullName = MARCAS_RENDER[codMarca] || m.marca || 'Equipo';
+    const cleanId = m.idInterno || m.id || '';
+    const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+    const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+    const text = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+    return `<option value="${text}">${text}</option>`;
+  }).join('');
+  comboEquipos.innerHTML = `<option value="" disabled selected>Selecciona equipo...</option><option value="Otra / No registrada">Otra / No registrada</option>` + equiposHtml;
+  if (prevEquipo && comboEquipos.querySelector(`option[value="${prevEquipo}"]`)) {
+    comboEquipos.value = prevEquipo;
+  }
+
+  onTicketEquipoChange(comboEquipos.value);
+  try { lucide.createIcons(); } catch(e) {}
+};
+
 // Acción de cambiar de maquina en ticket para habilitar campo de horómetro
 function onTicketEquipoChange(val) {
   const group = document.getElementById('t-horometro-group');
@@ -1790,6 +1954,25 @@ async function crearTicketCliente(e) {
   btn.disabled = true;
 
   try {
+    const groupEmpresa = document.getElementById('t-empresa-group');
+    const comboEmpresa = document.getElementById('t-empresa');
+    let ticketCliente = '';
+
+    if (groupEmpresa && groupEmpresa.style.display !== 'none' && comboEmpresa) {
+      ticketCliente = comboEmpresa.value;
+      if (!ticketCliente) {
+        showToast('Por favor selecciona la empresa para la solicitud.', 'warning');
+        btn.innerHTML = origHtml;
+        btn.disabled = false;
+        return;
+      }
+    } else if (nombreEmpresaLogged && nombreEmpresaLogged !== 'todos') {
+      const dbClient = clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === nombreEmpresaLogged);
+      ticketCliente = dbClient ? dbClient.nombre : (currentSession.empresa || currentSession.nombre);
+    } else {
+      ticketCliente = currentSession.empresa || currentSession.nombre;
+    }
+
     const sitioVal = document.getElementById('t-sitio').value;
     const equipoVal = document.getElementById('t-equipo').value;
     const horometroVal = document.getElementById('t-horometro')?.value.trim() || '';
@@ -1832,11 +2015,13 @@ async function crearTicketCliente(e) {
       folio: newFolio,
       fecha: new Date().toISOString(),
       fechaCreacion: new Date().toISOString(),
+      fechaModificacion: new Date().toISOString(),
+      modificadoPor: currentSession.nombre || 'Cliente',
       fechaCierre: null,
       canal: 'portal',
       contacto: emailContacto || '',
       asunto: isSandbox ? `[PRUEBA] ${asuntoVal}` : asuntoVal,
-      cliente: currentSession.empresa || currentSession.nombre,
+      cliente: ticketCliente,
       sitio: sitioVal,
       solicitante: currentSession.nombre,
       creadoPor: currentSession.nombre,
@@ -1878,6 +2063,9 @@ async function crearTicketCliente(e) {
     document.getElementById('form-nuevo-ticket').reset();
     eliminarFotoTicketPreview();
     onTicketEquipoChange('');
+    if (groupEmpresa && groupEmpresa.style.display !== 'none') {
+      onTicketEmpresaChange('');
+    }
 
     // Actualizar Vistas
     doRender();
@@ -2074,7 +2262,8 @@ function renderServicesSection(misOrdenes) {
         estadoText = 'Programado';
       }
 
-      const tieneReporte = !!(o.firma_cliente_base64 || o.evidenciaBase64 || o.firma_tecnico_base64);
+      const tieneEvidenciasFotos = !!(o.evidencias && (o.evidencias.fotoInicio || o.evidencias.fotoFin || (Array.isArray(o.evidencias.adicionales) && o.evidencias.adicionales.length > 0)));
+      const tieneReporte = !!(o.firma_cliente_base64 || o.firma_tecnico_base64 || o.evidenciaBase64 || tieneEvidenciasFotos || o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || (o.bitacora && o.bitacora.length > 0));
       const actionBtn = tieneReporte ? 
         `<div style="display:flex; gap:0.25rem;">
            <button class="btn-secondary" style="padding:0.35rem 0.6rem; font-size:0.8rem; margin:0; display:inline-flex; align-items:center; gap:0.25rem;" onclick="abrirReportePdfCliente(event, '${o.id}', true)" title="Ver PDF"><i data-lucide="eye" style="width:13px; height:13px;"></i> Ver</button>
@@ -2461,7 +2650,7 @@ function abrirDetalleTicketCliente(id) {
       <div style="margin-top:1.5rem;">
         <h4 style="font-size:0.9rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.5rem;">Evidencia Fotográfica</h4>
         <div id="t-evidence-img-container-${t.id}" style="width:100%; max-height:220px; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; background:#000;">
-          <img id="t-evidence-img-${t.id}" src="${isPlaceholder ? '' : t.pdfCotizacion}" alt="Evidencia" style="width:100%; height:100%; object-fit:contain; display:${isPlaceholder ? 'none' : 'block'};" />
+          <img id="t-evidence-img-${t.id}" src="${isPlaceholder ? '' : t.pdfCotizacion}" alt="Evidencia" style="width:100%; height:100%; object-fit:contain; display:${isPlaceholder ? 'none' : 'block'}; cursor:pointer;" onclick="window.previsualizarImagenCompleta(this.src, 'Evidencia del Ticket')" title="Clic para ampliar" />
           ${isPlaceholder ? `<span id="t-evidence-loading-${t.id}" style="font-size:0.8rem; color:var(--text-secondary);"><i data-lucide="loader" class="rotating" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; display:inline-block;"></i> Cargando imagen...</span>` : ''}
         </div>
       </div>
@@ -2962,7 +3151,8 @@ function abrirDetalleOrdenCliente(id) {
 
   // Sincronizar el botón de descargar PDF si la orden contiene evidencias/firmas
   const btnView = document.getElementById('btn-view-pdf');
-  const tieneReporte = !!(o.firma_cliente_base64 || o.evidenciaBase64 || o.firma_tecnico_base64);
+  const tieneEvidenciasFotos = !!(o.evidencias && (o.evidencias.fotoInicio || o.evidencias.fotoFin || (Array.isArray(o.evidencias.adicionales) && o.evidencias.adicionales.length > 0)));
+  const tieneReporte = !!(o.firma_cliente_base64 || o.firma_tecnico_base64 || o.evidenciaBase64 || tieneEvidenciasFotos || o.estado === 'Completado' || o.estado === 'Cerrado' || o.estado === 'Cerrada' || (o.bitacora && o.bitacora.length > 0));
   if (btnDownload) {
     if (tieneReporte) {
       btnDownload.style.display = 'inline-flex';
@@ -3109,16 +3299,21 @@ function abrirDetalleOrdenCliente(id) {
 
   // Evidencias Fotográficas
   let fotosHtml = '';
-  const ev = o.evidencias || {};
-  const tieneFotos = !!(ev.fotoInicio || ev.fotoFin || (ev.adicionales && ev.adicionales.length > 0));
+  let ev = o.evidencias || {};
+  if (typeof ev === 'string') {
+    try { ev = JSON.parse(ev); } catch(e) { ev = {}; }
+  }
+  const adicionales = Array.isArray(ev.adicionales) ? ev.adicionales : (ev.adicionales ? Object.values(ev.adicionales) : []);
+  const tieneFotos = !!(ev.fotoInicio || ev.fotoFin || adicionales.length > 0 || o.evidenciaBase64);
   if (tieneFotos) {
     const todasLasFotos = [];
     if (ev.fotoInicio) todasLasFotos.push({ label: 'Entrada / Inicio', url: ev.fotoInicio });
     if (ev.fotoFin) todasLasFotos.push({ label: 'Salida / Fin', url: ev.fotoFin });
-    if (ev.adicionales) {
-      ev.adicionales.forEach((f, idx) => {
-        if (f) todasLasFotos.push({ label: `Adicional ${idx + 1}`, url: f });
-      });
+    adicionales.forEach((f, idx) => {
+      if (f) todasLasFotos.push({ label: `Adicional ${idx + 1}`, url: f });
+    });
+    if (todasLasFotos.length === 0 && o.evidenciaBase64) {
+      todasLasFotos.push({ label: 'Evidencia Principal', url: o.evidenciaBase64 });
     }
 
     fotosHtml = `
@@ -3127,7 +3322,7 @@ function abrirDetalleOrdenCliente(id) {
         <div style="display:flex; gap:0.75rem; overflow-x:auto; padding-bottom:0.5rem; scrollbar-width:thin;">
           ${todasLasFotos.map(f => `
             <div style="flex: 0 0 140px; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-sm); padding:0.25rem; text-align:center;">
-              <div style="width:100%; height:90px; border-radius:var(--radius-xs); overflow:hidden; background:black; position:relative; cursor:pointer;" onclick="window.open('${f.url}', '_blank')">
+              <div style="width:100%; height:90px; border-radius:var(--radius-xs); overflow:hidden; background:black; position:relative; cursor:pointer;" onclick="window.previsualizarImagenCompleta('${f.url}', '${f.label}')" title="Clic para ampliar">
                 <img src="${f.url}" alt="${f.label}" style="width:100%; height:100%; object-fit:cover; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'"/>
               </div>
               <span style="font-size:0.7rem; font-weight:600; color:var(--text-secondary); display:block; margin-top:0.35rem;">${f.label}</span>
@@ -3372,7 +3567,136 @@ function abrirDetalleOrdenCliente(id) {
   lucide.createIcons();
 }
 
-// Descargar/Imprimir Reporte PDF de la Orden
+// Helper para convertir URLs de imágenes a Base64 Data URI con soporte Supabase Storage, Fetch Blob y Canvas
+async function urlToDataUri(url) {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed || trimmed === '__DELETED__') return null;
+  if (trimmed.startsWith('data:image')) return trimmed;
+
+  // Intento 1: Descarga directa mediante Supabase Storage Client (evita cualquier restricción de CORS)
+  if (window.supabaseClient && trimmed.includes('/evidencias/')) {
+    try {
+      const parts = trimmed.split('/evidencias/');
+      let filePath = parts[1] || '';
+      if (filePath) {
+        filePath = decodeURIComponent(filePath.split('?')[0]);
+        const { data: blob, error } = await window.supabaseClient.storage.from('evidencias').download(filePath);
+        if (!error && blob && blob.size > 0) {
+          const dataUri = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          });
+          if (dataUri && dataUri.startsWith('data:image')) return dataUri;
+        }
+      }
+    } catch (err) {
+      console.warn('[urlToDataUri] Supabase storage download fallback:', err);
+    }
+  }
+
+  // Intento 2: Fetch como Blob estándar
+  try {
+    const res = await fetch(trimmed, { mode: 'cors' });
+    if (res.ok) {
+      const blob = await res.blob();
+      if (blob && blob.size > 0) {
+        const dataUri = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        });
+        if (dataUri && dataUri.startsWith('data:image')) return dataUri;
+      }
+    }
+  } catch (err) {
+    console.warn('[urlToDataUri] Fetch blob fallback:', err);
+  }
+
+  // Intento 3: Fetch con cache-busting
+  if (trimmed.startsWith('http')) {
+    try {
+      const cbUrl = trimmed.includes('?') ? `${trimmed}&_t=${Date.now()}` : `${trimmed}?_t=${Date.now()}`;
+      const res = await fetch(cbUrl, { mode: 'cors' });
+      if (res.ok) {
+        const blob = await res.blob();
+        if (blob && blob.size > 0) {
+          const dataUri = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          });
+          if (dataUri && dataUri.startsWith('data:image')) return dataUri;
+        }
+      }
+    } catch (err) {
+      console.warn('[urlToDataUri] Fetch cb fallback:', err);
+    }
+  }
+
+  // Intento 4: Elemento Image con crossOrigin y Canvas
+  try {
+    const dataUri = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width || 300;
+          canvas.height = img.naturalHeight || img.height || 200;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/jpeg', 0.95));
+        } catch (e) {
+          reject(e);
+        }
+      };
+      img.onerror = reject;
+      img.src = trimmed;
+    });
+    if (dataUri && dataUri.startsWith('data:image')) return dataUri;
+  } catch (err) {
+    console.warn('[urlToDataUri] Canvas conversion fallback:', err);
+  }
+
+  return trimmed;
+}
+
+window.previsualizarImagenCompleta = function(url, titulo) {
+  if (!url) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.style.zIndex = '100000';
+  overlay.style.background = 'rgba(0,0,0,0.85)';
+  overlay.style.display = 'flex';
+  overlay.style.alignItems = 'center';
+  overlay.style.justifyContent = 'center';
+  overlay.onclick = (e) => {
+    if (e.target === overlay) overlay.remove();
+  };
+  overlay.innerHTML = `
+    <div style="position:relative; max-width:92%; max-height:92%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.75rem; outline:none;" onclick="event.stopPropagation()">
+      <h3 style="color:white; margin:0; font-size:1.05rem; font-weight:600; text-shadow:0 2px 4px rgba(0,0,0,0.6);">${titulo || 'Evidencia Fotográfica'}</h3>
+      <div style="max-height:80vh; overflow:hidden; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center;">
+        <img src="${url}" style="max-width:100%; max-height:80vh; object-fit:contain; border-radius:8px;" />
+      </div>
+      <div style="display:flex; gap:0.75rem; align-items:center;">
+        <a href="${url}" target="_blank" download class="btn-secondary" style="font-size:0.8rem; padding:0.4rem 0.8rem; color:white; border-color:rgba(255,255,255,0.3); text-decoration:none; display:inline-flex; align-items:center; gap:0.3rem;"><i data-lucide="external-link" style="width:14px;height:14px;"></i> Abrir original</a>
+        <button onclick="this.closest('.modal-overlay').remove()" class="btn-primary" style="font-size:0.8rem; padding:0.4rem 0.8rem; cursor:pointer;">Cerrar</button>
+      </div>
+      <button onclick="this.closest('.modal-overlay').remove()" style="position:absolute; top:-35px; right:-15px; background:none; border:none; color:white; font-size:2rem; cursor:pointer; line-height:1;" title="Cerrar">&times;</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
+};
+
 // Descargar/Imprimir Reporte PDF de la Orden
 async function abrirReportePdfCliente(e, orderId, soloVisualizar = false) {
   if (e) e.stopPropagation();
@@ -3382,6 +3706,8 @@ async function abrirReportePdfCliente(e, orderId, soloVisualizar = false) {
   
   const o = ordenes.find(x => x.id === orderId);
   if (!o) return;
+
+  showToast(soloVisualizar ? 'Generando vista previa del PDF...' : 'Generando archivo PDF...', 'info');
 
   const formatFecha = (fStr) => {
     if (!fStr) return '—';
@@ -3505,14 +3831,47 @@ async function abrirReportePdfCliente(e, orderId, soloVisualizar = false) {
     `;
   }
 
-  // Evidencias (Impresión)
-  const ev = o.evidencias || { fotoInicio: null, fotoFin: null, adicionales: [] };
-  const adicionales = ev.adicionales || [];
-  const tieneInicio = !!ev.fotoInicio;
-  const tieneFin = !!ev.fotoFin;
+  // Evidencias (Impresión con Pre-carga asíncrona a Data URI)
+  let ev = o.evidencias || {};
+  if (typeof ev === 'string') {
+    try { ev = JSON.parse(ev); } catch(e) { ev = {}; }
+  }
+  const rawAdicionales = Array.isArray(ev.adicionales) ? ev.adicionales : (ev.adicionales ? Object.values(ev.adicionales) : []);
+  
+  // Siempre usar el logo corporativo de Eurorep en el encabezado
+  const logoSrc = 'logo_transparent.png';
+
+  // Pre-cargar todas las imágenes a Data URIs de forma paralela
+  const [
+    logoDataUri,
+    fotoInicioDataUri,
+    fotoFinDataUri,
+    firmaTecnicoDataUri,
+    firmaClienteDataUri,
+    legacyEvidenciaDataUri,
+    ...adicionalesDataUris
+  ] = await Promise.all([
+    urlToDataUri(logoSrc),
+    urlToDataUri(ev.fotoInicio),
+    urlToDataUri(ev.fotoFin),
+    urlToDataUri(o.firma_tecnico_base64),
+    urlToDataUri(o.firma_cliente_base64),
+    urlToDataUri(o.evidenciaBase64),
+    ...rawAdicionales.map(u => urlToDataUri(u))
+  ]);
+
+  const fotoInicioFinal = fotoInicioDataUri || ev.fotoInicio;
+  const fotoFinFinal = fotoFinDataUri || ev.fotoFin;
+  const logoFinal = logoDataUri || logoSrc;
+  const firmaTecnicoFinal = firmaTecnicoDataUri || o.firma_tecnico_base64;
+  const firmaClienteFinal = firmaClienteDataUri || o.firma_cliente_base64;
+  const adicionalesFinales = rawAdicionales.map((url, idx) => adicionalesDataUris[idx] || url);
+
+  const tieneInicio = !!fotoInicioFinal;
+  const tieneFin = !!fotoFinFinal;
 
   let printEvidenciasHtml = '';
-  if (tieneInicio || tieneFin || adicionales.length > 0) {
+  if (tieneInicio || tieneFin || adicionalesFinales.length > 0 || legacyEvidenciaDataUri) {
     printEvidenciasHtml += `
       <div style="display:block; margin-top:0.5rem;">
         <div style="display:block; text-align:left;">
@@ -3522,8 +3881,8 @@ async function abrirReportePdfCliente(e, orderId, soloVisualizar = false) {
       printEvidenciasHtml += `
         <div style="display:inline-block; vertical-align:top; width:330px; margin-right:1.5rem; margin-bottom:1.5rem; border:1px solid #d1d5db; border-radius:6px; padding:0.75rem; background:#f9fafb; text-align:center; page-break-inside:avoid; break-inside:avoid; box-sizing:border-box;">
           <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.5rem; text-transform:uppercase;">Foto de Inicio (Entrada)</div>
-          <div style="height:220px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; display:flex; justify-content:center; align-items:center; overflow:hidden;">
-            <img src="${ev.fotoInicio}" style="max-width:100%; max-height:100%; object-fit:contain;" />
+          <div style="height:220px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; text-align:center; line-height:216px; padding:2px; box-sizing:border-box;">
+            <img crossorigin="anonymous" src="${fotoInicioFinal}" style="max-width:310px; max-height:210px; width:auto; height:auto; display:inline-block; vertical-align:middle;" />
           </div>
         </div>
       `;
@@ -3533,8 +3892,19 @@ async function abrirReportePdfCliente(e, orderId, soloVisualizar = false) {
       printEvidenciasHtml += `
         <div style="display:inline-block; vertical-align:top; width:330px; margin-bottom:1.5rem; border:1px solid #d1d5db; border-radius:6px; padding:0.75rem; background:#f9fafb; text-align:center; page-break-inside:avoid; break-inside:avoid; box-sizing:border-box;">
           <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.5rem; text-transform:uppercase;">Foto de Fin (Salida)</div>
-          <div style="height:220px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; display:flex; justify-content:center; align-items:center; overflow:hidden;">
-            <img src="${ev.fotoFin}" style="max-width:100%; max-height:100%; object-fit:contain;" />
+          <div style="height:220px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; text-align:center; line-height:216px; padding:2px; box-sizing:border-box;">
+            <img crossorigin="anonymous" src="${fotoFinFinal}" style="max-width:310px; max-height:210px; width:auto; height:auto; display:inline-block; vertical-align:middle;" />
+          </div>
+        </div>
+      `;
+    }
+
+    if (!tieneInicio && !tieneFin && legacyEvidenciaDataUri) {
+      printEvidenciasHtml += `
+        <div style="display:inline-block; vertical-align:top; width:330px; margin-bottom:1.5rem; border:1px solid #d1d5db; border-radius:6px; padding:0.75rem; background:#f9fafb; text-align:center; page-break-inside:avoid; break-inside:avoid; box-sizing:border-box;">
+          <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.5rem; text-transform:uppercase;">Evidencia Principal</div>
+          <div style="height:220px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; text-align:center; line-height:216px; padding:2px; box-sizing:border-box;">
+            <img crossorigin="anonymous" src="${legacyEvidenciaDataUri}" style="max-width:310px; max-height:210px; width:auto; height:auto; display:inline-block; vertical-align:middle;" />
           </div>
         </div>
       `;
@@ -3544,19 +3914,19 @@ async function abrirReportePdfCliente(e, orderId, soloVisualizar = false) {
         </div>
     `;
 
-    if (adicionales.length > 0) {
+    if (adicionalesFinales.length > 0) {
       printEvidenciasHtml += `
         <div style="margin-top:1.5rem;">
           <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.75rem; text-transform:uppercase;">Evidencias Adicionales</div>
           <div style="display:block; text-align:left;">
       `;
 
-      adicionales.forEach((url, idx) => {
+      adicionalesFinales.forEach((url, idx) => {
         printEvidenciasHtml += `
           <div style="display:inline-block; vertical-align:top; border:1px solid #d1d5db; border-radius:6px; padding:0.5rem; background:#f9fafb; text-align:center; width:210px; margin-right:1.2rem; margin-bottom:1.2rem; page-break-inside:avoid; break-inside:avoid; box-sizing:border-box;">
             <div style="font-size:0.65rem; font-weight:600; color:#4b5563; margin-bottom:0.35rem;">Adicional ${idx + 1}</div>
-            <div style="height:140px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; display:flex; justify-content:center; align-items:center; overflow:hidden;">
-              <img src="${url}" style="max-width:100%; max-height:100%; object-fit:contain;" />
+            <div style="height:140px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; text-align:center; line-height:136px; padding:2px; box-sizing:border-box;">
+              <img crossorigin="anonymous" src="${url}" style="max-width:196px; max-height:134px; width:auto; height:auto; display:inline-block; vertical-align:middle;" />
             </div>
           </div>
         `;
@@ -3709,7 +4079,7 @@ async function abrirReportePdfCliente(e, orderId, soloVisualizar = false) {
 
     <div class="header" style="display: flex; justify-content: space-between; align-items: flex-start;">
       <div style="text-align: left;">
-        <img src="logo_transparent.png" alt="Eurorep Logo" style="height: 60px; object-fit: contain; margin-bottom: 0.5rem;" />
+        <img crossorigin="anonymous" src="${logoFinal}" alt="Eurorep Logo" style="height: 60px; object-fit: contain; margin-bottom: 0.5rem;" />
         <div style="font-size: 0.75rem; color: #64748b; line-height: 1.4;">
           <strong>EURO REPRESENTACIONES S.A. DE C.V.</strong><br>
           Servicio Técnico Especializado en Maquinaria<br>
@@ -3811,9 +4181,9 @@ async function abrirReportePdfCliente(e, orderId, soloVisualizar = false) {
         <!-- TECNICO -->
         <div style="flex:1; min-width:280px; max-width:350px; display:flex; flex-direction:column; align-items:center;">
           <h4 style="margin-bottom:1rem; color:#0f172a; font-size:0.95rem; font-weight:600; text-align:center;">Firma del Técnico</h4>
-          ${o.firma_tecnico_base64 
+          ${firmaTecnicoFinal 
             ? `<div style="border:1px solid #e2e8f0; border-radius:8px; padding:1rem; background:white; width:100%; text-align:center; box-sizing:border-box;">
-                 <img src="${o.firma_tecnico_base64}" alt="Firma del técnico" style="max-width:100%; max-height:120px; display:block; margin:0 auto;"/>
+                 <img crossorigin="anonymous" src="${firmaTecnicoFinal}" alt="Firma del técnico" style="max-width:100%; max-height:120px; display:block; margin:0 auto;"/>
                  <p style="text-align:center; color:#0f172a; font-weight:600; font-size:0.85rem; margin-top:0.5rem; margin-bottom:0;">${o.firma_tecnico_nombre || o.tecnico || 'Técnico'}</p>
                  ${o.firma_tecnico_fecha ? `<p style="text-align:center; color:#64748b; font-size:0.75rem; margin-top:0.25rem; margin-bottom:0;">${new Date(o.firma_tecnico_fecha).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'})}</p>` : ''}
                </div>`
@@ -3824,9 +4194,9 @@ async function abrirReportePdfCliente(e, orderId, soloVisualizar = false) {
         <!-- CLIENTE -->
         <div style="flex:1; min-width:280px; max-width:350px; display:flex; flex-direction:column; align-items:center;">
           <h4 style="margin-bottom:1rem; color:#0f172a; font-size:0.95rem; font-weight:600; text-align:center;">Firma del Cliente</h4>
-          ${o.firma_cliente_base64 
+          ${firmaClienteFinal 
             ? `<div style="border:1px solid #e2e8f0; border-radius:8px; padding:1rem; background:white; width:100%; text-align:center; box-sizing:border-box;">
-                 <img src="${o.firma_cliente_base64}" alt="Firma del cliente" style="max-width:100%; max-height:120px; display:block; margin:0 auto;"/>
+                 <img crossorigin="anonymous" src="${firmaClienteFinal}" alt="Firma del cliente" style="max-width:100%; max-height:120px; display:block; margin:0 auto;"/>
                  <p style="text-align:center; color:#0f172a; font-weight:600; font-size:0.85rem; margin-top:0.5rem; margin-bottom:0;">${o.firma_cliente_nombre || o.cliente || 'Cliente'}</p>
                  ${o.firma_cliente_fecha ? `<p style="text-align:center; color:#64748b; font-size:0.75rem; margin-top:0.25rem; margin-bottom:0;">${new Date(o.firma_cliente_fecha).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'})}</p>` : ''}
                </div>`
@@ -3845,19 +4215,31 @@ async function abrirReportePdfCliente(e, orderId, soloVisualizar = false) {
   tempContainer.appendChild(clone);
   document.body.appendChild(tempContainer);
 
+  // Esperar a que todas las imágenes estén decodificadas y listas en el DOM
+  const imgElements = Array.from(clone.querySelectorAll('img'));
+  await Promise.all(imgElements.map(img => {
+    if (img.complete && img.naturalWidth > 0) {
+      return typeof img.decode === 'function' ? img.decode().catch(() => {}) : Promise.resolve();
+    }
+    return new Promise(resolve => {
+      img.onload = () => (typeof img.decode === 'function' ? img.decode().then(resolve).catch(resolve) : resolve());
+      img.onerror = resolve;
+      setTimeout(resolve, 3000);
+    });
+  }));
+
   const folio = o.folio || orderId;
   const opt = {
     margin:       10,
     filename:     `Reporte_Servicio_${folio}.pdf`,
     image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true, letterRendering: true, logging: false },
+    html2canvas:  { scale: 2, useCORS: true, allowTaint: true, letterRendering: true, logging: false },
     jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' }
   };
 
   try {
     if (typeof html2pdf === 'function') {
       if (soloVisualizar) {
-        showToast('Generando vista previa del PDF...', 'info');
         const pdfBase64 = await html2pdf().from(clone).set(opt).outputPdf('datauristring');
         const base64Data = pdfBase64.split(',')[1];
         
@@ -3870,24 +4252,21 @@ async function abrirReportePdfCliente(e, orderId, soloVisualizar = false) {
         const blob = new Blob([array], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         window.open(url, '_blank');
-        document.body.removeChild(tempContainer);
       } else {
-        showToast('Generando archivo PDF...', 'info');
         await html2pdf().from(clone).set(opt).save();
-        document.body.removeChild(tempContainer);
       }
     } else {
       console.warn('html2pdf library is not loaded, calling window.print()');
       window.print();
-      document.body.removeChild(tempContainer);
     }
   } catch (err) {
     console.error('Error generating PDF:', err);
+    showToast('Error al compilar el PDF. Iniciando impresión estándar.', 'error');
+    window.print();
+  } finally {
     if (tempContainer.parentNode) {
       document.body.removeChild(tempContainer);
     }
-    showToast('Error al compilar el PDF. Iniciando impresión estándar.', 'error');
-    window.print();
   }
 }
 
@@ -4167,6 +4546,8 @@ async function responderCotizacionCliente(ticketId, respuesta) {
 
     t.cotAceptada = respuesta;
     t.motivoRechazo = respuesta === 'no' ? motivo : null;
+    t.fechaModificacion = new Date().toISOString();
+    t.modificadoPor = (typeof currentSession !== 'undefined' && currentSession?.nombre) || 'Cliente';
 
     // Sincronizar en la nube
     await window.pushToSupabase('tickets', t);
@@ -4305,7 +4686,7 @@ window.updateClientSidebarChatBadge = function() {
   
   if (unreadCount > 0) {
     badge.textContent = unreadCount;
-    badge.style.display = 'inline-block';
+    badge.style.display = 'inline-flex';
     badge.classList.add('visible');
   } else {
     badge.style.display = 'none';
@@ -4426,6 +4807,8 @@ window.enviarMensajeSoporteGeneral = async function() {
     chatTicket.comentariosClientes = [];
   }
   chatTicket.comentariosClientes.push(nuevoMensaje);
+  chatTicket.fechaModificacion = new Date().toISOString();
+  chatTicket.modificadoPor = commentAuthor;
 
   // Guardar localmente
   try {
@@ -4453,41 +4836,57 @@ window.enviarMensajeSoporteGeneral = async function() {
 
 // Registrar Service Worker para soporte PWA (sólo en producción, no en localhost)
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    const registerSW = () => {
+  window.addEventListener('load', () => {
+    if (!location.hostname.includes('localhost') && !location.hostname.includes('127.0.0.1')) {
       navigator.serviceWorker.register('/sw.js')
-        .then(reg => {
-          console.log('[PWA] Service Worker registrado con éxito desde Cliente Portal:', reg.scope);
-          
-          // Detectar actualizaciones e instalar inmediatamente
-          reg.addEventListener('updatefound', () => {
-            const installingWorker = reg.installing;
-            if (installingWorker) {
-              installingWorker.addEventListener('statechange', () => {
-                if (installingWorker.state === 'installed') {
-                  if (navigator.serviceWorker.controller) {
-                    console.log('[PWA] Nueva versión detectada e instalada. Recargando para aplicar cambios...');
-                    setTimeout(() => {
-                      window.location.reload();
-                    }, 500);
-                  }
-                }
-              });
-            }
-          });
-        })
-        .catch(err => console.error('[PWA] Error al registrar Service Worker desde Cliente Portal:', err));
-    };
-
-    if (document.readyState === 'complete') {
-      registerSW();
-    } else {
-      window.addEventListener('load', registerSW);
+        .then(reg => console.log('[PWA] Service Worker registrado con éxito:', reg.scope))
+        .catch(err => console.error('[PWA] Fallo al registrar Service Worker:', err));
     }
-  }
+  });
 }
 
-window.agregarComentarioExterno = async function(ticketId) {
+// Subir y asociar comprobante de pago PDF a un ticket existente
+window.subirComprobantePago = async function(ticketId, fileInput) {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  if (file.type !== 'application/pdf') {
+    showToast('Por favor selecciona un archivo PDF válido.', 'error');
+    return;
+  }
+
+  const t = tickets.find(x => x.id === ticketId);
+  if (!t) {
+    showToast('Ticket no encontrado.', 'error');
+    return;
+  }
+
+  showToast('Procesando comprobante...', 'info');
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const base64 = e.target.result;
+    t.comprobantePago = base64;
+    t.fechaModificacion = new Date().toISOString();
+    t.modificadoPor = (typeof currentSession !== 'undefined' && currentSession?.nombre) || 'Cliente';
+
+    // Guardar en Supabase
+    if (window.supabaseClient) {
+      try {
+        await window.pushToSupabase('tickets', t);
+      } catch (err) {
+        console.error('Error al guardar comprobante en Supabase:', err);
+      }
+    }
+
+    localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+    showToast('Comprobante de pago subido correctamente.', 'success');
+    abrirDetalleTicketCliente(ticketId);
+  };
+  reader.readAsDataURL(file);
+};
+
+window.agregarComentarioCliente = async function(ticketId) {
   const textarea = document.getElementById('chat-new-comment-externo');
   if (!textarea) return;
   const text = textarea.value.trim();
@@ -4499,24 +4898,29 @@ window.agregarComentarioExterno = async function(ticketId) {
     return;
   }
 
-  const currentUser = usuarios.find(u => u && u.id === window.currentSession?.userId);
-  const userName = currentUser ? currentUser.nombre : (window.nombreEmpresaLogged || window.currentSession?.nombre || 'Cliente');
+  const activeUser = (typeof simUser !== 'undefined' && simUser) ? simUser : (typeof currentSession !== 'undefined' ? currentSession : null);
+  const userName = activeUser ? activeUser.nombre : 'Cliente';
 
+  const now = new Date().toISOString();
   const nuevoMensaje = {
     usuario: userName,
-    fecha: new Date().toISOString(),
+    fecha: now,
     texto: text
   };
 
   if (!t.comentariosClientes) {
     t.comentariosClientes = [];
   }
+  t.fechaModificacion = now;
+  t.modificadoPor = userName;
 
   if (window.supabaseClient) {
     try {
       const tClone = JSON.parse(JSON.stringify(t));
       if (!tClone.comentariosClientes) tClone.comentariosClientes = [];
       tClone.comentariosClientes.push(nuevoMensaje);
+      tClone.fechaModificacion = now;
+      tClone.modificadoPor = userName;
       
       await window.pushToSupabase('tickets', tClone);
       
@@ -4537,5 +4941,43 @@ window.agregarComentarioExterno = async function(ticketId) {
     abrirDetalleTicketCliente(ticketId);
   }
 };
+
+// ============================================================
+// DIAGRAMA DE FLUJO INTERACTIVO (CLIENTE)
+// ============================================================
+window.abrirModalDiagramaFlujo = function() {
+  const modal = document.getElementById('modal-diagrama-flujo-overlay');
+  if (modal) {
+    modal.classList.add('open');
+    if (window.lucide) lucide.createIcons();
+  }
+};
+
+window.cerrarModalDiagramaFlujo = function(e) {
+  if (e && e.target && !e.target.classList.contains('modal-overlay') && !e.target.classList.contains('btn-close-modal') && !e.target.closest('.btn-close-modal')) return;
+  const modal = document.getElementById('modal-diagrama-flujo-overlay');
+  if (modal) modal.classList.remove('open');
+};
+
+let currentDiagramZoomCliente = 1;
+window.zoomDiagramaFlujo = function(delta) {
+  const content = document.getElementById('flowchart-modal-content');
+  if (!content) return;
+  currentDiagramZoomCliente = Math.max(0.6, Math.min(1.8, currentDiagramZoomCliente + delta));
+  content.style.transform = `scale(${currentDiagramZoomCliente})`;
+  content.style.transformOrigin = 'top center';
+  const label = document.getElementById('diagrama-zoom-label');
+  if (label) label.textContent = `${Math.round(currentDiagramZoomCliente * 100)}%`;
+};
+
+window.resetZoomDiagramaFlujo = function() {
+  const content = document.getElementById('flowchart-modal-content');
+  if (!content) return;
+  currentDiagramZoomCliente = 1;
+  content.style.transform = 'scale(1)';
+  const label = document.getElementById('diagrama-zoom-label');
+  if (label) label.textContent = '100%';
+};
+
 
 

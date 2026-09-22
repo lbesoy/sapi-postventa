@@ -103,3 +103,71 @@ window.isTestUser = function(user) {
   const email = (user.email || '').toLowerCase();
   return name.includes('prueba') || name.includes('test') || email.includes('prueba') || email.includes('test');
 };
+
+// Obtiene la fecha de última modificación de un ticket con fallbacks inteligentes
+window.getTicketFechaModificacion = function(t) {
+  if (!t || typeof t !== 'object') return null;
+  if (t.fechaModificacion) return t.fechaModificacion;
+  if (t.fecha_modificacion) return t.fecha_modificacion;
+  if (t.updated_at) return t.updated_at;
+  
+  // Si tiene comentarios internos recientes, verificar la última fecha
+  if (Array.isArray(t.comentariosInternos) && t.comentariosInternos.length > 0) {
+    const last = t.comentariosInternos[t.comentariosInternos.length - 1];
+    if (last && last.fecha) return last.fecha;
+  }
+  
+  // Si tiene comentarios de clientes recientes, verificar la última fecha
+  if (Array.isArray(t.comentariosClientes) && t.comentariosClientes.length > 0) {
+    const last = t.comentariosClientes[t.comentariosClientes.length - 1];
+    if (last && last.fecha) return last.fecha;
+  }
+  
+  return t.fechaCreacion || t.fecha || t.created_at || null;
+};
+
+// Obtiene el nombre del usuario actualmente autenticado o activo en el contexto
+window.getCurrentUserDisplayName = function() {
+  try {
+    if (typeof currentSession !== 'undefined' && currentSession) {
+      if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
+        const u = usuarios.find(x => x && x.id === currentSession.userId);
+        if (u && u.nombre) return u.nombre;
+      }
+      if (currentSession.nombre) return currentSession.nombre;
+      if (currentSession.empresa) return currentSession.empresa;
+    }
+    if (typeof currentClienteSession !== 'undefined' && currentClienteSession) {
+      if (currentClienteSession.contacto) return currentClienteSession.contacto;
+      if (currentClienteSession.nombre) return currentClienteSession.nombre;
+      if (currentClienteSession.empresa) return currentClienteSession.empresa;
+    }
+    const sess = (typeof safeGetJSON === 'function') ? safeGetJSON('eurorep_session', null) : JSON.parse(localStorage.getItem('eurorep_session') || 'null');
+    if (sess && sess.nombre) return sess.nombre;
+  } catch (e) {}
+  return 'Usuario';
+};
+
+// Obtiene el nombre del usuario que realizó la última modificación del ticket con fallbacks inteligentes
+window.getTicketModificadoPor = function(t) {
+  if (!t || typeof t !== 'object') return '—';
+  if (t.modificadoPor && String(t.modificadoPor).trim()) return String(t.modificadoPor).trim();
+  if (t.modificado_por && String(t.modificado_por).trim()) return String(t.modificado_por).trim();
+  if (t.ultimoModificadoPor && String(t.ultimoModificadoPor).trim()) return String(t.ultimoModificadoPor).trim();
+  
+  // Si tiene comentarios internos recientes, tomar el autor del último comentario
+  if (Array.isArray(t.comentariosInternos) && t.comentariosInternos.length > 0) {
+    const last = t.comentariosInternos[t.comentariosInternos.length - 1];
+    if (last && (last.usuario || last.autor)) return (last.usuario || last.autor);
+  }
+  
+  // Si tiene comentarios de clientes recientes, tomar el autor del último comentario
+  if (Array.isArray(t.comentariosClientes) && t.comentariosClientes.length > 0) {
+    const last = t.comentariosClientes[t.comentariosClientes.length - 1];
+    if (last && (last.usuario || last.autor || last.cliente)) return (last.usuario || last.autor || last.cliente);
+  }
+  
+  return t.creadoPor || t.solicitante || t.usuario || '—';
+};
+
+

@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagrama de Flujo del Proceso – Eurorep SAPI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="../theme-base.css?v=1">
+  <link rel="stylesheet" href="../style.css?v=57">
+  <style>
+    body {
+      background: var(--bg-primary, #0f1117);
+      color: var(--text-primary, #e8ecf3);
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .page-container {
+      max-width: 1200px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      background: var(--bg-secondary, #1a1d27);
+      border: 1px solid var(--border, #2e3248);
+      padding: 1rem 1.5rem;
+      border-radius: 12px;
+    }
+    .header-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .header-icon {
+      background: rgba(139, 92, 246, 0.15);
+      color: #8b5cf6;
+      width: 42px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+    }
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 0.9rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: 1px solid var(--border, #2e3248);
+      background: var(--bg-card, #1e2130);
+      color: var(--text-primary, #e8ecf3);
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .btn-action:hover {
+      background: var(--bg-hover, #252840);
+      border-color: var(--accent, #e8820c);
+    }
+    .btn-primary-action {
+      background: var(--primary, #e8820c);
+      color: #fff;
+      border-color: var(--primary, #e8820c);
+    }
+    @media print {
+      .header-bar, .flowchart-toolbar, .flowchart-actions {
+        display: none !important;
+      }
+      body {
+        background: #fff !important;
+        color: #000 !important;
+        padding: 0 !important;
+      }
+      .flowchart-wrapper {
+        border: none !important;
+        box-shadow: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page-container">
+    <div class="header-bar">
+      <div class="header-title-wrap">
+        <div class="header-icon">
+          <i data-lucide="git-fork" style="width:24px; height:24px;"></i>
+        </div>
+        <div>
+          <h1 style="font-size:1.25rem; margin:0; font-weight:700;">Diagrama de Flujo del Proceso</h1>
+          <p style="font-size:0.82rem; margin:0.2rem 0 0; color:var(--text-secondary,#8892a4);">Mapa de interacción: Euro SAPI (Portal Interno) vs. Portal Clientes</p>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:0.5rem; align-items:center;">
+        <button class="btn-action" onclick="window.print()">
+          <i data-lucide="printer" style="width:15px; height:15px;"></i> Imprimir / PDF
+        </button>
+        <a href="../index.html" class="btn-action btn-primary-action">
+          <i data-lucide="arrow-left" style="width:15px; height:15px;"></i> Volver al Portal
+        </a>
+      </div>
+    </div>
+
+    <div class="flowchart-wrapper">
+      <div class="flowchart-toolbar">
+        <div class="flowchart-filters">
+          <button class="flowchart-filter-btn active" onclick="filtrarRuta('all', this)">Todos los Pasos</button>
+          <button class="flowchart-filter-btn" onclick="filtrarRuta('con_portal', this)">Estándar (Con Portal)</button>
+          <button class="flowchart-filter-btn" onclick="filtrarRuta('sin_portal', this)">Estándar (Sin Portal)</button>
+          <button class="flowchart-filter-btn" onclick="filtrarRuta('levantamiento', this)">Levantamiento</button>
+          <button class="flowchart-filter-btn" onclick="filtrarRuta('garantia', this)">Garantía Interna</button>
+          <button class="flowchart-filter-btn" onclick="filtrarRuta('subticket', this)">Refacciones en OS</button>
+        </div>
+        <div class="flowchart-actions">
+          <button class="flowchart-btn-tool" onclick="toggleSimbologia()">
+            <i data-lucide="info" style="width:13px; height:13px;"></i> Simbología
+          </button>
+          <button class="flowchart-btn-tool" onclick="zoomDiagrama(-0.1)"><i data-lucide="minus" style="width:12px; height:12px;"></i></button>
+          <span id="diagrama-zoom-label" style="font-size:0.75rem; font-weight:600; min-width:35px; text-align:center;">100%</span>
+          <button class="flowchart-btn-tool" onclick="zoomDiagrama(0.1)"><i data-lucide="plus" style="width:12px; height:12px;"></i></button>
+          <button class="flowchart-btn-tool" onclick="resetZoom()">100%</button>
+        </div>
+      </div>
+
+      <div class="flowchart-legend" id="flowchart-legend-box" style="display:flex;">
+        <div class="flowchart-legend-item"><span class="flowchart-legend-dot" style="background:#8b5cf6;"></span><b>Euro SAPI:</b> Portal Interno</div>
+        <div class="flowchart-legend-item"><span class="flowchart-legend-dot" style="background:#3b82f6;"></span><b>Portal Clientes:</b> Solicitud y Aprobación</div>
+        <div class="flowchart-legend-item"><span class="flowchart-legend-dot" style="background:#eab308;"></span><b>Correo:</b> Notificación Automática</div>
+        <div class="flowchart-legend-item"><span class="flowchart-legend-dot" style="background:#10b981;"></span><b>Aprobado:</b> Pedido y Cierre Exitoso</div>
+        <div class="flowchart-legend-item"><span class="flowchart-legend-dot" style="background:#ef4444;"></span><b>Rechazo:</b> Obligatorio ¿Por qué?</div>
+        <div class="flowchart-legend-item"><span class="flowchart-legend-dot" style="background:#14b8a6;"></span><b>Servicio:</b> OS en Campo</div>
+        <div class="flowchart-legend-item"><span class="flowchart-legend-dot" style="background:#f97316;"></span><b>Subticket:</b> TKT-26XXX-A</div>
+      </div>
+
+      <div class="flowchart-body">
+        <div id="flowchart-zoomable" style="transition:transform 0.15s ease-out; transform-origin: top center;">
+          <div class="flowchart-columns-grid">
+            
+            <div class="flowchart-lane lane-internal">
+              <div class="flowchart-lane-header">
+                <i data-lucide="building-2" style="width:18px; height:18px;"></i>
+                <span>Euro SAPI (Portal Interno)</span>
+              </div>
+
+              <!-- Nivel 0: Entrada por Levantamiento de Campo -->
+              <div class="flowchart-step-box step-levantamiento">
+                <div class="flowchart-card-node node-cyan">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="clipboard-check" style="width:14px; height:14px; color:#06b6d4;"></i> 1. Levantamiento Previo en Campo</span>
+                    <span class="node-badge" style="background:rgba(6,182,212,0.18); color:#06b6d4; font-weight:700;">Diagnóstico</span>
+                  </div>
+                  <div class="node-desc">Visita técnica previa en sitio cuando no se conocen las fallas ni refacciones necesarias.</div>
+                  <div class="node-items-list">
+                    • Se envía técnico a diagnosticar y tomar fotografías<br>
+                    • Se capturan las piezas requeridas en el reporte<br>
+                    • <b>Supervisor valida ➔ Detona creación del Ticket comercial</b>
+                  </div>
+                </div>
+                <div class="flow-connector-v">
+                  <div class="connector-line" style="border-color:#06b6d4;"></div>
+                  <i data-lucide="arrow-down" style="width:12px; height:12px; color:#06b6d4;"></i>
+                </div>
+              </div>
+
+              <!-- Nivel 1: Entrada Directa y Creación de Ticket -->
+              <div class="flowchart-step-box step-entrada step-llamada-directa">
+                <div class="flowchart-card-node node-purple">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="phone-call" style="width:14px; height:14px; color:#8b5cf6;"></i> Llamada, WhatsApp o Correo Directo</span>
+                    <span class="node-badge badge-purple">Sin Portal</span>
+                  </div>
+                  <div class="node-desc"><b>Flujo Tradicional / Sin Portal:</b> Captura directa del reporte por el equipo interno de Eurorep en Euro SAPI.</div>
+                </div>
+
+                <div class="flow-connector-v">
+                  <div class="connector-line"></div>
+                  <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                </div>
+              </div>
+
+              <div class="flowchart-step-box step-entrada">
+                <div class="flowchart-card-node node-purple">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="user-check" style="width:14px; height:14px; color:#8b5cf6;"></i> Asignado a Supervisor</span>
+                    <span class="node-badge badge-purple">Mesa de Ayuda</span>
+                  </div>
+                  <div class="node-desc">Asignación al supervisor correspondiente para coordinar cotización y refacciones.</div>
+                </div>
+
+                <div class="flow-connector-v">
+                  <div class="connector-line"></div>
+                  <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                </div>
+
+                <div class="flowchart-card-node node-purple">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="ticket" style="width:14px; height:14px; color:#8b5cf6;"></i> Ticket Creado</span>
+                    <span class="node-badge badge-purple">Activo</span>
+                  </div>
+                  <div class="node-desc">Clasificación del tipo de requerimiento:</div>
+                  <div class="node-items-list">
+                    • <b>Servicio</b> / <b>Puesta en marcha</b> / <b>Soporte</b> (➔ Genera OS)<br>
+                    • <b>Garantía</b> / <b>Refacciones</b> (➔ Genera Guía de Envío)
+                  </div>
+                </div>
+              </div>
+
+              <div class="flowchart-step-box step-cotizacion">
+                <div class="flow-connector-v">
+                  <div class="connector-line"></div>
+                  <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                </div>
+
+                <div class="flowchart-card-node node-purple">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="clock" style="width:14px; height:14px; color:#8b5cf6;"></i> Pendiente de Refacciones</span>
+                    <span class="node-badge badge-purple">Diagnóstico</span>
+                  </div>
+                  <div class="node-desc">Se determinan y colocan las refacciones necesarias en el ticket.</div>
+                </div>
+
+                <div class="flow-connector-v">
+                  <div class="connector-line"></div>
+                  <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                </div>
+
+                <div class="flowchart-card-node node-purple">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="calculator" style="width:14px; height:14px; color:#8b5cf6;"></i> Se Realiza Cotización</span>
+                    <span class="node-badge badge-purple">Presupuesto</span>
+                  </div>
+                  <div class="node-desc">Se calcula precio de piezas y mano de obra para enviar al cliente.</div>
+                </div>
+
+                <!-- Rechazo de cotización -->
+                <div class="flowchart-card-node node-red" style="margin-top:0.35rem; padding:0.6rem 0.75rem;">
+                  <div class="node-title" style="font-size:0.75rem; color:#ef4444;"><i data-lucide="x-circle" style="width:12px; height:12px;"></i> Si se Rechaza Cotización</div>
+                  <div class="node-desc" style="font-size:0.72rem; margin-top:0.2rem;">Captura obligatoria de motivo <b>¿Por qué?</b> ➔ Estado: <b>Cerrado</b></div>
+                </div>
+
+                <div class="flow-connector-v">
+                  <div class="connector-line"></div>
+                  <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                </div>
+
+                <div class="flowchart-card-node node-green">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="file-check" style="width:14px; height:14px; color:#10b981;"></i> Aceptado con Pedido</span>
+                    <span class="node-badge badge-green">Validado</span>
+                  </div>
+                  <div class="node-desc">Requisitos validados para avanzar:</div>
+                  <div class="node-items-list">
+                    • <b>Con Portal:</b> El cliente aprueba en línea y adjunta su Orden de Compra.<br>
+                    • <b>Sin Portal:</b> El cliente envía la OC por correo/WA y el supervisor la carga en Euro SAPI.
+                  </div>
+                </div>
+              </div>
+
+              <!-- Nivel 3: Bifurcación tras Pedido (Servicio vs. Garantía) -->
+              <div class="flowchart-step-box step-os">
+                <div class="flow-connector-v">
+                  <div class="connector-line"></div>
+                  <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                </div>
+
+                <!-- RUTA A: SERVICIO / PUESTA EN MARCHA (GENERA ORDEN DE SERVICIO EN CAMPO) -->
+                <div class="flowchart-card-node node-teal">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="clipboard-list" style="width:14px; height:14px; color:#14b8a6;"></i> Si es Servicio: ORDEN DE SERVICIO (OS)</span>
+                    <span class="node-badge badge-teal">Técnicos en Campo</span>
+                  </div>
+                  <div class="node-desc">Ejecución presencial en sitio:</div>
+                  <div class="node-items-list">
+                    • <b>Pendiente:</b> Programación de técnicos y precarga de piezas.<br>
+                    • <b>En Curso:</b> Bitácoras diarias, reporte general y firmas de conformidad.
+                  </div>
+
+                  <!-- Evaluación de refacciones en campo (Exclusivo de OS) -->
+                  <div style="margin-top:0.6rem; padding-top:0.5rem; border-top:1px dashed rgba(20,184,166,0.3);">
+                    <div style="font-size:0.75rem; font-weight:600; color:var(--text-primary); margin-bottom:0.3rem;">¿Refacciones Extra en Campo?</div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.4rem;">
+                      <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:6px; padding:0.4rem 0.5rem;">
+                        <div style="color:#10b981; font-weight:700; font-size:0.72rem;">NO (Resuelto)</div>
+                        <div style="font-size:0.68rem; color:var(--text-secondary);"><b>OS Cerrada:</b> Reporte técnico final con firmas.</div>
+                      </div>
+                      <div class="step-subticket" style="background:rgba(249,115,22,0.1); border:1px solid rgba(249,115,22,0.3); border-radius:6px; padding:0.4rem 0.5rem;">
+                        <div style="color:#f97316; font-weight:700; font-size:0.72rem;">SÍ ➔ TKT-26XXX-A</div>
+                        <div style="font-size:0.68rem; color:var(--text-secondary);"><b>Subticket Hijo:</b> Refacciones extra y cotización.</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flow-connector-v">
+                  <div class="connector-line"></div>
+                  <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                </div>
+
+                <!-- RUTA B: GARANTÍA (NUNCA GENERA OS EN CAMPO, GENERA GUÍA DE ENVÍO) -->
+                <div class="flowchart-card-node node-teal step-garantia" style="border-color:rgba(14,165,233,0.6); background:rgba(14,165,233,0.08);">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="truck" style="width:14px; height:14px; color:#0ea5e9;"></i> Si es Garantía o Refacciones: GUÍA DE ENVÍO</span>
+                    <span class="node-badge" style="background:rgba(14,165,233,0.2); color:#0ea5e9;">Despacho de Piezas</span>
+                  </div>
+                  <div class="node-desc"><b>No genera Orden de Servicio en campo.</b> Despacho directo de refacciones:</div>
+                  <div class="node-items-list">
+                    • <b>Paquetería y No. de Guía:</b> Asignación de empresa y código de rastreo.<br>
+                    • <b>Despacho y Envío:</b> Se notifica al cliente y se envían las refacciones.<br>
+                    • <b>Cierre:</b> Estado <b>Garantía Entregada</b> con comprobante de paquetería.
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <div class="flowchart-lane lane-client">
+              <div class="flowchart-lane-header">
+                <i data-lucide="globe" style="width:18px; height:18px;"></i>
+                <span>Portal Clientes</span>
+              </div>
+
+              <div class="flowchart-step-box step-portal-entrada">
+                <div class="flowchart-card-node node-blue">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="file-plus" style="width:14px; height:14px; color:#3b82f6;"></i> Reportado / Solicitado</span>
+                    <span class="node-badge badge-blue">Portal</span>
+                  </div>
+                  <div class="node-desc">El cliente reporta una falla o solicita un servicio desde su panel web.</div>
+                </div>
+
+                <div class="flow-connector-bridge bridge-to-internal">
+                  <i data-lucide="arrow-left" style="width:14px; height:14px; color:#8b5cf6;"></i>
+                  <span>Entra a Euro SAPI para Asignación</span>
+                </div>
+
+                <div class="flowchart-card-node node-yellow">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="mail" style="width:14px; height:14px; color:#eab308;"></i> En Curso (Correo)</span>
+                    <span class="node-badge badge-yellow">Notificación</span>
+                  </div>
+                  <div class="node-desc">Correo automático confirmando recepción y asignación del ticket.</div>
+                </div>
+              </div>
+
+              <div class="flowchart-step-box" style="margin-top:2.5rem;">
+                <div class="flowchart-card-node node-yellow">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="mail" style="width:14px; height:14px; color:#eab308;"></i> Cotización Recibida (Correo)</span>
+                    <span class="node-badge badge-yellow">Notificación</span>
+                  </div>
+                  <div class="node-desc">Se notifica que el presupuesto de piezas y mano de obra está disponible.</div>
+                </div>
+
+                <div class="flow-connector-v">
+                  <div class="connector-line"></div>
+                  <i data-lucide="arrow-down" style="width:12px; height:12px;"></i>
+                </div>
+
+                <div class="flowchart-card-node node-blue">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="check-square" style="width:14px; height:14px; color:#3b82f6;"></i> Acepta o Rechaza</span>
+                    <span class="node-badge badge-blue">Decisión</span>
+                  </div>
+                  <div class="node-desc">El cliente evalúa la cotización desde su portal:</div>
+                  <div class="node-items-list">
+                    • <b>Rechaza:</b> Ingresa motivo obligatorio <i>¿Por qué?</i> ➔ Estado <b>Cerrado</b>.<br>
+                    • <b>Acepta:</b> Adjunta su <b>Orden de Compra (PDF + No. Pedido)</b>.
+                  </div>
+                </div>
+
+                <div class="flow-connector-bridge bridge-to-internal">
+                  <i data-lucide="arrow-left" style="width:14px; height:14px; color:#10b981;"></i>
+                  <span>Transfiere Pedido PDF a Euro SAPI</span>
+                </div>
+
+                <div class="flowchart-card-node node-yellow">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="mail" style="width:14px; height:14px; color:#eab308;"></i> En Proceso (Correo)</span>
+                    <span class="node-badge badge-yellow">Notificación</span>
+                  </div>
+                  <div class="node-desc">Aviso automático de que el pedido fue recibido y está en programación.</div>
+                </div>
+              </div>
+
+              <div class="flowchart-step-box" style="margin-top:2.5rem;">
+                <div class="flowchart-card-node node-yellow">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="mail" style="width:14px; height:14px; color:#eab308;"></i> Notificación según Tipo (Correo)</span>
+                    <span class="node-badge badge-yellow">Notificación</span>
+                  </div>
+                  <div class="node-desc">Envío automático según el tipo de solicitud:</div>
+                  <div class="node-items-list">
+                    • <b>Si es Servicio:</b> Aviso de OS programada y técnicos asignados.<br>
+                    • <b>Si es Garantía o Refacciones:</b> Guía de paquetería y código de rastreo.
+                  </div>
+                </div>
+              </div>
+
+              <div class="flowchart-step-box" style="margin-top:4rem;">
+                <div class="flowchart-card-node node-green">
+                  <div class="node-title-row">
+                    <span class="node-title"><i data-lucide="check-circle-2" style="width:14px; height:14px; color:#10b981;"></i> Documentación Final</span>
+                    <span class="node-badge badge-green">Cierre</span>
+                  </div>
+                  <div class="node-desc">Consulta y descarga de expedientes completos:</div>
+                  <div class="node-items-list">
+                    • Reporte técnico final firmado (PDF).<br>
+                    • Guías de envío y recibos de entrega.
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    let currentZoom = 1;
+    function zoomDiagrama(delta) {
+      const content = document.getElementById('flowchart-zoomable');
+      if (!content) return;
+      currentZoom = Math.max(0.6, Math.min(1.8, currentZoom + delta));
+      content.style.transform = 'scale(' + currentZoom + ')';
+      document.getElementById('diagrama-zoom-label').textContent = Math.round(currentZoom * 100) + '%';
+    }
+
+    function resetZoom() {
+      const content = document.getElementById('flowchart-zoomable');
+      if (!content) return;
+      currentZoom = 1;
+      content.style.transform = 'scale(1)';
+      document.getElementById('diagrama-zoom-label').textContent = '100%';
+    }
+
+    function toggleSimbologia() {
+      const legend = document.getElementById('flowchart-legend-box');
+      if (legend) {
+        legend.style.display = legend.style.display === 'none' ? 'flex' : 'none';
+      }
+    }
+
+    function filtrarRuta(ruta, btn) {
+      document.querySelectorAll('.flowchart-filter-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+
+      const root = document.getElementById('flowchart-zoomable');
+      if (!root) return;
+
+      // Restablecer visibilidad
+      root.querySelectorAll('.flowchart-step-hidden').forEach(el => {
+        el.classList.remove('flowchart-step-hidden');
+        el.style.display = '';
+      });
+
+      const grid = root.querySelector('.flowchart-columns-grid');
+      if (grid) grid.style.gridTemplateColumns = '';
+
+      const ocultar = (selector) => {
+        root.querySelectorAll(selector).forEach(el => {
+          el.classList.add('flowchart-step-hidden');
+          el.style.setProperty('display', 'none', 'important');
+        });
+      };
+
+      if (ruta === 'con_portal') {
+        // Flujo Estándar con Portal de Clientes: Ocultar Levantamiento previo, Llamada/WhatsApp y Subtickets
+        ocultar('.step-levantamiento, .step-llamada-directa, .step-subticket');
+      } else if (ruta === 'sin_portal') {
+        // Flujo Estándar Sin Portal de Clientes: Ocultar Levantamiento previo, Subtickets y todo el panel del Portal de Clientes
+        ocultar('.lane-client, .bridge-to-internal, .step-levantamiento, .step-portal-entrada, .step-subticket');
+        if (grid) grid.style.gridTemplateColumns = '1fr';
+      } else if (ruta === 'levantamiento') {
+        // Flujo Levantamiento
+        ocultar('.step-llamada-directa, .step-portal-entrada, .lane-client, .step-garantia, .step-subticket');
+        if (grid) grid.style.gridTemplateColumns = '1fr';
+      } else if (ruta === 'garantia') {
+        // Flujo Garantía
+        ocultar('.step-levantamiento, .step-cotizacion, .step-os, .step-subticket');
+      } else if (ruta === 'subticket') {
+        // Subticket de refacciones extra generado en campo
+        ocultar('.step-levantamiento, .step-llamada-directa, .step-portal-entrada, .lane-client, .step-garantia');
+        if (grid) grid.style.gridTemplateColumns = '1fr';
+      }
+    }
+  </script>
+</body>
+</html>

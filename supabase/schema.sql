@@ -74,7 +74,10 @@ CREATE TABLE public.tickets (
     comentarios_internos JSONB DEFAULT '[]'::jsonb,
     comentarios_clientes JSONB DEFAULT '[]'::jsonb,
     creado_por TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    modificado_por TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    fecha_modificacion TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 6. TABLE: sitios

@@ -27,13 +27,16 @@ window.agregarMaquinaChip = function(maquinaName) {
     box-shadow: var(--shadow-sm);
   `;
   
-  const deleteBtn = isRefTicket ? '' : `<span onclick="this.parentElement.remove()" style="cursor:pointer; font-weight:bold; color:var(--red, #ef4444); margin-left:4px; font-size:1.1rem; line-height:1;">&times;</span>`;
+  const deleteBtn = isRefTicket ? '' : `<span onclick="this.parentElement.remove(); if (typeof window.alCambiarCategoriaTicket === 'function' && document.getElementById('t-categoria')?.value === 'Servicio Técnico') window.alCambiarCategoriaTicket();" style="cursor:pointer; font-weight:bold; color:var(--red, #ef4444); margin-left:4px; font-size:1.1rem; line-height:1;">&times;</span>`;
 
   chip.innerHTML = `
     <span>${maquinaName}</span>
     ${deleteBtn}
   `;
   container.appendChild(chip);
+  if (typeof window.alCambiarCategoriaTicket === 'function' && document.getElementById('t-categoria')?.value === 'Servicio Técnico') {
+    window.alCambiarCategoriaTicket();
+  }
 };let currentMaqSortCol = 'reciente';
 let currentMaqSortDir = 'desc';
 let currentCliSortCol = 'reciente';
@@ -46,7 +49,21 @@ let currentDesgloseData = [];
 
 // Registrar Service Worker para soporte PWA (sólo en producción, no en localhost)
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      for (const reg of regs) {
+        reg.unregister();
+        console.log('[Dev] Service Worker desregistrado en localhost:', reg.scope);
+      }
+    });
+    if (typeof caches !== 'undefined') {
+      caches.keys().then(keys => {
+        for (const k of keys) {
+          caches.delete(k);
+        }
+      });
+    }
+  } else {
     const registerSW = () => {
       navigator.serviceWorker.register('/sw.js')
         .then(reg => {
@@ -131,6 +148,8 @@ window.generarTicketsRefaccionesFaltantes = async function() {
     const ticket = {
       id: crypto.randomUUID(),
       folio: targetFolio,
+      ordenId: o.id,
+      ordenFolio: o.folio,
       fecha: now,
       fechaCreacion: now,
       fechaCierre: null,
@@ -144,7 +163,7 @@ window.generarTicketsRefaccionesFaltantes = async function() {
       area: ticketPadre ? (ticketPadre.area || 'Operaciones') : 'Operaciones',
       categoria: 'Refacción',
       prioridad: ticketPadre ? (ticketPadre.prioridad || 'Media') : 'Media',
-      asignado: o.tecnico || '',
+      asignado: (ticketPadre && ticketPadre.asignado) ? ticketPadre.asignado : '',
       descripcion: `Ticket de refacciones por pedir generado de la Orden de Servicio ${o.folio}.`,
       equipo: o.equipo,
       notas: '',
@@ -950,6 +969,8 @@ window.addEventListener('supabase_datos_cargados', async () => {
       renderTickets('dash-tickets');
     }
     if (typeof updateTicketBadge === 'function') updateTicketBadge(); updateOrdenesBadge();
+    if (typeof window.sincronizarNotificacionesInternas === 'function') window.sincronizarNotificacionesInternas();
+    if (typeof window.updateNotificationBell === 'function') window.updateNotificationBell();
     
     if (typeof renderMaquinaria === 'function' && document.getElementById('view-maquinaria')?.classList.contains('active')) {
       renderMaquinaria();
@@ -1257,12 +1278,12 @@ const MARCAS_OFICIALES = ['Fiori', 'Rubble Master', 'Hyundai', 'CIFA', 'SIMEM', 
 function getLogoMarca(marca) {
   if (!marca) return null;
   const m = marca.toLowerCase().trim();
-  if (m.includes('fiori')) return 'logo_fiori.png?v=2';
-  if (m.includes('rubble')) return 'logo_rublemaster.svg?v=2';
-  if (m.includes('hyundai')) return 'logo_hyundai.png?v=2';
+  if (m.includes('fiori') || m.includes('db460') || m.includes('db 460')) return 'logo_fiori.png?v=2';
+  if (m.includes('rubble') || m === 'rm' || m === 'rbm' || m.startsWith('rm-') || m.startsWith('rm ') || m.includes('rubblemaster') || m.startsWith('rm') || m.startsWith('ms')) return 'logo_rublemaster.svg?v=2';
+  if (m.includes('hyundai') || m.startsWith('hx') || m.startsWith('hl')) return 'logo_hyundai.png?v=2';
   if (m.includes('cifa')) return 'logo_cifa.png?v=1';
   if (m.includes('simem')) return 'logo_simem.png?v=1';
-  if (m.includes('casa grande') || m.includes('casagrande')) return 'logo_casagrande.png?v=1';
+  if (m.includes('casa grande') || m.includes('casagrande') || m.startsWith('b125') || m.startsWith('b250')) return 'logo_casagrande.png?v=1';
   return null;
 }
 
@@ -1282,23 +1303,23 @@ let ROLES = {
   superadmin: {
     label: 'Super Administrador',
     color: '#E8820C',
-    views: ['dashboard','servicios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos','telemetry','chat-soporte'],
+    views: ['dashboard','servicios','envios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos','telemetry','chat-soporte'],
     canSwitchRoles: true,
   },
   admin: {
     label: 'Administrador',
     color: '#4f8ef7',
-    views: ['dashboard','servicios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos','chat-soporte'],
+    views: ['dashboard','servicios','envios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos','chat-soporte'],
   },
   supervisor: {
     label: 'Supervisor',
     color: '#eab308',
-    views: ['dashboard','servicios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','preferencias','gastos','chat-soporte'],
+    views: ['dashboard','servicios','envios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','preferencias','gastos','chat-soporte'],
   },
   tecnico: {
     label: 'Técnico / Instalador',
     color: '#10b981',
-    views: ['dashboard','servicios','calendario','levantamientos','tickets','preferencias','gastos'],
+    views: ['dashboard','servicios','envios','calendario','levantamientos','tickets','preferencias','gastos'],
   },
   empresa: {
     label: 'Empresa / Cliente',
@@ -1308,12 +1329,12 @@ let ROLES = {
   consulta: {
     label: 'Consulta',
     color: '#64748b',
-    views: ['dashboard','servicios','calendario','tickets','maquinaria','preferencias'],
+    views: ['dashboard','servicios','envios','calendario','tickets','maquinaria','preferencias'],
   },
 };
 
 const ROLES_LABELS = {
-  dashboard: 'Dashboard', servicios: 'Órdenes de Servicio', calendario: 'Calendario',
+  dashboard: 'Dashboard', servicios: 'Órdenes de Servicio', envios: 'Envíos y Guías de Entrega', calendario: 'Calendario',
   tickets: 'Tickets', levantamientos: 'Levantamientos', clientes: 'Clientes', maquinaria: 'Maquinaria', refacciones: 'Refacciones',
   sitios: 'Mis Sitios', tecnicos: 'Técnicos', config: 'Configuración',
   preferencias: 'Preferencias', gastos: 'Control de Gastos', telemetry: 'Monitoreo Telemetría',
@@ -1353,6 +1374,17 @@ function cargarRolesDesdeStorage() {
     }
   }
 
+  // Garantizar vista de envíos para los roles autorizados tras la actualización
+  const rolesConEnvios = ['superadmin', 'admin', 'supervisor', 'tecnico', 'consulta'];
+  rolesConEnvios.forEach(rol => {
+    if (ROLES[rol] && Array.isArray(ROLES[rol].views)) {
+      if (!ROLES[rol].views.includes('envios')) {
+        ROLES[rol].views.push('envios');
+        configChanged = true;
+      }
+    }
+  });
+
   // Garantizar vista de levantamientos para los roles principales tras la actualización
   const rolesConLevantamientos = ['superadmin', 'admin', 'supervisor', 'tecnico'];
   rolesConLevantamientos.forEach(rol => {
@@ -1391,6 +1423,9 @@ function cargarRolesDesdeStorage() {
   if (!isMigrated) {
     for (const r in ROLES) {
       if (ROLES[r] && Array.isArray(ROLES[r].views)) {
+        if (!ROLES[r].views.includes('envios') && ['superadmin', 'admin', 'supervisor', 'tecnico', 'consulta'].includes(r)) {
+          ROLES[r].views.push('envios');
+        }
         if (!ROLES[r].views.includes('calendario') && ['superadmin', 'admin', 'supervisor', 'tecnico', 'consulta'].includes(r)) {
           ROLES[r].views.push('calendario');
         }
@@ -1448,13 +1483,29 @@ async function iniciarSesionSubmit(e) {
       return;
     }
 
-    const { data, error } = await window.supabaseClient.auth.signInWithPassword({
-      email: inputEmail,
-      password: inputPass
-    });
+    let data, error;
+    try {
+      const res = await window.supabaseClient.auth.signInWithPassword({
+        email: inputEmail,
+        password: inputPass
+      });
+      data = res.data;
+      error = res.error;
+    } catch (fetchErr) {
+      errEl.textContent = 'Error de conexión con el servidor. Por favor reintenta en unos momentos.';
+      errEl.style.color = 'var(--red)';
+      return;
+    }
 
     if (error) {
-      errEl.textContent = error.message.includes('Invalid login') ? 'Correo o contraseña incorrectos.' : error.message;
+      const msg = error.message || '';
+      if (msg.includes('Invalid login')) {
+        errEl.textContent = 'Correo o contraseña incorrectos.';
+      } else if (msg.includes('Failed to fetch') || msg.includes('CORS') || error.status === 522) {
+        errEl.textContent = 'El servicio de autenticación no respondió a tiempo. Reintenta en unos momentos.';
+      } else {
+        errEl.textContent = msg;
+      }
       errEl.style.color = 'var(--red)';
       return;
     }
@@ -1513,6 +1564,11 @@ function entrarApp(user) {
   } catch (err) {
     console.error('Error during app layout transition:', err);
   }
+
+  // Activar canal Realtime optimizado una vez logueado
+  if (window.setupRealtime) {
+    window.setupRealtime();
+  }
   
   if (window.cargarDatosDeSupabase) {
      // Mostrar notificacion de carga al usuario
@@ -1563,6 +1619,13 @@ function cerrarSesion() {
   cerrarSesionModal();
   localStorage.removeItem('eurorep_session');
   currentSession = null; // Limpiar sesión completamente
+
+  if (window.supabaseRealtimeChannel && window.supabaseClient) {
+    try {
+      window.supabaseClient.removeChannel(window.supabaseRealtimeChannel);
+      window.supabaseRealtimeChannel = null;
+    } catch (e) {}
+  }
   
   if (window.supabaseClient) {
     window.supabaseClient.auth.signOut().then(() => {
@@ -1909,45 +1972,97 @@ let editandoUserId = null;
 function isTestData(item) {
   if (!item) return false;
   
-  if (item.esPrueba === true || item.isTest === true) return true;
+  if (item.esPrueba === true || item.isTest === true || item.es_prueba === true) return true;
   
-    try {
-      let notesObj = null;
-      if (typeof item.notas === 'string') {
-        const trimmed = item.notas.trim();
-        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-          notesObj = JSON.parse(trimmed);
-        }
-      } else {
-        notesObj = item.notas;
+  try {
+    let notesObj = null;
+    if (typeof item.notas === 'string') {
+      const trimmed = item.notas.trim();
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        notesObj = JSON.parse(trimmed);
       }
-      if (notesObj && (notesObj.esPrueba === true || notesObj.isTest === true)) {
-        return true;
-      }
-    } catch (e) {}
-  
-  // Comprobar si el folio, asunto, título o descripción contienen [PRUEBA] o [TEST]
-  const fieldsToCheckPrefix = [
+    } else {
+      notesObj = item.notas;
+    }
+    if (notesObj && (notesObj.esPrueba === true || notesObj.isTest === true || notesObj.es_prueba === true)) {
+      return true;
+    }
+  } catch (e) {}
+
+  // Comprobar campos clave exclusivamente con etiquetas explícitas [PRUEBA] / [TEST] o prefijos reconocidos
+  const fieldsToCheck = [
     item.folio,
-    item.asunto,
-    item.titulo,
-    item.title,
-    item.descripcion,
-    item.description
+    item.ordenFolio,
+    item.ordenId,
+    item.id,
+    item.soporte,
+    item.numero_orden
   ];
-  for (const field of fieldsToCheckPrefix) {
+  for (const field of fieldsToCheck) {
     if (field && typeof field === 'string') {
-      const trimmed = field.trim().toUpperCase();
-      if (trimmed.includes('[PRUEBA]') || trimmed.includes('[TEST]')) {
+      const upper = field.trim().toUpperCase();
+      if (
+        upper.includes('[PRUEBA]') || 
+        upper.includes('[TEST]') || 
+        upper.startsWith('OS-PRUEBA') || 
+        upper.startsWith('TKT-PRUEBA') || 
+        upper.startsWith('LEV-PRUEBA') ||
+        upper.startsWith('TEST-') ||
+        upper.startsWith('PRUEBA-') ||
+        /^TKT-OS00\d+/i.test(upper) ||
+        /^OS00\d+/i.test(upper)
+      ) {
         return true;
       }
+    }
+  }
+
+  // Título / asunto con etiqueta explícita de prueba
+  if (item.asunto && typeof item.asunto === 'string') {
+    const asUpper = item.asunto.trim().toUpperCase();
+    if (asUpper.includes('[PRUEBA]') || asUpper.includes('[TEST]')) return true;
+  }
+  if (item.titulo && typeof item.titulo === 'string') {
+    const titUpper = item.titulo.trim().toUpperCase();
+    if (titUpper.includes('[PRUEBA]') || titUpper.includes('[TEST]')) return true;
+  }
+
+  // Cliente explícito de prueba
+  if (item.cliente && typeof item.cliente === 'string') {
+    const cliUpper = item.cliente.trim().toUpperCase();
+    if (cliUpper.includes('[PRUEBA]') || cliUpper.includes('[TEST]') || cliUpper === 'CLIENTE PRUEBA' || cliUpper === 'CLIENTE DE PRUEBA' || cliUpper === 'TEST CLIENT') {
+      return true;
+    }
+  }
+
+  // Si es un ticket con orden vinculada de prueba
+  if (item.ordenId && typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
+    const assocOrd = ordenes.find(o => o && o.id === item.ordenId);
+    if (assocOrd && (assocOrd.esPrueba === true || assocOrd.isTest === true || (assocOrd.folio && assocOrd.folio.toUpperCase().includes('PRUEBA')))) {
+      return true;
+    }
+  }
+
+  // Si es una orden con soporte vinculado de prueba
+  if (item.soporte && typeof tickets !== 'undefined' && Array.isArray(tickets)) {
+    const assocTkt = tickets.find(t => t && (t.id === item.soporte || t.folio === item.soporte));
+    if (assocTkt && (assocTkt.esPrueba === true || assocTkt.isTest === true || (assocTkt.folio && assocTkt.folio.toUpperCase().includes('PRUEBA')))) {
+      return true;
     }
   }
   
   return false;
 }
 
-
+function isTestUser(user) {
+  if (typeof window.isTestUser === 'function' && window.isTestUser !== isTestUser) {
+    return window.isTestUser(user);
+  }
+  if (!user) return false;
+  const name = (user.nombre || '').toLowerCase();
+  const email = (user.email || user.correo || '').toLowerCase();
+  return name.includes('prueba') || name.includes('test') || email.includes('prueba') || email.includes('test');
+}
 
 function isTestModeActive() {
   const user = usuarios.find(u => u.id === currentSession.userId);
@@ -2022,8 +2137,15 @@ function actualizarVistaActual() {
   try { renderDashboardV2(); } catch(e){}
   try { renderDashboardTecnicos(); } catch(e){}
   try { renderTecnicos(); } catch(e){}
-  try { renderCalendario(); } catch(e){}
-  try { updateTicketBadge(); updateOrdenesBadge(); } catch(e){}
+  try { 
+    updateTicketBadge(); 
+    updateOrdenesBadge(); 
+    if (typeof window.updateEnviosBadge === 'function') window.updateEnviosBadge(); 
+    if (typeof window.actualizarBadgeLevantamientos === 'function') window.actualizarBadgeLevantamientos();
+  } catch(e){}
+  if (typeof window.renderEnvios === 'function') {
+    try { window.renderEnvios(); } catch(e){}
+  }
   if (typeof window.renderGastos === 'function') {
     try { window.renderGastos(); } catch(e){}
   }
@@ -2035,6 +2157,9 @@ function actualizarVistaActual() {
   }
   if (typeof renderIdeasFallas === 'function') {
     try { renderIdeasFallas(); } catch(e){}
+  }
+  if (typeof window.filtrarKitsServicio === 'function') {
+    try { window.filtrarKitsServicio(); } catch(e){}
   }
 }
 
@@ -2093,6 +2218,13 @@ function applyRole(rolKey) {
       btnMaqFusionar.style.display = (currentSession.realRol === 'superadmin') ? 'flex' : 'none';
     }
 
+    // Show/hide Kits de Servicio button (ONLY superadmin, admin, supervisor)
+    const btnMaqKits = document.getElementById('btn-maq-kits-servicio');
+    if (btnMaqKits) {
+      const canViewKits = ['superadmin', 'admin', 'supervisor'].includes(rolKey);
+      btnMaqKits.style.display = canViewKits ? 'inline-flex' : 'none';
+    }
+
     // Show/hide weekly report button (ONLY superadmin or admin)
     const repSemBtn = document.getElementById('btn-reporte-semanal-tecnicos');
     if (repSemBtn) {
@@ -2147,9 +2279,9 @@ function applyRole(rolKey) {
       btnDashTecnicos.style.display = ['empresa', 'cliente', 'cliente-consultor'].includes(rolKey) ? 'none' : 'inline-block';
     }
 
-    // Ocultar campo y columna de Prioridad para empresas/clientes
+    // Ocultar campo y columna de Prioridad, Asignado y Comentarios Internos para empresas/clientes
     const isCliente = ['empresa', 'cliente', 'cliente-consultor'].includes(rolKey);
-    document.querySelectorAll('.col-prioridad, .col-asignado').forEach(el => el.style.display = isCliente ? 'none' : '');
+    document.querySelectorAll('.col-prioridad, .col-asignado, .col-comentario-interno').forEach(el => el.style.display = isCliente ? 'none' : '');
     const groupPrioridad = document.getElementById('group-t-prioridad');
     if (groupPrioridad) {
       groupPrioridad.style.display = isCliente ? 'none' : '';
@@ -2232,6 +2364,7 @@ function updateTopbarButtons(view, role) {
 
   if (view === 'tickets') {
     if (btnTicket && !['consulta', 'tecnico'].includes(role)) btnTicket.style.display = '';
+    if (typeof window.actualizarBadgeDepuradorTickets === 'function') window.actualizarBadgeDepuradorTickets();
   } else if (view === 'clientes') {
     if (btnCliente && allowedToCreateClientsAndMachines) btnCliente.style.display = '';
     const portalTab = document.getElementById('btn-tab-cli-portal');
@@ -2243,6 +2376,7 @@ function updateTopbarButtons(view, role) {
     }
   } else if (view === 'servicios') {
     if (btnOrden && ['superadmin', 'admin', 'supervisor'].includes(role)) btnOrden.style.display = '';
+    if (typeof window.actualizarBadgeDepuradorOrdenes === 'function') window.actualizarBadgeDepuradorOrdenes();
   } else if (view === 'levantamientos') {
     if (btnLevantamiento && ['superadmin', 'admin', 'supervisor', 'tecnico'].includes(role)) btnLevantamiento.style.display = '';
   }
@@ -2385,6 +2519,148 @@ function cargarConfig() {
 
 // ─── IDEAS Y FALLAS MODULE ──────────────────────────────────────────────────
 let editandoIdeaFallaId = null;
+let ifArchivosAdjuntosTemp = [];
+
+function renderIfArchivosPreview() {
+  const container = document.getElementById('if-archivos-preview');
+  if (!container) return;
+  if (ifArchivosAdjuntosTemp.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = ifArchivosAdjuntosTemp.map((arch, idx) => {
+    const isImg = arch.tipo && arch.tipo.startsWith('image/');
+    return `
+      <div style="display:flex; align-items:center; gap:0.4rem; background:var(--bg-card); border:1px solid var(--border); padding:0.35rem 0.6rem; border-radius:6px; font-size:0.75rem; max-width:220px; box-shadow:var(--shadow-sm);">
+        ${isImg 
+          ? `<img src="${arch.url}" style="width:26px; height:26px; object-fit:cover; border-radius:4px;" />` 
+          : `<i data-lucide="file-text" style="width:20px; height:20px; color:var(--accent);"></i>`
+        }
+        <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600;" title="${arch.nombre}">${arch.nombre}</span>
+        <button type="button" onclick="window.eliminarIfArchivoTemp(${idx})" style="background:none; border:none; color:var(--red); cursor:pointer; font-weight:bold; font-size:0.9rem; padding:0 2px;">✕</button>
+      </div>
+    `;
+  }).join('');
+  if (window.lucide) lucide.createIcons();
+}
+window.renderIfArchivosPreview = renderIfArchivosPreview;
+
+window.eliminarIfArchivoTemp = function(idx) {
+  if (idx > -1 && idx < ifArchivosAdjuntosTemp.length) {
+    ifArchivosAdjuntosTemp.splice(idx, 1);
+    renderIfArchivosPreview();
+  }
+};
+
+window.handleIfFilesSelect = function(e) {
+  const files = Array.from(e.target.files || []);
+  procesarFilesIf(files);
+  e.target.value = '';
+};
+
+window.handleIfFilesDrop = function(e) {
+  e.preventDefault();
+  const files = Array.from(e.dataTransfer.files || []);
+  procesarFilesIf(files);
+};
+
+function procesarFilesIf(files) {
+  files.forEach(file => {
+    if (file.size > 8 * 1024 * 1024) {
+      alert(`El archivo "${file.name}" supera el límite recomendado de 8MB.`);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      ifArchivosAdjuntosTemp.push({
+        nombre: file.name,
+        tipo: file.type,
+        url: evt.target.result,
+        fecha: new Date().toISOString()
+      });
+      renderIfArchivosPreview();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+    window.toggleIfResolucionInput = function() {
+  const estadoVal = document.getElementById('if-estado')?.value;
+  const resContainer = document.getElementById('if-resolucion-container');
+  if (resContainer) {
+    resContainer.style.display = (estadoVal === 'Resuelto') ? 'block' : 'none';
+  }
+};
+
+window.abrirModalResolucionIdeaFalla = function(id) {
+  const item = ideasFallasDb.find(x => x.id === id);
+  if (!item) return;
+
+  const inputId = document.getElementById('if-res-id');
+  const inputExp = document.getElementById('if-res-explicacion');
+  if (inputId) inputId.value = id;
+  if (inputExp) inputExp.value = item.resolucion || '';
+
+  const modalOverlay = document.getElementById('modal-resolucion-idea-falla-overlay');
+  if (modalOverlay) modalOverlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  if (window.lucide) lucide.createIcons();
+};
+
+window.cerrarModalResolucionIdeaFalla = function(e) {
+  const modalOverlay = document.getElementById('modal-resolucion-idea-falla-overlay');
+  if (e && e.target !== modalOverlay) return;
+  if (modalOverlay) modalOverlay.classList.remove('open');
+  document.body.style.overflow = '';
+  renderIdeasFallas();
+};
+
+window.guardarResolucionIdeaFalla = async function(e) {
+  if (e) e.preventDefault();
+
+  const id = document.getElementById('if-res-id')?.value;
+  const explicacion = document.getElementById('if-res-explicacion')?.value || '';
+
+  if (!id) return;
+  if (!explicacion.trim()) {
+    alert('Por favor escribe la explicación o conclusión de la solución.');
+    return;
+  }
+
+  const idx = ideasFallasDb.findIndex(x => x.id === id);
+  if (idx === -1) return;
+
+  const user = usuarios.find(u => u.id === currentSession?.userId);
+  const userNombre = user ? user.nombre : (currentSession?.nombre || 'Superadmin');
+
+  ideasFallasDb[idx] = {
+    ...ideasFallasDb[idx],
+    estado: 'Resuelto',
+    resolucion: explicacion.trim(),
+    resuelto_por: userNombre,
+    fecha_resolucion: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  const item = ideasFallasDb[idx];
+  localStorage.setItem('sapi_ideas_fallas', JSON.stringify(ideasFallasDb));
+  
+  const modalOverlay = document.getElementById('modal-resolucion-idea-falla-overlay');
+  if (modalOverlay) modalOverlay.classList.remove('open');
+  document.body.style.overflow = '';
+
+  renderIdeasFallas();
+
+  if (window.pushToSupabase) {
+    try {
+      await window.pushToSupabase('ideas_fallas', item);
+      if (typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion('Registro marcado como Resuelto con conclusión.', 'success');
+      }
+    } catch (err) {
+      console.error('[IdeasFallas] Error al guardar resolución en Supabase:', err);
+    }
+  }
+};
 
 function puedeEditarIdeaFalla(item) {
   if (!item) return false;
@@ -2445,16 +2721,31 @@ function abrirModalIdeaFalla(id = null) {
       const descTextarea = document.getElementById('if-descripcion');
       if (descTextarea) descTextarea.value = item.descripcion || '';
 
+      const moduloSelect = document.getElementById('if-modulo');
+      if (moduloSelect) moduloSelect.value = item.modulo || 'General';
+
       const prioridadSelect = document.getElementById('if-prioridad');
       if (prioridadSelect) prioridadSelect.value = item.prioridad || 'Media';
 
       const estadoSelect = document.getElementById('if-estado');
       if (estadoSelect) estadoSelect.value = item.estado || 'Pendiente';
+
+      const resolucionTextarea = document.getElementById('if-resolucion');
+      if (resolucionTextarea) resolucionTextarea.value = item.resolucion || '';
+
+      ifArchivosAdjuntosTemp = item.archivos ? JSON.parse(JSON.stringify(item.archivos)) : [];
+      window.toggleIfResolucionInput();
     }
   } else {
     if (modalTitle) modalTitle.textContent = 'Reportar Idea / Falla';
     if (estadoContainer) estadoContainer.style.display = 'none';
+    const moduloSelect = document.getElementById('if-modulo');
+    if (moduloSelect) moduloSelect.value = 'General';
+    ifArchivosAdjuntosTemp = [];
+    window.toggleIfResolucionInput();
   }
+
+  renderIfArchivosPreview();
 
   const modalOverlay = document.getElementById('modal-idea-falla-overlay');
   if (modalOverlay) modalOverlay.classList.add('open');
@@ -2468,6 +2759,7 @@ function cerrarModalIdeaFalla(e) {
   if (modalOverlay) modalOverlay.classList.remove('open');
   document.body.style.overflow = '';
   editandoIdeaFallaId = null;
+  ifArchivosAdjuntosTemp = [];
 }
 
 async function guardarIdeaFalla(e) {
@@ -2476,6 +2768,7 @@ async function guardarIdeaFalla(e) {
   const tipo = document.querySelector('input[name="if-tipo"]:checked')?.value || 'Idea';
   const titulo = document.getElementById('if-titulo')?.value || '';
   const descripcion = document.getElementById('if-descripcion')?.value || '';
+  const modulo = document.getElementById('if-modulo')?.value || 'General';
   const prioridad = document.getElementById('if-prioridad')?.value || 'Media';
   const isSuperadmin = (currentSession && currentSession.viewMode === 'superadmin');
 
@@ -2501,13 +2794,27 @@ async function guardarIdeaFalla(e) {
         ? (document.getElementById('if-estado').value || existingItem.estado || 'Pendiente')
         : (existingItem.estado || 'Pendiente');
 
+      const resolucionText = document.getElementById('if-resolucion')?.value || '';
+      let resueltoPor = existingItem.resuelto_por;
+      let fechaResolucion = existingItem.fecha_resolucion;
+
+      if (nuevoEstado === 'Resuelto' && (!existingItem.estado || existingItem.estado !== 'Resuelto' || !fechaResolucion)) {
+        resueltoPor = userNombre;
+        fechaResolucion = new Date().toISOString();
+      }
+
       ideasFallasDb[idx] = {
         ...existingItem,
         tipo,
+        modulo,
         titulo,
         descripcion,
+        archivos: [...ifArchivosAdjuntosTemp],
         prioridad,
         estado: nuevoEstado,
+        resolucion: resolucionText.trim(),
+        resuelto_por: resueltoPor,
+        fecha_resolucion: fechaResolucion,
         updated_at: new Date().toISOString()
       };
       item = ideasFallasDb[idx];
@@ -2516,8 +2823,10 @@ async function guardarIdeaFalla(e) {
     item = {
       id: 'IF-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
       tipo,
+      modulo,
       titulo,
       descripcion,
+      archivos: [...ifArchivosAdjuntosTemp],
       prioridad,
       estado: 'Pendiente',
       creado_por: userNombre,
@@ -2550,6 +2859,11 @@ async function cambiarEstadoIdeaFalla(id, nuevoEstado) {
   if (!isSuperadmin) {
     alert('Acceso denegado: Solo los superadministradores pueden cambiar el estado de una idea o falla.');
     renderIdeasFallas();
+    return;
+  }
+
+  if (nuevoEstado === 'Resuelto') {
+    window.abrirModalResolucionIdeaFalla(id);
     return;
   }
 
@@ -2605,33 +2919,107 @@ async function eliminarIdeaFalla(id) {
   }
 }
 
+window.filtrarIdeaFallaPorKpi = function(tipo, val) {
+  const elTipo = document.getElementById('filtro-tipo-idea-falla');
+  const elEstado = document.getElementById('filtro-estado-idea-falla');
+
+  if (tipo === 'tipo') {
+    if (elTipo) {
+      elTipo.value = (elTipo.value === val) ? 'todos' : val;
+    }
+    if (elEstado) elEstado.value = 'pendientes_en_curso';
+  } else if (tipo === 'estado') {
+    if (elEstado) {
+      elEstado.value = (elEstado.value === val) ? 'pendientes_en_curso' : val;
+    }
+    if (elTipo) elTipo.value = 'todos';
+  }
+  
+  renderIdeasFallas();
+};
+
 function renderIdeasFallas() {
   const tbody = document.getElementById('tabla-ideas-fallas-body');
   if (!tbody) return;
 
   const isSuperadmin = (currentSession && currentSession.viewMode === 'superadmin');
 
+  // Actualizar recuadros KPI
+  const ideasCount = ideasFallasDb.filter(x => x.tipo === 'Idea' && x.estado !== 'Resuelto' && x.estado !== 'Rechazado').length;
+  const fallasCount = ideasFallasDb.filter(x => x.tipo === 'Falla' && x.estado !== 'Resuelto' && x.estado !== 'Rechazado').length;
+  const pendientesCount = ideasFallasDb.filter(x => ['Pendiente', 'En Análisis', 'En Desarrollo', 'En Pruebas', 'En Progreso'].includes(x.estado || 'Pendiente')).length;
+  const completadosCount = ideasFallasDb.filter(x => x.estado === 'Resuelto').length;
+
+  const kpiIdeas = document.getElementById('kpi-if-ideas');
+  if (kpiIdeas) kpiIdeas.textContent = ideasCount;
+
+  const kpiFallas = document.getElementById('kpi-if-fallas');
+  if (kpiFallas) kpiFallas.textContent = fallasCount;
+
+  const kpiPendientes = document.getElementById('kpi-if-pendientes');
+  if (kpiPendientes) kpiPendientes.textContent = pendientesCount;
+
+  const kpiCompletados = document.getElementById('kpi-if-completados');
+  if (kpiCompletados) kpiCompletados.textContent = completadosCount;
+
   const query = (document.getElementById('busqueda-idea-falla')?.value || '').toLowerCase().trim();
+  const filtroModulo = document.getElementById('filtro-modulo-idea-falla')?.value || 'todos';
   const filtroTipo = document.getElementById('filtro-tipo-idea-falla')?.value || 'todos';
   const filtroPrioridad = document.getElementById('filtro-prioridad-idea-falla')?.value || 'todos';
-  const filtroEstado = document.getElementById('filtro-estado-idea-falla')?.value || 'todos';
+  const filtroEstado = document.getElementById('filtro-estado-idea-falla')?.value || 'pendientes_en_curso';
+
+  // Resaltado visual del recuadro KPI activo
+  const cardIdeas = document.getElementById('card-kpi-if-ideas');
+  const cardFallas = document.getElementById('card-kpi-if-fallas');
+  const cardPendientes = document.getElementById('card-kpi-if-pendientes');
+  const cardCompletados = document.getElementById('card-kpi-if-completados');
+
+  [cardIdeas, cardFallas, cardPendientes, cardCompletados].forEach(c => {
+    if (c) {
+      c.style.borderColor = 'var(--border)';
+      c.style.boxShadow = 'var(--shadow-sm)';
+      c.style.transform = 'none';
+    }
+  });
+
+  if (filtroTipo === 'Idea' && cardIdeas) {
+    cardIdeas.style.borderColor = '#10b981';
+    cardIdeas.style.boxShadow = '0 0 0 2px rgba(16, 185, 129, 0.25)';
+    cardIdeas.style.transform = 'translateY(-2px)';
+  } else if (filtroTipo === 'Falla' && cardFallas) {
+    cardFallas.style.borderColor = '#ef4444';
+    cardFallas.style.boxShadow = '0 0 0 2px rgba(239, 68, 68, 0.25)';
+    cardFallas.style.transform = 'translateY(-2px)';
+  } else if (filtroEstado === 'pendientes_en_curso' && cardPendientes) {
+    cardPendientes.style.borderColor = '#f59e0b';
+    cardPendientes.style.boxShadow = '0 0 0 2px rgba(245, 158, 11, 0.25)';
+    cardPendientes.style.transform = 'translateY(-2px)';
+  } else if (filtroEstado === 'Resuelto' && cardCompletados) {
+    cardCompletados.style.borderColor = '#10b981';
+    cardCompletados.style.boxShadow = '0 0 0 2px rgba(16, 185, 129, 0.25)';
+    cardCompletados.style.transform = 'translateY(-2px)';
+  }
 
   const filtrados = ideasFallasDb.filter(item => {
-    // Buscar coincidencia en título y descripción
     const matchQuery = !query || 
       (item.titulo || '').toLowerCase().includes(query) || 
       (item.descripcion || '').toLowerCase().includes(query);
 
-    // Filtrar por tipo
+    const matchModulo = filtroModulo === 'todos' || (item.modulo || 'General') === filtroModulo;
     const matchTipo = filtroTipo === 'todos' || item.tipo === filtroTipo;
-
-    // Filtrar por prioridad
     const matchPrioridad = filtroPrioridad === 'todos' || item.prioridad === filtroPrioridad;
 
-    // Filtrar por estado
-    const matchEstado = filtroEstado === 'todos' || item.estado === filtroEstado;
+    let matchEstado = true;
+    if (filtroEstado === 'pendientes_en_curso') {
+      matchEstado = ['Pendiente', 'En Análisis', 'En Desarrollo', 'En Pruebas', 'En Progreso'].includes(item.estado || 'Pendiente');
+    } else if (filtroEstado !== 'todos') {
+      matchEstado = item.estado === filtroEstado;
+    } else if (filtroTipo === 'Idea' || filtroTipo === 'Falla') {
+      // Excluir automáticamente las resueltas y rechazadas al ver el catálogo activo de Ideas o Fallas
+      matchEstado = item.estado !== 'Resuelto' && item.estado !== 'Rechazado';
+    }
 
-    return matchQuery && matchTipo && matchPrioridad && matchEstado;
+    return matchQuery && matchModulo && matchTipo && matchPrioridad && matchEstado;
   });
 
   // Ordenar por orden de priorización (campo orden) y luego por fecha descendente
@@ -2647,37 +3035,92 @@ function renderIdeasFallas() {
   if (filtrados.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" style="text-align:center; padding:2rem; color:var(--text-muted);">
-          No se encontraron registros de Ideas y Fallas.
+        <td colspan="7" style="text-align:center; padding:2.5rem 1rem; color:var(--text-muted); font-size:0.88rem;">
+          <div style="display:flex; flex-direction:column; align-items:center; gap:0.5rem;">
+            <i data-lucide="inbox" style="width:28px; height:28px; opacity:0.4;"></i>
+            <span>No se encontraron registros de Ideas y Fallas.</span>
+          </div>
         </td>
       </tr>
     `;
+    lucide.createIcons();
     return;
   }
+
+  const MODULE_CONFIG = {
+    'Tickets': { label: 'Tickets', color: '#4f8ef7', bg: 'rgba(79, 142, 247, 0.1)' },
+    'Levantamientos': { label: 'Levantamientos', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)' },
+    'Órdenes': { label: 'Órdenes', color: '#E8820C', bg: 'rgba(232, 130, 12, 0.1)' },
+    'Clientes': { label: 'Clientes / SAP', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
+    'Gastos': { label: 'Gastos / Clara', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)' },
+    'Portal': { label: 'Portal Clientes', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },
+    'Calendario': { label: 'Calendario', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+    'UI': { label: 'UI / Interfaz', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)' },
+    'General': { label: 'General', color: '#64748b', bg: 'rgba(100, 116, 139, 0.1)' }
+  };
 
   tbody.innerHTML = filtrados.map((item, idx) => {
     const canEdit = puedeEditarIdeaFalla(item);
 
-    // Colores y tags para tipos
-    const tagColor = item.tipo === 'Idea' ? 'background:rgba(16, 185, 129, 0.12); color:#10b981;' : 'background:rgba(239, 68, 68, 0.12); color:#ef4444;';
-    const tagEmoji = item.tipo === 'Idea' ? '💡' : '🐛';
+    // Tag para Módulo
+    const modKey = item.modulo || 'General';
+    const modCfg = MODULE_CONFIG[modKey] || MODULE_CONFIG['General'];
 
-    // Badge de estado
-    let badgeStyle = 'background: rgba(245, 158, 11, 0.12); color: #f59e0b;'; // Pendiente (amber)
-    let estadoLabel = item.estado || 'Pendiente';
-    if (item.estado === 'En Progreso') {
-      badgeStyle = 'background: rgba(59, 130, 246, 0.12); color: #3b82f6;'; // En Progreso (blue)
+    // Badge de estado / etapa
+    let badgeStyle = 'background: rgba(245, 158, 11, 0.1); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3);'; // Pendiente
+    if (item.estado === 'En Análisis') {
+      badgeStyle = 'background: rgba(168, 85, 247, 0.1); color: #9333ea; border: 1px solid rgba(168, 85, 247, 0.3);';
+    } else if (item.estado === 'En Desarrollo' || item.estado === 'En Progreso') {
+      badgeStyle = 'background: rgba(59, 130, 246, 0.1); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.3);';
+    } else if (item.estado === 'En Pruebas') {
+      badgeStyle = 'background: rgba(6, 182, 212, 0.1); color: #0891b2; border: 1px solid rgba(6, 182, 212, 0.3);';
     } else if (item.estado === 'Resuelto') {
-      badgeStyle = 'background: rgba(16, 185, 129, 0.12); color: #10b981;'; // Resuelto (green)
+      badgeStyle = 'background: rgba(16, 185, 129, 0.1); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3);';
     } else if (item.estado === 'Rechazado') {
-      badgeStyle = 'background: rgba(239, 68, 68, 0.12); color: #ef4444;'; // Rechazado (red)
+      badgeStyle = 'background: rgba(239, 68, 68, 0.1); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.3);';
     }
 
-    // Prioridad del elemento
+    // Prioridad del elemento y estilo
     const prioVal = item.prioridad || 'Media';
+    let prioStyle = 'background: rgba(59, 130, 246, 0.08); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.25);';
+    if (prioVal === 'Baja') {
+      prioStyle = 'background: rgba(100, 116, 139, 0.08); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.25);';
+    } else if (prioVal === 'Alta') {
+      prioStyle = 'background: rgba(245, 158, 11, 0.08); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.25);';
+    } else if (prioVal === 'Crítica') {
+      prioStyle = 'background: rgba(239, 68, 68, 0.1); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.35); font-weight: 700;';
+    }
 
     // Formatear fecha
     const fecha = item.created_at ? new Date(item.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+    
+    const archivosHTML = (item.archivos && item.archivos.length > 0) ? `
+      <div style="display:flex; flex-wrap:wrap; gap:0.35rem; margin-top:0.45rem;">
+        ${item.archivos.map(arch => {
+          const isImg = arch.tipo && arch.tipo.startsWith('image/');
+          return `
+            <a href="${arch.url}" target="_blank" download="${arch.nombre}" onclick="event.stopPropagation();" 
+               style="display:inline-flex; align-items:center; gap:0.3rem; background:var(--bg-secondary); border:1px solid var(--border); padding:0.2rem 0.5rem; border-radius:4px; font-size:0.72rem; color:var(--accent); text-decoration:none; font-weight:600; transition:all 0.15s;"
+               onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+              ${isImg ? `<i data-lucide="image" style="width:12px; height:12px;"></i>` : `<i data-lucide="paperclip" style="width:12px; height:12px;"></i>`}
+              <span style="max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${arch.nombre}</span>
+            </a>
+          `;
+        }).join('')}
+      </div>
+    ` : '';
+
+    const fechaRes = item.fecha_resolucion ? `• ${new Date(item.fecha_resolucion).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}` : '';
+    const resolucionHTML = (item.resolucion && (item.estado === 'Resuelto' || item.resolucion.trim().length > 0)) ? `
+      <div style="margin-top:0.45rem; background:rgba(16, 185, 129, 0.06); border:1px solid rgba(16, 185, 129, 0.2); border-left:3px solid #10b981; padding:0.45rem 0.65rem; border-radius:6px; font-size:0.78rem; word-break:break-word;">
+        <div style="font-weight:700; color:#10b981; display:flex; align-items:center; gap:0.3rem; margin-bottom:0.15rem;">
+          <i data-lucide="check-circle-2" style="width:13px; height:13px;"></i>
+          <span>Solución:</span>
+        </div>
+        <div style="color:var(--text-primary); white-space:pre-wrap; font-size:0.78rem; line-height:1.4;">${item.resolucion}</div>
+        ${item.resuelto_por ? `<div style="font-size:0.7rem; color:var(--text-muted); margin-top:0.25rem;">Resuelto por <b>${item.resuelto_por}</b> ${fechaRes}</div>` : ''}
+      </div>
+    ` : '';
 
     const dragAttrs = isSuperadmin 
       ? `draggable="true" 
@@ -2694,61 +3137,82 @@ function renderIdeasFallas() {
           class="idea-falla-row"
           onmouseover="this.style.backgroundColor='var(--bg-hover, #f8fafc)'" 
           onmouseout="this.style.backgroundColor='transparent'">
-        <td style="text-align: center; vertical-align: middle; padding: 0.85rem 0.5rem;">
-          <div style="display: inline-flex; align-items: center; gap: 0.35rem; ${isSuperadmin ? 'cursor: grab;' : ''} color: var(--text-muted);">
-            <span style="font-weight: 700; color: var(--text-primary); font-size: 0.82rem; background: var(--bg-hover, #e2e8f0); padding: 0.15rem 0.4rem; border-radius: 4px; min-width: 22px; display: inline-block; text-align: center;">${idx + 1}</span>
-            ${isSuperadmin ? '<i data-lucide="grip-vertical" style="width: 14px; height: 14px; opacity: 0.7;"></i>' : ''}
+        <td style="text-align: center; vertical-align: middle; padding: 0.75rem 0.5rem;">
+          <div style="display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;">
+            <span style="font-weight: 700; color: var(--text-primary); font-size: 0.78rem; background: var(--bg-hover, #e2e8f0); padding: 0.15rem 0.45rem; border-radius: 4px; min-width: 22px; text-align: center;">${idx + 1}</span>
+            ${isSuperadmin ? '<i data-lucide="grip-vertical" style="width: 14px; height: 14px; color: var(--text-muted); opacity: 0.65; cursor: grab;"></i>' : ''}
           </div>
         </td>
-        <td style="padding: 0.85rem 1rem; vertical-align: middle;">
-          <span style="display:inline-flex; align-items:center; gap:0.35rem; padding:0.25rem 0.6rem; border-radius:var(--radius-sm); font-size:0.75rem; font-weight:600; ${tagColor}">
-            ${tagEmoji} ${item.tipo}
-          </span>
+        <td style="padding: 0.75rem 0.6rem; vertical-align: middle;">
+          <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.3rem;">
+            ${item.tipo === 'Idea' 
+              ? `<span style="display:inline-flex; align-items:center; gap:0.3rem; padding:0.2rem 0.55rem; border-radius:5px; font-size:0.73rem; font-weight:700; background:rgba(16, 185, 129, 0.1); color:#10b981; border: 1px solid rgba(16, 185, 129, 0.25);"><i data-lucide="sparkles" style="width:12px; height:12px;"></i> Idea</span>`
+              : `<span style="display:inline-flex; align-items:center; gap:0.3rem; padding:0.2rem 0.55rem; border-radius:5px; font-size:0.73rem; font-weight:700; background:rgba(239, 68, 68, 0.1); color:#ef4444; border: 1px solid rgba(239, 68, 68, 0.25);"><i data-lucide="alert-triangle" style="width:12px; height:12px;"></i> Falla</span>`
+            }
+            <div style="display:inline-flex; align-items:center; gap:0.3rem; font-size:0.72rem; font-weight:600; color:var(--text-secondary); background:var(--bg-secondary); padding:0.15rem 0.45rem; border-radius:4px; border:1px solid var(--border); white-space:nowrap;">
+              <i data-lucide="layers" style="width:11px; height:11px; opacity:0.7; flex-shrink:0;"></i>
+              <span>${modCfg.label}</span>
+            </div>
+          </div>
         </td>
-        <td style="padding: 0.85rem 1rem; vertical-align: middle;">
-          <div style="font-weight:600; color:var(--text-primary); margin-bottom:0.15rem; font-size: 0.88rem;">${item.titulo}</div>
-          <div style="font-size:0.8rem; color:var(--text-secondary); white-space:pre-wrap; max-width: 450px;">${item.descripcion || '<span style="font-style:italic;color:var(--text-muted);">Sin descripción</span>'}</div>
+        <td style="padding: 0.75rem 1rem; vertical-align: middle; word-break: break-word;">
+          <div style="font-weight: 600; color: var(--text-primary); font-size: 0.88rem; line-height: 1.35; margin-bottom: 0.2rem;">${item.titulo || ''}</div>
+          ${item.descripcion ? `<div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.45; margin-top: 0.25rem; word-break: break-word;">${item.descripcion}</div>` : ''}
+          ${archivosHTML}
+          ${resolucionHTML}
         </td>
-        <td style="padding: 0.85rem 1rem; vertical-align: middle;">
-          <select ${canEdit ? '' : 'disabled'} style="font-size: 0.78rem; font-weight: 600; padding: 0.3rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); color: var(--text-primary); outline: none; ${canEdit ? 'cursor: pointer;' : 'cursor: default; opacity: 0.9;'} transition: border-color 0.15s;"
-            onchange="cambiarPrioridadIdeaFalla('${item.id}', this.value)"
-            onfocus="this.style.borderColor='var(--accent)'" 
-            onblur="this.style.borderColor='var(--border)'">
-            <option value="Baja" ${prioVal === 'Baja' ? 'selected' : ''}>Baja</option>
-            <option value="Media" ${prioVal === 'Media' ? 'selected' : ''}>Media</option>
-            <option value="Alta" ${prioVal === 'Alta' ? 'selected' : ''}>Alta</option>
-            <option value="Crítica" ${prioVal === 'Crítica' ? 'selected' : ''}>Crítica</option>
+        <td style="padding: 0.75rem 0.5rem; vertical-align: middle; text-align: center;">
+          <select ${canEdit ? '' : 'disabled'} style="font-size: 0.76rem; font-weight: 600; padding: 0.32rem 0.6rem; border-radius: 6px; outline: none; ${canEdit ? 'cursor: pointer;' : 'cursor: default; opacity: 0.9;'} ${prioStyle} text-align: center; transition: all 0.15s;"
+            onchange="cambiarPrioridadIdeaFalla('${item.id}', this.value)">
+            <option value="Baja" ${prioVal === 'Baja' ? 'selected' : ''} style="background: var(--bg-card); color: var(--text-primary);">Baja</option>
+            <option value="Media" ${prioVal === 'Media' ? 'selected' : ''} style="background: var(--bg-card); color: var(--text-primary);">Media</option>
+            <option value="Alta" ${prioVal === 'Alta' ? 'selected' : ''} style="background: var(--bg-card); color: var(--text-primary);">Alta</option>
+            <option value="Crítica" ${prioVal === 'Crítica' ? 'selected' : ''} style="background: var(--bg-card); color: var(--text-primary);">Crítica</option>
           </select>
         </td>
-        <td style="padding: 0.85rem 1rem; vertical-align: middle;">
-          <div style="font-size:0.85rem; font-weight:500; color: var(--text-primary);">${item.creado_por || 'Sistema'}</div>
-          <div style="font-size:0.75rem; color:var(--text-muted);">${fecha}</div>
+        <td style="padding: 0.75rem 0.6rem; vertical-align: middle;">
+          <div style="display: flex; flex-direction: column; gap: 0.2rem;">
+            <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem; white-space: nowrap;" title="${item.creado_por || 'Sistema'}">
+              <i data-lucide="user" style="width: 12px; height: 12px; opacity: 0.65; color: var(--text-muted); flex-shrink:0;"></i>
+              <span>${item.creado_por || 'Sistema'}</span>
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem; white-space: nowrap;">
+              <i data-lucide="calendar" style="width: 11px; height: 11px; opacity: 0.65; color: var(--text-muted); flex-shrink:0;"></i>
+              <span>${fecha}</span>
+            </div>
+          </div>
         </td>
-        <td style="padding: 0.85rem 1rem; vertical-align: middle;">
+        <td style="padding: 0.75rem 0.5rem; vertical-align: middle; text-align: center;">
           <select ${isSuperadmin ? '' : 'disabled'} onchange="cambiarEstadoIdeaFalla('${item.id}', this.value)" 
-                  style="font-size: 0.72rem; font-weight: 700; padding: 0.25rem 0.55rem; border-radius: 20px; outline: none; ${isSuperadmin ? 'cursor: pointer;' : 'cursor: default; opacity: 0.9;'} border: 1px solid transparent; text-align: center; ${badgeStyle} transition: all 0.2s;">
+                  style="font-size: 0.74rem; font-weight: 700; padding: 0.32rem 0.7rem; border-radius: 20px; outline: none; ${isSuperadmin ? 'cursor: pointer;' : 'cursor: default; opacity: 0.95;'} text-align: center; ${badgeStyle} transition: all 0.2s;">
             <option value="Pendiente" ${item.estado === 'Pendiente' ? 'selected' : ''} style="background: var(--bg-card); color: var(--text-primary);">Pendiente</option>
-            <option value="En Progreso" ${item.estado === 'En Progreso' ? 'selected' : ''} style="background: var(--bg-card); color: var(--text-primary);">En Progreso</option>
+            <option value="En Análisis" ${item.estado === 'En Análisis' ? 'selected' : ''} style="background: var(--bg-card); color: var(--text-primary);">En Análisis</option>
+            <option value="En Desarrollo" ${(item.estado === 'En Desarrollo' || item.estado === 'En Progreso') ? 'selected' : ''} style="background: var(--bg-card); color: var(--text-primary);">En Desarrollo</option>
+            <option value="En Pruebas" ${item.estado === 'En Pruebas' ? 'selected' : ''} style="background: var(--bg-card); color: var(--text-primary);">En Pruebas</option>
             <option value="Resuelto" ${item.estado === 'Resuelto' ? 'selected' : ''} style="background: var(--bg-card); color: var(--text-primary);">Resuelto</option>
             <option value="Rechazado" ${item.estado === 'Rechazado' ? 'selected' : ''} style="background: var(--bg-card); color: var(--text-primary);">Rechazado</option>
           </select>
         </td>
-        <td style="padding: 0.85rem 1rem; vertical-align: middle; text-align: right; white-space: nowrap;">
-          <div style="display: inline-flex; gap: 0.35rem; align-items: center;">
+        <td style="padding: 0.75rem 0.6rem; vertical-align: middle; text-align: right; white-space: nowrap;">
+          <div style="display: inline-flex; gap: 0.35rem; align-items: center; justify-content: flex-end;">
             ${canEdit ? `
               <button class="action-btn" title="Editar" onclick="abrirModalIdeaFalla('${item.id}')"
-                style="padding: 0.35rem; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; color: var(--text-secondary); display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s;">
-                <i data-lucide="edit" style="width: 14px; height: 14px;"></i>
+                style="padding: 0.35rem 0.45rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; color: var(--text-secondary); display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s;"
+                onmouseover="this.style.borderColor='var(--accent)'; this.style.color='var(--accent)';"
+                onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-secondary)';">
+                <i data-lucide="edit-2" style="width: 13px; height: 13px;"></i>
               </button>
             ` : ''}
             ${isSuperadmin ? `
               <button class="action-btn del" title="Eliminar" onclick="eliminarIdeaFalla('${item.id}')"
-                style="padding: 0.35rem; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; color: var(--red); display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s;">
-                <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                style="padding: 0.35rem 0.45rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; color: var(--red, #ef4444); display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s;"
+                onmouseover="this.style.background='rgba(239, 68, 68, 0.1)';"
+                onmouseout="this.style.background='var(--bg-secondary)';">
+                <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
               </button>
             ` : ''}
             ${!canEdit && !isSuperadmin ? `
-              <span style="color: var(--text-muted); font-size: 0.75rem; font-style: italic; padding: 0.2rem 0.5rem;">Solo lectura</span>
+              <span style="color: var(--text-muted); font-size: 0.72rem; font-style: italic; padding: 0.2rem 0.4rem;">Solo lectura</span>
             ` : ''}
           </div>
         </td>
@@ -3795,6 +4259,14 @@ function abrirModalUsuario(id) {
     uResetPassSection.style.display = id ? 'block' : 'none';
   }
 
+  // Limpiar y configurar sección de fusión de cuenta
+  const uFusionSection = document.getElementById('u-fusion-section');
+  const uFusionDestinoSelect = document.getElementById('u-fusion-destino-select');
+  const uFusionPreviewBox = document.getElementById('u-fusion-preview-box');
+  const uFusionOrigenLabel = document.getElementById('u-fusion-origen-label');
+  if (uFusionPreviewBox) uFusionPreviewBox.style.display = 'none';
+  if (uFusionDestinoSelect) uFusionDestinoSelect.value = '';
+
   const u = id ? usuarios.find(x => x.id === id) : null;
   const assocEmpresas = u ? (u.empresas || []) : [];
   const legacyEmp = (u && u.empresa) ? u.empresa.toLowerCase().trim() : '';
@@ -3934,6 +4406,37 @@ function abrirModalUsuario(id) {
       rolRadios.forEach(r => r.disabled = true);
       if (uActivo) uActivo.disabled = true;
     }
+
+    // Configurar Fusión de Cuenta en el modal
+    const isSuperOrAdmin = currentSession && ['superadmin', 'admin'].includes(currentSession.realRol || currentSession.viewMode);
+    if (uFusionSection) {
+      if (isSuperOrAdmin) {
+        uFusionSection.style.display = 'block';
+        if (uFusionOrigenLabel) {
+          uFusionOrigenLabel.textContent = `${u.nombre || 'Sin nombre'} (${u.email || u.correo || 'Sin correo'})`;
+        }
+        if (uFusionDestinoSelect) {
+          const validUsers = (Array.isArray(usuarios) ? usuarios : []).filter(x => x && x.id !== id && (x.email || x.correo) !== (u.email || u.correo));
+          validUsers.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' }));
+          let optsHtml = '<option value="">-- Selecciona el usuario destino --</option>';
+          validUsers.forEach(other => {
+            const otherId = other.id || '';
+            const otherNom = other.nombre || 'Sin nombre';
+            const otherEmail = other.email || other.correo || 'Sin correo';
+            const rolKey = other.rol || 'tecnico';
+            const rolLabel = (typeof ROLES !== 'undefined' && ROLES && ROLES[rolKey]?.label) || rolKey;
+            const inactivo = other.activo === false ? ' [Inactivo]' : '';
+            optsHtml += `<option value="${otherId}">${otherNom} (${otherEmail}) - ${rolLabel}${inactivo}</option>`;
+          });
+          uFusionDestinoSelect.innerHTML = optsHtml;
+          uFusionDestinoSelect.value = '';
+        }
+      } else {
+        uFusionSection.style.display = 'none';
+      }
+    }
+  } else {
+    if (uFusionSection) uFusionSection.style.display = 'none';
   }
   if (uModalOverlay) uModalOverlay.classList.add('open');
   document.body.style.overflow = 'hidden';
@@ -3956,7 +4459,238 @@ function cerrarModalUsuario(e) {
   if (uModalOverlay) uModalOverlay.classList.remove('open');
   document.body.style.overflow = '';
   editandoUserId = null;
+  const uFusionPreviewBox = document.getElementById('u-fusion-preview-box');
+  if (uFusionPreviewBox) uFusionPreviewBox.style.display = 'none';
+  const uFusionDestinoSelect = document.getElementById('u-fusion-destino-select');
+  if (uFusionDestinoSelect) uFusionDestinoSelect.value = '';
 }
+
+function onCambioFusionDestinoModal() {
+  const selectDest = document.getElementById('u-fusion-destino-select');
+  const previewBox = document.getElementById('u-fusion-preview-box');
+  const previewText = document.getElementById('u-fusion-preview-text');
+
+  if (!selectDest || !previewBox || !previewText) return;
+  const destId = selectDest.value;
+  if (!destId || !editandoUserId) {
+    previewBox.style.display = 'none';
+    return;
+  }
+
+  const uOrig = (Array.isArray(usuarios) ? usuarios : []).find(x => x && (x.id === editandoUserId || x.email === editandoUserId));
+  const uDest = (Array.isArray(usuarios) ? usuarios : []).find(x => x && (x.id === destId || x.email === destId));
+
+  if (!uOrig || !uDest) {
+    previewBox.style.display = 'none';
+    return;
+  }
+
+  const rolKey = uOrig.rol || 'tecnico';
+  const rolLabel = (typeof ROLES !== 'undefined' && ROLES && ROLES[rolKey]?.label) || rolKey;
+  const emailOrig = uOrig.email || uOrig.correo || 'Sin correo';
+  const emailDest = uDest.email || uDest.correo || 'Sin correo';
+
+  previewBox.style.display = 'block';
+  previewText.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:0.35rem;">
+      <div><strong style="color:var(--red, #ef4444);">❌ Cuenta a eliminar:</strong> ${uOrig.nombre || 'Sin nombre'} (${emailOrig})</div>
+      <div><strong style="color:var(--green, #10b981);">✅ Cuenta que conservará el historial:</strong> ${uDest.nombre || uOrig.nombre || 'Sin nombre'} (${emailDest})</div>
+      <div style="margin-top:0.25rem; font-size:0.75rem; color:var(--text-secondary); border-top:1px dashed rgba(232,130,12,0.3); padding-top:0.35rem;">
+        Se transferirán todas las órdenes de servicio, bitácoras, tickets, gastos, tarjetas Clara, calendario y permisos del rol <strong>${rolLabel}</strong> a <strong>${emailDest}</strong>.
+      </div>
+    </div>
+  `;
+}
+window.onCambioFusionDestinoModal = onCambioFusionDestinoModal;
+
+async function ejecutarFusionDesdeEditarUsuario(e) {
+  if (e) e.preventDefault();
+  if (!editandoUserId) {
+    mostrarNotificacion('Error: No hay ningún usuario seleccionado para editar.', 'error');
+    return;
+  }
+
+  const selectDest = document.getElementById('u-fusion-destino-select');
+  const destId = selectDest ? selectDest.value : null;
+
+  if (!destId) {
+    mostrarNotificacion('Por favor, selecciona la cuenta destino receptora.', 'warning');
+    return;
+  }
+
+  if (destId === editandoUserId) {
+    mostrarNotificacion('La cuenta destino no puede ser la misma que la de origen.', 'error');
+    return;
+  }
+
+  const uOrig = (Array.isArray(usuarios) ? usuarios : []).find(x => x && (x.id === editandoUserId || x.email === editandoUserId));
+  const uDest = (Array.isArray(usuarios) ? usuarios : []).find(x => x && (x.id === destId || x.email === destId));
+
+  if (!uOrig || !uDest) {
+    mostrarNotificacion('No se encontró alguna de las cuentas seleccionadas.', 'error');
+    return;
+  }
+
+  const emailOrig = (uOrig.email || uOrig.correo || '').trim().toLowerCase();
+  const emailDest = (uDest.email || uDest.correo || '').trim().toLowerCase();
+
+  const confirmMsg = `¿Estás completamente seguro de que deseas fusionar estas cuentas?\n\n` +
+    `❌ ORIGEN (Se eliminará): ${uOrig.nombre || 'Sin nombre'} (${emailOrig})\n` +
+    `✅ DESTINO (Recibirá todo el historial): ${uDest.nombre || uOrig.nombre || 'Sin nombre'} (${emailDest})\n\n` +
+    `Esta acción transferirá todas las órdenes de servicio, bitácoras, gastos, calendario y tickets al nuevo usuario.`;
+
+  if (!confirm(confirmMsg)) return;
+
+  const btn = document.getElementById('btn-ejecutar-fusion-modal');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span style="display:inline-block;width:13px;height:13px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:sapi-spin 0.8s linear infinite;margin-right:6px;vertical-align:middle;"></span> Fusionando...';
+  }
+
+  try {
+    mostrarNotificacion('Iniciando transferencia y fusión de cuentas...', 'info');
+
+    let serverSuccess = false;
+
+    // 1. Intentar vía API serverless segura con Service Role
+    try {
+      const session = window.supabaseClient ? (await window.supabaseClient.auth.getSession())?.data?.session : null;
+      const token = session ? session.access_token : '';
+      if (token) {
+        const response = await fetch('/api/admin-merge-users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            originUserId: uOrig.id,
+            targetUserId: uDest.id
+          })
+        });
+
+        const resJson = await response.json();
+        if (response.ok && resJson.success) {
+          serverSuccess = true;
+        } else {
+          console.warn('[Fusion API] Fallback necesario:', resJson.error);
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[Fusion API] Error invocando API endpoint:', apiErr);
+    }
+
+    // 2. Si la API falló (o estamos offline/local sin endpoints), intentar RPC
+    if (!serverSuccess && window.supabaseClient && emailOrig && emailDest) {
+      try {
+        const { data: rpcRes, error: rpcErr } = await window.supabaseClient.rpc('fusionar_cuentas_usuario', {
+          p_email_viejo: emailOrig,
+          p_email_nuevo: emailDest
+        });
+        if (!rpcErr) {
+          serverSuccess = true;
+        } else {
+          console.warn('[Fusion RPC] Error llamando RPC:', rpcErr.message);
+        }
+      } catch (rpcEx) {
+        console.warn('[Fusion RPC] Excepción llamando RPC:', rpcEx);
+      }
+    }
+
+    // 3. Fallback directo con el cliente autenticado
+    if (!serverSuccess && window.supabaseClient) {
+      console.log('[Fusion Direct] Ejecutando migración de datos directa...');
+      const targetNombre = (uDest.nombre && uDest.nombre.trim() !== '') ? uDest.nombre : uOrig.nombre;
+
+      // Actualizar perfil y rol en user_roles para la nueva cuenta
+      await window.supabaseClient
+        .from('user_roles')
+        .update({
+          nombre: targetNombre,
+          rol: uOrig.rol || uDest.rol || 'tecnico',
+          telefono: uDest.telefono || uOrig.telefono || null,
+          empresa: uDest.empresa || uOrig.empresa || null,
+          activo: true
+        })
+        .eq('id', uDest.id);
+
+      // Traspasar asociaciones de empresas (cliente_usuarios)
+      try {
+        const { data: relOld } = await window.supabaseClient.from('cliente_usuarios').select('*').eq('usuario_id', uOrig.id);
+        if (relOld && relOld.length > 0) {
+          for (const rel of relOld) {
+            await window.supabaseClient.from('cliente_usuarios').upsert({
+              cliente_id: rel.cliente_id,
+              usuario_id: uDest.id
+            }, { onConflict: 'cliente_id,usuario_id' });
+          }
+          await window.supabaseClient.from('cliente_usuarios').delete().eq('usuario_id', uOrig.id);
+        }
+      } catch (e) {}
+
+      // Traspasar otras relaciones
+      try { await window.supabaseClient.from('cliente_tecnicos').update({ usuario_id: uDest.id }).eq('usuario_id', uOrig.id); } catch(e){}
+      try { await window.supabaseClient.from('cliente_supervisores').update({ usuario_id: uDest.id }).eq('usuario_id', uOrig.id); } catch(e){}
+      try { await window.supabaseClient.from('gastos').update({ usuario_id: uDest.id }).eq('usuario_id', uOrig.id); } catch(e){}
+      try { await window.supabaseClient.from('gastos_aprobados').update({ usuario_id: uDest.id }).eq('usuario_id', uOrig.id); } catch(e){}
+      try { await window.supabaseClient.from('gastos_rechazados').update({ usuario_id: uDest.id }).eq('usuario_id', uOrig.id); } catch(e){}
+      try { await window.supabaseClient.from('clara_cards').update({ usuario_vinculado_id: uDest.id }).eq('usuario_vinculado_id', uOrig.id); } catch(e){}
+      try { await window.supabaseClient.from('calendario_eventos').update({ tecnico_id: uDest.id, creado_por: uDest.id, tecnico_nombre: targetNombre }).eq('tecnico_id', uOrig.id); } catch(e){}
+      try { await window.supabaseClient.from('maquinaria_horometros').update({ usuario_id: uDest.id }).eq('usuario_id', uOrig.id); } catch(e){}
+      try { await window.supabaseClient.from('auditoria_logs').update({ usuario_id: uDest.id }).eq('usuario_id', uOrig.id); } catch(e){}
+      try { await window.supabaseClient.from('sapi_telemetry').update({ user_id: uDest.id }).eq('user_id', uOrig.id); } catch(e){}
+      try { await window.supabaseClient.from('ideas_fallas').update({ creado_por_id: String(uDest.id) }).eq('creado_por_id', String(uOrig.id)); } catch(e){}
+
+      if (uOrig.nombre) {
+        try { await window.supabaseClient.from('ordenes').update({ tecnico: targetNombre }).eq('tecnico', uOrig.nombre); } catch(e){}
+        try { await window.supabaseClient.from('orden_bitacora').update({ tecnico: targetNombre }).eq('tecnico', uOrig.nombre); } catch(e){}
+        try { await window.supabaseClient.from('tickets').update({ asignado: targetNombre }).eq('asignado', uOrig.nombre); } catch(e){}
+        try { await window.supabaseClient.from('tickets').update({ solicitante: targetNombre }).eq('solicitante', uOrig.nombre); } catch(e){}
+      }
+
+      // Eliminar registro del rol viejo
+      try {
+        await window.supabaseClient.from('user_roles').delete().eq('id', uOrig.id);
+      } catch (e) {}
+    }
+
+    // 4. Actualizar estado local en memoria
+    if (Array.isArray(usuarios)) {
+      usuarios = usuarios.filter(u => u.id !== uOrig.id);
+      const destIndex = usuarios.findIndex(u => u.id === uDest.id);
+      if (destIndex !== -1) {
+        usuarios[destIndex].rol = uOrig.rol || uDest.rol;
+        usuarios[destIndex].activo = true;
+      }
+      window.usuarios = usuarios;
+      localStorage.setItem('eurorep_usuarios', JSON.stringify(usuarios));
+    }
+
+    mostrarNotificacion('¡Cuentas fusionadas exitosamente! Todo el historial está en el nuevo correo.', 'success');
+    cerrarModalUsuario();
+
+    // Recargar datos desde la nube y refrescar UI
+    window._syncPromise = null;
+    if (typeof window.cargarDatosDeSupabase === 'function') {
+      window.cargarDatosDeSupabase().catch(e => console.warn(e));
+    }
+    if (typeof renderUsuariosList === 'function') {
+      renderUsuariosList();
+    }
+  } catch (err) {
+    console.error('[Fusion] Error durante la fusión de cuentas:', err);
+    mostrarNotificacion('Error al fusionar cuentas: ' + (err.message || err), 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="git-merge" style="width:15px; height:15px;"></i> Transferir Historial y Fusionar';
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+    }
+  }
+}
+window.ejecutarFusionDesdeEditarUsuario = ejecutarFusionDesdeEditarUsuario;
 
 async function adminRestablecerPasswordClick(e) {
   if (e) e.preventDefault();
@@ -4290,8 +5024,13 @@ function setupNav() {
       }
 
       // Render telemetry dashboard if active
-      if (view === 'telemetry' && window.renderTelemetryDashboard) {
-        window.renderTelemetryDashboard();
+      if (view === 'telemetry') {
+        if (window.renderTelemetryDashboard) {
+          window.renderTelemetryDashboard();
+        }
+        if (typeof window.fetchTelemetryFromSupabase === 'function') {
+          window.fetchTelemetryFromSupabase();
+        }
       }
 
       // Page title via data-title attribute
@@ -4316,6 +5055,7 @@ function setupNav() {
           cargarListaQueriesSAP();
         }
         if (view === 'servicios') { renderTabla('servicios'); renderStats(); }
+        if (view === 'envios' && typeof renderEnvios === 'function') renderEnvios();
         if (view === 'tickets') { renderTickets(); renderStats(); }
         if (view === 'levantamientos' && typeof renderLevantamientos === 'function') renderLevantamientos();
         if (view === 'tecnicos') {
@@ -4502,7 +5242,7 @@ window.abrirDesgloseDashboard = function(tipo, filtro) {
     
     ticketsFiltrados.forEach(d => {
       const badgeClass = `badge-${badgeTicketEstado(d)}`;
-      const estadoText = d.estado === 'Cerrado' ? (d.cotAceptada === 'si' ? 'Cerrado (Aceptado)' : 'Cerrado (Rechazado)') : d.estado;
+      const estadoText = d.estado === 'Cerrado' ? (d.cotAceptada === 'si' ? 'Aceptado' : (d.cotAceptada === 'no' || d.cotAceptada === 'rechazada' ? 'Rechazado' : 'Aceptado')) : d.estado;
       const montoText = (d.montoCotizacion !== undefined && d.montoCotizacion !== null) ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(d.montoCotizacion) : '—';
       tbody.innerHTML += `<tr><td>${d.folio || d.id.split('-')[0]}</td><td>${d.asunto || 'N/A'}</td><td>${d.cliente || d.solicitante || 'N/A'}</td><td><span class="badge ${badgeClass}">${estadoText}</span></td><td style="font-weight:600; white-space:nowrap;">${montoText}</td>${!isEmpresa ? `<td>${d.prioridad || 'Media'}</td>` : ''}</tr>`;
     });
@@ -5488,11 +6228,13 @@ function renderDashboardV2() {
 function setDashView(tab) {
   const btnV2 = document.getElementById('btn-dash-v2');
   const btnTecnicos = document.getElementById('btn-dash-tecnicos');
+  const btnJunta = document.getElementById('btn-dash-junta');
   const contentV2 = document.getElementById('dash-content-v2');
   const contentTecnicos = document.getElementById('dash-content-tecnicos');
+  const contentJunta = document.getElementById('dash-content-junta');
 
   // Reset styles
-  [btnV2, btnTecnicos].forEach(btn => {
+  [btnV2, btnTecnicos, btnJunta].forEach(btn => {
     if(!btn) return;
     btn.classList.remove('active');
     btn.style.background = 'transparent';
@@ -5502,9 +6244,19 @@ function setDashView(tab) {
   });
 
   // Hide all contents
-  [contentV2, contentTecnicos].forEach(c => {
+  [contentV2, contentTecnicos, contentJunta].forEach(c => {
     if(c) c.style.display = 'none';
   });
+
+  // Ocultar selector de Periodo cuando estamos en la pestaña de Junta
+  const dateFilterContainer = document.getElementById('dash-date-filter-container');
+  if (dateFilterContainer) {
+    if (tab === 'junta') {
+      dateFilterContainer.style.display = 'none';
+    } else {
+      dateFilterContainer.style.display = 'flex';
+    }
+  }
 
   // Activate selected
   let activeBtn;
@@ -5516,6 +6268,13 @@ function setDashView(tab) {
     activeBtn = btnTecnicos;
     if(contentTecnicos) contentTecnicos.style.display = 'block';
     renderDashboardTecnicos();
+  } else if (tab === 'junta') {
+    activeBtn = btnJunta;
+    if(contentJunta) {
+      contentJunta.style.display = 'flex';
+      window.poblarFiltrosJuntaSelectores();
+      window.renderJuntaRevision();
+    }
   }
 
   if (activeBtn) {
@@ -5525,6 +6284,8 @@ function setDashView(tab) {
     activeBtn.style.fontWeight = '600';
     activeBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
   }
+
+  if (window.lucide) lucide.createIcons();
 }
 
 function renderDashboardTecnicos() {
@@ -5764,19 +6525,64 @@ function renderTabla(ctx) {
       const isAdmin = currentSession && ['superadmin', 'admin'].includes(currentSession.viewMode);
       btnRegen.style.display = isAdmin ? 'flex' : 'none';
     }
+    const btnDepurar = document.getElementById('btn-depurar-ordenes-ref');
+    if (btnDepurar) {
+      const isSuperAdmin = currentSession && (currentSession.viewMode === 'superadmin' || currentSession.userId === 'superadmin');
+      btnDepurar.style.display = isSuperAdmin ? 'flex' : 'none';
+      if (isSuperAdmin && typeof window.actualizarBadgeDepuradorOrdenes === 'function') {
+        window.actualizarBadgeDepuradorOrdenes();
+      }
+    }
   }
   const isV2 = ctx === 'v2';
   const bodyId = isServiciosView ? 'tabla-body-servicios' : (isV2 ? 'v2-tabla-body' : 'tabla-body');
   const searchId = isServiciosView ? 'search-servicios' : (isV2 ? 'v2-search-ordenes' : 'search-input');
   const q = (document.getElementById(searchId)?.value || '').toLowerCase();
+  const qClean = q.trim();
+  const qNorm = qClean.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const qNum = qClean.replace(/[^0-9]/g, '');
   
-  let filtradas = getFilteredOrders().filter(o =>
-    !q ||
-    (o.cliente||'').toLowerCase().includes(q) ||
-    (o.tecnico||'').toLowerCase().includes(q) ||
-    (o.folio||'').toLowerCase().includes(q) ||
-    (o.ubicacion||'').toLowerCase().includes(q)
-  );
+  let filtradas = getFilteredOrders().filter(o => {
+    if (!qClean) return true;
+    const oFol = String(o.folio || o.numero_orden || o.id || '').toLowerCase();
+    const oFolNorm = oFol.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const oFolNum = oFol.replace(/[^0-9]/g, '');
+
+    const matchFolio = oFol.includes(qClean) || 
+                       (qNorm && oFolNorm.includes(qNorm)) || 
+                       (qNorm && qNorm.includes(oFolNorm)) ||
+                       (qNum.length >= 4 && oFolNum === qNum);
+    const matchCliente = String(o.cliente || '').toLowerCase().includes(qClean);
+    const matchTecnico = String(o.tecnico || '').toLowerCase().includes(qClean);
+    const matchUbicacion = String(o.ubicacion || '').toLowerCase().includes(qClean);
+    const matchModelo = String(o.modelo || '').toLowerCase().includes(qClean);
+    const matchTipo = String(o.tipo || '').toLowerCase().includes(qClean);
+    const matchEstado = String(o.estado || '').toLowerCase().includes(qClean);
+
+    // Buscar por ticket origen (folio, id, asunto, solicitante)
+    let matchTicket = false;
+    const rawSoporte = String(o.soporte || o.ticket_id || o.ticket_folio || '').toLowerCase();
+    const rawSoporteNorm = rawSoporte.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const rawSoporteNum = rawSoporte.replace(/[^0-9]/g, '');
+    if (rawSoporte && (rawSoporte.includes(qClean) || (qNorm && rawSoporteNorm.includes(qNorm)) || (qNum.length >= 4 && rawSoporteNum === qNum))) {
+      matchTicket = true;
+    }
+
+    if (!matchTicket && (o.soporte || o.ticket_id || o.ticket_folio)) {
+      const targetTktId = o.soporte || o.ticket_id;
+      const targetTktFolio = o.ticket_folio;
+      const tk = (typeof tickets !== 'undefined' && tickets) 
+        ? tickets.find(x => x.id === targetTktId || x.folio === targetTktId || (targetTktFolio && x.folio === targetTktFolio))
+        : null;
+      if (tk) {
+        if (String(tk.folio || '').toLowerCase().includes(qClean)) matchTicket = true;
+        if (String(tk.asunto || '').toLowerCase().includes(qClean)) matchTicket = true;
+        if (String(tk.solicitante || '').toLowerCase().includes(qClean)) matchTicket = true;
+      }
+    }
+
+    return matchCliente || matchTecnico || matchFolio || matchUbicacion || matchModelo || matchTipo || matchEstado || matchTicket;
+  });
 
   if (isServiciosView && filtroEstadoServicios) {
     filtradas = filtradas.filter(o => (o.estado || '').toLowerCase() === filtroEstadoServicios.toLowerCase());
@@ -5942,8 +6748,12 @@ function renderTabla(ctx) {
     if (((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__') || o.cierre_papel_pdf) && !['superadmin', 'admin'].includes(currentSession.viewMode)) {
       orderCanEdit = false;
     }
-    const ticketAsoc = o.soporte ? tickets.find(x => x.id === o.soporte) : null;
-    const ticketHtml = ticketAsoc ? `<a href="#" onclick="editarTicket('${ticketAsoc.id}'); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;">${ticketAsoc.folio}</a>` : '-';
+    const ticketAsoc = (o.soporte || o.ticket_id || o.ticket_folio)
+      ? tickets.find(x => x.id === o.soporte || x.folio === o.soporte || (o.ticket_id && x.id === o.ticket_id) || (o.ticket_folio && x.folio === o.ticket_folio))
+      : null;
+    const ticketHtml = ticketAsoc
+      ? `<a href="#" onclick="verDetalleTicket('${ticketAsoc.id}'); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;" title="${ticketAsoc.asunto || ''}">${ticketAsoc.folio}</a>`
+      : (o.soporte ? `<span style="font-family:monospace; font-size:0.8rem; color:var(--text-muted);">${o.soporte}</span>` : '-');
     
     return `
     <tr>
@@ -6465,6 +7275,53 @@ function toggleSortClientes(col) {
   renderClientes();
 }
 
+function calcularDisponibilidadFlota(maquinasList, ordenesList = ordenes) {
+  const list = maquinasList || [];
+  if (list.length === 0) {
+    return { total: 0, operativos: 0, mantenimiento: 0, porcentaje: 100, color: 'var(--green, #10b981)' };
+  }
+
+  const activeOrders = (ordenesList || []).filter(o => {
+    const est = (o.estado || '').toLowerCase().trim();
+    return est && !['completado', 'cerrada', 'cerrado'].includes(est);
+  });
+
+  const maintSet = new Set();
+  activeOrders.forEach(o => {
+    const match = list.find(m => {
+      const idKey = m.id || m.idInterno || m.uniqueId;
+      if (idKey && (idKey === o.maquinaria_id || idKey === o.maquina)) return true;
+      if (m.idInterno && (m.idInterno === o.maquinaria_id || m.idInterno === o.maquina)) return true;
+      if (m.serie && m.serie !== 'N/A' && (m.serie === o.maquinaria_id || m.serie === o.maquina || m.serie === o.serie)) return true;
+      const equipoString = o.equipo || '';
+      const names = equipoString.split(',').map(n => n.trim()).filter(Boolean);
+      return names.some(name => {
+        return (
+          (m.idInterno && name.includes(`[${m.idInterno}]`)) ||
+          (m.serie && m.serie !== 'N/A' && name.includes(`(SN: ${m.serie})`)) ||
+          (m.idInterno && name === m.idInterno) ||
+          (m.serie && m.serie !== 'N/A' && name === m.serie)
+        );
+      });
+    });
+    if (match) {
+      maintSet.add(match.idInterno || match.uniqueId || match.id || match.serie);
+    }
+  });
+
+  const total = list.length;
+  const mantenimiento = maintSet.size;
+  const operativos = Math.max(0, total - mantenimiento);
+  const porcentaje = Math.round((operativos / total) * 100);
+
+  let color = 'var(--green, #10b981)';
+  if (porcentaje < 80) color = 'var(--red, #ef4444)';
+  else if (porcentaje < 100) color = 'var(--orange, #E8820C)';
+
+  return { total, operativos, mantenimiento, porcentaje, color };
+}
+window.calcularDisponibilidadFlota = calcularDisponibilidadFlota;
+
 function renderClientes() {
   const grid = document.getElementById('clientes-grid');
   const tbody = document.getElementById('clientes-table-body');
@@ -6566,6 +7423,53 @@ function renderClientes() {
   
   const startIndex = (currentPageClientes - 1) * CLIENTES_PER_PAGE;
   const paginatedClientes = filtrados.slice(startIndex, startIndex + CLIENTES_PER_PAGE);
+
+  // RENDERIZAR KPI BANNER DE DISPONIBILIDAD DE FLOTA EN CATÁLOGO DE CLIENTES
+  const cliKpiEl = document.getElementById('cli-kpis-flota-container');
+  if (cliKpiEl) {
+    let allMachinesTotal = [...maquinariaDb];
+    clientesDb.forEach(c => {
+      if (c.maquinas) {
+        c.maquinas.forEach(m => {
+          if (!allMachinesTotal.some(sm => sm.idInterno === m.idInterno || (m.serie && m.serie !== 'N/A' && sm.serie === m.serie))) {
+            allMachinesTotal.push(m);
+          }
+        });
+      }
+    });
+
+    const globalDisp = calcularDisponibilidadFlota(allMachinesTotal, ordenes);
+    cliKpiEl.innerHTML = `
+      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; box-shadow: var(--shadow-sm);">
+        <div style="display: flex; align-items: center; gap: 1.25rem;">
+          <div style="width: 52px; height: 52px; border-radius: 50%; background: conic-gradient(${globalDisp.color} 0% ${globalDisp.porcentaje}%, var(--bg-hover, #1f2937) ${globalDisp.porcentaje}% 100%); display: flex; align-items: center; justify-content: center; position: relative; flex-shrink: 0;">
+            <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--bg-card, #111827); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; color: var(--text-primary);">
+              <span>${globalDisp.porcentaje}%</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; gap: 0.35rem;">
+              <i data-lucide="activity" style="width: 14px; height: 14px; color: ${globalDisp.color};"></i>
+              Disponibilidad de la Flota (Global)
+            </div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.15rem;">
+              ${globalDisp.operativos} / ${globalDisp.total} Equipos Operativos
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 1.25rem; align-items: center; flex-wrap: wrap;">
+          <div style="background: var(--bg-secondary); padding: 0.5rem 0.85rem; border-radius: var(--radius-sm); border-left: 3px solid var(--green);">
+            <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Operando</div>
+            <div style="font-size: 1.1rem; font-weight: 800; color: var(--green);">${globalDisp.operativos}</div>
+          </div>
+          <div style="background: var(--bg-secondary); padding: 0.5rem 0.85rem; border-radius: var(--radius-sm); border-left: 3px solid ${globalDisp.mantenimiento > 0 ? 'var(--red)' : 'var(--border)'};">
+            <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">En Mantenimiento</div>
+            <div style="font-size: 1.1rem; font-weight: 800; color: ${globalDisp.mantenimiento > 0 ? 'var(--red)' : 'var(--text-muted)'};">${globalDisp.mantenimiento}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
   
   // RENDERIZAR CABECERAS PERSONALIZADAS
   const trHeader = document.querySelector('#clientes .data-table thead tr');
@@ -6586,18 +7490,25 @@ function renderClientes() {
   grid.innerHTML = paginatedClientes.map(c => {
     const qtyOrdenes = ordenes.filter(x => x.cliente === c.nombre).length;
     
-    // Contar máquinas combinadas (SAP + manuales)
+    // Contar máquinas combinadas (SAP + manuales) y calcular disponibilidad del cliente
     const maqClient = maquinariaDb.filter(m => m.cliente === c.nombre || (c.id && m.cliente === c.id) || (c.rfc && m.cliente === c.rfc));
-    let totalMaquinas = maqClient.length;
+    let clientMachinesList = [...maqClient];
     (c.maquinas || []).forEach(m => {
-       if (!maqClient.some(sap => sap.id === m.idInterno || sap.serie === m.serie || sap.idInterno === m.idInterno)) {
-           totalMaquinas++;
+       if (!clientMachinesList.some(sap => sap.id === m.idInterno || sap.serie === m.serie || sap.idInterno === m.idInterno)) {
+           clientMachinesList.push(m);
        }
     });
+    const totalMaquinas = clientMachinesList.length;
 
     let maquinasText = '';
     if (totalMaquinas > 0) {
-      maquinasText = `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.4rem;"><i data-lucide="settings-2" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:0.2rem;"></i> ${totalMaquinas} máquina(s)</div>`;
+      const dispInfo = calcularDisponibilidadFlota(clientMachinesList, ordenes);
+      maquinasText = `
+        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.4rem; display:flex; align-items:center; justify-content:space-between;">
+          <span><i data-lucide="settings-2" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:0.2rem;"></i> ${totalMaquinas} máquina(s)</span>
+          <span class="badge" style="font-size:0.7rem; font-weight:700; background:${dispInfo.color}18; color:${dispInfo.color}; padding:0.15rem 0.45rem; border-radius:12px;">${dispInfo.porcentaje}% Disp.</span>
+        </div>
+      `;
     }
     
     // Formatear moneda (SAP)
@@ -6837,14 +7748,7 @@ function verDetalleCliente(nombre) {
   `;
 
   // Sitios
-  let sitiosFromDb = sitiosDb.filter(s => s.cliente === clienteOb?.id || s.cliente === clienteOb?.idInterno || s.cliente === clienteOb?.rfc || s.cliente === clienteOb?.nombre).map(s => s.nombre);
-  let sitios = clienteOb?.sitios || [];
-  if (clienteOb?.ubicacion && !sitios.includes(clienteOb.ubicacion)) {
-    sitios = [clienteOb.ubicacion, ...sitios];
-  }
-  
-  sitios = [...new Set([...sitios, ...sitiosFromDb])];
-  
+  let sitios = getNombresDeSitiosParaCliente(clienteOb || nombre);
   if (sitios.length === 0) sitios = ['Sede Principal'];
 
   html += `
@@ -9717,19 +10621,30 @@ window.seleccionarDescRefaccion = function(optionEl, comboIdDesc, clave, precio)
   const comboMenu = optionEl.closest('.combo-menu');
   
   // Close the menu
-  comboMenu.classList.remove('open');
-  document.getElementById(comboIdDesc + '-combo').classList.remove('focus');
+  if (comboMenu) comboMenu.classList.remove('open');
+  const comboEl = document.getElementById(comboIdDesc + '-combo');
+  if (comboEl) comboEl.classList.remove('focus');
   
   // Update hidden input and display text
-  document.getElementById(comboIdDesc).value = text;
-  document.getElementById(comboIdDesc + '-display').textContent = text;
+  const hiddenInput = document.getElementById(comboIdDesc);
+  const displaySpan = document.getElementById(comboIdDesc + '-display');
+  if (hiddenInput) hiddenInput.value = text;
+  if (displaySpan) displaySpan.textContent = text;
   
   // Update Clave and Precio
   const row = optionEl.closest('.ref-row');
-  const inputClave = row.querySelector('.ref-clave');
-  const inputPrecio = row.querySelector('.ref-precio');
-  if (inputClave) inputClave.value = clave || '';
-  if (inputPrecio) inputPrecio.value = precio || '';
+  if (row) {
+    const inputClave = row.querySelector('.ref-clave');
+    const inputPrecio = row.querySelector('.ref-precio');
+    if (inputClave) inputClave.value = clave || '';
+    if (inputPrecio) inputPrecio.value = precio || '';
+
+    // Auto-detect Sistema if row has .ref-sistema or .kit-row-sistema
+    const selectSist = row.querySelector('.ref-sistema, .kit-row-sistema');
+    if (selectSist && typeof window.detectarSistemaRefaccion === 'function') {
+      selectSist.value = window.detectarSistemaRefaccion(text);
+    }
+  }
 };
 
 let refComboCounter = 0;
@@ -11077,6 +11992,17 @@ window.previsualizarImagenCompleta = function(url, titulo) {
   document.body.appendChild(overlay);
 };
 
+window.abrirImagenEnPestana = function(ticketId) {
+  const t = (window.tickets || []).find(x => x.id === ticketId);
+  const src = (t && t.pdfCotizacion && t.pdfCotizacion !== '__HAS_PDF__') ? t.pdfCotizacion : (t?.foto || t?.evidencia);
+  if (src) {
+    const win = window.open();
+    if (win) {
+      win.document.write(`<title>Evidencia Fotográfica Ticket ${t?.folio || ''}</title><body style="margin:0; background:#111; display:flex; align-items:center; justify-content:center; min-height:100vh;"><img src="${src}" style="max-width:100%; max-height:100vh; object-fit:contain;" /></body>`);
+    }
+  }
+};
+
 window.subirEvidenciaFoto = async function(ordenId, tipo, inputEl) {
   const file = inputEl.files[0];
   if (!file) return;
@@ -11388,8 +12314,21 @@ window.eliminarEvidenciaFoto = async function(ordenId, tipo, url) {
 
 // ===== DETALLE =====
 function verDetalle(id) {
-  const o = ordenes.find(x => x.id === id);
+  let o = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes.find(x => x && x.id === id) : null;
+  if (!o) {
+    const norm = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const targetNorm = norm(id);
+    const targetNum = String(id).replace(/[^0-9]/g, '');
+    let pool = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? [...ordenes] : [];
+    if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) pool = pool.concat(window.ordenes);
+    try {
+      const local = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_ordenes', []) : JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+      if (Array.isArray(local)) pool = pool.concat(local);
+    } catch (e) {}
+    o = pool.find(x => x && (x.id === id || x.folio === id || norm(x.folio || x.id) === targetNorm || (targetNum.length >= 4 && String(x.folio || '').replace(/[^0-9]/g, '') === targetNum)));
+  }
   if (!o) return;
+  const actualId = o.id || id;
   document.getElementById('detalle-title').textContent = `Orden ${o.folio || o.id.slice(0,8)}`;
   
   const btnCierrePapel = document.getElementById('btn-cierre-papel');
@@ -11398,7 +12337,7 @@ function verDetalle(id) {
     const orderClosed = ['completado', 'cerrada', 'cerrado', 'finalizado'].includes(String(o.estado || '').toLowerCase()) || o.cierre_papel_pdf;
     if (isAllowedRole && !orderClosed) {
       btnCierrePapel.style.display = 'flex';
-      btnCierrePapel.setAttribute('onclick', `abrirCierrePapel('${id}')`);
+      btnCierrePapel.setAttribute('onclick', `abrirCierrePapel('${actualId}')`);
     } else {
       btnCierrePapel.style.display = 'none';
     }
@@ -11409,7 +12348,7 @@ function verDetalle(id) {
     const hasCierrePapel = !!o.cierre_papel_pdf;
     if (currentSession.viewMode !== 'consulta' && !hasCierrePapel && (!o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__')) {
       btnCompletar.style.display = 'flex';
-      btnCompletar.setAttribute('onclick', `completarReporteDesdeDetalle('${id}')`);
+      btnCompletar.setAttribute('onclick', `completarReporteDesdeDetalle('${actualId}')`);
     } else {
       btnCompletar.style.display = 'none';
     }
@@ -11430,7 +12369,7 @@ function verDetalle(id) {
       btnEnviarCorreo.style.display = 'none';
     } else {
       btnEnviarCorreo.style.display = 'flex';
-      btnEnviarCorreo.setAttribute('onclick', `enviarCorreoOrden('${id}')`);
+      btnEnviarCorreo.setAttribute('onclick', `enviarCorreoOrden('${actualId}')`);
     }
   }
 
@@ -11443,7 +12382,7 @@ function verDetalle(id) {
     }
   }
 
-  window.currentDetalleOrdenId = id;
+  window.currentDetalleOrdenId = actualId;
 
   const renderBitacora = (o) => {
     let html = '';
@@ -14925,6 +15864,10 @@ async function generarBase64Pdf(ordenId) {
   clone.style.background = '#ffffff';
   clone.style.padding = '20px';
   
+  clone.querySelectorAll('img').forEach(img => {
+    img.setAttribute('crossorigin', 'anonymous');
+  });
+
   const tempContainer = document.createElement('div');
   tempContainer.style.position = 'absolute';
   tempContainer.style.left = '-9999px';
@@ -14933,11 +15876,24 @@ async function generarBase64Pdf(ordenId) {
   tempContainer.appendChild(clone);
   document.body.appendChild(tempContainer);
 
+  // Esperar a que todas las imágenes estén decodificadas y listas
+  const imgElements = Array.from(clone.querySelectorAll('img'));
+  await Promise.all(imgElements.map(img => {
+    if (img.complete && img.naturalWidth > 0) {
+      return typeof img.decode === 'function' ? img.decode().catch(() => {}) : Promise.resolve();
+    }
+    return new Promise(resolve => {
+      img.onload = () => (typeof img.decode === 'function' ? img.decode().then(resolve).catch(resolve) : resolve());
+      img.onerror = resolve;
+      setTimeout(resolve, 3000);
+    });
+  }));
+
   const opt = {
     margin:       10,
     filename:     `Reporte_Servicio_${ordenId}.pdf`,
     image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true, letterRendering: true, logging: false },
+    html2canvas:  { scale: 2, useCORS: true, allowTaint: true, letterRendering: true, logging: false },
     jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' }
   };
 
@@ -14945,19 +15901,18 @@ async function generarBase64Pdf(ordenId) {
     // Si la librería html2pdf está disponible
     if (typeof html2pdf === 'function') {
       const pdfBase64 = await html2pdf().from(clone).set(opt).outputPdf('datauristring');
-      document.body.removeChild(tempContainer);
       return pdfBase64.split(',')[1];
     } else {
       console.error('html2pdf library is not loaded');
-      document.body.removeChild(tempContainer);
       return null;
     }
   } catch (err) {
     console.error('Error generating PDF:', err);
+    return null;
+  } finally {
     if (tempContainer.parentNode) {
       document.body.removeChild(tempContainer);
     }
-    return null;
   }
 }
 
@@ -15310,12 +16265,26 @@ function updateTicketBadge() {
 
   const abiertos = filtered.filter(t => t.estado === 'Abierto').length;
   const badge = document.getElementById('nav-badge-tickets');
-  if (!badge) return;
-  if (abiertos > 0) {
-    badge.textContent = abiertos;
-    badge.classList.add('visible');
-  } else {
-    badge.classList.remove('visible');
+  if (badge) {
+    if (abiertos > 0) {
+      badge.textContent = abiertos;
+      badge.classList.add('visible');
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.textContent = '';
+      badge.classList.remove('visible');
+      badge.style.display = 'none';
+    }
+  }
+
+  if (typeof window.updateEnviosBadge === 'function') {
+    window.updateEnviosBadge();
+  }
+  if (typeof window.actualizarBadgeLevantamientos === 'function') {
+    window.actualizarBadgeLevantamientos();
+  }
+  if (typeof window.actualizarBadgeJuntaRevision === 'function') {
+    window.actualizarBadgeJuntaRevision();
   }
 }
 
@@ -15395,12 +16364,33 @@ function updateOrdenesBadge() {
 
   const activas = filtered.filter(o => o.estado === 'Pendiente' || o.estado === 'En Proceso').length;
   const badge = document.getElementById('nav-badge-ordenes');
-  if (!badge) return;
-  if (activas > 0) {
-    badge.textContent = activas;
-    badge.classList.add('visible');
-  } else {
-    badge.classList.remove('visible');
+  if (badge) {
+    if (activas > 0) {
+      badge.textContent = activas;
+      badge.classList.add('visible');
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.textContent = '';
+      badge.classList.remove('visible');
+      badge.style.display = 'none';
+    }
+  }
+
+  if (typeof window.actualizarBadgeLevantamientos === 'function') {
+    window.actualizarBadgeLevantamientos();
+  }
+  if (typeof window.actualizarBadgeDepuradorOrdenes === 'function') {
+    window.actualizarBadgeDepuradorOrdenes();
+  }
+  if (typeof window.actualizarBadgeDepuradorTickets === 'function') {
+    window.actualizarBadgeDepuradorTickets();
+  }
+
+  if (typeof window.updateEnviosBadge === 'function') {
+    window.updateEnviosBadge();
+  }
+  if (typeof window.actualizarBadgeJuntaRevision === 'function') {
+    window.actualizarBadgeJuntaRevision();
   }
 }
 
@@ -15542,6 +16532,51 @@ function actualizarFiltrosPersonal() {
         sel.disabled = isTecnico;
       } 
     });
+
+    // Actualizar filtro de tipo/categoría de ticket
+    const selectTipos = [document.getElementById('filter-tkt-tipo'), document.getElementById('filter-dash-tkt-tipo')];
+    const baseTipos = [
+      'Refacción',
+      'Servicio Técnico',
+      'Soporte',
+      'Garantía',
+      'Garantía Interna',
+      'Pre-Entrega',
+      'Puesta en Marcha',
+      'Solicitud de Información',
+      'Otro'
+    ];
+    const allTipos = new Set(baseTipos);
+    if (Array.isArray(tickets)) {
+      tickets.forEach(t => {
+        if (t && (t.categoria || t.tipo)) {
+          const cat = String(t.categoria || t.tipo).trim();
+          if (cat) allTipos.add(cat);
+        }
+      });
+    }
+    const sortedTipos = Array.from(allTipos).filter(Boolean).sort((a,b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+    const tipoOptionsHtml = '<option value="">Todos los Tipos</option>' + sortedTipos.map(t => `<option value="${t}">${t}</option>`).join('');
+    selectTipos.forEach(sel => {
+      if (sel) {
+        const prevVal = sel.value;
+        sel.innerHTML = tipoOptionsHtml;
+        if (prevVal) {
+          const normalizedVal = window.normStr ? window.normStr(prevVal) : prevVal.toLowerCase().trim();
+          const matchedOption = Array.from(sel.options).find(opt => (window.normStr ? window.normStr(opt.value) : opt.value.toLowerCase().trim()) === normalizedVal);
+          if (matchedOption) {
+            sel.value = matchedOption.value;
+          }
+        }
+      }
+    });
+
+    if (window.actualizarUISupervisorFilter) {
+      window.actualizarUISupervisorFilter();
+    }
+    if (window.actualizarUITipoFilter) {
+      window.actualizarUITipoFilter(sortedTipos);
+    }
   } catch (error) {
     console.error('Error al actualizar filtros de personal:', error);
   }
@@ -15549,6 +16584,129 @@ function actualizarFiltrosPersonal() {
 
 let ticketSortColumn = 'folio';
 let ticketSortDirection = 'desc';
+
+window.onSortTicketsChange = function(val) {
+  if (!val) return;
+  const parts = val.split('-');
+  const col = parts[0];
+  const dir = parts[1] || 'desc';
+  ticketSortColumn = col;
+  ticketSortDirection = dir;
+  window.actualizarCabeceraOrdenacion();
+  renderTickets();
+};
+
+window.toggleSortMenu = function(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('menu-sort-tickets');
+  if (!menu) return;
+  const isOpen = menu.style.display === 'block';
+  // Cerrar menú de antigüedad si estuviera abierto
+  const menuAnt = document.getElementById('menu-antiguedad-filter');
+  if (menuAnt) menuAnt.style.display = 'none';
+
+  menu.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    window.actualizarUISortMenu();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+};
+
+window.setSortDirection = function(dir) {
+  ticketSortDirection = dir;
+  window.actualizarCabeceraOrdenacion();
+  renderTickets();
+};
+
+window.seleccionarColumnaOrden = function(col) {
+  const colNorm = (col === 'fecha-mod') ? 'fecha-mod' : col;
+  const currentNorm = (ticketSortColumn === 'fecha-modificacion') ? 'fecha-mod' : ticketSortColumn;
+  if (currentNorm === colNorm) {
+    ticketSortDirection = ticketSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    ticketSortColumn = (col === 'fecha-mod') ? 'fecha-modificacion' : col;
+    if (['monto', 'fecha', 'fecha-modificacion', 'fecha-mod', 'folio', 'prioridad', 'comentario'].includes(ticketSortColumn)) {
+      ticketSortDirection = 'desc';
+    } else {
+      ticketSortDirection = 'asc';
+    }
+  }
+  window.actualizarCabeceraOrdenacion();
+  const menu = document.getElementById('menu-sort-tickets');
+  if (menu) menu.style.display = 'none';
+  renderTickets();
+};
+
+window.actualizarUISortMenu = function() {
+  const colNorm = (ticketSortColumn === 'fecha-modificacion') ? 'fecha-mod' : ticketSortColumn;
+  const isAsc = ticketSortDirection === 'asc';
+
+  // Botones de dirección en popover
+  const btnDesc = document.getElementById('btn-sort-dir-desc');
+  const btnAsc = document.getElementById('btn-sort-dir-asc');
+  if (btnDesc && btnAsc) {
+    if (!isAsc) {
+      btnDesc.style.background = 'var(--bg-card)';
+      btnDesc.style.color = 'var(--accent)';
+      btnDesc.style.boxShadow = 'var(--shadow-sm)';
+      btnAsc.style.background = 'transparent';
+      btnAsc.style.color = 'var(--text-muted)';
+      btnAsc.style.boxShadow = 'none';
+    } else {
+      btnAsc.style.background = 'var(--bg-card)';
+      btnAsc.style.color = 'var(--accent)';
+      btnAsc.style.boxShadow = 'var(--shadow-sm)';
+      btnDesc.style.background = 'transparent';
+      btnDesc.style.color = 'var(--text-muted)';
+      btnDesc.style.boxShadow = 'none';
+    }
+  }
+
+  const colMeta = {
+    'folio': { name: 'Folio', descLabel: 'Mayor a Menor', ascLabel: 'Menor a Mayor', shortDesc: 'Mayor', shortAsc: 'Menor' },
+    'fecha-mod': { name: 'Última Modif.', descLabel: 'Más reciente', ascLabel: 'Más antigua', shortDesc: 'Reciente', shortAsc: 'Antigua' },
+    'fecha': { name: 'Creación', descLabel: 'Más reciente', ascLabel: 'Más antigua', shortDesc: 'Reciente', shortAsc: 'Antigua' },
+    'monto': { name: 'Monto', descLabel: 'Mayor a Menor', ascLabel: 'Menor a Mayor', shortDesc: 'Mayor', shortAsc: 'Menor' },
+    'prioridad': { name: 'Prioridad', descLabel: 'Alta a Baja', ascLabel: 'Baja a Alta', shortDesc: 'Alta', shortAsc: 'Baja' },
+    'comentario': { name: 'Comentario', descLabel: 'Más reciente', ascLabel: 'Más antiguo', shortDesc: 'Reciente', shortAsc: 'Antiguo' },
+    'asunto': { name: 'Asunto', descLabel: 'Z → A', ascLabel: 'A → Z', shortDesc: 'Z-A', shortAsc: 'A-Z' },
+    'solicitante': { name: 'Solicitante', descLabel: 'Z → A', ascLabel: 'A → Z', shortDesc: 'Z-A', shortAsc: 'A-Z' },
+    'estado': { name: 'Estado', descLabel: 'Z → A', ascLabel: 'A → Z', shortDesc: 'Z-A', shortAsc: 'A-Z' },
+    'tipo': { name: 'Tipo', descLabel: 'Z → A', ascLabel: 'A → Z', shortDesc: 'Z-A', shortAsc: 'A-Z' }
+  };
+
+  const currentMeta = colMeta[colNorm] || { name: colNorm, descLabel: 'Desc', ascLabel: 'Asc', shortDesc: 'Desc', shortAsc: 'Asc' };
+
+  // Actualizar texto del botón principal
+  const labelBtn = document.getElementById('label-sort-tickets');
+  if (labelBtn) {
+    const dirText = isAsc ? currentMeta.shortAsc : currentMeta.shortDesc;
+    labelBtn.textContent = `${currentMeta.name} (${dirText})`;
+  }
+
+  // Actualizar filas de opciones
+  const rows = document.querySelectorAll('.sort-opt-row');
+  rows.forEach(r => {
+    const rCol = r.dataset.col;
+    const isAct = (rCol === colNorm);
+    r.style.background = isAct ? 'var(--bg-hover)' : 'transparent';
+    r.style.color = isAct ? 'var(--accent)' : 'var(--text-primary)';
+    r.style.fontWeight = isAct ? '600' : '500';
+
+    const check = r.querySelector('.sort-check');
+    if (check) check.style.display = isAct ? 'inline-block' : 'none';
+
+    const sublabel = r.querySelector('.sort-opt-sublabel');
+    if (sublabel) {
+      const meta = colMeta[rCol];
+      if (meta) {
+        sublabel.textContent = isAsc ? meta.ascLabel : meta.descLabel;
+      }
+    }
+  });
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
 
 window.actualizarCabeceraOrdenacion = function() {
   const headers = {
@@ -15558,11 +16716,14 @@ window.actualizarCabeceraOrdenacion = function() {
     'area': 'th-ord-area',
     'prioridad': 'th-ord-prioridad',
     'estado': 'th-ord-estado',
+    'comentario': 'th-ord-comentario',
     'cotizacion': 'th-ord-cotizacion',
     'monto': 'th-ord-monto-cotizacion',
     'pedido': 'th-ord-pedido',
     'asignado': 'th-ord-asignado',
-    'fecha': 'th-ord-fecha'
+    'fecha': 'th-ord-fecha',
+    'fecha-modificacion': 'th-ord-fecha-modificacion',
+    'fecha-mod': 'th-ord-fecha-modificacion'
   };
   
   Object.values(headers).forEach(id => {
@@ -15585,6 +16746,21 @@ window.actualizarCabeceraOrdenacion = function() {
     activeEl.classList.add(isAsc ? 'sort-asc' : 'sort-desc');
     activeEl.innerHTML = `<span style="display:inline-flex; align-items:center; gap:4px; cursor:pointer;">${text} <i data-lucide="${isAsc ? 'chevron-up' : 'chevron-down'}" style="width:14px;height:14px;color:var(--accent);"></i></span>`;
   }
+
+  // Sincronizar popover de ordenación
+  if (window.actualizarUISortMenu) {
+    window.actualizarUISortMenu();
+  }
+
+  // Sincronizar select sort-tickets si existe
+  const sortSelect = document.getElementById('sort-tickets');
+  if (sortSelect) {
+    const desired = `${ticketSortColumn}-${ticketSortDirection}`;
+    const exists = Array.from(sortSelect.options).some(o => o.value === desired);
+    if (exists) {
+      sortSelect.value = desired;
+    }
+  }
   
   if (typeof lucide !== 'undefined' && lucide.createIcons) {
     lucide.createIcons();
@@ -15596,9 +16772,587 @@ window.ordenarTicketsPor = function(columna) {
     ticketSortDirection = ticketSortDirection === 'asc' ? 'desc' : 'asc';
   } else {
     ticketSortColumn = columna;
-    ticketSortDirection = 'asc';
+    // Para folios, montos, fechas, modificaciones, prioridades y comentarios, el primer click es 'desc' (Mayor a menor / Más reciente)
+    if (['monto', 'fecha', 'fecha-modificacion', 'fecha-mod', 'folio', 'prioridad', 'comentario'].includes(columna)) {
+      ticketSortDirection = 'desc';
+    } else {
+      ticketSortDirection = 'asc';
+    }
   }
   renderTickets();
+};
+
+// ===== FILTRO DE TIPO DE TICKET =====
+window.toggleTipoFilterMenu = function(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('menu-tkt-tipo-filter');
+  if (!menu) return;
+  const isOpen = menu.style.display === 'block';
+  const mSup = document.getElementById('menu-tkt-sup-filter');
+  const mAnt = document.getElementById('menu-antiguedad-filter');
+  const mSort = document.getElementById('menu-sort-tickets');
+  if (mSup) mSup.style.display = 'none';
+  if (mAnt) mAnt.style.display = 'none';
+  if (mSort) mSort.style.display = 'none';
+
+  menu.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    window.actualizarUITipoFilter();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+};
+
+window.setTicketTipoFilter = function(val) {
+  const sel = document.getElementById('filter-tkt-tipo');
+  if (sel) {
+    sel.value = val || '';
+  }
+  window.actualizarUITipoFilter();
+  const menu = document.getElementById('menu-tkt-tipo-filter');
+  if (menu) menu.style.display = 'none';
+  renderTickets();
+};
+
+window.actualizarUITipoFilter = function(tiposList) {
+  const sel = document.getElementById('filter-tkt-tipo');
+  const currentVal = sel ? sel.value : '';
+  const btn = document.getElementById('btn-tkt-tipo-filter');
+  const label = document.getElementById('label-tkt-tipo-filter');
+  const listContainer = document.getElementById('tipo-filter-options-list');
+
+  if (label) {
+    label.textContent = currentVal ? currentVal : 'Todos los Tipos';
+  }
+  if (btn) {
+    if (currentVal) {
+      btn.style.background = 'var(--accent-light)';
+      btn.style.color = 'var(--accent)';
+      btn.style.borderColor = 'var(--accent)';
+    } else {
+      btn.style.background = 'var(--bg-card)';
+      btn.style.color = 'var(--text-secondary)';
+      btn.style.borderColor = 'var(--border)';
+    }
+  }
+
+  if (listContainer) {
+    let options = [];
+    if (Array.isArray(tiposList) && tiposList.length > 0) {
+      options = tiposList;
+    } else if (sel && sel.options) {
+      options = Array.from(sel.options).map(o => o.value).filter(Boolean);
+    }
+
+    const iconForTipo = (tipo) => {
+      const t = String(tipo || '').toLowerCase();
+      if (t.includes('refacc')) return 'package';
+      if (t.includes('servici') || t.includes('manten')) return 'wrench';
+      if (t.includes('soport')) return 'headphones';
+      if (t.includes('garant')) return 'shield-check';
+      if (t.includes('entrega') || t.includes('marcha')) return 'truck';
+      if (t.includes('informac')) return 'help-circle';
+      if (t.includes('correctiv') || t.includes('falla')) return 'alert-triangle';
+      return 'tag';
+    };
+
+    let html = `
+      <button type="button" class="tipo-opt-row" onclick="window.setTicketTipoFilter('')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: ${!currentVal ? 'var(--bg-hover)' : 'transparent'}; color: ${!currentVal ? 'var(--accent)' : 'var(--text-primary)'}; font-size: 0.8rem; font-weight: ${!currentVal ? '600' : '500'}; cursor: pointer; text-align: left; transition: all 0.15s;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <i data-lucide="tags" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+          <span>Todos los Tipos</span>
+        </div>
+        <i data-lucide="check" style="width: 13px; height: 13px; display: ${!currentVal ? 'inline-block' : 'none'};"></i>
+      </button>
+    `;
+
+    options.forEach(tipo => {
+      const isAct = (tipo === currentVal);
+      const icon = iconForTipo(tipo);
+      html += `
+        <button type="button" class="tipo-opt-row" onclick="window.setTicketTipoFilter('${tipo.replace(/'/g, "\\'")}')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: ${isAct ? 'var(--bg-hover)' : 'transparent'}; color: ${isAct ? 'var(--accent)' : 'var(--text-primary)'}; font-size: 0.8rem; font-weight: ${isAct ? '600' : '500'}; cursor: pointer; text-align: left; transition: all 0.15s;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <i data-lucide="${icon}" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+            <span>${tipo}</span>
+          </div>
+          <i data-lucide="check" style="width: 13px; height: 13px; display: ${isAct ? 'inline-block' : 'none'};"></i>
+        </button>
+      `;
+    });
+
+    listContainer.innerHTML = html;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+};
+
+// ===== FILTRO DE SUPERVISOR =====
+window.toggleSupervisorFilterMenu = function(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('menu-tkt-sup-filter');
+  if (!menu) return;
+  const isOpen = menu.style.display === 'block';
+  const mTipo = document.getElementById('menu-tkt-tipo-filter');
+  const mAnt = document.getElementById('menu-antiguedad-filter');
+  const mSort = document.getElementById('menu-sort-tickets');
+  if (mTipo) mTipo.style.display = 'none';
+  if (mAnt) mAnt.style.display = 'none';
+  if (mSort) mSort.style.display = 'none';
+
+  menu.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    window.actualizarUISupervisorFilter();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+};
+
+window.setTicketSupervisorFilter = function(val) {
+  const sel = document.getElementById('filter-tkt-supervisor');
+  if (sel) {
+    sel.value = val || '';
+  }
+  window.actualizarUISupervisorFilter();
+  const menu = document.getElementById('menu-tkt-sup-filter');
+  if (menu) menu.style.display = 'none';
+  renderTickets();
+};
+
+window.actualizarUISupervisorFilter = function() {
+  const sel = document.getElementById('filter-tkt-supervisor');
+  const currentVal = sel ? sel.value : '';
+  const btn = document.getElementById('btn-tkt-sup-filter');
+  const label = document.getElementById('label-tkt-sup-filter');
+  const listContainer = document.getElementById('sup-filter-options-list');
+
+  if (label) {
+    label.textContent = currentVal ? currentVal : 'Cualquier Supervisor';
+  }
+  if (btn) {
+    if (currentVal) {
+      btn.style.background = 'var(--accent-light)';
+      btn.style.color = 'var(--accent)';
+      btn.style.borderColor = 'var(--accent)';
+    } else {
+      btn.style.background = 'var(--bg-card)';
+      btn.style.color = 'var(--text-secondary)';
+      btn.style.borderColor = 'var(--border)';
+    }
+  }
+
+  if (listContainer && sel && sel.options) {
+    const options = Array.from(sel.options).map(o => o.value).filter(Boolean);
+    let html = `
+      <button type="button" class="sup-opt-row" onclick="window.setTicketSupervisorFilter('')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: ${!currentVal ? 'var(--bg-hover)' : 'transparent'}; color: ${!currentVal ? 'var(--accent)' : 'var(--text-primary)'}; font-size: 0.8rem; font-weight: ${!currentVal ? '600' : '500'}; cursor: pointer; text-align: left; transition: all 0.15s;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <i data-lucide="users" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+          <span>Cualquier Supervisor</span>
+        </div>
+        <i data-lucide="check" style="width: 13px; height: 13px; display: ${!currentVal ? 'inline-block' : 'none'};"></i>
+      </button>
+    `;
+
+    options.forEach(sup => {
+      const isAct = (sup === currentVal);
+      html += `
+        <button type="button" class="sup-opt-row" onclick="window.setTicketSupervisorFilter('${sup.replace(/'/g, "\\'")}')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: ${isAct ? 'var(--bg-hover)' : 'transparent'}; color: ${isAct ? 'var(--accent)' : 'var(--text-primary)'}; font-size: 0.8rem; font-weight: ${isAct ? '600' : '500'}; cursor: pointer; text-align: left; transition: all 0.15s;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <i data-lucide="user" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+            <span>${sup}</span>
+          </div>
+          <i data-lucide="check" style="width: 13px; height: 13px; display: ${isAct ? 'inline-block' : 'none'};"></i>
+        </button>
+      `;
+    });
+
+    listContainer.innerHTML = html;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+};
+
+// ===== FILTRO DE ANTIGÜEDAD (TICKETS) =====
+window.ticketAntiguedadModo = 'mod'; // 'mod' o 'crea'
+window.ticketAntiguedadRango = ''; // '' (todas), '1_7', '8_15', 'gt_15'
+
+window.toggleAntiguedadFilterMenu = function(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('menu-antiguedad-filter');
+  if (!menu) return;
+  const isOpen = menu.style.display === 'block';
+  const mTipo = document.getElementById('menu-tkt-tipo-filter');
+  const mSup = document.getElementById('menu-tkt-sup-filter');
+  const mSort = document.getElementById('menu-sort-tickets');
+  if (mTipo) mTipo.style.display = 'none';
+  if (mSup) mSup.style.display = 'none';
+  if (mSort) mSort.style.display = 'none';
+
+  menu.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen && typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+window.cambiarModoAntiguedad = function(modo) {
+  window.ticketAntiguedadModo = modo;
+  const tabMod = document.getElementById('tab-antiguedad-mod');
+  const tabCrea = document.getElementById('tab-antiguedad-crea');
+  if (tabMod && tabCrea) {
+    if (modo === 'mod') {
+      tabMod.style.background = 'var(--bg-card)';
+      tabMod.style.color = 'var(--accent)';
+      tabMod.style.boxShadow = 'var(--shadow-sm)';
+      tabCrea.style.background = 'transparent';
+      tabCrea.style.color = 'var(--text-muted)';
+      tabCrea.style.boxShadow = 'none';
+    } else {
+      tabCrea.style.background = 'var(--bg-card)';
+      tabCrea.style.color = 'var(--accent)';
+      tabCrea.style.boxShadow = 'var(--shadow-sm)';
+      tabMod.style.background = 'transparent';
+      tabMod.style.color = 'var(--text-muted)';
+      tabMod.style.boxShadow = 'none';
+    }
+  }
+  if (window.ticketAntiguedadRango) {
+    window.actualizarUIAntiguedadFilter();
+    renderTickets();
+  }
+};
+
+window.setAntiguedadRango = function(rango) {
+  window.ticketAntiguedadRango = rango;
+  window.actualizarUIAntiguedadFilter();
+  const menu = document.getElementById('menu-antiguedad-filter');
+  if (menu) menu.style.display = 'none';
+  renderTickets();
+};
+
+window.setAntiguedadFilter = function(val) {
+  window.setAntiguedadRango(val);
+};
+
+window.actualizarUIAntiguedadFilter = function() {
+  const btn = document.getElementById('btn-antiguedad-filter');
+  const label = document.getElementById('label-antiguedad-filter');
+  const rows = document.querySelectorAll('.antiguedad-opt-row');
+  
+  rows.forEach(r => {
+    const isAct = r.dataset.rango === (window.ticketAntiguedadRango || '');
+    r.style.background = isAct ? 'var(--bg-hover)' : 'transparent';
+    r.style.color = isAct ? 'var(--accent)' : 'var(--text-primary)';
+    r.style.fontWeight = isAct ? '600' : '500';
+    const check = r.querySelector('.antiguedad-check');
+    if (check) check.style.display = isAct ? 'inline-block' : 'none';
+  });
+
+  if (!window.ticketAntiguedadRango) {
+    if (label) label.textContent = 'Antigüedad';
+    if (btn) {
+      btn.style.background = 'var(--bg-card)';
+      btn.style.color = 'var(--text-secondary)';
+      btn.style.borderColor = 'var(--border)';
+    }
+  } else {
+    const modoName = window.ticketAntiguedadModo === 'mod' ? 'Modif' : 'Creación';
+    const rangoNames = { '1_7': '1 a 7 d', '8_15': '8 a 15 d', 'gt_15': '+15 d' };
+    const text = `${modoName}: ${rangoNames[window.ticketAntiguedadRango] || window.ticketAntiguedadRango}`;
+    if (label) label.textContent = text;
+    if (btn) {
+      btn.style.background = 'var(--accent-light)';
+      btn.style.color = 'var(--accent)';
+      btn.style.borderColor = 'var(--accent)';
+    }
+  }
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+document.addEventListener('click', function(e) {
+  const popovers = [
+    { menu: document.getElementById('menu-tkt-tipo-filter'), btn: document.getElementById('btn-tkt-tipo-filter') },
+    { menu: document.getElementById('menu-tkt-sup-filter'), btn: document.getElementById('btn-tkt-sup-filter') },
+    { menu: document.getElementById('menu-antiguedad-filter'), btn: document.getElementById('btn-antiguedad-filter') },
+    { menu: document.getElementById('menu-sort-tickets'), btn: document.getElementById('btn-sort-tickets') }
+  ];
+
+  popovers.forEach(p => {
+    if (p.menu && p.menu.style.display === 'block') {
+      if (!p.menu.contains(e.target) && (!p.btn || !p.btn.contains(e.target))) {
+        p.menu.style.display = 'none';
+      }
+    }
+  });
+});
+
+// ===== ASOCIACIÓN TICKET HIJO DE REFACCIONES (-A) <-> ORDEN DE SERVICIO / TICKET PADRE =====
+window.esTicketHijoRefacciones = function(t) {
+  if (!t || typeof t !== 'object') return false;
+  const tFolio = String(t.folio || '').trim();
+  // Solo los tickets que tienen terminación -A / -a o vínculo explícito de subticket
+  return /-[Aa]$/i.test(tFolio) || tFolio.toUpperCase().includes('-A') || Boolean(t.parentTicketId || t.ticketPadreId || t.ticket_padre_id);
+};
+
+window.obtenerOrdenAsociadaTicket = function(t) {
+  if (!t || typeof t !== 'object') return null;
+  // Solo los tickets con -A (subtickets de refacciones) tienen relación con órdenes de servicio
+  if (typeof window.esTicketHijoRefacciones === 'function' && !window.esTicketHijoRefacciones(t)) {
+    return null;
+  }
+
+  // 1. Recopilar todas las órdenes disponibles (variable global, window, y localStorage)
+  let pool = [];
+  if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
+    pool = pool.concat(ordenes);
+  }
+  if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) {
+    pool = pool.concat(window.ordenes);
+  }
+  try {
+    const local = (typeof safeGetJSON === 'function') 
+      ? safeGetJSON('sapi_ordenes', []) 
+      : JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+    if (Array.isArray(local)) pool = pool.concat(local);
+  } catch (e) {}
+
+  // Deduplicar órdenes por ID o Folio
+  const map = new Map();
+  for (const o of pool) {
+    if (o && (o.id || o.folio)) {
+      const key = o.id || o.folio;
+      if (!map.has(key)) map.set(key, o);
+    }
+  }
+  const allOrds = Array.from(map.values());
+  if (allOrds.length === 0) return null;
+
+  const allTkts = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : [];
+
+  // Helper para normalizar cadenas (sin espacios, sin guiones, mayúsculas)
+  const norm = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const getOrderFolio = (o) => String(o.folio || o.numero_orden || o.numeroOrden || o.noOrden || o.id || '').trim();
+
+  // 2. Coincidencia directa por ordenId, orden_id, ordenFolio en órdenes REALES
+  if (t.ordenId || t.orden_id) {
+    const targetId = t.ordenId || t.orden_id;
+    const found = allOrds.find(o => o && (o.id === targetId || o.folio === targetId || norm(getOrderFolio(o)) === norm(targetId)));
+    if (found) return found;
+  }
+  if (t.ordenFolio) {
+    const found = allOrds.find(o => o && (norm(getOrderFolio(o)) === norm(t.ordenFolio) || getOrderFolio(o).includes(t.ordenFolio)));
+    if (found) return found;
+  }
+
+  // 3. Coincidencia por soporte en la orden (orden.soporte === t.id o t.folio)
+  if (t.id) {
+    const found = allOrds.find(o => o && (o.soporte === t.id || norm(o.soporte) === norm(t.id)));
+    if (found) return found;
+  }
+  if (t.folio) {
+    const found = allOrds.find(o => o && (o.soporte === t.folio || norm(o.soporte) === norm(t.folio)));
+    if (found) return found;
+  }
+
+  // 4. Extracción de número de ticket/OS base (ej. TKT-OS-26248-A -> número 26248, buscando orden con soporte TKT-26248)
+  const tFolio = String(t.folio || '').trim();
+  const numMatch = tFolio.match(/\d{4,6}/) || (t.asunto ? String(t.asunto).match(/\d{4,6}/) : null);
+  const ticketNumber = numMatch ? numMatch[0] : '';
+
+  if (ticketNumber) {
+    // A) Buscar orden que tenga en soporte este folio de ticket (ej: orden OS-26145 con soporte TKT-26248)
+    const foundBySoporteNum = allOrds.find(o => {
+      if (!o || !o.soporte) return false;
+      const sopNorm = norm(o.soporte);
+      const sopNum = String(o.soporte).replace(/[^0-9]/g, '');
+      return sopNum === ticketNumber || sopNorm === ('TKT' + ticketNumber) || sopNorm === ticketNumber;
+    });
+    if (foundBySoporteNum) return foundBySoporteNum;
+
+    // B) Buscar el ticket padre en la lista de tickets y ver si alguna orden apunta a ese ticket padre
+    const parentTicket = allTkts.find(x => {
+      if (!x) return false;
+      const xFol = String(x.folio || '').trim();
+      const xNum = xFol.replace(/[^0-9]/g, '');
+      return (xFol === `TKT-${ticketNumber}` || xFol === ticketNumber || xNum === ticketNumber) && x.id !== t.id;
+    });
+    if (parentTicket) {
+      const foundByParent = allOrds.find(o => o && (o.soporte === parentTicket.id || o.soporte === parentTicket.folio || norm(o.soporte) === norm(parentTicket.folio)));
+      if (foundByParent) return foundByParent;
+    }
+
+    // C) Buscar si el número de ticket coincide con el número de la orden REAL
+    const foundByOrdNum = allOrds.find(o => {
+      if (!o) return false;
+      const oFol = getOrderFolio(o);
+      const oNum = oFol.replace(/[^0-9]/g, '');
+      return oNum === ticketNumber;
+    });
+    if (foundByOrdNum) return foundByOrdNum;
+  }
+
+  // 5. Coincidencia por folios limpios en órdenes REALES
+  if (tFolio) {
+    let cleanBase = tFolio.replace(/-[Aa]$/i, '').trim();
+    if (cleanBase.startsWith('[PRUEBA] ')) cleanBase = cleanBase.replace('[PRUEBA] ', '').trim();
+    if (cleanBase.startsWith('[TEST] ')) cleanBase = cleanBase.replace('[TEST] ', '').trim();
+    if (cleanBase.startsWith('TKT-')) cleanBase = cleanBase.replace('TKT-', '').trim();
+    const normBase = norm(cleanBase);
+
+    const foundDirect = allOrds.find(o => {
+      if (!o) return false;
+      const oFol = getOrderFolio(o);
+      const oNorm = norm(oFol);
+      return oNorm === normBase || o.id === cleanBase;
+    });
+    if (foundDirect) return foundDirect;
+  }
+
+  // 6. Búsqueda por patrón OS-XXXXX en Asunto, Folio o Descripción que coincida con una orden REAL
+  const fullText = `${tFolio} ${t.asunto || ''} ${t.descripcion || ''}`;
+  const osMatches = fullText.match(/(?:OS|ORD)[-\s]?\d{3,7}/gi);
+  if (osMatches && osMatches.length > 0) {
+    for (const matchStr of osMatches) {
+      const normMatch = norm(matchStr);
+      const numOnly = matchStr.replace(/[^0-9]/g, '');
+
+      const found = allOrds.find(o => {
+        if (!o) return false;
+        const oFol = getOrderFolio(o);
+        const oNorm = norm(oFol);
+        const oNum = oFol.replace(/[^0-9]/g, '');
+        return oNorm === normMatch || (numOnly.length >= 4 && oNum === numOnly);
+      });
+      if (found) return found;
+    }
+  }
+
+  // IMPORTANTE: Si la orden NO existe en la base de datos de órdenes, devolvemos null (no inventar órdenes sintéticas)
+  return null;
+};
+
+// Alias para compatibilidad histórica en vistas de refacciones
+window.obtenerOrdenAsociadaATicketRefacciones = window.obtenerOrdenAsociadaTicket;
+
+window.verOrdenDesdeTicket = function(ordenId) {
+  if (!ordenId) return;
+  const overlayDetalle = document.getElementById('modal-ticket-detalle-overlay');
+  if (overlayDetalle) overlayDetalle.classList.remove('open');
+  const overlayEdit = document.getElementById('modal-ticket-overlay');
+  if (overlayEdit) overlayEdit.classList.remove('open');
+  document.body.style.overflow = '';
+  
+  // Buscar en el pool de órdenes si existe el objeto orden
+  let pool = [];
+  if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) pool = pool.concat(ordenes);
+  if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) pool = pool.concat(window.ordenes);
+  try {
+    const local = (typeof safeGetJSON === 'function') 
+      ? safeGetJSON('sapi_ordenes', []) 
+      : JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+    if (Array.isArray(local)) pool = pool.concat(local);
+  } catch (e) {}
+
+  const norm = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const targetNorm = norm(ordenId);
+  const targetNum = String(ordenId).replace(/[^0-9]/g, '');
+
+  const foundOrder = pool.find(o => {
+    if (!o) return false;
+    const oFol = String(o.folio || o.numero_orden || o.numeroOrden || o.noOrden || o.id || '').trim();
+    const oNorm = norm(oFol);
+    const oNum = oFol.replace(/[^0-9]/g, '');
+    return o.id === ordenId || oFol === ordenId || oNorm === targetNorm || (targetNum.length >= 4 && oNum === targetNum);
+  });
+
+  if (foundOrder && typeof verDetalle === 'function') {
+    verDetalle(foundOrder.id || foundOrder.folio);
+  } else {
+    // Si no está en memoria, navegar a la pestaña de Órdenes de Servicio y filtrar por el folio
+    const navServicios = document.querySelector('.nav-item[data-view="servicios"]');
+    if (navServicios) navServicios.click();
+    setTimeout(() => {
+      const searchInput = document.getElementById('search-servicios');
+      if (searchInput) {
+        searchInput.value = ordenId;
+        if (typeof filtrarOrdenes === 'function') {
+          filtrarOrdenes('servicios');
+        }
+      }
+    }, 150);
+  }
+};
+
+// ===== ASOCIACIÓN TICKET HIJO -> TICKET PADRE / ORIGEN =====
+window.obtenerTicketPadre = function(t) {
+  if (!t || typeof t !== 'object') return null;
+
+  // Solo los tickets con -A (subtickets de refacciones) tienen ticket padre
+  if (typeof window.esTicketHijoRefacciones === 'function' && !window.esTicketHijoRefacciones(t)) {
+    return null;
+  }
+
+  const tFolio = String(t.folio || '').trim();
+
+  let pool = [];
+  if (typeof tickets !== 'undefined' && Array.isArray(tickets)) pool = pool.concat(tickets);
+  if (typeof window !== 'undefined' && Array.isArray(window.tickets)) pool = pool.concat(window.tickets);
+  try {
+    const local = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_tickets', []) : JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+    if (Array.isArray(local)) pool = pool.concat(local);
+  } catch (e) {}
+
+  const map = new Map();
+  for (const tk of pool) {
+    if (tk && (tk.id || tk.folio)) {
+      const key = tk.id || tk.folio;
+      if (!map.has(key)) map.set(key, tk);
+    }
+  }
+  const allTkts = Array.from(map.values());
+  const norm = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  // 1. Coincidencia directa por id/folio de padre
+  if (t.parentTicketId || t.ticketPadreId || t.ticket_padre_id) {
+    const pId = t.parentTicketId || t.ticketPadreId || t.ticket_padre_id;
+    const found = allTkts.find(x => x && (x.id === pId || x.folio === pId || norm(x.folio) === norm(pId)) && x.id !== t.id);
+    if (found) return found;
+  }
+
+  // 2. Extracción de folio limpio quitando -A, TKT-, etc.
+  let cleanBase = tFolio.replace(/-[Aa]$/i, '').trim();
+  if (cleanBase.startsWith('[PRUEBA] ')) cleanBase = cleanBase.replace('[PRUEBA] ', '').trim();
+  if (cleanBase.startsWith('[TEST] ')) cleanBase = cleanBase.replace('[TEST] ', '').trim();
+  
+  // Extraer número de ticket (ej. 26249 de TKT-OS-26249-A o de TKT-26249-A)
+  const numMatch = cleanBase.match(/\d{4,6}/) || (t.asunto ? String(t.asunto).match(/\d{4,6}/) : null);
+  const ticketNum = numMatch ? numMatch[0] : '';
+
+  if (ticketNum) {
+    // Buscar en lista de tickets si existe TKT-26249, 26249 o TKT-OS-26249 (sin -A)
+    const found = allTkts.find(x => {
+      if (!x || x.id === t.id) return false;
+      const xFol = String(x.folio || '').trim();
+      const xNum = xFol.replace(/[^0-9]/g, '');
+      const xNorm = norm(xFol);
+      return xFol === `TKT-${ticketNum}` || xFol === `TKT-OS-${ticketNum}` || xFol === ticketNum || xNum === ticketNum || xNorm === ('TKT' + ticketNum);
+    });
+    if (found) return found;
+  }
+
+  // 3. Buscar por cleanBase
+  if (cleanBase && cleanBase !== tFolio) {
+    const normBase = norm(cleanBase);
+    const found = allTkts.find(x => x && x.id !== t.id && (norm(x.folio) === normBase || x.id === cleanBase));
+    if (found) return found;
+  }
+
+  // 4. Fallback: número identificable de ticket padre
+  if (ticketNum) {
+    const parentFolio = `TKT-${ticketNum}`;
+    if (parentFolio !== tFolio && norm(parentFolio) !== norm(tFolio)) {
+      return {
+        id: parentFolio,
+        folio: parentFolio,
+        asunto: `Ticket Origen ${parentFolio}`,
+        isSynthetic: true
+      };
+    }
+  }
+
+  return null;
 };
 
 // ===== RENDER TICKETS =====
@@ -15622,12 +17376,15 @@ function renderTickets(ctx) {
       t && t.categoria !== 'Soporte General' && (
         !q ||
         String(t.asunto||'').toLowerCase().includes(q) ||
+        String(t.categoria||'').toLowerCase().includes(q) ||
+        String(t.tipo||'').toLowerCase().includes(q) ||
         String(t.solicitante||'').toLowerCase().includes(q) ||
         String(t.cliente||'').toLowerCase().includes(q) ||
         String(t.asignado||'').toLowerCase().includes(q) ||
         String(t.folio||'').toLowerCase().includes(q) ||
         String(t.cotizacionSAP||'').toLowerCase().includes(q) ||
-        String(t.pedidoSAP||'').toLowerCase().includes(q)
+        String(t.pedidoSAP||'').toLowerCase().includes(q) ||
+        (t.comentariosInternos && Array.isArray(t.comentariosInternos) && t.comentariosInternos.some(c => c && (String(c.texto||'').toLowerCase().includes(q) || String(c.usuario||'').toLowerCase().includes(q))))
       )
     );
     
@@ -15652,6 +17409,11 @@ function renderTickets(ctx) {
           valA = String(a.solicitante || '').toLowerCase();
           valB = String(b.solicitante || '').toLowerCase();
           break;
+        case 'categoria':
+        case 'tipo':
+          valA = String(a.categoria || a.tipo || '').toLowerCase();
+          valB = String(b.categoria || b.tipo || '').toLowerCase();
+          break;
         case 'area':
           valA = String(a.area || '').toLowerCase();
           valB = String(b.area || '').toLowerCase();
@@ -15665,6 +17427,15 @@ function renderTickets(ctx) {
           valA = String(a.estado || '').toLowerCase();
           valB = String(b.estado || '').toLowerCase();
           break;
+        case 'comentario':
+          const getCommentTime = (tkt) => {
+            if (!tkt || !tkt.comentariosInternos || !tkt.comentariosInternos.length) return 0;
+            const last = tkt.comentariosInternos[tkt.comentariosInternos.length - 1];
+            return last && last.fecha ? new Date(last.fecha).getTime() : 0;
+          };
+          valA = getCommentTime(a);
+          valB = getCommentTime(b);
+          return ticketSortDirection === 'asc' ? valA - valB : valB - valA;
         case 'cotizacion':
           valA = String(a.cotizacionSAP || '').toLowerCase();
           valB = String(b.cotizacionSAP || '').toLowerCase();
@@ -15685,6 +17456,11 @@ function renderTickets(ctx) {
           valA = new Date(a.fechaCreacion || a.fecha || 0).getTime();
           valB = new Date(b.fechaCreacion || b.fecha || 0).getTime();
           return ticketSortDirection === 'asc' ? valA - valB : valB - valA;
+        case 'fecha-modificacion':
+        case 'fecha-mod':
+          valA = new Date(window.getTicketFechaModificacion ? window.getTicketFechaModificacion(a) : (a.fechaModificacion || a.fechaCreacion || a.fecha || 0)).getTime();
+          valB = new Date(window.getTicketFechaModificacion ? window.getTicketFechaModificacion(b) : (b.fechaModificacion || b.fechaCreacion || b.fecha || 0)).getTime();
+          return ticketSortDirection === 'asc' ? valA - valB : valB - valA;
         default:
           valA = String(a.folio || '');
           valB = String(b.folio || '');
@@ -15700,9 +17476,13 @@ function renderTickets(ctx) {
   
     let tecFilter = '';
     let supFilter = '';
+    let tipoFilter = '';
     if (!isEmpresa) {
+      tipoFilter = document.getElementById(isDashView ? 'filter-dash-tkt-tipo' : 'filter-tkt-tipo')?.value || '';
       tecFilter = document.getElementById(isDashView ? 'filter-dash-tkt-tecnico' : 'filter-tkt-tecnico')?.value || '';
       supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value || '';
+    } else {
+      tipoFilter = document.getElementById('filter-tkt-tipo')?.value || '';
     }
   
     if (isEmpresa) {
@@ -15730,6 +17510,52 @@ function renderTickets(ctx) {
     }
     if (userRole === 'supervisor') {
       supFilter = document.getElementById(isDashView ? 'filter-dash-tkt-supervisor' : 'filter-tkt-supervisor')?.value || '';
+    }
+
+    if (tipoFilter) {
+      const tipoNorm = window.normStr ? window.normStr(tipoFilter) : tipoFilter.toLowerCase().trim();
+      filtered = filtered.filter(t => {
+        if (!t) return false;
+        const cat = String(t.categoria || t.tipo || '');
+        const catNorm = window.normStr ? window.normStr(cat) : cat.toLowerCase().trim();
+        if (tipoNorm === 'otro') {
+          return catNorm === 'otro' || !catNorm;
+        }
+        return catNorm === tipoNorm;
+      });
+    }
+
+    if (window.ticketAntiguedadRango) {
+      const nowTime = new Date().getTime();
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const modo = window.ticketAntiguedadModo || 'mod';
+      const rango = window.ticketAntiguedadRango;
+      
+      filtered = filtered.filter(t => {
+        if (!t) return false;
+        
+        let targetDateStr = null;
+        if (modo === 'mod') {
+          targetDateStr = window.getTicketFechaModificacion ? window.getTicketFechaModificacion(t) : (t.fechaModificacion || t.fechaCreacion || t.fecha);
+        } else {
+          targetDateStr = t.fechaCreacion || t.fecha;
+        }
+        
+        if (!targetDateStr) return false;
+        const targetTime = new Date(targetDateStr).getTime();
+        if (isNaN(targetTime)) return false;
+        
+        const diffDays = (nowTime - targetTime) / msPerDay;
+        
+        if (rango === '1_7') {
+          return diffDays <= 7;
+        } else if (rango === '8_15') {
+          return diffDays > 7 && diffDays <= 15;
+        } else if (rango === 'gt_15') {
+          return diffDays > 15;
+        }
+        return true;
+      });
     }
     
     if (tecFilter || supFilter) {
@@ -15807,7 +17633,7 @@ function renderTickets(ctx) {
     }
     
     if (!filtered.length) {
-      body.innerHTML = `<tr><td colspan="13" class="empty-state">No hay tickets${q||(!isDashView && ticketFiltroActivo!=='todos')?' que coincidan':' registrados'}.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="14" class="empty-state">No hay tickets${q||(!isDashView && ticketFiltroActivo!=='todos')?' que coincidan':' registrados'}.</td></tr>`;
       return;
     }
     const canEdit = currentSession.viewMode !== 'consulta';
@@ -15815,32 +17641,90 @@ function renderTickets(ctx) {
   
     body.innerHTML = filtered.map((t, i) => {
       if (!t) return '';
+      const latestComment = (t.comentariosInternos && Array.isArray(t.comentariosInternos) && t.comentariosInternos.length > 0)
+      let comentarioHtml = '<span style="color:var(--text-muted); font-size:0.75rem;">—</span>';
+      if (t.comentariosInternos && Array.isArray(t.comentariosInternos) && t.comentariosInternos.length > 0) {
+        const ult = t.comentariosInternos[t.comentariosInternos.length - 1];
+        const rawText = String(ult.texto || '').replace(/\s+/g, ' ').trim();
+        const safeText = escapeHTML(rawText);
+        const safeUser = escapeHTML(ult.usuario || '');
+        const fechaStr = ult.fecha ? formatFechaAmigable(ult.fecha) : '';
+        const tooltip = `${safeUser}${fechaStr ? ' (' + fechaStr + ')' : ''}: ${safeText}`;
+        
+        comentarioHtml = `
+          <div style="font-weight: 500; font-size: 0.8rem; color: var(--text-primary); line-height: 1.35; min-width: 210px; max-width: 310px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${tooltip}">
+            ${safeText || '—'}
+          </div>
+          ${(safeUser || fechaStr) ? `
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 0.2rem; min-width: 210px; max-width: 310px; font-size: 0.72rem;" title="${tooltip}">
+              <span style="color: var(--accent); font-weight: 600; min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+                <i data-lucide="message-square" style="width:11px;height:11px;flex-shrink:0;"></i>
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${safeUser || 'Staff'}</span>
+              </span>
+              ${fechaStr ? `<span style="flex-shrink: 0; white-space: nowrap; color: var(--text-muted); font-size: 0.72rem; font-weight: 500;">• ${fechaStr}</span>` : ''}
+            </div>
+          ` : ''}
+        `;
+      }
+
+      const assocOrder = window.obtenerOrdenAsociadaTicket(t);
+      const parentTicket = !assocOrder ? (typeof window.obtenerTicketPadre === 'function' ? window.obtenerTicketPadre(t) : null) : null;
+
       return `
-      <tr style="cursor:pointer; transition: background 0.2s;" onclick="if(!event.target.closest('.action-btn')){ verDetalleTicket('${t.id}'); }" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
+      <tr style="cursor:pointer; transition: background 0.2s;" onclick="if(!event.target.closest('.action-btn, .os-link-btn, .parent-tkt-btn')){ verDetalleTicket('${t.id}'); }" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
         <td data-label="Acciones" style="white-space:nowrap; width:60px;">
-          <div style="display:flex;gap:0.25rem;">
-            <button class="action-btn" onclick="verDetalleTicket('${t.id}')" title="Ver"><i data-lucide="eye"></i></button>
-            ${canEdit ? `<button class="action-btn" onclick="editarTicket('${t.id}')" title="Editar"><i data-lucide="pencil"></i></button>` : ''}
+          <div style="display:flex;gap:0.25rem; align-items:center;">
+            <button class="action-btn" onclick="verDetalleTicket('${t.id}')" title="Ver Ticket"><i data-lucide="eye"></i></button>
+            ${canEdit ? `<button class="action-btn" onclick="editarTicket('${t.id}')" title="Editar Ticket"><i data-lucide="pencil"></i></button>` : ''}
+            ${assocOrder ? `<button class="action-btn os-link-btn" onclick="event.stopPropagation(); window.verOrdenDesdeTicket('${assocOrder.id}')" title="Ver Orden de Servicio ${assocOrder.folio || ''}" style="color: #2563eb; background: rgba(37,99,235,0.08); border-color: rgba(37,99,235,0.25);"><i data-lucide="file-text"></i></button>` : (parentTicket ? `<button class="action-btn parent-tkt-btn" onclick="event.stopPropagation(); verDetalleTicket('${parentTicket.id}')" title="Ver Ticket Origen ${parentTicket.folio || ''}" style="color: #ea580c; background: rgba(234,88,12,0.08); border-color: rgba(234,88,12,0.25);"><i data-lucide="ticket"></i></button>` : '')}
           </div>
         </td>
-        <td data-label="Folio"><strong>${t.folio||('#'+(i+1))}</strong></td>
+        <td data-label="Folio" style="white-space: nowrap;">
+          <div style="display: flex; flex-direction: column; gap: 3px; align-items: flex-start;">
+            <strong>${t.folio||('#'+(i+1))}</strong>
+            ${assocOrder ? `
+              <button type="button" class="os-link-btn" onclick="event.stopPropagation(); window.verOrdenDesdeTicket('${assocOrder.id}')" style="display: inline-flex; align-items: center; gap: 3px; font-size: 0.7rem; font-weight: 600; color: #2563eb; background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.25); padding: 1px 5px; border-radius: 4px; cursor: pointer; text-decoration: none;" title="Abrir Orden de Servicio ${assocOrder.folio || assocOrder.id}">
+                <i data-lucide="file-text" style="width: 10px; height: 10px;"></i>
+                <span>${assocOrder.folio || 'Ver OS'}</span>
+                <i data-lucide="external-link" style="width: 9px; height: 9px;"></i>
+              </button>
+            ` : (parentTicket ? `
+              <button type="button" class="os-link-btn parent-tkt-btn" onclick="event.stopPropagation(); verDetalleTicket('${parentTicket.id}')" style="display: inline-flex; align-items: center; gap: 3px; font-size: 0.7rem; font-weight: 600; color: #ea580c; background: rgba(234, 88, 12, 0.08); border: 1px solid rgba(234, 88, 12, 0.25); padding: 1px 5px; border-radius: 4px; cursor: pointer; text-decoration: none;" title="Abrir Ticket Origen ${parentTicket.folio || parentTicket.id}">
+                <i data-lucide="ticket" style="width: 10px; height: 10px;"></i>
+                <span>${parentTicket.folio || parentTicket.id}</span>
+                <i data-lucide="external-link" style="width: 9px; height: 9px;"></i>
+              </button>
+            ` : '')}
+          </div>
+        </td>
         <td data-label="Asunto">
-          <div style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.asunto || ''}">
+          <div style="min-width: 160px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.asunto || ''}">
             ${t.asunto||'—'}
           </div>
+          ${t.categoria ? `<div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.2rem;"><span class="badge" style="background:var(--bg-hover); color:var(--text-secondary); font-size:0.68rem; padding:0.1rem 0.35rem; border:1px solid var(--border);">${t.categoria}</span></div>` : ''}
         </td>
         <td data-label="Solicitante">
-          <div style="font-weight:500; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.solicitante || ''}">${t.solicitante||'—'}</div>
-          ${t.cliente ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}"><i data-lucide="building-2" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}</div>` : ''}
+          <div style="font-weight:500; min-width: 150px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.solicitante || ''}">${t.solicitante||'—'}</div>
+          ${t.cliente ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem; min-width: 150px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}"><i data-lucide="building-2" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}</div>` : ''}
         </td>
         <td data-label="Área" style="white-space:nowrap;">${t.area||'—'}</td>
         <td data-label="Prioridad" class="col-prioridad" style="white-space:nowrap; display: ${isEmpresa ? 'none' : ''};"><span class="badge badge-${String(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
         <td data-label="Estado" style="white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(t)}">${getTicketEstadoLabel(t)}</span></td>
+        <td data-label="Último Comentario" class="col-comentario-interno" style="display: ${isEmpresa ? 'none' : ''};">
+          ${comentarioHtml}
+        </td>
         <td data-label="Cotización SAP" style="white-space:nowrap; font-family: monospace;">${t.cotizacionSAP||'—'}</td>
         <td data-label="Monto" style="white-space:nowrap; font-weight: 600;">${(t.montoCotizacion !== undefined && t.montoCotizacion !== null) ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(t.montoCotizacion) : '—'}</td>
         <td data-label="Pedido SAP" style="white-space:nowrap; font-family: monospace;">${t.pedidoSAP||'—'}</td>
-        <td data-label="Asignado" class="col-asignado" style="white-space:nowrap; display: ${isEmpresa ? 'none' : ''};">${t.asignado||'—'}</td>
-        <td data-label="Fecha" style="white-space:nowrap;">${formatFechaHoraAmigable(t.fechaCreacion || t.fecha)}</td>
+        <td data-label="Asignado" class="col-asignado" style="white-space:nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis; display: ${isEmpresa ? 'none' : ''};" title="${t.asignado||''}">${t.asignado||'—'}</td>
+        <td data-label="Fecha Creación" style="white-space:nowrap;">${formatFechaHoraAmigable(t.fechaCreacion || t.fecha)}</td>
+        <td data-label="Última Modif." style="white-space:nowrap;">
+          <div style="font-size:0.8rem; color:var(--text-secondary);">${formatFechaHoraAmigable(window.getTicketFechaModificacion ? window.getTicketFechaModificacion(t) : (t.fechaModificacion || t.fechaCreacion || t.fecha))}</div>
+          <div style="font-size:0.72rem; color:var(--accent); font-weight:500; overflow:hidden; text-overflow:ellipsis; max-width:135px; display:flex; align-items:center; gap:3px; margin-top:2px;" title="Modificado por ${window.getTicketModificadoPor ? window.getTicketModificadoPor(t) : (t.modificadoPor || '—')}">
+            <i data-lucide="user" style="width:11px;height:11px;flex-shrink:0;"></i>
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${window.getTicketModificadoPor ? window.getTicketModificadoPor(t) : (t.modificadoPor || '—')}</span>
+          </div>
+        </td>
         <td data-label="" style="width:40px; text-align:center;">
           ${canDelete ? `<button class="action-btn del" onclick="eliminarTicket('${t.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
         </td>
@@ -15849,12 +17733,15 @@ function renderTickets(ctx) {
     }).join('');
     
     try { actualizarCabeceraOrdenacion(); } catch (e) {}
-    lucide.createIcons();
+    try { if (typeof window.actualizarBadgeDepuradorTickets === 'function') window.actualizarBadgeDepuradorTickets(); } catch (e) {}
+    if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+      lucide.createIcons();
+    }
   } catch (error) {
     console.error("Error in renderTickets:", error);
     const body = document.getElementById(bodyId);
     if (body) {
-      body.innerHTML = `<tr><td colspan="13" class="error-state" style="color:#ef4444; font-weight:600; padding:20px; text-align:center; background:rgba(239,68,68,0.05);">Falla al renderizar tickets: ${error.message}</td></tr>`;
+      body.innerHTML = `<tr><td colspan="15" class="error-state" style="color:#ef4444; font-weight:600; padding:20px; text-align:center; background:rgba(239,68,68,0.05);">Falla al renderizar tickets: ${error.message}</td></tr>`;
     }
   }
 }
@@ -15887,11 +17774,6 @@ function badgeTicketEstado(tOrEstado) {
         return 'cerrado-aprobado';
       }
     }
-    if (tOrEstado.estado === 'Refacciones' || (tOrEstado.folio && tOrEstado.folio.endsWith('-A'))) {
-      if (window.esTicketEnTransito(tOrEstado)) {
-        return 'en-transito';
-      }
-    }
   }
   const map = { 'Abierto':'abierto', 'Cotización':'en-proceso', 'Refacciones':'refacciones', 'Cerrado':'cerrado' };
   return map[estado] || 'abierto';
@@ -15900,16 +17782,11 @@ function badgeTicketEstado(tOrEstado) {
 function getTicketEstadoLabel(t) {
   if (!t) return '—';
   if (t.estado === 'Cerrado') {
-    return t.cotAceptada === 'si' ? 'Cerrado (Aceptado)' : 'Cerrado (Rechazado)';
+    return t.cotAceptada === 'si' ? 'Aceptado' : (t.cotAceptada === 'no' || t.cotAceptada === 'rechazada' ? 'Rechazado' : 'Aceptado');
   }
   if (t.estado === 'Cotización') {
     if (t.cotAceptada === 'si' || t.cotAceptada === 'aprobada') return 'Cotización (Aprobada)';
     if (t.cotAceptada === 'no' || t.cotAceptada === 'rechazada') return 'Cotización (Rechazada)';
-  }
-  if (t.estado === 'Refacciones' || (t.folio && t.folio.endsWith('-A'))) {
-    if (window.esTicketEnTransito(t)) {
-      return 'En Tránsito';
-    }
   }
   return t.estado || 'Abierto';
 }
@@ -15979,6 +17856,7 @@ function renderMaquinaria() {
   let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
   if (nombreEmpresaLogged) nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
   const canEdit = currentSession.viewMode !== 'consulta' && !isEmpresa;
+  const canViewKits = ['superadmin', 'admin', 'supervisor'].includes(String(currentSession.viewMode || currentSession.rol || currentSession.realRol || '').toLowerCase().trim());
 
   let allMachines = [];
   
@@ -16089,6 +17967,44 @@ function renderMaquinaria() {
       });
     }
   });
+
+  // RENDERIZAR BANNER KPI DISPONIBILIDAD DE FLOTA EN MAQUINARIA
+  const maqKpiEl = document.getElementById('maq-kpis-flota-container');
+  if (maqKpiEl) {
+    const globalDisp = calcularDisponibilidadFlota(allMachines, ordenes);
+    maqKpiEl.innerHTML = `
+      <div class="stats-grid" style="margin-bottom: 0.5rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:var(--accent);"><i data-lucide="settings-2"></i></div>
+          <div>
+            <div class="stat-label">Total en Flota</div>
+            <div class="stat-value">${globalDisp.total}</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:var(--green);"><i data-lucide="check-circle-2"></i></div>
+          <div>
+            <div class="stat-label">Equipos Operativos</div>
+            <div class="stat-value" style="color:var(--green);">${globalDisp.operativos}</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:var(--red);"><i data-lucide="wrench"></i></div>
+          <div>
+            <div class="stat-label">En Mantenimiento</div>
+            <div class="stat-value" style="color:${globalDisp.mantenimiento > 0 ? 'var(--red)' : 'var(--text-muted)'};">${globalDisp.mantenimiento}</div>
+          </div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid ${globalDisp.color};">
+          <div class="stat-icon" style="background:${globalDisp.color}18;color:${globalDisp.color};"><i data-lucide="activity"></i></div>
+          <div>
+            <div class="stat-label">Disponibilidad Global</div>
+            <div class="stat-value" style="color:${globalDisp.color};">${globalDisp.porcentaje}%</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
 
   // Opciones de Filtro Dinámico
   const filterSitioEl = document.getElementById('filter-maq-sitio');
@@ -16222,6 +18138,11 @@ function renderMaquinaria() {
       ${customTds}
       <td data-label="">
         <div style="display:flex; gap:0.25rem;">
+          ${canViewKits ? `
+          <button class="action-btn" onclick="event.stopPropagation(); window.abrirModalKitsServicio('${(m.modelo || '').replace(/'/g, "\\'")}')" title="Ver Kits de Servicio para ${m.modelo || 'esta máquina'}" style="color:#2563eb; background:rgba(37,99,235,0.06); border-color:rgba(37,99,235,0.2);">
+            <i data-lucide="package"></i>
+          </button>
+          ` : ''}
           <button class="action-btn" onclick="event.stopPropagation(); verDetalleCliente('${m.cliente.replace(/'/g, "\\'")}')" title="Ver Perfil de la Empresa">
             <i data-lucide="building-2"></i>
           </button>
@@ -16498,6 +18419,8 @@ window.crearOActualizarTicketRefacciones = async function(orden) {
   const ticket = {
     id: ticketExistente ? ticketExistente.id : crypto.randomUUID(),
     folio: targetFolio,
+    ordenId: orden.id,
+    ordenFolio: orden.folio,
     fecha: ticketExistente ? ticketExistente.fecha : now,
     fechaCreacion: ticketExistente ? ticketExistente.fechaCreacion : now,
     fechaCierre: ticketExistente ? ticketExistente.fechaCierre : null,
@@ -16550,6 +18473,10 @@ window.crearOActualizarTicketRefacciones = async function(orden) {
     } catch (err) {
       console.error(`[crearOActualizarTicketRefacciones] Error al sincronizar ticket con Supabase:`, err);
     }
+  }
+
+  if (typeof window.asegurarGuiaEnvioParaTicket === 'function') {
+    window.asegurarGuiaEnvioParaTicket(ticket);
   }
 
   if (typeof updateTicketBadge === 'function') updateTicketBadge();
@@ -16626,54 +18553,16 @@ function renderRefaccionesPendientes() {
   const currentUser = usuarios.find(u => u && u.id === currentSession.userId);
   const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
   
-  window.obtenerOrdenAsociadaATicketRefacciones = function(t) {
-    if (!t || !t.folio) return null;
-    const originalFolio = t.folio.replace('-A', '');
-    const parentTicket = tickets.find(x => x.folio === originalFolio);
-    if (parentTicket) {
-      return ordenes.find(o => o.soporte === parentTicket.id);
-    }
-    let cleanOrdFolio = originalFolio;
-    if (cleanOrdFolio.startsWith('[PRUEBA] ')) cleanOrdFolio = cleanOrdFolio.replace('[PRUEBA] ', '');
-    if (cleanOrdFolio.startsWith('[TEST] ')) cleanOrdFolio = cleanOrdFolio.replace('[TEST] ', '');
-    if (cleanOrdFolio.startsWith('TKT-')) cleanOrdFolio = cleanOrdFolio.replace('TKT-', '');
-    cleanOrdFolio = cleanOrdFolio.trim();
-    return ordenes.find(o => {
-      let ofol = o.folio || '';
-      if (ofol.startsWith('[PRUEBA] ')) ofol = ofol.replace('[PRUEBA] ', '');
-      if (ofol.startsWith('[TEST] ')) ofol = ofol.replace('[TEST] ', '');
-      return ofol.trim() === cleanOrdFolio;
-    });
-  };
+  window.obtenerOrdenAsociadaATicketRefacciones = window.obtenerOrdenAsociadaTicket;
 
-  let rawTickets = getFilteredTickets().filter(t => t && t.categoria === 'Refacción' && t.estado !== 'Cerrado' && t.folio && t.folio.endsWith('-A'));
-  
-  // 1. Filtrar solo aquellos tickets que tengan una orden en estado "Refacciones pendientes"
-  let refTickets = rawTickets.filter(t => {
-    const assocOrder = window.obtenerOrdenAsociadaATicketRefacciones(t);
-    if (!assocOrder) return false;
-    const orderState = String(assocOrder.estado || '').toLowerCase().trim();
-    if (orderState !== 'refacciones pendientes') return false;
-    t._asocOrder = assocOrder; // Guardar referencia para desduplicar
-    return true;
+  const allTickets = (typeof getFilteredTickets === 'function' ? getFilteredTickets() : tickets) || [];
+  let refTickets = allTickets.filter(t => {
+    if (!t || t.estado === 'Cerrado') return false;
+    const cat = String(t.categoria || '').toLowerCase();
+    const hasParts = Array.isArray(t.refaccionesSeleccionadas) && t.refaccionesSeleccionadas.length > 0;
+    const isRefCat = cat.includes('refacci') || cat.includes('garant') || (t.folio && t.folio.endsWith('-A'));
+    return hasParts || isRefCat;
   });
-
-  // 2. Desduplicar por id de orden asociada (prefeiendo el ticket que tenga refacciones reales registradas)
-  const orderTicketsMap = new Map();
-  refTickets.forEach(t => {
-    const orderId = t._asocOrder.id;
-    const existing = orderTicketsMap.get(orderId);
-    if (!existing) {
-      orderTicketsMap.set(orderId, t);
-    } else {
-      const existingCount = (existing.refaccionesSeleccionadas || []).length;
-      const currentCount = (t.refaccionesSeleccionadas || []).length;
-      if (currentCount > existingCount) {
-        orderTicketsMap.set(orderId, t);
-      }
-    }
-  });
-  refTickets = Array.from(orderTicketsMap.values());
 
   if (isEmpresa) {
     let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
@@ -16705,15 +18594,117 @@ function renderRefaccionesPendientes() {
 
   if (refTickets.length === 0) {
     if (refaccionesViewMode === 'cards') {
-      grid.innerHTML = '<div style="color:var(--text-muted); padding:1rem; grid-column: 1/-1;">No hay tickets de refacciones pendientes en este momento.</div>';
+      if (grid) grid.innerHTML = '<div style="color:var(--text-muted); padding:1rem; grid-column: 1/-1;">No hay tickets de refacciones pendientes en este momento.</div>';
+    } else if (refaccionesViewMode === 'pieces') {
+      if (piecesBody) piecesBody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:2rem; font-style:italic;">No hay piezas de refacciones pendientes en este momento.</td></tr>';
     } else {
-      if (tableBody) {
-        tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:2rem; font-style:italic;">No hay tickets de refacciones pendientes en este momento.</td></tr>';
-      }
+      if (tableBody) tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:2rem; font-style:italic;">No hay tickets de refacciones pendientes en este momento.</td></tr>';
     }
     return;
   }
 
+  // ===== VISTA POR PIEZAS (PIECES MODE) =====
+  if (refaccionesViewMode === 'pieces' && piecesBody) {
+    let totalPiecesCount = 0;
+    refTickets.forEach(t => {
+      const originalFolio = (t.folio || '').replace('-A', '');
+      const parentTicket = tickets.find(x => x.folio === originalFolio && x.id !== t.id);
+      const parentOrder = window.obtenerOrdenAsociadaATicketRefacciones(t);
+
+      const parentLink = `
+        <div style="display:flex; flex-direction:column; gap:2px; margin-top:4px; align-items:flex-start;">
+          ${parentOrder ? `
+          <div style="font-size:0.72rem; color:var(--text-secondary); display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="event.stopPropagation(); verDetalle('${parentOrder.id}')">
+            <i data-lucide="file-text" style="width:11px; height:11px; color:var(--text-muted);"></i>
+            <span>OS: <span style="text-decoration:underline; font-weight:600; color:var(--text-primary);">${parentOrder.folio}</span></span>
+          </div>` : ''}
+          ${parentTicket ? `
+          <div style="font-size:0.72rem; color:var(--text-secondary); display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="event.stopPropagation(); editarTicket('${parentTicket.id}')">
+            <i data-lucide="link" style="width:11px; height:11px; color:var(--text-muted);"></i>
+            <span>Original: <span style="text-decoration:underline; font-weight:600; color:var(--text-primary);">${parentTicket.folio}</span></span>
+          </div>` : ''}
+        </div>
+      `;
+
+      const parts = (t.refaccionesSeleccionadas && t.refaccionesSeleccionadas.length > 0)
+        ? t.refaccionesSeleccionadas
+        : [{ clave: 'N/A', descripcion: t.asunto || 'Refacciones solicitadas', cantidad: 1, estatusPedido: 'Por Pedir', marca: '' }];
+
+      parts.forEach(p => {
+        totalPiecesCount++;
+        let pStatusColor = '#ef4444';
+        let pStatusBg = 'rgba(239, 68, 68, 0.1)';
+        if (p.estatusPedido === 'En Tránsito / Pedido') {
+          pStatusColor = '#e8820c';
+          pStatusBg = 'rgba(232, 130, 12, 0.1)';
+        } else if (p.estatusPedido === 'Entregado al Técnico') {
+          pStatusColor = '#22c55e';
+          pStatusBg = 'rgba(34, 197, 94, 0.1)';
+        }
+        const pMarca = p.marca || '';
+        let brandName = {
+          'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM',
+          'MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS',
+          'TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM',
+          'POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG',
+          'HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
+        }[String(pMarca).toUpperCase()] || pMarca || '';
+
+        const row = document.createElement('tr');
+        row.style.borderBottom = '1px solid var(--border)';
+        row.style.color = 'var(--text-primary)';
+        row.style.fontSize = '0.85rem';
+        row.style.cursor = 'pointer';
+        row.onclick = () => editarTicket(t.id);
+
+        row.innerHTML = `
+          <td style="padding:0.75rem 0.5rem; text-align:center;" onclick="event.stopPropagation();">
+            <button class="btn-primary" style="padding:0.25rem 0.5rem; font-size:0.75rem; border-radius:4px; display:inline-flex; align-items:center; gap:0.25rem; border:none; cursor:pointer;" onclick="editarTicket('${t.id}')">
+              <i data-lucide="eye" style="width:12px; height:12px;"></i> Ver
+            </button>
+          </td>
+          <td style="padding:0.75rem 0.5rem; font-family:monospace; font-weight:700;">
+            <div style="display:flex; flex-direction:column; gap:0.25rem; align-items:flex-start;">
+              <span style="background:var(--accent-light); color:var(--accent); padding:0.15rem 0.4rem; border-radius:4px; font-size:0.78rem;">${t.folio}</span>
+              ${parentLink}
+            </div>
+          </td>
+          <td style="padding:0.75rem 0.5rem; font-weight:600; line-height:1.3;">
+            <span style="color:var(--accent); font-weight:700; margin-right:4px;">${p.cantidad || 1}x</span>
+            ${p.descripcion || p.nombre || 'Pieza'}
+          </td>
+          <td style="padding:0.75rem 0.5rem; font-family:monospace; font-size:0.8rem; color:var(--text-secondary);">
+            <div>${p.clave || p.codigo || '—'}</div>
+            ${brandName ? `<div style="font-size:0.72rem; color:var(--text-muted); font-family:inherit;">${brandName}</div>` : ''}
+          </td>
+          <td style="padding:0.75rem 0.5rem; font-weight:500;">
+            ${t.cliente || 'Sin cliente'}
+          </td>
+          <td style="padding:0.75rem 0.5rem; font-size:0.8rem; color:var(--text-secondary); line-height:1.3;">
+            <div><i data-lucide="map-pin" style="width:11px; height:11px; vertical-align:middle; margin-right:3px; color:var(--text-muted);"></i> ${t.sitio || 'Sin sitio'}</div>
+            ${t.equipo ? `<div style="margin-top:2px;"><i data-lucide="settings-2" style="width:11px; height:11px; vertical-align:middle; margin-right:3px; color:var(--text-muted);"></i> ${t.equipo}</div>` : ''}
+          </td>
+          <td style="padding:0.75rem 0.5rem; text-align:center;">
+            <span class="status-badge" style="font-size:0.72rem; font-weight:700; color:${pStatusColor}; background:${pStatusBg}; border:1px solid ${pStatusColor}33; padding:0.25rem 0.5rem; border-radius:4px; cursor:pointer; display:inline-block; white-space:nowrap;" onclick="event.stopPropagation(); window.abrirModalPiezaPendienteTicket('${t.id}', '${p.clave || p.codigo || ''}', '${p.descripcion || p.nombre || ''}', '${p.estatusPedido || 'Por Pedir'}', ${p.cantidad || 1}, '${p.marca || ''}')">
+              ${p.estatusPedido || 'Por Pedir'}
+            </span>
+          </td>
+          <td style="padding:0.75rem 0.5rem; text-align:center; font-size:0.8rem; color:var(--text-muted); white-space:nowrap;">
+            ${new Date(t.fechaCreacion || t.fecha || Date.now()).toLocaleDateString()}
+          </td>
+        `;
+        piecesBody.appendChild(row);
+      });
+    });
+
+    if (totalPiecesCount === 0) {
+      piecesBody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:2rem; font-style:italic;">No hay piezas solicitadas pendientes en este momento.</td></tr>';
+    }
+    if (window.lucide) window.lucide.createIcons({ root: piecesContainer });
+    return;
+  }
+
+  // ===== VISTA CARDS O TABLA DE TICKETS =====
   if (refaccionesViewMode === 'cards') {
     refTickets.forEach(t => {
       const card = document.createElement('div');
@@ -16740,30 +18731,11 @@ function renderRefaccionesPendientes() {
       } else if (t.estado === 'Abierto') {
         badgeColor = 'var(--blue, #3b82f6)';
         badgeBg = 'rgba(59, 130, 246, 0.1)';
-      } else if (t.estado === 'Refacciones' || (t.folio && t.folio.endsWith('-A'))) {
-        if (window.esTicketEnTransito(t)) {
-          badgeColor = '#3b82f6';
-          badgeBg = 'rgba(59, 130, 246, 0.1)';
-        }
       }
 
       const originalFolio = t.folio.replace('-A', '');
       const parentTicket = tickets.find(x => x.folio === originalFolio);
-      let parentOrder = null;
-      if (!parentTicket) {
-        let cleanOrdFolio = originalFolio;
-        if (cleanOrdFolio.startsWith('[PRUEBA] ')) cleanOrdFolio = cleanOrdFolio.replace('[PRUEBA] ', '');
-        if (cleanOrdFolio.startsWith('[TEST] ')) cleanOrdFolio = cleanOrdFolio.replace('[TEST] ', '');
-        if (cleanOrdFolio.startsWith('TKT-')) cleanOrdFolio = cleanOrdFolio.replace('TKT-', '');
-        cleanOrdFolio = cleanOrdFolio.trim();
-
-        parentOrder = ordenes.find(o => {
-          let ofol = o.folio || '';
-          if (ofol.startsWith('[PRUEBA] ')) ofol = ofol.replace('[PRUEBA] ', '');
-          if (ofol.startsWith('[TEST] ')) ofol = ofol.replace('[TEST] ', '');
-          return ofol.trim() === cleanOrdFolio;
-        });
-      }
+      const parentOrder = window.obtenerOrdenAsociadaATicketRefacciones(t);
 
       const parts = t.refaccionesSeleccionadas || [];
       let partsHtml = '';
@@ -16791,21 +18763,6 @@ function renderRefaccionesPendientes() {
                   'HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
                 }[String(pMarca).toUpperCase()] || pMarca || '';
                 let detailsText = `Clave: ${p.clave || p.codigo} ${brandName ? `(${brandName})` : ''}`;
-                let extraInfo = [];
-                if (p.proveedor) extraInfo.push(`Prov: ${p.proveedor}`);
-                if (p.precio) {
-                  const val = parseFloat(p.precio);
-                  if (!isNaN(val)) {
-                    extraInfo.push(`Precio: $${val.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
-                  } else {
-                    extraInfo.push(`Precio: $${p.precio}`);
-                  }
-                }
-                if (extraInfo.length > 0) {
-                  detailsText += ` | ${extraInfo.join(' | ')}`;
-                }
-
-                let miniProgressHtml = '';
 
                 return `
                   <div style="background:var(--bg-secondary); padding:0.4rem 0.6rem; border-radius:6px; font-size:0.85rem; border:1px solid var(--border); display: flex; flex-direction: column; gap: 2px;">
@@ -16819,7 +18776,6 @@ function renderRefaccionesPendientes() {
                         ${p.estatusPedido || 'Por Pedir'}
                       </span>
                     </div>
-                    ${miniProgressHtml}
                   </div>
                 `;
               }).join('')}
@@ -16886,12 +18842,11 @@ function renderRefaccionesPendientes() {
       grid.appendChild(card);
     });
     if (window.lucide) window.lucide.createIcons({ root: grid });
-  } else {
+  } else if (tableBody) {
     refTickets.forEach(t => {
       const originalFolio = t.folio.replace('-A', '');
       const parentTicket = tickets.find(x => x.folio === originalFolio);
-      
-      const parentOrder = t._asocOrder || window.obtenerOrdenAsociadaATicketRefacciones(t);
+      const parentOrder = window.obtenerOrdenAsociadaATicketRefacciones(t);
 
       const parentLink = `
         <div style="display:flex; flex-direction:column; gap:2px; margin-top:4px; align-items:flex-start;">
@@ -16933,37 +18888,21 @@ function renderRefaccionesPendientes() {
               }[String(pMarca).toUpperCase()] || pMarca || '';
               
               let detailsText = `Clave: ${p.clave || p.codigo} ${brandName ? `(${brandName})` : ''}`;
-              let extraInfo = [];
-              if (p.proveedor) extraInfo.push(`Prov: ${p.proveedor}`);
-              if (p.precio) {
-                const val = parseFloat(p.precio);
-                if (!isNaN(val)) {
-                  extraInfo.push(`Precio: $${val.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
-                } else {
-                  extraInfo.push(`Precio: $${p.precio}`);
-                }
-              }
-               if (extraInfo.length > 0) {
-                 detailsText += ` | ${extraInfo.join(' | ')}`;
-               }
 
-               let miniProgressHtml = '';
-
-               return `
-                 <div style="background:var(--bg-secondary); padding:0.25rem 0.5rem; border-radius:4px; font-size:0.8rem; border:1px solid var(--border); width: 100%; max-width: 450px; display: flex; flex-direction: column; gap: 2px;">
-                   <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; width: 100%;">
-                     <span style="font-weight:500; color:var(--text-primary);">
-                       <span style="color:var(--accent); font-weight:700; margin-right:4px;">${p.cantidad}x</span> 
-                       ${p.descripcion || p.nombre}
-                       <span style="font-size:0.7rem; color:var(--text-muted); font-family:monospace; display:block; margin-top:1px;">${detailsText}</span>
-                     </span>
-                     <span class="status-badge" style="font-size:0.65rem; font-weight:700; color:${pStatusColor}; background:${pStatusBg}; padding:1px 5px; border-radius:3px; white-space:nowrap; border: 1px solid ${pStatusColor}33; cursor:pointer;" onclick="event.stopPropagation(); window.abrirModalPiezaPendienteTicket('${t.id}', '${p.clave || p.codigo}', '${p.descripcion || p.nombre}', '${p.estatusPedido || 'Por Pedir'}', ${p.cantidad}, '${p.marca || ''}')">
-                       ${p.estatusPedido || 'Por Pedir'}
-                     </span>
-                   </div>
-                   ${miniProgressHtml}
-                 </div>
-               `;
+              return `
+                <div style="background:var(--bg-secondary); padding:0.25rem 0.5rem; border-radius:4px; font-size:0.8rem; border:1px solid var(--border); width: 100%; max-width: 450px; display: flex; flex-direction: column; gap: 2px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; width: 100%;">
+                    <span style="font-weight:500; color:var(--text-primary);">
+                      <span style="color:var(--accent); font-weight:700; margin-right:4px;">${p.cantidad}x</span> 
+                      ${p.descripcion || p.nombre}
+                      <span style="font-size:0.7rem; color:var(--text-muted); font-family:monospace; display:block; margin-top:1px;">${detailsText}</span>
+                    </span>
+                    <span class="status-badge" style="font-size:0.65rem; font-weight:700; color:${pStatusColor}; background:${pStatusBg}; padding:1px 5px; border-radius:3px; white-space:nowrap; border: 1px solid ${pStatusColor}33; cursor:pointer;" onclick="event.stopPropagation(); window.abrirModalPiezaPendienteTicket('${t.id}', '${p.clave || p.codigo}', '${p.descripcion || p.nombre}', '${p.estatusPedido || 'Por Pedir'}', ${p.cantidad}, '${p.marca || ''}')">
+                      ${p.estatusPedido || 'Por Pedir'}
+                    </span>
+                  </div>
+                </div>
+              `;
             }).join('')}
           </div>
         `;
@@ -16979,11 +18918,6 @@ function renderRefaccionesPendientes() {
       } else if (t.estado === 'Abierto') {
         badgeColor = 'var(--blue, #3b82f6)';
         badgeBg = 'rgba(59, 130, 246, 0.1)';
-      } else if (t.estado === 'Refacciones' || (t.folio && t.folio.endsWith('-A'))) {
-        if (window.esTicketEnTransito(t)) {
-          badgeColor = '#3b82f6';
-          badgeBg = 'rgba(59, 130, 246, 0.1)';
-        }
       }
 
       const row = document.createElement('tr');
@@ -17549,14 +19483,49 @@ function renderSitios() {
   let sitiosList = [];
   
   if (isAdmin) {
-    sitiosList = sitiosDb;
+    sitiosList = [...(sitiosDb || [])];
+    (clientesDb || []).forEach(c => {
+      if (c && c.sitios && Array.isArray(c.sitios)) {
+        c.sitios.forEach(s => {
+          const sNombre = getSitioNombre(s);
+          if (sNombre && !sitiosList.some(ex => (ex.nombre || '').toLowerCase() === sNombre.toLowerCase() && (ex.cliente === c.id || ex.cliente === c.idInterno || ex.cliente === c.rfc || ex.cliente === c.nombre))) {
+            sitiosList.push(typeof s === 'object' ? Object.assign({ cliente: c.id || c.nombre }, s) : { nombre: sNombre, cliente: c.id || c.nombre });
+          }
+        });
+      }
+    });
   } else {
-    const clienteObj = clientesDb.find(c => c.nombre === (currentUser.empresa || currentUser.nombre));
-    let sitios = clienteObj && clienteObj.sitios ? clienteObj.sitios : [];
-    if (clienteObj && clienteObj.ubicacion && !sitios.some(s => getSitioNombre(s) === clienteObj.ubicacion)) {
-      sitios = [clienteObj.ubicacion, ...sitios];
+    const clientName = currentUser ? (currentUser.empresa || currentUser.nombre) : '';
+    const clienteObj = (clientesDb || []).find(c => c.nombre === clientName || c.id === clientName || c.idInterno === clientName || c.rfc === clientName);
+
+    const candidateKeys = new Set();
+    if (clientName) candidateKeys.add(clientName.toLowerCase());
+    if (clienteObj) {
+      if (clienteObj.id) candidateKeys.add(String(clienteObj.id).toLowerCase());
+      if (clienteObj.idInterno) candidateKeys.add(String(clienteObj.idInterno).toLowerCase());
+      if (clienteObj.rfc) candidateKeys.add(String(clienteObj.rfc).toLowerCase());
+      if (clienteObj.nombre) candidateKeys.add(String(clienteObj.nombre).toLowerCase());
     }
-    sitiosList = sitios;
+
+    const sitiosFromDb = (sitiosDb || []).filter(s => {
+      if (!s) return false;
+      const sCli = String(s.cliente || '').toLowerCase();
+      const sCliCustom = String(s.customData?.clienteNombre || '').toLowerCase();
+      return candidateKeys.has(sCli) || (sCliCustom && candidateKeys.has(sCliCustom));
+    });
+
+    let localSitios = clienteObj && clienteObj.sitios ? clienteObj.sitios : [];
+    if (clienteObj && clienteObj.ubicacion && !localSitios.some(s => getSitioNombre(s) === clienteObj.ubicacion)) {
+      localSitios = [{ nombre: clienteObj.ubicacion }, ...localSitios];
+    }
+
+    sitiosList = [...sitiosFromDb];
+    localSitios.forEach(s => {
+      const sNombre = getSitioNombre(s);
+      if (sNombre && !sitiosList.some(ex => (ex.nombre || '').toLowerCase() === sNombre.toLowerCase())) {
+        sitiosList.push(typeof s === 'object' ? s : { nombre: sNombre, cliente: clienteObj?.id || clientName });
+      }
+    });
   }
   
   // 1. Aplicar filtro de búsqueda
@@ -17778,6 +19747,16 @@ function guardarRenombreSitio(e) {
       clienteObj.ubicacion = nuevoNombre.trim();
     }
     
+    // Sincronizar en sitiosDb también si existe
+    const sitioDbOb = (sitiosDb || []).find(s => s.nombre === nombreActual && (clienteObj ? (s.cliente === clienteObj.id || s.cliente === clienteObj.nombre || s.customData?.clienteNombre === clienteObj.nombre) : true));
+    if (sitioDbOb) {
+      sitioDbOb.nombre = nuevoNombre.trim();
+      if (!sitioDbOb.customData) sitioDbOb.customData = {};
+      sitioDbOb.customData.ubicacion = nuevoNombre.trim();
+      localStorage.setItem('sapi_sitios_db', JSON.stringify(sitiosDb));
+      if (window.pushToSupabase) window.pushToSupabase('sitios', sitioDbOb);
+    }
+
     localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
     if (window.pushToSupabase) window.pushToSupabase('clientes', clienteObj);
     renderSitios();
@@ -19597,6 +21576,11 @@ window.toggleInternalNotificationDropdown = function(event) {
   const dd = document.getElementById('internal-notification-dropdown');
   if (dd) {
     const isHidden = dd.style.display === 'none' || dd.style.display === '';
+    if (isHidden) {
+      if (typeof window.sincronizarNotificacionesInternas === 'function') {
+        window.sincronizarNotificacionesInternas();
+      }
+    }
     dd.style.display = isHidden ? 'block' : 'none';
   }
 };
@@ -19608,6 +21592,96 @@ document.addEventListener('click', function(e) {
     dd.style.display = 'none';
   }
 });
+
+window.sincronizarNotificacionesInternas = function() {
+  const isSuperadmin = (currentSession && (currentSession.viewMode === 'superadmin' || currentSession.rol === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.userId === 'superadmin'));
+  const isSupervisor = (currentSession && (currentSession.viewMode === 'supervisor' || currentSession.rol === 'supervisor'));
+  const currentUser = usuarios.find(u => u && u.id === currentSession?.userId);
+  const currentUserName = currentUser ? currentUser.nombre : 'Usuario';
+  const quinceDiasMs = 15 * 24 * 60 * 60 * 1000;
+  const ahora = Date.now();
+
+  let allNotifications = [];
+  try {
+    allNotifications = JSON.parse(localStorage.getItem('sapi_internal_notifications')) || [];
+  } catch(e) {}
+
+  let readKeys = new Set();
+  try {
+    const storedReadKeys = JSON.parse(localStorage.getItem('sapi_internal_notifications_read_keys')) || [];
+    readKeys = new Set(storedReadKeys);
+  } catch(e) {}
+
+  allNotifications.forEach(n => {
+    if (n.leida && n.id) {
+      readKeys.add(n.id);
+    }
+  });
+
+  const tkts = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : (JSON.parse(localStorage.getItem('sapi_tickets') || '[]'));
+  
+  const mapNotifs = new Map();
+  allNotifications.forEach(n => {
+    if (n && n.id) {
+      if (isSuperadmin && n.fecha) {
+        const tNotif = new Date(n.fecha).getTime();
+        if (!isNaN(tNotif) && (ahora - tNotif > quinceDiasMs)) return;
+      }
+      mapNotifs.set(n.id, n);
+    }
+  });
+
+  tkts.forEach(t => {
+    if (t && Array.isArray(t.comentariosInternos) && t.comentariosInternos.length > 0) {
+      t.comentariosInternos.forEach(c => {
+        if (!c || (!c.texto && !c.usuario)) return;
+        const fechaComentario = c.fecha || t.fechaModificacion || t.fecha || new Date().toISOString();
+        if (isSuperadmin) {
+          const timestamp = new Date(fechaComentario).getTime();
+          if (!isNaN(timestamp) && (ahora - timestamp > quinceDiasMs)) {
+            return; // Omitir comentarios de más de 15 días para superadmin
+          }
+        }
+        const notifId = `${t.id}_comment_${c.fecha}_${c.usuario}`;
+        const lectores = Array.isArray(c.leidoPor) ? c.leidoPor : [];
+        const isReadByMe = readKeys.has(notifId) || lectores.some(l => (typeof l === 'string' ? l === currentUserName : l && l.usuario === currentUserName));
+        
+        mapNotifs.set(notifId, {
+          id: notifId,
+          tipo: 'comentario',
+          ticketId: t.id,
+          ticketFolio: t.folio || 'Ticket',
+          ticketAsunto: t.asunto || 'Sin asunto',
+          fecha: fechaComentario,
+          usuario: c.usuario || 'Usuario',
+          comentarioTexto: c.texto || '',
+          comentarioFecha: c.fecha || '',
+          leida: isReadByMe,
+          leidoPor: lectores,
+          esPrueba: !!t.esPrueba
+        });
+      });
+    }
+  });
+
+  let updatedList = Array.from(mapNotifs.values());
+  updatedList.sort((a, b) => {
+    const da = new Date(a.fecha || 0).getTime();
+    const db = new Date(b.fecha || 0).getTime();
+    return db - da;
+  });
+
+  if (updatedList.length > 100) {
+    updatedList = updatedList.slice(0, 100);
+  }
+
+  localStorage.setItem('sapi_internal_notifications', JSON.stringify(updatedList));
+  localStorage.setItem('sapi_internal_notifications_read_keys', JSON.stringify(Array.from(readKeys)));
+
+  if (typeof window.updateInternalNotificationBell === 'function') {
+    window.updateInternalNotificationBell();
+  }
+};
 
 window.generarNotificacionInterna = function(ticket, asignadoAnterior, asignadoNuevo) {
   const normOld = String(asignadoAnterior || '').trim().toLowerCase();
@@ -19632,6 +21706,7 @@ window.generarNotificacionInterna = function(ticket, asignadoAnterior, asignadoN
     asignadoAnterior: asignadoAnterior || 'Sin asignar',
     asignadoNuevo: asignadoNuevo || 'Sin asignar',
     leida: false,
+    leidoPor: [],
     esPrueba: !!ticket.esPrueba
   };
 
@@ -19651,30 +21726,32 @@ window.generarNotificacionComentarioInterno = function(ticket, comentario) {
 
   const currentUser = usuarios.find(u => u && u.id === window.currentSession?.userId);
   const currentUserName = currentUser ? currentUser.nombre : 'Usuario';
-  
-  // Si el comentario lo escribió el usuario actual, NO generar notificación
-  if (comentario.usuario === currentUserName) return;
+  const isSuperadmin = (currentSession && (currentSession.viewMode === 'superadmin' || currentSession.rol === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.userId === 'superadmin'));
 
-  // Evitar duplicados
+  if (!isSuperadmin && comentario.usuario === currentUserName) return;
+
+  const notifId = `${ticket.id}_comment_${comentario.fecha}_${comentario.usuario}`;
   const exists = allNotifications.some(n => 
-    n.ticketId === ticket.id && 
-    n.tipo === 'comentario' && 
-    n.comentarioFecha === comentario.fecha &&
-    n.usuario === comentario.usuario
+    n.id === notifId ||
+    (n.ticketId === ticket.id && 
+     n.tipo === 'comentario' && 
+     n.comentarioFecha === comentario.fecha &&
+     n.usuario === comentario.usuario)
   );
   if (exists) return;
 
   const newNotif = {
-    id: crypto.randomUUID(),
+    id: notifId,
     tipo: 'comentario',
     ticketId: ticket.id,
     ticketFolio: ticket.folio || '',
     ticketAsunto: ticket.asunto || '',
-    fecha: new Date().toISOString(),
+    fecha: comentario.fecha || new Date().toISOString(),
     usuario: comentario.usuario,
     comentarioTexto: comentario.texto,
     comentarioFecha: comentario.fecha,
     leida: false,
+    leidoPor: comentario.leidoPor || [],
     esPrueba: !!ticket.esPrueba
   };
 
@@ -19689,7 +21766,7 @@ window.generarNotificacionComentarioInterno = function(ticket, comentario) {
 window.updateInternalNotificationBell = function() {
   const bell = document.getElementById('internal-notification-bell-container');
   if (bell) {
-    if (currentSession.viewMode === 'tecnico') {
+    if (currentSession && currentSession.viewMode === 'tecnico') {
       bell.style.display = 'none';
       return;
     } else {
@@ -19706,8 +21783,31 @@ window.updateInternalNotificationBell = function() {
     allNotifications = JSON.parse(localStorage.getItem('sapi_internal_notifications')) || [];
   } catch(e) {}
 
-  const isTest = isTestModeActive();
-  const filtered = allNotifications.filter(n => !!n.esPrueba === isTest);
+  const isTest = (typeof isTestModeActive === 'function') ? isTestModeActive() : false;
+  const isSuperadmin = (currentSession && (currentSession.viewMode === 'superadmin' || currentSession.rol === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.userId === 'superadmin'));
+  const isSupervisor = (currentSession && (currentSession.viewMode === 'supervisor' || currentSession.rol === 'supervisor'));
+  const currentUser = usuarios.find(u => u && u.id === currentSession?.userId);
+  const currentUserName = currentUser ? currentUser.nombre : 'Usuario';
+
+  let filtered = allNotifications.filter(n => !!n.esPrueba === isTest);
+
+  const quinceDiasMs = 15 * 24 * 60 * 60 * 1000;
+  const ahora = Date.now();
+
+  // Si es Superadmin o Supervisor, ve las notificaciones de TODOS
+  // Si es Superadmin, se descartan notificaciones de más de 15 días de antigüedad
+  if (isSuperadmin) {
+    filtered = filtered.filter(n => {
+      if (!n.fecha) return true;
+      const t = new Date(n.fecha).getTime();
+      return !isNaN(t) && (ahora - t <= quinceDiasMs);
+    });
+  } else if (!isSupervisor) {
+    // Si es otro usuario regular, ve las de sus tickets o creadas por otros
+    const myTicketIds = new Set((tickets || []).filter(t => t.asignado === currentUserName || t.supervisor === currentUserName).map(t => t.id));
+    filtered = filtered.filter(n => myTicketIds.has(n.ticketId) || n.usuario !== currentUserName);
+  }
+
   const unreadCount = filtered.filter(n => !n.leida).length;
 
   if (badge) {
@@ -19732,8 +21832,28 @@ window.updateInternalNotificationBell = function() {
         const fechaFormat = n.fecha ? new Date(n.fecha).toLocaleDateString('es-MX', { day:'numeric', month:'short', hour:'numeric', minute:'2-digit' }) : 'Reciente';
         const isUnread = !n.leida;
         
+        // Calcular quién ya leyó esta notificación
+        const lectores = Array.isArray(n.leidoPor) ? n.leidoPor.map(l => (typeof l === 'string' ? l : l && l.usuario)).filter(Boolean) : [];
+        const otrosLectores = lectores.filter(l => l !== n.usuario);
+        let readReceiptHtml = '';
+        if (otrosLectores.length > 0) {
+          readReceiptHtml = `
+            <div style="font-size:0.65rem; color:#10b981; margin-top:0.25rem; display:flex; align-items:center; gap:0.3rem; font-weight:500;">
+              <i data-lucide="check-check" style="width:12px; height:12px; color:#10b981; flex-shrink:0;"></i>
+              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Leído por: ${otrosLectores.join(', ')}">Leído por: <strong style="color:var(--text-primary);">${otrosLectores.join(', ')}</strong></span>
+            </div>
+          `;
+        } else {
+          readReceiptHtml = `
+            <div style="font-size:0.65rem; color:var(--text-muted); margin-top:0.25rem; display:flex; align-items:center; gap:0.3rem; opacity:0.75;">
+              <i data-lucide="check" style="width:11px; height:11px; flex-shrink:0;"></i>
+              <span>Sin leer por otros</span>
+            </div>
+          `;
+        }
+        
         html += `
-          <div style="padding:0.6rem 1rem; border-bottom:1px solid rgba(255,255,255,0.02); display:flex; flex-direction:column; gap:0.2rem; cursor:pointer; transition:background 0.2s; position:relative; ${isUnread ? 'background:rgba(139,92,246,0.03);' : ''}" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='${isUnread ? 'rgba(139,92,246,0.03)' : 'transparent'}'" onclick="window.verTicketYMarcarInternaLeida('${n.ticketId}', '${n.id}')">
+          <div style="padding:0.6rem 1rem; border-bottom:1px solid rgba(255,255,255,0.02); display:flex; flex-direction:column; gap:0.2rem; cursor:pointer; transition:background 0.2s; position:relative; ${isUnread ? 'background:rgba(139,92,246,0.05);' : ''}" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='${isUnread ? 'rgba(139,92,246,0.05)' : 'transparent'}'" onclick="window.verTicketYMarcarInternaLeida('${n.ticketId}', '${n.id}')">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <span style="font-weight:700; font-size:0.78rem; color:var(--text-primary);">${n.ticketFolio || 'Ticket'}</span>
               <span style="font-size:0.65rem; color:var(--text-muted);">${fechaFormat}</span>
@@ -19754,42 +21874,63 @@ window.updateInternalNotificationBell = function() {
                 Modificado por: <strong>${n.usuario}</strong>
               </div>
             `}
-            ${isUnread ? `<span style="position:absolute; right:8px; bottom:8px; width:6px; height:6px; border-radius:50%; background:#8b5cf6;"></span>` : ''}
+            ${readReceiptHtml}
+            ${isUnread ? `<span style="position:absolute; right:8px; bottom:8px; width:6px; height:6px; border-radius:50%; background:#8b5cf6; box-shadow:0 0 6px rgba(139,92,246,0.6);"></span>` : ''}
           </div>
         `;
       });
       container.innerHTML = html;
+      if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+        lucide.createIcons();
+      }
     }
   }
 };
 
 window.verTicketYMarcarInternaLeida = function(ticketId, notificationId) {
-  // Marcar como leída
   let allNotifications = [];
   try {
     allNotifications = JSON.parse(localStorage.getItem('sapi_internal_notifications')) || [];
   } catch(e) {}
 
+  let readKeys = new Set();
+  try {
+    const storedReadKeys = JSON.parse(localStorage.getItem('sapi_internal_notifications_read_keys')) || [];
+    readKeys = new Set(storedReadKeys);
+  } catch(e) {}
+
+  if (notificationId) {
+    readKeys.add(notificationId);
+  }
+
+  const currentUser = usuarios.find(u => u && u.id === currentSession?.userId);
+  const currentUserName = currentUser ? currentUser.nombre : 'Usuario';
+  const nowIso = new Date().toISOString();
+
   allNotifications = allNotifications.map(n => {
-    if (n.id === notificationId) n.leida = true;
+    if (n.id === notificationId) {
+      n.leida = true;
+      if (!Array.isArray(n.leidoPor)) n.leidoPor = [];
+      if (!n.leidoPor.some(l => (typeof l === 'string' ? l === currentUserName : l && l.usuario === currentUserName))) {
+        n.leidoPor.push({ usuario: currentUserName, fecha: nowIso });
+      }
+    }
     return n;
   });
   localStorage.setItem('sapi_internal_notifications', JSON.stringify(allNotifications));
+  localStorage.setItem('sapi_internal_notifications_read_keys', JSON.stringify(Array.from(readKeys)));
 
   window.updateInternalNotificationBell();
 
-  // Cerrar dropdown
   const dd = document.getElementById('internal-notification-dropdown');
   if (dd) dd.style.display = 'none';
 
-  // Ir a pestaña de tickets
   const navItem = document.querySelector('.nav-item[data-view="tickets"]');
   if (navItem) navItem.click();
 
-  // Abrir detalle del ticket
   if (typeof verDetalleTicket === 'function') {
     verDetalleTicket(ticketId);
-  } else {
+  } else if (typeof abrirTicket === 'function') {
     abrirTicket(ticketId);
   }
 };
@@ -19800,12 +21941,32 @@ window.marcarTodasInternasLeidas = function() {
     allNotifications = JSON.parse(localStorage.getItem('sapi_internal_notifications')) || [];
   } catch(e) {}
 
-  const isTest = isTestModeActive();
+  let readKeys = new Set();
+  try {
+    const storedReadKeys = JSON.parse(localStorage.getItem('sapi_internal_notifications_read_keys')) || [];
+    readKeys = new Set(storedReadKeys);
+  } catch(e) {}
+
+  const isTest = (typeof isTestModeActive === 'function') ? isTestModeActive() : false;
+  const isSuperadmin = (currentSession && (currentSession.viewMode === 'superadmin' || currentSession.rol === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.userId === 'superadmin'));
+  const quinceDiasMs = 15 * 24 * 60 * 60 * 1000;
+  const ahora = Date.now();
+
   allNotifications = allNotifications.map(n => {
-    if (!!n.esPrueba === isTest) n.leida = true;
+    if (!!n.esPrueba === isTest) {
+      if (isSuperadmin && n.fecha) {
+        const t = new Date(n.fecha).getTime();
+        if (!isNaN(t) && (ahora - t > quinceDiasMs)) {
+          return n;
+        }
+      }
+      n.leida = true;
+      if (n.id) readKeys.add(n.id);
+    }
     return n;
   });
   localStorage.setItem('sapi_internal_notifications', JSON.stringify(allNotifications));
+  localStorage.setItem('sapi_internal_notifications_read_keys', JSON.stringify(Array.from(readKeys)));
 
   window.updateInternalNotificationBell();
 };
@@ -20234,6 +22395,78 @@ window.actualizarEstatusRefaccionesDesdeGuias = function(t) {
   window.actualizarVisibilidadDestinoPiezas(t);
 };
 
+// Helper: Determina si un ticket requiere una Orden de Servicio en campo o si es solo despacho / refacciones / garantía
+window.esTicketDeServicioEnCampo = function(t) {
+  if (!t || typeof t !== 'object') return false;
+  
+  const norm = (s) => {
+    if (!s) return '';
+    if (typeof window.normStr === 'function') return window.normStr(s);
+    return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  };
+
+  const cat = norm(t.categoria);
+  const area = norm(t.area);
+  const tipo = norm(t.tipo);
+  const asunto = norm(t.asunto);
+  const desc = norm(t.descripcion);
+  const folio = String(t.folio || '').trim().toUpperCase();
+
+  // 1. Subtickets de refacción (-A) o folios con prefijo de refacción
+  if (folio.endsWith('-A') || folio.includes('-REF') || folio.includes('-A-') || folio.startsWith('REF-')) {
+    return false;
+  }
+
+  // 2. Si el Área es Refacciones, Garantías, Piezas o Almacén
+  if (area.includes('refacci') || area.includes('garant') || area.includes('pieza') || area.includes('almacen')) {
+    return false;
+  }
+
+  // 3. Si la Categoría es Refacción, Refacciones, Garantía, Piezas, Despacho, Envío, Paquetería o Información
+  const esCatRefOrGar = cat.includes('refacci') || cat.includes('garant') || cat.includes('pieza') || 
+                        cat.includes('despacho') || cat.includes('envio') || cat.includes('paqueteri') || 
+                        cat.includes('solicitud de informacion');
+  if (esCatRefOrGar) {
+    // Si el área o categoría es refacción/garantía sin ser servicio explícito
+    if (!cat.includes('servicio') && !cat.includes('mantenimiento') && !cat.includes('puesta en marcha') && !cat.includes('pre-entrega') && !cat.includes('inspeccion') && !cat.includes('reparacion')) {
+      return false;
+    }
+  }
+
+  // 4. Si el Tipo es Refacción, Garantía o Despacho
+  if (tipo.includes('refacci') || tipo.includes('garant') || tipo.includes('pieza') || tipo.includes('despacho')) {
+    return false;
+  }
+
+  // 5. Si el Asunto contiene términos explícitos de refacciones o garantías (y no es servicio técnico en campo)
+  const esAsuntoRef = (asunto.includes('refacci') || asunto.includes('garant') || asunto.includes('despacho')) &&
+                      !asunto.includes('servicio') && !asunto.includes('mantenimiento') && !asunto.includes('puesta en marcha') && !asunto.includes('reparacion');
+  if (esAsuntoRef) {
+    return false;
+  }
+
+  // 6. Si el destino de las piezas es directo al cliente
+  if (t.destinoPiezas === 'cliente') {
+    return false;
+  }
+
+  // 7. Si el ticket tiene refacciones o envíos y no es un servicio técnico en campo explícito
+  const esServicioTecnicoExplicito = cat.includes('servicio') || cat.includes('mantenimiento') || cat.includes('puesta en marcha') || cat.includes('pre-entrega') || cat.includes('inspeccion') || cat.includes('reparacion');
+  const tieneRefacciones = (Array.isArray(t.refaccionesSeleccionadas) && t.refaccionesSeleccionadas.length > 0) || (Array.isArray(t.envios) && t.envios.length > 0) || (t.guiaPedido && String(t.guiaPedido).trim().length > 0);
+  
+  if (tieneRefacciones && !esServicioTecnicoExplicito) {
+    return false;
+  }
+
+  // 8. Solo retornar true si existe indicación de servicio / mantenimiento / puesta en marcha / pre-entrega / soporte en campo
+  const esServicio = esServicioTecnicoExplicito || 
+                     cat.includes('soporte') || cat.includes('otro') ||
+                     area.includes('servicio') || area.includes('operaciones') || area.includes('soporte') ||
+                     tipo.includes('servicio') || tipo.includes('preventivo') || tipo.includes('correctivo');
+
+  return esServicio;
+};
+
 window.renderEnvioCards = function(t) {
   const container = document.getElementById('envios-container');
   if (!container) return;
@@ -20613,7 +22846,7 @@ function abrirTicket(id) {
   const selectAsignado = document.getElementById('t-asignado');
   if (selectAsignado) {
     selectAsignado.innerHTML = '<option value="">Sin asignar</option>';
-    usuarios.filter(u => u.rol === 'supervisor').forEach(u => {
+    usuarios.filter(u => u && ['supervisor', 'admin', 'superadmin'].includes(u.rol) && u.activo !== false && ((typeof isTestModeActive === 'function' && isTestModeActive()) || !(typeof isTestUser === 'function' && isTestUser(u)))).forEach(u => {
       const opt = document.createElement('option');
       opt.value = u.nombre;
       opt.textContent = u.nombre;
@@ -20659,14 +22892,19 @@ function abrirTicket(id) {
       document.getElementById('t-prioridad').value = t.prioridad || 'Media';
       const selectAsignado = document.getElementById('t-asignado');
       if (selectAsignado) {
-        let exists = Array.from(selectAsignado.options).some(o => o.value === t.asignado);
-        if (!exists && t.asignado) {
-          const opt = document.createElement('option');
-          opt.value = t.asignado;
-          opt.textContent = t.asignado + ' (No es supervisor)';
-          selectAsignado.appendChild(opt);
+        const infoAsig = window.obtenerInfoRolUsuario(t.asignado);
+        if (['supervisor', 'admin', 'superadmin'].includes(infoAsig.rol)) {
+          let exists = Array.from(selectAsignado.options).some(o => o.value === t.asignado);
+          if (!exists && t.asignado) {
+            const opt = document.createElement('option');
+            opt.value = t.asignado;
+            opt.textContent = t.asignado;
+            selectAsignado.appendChild(opt);
+          }
+          selectAsignado.value = t.asignado;
+        } else {
+          selectAsignado.value = '';
         }
-        selectAsignado.value = t.asignado || '';
       }
       document.getElementById('t-descripcion').value = t.descripcion || '';
       document.getElementById('t-notas').value = t.notas || '';
@@ -20804,8 +23042,10 @@ function abrirTicket(id) {
   toggleResolucionTicket();
   toggleMotivoRechazo();
 
-  // Control de campos y cabecera para Tickets de Refacciones (-A)
+  // Control de campos y cabecera para Tickets de Refacciones / Garantías
   const isRefTicket = t && t.folio && t.folio.endsWith('-A');
+  const catLower = (t && t.categoria ? t.categoria : (document.getElementById('t-categoria')?.value || '')).trim().toLowerCase();
+  const isShippingCategory = !window.esTicketDeServicioEnCampo(t || { categoria: catLower });
   const refHeader = document.getElementById('ref-ticket-info-header');
   const refShippingFields = document.getElementById('ref-ticket-shipping-fields');
 
@@ -20843,15 +23083,37 @@ function abrirTicket(id) {
         elRefInfoCat.textContent = t.categoria || 'Refacción';
       }
 
-      // Populate Service Order client signature date
+      // Populate Service Order client signature date & Order link button
+      const assocOrder = window.obtenerOrdenAsociadaTicket(t);
       const elRefCierre = document.getElementById('ref-info-fechacierre');
       if (elRefCierre) {
         let signatureDateStr = 'Pendiente';
-        const assocOrder = window.obtenerOrdenAsociadaATicketRefacciones(t);
         if (assocOrder && assocOrder.firma_cliente_fecha) {
           signatureDateStr = new Date(assocOrder.firma_cliente_fecha).toLocaleDateString();
         }
         elRefCierre.textContent = signatureDateStr;
+      }
+
+      const elRefOrdenBtn = document.getElementById('ref-info-orden-btn-container');
+      if (elRefOrdenBtn) {
+        if (assocOrder && assocOrder.id) {
+          elRefOrdenBtn.innerHTML = `
+            <button type="button" onclick="window.verOrdenDesdeTicket('${assocOrder.id}')" class="btn-secondary" style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px; font-size:0.75rem; font-weight:600; color:#2563eb; border:1px solid rgba(37,99,235,0.3); background:rgba(37,99,235,0.08); border-radius:6px; cursor:pointer;">
+              <i data-lucide="file-text" style="width:13px;height:13px;"></i> Ver Orden de Servicio (${assocOrder.folio || assocOrder.id})
+            </button>
+          `;
+        } else {
+          const parentTicket = typeof window.obtenerTicketPadre === 'function' ? window.obtenerTicketPadre(t) : null;
+          if (parentTicket) {
+            elRefOrdenBtn.innerHTML = `
+              <button type="button" onclick="verDetalleTicket('${parentTicket.id}')" class="btn-secondary" style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px; font-size:0.75rem; font-weight:600; color:#ea580c; border:1px solid rgba(234,88,12,0.3); background:rgba(234,88,12,0.08); border-radius:6px; cursor:pointer;">
+                <i data-lucide="ticket" style="width:13px;height:13px;"></i> Ver Ticket Origen (${parentTicket.folio || parentTicket.id})
+              </button>
+            `;
+          } else {
+            elRefOrdenBtn.innerHTML = '';
+          }
+        }
       }
 
       // Populate machinery badges
@@ -20905,9 +23167,12 @@ function abrirTicket(id) {
     }
   } else {
     if (refHeader) refHeader.style.display = 'none';
-    if (document.getElementById('ref-ticket-shipping-fields')) {
-      document.getElementById('ref-ticket-shipping-fields').style.display = 'none';
+    
+    // Los envíos ahora se gestionan centralizadamente desde el módulo de Envíos
+    if (refShippingFields) {
+      refShippingFields.style.display = 'none';
     }
+
     if (document.getElementById('ref-ticket-destination-fields')) {
       document.getElementById('ref-ticket-destination-fields').style.display = 'none';
     }
@@ -20930,6 +23195,10 @@ function abrirTicket(id) {
     }
     if (document.getElementById('group-t-categoria')) {
       document.getElementById('group-t-categoria').style.display = 'block';
+      const catSelect = document.getElementById('t-categoria');
+      if (catSelect) {
+        catSelect.disabled = false;
+      }
     }
     if (document.getElementById('section-t-origen')) {
       const isEmpresa = currentSession.viewMode === 'empresa';
@@ -20950,6 +23219,16 @@ function abrirTicket(id) {
 
     const selectEq = document.getElementById('t-equipo');
     if (selectEq) selectEq.style.display = 'block';
+  }
+
+  // Disparar sincronización de categoría y selector de kits para Servicio Técnico
+  if (typeof window.alCambiarCategoriaTicket === 'function') {
+    window.alCambiarCategoriaTicket();
+    if (t && t.categoria === 'Servicio Técnico' && t.kitServicioId && typeof window.seleccionarMachoteTicket === 'function') {
+      window.seleccionarMachoteTicket(t.kitServicioId);
+    } else if (typeof window.seleccionarMachoteTicket === 'function') {
+      window.seleccionarMachoteTicket('');
+    }
   }
 
   document.getElementById('modal-ticket-overlay').classList.add('open');
@@ -20982,6 +23261,9 @@ window.abrirTicketPreloaded = function(datos) {
   }
   if (datos.prioridad) {
     document.getElementById('t-prioridad').value = datos.prioridad;
+  }
+  if (datos.area) {
+    document.getElementById('t-area').value = datos.area;
   }
   if (datos.categoria) {
     document.getElementById('t-categoria').value = datos.categoria;
@@ -21447,19 +23729,17 @@ function selectComboOption(id, value, label, isInitial = false) {
     
     if (value && value !== 'Ninguno' && value !== 'Ninguno / Uso Interno') {
       if (sitGroup) sitGroup.style.display = 'block';
-      if (sitInput) sitInput.value = '';
-      if (sitDisplay) sitDisplay.textContent = 'Ninguno';
+      if (sitInput && !isInitial) sitInput.value = '';
+      if (sitDisplay && !isInitial) sitDisplay.textContent = 'Ninguno';
       
       if (sitOptions) {
         sitOptions.innerHTML = '<div class="combo-option" onclick="selectComboOption(\'t-sitio\', \'\', \'Ninguno\')">Ninguno</div>';
-        const c = clientesDb.find(x => x.nombre === value);
-        if (c) {
-          const sitios = getNombresDeSitiosParaCliente(c);
-          sitios.forEach(sn => {
-            const escapedSn = sn.replace(/'/g, "\\'");
-            sitOptions.innerHTML += `<div class="combo-option" onclick="selectComboOption('t-sitio', '${escapedSn}', '${escapedSn}')">${sn}</div>`;
-          });
-        }
+        const c = (clientesDb || []).find(x => x.nombre === value || x.id === value || x.idInterno === value || x.rfc === value);
+        const sitios = getNombresDeSitiosParaCliente(c || value);
+        sitios.forEach(sn => {
+          const escapedSn = sn.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          sitOptions.innerHTML += `<div class="combo-option" onclick="selectComboOption('t-sitio', '${escapedSn}', '${escapedSn}')">${sn}</div>`;
+        });
       }
     } else {
       if (sitGroup) sitGroup.style.display = 'none';
@@ -21490,11 +23770,10 @@ function agregarSitioCombo(id) {
     return;
   }
   const q = document.getElementById('t-sitio-search')?.value.trim() || '';
-  document.getElementById('s-cliente-nombre').value = cName;
-  document.getElementById('s-sitio-nombre').value = q;
-  document.getElementById('s-sitio-direccion').value = '';
-  document.getElementById('modal-sitio-title').textContent = 'Nuevo Sitio: ' + cName;
-  document.getElementById('modal-agregar-sitio-overlay').classList.add('open');
+  agregarSitioCliente(cName);
+  if (q) {
+    document.getElementById('s-sitio-nombre').value = q;
+  }
   document.getElementById('t-sitio-menu').classList.remove('open');
   document.getElementById('t-sitio-combo').classList.remove('focus');
   window._addingSiteFromTicket = true;
@@ -21738,11 +24017,35 @@ async function guardarTicket(e) {
 
   const destinoPrecioVal = document.getElementById('ref-destino-precio')?.value || '';
 
+  const catSeleccionada = document.getElementById('t-categoria')?.value || '';
+  const kitIdSeleccionado = (catSeleccionada === 'Servicio Técnico') 
+    ? (document.getElementById('t-kit-servicio-select')?.value || '') 
+    : '';
+  const kitObj = window._ticketKitSeleccionado || (kitIdSeleccionado ? (window.loadKitsServicio() || []).find(k => k.id === kitIdSeleccionado) : null);
+  const kitNombreSeleccionado = (kitObj && kitIdSeleccionado) 
+    ? kitObj.nombre 
+    : (t_existente ? (t_existente.kitServicioNombre || '') : '');
+
+  let refaccionesFinales = t_existente ? (t_existente.refaccionesSeleccionadas || []) : [];
+  if (kitObj && kitIdSeleccionado && refaccionesFinales.length === 0) {
+    refaccionesFinales = (kitObj.piezas || []).map(p => ({
+      clave: p.codigo || p.clave || 'S/C',
+      codigo: p.codigo || p.clave || 'S/C',
+      nombre: p.descripcion || p.nombre || 'Sin Descripción',
+      descripcion: p.descripcion || p.nombre || 'Sin Descripción',
+      marca: p.marca || kitObj.marca || '',
+      cantidad: parseInt(p.cantidad, 10) || 1,
+      estatusPedido: 'Por Pedir'
+    }));
+  }
+
   const ticket = {
     id: editandoTicketId || crypto.randomUUID(),
     folio: editandoTicketId ? t_existente?.folio : newFolio,
     fecha: t_existente ? t_existente.fecha : new Date().toISOString(),
     fechaCreacion: t_existente ? t_existente.fechaCreacion : new Date().toISOString(),
+    fechaModificacion: new Date().toISOString(),
+    modificadoPor: window.getCurrentUserDisplayName ? window.getCurrentUserDisplayName() : (usuarios.find(u => u.id === currentSession.userId)?.nombre || 'Usuario'),
     fechaCierre: estado === 'Cerrado' ? (t_existente?.fechaCierre || new Date().toISOString()) : null,
     canal,
     contacto,
@@ -21752,31 +24055,33 @@ async function guardarTicket(e) {
     solicitante: document.getElementById('t-solicitante').value.trim(),
     creadoPor: t_existente ? (t_existente.creadoPor || t_existente.solicitante) : (usuarios.find(u => u.id === currentSession.userId)?.nombre || ''),
     area: document.getElementById('t-area').value,
-    categoria: document.getElementById('t-categoria').value,
+    categoria: catSeleccionada,
     prioridad: document.getElementById('t-prioridad').value,
     asignado: document.getElementById('t-asignado').value.trim(),
     descripcion: document.getElementById('t-descripcion').value.trim(),
     equipo: equipoVal,
     horometro: document.getElementById('t-horometro')?.value.trim() || '',
     notas: document.getElementById('t-notas').value.trim(),
+    kitServicioId: kitIdSeleccionado || (t_existente ? (t_existente.kitServicioId || '') : ''),
+    kitServicioNombre: kitNombreSeleccionado || (t_existente ? (t_existente.kitServicioNombre || '') : ''),
     estado,
     cotizacionSAP: (window.editandoCotizaciones && window.editandoCotizaciones.length > 0) ? window.editandoCotizaciones[0].sap : '',
     montoCotizacion: (window.editandoCotizaciones && window.editandoCotizaciones.length > 0) ? window.editandoCotizaciones.reduce((sum, c) => sum + (Number(c.monto) || 0), 0) : null,
     cotAceptada: document.querySelector('input[name="t-cot-aceptada"]:checked')?.value || '',
     motivoRechazo: document.getElementById('t-motivo-rechazo')?.value.trim() || '',
     pedidoSAP: document.getElementById('t-pedido-sap')?.value.trim() || '',
-    tecnicosAsignados: t_existente ? (t_existente.tecnicosAsignados || []) : [],
+    tecnicosAsignados: [],
     pdfPedido: pdfPedidoBase64,
     pdfCotizacion: (window.editandoCotizaciones && window.editandoCotizaciones.length > 0) ? window.editandoCotizaciones[0].pdf : null,
     cotizacionesAdicionales: window.editandoCotizaciones || [],
     comentariosInternos: t_existente ? (t_existente.comentariosInternos || []) : [],
     esPrueba: t_existente ? (t_existente.esPrueba || false) : isTestModeActive(),
-    refaccionesSeleccionadas: t_existente ? (t_existente.refaccionesSeleccionadas || []) : [],
-    guiaPedido: guiaVal,
-    paqueteria: paqueteriaVal,
-    fechaPedido: fPedidoVal,
-    fechaEntrega: fEntregaVal,
-    envios: enviosVal,
+    refaccionesSeleccionadas: refaccionesFinales,
+    guiaPedido: guiaVal || (t_existente ? (t_existente.guiaPedido || '') : ''),
+    paqueteria: paqueteriaVal || (t_existente ? (t_existente.paqueteria || '') : ''),
+    fechaPedido: fPedidoVal || (t_existente ? (t_existente.fechaPedido || '') : ''),
+    fechaEntrega: fEntregaVal || (t_existente ? (t_existente.fechaEntrega || '') : ''),
+    envios: (enviosVal && enviosVal.length > 0) ? enviosVal : (t_existente ? (t_existente.envios || []) : []),
     destinoPiezas: document.getElementById('ref-destino-piezas')?.value || '',
     destinoPrecio: destinoPrecioVal,
     destinoPdfUrl: destinoPdfUrl
@@ -21872,11 +24177,11 @@ async function guardarTicket(e) {
   if (isEmpresa && !editandoTicketId && !ticket.asignado) {
     const c = clientesDb.find(x => x.nombre === ticket.cliente);
     if (c) {
-      if (c.tecnicosAsignados && c.tecnicosAsignados.length > 0) {
-        ticket.asignado = c.tecnicosAsignados.map(id => usuarios.find(u => u.id === id)?.nombre).filter(Boolean).join(', ');
-      } else if (c.tecnicoAsignado) { // Legacy single support
-        const tecUser = usuarios.find(u => u.id === c.tecnicoAsignado);
-        if (tecUser) ticket.asignado = tecUser.nombre;
+      if (c.supervisoresAsignados && c.supervisoresAsignados.length > 0) {
+        ticket.asignado = c.supervisoresAsignados.map(id => usuarios.find(u => u.id === id)?.nombre).filter(Boolean).join(', ');
+      } else if (c.supervisorAsignado) {
+        const supUser = usuarios.find(u => u.id === c.supervisorAsignado);
+        if (supUser) ticket.asignado = supUser.nombre;
       }
     }
   }
@@ -21908,131 +24213,144 @@ async function guardarTicket(e) {
     await window.pushToSupabase('tickets', ticket);
   }
 
-  // Generar Orden de Servicio automáticamente si se cierra el ticket y fue aceptada la cotización
+  // Generar Orden de Servicio automáticamente solo si es de Servicio en campo (NO para Garantías ni Refacciones)
   if (estado === 'Cerrado' && ticket.cotAceptada === 'si') {
-    const ordenExistente = ordenes.find(o => o.soporte === ticket.id);
-    if (!ordenExistente) {
-      let modeloStr = '';
-      let serieStr = '';
-      let marcaStr = '';
-      let ecoStr = '';
-      let maquinariaId = null;
+    if (window.esTicketDeServicioEnCampo(ticket)) {
+      const ordenExistente = ordenes.find(o => o.soporte === ticket.id);
+      if (!ordenExistente) {
+        let modeloStr = '';
+        let serieStr = '';
+        let marcaStr = '';
+        let ecoStr = '';
+        let maquinariaId = null;
 
-      if (ticket.equipo) {
-        const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
-        
-        const matchMaquina = (m, name) => {
-          const cleanId = m.idInterno || m.id || '';
-          const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
-          const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
-          const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
-          const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+        if (ticket.equipo) {
+          const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
           
-          return (
-            name === mName ||
-            name === cleanId ||
-            name === m.serie ||
-            name.includes(cleanId) ||
-            (m.serie && name.includes(m.serie))
-          );
-        };
+          const matchMaquina = (m, name) => {
+            const cleanId = m.idInterno || m.id || '';
+            const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+            const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+            const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+            const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+            
+            return (
+              name === mName ||
+              name === cleanId ||
+              name === m.serie ||
+              name.includes(cleanId) ||
+              (m.serie && name.includes(m.serie))
+            );
+          };
 
-        const eqNames = ticket.equipo.split(', ');
-        const modelosArr = [];
-        const seriesArr = [];
-        const marcasArr = [];
-        const ecosArr = [];
+          const eqNames = ticket.equipo.split(', ');
+          const modelosArr = [];
+          const seriesArr = [];
+          const marcasArr = [];
+          const ecosArr = [];
 
-        eqNames.forEach(eqName => {
-          let maq = null;
-          clientesDb.forEach(c => {
-            if (c.maquinas) {
-              const found = c.maquinas.find(m => matchMaquina(m, eqName));
-              if (found) maq = found;
+          eqNames.forEach(eqName => {
+            let maq = null;
+            clientesDb.forEach(c => {
+              if (c.maquinas) {
+                const found = c.maquinas.find(m => matchMaquina(m, eqName));
+                if (found) maq = found;
+              }
+            });
+            if (!maq) maq = maquinariaDb.find(m => matchMaquina(m, eqName));
+
+            if (maq) {
+              if (maq.modelo) modelosArr.push(maq.modelo);
+              if (maq.serie) seriesArr.push(maq.serie);
+              if (maq.marca) marcasArr.push(maq.marca);
+              if (maq.no_economico) ecosArr.push(maq.no_economico);
+              if (!maquinariaId) maquinariaId = maq.id || maq.idInterno || null;
+            } else {
+              if (eqName.includes('(SN: ')) {
+                const parts = eqName.split('(SN: ');
+                const s = parts[1].replace(')', '').trim();
+                let left = parts[0].trim();
+                if (left.startsWith('[') && left.includes(']')) {
+                  left = left.substring(left.indexOf(']') + 1).trim();
+                }
+                modelosArr.push(left);
+                seriesArr.push(s);
+              } else {
+                modelosArr.push(eqName);
+              }
             }
           });
-          if (!maq) maq = maquinariaDb.find(m => matchMaquina(m, eqName));
 
-          if (maq) {
-            if (maq.modelo) modelosArr.push(maq.modelo);
-            if (maq.serie) seriesArr.push(maq.serie);
-            if (maq.marca) marcasArr.push(maq.marca);
-            if (maq.no_economico) ecosArr.push(maq.no_economico);
-            if (!maquinariaId) maquinariaId = maq.id || maq.idInterno || null;
-          } else {
-            if (eqName.includes('(SN: ')) {
-              const parts = eqName.split('(SN: ');
-              const s = parts[1].replace(')', '').trim();
-              let left = parts[0].trim();
-              if (left.startsWith('[') && left.includes(']')) {
-                left = left.substring(left.indexOf(']') + 1).trim();
-              }
-              modelosArr.push(left);
-              seriesArr.push(s);
-            } else {
-              modelosArr.push(eqName);
-            }
-          }
-        });
+          modeloStr = [...new Set(modelosArr)].join(', ');
+          serieStr = [...new Set(seriesArr)].join(', ');
+          marcaStr = [...new Set(marcasArr)].join(', ');
+          ecoStr = [...new Set(ecosArr)].join(', ');
+        }
 
-        modeloStr = [...new Set(modelosArr)].join(', ');
-        serieStr = [...new Set(seriesArr)].join(', ');
-        marcaStr = [...new Set(marcasArr)].join(', ');
-        ecoStr = [...new Set(ecosArr)].join(', ');
+        let newFolio = generarFolioConsecutivo();
+        const isTest = isTestData(ticket) || isTestModeActive();
+        if (isTest && newFolio && !newFolio.startsWith('[PRUEBA]')) {
+          newFolio = `[PRUEBA] ${newFolio}`;
+        }
+
+        let orderTecnicos = [...(ticket.tecnicosAsignados || [])];
+        if (orderTecnicos.length === 0 && ticket.asignado) {
+          orderTecnicos = ticket.asignado.split(',').map(s => s.trim()).filter(Boolean);
+        }
+
+        const nuevaOrden = {
+          id: newFolio,
+          fecha: getLocalDateString(),
+          folio: newFolio,
+          pedido: ticket.pedidoSAP || '',
+          cliente: ticket.cliente || '',
+          ubicacion: ticket.sitio || '',
+          ubicacion_sitio: '',
+          operador: '',
+          eco: ecoStr || '',
+          horometro: '',
+          modelo: modeloStr,
+          serie: serieStr,
+          marca: marcaStr || '',
+          maquinaria_id: maquinariaId || null,
+          equipo: ticket.equipo || '',
+          tecnico: orderTecnicos.join(', '),
+          tecnicosAsignados: orderTecnicos,
+          soporte: ticket.id,
+          km_ida: '', km_vuelta: '', km_total: '',
+          tipo: 'Servicio',
+          estado: 'Pendiente',
+          falla: (ticket.asunto ? ticket.asunto + '\n' : '') + (ticket.descripcion || ''),
+          trabajos: '', dictamen: '', condiciones: '',
+          observaciones: '', pendientes: '',
+          ref_utilizadas: [], ref_necesarias: [],
+          factura_ref: '', factura_mo: '',
+          noches: '', alimentacion: '', traslado_costo: '',
+          dias: [],
+          esPrueba: isTest,
+        };
+
+        ordenes.unshift(nuevaOrden);
+        safeSetJSON('sapi_ordenes', ordenes);
+        if (window.supabaseClient) {
+          await window.pushToSupabase('ordenes', nuevaOrden);
+        }
+        mostrarNotificacion('Orden de servicio pre-cargada y generada.', 'success');
+        if (typeof renderTabla === 'function') renderTabla('servicios');
       }
-
-      let newFolio = generarFolioConsecutivo();
-      const isTest = isTestData(ticket) || isTestModeActive();
-      if (isTest && newFolio && !newFolio.startsWith('[PRUEBA]')) {
-        newFolio = `[PRUEBA] ${newFolio}`;
-      }
-
-      let orderTecnicos = [...(ticket.tecnicosAsignados || [])];
-      if (orderTecnicos.length === 0 && ticket.asignado) {
-        orderTecnicos = ticket.asignado.split(',').map(s => s.trim()).filter(Boolean);
-      }
-
-      const nuevaOrden = {
-        id: newFolio,
-        fecha: getLocalDateString(),
-        folio: newFolio,
-        pedido: ticket.pedidoSAP || '',
-        cliente: ticket.cliente || '',
-        ubicacion: ticket.sitio || '',
-        ubicacion_sitio: '',
-        operador: '',
-        eco: ecoStr || '',
-        horometro: '',
-        modelo: modeloStr,
-        serie: serieStr,
-        marca: marcaStr || '',
-        maquinaria_id: maquinariaId || null,
-        equipo: ticket.equipo || '',
-        tecnico: orderTecnicos.join(', '),
-        tecnicosAsignados: orderTecnicos,
-        soporte: ticket.id,
-        km_ida: '', km_vuelta: '', km_total: '',
-        tipo: 'Servicio',
-        estado: 'Pendiente',
-        falla: (ticket.asunto ? ticket.asunto + '\n' : '') + (ticket.descripcion || ''),
-        trabajos: '', dictamen: '', condiciones: '',
-        observaciones: '', pendientes: '',
-        ref_utilizadas: [], ref_necesarias: [],
-        factura_ref: '', factura_mo: '',
-        noches: '', alimentacion: '', traslado_costo: '',
-        dias: [],
-        esPrueba: isTest,
-      };
-
-      ordenes.unshift(nuevaOrden);
-      safeSetJSON('sapi_ordenes', ordenes);
-      if (window.supabaseClient) {
-        await window.pushToSupabase('ordenes', nuevaOrden);
-      }
-      mostrarNotificacion('Orden de servicio pre-cargada y generada.', 'success');
-      if (typeof renderTabla === 'function') renderTabla('servicios');
+    } else {
+      mostrarNotificacion(`Ticket de ${ticket.categoria || 'Garantía / Refacciones'} procesado para Guía de Envío / Despacho.`, 'info');
     }
   }
+
+  // Asegurar generación automática de Guía de Envío si el ticket tiene refacciones
+  if (typeof window.asegurarGuiaEnvioParaTicket === 'function') {
+    const isRefCat = String(ticket.categoria || '').toLowerCase().includes('refacci') || String(ticket.categoria || '').toLowerCase().includes('garant') || (ticket.folio && ticket.folio.endsWith('-A'));
+    if (isRefCat || (ticket.refaccionesSeleccionadas && ticket.refaccionesSeleccionadas.length > 0)) {
+      window.asegurarGuiaEnvioParaTicket(ticket);
+    }
+  }
+
   if (window._levantamientoDeOrigen) {
     const lev = window._levantamientoDeOrigen;
     lev.estado = 'Completado';
@@ -22108,6 +24426,35 @@ window.renderComentariosInternosHtml = function(t) {
             ? 'align-self: flex-end; background: rgba(232, 130, 12, 0.08); border-left: 3px solid var(--accent);'
             : 'align-self: flex-start; background: var(--bg-card); border-left: 3px solid var(--border);';
           
+          const lectores = Array.isArray(c.leidoPor)
+            ? c.leidoPor.map(l => {
+                if (typeof l === 'string') return l;
+                if (l && l.usuario) {
+                  const fStr = l.fecha ? formatFechaHoraAmigable(l.fecha) : '';
+                  return fStr ? `${l.usuario} (${fStr})` : l.usuario;
+                }
+                return null;
+              }).filter(Boolean)
+            : [];
+          
+          const otrosLectores = lectores.filter(l => !l.startsWith(c.usuario));
+          let leidoHtml = '';
+          if (otrosLectores.length > 0) {
+            leidoHtml = `
+              <div style="margin-top: 0.35rem; display: flex; align-items: center; gap: 0.3rem; font-size: 0.68rem; color: #10b981; font-weight: 500;">
+                <i data-lucide="check-check" style="width: 12px; height: 12px; color: #10b981; flex-shrink:0;"></i>
+                <span>Leído por: <strong style="color: var(--text-primary);">${otrosLectores.join(', ')}</strong></span>
+              </div>
+            `;
+          } else {
+            leidoHtml = `
+              <div style="margin-top: 0.35rem; display: flex; align-items: center; gap: 0.3rem; font-size: 0.68rem; color: var(--text-muted); opacity: 0.7;">
+                <i data-lucide="check" style="width: 12px; height: 12px; flex-shrink:0;"></i>
+                <span>No leído aún por otros</span>
+              </div>
+            `;
+          }
+
           return `
             <div style="max-width: 85%; padding: 0.6rem 0.8rem; border-radius: 8px; box-shadow: var(--shadow-sm); ${alignStyle}">
               <div style="display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 0.25rem; align-items: center;">
@@ -22115,6 +24462,7 @@ window.renderComentariosInternosHtml = function(t) {
                 <span style="font-size: 0.65rem; color: var(--text-muted); font-family: monospace;">${formatFechaHoraAmigable(c.fecha)}</span>
               </div>
               <div style="font-size: 0.85rem; white-space: pre-wrap; color: var(--text-primary); line-height: 1.35; font-family: inherit;">${c.texto}</div>
+              ${leidoHtml}
             </div>
           `;
         }).join('')
@@ -22267,26 +24615,32 @@ window.agregarComentarioInterno = async function(ticketId) {
   const currentUser = usuarios.find(u => u && u.id === window.currentSession?.userId);
   const userName = currentUser ? currentUser.nombre : 'Usuario';
 
+  const now = new Date().toISOString();
   const nuevoComentario = {
     usuario: userName,
-    fecha: new Date().toISOString(),
+    fecha: now,
     texto: text
   };
 
   if (!t.comentariosInternos) {
     t.comentariosInternos = [];
   }
+  t.fechaModificacion = now;
+  t.modificadoPor = userName;
 
   if (window.supabaseClient) {
     try {
       const tClone = JSON.parse(JSON.stringify(t));
       if (!tClone.comentariosInternos) tClone.comentariosInternos = [];
       tClone.comentariosInternos.push(nuevoComentario);
+      tClone.fechaModificacion = now;
+      tClone.modificadoPor = userName;
       
       await window.pushToSupabase('tickets', tClone);
       
       t.comentariosInternos.push(nuevoComentario);
       safeSetJSON('sapi_tickets', tickets);
+      if (typeof window.sincronizarNotificacionesInternas === 'function') window.sincronizarNotificacionesInternas();
       mostrarNotificacion('Comentario agregado.', 'success');
       
       verDetalleTicket(ticketId);
@@ -22297,6 +24651,7 @@ window.agregarComentarioInterno = async function(ticketId) {
   } else {
     t.comentariosInternos.push(nuevoComentario);
     safeSetJSON('sapi_tickets', tickets);
+    if (typeof window.sincronizarNotificacionesInternas === 'function') window.sincronizarNotificacionesInternas();
     mostrarNotificacion('Comentario guardado localmente.', 'success');
     verDetalleTicket(ticketId);
   }
@@ -22321,21 +24676,26 @@ window.agregarComentarioExterno = async function(ticketId) {
   const currentUser = usuarios.find(u => u && u.id === window.currentSession?.userId);
   const userName = currentUser ? currentUser.nombre : (window.nombreEmpresaLogged || window.currentSession?.nombre || 'Soporte');
 
+  const now = new Date().toISOString();
   const nuevoMensaje = {
     usuario: userName,
-    fecha: new Date().toISOString(),
+    fecha: now,
     texto: text
   };
 
   if (!t.comentariosClientes) {
     t.comentariosClientes = [];
   }
+  t.fechaModificacion = now;
+  t.modificadoPor = userName;
 
   if (window.supabaseClient) {
     try {
       const tClone = JSON.parse(JSON.stringify(t));
       if (!tClone.comentariosClientes) tClone.comentariosClientes = [];
       tClone.comentariosClientes.push(nuevoMensaje);
+      tClone.fechaModificacion = now;
+      tClone.modificadoPor = userName;
       
       await window.pushToSupabase('tickets', tClone);
       
@@ -22370,21 +24730,134 @@ window.agregarComentarioExterno = async function(ticketId) {
 
 // ===== DETALLE TICKET =====
 function verDetalleTicket(id) {
-  const t = tickets.find(x => x.id === id);
-  if (!t) return;
+  let t = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets.find(x => x && (x.id === id || x.folio === id)) : null;
+  if (!t) {
+    const norm = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const targetNorm = norm(id);
+    const targetNum = String(id).replace(/[^0-9]/g, '');
+    let pool = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? [...tickets] : [];
+    if (typeof window !== 'undefined' && Array.isArray(window.tickets)) pool = pool.concat(window.tickets);
+    try {
+      const local = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_tickets', []) : JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+      if (Array.isArray(local)) pool = pool.concat(local);
+    } catch (e) {}
+    t = pool.find(x => x && (x.id === id || x.folio === id || norm(x.folio || x.id) === targetNorm || (targetNum.length >= 4 && String(x.folio || '').replace(/[^0-9]/g, '') === targetNum)));
+  }
+  if (!t) {
+    const navTickets = document.querySelector('.nav-item[data-view="tickets"]');
+    if (navTickets) navTickets.click();
+    setTimeout(() => {
+      const searchInput = document.getElementById('search-tickets');
+      if (searchInput) {
+        searchInput.value = id;
+        if (typeof renderTickets === 'function') renderTickets();
+      }
+    }, 150);
+    return;
+  }
+
+  // Registrar lectura de comentarios internos por el usuario actual
+  const currentUserObj = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios.find(u => u && u.id === window.currentSession?.userId) : null;
+  const currentUserName = currentUserObj ? currentUserObj.nombre : '';
+
+  if (currentUserName && Array.isArray(t.comentariosInternos) && t.comentariosInternos.length > 0) {
+    let modified = false;
+    const nowIso = new Date().toISOString();
+    t.comentariosInternos.forEach(c => {
+      if (!c) return;
+      if (!Array.isArray(c.leidoPor)) {
+        c.leidoPor = [];
+      }
+      const yaLeido = c.leidoPor.some(l => (typeof l === 'string' ? l === currentUserName : l && l.usuario === currentUserName));
+      if (!yaLeido) {
+        c.leidoPor.push({
+          usuario: currentUserName,
+          fecha: nowIso
+        });
+        modified = true;
+      }
+    });
+
+    if (modified) {
+      safeSetJSON('sapi_tickets', tickets);
+      if (window.supabaseClient) {
+        window.pushToSupabase('tickets', t).catch(err => console.warn('[Sync] Error al actualizar lectura de comentarios:', err));
+      }
+      if (typeof window.sincronizarNotificacionesInternas === 'function') {
+        window.sincronizarNotificacionesInternas();
+      }
+    }
+  }
+
+  const assocOrder = window.obtenerOrdenAsociadaTicket(t);
+  const parentTicket = !assocOrder ? (typeof window.obtenerTicketPadre === 'function' ? window.obtenerTicketPadre(t) : null) : null;
   const isDecisionLocked = ['si', 'aprobada', 'no', 'rechazada'].includes(String(t.cotAceptada || '').toLowerCase().trim());
   document.getElementById('ticket-detalle-title').textContent = `Ticket ${t.folio}`;
-  const field = (label, val) => `
-    <div class="detalle-field">
+  const field = (label, val, fullWidth = false) => `
+    <div class="detalle-field" ${fullWidth ? 'style="grid-column: 1 / -1;"' : ''}>
       <div class="detalle-label">${label}</div>
       <div class="detalle-value">${val || '—'}</div>
     </div>`;
   document.getElementById('ticket-detalle-body').innerHTML = `
+    ${assocOrder ? `
+    <div class="detalle-section" style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(37, 99, 235, 0.03) 100%); border: 1px solid rgba(37, 99, 235, 0.25); border-radius: 8px; padding: 0.85rem 1.1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <div style="width: 38px; height: 38px; border-radius: 8px; background: rgba(37, 99, 235, 0.15); color: #2563eb; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <i data-lucide="file-text" style="width: 20px; height: 20px;"></i>
+        </div>
+        <div>
+          <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: #2563eb;">Orden de Servicio Vinculada</div>
+          <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px; margin-top: 1px;">
+            <span>${assocOrder.folio || assocOrder.id}</span>
+            ${assocOrder.tipoServicio ? `<span class="badge" style="font-size: 0.68rem; background: var(--bg-card); border: 1px solid var(--border);">${assocOrder.tipoServicio}</span>` : ''}
+            ${assocOrder.estado ? `<span class="badge badge-${String(assocOrder.estado).toLowerCase()}">${assocOrder.estado}</span>` : ''}
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px;">
+            ${assocOrder.cliente ? `<span style="margin-right: 8px;"><i data-lucide="building-2" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${assocOrder.cliente}</span>` : ''}
+            ${assocOrder.equipo ? `<span><i data-lucide="wrench" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${assocOrder.equipo}</span>` : ''}
+          </div>
+        </div>
+      </div>
+      <div>
+        <button type="button" class="btn-primary" onclick="window.verOrdenDesdeTicket('${assocOrder.id}')" style="display: inline-flex; align-items: center; gap: 6px; padding: 0.45rem 0.9rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; border-radius: 6px; background: #2563eb; color: #ffffff; border: none;">
+          <i data-lucide="external-link" style="width: 14px; height: 14px;"></i> Ver Orden de Servicio
+        </button>
+      </div>
+    </div>
+    ` : (parentTicket ? `
+    <div class="detalle-section" style="background: linear-gradient(135deg, rgba(234, 88, 12, 0.08) 0%, rgba(234, 88, 12, 0.03) 100%); border: 1px solid rgba(234, 88, 12, 0.25); border-radius: 8px; padding: 0.85rem 1.1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <div style="width: 38px; height: 38px; border-radius: 8px; background: rgba(234, 88, 12, 0.15); color: #ea580c; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <i data-lucide="ticket" style="width: 20px; height: 20px;"></i>
+        </div>
+        <div>
+          <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: #ea580c;">Ticket de Origen Vinculado</div>
+          <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px; margin-top: 1px;">
+            <span>${parentTicket.folio || parentTicket.id}</span>
+            ${parentTicket.categoria ? `<span class="badge" style="font-size: 0.68rem; background: var(--bg-card); border: 1px solid var(--border);">${parentTicket.categoria}</span>` : ''}
+            ${parentTicket.estado ? `<span class="badge badge-${badgeTicketEstado(parentTicket)}">${getTicketEstadoLabel(parentTicket)}</span>` : ''}
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px;">
+            ${parentTicket.asunto ? `<span>${parentTicket.asunto}</span>` : (parentTicket.cliente ? `<span>${parentTicket.cliente}</span>` : '')}
+          </div>
+        </div>
+      </div>
+      <div>
+        <button type="button" class="btn-primary" onclick="verDetalleTicket('${parentTicket.id}')" style="display: inline-flex; align-items: center; gap: 6px; padding: 0.45rem 0.9rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; border-radius: 6px; background: #ea580c; color: #ffffff; border: none;">
+          <i data-lucide="external-link" style="width: 14px; height: 14px;"></i> Ver Ticket Origen
+        </button>
+      </div>
+    </div>
+    ` : '')}
     <div class="detalle-section">
       <div class="detalle-section-title">Datos del Ticket</div>
       <div class="detalle-grid">
         ${field('Folio', t.folio)}
-        ${field('Fecha', formatFechaHoraAmigable(t.fechaCreacion || t.fecha))}
+        ${assocOrder ? field('Orden de Servicio', `<a href="javascript:void(0)" onclick="window.verOrdenDesdeTicket('${assocOrder.id}')" style="color:#2563eb; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px;"><i data-lucide="file-text" style="width:13px;height:13px;"></i> ${assocOrder.folio || assocOrder.id} <i data-lucide="external-link" style="width:11px;height:11px;"></i></a>`) : (parentTicket ? field('Ticket Origen', `<a href="javascript:void(0)" onclick="verDetalleTicket('${parentTicket.id}')" style="color:#ea580c; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px;"><i data-lucide="ticket" style="width:13px;height:13px;"></i> ${parentTicket.folio || parentTicket.id} <i data-lucide="external-link" style="width:11px;height:11px;"></i></a>`) : '')}
+        ${field('Fecha Creación', formatFechaHoraAmigable(t.fechaCreacion || t.fecha))}
+        ${field('Última Modificación', formatFechaHoraAmigable(window.getTicketFechaModificacion ? window.getTicketFechaModificacion(t) : (t.fechaModificacion || t.fechaCreacion || t.fecha)))}
+        ${field('Modificado por', window.getTicketModificadoPor ? window.getTicketModificadoPor(t) : (t.modificadoPor || t.creadoPor || '—'))}
+        ${field('Asunto', `<strong style="color:var(--text-primary); font-size:0.95rem;">${t.asunto || '—'}</strong>`, true)}
         ${t.cliente ? field('Cliente', `${t.cliente}${t.sitio ? ` (Sitio: ${t.sitio})` : ''}`) : ''}
         ${field('Canal', t.canal ? ({correo:'Correo',whatsapp:'WhatsApp',telefono:'Llamada Tel.'}[t.canal]||t.canal) : '—')}
         ${field('Contacto', t.contacto)}
@@ -22395,7 +24868,7 @@ function verDetalleTicket(id) {
         ${field('Área', t.area)}
         ${field('Categoría', t.categoria)}
         ${field('Asignado a', t.asignado)}
-        ${field('Equipo / Máquina', t.equipo)}
+        ${field('Equipo / Máquina', t.equipo, true)}
       </div>
     </div>
     <div class="detalle-section">
@@ -22407,6 +24880,24 @@ function verDetalleTicket(id) {
       <div class="detalle-section-title">Notas Internas</div>
       <div class="detalle-field"><div class="detalle-value" style="white-space:pre-wrap;">${t.notas}</div></div>
     </div>` : ''}
+
+    ${((t.pdfCotizacion && !t.cotizacionSAP) || t.foto || t.evidencia || (t.evidencias && (Array.isArray(t.evidencias) ? t.evidencias.length > 0 : Object.keys(t.evidencias).length > 0)) || (t.notas && String(t.notas).toLowerCase().includes('evidencia fotográfica'))) ? `
+    <div class="detalle-section" id="section-detalle-evidencia-${t.id}">
+      <div class="detalle-section-title" style="display:flex; align-items:center; gap:0.5rem; color:var(--accent);"><i data-lucide="camera"></i> Evidencia Fotográfica</div>
+      <div class="detalle-field" style="display:flex; flex-direction:column; gap:0.5rem;">
+        <div id="detalle-evidence-container-${t.id}" style="width:100%; border-radius:10px; overflow:hidden; border:1px solid var(--border); background:rgba(0,0,0,0.35); display:flex; align-items:center; justify-content:center; min-height:180px; max-height:380px; position:relative; padding:0.5rem;">
+          <img id="detalle-evidence-img-${t.id}" src="${(t.pdfCotizacion && t.pdfCotizacion !== '__HAS_PDF__') ? t.pdfCotizacion : (t.foto || t.evidencia || '')}" alt="Evidencia de Falla" style="max-width:100%; max-height:360px; object-fit:contain; border-radius:6px; cursor:pointer; display:${(t.pdfCotizacion && t.pdfCotizacion !== '__HAS_PDF__') || t.foto || t.evidencia ? 'block' : 'none'}; box-shadow:0 4px 15px rgba(0,0,0,0.25);" onclick="window.previsualizarImagenCompleta(this.src, 'Evidencia Fotográfica - Ticket ${t.folio || ''}')" title="Clic para ver en pantalla completa" />
+          <span id="detalle-evidence-loading-${t.id}" style="font-size:0.82rem; color:var(--text-muted); display:${(!t.pdfCotizacion || t.pdfCotizacion === '__HAS_PDF__') && !t.foto && !t.evidencia ? 'inline-flex' : 'none'}; align-items:center; gap:6px;">
+            <i data-lucide="loader" class="rotating" style="width:16px;height:16px;color:var(--accent);"></i> Cargando evidencia fotográfica...
+          </span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:var(--text-muted); padding:0 0.2rem;">
+          <span><i data-lucide="maximize-2" style="width:12px;height:12px;vertical-align:middle;margin-right:3px;"></i> Haz clic en la imagen para ampliar en pantalla completa</span>
+          <button type="button" onclick="window.abrirImagenEnPestana('${t.id}')" style="background:none; border:none; color:var(--accent); font-size:0.75rem; cursor:pointer; font-weight:600; padding:0; display:inline-flex; align-items:center; gap:3px;"><i data-lucide="external-link" style="width:12px;height:12px;"></i> Abrir original</button>
+        </div>
+      </div>
+    </div>
+    ` : ''}
 
     ${t.estado === 'Cerrado' ? `
     <div class="detalle-section">
@@ -22759,6 +25250,39 @@ function verDetalleTicket(id) {
       chatContainer.scrollTop = chatContainer.scrollHeight;
     }
   }, 100);
+
+  // Carga asíncrona de evidencia fotográfica si viene como placeholder o si existe en base de datos
+  const hasPendingEvidence = t.pdfCotizacion === '__HAS_PDF__' || (!t.pdfCotizacion && t.notas && String(t.notas).toLowerCase().includes('evidencia fotográfica'));
+  if (hasPendingEvidence && window.supabaseClient) {
+    setTimeout(async () => {
+      try {
+        const { data, error } = await window.supabaseClient
+          .from('tickets')
+          .select('pdf_cotizacion')
+          .eq('id', t.id)
+          .single();
+        if (error) throw error;
+        const base64 = data ? data.pdf_cotizacion : null;
+        const imgEl = document.getElementById(`detalle-evidence-img-${t.id}`);
+        const loadEl = document.getElementById(`detalle-evidence-loading-${t.id}`);
+        if (base64) {
+          t.pdfCotizacion = base64;
+          if (imgEl) {
+            imgEl.src = base64;
+            imgEl.style.display = 'block';
+          }
+          if (loadEl) loadEl.style.display = 'none';
+        } else {
+          if (loadEl) loadEl.innerHTML = '<span style="color:var(--text-muted);"><i data-lucide="image-off" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i> No se encontró imagen adjunta en la base de datos</span>';
+        }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      } catch (err) {
+        console.error('Error cargando evidencia fotográfica en verDetalleTicket:', err);
+        const loadEl = document.getElementById(`detalle-evidence-loading-${t.id}`);
+        if (loadEl) loadEl.innerHTML = '<span style="color:var(--red); font-size:0.8rem;">Error al descargar imagen de evidencia</span>';
+      }
+    }, 30);
+  }
 
   if (t.estado === 'Cerrado' && t.cotAceptada === 'si' && window.supabaseClient) {
     setTimeout(async () => {
@@ -23199,167 +25723,179 @@ async function cerrarCotizacionTicket(id) {
   safeSetJSON('sapi_tickets', tickets);
   
   if (aceptada === 'si') {
-    const ordenExistente = ordenes.find(o => o.soporte === t.id);
-    if (!ordenExistente) {
-      let modeloStr = '';
-      let serieStr = '';
-      let marcaStr = '';
-      let ecoStr = '';
-      let maquinariaId = null;
+    if (window.esTicketDeServicioEnCampo(t)) {
+      const ordenExistente = ordenes.find(o => o.soporte === t.id);
+      if (!ordenExistente) {
+        let modeloStr = '';
+        let serieStr = '';
+        let marcaStr = '';
+        let ecoStr = '';
+        let maquinariaId = null;
 
-      if (t.equipo) {
-        const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
-        
-        const matchMaquina = (m) => {
-          const cleanId = m.idInterno || m.id || '';
-          if (!cleanId) return false;
-          const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
-          const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
-          const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
-          const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+        if (t.equipo) {
+          const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
           
-          const equipoString = t.equipo || '';
-          const names = equipoString.split(',').map(n => n.trim()).filter(Boolean);
-          
-          return names.some(name => {
-            return (
-              name === mName ||
-              name === cleanId ||
-              name === m.serie ||
-              name.includes(`[${cleanId}]`) ||
-              (m.serie && name.includes(`(SN: ${m.serie})`))
-            );
-          });
-        };
+          const matchMaquina = (m) => {
+            const cleanId = m.idInterno || m.id || '';
+            if (!cleanId) return false;
+            const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+            const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+            const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+            const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+            
+            const equipoString = t.equipo || '';
+            const names = equipoString.split(',').map(n => n.trim()).filter(Boolean);
+            
+            return names.some(name => {
+              return (
+                name === mName ||
+                name === cleanId ||
+                name === m.serie ||
+                name.includes(`[${cleanId}]`) ||
+                (m.serie && name.includes(`(SN: ${m.serie})`))
+              );
+            });
+          };
 
-        let maq = null;
-        clientesDb.forEach(c => {
-          if (c.maquinas) {
-            const found = c.maquinas.find(matchMaquina);
-            if (found) maq = found;
-          }
-        });
-        if (!maq) maq = maquinariaDb.find(matchMaquina);
-
-        if (maq) {
-          modeloStr = maq.modelo || '';
-          serieStr = maq.serie || '';
-          marcaStr = maq.marca || '';
-          ecoStr = maq.no_economico || '';
-          maquinariaId = maq.id || maq.idInterno || null;
-        } else {
-          if (t.equipo.includes('(SN: ')) {
-            const parts = t.equipo.split('(SN: ');
-            serieStr = parts[1].replace(')', '').trim();
-            let left = parts[0].trim();
-            if (left.startsWith('[') && left.includes(']')) {
-              left = left.substring(left.indexOf(']') + 1).trim();
+          let maq = null;
+          clientesDb.forEach(c => {
+            if (c.maquinas) {
+              const found = c.maquinas.find(matchMaquina);
+              if (found) maq = found;
             }
-            modeloStr = left;
+          });
+          if (!maq) maq = maquinariaDb.find(matchMaquina);
+
+          if (maq) {
+            modeloStr = maq.modelo || '';
+            serieStr = maq.serie || '';
+            marcaStr = maq.marca || '';
+            ecoStr = maq.no_economico || '';
+            maquinariaId = maq.id || maq.idInterno || null;
           } else {
-            modeloStr = t.equipo;
+            if (t.equipo.includes('(SN: ')) {
+              const parts = t.equipo.split('(SN: ');
+              serieStr = parts[1].replace(')', '').trim();
+              let left = parts[0].trim();
+              if (left.startsWith('[') && left.includes(']')) {
+                left = left.substring(left.indexOf(']') + 1).trim();
+              }
+              modeloStr = left;
+            } else {
+              modeloStr = t.equipo;
+            }
           }
         }
-      }
 
-      let newFolio = generarFolioConsecutivo();
-      const isTest = isTestData(t) || isTestModeActive();
-      if (isTest && newFolio && !newFolio.startsWith('[PRUEBA]')) {
-        newFolio = `[PRUEBA] ${newFolio}`;
-      }
+        let newFolio = generarFolioConsecutivo();
+        const isTest = isTestData(t) || isTestModeActive();
+        if (isTest && newFolio && !newFolio.startsWith('[PRUEBA]')) {
+          newFolio = `[PRUEBA] ${newFolio}`;
+        }
 
-      let refUtilizadasExtraidas = [];
-      if (window.supabaseClient) {
-        try {
-          const { data: dbEx } = await window.supabaseClient
-            .from('pdf_extracciones_ai')
-            .select('conceptos')
-            .eq('ticket_id', id)
-            .order('fecha_extraccion', { ascending: false })
-            .limit(1);
-          if (dbEx && dbEx.length > 0 && dbEx[0].conceptos) {
-            refUtilizadasExtraidas = dbEx[0].conceptos.map(c => {
-              let matchedClave = '';
-              const descUpper = (c.descripcion || '').trim().toUpperCase();
-              if (descUpper && typeof refaccionesDb !== 'undefined') {
-                const match = refaccionesDb.find(r => (r.descripcion || '').toUpperCase().trim() === descUpper);
-                if (match) matchedClave = match.codigo || match.id || '';
-              }
-              return {
-                descripcion: c.descripcion || '',
-                cantidad: (c.cantidad || 1).toString(),
-                clave: matchedClave,
-                isFromPdf: true
-              };
-            });
-          }
-        } catch(err) {}
-      }
-      if (refUtilizadasExtraidas.length === 0 && window._lastPdfPedidoExtracted && window._lastPdfPedidoExtracted.mainArticulos) {
-        refUtilizadasExtraidas = window._lastPdfPedidoExtracted.mainArticulos.map(c => {
-          let matchedClave = '';
-          const descUpper = (c.descripcion || '').trim().toUpperCase();
-          if (descUpper && typeof refaccionesDb !== 'undefined') {
-            const match = refaccionesDb.find(r => (r.descripcion || '').toUpperCase().trim() === descUpper);
-            if (match) matchedClave = match.codigo || match.id || '';
-          }
-          return {
-            descripcion: c.descripcion || '',
-            cantidad: (c.cantidad || 1).toString(),
-            clave: matchedClave,
-            isFromPdf: true
-          };
-        });
-      }
+        let refUtilizadasExtraidas = [];
+        if (window.supabaseClient) {
+          try {
+            const { data: dbEx } = await window.supabaseClient
+              .from('pdf_extracciones_ai')
+              .select('conceptos')
+              .eq('ticket_id', id)
+              .order('fecha_extraccion', { ascending: false })
+              .limit(1);
+            if (dbEx && dbEx.length > 0 && dbEx[0].conceptos) {
+              refUtilizadasExtraidas = dbEx[0].conceptos.map(c => {
+                let matchedClave = '';
+                const descUpper = (c.descripcion || '').trim().toUpperCase();
+                if (descUpper && typeof refaccionesDb !== 'undefined') {
+                  const match = refaccionesDb.find(r => (r.descripcion || '').toUpperCase().trim() === descUpper);
+                  if (match) matchedClave = match.codigo || match.id || '';
+                }
+                return {
+                  descripcion: c.descripcion || '',
+                  cantidad: (c.cantidad || 1).toString(),
+                  clave: matchedClave,
+                  isFromPdf: true
+                };
+              });
+            }
+          } catch(err) {}
+        }
+        if (refUtilizadasExtraidas.length === 0 && window._lastPdfPedidoExtracted && window._lastPdfPedidoExtracted.mainArticulos) {
+          refUtilizadasExtraidas = window._lastPdfPedidoExtracted.mainArticulos.map(c => {
+            let matchedClave = '';
+            const descUpper = (c.descripcion || '').trim().toUpperCase();
+            if (descUpper && typeof refaccionesDb !== 'undefined') {
+              const match = refaccionesDb.find(r => (r.descripcion || '').toUpperCase().trim() === descUpper);
+              if (match) matchedClave = match.codigo || match.id || '';
+            }
+            return {
+              descripcion: c.descripcion || '',
+              cantidad: (c.cantidad || 1).toString(),
+              clave: matchedClave,
+              isFromPdf: true
+            };
+          });
+        }
 
-      let refNecesariasManuales = [];
-      if (t.refaccionesSeleccionadas && t.refaccionesSeleccionadas.length > 0) {
-        refNecesariasManuales = t.refaccionesSeleccionadas.map(r => ({
-          descripcion: r.nombre || r.descripcion || '',
-          cantidad: (r.cantidad || 1).toString(),
-          clave: r.codigo || r.clave || ''
-        }));
-      }
+        let refNecesariasManuales = [];
+        if (t.refaccionesSeleccionadas && t.refaccionesSeleccionadas.length > 0) {
+          refNecesariasManuales = t.refaccionesSeleccionadas.map(r => ({
+            descripcion: r.nombre || r.descripcion || '',
+            cantidad: (r.cantidad || 1).toString(),
+            clave: r.codigo || r.clave || ''
+          }));
+        }
 
-      const nuevaOrden = {
-        id: newFolio,
-        fecha: getLocalDateString(),
-        folio: newFolio,
-        pedido: pedidoSAP || '',
-        cliente: t.cliente || '',
-        ubicacion: t.sitio || '',
-        ubicacion_sitio: '',
-        operador: '', // Se preguntará en sitio
-        eco: ecoStr || '',
-        horometro: '',
-        modelo: modeloStr,
-        serie: serieStr,
-        marca: marcaStr || '',
-        maquinaria_id: maquinariaId || null,
-        equipo: t.equipo || '',
-        tecnico: tecnicosAsignados.join(', '),
-        tecnicosAsignados: tecnicosAsignados,
-        soporte: t.id,
-        km_ida: '', km_vuelta: '', km_total: '',
-        tipo: tipoVisitaSeleccionado,
-        estado: 'Pendiente',
-        falla: (t.asunto ? t.asunto + '\n' : '') + (t.descripcion || ''),
-        trabajos: '', dictamen: '', condiciones: '',
-        observaciones: '', pendientes: '',
-        ref_utilizadas: refUtilizadasExtraidas, ref_necesarias: refNecesariasManuales,
-        factura_ref: '', factura_mo: '',
-        noches: '', alimentacion: '', traslado_costo: '',
-        dias: [],
-        esPrueba: isTest,
-      };
+        const nuevaOrden = {
+          id: newFolio,
+          fecha: getLocalDateString(),
+          folio: newFolio,
+          pedido: pedidoSAP || '',
+          cliente: t.cliente || '',
+          ubicacion: t.sitio || '',
+          ubicacion_sitio: '',
+          operador: '', // Se preguntará en sitio
+          eco: ecoStr || '',
+          horometro: '',
+          modelo: modeloStr,
+          serie: serieStr,
+          marca: marcaStr || '',
+          maquinaria_id: maquinariaId || null,
+          equipo: t.equipo || '',
+          tecnico: tecnicosAsignados.join(', '),
+          tecnicosAsignados: tecnicosAsignados,
+          soporte: t.id,
+          km_ida: '', km_vuelta: '', km_total: '',
+          tipo: tipoVisitaSeleccionado,
+          estado: 'Pendiente',
+          falla: (t.asunto ? t.asunto + '\n' : '') + (t.descripcion || ''),
+          trabajos: '', dictamen: '', condiciones: '',
+          observaciones: '', pendientes: '',
+          ref_utilizadas: refUtilizadasExtraidas, ref_necesarias: refNecesariasManuales,
+          factura_ref: '', factura_mo: '',
+          noches: '', alimentacion: '', traslado_costo: '',
+          dias: [],
+          esPrueba: isTest,
+        };
 
-      ordenes.unshift(nuevaOrden);
-      safeSetJSON('sapi_ordenes', ordenes);
-      if (window.supabaseClient) {
-        window.pushToSupabase('ordenes', nuevaOrden);
+        ordenes.unshift(nuevaOrden);
+        safeSetJSON('sapi_ordenes', ordenes);
+        if (window.supabaseClient) {
+          window.pushToSupabase('ordenes', nuevaOrden);
+        }
+        mostrarNotificacion('Orden de servicio pre-cargada y generada.', 'success');
+        if (typeof renderTabla === 'function') renderTabla('servicios');
       }
-      mostrarNotificacion('Orden de servicio pre-cargada y generada.', 'success');
-      if (typeof renderTabla === 'function') renderTabla('servicios');
+    } else {
+      mostrarNotificacion(`Ticket de ${t.categoria || 'Garantía / Refacciones'} procesado para Guía de Envío.`, 'info');
+    }
+  }
+
+  // Asegurar generación automática de Guía de Envío si el ticket tiene refacciones
+  if (typeof window.asegurarGuiaEnvioParaTicket === 'function') {
+    const isRefCat = String(t.categoria || '').toLowerCase().includes('refacci') || String(t.categoria || '').toLowerCase().includes('garant') || (t.folio && t.folio.endsWith('-A'));
+    if (isRefCat || (t.refaccionesSeleccionadas && t.refaccionesSeleccionadas.length > 0)) {
+      window.asegurarGuiaEnvioParaTicket(t);
     }
   }
   
@@ -23442,12 +25978,50 @@ window.forzarEstadoTicket = async function(id) {
 function getSitioNombre(s) { return typeof s === 'string' ? s : (s?.nombre || ''); }
 function getNombresDeSitiosParaCliente(clienteObj) {
   if (!clienteObj) return [];
-  let sitiosFromDb = sitiosDb.filter(s => s.cliente === clienteObj.id || s.cliente === clienteObj.idInterno || s.cliente === clienteObj.rfc || s.cliente === clienteObj.nombre).map(s => s.nombre);
-  let localSitios = clienteObj.sitios || [];
-  if (clienteObj.ubicacion && !localSitios.some(s => getSitioNombre(s) === clienteObj.ubicacion)) {
-    localSitios = [clienteObj.ubicacion, ...localSitios];
+  let cObj = typeof clienteObj === 'object' ? clienteObj : null;
+  let rawVal = typeof clienteObj === 'string' ? clienteObj.trim() : '';
+
+  if (!cObj && rawVal) {
+    cObj = (clientesDb || []).find(c => c.nombre === rawVal || c.id === rawVal || c.idInterno === rawVal || c.rfc === rawVal);
   }
-  return [...new Set([...localSitios.map(getSitioNombre), ...sitiosFromDb])];
+
+  const candidateKeys = new Set();
+  if (rawVal) candidateKeys.add(rawVal.toLowerCase());
+  if (cObj) {
+    if (cObj.id) candidateKeys.add(String(cObj.id).toLowerCase());
+    if (cObj.idInterno) candidateKeys.add(String(cObj.idInterno).toLowerCase());
+    if (cObj.rfc) candidateKeys.add(String(cObj.rfc).toLowerCase());
+    if (cObj.nombre) candidateKeys.add(String(cObj.nombre).toLowerCase());
+  }
+
+  // 1. Buscar en sitiosDb
+  const sitiosFromDb = (sitiosDb || []).filter(s => {
+    if (!s) return false;
+    const sCli = String(s.cliente || '').toLowerCase();
+    const sCliCustom = String(s.customData?.clienteNombre || '').toLowerCase();
+    return candidateKeys.has(sCli) || (sCliCustom && candidateKeys.has(sCliCustom));
+  }).map(s => s.nombre).filter(Boolean);
+
+  // 2. Buscar en clienteObj.sitios
+  let localSitios = [];
+  if (cObj) {
+    if (Array.isArray(cObj.sitios)) {
+      localSitios = cObj.sitios.map(getSitioNombre).filter(Boolean);
+    }
+    if (cObj.ubicacion && !localSitios.includes(cObj.ubicacion)) {
+      localSitios = [cObj.ubicacion, ...localSitios];
+    }
+  }
+
+  // 3. Buscar en maquinariaDb
+  const sitiosFromMaq = (maquinariaDb || []).filter(m => {
+    if (!m) return false;
+    const mCli = String(m.cliente || '').toLowerCase();
+    return candidateKeys.has(mCli);
+  }).map(m => m.ubicacion || m.sitio).filter(Boolean);
+
+  const merged = [...new Set([...sitiosFromDb, ...localSitios, ...sitiosFromMaq])];
+  return merged.filter(s => s && s.trim() !== '');
 }
 
 function generarIdInternoMaquina(marca, anioVenta) {
@@ -23499,16 +26073,77 @@ function generarIdInternoMaquina(marca, anioVenta) {
 }
 
 function agregarSitioClienteDesdeEmpresa() {
-  const currentUser = usuarios.find(u => u.id === currentSession.userId);
-  if (!currentUser) return;
-  agregarSitioCliente(currentUser.empresa || currentUser.nombre);
+  const isEmpresa = currentSession.viewMode === 'empresa';
+  if (isEmpresa) {
+    const currentUser = usuarios.find(u => u.id === currentSession.userId);
+    agregarSitioCliente(currentUser ? (currentUser.empresa || currentUser.nombre) : '');
+  } else {
+    agregarSitioCliente('');
+  }
 }
 
 function agregarSitioCliente(nombre) {
   document.getElementById('form-agregar-sitio').reset();
-  document.getElementById('s-cliente-nombre').value = nombre;
+  const clientGroup = document.getElementById('s-cliente-group');
+  const clientSelect = document.getElementById('s-cliente-select');
+  const clientHidden = document.getElementById('s-cliente-nombre');
+  const modalTitle = document.getElementById('modal-sitio-title');
+
+  if (clientSelect) {
+    clientSelect.innerHTML = '<option value="">-- Selecciona un cliente / empresa --</option>';
+    const allClients = new Map();
+    (clientesDb || []).forEach(c => {
+      if (c && c.nombre && c.nombre.trim()) {
+        allClients.set(c.nombre.trim(), c.id || c.nombre.trim());
+      }
+    });
+    (maquinariaDb || []).forEach(m => {
+      if (m && m.cliente && m.cliente.trim() && !allClients.has(m.cliente.trim())) {
+        allClients.set(m.cliente.trim(), m.cliente.trim());
+      }
+    });
+
+    const sortedNames = Array.from(allClients.keys()).sort((a, b) => a.localeCompare(b));
+    sortedNames.forEach(cName => {
+      const opt = document.createElement('option');
+      opt.value = cName;
+      opt.textContent = cName;
+      clientSelect.appendChild(opt);
+    });
+  }
+
+  const isEmpresa = currentSession.viewMode === 'empresa';
+
+  if (nombre && String(nombre).trim()) {
+    const cleanNombre = String(nombre).trim();
+    if (clientHidden) clientHidden.value = cleanNombre;
+    if (clientSelect) clientSelect.value = cleanNombre;
+    if (clientGroup) clientGroup.style.display = 'none';
+    if (modalTitle) modalTitle.textContent = 'Nuevo Sitio: ' + cleanNombre;
+  } else {
+    if (isEmpresa) {
+      const currentUser = usuarios.find(u => u.id === currentSession.userId);
+      const empName = currentUser ? (currentUser.empresa || currentUser.nombre) : '';
+      if (clientHidden) clientHidden.value = empName;
+      if (clientSelect) clientSelect.value = empName;
+      if (clientGroup) clientGroup.style.display = 'none';
+      if (modalTitle) modalTitle.textContent = 'Nuevo Sitio: ' + (empName || 'Mi Empresa');
+    } else {
+      if (clientHidden) clientHidden.value = '';
+      if (clientSelect) clientSelect.value = '';
+      if (clientGroup) clientGroup.style.display = 'block';
+      if (modalTitle) modalTitle.textContent = 'Nuevo Sitio / Obra';
+    }
+  }
+
   document.getElementById('modal-agregar-sitio-overlay').classList.add('open');
-  document.getElementById('s-sitio-nombre').focus();
+  setTimeout(() => {
+    if (clientGroup && clientGroup.style.display !== 'none' && clientSelect) {
+      clientSelect.focus();
+    } else {
+      document.getElementById('s-sitio-nombre')?.focus();
+    }
+  }, 50);
 }
 
 function cerrarModalSitio(e) {
@@ -23516,18 +26151,35 @@ function cerrarModalSitio(e) {
   document.getElementById('modal-agregar-sitio-overlay').classList.remove('open');
 }
 
-function guardarSitioCliente(e) {
+async function guardarSitioCliente(e) {
   e.preventDefault();
-  const nombre = document.getElementById('s-cliente-nombre').value;
+  let nombre = (document.getElementById('s-cliente-nombre')?.value || '').trim();
+  const selectVal = (document.getElementById('s-cliente-select')?.value || '').trim();
+  const clientGroup = document.getElementById('s-cliente-group');
+
+  if (clientGroup && clientGroup.style.display !== 'none' && selectVal) {
+    nombre = selectVal;
+  } else if (!nombre && selectVal) {
+    nombre = selectVal;
+  }
+
+  if (!nombre) {
+    mostrarNotificacion('Por favor selecciona o especifica una Empresa / Cliente.', 'warning');
+    return;
+  }
+
   const nuevoSitio = document.getElementById('s-sitio-nombre').value.trim();
   const cp = document.getElementById('s-sitio-cp')?.value.trim() || '';
   const ciudad = document.getElementById('s-sitio-ciudad')?.value.trim() || '';
   const estado = document.getElementById('s-sitio-estado')?.value.trim() || '';
   const direccion = document.getElementById('s-sitio-direccion')?.value.trim() || '';
   
-  if (!nuevoSitio || nuevoSitio === '') return;
+  if (!nuevoSitio || nuevoSitio === '') {
+    mostrarNotificacion('El nombre del sitio es obligatorio.', 'warning');
+    return;
+  }
 
-  let clienteObj = clientesDb.find(c => c.nombre === nombre);
+  let clienteObj = clientesDb.find(c => c.nombre === nombre || c.id === nombre || c.idInterno === nombre || c.rfc === nombre);
   if (!clienteObj) {
     clienteObj = {
       id: crypto.randomUUID(),
@@ -23540,29 +26192,89 @@ function guardarSitioCliente(e) {
   }
 
   if (!clienteObj.sitios) clienteObj.sitios = [];
-  
-  const siteExists = clienteObj.sitios.some(s => getSitioNombre(s).toLowerCase() === nuevoSitio.toLowerCase());
 
-  if (!siteExists) {
-    clienteObj.sitios.push({
+  const clientDbId = clienteObj.id || nombre;
+  const clientDbName = clienteObj.nombre || nombre;
+
+  // 1. Guardar/Actualizar en sitiosDb
+  let existSitioDb = (sitiosDb || []).find(s => {
+    if (!s) return false;
+    const sameCli = s.cliente === clienteObj.id || s.cliente === clienteObj.idInterno || s.cliente === clienteObj.rfc || s.cliente === clienteObj.nombre || s.cliente === nombre || s.customData?.clienteNombre === clientDbName;
+    return sameCli && (s.nombre || '').toLowerCase() === nuevoSitio.toLowerCase();
+  });
+
+  if (!existSitioDb) {
+    existSitioDb = {
+      id: crypto.randomUUID(),
       nombre: nuevoSitio,
-      direccion, cp, ciudad, estado
-    });
-    localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
-    if (window.pushToSupabase) window.pushToSupabase('clientes', clienteObj);
+      cliente: clientDbId,
+      direccion: direccion,
+      cp: cp,
+      ciudad: ciudad,
+      estado: estado,
+      customData: {
+        ubicacion: nuevoSitio,
+        clienteNombre: clientDbName,
+        'Código Postal': cp,
+        'Ciudad': ciudad,
+        'Estado': estado,
+        'Dirección': direccion
+      },
+      createdAt: new Date().toISOString()
+    };
+    sitiosDb.push(existSitioDb);
+  } else {
+    existSitioDb.direccion = direccion || existSitioDb.direccion;
+    existSitioDb.cp = cp || existSitioDb.cp;
+    existSitioDb.ciudad = ciudad || existSitioDb.ciudad;
+    existSitioDb.estado = estado || existSitioDb.estado;
+    if (!existSitioDb.customData) existSitioDb.customData = {};
+    existSitioDb.customData.ubicacion = nuevoSitio;
+    existSitioDb.customData.clienteNombre = clientDbName;
+    if (cp) existSitioDb.customData['Código Postal'] = cp;
+    if (ciudad) existSitioDb.customData['Ciudad'] = ciudad;
+    if (estado) existSitioDb.customData['Estado'] = estado;
+    if (direccion) existSitioDb.customData['Dirección'] = direccion;
   }
-  
+
+  localStorage.setItem('sapi_sitios_db', JSON.stringify(sitiosDb));
+  if (window.pushToSupabase) {
+    await window.pushToSupabase('sitios', existSitioDb);
+  }
+
+  // 2. Guardar en clienteObj.sitios para compatibilidad
+  const siteInLegacyIdx = clienteObj.sitios.findIndex(s => getSitioNombre(s).toLowerCase() === nuevoSitio.toLowerCase());
+  const siteObjLegacy = {
+    nombre: nuevoSitio,
+    direccion, cp, ciudad, estado
+  };
+  if (siteInLegacyIdx === -1) {
+    clienteObj.sitios.push(siteObjLegacy);
+  } else {
+    clienteObj.sitios[siteInLegacyIdx] = Object.assign({}, clienteObj.sitios[siteInLegacyIdx], siteObjLegacy);
+  }
+  localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
+  if (window.pushToSupabase) {
+    await window.pushToSupabase('clientes', clienteObj);
+  }
+
   cerrarModalSitio();
+  mostrarNotificacion(`Sitio "${nuevoSitio}" guardado correctamente.`, 'success');
   
   if (window._addingSiteFromTicket) {
-    selectComboOption('t-cliente', nombre, document.getElementById('t-cliente-display').textContent);
-    const escapedSn = nuevoSitio.replace(/'/g, "\\'");
-    selectComboOption('t-sitio', escapedSn, escapedSn);
+    const clientLabel = document.getElementById('t-cliente-display')?.textContent || clientDbName;
+    selectComboOption('t-cliente', clientDbName, clientLabel, true);
+    selectComboOption('t-sitio', nuevoSitio, nuevoSitio);
     window._addingSiteFromTicket = false;
   } else if (currentSession.viewMode === 'empresa') {
     renderSitios();
   } else {
-    verDetalleCliente(nombre);
+    if (document.getElementById('view-sitios')?.classList.contains('active')) {
+      renderSitios();
+    }
+    if (document.getElementById('detalle-cliente-modal')?.classList.contains('open') || document.getElementById('modal-detalle-cliente')?.classList.contains('open')) {
+      verDetalleCliente(clientDbName);
+    }
   }
 }
 
@@ -23800,7 +26512,6 @@ function renderCalendario() {
   const filtroCliente = document.getElementById('filter-cal-cliente')?.value || '';
   let filtroTecnico = document.getElementById('filter-cal-tecnico')?.value || '';
 
-  // Filtrar seguridad (rol empresa y rol tecnico)
   const isEmpresa = currentSession.viewMode === 'empresa';
   const isTecnico = currentSession.viewMode === 'tecnico';
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
@@ -23816,7 +26527,9 @@ function renderCalendario() {
   }
 
   const eventos = [];
-  
+  const pushedTraslados = new Set();
+  const pushedBitacoras = new Set();
+
   const currentYear = new Date().getFullYear();
   eventos.push(...getFestivosMexico(currentYear - 1));
   eventos.push(...getFestivosMexico(currentYear));
@@ -23845,15 +26558,11 @@ function renderCalendario() {
         
         let eventColor = '#ef4444'; // Rojo: Trabajo realizado sin asignación por defecto
         const esAsignacionPendiente = b.realizado === false || (b.nota && b.nota.includes('Programado por supervisor') && b.realizado !== true);
-        
-
 
         if (esAsignacionPendiente) {
           eventColor = '#8b5cf6'; // Morado: Asignación programada (Pendiente)
         } else {
-          // Asignación o trabajo completado
           if (b.programadoEntrada) {
-            // Era una asignación programada original
             const isAligned = !b.desviacion || b.desviacion === 'Alineado' || b.desviacion === '0m';
             if (isAligned) {
               eventColor = '#10b981'; // Verde: Asignación completada al 100%
@@ -23861,7 +26570,6 @@ function renderCalendario() {
               eventColor = '#3b82f6'; // Azul: Asignación completada pero con horas distintas
             }
           } else {
-            // Trabajo realizado sin asignación
             eventColor = '#ef4444'; // Rojo: Trabajo realizado sin asignación
           }
         }
@@ -23880,7 +26588,6 @@ function renderCalendario() {
           isAllDay = false;
           startVal = `${dateStr}T${b.entrada}:00`;
           
-          // Si cruza la medianoche (ej. entrada 20:00, salida 02:00)
           if (b.salida < b.entrada) {
             const dObj = new Date(dateStr + 'T00:00:00');
             dObj.setDate(dObj.getDate() + 1);
@@ -23932,134 +26639,135 @@ function renderCalendario() {
 
         const toLocalISO = (d) => new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().substring(0,16)+':00';
 
-        // Renderizar bloque de traslado si existe duración
-        if (b.horas_traslado && !isTrasladoEvent) {
+        // Renderizar bloque de traslado de ida si existe duración (1 por técnico por día por orden)
+        if (b.horas_traslado && parseFloat(b.horas_traslado) > 0 && !isTrasladoEvent) {
           try {
-            const idaDateStr = b.fecha_inicio_traslado || dateStr;
-            let startLlegada;
-            let endLlegada;
-            if (b.hora_inicio) {
-              const hInicioClean = b.hora_inicio.split(':').slice(0,2).join(':');
-              startLlegada = new Date(`${idaDateStr}T${hInicioClean}:00`);
-              if (!isNaN(startLlegada.getTime())) {
-                endLlegada = new Date(startLlegada.getTime() + Math.round(parseFloat(b.horas_traslado) * 60 * 60000));
-              }
-            } else if (b.entrada) {
-              endLlegada = new Date(`${idaDateStr}T${b.entrada}:00`);
-              if (!isNaN(endLlegada.getTime())) {
-                startLlegada = new Date(endLlegada.getTime() - Math.round(parseFloat(b.horas_traslado) * 60 * 60000));
-              }
-            }
-
-            if (startLlegada && endLlegada && !isNaN(startLlegada.getTime())) {
-              eventos.push({
-                id: `bit-traslado-ida-${b.id || Math.random()}`,
-                title: `🚗 Ida - ${(b.tecnico || 'Téc').split(' ')[0]} | ${o.folio || o.id.substring(0,8)}`,
-                start: toLocalISO(startLlegada),
-                end: toLocalISO(endLlegada),
-                allDay: false,
-                backgroundColor: (function() {
-                  if (b.realizado === false || (b.nota && b.nota.includes('Programado') && b.realizado !== true)) return '#8b5cf6';
-                  if (b.programadoHorasTraslado !== undefined && b.programadoHorasTraslado !== null) {
-                    return parseFloat(b.horas_traslado) === parseFloat(b.programadoHorasTraslado) ? '#10b981' : '#3b82f6';
-                  }
-                  return '#ef4444';
-                })(),
-                borderColor: (function() {
-                  if (b.realizado === false || (b.nota && b.nota.includes('Programado') && b.realizado !== true)) return '#8b5cf6';
-                  if (b.programadoHorasTraslado !== undefined && b.programadoHorasTraslado !== null) {
-                    return parseFloat(b.horas_traslado) === parseFloat(b.programadoHorasTraslado) ? '#10b981' : '#3b82f6';
-                  }
-                  return '#ef4444';
-                })(),
-                textColor: '#ffffff',
-                extendedProps: {
-                  isBitacora: true,
-                  isTraslado: true,
-                  tipoTraslado: 'Ida',
-                  duracion: b.horas_traslado,
-                  ordenId: o.id,
-                  tecnico: b.tecnico,
-                  cliente: o.cliente,
-                  ubicacion: o.ubicacion || 'Sin ubicación',
-                  equipo: o.equipo || o.modelo || 'N/A'
+            let idaDateStr = b.fecha_inicio_traslado || dateStr;
+            if (idaDateStr.includes('T')) idaDateStr = idaDateStr.split('T')[0];
+            const keyIda = `ida_${o.id}_${b.tecnico || ''}_${idaDateStr}`;
+            if (!pushedTraslados.has(keyIda)) {
+              let startLlegada;
+              let endLlegada;
+              if (b.hora_inicio) {
+                const hInicioClean = b.hora_inicio.split(':').slice(0,2).join(':');
+                startLlegada = new Date(`${idaDateStr}T${hInicioClean}:00`);
+                if (!isNaN(startLlegada.getTime())) {
+                  endLlegada = new Date(startLlegada.getTime() + Math.round(parseFloat(b.horas_traslado) * 60 * 60000));
                 }
-              });
+              } else if (b.entrada) {
+                endLlegada = new Date(`${idaDateStr}T${b.entrada}:00`);
+                if (!isNaN(endLlegada.getTime())) {
+                  startLlegada = new Date(endLlegada.getTime() - Math.round(parseFloat(b.horas_traslado) * 60 * 60000));
+                }
+              }
+
+              if (startLlegada && endLlegada && !isNaN(startLlegada.getTime())) {
+                pushedTraslados.add(keyIda);
+                eventos.push({
+                  id: `bit-traslado-ida-${b.id || Math.random()}`,
+                  title: `🚗 Ida - ${(b.tecnico || 'Téc').split(' ')[0]} | ${o.folio || o.id.substring(0,8)}`,
+                  start: toLocalISO(startLlegada),
+                  end: toLocalISO(endLlegada),
+                  allDay: false,
+                  backgroundColor: (function() {
+                    if (b.realizado === false || (b.nota && b.nota.includes('Programado') && b.realizado !== true)) return '#8b5cf6';
+                    if (b.programadoHorasTraslado !== undefined && b.programadoHorasTraslado !== null) {
+                      return parseFloat(b.horas_traslado) === parseFloat(b.programadoHorasTraslado) ? '#10b981' : '#3b82f6';
+                    }
+                    return '#ef4444';
+                  })(),
+                  borderColor: (function() {
+                    if (b.realizado === false || (b.nota && b.nota.includes('Programado') && b.realizado !== true)) return '#8b5cf6';
+                    if (b.programadoHorasTraslado !== undefined && b.programadoHorasTraslado !== null) {
+                      return parseFloat(b.horas_traslado) === parseFloat(b.programadoHorasTraslado) ? '#10b981' : '#3b82f6';
+                    }
+                    return '#ef4444';
+                  })(),
+                  textColor: '#ffffff',
+                  extendedProps: {
+                    isBitacora: true,
+                    isTraslado: true,
+                    tipoTraslado: 'Ida',
+                    duracion: b.horas_traslado,
+                    ordenId: o.id,
+                    tecnico: b.tecnico,
+                    cliente: o.cliente,
+                    ubicacion: o.ubicacion || 'Sin ubicación',
+                    equipo: o.equipo || o.modelo || 'N/A'
+                  }
+                });
+              }
             }
           } catch(e) { console.error('Error en traslado ida:', e); }
         }
 
-        // Renderizar bloque de regreso si existe duración (solo si el bloque principal no es un traslado en sí mismo)
-        if (b.horas_regreso && !isTrasladoEvent) {
+        // Renderizar bloque de traslado de regreso si existe duración (1 por técnico por día por orden)
+        if (b.horas_regreso && parseFloat(b.horas_regreso) > 0 && !isTrasladoEvent) {
           try {
-            let orderEndDateStr = endDateStr;
-            if (!b.fecha_fin_regreso && o.bitacora && o.bitacora.length > 0) {
-               let maxD = new Date(endDateStr + 'T00:00:00');
-               o.bitacora.forEach(b2 => {
-                  if (!b2.fecha) return;
-                  const d2 = new Date(b2.fecha + 'T00:00:00');
-                  if (b2.entrada && b2.salida && b2.salida < b2.entrada) d2.setDate(d2.getDate() + 1);
-                  if (d2 > maxD) {
-                     maxD = d2;
-                     orderEndDateStr = d2.toISOString().split('T')[0];
-                  }
-               });
-            }
-            const regresoDateStr = b.fecha_fin_regreso || orderEndDateStr;
-            let startRegreso;
-            let endRegreso;
-            if (b.hora_fin_regreso) {
-              const hRegresoClean = b.hora_fin_regreso.split(':').slice(0,2).join(':');
-              startRegreso = new Date(`${regresoDateStr}T${hRegresoClean}:00`);
-              if (!isNaN(startRegreso.getTime())) {
-                endRegreso = new Date(startRegreso.getTime() + Math.round(parseFloat(b.horas_regreso) * 60 * 60000));
-              }
-            } else if (b.salida) {
-              startRegreso = new Date(`${regresoDateStr}T${b.salida}:00`);
-              if (!isNaN(startRegreso.getTime())) {
-                endRegreso = new Date(startRegreso.getTime() + Math.round(parseFloat(b.horas_regreso) * 60 * 60000));
-              }
-            }
-
-            if (startRegreso && endRegreso && !isNaN(startRegreso.getTime())) {
-              eventos.push({
-                id: `bit-traslado-regreso-${b.id || Math.random()}`,
-                title: `🚗 Regreso - ${(b.tecnico || 'Téc').split(' ')[0]} | ${o.folio || o.id.substring(0,8)}`,
-                start: toLocalISO(startRegreso),
-                end: toLocalISO(endRegreso),
-                allDay: false,
-                backgroundColor: (function() {
-                  if (b.realizado === false || (b.nota && b.nota.includes('Programado') && b.realizado !== true)) return '#8b5cf6';
-                  if (b.programadoHorasRegreso !== undefined && b.programadoHorasRegreso !== null) {
-                    return parseFloat(b.horas_regreso) === parseFloat(b.programadoHorasRegreso) ? '#10b981' : '#3b82f6';
-                  }
-                  return '#ef4444';
-                })(),
-                borderColor: (function() {
-                  if (b.realizado === false || (b.nota && b.nota.includes('Programado') && b.realizado !== true)) return '#8b5cf6';
-                  if (b.programadoHorasRegreso !== undefined && b.programadoHorasRegreso !== null) {
-                    return parseFloat(b.horas_regreso) === parseFloat(b.programadoHorasRegreso) ? '#10b981' : '#3b82f6';
-                  }
-                  return '#ef4444';
-                })(),
-                textColor: '#ffffff',
-                extendedProps: {
-                  isBitacora: true,
-                  isTraslado: true,
-                  tipoTraslado: 'Regreso',
-                  duracion: b.horas_regreso,
-                  ordenId: o.id,
-                  tecnico: b.tecnico,
-                  cliente: o.cliente,
-                  ubicacion: o.ubicacion || 'Sin ubicación',
-                  equipo: o.equipo || o.modelo || 'N/A'
+            let regresoDateStr = b.fecha_fin_regreso || dateStr;
+            if (regresoDateStr.includes('T')) regresoDateStr = regresoDateStr.split('T')[0];
+            const keyRegreso = `regreso_${o.id}_${b.tecnico || ''}_${regresoDateStr}`;
+            if (!pushedTraslados.has(keyRegreso)) {
+              let startRegreso;
+              let endRegreso;
+              if (b.hora_fin_regreso) {
+                const hRegresoClean = b.hora_fin_regreso.split(':').slice(0,2).join(':');
+                startRegreso = new Date(`${regresoDateStr}T${hRegresoClean}:00`);
+                if (!isNaN(startRegreso.getTime())) {
+                  endRegreso = new Date(startRegreso.getTime() + Math.round(parseFloat(b.horas_regreso) * 60 * 60000));
                 }
-              });
+              } else if (b.salida) {
+                startRegreso = new Date(`${regresoDateStr}T${b.salida}:00`);
+                if (!isNaN(startRegreso.getTime())) {
+                  endRegreso = new Date(startRegreso.getTime() + Math.round(parseFloat(b.horas_regreso) * 60 * 60000));
+                }
+              }
+
+              if (startRegreso && endRegreso && !isNaN(startRegreso.getTime())) {
+                pushedTraslados.add(keyRegreso);
+                eventos.push({
+                  id: `bit-traslado-regreso-${b.id || Math.random()}`,
+                  title: `🚗 Regreso - ${(b.tecnico || 'Téc').split(' ')[0]} | ${o.folio || o.id.substring(0,8)}`,
+                  start: toLocalISO(startRegreso),
+                  end: toLocalISO(endRegreso),
+                  allDay: false,
+                  backgroundColor: (function() {
+                    if (b.realizado === false || (b.nota && b.nota.includes('Programado') && b.realizado !== true)) return '#8b5cf6';
+                    if (b.programadoHorasRegreso !== undefined && b.programadoHorasRegreso !== null) {
+                      return parseFloat(b.horas_regreso) === parseFloat(b.programadoHorasRegreso) ? '#10b981' : '#3b82f6';
+                    }
+                    return '#ef4444';
+                  })(),
+                  borderColor: (function() {
+                    if (b.realizado === false || (b.nota && b.nota.includes('Programado') && b.realizado !== true)) return '#8b5cf6';
+                    if (b.programadoHorasRegreso !== undefined && b.programadoHorasRegreso !== null) {
+                      return parseFloat(b.horas_regreso) === parseFloat(b.programadoHorasRegreso) ? '#10b981' : '#3b82f6';
+                    }
+                    return '#ef4444';
+                  })(),
+                  textColor: '#ffffff',
+                  extendedProps: {
+                    isBitacora: true,
+                    isTraslado: true,
+                    tipoTraslado: 'Regreso',
+                    duracion: b.horas_regreso,
+                    ordenId: o.id,
+                    tecnico: b.tecnico,
+                    cliente: o.cliente,
+                    ubicacion: o.ubicacion || 'Sin ubicación',
+                    equipo: o.equipo || o.modelo || 'N/A'
+                  }
+                });
+              }
             }
           } catch(e) { console.error('Error en traslado regreso:', e); }
         }
 
-        eventos.push(ev);
+        const keyBit = `bit_${o.id}_${b.tecnico || ''}_${startVal}_${endVal || 'allday'}_${b.nota || ''}`;
+        if (!pushedBitacoras.has(keyBit)) {
+          pushedBitacoras.add(keyBit);
+          eventos.push(ev);
+        }
       });
     }
   });
@@ -24207,6 +26915,25 @@ function renderCalendario() {
     });
   }
 
+  // Deduplicación final por huella digital de evento (para evitar duplicados en pantalla)
+  const eventosUnicos = [];
+  const seenFingerprints = new Set();
+
+  eventos.forEach(ev => {
+    const startStr = ev.start ? (typeof ev.start === 'string' ? ev.start : ev.start.toISOString()) : '';
+    const endStr = ev.end ? (typeof ev.end === 'string' ? ev.end : ev.end.toISOString()) : '';
+    const titleStr = (ev.title || '').trim().toLowerCase();
+    const tecStr = (ev.extendedProps?.tecnico || '').trim().toLowerCase();
+    const ordId = ev.extendedProps?.ordenId || '';
+    
+    const fingerprint = `${titleStr}::${tecStr}::${ordId}::${startStr}::${endStr}`;
+
+    if (!seenFingerprints.has(fingerprint)) {
+      seenFingerprints.add(fingerprint);
+      eventosUnicos.push(ev);
+    }
+  });
+
   const isMobileCalendar = window.innerWidth <= 768;
   calendarInstance = new FullCalendar.Calendar(container, {
     locale: 'es',
@@ -24230,7 +26957,7 @@ function renderCalendario() {
       day: 'Día',
       list: 'Lista'
     },
-    events: eventos,
+    events: eventosUnicos,
     eventClick: function(info) {
       if (info.event.extendedProps.isFestivo) return; // No hacer nada al hacer clic en días festivos
       if (info.event.extendedProps.isBitacora) {
@@ -32660,6 +35387,17 @@ async function confirmarFusionClientes() {
   const removedIds = new Set();
 
   localOrds.forEach(o => {
+    // Limpiar entradas duplicadas dentro de la propia bitácora de la orden
+    if (o.bitacora && Array.isArray(o.bitacora) && o.bitacora.length > 0) {
+      const seenB = new Set();
+      o.bitacora = o.bitacora.filter(b => {
+        const bKey = `${b.id || ''}_${b.fecha}_${b.tecnico}_${b.entrada}_${b.salida}_${b.nota || ''}`;
+        if (seenB.has(bKey)) return false;
+        seenB.add(bKey);
+        return true;
+      });
+    }
+
     // Generar una clave única basada en el contenido de la orden (excluyendo id y folio)
     const key = [
       o.cliente || '',
@@ -32793,8 +35531,8 @@ window.regenerarOrdenesDesdeTickets = async function() {
     }
   }
 
-  // 3. Filtrar y ordenar tickets cerrados (excluyendo rechazados si los hay)
-  const ticketsFiltrados = tickets.filter(t => t.estado === 'Cerrado' && t.cotAceptada !== 'no');
+  // 3. Filtrar y ordenar tickets cerrados de SERVICIO EN CAMPO (excluyendo rechazados, garantías y refacciones)
+  const ticketsFiltrados = tickets.filter(t => t.estado === 'Cerrado' && t.cotAceptada !== 'no' && window.esTicketDeServicioEnCampo(t));
   ticketsFiltrados.sort((a, b) => {
     const d1 = new Date(a.fechaCreacion || a.fecha || 0);
     const d2 = new Date(b.fechaCreacion || b.fecha || 0);
@@ -33099,6 +35837,8 @@ window.guardarRefaccionesTicketDesdeUI = function(ticketId, transitionToRefaccio
   
   t.refaccionesSeleccionadas = list;
   t.notas = window.inyectarRefaccionesEnNotas(t.notas || '', list);
+  t.fechaModificacion = new Date().toISOString();
+  t.modificadoPor = window.getCurrentUserDisplayName ? window.getCurrentUserDisplayName() : 'Usuario';
   
   if (transitionToRefacciones) {
     t.estado = 'Refacciones';
@@ -33124,9 +35864,12 @@ window.cerrarGarantiaInternaDirecto = async function(id) {
   const confirmar = confirm('¿Estás seguro de que deseas finalizar y cerrar este ticket de Garantía Interna directamente?');
   if (!confirmar) return;
   
+  const now = new Date().toISOString();
   t.estado = 'Cerrado';
   t.cotAceptada = 'si';
-  t.fechaCierre = new Date().toISOString();
+  t.fechaCierre = now;
+  t.fechaModificacion = now;
+  t.modificadoPor = window.getCurrentUserDisplayName ? window.getCurrentUserDisplayName() : 'Usuario';
   
   if (window.supabaseClient) {
     await window.pushToSupabase('tickets', t);
@@ -33641,6 +36384,16 @@ function dispararInicializacionGlobal() {
     inicializarPasswordRecovery();
   } catch (err) {
     console.error('Error al inicializar recuperación de contraseña:', err);
+  }
+  try {
+    if (typeof updateTicketBadge === 'function') updateTicketBadge();
+    if (typeof updateOrdenesBadge === 'function') updateOrdenesBadge();
+    if (typeof window.actualizarBadgeLevantamientos === 'function') window.actualizarBadgeLevantamientos();
+    if (typeof window.updateEnviosBadge === 'function') window.updateEnviosBadge();
+    if (typeof window.sincronizarNotificacionesInternas === 'function') window.sincronizarNotificacionesInternas();
+    if (typeof window.updateNotificationBell === 'function') window.updateNotificationBell();
+  } catch (err) {
+    console.error('Error al actualizar badges y notificaciones:', err);
   }
 
   // Listener para el campo de orden en el modal registrar actividad
@@ -34817,8 +37570,7501 @@ window.ejecutarAutomatizacion = async function(evento, contexto) {
   }
 };
 
+// ============================================================
+// DIAGRAMA DE FLUJO INTERACTIVO (PREFERENCIAS)
+// ============================================================
+window.abrirModalDiagramaFlujo = function() {
+  const modal = document.getElementById('modal-diagrama-flujo-overlay');
+  const mainContent = document.getElementById('flowchart-main-content');
+  const modalContent = document.getElementById('flowchart-modal-content');
+  if (modal && mainContent && modalContent) {
+    modalContent.innerHTML = mainContent.innerHTML;
+    modal.classList.add('open');
+    if (window.lucide) lucide.createIcons();
+  }
+};
+
+window.cerrarModalDiagramaFlujo = function(e) {
+  if (e && e.target && !e.target.classList.contains('modal-overlay') && !e.target.classList.contains('close-btn') && !e.target.closest('.close-btn')) return;
+  const modal = document.getElementById('modal-diagrama-flujo-overlay');
+  if (modal) modal.classList.remove('open');
+};
+
+let currentDiagramZoom = 1;
+window.zoomDiagramaFlujo = function(delta) {
+  const content = document.getElementById('flowchart-modal-content');
+  if (!content) return;
+  currentDiagramZoom = Math.max(0.6, Math.min(1.8, currentDiagramZoom + delta));
+  content.style.transform = `scale(${currentDiagramZoom})`;
+  content.style.transformOrigin = 'top center';
+  const label = document.getElementById('diagrama-zoom-label');
+  if (label) label.textContent = `${Math.round(currentDiagramZoom * 100)}%`;
+};
+
+window.resetZoomDiagramaFlujo = function() {
+  const content = document.getElementById('flowchart-modal-content');
+  if (!content) return;
+  currentDiagramZoom = 1;
+  content.style.transform = 'scale(1)';
+  const label = document.getElementById('diagrama-zoom-label');
+  if (label) label.textContent = '100%';
+};
+
+window.toggleSimbologiaFlujo = function() {
+  const legend = document.getElementById('flowchart-legend-box');
+  if (legend) {
+    legend.style.display = legend.style.display === 'none' ? 'flex' : 'none';
+  }
+};
+
+window.filtrarRutaDiagrama = function(ruta, btn) {
+  document.querySelectorAll('.flowchart-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  const container = document.getElementById('flowchart-main-content');
+  const modalContainer = document.getElementById('flowchart-modal-content');
+  
+  [container, modalContainer].forEach(root => {
+    if (!root) return;
+    const nodes = root.querySelectorAll('.flowchart-card-node, .flow-connector-bridge, .flow-connector-v');
+    nodes.forEach(n => {
+      n.style.opacity = '1';
+      n.style.filter = 'none';
+    });
+
+    if (ruta === 'normal') {
+      root.querySelectorAll('.step-levantamiento, .step-garantia, .step-subticket').forEach(el => {
+        el.style.opacity = '0.25';
+        el.style.filter = 'grayscale(80%)';
+      });
+    } else if (ruta === 'levantamiento') {
+      nodes.forEach(el => {
+        if (!el.closest('.step-levantamiento') && !el.closest('.step-entrada')) {
+          el.style.opacity = '0.25';
+          el.style.filter = 'grayscale(80%)';
+        }
+      });
+    } else if (ruta === 'garantia') {
+      nodes.forEach(el => {
+        if (!el.closest('.step-garantia') && !el.closest('.step-os') && !el.closest('.step-cierre')) {
+          el.style.opacity = '0.25';
+          el.style.filter = 'grayscale(80%)';
+        }
+      });
+    } else if (ruta === 'subticket') {
+      nodes.forEach(el => {
+        if (!el.closest('.step-subticket') && !el.closest('.step-cotizacion') && !el.closest('.step-os')) {
+          el.style.opacity = '0.25';
+          el.style.filter = 'grayscale(80%)';
+        }
+      });
+    }
+  });
+};
+
+// ============================================================
+// DEPURADOR DE ÓRDENES DE REFACCIONES Y GARANTÍAS (SUPERADMIN)
+// ============================================================
+window._depurarOrdenesCache = [];
+window._depurarSeleccionadas = new Set();
+window._depurarFiltradasActuales = [];
+
+window.contarOrdenesRefacciones = function() {
+  let ords = typeof getFilteredOrders === 'function' ? getFilteredOrders() : ((typeof ordenes !== 'undefined' && ordenes && ordenes.length > 0) ? ordenes : JSON.parse(localStorage.getItem('sapi_ordenes') || '[]'));
+  let tkts = typeof getFilteredTickets === 'function' ? getFilteredTickets() : ((typeof tickets !== 'undefined' && tickets && tickets.length > 0) ? tickets : JSON.parse(localStorage.getItem('sapi_tickets') || '[]'));
+
+  // Filtrado estricto para excluir tickets y órdenes de la Sandbox / Modo de Pruebas
+  if (typeof isTestData === 'function') {
+    const activeSandbox = typeof isTestModeActive === 'function' ? isTestModeActive() : false;
+    ords = ords.filter(o => isTestData(o) === activeSandbox);
+    tkts = tkts.filter(t => isTestData(t) === activeSandbox);
+  }
+
+  const vinculadasRef = [];
+  const vinculadasGar = [];
+
+  ords.forEach(o => {
+    const ticketId = o.soporte || o.ticket_id;
+    if (!ticketId) return;
+    const t = tkts.find(x => x.id === ticketId || x.folio === ticketId);
+    if (t) {
+      const norm = (s) => (typeof window.normStr === 'function' ? window.normStr(s) : String(s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim());
+      const cat = norm(t.categoria);
+      const area = norm(t.area);
+      const tipo = norm(t.tipo);
+      const folio = String(t.folio || '').trim().toUpperCase();
+      const clienteNom = o.cliente || t.cliente || 'Sin cliente';
+
+      // Identificar si el ticket es de Garantía o Refacción/Despacho
+      const isGarantia = cat.includes('garant') || area.includes('garant') || tipo.includes('garant');
+      const isRefaccion = cat.includes('refacci') || cat.includes('pieza') || cat.includes('despacho') || 
+                          cat.includes('envio') || cat.includes('paqueteri') || 
+                          area.includes('refacci') || area.includes('almacen') || area.includes('pieza') ||
+                          tipo.includes('refacci') || tipo.includes('despacho') ||
+                          folio.endsWith('-A') || folio.includes('-REF') || folio.startsWith('REF-');
+
+      // Si el ticket NO es de refacción ni de garantía (ej. es "Otro", "Servicio Técnico", "Soporte", etc.), NUNCA debe incluirse en este depurador
+      if (!isGarantia && !isRefaccion) {
+        return;
+      }
+
+      const isFieldService = typeof window.esTicketDeServicioEnCampo === 'function' ? window.esTicketDeServicioEnCampo(t) : (cat.includes('servicio') || cat.includes('mantenimiento'));
+
+      if (!isFieldService) {
+        if (isGarantia) {
+          vinculadasGar.push({
+            id: o.id,
+            ordenFolio: o.folio || o.id,
+            ordenEstado: o.estado || 'Pendiente',
+            fechaOS: o.fecha || '',
+            ticketFolio: t.folio || t.id,
+            ticketCategoria: t.categoria || 'Garantía',
+            asuntoTicket: t.asunto || '',
+            cliente: clienteNom,
+            isRef: false,
+            isGar: true
+          });
+        } else if (isRefaccion) {
+          vinculadasRef.push({
+            id: o.id,
+            ordenFolio: o.folio || o.id,
+            ordenEstado: o.estado || 'Pendiente',
+            fechaOS: o.fecha || '',
+            ticketFolio: t.folio || t.id,
+            ticketCategoria: t.categoria || (t.area && t.area.toLowerCase().includes('refacci') ? 'Refacciones' : 'Refacción'),
+            asuntoTicket: t.asunto || '',
+            cliente: clienteNom,
+            isRef: true,
+            isGar: false
+          });
+        }
+      }
+    }
+  });
+
+  return {
+    totalOrdenes: ords.length,
+    totalTickets: tkts.length,
+    ordenesRefacciones: vinculadasRef.length,
+    ordenesGarantias: vinculadasGar.length,
+    detalleRefacciones: vinculadasRef,
+    detalleGarantias: vinculadasGar,
+    todas: [...vinculadasRef, ...vinculadasGar]
+  };
+};
+
+window.actualizarBadgeDepuradorOrdenes = function() {
+  const isSuperAdmin = currentSession && (currentSession.viewMode === 'superadmin' || currentSession.userId === 'superadmin');
+  const cardSuperadmin = document.getElementById('card-superadmin-depuracion');
+  if (cardSuperadmin) {
+    cardSuperadmin.style.display = isSuperAdmin ? 'block' : 'none';
+  }
+
+  const btnDepurar = document.getElementById('btn-depurar-ordenes-ref');
+  if (btnDepurar) {
+    btnDepurar.style.display = isSuperAdmin ? 'flex' : 'none';
+  }
+
+  if (isSuperAdmin) {
+    const res = window.contarOrdenesRefacciones();
+    const countTotal = res.ordenesRefacciones + res.ordenesGarantias;
+    const badgeServ = document.getElementById('badge-count-ordenes-ref');
+    if (badgeServ) badgeServ.textContent = countTotal;
+    const badgePref = document.getElementById('badge-count-pref-ref');
+    if (badgePref) badgePref.textContent = countTotal;
+  }
+};
+
+window.abrirModalDepurarOrdenes = function() {
+  const isSuperAdmin = currentSession && (currentSession.viewMode === 'superadmin' || currentSession.userId === 'superadmin');
+  if (!isSuperAdmin) {
+    mostrarNotificacion('Solo el Superadministrador puede acceder a la herramienta de depuración.', 'error');
+    return;
+  }
+
+  const res = window.contarOrdenesRefacciones();
+  window._depurarOrdenesCache = res.todas;
+  window._depurarSeleccionadas.clear();
+
+  // Actualizar stats
+  const statRef = document.getElementById('depurar-stat-ref');
+  if (statRef) statRef.textContent = res.ordenesRefacciones;
+  const statGar = document.getElementById('depurar-stat-gar');
+  if (statGar) statGar.textContent = res.ordenesGarantias;
+  const statSel = document.getElementById('depurar-stat-selected');
+  if (statSel) statSel.textContent = '0';
+
+  // Reset filtros
+  const searchInput = document.getElementById('depurar-search-input');
+  if (searchInput) searchInput.value = '';
+  const filterCat = document.getElementById('depurar-filter-categoria');
+  if (filterCat) filterCat.value = 'all';
+  const filterEst = document.getElementById('depurar-filter-estado');
+  if (filterEst) filterEst.value = 'all';
+
+  window.filtrarTablaDepurador();
+
+  const modal = document.getElementById('modal-depurar-ordenes-overlay');
+  if (modal) {
+    modal.style.display = 'flex';
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+};
+
+window.cerrarModalDepurarOrdenes = function(e) {
+  if (e && e.target && e.target !== document.getElementById('modal-depurar-ordenes-overlay') && !e.target.classList.contains('modal-close') && !e.target.closest('.modal-close')) {
+    return;
+  }
+  const modal = document.getElementById('modal-depurar-ordenes-overlay');
+  if (modal) {
+    modal.style.display = 'none';
+    modal.classList.remove('open');
+  }
+  document.body.style.overflow = '';
+};
+
+window.filtrarTablaDepurador = function() {
+  const q = (document.getElementById('depurar-search-input')?.value || '').toLowerCase().trim();
+  const fCat = document.getElementById('depurar-filter-categoria')?.value || 'all';
+  const fEst = document.getElementById('depurar-filter-estado')?.value || 'all';
+
+  let filtradas = (window._depurarOrdenesCache || []).filter(item => {
+    if (fCat === 'refaccion' && !item.isRef) return false;
+    if (fCat === 'garantia' && !item.isGar) return false;
+    if (fEst !== 'all' && item.ordenEstado !== fEst) return false;
+
+    if (q) {
+      const matchFolioOS = (item.ordenFolio || '').toLowerCase().includes(q);
+      const matchFolioTkt = (item.ticketFolio || '').toLowerCase().includes(q);
+      const matchCliente = (item.cliente || '').toLowerCase().includes(q);
+      const matchAsunto = (item.asuntoTicket || '').toLowerCase().includes(q);
+      const matchCat = (item.ticketCategoria || '').toLowerCase().includes(q);
+      if (!matchFolioOS && !matchFolioTkt && !matchCliente && !matchAsunto && !matchCat) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  window._depurarFiltradasActuales = filtradas;
+
+  const tbody = document.getElementById('depurar-tabla-body');
+  if (!tbody) return;
+
+  if (filtradas.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" style="text-align:center; padding:3rem; color:var(--text-muted); font-size:0.9rem;">
+          <i data-lucide="check-circle" style="width:32px; height:32px; color:#10b981; margin-bottom:0.5rem; display:block; margin-inline:auto;"></i>
+          No hay órdenes de refacciones o garantías que coincidan con los filtros seleccionados.
+        </td>
+      </tr>
+    `;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    window.actualizarBotonesAccionMasivaDepurador();
+    return;
+  }
+
+  let html = '';
+  filtradas.forEach(item => {
+    const isChecked = window._depurarSeleccionadas.has(item.id);
+    const badgeColor = item.isGar ? '#0ea5e9' : '#ea580c';
+    const badgeBg = item.isGar ? 'rgba(14,165,233,0.15)' : 'rgba(234,88,12,0.15)';
+    const dateFormatted = item.fechaOS ? item.fechaOS.split('T')[0] : 'Sin fecha';
+
+    let estadoBg = 'rgba(100,116,139,0.15)';
+    let estadoColor = '#64748b';
+    if (item.ordenEstado === 'Pendiente') { estadoBg = 'rgba(234,179,8,0.15)'; estadoColor = '#ca8a04'; }
+    else if (item.ordenEstado === 'En proceso') { estadoBg = 'rgba(59,130,246,0.15)'; estadoColor = '#2563eb'; }
+    else if (item.ordenEstado === 'Completado') { estadoBg = 'rgba(16,185,129,0.15)'; estadoColor = '#16a34a'; }
+    else if (item.ordenEstado === 'Refacciones pendientes') { estadoBg = 'rgba(249,115,22,0.15)'; estadoColor = '#ea580c'; }
+
+    html += `
+      <tr style="border-bottom:1px solid var(--border); transition: background 0.15s; ${isChecked ? 'background:rgba(234,88,12,0.05);' : ''}">
+        <td style="text-align:center; padding:0.6rem 0.4rem;">
+          <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="window.toggleDepurarRowCheck('${item.id}', this.checked)" style="cursor:pointer;" />
+        </td>
+        <td style="padding:0.6rem 0.75rem; font-weight:700; color:var(--text-primary);">
+          <span style="display:inline-flex; align-items:center; gap:0.3rem;">
+            <i data-lucide="file-text" style="width:13px; height:13px; color:var(--accent);"></i>
+            ${item.ordenFolio}
+          </span>
+        </td>
+        <td style="padding:0.6rem 0.75rem;">
+          <span style="display:inline-block; font-size:0.75rem; font-weight:600; padding:2px 8px; border-radius:10px; background:${estadoBg}; color:${estadoColor};">
+            ${item.ordenEstado}
+          </span>
+        </td>
+        <td style="padding:0.6rem 0.75rem; color:var(--text-muted); font-size:0.78rem;">
+          ${dateFormatted}
+        </td>
+        <td style="padding:0.6rem 0.75rem; font-weight:600; color:var(--text-primary); max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+          ${item.cliente}
+        </td>
+        <td style="padding:0.6rem 0.75rem;">
+          <span style="font-family:monospace; font-weight:600; background:var(--bg-body); border:1px solid var(--border); padding:2px 6px; border-radius:4px; font-size:0.75rem;">
+            ${item.ticketFolio}
+          </span>
+        </td>
+        <td style="padding:0.6rem 0.75rem;">
+          <span style="display:inline-block; font-size:0.72rem; font-weight:600; padding:2px 6px; border-radius:4px; background:${badgeBg}; color:${badgeColor}; border:1px solid ${badgeColor}33;">
+            ${item.ticketCategoria}
+          </span>
+        </td>
+        <td style="padding:0.6rem 0.75rem; color:var(--text-muted); font-size:0.78rem; max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${item.asuntoTicket || ''}">
+          ${item.asuntoTicket || '<i style="opacity:0.6;">Sin asunto</i>'}
+        </td>
+        <td style="padding:0.6rem 0.5rem; text-align:center;">
+          <button type="button" class="action-btn del" onclick="window.eliminarOrdenDesdeDepurador('${item.id}')" title="Eliminar orden de servicio" style="padding:4px 8px; border:none; background:rgba(239,68,68,0.1); color:#ef4444; border-radius:4px; cursor:pointer;">
+            <i data-lucide="trash-2" style="width:14px; height:14px;"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  window.actualizarBotonesAccionMasivaDepurador();
+};
+
+window.toggleDepurarCheckAll = function(checked) {
+  (window._depurarFiltradasActuales || []).forEach(item => {
+    if (checked) {
+      window._depurarSeleccionadas.add(item.id);
+    } else {
+      window._depurarSeleccionadas.delete(item.id);
+    }
+  });
+  window.filtrarTablaDepurador();
+};
+
+window.toggleDepurarRowCheck = function(id, checked) {
+  if (checked) {
+    window._depurarSeleccionadas.add(id);
+  } else {
+    window._depurarSeleccionadas.delete(id);
+  }
+  window.actualizarBotonesAccionMasivaDepurador();
+};
+
+window.actualizarBotonesAccionMasivaDepurador = function() {
+  const count = window._depurarSeleccionadas.size;
+  const statSel = document.getElementById('depurar-stat-selected');
+  if (statSel) statSel.textContent = count;
+
+  const btnDel = document.getElementById('btn-depurar-delete-selected');
+  const countLabel = document.getElementById('btn-depurar-del-count');
+  if (countLabel) countLabel.textContent = count;
+
+  if (btnDel) {
+    if (count > 0) {
+      btnDel.disabled = false;
+      btnDel.style.opacity = '1';
+      btnDel.style.cursor = 'pointer';
+    } else {
+      btnDel.disabled = true;
+      btnDel.style.opacity = '0.5';
+      btnDel.style.cursor = 'not-allowed';
+    }
+  }
+
+  // Check master checkbox state
+  const checkAll = document.getElementById('depurar-check-all');
+  if (checkAll && window._depurarFiltradasActuales && window._depurarFiltradasActuales.length > 0) {
+    const allVisibleChecked = window._depurarFiltradasActuales.every(i => window._depurarSeleccionadas.has(i.id));
+    checkAll.checked = allVisibleChecked;
+  } else if (checkAll) {
+    checkAll.checked = false;
+  }
+};
+
+window.eliminarOrdenDesdeDepurador = async function(id) {
+  const item = (window._depurarOrdenesCache || []).find(x => x.id === id);
+  const folio = item ? item.ordenFolio : id;
+
+  const confirmed = await window.confirmarAccion({
+    titulo: 'Eliminar Orden de Servicio',
+    mensaje: `¿Deseas eliminar la orden ${folio}? El ticket comercial correspondiente (${item ? item.ticketFolio : ''}) seguirá conservándose.`,
+    textoAceptar: 'Eliminar Orden',
+    textoCancelar: 'Cancelar',
+    esPeligroso: true
+  });
+  if (!confirmed) return;
+
+  // 1. Eliminar de memoria local
+  ordenes = ordenes.filter(o => o.id !== id);
+  safeSetJSON('sapi_ordenes', ordenes);
+
+  // 2. Eliminar de Supabase
+  if (window.deleteFromSupabase) {
+    window.deleteFromSupabase('ordenes', id);
+  }
+
+  window._depurarSeleccionadas.delete(id);
+  window._depurarOrdenesCache = window._depurarOrdenesCache.filter(x => x.id !== id);
+
+  // Actualizar vistas
+  if (typeof renderTabla === 'function') {
+    renderTabla('servicios');
+    renderTabla();
+  }
+  if (typeof renderStats === 'function') renderStats();
+  if (typeof renderCalendario === 'function') renderCalendario();
+
+  window.actualizarBadgeDepuradorOrdenes();
+
+  // Actualizar stats del modal
+  const res = window.contarOrdenesRefacciones();
+  const statRef = document.getElementById('depurar-stat-ref');
+  if (statRef) statRef.textContent = res.ordenesRefacciones;
+  const statGar = document.getElementById('depurar-stat-gar');
+  if (statGar) statGar.textContent = res.ordenesGarantias;
+
+  window.filtrarTablaDepurador();
+  mostrarNotificacion(`Orden ${folio} eliminada con éxito.`, 'success');
+};
+
+window.eliminarSeleccionadasDepurador = async function() {
+  const ids = Array.from(window._depurarSeleccionadas);
+  if (ids.length === 0) return;
+
+  const confirmed = await window.confirmarAccion({
+    titulo: 'Eliminar Órdenes Seleccionadas',
+    mensaje: `¿Estás seguro de que deseas eliminar permanentemente las ${ids.length} órdenes seleccionadas? Los tickets origen se conservarán intactos.`,
+    textoAceptar: `Eliminar ${ids.length} Órdenes`,
+    textoCancelar: 'Cancelar',
+    esPeligroso: true
+  });
+  if (!confirmed) return;
+
+  const idSet = new Set(ids);
+  ordenes = ordenes.filter(o => !idSet.has(o.id));
+  safeSetJSON('sapi_ordenes', ordenes);
+
+  if (window.deleteFromSupabase) {
+    ids.forEach(id => window.deleteFromSupabase('ordenes', id));
+  }
+
+  window._depurarSeleccionadas.clear();
+  window._depurarOrdenesCache = window._depurarOrdenesCache.filter(x => !idSet.has(x.id));
+
+  if (typeof renderTabla === 'function') {
+    renderTabla('servicios');
+    renderTabla();
+  }
+  if (typeof renderStats === 'function') renderStats();
+  if (typeof renderCalendario === 'function') renderCalendario();
+
+  window.actualizarBadgeDepuradorOrdenes();
+
+  const res = window.contarOrdenesRefacciones();
+  const statRef = document.getElementById('depurar-stat-ref');
+  if (statRef) statRef.textContent = res.ordenesRefacciones;
+  const statGar = document.getElementById('depurar-stat-gar');
+  if (statGar) statGar.textContent = res.ordenesGarantias;
+
+  window.filtrarTablaDepurador();
+  mostrarNotificacion(`Se eliminaron ${ids.length} órdenes seleccionadas.`, 'success');
+};
+
+window.eliminarTodasPendientesRefacciones = async function() {
+  const pendientes = (window._depurarOrdenesCache || []).filter(x => x.isRef && x.ordenEstado === 'Pendiente');
+  if (pendientes.length === 0) {
+    mostrarNotificacion('No hay órdenes pendientes de refacciones para eliminar.', 'info');
+    return;
+  }
+
+  const confirmed = await window.confirmarAccion({
+    titulo: 'Eliminar Órdenes Pendientes de Refacciones',
+    mensaje: `Se encontraron ${pendientes.length} órdenes con estado 'Pendiente' vinculadas a tickets de Refacciones. ¿Deseas eliminarlas todas?`,
+    textoAceptar: `Eliminar ${pendientes.length} Pendientes`,
+    textoCancelar: 'Cancelar',
+    esPeligroso: true
+  });
+  if (!confirmed) return;
+
+  const idSet = new Set(pendientes.map(x => x.id));
+  ordenes = ordenes.filter(o => !idSet.has(o.id));
+  safeSetJSON('sapi_ordenes', ordenes);
+
+  if (window.deleteFromSupabase) {
+    pendientes.forEach(p => window.deleteFromSupabase('ordenes', p.id));
+  }
+
+  pendientes.forEach(p => window._depurarSeleccionadas.delete(p.id));
+  window._depurarOrdenesCache = window._depurarOrdenesCache.filter(x => !idSet.has(x.id));
+
+  if (typeof renderTabla === 'function') {
+    renderTabla('servicios');
+    renderTabla();
+  }
+  if (typeof renderStats === 'function') renderStats();
+  if (typeof renderCalendario === 'function') renderCalendario();
+
+  window.actualizarBadgeDepuradorOrdenes();
+
+  const res = window.contarOrdenesRefacciones();
+  const statRef = document.getElementById('depurar-stat-ref');
+  if (statRef) statRef.textContent = res.ordenesRefacciones;
+  const statGar = document.getElementById('depurar-stat-gar');
+  if (statGar) statGar.textContent = res.ordenesGarantias;
+
+  window.filtrarTablaDepurador();
+  mostrarNotificacion(`Se eliminaron ${pendientes.length} órdenes pendientes de refacciones.`, 'success');
+};
+
+window.exportarDepuradorAExcel = function() {
+  const lista = window._depurarFiltradasActuales || window._depurarOrdenesCache || [];
+  if (lista.length === 0) {
+    if (typeof window.mostrarNotificacion === 'function') {
+      window.mostrarNotificacion('No hay órdenes en la lista para exportar a Excel.', 'warning');
+    } else {
+      alert('No hay órdenes en la lista para exportar a Excel.');
+    }
+    return;
+  }
+
+  const dataExport = lista.map((item, idx) => ({
+    '#': idx + 1,
+    'Folio OS': item.ordenFolio || item.id || '',
+    'Estatus OS': item.ordenEstado || '',
+    'Fecha OS': item.fechaOS ? item.fechaOS.split('T')[0] : '',
+    'Cliente': item.cliente || '',
+    'Ticket Origen': item.ticketFolio || '',
+    'Categoría Ticket': item.ticketCategoria || '',
+    'Asunto Ticket': item.asuntoTicket || ''
+  }));
+
+  const fechaHoy = new Date().toISOString().split('T')[0];
+  const filename = `Depurador_Ordenes_Servicio_${fechaHoy}.xlsx`;
+
+  if (typeof XLSX !== 'undefined') {
+    const ws = XLSX.utils.json_to_sheet(dataExport);
+    
+    ws['!cols'] = [
+      { wch: 6 },
+      { wch: 16 },
+      { wch: 22 },
+      { wch: 14 },
+      { wch: 35 },
+      { wch: 16 },
+      { wch: 20 },
+      { wch: 50 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Órdenes Depurables');
+    XLSX.writeFile(wb, filename);
+
+    if (typeof window.mostrarNotificacion === 'function') {
+      window.mostrarNotificacion(`Se exportaron ${lista.length} órdenes a Excel (${filename}).`, 'success');
+    }
+  } else {
+    const headers = Object.keys(dataExport[0]);
+    let csv = '\uFEFF' + headers.join(',') + '\n';
+    dataExport.forEach(row => {
+      const line = headers.map(h => `"${String(row[h] || '').replace(/"/g, '""')}"`).join(',');
+      csv += line + '\n';
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename.replace('.xlsx', '.csv');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    if (typeof window.mostrarNotificacion === 'function') {
+      window.mostrarNotificacion(`Se exportaron ${lista.length} órdenes a CSV.`, 'success');
+    }
+  }
+};
+
+// ============================================================
+// DEPURADOR Y REGENERADOR DE TICKETS -A (SUPERADMIN)
+// ============================================================
+window._depurarTicketsCache = [];
+window._depurarTicketsSeleccionadas = new Set();
+window._depurarTicketsFiltradasActuales = [];
+
+window.analizarInformacionTicket = function(t) {
+  if (!t || typeof t !== 'object') {
+    return {
+      tieneInfo: false,
+      detalles: [],
+      modificadoPor: null,
+      fechaMod: null,
+      numComentarios: 0,
+      cotizacionSAP: '',
+      pedidoSAP: '',
+      numEnvios: 0,
+      tieneCotizacion: false,
+      montoCotizacion: ''
+    };
+  }
+
+  const detalles = [];
+
+  // 1. Cotización y Pedido SAP
+  const cotSAP = String(t.cotizacionSAP || t.cotizacion_sap || '').trim();
+  const pedSAP = String(t.pedidoSAP || '').trim();
+  const montoCot = (t.montoCotizacion && String(t.montoCotizacion).trim() && String(t.montoCotizacion).trim() !== '0') ? String(t.montoCotizacion).trim() : '';
+  const tienePDFCot = Boolean(t.pdfCotizacion);
+  const tieneCotAdic = Array.isArray(t.cotizacionesAdicionales) && t.cotizacionesAdicionales.length > 0;
+  const tieneCotAceptada = ['si', 'no', 'aprobada', 'rechazada', 'pendiente'].includes(String(t.cotAceptada || '').toLowerCase().trim());
+  const estadoCot = ['cotización', 'cotizacion', 'cotizado'].includes(String(t.estado || '').toLowerCase().trim());
+
+  const tieneCotizacion = Boolean(cotSAP || montoCot || tienePDFCot || tieneCotAdic || tieneCotAceptada || estadoCot);
+
+  if (cotSAP) detalles.push(`Cotización SAP: ${cotSAP}`);
+  if (pedSAP) detalles.push(`Pedido SAP: ${pedSAP}`);
+  if (montoCot) detalles.push(`Monto: $${montoCot}`);
+  if (t.cotAceptada === 'si' || t.cotAceptada === 'aprobada') detalles.push('Cotización Aceptada');
+  else if (t.cotAceptada === 'no' || t.cotAceptada === 'rechazada') detalles.push('Cotización Rechazada');
+
+  // 2. Comentarios internos
+  const numComentarios = Array.isArray(t.comentariosInternos) ? t.comentariosInternos.filter(c => c && (c.texto || c.usuario)).length : 0;
+  if (numComentarios > 0) {
+    detalles.push(`${numComentarios} comentario${numComentarios > 1 ? 's' : ''} interno${numComentarios > 1 ? 's' : ''}`);
+  }
+
+  // 3. Envíos y guías de paquetería
+  const numEnvios = Array.isArray(t.envios) ? t.envios.length : 0;
+  if (numEnvios > 0) {
+    detalles.push(`${numEnvios} guía${numEnvios > 1 ? 's' : ''} de envío`);
+  }
+
+  // 4. Archivos adjuntos o fotos
+  const numAdjuntos = (Array.isArray(t.adjuntos) ? t.adjuntos.length : 0) + (Array.isArray(t.fotos) ? t.fotos.length : 0);
+  if (numAdjuntos > 0) {
+    detalles.push(`${numAdjuntos} adjunto${numAdjuntos > 1 ? 's' : ''}`);
+  }
+
+  // 5. Refacciones con estatus de pedido avanzado
+  if (Array.isArray(t.refaccionesSeleccionadas) && t.refaccionesSeleccionadas.length > 0) {
+    const partsConEstatus = t.refaccionesSeleccionadas.filter(p => p && p.estatusPedido && !['Pendiente', 'Por Pedir'].includes(p.estatusPedido));
+    if (partsConEstatus.length > 0) {
+      detalles.push(`${partsConEstatus.length} parte(s) en proceso (${partsConEstatus.map(p => p.estatusPedido).join(', ')})`);
+    }
+  }
+
+  // 6. Modificación manual por usuario (solo cuando es una modificación humana real)
+  const modUser = t.modificadoPor || t.modificado_por || null;
+  const esModificadoHumano = modUser && !['Sistema', 'Automático', 'Autogenerado', '—', '', 'null', 'undefined'].includes(String(modUser).trim());
+
+  if (esModificadoHumano) {
+    detalles.push(`Modificado por ${modUser}`);
+  }
+
+  return {
+    tieneInfo: detalles.length > 0,
+    detalles: detalles,
+    modificadoPor: esModificadoHumano ? modUser : null,
+    fechaMod: t.fechaModificacion || t.updated_at || null,
+    numComentarios: numComentarios,
+    cotizacionSAP: cotSAP,
+    pedidoSAP: pedSAP,
+    numEnvios: numEnvios,
+    tieneCotizacion: tieneCotizacion,
+    montoCotizacion: montoCot
+  };
+};
+
+window.contarTicketsADepuracion = function() {
+  let ords = typeof getFilteredOrders === 'function' ? getFilteredOrders() : ((typeof ordenes !== 'undefined' && ordenes && ordenes.length > 0) ? ordenes : JSON.parse(localStorage.getItem('sapi_ordenes') || '[]'));
+  let tkts = typeof getFilteredTickets === 'function' ? getFilteredTickets() : ((typeof tickets !== 'undefined' && tickets && tickets.length > 0) ? tickets : JSON.parse(localStorage.getItem('sapi_tickets') || '[]'));
+
+  if (typeof isTestData === 'function') {
+    const activeSandbox = typeof isTestModeActive === 'function' ? isTestModeActive() : false;
+    ords = ords.filter(o => isTestData(o) === activeSandbox);
+    tkts = tkts.filter(t => isTestData(t) === activeSandbox);
+  }
+
+  const ticketsA = [];
+  let huerfanosCount = 0;
+  let osCount = 0;
+  let padreCount = 0;
+  let modificadosCount = 0;
+  let limpiosCount = 0;
+  let conCotizacionCount = 0;
+  let sinCotizacionCount = 0;
+
+  tkts.forEach(t => {
+    if (!t) return;
+    const tFolio = String(t.folio || '').trim();
+    const isA = /-[Aa]$/i.test(tFolio) || tFolio.toUpperCase().includes('-A') || Boolean(t.parentTicketId || t.ticketPadreId);
+    if (!isA) return;
+
+    const assocOrder = window.obtenerOrdenAsociadaTicket(t);
+    const parentTicket = !assocOrder ? (typeof window.obtenerTicketPadre === 'function' ? window.obtenerTicketPadre(t) : null) : null;
+    const refCount = (t.refaccionesSeleccionadas && Array.isArray(t.refaccionesSeleccionadas)) ? t.refaccionesSeleccionadas.length : 0;
+    const info = window.analizarInformacionTicket(t);
+
+    let tipoVinculo = 'huerfano';
+    let vinculoDetalle = 'Sin Orden / Ticket Origen';
+
+    if (assocOrder) {
+      tipoVinculo = 'os';
+      vinculoDetalle = `OS: ${assocOrder.folio || assocOrder.id}`;
+      osCount++;
+    } else if (parentTicket) {
+      tipoVinculo = 'padre';
+      vinculoDetalle = `Ticket Padre: ${parentTicket.folio || parentTicket.id}`;
+      padreCount++;
+    } else {
+      huerfanosCount++;
+    }
+
+    if (info.tieneInfo) {
+      modificadosCount++;
+    } else {
+      limpiosCount++;
+    }
+
+    if (info.tieneCotizacion) {
+      conCotizacionCount++;
+    } else {
+      sinCotizacionCount++;
+    }
+
+    ticketsA.push({
+      id: t.id,
+      folio: t.folio || 'S/F',
+      asunto: t.asunto || '—',
+      cliente: t.cliente || 'Sin cliente',
+      sitio: t.sitio || '',
+      estado: t.estado || 'Refacciones',
+      fechaCreacion: t.fechaCreacion || t.fecha || '',
+      refCount: refCount,
+      tipoVinculo: tipoVinculo,
+      vinculoDetalle: vinculoDetalle,
+      assocOrderFolio: assocOrder ? (assocOrder.folio || assocOrder.id) : null,
+      parentTicketFolio: parentTicket ? (parentTicket.folio || parentTicket.id) : null,
+      info: info,
+      raw: t
+    });
+  });
+
+  return {
+    total: ticketsA.length,
+    huerfanosCount,
+    osCount,
+    padreCount,
+    modificadosCount,
+    limpiosCount,
+    conCotizacionCount,
+    sinCotizacionCount,
+    todos: ticketsA
+  };
+};
+
+window.actualizarEstadisticasModalDepurador = function(diag) {
+  if (!diag) diag = window.contarTicketsADepuracion();
+  const statTotal = document.getElementById('depurar-tkt-stat-total');
+  if (statTotal) statTotal.textContent = diag.total;
+  const statMod = document.getElementById('depurar-tkt-stat-modificados');
+  if (statMod) statMod.textContent = diag.modificadosCount;
+  const statLimp = document.getElementById('depurar-tkt-stat-limpios');
+  if (statLimp) statLimp.textContent = diag.limpiosCount;
+  const statHuerf = document.getElementById('depurar-tkt-stat-huerfanos');
+  if (statHuerf) statHuerf.textContent = diag.huerfanosCount;
+  const statOS = document.getElementById('depurar-tkt-stat-os');
+  if (statOS) statOS.textContent = diag.osCount;
+  const statPadre = document.getElementById('depurar-tkt-stat-padre');
+  if (statPadre) statPadre.textContent = diag.padreCount;
+  const statCot = document.getElementById('depurar-tkt-stat-cotizados');
+  if (statCot) statCot.textContent = diag.conCotizacionCount;
+  const statSinCot = document.getElementById('depurar-tkt-stat-sincot');
+  if (statSinCot) statSinCot.textContent = diag.sinCotizacionCount;
+  const statSel = document.getElementById('depurar-tkt-stat-selected');
+  if (statSel) statSel.textContent = window._depurarTicketsSeleccionadas.size;
+};
+
+window.actualizarBadgeDepuradorTickets = function() {
+  const btnDepurar = document.getElementById('btn-depurar-tickets-ref');
+  if (!btnDepurar) return;
+  const isSuperAdmin = currentSession && (currentSession.viewMode === 'superadmin' || currentSession.userId === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.rol === 'superadmin');
+  btnDepurar.style.display = isSuperAdmin ? 'inline-flex' : 'none';
+  if (isSuperAdmin) {
+    const diag = window.contarTicketsADepuracion();
+    const badge = document.getElementById('badge-count-tickets-a');
+    if (badge) badge.textContent = diag.total;
+  }
+};
+
+window.abrirModalDepurarTickets = function() {
+  const isSuperAdmin = currentSession && (currentSession.viewMode === 'superadmin' || currentSession.userId === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.rol === 'superadmin');
+  if (!isSuperAdmin) {
+    mostrarNotificacion('Solo el Superadministrador puede acceder a la herramienta de depuración de tickets.', 'error');
+    return;
+  }
+
+  const diag = window.contarTicketsADepuracion();
+  window._depurarTicketsCache = diag.todos;
+  window._depurarTicketsSeleccionadas.clear();
+
+  window.actualizarEstadisticasModalDepurador(diag);
+
+  const searchInput = document.getElementById('depurar-tkt-search-input');
+  if (searchInput) searchInput.value = '';
+  const filterVinc = document.getElementById('depurar-tkt-filter-vinculo');
+  if (filterVinc) filterVinc.value = 'all';
+  const filterCot = document.getElementById('depurar-tkt-filter-cotizacion');
+  if (filterCot) filterCot.value = 'all';
+
+  window.filtrarTablaDepuradorTickets();
+
+  const modal = document.getElementById('modal-depurar-tickets-overlay');
+  if (modal) {
+    modal.style.display = 'flex';
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
+};
+
+window.cerrarModalDepurarTickets = function(e) {
+  if (e && e.target && e.target !== document.getElementById('modal-depurar-tickets-overlay') && !e.target.classList.contains('modal-close') && !e.target.closest('.modal-close') && !e.target.closest('button')) {
+    return;
+  }
+  const modal = document.getElementById('modal-depurar-tickets-overlay');
+  if (modal) {
+    modal.style.display = 'none';
+    modal.classList.remove('open');
+  }
+  document.body.style.overflow = '';
+};
+
+window.filtrarTablaDepuradorTickets = function() {
+  const q = (document.getElementById('depurar-tkt-search-input')?.value || '').toLowerCase().trim();
+  const fVinc = document.getElementById('depurar-tkt-filter-vinculo')?.value || 'all';
+  const fCot = document.getElementById('depurar-tkt-filter-cotizacion')?.value || 'all';
+
+  let filtradas = (window._depurarTicketsCache || []).filter(item => {
+    // Filtro por cotización
+    if (fCot === 'con_cotizacion' && !item.info.tieneCotizacion) return false;
+    if (fCot === 'sin_cotizacion' && item.info.tieneCotizacion) return false;
+
+    // Filtro por vínculo / estado
+    if (fVinc === 'modificados' && !item.info.tieneInfo) return false;
+    if (fVinc === 'limpios' && item.info.tieneInfo) return false;
+    if (fVinc === 'huerfano' && item.tipoVinculo !== 'huerfano') return false;
+    if (fVinc === 'os' && item.tipoVinculo !== 'os') return false;
+    if (fVinc === 'padre' && item.tipoVinculo !== 'padre') return false;
+
+    if (q) {
+      const matchFolio = (item.folio || '').toLowerCase().includes(q);
+      const matchAsunto = (item.asunto || '').toLowerCase().includes(q);
+      const matchCliente = (item.cliente || '').toLowerCase().includes(q);
+      const matchVinculo = (item.vinculoDetalle || '').toLowerCase().includes(q);
+      const matchMod = (item.info.detalles || []).some(d => d.toLowerCase().includes(q));
+      const matchCot = item.info.tieneCotizacion ? 'con cotizacion cotizado sap' : 'sin cotizacion';
+      if (!matchFolio && !matchAsunto && !matchCliente && !matchVinculo && !matchMod && !matchCot.includes(q)) return false;
+    }
+    return true;
+  });
+
+  window._depurarTicketsFiltradasActuales = filtradas;
+
+  const tbody = document.getElementById('depurar-tkt-tabla-body');
+  if (!tbody) return;
+
+  if (filtradas.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="10" style="text-align:center; padding:2.5rem; color:var(--text-muted);">
+          No se encontraron tickets -A con los filtros aplicados.
+        </td>
+      </tr>
+    `;
+    window.actualizarContadoresSeleccionTickets();
+    return;
+  }
+
+  tbody.innerHTML = filtradas.map(item => {
+    const isChecked = window._depurarTicketsSeleccionadas.has(item.id);
+    const badgeVinculo = item.tipoVinculo === 'os'
+      ? `<span class="badge" style="background:rgba(37,99,235,0.1); color:#2563eb; border:1px solid rgba(37,99,235,0.3); white-space:nowrap;"><i data-lucide="file-text" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${item.vinculoDetalle}</span>`
+      : (item.tipoVinculo === 'padre'
+        ? `<span class="badge" style="background:rgba(234,88,12,0.1); color:#ea580c; border:1px solid rgba(234,88,12,0.3); white-space:nowrap;"><i data-lucide="ticket" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${item.vinculoDetalle}</span>`
+        : `<span class="badge" style="background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.3); white-space:nowrap;"><i data-lucide="alert-triangle" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>Huérfano / Sin Orden</span>`
+      );
+
+    const badgeCotTag = item.info.tieneCotizacion
+      ? `<span class="badge" style="background:rgba(16,185,129,0.12); color:#059669; border:1px solid rgba(16,185,129,0.3); font-weight:700; width:fit-content;"><i data-lucide="file-check-2" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:3px;"></i>${item.info.cotizacionSAP ? 'SAP: ' + item.info.cotizacionSAP : 'Con Cotización'}</span>`
+      : `<span class="badge" style="background:rgba(100,116,139,0.1); color:#64748b; border:1px solid rgba(100,116,139,0.25); font-weight:500; width:fit-content;"><i data-lucide="clock" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:3px;"></i>Sin Cotización</span>`;
+
+    const cellAuditoria = item.info.tieneInfo
+      ? `
+        <div style="display:flex; flex-direction:column; gap:4px; max-width:280px;">
+          <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+            <span class="badge" style="background:rgba(217,119,6,0.12); color:#d97706; border:1px solid rgba(217,119,6,0.3); font-weight:700; width:fit-content;">
+              <i data-lucide="edit-3" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:3px;"></i>Modificado
+            </span>
+            ${badgeCotTag}
+          </div>
+          <div style="font-size:0.72rem; color:var(--text-secondary); line-height:1.35;" title="${item.info.detalles.join('\n')}">
+            ${item.info.detalles.map(d => `<span style="display:inline-block; background:rgba(217,119,6,0.08); color:var(--text-primary); border:1px solid rgba(217,119,6,0.2); padding:1px 6px; border-radius:4px; margin:1px 2px 1px 0; font-weight:500;">${d}</span>`).join('')}
+          </div>
+        </div>
+      `
+      : `
+        <div style="display:flex; flex-direction:column; gap:4px; max-width:280px;">
+          <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+            <span class="badge" style="background:rgba(16,185,129,0.1); color:#10b981; border:1px solid rgba(16,185,129,0.25); font-weight:600; white-space:nowrap;">
+              <i data-lucide="check-circle" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:3px;"></i>Sin Modificar (Limpio)
+            </span>
+            ${badgeCotTag}
+          </div>
+        </div>
+      `;
+
+    return `
+      <tr style="border-bottom:1px solid var(--border); ${isChecked ? 'background:rgba(234,88,12,0.06);' : ''}">
+        <td style="text-align:center; padding:0.6rem 0.4rem;">
+          <input type="checkbox" onchange="window.toggleDepurarTicket('${item.id}', this.checked)" ${isChecked ? 'checked' : ''} style="cursor:pointer;" />
+        </td>
+        <td style="padding:0.6rem 0.75rem; font-weight:700; white-space:nowrap;">
+          <a href="javascript:void(0)" onclick="window.cerrarModalDepurarTickets(); verDetalleTicket('${item.id}');" style="color:var(--accent); text-decoration:underline;" title="Abrir detalle del Ticket">${item.folio}</a>
+        </td>
+        <td style="padding:0.6rem 0.75rem; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.asunto}">${item.asunto}</td>
+        <td style="padding:0.6rem 0.75rem; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.cliente}${item.sitio ? ' - ' + item.sitio : ''}">
+          <div style="font-weight:500;">${item.cliente}</div>
+          ${item.sitio ? `<div style="font-size:0.72rem; color:var(--text-muted);">${item.sitio}</div>` : ''}
+        </td>
+        <td style="padding:0.6rem 0.75rem;">${badgeVinculo}</td>
+        <td style="padding:0.6rem 0.75rem; text-align:center;">
+          <span class="badge" style="background:var(--bg-body); border:1px solid var(--border); font-weight:600;">${item.refCount} partes</span>
+        </td>
+        <td style="padding:0.6rem 0.75rem;">${cellAuditoria}</td>
+        <td style="padding:0.6rem 0.75rem; white-space:nowrap;"><span class="badge badge-${badgeTicketEstado(item.raw)}">${getTicketEstadoLabel(item.raw)}</span></td>
+        <td style="padding:0.6rem 0.75rem; font-size:0.75rem; color:var(--text-muted); white-space:nowrap;">${formatFechaAmigable(item.fechaCreacion)}</td>
+        <td style="text-align:center; padding:0.6rem 0.5rem; white-space:nowrap;">
+          <div style="display:inline-flex; align-items:center; gap:4px;">
+            <button class="action-btn" onclick="window.cerrarModalDepurarTickets(); verDetalleTicket('${item.id}');" title="Ver Ticket Completo" style="width:28px; height:28px; border-radius:6px; color:var(--accent, #ea580c); border:1px solid rgba(234,88,12,0.25); background:transparent; cursor:pointer;">
+              <i data-lucide="eye" style="width:13px; height:13px;"></i>
+            </button>
+            <button class="action-btn del" onclick="window.eliminarTicketIndividualDepurador('${item.id}')" title="Eliminar Ticket" style="width:28px; height:28px; border-radius:6px; color:var(--danger, #ef4444); border:1px solid rgba(239,68,68,0.25); background:transparent; cursor:pointer;">
+              <i data-lucide="trash-2" style="width:13px; height:13px;"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  window.actualizarContadoresSeleccionTickets();
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
+};
+
+window.toggleDepurarCheckAllTickets = function(checked) {
+  (window._depurarTicketsFiltradasActuales || []).forEach(item => {
+    if (checked) {
+      window._depurarTicketsSeleccionadas.add(item.id);
+    } else {
+      window._depurarTicketsSeleccionadas.delete(item.id);
+    }
+  });
+  window.filtrarTablaDepuradorTickets();
+};
+
+window.toggleDepurarTicket = function(id, checked) {
+  if (checked) {
+    window._depurarTicketsSeleccionadas.add(id);
+  } else {
+    window._depurarTicketsSeleccionadas.delete(id);
+  }
+  window.actualizarContadoresSeleccionTickets();
+};
+
+window.actualizarContadoresSeleccionTickets = function() {
+  const count = window._depurarTicketsSeleccionadas.size;
+  const statSel = document.getElementById('depurar-tkt-stat-selected');
+  if (statSel) statSel.textContent = count;
+
+  const btnDel = document.getElementById('btn-depurar-tkt-delete-selected');
+  const countLabel = document.getElementById('btn-depurar-tkt-del-count');
+  if (countLabel) countLabel.textContent = count;
+
+  if (btnDel) {
+    if (count > 0) {
+      btnDel.disabled = false;
+      btnDel.style.opacity = '1';
+      btnDel.style.cursor = 'pointer';
+    } else {
+      btnDel.disabled = true;
+      btnDel.style.opacity = '0.5';
+      btnDel.style.cursor = 'not-allowed';
+    }
+  }
+
+  const checkAll = document.getElementById('depurar-tkt-check-all');
+  if (checkAll && window._depurarTicketsFiltradasActuales && window._depurarTicketsFiltradasActuales.length > 0) {
+    const allVisibleChecked = window._depurarTicketsFiltradasActuales.every(i => window._depurarTicketsSeleccionadas.has(i.id));
+    checkAll.checked = allVisibleChecked;
+  } else if (checkAll) {
+    checkAll.checked = false;
+  }
+};
+
+window.eliminarTicketIndividualDepurador = async function(id) {
+  const item = (window._depurarTicketsCache || []).find(x => x.id === id);
+  const folio = item ? item.folio : id;
+
+  const confirmed = await window.confirmarAccion({
+    titulo: 'Eliminar Ticket',
+    mensaje: `¿Deseas eliminar el ticket ${folio}?`,
+    textoAceptar: 'Eliminar',
+    textoCancelar: 'Cancelar',
+    esPeligroso: true
+  });
+  if (!confirmed) return;
+
+  tickets = tickets.filter(t => t.id !== id);
+  safeSetJSON('sapi_tickets', tickets);
+  if (window.deleteFromSupabase) {
+    await window.deleteFromSupabase('tickets', id).catch(() => {});
+  }
+
+  window._depurarTicketsSeleccionadas.delete(id);
+  window._depurarTicketsCache = window._depurarTicketsCache.filter(x => x.id !== id);
+
+  const diag = window.contarTicketsADepuracion();
+  window.actualizarEstadisticasModalDepurador(diag);
+  window.filtrarTablaDepuradorTickets();
+  renderTickets();
+  renderStats();
+  window.actualizarBadgeDepuradorTickets();
+  mostrarNotificacion(`Ticket ${folio} eliminado correctamente.`, 'success');
+};
+
+window.eliminarSeleccionadosDepuradorTickets = async function() {
+  const ids = Array.from(window._depurarTicketsSeleccionadas);
+  if (ids.length === 0) return;
+
+  const confirmed = await window.confirmarAccion({
+    titulo: 'Eliminar Tickets Seleccionados',
+    mensaje: `¿Estás seguro de eliminar los ${ids.length} tickets seleccionados? Esta acción es irreversible.`,
+    textoAceptar: `Eliminar (${ids.length})`,
+    textoCancelar: 'Cancelar',
+    esPeligroso: true
+  });
+  if (!confirmed) return;
+
+  tickets = tickets.filter(t => !ids.includes(t.id));
+  safeSetJSON('sapi_tickets', tickets);
+  if (window.deleteFromSupabase) {
+    await Promise.all(ids.map(id => window.deleteFromSupabase('tickets', id).catch(() => {})));
+  }
+
+  window._depurarTicketsSeleccionadas.clear();
+  window._depurarTicketsCache = window._depurarTicketsCache.filter(x => !ids.includes(x.id));
+
+  const diag = window.contarTicketsADepuracion();
+  window.actualizarEstadisticasModalDepurador(diag);
+  window.filtrarTablaDepuradorTickets();
+  renderTickets();
+  renderStats();
+  window.actualizarBadgeDepuradorTickets();
+  mostrarNotificacion(`${ids.length} tickets eliminados correctamente.`, 'success');
+};
+
+// Regenerador específico para Tickets SIN Cotización (Protege 100% de los tickets con cotización)
+window.regenerarSoloTicketsSinCotizacion = async function() {
+  const isSuperAdmin = currentSession && (currentSession.viewMode === 'superadmin' || currentSession.userId === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.rol === 'superadmin');
+  if (!isSuperAdmin) {
+    mostrarNotificacion('Solo el Superadministrador puede ejecutar esta acción.', 'error');
+    return;
+  }
+
+  const diag = window.contarTicketsADepuracion();
+  const sinCot = diag.todos.filter(i => !i.info.tieneCotizacion);
+  const conCot = diag.todos.filter(i => i.info.tieneCotizacion);
+
+  if (sinCot.length === 0) {
+    mostrarNotificacion('No hay tickets -A sin cotización para regenerar. Todos los existentes ya cuentan con cotización registrada.', 'info');
+    return;
+  }
+
+  const confirmed = await window.confirmarAccion({
+    titulo: 'Regenerar Tickets Sin Cotización',
+    mensaje: `Se eliminarán ${sinCot.length} ticket(s) -A que NO tienen cotización y se conservarán 100% intactos ${conCot.length} ticket(s) que YA TIENEN COTIZACIÓN registrada.\n\nLuego se regenerarán únicamente las refacciones necesarias desde las Órdenes de Servicio activas. ¿Deseas continuar?`,
+    textoAceptar: `Regenerar (${sinCot.length} sin cotización)`,
+    textoCancelar: 'Cancelar',
+    esPeligroso: false
+  });
+  if (!confirmed) return;
+
+  const existingFolioMap = new Map();
+  (Array.isArray(tickets) ? tickets : []).forEach(t => {
+    if (t && t.folio) existingFolioMap.set(t.folio, t.id);
+  });
+
+  const sinCotIds = new Set(sinCot.map(v => v.id));
+
+  // 1. Conservar solo los que YA TIENEN COTIZACIÓN
+  tickets = (Array.isArray(tickets) ? tickets : []).filter(t => !sinCotIds.has(t.id));
+
+  // 2. Regenerar ÚNICAMENTE desde Órdenes de Servicio activas con refacciones necesarias
+  const poolOrdenes = Array.isArray(ordenes) ? [...ordenes] : [];
+  let regeneradosOS = 0;
+  const now = new Date().toISOString();
+
+  poolOrdenes.forEach(o => {
+    if (!o) return;
+    const refNecesarias = o.ref_necesarias || [];
+    if (!Array.isArray(refNecesarias) || refNecesarias.length === 0) return;
+
+    let baseFolio = String(o.folio || '').trim();
+    if (o.soporte) {
+      const parentTicket = (Array.isArray(tickets) ? tickets : []).find(t => t.id === o.soporte || t.folio === o.soporte);
+      if (parentTicket && parentTicket.folio) baseFolio = parentTicket.folio;
+    }
+    if (!baseFolio) return;
+
+    let targetFolio = baseFolio.startsWith('TKT-') ? `${baseFolio}-A` : `TKT-${baseFolio}-A`;
+    if (targetFolio.endsWith('-A-A')) targetFolio = targetFolio.replace('-A-A', '-A');
+
+    // Verificar si ya existe un ticket protegido (con cotización) para esta orden
+    const yaExiste = tickets.some(t => t && (t.ordenId === o.id || t.folio === targetFolio));
+    if (yaExiste) return;
+
+    const refaccionesMapeadas = refNecesarias.map(r => ({
+      marca: r.marca || '',
+      codigo: r.clave || r.codigo || 'S/C',
+      clave: r.clave || r.codigo || 'S/C',
+      nombre: r.descripcion || r.nombre || 'Sin Descripción',
+      descripcion: r.descripcion || r.nombre || 'Sin Descripción',
+      cantidad: r.cantidad || 1,
+      estatusPedido: r.estatusPedido || 'Por Pedir'
+    }));
+
+    const ticketId = existingFolioMap.get(targetFolio) || crypto.randomUUID();
+
+    const nuevoTicket = {
+      id: ticketId,
+      folio: targetFolio,
+      ordenId: o.id,
+      ordenFolio: o.folio,
+      fecha: o.fecha || now,
+      fechaCreacion: o.fecha || now,
+      fechaCierre: null,
+      canal: 'sistema',
+      contacto: '',
+      asunto: `Refacciones para ${o.folio || ''}`,
+      cliente: o.cliente || 'Sin cliente',
+      sitio: o.ubicacion || o.ubicacion_sitio || '',
+      solicitante: o.creadoPor || o.tecnico || 'Sistema',
+      creadoPor: o.creadoPor || o.tecnico || 'Sistema',
+      area: 'Operaciones',
+      categoria: 'Refacción',
+      prioridad: 'Media',
+      asignado: 'Adrian Franco',
+      descripcion: `Ticket de refacciones por pedir generado de la Orden de Servicio ${o.folio}.`,
+      equipo: o.equipo || '',
+      horometro: o.horometro_real || o.horometro || '',
+      notas: '',
+      refaccionesSeleccionadas: refaccionesMapeadas,
+      cotizacionesAdicionales: [],
+      estado: 'Refacciones',
+      cotizacionSAP: '',
+      montoCotizacion: null,
+      cotAceptada: '',
+      motivoRechazo: '',
+      pedidoSAP: '',
+      comentariosInternos: [],
+      comentariosClientes: [],
+      tecnicosAsignados: [],
+      pdfPedido: null,
+      pdfCotizacion: null,
+      esPrueba: o.esPrueba || false
+    };
+
+    tickets.push(nuevoTicket);
+    regeneradosOS++;
+  });
+
+  // 3. Eliminar en Supabase solo los IDs que ya no existen en la lista final
+  const finalIds = new Set(tickets.map(t => t.id));
+  const idsToDelete = Array.from(sinCotIds).filter(id => !finalIds.has(id));
+  if (window.deleteFromSupabase && idsToDelete.length > 0) {
+    await Promise.all(idsToDelete.map(id => window.deleteFromSupabase('tickets', id).catch(() => {})));
+  }
+
+  // 4. Sincronizar los tickets nuevos/regenerados en Supabase
+  if (window.pushToSupabase) {
+    const regeneratedTickets = tickets.filter(t => sinCotIds.has(t.id) || !existingFolioMap.has(t.folio));
+    for (const t of regeneratedTickets) {
+      await window.pushToSupabase('tickets', t).catch(() => {});
+    }
+  }
+
+  safeSetJSON('sapi_tickets', tickets);
+  renderTickets();
+  renderStats();
+  window.actualizarBadgeDepuradorTickets();
+  window.actualizarBadgeDepuradorOrdenes();
+
+  mostrarNotificacion(`Regeneración exitosa: ${idsToDelete.length} duplicados/huérfanos eliminados, ${conCot.length} tickets cotizados protegidos, ${regeneradosOS} tickets de Órdenes de Servicio sincronizados.`, 'success');
+
+  const nuevoDiag = window.contarTicketsADepuracion();
+  window._depurarTicketsCache = nuevoDiag.todos;
+  window._depurarTicketsSeleccionadas.clear();
+  window.actualizarEstadisticasModalDepurador(nuevoDiag);
+  window.filtrarTablaDepuradorTickets();
+};
+
+// Limpieza segura: Solo elimina tickets vacíos / sin modificar y regenera los faltantes desde Órdenes de Servicio
+window.limpiarSoloTicketsVaciosYRegenerar = async function() {
+  const diag = window.contarTicketsADepuracion();
+  const vacios = diag.todos.filter(i => !i.info.tieneInfo);
+  const modificados = diag.todos.filter(i => i.info.tieneInfo);
+
+  if (vacios.length === 0) {
+    mostrarNotificacion('No hay tickets -A vacíos para limpiar. Todos los existentes tienen información capturada por el equipo.', 'info');
+    return;
+  }
+
+  const confirmed = await window.confirmarAccion({
+    titulo: 'Limpiar Solo Tickets Vacíos',
+    mensaje: `Se eliminarán ${vacios.length} tickets -A vacíos/sin modificar y se conservarán intactos ${modificados.length} tickets con comentarios/SAP del equipo. Luego se sincronizarán los tickets requeridos desde las Órdenes de Servicio activas. ¿Deseas continuar?`,
+    textoAceptar: `Limpiar ${vacios.length} vacíos y regenerar`,
+    textoCancelar: 'Cancelar',
+    esPeligroso: false
+  });
+  if (!confirmed) return;
+
+  const existingFolioMap = new Map();
+  (Array.isArray(tickets) ? tickets : []).forEach(t => {
+    if (t && t.folio) existingFolioMap.set(t.folio, t.id);
+  });
+
+  const vaciosIds = new Set(vacios.map(v => v.id));
+
+  // Eliminar solo los vacíos
+  tickets = tickets.filter(t => !vaciosIds.has(t.id));
+
+  // 1. Regenerar desde Órdenes de Servicio activas que no tengan ya un ticket activo
+  const poolOrdenes = Array.isArray(ordenes) ? [...ordenes] : [];
+  let regeneradosOS = 0;
+  const now = new Date().toISOString();
+
+  poolOrdenes.forEach(o => {
+    if (!o) return;
+    const refNecesarias = o.ref_necesarias || [];
+    if (!Array.isArray(refNecesarias) || refNecesarias.length === 0) return;
+
+    let baseFolio = String(o.folio || '').trim();
+    if (o.soporte) {
+      const parentTicket = (Array.isArray(tickets) ? tickets : []).find(t => t.id === o.soporte || t.folio === o.soporte);
+      if (parentTicket && parentTicket.folio) baseFolio = parentTicket.folio;
+    }
+    if (!baseFolio) return;
+
+    let targetFolio = baseFolio.startsWith('TKT-') ? `${baseFolio}-A` : `TKT-${baseFolio}-A`;
+    if (targetFolio.endsWith('-A-A')) targetFolio = targetFolio.replace('-A-A', '-A');
+
+    // Verificar si ya existe un ticket conservado para esta orden
+    const yaExiste = tickets.some(t => t && (t.ordenId === o.id || t.folio === targetFolio));
+    if (yaExiste) return;
+
+    const refaccionesMapeadas = refNecesarias.map(r => ({
+      marca: r.marca || '',
+      codigo: r.clave || r.codigo || 'S/C',
+      clave: r.clave || r.codigo || 'S/C',
+      nombre: r.descripcion || r.nombre || 'Sin Descripción',
+      descripcion: r.descripcion || r.nombre || 'Sin Descripción',
+      cantidad: r.cantidad || 1,
+      estatusPedido: r.estatusPedido || 'Por Pedir'
+    }));
+
+    const ticketId = existingFolioMap.get(targetFolio) || crypto.randomUUID();
+
+    const nuevoTicket = {
+      id: ticketId,
+      folio: targetFolio,
+      ordenId: o.id,
+      ordenFolio: o.folio,
+      fecha: o.fecha || now,
+      fechaCreacion: o.fecha || now,
+      fechaCierre: null,
+      canal: 'sistema',
+      contacto: '',
+      asunto: `Refacciones para ${o.folio || ''}`,
+      cliente: o.cliente || 'Sin cliente',
+      sitio: o.ubicacion || o.ubicacion_sitio || '',
+      solicitante: o.creadoPor || o.tecnico || 'Sistema',
+      creadoPor: o.creadoPor || o.tecnico || 'Sistema',
+      area: 'Operaciones',
+      categoria: 'Refacción',
+      prioridad: 'Media',
+      asignado: 'Adrian Franco',
+      descripcion: `Ticket de refacciones por pedir generado de la Orden de Servicio ${o.folio}.`,
+      equipo: o.equipo || '',
+      horometro: o.horometro_real || o.horometro || '',
+      notas: '',
+      refaccionesSeleccionadas: refaccionesMapeadas,
+      cotizacionesAdicionales: [],
+      estado: 'Refacciones',
+      cotizacionSAP: '',
+      montoCotizacion: null,
+      cotAceptada: '',
+      motivoRechazo: '',
+      pedidoSAP: '',
+      comentariosInternos: [],
+      comentariosClientes: [],
+      tecnicosAsignados: [],
+      pdfPedido: null,
+      pdfCotizacion: null,
+      esPrueba: o.esPrueba || false
+    };
+
+    tickets.push(nuevoTicket);
+    regeneradosOS++;
+  });
+
+  // 2. Eliminar en Supabase solo los IDs que ya no existen
+  const finalIdsVacios = new Set(tickets.map(t => t.id));
+  const idsToDeleteVacios = Array.from(vaciosIds).filter(id => !finalIdsVacios.has(id));
+  if (window.deleteFromSupabase && idsToDeleteVacios.length > 0) {
+    await Promise.all(idsToDeleteVacios.map(id => window.deleteFromSupabase('tickets', id).catch(() => {})));
+  }
+
+  // 3. Sincronizar los tickets nuevos/regenerados en Supabase
+  if (window.pushToSupabase) {
+    const regeneratedTickets = tickets.filter(t => vaciosIds.has(t.id) || !existingFolioMap.has(t.folio));
+    for (const t of regeneratedTickets) {
+      await window.pushToSupabase('tickets', t).catch(() => {});
+    }
+  }
+
+  safeSetJSON('sapi_tickets', tickets);
+  renderTickets();
+  renderStats();
+  window.actualizarBadgeDepuradorTickets();
+  window.actualizarBadgeDepuradorOrdenes();
+
+  mostrarNotificacion(`Limpieza segura completada: ${idsToDeleteVacios.length} tickets vacíos eliminados, ${modificados.length} modificados protegidos, ${regeneradosOS} tickets de Órdenes de Servicio sincronizados.`, 'success');
+
+  const nuevoDiag = window.contarTicketsADepuracion();
+  window._depurarTicketsCache = nuevoDiag.todos;
+  window._depurarTicketsSeleccionadas.clear();
+  window.actualizarEstadisticasModalDepurador(nuevoDiag);
+  window.filtrarTablaDepuradorTickets();
+};
+
+// Regenerador específico desde Tickets Padre (Sincroniza subtickets que ya están vinculados a su Padre real)
+window.regenerarTicketsDesdeTicketsPadre = async function() {
+  const isSuperAdmin = currentSession && (currentSession.viewMode === 'superadmin' || currentSession.userId === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.rol === 'superadmin');
+  if (!isSuperAdmin) {
+    mostrarNotificacion('Solo el Superadministrador puede ejecutar esta acción.', 'error');
+    return;
+  }
+
+  const diag = window.contarTicketsADepuracion();
+  const ticketsConPadre = diag.todos.filter(i => i.tipoVinculo === 'padre');
+
+  if (ticketsConPadre.length === 0) {
+    mostrarNotificacion('No se encontraron subtickets -A vinculados a un Ticket Padre para regenerar.', 'info');
+    return;
+  }
+
+  const confirmed = await window.confirmarAccion({
+    titulo: 'Sincronizar Subtickets desde Tickets Padre',
+    mensaje: `Se identificaron ${ticketsConPadre.length} subticket(s) -A vinculados a sus Tickets Padre. Esta acción sincronizará los datos del ticket padre correspondiente (cliente, sitio, equipo, horómetro). ¿Deseas continuar?`,
+    textoAceptar: `Sincronizar (${ticketsConPadre.length})`,
+    textoCancelar: 'Cancelar',
+    esPeligroso: false
+  });
+  if (!confirmed) return;
+
+  const poolTickets = Array.isArray(tickets) ? [...tickets] : [];
+  let sincronizados = 0;
+
+  for (const item of ticketsConPadre) {
+    const tHijo = poolTickets.find(t => t && t.id === item.id);
+    if (!tHijo) continue;
+
+    const p = window.obtenerTicketPadre(tHijo);
+    if (!p) continue;
+
+    // Sincronizar datos exactos desde el padre real
+    tHijo.parentTicketId = p.id;
+    tHijo.ticketPadreId = p.id;
+    tHijo.ordenId = null;
+    tHijo.ordenFolio = null;
+
+    if (p.cliente) tHijo.cliente = p.cliente;
+    if (p.sitio) tHijo.sitio = p.sitio;
+    if (p.equipo) tHijo.equipo = p.equipo;
+    if (p.horometro) tHijo.horometro = p.horometro;
+
+    if (Array.isArray(p.refaccionesSeleccionadas) && p.refaccionesSeleccionadas.length > 0) {
+      if (!tHijo.refaccionesSeleccionadas || tHijo.refaccionesSeleccionadas.length === 0) {
+        tHijo.refaccionesSeleccionadas = p.refaccionesSeleccionadas.map(r => ({
+          marca: r.marca || '',
+          codigo: r.clave || r.codigo || 'S/C',
+          clave: r.clave || r.codigo || 'S/C',
+          nombre: r.descripcion || r.nombre || 'Sin Descripción',
+          descripcion: r.descripcion || r.nombre || 'Sin Descripción',
+          cantidad: r.cantidad || 1,
+          estatusPedido: r.estatusPedido || 'Por Pedir'
+        }));
+      }
+    }
+
+    if (window.pushToSupabase) {
+      await window.pushToSupabase('tickets', tHijo).catch(() => {});
+    }
+    sincronizados++;
+  }
+
+  safeSetJSON('sapi_tickets', tickets);
+  renderTickets();
+  renderStats();
+  window.actualizarBadgeDepuradorTickets();
+  window.actualizarBadgeDepuradorOrdenes();
+
+  mostrarNotificacion(`Sincronización desde Tickets Padre exitosa: ${sincronizados} tickets sincronizados.`, 'success');
+
+  const nuevoDiag = window.contarTicketsADepuracion();
+  window._depurarTicketsCache = nuevoDiag.todos;
+  window._depurarTicketsSeleccionadas.clear();
+  window.actualizarEstadisticasModalDepurador(nuevoDiag);
+  window.filtrarTablaDepuradorTickets();
+};
+
+window.depurarYRegenerarTicketsCompletos = async function() {
+  const diag = window.contarTicketsADepuracion();
+  let advertenciaModificados = '';
+
+  if (diag.modificadosCount > 0) {
+    advertenciaModificados = `\n\n⚠️ ¡ATENCIÓN! Se detectaron ${diag.modificadosCount} ticket(s) con comentarios internos, órdenes SAP o modificaciones del equipo. La 'Limpieza Total' los eliminará y regenerará desde cero desde las Órdenes de Servicio activas.`;
+  }
+
+  const confirmed = await window.confirmarAccion({
+    titulo: 'Limpieza y Regeneración Total de Tickets -A',
+    mensaje: `Esta acción eliminará todos los tickets -A (${diag.total} en total) y escaneará las Órdenes de Servicio activas para regenerar tickets 100% limpios y vinculados a sus OS.${advertenciaModificados}\n\n¿Estás seguro de continuar?`,
+    textoAceptar: 'Limpiar y Regenerar Todo',
+    textoCancelar: 'Cancelar',
+    esPeligroso: true
+  });
+  if (!confirmed) return;
+
+  const existingFolioMap = new Map();
+  (Array.isArray(tickets) ? tickets : []).forEach(t => {
+    if (t && t.folio) existingFolioMap.set(t.folio, t.id);
+  });
+
+  const poolTickets = Array.isArray(tickets) ? [...tickets] : [];
+  const poolOrdenes = Array.isArray(ordenes) ? [...ordenes] : [];
+
+  // 1. Identificar todos los tickets -A existentes
+  const ticketsABorrados = [];
+  const ticketsConservados = [];
+
+  poolTickets.forEach(t => {
+    if (!t) return;
+    const tFolio = String(t.folio || '').trim();
+    const isA = /-[Aa]$/i.test(tFolio) || tFolio.toUpperCase().includes('-A') || Boolean(t.parentTicketId || t.ticketPadreId);
+    if (isA) {
+      ticketsABorrados.push(t);
+    } else {
+      ticketsConservados.push(t);
+    }
+  });
+
+  tickets = ticketsConservados;
+  let regeneradosOS = 0;
+  const now = new Date().toISOString();
+
+  // 2. Regenerar desde Órdenes de Servicio activas que tienen refacciones necesarias
+  poolOrdenes.forEach(o => {
+    if (!o) return;
+    const refNecesarias = o.ref_necesarias || [];
+    if (!Array.isArray(refNecesarias) || refNecesarias.length === 0) return;
+
+    let baseFolio = String(o.folio || '').trim();
+    if (o.soporte) {
+      const parentTicket = ticketsConservados.find(t => t.id === o.soporte || t.folio === o.soporte);
+      if (parentTicket && parentTicket.folio) baseFolio = parentTicket.folio;
+    }
+    if (!baseFolio) return;
+
+    let targetFolio = baseFolio.startsWith('TKT-') ? `${baseFolio}-A` : `TKT-${baseFolio}-A`;
+    if (targetFolio.endsWith('-A-A')) targetFolio = targetFolio.replace('-A-A', '-A');
+
+    const refaccionesMapeadas = refNecesarias.map(r => ({
+      marca: r.marca || '',
+      codigo: r.clave || r.codigo || 'S/C',
+      clave: r.clave || r.codigo || 'S/C',
+      nombre: r.descripcion || r.nombre || 'Sin Descripción',
+      descripcion: r.descripcion || r.nombre || 'Sin Descripción',
+      cantidad: r.cantidad || 1,
+      estatusPedido: r.estatusPedido || 'Por Pedir'
+    }));
+
+    const ticketId = existingFolioMap.get(targetFolio) || crypto.randomUUID();
+
+    const nuevoTicket = {
+      id: ticketId,
+      folio: targetFolio,
+      ordenId: o.id,
+      ordenFolio: o.folio,
+      fecha: o.fecha || now,
+      fechaCreacion: o.fecha || now,
+      fechaCierre: null,
+      canal: 'sistema',
+      contacto: '',
+      asunto: `Refacciones para ${o.folio || ''}`,
+      cliente: o.cliente || 'Sin cliente',
+      sitio: o.ubicacion || o.ubicacion_sitio || '',
+      solicitante: o.creadoPor || o.tecnico || 'Sistema',
+      creadoPor: o.creadoPor || o.tecnico || 'Sistema',
+      area: 'Operaciones',
+      categoria: 'Refacción',
+      prioridad: 'Media',
+      asignado: 'Adrian Franco',
+      descripcion: `Ticket de refacciones por pedir generado de la Orden de Servicio ${o.folio}.`,
+      equipo: o.equipo || '',
+      horometro: o.horometro_real || o.horometro || '',
+      notas: '',
+      refaccionesSeleccionadas: refaccionesMapeadas,
+      cotizacionesAdicionales: [],
+      estado: 'Refacciones',
+      cotizacionSAP: '',
+      montoCotizacion: null,
+      cotAceptada: '',
+      motivoRechazo: '',
+      pedidoSAP: '',
+      comentariosInternos: [],
+      comentariosClientes: [],
+      tecnicosAsignados: [],
+      pdfPedido: null,
+      pdfCotizacion: null,
+      esPrueba: o.esPrueba || false
+    };
+
+    tickets.push(nuevoTicket);
+    regeneradosOS++;
+  });
+
+  // 3. Eliminar en Supabase solo los IDs que ya no existen
+  const finalIds = new Set(tickets.map(t => t.id));
+  const idsToDelete = ticketsABorrados.map(t => t.id).filter(id => !finalIds.has(id));
+  if (window.deleteFromSupabase && idsToDelete.length > 0) {
+    await Promise.all(idsToDelete.map(id => window.deleteFromSupabase('tickets', id).catch(() => {})));
+  }
+
+  // 4. Sincronizar en Supabase
+  if (window.pushToSupabase) {
+    const isA_Ticket = (t) => {
+      const f = String(t?.folio || '').trim();
+      return /-[Aa]$/i.test(f) || f.toUpperCase().includes('-A') || Boolean(t?.parentTicketId || t?.ticketPadreId);
+    };
+    for (const t of tickets.filter(isA_Ticket)) {
+      await window.pushToSupabase('tickets', t).catch(() => {});
+    }
+  }
+
+  safeSetJSON('sapi_tickets', tickets);
+  renderTickets();
+  renderStats();
+  window.actualizarBadgeDepuradorTickets();
+  window.actualizarBadgeDepuradorOrdenes();
+
+  mostrarNotificacion(`Limpieza exitosa: ${idsToDelete.length} tickets obsoletos/duplicados eliminados, ${regeneradosOS} tickets de Órdenes de Servicio regenerados.`, 'success');
+
+  // Recargar datos en el modal
+  const diagNuevo = window.contarTicketsADepuracion();
+  window._depurarTicketsCache = diagNuevo.todos;
+  window._depurarTicketsSeleccionadas.clear();
+  window.actualizarEstadisticasModalDepurador(diagNuevo);
+  window.filtrarTablaDepuradorTickets();
+};
+
+window.exportarDepuradorTicketsAExcel = function() {
+  const lista = window._depurarTicketsFiltradasActuales || [];
+  if (lista.length === 0) {
+    mostrarNotificacion('No hay tickets en la lista para exportar.', 'warning');
+    return;
+  }
+  if (typeof XLSX === 'undefined') {
+    mostrarNotificacion('Librería de Excel no disponible.', 'error');
+    return;
+  }
+
+  const data = lista.map(i => ({
+    'Folio Ticket': i.folio,
+    'Asunto': i.asunto,
+    'Cliente': i.cliente,
+    'Sitio': i.sitio,
+    'Tipo de Vínculo': i.tipoVinculo === 'os' ? 'Orden de Servicio' : (i.tipoVinculo === 'padre' ? 'Ticket Padre' : 'Huérfano'),
+    'Detalle Vínculo': i.vinculoDetalle,
+    'No. Refacciones': i.refCount,
+    'Tiene Cotización': i.info.tieneCotizacion ? 'SÍ' : 'NO',
+    'Tiene Información / Modificado': i.info.tieneInfo ? 'SÍ (Modificado)' : 'NO (Limpio)',
+    'Detalle de Modificaciones': i.info.detalles.join(' | ') || 'Ninguna',
+    'Modificado Por': i.info.modificadoPor || '—',
+    'Comentarios Internos': i.info.numComentarios,
+    'Cotización SAP': i.info.cotizacionSAP || '—',
+    'Monto Cotización': i.info.montoCotizacion ? `$${i.info.montoCotizacion}` : '—',
+    'Pedido SAP': i.info.pedidoSAP || '—',
+    'Envíos / Guías': i.info.numEnvios,
+    'Estado': i.estado,
+    'Fecha Creación': i.fechaCreacion
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Depuración Tickets -A');
+  XLSX.writeFile(wb, `Auditoria_Tickets_A_${new Date().toISOString().slice(0,10)}.xlsx`);
+  mostrarNotificacion('Reporte Excel generado con éxito.', 'success');
+};
+
+// ============================================================
+// MÓDULO DE ENVÍOS Y GUÍAS DE PAQUETERÍA (EURO SAPI)
+// ============================================================
+window.currentEnviosFiltroEstado = 'todos';
+window.currentEnviosFiltroPaqueteria = 'todas';
+
+// Generador de URLs inteligentes de rastreo según la transportista
+window.obtenerUrlRastreoPaqueteria = function(paqueteria, guia) {
+  if (!guia) return '';
+  const g = String(guia).trim();
+  const paq = String(paqueteria || '').toLowerCase().trim();
+
+  if (paq.includes('dhl')) {
+    return `https://www.dhl.com/mx-es/home/tracking/tracking-express.html?submit=1&tracking-id=${encodeURIComponent(g)}`;
+  } else if (paq.includes('fedex')) {
+    return `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(g)}`;
+  } else if (paq.includes('estafeta')) {
+    return `https://www.estafeta.com/Herramientas/Rastreo?guia=${encodeURIComponent(g)}`;
+  } else if (paq.includes('paquetexpress') || paq.includes('paquete express')) {
+    return `https://www.paquetexpress.com.mx/rastreo-de-guias?guias=${encodeURIComponent(g)}`;
+  } else if (paq.includes('redpack')) {
+    return `https://www.redpack.com.mx/rastreo-de-envios/?guia=${encodeURIComponent(g)}`;
+  } else if (paq.includes('castores')) {
+    return `https://www.castores.com.mx/rastreo?guia=${encodeURIComponent(g)}`;
+  } else if (paq.includes('tresguerras') || paq.includes('tres guerras') || paq.includes('3g')) {
+    return `https://www.tresguerras.com.mx/3G/tracking.php?guia=${encodeURIComponent(g)}`;
+  } else if (paq.includes('sendex')) {
+    return `https://www.sendex.mx/rastreo/?guia=${encodeURIComponent(g)}`;
+  } else if (paq.includes('ups')) {
+    return `https://www.ups.com/track?tracknum=${encodeURIComponent(g)}`;
+  }
+  return '';
+};
+
+// Genera o asegura una guía de envío en estado 'En Preparación' para tickets con refacciones solicitadas
+window.asegurarGuiaEnvioParaTicket = function(ticket) {
+  if (!ticket) return null;
+  const parts = ticket.refaccionesSeleccionadas || [];
+  const cat = String(ticket.categoria || '').toLowerCase();
+  const isRef = cat.includes('refacci') || cat.includes('garant') || (ticket.folio && ticket.folio.endsWith('-A')) || parts.length > 0;
+  if (!isRef) return null;
+
+  if (!ticket.envios) ticket.envios = [];
+
+  // Si ya tiene al menos una guía de envío registrada, no duplicar
+  if (ticket.envios.length > 0) {
+    if (ticket.envios[0] && (!ticket.envios[0].parts || ticket.envios[0].parts.length === 0) && parts.length > 0) {
+      ticket.envios[0].parts = parts.map(p => ({
+        clave: p.clave || p.codigo || '',
+        descripcion: p.descripcion || p.nombre || '',
+        cantidad: p.cantidad || 1
+      }));
+      if (window.pushToSupabase) window.pushToSupabase('envios', ticket.envios[0]).catch(err => console.warn('[Envios Auto Sync] Error:', err));
+    }
+    return ticket.envios[0];
+  }
+
+  // Generar nueva guía de envío automática
+  const nuevoEnvio = {
+    id: `env-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    ticketId: ticket.id,
+    ticketFolio: ticket.folio || ticket.id,
+    ticketAsunto: ticket.asunto || '',
+    cliente: ticket.cliente || 'Sin cliente',
+    sitio: ticket.sitio || 'General',
+    paqueteria: 'Por Definir',
+    guiaPedido: '',
+    urlRastreo: '',
+    fechaEnvio: new Date().toISOString().split('T')[0],
+    fechaPedido: new Date().toISOString().split('T')[0],
+    fechaEntrega: '',
+    fechaLlegada: '',
+    llego: false,
+    estatus: 'En Preparación',
+    parts: parts.map(p => ({
+      clave: p.clave || p.codigo || '',
+      descripcion: p.descripcion || p.nombre || '',
+      cantidad: p.cantidad || 1
+    })),
+    pdfGuia: '',
+    notas: 'Guía generada automáticamente al confirmar solicitud de refacciones.'
+  };
+
+  ticket.envios.push(nuevoEnvio);
+
+  // Guardar en sapi_envios_db y sincronizar a Supabase
+  try {
+    const dbEnvios = JSON.parse(localStorage.getItem('sapi_envios_db') || '[]');
+    if (!dbEnvios.some(e => e.id === nuevoEnvio.id)) {
+      dbEnvios.unshift(nuevoEnvio);
+      localStorage.setItem('sapi_envios_db', JSON.stringify(dbEnvios));
+    }
+    if (typeof safeSetJSON === 'function' && typeof tickets !== 'undefined') {
+      safeSetJSON('sapi_tickets', tickets);
+    }
+  } catch(e) {}
+
+  if (window.pushToSupabase) {
+    window.pushToSupabase('envios', nuevoEnvio).catch(err => console.warn('[Envios Auto] Error al sincronizar:', err));
+  }
+
+  if (typeof window.renderEnvios === 'function') {
+    window.renderEnvios();
+  }
+
+  return nuevoEnvio;
+};
+
+// Obtiene la lista unificada de todas las guías de envío registradas
+window.obtenerTodosLosEnvios = function() {
+  const tkts = (typeof tickets !== 'undefined' && tickets && tickets.length > 0) 
+    ? tickets 
+    : JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+
+  const enviosList = [];
+
+  tkts.forEach(t => {
+    let envios = t.envios || [];
+    const cat = String(t.categoria || '').toLowerCase();
+    const hasDirectParts = Array.isArray(t.refaccionesSeleccionadas) && t.refaccionesSeleccionadas.length > 0;
+    const isSubticketA = t.folio && t.folio.endsWith('-A');
+    const hasExplicitGuia = !!(t.guiaPedido && t.guiaPedido.trim());
+
+    // Buscar refacciones en orden de servicio asociada si no las tiene directamente
+    let partsList = (t.refaccionesSeleccionadas || []).map(p => ({
+      clave: p.clave || p.codigo || '',
+      descripcion: p.descripcion || p.nombre || '',
+      cantidad: p.cantidad || 1,
+      estatusPedido: p.estatusPedido || 'Por Pedir'
+    }));
+
+    if (partsList.length === 0 && typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
+      const assocOrder = typeof window.obtenerOrdenAsociadaATicketRefacciones === 'function'
+        ? window.obtenerOrdenAsociadaATicketRefacciones(t)
+        : ordenes.find(o => o.soporte === t.id || o.folio === (t.folio || '').replace('-A', ''));
+      if (assocOrder && Array.isArray(assocOrder.ref_necesarias) && assocOrder.ref_necesarias.length > 0) {
+        partsList = assocOrder.ref_necesarias.map(p => ({
+          clave: p.clave || p.codigo || '',
+          descripcion: p.descripcion || p.nombre || '',
+          cantidad: p.cantidad || 1,
+          estatusPedido: p.estatusPedido || 'Por Pedir'
+        }));
+      }
+    }
+
+    const hasAnyParts = partsList.length > 0;
+
+    // Solo incluir tickets que realmente tengan refacciones, guías o sean subticket de refacciones (-A)
+    const shouldHaveEnvio = (envios.length > 0) || hasDirectParts || hasAnyParts || isSubticketA || hasExplicitGuia;
+
+    if (!shouldHaveEnvio) return;
+
+    // Si es un ticket de refacciones pero no tiene aún un array explícito de envíos, generar su guía inicial
+    if (envios.length === 0) {
+      const isEntregado = (hasAnyParts && partsList.every(p => p.estatusPedido === 'Entregado al Técnico')) || t.estatusPedido === 'Entregado al Técnico';
+
+      envios = [{
+        id: `auto-${t.id}`,
+        paqueteria: t.paqueteria || 'Por Definir',
+        guiaPedido: t.guiaPedido || '',
+        urlRastreo: window.obtenerUrlRastreoPaqueteria(t.paqueteria, t.guiaPedido),
+        fechaPedido: t.fechaPedido || (t.fechaCreacion ? t.fechaCreacion.split('T')[0] : (t.fecha ? t.fecha.split('T')[0] : '')),
+        fechaEntrega: t.fechaEntrega || '',
+        llego: !!isEntregado,
+        fechaLlegada: t.fechaEntrega || (isEntregado ? (t.fechaCierre ? t.fechaCierre.split('T')[0] : '') : ''),
+        parts: partsList,
+        pdfGuia: t.pdfGuia || '',
+        notas: t.notas || ''
+      }];
+    }
+
+    envios.forEach(e => {
+      // Determinar estatus del envío con precisión
+      let estatus = 'En Preparación';
+      const guiaValida = e.guiaPedido && String(e.guiaPedido).trim().length > 0;
+      const partesEntregadas = Array.isArray(e.parts) && e.parts.length > 0 && e.parts.every(p => p.estatusPedido === 'Entregado al Técnico');
+
+      if (e.llego || partesEntregadas) {
+        estatus = 'Entregado';
+      } else if (guiaValida) {
+        estatus = 'En Tránsito';
+      } else {
+        estatus = 'En Preparación';
+      }
+
+      enviosList.push({
+        id: e.id || Math.random().toString(36).substring(2, 9),
+        ticketId: t.id,
+        ticketFolio: t.folio || t.id,
+        ticketAsunto: t.asunto || '',
+        ticketCategoria: t.categoria || 'Refacción',
+        cliente: t.cliente || 'Sin cliente',
+        sitio: t.sitio || 'General',
+        paqueteria: e.paqueteria || 'Por Definir',
+        guiaPedido: e.guiaPedido || '',
+        urlRastreo: e.urlRastreo || window.obtenerUrlRastreoPaqueteria(e.paqueteria, e.guiaPedido),
+        fechaEnvio: e.fechaPedido || e.fechaEnvio || '',
+        fechaPedido: e.fechaPedido || e.fechaEnvio || '',
+        fechaEntrega: e.fechaEntrega || '',
+        fechaLlegada: e.fechaLlegada || '',
+        llego: estatus === 'Entregado',
+        estatus: estatus,
+        parts: (e.parts && e.parts.length > 0) ? e.parts : partsList,
+        pdfGuia: e.pdfGuia || '',
+        notas: e.notas || ''
+      });
+    });
+  });
+
+  // Incluir envíos independientes desde sapi_envios_db si no están ya en la lista
+  try {
+    const dbEnvios = JSON.parse(localStorage.getItem('sapi_envios_db') || '[]');
+    dbEnvios.forEach(dbe => {
+      if (!enviosList.some(x => x.id === dbe.id)) {
+        enviosList.push(dbe);
+      }
+    });
+  } catch(e) {}
+
+  return enviosList;
+};
+
+// Renderiza la tabla y KPIs de la vista Envíos
+window.renderEnvios = function() {
+  const tbody = document.getElementById('tabla-body-envios');
+  if (!tbody) return;
+
+  const q = (document.getElementById('search-envios')?.value || '').toLowerCase().trim();
+  const fEstado = document.getElementById('filter-envios-estado')?.value || window.currentEnviosFiltroEstado || 'todos';
+  const fPaq = document.getElementById('filter-envios-paqueteria')?.value || window.currentEnviosFiltroPaqueteria || 'todas';
+
+  const todos = window.obtenerTodosLosEnvios();
+
+  // Actualizar KPIs superiores
+  const countTotal = todos.length;
+  const countTransito = todos.filter(e => e.estatus === 'En Tránsito').length;
+  const countEntregados = todos.filter(e => e.estatus === 'Entregado').length;
+  const countPreparando = todos.filter(e => e.estatus === 'En Preparación').length;
+
+  const statTot = document.getElementById('stat-envios-total');
+  if (statTot) statTot.textContent = countTotal;
+  const statTra = document.getElementById('stat-envios-transito');
+  if (statTra) statTra.textContent = countTransito;
+  const statEnt = document.getElementById('stat-envios-entregados');
+  if (statEnt) statEnt.textContent = countEntregados;
+  const statPrep = document.getElementById('stat-envios-preparando');
+  if (statPrep) statPrep.textContent = countPreparando;
+
+  // Actualizar badge en el menú lateral
+  window.updateEnviosBadge(countTransito);
+
+  // Filtrar envíos
+  let filtrados = todos.filter(e => {
+    if (fEstado !== 'todos' && e.estatus !== fEstado) return false;
+    if (fPaq !== 'todas' && !String(e.paqueteria).toLowerCase().includes(fPaq.toLowerCase())) return false;
+
+    if (q) {
+      const matchGuia = String(e.guiaPedido || '').toLowerCase().includes(q);
+      const matchTicket = String(e.ticketFolio || '').toLowerCase().includes(q);
+      const matchAsunto = String(e.ticketAsunto || '').toLowerCase().includes(q);
+      const matchCliente = String(e.cliente || '').toLowerCase().includes(q);
+      const matchSitio = String(e.sitio || '').toLowerCase().includes(q);
+      const matchPaq = String(e.paqueteria || '').toLowerCase().includes(q);
+      const matchParts = (e.parts || []).some(p => 
+        String(p.clave || '').toLowerCase().includes(q) || 
+        String(p.descripcion || '').toLowerCase().includes(q)
+      );
+
+      if (!matchGuia && !matchTicket && !matchAsunto && !matchCliente && !matchSitio && !matchPaq && !matchParts) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  // Ordenar: primero En Preparación, luego En Tránsito, al final Entregados (y dentro de cada grupo por fecha más reciente)
+  filtrados.sort((a, b) => {
+    const statusWeight = {
+      'En Preparación': 1,
+      'En Tránsito': 2,
+      'Entregado': 3
+    };
+    const wA = statusWeight[a.estatus] || 99;
+    const wB = statusWeight[b.estatus] || 99;
+    if (wA !== wB) return wA - wB;
+    const fA = a.fechaEnvio ? new Date(a.fechaEnvio).getTime() : 0;
+    const fB = b.fechaEnvio ? new Date(b.fechaEnvio).getTime() : 0;
+    return fB - fA;
+  });
+
+  if (filtrados.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="10" class="empty-state" style="padding:3rem 1rem; text-align:center; color:var(--text-muted);">
+          <i data-lucide="package" style="width:36px; height:36px; stroke-width:1.5; color:var(--accent); margin-bottom:0.5rem; display:block; margin-inline:auto;"></i>
+          ${q || fEstado !== 'todos' || fPaq !== 'todas' ? 'No se encontraron envíos que coincidan con los filtros aplicados.' : 'No hay guías de envío registradas aún.'}
+        </td>
+      </tr>
+    `;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    return;
+  }
+
+  let html = '';
+  filtrados.forEach(e => {
+    // Estatus Badge
+    let statusBg = 'rgba(234, 179, 8, 0.15)';
+    let statusColor = '#ca8a04';
+    let statusIcon = 'clock';
+
+    if (e.estatus === 'En Tránsito') {
+      statusBg = 'rgba(14, 165, 233, 0.15)';
+      statusColor = '#0284c7';
+      statusIcon = 'navigation';
+    } else if (e.estatus === 'Entregado') {
+      statusBg = 'rgba(16, 185, 129, 0.15)';
+      statusColor = '#16a34a';
+      statusIcon = 'check-circle';
+    }
+
+    // Piezas resumen
+    let partsSummary = 'Sin piezas especificadas';
+    if (e.parts && e.parts.length > 0) {
+      if (e.parts.length === 1) {
+        partsSummary = e.parts[0].descripcion || e.parts[0].clave || '1 refacción';
+      } else {
+        partsSummary = `<b>${e.parts.length} refacciones:</b> ${e.parts[0].descripcion || e.parts[0].clave} +${e.parts.length - 1} más`;
+      }
+    }
+
+    // Tracking link
+    const trackingUrl = e.urlRastreo || window.obtenerUrlRastreoPaqueteria(e.paqueteria, e.guiaPedido);
+    const trackingBtn = trackingUrl 
+      ? `<a href="${trackingUrl}" target="_blank" class="action-btn" title="Rastrear en web de paquetería" style="color:#0ea5e9; text-decoration:none;"><i data-lucide="external-link"></i></a>` 
+      : '';
+
+    // PDF botón
+    const pdfBtn = e.pdfGuia 
+      ? `<button type="button" class="action-btn" onclick="window.visualizarPdfGuia('${e.ticketId}', '${e.id}')" title="Ver Comprobante / PDF"><i data-lucide="file-text" style="color:var(--accent);"></i></button>` 
+      : '<span style="color:var(--text-muted); font-size:0.75rem;">—</span>';
+
+    html += `
+      <tr style="cursor:pointer; transition:background 0.15s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
+        <td data-label="Acciones" style="white-space:nowrap; width:75px; text-align:center;" onclick="event.stopPropagation();">
+          <div style="display:inline-flex; gap:0.25rem; align-items:center; justify-content:center;">
+            <button class="action-btn" onclick="window.abrirDetalleEnvio('${e.id}')" title="Ver Detalle" style="padding:4px; display:inline-flex; align-items:center; justify-content:center;"><i data-lucide="eye" style="width:14px; height:14px;"></i></button>
+            <button class="action-btn" onclick="window.abrirModalNuevoEnvio('${e.ticketId}', '${e.id}')" title="Editar Guía" style="padding:4px; display:inline-flex; align-items:center; justify-content:center;"><i data-lucide="pencil" style="width:14px; height:14px;"></i></button>
+            ${trackingBtn}
+            <button class="action-btn del" onclick="window.eliminarEnvio('${e.id}', '${e.ticketId}')" title="Eliminar" style="padding:4px; display:inline-flex; align-items:center; justify-content:center;"><i data-lucide="trash-2" style="width:14px; height:14px;"></i></button>
+          </div>
+        </td>
+        <td data-label="Guía" onclick="window.abrirDetalleEnvio('${e.id}')" style="white-space:nowrap;">
+          <span style="font-family:monospace; font-weight:700; color:var(--text-primary); font-size:0.88rem;">
+            ${e.guiaPedido || '<i style="color:var(--text-muted); font-weight:normal;">Sin guía</i>'}
+          </span>
+        </td>
+        <td data-label="Paquetería" onclick="window.abrirDetalleEnvio('${e.id}')" style="white-space:nowrap;">
+          <span style="display:inline-flex; align-items:center; gap:0.35rem; padding:3px 8px; border-radius:6px; background:var(--bg-card); border:1px solid var(--border); font-size:0.8rem; font-weight:600;">
+            <i data-lucide="truck" style="width:13px; height:13px; color:var(--accent);"></i>
+            ${e.paqueteria}
+          </span>
+        </td>
+        <td data-label="Ticket" onclick="event.stopPropagation();" style="white-space:nowrap;">
+          <a href="#" onclick="verDetalleTicket('${e.ticketId}'); return false;" style="color:var(--accent); font-weight:700; text-decoration:underline; font-size:0.85rem;" title="${e.ticketAsunto || ''}">
+            ${e.ticketFolio}
+          </a>
+        </td>
+        <td data-label="Cliente" onclick="window.abrirDetalleEnvio('${e.id}')" style="max-width:180px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+          <strong style="font-size:0.85rem; color:var(--text-primary);" title="${e.cliente}">${e.cliente}</strong>
+        </td>
+        <td data-label="Destino" onclick="window.abrirDetalleEnvio('${e.id}')" style="max-width:140px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+          <span style="font-size:0.82rem; color:var(--text-secondary);" title="${e.sitio || 'General'}">${e.sitio || 'General'}</span>
+        </td>
+        <td data-label="Contenido" style="max-width:240px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" onclick="window.abrirDetalleEnvio('${e.id}')" title="${(e.parts||[]).map(p=>p.descripcion||p.clave).join(', ')}">
+          <span style="font-size:0.82rem; color:var(--text-secondary);">${partsSummary}</span>
+        </td>
+        <td data-label="Fecha Envío" onclick="window.abrirDetalleEnvio('${e.id}')" style="font-size:0.82rem; color:var(--text-muted); white-space:nowrap;">
+          ${e.fechaEnvio || '—'}
+        </td>
+        <td data-label="Fecha Entrega" onclick="window.abrirDetalleEnvio('${e.id}')" style="font-size:0.82rem; color:var(--text-muted); white-space:nowrap;">
+          ${e.fechaLlegada || e.fechaEntrega || '—'}
+        </td>
+        <td data-label="Estatus" onclick="window.abrirDetalleEnvio('${e.id}')" style="white-space:nowrap;">
+          <span style="display:inline-flex; align-items:center; gap:0.35rem; font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:10px; background:${statusBg}; color:${statusColor};">
+            <i data-lucide="${statusIcon}" style="width:12px; height:12px;"></i>
+            ${e.estatus}
+          </span>
+        </td>
+        <td data-label="PDF" style="text-align:center; width:50px;" onclick="event.stopPropagation();">
+          ${pdfBtn}
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+// Actualiza el badge en la barra lateral
+window.updateEnviosBadge = function(count) {
+  const badge = document.getElementById('nav-badge-envios');
+  if (!badge) return;
+  const num = (count !== undefined) ? count : window.obtenerTodosLosEnvios().filter(e => e.estatus === 'En Tránsito').length;
+  if (num > 0) {
+    badge.textContent = num;
+    badge.classList.add('visible');
+    badge.style.display = 'inline-flex';
+  } else {
+    badge.classList.remove('visible');
+    badge.style.display = 'none';
+  }
+};
+
+// Abre el modal para crear o editar una guía de envío
+window.abrirModalNuevoEnvio = function(ticketId, envioId) {
+  // Asegurar que el modal de detalle esté cerrado
+  const modalDetalle = document.getElementById('modal-detalle-envio-overlay');
+  if (modalDetalle) {
+    modalDetalle.style.display = 'none';
+    modalDetalle.classList.remove('open');
+  }
+
+  const modal = document.getElementById('modal-envio-overlay');
+  if (!modal) return;
+
+  const tkts = (typeof tickets !== 'undefined' && tickets) ? tickets : [];
+  const selectTkt = document.getElementById('envio-input-ticket');
+  
+  // Poblar select de tickets — Solo tickets/órdenes con refacciones necesarias
+  const tktsConRefacciones = tkts.filter(t => {
+    if (!t) return false;
+    // 1. Refacciones directamente en el ticket
+    if (Array.isArray(t.refaccionesSeleccionadas) && t.refaccionesSeleccionadas.length > 0) return true;
+    
+    // 2. Refacciones en la orden de servicio asociada
+    if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
+      const assocOrder = typeof window.obtenerOrdenAsociadaATicketRefacciones === 'function'
+        ? window.obtenerOrdenAsociadaATicketRefacciones(t)
+        : ordenes.find(o => o.soporte === t.id || o.folio === (t.folio || '').replace('-A', ''));
+      if (assocOrder && Array.isArray(assocOrder.ref_necesarias) && assocOrder.ref_necesarias.length > 0) return true;
+    }
+
+    // 3. Subticket de refacción generado (-A) o categoría Refacción
+    const cat = String(t.categoria || '').toLowerCase();
+    if (cat.includes('refacci') || (t.folio && t.folio.endsWith('-A'))) return true;
+
+    // 4. Si estamos editando y este ticket ya tiene este envío asociado
+    if (ticketId && t.id === ticketId) return true;
+
+    return false;
+  });
+
+  if (selectTkt) {
+    let opts = '<option value="">-- Seleccionar Ticket / Orden con Refacciones --</option>';
+    tktsConRefacciones.forEach(t => {
+      const partsCount = (t.refaccionesSeleccionadas || []).length;
+      opts += `<option value="${t.id}">${t.folio || t.id} - ${t.cliente || 'Sin cliente'} (${t.categoria || 'Refacción'}${partsCount > 0 ? ` · ${partsCount} pza(s)` : ''}) - ${t.asunto || ''}</option>`;
+    });
+    selectTkt.innerHTML = opts;
+  }
+
+  // Limpiar campos
+  document.getElementById('envio-modal-id').value = envioId || '';
+  document.getElementById('envio-modal-ticket-id').value = ticketId || '';
+  document.getElementById('envio-input-paqueteria').value = 'DHL';
+  document.getElementById('envio-input-guia').value = '';
+  document.getElementById('envio-input-url-rastreo').value = '';
+  document.getElementById('envio-input-fecha-envio').value = new Date().toISOString().split('T')[0];
+  document.getElementById('envio-input-fecha-entrega').value = '';
+  document.getElementById('envio-input-fecha-llegada').value = '';
+  document.getElementById('envio-input-llego').checked = false;
+  document.getElementById('envio-input-notas').value = '';
+  document.getElementById('envio-container-fecha-llegada').style.display = 'none';
+
+  let selectedTicket = null;
+  if (ticketId) {
+    selectedTicket = tkts.find(t => t.id === ticketId);
+    if (selectTkt) selectTkt.value = ticketId;
+  }
+
+  // Si estamos editando una guía existente
+  if (envioId && selectedTicket && selectedTicket.envios) {
+    const env = selectedTicket.envios.find(e => e.id === envioId);
+    if (env) {
+      document.getElementById('envio-input-paqueteria').value = env.paqueteria || 'DHL';
+      document.getElementById('envio-input-guia').value = env.guiaPedido || '';
+      document.getElementById('envio-input-url-rastreo').value = env.urlRastreo || window.obtenerUrlRastreoPaqueteria(env.paqueteria, env.guiaPedido);
+      document.getElementById('envio-input-fecha-envio').value = env.fechaPedido || '';
+      document.getElementById('envio-input-fecha-entrega').value = env.fechaEntrega || '';
+      document.getElementById('envio-input-fecha-llegada').value = env.fechaLlegada || '';
+      document.getElementById('envio-input-llego').checked = !!env.llego;
+      document.getElementById('envio-input-notas').value = env.notas || '';
+      if (env.llego) {
+        document.getElementById('envio-container-fecha-llegada').style.display = 'block';
+      }
+    }
+  }
+
+  window.onCambioTicketEnvio(selectedTicket ? selectedTicket.id : '');
+
+  modal.style.display = 'flex';
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+window.cerrarModalEnvio = function(e) {
+  if (e && e.target && e.target !== document.getElementById('modal-envio-overlay') && !e.target.classList.contains('modal-close') && !e.target.closest('.modal-close') && !e.target.closest('button[onclick*="cerrarModalEnvio"]')) {
+    return;
+  }
+  const modal = document.getElementById('modal-envio-overlay');
+  if (modal) {
+    modal.style.display = 'none';
+    modal.classList.remove('open');
+  }
+  document.body.style.overflow = '';
+};
+
+// Evento al seleccionar un ticket en el modal de envío
+window.onCambioTicketEnvio = function(ticketId) {
+  const tkts = (typeof tickets !== 'undefined' && tickets) ? tickets : [];
+  const t = tkts.find(x => x.id === ticketId);
+
+  const inpCli = document.getElementById('envio-input-cliente');
+  const inpSit = document.getElementById('envio-input-destino');
+  const partsBox = document.getElementById('envio-parts-selection');
+
+  if (!t) {
+    if (inpCli) inpCli.value = '';
+    if (inpSit) inpSit.value = '';
+    if (partsBox) partsBox.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">Selecciona un ticket para ver sus refacciones asociadas.</div>';
+    return;
+  }
+
+  if (inpCli) inpCli.value = t.cliente || '';
+  if (inpSit) inpSit.value = t.sitio ? `${t.sitio}` : '';
+
+  // Renderizar checkboxes de refacciones del ticket o de su orden asociada
+  if (partsBox) {
+    let parts = t.refaccionesSeleccionadas || [];
+    if (parts.length === 0 && typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
+      const assocOrder = typeof window.obtenerOrdenAsociadaATicketRefacciones === 'function'
+        ? window.obtenerOrdenAsociadaATicketRefacciones(t)
+        : ordenes.find(o => o.soporte === t.id || o.folio === (t.folio || '').replace('-A', ''));
+      if (assocOrder && Array.isArray(assocOrder.ref_necesarias) && assocOrder.ref_necesarias.length > 0) {
+        parts = assocOrder.ref_necesarias;
+      }
+    }
+
+    if (parts.length === 0) {
+      partsBox.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">El ticket no tiene refacciones cargadas actualmente.</div>';
+    } else {
+      let pHtml = '<div style="display:flex; flex-direction:column; gap:0.4rem; max-height:160px; overflow-y:auto; padding:0.25rem;">';
+      parts.forEach((p, idx) => {
+        pHtml += `
+          <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; cursor:pointer; background:var(--bg-body); padding:0.35rem 0.6rem; border-radius:6px; border:1px solid var(--border);">
+            <input type="checkbox" class="envio-part-cb" data-clave="${p.clave || p.codigo || ''}" data-desc="${p.descripcion || p.nombre || ''}" checked />
+            <span style="font-weight:600; color:var(--text-primary);">${p.clave || p.codigo ? `[${p.clave || p.codigo}]` : ''} ${p.descripcion || p.nombre || 'Pieza'}</span>
+            <span style="font-size:0.75rem; color:var(--text-muted); margin-left:auto;">Cant: ${p.cantidad || 1}</span>
+          </label>
+        `;
+      });
+      pHtml += '</div>';
+      partsBox.innerHTML = pHtml;
+    }
+  }
+};
+
+window.onCambioPaqueteriaEnvio = function() {
+  const paq = document.getElementById('envio-input-paqueteria')?.value || '';
+  const guia = document.getElementById('envio-input-guia')?.value || '';
+  const urlInp = document.getElementById('envio-input-url-rastreo');
+  if (urlInp && (!urlInp.value || urlInp.dataset.autogen === 'true')) {
+    const generated = window.obtenerUrlRastreoPaqueteria(paq, guia);
+    urlInp.value = generated;
+    urlInp.dataset.autogen = 'true';
+  }
+};
+
+window.onToggleLlegoEnvio = function(checked) {
+  const container = document.getElementById('envio-container-fecha-llegada');
+  const inpFecha = document.getElementById('envio-input-fecha-llegada');
+  if (container) {
+    container.style.display = checked ? 'block' : 'none';
+    if (checked && inpFecha && !inpFecha.value) {
+      inpFecha.value = new Date().toISOString().split('T')[0];
+    }
+  }
+};
+
+// Guarda la guía de envío en el ticket y en la base de datos
+window.guardarModalEnvio = async function(event) {
+  if (event) event.preventDefault();
+
+  const envioId = document.getElementById('envio-modal-id').value;
+  const ticketId = document.getElementById('envio-input-ticket').value;
+  const paqueteria = document.getElementById('envio-input-paqueteria').value;
+  const guiaPedido = document.getElementById('envio-input-guia').value.trim();
+  const urlRastreo = document.getElementById('envio-input-url-rastreo').value.trim();
+  const fechaPedido = document.getElementById('envio-input-fecha-envio').value;
+  const fechaEntrega = document.getElementById('envio-input-fecha-entrega').value;
+  const llego = document.getElementById('envio-input-llego').checked;
+  const fechaLlegada = document.getElementById('envio-input-fecha-llegada').value;
+  const notas = document.getElementById('envio-input-notas').value.trim();
+
+  if (!ticketId) {
+    alert('Por favor selecciona un ticket comercial para asociar este envío.');
+    return;
+  }
+
+  // Recolectar refacciones marcadas
+  const parts = [];
+  document.querySelectorAll('.envio-part-cb:checked').forEach(cb => {
+    parts.push({
+      clave: cb.getAttribute('data-clave') || '',
+      descripcion: cb.getAttribute('data-desc') || ''
+    });
+  });
+
+  const tkts = (typeof tickets !== 'undefined' && tickets) ? tickets : [];
+  const t = tkts.find(x => x.id === ticketId);
+  if (!t) {
+    alert('No se encontró el ticket seleccionado.');
+    return;
+  }
+
+  if (!t.envios) t.envios = [];
+
+  const nuevoEnvioObj = {
+    id: envioId || Math.random().toString(36).substring(2, 9),
+    paqueteria,
+    guiaPedido,
+    urlRastreo: urlRastreo || window.obtenerUrlRastreoPaqueteria(paqueteria, guiaPedido),
+    fechaPedido,
+    fechaEntrega,
+    llego,
+    fechaLlegada: llego ? (fechaLlegada || new Date().toISOString().split('T')[0]) : '',
+    parts,
+    notas
+  };
+
+  const existingIdx = t.envios.findIndex(e => e.id === nuevoEnvioObj.id);
+  if (existingIdx >= 0) {
+    t.envios[existingIdx] = nuevoEnvioObj;
+  } else {
+    t.envios.push(nuevoEnvioObj);
+  }
+
+  // Actualizar datos legacy principales en el ticket
+  t.paqueteria = paqueteria;
+  t.guiaPedido = guiaPedido;
+  t.fechaPedido = fechaPedido;
+  t.fechaEntrega = fechaEntrega;
+
+  // Actualizar estatus de refacciones asociadas
+  if (t.refaccionesSeleccionadas) {
+    t.refaccionesSeleccionadas.forEach(p => {
+      const pClave = p.clave || p.codigo || '';
+      const pDesc = p.descripcion || p.nombre || '';
+      const isIncluded = parts.some(ep => ep.clave === pClave && ep.descripcion === pDesc);
+
+      if (isIncluded) {
+        p.estatusPedido = llego ? 'Entregado al Técnico' : 'En Tránsito / Pedido';
+        p.guiaPedido = guiaPedido;
+      }
+    });
+  }
+
+  // Guardar en Storage y Supabase
+  if (typeof safeSetJSON === 'function') safeSetJSON('sapi_tickets', tickets);
+  if (window.pushToSupabase) {
+    window.pushToSupabase('tickets', t);
+    window.pushToSupabase('envios', nuevoEnvioObj).catch(err => console.warn('[Envios Sync] Error al sincronizar en tabla envios:', err));
+  }
+
+  window.cerrarModalEnvio();
+  window.renderEnvios();
+  if (typeof renderTickets === 'function') renderTickets();
+
+  mostrarNotificacion(`Guía de envío ${guiaPedido || 'guardada'} con éxito.`, 'success');
+};
+
+// Abre el detalle de una guía de envío en modal visual enriquecido como la tarjeta del ticket
+window.abrirDetalleEnvio = function(envioId) {
+  // Asegurar que el modal de creación/edición esté cerrado
+  const modalEnvio = document.getElementById('modal-envio-overlay');
+  if (modalEnvio) {
+    modalEnvio.style.display = 'none';
+    modalEnvio.classList.remove('open');
+  }
+
+  const todos = window.obtenerTodosLosEnvios();
+  const env = todos.find(e => e.id === envioId);
+  if (!env) return;
+
+  const modal = document.getElementById('modal-detalle-envio-overlay');
+  const body = document.getElementById('detalle-envio-body');
+  const title = document.getElementById('detalle-envio-title');
+
+  if (title) title.innerHTML = `<span style="font-family:monospace; font-weight:800;">${env.guiaPedido ? `Guía: ${env.guiaPedido}` : 'Guía de Envío'}</span>`;
+
+  const trackingUrl = env.urlRastreo || window.obtenerUrlRastreoPaqueteria(env.paqueteria, env.guiaPedido);
+
+  // Cálculo de tiempos
+  let tiempoText = 'El tiempo se calculará al ingresar las fechas.';
+  let tiempoColor = 'var(--text-secondary)';
+  let tiempoIcon = 'clock';
+
+  if (env.llego) {
+    tiempoText = `✅ <strong style="color:#10b981;">Entregado / Recibido</strong> ${env.fechaLlegada ? `el ${env.fechaLlegada}` : ''}`;
+    tiempoColor = '#10b981';
+    tiempoIcon = 'check-circle-2';
+  } else {
+    let partsTiempo = [];
+    if (env.fechaEnvio) {
+      const reqDate = new Date(env.fechaEnvio);
+      reqDate.setHours(0,0,0,0);
+      const hoy = new Date();
+      hoy.setHours(0,0,0,0);
+      const diffTranscurrido = Math.floor((hoy.getTime() - reqDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffTranscurrido >= 0) {
+        partsTiempo.push(`Transcurrido: <strong style="color:var(--accent);">${diffTranscurrido}d</strong>`);
+      }
+    }
+
+    if (env.fechaEntrega) {
+      const estDate = new Date(env.fechaEntrega);
+      estDate.setHours(0,0,0,0);
+      const hoy = new Date();
+      hoy.setHours(0,0,0,0);
+      const diffFaltante = Math.ceil((estDate.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffFaltante > 0) {
+        partsTiempo.push(`Faltan: <strong style="color:var(--text-primary);">${diffFaltante}d</strong>`);
+      } else if (diffFaltante === 0) {
+        partsTiempo.push(`<span style="color:#f97316; font-weight:700;">¡Se entrega HOY!</span>`);
+      } else {
+        partsTiempo.push(`<span style="color:#ef4444; font-weight:700;">⚠️ Atrasado: ${Math.abs(diffFaltante)}d</span>`);
+      }
+    }
+
+    if (partsTiempo.length > 0) {
+      tiempoText = partsTiempo.join(' | ');
+    }
+  }
+
+  // Lista de Refacciones
+  let partsHtml = '';
+  if (env.parts && env.parts.length > 0) {
+    partsHtml = `
+      <div style="margin-top:1rem; border-top:1px solid var(--border); padding-top:0.75rem;">
+        <div style="font-size:0.8rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:0.5rem; display:flex; justify-content:space-between; align-items:center;">
+          <span>Refacciones en este Envío (${env.parts.length})</span>
+          <span style="font-size:0.72rem; color:var(--text-muted); font-weight:normal;">Estatus de pieza: ${env.llego ? 'Entregado al Técnico' : 'En Tránsito / Pedido'}</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:0.4rem; max-height:180px; overflow-y:auto; padding:2px;">
+          ${env.parts.map(p => `
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; background:var(--bg-body); padding:0.45rem 0.75rem; border-radius:6px; border:1px solid var(--border);">
+              <div>
+                <strong style="color:var(--accent); margin-right:4px;">${p.cantidad || 1}x</strong>
+                <span style="font-weight:600; color:var(--text-primary);">${p.descripcion || p.nombre || 'Pieza'}</span>
+                ${p.clave || p.codigo ? `<span style="color:var(--text-muted); font-size:0.75rem; font-family:monospace; margin-left:4px;">(${p.clave || p.codigo})</span>` : ''}
+              </div>
+              <span class="badge badge-${env.llego ? 'completado' : 'proceso'}" style="font-size:0.72rem; padding:2px 8px;">
+                ${env.llego ? 'Entregada' : 'En Tránsito'}
+              </span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  } else {
+    partsHtml = `
+      <div style="margin-top:1rem; border-top:1px solid var(--border); padding-top:0.75rem;">
+        <span style="color:var(--text-muted); font-style:italic; font-size:0.82rem;">No hay refacciones desglosadas en este envío.</span>
+      </div>
+    `;
+  }
+
+  if (body) {
+    body.innerHTML = `
+      <!-- Header Info Card -->
+      <div style="background:var(--bg-body); border:1px solid var(--border); border-radius:8px; padding:0.85rem 1rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <div style="background:rgba(234, 88, 12, 0.15); color:var(--accent); padding:0.5rem; border-radius:8px; display:flex;">
+            <i data-lucide="truck" style="width:22px; height:22px;"></i>
+          </div>
+          <div>
+            <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Paquetería / Transportista</div>
+            <div style="font-size:1.15rem; font-weight:800; color:var(--text-primary);">${env.paqueteria || 'Por Definir'}</div>
+          </div>
+        </div>
+
+        <!-- Toggle ¿Ya Llegó? interactivo -->
+        <div style="display:flex; align-items:center; gap:0.6rem; background:var(--bg-card); padding:0.4rem 0.75rem; border-radius:6px; border:1px solid var(--border);">
+          <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; font-weight:700; color:var(--text-primary); cursor:pointer; user-select:none; margin:0;">
+            <input type="checkbox" id="modal-detalle-envio-llego" ${env.llego ? 'checked' : ''} onchange="window.toggleLlegoDesdeDetalle('${env.id}', '${env.ticketId}', this.checked)" style="width:16px; height:16px; cursor:pointer;" />
+            <span>¿Ya Llegó?</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Barra de tiempo / cálculo de días -->
+      <div style="display:flex; align-items:center; gap:8px; font-size:0.85rem; font-weight:600; color:${tiempoColor}; background:var(--bg-body); padding:0.6rem 0.85rem; border-radius:6px; border:1px solid var(--border); margin-bottom:1rem;">
+        <i data-lucide="${tiempoIcon}" style="width:16px; height:16px; color:var(--accent);"></i>
+        <span>${tiempoText}</span>
+      </div>
+
+      <!-- Grid de Datos Clave -->
+      <div class="detalle-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:0.85rem 1rem;">
+        <div class="detalle-field">
+          <div class="detalle-label" style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:600;">Número de Guía</div>
+          <div class="detalle-value" style="font-family:monospace; font-weight:700; font-size:0.95rem; color:var(--text-primary);">${env.guiaPedido || '<i style="color:var(--text-muted); font-weight:normal;">Sin guía</i>'}</div>
+        </div>
+
+        <div class="detalle-field">
+          <div class="detalle-label" style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:600;">Ticket Comercial</div>
+          <div class="detalle-value">
+            <a href="#" onclick="verDetalleTicket('${env.ticketId}'); return false;" style="color:var(--accent); font-weight:700; text-decoration:underline; font-size:0.92rem;">
+              ${env.ticketFolio}
+            </a>
+          </div>
+        </div>
+
+        <div class="detalle-field">
+          <div class="detalle-label" style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:600;">Cliente / Destinatario</div>
+          <div class="detalle-value" style="font-weight:700; color:var(--text-primary);">${env.cliente}</div>
+        </div>
+
+        <div class="detalle-field">
+          <div class="detalle-label" style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:600;">Sitio / Ubicación</div>
+          <div class="detalle-value" style="color:var(--text-secondary);">${env.sitio || 'General'}</div>
+        </div>
+
+        <div class="detalle-field">
+          <div class="detalle-label" style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:600;">Fecha de Pedido / Embarque</div>
+          <div class="detalle-value" style="font-weight:600; color:var(--text-primary);">${env.fechaEnvio || '—'}</div>
+        </div>
+
+        <div class="detalle-field">
+          <div class="detalle-label" style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:600;">${env.llego ? 'Fecha Real de Llegada' : 'Fecha Estimada de Entrega'}</div>
+          <div class="detalle-value" style="font-weight:600; color:${env.llego ? '#10b981' : 'var(--text-primary)'};">${env.fechaLlegada || env.fechaEntrega || '—'}</div>
+        </div>
+      </div>
+
+      ${partsHtml}
+
+      ${env.notas ? `
+        <div style="margin-top:0.85rem; padding:0.6rem 0.85rem; background:var(--bg-body); border-radius:6px; border:1px solid var(--border); font-size:0.82rem; color:var(--text-secondary);">
+          <strong style="color:var(--text-primary);">Notas del Despacho:</strong> ${env.notas}
+        </div>
+      ` : ''}
+
+      <!-- Acciones Inferiores -->
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-top:1.25rem; border-top:1px solid var(--border); padding-top:1rem;">
+        <button type="button" class="btn-secondary" onclick="window.eliminarEnvio('${env.id}', '${env.ticketId}')" style="color:#ef4444; border-color:rgba(239,68,68,0.3); font-size:0.85rem; display:inline-flex; align-items:center; gap:0.35rem;">
+          <i data-lucide="trash-2" style="width:14px; height:14px;"></i> Eliminar
+        </button>
+
+        <div style="display:flex; gap:0.5rem;">
+          ${trackingUrl ? `
+            <a href="${trackingUrl}" target="_blank" class="btn-primary" style="text-decoration:none; display:inline-flex; align-items:center; gap:0.4rem; font-size:0.85rem;">
+              <i data-lucide="external-link" style="width:14px; height:14px;"></i> Rastrear en ${env.paqueteria}
+            </a>
+          ` : ''}
+          <button type="button" class="btn-secondary" onclick="window.abrirModalNuevoEnvio('${env.ticketId}', '${env.id}')" style="font-size:0.85rem; display:inline-flex; align-items:center; gap:0.35rem;">
+            <i data-lucide="pencil" style="width:14px; height:14px;"></i> Editar
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  if (modal) {
+    modal.style.display = 'flex';
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+};
+
+// Permite cambiar el estado de llegada directamente desde el modal de detalle
+window.toggleLlegoDesdeDetalle = function(envioId, ticketId, checked) {
+  const tkts = (typeof tickets !== 'undefined' && tickets) ? tickets : [];
+  const t = tkts.find(x => x.id === ticketId);
+  if (!t) return;
+
+  if (t.envios) {
+    const env = t.envios.find(e => e.id === envioId);
+    if (env) {
+      env.llego = checked;
+      if (checked && !env.fechaLlegada) {
+        env.fechaLlegada = new Date().toISOString().split('T')[0];
+      }
+    }
+  }
+
+  // Actualizar refacciones vinculadas
+  if (t.refaccionesSeleccionadas && t.envios) {
+    const env = t.envios.find(e => e.id === envioId);
+    if (env && env.parts) {
+      t.refaccionesSeleccionadas.forEach(p => {
+        const isIncluded = env.parts.some(ep => ep.clave === (p.clave || p.codigo) && ep.descripcion === (p.descripcion || p.nombre));
+        if (isIncluded) {
+          p.estatusPedido = checked ? 'Entregado al Técnico' : 'En Tránsito / Pedido';
+        }
+      });
+    }
+  }
+
+  if (typeof safeSetJSON === 'function') safeSetJSON('sapi_tickets', tickets);
+  if (window.pushToSupabase) {
+    window.pushToSupabase('tickets', t);
+    const envActualizado = t.envios ? t.envios.find(e => e.id === envioId) : null;
+    if (envActualizado) {
+      window.pushToSupabase('envios', envActualizado).catch(err => console.warn('[Envios Sync] Error al sincronizar en tabla envios:', err));
+    }
+  }
+
+  window.renderEnvios();
+  window.abrirDetalleEnvio(envioId);
+  mostrarNotificacion(checked ? 'Envío marcado como Entregado.' : 'Envío marcado en Tránsito.', 'success');
+};
+
+window.cerrarDetalleEnvio = function(e) {
+  if (e && e.target && e.target !== document.getElementById('modal-detalle-envio-overlay') && !e.target.classList.contains('modal-close') && !e.target.closest('.modal-close')) {
+    return;
+  }
+  const modal = document.getElementById('modal-detalle-envio-overlay');
+  if (modal) {
+    modal.style.display = 'none';
+    modal.classList.remove('open');
+  }
+  document.body.style.overflow = '';
+};
+
+// Elimina una guía de envío de su ticket
+window.eliminarEnvio = async function(envioId, ticketId) {
+  const confirmed = await window.confirmarAccion({
+    titulo: 'Eliminar Guía de Envío',
+    mensaje: '¿Estás seguro de que deseas eliminar esta guía de envío? Las refacciones volverán al estatus por pedir si no están en otra guía.',
+    textoAceptar: 'Eliminar Guía',
+    textoCancelar: 'Cancelar',
+    esPeligroso: true
+  });
+  if (!confirmed) return;
+
+  const tkts = (typeof tickets !== 'undefined' && tickets) ? tickets : [];
+  const t = tkts.find(x => x.id === ticketId);
+  if (t && t.envios) {
+    t.envios = t.envios.filter(e => e.id !== envioId);
+    if (typeof safeSetJSON === 'function') safeSetJSON('sapi_tickets', tickets);
+    if (window.pushToSupabase) window.pushToSupabase('tickets', t);
+  }
+
+  if (window.deleteFromSupabase) {
+    window.deleteFromSupabase('envios', envioId).catch(err => console.warn('[Envios Sync] Error al eliminar de tabla envios:', err));
+  }
+
+  window.renderEnvios();
+  mostrarNotificacion('Guía de envío eliminada.', 'success');
+};
+
+// ============================================================
+// PANEL DE REVISIÓN DE JUNTAS Y PENDIENTES OPERATIVOS (AVANZADO)
+// ============================================================
+
+window.currentJuntaFilterTipo = 'todos';
+window.currentJuntaFilterAntiguedad = 'todos';
+window.currentJuntaFilterUrgente = false;
+window.currentJuntaSortBy = 'antiguedad_desc';
+window.currentJuntaViewMode = 'tarjetas'; // 'tarjetas' | 'responsables'
+window.currentJuntaFilterCausa = 'todos';
+window.currentJuntaFullscreen = false;
+window.juntaAnalyticsVisible = false;
+window.juntaItemsFiltradosCache = [];
+
+// Helper para escapar HTML en cadenas
+function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+window.escapeHTML = escapeHTML;
+
+// Helper para calcular días transcurridos
+function calcularDiasJunta(fechaStr) {
+  if (!fechaStr) return 0;
+  try {
+    const d = new Date(fechaStr);
+    if (isNaN(d.getTime())) return 0;
+    const diffMs = new Date() - d;
+    return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+  } catch(e) {
+    return 0;
+  }
+}
+
+function formatearTiempoRelativoJunta(dias, fechaStr) {
+  if (dias === 0) return 'Hoy';
+  if (dias === 1) return 'Ayer (1 día)';
+  if (dias < 7) return `Hace ${dias} días`;
+  if (dias < 14) return `Hace ${dias} días (1 sem)`;
+  if (dias < 30) return `Hace ${dias} días (${Math.floor(dias/7)} sem)`;
+  return `Hace ${dias} días (${Math.floor(dias/30)} meses)`;
+}
+
+function normalizarTextoJunta(str) {
+  return String(str || '')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+// Obtener información visual y rol del usuario / responsable
+window.obtenerInfoRolUsuario = function(nombre) {
+  if (!nombre) return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
+  
+  const norm = normalizarTextoJunta(nombre);
+  if (norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === '' || norm === 'sin_asignar') {
+    return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
+  }
+
+  // 1. Buscar en array de usuarios del sistema
+  let user = null;
+  if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
+    user = usuarios.find(u => u && u.nombre && normalizarTextoJunta(u.nombre) === norm);
+    if (!user) {
+      const normWords = norm.split(/\s+/).filter(w => w.length > 2);
+      if (normWords.length > 0) {
+        user = usuarios.find(u => {
+          if (!u || !u.nombre) return false;
+          const uNormWords = normalizarTextoJunta(u.nombre).split(/\s+/).filter(w => w.length > 2);
+          const matches = normWords.filter(w => uNormWords.includes(w));
+          return matches.length >= 2 || (normWords.length === 1 && matches.length === 1);
+        });
+      }
+    }
+  }
+
+  if (user && user.rol) {
+    const rolKey = String(user.rol).toLowerCase();
+    let label = 'Técnico';
+    let color = '#10b981';
+    let icon = 'wrench';
+
+    if (rolKey === 'superadmin') {
+      label = 'Super Admin';
+      color = '#E8820C';
+      icon = 'shield-alert';
+    } else if (rolKey === 'admin') {
+      label = 'Administrador';
+      color = '#4f8ef7';
+      icon = 'shield';
+    } else if (rolKey === 'supervisor') {
+      label = 'Supervisor';
+      color = '#ca8a04';
+      icon = 'user-check';
+    } else if (rolKey === 'tecnico') {
+      label = 'Técnico';
+      color = '#10b981';
+      icon = 'wrench';
+    } else if (rolKey === 'empresa') {
+      label = 'Cliente';
+      color = '#8b5cf6';
+      icon = 'building';
+    } else if (rolKey === 'consulta') {
+      label = 'Solo Consulta';
+      color = '#64748b';
+      icon = 'eye';
+    } else {
+      const conf = (typeof ROLES !== 'undefined' && ROLES[rolKey]) ? ROLES[rolKey] : null;
+      label = conf ? conf.label : (rolKey.charAt(0).toUpperCase() + rolKey.slice(1));
+      color = conf ? conf.color : '#10b981';
+    }
+
+    return { rol: rolKey, label, color, icon };
+  }
+
+  // 2. Buscar en array de técnicos (tecnicosDb)
+  if (typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) {
+    let isTec = tecnicosDb.some(t => t && t.nombre && (
+      normalizarTextoJunta(t.nombre) === norm || 
+      normalizarTextoJunta(t.nombre).includes(norm) || 
+      norm.includes(normalizarTextoJunta(t.nombre)) ||
+      (typeof formatNombreCorto === 'function' && normalizarTextoJunta(formatNombreCorto(t.nombre)) === norm)
+    ));
+    if (!isTec) {
+      const normWords = norm.split(/\s+/).filter(w => w.length > 2);
+      if (normWords.length > 0) {
+        isTec = tecnicosDb.some(t => {
+          if (!t || !t.nombre) return false;
+          const tNormWords = normalizarTextoJunta(t.nombre).split(/\s+/).filter(w => w.length > 2);
+          const matches = normWords.filter(w => tNormWords.includes(w));
+          return matches.length >= 2 || (normWords.length === 1 && matches.length === 1);
+        });
+      }
+    }
+    if (isTec) {
+      return { rol: 'tecnico', label: 'Técnico', color: '#10b981', icon: 'wrench' };
+    }
+  }
+
+  // Si no está registrado como supervisor/admin pero tiene órdenes o tareas de campo asignadas, su rol operativo es Técnico
+  return { rol: 'tecnico', label: 'Técnico', color: '#10b981', icon: 'wrench' };
+};
+
+// Helper para desglosar responsables combinados en usuarios individuales únicos
+function extraerListaResponsables(raw) {
+  if (!raw) return ['Sin Asignar'];
+  const rawStr = String(raw).trim();
+  if (!rawStr || rawStr === '-' || rawStr.toLowerCase() === 'sin asignar' || rawStr.toLowerCase() === 'sin_asignar') {
+    return ['Sin Asignar'];
+  }
+  const parts = rawStr.split(/[,;/]+/).map(s => s.trim()).filter(Boolean);
+  const validParts = parts.filter(s => s !== '-' && s.toLowerCase() !== 'sin asignar' && s.toLowerCase() !== 'sin_asignar');
+  return validParts.length > 0 ? Array.from(new Set(validParts)) : ['Sin Asignar'];
+}
+
+// Sanitizar asignaciones de tickets: por regla de negocio los tickets NUNCA deben estar asignados a técnicos
+window.sanitizarAsignacionesTickets = function() {
+  const tkts = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : [];
+  if (tkts.length === 0) return;
+
+  let modificado = false;
+  tkts.forEach(t => {
+    if (!t) return;
+    let tieneTecnico = false;
+
+    // Eliminar campos de técnico directos
+    if (t.tecnico) {
+      delete t.tecnico;
+      tieneTecnico = true;
+    }
+    if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) {
+      t.tecnicosAsignados = [];
+      tieneTecnico = true;
+    }
+
+    // Sanitizar t.asignado (solo permitir supervisores, admins o superadmins)
+    if (t.asignado) {
+      const parts = String(t.asignado).split(/[,;/]+/).map(s => s.trim()).filter(Boolean);
+      const validSupervisores = parts.filter(name => {
+        const info = window.obtenerInfoRolUsuario(name);
+        return ['supervisor', 'admin', 'superadmin'].includes(info.rol);
+      });
+      const nuevoAsignado = validSupervisores.join(', ');
+      if (nuevoAsignado !== t.asignado) {
+        t.asignado = nuevoAsignado;
+        tieneTecnico = true;
+      }
+    }
+
+    // Sanitizar t.asignadoA
+    if (t.asignadoA) {
+      const partsA = String(t.asignadoA).split(/[,;/]+/).map(s => s.trim()).filter(Boolean);
+      const validSupervisoresA = partsA.filter(name => {
+        const info = window.obtenerInfoRolUsuario(name);
+        return ['supervisor', 'admin', 'superadmin'].includes(info.rol);
+      });
+      const nuevoAsignadoA = validSupervisoresA.join(', ');
+      if (nuevoAsignadoA !== t.asignadoA) {
+        t.asignadoA = nuevoAsignadoA;
+        tieneTecnico = true;
+      }
+    }
+
+    // Sanitizar t.supervisor
+    if (t.supervisor) {
+      const infoSup = window.obtenerInfoRolUsuario(t.supervisor);
+      if (!['supervisor', 'admin', 'superadmin'].includes(infoSup.rol)) {
+        t.supervisor = '';
+        tieneTecnico = true;
+      }
+    }
+
+    if (tieneTecnico) {
+      modificado = true;
+      if (window.pushToSupabase) {
+        window.pushToSupabase('tickets', t).catch(e => console.warn('Sync sanitizar ticket error:', e));
+      }
+    }
+  });
+
+  if (modificado) {
+    console.log('[Sanitización] Se limpiaron asignaciones de técnicos en tickets.');
+    if (typeof safeSetJSON === 'function') safeSetJSON('sapi_tickets', tickets);
+  }
+};
+
+// Obtiene supervisores y coordinadores activos disponibles para asignación de tickets
+window.obtenerListaSupervisoresJunta = function() {
+  const lista = [];
+  const nombresSet = new Set();
+
+  if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
+    usuarios.forEach(u => {
+      if (!u || !u.nombre || u.activo === false) return;
+      if (!['supervisor', 'admin', 'superadmin'].includes(u.rol)) return;
+      if (typeof isTestModeActive === 'function' && isTestModeActive()) {
+        // En modo pruebas permitimos
+      } else if (typeof isTestUser === 'function' && isTestUser(u)) {
+        return;
+      }
+      u.nombre.split(/[,;/]+/).forEach(part => {
+        const n = (typeof formatNombreCorto === 'function') ? formatNombreCorto(part.trim()) : part.trim();
+        if (n && n !== '-' && n.toLowerCase() !== 'sin asignar' && !nombresSet.has(n)) {
+          nombresSet.add(n);
+          lista.push(n);
+        }
+      });
+    });
+  }
+
+  return lista.sort((a, b) => a.localeCompare(b));
+};
+
+// Obtiene todos los técnicos y operativos activos disponibles para órdenes y levantamientos
+window.obtenerListaTecnicosJunta = function() {
+  const lista = [];
+  const nombresSet = new Set();
+
+  if (typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) {
+    tecnicosDb.forEach(t => {
+      if (t && t.nombre) {
+        t.nombre.split(/[,;/]+/).forEach(part => {
+          const n = (typeof formatNombreCorto === 'function') ? formatNombreCorto(part.trim()) : part.trim();
+          if (n && n !== '-' && n.toLowerCase() !== 'sin asignar' && !nombresSet.has(n)) {
+            nombresSet.add(n);
+            lista.push(n);
+          }
+        });
+      }
+    });
+  }
+
+  if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
+    usuarios.forEach(u => {
+      if (!u || !u.nombre || u.activo === false) return;
+      if (!['tecnico', 'supervisor'].includes(u.rol)) return;
+      if (typeof isTestModeActive === 'function' && isTestModeActive()) {
+        // En modo pruebas permitimos
+      } else if (typeof isTestUser === 'function' && isTestUser(u)) {
+        return;
+      }
+      u.nombre.split(/[,;/]+/).forEach(part => {
+        const n = (typeof formatNombreCorto === 'function') ? formatNombreCorto(part.trim()) : part.trim();
+        if (n && n !== '-' && n.toLowerCase() !== 'sin asignar' && !nombresSet.has(n)) {
+          nombresSet.add(n);
+          lista.push(n);
+        }
+      });
+    });
+  }
+
+  return lista.sort((a, b) => a.localeCompare(b));
+};
+
+// Obtiene todos los pendientes consolidados de tickets, órdenes, envíos y levantamientos
+window.obtenerTodosLosPendientes = function() {
+  if (typeof window.sanitizarAsignacionesTickets === 'function') {
+    window.sanitizarAsignacionesTickets();
+  }
+
+  const lista = [];
+
+  // 1. TICKETS ABIERTOS / PENDIENTES
+  const tkts = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : [];
+  tkts.forEach(t => {
+    if (!t) return;
+    if (t.estado === 'Cerrado' || t.estado === 'Cancelado') return;
+    
+    if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+      if (isTestData(t) !== isTestModeActive()) return;
+    }
+
+    const fechaCreacion = t.fechaCreacion || t.fecha || t.created_at || '';
+    const dias = calcularDiasJunta(fechaCreacion);
+    
+    let cuelloDeBotella = '';
+    let cuelloNivel = 'normal';
+    let tipoEspecifico = 'Ticket';
+    let causaId = 'en_diagnostico';
+
+    const montoVal = Number(t.montoCotizacion || t.monto || 0);
+
+    if (t.estado === 'Cotización' || t.categoria === 'Refacción' || t.requiereCotizacion) {
+      tipoEspecifico = 'Cotización';
+      if (!t.cotizacionSAP) {
+        cuelloDeBotella = 'Falta generar / capturar cotización en SAP';
+        cuelloNivel = 'warning';
+        causaId = 'cotizacion_pendiente_generar';
+      } else if (!t.cotAceptada || t.cotAceptada === 'pendiente') {
+        const montoStr = montoVal > 0 ? ` ($${new Intl.NumberFormat('es-MX').format(montoVal)})` : '';
+        cuelloDeBotella = `Cotización SAP #${t.cotizacionSAP} enviada${montoStr}: pendiente decisión / OC de cliente`;
+        cuelloNivel = 'normal';
+        causaId = 'cotizacion_espera_cliente';
+      } else if (t.cotAceptada === 'si') {
+        cuelloDeBotella = 'Cotización aceptada: pendiente de generar OS o enviar refacciones';
+        cuelloNivel = 'warning';
+        causaId = 'refaccion_proveedor';
+      }
+    } else if (t.estado === 'Abierto') {
+      if (!t.asignado && !t.asignadoA) {
+        cuelloDeBotella = 'Ticket abierto: supervisor / responsable sin asignar';
+        cuelloNivel = 'warning';
+        causaId = 'sin_asignar';
+      } else {
+        cuelloDeBotella = 'Ticket abierto: en espera de diagnóstico inicial';
+        cuelloNivel = 'normal';
+        causaId = 'en_diagnostico';
+      }
+    } else if (t.estado === 'En Proceso' || t.estado === 'En Espera') {
+      if (t.refaccionesSeleccionadas && t.refaccionesSeleccionadas.length > 0) {
+        cuelloDeBotella = `En espera de refacciones (${t.refaccionesSeleccionadas.length} piezas)`;
+        cuelloNivel = 'warning';
+        causaId = 'refaccion_proveedor';
+      } else {
+        cuelloDeBotella = 'En proceso de atención técnica';
+        cuelloNivel = 'normal';
+        causaId = 'en_diagnostico';
+      }
+    } else {
+      cuelloDeBotella = `Estado: ${t.estado}`;
+      causaId = 'en_diagnostico';
+    }
+
+    if (dias >= 14) {
+      cuelloNivel = 'danger';
+    } else if (dias >= 7 && cuelloNivel !== 'danger') {
+      cuelloNivel = 'warning';
+    }
+
+    let ultimoComentario = null;
+    if (t.comentariosInternos && Array.isArray(t.comentariosInternos) && t.comentariosInternos.length > 0) {
+      const c = t.comentariosInternos[t.comentariosInternos.length - 1];
+      if (c && c.texto && String(c.texto).trim()) {
+        ultimoComentario = {
+          usuario: c.usuario || 'Staff',
+          fecha: c.fecha || '',
+          texto: String(c.texto).trim()
+        };
+      }
+    }
+
+    // Los tickets solo pueden estar asignados a supervisores / coordinadores / admins, NUNCA a técnicos
+    const rawParts = extraerListaResponsables(t.asignado || t.asignadoA || t.supervisor || '');
+    const validSupervisores = rawParts.filter(name => {
+      if (!name || name === 'Sin Asignar' || name === '-' || name === 'Por Definir' || name === 'sin_asignar') return false;
+      const info = window.obtenerInfoRolUsuario(name);
+      return ['supervisor', 'admin', 'superadmin'].includes(info.rol);
+    });
+
+    const listaResp = validSupervisores.length > 0 ? validSupervisores : ['Sin Asignar'];
+
+    let serieValTkt = t.serie || t.numeroSerie || t.serie_equipo || t.noSerie || t.numero_serie || t.maquinaSerie || '';
+    let equipoValTkt = t.maquina || t.equipo || t.numeroEconomico || t.noEconomico || t.modelo || '';
+    
+    if (!serieValTkt && equipoValTkt && equipoValTkt.includes('(SN: ')) {
+      const parts = equipoValTkt.split('(SN: ');
+      if (parts[1]) {
+        serieValTkt = parts[1].replace(')', '').trim();
+        equipoValTkt = parts[0].trim();
+      }
+    }
+    
+    if ((!serieValTkt || !equipoValTkt) && (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb))) {
+      const match = maquinariaDb.find(m => 
+        (t.maquinaId && (m.id === t.maquinaId || m.idInterno === t.maquinaId)) ||
+        (equipoValTkt && (m.idInterno === equipoValTkt || m.modelo === equipoValTkt || m.serie === equipoValTkt || m.numeroEconomico === equipoValTkt)) ||
+        (t.cliente && m.cliente === t.cliente && (m.idInterno === equipoValTkt || m.modelo === equipoValTkt))
+      );
+      if (match) {
+        if (!serieValTkt && match.serie && match.serie !== 'N/A') serieValTkt = match.serie;
+        if (!equipoValTkt) equipoValTkt = match.numeroEconomico || match.modelo || match.idInterno || '';
+      }
+    }
+
+    lista.push({
+      id: t.id,
+      tipo: 'ticket',
+      tipoLabel: tipoEspecifico === 'Cotización' ? 'Cotización' : 'Ticket',
+      tipoEspecifico: tipoEspecifico,
+      tipoIcon: tipoEspecifico === 'Cotización' ? 'receipt' : 'ticket',
+      tipoColor: tipoEspecifico === 'Cotización' ? '#3b82f6' : '#8b5cf6',
+      folio: t.folio || `TKT-${t.id}`,
+      titulo: t.asunto || t.titulo || 'Ticket de servicio',
+      cliente: t.cliente || 'Sin Cliente',
+      sitio: t.sitio || 'General',
+      equipo: equipoValTkt,
+      serie: serieValTkt,
+      responsable: listaResp.join(', '),
+      responsablesList: listaResp,
+      prioridad: t.prioridad || (dias > 7 ? 'Alta' : 'Media'),
+      estado: t.estado || 'Abierto',
+      fecha: fechaCreacion,
+      fechaCompromiso: t.fechaCompromiso || null,
+      diasAntiguedad: dias,
+      monto: montoVal,
+      refaccionesCount: (t.refaccionesSeleccionadas || []).length,
+      tiempoRelativo: formatearTiempoRelativoJunta(dias, fechaCreacion),
+      cuelloDeBotella: cuelloDeBotella,
+      cuelloNivel: cuelloNivel,
+      causaId: causaId,
+      ultimoComentario: ultimoComentario,
+      comentariosCount: (t.comentariosInternos || []).length,
+      rawItem: t
+    });
+  });
+
+  // 2. ÓRDENES DE SERVICIO PENDIENTES
+  const ords = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes : [];
+  ords.forEach(o => {
+    if (!o) return;
+    if (o.estado === 'Cerrada' || o.estado === 'Cancelada') return;
+    
+    if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+      if (isTestData(o) !== isTestModeActive()) return;
+    }
+
+    const fechaCreacion = o.fecha_creacion || o.fecha || o.created_at || '';
+    const dias = calcularDiasJunta(fechaCreacion);
+
+    const faltaFirmaTecnico = !o.firma_tecnico_base64 || o.firma_tecnico_base64 === '__DELETED__';
+    const faltaFirmaCliente = !o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__';
+    const faltaBitacora = !o.bitacora || !String(o.bitacora).trim();
+    const tieneRefNecesarias = Array.isArray(o.ref_necesarias) && o.ref_necesarias.length > 0;
+    const refCount = tieneRefNecesarias ? o.ref_necesarias.length : 0;
+
+    let cuelloDeBotella = '';
+    let cuelloNivel = 'normal';
+    let causaId = 'en_diagnostico';
+
+    if (faltaFirmaTecnico && faltaFirmaCliente) {
+      cuelloDeBotella = 'Faltan firmas de Técnico y de Cliente para validar servicio';
+      cuelloNivel = 'warning';
+      causaId = 'falta_firma';
+    } else if (faltaFirmaCliente) {
+      cuelloDeBotella = 'Falta firma / conformidad del Cliente';
+      cuelloNivel = 'warning';
+      causaId = 'falta_firma';
+    } else if (faltaFirmaTecnico) {
+      cuelloDeBotella = 'Falta firma del Técnico responsable';
+      cuelloNivel = 'warning';
+      causaId = 'falta_firma';
+    } else if (faltaBitacora) {
+      cuelloDeBotella = 'Bitácora técnica vacía o sin reporte capturado';
+      cuelloNivel = 'warning';
+      causaId = 'en_diagnostico';
+    } else if (tieneRefNecesarias) {
+      cuelloDeBotella = `Requiere refacciones pendientes (${o.ref_necesarias.length} piezas)`;
+      cuelloNivel = 'warning';
+      causaId = 'refaccion_proveedor';
+    } else if (!o.tecnico || o.tecnico === 'Sin asignar' || o.tecnico === '-') {
+      cuelloDeBotella = 'Técnico sin asignar para ejecutar orden';
+      cuelloNivel = 'warning';
+      causaId = 'sin_asignar';
+    } else {
+      cuelloDeBotella = `Orden en estado "${o.estado || 'Abierta'}" en ejecución`;
+      cuelloNivel = 'normal';
+      causaId = 'en_diagnostico';
+    }
+
+    if (dias >= 14) {
+      cuelloNivel = 'danger';
+    } else if (dias >= 7 && cuelloNivel !== 'danger') {
+      cuelloNivel = 'warning';
+    }
+
+    const responsableRaw = (Array.isArray(o.tecnicosAsignados) && o.tecnicosAsignados.length > 0)
+      ? o.tecnicosAsignados.join(', ')
+      : (o.tecnico || 'Sin Asignar');
+    const listaResp = extraerListaResponsables(responsableRaw);
+
+    let serieValOrd = o.serie || o.no_serie || o.numero_serie || o.serie_equipo || '';
+    let equipoValOrd = o.numero_economico || o.equipo || o.maquina || o.modelo || '';
+
+    if (!serieValOrd && equipoValOrd && equipoValOrd.includes('(SN: ')) {
+      const parts = equipoValOrd.split('(SN: ');
+      if (parts[1]) {
+        serieValOrd = parts[1].replace(')', '').trim();
+        equipoValOrd = parts[0].trim();
+      }
+    }
+
+    if ((!serieValOrd || !equipoValOrd) && (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb))) {
+      const match = maquinariaDb.find(m => 
+        (o.maquinaria_id && (m.id === o.maquinaria_id || m.idInterno === o.maquinaria_id)) ||
+        (equipoValOrd && (m.idInterno === equipoValOrd || m.modelo === equipoValOrd || m.serie === equipoValOrd || m.numeroEconomico === equipoValOrd)) ||
+        (o.cliente && m.cliente === o.cliente && (m.idInterno === equipoValOrd || m.modelo === equipoValOrd))
+      );
+      if (match) {
+        if (!serieValOrd && match.serie && match.serie !== 'N/A') serieValOrd = match.serie;
+        if (!equipoValOrd) equipoValOrd = match.numeroEconomico || match.modelo || match.idInterno || '';
+      }
+    }
+
+    lista.push({
+      id: o.id,
+      tipo: 'orden',
+      tipoLabel: 'Órden de Servicio',
+      tipoEspecifico: 'Órden',
+      tipoIcon: 'clipboard-list',
+      tipoColor: '#10b981',
+      folio: o.folio || `OS-${o.id}`,
+      titulo: o.tipo_servicio ? `${o.tipo_servicio}: ${o.falla_reportada || o.trabajo_realizado || 'Servicio de campo'}` : (o.falla_reportada || o.trabajo_realizado || 'Servicio de campo'),
+      cliente: o.cliente || 'Sin Cliente',
+      sitio: o.sitio || o.ubicacion || 'General',
+      equipo: equipoValOrd,
+      serie: serieValOrd,
+      responsable: listaResp.join(', '),
+      responsablesList: listaResp,
+      prioridad: o.prioridad || (dias > 7 ? 'Alta' : 'Media'),
+      estado: o.estado || 'Abierta',
+      fecha: fechaCreacion,
+      fechaCompromiso: o.fechaCompromiso || null,
+      diasAntiguedad: dias,
+      monto: Number(o.monto || o.monto_total || 0),
+      refaccionesCount: refCount,
+      tiempoRelativo: formatearTiempoRelativoJunta(dias, fechaCreacion),
+      cuelloDeBotella: cuelloDeBotella,
+      cuelloNivel: cuelloNivel,
+      causaId: causaId,
+      ultimoComentario: null,
+      comentariosCount: 0,
+      rawItem: o
+    });
+  });
+
+  // 3. ENVÍOS PENDIENTES
+  if (typeof window.obtenerTodosLosEnvios === 'function') {
+    const envs = window.obtenerTodosLosEnvios();
+    envs.forEach(e => {
+      if (!e) return;
+      if (e.estatus === 'Entregado' || e.llego) return;
+
+      const fechaEnvio = e.fechaEnvio || e.fechaPedido || '';
+      const dias = calcularDiasJunta(fechaEnvio);
+
+      let cuelloDeBotella = '';
+      let cuelloNivel = 'normal';
+      let causaId = 'envio_sin_guia';
+
+      if (!e.guiaPedido || !String(e.guiaPedido).trim()) {
+        cuelloDeBotella = `Guía pendiente de registrar (${e.paqueteria || 'Paquetería'})`;
+        cuelloNivel = 'warning';
+        causaId = 'envio_sin_guia';
+      } else {
+        cuelloDeBotella = `En camino con ${e.paqueteria || 'Paquetería'} (Guía: ${e.guiaPedido})`;
+        cuelloNivel = 'normal';
+        causaId = 'refaccion_proveedor';
+      }
+
+      if (dias >= 7) {
+        cuelloNivel = 'danger';
+        cuelloDeBotella += ` - ¡Posible rezago de paquetería! (${dias} días)`;
+      }
+
+      const partesTexto = (Array.isArray(e.parts) && e.parts.length > 0)
+        ? e.parts.map(p => `${p.cantidad || 1}x ${p.descripcion || p.codigo || 'Pieza'}`).join(', ')
+        : 'Refacciones varias';
+
+      const responsableRaw = e.paqueteria || 'Logística';
+      const listaResp = extraerListaResponsables(responsableRaw);
+
+      lista.push({
+        id: e.id,
+        tipo: 'envio',
+        tipoLabel: 'Envío',
+        tipoEspecifico: 'Envío',
+        tipoIcon: 'truck',
+        tipoColor: '#f59e0b',
+        folio: e.guiaPedido ? `GUÍA: ${e.guiaPedido}` : `ENV-${String(e.id).substring(0,8)}`,
+        titulo: `Refacciones para ${e.ticketFolio || 'Ticket'}: ${partesTexto}`,
+        cliente: e.cliente || 'Sin Cliente',
+        sitio: e.sitio || 'General',
+        equipo: e.equipo || '',
+        serie: e.serie || '',
+        responsable: listaResp.join(', '),
+        responsablesList: listaResp,
+        prioridad: dias > 5 ? 'Alta' : 'Media',
+        estado: e.estatus || 'En Tránsito',
+        fecha: fechaEnvio,
+        fechaCompromiso: e.fechaCompromiso || null,
+        diasAntiguedad: dias,
+        monto: 0,
+        refaccionesCount: (e.parts || []).length,
+        tiempoRelativo: formatearTiempoRelativoJunta(dias, fechaEnvio),
+        cuelloDeBotella: cuelloDeBotella,
+        cuelloNivel: cuelloNivel,
+        causaId: causaId,
+        ultimoComentario: null,
+        comentariosCount: 0,
+        rawItem: e
+      });
+    });
+  }
+
+  // 4. LEVANTAMIENTOS ABIERTOS
+  const levs = (typeof levantamientos !== 'undefined' && Array.isArray(levantamientos)) ? levantamientos : (safeGetJSON('sapi_levantamientos', []));
+  levs.forEach(l => {
+    if (!l) return;
+    if (l.estado === 'Completado' || l.estado === 'Cerrado' || l.estado === 'Cancelado') return;
+    
+    if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+      if (isTestData(l) !== isTestModeActive()) return;
+    }
+
+    const fechaCreacion = l.created_at || l.fecha_esperada || '';
+    const dias = calcularDiasJunta(fechaCreacion);
+
+    let cuelloDeBotella = '';
+    let cuelloNivel = 'normal';
+    let causaId = 'en_diagnostico';
+
+    if (!l.tecnico_asignado || l.tecnico_asignado === '-' || l.tecnico_asignado === 'Sin asignar') {
+      cuelloDeBotella = 'Levantamiento nuevo: técnico sin asignar';
+      cuelloNivel = 'warning';
+      causaId = 'sin_asignar';
+    } else if (l.estado === 'Por Cotizar' || l.estado === 'Pendiente') {
+      cuelloDeBotella = 'Pendiente de cotizar refacciones en SAP';
+      cuelloNivel = 'warning';
+      causaId = 'cotizacion_pendiente_generar';
+    } else if (l.estado === 'Cotizado') {
+      cuelloDeBotella = 'Cotización enviada a cliente: en espera de confirmación';
+      cuelloNivel = 'normal';
+      causaId = 'cotizacion_espera_cliente';
+    } else {
+      cuelloDeBotella = `Estado del levantamiento: ${l.estado || 'Pendiente'}`;
+      cuelloNivel = 'normal';
+      causaId = 'en_diagnostico';
+    }
+
+    if (dias >= 14) {
+      cuelloNivel = 'danger';
+    } else if (dias >= 7 && cuelloNivel !== 'danger') {
+      cuelloNivel = 'warning';
+    }
+
+    const responsableRaw = l.tecnico_asignado || l.solicitante || 'Sin Asignar';
+    const listaResp = extraerListaResponsables(responsableRaw);
+
+    let serieValLev = l.serie || l.no_serie || l.numero_serie || l.serie_equipo || l.maquina_serie || '';
+    let equipoValLev = l.maquina || l.equipo || l.modelo || l.numero_economico || '';
+
+    if (!serieValLev && equipoValLev && equipoValLev.includes('(SN: ')) {
+      const parts = equipoValLev.split('(SN: ');
+      if (parts[1]) {
+        serieValLev = parts[1].replace(')', '').trim();
+        equipoValLev = parts[0].trim();
+      }
+    }
+
+    if ((!serieValLev || !equipoValLev) && (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb))) {
+      const match = maquinariaDb.find(m => 
+        (equipoValLev && (m.idInterno === equipoValLev || m.modelo === equipoValLev || m.serie === equipoValLev || m.numeroEconomico === equipoValLev)) ||
+        (l.cliente && m.cliente === l.cliente && (m.idInterno === equipoValLev || m.modelo === equipoValLev))
+      );
+      if (match) {
+        if (!serieValLev && match.serie && match.serie !== 'N/A') serieValLev = match.serie;
+        if (!equipoValLev) equipoValLev = match.numeroEconomico || match.modelo || match.idInterno || '';
+      }
+    }
+
+    lista.push({
+      id: l.id,
+      tipo: 'levantamiento',
+      tipoLabel: 'Levantamiento',
+      tipoEspecifico: 'Levantamiento',
+      tipoIcon: 'clipboard-check',
+      tipoColor: '#06b6d4',
+      folio: l.folio || `LEV-${l.id}`,
+      titulo: l.observaciones || l.notas || `Levantamiento en ${l.sitio || l.cliente || 'sitio'}`,
+      cliente: l.cliente || 'Sin Cliente',
+      sitio: l.sitio || 'General',
+      equipo: equipoValLev,
+      serie: serieValLev,
+      responsable: listaResp.join(', '),
+      responsablesList: listaResp,
+      prioridad: dias > 7 ? 'Alta' : 'Media',
+      estado: l.estado || 'Pendiente',
+      fecha: fechaCreacion,
+      fechaCompromiso: l.fechaCompromiso || null,
+      diasAntiguedad: dias,
+      monto: 0,
+      refaccionesCount: 0,
+      tiempoRelativo: formatearTiempoRelativoJunta(dias, fechaCreacion),
+      cuelloDeBotella: cuelloDeBotella,
+      cuelloNivel: cuelloNivel,
+      causaId: causaId,
+      ultimoComentario: null,
+      comentariosCount: 0,
+      rawItem: l
+    });
+  });
+
+  return lista;
+};
+
+// Abre la pestaña de revisión de juntas dentro del Dashboard
+window.abrirModalJuntaRevision = function() {
+  if (typeof switchView === 'function') {
+    switchView('dashboard');
+  }
+  if (typeof setDashView === 'function') {
+    setDashView('junta');
+  }
+};
+
+// Cierra o restablece pantalla completa
+window.cerrarModalJuntaRevision = function(e) {
+  if (window.currentJuntaFullscreen) {
+    window.toggleFullscreenJunta();
+  }
+};
+
+// Modo pantalla completa para el panel de juntas dentro de dashboard
+window.toggleFullscreenJunta = function() {
+  const panel = document.getElementById('dash-content-junta');
+  const icon = document.getElementById('icon-junta-fullscreen');
+  if (!panel) return;
+
+  window.currentJuntaFullscreen = !window.currentJuntaFullscreen;
+  if (window.currentJuntaFullscreen) {
+    panel.classList.add('junta-fullscreen');
+    if (icon) icon.setAttribute('data-lucide', 'minimize-2');
+    document.body.style.overflow = 'hidden';
+  } else {
+    panel.classList.remove('junta-fullscreen');
+    if (icon) icon.setAttribute('data-lucide', 'maximize-2');
+    document.body.style.overflow = '';
+  }
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+// Toggle de la sección de diagnóstico de cuellos de botella
+window.toggleJuntaAnalytics = function() {
+  const container = document.getElementById('junta-bottleneck-bars-container');
+  const chevron = document.getElementById('icon-junta-analytics-chevron');
+  const textEl = document.getElementById('junta-analytics-toggle-text');
+  if (!container) return;
+
+  window.juntaAnalyticsVisible = !window.juntaAnalyticsVisible;
+  if (window.juntaAnalyticsVisible) {
+    container.style.display = 'flex';
+    if (textEl) textEl.textContent = 'Ocultar Diagnóstico';
+    if (chevron) chevron.setAttribute('data-lucide', 'chevron-up');
+  } else {
+    container.style.display = 'none';
+    if (textEl) textEl.textContent = 'Ver Diagnóstico';
+    if (chevron) chevron.setAttribute('data-lucide', 'chevron-down');
+  }
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+// Toggle de la sección de tabla de responsables con más pendientes
+window.juntaRespTableVisible = true;
+window.toggleJuntaResponsablesTable = function() {
+  const container = document.getElementById('junta-responsables-table-container');
+  const chevron = document.getElementById('icon-junta-resp-table-chevron');
+  const textEl = document.getElementById('junta-resp-table-toggle-text');
+  if (!container) return;
+
+  window.juntaRespTableVisible = !window.juntaRespTableVisible;
+  if (window.juntaRespTableVisible) {
+    container.style.display = 'block';
+    if (textEl) textEl.textContent = 'Ocultar Tabla';
+    if (chevron) chevron.setAttribute('data-lucide', 'chevron-up');
+  } else {
+    container.style.display = 'none';
+    if (textEl) textEl.textContent = 'Ver Tabla';
+    if (chevron) chevron.setAttribute('data-lucide', 'chevron-down');
+  }
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+// Filtrar por causa raíz específica desde el diagnóstico
+window.juntaFiltrarPorCausa = function(causaId) {
+  window.currentJuntaFilterCausa = causaId || 'todos';
+  
+  const badge = document.getElementById('junta-causa-active-badge');
+  const textSpan = document.getElementById('junta-causa-active-text');
+
+  const nombresCausas = {
+    'refaccion_proveedor': '📦 En espera de refacciones (compras/almacén)',
+    'cotizacion_espera_cliente': '📄 Cotización enviada: esperando decisión / OC cliente',
+    'cotizacion_pendiente_generar': '📝 Pendiente de cotizar / generar cotización SAP',
+    'falta_firma': '✍️ Falta firma de técnico y/o cliente',
+    'sin_asignar': '👤 Responsable / Técnico sin asignar',
+    'en_diagnostico': '🛠️ En diagnóstico técnico o taller',
+    'envio_sin_guia': '🚚 Guía de envío pendiente'
+  };
+
+  if (window.currentJuntaFilterCausa !== 'todos' && badge && textSpan) {
+    textSpan.textContent = nombresCausas[window.currentJuntaFilterCausa] || window.currentJuntaFilterCausa;
+    badge.style.display = 'inline-flex';
+  } else if (badge) {
+    badge.style.display = 'none';
+  }
+
+  window.renderJuntaRevision();
+};
+
+// Selector de modo de visualización: Tarjetas vs Ronda de Responsables
+window.setJuntaViewMode = function(mode) {
+  window.currentJuntaViewMode = mode || 'tarjetas';
+
+  const btnTarjetas = document.getElementById('junta-mode-tarjetas');
+  const btnResp = document.getElementById('junta-mode-responsables');
+
+  if (btnTarjetas && btnResp) {
+    if (window.currentJuntaViewMode === 'tarjetas') {
+      btnTarjetas.classList.add('active');
+      btnResp.classList.remove('active');
+    } else {
+      btnResp.classList.add('active');
+      btnTarjetas.classList.remove('active');
+    }
+  }
+
+  window.renderJuntaRevision();
+};
+
+// Poblar selectores de clientes y responsables (sin combinaciones, usuarios únicos individuales)
+window.poblarFiltrosJuntaSelectores = function() {
+  const todos = window.obtenerTodosLosPendientes();
+  
+  // Clientes únicos
+  const selectCliente = document.getElementById('junta-filter-cliente');
+  if (selectCliente) {
+    const valActual = selectCliente.value || 'todos';
+    const clientesSet = new Set();
+    todos.forEach(item => {
+      if (item.cliente && item.cliente !== 'Sin Cliente') clientesSet.add(item.cliente.trim());
+    });
+    const clientesOrdenados = Array.from(clientesSet).sort((a, b) => a.localeCompare(b));
+    
+    let html = '<option value="todos">Todos los Clientes</option>';
+    clientesOrdenados.forEach(c => {
+      html += `<option value="${escapeHTML(c)}" ${valActual === c ? 'selected' : ''}>${escapeHTML(c)}</option>`;
+    });
+    selectCliente.innerHTML = html;
+  }
+
+  // Responsables únicos individuales (desglosados por persona)
+  const selectResp = document.getElementById('junta-filter-responsable');
+  if (selectResp) {
+    const valActual = window.currentJuntaFilterResponsable || selectResp.value || 'todos';
+    const respSet = new Set();
+    todos.forEach(item => {
+      (item.responsablesList || []).forEach(r => {
+        const rTrim = String(r).trim();
+        if (rTrim && rTrim !== 'Sin Asignar' && rTrim !== '-' && rTrim.toLowerCase() !== 'sin asignar' && rTrim.toLowerCase() !== 'sin_asignar') {
+          respSet.add(rTrim);
+        }
+      });
+    });
+    const respOrdenados = Array.from(respSet).sort((a, b) => a.localeCompare(b));
+    
+    let html = '<option value="todos">Todos los Responsables</option>';
+    html += `<option value="Sin Asignar" ${valActual === 'Sin Asignar' ? 'selected' : ''}>⚠️ Sin Asignar / Por Definir</option>`;
+    respOrdenados.forEach(r => {
+      const rolInfo = window.obtenerInfoRolUsuario(r);
+      const rolLabelStr = rolInfo && rolInfo.label && rolInfo.rol !== 'usuario' ? ` (${rolInfo.label})` : '';
+      html += `<option value="${escapeHTML(r)}" ${valActual === r ? 'selected' : ''}>${escapeHTML(r)}${escapeHTML(rolLabelStr)}</option>`;
+    });
+    selectResp.innerHTML = html;
+  }
+};
+
+// Renderizado del diagnóstico analítico de cuellos de botella
+window.renderJuntaBottleneckAnalytics = function(todos) {
+  const container = document.getElementById('junta-bottleneck-bars-container');
+  if (!container) return;
+
+  const total = todos.length;
+  if (total === 0) {
+    container.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted);">Sin datos para diagnosticar.</div>';
+    return;
+  }
+
+  const defs = [
+    { id: 'refaccion_proveedor', label: 'En espera de refacciones de proveedor / compras', icon: 'package', color: '#ec4899' },
+    { id: 'cotizacion_espera_cliente', label: 'Cotización enviada: espera de decisión u OC cliente', icon: 'receipt', color: '#3b82f6' },
+    { id: 'cotizacion_pendiente_generar', label: 'Falta cotizar refacciones / capturar en SAP', icon: 'file-text', color: '#f59e0b' },
+    { id: 'falta_firma', label: 'Falta firma de técnico y/o cliente (bloqueo administrativo)', icon: 'file-signature', color: '#10b981' },
+    { id: 'sin_asignar', label: 'Responsable / Técnico sin asignar', icon: 'user-x', color: '#ef4444' },
+    { id: 'en_diagnostico', label: 'En diagnóstico técnico / proceso de taller', icon: 'wrench', color: '#8b5cf6' },
+    { id: 'envio_sin_guia', label: 'Guía de envío pendiente de capturar', icon: 'truck', color: '#06b6d4' }
+  ];
+
+  let html = '';
+  defs.forEach(d => {
+    const count = todos.filter(x => x.causaId === d.id).length;
+    if (count === 0) return;
+    const pct = Math.round((count / total) * 100);
+    const isActive = window.currentJuntaFilterCausa === d.id;
+
+    html += `
+      <div class="junta-bar-row ${isActive ? 'active' : ''}" onclick="window.juntaFiltrarPorCausa('${isActive ? 'todos' : d.id}')" title="Haz clic para filtrar los ${count} casos por esta causa">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; font-size: 0.8rem;">
+          <div style="display: flex; align-items: center; gap: 0.4rem; font-weight: 600; color: var(--text-primary);">
+            <i data-lucide="${d.icon}" style="width: 14px; height: 14px; color: ${d.color};"></i>
+            <span>${escapeHTML(d.label)}</span>
+          </div>
+          <div style="font-weight: 700; color: var(--text-primary);">
+            <span>${count}</span> <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">(${pct}%)</span>
+          </div>
+        </div>
+        <div style="width: 100%; height: 7px; background: var(--bg-hover); border-radius: 999px; overflow: hidden; border: 1px solid var(--border);">
+          <div style="width: ${pct}%; height: 100%; background: ${d.color}; border-radius: 999px; transition: width 0.3s ease;"></div>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html || '<div style="font-size:0.8rem; color:var(--text-muted);">Sin cuellos de botella detectados.</div>';
+};
+
+// Renderizado de la tabla analítica de responsables con más pendientes
+window.renderJuntaResponsablesTable = function(todos) {
+  const container = document.getElementById('junta-responsables-table-container');
+  if (!container) return;
+
+  const total = todos.length;
+  if (total === 0) {
+    container.innerHTML = '<div style="padding:1rem; text-align:center; color:var(--text-muted); font-size:0.8rem;">Sin pendientes registrados.</div>';
+    return;
+  }
+
+  // Agrupar items por cada responsable individual único
+  const grupos = {};
+  todos.forEach(item => {
+    const rList = (item.responsablesList && item.responsablesList.length > 0) ? item.responsablesList : ['Sin Asignar'];
+    rList.forEach(respKey => {
+      const rName = String(respKey || '').trim() || 'Sin Asignar';
+      if (!grupos[rName]) {
+        grupos[rName] = {
+          nombre: rName,
+          items: [],
+          total: 0,
+          ticketsCount: 0,
+          ticketsMas15: 0,
+          ordenesCount: 0,
+          ordenesSinFirma: 0,
+          enviosCount: 0,
+          levantamientosCount: 0,
+          urgentesCount: 0,
+          maxDias: 0
+        };
+      }
+      if (!grupos[rName].items.some(x => x.tipo === item.tipo && x.id === item.id)) {
+        grupos[rName].items.push(item);
+        grupos[rName].total++;
+        if (item.tipo === 'ticket') {
+          grupos[rName].ticketsCount++;
+          if (item.diasAntiguedad > 15) grupos[rName].ticketsMas15++;
+        } else if (item.tipo === 'orden') {
+          grupos[rName].ordenesCount++;
+          if (item.rawItem && (item.rawItem.firma_cliente_base64 === '__DELETED__' || !item.rawItem.firma_cliente_base64 || !item.rawItem.firma_tecnico_base64 || item.rawItem.firma_tecnico_base64 === '__DELETED__')) {
+            grupos[rName].ordenesSinFirma++;
+          }
+        } else if (item.tipo === 'envio') {
+          grupos[rName].enviosCount++;
+        } else if (item.tipo === 'levantamiento') {
+          grupos[rName].levantamientosCount++;
+        }
+        if (item.prioridad === 'Urgente' || item.cuelloNivel === 'danger') {
+          grupos[rName].urgentesCount++;
+        }
+        if (item.diasAntiguedad > grupos[rName].maxDias) {
+          grupos[rName].maxDias = item.diasAntiguedad;
+        }
+      }
+    });
+  });
+
+  const respArray = Object.values(grupos).sort((a, b) => {
+    if (a.nombre === 'Sin Asignar') return 1;
+    if (b.nombre === 'Sin Asignar') return -1;
+    return b.total - a.total;
+  });
+
+  const maxTotal = respArray.length > 0 ? Math.max(...respArray.map(r => r.total), 1) : 1;
+
+  let html = `
+    <table style="width:100%; border-collapse:collapse; font-size:0.82rem; text-align:left; min-width:760px;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border); color:var(--text-muted); font-size:0.72rem; text-transform:uppercase; letter-spacing:0.04em;">
+          <th style="padding:0.6rem 0.75rem; font-weight:700; width:40px; text-align:center;">#</th>
+          <th style="padding:0.6rem 0.75rem; font-weight:700;">Responsable</th>
+          <th style="padding:0.6rem 0.75rem; font-weight:700; text-align:center; width:130px;">Rol</th>
+          <th style="padding:0.6rem 0.75rem; font-weight:700; width:160px;">Total Pendientes</th>
+          <th style="padding:0.6rem 0.75rem; font-weight:700; text-align:center;">Tickets</th>
+          <th style="padding:0.6rem 0.75rem; font-weight:700; text-align:center;">Órdenes</th>
+          <th style="padding:0.6rem 0.75rem; font-weight:700; text-align:center;">Envíos</th>
+          <th style="padding:0.6rem 0.75rem; font-weight:700; text-align:center;">Mayor Rezago</th>
+          <th style="padding:0.6rem 0.75rem; font-weight:700; text-align:right;">Acción</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  respArray.forEach((r, idx) => {
+    const isUnassigned = r.nombre === 'Sin Asignar';
+    const pct = Math.round((r.total / maxTotal) * 100);
+    const barColor = isUnassigned ? '#ef4444' : (r.total >= 10 ? '#ef4444' : (r.total >= 5 ? '#f59e0b' : '#3b82f6'));
+    const medal = idx === 0 && !isUnassigned ? '🥇 ' : (idx === 1 && !isUnassigned ? '🥈 ' : (idx === 2 && !isUnassigned ? '🥉 ' : ''));
+    const initial = isUnassigned ? '?' : (r.nombre[0] || '?').toUpperCase();
+    const avatarBg = isUnassigned ? 'rgba(239,68,68,0.15)' : 'rgba(79,142,247,0.15)';
+    const avatarColor = isUnassigned ? '#ef4444' : '#4f8ef7';
+
+    // Highlight current filter if active
+    const fRespCurrent = window.currentJuntaFilterResponsable || document.getElementById('junta-filter-responsable')?.value || 'todos';
+    const isActiveFilter = fRespCurrent !== 'todos' && (
+      normalizarTextoJunta(fRespCurrent) === normalizarTextoJunta(r.nombre)
+    );
+
+    const safeNombreArg = escapeHTML(r.nombre).replace(/'/g, "\\'");
+    const rolInfo = window.obtenerInfoRolUsuario(r.nombre);
+
+    html += `
+      <tr style="border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.15s ease; ${isActiveFilter ? 'background:rgba(232,130,12,0.08);' : ''}" 
+          onclick="window.filtrarSoloEsteTecnico('${safeNombreArg}')" 
+          title="Haz clic para enfocar los pendientes de ${escapeHTML(r.nombre)}"
+          onmouseenter="if(!${isActiveFilter}) this.style.background='var(--bg-hover)'" 
+          onmouseleave="if(!${isActiveFilter}) this.style.background=''">
+        <td style="padding:0.55rem 0.75rem; text-align:center; font-weight:700; color:var(--text-muted); font-size:0.78rem;">
+          ${medal ? medal : (idx + 1)}
+        </td>
+        <td style="padding:0.55rem 0.75rem;">
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <div style="width:26px; height:26px; border-radius:50%; background:${avatarBg}; color:${avatarColor}; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:800; flex-shrink:0;">
+              ${isUnassigned ? '<i data-lucide="user-x" style="width:13px; height:13px;"></i>' : initial}
+            </div>
+            <div>
+              <span style="font-weight:700; color:${isUnassigned ? 'var(--red, #ef4444)' : 'var(--text-primary)'};">${escapeHTML(r.nombre)}</span>
+              ${r.urgentesCount > 0 ? `<span style="margin-left:4px; font-size:0.68rem; color:#ef4444; font-weight:700;">🔥 ${r.urgentesCount} urgentes</span>` : ''}
+            </div>
+          </div>
+        </td>
+        <td style="padding:0.55rem 0.75rem; text-align:center;">
+          <span class="badge" style="background:${rolInfo.color}18; color:${rolInfo.color}; border:1px solid ${rolInfo.color}40; border-radius:99px; padding:0.18rem 0.55rem; font-size:0.7rem; font-weight:700; white-space:nowrap; display:inline-flex; align-items:center; gap:4px;">
+            <i data-lucide="${rolInfo.icon}" style="width:11px; height:11px;"></i>
+            <span>${escapeHTML(rolInfo.label)}</span>
+          </span>
+        </td>
+        <td style="padding:0.55rem 0.75rem;">
+          <div style="display:flex; flex-direction:column; gap:0.2rem;">
+            <div style="display:flex; justify-content:space-between; font-size:0.78rem; font-weight:700; color:var(--text-primary);">
+              <span>${r.total} pendientes</span>
+              <span style="color:var(--text-muted); font-size:0.7rem; font-weight:normal;">${Math.round((r.total / total) * 100)}%</span>
+            </div>
+            <div style="width:100%; height:6px; background:var(--bg-hover); border-radius:999px; overflow:hidden; border:1px solid var(--border);">
+              <div style="width:${pct}%; height:100%; background:${barColor}; border-radius:999px;"></div>
+            </div>
+          </div>
+        </td>
+        <td style="padding:0.55rem 0.75rem; text-align:center;">
+          <span style="font-weight:700; color:#8b5cf6;">${r.ticketsCount}</span>
+          ${r.ticketsMas15 > 0 ? `<div style="font-size:0.68rem; color:#ef4444; font-weight:600;">+${r.ticketsMas15} (+15d)</div>` : ''}
+        </td>
+        <td style="padding:0.55rem 0.75rem; text-align:center;">
+          <span style="font-weight:700; color:#10b981;">${r.ordenesCount}</span>
+          ${r.ordenesSinFirma > 0 ? `<div style="font-size:0.68rem; color:#f59e0b; font-weight:600;">${r.ordenesSinFirma} s/firma</div>` : ''}
+        </td>
+        <td style="padding:0.55rem 0.75rem; text-align:center;">
+          <span style="font-weight:700; color:#f59e0b;">${r.enviosCount}</span>
+        </td>
+        <td style="padding:0.55rem 0.75rem; text-align:center;">
+          <span class="badge" style="background:${r.maxDias > 14 ? 'rgba(239,68,68,0.15)' : (r.maxDias > 7 ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)')}; color:${r.maxDias > 14 ? '#ef4444' : (r.maxDias > 7 ? '#f59e0b' : '#10b981')}; font-weight:700; padding:0.15rem 0.45rem; border-radius:6px; font-size:0.72rem;">
+            ${r.maxDias} días
+          </span>
+        </td>
+        <td style="padding:0.55rem 0.75rem; text-align:right;">
+          <button type="button" class="btn-secondary" onclick="event.stopPropagation(); window.filtrarSoloEsteTecnico('${safeNombreArg}')" style="font-size:0.72rem; padding:0.25rem 0.55rem; display:inline-flex; align-items:center; gap:3px; font-weight:600;">
+            <i data-lucide="filter" style="width:11px; height:11px;"></i> <span>Ver casos</span>
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+
+  html += `
+      </tbody>
+    </table>
+  `;
+
+  container.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+// Generador HTML para una tarjeta individual de pendiente con acciones rápidas
+function generarHtmlTarjetaJunta(item, tecnicosDisponibles) {
+  let cardClass = 'junta-card-item';
+  if (item.prioridad === 'Urgente' || item.cuelloNivel === 'danger') {
+    cardClass += ' critico-card';
+  } else if (item.diasAntiguedad >= 7 || item.cuelloNivel === 'warning') {
+    cardClass += ' alerta-card';
+  }
+
+  // Badge de antigüedad
+  let delayBadgeClass = 'normal';
+  let delayIcon = 'clock';
+  let delayText = `Hace ${item.diasAntiguedad} ${item.diasAntiguedad === 1 ? 'día' : 'días'}`;
+  if (item.diasAntiguedad > 14) {
+    delayBadgeClass = 'danger';
+    delayIcon = 'alert-triangle';
+    delayText = `⚠️ Crítico: ${item.diasAntiguedad} días`;
+  } else if (item.diasAntiguedad >= 7) {
+    delayBadgeClass = 'warning';
+    delayIcon = 'clock';
+    delayText = `⏳ Alerta: ${item.diasAntiguedad} días`;
+  }
+
+  // Badge de fecha compromiso acordada
+  let deadlineHtml = '';
+  if (item.fechaCompromiso) {
+    const dComp = new Date(item.fechaCompromiso);
+    const hoyMs = new Date().setHours(0,0,0,0);
+    const esVencido = !isNaN(dComp.getTime()) && dComp.getTime() < hoyMs;
+    const txtFmt = !isNaN(dComp.getTime()) ? dComp.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }) : item.fechaCompromiso;
+    deadlineHtml = `
+      <span class="junta-deadline-pill ${esVencido ? 'vencido' : ''}" title="Fecha límite acordada en junta: ${item.fechaCompromiso}">
+        <i data-lucide="calendar-check" style="width:11px; height:11px;"></i>
+        <span>${esVencido ? 'Vencido: ' : 'Compromiso: '}${txtFmt}</span>
+      </span>
+    `;
+  }
+
+  // Monto si existe
+  let montoHtml = '';
+  if (item.monto > 0) {
+    montoHtml = `
+      <span style="font-weight: 800; color: #10b981; font-family: monospace; font-size: 0.78rem; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); padding: 1px 6px; border-radius: 5px;">
+        $${new Intl.NumberFormat('es-MX').format(item.monto)} MXN
+      </span>
+    `;
+  }
+
+  // Selector de reasignación rápida (Supervisores para tickets, Técnicos para órdenes/levantamientos/envíos)
+  const listaDisponibles = (item.tipo === 'ticket') 
+    ? (typeof window.obtenerListaSupervisoresJunta === 'function' ? window.obtenerListaSupervisoresJunta() : [])
+    : (tecnicosDisponibles && tecnicosDisponibles.length > 0 ? tecnicosDisponibles : (typeof window.obtenerListaTecnicosJunta === 'function' ? window.obtenerListaTecnicosJunta() : []));
+
+  let primerResp = (item.responsablesList && item.responsablesList[0]) ? item.responsablesList[0] : 'Sin Asignar';
+  if (item.tipo === 'ticket' && primerResp !== 'Sin Asignar') {
+    const isSup = listaDisponibles.some(s => normalizarTextoJunta(s) === normalizarTextoJunta(primerResp));
+    if (!isSup) primerResp = 'Sin Asignar';
+  }
+
+  let tecOptionsHtml = `<option value="${escapeHTML(primerResp)}" selected>${escapeHTML(primerResp)}</option>`;
+  if (primerResp !== 'Sin Asignar') {
+    tecOptionsHtml += `<option value="Sin Asignar">Sin Asignar</option>`;
+  }
+  listaDisponibles.forEach(tec => {
+    if (normalizarTextoJunta(tec) !== normalizarTextoJunta(primerResp) && tec !== 'Sin Asignar') {
+      tecOptionsHtml += `<option value="${escapeHTML(tec)}">${escapeHTML(tec)}</option>`;
+    }
+  });
+
+  // Último comentario o acuerdo interno (visibilidad garantizada ÚNICAMENTE en Tickets)
+  let commentHtml = '';
+  if (item.tipo === 'ticket') {
+    if (item.ultimoComentario && item.ultimoComentario.texto) {
+      const uNom = escapeHTML(item.ultimoComentario.usuario || 'Staff');
+      const uTxt = escapeHTML(item.ultimoComentario.texto);
+      const uFec = item.ultimoComentario.fecha ? (typeof formatFechaHoraAmigable === 'function' ? formatFechaHoraAmigable(item.ultimoComentario.fecha) : (typeof formatFechaAmigable === 'function' ? formatFechaAmigable(item.ultimoComentario.fecha) : item.ultimoComentario.fecha.substring(0, 10))) : '';
+      const tooltipText = escapeHTML(`${item.ultimoComentario.usuario || 'Staff'}${uFec ? ' (' + uFec + ')' : ''}: ${item.ultimoComentario.texto}`);
+
+      commentHtml = `
+        <div style="background: var(--bg-hover); border: 1px solid var(--border); border-left: 3.5px solid var(--accent); border-radius: 8px; padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);" title="${tooltipText}">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; font-size: 0.72rem;">
+            <span style="color: var(--accent); font-weight: 700; display: inline-flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              <i data-lucide="message-square" style="width: 12px; height: 12px; flex-shrink: 0;"></i>
+              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${uNom}</span>
+            </span>
+            ${uFec ? `<span style="color: var(--text-muted); font-size: 0.68rem; font-weight: 500; white-space: nowrap; flex-shrink: 0;">• ${escapeHTML(uFec)}</span>` : ''}
+          </div>
+          <div style="color: var(--text-primary); font-size: 0.79rem; line-height: 1.38; font-weight: 500; word-break: break-word; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+            ${uTxt}
+          </div>
+        </div>
+      `;
+    } else {
+      commentHtml = `
+        <div style="background: var(--bg-hover); border: 1px dashed var(--border); border-radius: 8px; padding: 0.42rem 0.75rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; font-size: 0.73rem; color: var(--text-muted);">
+          <span style="display: inline-flex; align-items: center; gap: 5px; opacity: 0.75;">
+            <i data-lucide="message-square" style="width: 12px; height: 12px;"></i>
+            <span>Sin comentarios internos</span>
+          </span>
+          <button type="button" onclick="event.stopPropagation(); window.toggleNotaRapidaJunta('${item.tipo}', '${item.id}')" style="font-size: 0.72rem; color: var(--accent); background: none; border: none; cursor: pointer; font-weight: 600; padding: 0; display: inline-flex; align-items: center; gap: 3px;" title="Registrar nuevo acuerdo o comentario">
+            <i data-lucide="plus" style="width: 11px; height: 11px;"></i> Comentar
+          </button>
+        </div>
+      `;
+    }
+  }
+
+  const isUrgente = item.prioridad === 'Urgente';
+
+  let assocOrderHtml = '';
+  if (item.tipo === 'ticket') {
+    const rawT = item.rawItem || { id: item.id, folio: item.folio };
+    const assocOrder = window.obtenerOrdenAsociadaTicket(rawT);
+    const parentTicket = !assocOrder ? (typeof window.obtenerTicketPadre === 'function' ? window.obtenerTicketPadre(rawT) : null) : null;
+    if (assocOrder) {
+      assocOrderHtml = `
+        <button type="button" class="junta-quick-action-btn" onclick="event.stopPropagation(); window.verOrdenDesdeTicket('${assocOrder.id}')" title="Ver Orden de Servicio vinculada (${escapeHTML(assocOrder.folio || assocOrder.id)})" style="background: rgba(37, 99, 235, 0.1); color: #2563eb; border-color: rgba(37, 99, 235, 0.3); font-size: 0.72rem; font-weight: 600; padding: 2px 7px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+          <i data-lucide="file-text" style="width: 11px; height: 11px;"></i>
+          <span>${escapeHTML(assocOrder.folio || 'Ver OS')}</span>
+        </button>
+      `;
+    } else if (parentTicket) {
+      assocOrderHtml = `
+        <button type="button" class="junta-quick-action-btn" onclick="event.stopPropagation(); verDetalleTicket('${parentTicket.id}')" title="Ver Ticket Origen (${escapeHTML(parentTicket.folio || parentTicket.id)})" style="background: rgba(234, 88, 12, 0.1); color: #ea580c; border-color: rgba(234, 88, 12, 0.3); font-size: 0.72rem; font-weight: 600; padding: 2px 7px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+          <i data-lucide="ticket" style="width: 11px; height: 11px;"></i>
+          <span>${escapeHTML(parentTicket.folio || parentTicket.id)}</span>
+        </button>
+      `;
+    }
+  }
+
+  return `
+    <div class="${cardClass}" id="junta-card-${item.tipo}-${item.id}" onclick="if(!event.target.closest('button, select, input, textarea, a, .junta-quicknote-drawer, .junta-quick-action-btn, option')){ window.abrirDetalleElementoJunta('${item.tipo}', '${item.id}'); }" title="Haz clic para abrir detalle de ${item.tipoLabel} (${escapeHTML(item.folio)})">
+      
+      <!-- HEADER TARJETA: TIPO, FOLIO, TIEMPO, DEADLINE, MONTO, PRIORIDAD RÁPIDA -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+          <span style="background: ${item.tipoColor}18; color: ${item.tipoColor}; border: 1px solid ${item.tipoColor}35; font-size: 0.72rem; font-weight: 700; padding: 2px 7px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;">
+            <i data-lucide="${item.tipoIcon}" style="width: 12px; height: 12px;"></i> ${item.tipoLabel}
+          </span>
+          <strong style="font-size: 0.85rem; color: var(--text-primary); font-family: monospace; letter-spacing: -0.2px;">${escapeHTML(item.folio)}</strong>
+          ${assocOrderHtml}
+          ${montoHtml}
+          ${deadlineHtml}
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 0.35rem;">
+          <!-- Botón de Fuego Urgente en 1 Clic -->
+          <button type="button" class="junta-quick-action-btn ${isUrgente ? 'active-flame' : ''}" onclick="event.stopPropagation(); window.juntaToggleUrgente('${item.tipo}', '${item.id}')" title="Alternar Prioridad Urgente">
+            <i data-lucide="flame" style="width: 12px; height: 12px;"></i>
+            <span>${isUrgente ? 'Urgente' : 'Normal'}</span>
+          </button>
+
+          <div class="junta-delay-badge ${delayBadgeClass}" title="Fecha: ${item.fecha ? item.fecha.substring(0,10) : 'N/A'}">
+            <i data-lucide="${delayIcon}" style="width: 11px; height: 11px;"></i>
+            <span>${item.tiempoRelativo}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- INFO CLIENTE Y UBICACIÓN -->
+      <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+        <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); line-height: 1.3;">
+          ${escapeHTML(item.cliente)}
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.65rem; font-size: 0.76rem; color: var(--text-muted); flex-wrap: wrap;">
+          <span style="display: inline-flex; align-items: center; gap: 3px;"><i data-lucide="map-pin" style="width: 12px; height: 12px;"></i> ${escapeHTML(item.sitio)}</span>
+          ${(() => {
+            const eq = item.equipo ? escapeHTML(item.equipo) : '';
+            const sn = item.serie && item.serie !== 'N/A' && item.serie !== item.equipo ? escapeHTML(item.serie) : '';
+            if (!eq && !sn) return '';
+            if (eq && sn) {
+              return `<span style="display: inline-flex; align-items: center; gap: 3px;" title="Maquinaria: ${eq} | S/N: ${sn}"><i data-lucide="cpu" style="width: 12px; height: 12px;"></i> ${eq} <span style="opacity:0.85; font-weight:normal; font-size:0.72rem;">(S/N: ${sn})</span></span>`;
+            }
+            if (eq) {
+              return `<span style="display: inline-flex; align-items: center; gap: 3px;" title="Maquinaria: ${eq}"><i data-lucide="cpu" style="width: 12px; height: 12px;"></i> ${eq}</span>`;
+            }
+            return `<span style="display: inline-flex; align-items: center; gap: 3px;" title="Serie: ${sn}"><i data-lucide="cpu" style="width: 12px; height: 12px;"></i> S/N: ${sn}</span>`;
+          })()}
+          
+          <!-- Reasignación rápida de responsable/técnico en 1 clic -->
+          <div style="display: inline-flex; align-items: center; gap: 3px; background: var(--bg-hover); padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border);" title="${item.tipo === 'ticket' ? 'Reasignar supervisor' : 'Reasignar técnico'}" onclick="event.stopPropagation();">
+            <i data-lucide="${item.tipo === 'ticket' ? 'user-check' : 'user'}" style="width: 12px; height: 12px; color: var(--accent);"></i>
+            <select onclick="event.stopPropagation();" onchange="event.stopPropagation(); window.juntaReasignarTecnico('${item.tipo}', '${item.id}', this.value)" style="border: none; background: transparent; color: var(--text-primary); font-size: 0.74rem; font-weight: 600; cursor: pointer; outline: none; max-width: 150px;">
+              ${tecOptionsHtml}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- ASUNTO / TRABAJO -->
+      <div style="font-size: 0.82rem; color: var(--text-primary); line-height: 1.4; font-weight: 500;">
+        ${escapeHTML(item.titulo)}
+      </div>
+
+      <!-- CUELLO DE BOTELLA OPERATIVO -->
+      <div class="junta-bottleneck-box ${item.cuelloNivel}">
+        <i data-lucide="alert-circle" style="width: 14px; height: 14px; flex-shrink: 0; margin-top: 2px;"></i>
+        <div style="flex: 1;">
+          <strong style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 2px;">Cuello de botella:</strong>
+          <span>${escapeHTML(item.cuelloDeBotella)}</span>
+        </div>
+      </div>
+
+      <!-- ÚLTIMO COMENTARIO -->
+      ${commentHtml}
+
+      <!-- BOTONES DE ACCIÓN INFERIOR -->
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 0.65rem; margin-top: 0.2rem; flex-wrap: wrap; gap: 0.4rem;">
+        <span style="font-size: 0.7rem; color: var(--text-muted);">Estatus: <strong>${escapeHTML(item.estado)}</strong></span>
+        <div style="display: flex; gap: 0.35rem; align-items: center;">
+          <!-- Botón Fecha Compromiso -->
+          <button type="button" class="btn-secondary" onclick="event.stopPropagation(); window.juntaSetDeadlinePrompt('${item.tipo}', '${item.id}', '${item.fechaCompromiso || ''}')" style="font-size:0.73rem; padding:0.3rem 0.55rem; display:inline-flex; align-items:center; gap:3px;" title="Definir fecha límite / compromiso acordada en junta">
+            <i data-lucide="calendar-plus" style="width:12px;height:12px;"></i> <span>Compromiso</span>
+          </button>
+
+          <!-- Botón Acuerdo de Junta -->
+          <button type="button" class="btn-secondary" onclick="event.stopPropagation(); window.toggleNotaRapidaJunta('${item.tipo}', '${item.id}')" style="font-size:0.73rem; padding:0.3rem 0.55rem; display:inline-flex; align-items:center; gap:3px;" title="Capturar acuerdo inmediato">
+            <i data-lucide="message-square-plus" style="width:12px;height:12px;"></i> <span>Acuerdo</span>
+          </button>
+
+          <!-- Botón Ver Detalle -->
+          <button type="button" class="btn-primary" onclick="event.stopPropagation(); window.abrirDetalleElementoJunta('${item.tipo}', '${item.id}')" style="font-size:0.73rem; padding:0.3rem 0.6rem; display:inline-flex; align-items:center; gap:3px; background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary);">
+            <i data-lucide="external-link" style="width:12px;height:12px;"></i> <span>Detalle</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- DRAWER NOTA RÁPIDA DE JUNTA -->
+      <div id="junta-quicknote-box-${item.tipo}-${item.id}" class="junta-quicknote-drawer" style="display: none; flex-direction: column; gap: 0.4rem; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem; margin-top: 0.5rem;" onclick="event.stopPropagation();">
+        <label style="font-size: 0.72rem; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 4px;">
+          <i data-lucide="pen-line" style="width: 12px; height: 12px;"></i> Registrar Acuerdo de Junta (se añadirá al historial):
+        </label>
+        <textarea id="junta-quicknote-input-${item.tipo}-${item.id}" rows="2" placeholder="Ej: Se acuerda enviar refacción el jueves y Rodrigo concluye el viernes..." style="width: 100%; font-size: 0.75rem; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem; resize: vertical;"></textarea>
+        <div style="display: flex; justify-content: flex-end; gap: 0.35rem;">
+          <button type="button" class="btn-secondary" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;" onclick="event.stopPropagation(); window.toggleNotaRapidaJunta('${item.tipo}', '${item.id}')">Cancelar</button>
+          <button type="button" class="btn-primary" style="font-size: 0.7rem; padding: 0.2rem 0.6rem;" onclick="event.stopPropagation(); window.guardarNotaRapidaJunta('${item.tipo}', '${item.id}')">Guardar Acuerdo</button>
+        </div>
+      </div>
+
+    </div>
+  `;
+}
+
+// Renderizado principal del panel de juntas
+window.renderJuntaRevision = function() {
+  const container = document.getElementById('junta-cards-container');
+  if (!container) return;
+
+  const todos = window.obtenerTodosLosPendientes();
+  const tecnicosDisponibles = window.obtenerListaTecnicosJunta();
+
+  // 1. CALCULAR MÉTRICAS KPI DE VOLUMEN
+  const countTotal = todos.length;
+  const countTickets = todos.filter(x => x.tipo === 'ticket').length;
+  const countTicketsMas15Dias = todos.filter(x => x.tipo === 'ticket' && x.diasAntiguedad > 15).length;
+  
+  const countOrdenes = todos.filter(x => x.tipo === 'orden').length;
+  const countOrdenesSinFirma = todos.filter(x => x.tipo === 'orden' && (x.rawItem.firma_cliente_base64 === '__DELETED__' || !x.rawItem.firma_cliente_base64 || !x.rawItem.firma_tecnico_base64 || x.rawItem.firma_tecnico_base64 === '__DELETED__')).length;
+  
+  const countEnvios = todos.filter(x => x.tipo === 'envio').length;
+  const countEnviosSinGuia = todos.filter(x => x.tipo === 'envio' && (!x.rawItem.guiaPedido || !String(x.rawItem.guiaPedido).trim())).length;
+  
+  const countCotizaciones = todos.filter(x => x.tipoEspecifico === 'Cotización').length;
+  const countLevantamientos = todos.filter(x => x.tipo === 'levantamiento').length;
+  const countLevPorRealizar = todos.filter(x => x.tipo === 'levantamiento' && (x.rawItem.estado === 'Por Cotizar' || x.rawItem.estado === 'Pendiente' || x.rawItem.estado === 'Por Realizar' || !x.rawItem.estado)).length;
+  
+  const countCriticos = todos.filter(x => x.diasAntiguedad >= 7).length;
+
+  // Actualizar KPI DOM
+  const elTot = document.getElementById('junta-kpi-total');
+  if (elTot) elTot.textContent = countTotal;
+  const elTkt = document.getElementById('junta-kpi-tickets');
+  if (elTkt) elTkt.textContent = countTickets;
+  const elTktSub = document.getElementById('junta-kpi-tickets-sub');
+  if (elTktSub) elTktSub.textContent = `${countTicketsMas15Dias} +15 días`;
+
+  const elOrd = document.getElementById('junta-kpi-ordenes');
+  if (elOrd) elOrd.textContent = countOrdenes;
+  const elOrdSub = document.getElementById('junta-kpi-ordenes-sub');
+  if (elOrdSub) elOrdSub.textContent = `${countOrdenesSinFirma} sin firma`;
+
+  const elEnv = document.getElementById('junta-kpi-envios');
+  if (elEnv) elEnv.textContent = countEnvios;
+  const elEnvSub = document.getElementById('junta-kpi-envios-sub');
+  if (elEnvSub) elEnvSub.textContent = `${countEnviosSinGuia} sin guía`;
+
+  const elLev = document.getElementById('junta-kpi-levantamientos');
+  if (elLev) elLev.textContent = countLevantamientos;
+  const elLevSub = document.getElementById('junta-kpi-levantamientos-sub');
+  if (elLevSub) elLevSub.textContent = `${countLevPorRealizar} por realizar`;
+
+  const elCrit = document.getElementById('junta-kpi-criticos');
+  if (elCrit) elCrit.textContent = countCriticos;
+
+  // 2. CALCULAR MÉTRICAS FINANCIERAS (OPCIÓN 2)
+  const sumMontoCotizaciones = todos.filter(x => x.tipoEspecifico === 'Cotización').reduce((sum, item) => sum + (Number(item.monto) || 0), 0);
+  const totalRefaccionesPendientes = todos.reduce((sum, item) => sum + (Number(item.refaccionesCount) || 0), 0);
+
+  const elFinCot = document.getElementById('junta-fin-cotizaciones');
+  if (elFinCot) elFinCot.textContent = `$${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(sumMontoCotizaciones)} MXN`;
+  const elFinCotSub = document.getElementById('junta-fin-cotizaciones-sub');
+  if (elFinCotSub) elFinCotSub.textContent = `${countCotizaciones} cotizaciones abiertas esperando OC/Autorización`;
+
+  const elFinOrd = document.getElementById('junta-fin-ordenes');
+  if (elFinOrd) elFinOrd.textContent = `${countOrdenesSinFirma} órdenes`;
+
+  const elFinRef = document.getElementById('junta-fin-refacciones');
+  if (elFinRef) elFinRef.textContent = `${totalRefaccionesPendientes} piezas`;
+
+  // 3. ACTUALIZAR PÍLDORAS DE TIPO
+  const cpTodos = document.getElementById('count-pill-todos');
+  if (cpTodos) cpTodos.textContent = countTotal;
+  const cpTkt = document.getElementById('count-pill-ticket');
+  if (cpTkt) cpTkt.textContent = countTickets;
+  const cpOrd = document.getElementById('count-pill-orden');
+  if (cpOrd) cpOrd.textContent = countOrdenes;
+  const cpEnv = document.getElementById('count-pill-envio');
+  if (cpEnv) cpEnv.textContent = countEnvios;
+  const cpCot = document.getElementById('count-pill-cotizacion');
+  if (cpCot) cpCot.textContent = countCotizaciones;
+  const cpLev = document.getElementById('count-pill-levantamiento');
+  if (cpLev) cpLev.textContent = countLevantamientos;
+
+  // Header & sidebar badges
+  const headerBadge = document.getElementById('junta-badge-total-header');
+  if (headerBadge) headerBadge.textContent = `${countTotal} pendientes`;
+  window.actualizarBadgeJuntaRevision(countTotal);
+
+  // 4. RENDERIZAR DIAGNÓSTICO Y TABLA DE RESPONSABLES
+  window.renderJuntaBottleneckAnalytics(todos);
+  window.renderJuntaResponsablesTable(todos);
+
+  // 5. APLICAR FILTROS MULTICRITERIO
+  const fTipo = window.currentJuntaFilterTipo || 'todos';
+  const fAntiguedad = document.getElementById('junta-filter-antiguedad')?.value || window.currentJuntaFilterAntiguedad || 'todos';
+  const fCliente = document.getElementById('junta-filter-cliente')?.value || 'todos';
+  const fResp = document.getElementById('junta-filter-responsable')?.value || 'todos';
+  const fUrgente = !!window.currentJuntaFilterUrgente;
+  const fCausa = window.currentJuntaFilterCausa || 'todos';
+  const q = (document.getElementById('junta-search-input')?.value || '').toLowerCase().trim();
+  const sortBy = document.getElementById('junta-sort-by')?.value || window.currentJuntaSortBy || 'antiguedad_desc';
+
+  let filtrados = todos.filter(item => {
+    // Tipo
+    if (fTipo === 'ticket' && item.tipo !== 'ticket') return false;
+    if (fTipo === 'orden' && item.tipo !== 'orden') return false;
+    if (fTipo === 'envio' && item.tipo !== 'envio') return false;
+    if (fTipo === 'cotizacion' && item.tipoEspecifico !== 'Cotización') return false;
+    if (fTipo === 'levantamiento' && item.tipo !== 'levantamiento') return false;
+
+    // Causa raíz seleccionada en el diagnóstico
+    if (fCausa !== 'todos' && item.causaId !== fCausa) return false;
+
+    // Antigüedad
+    if (fAntiguedad === 'hoy' && item.diasAntiguedad > 1) return false;
+    if (fAntiguedad === 'mayor_3' && item.diasAntiguedad < 3) return false;
+    if (fAntiguedad === 'alerta_7' && item.diasAntiguedad < 7) return false;
+    if (fAntiguedad === 'critico_14' && item.diasAntiguedad < 14) return false;
+
+    // Cliente
+    if (fCliente !== 'todos' && item.cliente !== fCliente) return false;
+
+    // Responsable (comprueba si el usuario seleccionado está asignado individualmente al item)
+    if (fResp && fResp !== 'todos') {
+      const fNorm = normalizarTextoJunta(fResp);
+      const isUnassigned = fNorm === 'sin asignar' || fNorm === 'por definir' || fNorm === '-' || fNorm === 'sin_asignar';
+      
+      if (isUnassigned) {
+        const isItemUnassigned = !item.responsable || 
+          item.responsable === '-' || 
+          normalizarTextoJunta(item.responsable).includes('sin asignar') || 
+          normalizarTextoJunta(item.responsable).includes('por definir') ||
+          (item.responsablesList || []).some(r => {
+            const rN = normalizarTextoJunta(r);
+            return rN === 'sin asignar' || rN === 'por definir' || rN === '-' || rN === '';
+          });
+        if (!isItemUnassigned) return false;
+      } else {
+        const itemRespListNorm = (item.responsablesList || []).map(r => normalizarTextoJunta(r));
+        const itemRespNorm = normalizarTextoJunta(item.responsable);
+        
+        const match = itemRespListNorm.some(r => r.includes(fNorm) || fNorm.includes(r)) ||
+                      itemRespNorm.includes(fNorm) || 
+                      fNorm.includes(itemRespNorm);
+        if (!match) return false;
+      }
+    }
+
+    // Urgente
+    if (fUrgente && item.prioridad !== 'Urgente' && item.prioridad !== 'Alta' && item.cuelloNivel !== 'danger') return false;
+
+    // Búsqueda de texto
+    if (q) {
+      const matchFolio = (item.folio || '').toLowerCase().includes(q);
+      const matchCli = (item.cliente || '').toLowerCase().includes(q);
+      const matchSit = (item.sitio || '').toLowerCase().includes(q);
+      const matchEq = (item.equipo || '').toLowerCase().includes(q);
+      const matchSerie = (item.serie || '').toLowerCase().includes(q);
+      const matchResp = (item.responsable || '').toLowerCase().includes(q);
+      const matchTit = (item.titulo || '').toLowerCase().includes(q);
+      const matchCuello = (item.cuelloDeBotella || '').toLowerCase().includes(q);
+      const matchNota = item.ultimoComentario ? (String(item.ultimoComentario.texto || '').toLowerCase().includes(q) || String(item.ultimoComentario.usuario || '').toLowerCase().includes(q)) : false;
+
+      if (!matchFolio && !matchCli && !matchSit && !matchEq && !matchSerie && !matchResp && !matchTit && !matchCuello && !matchNota) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  // 6. ORDENAMIENTO
+  filtrados.sort((a, b) => {
+    if (sortBy === 'antiguedad_desc') {
+      return b.diasAntiguedad - a.diasAntiguedad;
+    } else if (sortBy === 'antiguedad_asc') {
+      return a.diasAntiguedad - b.diasAntiguedad;
+    } else if (sortBy === 'prioridad') {
+      const peso = { 'Urgente': 4, 'Alta': 3, 'Media': 2, 'Baja': 1 };
+      const pesoA = peso[a.prioridad] || (a.diasAntiguedad > 14 ? 4 : (a.diasAntiguedad > 7 ? 3 : 2));
+      const pesoB = peso[b.prioridad] || (b.diasAntiguedad > 14 ? 4 : (b.diasAntiguedad > 7 ? 3 : 2));
+      if (pesoB !== pesoA) return pesoB - pesoA;
+      return b.diasAntiguedad - a.diasAntiguedad;
+    } else if (sortBy === 'cliente') {
+      return (a.cliente || '').localeCompare(b.cliente || '');
+    } else if (sortBy === 'responsable') {
+      return (a.responsable || '').localeCompare(b.responsable || '');
+    }
+    return b.diasAntiguedad - a.diasAntiguedad;
+  });
+
+  window.juntaItemsFiltradosCache = filtrados;
+
+  // Actualizar contador
+  const countLabel = document.getElementById('junta-items-count-label');
+  if (countLabel) countLabel.textContent = `${filtrados.length} ${filtrados.length === 1 ? 'pendiente' : 'pendientes'}`;
+
+  // 7. RENDERIZAR SEGÚN MODO DE VISTA (TARJETAS O RONDA DE RESPONSABLES)
+  if (filtrados.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; background: var(--bg-card); border: 1px dashed var(--border); border-radius: 12px; padding: 3rem 1.5rem; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem;">
+        <div style="width: 50px; height: 50px; border-radius: 50%; background: var(--bg-hover); display: flex; align-items: center; justify-content: center; color: var(--text-muted);">
+          <i data-lucide="check-circle" style="width: 26px; height: 26px; color: var(--green);"></i>
+        </div>
+        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">¡Sin pendientes con estos filtros!</h3>
+        <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted); max-width: 420px;">No se encontraron elementos activos que coincidan con la búsqueda o filtros aplicados.</p>
+        <button type="button" class="btn-secondary" onclick="window.resetFiltrosJunta()" style="margin-top: 0.5rem; font-size: 0.8rem;">Restablecer Filtros</button>
+      </div>
+    `;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    return;
+  }
+
+  // MODO 1: RONDA DE RESPONSABLES / STANDUP (OPCIÓN 3) - AGRUPADOS POR USUARIO INDIVIDUAL
+  if (window.currentJuntaViewMode === 'responsables') {
+    // Agrupar filtrados por cada responsable individual único
+    const grupos = {};
+    filtrados.forEach(item => {
+      const rList = (item.responsablesList && item.responsablesList.length > 0) ? item.responsablesList : ['Sin Asignar'];
+      rList.forEach(respKey => {
+        if (!grupos[respKey]) grupos[respKey] = [];
+        if (!grupos[respKey].some(x => x.tipo === item.tipo && x.id === item.id)) {
+          grupos[respKey].push(item);
+        }
+      });
+    });
+
+    // Ordenar grupos por cantidad de pendientes (más saturados primero)
+    const respOrdenados = Object.keys(grupos).sort((a, b) => {
+      if (a === 'Sin Asignar') return 1;
+      if (b === 'Sin Asignar') return -1;
+      return grupos[b].length - grupos[a].length;
+    });
+
+    let htmlGroups = '';
+    respOrdenados.forEach(resp => {
+      const itemsResp = grupos[resp];
+      const countResp = itemsResp.length;
+      const countUrgentes = itemsResp.filter(x => x.prioridad === 'Urgente' || x.cuelloNivel === 'danger').length;
+      const maxDias = Math.max(...itemsResp.map(x => x.diasAntiguedad));
+
+      // Nivel de saturación
+      let satClass = 'baja';
+      let satText = 'Carga Ligera';
+      if (countResp >= 5) {
+        satClass = 'alta';
+        satText = 'Alta Saturación';
+      } else if (countResp >= 3) {
+        satClass = 'media';
+        satText = 'Carga Moderada';
+      }
+
+      let cardsResp = '';
+      itemsResp.forEach(item => {
+        cardsResp += generarHtmlTarjetaJunta(item, tecnicosDisponibles);
+      });
+
+      htmlGroups += `
+        <div class="junta-tech-group-container ${countUrgentes > 0 ? 'has-criticos' : ''}" style="grid-column: 1 / -1;">
+          
+          <!-- HEADER DEL TÉCNICO / RESPONSABLE INDIVIDUAL -->
+          <div class="junta-tech-group-header">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <div style="width: 34px; height: 34px; border-radius: 50%; background: ${resp === 'Sin Asignar' ? 'rgba(239,68,68,0.15)' : 'rgba(232,130,12,0.15)'}; color: ${resp === 'Sin Asignar' ? '#ef4444' : 'var(--accent)'}; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.85rem;">
+                <i data-lucide="${resp === 'Sin Asignar' ? 'user-x' : 'user'}" style="width: 17px; height: 17px;"></i>
+              </div>
+              <div>
+                <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.45rem;">
+                  <span>${escapeHTML(resp)}</span>
+                  <span class="junta-sat-badge ${satClass}">${satText}</span>
+                </h4>
+                <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.6rem; margin-top: 2px;">
+                  <span><strong>${countResp}</strong> ${countResp === 1 ? 'pendiente asignado' : 'pendientes asignados'}</span>
+                  ${countUrgentes > 0 ? `<span style="color: #ef4444; font-weight: 700;">• 🔥 ${countUrgentes} urgentes</span>` : ''}
+                  <span>• ⏳ Mayor rezago: ${maxDias} días</span>
+                </div>
+              </div>
+            </div>
+
+            <button type="button" class="btn-secondary" onclick="window.filtrarSoloEsteTecnico('${escapeHTML(resp)}')" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; display: inline-flex; align-items: center; gap: 4px;">
+              <i data-lucide="filter" style="width: 12px; height: 12px;"></i> <span>Enfocar</span>
+            </button>
+          </div>
+
+          <!-- GRID DE TARJETAS DE ESTE TÉCNICO -->
+          <div class="junta-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 0.75rem;">
+            ${cardsResp}
+          </div>
+
+        </div>
+      `;
+    });
+
+    container.innerHTML = htmlGroups;
+  } else {
+    // MODO 2: VISTA TARJETAS ESTÁNDAR
+    let htmlCards = '';
+    filtrados.forEach(item => {
+      htmlCards += generarHtmlTarjetaJunta(item, tecnicosDisponibles);
+    });
+    container.innerHTML = htmlCards;
+  }
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+// Enfocar en un técnico / responsable específico
+window.filtrarSoloEsteTecnico = function(respNombre) {
+  if (!respNombre) return;
+
+  window.currentJuntaFilterResponsable = respNombre;
+  
+  // Si no hay selector poblado aún, poblarlo o asegurar la opción
+  const selResp = document.getElementById('junta-filter-responsable');
+  if (selResp) {
+    let exists = Array.from(selResp.options).some(o => o.value === respNombre || normalizarTextoJunta(o.value) === normalizarTextoJunta(respNombre));
+    if (!exists && respNombre !== 'todos') {
+      const opt = document.createElement('option');
+      opt.value = respNombre;
+      opt.textContent = respNombre;
+      selResp.appendChild(opt);
+    }
+    selResp.value = respNombre;
+  }
+  
+  // Limpiar filtros conflictivos para garantizar que se vean los casos del técnico
+  window.currentJuntaFilterCausa = 'todos';
+  const inSearch = document.getElementById('junta-search-input');
+  if (inSearch) inSearch.value = '';
+  
+  // Limpiar filtro de tipo para mostrar todos sus tickets, órdenes y envíos
+  window.currentJuntaFilterTipo = 'todos';
+  document.querySelectorAll('.junta-type-btn').forEach(btn => {
+    if (btn.getAttribute('data-tipo') === 'todos') btn.classList.add('active');
+    else btn.classList.remove('active');
+  });
+
+  // Limpiar filtro urgencia si estuviera activo
+  window.currentJuntaFilterUrgente = false;
+  const btnUrg = document.getElementById('junta-urgente-toggle-btn');
+  if (btnUrg) btnUrg.classList.remove('active');
+
+  // Actualizar badges
+  const badgeCausa = document.getElementById('junta-causa-active-badge');
+  if (badgeCausa) badgeCausa.style.display = 'none';
+
+  const badgeResp = document.getElementById('junta-resp-active-badge');
+  const textResp = document.getElementById('junta-resp-active-text');
+  if (badgeResp && textResp) {
+    textResp.textContent = respNombre;
+    badgeResp.style.display = 'inline-flex';
+  }
+
+  // Asegurar vista de tarjetas para ver los casos
+  window.setJuntaViewMode('tarjetas');
+  window.renderJuntaRevision();
+
+  // Desplazar la vista suavemente hacia la barra de filtros/tarjetas
+  setTimeout(() => {
+    const targetEl = document.querySelector('.junta-filter-bar') || document.getElementById('junta-cards-container');
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, 60);
+};
+
+// Quitar filtro activo de responsable
+window.quitarFiltroResponsableJunta = function() {
+  window.currentJuntaFilterResponsable = 'todos';
+  const selResp = document.getElementById('junta-filter-responsable');
+  if (selResp) selResp.value = 'todos';
+  const badgeResp = document.getElementById('junta-resp-active-badge');
+  if (badgeResp) badgeResp.style.display = 'none';
+  window.renderJuntaRevision();
+};
+
+// ACCIÓN RÁPIDA 1: Reasignar Responsable/Técnico al vuelo (Opción 4)
+window.juntaReasignarTecnico = async function(tipo, id, nuevoResponsable) {
+  if (!nuevoResponsable) return;
+
+  try {
+    const valFinal = (nuevoResponsable === 'Sin Asignar' || nuevoResponsable === '-') ? '' : nuevoResponsable;
+
+    if (tipo === 'ticket') {
+      const tkts = (typeof tickets !== 'undefined' && tickets) ? tickets : [];
+      const t = tkts.find(x => x.id === id);
+      if (t) {
+        const oldAsignado = t.asignado || t.asignadoA || 'Sin asignar';
+        t.asignado = valFinal;
+        t.asignadoA = valFinal;
+        delete t.tecnico;
+        t.tecnicosAsignados = [];
+        if (typeof safeSetJSON === 'function') safeSetJSON('sapi_tickets', tickets);
+        if (window.pushToSupabase) await window.pushToSupabase('tickets', t);
+        if (typeof window.generarNotificacionInterna === 'function') {
+          window.generarNotificacionInterna(t, oldAsignado, nuevoResponsable);
+        }
+      }
+    } else if (tipo === 'orden') {
+      const ords = (typeof ordenes !== 'undefined' && ordenes) ? ordenes : [];
+      const o = ords.find(x => x.id === id);
+      if (o) {
+        o.tecnico = valFinal;
+        if (typeof safeSetJSON === 'function') safeSetJSON('sapi_ordenes', ordenes);
+        if (window.pushToSupabase) await window.pushToSupabase('ordenes', o);
+      }
+    } else if (tipo === 'levantamiento') {
+      const levs = (typeof levantamientos !== 'undefined' && levantamientos) ? levantamientos : (safeGetJSON('sapi_levantamientos', []));
+      const l = levs.find(x => x.id === id);
+      if (l) {
+        l.tecnico_asignado = valFinal;
+        l.asignado_a = valFinal;
+        if (typeof safeSetJSON === 'function') safeSetJSON('sapi_levantamientos', levantamientos);
+        if (window.pushToSupabase) await window.pushToSupabase('levantamientos', l);
+      }
+    } else if (tipo === 'envio') {
+      const envs = (typeof envios !== 'undefined' && envios) ? envios : (safeGetJSON('sapi_envios_db', []));
+      const e = envs.find(x => x.id === id);
+      if (e) {
+        e.responsable = valFinal;
+        if (typeof safeSetJSON === 'function') safeSetJSON('sapi_envios_db', envs);
+        if (window.pushToSupabase) await window.pushToSupabase('envios', e);
+      }
+    }
+
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion(`✅ Reasignado a ${nuevoResponsable} con éxito.`, 'success');
+    }
+    window.poblarFiltrosJuntaSelectores();
+    window.renderJuntaRevision();
+  } catch(err) {
+    console.error('Error al reasignar responsable:', err);
+    if (typeof mostrarNotificacion === 'function') mostrarNotificacion('Error al reasignar: ' + err.message, 'error');
+  }
+};
+
+// ACCIÓN RÁPIDA 2: Alternar Prioridad Urgente en 1 Clic (Opción 4)
+window.juntaToggleUrgente = async function(tipo, id) {
+  try {
+    let nuevaPrioridad = 'Urgente';
+
+    if (tipo === 'ticket') {
+      const tkts = (typeof tickets !== 'undefined' && tickets) ? tickets : [];
+      const t = tkts.find(x => x.id === id);
+      if (t) {
+        nuevaPrioridad = (t.prioridad === 'Urgente') ? 'Media' : 'Urgente';
+        t.prioridad = nuevaPrioridad;
+        if (typeof safeSetJSON === 'function') safeSetJSON('sapi_tickets', tickets);
+        if (window.pushToSupabase) await window.pushToSupabase('tickets', t);
+      }
+    } else if (tipo === 'orden') {
+      const ords = (typeof ordenes !== 'undefined' && ordenes) ? ordenes : [];
+      const o = ords.find(x => x.id === id);
+      if (o) {
+        nuevaPrioridad = (o.prioridad === 'Urgente') ? 'Media' : 'Urgente';
+        o.prioridad = nuevaPrioridad;
+        if (typeof safeSetJSON === 'function') safeSetJSON('sapi_ordenes', ordenes);
+        if (window.pushToSupabase) await window.pushToSupabase('ordenes', o);
+      }
+    } else if (tipo === 'levantamiento') {
+      const levs = (typeof levantamientos !== 'undefined' && levantamientos) ? levantamientos : (safeGetJSON('sapi_levantamientos', []));
+      const l = levs.find(x => x.id === id);
+      if (l) {
+        nuevaPrioridad = (l.prioridad === 'Urgente') ? 'Media' : 'Urgente';
+        l.prioridad = nuevaPrioridad;
+        if (typeof safeSetJSON === 'function') safeSetJSON('sapi_levantamientos', levantamientos);
+        if (window.pushToSupabase) await window.pushToSupabase('levantamientos', l);
+      }
+    }
+
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion(`Prioridad actualizada a: ${nuevaPrioridad}`, 'info');
+    }
+    window.renderJuntaRevision();
+  } catch(err) {
+    console.error('Error al cambiar prioridad:', err);
+  }
+};
+
+// ACCIÓN RÁPIDA 3: Definir Fecha Compromiso / Deadline (Opción 4)
+window.juntaSetDeadlinePrompt = function(tipo, id, fechaActual) {
+  const inputFecha = prompt('Fecha límite / compromiso acordada en junta (AAAA-MM-DD):', fechaActual ? fechaActual.substring(0,10) : new Date().toISOString().substring(0,10));
+  if (inputFecha === null) return;
+  window.juntaGuardarFechaCompromiso(tipo, id, inputFecha.trim());
+};
+
+window.juntaGuardarFechaCompromiso = async function(tipo, id, fechaStr) {
+  try {
+    if (tipo === 'ticket') {
+      const tkts = (typeof tickets !== 'undefined' && tickets) ? tickets : [];
+      const t = tkts.find(x => x.id === id);
+      if (t) {
+        t.fechaCompromiso = fechaStr || null;
+        if (typeof safeSetJSON === 'function') safeSetJSON('sapi_tickets', tickets);
+        if (window.pushToSupabase) await window.pushToSupabase('tickets', t);
+      }
+    } else if (tipo === 'orden') {
+      const ords = (typeof ordenes !== 'undefined' && ordenes) ? ordenes : [];
+      const o = ords.find(x => x.id === id);
+      if (o) {
+        o.fechaCompromiso = fechaStr || null;
+        if (typeof safeSetJSON === 'function') safeSetJSON('sapi_ordenes', ordenes);
+        if (window.pushToSupabase) await window.pushToSupabase('ordenes', o);
+      }
+    } else if (tipo === 'levantamiento') {
+      const levs = (typeof levantamientos !== 'undefined' && levantamientos) ? levantamientos : (safeGetJSON('sapi_levantamientos', []));
+      const l = levs.find(x => x.id === id);
+      if (l) {
+        l.fechaCompromiso = fechaStr || null;
+        if (typeof safeSetJSON === 'function') safeSetJSON('sapi_levantamientos', levantamientos);
+        if (window.pushToSupabase) await window.pushToSupabase('levantamientos', l);
+      }
+    }
+
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion(fechaStr ? `📅 Compromiso fijado para el ${fechaStr}` : 'Compromiso eliminado', 'success');
+    }
+    window.renderJuntaRevision();
+  } catch(err) {
+    console.error('Error al fijar fecha compromiso:', err);
+  }
+};
+
+// Acciones de filtrado
+window.aplicarFiltrosJunta = function() {
+  const selResp = document.getElementById('junta-filter-responsable');
+  if (selResp) {
+    window.currentJuntaFilterResponsable = selResp.value || 'todos';
+    const badgeResp = document.getElementById('junta-resp-active-badge');
+    const textResp = document.getElementById('junta-resp-active-text');
+    if (badgeResp && textResp) {
+      if (selResp.value && selResp.value !== 'todos') {
+        textResp.textContent = selResp.options[selResp.selectedIndex]?.text || selResp.value;
+        badgeResp.style.display = 'inline-flex';
+      } else {
+        badgeResp.style.display = 'none';
+      }
+    }
+  }
+  window.renderJuntaRevision();
+};
+
+window.setJuntaTipoFiltro = function(tipo) {
+  window.currentJuntaFilterTipo = tipo || 'todos';
+  
+  // Actualizar botones de tipo
+  document.querySelectorAll('.junta-type-btn').forEach(btn => {
+    if (btn.getAttribute('data-tipo') === window.currentJuntaFilterTipo) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+
+  // Actualizar KPI cards
+  document.querySelectorAll('.junta-kpi-card').forEach(c => c.classList.remove('active'));
+  const targetKpi = document.getElementById(`kpi-card-${window.currentJuntaFilterTipo}`);
+  if (targetKpi) targetKpi.classList.add('active');
+
+  window.renderJuntaRevision();
+};
+
+window.setJuntaAntiguedadFiltro = function(antiguedad) {
+  window.currentJuntaFilterAntiguedad = antiguedad || 'todos';
+  const sel = document.getElementById('junta-filter-antiguedad');
+  if (sel) sel.value = window.currentJuntaFilterAntiguedad;
+
+  // Si se hizo clic en KPI de Alerta > 7 días, activar su card
+  if (antiguedad === 'alerta_7') {
+    document.querySelectorAll('.junta-kpi-card').forEach(c => c.classList.remove('active'));
+    const kpiAlert = document.getElementById('kpi-card-alertas');
+    if (kpiAlert) kpiAlert.classList.add('active');
+  }
+
+  window.renderJuntaRevision();
+};
+
+window.toggleJuntaUrgenteFiltro = function() {
+  window.currentJuntaFilterUrgente = !window.currentJuntaFilterUrgente;
+  const btn = document.getElementById('junta-urgente-toggle-btn');
+  if (btn) {
+    if (window.currentJuntaFilterUrgente) btn.classList.add('active');
+    else btn.classList.remove('active');
+  }
+  window.renderJuntaRevision();
+};
+
+window.resetFiltrosJunta = function() {
+  window.currentJuntaFilterTipo = 'todos';
+  window.currentJuntaFilterAntiguedad = 'todos';
+  window.currentJuntaFilterUrgente = false;
+  window.currentJuntaFilterCausa = 'todos';
+  window.currentJuntaFilterResponsable = 'todos';
+  
+  const inSearch = document.getElementById('junta-search-input');
+  if (inSearch) inSearch.value = '';
+  const selCli = document.getElementById('junta-filter-cliente');
+  if (selCli) selCli.value = 'todos';
+  const selResp = document.getElementById('junta-filter-responsable');
+  if (selResp) selResp.value = 'todos';
+  const selAnt = document.getElementById('junta-filter-antiguedad');
+  if (selAnt) selAnt.value = 'todos';
+  const selSort = document.getElementById('junta-sort-by');
+  if (selSort) selSort.value = 'antiguedad_desc';
+
+  const badgeCausa = document.getElementById('junta-causa-active-badge');
+  if (badgeCausa) badgeCausa.style.display = 'none';
+
+  const badgeResp = document.getElementById('junta-resp-active-badge');
+  if (badgeResp) badgeResp.style.display = 'none';
+
+  const btnUrg = document.getElementById('junta-urgente-toggle-btn');
+  if (btnUrg) btnUrg.classList.remove('active');
+
+  document.querySelectorAll('.junta-type-btn').forEach(btn => {
+    if (btn.getAttribute('data-tipo') === 'todos') btn.classList.add('active');
+    else btn.classList.remove('active');
+  });
+
+  document.querySelectorAll('.junta-kpi-card').forEach(c => c.classList.remove('active'));
+  const kpiTodos = document.getElementById('kpi-card-todos');
+  if (kpiTodos) kpiTodos.classList.add('active');
+
+  window.renderJuntaRevision();
+};
+
+// Abre modal de detalle nativo sin romper el contexto
+window.abrirDetalleElementoJunta = function(tipo, id) {
+  if (tipo === 'ticket') {
+    if (typeof verDetalleTicket === 'function') verDetalleTicket(id);
+  } else if (tipo === 'orden') {
+    if (typeof verDetalle === 'function') verDetalle(id);
+  } else if (tipo === 'envio') {
+    if (typeof window.abrirDetalleEnvio === 'function') window.abrirDetalleEnvio(id);
+  } else if (tipo === 'levantamiento') {
+    if (typeof verDetalleLevantamiento === 'function') verDetalleLevantamiento(id);
+  }
+};
+
+// Toggle caja de acuerdo rápido
+window.toggleNotaRapidaJunta = function(tipo, id) {
+  const box = document.getElementById(`junta-quicknote-box-${tipo}-${id}`);
+  if (!box) return;
+
+  const isHidden = box.style.display === 'none';
+  box.style.display = isHidden ? 'flex' : 'none';
+  if (isHidden) {
+    const input = document.getElementById(`junta-quicknote-input-${tipo}-${id}`);
+    if (input) setTimeout(() => input.focus(), 50);
+  }
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+// Guardar nota rápida de junta
+window.guardarNotaRapidaJunta = async function(tipo, id) {
+  const input = document.getElementById(`junta-quicknote-input-${tipo}-${id}`);
+  if (!input) return;
+  const texto = input.value.trim();
+  if (!texto) {
+    if (typeof mostrarNotificacion === 'function') mostrarNotificacion('Escribe el texto del acuerdo antes de guardar.', 'warning');
+    return;
+  }
+
+  const uNom = (typeof currentSession !== 'undefined' && currentSession.nombre) 
+    ? currentSession.nombre 
+    : ((typeof usuarios !== 'undefined' && currentSession && currentSession.userId) 
+        ? (usuarios.find(u => u.id === currentSession.userId)?.nombre || 'Usuario') 
+        : 'Equipo Operativo');
+
+  const fechaHoy = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+  const textoFormateado = `[Acuerdo Junta ${fechaHoy}]: ${texto}`;
+
+  const nuevoComentario = {
+    usuario: uNom,
+    fecha: new Date().toISOString(),
+    texto: textoFormateado
+  };
+
+  try {
+    if (tipo === 'ticket') {
+      const tkts = (typeof tickets !== 'undefined' && tickets) ? tickets : [];
+      const t = tkts.find(x => x.id === id);
+      if (t) {
+        if (!t.comentariosInternos) t.comentariosInternos = [];
+        t.comentariosInternos.push(nuevoComentario);
+        if (typeof safeSetJSON === 'function') safeSetJSON('sapi_tickets', tickets);
+        if (window.pushToSupabase) await window.pushToSupabase('tickets', t);
+      }
+    } else if (tipo === 'orden') {
+      const ords = (typeof ordenes !== 'undefined' && ordenes) ? ordenes : [];
+      const o = ords.find(x => x.id === id);
+      if (o) {
+        if (!o.comentariosInternos) o.comentariosInternos = [];
+        o.comentariosInternos.push(nuevoComentario);
+        // También anexar a bitácora para visibilidad en campo
+        o.bitacora = (o.bitacora ? `${o.bitacora}\n\n` : '') + `[Acuerdo Junta ${fechaHoy} - ${uNom}]: ${texto}`;
+        if (typeof safeSetJSON === 'function') safeSetJSON('sapi_ordenes', ordenes);
+        if (window.pushToSupabase) await window.pushToSupabase('ordenes', o);
+      }
+    } else if (tipo === 'envio') {
+      const todosEnv = (typeof window.obtenerTodosLosEnvios === 'function') ? window.obtenerTodosLosEnvios() : [];
+      const e = todosEnv.find(x => x.id === id);
+      if (e) {
+        e.notas = (e.notas ? `${e.notas}\n` : '') + `[Acuerdo Junta ${fechaHoy}]: ${texto}`;
+        if (e.ticketId) {
+          const t = (typeof tickets !== 'undefined' && tickets) ? tickets.find(x => x.id === e.ticketId) : null;
+          if (t && t.envios) {
+            const envObj = t.envios.find(x => x.id === id);
+            if (envObj) envObj.notas = e.notas;
+            if (typeof safeSetJSON === 'function') safeSetJSON('sapi_tickets', tickets);
+            if (window.pushToSupabase) await window.pushToSupabase('tickets', t);
+          }
+        }
+      }
+    } else if (tipo === 'levantamiento') {
+      const levs = (typeof levantamientos !== 'undefined' && levantamientos) ? levantamientos : (safeGetJSON('sapi_levantamientos', []));
+      const l = levs.find(x => x.id === id);
+      if (l) {
+        l.notas = (l.notas ? `${l.notas}\n\n` : '') + `[Acuerdo Junta ${fechaHoy} - ${uNom}]: ${texto}`;
+        if (typeof safeSetJSON === 'function') safeSetJSON('sapi_levantamientos', levantamientos);
+        if (window.pushToSupabase) await window.pushToSupabase('levantamientos', l);
+      }
+    }
+
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion('Acuerdo de junta guardado correctamente.', 'success');
+    }
+    input.value = '';
+    window.renderJuntaRevision();
+  } catch(err) {
+    console.error('Error al guardar acuerdo de junta:', err);
+    if (typeof mostrarNotificacion === 'function') mostrarNotificacion('Error al guardar el acuerdo: ' + err.message, 'error');
+  }
+};
+
+// Generador y copia de Minuta de Junta al portapapeles
+window.copiarMinutaJunta = function() {
+  const lista = window.juntaItemsFiltradosCache || window.obtenerTodosLosPendientes();
+  if (lista.length === 0) {
+    if (typeof mostrarNotificacion === 'function') mostrarNotificacion('No hay pendientes visibles para generar la minuta.', 'warning');
+    return;
+  }
+
+  const fechaStr = new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const horaStr = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+
+  let minuta = `📋 *MINUTA DE REVISIÓN OPERATIVA - EUROREP*\n`;
+  minuta += `📅 *Fecha:* ${fechaStr} - ${horaStr}\n`;
+  minuta += `👥 *Total de Pendientes Analizados:* ${lista.length}\n`;
+  minuta += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  // Agrupar por tipo
+  const tks = lista.filter(x => x.tipo === 'ticket');
+  const ords = lista.filter(x => x.tipo === 'orden');
+  const envs = lista.filter(x => x.tipo === 'envio');
+  const levs = lista.filter(x => x.tipo === 'levantamiento');
+
+  if (tks.length > 0) {
+    minuta += `🎫 *TICKETS Y COTIZACIONES PENDIENTES (${tks.length})*\n`;
+    tks.forEach((t, i) => {
+      minuta += `${i+1}. [${t.folio}] *${t.cliente}* (${t.sitio})\n`;
+      minuta += `   • *Asunto:* ${t.titulo}\n`;
+      minuta += `   • *Antigüedad:* ${t.tiempoRelativo} | *Asignado:* ${t.responsable}\n`;
+      minuta += `   • ⚠️ *Cuello de Botella:* ${t.cuelloDeBotella}\n`;
+      if (t.fechaCompromiso) {
+        minuta += `   • 📅 *Compromiso Acordado:* ${t.fechaCompromiso}\n`;
+      }
+      if (t.ultimoComentario) {
+        minuta += `   • 💬 *Último Comentario (${t.ultimoComentario.usuario}):* ${t.ultimoComentario.texto}\n`;
+      }
+      minuta += `\n`;
+    });
+    minuta += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  }
+
+  if (ords.length > 0) {
+    minuta += `🛠️ *ÓRDENES DE SERVICIO PENDIENTES (${ords.length})*\n`;
+    ords.forEach((o, i) => {
+      minuta += `${i+1}. [${o.folio}] *${o.cliente}* (${o.sitio})\n`;
+      minuta += `   • *Servicio:* ${o.titulo}\n`;
+      minuta += `   • *Antigüedad:* ${o.tiempoRelativo} | *Técnico:* ${o.responsable}\n`;
+      minuta += `   • ⚠️ *Cuello de Botella:* ${o.cuelloDeBotella}\n`;
+      if (o.fechaCompromiso) {
+        minuta += `   • 📅 *Compromiso Acordado:* ${o.fechaCompromiso}\n`;
+      }
+      if (o.ultimoComentario) {
+        minuta += `   • 💬 *Último Reporte:* ${o.ultimoComentario.texto}\n`;
+      }
+      minuta += `\n`;
+    });
+    minuta += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  }
+
+  if (envs.length > 0) {
+    minuta += `🚚 *ENVÍOS Y GUÍAS DE REFACCIONES (${envs.length})*\n`;
+    envs.forEach((e, i) => {
+      minuta += `${i+1}. [${e.folio}] *${e.cliente}*\n`;
+      minuta += `   • *Detalle:* ${e.titulo}\n`;
+      minuta += `   • *Antigüedad:* ${e.tiempoRelativo} | *Paquetería:* ${e.responsable}\n`;
+      minuta += `   • ⚠️ *Estatus:* ${e.cuelloDeBotella}\n\n`;
+    });
+    minuta += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  }
+
+  if (levs.length > 0) {
+    minuta += `📋 *LEVANTAMIENTOS DE CAMPO (${levs.length})*\n`;
+    levs.forEach((l, i) => {
+      minuta += `${i+1}. [${l.folio}] *${l.cliente}* (${l.sitio})\n`;
+      minuta += `   • *Antigüedad:* ${l.tiempoRelativo} | *Responsable:* ${l.responsable}\n`;
+      minuta += `   • ⚠️ *Cuello de Botella:* ${l.cuelloDeBotella}\n\n`;
+    });
+    minuta += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  }
+
+  minuta += `📌 *Generado automáticamente desde Eurorep SAPI Platform*`;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(minuta).then(() => {
+      if (typeof mostrarNotificacion === 'function') {
+        mostrarNotificacion('¡Minuta de junta copiada al portapapeles! Lista para pegar en WhatsApp o Teams.', 'success');
+      } else {
+        alert('Minuta copiada al portapapeles.');
+      }
+    }).catch(err => {
+      console.warn('Error al copiar minuta:', err);
+      prompt('Copia el texto de la minuta:', minuta);
+    });
+  } else {
+    prompt('Copia el texto de la minuta:', minuta);
+  }
+};
+
+// Actualiza el badge en la pestaña del dashboard
+window.actualizarBadgeJuntaRevision = function(totalCount) {
+  let count = totalCount;
+  if (count === undefined) {
+    const todos = window.obtenerTodosLosPendientes();
+    count = todos.length;
+  }
+  const badgeTab = document.getElementById('dash-tab-badge-junta');
+  if (badgeTab) {
+    if (count > 0) {
+      badgeTab.textContent = count;
+      badgeTab.style.display = 'inline-flex';
+    } else {
+      badgeTab.style.display = 'none';
+    }
+  }
+};
+
+// Atajo de teclado Alt + J para ir directo a la pestaña de Revisión de Juntas
+document.addEventListener('keydown', function(e) {
+  if (e.altKey && (e.key === 'j' || e.key === 'J')) {
+    e.preventDefault();
+    window.abrirModalJuntaRevision();
+  } else if (e.key === 'Escape') {
+    if (window.currentJuntaFullscreen) {
+      window.toggleFullscreenJunta();
+    }
+  }
+});
+
+// =========================================================================
+// MÓDULO DE KITS DE SERVICIO PREVENTIVO POR MAQUINARIA (250h, 500h, 1000h)
+// =========================================================================
+
+const KITS_PRECARGADOS_DEFAULT = [
+  // --- RUBBLE MASTER RM120X / RM120GO! ---
+  {
+    id: 'kit-rm120x-250h',
+    nombre: 'Kit Preventivo 250h - Rubble Master RM120X / RM120GO!',
+    modelo: 'RM120X',
+    marca: 'RUBBLE MASTER',
+    intervalo: '250',
+    descripcion: 'Servicio preventivo menor: Reemplazo de filtro de aceite motor, filtro combustible primario y separador de agua.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'RM-510023', descripcion: 'Filtro de Aceite Motor John Deere / Volvo', marca: 'RUBBLE MASTER', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'RM-510045', descripcion: 'Filtro de Combustible Primario', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-510048', descripcion: 'Filtro Separador de Agua y Pre-combustible', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-rm120x-500h',
+    nombre: 'Kit Preventivo 500h - Rubble Master RM120X / RM120GO!',
+    modelo: 'RM120X',
+    marca: 'RUBBLE MASTER',
+    intervalo: '500',
+    descripcion: 'Servicio preventivo intermedio: Reemplazo completo de filtros de motor, aire primario e hidráulico de retorno.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'RM-510023', descripcion: 'Filtro de Aceite Motor', marca: 'RUBBLE MASTER', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'RM-510045', descripcion: 'Filtro Combustible Primario', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-510046', descripcion: 'Filtro Combustible Secundario / Fino', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-510048', descripcion: 'Filtro Separador de Agua', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-520110', descripcion: 'Filtro de Aire Motor Primario', marca: 'RUBBLE MASTER', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'RM-530080', descripcion: 'Filtro Hidráulico de Retorno', marca: 'RUBBLE MASTER', sistema: 'Hidráulico', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-rm120x-1000h',
+    nombre: 'Kit Preventivo 1000h - Rubble Master RM120X / RM120GO!',
+    modelo: 'RM120X',
+    marca: 'RUBBLE MASTER',
+    intervalo: '1000',
+    descripcion: 'Servicio preventivo mayor / 1000h: Filtración integral de motor, aire de seguridad, hidráulica completa, respiradores y bandas.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'RM-510023', descripcion: 'Filtro de Aceite Motor', marca: 'RUBBLE MASTER', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'RM-510045', descripcion: 'Filtro Combustible Primario', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-510046', descripcion: 'Filtro Combustible Secundario', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-510048', descripcion: 'Filtro Separador de Agua', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-520110', descripcion: 'Filtro de Aire Motor Primario', marca: 'RUBBLE MASTER', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'RM-520111', descripcion: 'Filtro de Aire Motor Secundario (Seguridad)', marca: 'RUBBLE MASTER', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'RM-530080', descripcion: 'Filtro Hidráulico de Retorno', marca: 'RUBBLE MASTER', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'RM-530085', descripcion: 'Filtro Hidráulico de Presión Alta', marca: 'RUBBLE MASTER', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'RM-530090', descripcion: 'Respirador / Filtro Aire Tanque Hidráulico', marca: 'RUBBLE MASTER', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'RM-540200', descripcion: 'Juego de Bandas de Transmisión Motor / Rotor', marca: 'RUBBLE MASTER', sistema: 'Transmisión', cantidad: 1 }
+    ]
+  },
+
+  // --- RUBBLE MASTER MS125GO! (CRIBA) ---
+  {
+    id: 'kit-ms125go-250h',
+    nombre: 'Kit Preventivo 250h - Rubble Master MS125GO!',
+    modelo: 'MS125GO!',
+    marca: 'RUBBLE MASTER',
+    intervalo: '250',
+    descripcion: 'Mantenimiento preventivo básico 250h para criba MS125GO! (Motor Deutz / CAT).',
+    esOficial: true,
+    piezas: [
+      { codigo: 'RM-MS-023', descripcion: 'Filtro de Aceite Motor Deutz / CAT', marca: 'RUBBLE MASTER', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'RM-MS-045', descripcion: 'Filtro de Combustible en Línea', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-MS-048', descripcion: 'Filtro Separador Agua Combustible', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-ms125go-500h',
+    nombre: 'Kit Preventivo 500h - Rubble Master MS125GO!',
+    modelo: 'MS125GO!',
+    marca: 'RUBBLE MASTER',
+    intervalo: '500',
+    descripcion: 'Mantenimiento preventivo 500h: Filtros de motor, aire primario e hidráulico de circuito de cribado.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'RM-MS-023', descripcion: 'Filtro de Aceite Motor', marca: 'RUBBLE MASTER', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'RM-MS-045', descripcion: 'Filtro de Combustible', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-MS-048', descripcion: 'Filtro Separador Agua', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-MS-110', descripcion: 'Filtro de Aire Primario', marca: 'RUBBLE MASTER', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'RM-MS-080', descripcion: 'Filtro Hidráulico Criba', marca: 'RUBBLE MASTER', sistema: 'Hidráulico', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-ms125go-1000h',
+    nombre: 'Kit Preventivo 1000h - Rubble Master MS125GO!',
+    modelo: 'MS125GO!',
+    marca: 'RUBBLE MASTER',
+    intervalo: '1000',
+    descripcion: 'Servicio mayor 1000h: Filtración completa de motor y sistema hidráulico de tracción y cribado.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'RM-MS-023', descripcion: 'Filtro de Aceite Motor', marca: 'RUBBLE MASTER', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'RM-MS-045', descripcion: 'Filtro de Combustible', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-MS-048', descripcion: 'Filtro Separador Agua', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-MS-110', descripcion: 'Filtro de Aire Primario', marca: 'RUBBLE MASTER', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'RM-MS-111', descripcion: 'Filtro de Aire Secundario', marca: 'RUBBLE MASTER', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'RM-MS-080', descripcion: 'Filtro Hidráulico Criba', marca: 'RUBBLE MASTER', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'RM-MS-085', descripcion: 'Filtro Hidráulico Presión', marca: 'RUBBLE MASTER', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'RM-MS-090', descripcion: 'Respirador Tanque Hidráulico', marca: 'RUBBLE MASTER', sistema: 'Hidráulico', cantidad: 1 }
+    ]
+  },
+
+  // --- RUBBLE MASTER RM100GO! / RM70 ---
+  {
+    id: 'kit-rm100go-250h',
+    nombre: 'Kit Preventivo 250h - Rubble Master RM100GO! / RM70',
+    modelo: 'RM100Go!',
+    marca: 'RUBBLE MASTER',
+    intervalo: '250',
+    descripcion: 'Servicio preventivo menor 250h para trituradoras RM100 / RM70.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'RM-100-023', descripcion: 'Filtro de Aceite Motor John Deere', marca: 'RUBBLE MASTER', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'RM-100-045', descripcion: 'Filtro de Combustible Primario', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-100-048', descripcion: 'Filtro Separador de Agua', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-rm100go-500h',
+    nombre: 'Kit Preventivo 500h - Rubble Master RM100GO! / RM70',
+    modelo: 'RM100Go!',
+    marca: 'RUBBLE MASTER',
+    intervalo: '500',
+    descripcion: 'Servicio preventivo intermedio 500h para trituradoras RM100 / RM70.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'RM-100-023', descripcion: 'Filtro de Aceite Motor', marca: 'RUBBLE MASTER', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'RM-100-045', descripcion: 'Filtro Combustible Primario', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-100-046', descripcion: 'Filtro Combustible Secundario', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-100-048', descripcion: 'Filtro Separador de Agua', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-100-110', descripcion: 'Filtro de Aire Primario', marca: 'RUBBLE MASTER', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'RM-100-080', descripcion: 'Filtro Hidráulico de Retorno', marca: 'RUBBLE MASTER', sistema: 'Hidráulico', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-rm100go-1000h',
+    nombre: 'Kit Preventivo 1000h - Rubble Master RM100GO! / RM70',
+    modelo: 'RM100Go!',
+    marca: 'RUBBLE MASTER',
+    intervalo: '1000',
+    descripcion: 'Servicio mayor 1000h para trituradoras RM100 / RM70.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'RM-100-023', descripcion: 'Filtro de Aceite Motor', marca: 'RUBBLE MASTER', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'RM-100-045', descripcion: 'Filtro Combustible Primario', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-100-046', descripcion: 'Filtro Combustible Secundario', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-100-048', descripcion: 'Filtro Separador de Agua', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RM-100-110', descripcion: 'Filtro de Aire Primario', marca: 'RUBBLE MASTER', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'RM-100-111', descripcion: 'Filtro de Aire Secundario', marca: 'RUBBLE MASTER', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'RM-100-080', descripcion: 'Filtro Hidráulico Retorno', marca: 'RUBBLE MASTER', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'RM-100-085', descripcion: 'Filtro Hidráulico Presión', marca: 'RUBBLE MASTER', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'RM-100-090', descripcion: 'Respirador Tanque Hidráulico', marca: 'RUBBLE MASTER', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'RM-100-200', descripcion: 'Juego de Bandas de Transmisión Rotor', marca: 'RUBBLE MASTER', sistema: 'Transmisión', cantidad: 1 }
+    ]
+  },
+
+  // --- ZOOMLION ZR255H (PILOTERA CIMENTACIÓN) ---
+  {
+    id: 'kit-zr255h-250h',
+    nombre: 'Kit Preventivo 250h - Zoomlion ZR255H (Motor Cummins QSL8.9)',
+    modelo: 'ZR255H',
+    marca: 'ZOOMLION',
+    intervalo: '250',
+    descripcion: 'Servicio menor 250h para perforadora / pilotera Zoomlion ZR255H.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'CUM-LF9009', descripcion: 'Filtro Aceite Lubricante Motor Cummins QSL8.9', marca: 'ZOOMLION / CUMMINS', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'CUM-FF5612', descripcion: 'Filtro Combustible Primario Fleetguard', marca: 'ZOOMLION / CUMMINS', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CUM-FS19732', descripcion: 'Filtro Separador Agua / Combustible', marca: 'ZOOMLION / CUMMINS', sistema: 'Combustible', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-zr255h-500h',
+    nombre: 'Kit Preventivo 500h - Zoomlion ZR255H (Motor Cummins QSL8.9)',
+    modelo: 'ZR255H',
+    marca: 'ZOOMLION',
+    intervalo: '500',
+    descripcion: 'Servicio intermedio 500h: Motor Cummins, admisión y filtros de retorno hidráulico.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'CUM-LF9009', descripcion: 'Filtro Aceite Motor Cummins QSL8.9', marca: 'ZOOMLION / CUMMINS', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'CUM-FF5612', descripcion: 'Filtro Combustible Primario', marca: 'ZOOMLION / CUMMINS', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CUM-FF5776', descripcion: 'Filtro Combustible Secundario NanoNet', marca: 'ZOOMLION / CUMMINS', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CUM-FS19732', descripcion: 'Filtro Separador Agua', marca: 'ZOOMLION / CUMMINS', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'ZL-AF2550', descripcion: 'Filtro de Aire Motor Primario Donaldson', marca: 'ZOOMLION', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'ZL-HYD-500', descripcion: 'Filtro Hidráulico Retorno Pilotera ZR255H', marca: 'ZOOMLION', sistema: 'Hidráulico', cantidad: 2 }
+    ]
+  },
+  {
+    id: 'kit-zr255h-1000h',
+    nombre: 'Kit Preventivo 1000h - Zoomlion ZR255H (Servicio Mayor)',
+    modelo: 'ZR255H',
+    marca: 'ZOOMLION',
+    intervalo: '1000',
+    descripcion: 'Servicio mayor 1000h: Filtración integral motor, aire de seguridad, hidráulico retorno, servomando y bandas.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'CUM-LF9009', descripcion: 'Filtro Aceite Motor Cummins QSL8.9', marca: 'ZOOMLION / CUMMINS', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'CUM-FF5612', descripcion: 'Filtro Combustible Primario', marca: 'ZOOMLION / CUMMINS', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CUM-FF5776', descripcion: 'Filtro Combustible Secundario', marca: 'ZOOMLION / CUMMINS', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CUM-FS19732', descripcion: 'Filtro Separador Agua', marca: 'ZOOMLION / CUMMINS', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'ZL-AF2550', descripcion: 'Filtro Aire Motor Primario', marca: 'ZOOMLION', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'ZL-AF2551', descripcion: 'Filtro Aire Motor Secundario Seguridad', marca: 'ZOOMLION', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'ZL-HYD-500', descripcion: 'Filtro Hidráulico Retorno Principal', marca: 'ZOOMLION', sistema: 'Hidráulico', cantidad: 2 },
+      { codigo: 'ZL-HYD-510', descripcion: 'Filtro Hidráulico Línea Piloto / Servomando', marca: 'ZOOMLION', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'ZL-HYD-520', descripcion: 'Respirador Tanque Hidráulico con Desecante', marca: 'ZOOMLION', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'ZL-BELT-89', descripcion: 'Banda Serpentina Alternador / Ventilador QSL9', marca: 'ZOOMLION / CUMMINS', sistema: 'Transmisión', cantidad: 1 }
+    ]
+  },
+
+  // --- RUBBLE MASTER RMJ110X (TRITURADORA MANDÍBULAS) ---
+  {
+    id: 'kit-rmj110x-250h',
+    nombre: 'Kit Preventivo 250h - Rubble Master RMJ110X',
+    modelo: 'RMJ110X',
+    marca: 'RUBBLE MASTER',
+    intervalo: '250',
+    descripcion: 'Mantenimiento preventivo menor para triturador de mandíbulas RMJ110X.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'RMJ-510023', descripcion: 'Filtro de Aceite Motor', marca: 'RUBBLE MASTER', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'RMJ-510045', descripcion: 'Filtro Combustible Primario', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RMJ-510048', descripcion: 'Filtro Separador de Agua', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-rmj110x-500h',
+    nombre: 'Kit Preventivo 500h - Rubble Master RMJ110X',
+    modelo: 'RMJ110X',
+    marca: 'RUBBLE MASTER',
+    intervalo: '500',
+    descripcion: 'Mantenimiento preventivo 500h para triturador de mandíbulas RMJ110X.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'RMJ-510023', descripcion: 'Filtro de Aceite Motor', marca: 'RUBBLE MASTER', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'RMJ-510045', descripcion: 'Filtro Combustible Primario', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RMJ-510046', descripcion: 'Filtro Combustible Secundario', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RMJ-510048', descripcion: 'Filtro Separador de Agua', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RMJ-520110', descripcion: 'Filtro de Aire Primario', marca: 'RUBBLE MASTER', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'RMJ-530080', descripcion: 'Filtro Hidráulico Retorno', marca: 'RUBBLE MASTER', sistema: 'Hidráulico', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-rmj110x-1000h',
+    nombre: 'Kit Preventivo 1000h - Rubble Master RMJ110X',
+    modelo: 'RMJ110X',
+    marca: 'RUBBLE MASTER',
+    intervalo: '1000',
+    descripcion: 'Servicio mayor 1000h para triturador de mandíbulas RMJ110X.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'RMJ-510023', descripcion: 'Filtro de Aceite Motor', marca: 'RUBBLE MASTER', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'RMJ-510045', descripcion: 'Filtro Combustible Primario', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RMJ-510046', descripcion: 'Filtro Combustible Secundario', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RMJ-510048', descripcion: 'Filtro Separador de Agua', marca: 'RUBBLE MASTER', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'RMJ-520110', descripcion: 'Filtro Aire Primario', marca: 'RUBBLE MASTER', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'RMJ-520111', descripcion: 'Filtro Aire Secundario Seguridad', marca: 'RUBBLE MASTER', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'RMJ-530080', descripcion: 'Filtro Hidráulico Retorno', marca: 'RUBBLE MASTER', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'RMJ-530085', descripcion: 'Filtro Hidráulico Presión', marca: 'RUBBLE MASTER', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'RMJ-530090', descripcion: 'Respirador Tanque Hidráulico', marca: 'RUBBLE MASTER', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'RMJ-540200', descripcion: 'Juego de Bandas de Transmisión Volante', marca: 'RUBBLE MASTER', sistema: 'Transmisión', cantidad: 1 }
+    ]
+  },
+
+  // --- FIORI (AUTOHORMIGONERAS) ---
+  {
+    id: 'kit-fiori-db460-250h',
+    nombre: 'Kit Preventivo 250h - Fiori DB 460 CBV',
+    modelo: 'DB 460 CBV',
+    marca: 'FIORI',
+    intervalo: '250',
+    descripcion: 'Mantenimiento preventivo básico 250h para autohormigonera Fiori DB 460 CBV (Motor Perkins).',
+    esOficial: true,
+    piezas: [
+      { codigo: 'FIO-2654403', descripcion: 'Filtro de Aceite Motor Perkins', marca: 'FIORI', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'FIO-26560201', descripcion: 'Filtro Combustible Primario', marca: 'FIORI', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'FIO-26560143', descripcion: 'Filtro Separador de Agua Pre-filtro', marca: 'FIORI', sistema: 'Combustible', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-fiori-db460-500h',
+    nombre: 'Kit Preventivo 500h - Fiori DB 460 CBV',
+    modelo: 'DB 460 CBV',
+    marca: 'FIORI',
+    intervalo: '500',
+    descripcion: 'Mantenimiento 500h: Filtración de motor, aire primario e hidráulico de circuito cerrado/abierto.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'FIO-2654403', descripcion: 'Filtro de Aceite Motor Perkins', marca: 'FIORI', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'FIO-26560201', descripcion: 'Filtro Combustible Primario', marca: 'FIORI', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'FIO-26560143', descripcion: 'Filtro Separador de Agua', marca: 'FIORI', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'FIO-443401', descripcion: 'Filtro de Aire Motor Primario', marca: 'FIORI', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'FIO-705201', descripcion: 'Filtro Hidráulico de Retorno Tambor', marca: 'FIORI', sistema: 'Hidráulico', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-fiori-db460-1000h',
+    nombre: 'Kit Preventivo 1000h - Fiori DB 460 CBV',
+    modelo: 'DB 460 CBV',
+    marca: 'FIORI',
+    intervalo: '1000',
+    descripcion: 'Servicio mayor 1000h: Reemplazo integral de filtración de motor, aire, transmisión hidrostática e hidráulica.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'FIO-2654403', descripcion: 'Filtro de Aceite Motor Perkins', marca: 'FIORI', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'FIO-26560201', descripcion: 'Filtro Combustible Primario', marca: 'FIORI', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'FIO-26560143', descripcion: 'Filtro Separador de Agua', marca: 'FIORI', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'FIO-443401', descripcion: 'Filtro de Aire Motor Primario', marca: 'FIORI', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'FIO-443402', descripcion: 'Filtro de Aire Motor de Seguridad', marca: 'FIORI', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'FIO-705201', descripcion: 'Filtro Hidráulico de Retorno', marca: 'FIORI', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'FIO-705205', descripcion: 'Filtro Hidrostático de Alta Presión', marca: 'FIORI', sistema: 'Transmisión', cantidad: 1 },
+      { codigo: 'FIO-801220', descripcion: 'Respirador Tanque Hidráulico', marca: 'FIORI', sistema: 'Hidráulico', cantidad: 1 }
+    ]
+  },
+
+  // --- CASA GRANDE (PERFORADORAS / PILOTERAS) ---
+  {
+    id: 'kit-casagrande-b125-250h',
+    nombre: 'Kit Preventivo 250h - Casagrande B125 XP',
+    modelo: 'B125 XP',
+    marca: 'CASA GRANDE',
+    intervalo: '250',
+    descripcion: 'Servicio preventivo básico 250h para perforadora Casagrande B125 XP (Motor Cummins QSB6.7).',
+    esOficial: true,
+    piezas: [
+      { codigo: 'CG-LF3970', descripcion: 'Filtro Aceite Motor Cummins QSB6.7', marca: 'CASA GRANDE', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'CG-FF5488', descripcion: 'Filtro Combustible Primario', marca: 'CASA GRANDE', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CG-FS19732', descripcion: 'Filtro Separador de Agua', marca: 'CASA GRANDE', sistema: 'Combustible', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-casagrande-b125-500h',
+    nombre: 'Kit Preventivo 500h - Casagrande B125 XP',
+    modelo: 'B125 XP',
+    marca: 'CASA GRANDE',
+    intervalo: '500',
+    descripcion: 'Servicio preventivo 500h para perforadora Casagrande B125 XP.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'CG-LF3970', descripcion: 'Filtro Aceite Motor Cummins', marca: 'CASA GRANDE', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'CG-FF5488', descripcion: 'Filtro Combustible Primario', marca: 'CASA GRANDE', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CG-FF5612', descripcion: 'Filtro Combustible Secundario', marca: 'CASA GRANDE', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CG-FS19732', descripcion: 'Filtro Separador de Agua', marca: 'CASA GRANDE', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CG-AF25292', descripcion: 'Filtro Aire Motor Primario', marca: 'CASA GRANDE', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'CG-HYD-125', descripcion: 'Filtro Hidráulico de Retorno', marca: 'CASA GRANDE', sistema: 'Hidráulico', cantidad: 2 }
+    ]
+  },
+  {
+    id: 'kit-casagrande-b125-1000h',
+    nombre: 'Kit Preventivo 1000h - Casagrande B125 XP',
+    modelo: 'B125 XP',
+    marca: 'CASA GRANDE',
+    intervalo: '1000',
+    descripcion: 'Servicio mayor 1000h para perforadora Casagrande B125 XP (Filtración integral).',
+    esOficial: true,
+    piezas: [
+      { codigo: 'CG-LF3970', descripcion: 'Filtro Aceite Motor Cummins', marca: 'CASA GRANDE', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'CG-FF5488', descripcion: 'Filtro Combustible Primario', marca: 'CASA GRANDE', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CG-FF5612', descripcion: 'Filtro Combustible Secundario', marca: 'CASA GRANDE', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CG-FS19732', descripcion: 'Filtro Separador de Agua', marca: 'CASA GRANDE', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CG-AF25292', descripcion: 'Filtro Aire Primario', marca: 'CASA GRANDE', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'CG-AF25293', descripcion: 'Filtro Aire Secundario Seguridad', marca: 'CASA GRANDE', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'CG-HYD-125', descripcion: 'Filtro Hidráulico de Retorno', marca: 'CASA GRANDE', sistema: 'Hidráulico', cantidad: 2 },
+      { codigo: 'CG-HYD-130', descripcion: 'Filtro Servomando / Piloto', marca: 'CASA GRANDE', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'CG-HYD-140', descripcion: 'Respirador Tanque Hidráulico', marca: 'CASA GRANDE', sistema: 'Hidráulico', cantidad: 1 }
+    ]
+  },
+
+  // --- HYUNDAI (EXCAVADORAS) ---
+  {
+    id: 'kit-hyundai-hx220l-250h',
+    nombre: 'Kit Preventivo 250h - Hyundai HX220L',
+    modelo: 'HX220L',
+    marca: 'HYUNDAI',
+    intervalo: '250',
+    descripcion: 'Servicio menor 250h para excavadora Hyundai HX220L (Motor Cummins QSB6.7).',
+    esOficial: true,
+    piezas: [
+      { codigo: 'HY-11N6-90510', descripcion: 'Filtro de Aceite Motor Cummins', marca: 'HYUNDAI', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'HY-11E1-70120', descripcion: 'Filtro de Combustible Primario', marca: 'HYUNDAI', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'HY-11N6-90520', descripcion: 'Filtro Separador de Agua', marca: 'HYUNDAI', sistema: 'Combustible', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-hyundai-hx220l-500h',
+    nombre: 'Kit Preventivo 500h - Hyundai HX220L',
+    modelo: 'HX220L',
+    marca: 'HYUNDAI',
+    intervalo: '500',
+    descripcion: 'Servicio 500h: Motor, combustible, aire e hidráulico de retorno para Hyundai HX220L.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'HY-11N6-90510', descripcion: 'Filtro de Aceite Motor', marca: 'HYUNDAI', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'HY-11E1-70120', descripcion: 'Filtro Combustible Primario', marca: 'HYUNDAI', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'HY-11E1-70130', descripcion: 'Filtro Combustible Secundario', marca: 'HYUNDAI', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'HY-11N6-90520', descripcion: 'Filtro Separador de Agua', marca: 'HYUNDAI', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'HY-11NA-90110', descripcion: 'Filtro de Aire Primario', marca: 'HYUNDAI', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'HY-31N8-01360', descripcion: 'Filtro Hidráulico de Retorno', marca: 'HYUNDAI', sistema: 'Hidráulico', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-hyundai-hx220l-1000h',
+    nombre: 'Kit Preventivo 1000h - Hyundai HX220L',
+    modelo: 'HX220L',
+    marca: 'HYUNDAI',
+    intervalo: '1000',
+    descripcion: 'Servicio mayor 1000h para excavadora Hyundai HX220L (Filtración completa y drenaje piloto).',
+    esOficial: true,
+    piezas: [
+      { codigo: 'HY-11N6-90510', descripcion: 'Filtro de Aceite Motor', marca: 'HYUNDAI', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'HY-11E1-70120', descripcion: 'Filtro Combustible Primario', marca: 'HYUNDAI', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'HY-11E1-70130', descripcion: 'Filtro Combustible Secundario', marca: 'HYUNDAI', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'HY-11N6-90520', descripcion: 'Filtro Separador Agua', marca: 'HYUNDAI', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'HY-11NA-90110', descripcion: 'Filtro Aire Primario', marca: 'HYUNDAI', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'HY-11NA-90120', descripcion: 'Filtro Aire Secundario Seguridad', marca: 'HYUNDAI', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'HY-31N8-01360', descripcion: 'Filtro Hidráulico Retorno', marca: 'HYUNDAI', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'HY-31N8-01370', descripcion: 'Filtro Hidráulico Línea Piloto', marca: 'HYUNDAI', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'HY-31N8-01380', descripcion: 'Respirador Tanque Hidráulico', marca: 'HYUNDAI', sistema: 'Hidráulico', cantidad: 1 }
+    ]
+  },
+
+  // --- CIFA (BOMBAS DE CONCRETO) ---
+  {
+    id: 'kit-cifa-k45h-250h',
+    nombre: 'Kit Preventivo 250h - CIFA K45H / K38L',
+    modelo: 'K45H',
+    marca: 'CIFA',
+    intervalo: '250',
+    descripcion: 'Servicio básico preventivo 250h para bomba de concreto CIFA (Motor y bombeo).',
+    esOficial: true,
+    piezas: [
+      { codigo: 'CIF-102931', descripcion: 'Filtro Aceite Motor Camión / Bomba', marca: 'CIFA', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'CIF-102945', descripcion: 'Filtro Combustible Primario', marca: 'CIFA', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CIF-102948', descripcion: 'Filtro Separador de Agua', marca: 'CIFA', sistema: 'Combustible', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-cifa-k45h-500h',
+    nombre: 'Kit Preventivo 500h - CIFA K45H / K38L',
+    modelo: 'K45H',
+    marca: 'CIFA',
+    intervalo: '500',
+    descripcion: 'Servicio 500h: Filtración de motor, aire y retorno del circuito hidráulico de bombeo.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'CIF-102931', descripcion: 'Filtro Aceite Motor', marca: 'CIFA', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'CIF-102945', descripcion: 'Filtro Combustible Primario', marca: 'CIFA', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CIF-102946', descripcion: 'Filtro Combustible Secundario', marca: 'CIFA', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CIF-102948', descripcion: 'Filtro Separador de Agua', marca: 'CIFA', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CIF-220110', descripcion: 'Filtro Aire Motor Primario', marca: 'CIFA', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'CIF-330080', descripcion: 'Filtro Hidráulico Retorno Circuito Bombeo', marca: 'CIFA', sistema: 'Hidráulico', cantidad: 2 }
+    ]
+  },
+  {
+    id: 'kit-cifa-k45h-1000h',
+    nombre: 'Kit Preventivo 1000h - CIFA K45H / K38L',
+    modelo: 'K45H',
+    marca: 'CIFA',
+    intervalo: '1000',
+    descripcion: 'Servicio mayor 1000h: Filtración completa de motor, aire de seguridad, hidráulica cerrada y acumuladores de nitrógeno.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'CIF-102931', descripcion: 'Filtro Aceite Motor', marca: 'CIFA', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'CIF-102945', descripcion: 'Filtro Combustible Primario', marca: 'CIFA', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CIF-102946', descripcion: 'Filtro Combustible Secundario', marca: 'CIFA', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CIF-102948', descripcion: 'Filtro Separador de Agua', marca: 'CIFA', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'CIF-220110', descripcion: 'Filtro Aire Motor Primario', marca: 'CIFA', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'CIF-220111', descripcion: 'Filtro Aire Secundario Seguridad', marca: 'CIFA', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'CIF-330080', descripcion: 'Filtro Hidráulico Retorno Bombeo', marca: 'CIFA', sistema: 'Hidráulico', cantidad: 2 },
+      { codigo: 'CIF-330085', descripcion: 'Filtro Hidráulico Alta Presión Circuito Cerrado', marca: 'CIFA', sistema: 'Hidráulico', cantidad: 2 },
+      { codigo: 'CIF-330090', descripcion: 'Respirador Tanque Hidráulico con Desecante', marca: 'CIFA', sistema: 'Hidráulico', cantidad: 1 }
+    ]
+  },
+
+  // --- SIMEM (PLANTAS DE CONCRETO) ---
+  {
+    id: 'kit-simem-eagle2500-250h',
+    nombre: 'Kit Preventivo 250h - Simem EAGLE 2500 / MEB 2000',
+    modelo: 'EAGLE 2500',
+    marca: 'SIMEM',
+    intervalo: '250',
+    descripcion: 'Mantenimiento preventivo básico 250h: Deshumidificación neumática y lubricación de compuertas.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'SIM-FL-01', descripcion: 'Filtro Regulador de Aire Comprimido Neumática', marca: 'SIMEM', sistema: 'Neumático', cantidad: 1 },
+      { codigo: 'SIM-LUB-01', descripcion: 'Cartucho Aceite Lubricador de Línea Neumática', marca: 'SIMEM', sistema: 'Neumático', cantidad: 1 },
+      { codigo: 'SIM-HYD-01', descripcion: 'Filtro Aceite Unidad Hidráulica Compuerta Descarga', marca: 'SIMEM', sistema: 'Hidráulico', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-simem-eagle2500-500h',
+    nombre: 'Kit Preventivo 500h - Simem EAGLE 2500 / MEB 2000',
+    modelo: 'EAGLE 2500',
+    marca: 'SIMEM',
+    intervalo: '500',
+    descripcion: 'Mantenimiento preventivo 500h: Filtración de aire comprimido, mangas de despresurización y aceite reductor.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'SIM-FL-01', descripcion: 'Filtro Regulador Aire Comprimido', marca: 'SIMEM', sistema: 'Neumático', cantidad: 1 },
+      { codigo: 'SIM-FL-02', descripcion: 'Filtro Coalescente Desoleador Neumática', marca: 'SIMEM', sistema: 'Neumático', cantidad: 1 },
+      { codigo: 'SIM-MAN-10', descripcion: 'Juego de Filtros Manga Despresurización Mezcladora', marca: 'SIMEM', sistema: 'Filtración Mezcla', cantidad: 1 },
+      { codigo: 'SIM-HYD-01', descripcion: 'Filtro Aceite Hidráulica Compuerta Descarga', marca: 'SIMEM', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'SIM-OIL-RED', descripcion: 'Aceite Sintético Reductor Mezclador Planetario', marca: 'SIMEM', sistema: 'Transmisión', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-simem-eagle2500-1000h',
+    nombre: 'Kit Preventivo 1000h - Simem EAGLE 2500 / MEB 2000',
+    modelo: 'EAGLE 2500',
+    marca: 'SIMEM',
+    intervalo: '1000',
+    descripcion: 'Servicio mayor 1000h: Filtración integral de compresor, filtros de aire de silos y reductores planetarios.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'SIM-FL-01', descripcion: 'Filtro Regulador Aire Comprimido', marca: 'SIMEM', sistema: 'Neumático', cantidad: 1 },
+      { codigo: 'SIM-FL-02', descripcion: 'Filtro Coalescente Desoleador', marca: 'SIMEM', sistema: 'Neumático', cantidad: 1 },
+      { codigo: 'SIM-SILO-01', descripcion: 'Cartucho Filtro Desempolvador Silo de Cemento', marca: 'SIMEM', sistema: 'Filtración Silo', cantidad: 2 },
+      { codigo: 'SIM-MAN-10', descripcion: 'Juego de Mangas Filtro Mezcladora', marca: 'SIMEM', sistema: 'Filtración Mezcla', cantidad: 1 },
+      { codigo: 'SIM-HYD-01', descripcion: 'Filtro Aceite Unidad Hidráulica', marca: 'SIMEM', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'SIM-HYD-02', descripcion: 'Respirador Tanque Hidráulico Compuerta', marca: 'SIMEM', sistema: 'Hidráulico', cantidad: 1 }
+    ]
+  },
+
+  // --- CUMMINS (MOTORES DIÉSEL INDUSTRIALES) ---
+  {
+    id: 'kit-cummins-qsb67-250h',
+    nombre: 'Kit Preventivo 250h - Motor Cummins QSB6.7 / QSL9',
+    modelo: 'QSB6.7',
+    marca: 'CUMMINS',
+    intervalo: '250',
+    descripcion: 'Servicio preventivo básico 250h para motores Cummins industriales (Fleetguard).',
+    esOficial: true,
+    piezas: [
+      { codigo: 'LF3970', descripcion: 'Filtro de Aceite Lubricante Motor Cummins Fleetguard LF3970', marca: 'CUMMINS', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'FF5488', descripcion: 'Filtro de Combustible Primario Fleetguard FF5488', marca: 'CUMMINS', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'FS19732', descripcion: 'Filtro Separador de Agua / Combustible Fleetguard FS19732', marca: 'CUMMINS', sistema: 'Combustible', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-cummins-qsb67-500h',
+    nombre: 'Kit Preventivo 500h - Motor Cummins QSB6.7 / QSL9',
+    modelo: 'QSB6.7',
+    marca: 'CUMMINS',
+    intervalo: '500',
+    descripcion: 'Servicio intermedio 500h: Filtración completa de lubricación, combustible NanoNet y aire.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'LF3970', descripcion: 'Filtro de Aceite Lubricante Cummins LF3970', marca: 'CUMMINS', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'FF5488', descripcion: 'Filtro Combustible Primario FF5488', marca: 'CUMMINS', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'FF5612', descripcion: 'Filtro Combustible Secundario NanoNet FF5612', marca: 'CUMMINS', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'FS19732', descripcion: 'Filtro Separador de Agua FS19732', marca: 'CUMMINS', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'AF25292', descripcion: 'Filtro de Aire Motor Primario Fleetguard AF25292', marca: 'CUMMINS', sistema: 'Aire / Admisión', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-cummins-qsb67-1000h',
+    nombre: 'Kit Preventivo 1000h - Motor Cummins QSB6.7 / QSL9',
+    modelo: 'QSB6.7',
+    marca: 'CUMMINS',
+    intervalo: '1000',
+    descripcion: 'Servicio mayor 1000h: Filtración integral de motor Cummins, aire de seguridad, refrigerante y bandas.',
+    esOficial: true,
+    piezas: [
+      { codigo: 'LF3970', descripcion: 'Filtro Aceite Lubricante Cummins LF3970', marca: 'CUMMINS', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'FF5488', descripcion: 'Filtro Combustible Primario FF5488', marca: 'CUMMINS', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'FF5612', descripcion: 'Filtro Combustible Secundario NanoNet FF5612', marca: 'CUMMINS', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'FS19732', descripcion: 'Filtro Separador de Agua FS19732', marca: 'CUMMINS', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'AF25292', descripcion: 'Filtro Aire Motor Primario AF25292', marca: 'CUMMINS', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'AF25293', descripcion: 'Filtro Aire Motor Secundario Seguridad AF25293', marca: 'CUMMINS', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'WF2071', descripcion: 'Filtro de Agua / Refrigerante Cummins con Aditivo DCA4', marca: 'CUMMINS', sistema: 'Refrigeración', cantidad: 1 },
+      { codigo: 'CUM-3974456', descripcion: 'Banda Serpentina de Accesorios Motor Cummins QSB6.7', marca: 'CUMMINS', sistema: 'Transmisión', cantidad: 1 }
+    ]
+  },
+
+  // --- KIT UNIVERSAL PREVENTIVO ---
+  {
+    id: 'kit-universal-250h',
+    nombre: 'Kit Preventivo Universal 250h (Multimarca)',
+    modelo: 'Universal',
+    marca: 'UNIVERSAL',
+    intervalo: '250',
+    descripcion: 'Kit estándar universal para servicio preventivo de 250 horas (Aceite motor y combustible).',
+    esOficial: true,
+    piezas: [
+      { codigo: 'UNI-FIL-01', descripcion: 'Filtro de Aceite Motor Universal', marca: 'UNIVERSAL', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'UNI-FIL-02', descripcion: 'Filtro de Combustible Primario Universal', marca: 'UNIVERSAL', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'UNI-FIL-03', descripcion: 'Filtro Separador de Agua Universal', marca: 'UNIVERSAL', sistema: 'Combustible', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-universal-500h',
+    nombre: 'Kit Preventivo Universal 500h (Multimarca)',
+    modelo: 'Universal',
+    marca: 'UNIVERSAL',
+    intervalo: '500',
+    descripcion: 'Kit estándar universal para servicio preventivo de 500 horas (Motor, combustible, aire e hidráulico).',
+    esOficial: true,
+    piezas: [
+      { codigo: 'UNI-FIL-01', descripcion: 'Filtro de Aceite Motor', marca: 'UNIVERSAL', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'UNI-FIL-02', descripcion: 'Filtro de Combustible Primario', marca: 'UNIVERSAL', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'UNI-FIL-04', descripcion: 'Filtro Combustible Secundario', marca: 'UNIVERSAL', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'UNI-FIL-03', descripcion: 'Filtro Separador de Agua', marca: 'UNIVERSAL', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'UNI-FIL-05', descripcion: 'Filtro de Aire Motor Primario', marca: 'UNIVERSAL', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'UNI-FIL-06', descripcion: 'Filtro Hidráulico de Retorno', marca: 'UNIVERSAL', sistema: 'Hidráulico', cantidad: 1 }
+    ]
+  },
+  {
+    id: 'kit-universal-1000h',
+    nombre: 'Kit Preventivo Universal 1000h (Multimarca)',
+    modelo: 'Universal',
+    marca: 'UNIVERSAL',
+    intervalo: '1000',
+    descripcion: 'Kit estándar universal para servicio preventivo mayor de 1000 horas (Filtración completa de todos los sistemas).',
+    esOficial: true,
+    piezas: [
+      { codigo: 'UNI-FIL-01', descripcion: 'Filtro de Aceite Motor', marca: 'UNIVERSAL', sistema: 'Motor', cantidad: 1 },
+      { codigo: 'UNI-FIL-02', descripcion: 'Filtro Combustible Primario', marca: 'UNIVERSAL', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'UNI-FIL-04', descripcion: 'Filtro Combustible Secundario', marca: 'UNIVERSAL', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'UNI-FIL-03', descripcion: 'Filtro Separador de Agua', marca: 'UNIVERSAL', sistema: 'Combustible', cantidad: 1 },
+      { codigo: 'UNI-FIL-05', descripcion: 'Filtro Aire Motor Primario', marca: 'UNIVERSAL', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'UNI-FIL-07', descripcion: 'Filtro Aire Motor Secundario Seguridad', marca: 'UNIVERSAL', sistema: 'Aire / Admisión', cantidad: 1 },
+      { codigo: 'UNI-FIL-06', descripcion: 'Filtro Hidráulico Retorno', marca: 'UNIVERSAL', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'UNI-FIL-08', descripcion: 'Filtro Hidráulico Alta Presión', marca: 'UNIVERSAL', sistema: 'Hidráulico', cantidad: 1 },
+      { codigo: 'UNI-FIL-09', descripcion: 'Respirador / Filtro Aire Tanque Hidráulico', marca: 'UNIVERSAL', sistema: 'Hidráulico', cantidad: 1 }
+    ]
+  }
+];
+
+window._currentKitFilterMarca = 'all';
+window._currentKitFilterHours = 'all';
+window._currentKitFilterModelo = 'all';
+
+window._actualizarSelectModelosKits = function(marcaVal, modeloSeleccionado) {
+  const selectMod = document.getElementById('filter-kit-modelo');
+  if (!selectMod) return;
+
+  const cat = window.obtenerCatalogoMaquinariaCompleto();
+  let optionsHtml = '';
+
+  if (!marcaVal || marcaVal === 'all') {
+    optionsHtml = '<option value="all">Todos los Modelos</option>';
+    cat.marcas.forEach(m => {
+      const mods = cat.modelosPorMarca[m];
+      if (mods && mods.length > 0) {
+        optionsHtml += `<optgroup label="${m}">`;
+        mods.sort().forEach(mod => {
+          const isSel = (modeloSeleccionado && mod.toLowerCase() === modeloSeleccionado.toLowerCase());
+          optionsHtml += `<option value="${mod}" ${isSel ? 'selected' : ''}>${mod}</option>`;
+        });
+        optionsHtml += `</optgroup>`;
+      }
+    });
+  } else {
+    optionsHtml = `<option value="all">Todos los Modelos (${marcaVal})</option>`;
+    const mods = cat.modelosPorMarca[marcaVal] || [];
+    mods.sort().forEach(mod => {
+      const isSel = (modeloSeleccionado && mod.toLowerCase() === modeloSeleccionado.toLowerCase());
+      optionsHtml += `<option value="${mod}" ${isSel ? 'selected' : ''}>${mod}</option>`;
+    });
+  }
+
+  selectMod.innerHTML = optionsHtml;
+  if (modeloSeleccionado && modeloSeleccionado !== 'all') {
+    selectMod.value = modeloSeleccionado;
+  } else {
+    selectMod.value = 'all';
+  }
+};
+
+window.loadKitsServicio = function() {
+  const isTest = typeof isTestModeActive === 'function' && isTestModeActive();
+  const storageKey = isTest ? 'sapi_kits_servicio_sandbox' : 'sapi_kits_servicio';
+
+  // Configuración de entorno:
+  // - Sandbox: Contiene los 36 machotes de ejemplo / prueba para referencia del equipo
+  // - Producción (Real): Inicia en 0 ([]) para que el equipo cree los machotes oficiales desde cero
+  if (!localStorage.getItem('sapi_kits_env_swap_sandbox_v4')) {
+    localStorage.setItem('sapi_kits_env_swap_sandbox_v4', 'true');
+    try {
+      // 1. Limpiar producción a lista vacía []
+      if (typeof safeSetJSON === 'function') {
+        safeSetJSON('sapi_kits_servicio', []);
+      } else {
+        localStorage.setItem('sapi_kits_servicio', JSON.stringify([]));
+      }
+      if (typeof window.pushToSupabase === 'function') {
+        window.pushToSupabase('kits_servicio', []);
+      }
+
+      // 2. Cargar los 36 machotes en Sandbox
+      if (typeof safeSetJSON === 'function') {
+        safeSetJSON('sapi_kits_servicio_sandbox', KITS_PRECARGADOS_DEFAULT);
+      } else {
+        localStorage.setItem('sapi_kits_servicio_sandbox', JSON.stringify(KITS_PRECARGADOS_DEFAULT));
+      }
+      if (typeof window.pushToSupabase === 'function') {
+        window.pushToSupabase('kits_servicio_sandbox', KITS_PRECARGADOS_DEFAULT);
+      }
+    } catch(e) {
+      console.warn('[Kits] Error al inicializar partición sandbox/producción:', e);
+    }
+  }
+
+  try {
+    const raw = (typeof safeGetJSON === 'function') 
+      ? safeGetJSON(storageKey, null) 
+      : JSON.parse(localStorage.getItem(storageKey) || 'null');
+    if (Array.isArray(raw)) {
+      return raw;
+    }
+  } catch (e) {
+    console.warn('[Kits] Error leyendo kits locales:', e);
+  }
+
+  // En Sandbox, si aún no hay datos inicializamos con los 36 machotes de prueba
+  if (isTest) {
+    window.saveKitsServicio(KITS_PRECARGADOS_DEFAULT);
+    return [...KITS_PRECARGADOS_DEFAULT];
+  }
+
+  // En Modo Real (Producción), si no hay datos se mantiene limpio en 0 ([])
+  return [];
+};
+
+window.saveKitsServicio = function(kits) {
+  const isTest = typeof isTestModeActive === 'function' && isTestModeActive();
+  const storageKey = isTest ? 'sapi_kits_servicio_sandbox' : 'sapi_kits_servicio';
+  const supabaseConfigId = isTest ? 'kits_servicio_sandbox' : 'kits_servicio';
+
+  try {
+    if (typeof safeSetJSON === 'function') {
+      safeSetJSON(storageKey, kits);
+    } else {
+      localStorage.setItem(storageKey, JSON.stringify(kits));
+    }
+    // Sincronizar con Supabase en la tabla config
+    if (typeof window.pushToSupabase === 'function') {
+      window.pushToSupabase(supabaseConfigId, kits);
+    }
+  } catch (e) {
+    console.error('[Kits] Error guardando kits:', e);
+  }
+};
+
+window.restablecerKitsOficiales = async function() {
+  const isTest = typeof isTestModeActive === 'function' && isTestModeActive();
+  const targetName = isTest ? 'el Sandbox de Pruebas' : 'Produccion Oficial (Supabase)';
+
+  const confirmed = await window.confirmarAccion({
+    titulo: 'Restablecer Kits Oficiales de Fabrica',
+    mensaje: `Deseas restaurar la lista oficial de kits de servicio preventivo para la flota Eurorep (250h, 500h, 1000h) en ${targetName}?`,
+    textoAceptar: 'Restablecer Oficiales',
+    textoCancelar: 'Cancelar',
+    esPeligroso: false
+  });
+  if (!confirmed) return;
+
+  window.saveKitsServicio(KITS_PRECARGADOS_DEFAULT);
+  mostrarNotificacion(`Kits de servicio preventivo restablecidos con exito en ${targetName}.`, 'success');
+  window.filtrarKitsServicio();
+};
+
+window.setKitFiltroHoras = function(horas, btnEl) {
+  window._currentKitFilterHours = horas || 'all';
+  const btns = document.querySelectorAll('.kit-interval-btn');
+  btns.forEach(b => {
+    b.classList.remove('active');
+    b.style.background = 'transparent';
+    b.style.color = 'var(--text-secondary)';
+  });
+  if (btnEl) {
+    btnEl.classList.add('active');
+    btnEl.style.background = 'var(--bg-hover)';
+    btnEl.style.color = 'var(--text-primary)';
+  }
+  window.filtrarKitsServicio();
+};
+
+window.alCambiarFiltroMarcaKits = function() {
+  const selectMarca = document.getElementById('filter-kit-marca');
+  const marcaVal = selectMarca ? selectMarca.value : 'all';
+  window._currentKitFilterMarca = marcaVal;
+
+  window._actualizarSelectModelosKits(marcaVal, 'all');
+  window.filtrarKitsServicio();
+};
+
+window.abrirModalKitsServicio = function(modeloPreseleccionado) {
+  const isAuthorized = currentSession && ['superadmin', 'admin', 'supervisor'].includes(String(currentSession.viewMode || currentSession.rol || currentSession.realRol || '').toLowerCase().trim());
+  if (!isAuthorized) {
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion('Solo Superadministradores, Administradores y Supervisores tienen permiso para ver y gestionar Kits de Servicio.', 'error');
+    } else {
+      alert('Solo Superadministradores, Administradores y Supervisores tienen permiso para ver y gestionar Kits de Servicio.');
+    }
+    return;
+  }
+
+  const modal = document.getElementById('modal-kits-servicio-overlay');
+  if (!modal) return;
+
+  // Actualizar indicador de modo en el encabezado del modal
+  const modeBadge = document.getElementById('kit-modal-mode-badge');
+  const isTest = typeof isTestModeActive === 'function' && isTestModeActive();
+  if (modeBadge) {
+    if (isTest) {
+      modeBadge.textContent = 'Sandbox (Pruebas)';
+      modeBadge.style.background = 'rgba(245, 158, 11, 0.12)';
+      modeBadge.style.color = '#d97706';
+      modeBadge.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+    } else {
+      modeBadge.textContent = 'Modo Real (Produccion)';
+      modeBadge.style.background = 'rgba(16, 185, 129, 0.12)';
+      modeBadge.style.color = '#059669';
+      modeBadge.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+    }
+  }
+
+  const cat = window.obtenerCatalogoMaquinariaCompleto();
+  
+  // Poblar selector de marcas
+  const selectMarca = document.getElementById('filter-kit-marca');
+  if (selectMarca) {
+    let htmlMarcas = '<option value="all">Todas las Marcas</option>';
+    cat.marcas.forEach(m => {
+      htmlMarcas += `<option value="${m}">${m}</option>`;
+    });
+    selectMarca.innerHTML = htmlMarcas;
+  }
+
+  // Detectar marca si viene modelo preseleccionado
+  let marcaPreseleccionada = 'all';
+  let modeloMatch = 'all';
+
+  if (modeloPreseleccionado) {
+    const rawTarget = modeloPreseleccionado.trim().toLowerCase();
+    for (const [m, mods] of Object.entries(cat.modelosPorMarca)) {
+      const found = mods.find(mod => mod.toLowerCase() === rawTarget || rawTarget.includes(mod.toLowerCase()) || mod.toLowerCase().includes(rawTarget));
+      if (found) {
+        marcaPreseleccionada = m;
+        modeloMatch = found;
+        break;
+      }
+    }
+    if (marcaPreseleccionada === 'all') {
+      // Buscar coincidencia parcial directa
+      for (const m of cat.marcas) {
+        if (rawTarget.includes(m.toLowerCase())) {
+          marcaPreseleccionada = m;
+          break;
+        }
+      }
+    }
+  }
+
+  if (selectMarca) {
+    selectMarca.value = marcaPreseleccionada;
+  }
+  window._currentKitFilterMarca = marcaPreseleccionada;
+
+  // Actualizar selector de modelos
+  window._actualizarSelectModelosKits(marcaPreseleccionada, modeloMatch !== 'all' ? modeloMatch : 'all');
+  window._currentKitFilterModelo = modeloMatch;
+
+  // Resetear filtro de horas a 'all'
+  window._currentKitFilterHours = 'all';
+  const btns = document.querySelectorAll('.kit-interval-btn');
+  btns.forEach((b, i) => {
+    if (i === 0) {
+      b.classList.add('active');
+      b.style.background = 'var(--bg-hover)';
+      b.style.color = 'var(--text-primary)';
+    } else {
+      b.classList.remove('active');
+      b.style.background = 'transparent';
+      b.style.color = 'var(--text-secondary)';
+    }
+  });
+
+  const searchInp = document.getElementById('search-kit-input');
+  if (searchInp) searchInp.value = '';
+
+  modal.style.display = 'flex';
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  window.filtrarKitsServicio();
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+};
+
+window.cerrarModalKitsServicio = function(e) {
+  if (e && e.target && e.target !== document.getElementById('modal-kits-servicio-overlay') && !e.target.classList.contains('modal-close') && !e.target.closest('.modal-close') && !e.target.closest('button')) {
+    return;
+  }
+  const modal = document.getElementById('modal-kits-servicio-overlay');
+  if (modal) {
+    modal.style.display = 'none';
+    modal.classList.remove('open');
+  }
+  document.body.style.overflow = '';
+};
+
+window.toggleManualMachotes = function(forceState) {
+  const panel = document.getElementById('panel-manual-machotes');
+  const btn = document.getElementById('btn-toggle-manual-kits');
+  if (!panel) return;
+  
+  const isVisible = panel.style.display !== 'none';
+  const nextState = typeof forceState === 'boolean' ? forceState : !isVisible;
+  
+  panel.style.display = nextState ? 'block' : 'none';
+  if (btn) {
+    if (nextState) {
+      btn.classList.add('active');
+      btn.style.background = 'rgba(37,99,235,0.12)';
+      btn.style.color = '#2563eb';
+      btn.style.borderColor = 'rgba(37,99,235,0.3)';
+    } else {
+      btn.classList.remove('active');
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }
+  }
+
+  if (nextState && typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+};
+
+window.filtrarKitsServicio = function() {
+  const allKits = window.loadKitsServicio();
+  const selectMarca = document.getElementById('filter-kit-marca');
+  const selectMod = document.getElementById('filter-kit-modelo');
+  const marcaVal = selectMarca ? selectMarca.value : 'all';
+  const modeloVal = selectMod ? selectMod.value : 'all';
+  const hoursVal = window._currentKitFilterHours || 'all';
+  const q = (document.getElementById('search-kit-input')?.value || '').toLowerCase().trim();
+
+  // Actualizar indicador de modo si el modal esta visible
+  const modeBadge = document.getElementById('kit-modal-mode-badge');
+  const isTest = typeof isTestModeActive === 'function' && isTestModeActive();
+  if (modeBadge) {
+    if (isTest) {
+      modeBadge.textContent = 'Sandbox (Pruebas)';
+      modeBadge.style.background = 'rgba(245, 158, 11, 0.12)';
+      modeBadge.style.color = '#d97706';
+      modeBadge.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+    } else {
+      modeBadge.textContent = 'Modo Real (Produccion)';
+      modeBadge.style.background = 'rgba(16, 185, 129, 0.12)';
+      modeBadge.style.color = '#059669';
+      modeBadge.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+    }
+  }
+
+  const cat = window.obtenerCatalogoMaquinariaCompleto();
+  const normalizarMarca = cat.normalizarMarca || ((m) => (m || 'UNIVERSAL').trim().toUpperCase());
+
+  // Kits filtrados por Marca y Modelo para los contadores de horas
+  const kitsParaStats = allKits.filter(k => {
+    if (marcaVal !== 'all' && normalizarMarca(k.marca) !== normalizarMarca(marcaVal)) {
+      return false;
+    }
+    if (modeloVal !== 'all') {
+      const matchMod = (k.modelo || '').toLowerCase() === modeloVal.toLowerCase();
+      const isUniv = (k.modelo === 'Universal' || k.modelo === 'UNIVERSAL / MULTIMARCA');
+      if (!matchMod && !isUniv) return false;
+    }
+    return true;
+  });
+
+  const countAll = kitsParaStats.length;
+  const count250 = kitsParaStats.filter(k => String(k.intervalo) === '250').length;
+  const count500 = kitsParaStats.filter(k => String(k.intervalo) === '500').length;
+  const count1000 = kitsParaStats.filter(k => String(k.intervalo) === '1000').length;
+
+  const statTotal = document.getElementById('kit-stat-total');
+  if (statTotal) statTotal.textContent = countAll;
+  const stat250 = document.getElementById('kit-stat-250');
+  if (stat250) stat250.textContent = count250;
+  const stat500 = document.getElementById('kit-stat-500');
+  if (stat500) stat500.textContent = count500;
+  const stat1000 = document.getElementById('kit-stat-1000');
+  if (stat1000) stat1000.textContent = count1000;
+
+  // Filtrar resultados completos
+  const filtrados = allKits.filter(kit => {
+    // Filtro marca
+    if (marcaVal !== 'all') {
+      if (normalizarMarca(kit.marca) !== normalizarMarca(marcaVal)) return false;
+    }
+
+    // Filtro modelo
+    if (modeloVal !== 'all') {
+      const matchMod = (kit.modelo || '').toLowerCase() === modeloVal.toLowerCase();
+      const isUniv = (kit.modelo === 'Universal' || kit.modelo === 'UNIVERSAL / MULTIMARCA');
+      if (!matchMod && !isUniv) return false;
+    }
+
+    // Filtro horas
+    if (hoursVal !== 'all') {
+      if (String(kit.intervalo) !== String(hoursVal)) return false;
+    }
+
+    // Filtro busqueda de texto
+    if (q) {
+      const matchNom = (kit.nombre || '').toLowerCase().includes(q);
+      const matchMod = (kit.modelo || '').toLowerCase().includes(q);
+      const matchMarca = (kit.marca || '').toLowerCase().includes(q);
+      const matchDesc = (kit.descripcion || '').toLowerCase().includes(q);
+      const matchPiezas = (kit.piezas || []).some(p => 
+        (p.codigo || '').toLowerCase().includes(q) || 
+        (p.clave || '').toLowerCase().includes(q) || 
+        (p.descripcion || '').toLowerCase().includes(q) ||
+        (p.sistema || '').toLowerCase().includes(q)
+      );
+      if (!matchNom && !matchMod && !matchMarca && !matchDesc && !matchPiezas) return false;
+    }
+
+    return true;
+  });
+
+  window.renderKitsServicioCards(filtrados);
+};
+
+window.renderKitsServicioCards = function(kits) {
+  const container = document.getElementById('kits-servicio-grid');
+  if (!container) return;
+
+  if (!kits || kits.length === 0) {
+    const isTest = typeof isTestModeActive === 'function' && isTestModeActive();
+    const emptyTitle = isTest 
+      ? 'No hay machotes en el Sandbox de pruebas' 
+      : 'No hay machotes de servicio en Produccion (Supabase)';
+    const emptyDesc = isTest
+      ? 'No hay machotes de mantenimiento en el Sandbox con los filtros aplicados. Puedes crear un machote nuevo de prueba o consultar el mini manual de ayuda.'
+      : 'Aun no se han registrado machotes de servicio preventivo oficiales en Produccion. Puedes crear un nuevo machote oficial, restaurar los estandares de fabrica o revisar el mini manual de uso.';
+
+    container.innerHTML = `
+      <div style="text-align: center; padding: 4rem 1rem; background: var(--bg-card); border: 1px dashed var(--border); border-radius: 12px; margin: 1rem 0;">
+        <div style="background: rgba(37,99,235,0.08); color: #2563eb; width: 56px; height: 56px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1rem;">
+          <i data-lucide="package-search" style="width: 28px; height: 28px;"></i>
+        </div>
+        <h4 style="font-size: 1.1rem; margin: 0 0 0.5rem 0; color: var(--text-primary); font-weight: 700;">${emptyTitle}</h4>
+        <p style="font-size: 0.85rem; color: var(--text-muted); max-width: 520px; margin: 0 auto 1.25rem auto; line-height: 1.5;">
+          ${emptyDesc}
+        </p>
+        <div style="display:flex; justify-content:center; gap:0.6rem; flex-wrap:wrap;">
+          <button type="button" class="btn-primary" onclick="window.abrirModalFormularioKit()" style="font-size:0.82rem; padding:0.4rem 1rem; background:#2563eb; border:none; border-radius:6px; color:#fff; cursor:pointer;">
+            <i data-lucide="plus" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i> Nuevo Machote
+          </button>
+          <button type="button" class="btn-secondary" onclick="window.toggleManualMachotes(true)" style="font-size:0.82rem; padding:0.4rem 1rem; border-radius:6px; cursor:pointer;">
+            <i data-lucide="book-open" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i> Ver Mini Manual
+          </button>
+          <button type="button" class="btn-secondary" onclick="window.restablecerKitsOficiales()" style="font-size:0.82rem; padding:0.4rem 1rem; border-radius:6px; cursor:pointer;">
+            <i data-lucide="rotate-ccw" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i> Restablecer Oficiales
+          </button>
+        </div>
+      </div>
+    `;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    return;
+  }
+
+  // Estilos de badge e intervalo por horas
+  const getIntervaloMeta = (intervalo) => {
+    const intNum = parseInt(intervalo, 10);
+    if (intNum === 250) {
+      return {
+        badgeBg: 'rgba(37, 99, 235, 0.1)',
+        badgeColor: '#2563eb',
+        badgeBorder: 'rgba(37, 99, 235, 0.25)',
+        accentColor: '#2563eb',
+        icon: 'zap',
+        label: '250 HORAS',
+        sublabel: 'Preventivo Menor',
+        cardBorder: 'var(--border)'
+      };
+    } else if (intNum === 500) {
+      return {
+        badgeBg: 'rgba(217, 119, 6, 0.1)',
+        badgeColor: '#d97706',
+        badgeBorder: 'rgba(217, 119, 6, 0.25)',
+        accentColor: '#d97706',
+        icon: 'wrench',
+        label: '500 HORAS',
+        sublabel: 'Preventivo Intermedio',
+        cardBorder: 'var(--border)'
+      };
+    } else if (intNum === 1000) {
+      return {
+        badgeBg: 'rgba(124, 58, 237, 0.1)',
+        badgeColor: '#7c3aed',
+        badgeBorder: 'rgba(124, 58, 237, 0.25)',
+        accentColor: '#7c3aed',
+        icon: 'settings',
+        label: '1000 HORAS',
+        sublabel: 'Preventivo Mayor',
+        cardBorder: 'var(--border)'
+      };
+    }
+    return {
+      badgeBg: 'rgba(16, 185, 129, 0.1)',
+      badgeColor: '#059669',
+      badgeBorder: 'rgba(16, 185, 129, 0.25)',
+      accentColor: '#059669',
+      icon: 'layers',
+      label: `${intervalo} HORAS`,
+      sublabel: 'Servicio Programado',
+      cardBorder: 'var(--border)'
+    };
+  };
+
+  // Agrupar los kits por Marca
+  const cat = window.obtenerCatalogoMaquinariaCompleto();
+  const normalizarMarca = cat.normalizarMarca || ((m) => (m || 'UNIVERSAL').trim().toUpperCase());
+
+  const grouped = {};
+  kits.forEach(kit => {
+    const brandName = normalizarMarca(kit.marca);
+    if (!grouped[brandName]) grouped[brandName] = [];
+    grouped[brandName].push(kit);
+  });
+
+  // Orden canonico de marcas oficiales
+  const brandPriority = ['RUBBLE MASTER', 'FIORI', 'HYUNDAI', 'CASAGRANDE', 'CIFA', 'SIMEM', 'ZOOMLION', 'CUMMINS', 'UNIVERSAL'];
+  const sortedBrands = Object.keys(grouped).sort((a, b) => {
+    const idxA = brandPriority.indexOf(a);
+    const idxB = brandPriority.indexOf(b);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return a.localeCompare(b);
+  });
+
+  // Generar HTML agrupado por secciones de Marca
+  container.innerHTML = sortedBrands.map(brandName => {
+    const brandKits = grouped[brandName] || [];
+    const logoSrc = getLogoMarca(brandName);
+
+    const brandCardsHtml = brandKits.map(kit => {
+      const meta = getIntervaloMeta(kit.intervalo);
+      const piezas = kit.piezas || [];
+      const totalPiezas = piezas.reduce((acc, p) => acc + (parseInt(p.cantidad, 10) || 1), 0);
+
+      return `
+        <div class="kit-card" style="background: var(--bg-card); border: 1px solid var(--border); border-top: 3px solid ${meta.accentColor}; border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.04);">
+          
+          <!-- Header de la Tarjeta del Machote -->
+          <div style="padding: 1rem 1.25rem 0.85rem 1.25rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem;">
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+              <!-- Tag de Modelo de Maquina -->
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="badge" style="background: rgba(37,99,235,0.08); color: #2563eb; border: 1px solid rgba(37,99,235,0.2); font-size: 0.74rem; padding: 2px 8px; border-radius: 6px; font-weight: 700; display:inline-flex; align-items:center; gap:4px;">
+                  <i data-lucide="truck" style="width:12px;height:12px;"></i> ${kit.modelo}
+                </span>
+                <span style="font-size:0.72rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">${kit.marca || brandName}</span>
+              </div>
+
+              <!-- Badge de Intervalo (250h, 500h, 1000h) -->
+              <span class="badge" style="background:${meta.badgeBg}; color:${meta.badgeColor}; border:1px solid ${meta.badgeBorder}; font-weight:700; font-size:0.72rem; padding:2px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
+                <i data-lucide="${meta.icon}" style="width:12px;height:12px;"></i> ${meta.label}
+              </span>
+            </div>
+
+            <div>
+              <h4 style="margin: 0.25rem 0 0 0; font-size: 0.98rem; font-weight: 800; color: var(--text-primary); line-height: 1.35;">${kit.nombre}</h4>
+            </div>
+
+          </div>
+
+          <!-- Alcance / Descripcion Tecnica -->
+          ${kit.descripcion ? `
+            <div style="margin: 0.75rem 1.15rem 0.25rem 1.15rem; padding: 0.55rem 0.75rem; background: var(--bg-hover); border-radius: 8px; border: 1px solid var(--border); display: flex; gap: 0.5rem; align-items: flex-start;">
+              <i data-lucide="info" style="width: 14px; height: 14px; color: ${meta.accentColor}; flex-shrink: 0; margin-top: 2px;"></i>
+              <div style="font-size: 0.76rem; color: var(--text-secondary); line-height: 1.45;">
+                ${kit.descripcion}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Header de Refacciones -->
+          <div style="padding: 0.75rem 1.15rem 0.35rem 1.15rem; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.69rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
+              Refacciones Requeridas
+            </span>
+            <span style="font-size: 0.69rem; font-weight: 600; color: var(--text-muted); background: var(--bg-secondary); padding: 1px 7px; border-radius: 10px; border: 1px solid var(--border);">
+              ${piezas.length} items • ${totalPiezas} pzas
+            </span>
+          </div>
+
+          <!-- Lista de Refacciones y Consumibles -->
+          <div style="padding: 0.15rem 1.15rem 0.75rem 1.15rem; flex: 1; display: flex; flex-direction: column; gap: 0.4rem; max-height: 230px; overflow-y: auto;">
+            ${piezas.map((p) => {
+              return `
+                <div class="kit-ref-row-item" style="display: flex; align-items: center; justify-content: space-between; gap: 0.65rem; padding: 0.45rem 0.65rem; background: var(--bg-body); border: 1px solid var(--border); border-radius: 7px; font-size: 0.78rem;">
+                  
+                  <div style="display: flex; align-items: center; gap: 0.55rem; min-width: 0; flex: 1;">
+                    <span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-weight: 700; color: #2563eb; font-size: 0.74rem; background: rgba(37,99,235,0.07); border: 1px solid rgba(37,99,235,0.18); padding: 2px 6px; border-radius: 5px; flex-shrink: 0;">
+                      ${p.codigo || p.clave || 'S/C'}
+                    </span>
+                    <span style="font-weight: 600; color: var(--text-primary); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${p.descripcion}">
+                      ${p.descripcion}
+                    </span>
+                  </div>
+
+                  <div style="display: flex; align-items: center; flex-shrink: 0; margin-left: 0.35rem;">
+                    <span style="font-size: 0.78rem; font-weight: 800; color: var(--text-primary); background: var(--bg-secondary); border: 1px solid var(--border); padding: 2px 7px; border-radius: 5px; min-width: 28px; text-align: center;">
+                      x${p.cantidad || 1}
+                    </span>
+                  </div>
+
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <!-- Footer y Acciones de la Tarjeta (Solo Machote) -->
+          <div style="padding: 0.75rem 1.15rem; background: var(--bg-secondary); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;">
+            <button type="button" class="btn-copiar-kit" onclick="window.copiarKitAlPortapapeles('${kit.id}')" title="Copiar este machote al portapapeles estructurado para WhatsApp o correo" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; font-size: 0.82rem; font-weight: 600; padding: 0.45rem 0.85rem; background: #2563eb; color: #ffffff; border: none; border-radius: 7px; cursor: pointer; box-shadow: 0 2px 6px rgba(37,99,235,0.22);">
+              <i data-lucide="copy" style="width: 14px; height: 14px;"></i> Copiar Machote
+            </button>
+
+            <div style="display: flex; gap: 0.3rem;">
+              <button type="button" class="action-btn" onclick="window.abrirModalFormularioKit('${kit.id}')" title="Editar Machote" style="padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                <i data-lucide="pencil" style="width: 13px; height: 13px;"></i>
+              </button>
+              <button type="button" class="action-btn" onclick="window.duplicarKitServicio('${kit.id}')" title="Duplicar Machote" style="padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                <i data-lucide="copy-plus" style="width: 13px; height: 13px;"></i>
+              </button>
+              <button type="button" class="action-btn" onclick="window.eliminarKitServicio('${kit.id}')" title="Eliminar Machote" style="padding: 5px 8px; border-radius: 6px; border: 1px solid rgba(239,68,68,0.3); background: rgba(239,68,68,0.06); color: #ef4444; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <!-- SECCION DE MARCA: ${brandName} -->
+      <div class="kit-brand-section" style="display:flex; flex-direction:column; gap:0.85rem;">
+        
+        <!-- Header de la Seccion de Marca -->
+        <div class="kit-brand-section-header" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding: 0.65rem 1rem; background: var(--bg-card); border: 1px solid var(--border); border-left: 4px solid #2563eb; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
+          
+          <div style="display:flex; align-items:center; gap:0.85rem; flex-wrap:wrap;">
+            ${logoSrc ? `
+              <div style="background:#ffffff; padding:4px 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:center; height:36px; min-width:64px;">
+                <img src="${logoSrc}" alt="${brandName}" style="max-height:26px; max-width:130px; object-fit:contain;" />
+              </div>
+            ` : `
+              <div style="background:rgba(37,99,235,0.1); color:#2563eb; padding:6px 10px; border-radius:8px; font-weight:700; font-size:0.85rem; display:flex; align-items:center; gap:6px;">
+                <i data-lucide="shield-check" style="width:16px;height:16px;"></i>
+              </div>
+            `}
+
+            <div>
+              <h3 style="margin:0; font-size:1.02rem; font-weight:800; color:var(--text-primary); letter-spacing:-0.2px;">
+                ${brandName}
+              </h3>
+              <div style="font-size:0.74rem; color:var(--text-muted); font-weight:500;">
+                ${brandKits.length} machote${brandKits.length === 1 ? '' : 's'} de mantenimiento configurado${brandKits.length === 1 ? '' : 's'}
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <span class="badge" style="background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-secondary); font-size:0.74rem; padding:3px 8px; border-radius:6px; font-weight:600;">
+              ${brandKits.length} Machote${brandKits.length === 1 ? '' : 's'}
+            </span>
+          </div>
+
+        </div>
+
+        <!-- Grid de Tarjetas de esta Marca -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1.25rem;">
+          ${brandCardsHtml}
+        </div>
+
+      </div>
+    `;
+  }).join('');
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+};
+
+window.copiarKitAlPortapapeles = function(kitId) {
+  const kits = window.loadKitsServicio();
+  const kit = kits.find(k => k.id === kitId);
+  if (!kit) return;
+
+  const lineas = [
+    `*MACHOTE DE SERVICIO PREVENTIVO — EUROREP*`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `*${kit.nombre.toUpperCase()}*`,
+    `Equipo / Modelo: ${kit.modelo} | Marca: ${kit.marca || 'N/A'}`,
+    `Intervalo: ${kit.intervalo} Horas de Operación`,
+    kit.descripcion ? `Alcance Técnico: ${kit.descripcion}` : '',
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `*LISTA DE REFACCIONES REQUERIDAS (${(kit.piezas||[]).length} ítems):*`
+  ];
+
+  (kit.piezas || []).forEach((p, idx) => {
+    lineas.push(`  ${idx + 1}. [${p.codigo || p.clave || 'S/C'}] ${p.descripcion} • Cant: ${p.cantidad || 1}`);
+  });
+
+  lineas.push(
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `Eurorep Postventa • Machote Técnico de Servicio`
+  );
+
+  const textoFinal = lineas.filter(l => l !== null && l !== undefined && l !== '').join('\n');
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(textoFinal).then(() => {
+      mostrarNotificacion(`Machote de ${kit.nombre} copiado al portapapeles. Listo para WhatsApp o correo.`, 'success');
+    }).catch(() => {
+      prompt('Copia el machote de servicio:', textoFinal);
+    });
+  } else {
+    prompt('Copia el machote de servicio:', textoFinal);
+  }
+};
+
+window.crearTicketDesdeKit = function(kitId) {
+  const kits = window.loadKitsServicio();
+  const kit = kits.find(k => k.id === kitId);
+  if (!kit) return;
+
+  window.cerrarModalKitsServicio();
+
+  const refaccionesMapeadas = (kit.piezas || []).map(p => ({
+    clave: p.codigo || p.clave || 'S/C',
+    codigo: p.codigo || p.clave || 'S/C',
+    nombre: p.descripcion || p.nombre || 'Sin Descripción',
+    descripcion: p.descripcion || p.nombre || 'Sin Descripción',
+    marca: p.marca || kit.marca || '',
+    cantidad: parseInt(p.cantidad, 10) || 1,
+    estatusPedido: 'Por Pedir'
+  }));
+
+  if (typeof window.abrirTicketPreloaded === 'function') {
+    window.abrirTicketPreloaded({
+      asunto: `Mantenimiento Preventivo ${kit.intervalo}h - ${kit.modelo}`,
+      categoria: 'Refacción',
+      prioridad: 'Media',
+      area: 'Operaciones',
+      descripcion: `Solicitud de refacciones para servicio de mantenimiento preventivo de ${kit.intervalo} horas para equipo modelo ${kit.modelo}.\n${kit.descripcion || ''}`,
+      refaccionesSeleccionadas: refaccionesMapeadas
+    });
+  } else if (typeof abrirTicket === 'function') {
+    abrirTicket(null);
+    setTimeout(() => {
+      const elAsunto = document.getElementById('t-asunto');
+      if (elAsunto) elAsunto.value = `Mantenimiento Preventivo ${kit.intervalo}h - ${kit.modelo}`;
+      const elCat = document.getElementById('t-categoria');
+      if (elCat) elCat.value = 'Refacción';
+      const elDesc = document.getElementById('t-descripcion');
+      if (elDesc) elDesc.value = `Solicitud de refacciones para servicio de mantenimiento preventivo de ${kit.intervalo} horas para equipo modelo ${kit.modelo}.\n${kit.descripcion || ''}`;
+      if (typeof window.inicializarRefaccionesTicket === 'function') {
+        window.inicializarRefaccionesTicket(null, refaccionesMapeadas);
+      }
+    }, 150);
+  }
+
+  mostrarNotificacion(`Ticket inicializado con las refacciones del ${kit.nombre}`, 'info');
+};
+
+window.exportarKitsAExcel = function() {
+  const kits = window.loadKitsServicio();
+  if (!kits || kits.length === 0) {
+    mostrarNotificacion('No hay kits de servicio para exportar.', 'error');
+    return;
+  }
+
+  if (typeof XLSX === 'undefined') {
+    mostrarNotificacion('La librería de Excel (XLSX) no está disponible.', 'error');
+    return;
+  }
+
+  const rows = [];
+  kits.forEach(kit => {
+    (kit.piezas || []).forEach(p => {
+      rows.push({
+        'ID Kit': kit.id,
+        'Nombre del Kit': kit.nombre,
+        'Modelo Maquinaria': kit.modelo,
+        'Marca Fabricante': kit.marca || '',
+        'Intervalo (Horas)': kit.intervalo,
+        'Código / Clave SAP': p.codigo || 'S/C',
+        'Descripción Refacción': p.descripcion || '',
+        'Sistema': p.sistema || 'General',
+        'Cantidad Recomendada': p.cantidad || 1,
+        'Notas de Servicio': kit.descripcion || ''
+      });
+    });
+  });
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Kits de Servicio');
+
+  const fechaStr = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `Kits_Servicio_Preventivo_Eurorep_${fechaStr}.xlsx`);
+  mostrarNotificacion('Catálogo de kits exportado a Excel exitosamente.', 'success');
+};
+
+// --- GESTIÓN DE KITS EN FORMULARIO DE TICKET (CATEGORÍA SERVICIO TÉCNICO) ---
+window._ticketKitSeleccionado = null;
+
+window.detectarMachotesParaMaquina = function(maquinaRawText, kitsList) {
+  if (!maquinaRawText || typeof maquinaRawText !== 'string' || !kitsList || kitsList.length === 0) {
+    return { sugeridos: [], nombreLimpio: '' };
+  }
+
+  // Limpiar texto de la máquina: remover [ID], (SN: ...)
+  let clean = maquinaRawText.trim();
+  if (clean.startsWith('[') && clean.includes(']')) {
+    clean = clean.substring(clean.indexOf(']') + 1).trim();
+  }
+  if (clean.includes('(SN:')) {
+    clean = clean.split('(SN:')[0].trim();
+  } else if (clean.includes('(sn:')) {
+    clean = clean.split('(sn:')[0].trim();
+  }
+
+  const cleanLower = clean.toLowerCase();
+  const cleanTokens = cleanLower.split(/[\s\-_/]+/).filter(t => t.length >= 2);
+
+  const matched = [];
+
+  kitsList.forEach(k => {
+    const kitModLower = (k.modelo || '').toLowerCase();
+    const kitModTokens = kitModLower.split(/[\s\-_/]+/).filter(t => t.length >= 2);
+    const kitMarcaLower = (k.marca || '').toLowerCase();
+
+    let score = 0;
+
+    // 1. Coincidencia de Marca
+    const marcaMatch = cleanLower.includes(kitMarcaLower) || 
+      (kitMarcaLower.includes('casa') && cleanLower.includes('casa')) ||
+      (kitMarcaLower.includes('grande') && cleanLower.includes('grande')) ||
+      (kitMarcaLower.includes('rubble') && cleanLower.includes('rubble')) ||
+      (kitMarcaLower.includes('fiori') && cleanLower.includes('fiori')) ||
+      (kitMarcaLower.includes('hyundai') && cleanLower.includes('hyundai')) ||
+      (kitMarcaLower.includes('cifa') && cleanLower.includes('cifa')) ||
+      (kitMarcaLower.includes('simem') && cleanLower.includes('simem')) ||
+      (kitMarcaLower.includes('zoomlion') && cleanLower.includes('zoomlion')) ||
+      (kitMarcaLower.includes('cummins') && cleanLower.includes('cummins'));
+
+    // 2. Coincidencia de Modelo (tokens alfanuméricos clave como b125, rm120, rm100, db460, hx220, zr255, k45, etc.)
+    const modelTokenMatch = cleanTokens.some(ct => {
+      return kitModTokens.some(kt => ct === kt || ct.includes(kt) || kt.includes(ct));
+    });
+
+    // 3. Coincidencia directa en texto
+    const directModelMatch = (kitModLower && cleanLower.includes(kitModLower)) ||
+      (cleanLower && kitModLower.includes(cleanLower)) ||
+      cleanTokens.some(ct => kitModLower.includes(ct) && ct.length >= 3);
+
+    if (marcaMatch && (modelTokenMatch || directModelMatch)) {
+      score = 10;
+    } else if (modelTokenMatch) {
+      score = 8;
+    } else if (directModelMatch && cleanTokens.some(t => /\d/.test(t))) {
+      score = 6;
+    }
+
+    if (score > 0) {
+      matched.push({ kit: k, score });
+    }
+  });
+
+  matched.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return parseInt(a.kit.intervalo, 10) - parseInt(b.kit.intervalo, 10);
+  });
+
+  return {
+    sugeridos: matched.map(m => m.kit),
+    nombreLimpio: clean || maquinaRawText
+  };
+};
+
+window.toggleMenuMachotesTicket = function(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  const menu = document.getElementById('custom-kit-dropdown-menu');
+  const chevron = document.getElementById('custom-kit-chevron');
+  const inputSearch = document.getElementById('custom-kit-search-input');
+  if (!menu) return;
+
+  const isOpen = menu.style.display === 'block';
+  if (isOpen) {
+    window.cerrarMenuMachotesTicket();
+  } else {
+    menu.style.display = 'block';
+    if (chevron) chevron.style.transform = 'rotate(180deg)';
+    if (inputSearch) {
+      inputSearch.value = '';
+      setTimeout(() => inputSearch.focus(), 60);
+    }
+    window.renderCustomMachotesList('');
+  }
+};
+
+window.cerrarMenuMachotesTicket = function() {
+  const menu = document.getElementById('custom-kit-dropdown-menu');
+  const chevron = document.getElementById('custom-kit-chevron');
+  if (menu) menu.style.display = 'none';
+  if (chevron) chevron.style.transform = 'rotate(0deg)';
+};
+
+window.filtrarMachotesTicketCustom = function(q) {
+  window.renderCustomMachotesList(q);
+};
+
+window.seleccionarMachoteTicket = function(kitId) {
+  const hiddenInput = document.getElementById('t-kit-servicio-select');
+  if (hiddenInput) hiddenInput.value = kitId || '';
+
+  const allKits = window.loadKitsServicio();
+  const kitsPool = (allKits && allKits.length > 0) ? allKits : KITS_PRECARGADOS_DEFAULT;
+  const kit = kitsPool.find(k => k.id === kitId);
+
+  const triggerContent = document.getElementById('custom-kit-trigger-content');
+  const btnLimpiar = document.getElementById('btn-limpiar-kit-ticket');
+
+  if (kit && kitId) {
+    const nPzas = (kit.piezas || []).length;
+    const pzasTxt = nPzas === 1 ? '1 refacción' : `${nPzas} refacciones`;
+    if (triggerContent) {
+      triggerContent.innerHTML = `
+        <span style="background:#2563eb; color:#fff; font-weight:700; font-size:0.75rem; padding:2px 7px; border-radius:4px; flex-shrink:0;">${kit.intervalo}h</span>
+        <strong style="color:var(--text-primary); font-size:0.84rem;">${kit.modelo || kit.nombre}</strong>
+        <span style="font-size:0.75rem; color:var(--text-muted);">(${pzasTxt})</span>
+      `;
+    }
+    if (btnLimpiar) btnLimpiar.style.display = 'inline-block';
+  } else {
+    if (triggerContent) {
+      triggerContent.innerHTML = `
+        <span style="color:var(--text-muted); font-size:0.85rem;">-- Sin Machote (Servicio Técnico Manual) --</span>
+      `;
+    }
+    if (btnLimpiar) btnLimpiar.style.display = 'none';
+  }
+
+  window.alSeleccionarKitEnTicket(kitId || '');
+  window.cerrarMenuMachotesTicket();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+window.limpiarMachoteTicket = function(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  window.seleccionarMachoteTicket('');
+};
+
+window.renderCustomMachotesList = function(filtroTexto = '') {
+  const container = document.getElementById('custom-kit-options-list');
+  if (!container) return;
+
+  const allKits = window.loadKitsServicio();
+  const kitsDisponibles = (allKits && allKits.length > 0) ? allKits : KITS_PRECARGADOS_DEFAULT;
+
+  // Detectar máquinas seleccionadas en el ticket
+  const chipsEq = Array.from(document.querySelectorAll('#t-equipos-seleccionados .maquina-chip')).map(el => el.getAttribute('data-value') || el.textContent || '');
+  const selectEqVal = document.getElementById('t-equipo')?.value || '';
+  const maquinasList = chipsEq.length > 0 ? chipsEq : (selectEqVal ? [selectEqVal] : []);
+
+  let sugeridosKits = [];
+  let nombreEquipoDetectado = '';
+
+  for (const maqStr of maquinasList) {
+    if (maqStr && maqStr !== 'Otra / No registrada') {
+      const res = window.detectarMachotesParaMaquina(maqStr, kitsDisponibles);
+      if (res.sugeridos && res.sugeridos.length > 0) {
+        sugeridosKits = res.sugeridos;
+        nombreEquipoDetectado = res.nombreLimpio;
+        break;
+      }
+    }
+  }
+
+  const currentKitId = document.getElementById('t-kit-servicio-select')?.value || '';
+  const q = (filtroTexto || '').toLowerCase().trim();
+
+  const matchFilter = (k) => {
+    if (!q) return true;
+    const matchNom = (k.nombre || '').toLowerCase().includes(q);
+    const matchMod = (k.modelo || '').toLowerCase().includes(q);
+    const matchMarca = (k.marca || '').toLowerCase().includes(q);
+    const matchDesc = (k.descripcion || '').toLowerCase().includes(q);
+    const matchHoras = (k.intervalo || '').toLowerCase().includes(q);
+    const matchPiezas = (k.piezas || []).some(p => 
+      (p.codigo || '').toLowerCase().includes(q) || 
+      (p.descripcion || '').toLowerCase().includes(q)
+    );
+    return matchNom || matchMod || matchMarca || matchDesc || matchHoras || matchPiezas;
+  };
+
+  let html = '';
+
+  // 0. Opción Sin Machote
+  if (!q || 'sin machote manual servicio'.includes(q)) {
+    const isSelected = !currentKitId;
+    html += `
+      <div class="custom-kit-row ${isSelected ? 'selected' : ''}" onclick="window.seleccionarMachoteTicket('')">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <i data-lucide="wrench" style="width:14px; height:14px; color:var(--text-muted);"></i>
+          <span style="font-size:0.83rem; color:var(--text-secondary); font-weight:${isSelected ? '700' : '500'};">-- Sin Machote (Servicio Manual) --</span>
+        </div>
+        ${isSelected ? '<i data-lucide="check" style="width:14px; height:14px; color:#2563eb;"></i>' : ''}
+      </div>
+    `;
+  }
+
+  const sugeridosFiltrados = sugeridosKits.filter(matchFilter);
+  const sugeridosIds = new Set(sugeridosKits.map(k => k.id));
+
+  // 1. RECOMENDADOS PARA EL EQUIPO SELECCIONADO (HASTA ARRIBA)
+  if (sugeridosFiltrados.length > 0) {
+    html += `<div class="custom-kit-optgroup-title recommended-title">Recomendados para: ${nombreEquipoDetectado.toUpperCase()}</div>`;
+    sugeridosFiltrados.forEach(k => {
+      const isSelected = (currentKitId === k.id);
+      const nPzas = (k.piezas || []).length;
+      const pzasTxt = nPzas === 1 ? '1 refacción' : `${nPzas} refacciones`;
+      html += `
+        <div class="custom-kit-row recommended-row ${isSelected ? 'selected' : ''}" onclick="window.seleccionarMachoteTicket('${k.id}')">
+          <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
+            <span style="background:#2563eb; color:#fff; font-weight:700; font-size:0.72rem; padding:2px 7px; border-radius:4px; flex-shrink:0;">${k.intervalo}h</span>
+            <div style="display:flex; flex-direction:column; min-width:0;">
+              <span style="font-weight:700; font-size:0.84rem; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${k.modelo || k.nombre}</span>
+              <span style="font-size:0.72rem; color:var(--text-secondary); line-height:1.2; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${k.descripcion ? (k.descripcion.length > 55 ? k.descripcion.substring(0, 55) + '...' : k.descripcion) : 'Servicio Preventivo'}</span>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:8px;">
+            <span style="background:var(--bg-body); border:1px solid var(--border); color:var(--text-secondary); font-size:0.72rem; padding:2px 6px; border-radius:4px; font-weight:600;">
+              ${pzasTxt}
+            </span>
+            ${isSelected ? '<i data-lucide="check" style="width:14px; height:14px; color:#2563eb;"></i>' : ''}
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  // 2. OTROS MACHOTES AGRUPADOS POR MARCA
+  const grouped = {};
+  kitsDisponibles.filter(matchFilter).forEach(k => {
+    if (sugeridosIds.has(k.id)) return; // No duplicar si ya se mostró en recomendados
+    const marca = (k.marca || 'VARIOS').toUpperCase();
+    if (!grouped[marca]) grouped[marca] = [];
+    grouped[marca].push(k);
+  });
+
+  const marcasKeys = Object.keys(grouped).sort();
+  marcasKeys.forEach(marca => {
+    const labelMarca = sugeridosKits.length > 0 ? `OTRAS MARCAS — ${marca}` : marca;
+    html += `<div class="custom-kit-optgroup-title">${labelMarca}</div>`;
+    grouped[marca].forEach(k => {
+      const isSelected = (currentKitId === k.id);
+      const nPzas = (k.piezas || []).length;
+      const pzasTxt = nPzas === 1 ? '1 refacción' : `${nPzas} refacciones`;
+      html += `
+        <div class="custom-kit-row ${isSelected ? 'selected' : ''}" onclick="window.seleccionarMachoteTicket('${k.id}')">
+          <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
+            <span style="background:rgba(37,99,235,0.12); color:#2563eb; font-weight:700; font-size:0.72rem; padding:2px 7px; border-radius:4px; flex-shrink:0;">${k.intervalo}h</span>
+            <div style="display:flex; flex-direction:column; min-width:0;">
+              <span style="font-weight:600; font-size:0.83rem; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${k.modelo || k.nombre}</span>
+              <span style="font-size:0.71rem; color:var(--text-muted); line-height:1.2;">${k.marca || 'Universal'}</span>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:8px;">
+            <span style="background:var(--bg-body); border:1px solid var(--border); color:var(--text-secondary); font-size:0.72rem; padding:2px 6px; border-radius:4px;">
+              ${pzasTxt}
+            </span>
+            ${isSelected ? '<i data-lucide="check" style="width:14px; height:14px; color:#2563eb;"></i>' : ''}
+          </div>
+        </div>
+      `;
+    });
+  });
+
+  if (!html) {
+    html = `<div style="text-align:center; padding:1.25rem; color:var(--text-muted); font-size:0.8rem;">No se encontraron machotes con "${filtroTexto}"</div>`;
+  }
+
+  container.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+window.alCambiarCategoriaTicket = function() {
+  const catEl = document.getElementById('t-categoria');
+  const groupKit = document.getElementById('group-t-kit-servicio');
+  const hiddenKit = document.getElementById('t-kit-servicio-select');
+  const previewKit = document.getElementById('t-kit-servicio-preview');
+  if (!catEl || !groupKit) return;
+
+  const esServicioTecnico = catEl.value === 'Servicio Técnico';
+  groupKit.style.display = esServicioTecnico ? 'block' : 'none';
+
+  if (!esServicioTecnico) {
+    if (hiddenKit) hiddenInput = hiddenKit.value = '';
+    if (previewKit) {
+      previewKit.style.display = 'none';
+      previewKit.innerHTML = '';
+    }
+    window._ticketKitSeleccionado = null;
+    window.cerrarMenuMachotesTicket();
+    return;
+  }
+
+  // Si es servicio técnico, actualizar lista y estado visual del trigger
+  const currentVal = hiddenKit ? hiddenKit.value : '';
+  if (currentVal) {
+    window.seleccionarMachoteTicket(currentVal);
+  } else {
+    window.renderCustomMachotesList('');
+  }
+};
+
+// Listener global para cerrar el menú custom al hacer clic fuera
+if (!window._machoteMenuListenerAttached) {
+  window._machoteMenuListenerAttached = true;
+  document.addEventListener('click', function(e) {
+    const picker = document.getElementById('custom-kit-picker');
+    if (picker && !picker.contains(e.target)) {
+      window.cerrarMenuMachotesTicket();
+    }
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      window.cerrarMenuMachotesTicket();
+    }
+  });
+}
+
+window.alSeleccionarKitEnTicket = function(kitId) {
+  const previewKit = document.getElementById('t-kit-servicio-preview');
+  if (!kitId) {
+    window._ticketKitSeleccionado = null;
+    if (previewKit) {
+      previewKit.style.display = 'none';
+      previewKit.innerHTML = '';
+    }
+    return;
+  }
+
+  const allKits = window.loadKitsServicio();
+  const kitsPool = (allKits && allKits.length > 0) ? allKits : KITS_PRECARGADOS_DEFAULT;
+  const kit = kitsPool.find(k => k.id === kitId);
+  if (!kit) return;
+
+  window._ticketKitSeleccionado = kit;
+
+  if (previewKit) {
+    const piezas = kit.piezas || [];
+    const totalPzas = piezas.reduce((sum, p) => sum + (parseInt(p.cantidad, 10) || 1), 0);
+    const piezasListHtml = piezas.map(p => `
+      <span style="display:inline-flex; align-items:center; gap:3px; background:var(--bg-body); border:1px solid var(--border); padding:2px 6px; border-radius:4px; margin:2px 0;">
+        <strong style="color:#2563eb; font-family:monospace;">${p.codigo || p.clave || 'S/C'}</strong> 
+        ${p.descripcion} (x${p.cantidad || 1})
+      </span>
+    `).join(' ');
+
+    previewKit.style.display = 'block';
+    previewKit.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.35rem; gap:0.5rem; flex-wrap:wrap;">
+        <div>
+          <strong style="color:var(--text-primary); font-size:0.84rem;">${kit.nombre}</strong>
+          <span style="font-size:0.72rem; color:var(--text-muted); margin-left:6px;">Equipo: ${kit.modelo}</span>
+        </div>
+        <span style="background:rgba(37,99,235,0.12); color:#2563eb; border:1px solid rgba(37,99,235,0.25); font-weight:700; padding:2px 7px; border-radius:5px; font-size:0.72rem;">
+          ${kit.intervalo} HORAS
+        </span>
+      </div>
+      ${kit.descripcion ? `<div style="color:var(--text-secondary); font-size:0.75rem; margin-bottom:0.4rem; line-height:1.4;">${kit.descripcion}</div>` : ''}
+      <div style="font-size:0.73rem; color:var(--text-muted); border-top:1px dashed var(--border); padding-top:0.35rem; margin-top:0.35rem;">
+        <strong>Refacciones vinculadas (${piezas.length} items • ${totalPzas} pzas):</strong>
+        <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
+          ${piezasListHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  // Sugerir Asunto si está vacío o por defecto
+  const elAsunto = document.getElementById('t-asunto');
+  if (elAsunto && (!elAsunto.value.trim() || elAsunto.value.includes('Servicio Preventivo') || elAsunto.value.includes('Mantenimiento'))) {
+    elAsunto.value = `Servicio Preventivo ${kit.intervalo}h - ${kit.modelo}`;
+  }
+
+  // Si la descripción está vacía o es genérica, prellenar con el alcance técnico
+  const elDesc = document.getElementById('t-descripcion');
+  if (elDesc && (!elDesc.value.trim() || elDesc.value.startsWith('Servicio preventivo'))) {
+    const listadoPiezasTxt = (kit.piezas || []).map((p, idx) => `  ${idx+1}. [${p.codigo||p.clave||'S/C'}] ${p.descripcion} (Cant: ${p.cantidad||1})`).join('\n');
+    elDesc.value = `Servicio preventivo de ${kit.intervalo} horas para ${kit.modelo}.\nAlcance: ${kit.descripcion || 'Mantenimiento preventivo programado.'}\n\nRefacciones requeridas:\n${listadoPiezasTxt}`;
+  }
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+window.abrirModalKitsDesdeTicket = function() {
+  const eqVal = document.getElementById('t-equipo')?.value || '';
+  window.abrirModalKitsServicio(eqVal);
+};
+
+// --- DETECCIÓN AUTOMÁTICA DE SISTEMA PARA REFACCIONES ---
+window.detectarSistemaRefaccion = function(descripcion) {
+  const descLower = (descripcion || '').toLowerCase();
+  if (descLower.includes('aceite') || descLower.includes('motor') || descLower.includes('lubricante') || descLower.includes('valvula') || descLower.includes('inyector') || descLower.includes('junta') || descLower.includes('piston')) return 'Motor';
+  if (descLower.includes('combustible') || descLower.includes('diesel') || descLower.includes('separador') || descLower.includes('gasoil') || descLower.includes('trampa') || descLower.includes('cebador')) return 'Combustible';
+  if (descLower.includes('aire') || descLower.includes('admision') || descLower.includes('admis') || descLower.includes('primario') || descLower.includes('secundario') || descLower.includes('seguridad') || descLower.includes('filtro aire')) return 'Aire / Admisión';
+  if (descLower.includes('hidraulico') || descLower.includes('hidráulico') || descLower.includes('presion') || descLower.includes('retorno') || descLower.includes('hidrost') || descLower.includes('servomando') || descLower.includes('bomba hidr')) return 'Hidráulico';
+  if (descLower.includes('banda') || descLower.includes('correa') || descLower.includes('polea') || descLower.includes('transmision') || descLower.includes('transmisión') || descLower.includes('engrane') || descLower.includes('cadena')) return 'Transmisión';
+  if (descLower.includes('electr') || descLower.includes('sensor') || descLower.includes('bateria') || descLower.includes('alternador') || descLower.includes('marcha') || descLower.includes('fusible') || descLower.includes('relevador')) return 'Eléctrico';
+  if (descLower.includes('cuchilla') || descLower.includes('diente') || descLower.includes('desgaste') || descLower.includes('martillo') || descLower.includes('blindaje') || descLower.includes('placa') || descLower.includes('malla')) return 'Desgaste / Cuchillas';
+  return 'General';
+};
+
+// --- AUTOCOMPLETADO Y VINCULACIÓN CON MAQUINARIA ---
+window.obtenerCatalogoMaquinariaCompleto = function() {
+  const marcasSet = new Set(['RUBBLE MASTER', 'FIORI', 'CASAGRANDE', 'HYUNDAI', 'CIFA', 'SIMEM', 'ZOOMLION', 'CUMMINS', 'UNIVERSAL']);
+  
+  // Modelos base conocidos por marca
+  const modelosPorMarca = {
+    'RUBBLE MASTER': ['RM120X', 'RM100GO!', 'RM90GO!', 'RM70GO!', 'RM60', 'RMJ110X', 'MS1200 MAX', 'MS1200', 'MS125GO!'],
+    'FIORI': ['DB 460 CBV', 'DB 260', 'DB 180', 'DBX 5000', 'DBX 3500'],
+    'CASAGRANDE': ['B125 XP', 'B250 XP', 'B300 XP', 'B360 XP'],
+    'HYUNDAI': ['HX220L', 'HX300L', 'HL760-9'],
+    'CIFA': ['K45H', 'K38L', 'RY1300'],
+    'SIMEM': ['EAGLE 2500', 'MEB 2000'],
+    'ZOOMLION': ['ZR255H', 'ZR360H'],
+    'CUMMINS': ['QSB6.7', 'QSL9', 'QSX15', 'K38 / QSK38', 'K50 / QSK50'],
+    'UNIVERSAL': ['UNIVERSAL / MULTIMARCA']
+  };
+
+  const normalizarMarca = (m) => {
+    if (!m) return 'UNIVERSAL';
+    const up = m.trim().toUpperCase();
+    if (up.includes('RUBBLE') || up === 'RBM') return 'RUBBLE MASTER';
+    if (up.includes('FIORI') || up === 'FIO') return 'FIORI';
+    if (up.includes('CASA') || up.includes('GRANDE') || up === 'CAS') return 'CASAGRANDE';
+    if (up.includes('HYUNDAI') || up === 'HYU' || up === 'EVE') return 'HYUNDAI';
+    if (up.includes('CIFA') || up === 'CIF') return 'CIFA';
+    if (up.includes('SIMEM') || up === 'SIM') return 'SIMEM';
+    if (up.includes('ZOOMLION')) return 'ZOOMLION';
+    if (up.includes('CUMMINS')) return 'CUMMINS';
+    return up;
+  };
+
+  // Agregar modelos registrados en maquinariaDb
+  if (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb)) {
+    maquinariaDb.forEach(m => {
+      const rawMod = (m.modelo || m.descripcion || '').trim();
+      const rawMarca = (m.marca || '').trim();
+      if (!rawMod || rawMod === 'Sin Modelo' || rawMod === 'N/A') return;
+      const marcaNorm = normalizarMarca(rawMarca);
+      marcasSet.add(marcaNorm);
+      if (!modelosPorMarca[marcaNorm]) modelosPorMarca[marcaNorm] = [];
+      if (!modelosPorMarca[marcaNorm].includes(rawMod)) {
+        modelosPorMarca[marcaNorm].push(rawMod);
+      }
+    });
+  }
+
+  // Agregar modelos de kits existentes
+  const allKits = (typeof window.loadKitsServicio === 'function') ? window.loadKitsServicio() : [];
+  allKits.forEach(k => {
+    const rawMod = (k.modelo || '').trim();
+    const rawMarca = (k.marca || '').trim();
+    if (!rawMod) return;
+    const marcaNorm = normalizarMarca(rawMarca);
+    marcasSet.add(marcaNorm);
+    if (!modelosPorMarca[marcaNorm]) modelosPorMarca[marcaNorm] = [];
+    if (!modelosPorMarca[marcaNorm].includes(rawMod)) {
+      modelosPorMarca[marcaNorm].push(rawMod);
+    }
+  });
+
+  return {
+    marcas: Array.from(marcasSet).sort(),
+    modelosPorMarca: modelosPorMarca,
+    normalizarMarca: normalizarMarca
+  };
+};
+
+window.popularSelectMarcasYModelosKit = function(selectedMarca, selectedModelo) {
+  const cat = window.obtenerCatalogoMaquinariaCompleto();
+  const selectMarca = document.getElementById('kit-form-marca');
+  const selectModelo = document.getElementById('kit-form-modelo');
+
+  if (!selectMarca || !selectModelo) return;
+
+  const currentMarca = selectedMarca || selectMarca.value || '';
+  const currentModelo = selectedModelo || selectModelo.value || '';
+
+  // 1. Poblar select de Marcas
+  let htmlMarcas = '<option value="">-- Seleccionar Marca --</option>';
+  cat.marcas.forEach(m => {
+    const isSel = (m.toUpperCase() === currentMarca.toUpperCase());
+    htmlMarcas += `<option value="${m}" ${isSel ? 'selected' : ''}>${m}</option>`;
+  });
+  selectMarca.innerHTML = htmlMarcas;
+
+  // 2. Poblar select de Modelos
+  let htmlModelos = '<option value="">-- Seleccionar Modelo de Maquinaria --</option>';
+
+  if (currentMarca && cat.modelosPorMarca[currentMarca]) {
+    // Filtrado por la marca seleccionada
+    const mods = cat.modelosPorMarca[currentMarca].sort();
+    mods.forEach(mod => {
+      const isSel = (mod.toLowerCase() === currentModelo.toLowerCase());
+      htmlModelos += `<option value="${mod}" ${isSel ? 'selected' : ''}>${mod}</option>`;
+    });
+  } else {
+    // Agrupado por marca
+    cat.marcas.forEach(m => {
+      const mods = cat.modelosPorMarca[m];
+      if (mods && mods.length > 0) {
+        htmlModelos += `<optgroup label="${m}">`;
+        mods.sort().forEach(mod => {
+          const isSel = (mod.toLowerCase() === currentModelo.toLowerCase());
+          htmlModelos += `<option value="${mod}" ${isSel ? 'selected' : ''}>${mod}</option>`;
+        });
+        htmlModelos += `</optgroup>`;
+      }
+    });
+  }
+
+  // Si el modelo actual es personalizado y no estaba en la lista, incluirlo
+  if (currentModelo && !htmlModelos.includes(`value="${currentModelo}"`)) {
+    htmlModelos += `<option value="${currentModelo}" selected>${currentModelo}</option>`;
+  }
+
+  selectModelo.innerHTML = htmlModelos;
+  if (currentModelo) selectModelo.value = currentModelo;
+  if (currentMarca) selectMarca.value = currentMarca;
+};
+
+window.alCambiarMarcaKit = function(marcaVal) {
+  const selectModelo = document.getElementById('kit-form-modelo');
+  const curModelo = selectModelo ? selectModelo.value : '';
+
+  // Re-poblar los modelos filtrados para la marca elegida
+  window.popularSelectMarcasYModelosKit(marcaVal, curModelo);
+
+  // Si el modelo actual no pertenece a la nueva marca, sugerir el primer modelo de la marca
+  const cat = window.obtenerCatalogoMaquinariaCompleto();
+  if (marcaVal && cat.modelosPorMarca[marcaVal] && cat.modelosPorMarca[marcaVal].length > 0) {
+    if (!cat.modelosPorMarca[marcaVal].includes(selectModelo.value)) {
+      selectModelo.value = cat.modelosPorMarca[marcaVal][0];
+      window.alCambiarModeloKit(selectModelo.value);
+    }
+  }
+
+  // Actualizar filas de refacciones vacías con la nueva marca
+  if (marcaVal) {
+    const rows = document.querySelectorAll('#ref-kit-list .ref-row');
+    rows.forEach(r => {
+      const hiddenM = r.querySelector('.ref-marca');
+      const hiddenD = r.querySelector('.ref-desc-hidden');
+      if (hiddenM && (!hiddenM.value || hiddenM.value === 'UNIVERSAL') && (!hiddenD || !hiddenD.value)) {
+        const idComboM = hiddenM.id;
+        const idComboD = r.querySelector('.ref-desc-hidden')?.id;
+        if (idComboM && idComboD) {
+          const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+          let brandCode = marcaVal;
+          if (typeof refaccionesDb !== 'undefined' && Array.isArray(refaccionesDb)) {
+            const match = refaccionesDb.find(ref => ref.marca && ref.marca.toLowerCase() === marcaVal.toLowerCase());
+            if (match) {
+              brandCode = match.marca;
+            } else {
+              for (const [k, v] of Object.entries(MARCAS_RENDER)) {
+                if (v.toLowerCase() === marcaVal.toLowerCase() || marcaVal.toLowerCase().includes(v.toLowerCase()) || v.toLowerCase().includes(marcaVal.toLowerCase())) {
+                  brandCode = k;
+                  break;
+                }
+              }
+            }
+          }
+          hiddenM.value = brandCode;
+          const comboSpanMarca = document.getElementById(`${idComboM}-display`);
+          if (comboSpanMarca) comboSpanMarca.textContent = MARCAS_RENDER[brandCode.toUpperCase()] || brandCode;
+          window.actualizarDescripcionesCombo(idComboM, idComboD);
+        }
+      }
+    });
+  }
+};
+
+window.alCambiarModeloKit = function(modeloVal) {
+  if (!modeloVal) return;
+  const modClean = modeloVal.trim();
+  const inMarca = document.getElementById('kit-form-marca');
+  const cat = window.obtenerCatalogoMaquinariaCompleto();
+
+  // Encontrar a qué marca pertenece este modelo
+  let marcaDetectada = '';
+  for (const [marca, mods] of Object.entries(cat.modelosPorMarca)) {
+    if (mods.some(m => m.toLowerCase() === modClean.toLowerCase())) {
+      marcaDetectada = marca;
+      break;
+    }
+  }
+
+  // Si no se encontró en el mapa, buscar en maquinariaDb
+  if (!marcaDetectada && typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb)) {
+    const match = maquinariaDb.find(m => {
+      const mMod = (m.modelo || m.descripcion || '').toLowerCase().trim();
+      return mMod === modClean.toLowerCase() || mMod.includes(modClean.toLowerCase()) || modClean.toLowerCase().includes(mMod);
+    });
+    if (match && match.marca) {
+      marcaDetectada = cat.normalizarMarca(match.marca);
+    }
+  }
+
+  // Inferir marca por prefijos de modelos oficiales si aún no se detectó
+  if (!marcaDetectada) {
+    const mLower = modClean.toLowerCase();
+    if (mLower.startsWith('rm') || mLower.startsWith('ms')) marcaDetectada = 'RUBBLE MASTER';
+    else if (mLower.startsWith('db') || mLower.includes('fiori')) marcaDetectada = 'FIORI';
+    else if (mLower.startsWith('b1') || mLower.startsWith('b2') || mLower.startsWith('b3') || mLower.includes('casagrande')) marcaDetectada = 'CASAGRANDE';
+    else if (mLower.startsWith('hx') || mLower.startsWith('hl') || mLower.includes('hyundai')) marcaDetectada = 'HYUNDAI';
+    else if (mLower.startsWith('zr') || mLower.includes('zoomlion')) marcaDetectada = 'ZOOMLION';
+    else if (mLower.startsWith('k') || mLower.startsWith('ry') || mLower.includes('cifa')) marcaDetectada = 'CIFA';
+    else if (mLower.includes('simem') || mLower.includes('eagle')) marcaDetectada = 'SIMEM';
+    else if (mLower.startsWith('qs') || mLower.includes('cummins')) marcaDetectada = 'CUMMINS';
+    else marcaDetectada = 'UNIVERSAL';
+  }
+
+  if (inMarca && marcaDetectada && inMarca.value !== marcaDetectada) {
+    inMarca.value = marcaDetectada;
+  }
+
+  // Sugerir nombre automático
+  const inNombre = document.getElementById('kit-form-nombre');
+  const inIntervalo = document.getElementById('kit-form-intervalo');
+  if (inNombre && (!inNombre.value || inNombre.value.startsWith('Machote Preventivo') || inNombre.value.startsWith('Kit Preventivo'))) {
+    const horas = inIntervalo ? inIntervalo.value : '250';
+    inNombre.value = `Machote Preventivo ${horas}h - ${modeloVal.trim()}`;
+  }
+
+  // Actualizar filas de refacciones vacías con la marca detectada
+  if (marcaDetectada) {
+    const rows = document.querySelectorAll('#ref-kit-list .ref-row');
+    rows.forEach(r => {
+      const hiddenM = r.querySelector('.ref-marca');
+      const hiddenD = r.querySelector('.ref-desc-hidden');
+      if (hiddenM && (!hiddenM.value || hiddenM.value === 'UNIVERSAL') && (!hiddenD || !hiddenD.value)) {
+        const idComboM = hiddenM.id;
+        const idComboD = r.querySelector('.ref-desc-hidden')?.id;
+        if (idComboM && idComboD) {
+          const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+          let brandCode = marcaDetectada;
+          if (typeof refaccionesDb !== 'undefined' && Array.isArray(refaccionesDb)) {
+            const match = refaccionesDb.find(ref => ref.marca && ref.marca.toLowerCase() === marcaDetectada.toLowerCase());
+            if (match) {
+              brandCode = match.marca;
+            } else {
+              for (const [k, v] of Object.entries(MARCAS_RENDER)) {
+                if (v.toLowerCase() === marcaDetectada.toLowerCase() || marcaDetectada.toLowerCase().includes(v.toLowerCase()) || v.toLowerCase().includes(marcaDetectada.toLowerCase())) {
+                  brandCode = k;
+                  break;
+                }
+              }
+            }
+          }
+          hiddenM.value = brandCode;
+          const comboSpanMarca = document.getElementById(`${idComboM}-display`);
+          if (comboSpanMarca) comboSpanMarca.textContent = MARCAS_RENDER[brandCode.toUpperCase()] || brandCode;
+          window.actualizarDescripcionesCombo(idComboM, idComboD);
+        }
+      }
+    });
+  }
+};
+
+window.alCambiarIntervaloKit = function(horasVal) {
+  const inNombre = document.getElementById('kit-form-nombre');
+  const inModelo = document.getElementById('kit-form-modelo');
+  if (inNombre && inModelo && inModelo.value.trim()) {
+    const mod = inModelo.value.trim();
+    inNombre.value = `Machote Preventivo ${horasVal}h - ${mod}`;
+  }
+};
+
+window.alEscribirClaveKit = function(inputEl, dropdownId) {
+  const dropdown = document.getElementById(dropdownId);
+  if (!dropdown) return;
+  const val = inputEl.value.trim().toLowerCase();
+  if (!val) {
+    dropdown.style.display = 'none';
+    dropdown.innerHTML = '';
+    return;
+  }
+
+  // Cerrar otros dropdowns abiertos
+  document.querySelectorAll('.kit-clave-dropdown').forEach(dd => {
+    if (dd.id !== dropdownId) dd.style.display = 'none';
+  });
+
+  const matches = (typeof refaccionesDb !== 'undefined' && Array.isArray(refaccionesDb))
+    ? refaccionesDb.filter(r => {
+        const c = (r.codigo || r.idInterno || r.id || '').toLowerCase();
+        const d = (r.descripcion || r.nombre || '').toLowerCase();
+        return c.includes(val) || d.includes(val);
+      }).slice(0, 15)
+    : [];
+
+  if (matches.length === 0) {
+    dropdown.innerHTML = `<div style="padding: 8px 10px; font-size:0.75rem; color:var(--text-muted); text-align:center;">No se encontró "${inputEl.value}"</div>`;
+    dropdown.style.display = 'block';
+    return;
+  }
+
+  let html = '';
+  matches.forEach(m => {
+    const clave = m.codigo || m.idInterno || m.id || 'S/C';
+    const desc = m.descripcion || m.nombre || '';
+    const marca = m.marca || '';
+    const sist = m.sistema || '';
+    const safeDesc = desc.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const safeClave = clave.replace(/'/g, "\\'");
+    const safeMarca = marca.replace(/'/g, "\\'");
+    const safeSist = sist.replace(/'/g, "\\'");
+
+    html += `
+      <div class="kit-clave-option" onclick="window.seleccionarRefaccionPorClaveKit('${dropdownId}', '${safeClave}', '${safeDesc}', '${safeMarca}', '${safeSist}')">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
+          <span style="font-family: monospace; font-weight: 700; color: #2563eb; font-size:0.79rem;">${clave}</span>
+          <span style="font-size: 0.67rem; font-weight: 600; color: var(--text-muted); background: var(--bg-secondary); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border);">${marca || 'GEN'}</span>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top:2px;" title="${desc}">${desc}</div>
+      </div>
+    `;
+  });
+
+  dropdown.innerHTML = html;
+  dropdown.style.display = 'block';
+};
+
+window.seleccionarRefaccionPorClaveKit = function(dropdownId, clave, desc, marca, sistema) {
+  const dropdown = document.getElementById(dropdownId);
+  if (dropdown) {
+    dropdown.style.display = 'none';
+    dropdown.innerHTML = '';
+  }
+
+  const row = dropdown ? dropdown.closest('.ref-row') : null;
+  if (!row) return;
+
+  const inputClave = row.querySelector('.ref-clave');
+  if (inputClave) inputClave.value = clave || '';
+
+  const hiddenDesc = row.querySelector('.ref-desc-hidden');
+  const comboSpanDesc = row.querySelector('.group-ref-desc .combo-box span');
+  if (hiddenDesc) hiddenDesc.value = desc || '';
+  if (comboSpanDesc) comboSpanDesc.textContent = desc || 'Descripción...';
+
+  const hiddenMarca = row.querySelector('.ref-marca');
+  const comboSpanMarca = row.querySelector('.group-ref-marca .combo-box span');
+
+  const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+
+  if (hiddenMarca && marca) {
+    let brandCode = marca;
+    for (const [k, v] of Object.entries(MARCAS_RENDER)) {
+      if (v.toLowerCase() === marca.toLowerCase() || marca.toLowerCase().includes(v.toLowerCase()) || v.toLowerCase().includes(marca.toLowerCase())) {
+        brandCode = k;
+        break;
+      }
+    }
+    hiddenMarca.value = brandCode;
+    if (comboSpanMarca) comboSpanMarca.textContent = MARCAS_RENDER[brandCode.toUpperCase()] || brandCode;
+    if (hiddenDesc) {
+      window.actualizarDescripcionesCombo(hiddenMarca.id, hiddenDesc.id);
+      hiddenDesc.value = desc;
+      if (comboSpanDesc) comboSpanDesc.textContent = desc;
+    }
+  }
+
+  const hiddenSist = row.querySelector('.ref-sistema');
+  if (hiddenSist) {
+    hiddenSist.value = sistema || (typeof window.detectarSistemaRefaccion === 'function' ? window.detectarSistemaRefaccion(desc) : 'General');
+  }
+};
+
+// Cerrar dropdowns de clave al hacer clic fuera
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.group-ref-clave')) {
+    document.querySelectorAll('.kit-clave-dropdown').forEach(dd => {
+      dd.style.display = 'none';
+    });
+  }
+});
+
+// --- FORMULARIO CREAR / EDITAR MACHOTE ---
+window.abrirModalFormularioKit = function(kitId) {
+  const modal = document.getElementById('modal-editar-kit-overlay');
+  if (!modal) return;
+
+  const inId = document.getElementById('kit-form-id');
+  const inNombre = document.getElementById('kit-form-nombre');
+  const inIntervalo = document.getElementById('kit-form-intervalo');
+  const inDesc = document.getElementById('kit-form-descripcion');
+  const titulo = document.getElementById('modal-kit-form-titulo');
+  const list = document.getElementById('ref-kit-list');
+
+  if (list) list.innerHTML = '';
+
+  let initialMod = '';
+  let initialMarca = '';
+
+  if (kitId) {
+    const kits = window.loadKitsServicio();
+    const kit = kits.find(k => k.id === kitId);
+    if (!kit) return;
+
+    if (titulo) titulo.textContent = `Editar: ${kit.nombre}`;
+    if (inId) inId.value = kit.id;
+    if (inNombre) inNombre.value = kit.nombre || '';
+    if (inIntervalo) inIntervalo.value = kit.intervalo || '250';
+    if (inDesc) inDesc.value = kit.descripcion || '';
+
+    initialMod = kit.modelo || '';
+    initialMarca = kit.marca || '';
+
+    window.popularSelectMarcasYModelosKit(initialMarca, initialMod);
+
+    (kit.piezas || []).forEach(p => {
+      window.agregarFilaPiezaKit(p);
+    });
+  } else {
+    if (titulo) titulo.textContent = 'Nuevo Machote de Servicio Preventivo';
+    if (inId) inId.value = '';
+    if (inNombre) inNombre.value = '';
+    initialMod = window._currentKitFilterModelo !== 'all' ? window._currentKitFilterModelo : '';
+    const initialHoras = window._currentKitFilterHours !== 'all' ? window._currentKitFilterHours : '250';
+    if (inIntervalo) inIntervalo.value = initialHoras;
+    if (inDesc) inDesc.value = '';
+
+    window.popularSelectMarcasYModelosKit('', initialMod);
+
+    if (initialMod) {
+      window.alCambiarModeloKit(initialMod);
+    }
+
+    // Agregar 2 filas iniciales
+    window.agregarFilaPiezaKit();
+    window.agregarFilaPiezaKit();
+  }
+
+  modal.style.display = 'flex';
+  modal.classList.add('open');
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+window.cerrarModalFormularioKit = function(e) {
+  if (e && e.target) {
+    const overlay = document.getElementById('modal-editar-kit-overlay');
+    const isOverlay = (e.target === overlay);
+    const isCloseBtn = (e.target.classList && e.target.classList.contains('modal-close')) || 
+                       (e.target.closest && e.target.closest('.modal-close')) ||
+                       (e.target.classList && e.target.classList.contains('btn-cancelar-modal')) ||
+                       (e.target.closest && e.target.closest('.btn-cancelar-modal'));
+    if (!isOverlay && !isCloseBtn) {
+      return;
+    }
+  }
+  const modal = document.getElementById('modal-editar-kit-overlay');
+  if (modal) {
+    modal.style.display = 'none';
+    modal.classList.remove('open');
+  }
+};
+
+window.agregarFilaPiezaKit = function(piezaData = {}) {
+  const list = document.getElementById('ref-kit-list');
+  if (!list) return;
+
+  const row = document.createElement('div');
+  row.className = 'ref-row kit-ref-row';
+  row.style.margin = '0';
+  row.style.borderBottom = '1px solid var(--border)';
+  row.style.padding = '0.35rem 0.2rem';
+  row.style.display = 'grid';
+  row.style.gridTemplateColumns = '140px 1fr 115px 55px 28px';
+  row.style.gap = '0.5rem';
+  row.style.alignItems = 'center';
+
+  window.refComboCounter = (window.refComboCounter || 0) + 1;
+  const idComboMarca = `ref-kit-marca-${window.refComboCounter}`;
+  const idComboDesc = `ref-kit-desc-${window.refComboCounter}`;
+  const idDropdownClave = `ref-kit-clave-dd-${window.refComboCounter}`;
+
+  let html = `
+    <!-- MARCA COMBO -->
+    <div style="position:relative; width:100%; min-width:0;" class="group-ref-marca">
+      <div class="combo-box" tabindex="0" id="${idComboMarca}-combo" style="padding: 0.45rem 0.4rem;">
+        <span id="${idComboMarca}-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 20px); font-size:0.8rem;">Marca...</span>
+        <i data-lucide="chevron-down" style="width:14px;height:14px; flex-shrink:0;"></i>
+      </div>
+      <div class="combo-menu" id="${idComboMarca}-menu" style="width: 250px; z-index: 9999;">
+        <div class="combo-search">
+          <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted)"></i>
+          <input type="text" id="${idComboMarca}-search" placeholder="Buscar marca..." oninput="filterCombo('${idComboMarca}', this.value)" onclick="event.stopPropagation()">
+        </div>
+        <div class="combo-options" id="${idComboMarca}-options">
+          <!-- Populated by popularSelectMarcas -->
+        </div>
+      </div>
+      <input type="hidden" class="ref-marca" id="${idComboMarca}" />
+    </div>
+
+    <!-- DESC COMBO -->
+    <div style="position:relative; width:100%; min-width:0;" class="group-ref-desc">
+      <div class="combo-box" tabindex="0" id="${idComboDesc}-combo" style="padding: 0.45rem 0.4rem;">
+        <span id="${idComboDesc}-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 20px); font-size:0.8rem;">Descripción...</span>
+        <i data-lucide="chevron-down" style="width:14px;height:14px; flex-shrink:0;"></i>
+      </div>
+      <div class="combo-menu" id="${idComboDesc}-menu" style="width: 100%; min-width: 300px; z-index: 9999;">
+        <div class="combo-search">
+          <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted)"></i>
+          <input type="text" id="${idComboDesc}-search" placeholder="Buscar refacción o clave..." oninput="filterCombo('${idComboDesc}', this.value)" onclick="event.stopPropagation()">
+        </div>
+        <div class="combo-options" id="${idComboDesc}-options">
+          <div class="combo-option" style="color:var(--text-muted)">Seleccione una marca primero</div>
+        </div>
+      </div>
+      <input type="hidden" class="ref-desc-hidden ref-desc" id="${idComboDesc}" />
+    </div>
+
+    <!-- CLAVE INPUT (BÚSQUEDA Y EDICIÓN DIRECTA) -->
+    <div style="position:relative; width:100%;" class="group-ref-clave">
+      <input 
+        type="text" 
+        placeholder="Clave" 
+        class="ref-clave kit-row-codigo" 
+        value="${piezaData.codigo || ''}" 
+        oninput="window.alEscribirClaveKit(this, '${idDropdownClave}')" 
+        onfocus="window.alEscribirClaveKit(this, '${idDropdownClave}')" 
+        autocomplete="off" 
+        style="width:100%; text-align:center; padding: 0.45rem 0.3rem; font-size:0.8rem; font-family:monospace; font-weight:700; color:#2563eb; background:var(--bg-body); border:1px solid var(--border); border-radius:6px; box-sizing:border-box;" 
+        title="Escribe la clave para buscar refacción" 
+      />
+      <div 
+        id="${idDropdownClave}" 
+        class="kit-clave-dropdown" 
+        style="display:none;"
+        onclick="event.stopPropagation()"
+      ></div>
+    </div>
+
+    <input type="hidden" class="ref-sistema kit-row-sistema" value="${piezaData.sistema || ''}" />
+
+    <!-- CANTIDAD -->
+    <div style="width:100%; text-align:center;">
+      <input type="number" placeholder="Cant." class="ref-cant kit-row-cant" style="width:100%; text-align:center; padding: 0.45rem 0.2rem; font-size:0.85rem; font-weight:700; border:1px solid var(--border); border-radius:6px; background:var(--bg-body); color:var(--text-primary); box-sizing:border-box;" min="1" max="99" value="${piezaData.cantidad || 1}"/>
+    </div>
+
+    <!-- BOTÓN ELIMINAR -->
+    <div style="text-align:center;">
+      <button type="button" class="btn-del-ref" onclick="event.stopPropagation(); this.closest('.ref-row').remove();" title="Eliminar fila" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:1.1rem; padding:0; display:inline-flex; align-items:center; justify-content:center;">✕</button>
+    </div>
+  `;
+
+  row.innerHTML = html;
+  list.appendChild(row);
+
+  if (window.lucide) window.lucide.createIcons({ root: row });
+
+  // Attach Event Listeners dynamically
+  const comboMarca = document.getElementById(`${idComboMarca}-combo`);
+  if (comboMarca) {
+    comboMarca.addEventListener('click', (e) => {
+      e.stopPropagation();
+      window.toggleCombo(idComboMarca);
+    });
+  }
+
+  const comboDesc = document.getElementById(`${idComboDesc}-combo`);
+  if (comboDesc) {
+    comboDesc.addEventListener('click', (e) => {
+      e.stopPropagation();
+      window.toggleCombo(idComboDesc);
+    });
+  }
+
+  // Prevent menu clicks from bubbling
+  const menuMarca = document.getElementById(`${idComboMarca}-menu`);
+  if (menuMarca) menuMarca.addEventListener('click', e => e.stopPropagation());
+
+  const menuDesc = document.getElementById(`${idComboDesc}-menu`);
+  if (menuDesc) menuDesc.addEventListener('click', e => e.stopPropagation());
+
+  // Popular marcas
+  window.popularSelectMarcas(idComboMarca, idComboDesc);
+
+  // Determinar marca inicial (de piezaData o de cabecera del machote)
+  let initialMarca = piezaData.marca || '';
+  if (!initialMarca) {
+    const headerMarca = document.getElementById('kit-form-marca')?.value.trim();
+    if (headerMarca) initialMarca = headerMarca;
+  }
+
+  const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+
+  if (initialMarca) {
+    const hiddenMarca = row.querySelector('.ref-marca');
+    const comboSpanMarca = document.getElementById(`${idComboMarca}-display`);
+
+    let brandCode = initialMarca;
+    if (typeof refaccionesDb !== 'undefined' && Array.isArray(refaccionesDb)) {
+      const match = refaccionesDb.find(r => r.marca && r.marca.toLowerCase() === initialMarca.toLowerCase());
+      if (match) {
+        brandCode = match.marca;
+      } else {
+        for (const [k, v] of Object.entries(MARCAS_RENDER)) {
+          if (v.toLowerCase() === initialMarca.toLowerCase() || initialMarca.toLowerCase().includes(v.toLowerCase()) || v.toLowerCase().includes(initialMarca.toLowerCase())) {
+            brandCode = k;
+            break;
+          }
+        }
+      }
+    }
+
+    if (hiddenMarca) hiddenMarca.value = brandCode;
+    if (comboSpanMarca) comboSpanMarca.textContent = MARCAS_RENDER[brandCode.toUpperCase()] || brandCode;
+
+    window.actualizarDescripcionesCombo(idComboMarca, idComboDesc);
+  }
+
+  const descVal = piezaData.descripcion || piezaData.nombre || '';
+  if (descVal) {
+    const hiddenDesc = row.querySelector('.ref-desc-hidden');
+    const comboSpanDesc = document.getElementById(`${idComboDesc}-display`);
+    if (hiddenDesc) hiddenDesc.value = descVal;
+    if (comboSpanDesc) comboSpanDesc.textContent = descVal;
+
+    const comboOptions = document.getElementById(`${idComboDesc}-options`);
+    if (comboOptions) {
+      let optExists = false;
+      comboOptions.querySelectorAll('.combo-option').forEach(opt => {
+        if ((opt.dataset.desc || opt.textContent || '').includes(descVal)) optExists = true;
+      });
+      if (!optExists) {
+        const legacyHtml = `<div class="combo-option" data-desc="${descVal}" data-clave="${piezaData.codigo || ''}" onclick="window.seleccionarDescRefaccion(this, '${idComboDesc}', '${piezaData.codigo || ''}', 0)">${descVal} ${piezaData.codigo ? `[${piezaData.codigo}]` : ''}</div>`;
+        if (comboOptions.innerHTML.includes('Seleccione una marca')) {
+          comboOptions.innerHTML = legacyHtml;
+        } else {
+          comboOptions.innerHTML += legacyHtml;
+        }
+      }
+    }
+  }
+
+  if (piezaData.codigo) {
+    const inputClave = row.querySelector('.ref-clave');
+    if (inputClave) inputClave.value = piezaData.codigo;
+  }
+
+  const inputSist = row.querySelector('.ref-sistema');
+  if (inputSist) {
+    if (piezaData.sistema) {
+      inputSist.value = piezaData.sistema;
+    } else if (descVal && typeof window.detectarSistemaRefaccion === 'function') {
+      inputSist.value = window.detectarSistemaRefaccion(descVal);
+    }
+  }
+};
+
+window.guardarKitServicio = function() {
+  const inId = document.getElementById('kit-form-id');
+  const inNombre = document.getElementById('kit-form-nombre');
+  const inModelo = document.getElementById('kit-form-modelo');
+  const inMarca = document.getElementById('kit-form-marca');
+  const inIntervalo = document.getElementById('kit-form-intervalo');
+  const inDesc = document.getElementById('kit-form-descripcion');
+
+  const nombre = inNombre?.value.trim();
+  const modelo = inModelo?.value.trim();
+  const marca = inMarca?.value.trim() || 'UNIVERSAL';
+  const intervalo = inIntervalo?.value.trim() || '250';
+  const descripcion = inDesc?.value.trim() || '';
+
+  if (!modelo) {
+    mostrarNotificacion('El modelo de maquinaria compatible es obligatorio.', 'error');
+    return;
+  }
+  if (!nombre) {
+    mostrarNotificacion('El nombre del machote es obligatorio.', 'error');
+    return;
+  }
+
+  // Recopilar piezas desde las filas de refacciones
+  const rows = document.querySelectorAll('#ref-kit-list .ref-row');
+  const piezas = [];
+  rows.forEach(row => {
+    const rowMarca = row.querySelector('.ref-marca')?.value.trim() || marca;
+    const desc = row.querySelector('.ref-desc-hidden')?.value.trim() || row.querySelector('.ref-desc')?.value.trim() || '';
+    let cod = row.querySelector('.ref-clave')?.value.trim() || '';
+    let sist = row.querySelector('.ref-sistema')?.value || '';
+    const cant = parseInt(row.querySelector('.ref-cant')?.value, 10) || 1;
+
+    if (desc) {
+      if (!cod || cod === 'S/C') {
+        if (typeof refaccionesDb !== 'undefined' && Array.isArray(refaccionesDb)) {
+          const match = refaccionesDb.find(r => (r.descripcion || '').toLowerCase() === desc.toLowerCase());
+          if (match && (match.codigo || match.id)) {
+            cod = match.codigo || match.id;
+          }
+        }
+      }
+      if (!cod) cod = 'S/C';
+
+      if (!sist && typeof window.detectarSistemaRefaccion === 'function') {
+        sist = window.detectarSistemaRefaccion(desc);
+      }
+      if (!sist) sist = 'General';
+
+      piezas.push({
+        codigo: cod,
+        descripcion: desc,
+        sistema: sist,
+        cantidad: cant,
+        marca: rowMarca
+      });
+    }
+  });
+
+  if (piezas.length === 0) {
+    mostrarNotificacion('Debes agregar al menos una refacción al machote.', 'error');
+    return;
+  }
+
+  const kits = window.loadKitsServicio();
+  const kitId = inId?.value.trim() || `kit-custom-${Date.now()}`;
+
+  const nuevoKit = {
+    id: kitId,
+    nombre: nombre,
+    modelo: modelo,
+    marca: marca,
+    intervalo: intervalo,
+    descripcion: descripcion,
+    esOficial: false,
+    piezas: piezas
+  };
+
+  const existIdx = kits.findIndex(k => k.id === kitId);
+  if (existIdx >= 0) {
+    kits[existIdx] = nuevoKit;
+    mostrarNotificacion(`Machote "${nombre}" actualizado correctamente.`, 'success');
+  } else {
+    kits.unshift(nuevoKit);
+    mostrarNotificacion(`Machote "${nombre}" creado exitosamente.`, 'success');
+  }
+
+  window.saveKitsServicio(kits);
+  window.cerrarModalFormularioKit();
+  window.filtrarKitsServicio();
+};
+
+window.eliminarKitServicio = async function(kitId) {
+  const kits = window.loadKitsServicio();
+  const kit = kits.find(k => k.id === kitId);
+  if (!kit) return;
+
+  const confirmed = await window.confirmarAccion({
+    titulo: 'Eliminar Kit de Servicio',
+    mensaje: `¿Estás seguro de que deseas eliminar el kit "${kit.nombre}"?`,
+    textoAceptar: 'Eliminar',
+    textoCancelar: 'Cancelar',
+    esPeligroso: true
+  });
+  if (!confirmed) return;
+
+  const filtrados = kits.filter(k => k.id !== kitId);
+  window.saveKitsServicio(filtrados);
+  mostrarNotificacion(`Kit "${kit.nombre}" eliminado.`, 'success');
+  window.filtrarKitsServicio();
+};
+
+window.duplicarKitServicio = function(kitId) {
+  const kits = window.loadKitsServicio();
+  const kit = kits.find(k => k.id === kitId);
+  if (!kit) return;
+
+  const clon = JSON.parse(JSON.stringify(kit));
+  clon.id = `kit-custom-${Date.now()}`;
+  clon.nombre = `${kit.nombre} (Copia)`;
+  clon.esOficial = false;
+
+  kits.unshift(clon);
+  window.saveKitsServicio(kits);
+  mostrarNotificacion(`Kit duplicado como "${clon.nombre}".`, 'success');
+  window.filtrarKitsServicio();
+};
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', dispararInicializacionGlobal);
 } else {
   dispararInicializacionGlobal();
 }
+
+
+
+

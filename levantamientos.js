@@ -101,13 +101,68 @@ function renderLevantamientos() {
   if (window.lucide) window.lucide.createIcons();
   
   // Update badge in sidebar
-  const badge = document.getElementById('nav-badge-levantamientos');
-  if (badge) {
-    const pendientes = list.filter(l => l.estado !== 'Completado').length;
-    badge.textContent = pendientes > 0 ? pendientes : '';
-    badge.style.display = pendientes > 0 ? 'inline-block' : 'none';
+  if (typeof window.actualizarBadgeLevantamientos === 'function') {
+    window.actualizarBadgeLevantamientos();
   }
 }
+
+window.actualizarBadgeLevantamientos = function() {
+  const badge = document.getElementById('nav-badge-levantamientos');
+  if (!badge) return;
+  let list = (typeof levantamientos !== 'undefined' && Array.isArray(levantamientos)) ? levantamientos : (window.levantamientos || []);
+  
+  // Filter by Sandbox mode
+  if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+    const activeSandbox = isTestModeActive();
+    list = list.filter(l => isTestData(l) === activeSandbox);
+  }
+
+  // Filtrar por rol de técnico (solo ver levantamientos asignados a sí mismo)
+  const isTecnico = (typeof currentSession !== 'undefined' && currentSession.viewMode === 'tecnico');
+  let miNombreLower = '';
+  if (isTecnico && typeof currentSession !== 'undefined') {
+    let miNombre = currentSession.nombre || '';
+    if (!miNombre && typeof usuarios !== 'undefined') {
+      const u = usuarios.find(usr => usr.id === currentSession.userId);
+      if (u) miNombre = u.nombre || '';
+    }
+    miNombreLower = miNombre.trim().toLowerCase();
+  }
+
+  if (isTecnico && miNombreLower) {
+    list = list.filter(l => {
+      if (!l.tecnico_asignado) return false;
+      const asignados = l.tecnico_asignado.split(',').map(s => s.trim().toLowerCase());
+      return asignados.includes(miNombreLower);
+    });
+  }
+
+  const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String((typeof currentSession !== 'undefined' && currentSession.viewMode) || '').toLowerCase().trim());
+  if (isEmpresa && typeof usuarios !== 'undefined' && typeof currentSession !== 'undefined') {
+    const currentUser = usuarios.find(u => u.id === currentSession.userId);
+    let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+    if (nombreEmpresaLogged) {
+      nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
+      list = list.filter(l => {
+        const cli = String(l.cliente || '').toLowerCase().trim();
+        return cli === nombreEmpresaLogged;
+      });
+    } else {
+      list = [];
+    }
+  }
+
+  const pendientes = list.filter(l => l.estado !== 'Completado' && l.estado !== 'Cancelado').length;
+  if (pendientes > 0) {
+    badge.textContent = pendientes;
+    badge.classList.add('visible');
+    badge.style.display = 'inline-flex';
+  } else {
+    badge.textContent = '';
+    badge.classList.remove('visible');
+    badge.style.display = 'none';
+  }
+};
 
 function window_abrirModalNuevoLevantamiento() {
   const id = (typeof uuidv4 === 'function') ? uuidv4() : crypto.randomUUID();
@@ -730,7 +785,8 @@ window.completarLevantamiento = async function(id) {
     descripcion: lev.descripcion,
     notas: 'Notas del técnico:\n' + lev.notas_tecnico,
     prioridad: 'Media',
-    categoria: 'Otro',
+    area: 'Refacciones',
+    categoria: 'Refacción',
     refaccionesSeleccionadas: refaccionesMapeadas
   };
 

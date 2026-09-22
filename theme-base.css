@@ -36,3 +36,315 @@ body.light-mode {
   --red: #dc2626;
   --red-light: rgba(220, 38, 38, 0.08);
 }
+
+/* ===== PANEL DE REVISIÓN DE JUNTAS Y PENDIENTES ===== */
+.junta-revision-modal.junta-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  border-radius: 0 !important;
+  border: none !important;
+  z-index: 999999 !important;
+}
+
+.junta-kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.junta-kpi-card.active {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px var(--accent-light), 0 4px 12px rgba(232, 130, 12, 0.15) !important;
+}
+
+.junta-type-btn {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.junta-type-btn:hover {
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+}
+
+.junta-type-btn.active {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(232, 130, 12, 0.3);
+}
+
+.junta-type-btn.active .junta-btn-count {
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+
+.junta-btn-count {
+  background: rgba(0, 0, 0, 0.08);
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.junta-urgente-btn.active {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: #ef4444 !important;
+  color: #ef4444 !important;
+}
+
+.junta-card-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  cursor: pointer;
+}
+
+.junta-card-item:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.junta-card-item.urgente-card {
+  border-left: 4px solid var(--red);
+}
+
+.junta-card-item.alerta-card {
+  border-left: 4px solid #f59e0b;
+}
+
+.junta-card-item.critico-card {
+  border-left: 4px solid #ef4444;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.03) 0%, var(--bg-card) 100%);
+}
+
+.junta-bottleneck-box {
+  background: rgba(232, 130, 12, 0.08);
+  border: 1px solid rgba(232, 130, 12, 0.25);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.junta-bottleneck-box.warning {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--text-primary);
+}
+
+.junta-bottleneck-box.danger {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.junta-delay-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.junta-delay-badge.normal {
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.junta-delay-badge.warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.junta-delay-badge.danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.junta-quicknote-drawer {
+  background: var(--bg-hover);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  animation: fadeIn 0.2s ease;
+}
+
+/* Modo de Vista Switcher */
+.junta-mode-btn {
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+}
+.junta-mode-btn.active {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Tarjetas Financieras */
+.junta-fin-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.junta-fin-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+/* Diagnóstico de Cuellos de Botella (Analytics) */
+.junta-bar-row {
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+.junta-bar-row:hover {
+  background: var(--bg-hover);
+}
+.junta-bar-row.active {
+  background: rgba(232, 130, 12, 0.1);
+  border: 1px solid rgba(232, 130, 12, 0.3);
+}
+
+/* Ronda de Responsables (Standup Grupos) */
+.junta-tech-group-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+.junta-tech-group-container.has-criticos {
+  border-left: 4px solid var(--red);
+}
+.junta-tech-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  cursor: pointer;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+.junta-sat-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  text-transform: uppercase;
+}
+.junta-sat-badge.baja {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.junta-sat-badge.media {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.junta-sat-badge.alta {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Acciones Rápidas en Tarjeta */
+.junta-quick-action-btn {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.15s ease;
+}
+.junta-quick-action-btn:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+.junta-quick-action-btn.active-flame {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.junta-deadline-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+.junta-deadline-pill.vencido {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+@media (max-width: 900px) {
+  .junta-cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .junta-filters-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .junta-financial-ribbon {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+

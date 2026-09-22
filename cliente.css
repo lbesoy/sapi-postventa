@@ -1721,3 +1721,361 @@ body {
   margin-top: 1rem;
   padding: 0.85rem;
 }
+
+/* ============================================================
+   DIAGRAMA DE FLUJO INTERACTIVO (PREFERENCIAS)
+   ============================================================ */
+.flowchart-wrapper {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.flowchart-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.flowchart-filters {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.flowchart-filter-btn {
+  font-size: 0.75rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.flowchart-filter-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.flowchart-filter-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+  font-weight: 600;
+}
+
+.flowchart-actions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.flowchart-btn-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+
+.flowchart-btn-tool:hover {
+  background: var(--bg-hover);
+  border-color: var(--primary);
+}
+
+.flowchart-body {
+  padding: 1.5rem;
+  overflow-x: auto;
+  min-width: 100%;
+}
+
+.flowchart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  background: rgba(0,0,0,0.08);
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.75rem;
+}
+
+.flowchart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-secondary);
+}
+
+.flowchart-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.flowchart-columns-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.75rem;
+  position: relative;
+  min-width: 680px;
+}
+
+.flowchart-lane {
+  background: var(--bg-body);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.flowchart-lane.lane-internal {
+  border-color: rgba(139, 92, 246, 0.4);
+  background: rgba(139, 92, 246, 0.03);
+}
+
+.flowchart-lane.lane-client {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.03);
+}
+
+.flowchart-lane-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.lane-internal .flowchart-lane-header {
+  border-color: #8b5cf6;
+  color: #a78bfa;
+}
+
+.lane-client .flowchart-lane-header {
+  border-color: #3b82f6;
+  color: #60a5fa;
+}
+
+body.light-mode .lane-internal .flowchart-lane-header {
+  color: #6d28d9;
+}
+
+body.light-mode .lane-client .flowchart-lane-header {
+  color: #1d4ed8;
+}
+
+.flowchart-step-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.flowchart-card-node {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  position: relative;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+
+.flowchart-card-node:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+}
+
+.flowchart-card-node.node-purple {
+  border-color: rgba(139, 92, 246, 0.5);
+  background: rgba(139, 92, 246, 0.06);
+}
+
+.flowchart-card-node.node-blue {
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.flowchart-card-node.node-yellow {
+  border-color: rgba(234, 179, 8, 0.6);
+  background: rgba(234, 179, 8, 0.08);
+}
+
+.flowchart-card-node.node-green {
+  border-color: rgba(16, 185, 129, 0.6);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.flowchart-card-node.node-red {
+  border-color: rgba(239, 68, 68, 0.6);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.flowchart-card-node.node-teal {
+  border-color: rgba(20, 184, 166, 0.6);
+  background: rgba(20, 184, 166, 0.08);
+}
+
+.flowchart-card-node.node-orange {
+  border-color: rgba(249, 115, 22, 0.6);
+  background: rgba(249, 115, 22, 0.08);
+}
+
+.flowchart-card-node.node-gray {
+  border-color: rgba(100, 116, 139, 0.5);
+  background: rgba(100, 116, 139, 0.06);
+}
+
+.flowchart-card-node.node-cyan {
+  border-color: rgba(6, 182, 212, 0.6);
+  background: rgba(6, 182, 212, 0.08);
+}
+
+.node-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.node-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.node-badge {
+  font-size: 0.68rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.badge-purple { background: rgba(139,92,246,0.2); color: #a78bfa; }
+.badge-blue { background: rgba(59,130,246,0.2); color: #60a5fa; }
+.badge-yellow { background: rgba(234,179,8,0.2); color: #eab308; }
+.badge-green { background: rgba(16,185,129,0.2); color: #10b981; }
+.badge-red { background: rgba(239,68,68,0.2); color: #ef4444; }
+.badge-teal { background: rgba(20,184,166,0.2); color: #14b8a6; }
+.badge-orange { background: rgba(249,115,22,0.2); color: #f97316; }
+
+.node-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.node-items-list {
+  margin-top: 0.4rem;
+  padding-left: 1.1rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.flow-connector-v {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0.25rem 0;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  gap: 0.15rem;
+}
+
+.flow-connector-v .connector-line {
+  width: 2px;
+  height: 14px;
+  background: var(--border);
+}
+
+.flow-connector-v.dotted .connector-line {
+  border-left: 2px dashed #eab308;
+  background: transparent;
+}
+
+.flow-connector-bridge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin: 0.35rem 0;
+  color: var(--text-primary);
+}
+
+.flow-connector-bridge.bridge-to-internal {
+  border-left: 3px solid #8b5cf6;
+}
+
+.flow-connector-bridge.bridge-to-client {
+  border-left: 3px solid #3b82f6;
+}
+
+.flow-connector-bridge.bridge-email {
+  border-left: 3px solid #eab308;
+  background: rgba(234, 179, 8, 0.05);
+}
+
+/* Modal Flowchart Container */
+#modal-diagrama-flujo-overlay .modal-container {
+  max-width: 1200px;
+  width: 95vw;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+#modal-diagrama-flujo-overlay .modal-header {
+  padding: 1rem 1.5rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#modal-diagrama-flujo-overlay .modal-body {
+  flex: 1;
+  overflow: auto;
+  padding: 1.5rem;
+  background: var(--bg-primary);
+}
+

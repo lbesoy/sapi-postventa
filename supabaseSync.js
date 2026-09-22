@@ -1,10 +1,16 @@
 // --- Global Helper for Paginated Supabase Fetches ---
-window.fetchTablePaginated = async (tableName, selectQuery = '*', orderColumn = null, orderAscending = false, queryModifier = null, pageLimit = 1000) => {
+window.fetchTablePaginated = async (tableName, selectQuery = '*', orderColumn = null, orderAscending = false, queryModifier = null, pageLimit = 1000, timeoutMs = 30000) => {
   const sb = window.supabaseClient;
   if (!sb) {
     console.error(`[Sync] Supabase client not initialized when fetching ${tableName}`);
     return [];
   }
+  
+  // Tablas con campos JSONB pesados (tickets) se descargan en lotes seguros de 100
+  if (tableName === 'tickets' && pageLimit > 100) {
+    pageLimit = 100;
+  }
+
   let allData = [];
   let fetchMore = true;
   let page = 0;
@@ -16,7 +22,15 @@ window.fetchTablePaginated = async (tableName, selectQuery = '*', orderColumn = 
     if (orderColumn) {
       query = query.order(orderColumn, { ascending: orderAscending });
     }
-    const { data, error } = await query.range(page * pageLimit, (page + 1) * pageLimit - 1);
+    
+    // Timeout protector de 30s para evitar cuelgues indefinidos
+    const fetchPromise = query.range(page * pageLimit, (page + 1) * pageLimit - 1);
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error(`Timeout (${timeoutMs/1000}s) en tabla ${tableName}`)), timeoutMs)
+    );
+
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
     if (error) {
       console.error(`[Sync] Error cargando ${tableName} página ${page}:`, error.message);
       throw error;
@@ -294,11 +308,18 @@ function ticketToRow(t) {
     if (t.fechaEntrega) prefix += `[E:${t.fechaEntrega}]\n`;
   }
 
+  const nowIso = new Date().toISOString();
+  const fechaMod = (window.getTicketFechaModificacion ? window.getTicketFechaModificacion(t) : null) || t.fechaModificacion || t.fecha_modificacion || t.updated_at || nowIso;
+  const modificadoPorVal = (window.getTicketModificadoPor ? window.getTicketModificadoPor(t) : null) || t.modificadoPor || t.modificado_por || t.creadoPor || null;
+
   const row = {
     id: t.id,
     folio: t.folio,
     fecha: t.fecha,
     fecha_creacion: t.fechaCreacion || new Date().toISOString(),
+    fecha_modificacion: fechaMod,
+    updated_at: fechaMod,
+    modificado_por: modificadoPorVal,
     fecha_cierre: t.fechaCierre || null,
     canal: t.canal || null,
     contacto: t.contacto || null,
@@ -339,7 +360,7 @@ function rowToTicket(t, idsWithPedido, idsWithCotizacion) {
   let clienteNombre = t.cliente;
   try {
     const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
-    const match = clientes.find(c => c.id && t.cliente && String(c.id).toLowerCase().trim() === String(t.cliente).toLowerCase().trim());
+    const match = clientes.find(c => c.id === t.cliente);
     if (match) clienteNombre = match.nombre;
   } catch (e) {}
 
@@ -350,18 +371,22 @@ function rowToTicket(t, idsWithPedido, idsWithCotizacion) {
     if (match) sitioNombre = match.nombre || match.direccion;
   } catch (e) {}
 
-  // Optimizar Base64 de PDFs guardando un marcador local para ahorrar espacio (evitar saturación de localStorage)
   let hasPed = false;
-  if (t.pdf_pedido) {
-    hasPed = true;
+  let hasCot = false;
+
+  if (t.has_pdf_pedido !== undefined) {
+    hasPed = t.has_pdf_pedido;
   } else if (idsWithPedido && idsWithPedido.has(t.id)) {
+    hasPed = true;
+  } else if (t.pdf_pedido && typeof t.pdf_pedido === 'string' && t.pdf_pedido.length > 50) {
     hasPed = true;
   }
 
-  let hasCot = false;
-  if (t.pdf_cotizacion) {
-    hasCot = true;
+  if (t.has_pdf_cotizacion !== undefined) {
+    hasCot = t.has_pdf_cotizacion;
   } else if (idsWithCotizacion && idsWithCotizacion.has(t.id)) {
+    hasCot = true;
+  } else if (t.pdf_cotizacion && typeof t.pdf_cotizacion === 'string' && t.pdf_cotizacion.length > 50) {
     hasCot = true;
   }
 
@@ -377,6 +402,8 @@ function rowToTicket(t, idsWithPedido, idsWithCotizacion) {
     folio: t.folio,
     fecha: t.fecha,
     fechaCreacion: t.fecha_creacion,
+    fechaModificacion: t.fecha_modificacion || t.updated_at || t.fecha_creacion || t.fecha || null,
+    modificadoPor: t.modificado_por || t.creado_por || null,
     fechaCierre: t.fecha_cierre,
     canal: t.canal,
     contacto: t.contacto,
@@ -873,6 +900,108 @@ function rowToGasto(g) {
   };
 }
 
+function envioToRow(e) {
+  if (!e) return {};
+  let ticketId = e.ticketId || e.ticket_id || null;
+  let clienteId = null;
+  let sitioId = null;
+
+  try {
+    const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+    const sitios = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+
+    if (e.cliente) {
+      const matchCli = clientes.find(c => c.id === e.cliente || (c.nombre && c.nombre.trim().toLowerCase() === String(e.cliente).trim().toLowerCase()));
+      if (matchCli) clienteId = matchCli.id;
+    }
+    if (e.sitio) {
+      const matchSit = sitios.find(s => (s.cliente === clienteId || s.cliente === e.cliente || !s.cliente) && (s.id === e.sitio || (s.nombre && s.nombre.trim().toLowerCase() === String(e.sitio).trim().toLowerCase()) || (s.direccion && s.direccion.trim().toLowerCase() === String(e.sitio).trim().toLowerCase())));
+      if (matchSit) {
+        sitioId = matchSit.id;
+      } else {
+        const existById = sitios.find(s => s.id === e.sitio);
+        if (existById) sitioId = existById.id;
+      }
+    }
+
+    if (ticketId) {
+      const tickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+      const matchTkt = tickets.find(t => t.id === ticketId || t.folio === ticketId);
+      if (matchTkt) ticketId = matchTkt.id;
+    }
+  } catch(err) {}
+
+  return {
+    id: e.id,
+    ticket_id: ticketId,
+    cliente: clienteId,
+    sitio: sitioId,
+    paqueteria: e.paqueteria || 'DHL',
+    guia_pedido: e.guiaPedido || e.guia_pedido || null,
+    url_rastreo: e.urlRastreo || e.url_rastreo || null,
+    fecha_envio: e.fechaEnvio || e.fecha_envio || e.fechaPedido || null,
+    fecha_entrega: e.fechaEntrega || e.fecha_entrega || null,
+    fecha_llegada: e.fechaLlegada || e.fecha_llegada || null,
+    llego: !!e.llego,
+    estatus: e.estatus || (e.llego ? 'Entregado' : 'En Tránsito'),
+    parts: e.parts || [],
+    pdf_guia: e.pdfGuia || e.pdf_guia || null,
+    notas: e.notas || null
+  };
+}
+window.envioToRow = envioToRow;
+
+function rowToEnvio(r) {
+  let clienteNombre = '';
+  let sitioNombre = '';
+  let ticketFolio = '';
+
+  try {
+    const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+    const sitios = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+    const localTickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+
+    if (r.cliente) {
+      const matchCli = clientes.find(c => c.id === r.cliente);
+      clienteNombre = matchCli ? matchCli.nombre : r.cliente;
+    }
+    if (r.sitio) {
+      const matchSit = sitios.find(s => s.id === r.sitio);
+      sitioNombre = matchSit ? matchSit.nombre : r.sitio;
+    }
+    if (r.ticket_id) {
+      const matchTkt = localTickets.find(t => t.id === r.ticket_id || t.folio === r.ticket_id);
+      if (matchTkt) {
+        ticketFolio = matchTkt.folio || matchTkt.id;
+        if (!clienteNombre) clienteNombre = matchTkt.cliente || '';
+        if (!sitioNombre) sitioNombre = matchTkt.sitio || '';
+      }
+    }
+  } catch(err) {}
+
+  return {
+    id: r.id,
+    _synced: true,
+    ticketId: r.ticket_id || '',
+    ticketFolio: ticketFolio || (r.ticket_id ? `TKT-${r.ticket_id}` : 'Directo'),
+    cliente: clienteNombre || 'Sin cliente',
+    sitio: sitioNombre || 'General',
+    paqueteria: r.paqueteria || 'DHL',
+    guiaPedido: r.guia_pedido || '',
+    urlRastreo: r.url_rastreo || '',
+    fechaEnvio: r.fecha_envio || '',
+    fechaPedido: r.fecha_envio || '',
+    fechaEntrega: r.fecha_entrega || '',
+    fechaLlegada: r.fecha_llegada || '',
+    llego: !!r.llego,
+    estatus: r.estatus || (r.llego ? 'Entregado' : 'En Tránsito'),
+    parts: r.parts || [],
+    pdfGuia: r.pdf_guia || '',
+    notas: r.notas || ''
+  };
+}
+window.rowToEnvio = rowToEnvio;
+
 
 function clienteToRow(c) {
   return {
@@ -897,15 +1026,15 @@ function rowToCliente(c) {
 function eventoToRow(e) {
   return {
     id: e.id,
-    titulo: e.titulo,
+    titulo: e.titulo || 'Evento',
     descripcion: e.descripcion || null,
-    fecha_inicio: e.fechaInicio || e.start || null,
+    fecha_inicio: e.fechaInicio || e.start || new Date().toISOString(),
     fecha_fin: e.fechaFin || e.end || null,
-    todo_el_dia: e.todoElDia || e.allDay || false,
-    tipo: e.tipo || 'Otro',
-    tecnico_id: e.tecnicoId || null,
+    todo_el_dia: !!(e.todoElDia || e.allDay),
+    tipo: ['Junta', 'Capacitación', 'Vacaciones', 'Descanso', 'Otro', 'Servicio', 'Levantamiento', 'Traslado'].includes(e.tipo) ? e.tipo : 'Otro',
+    tecnico_id: isValidUUID(e.tecnicoId) ? e.tecnicoId : null,
     tecnico_nombre: e.tecnicoNombre || null,
-    creado_por: e.creadoPor || null,
+    creado_por: isValidUUID(e.creadoPor) ? e.creadoPor : null,
     orden_id: e.ordenId || null,
     color: e.color || null,
     fecha_creacion: e.fechaCreacion || new Date().toISOString()
@@ -946,10 +1075,39 @@ function saveSyncQueue(queue) {
   updateSyncStatusUI();
 }
 
+function coalesceSyncQueue(queue) {
+  if (!Array.isArray(queue) || queue.length <= 1) return queue || [];
+  const map = new Map();
+  const result = [];
+  
+  for (const item of queue) {
+    if (!item) continue;
+    const itemId = item.data ? (item.data.id || item.data.idInterno || item.data.serie) : (item.id || null);
+    if (itemId && item.table) {
+      const key = `${item.table}::${itemId}`;
+      if (map.has(key)) {
+        const prevIdx = map.get(key);
+        if (result[prevIdx].action === 'delete' && item.action === 'upsert') {
+          // Conservar delete si ya estaba borrado
+        } else {
+          result[prevIdx] = item;
+        }
+      } else {
+        map.set(key, result.length);
+        result.push(item);
+      }
+    } else {
+      result.push(item);
+    }
+  }
+  return result;
+}
+
 function addToSyncQueue(table, action, data) {
   const queue = getSyncQueue();
   const existingIdx = queue.findIndex(item => {
     if (item.table !== table) return false;
+    if (table === 'roles' || table === 'kits_servicio' || table === 'kits_servicio_sandbox' || table === 'machotes_servicio') return true;
     const itemId = item.data ? (item.data.id || item.data.idInterno || item.data.serie) : null;
     const dataId = data ? (data.id || data.idInterno || data.serie) : null;
     return itemId === dataId && itemId !== null && itemId !== undefined;
@@ -993,7 +1151,7 @@ window.pushToSupabase = async function(tabla, item) {
   // Determinar si la operación debe ser ONLINE-ONLY (directa a Supabase sin encolar offline)
   let isOnlineOnly = false;
   
-  if (tabla === 'tickets' || tabla === 'ideas_fallas') {
+  if (tabla === 'tickets' || tabla === 'ideas_fallas' || tabla === 'envios') {
     isOnlineOnly = true;
   }
 
@@ -1014,18 +1172,63 @@ window.pushToSupabase = async function(tabla, item) {
       row = window.ticketToRow(item);
     } else if (tabla === 'levantamientos' && typeof window.levantamientoToRow === 'function') {
       row = window.levantamientoToRow(item);
+    } else if (tabla === 'envios' && typeof window.envioToRow === 'function') {
+      row = window.envioToRow(item);
     }
     
     // Upsert directo en la nube
     let { error } = await sb.from(tabla).upsert(row);
-    if (error && tabla === 'ideas_fallas' && (error.message.includes('prioridad') || error.message.includes('orden') || error.message.includes('schema cache'))) {
-      console.warn('[Direct Push] Columnas de prioridad/orden no encontradas en Supabase ideas_fallas. Reintentando sin ellas...');
+
+    // Bucle dinámico de autorecuperación para columnas no migradas en Supabase (PGRST204 / schema cache)
+    let colRetries = 0;
+    while (error && error.message && (error.message.includes('schema cache') || error.message.includes('column') || error.code === 'PGRST204') && colRetries < 8) {
+      colRetries++;
+      const match = error.message.match(/['"]([^'"]+)['"]\s+column/i) || 
+                    error.message.match(/column\s+['"]([^'"]+)['"]/i) ||
+                    error.message.match(/column\s+of\s+['"]([^'"]+)['"]/i);
+      const missingCol = match ? match[1] : null;
+      
+      if (missingCol && row[missingCol] !== undefined) {
+        console.warn(`[Direct Push] Columna '${missingCol}' no existe en Supabase (${tabla}). Eliminando y reintentando...`);
+        delete row[missingCol];
+        const resRetry = await sb.from(tabla).upsert(row);
+        error = resRetry.error;
+      } else {
+        const knownOptionals = ['prioridad', 'orden', 'fecha_modificacion', 'updated_at', 'modificado_por', 'fecha_resolucion', 'resolucion', 'resuelto_por', 'archivos'];
+        let deletedAny = false;
+        knownOptionals.forEach(col => {
+          if (row[col] !== undefined) {
+            delete row[col];
+            deletedAny = true;
+          }
+        });
+        if (!deletedAny) break;
+        const resRetry = await sb.from(tabla).upsert(row);
+        error = resRetry.error;
+      }
+    }
+
+    // Si hay error de clave foránea (ej. sitio_fkey, cliente_fkey) en envios u otras tablas
+    if (error && (error.code === '23503' || (error.message && error.message.includes('foreign key')))) {
+      console.warn(`[Direct Push] Violación de clave foránea en ${tabla}. Reintentando con claves foráneas neutralizadas...`);
       const fallbackRow = { ...row };
-      delete fallbackRow.prioridad;
-      delete fallbackRow.orden;
+      if (fallbackRow.sitio !== undefined) fallbackRow.sitio = null;
+      if (fallbackRow.sitio_id !== undefined) fallbackRow.sitio_id = null;
+      if (fallbackRow.cliente !== undefined && error.message.includes('cliente')) fallbackRow.cliente = null;
+      if (fallbackRow.ticket_id !== undefined && error.message.includes('ticket')) fallbackRow.ticket_id = null;
       const resFallback = await sb.from(tabla).upsert(fallbackRow);
       error = resFallback.error;
     }
+
+    // Si hay conflicto de clave única por folio (tickets_folio_unique o folio existente con distinto ID), actualizar el registro existente por folio
+    if (error && (tabla === 'tickets' || tabla === 'ordenes') && (error.message.includes('tickets_folio_unique') || error.message.includes('duplicate key') || error.message.includes('unique constraint'))) {
+      console.warn(`[Direct Push] Conflicto de folio único en ${tabla} para folio ${row.folio || row.id}. Actualizando registro existente por folio...`);
+      const keyCol = row.folio ? 'folio' : 'id';
+      const keyVal = row.folio || row.id;
+      const resUpdate = await sb.from(tabla).update(row).eq(keyCol, keyVal);
+      error = resUpdate.error;
+    }
+
     if (error) {
       console.error(`[Direct Push] Error al guardar en ${tabla}:`, error.message);
       if (typeof window.mostrarNotificacion === 'function') {
@@ -1036,20 +1239,17 @@ window.pushToSupabase = async function(tabla, item) {
     
     // Marcar el elemento local en localStorage como sincronizado (_synced = true)
     try {
-      const storageKey = tabla === 'tickets' ? 'sapi_tickets' : (tabla === 'ordenes' ? 'sapi_ordenes' : null);
+      const storageKey = tabla === 'tickets' ? 'sapi_tickets' : (tabla === 'ordenes' ? 'sapi_ordenes' : (tabla === 'envios' ? 'sapi_envios_db' : null));
       if (storageKey) {
         const localItems = JSON.parse(localStorage.getItem(storageKey) || '[]');
-        const idx = localItems.findIndex(x => x.id === item.id);
+        const idx = localItems.findIndex(i => i.id === item.id);
         if (idx > -1) {
           localItems[idx]._synced = true;
           localStorage.setItem(storageKey, JSON.stringify(localItems));
-          console.log(`[Direct Push] Marcado local ${tabla} como sincronizado (_synced: true) para ${item.id}`);
         }
       }
-    } catch (e) {
-      console.error('[Direct Push] Error al marcar elemento local como sincronizado:', e);
-    }
-
+    } catch(e) {}
+    
     console.log(`[Direct Push] Guardado exitoso directo en la tabla ${tabla}.`);
     return;
   }
@@ -1065,7 +1265,7 @@ window.deleteFromSupabase = async function(tabla, id) {
   // Determinar si la operación debe ser ONLINE-ONLY
   let isOnlineOnly = false;
   
-  if (tabla === 'tickets' || tabla === 'ideas_fallas') {
+  if (tabla === 'tickets' || tabla === 'ideas_fallas' || tabla === 'envios') {
     isOnlineOnly = true;
   }
 
@@ -1154,7 +1354,13 @@ async function _processSyncQueueInternal() {
     return;
   }
 
-  const queue = getSyncQueue();
+  // Coalescer duplicados antes de procesar
+  const rawQueue = getSyncQueue();
+  const queue = coalesceSyncQueue(rawQueue);
+  if (queue.length !== rawQueue.length) {
+    saveSyncQueue(queue);
+  }
+
   if (queue.length === 0) {
     updateSyncStatusUI();
     return;
@@ -1172,18 +1378,32 @@ async function _processSyncQueueInternal() {
 
   try {
     let successCount = 0;
-    
-    while (true) {
-      const queue = getSyncQueue();
-      if (queue.length === 0) break;
+    let consecutiveNetworkErrors = 0;
+    const MAX_CONSECUTIVE_NETWORK_ERRORS = 3;
 
-      const item = queue[0];
-      if (!item) {
-        const latestQueue = getSyncQueue();
-        latestQueue.shift();
-        saveSyncQueue(latestQueue);
+    // Snapshot de elementos a procesar en esta pasada (no bloqueante)
+    const queueToProcess = [...getSyncQueue()];
+
+    for (let qIdx = 0; qIdx < queueToProcess.length; qIdx++) {
+      const item = queueToProcess[qIdx];
+      if (!item) continue;
+
+      // Verificar si el item sigue presente en la cola (no fue eliminado manualmente)
+      const freshQueue = getSyncQueue();
+      const currentIdx = freshQueue.findIndex(q => 
+        q.table === item.table && 
+        q.action === item.action && 
+        ((q.data && item.data && (q.data.id === item.data.id || q.data.idInterno === item.data.idInterno || q.data.serie === item.data.serie)) || (q.id && item.id && q.id === item.id))
+      );
+      if (currentIdx === -1) {
         continue;
       }
+
+      if (!navigator.onLine && !window.isConnectionVerifiedOnline) {
+        console.log('[Sync] Conexión perdida durante sincronización. Pausando cola.');
+        break;
+      }
+
       let payload;
       let error = null;
       let resTabla = item.table;
@@ -1527,7 +1747,17 @@ async function _processSyncQueueInternal() {
               user_agent: item.data.userAgent
             };
           } else if (item.table === 'config') {
-            payload = { id: 'main', data: item.data };
+            if (item.data && item.data.id && item.data.data !== undefined) {
+              payload = { id: item.data.id, data: item.data.data };
+            } else {
+              payload = { id: 'main', data: item.data };
+            }
+          } else if (item.table === 'kits_servicio' || item.table === 'machotes_servicio') {
+            resTabla = 'config';
+            payload = { id: 'kits_servicio', data: item.data };
+          } else if (item.table === 'kits_servicio_sandbox') {
+            resTabla = 'config';
+            payload = { id: 'kits_servicio_sandbox', data: item.data };
           } else if (item.table === 'roles') {
             resTabla = 'config';
             payload = { id: 'roles', data: item.data };
@@ -1628,11 +1858,53 @@ async function _processSyncQueueInternal() {
                 }
               }
             }
+          } else if (item.table === 'envios') {
+            payload = typeof window.envioToRow === 'function' ? window.envioToRow(item.data) : item.data;
           } else {
             payload = item.data;
           }
 
-          const { error: upsertErr } = await sb.from(resTabla).upsert(payload, { onConflict: 'id' });
+          let { error: upsertErr } = await sb.from(resTabla).upsert(payload, { onConflict: 'id' });
+
+          // Bucle dinámico de autorecuperación para columnas no migradas en Supabase (PGRST204 / schema cache)
+          let queueColRetries = 0;
+          while (upsertErr && upsertErr.message && (upsertErr.message.includes('schema cache') || upsertErr.message.includes('column') || upsertErr.code === 'PGRST204') && queueColRetries < 8) {
+            queueColRetries++;
+            const match = upsertErr.message.match(/['"]([^'"]+)['"]\s+column/i) || 
+                          upsertErr.message.match(/column\s+['"]([^'"]+)['"]/i) ||
+                          upsertErr.message.match(/column\s+of\s+['"]([^'"]+)['"]/i);
+            const missingCol = match ? match[1] : null;
+            
+            if (missingCol && payload[missingCol] !== undefined) {
+              console.warn(`[Sync Queue] Columna '${missingCol}' no existe en Supabase (${resTabla}). Eliminando y reintentando...`);
+              delete payload[missingCol];
+              const resRetry = await sb.from(resTabla).upsert(payload, { onConflict: 'id' });
+              upsertErr = resRetry.error;
+            } else {
+              const knownOptionals = ['prioridad', 'orden', 'fecha_modificacion', 'updated_at', 'modificado_por', 'fecha_resolucion', 'resolucion', 'resuelto_por', 'archivos'];
+              let deletedAny = false;
+              knownOptionals.forEach(col => {
+                if (payload[col] !== undefined) {
+                  delete payload[col];
+                  deletedAny = true;
+                }
+              });
+              if (!deletedAny) break;
+              const resRetry = await sb.from(resTabla).upsert(payload, { onConflict: 'id' });
+              upsertErr = resRetry.error;
+            }
+          }
+
+          if (upsertErr && (upsertErr.code === '23503' || (upsertErr.message && upsertErr.message.includes('foreign key')))) {
+            console.warn(`[Sync Queue] Violación FK en ${resTabla}. Reintentando con claves foráneas neutralizadas...`);
+            const fallbackPayload = { ...payload };
+            if (fallbackPayload.sitio !== undefined) fallbackPayload.sitio = null;
+            if (fallbackPayload.sitio_id !== undefined) fallbackPayload.sitio_id = null;
+            if (fallbackPayload.cliente !== undefined && upsertErr.message.includes('cliente')) fallbackPayload.cliente = null;
+            if (fallbackPayload.ticket_id !== undefined && upsertErr.message.includes('ticket')) fallbackPayload.ticket_id = null;
+            const resFallback = await sb.from(resTabla).upsert(fallbackPayload, { onConflict: 'id' });
+            upsertErr = resFallback.error;
+          }
           error = upsertErr;
 
           if (item.table === 'ordenes' && !error) {
@@ -1920,57 +2192,60 @@ async function _processSyncQueueInternal() {
           // La telemetría es no-crítica: siempre se descarta silenciosamente sin notificar al usuario.
           if (item.table === 'sapi_telemetry') {
             console.warn('[Sync] Telemetría no enviada, descartando sin notificar:', error.message);
-            const latestQueue = getSyncQueue();
-            latestQueue.shift();
-            saveSyncQueue(latestQueue);
-          } else {
-            console.error(`[Sync] Error en operación (${item.table} - ${item.action}):`, error.message);
-            
-            // Guardar el mensaje de error en el primer item de la cola
-            const currentQueue = getSyncQueue();
-            if (currentQueue.length > 0) {
-              currentQueue[0].lastError = error.message;
-              currentQueue[0].lastErrorCode = error.code || 'N/A';
-              saveSyncQueue(currentQueue);
-            }
-            
-            const isNetworkError = error.message && (
-              error.message.includes('Failed to fetch') ||
-              error.message.includes('network') ||
-              error.message.includes('timeout') ||
-              error.message.includes('connection') ||
-              error.message.includes('TypeError') ||
-              error.message.includes('fetch') ||
-              error.message.includes('schema cache') ||
-              error.message.includes('503') ||
-              error.message.includes('502') ||
-              error.message.includes('Service Unavailable') ||
-              error.message.includes('Bad Gateway')
-            );
-
-            if (!isNetworkError) {
-              if (typeof window.mostrarNotificacion === 'function') {
-                window.mostrarNotificacion(`Error BD (${item.table}): ${error.message}`, 'error');
-              }
-              if (window._isSyncManualForced) {
-                if (window.mostrarNotificacion) {
-                  window.mostrarNotificacion(`Error BD (${item.table} - ${item.action}): ${error.message} | Código: ${error.code || 'N/A'}`, 'error');
-                } else {
-                  console.error(`[Sync] Error BD: ${item.table} (${item.action}) - ${error.message}`);
-                }
-              }
-            }
-
-            if (isNetworkError) {
-              break; // Error de red temporal, pausar procesamiento
-            } else {
-              console.warn(`[Sync] Error permanente de BD. Saltando elemento.`);
-              const latestQueue = getSyncQueue();
-              latestQueue.shift();
-              saveSyncQueue(latestQueue);
-            }
+            const q = getSyncQueue();
+            const idx = q.findIndex(x => x.table === item.table && x.action === item.action && x.data?.id === item.data?.id);
+            if (idx > -1) { q.splice(idx, 1); saveSyncQueue(q); }
+            continue;
           }
+
+          console.error(`[Sync] Error en elemento (${item.table} - ${item.action}):`, error.message);
+          
+          // Guardar el mensaje de error en este item específico de la cola
+          const q = getSyncQueue();
+          const targetIdx = q.findIndex(x => 
+            x.table === item.table && 
+            x.action === item.action && 
+            ((x.data && item.data && (x.data.id === item.data.id || x.data.idInterno === item.data.idInterno || x.data.serie === item.data.serie)) || (x.id && item.id && x.id === item.id))
+          );
+          if (targetIdx > -1) {
+            q[targetIdx].lastError = error.message;
+            q[targetIdx].lastErrorCode = error.code || 'N/A';
+            q[targetIdx].retries = (q[targetIdx].retries || 0) + 1;
+            q[targetIdx].lastAttempt = Date.now();
+            saveSyncQueue(q);
+          }
+          
+          const isNetworkError = error.message && (
+            error.message.includes('Failed to fetch') ||
+            error.message.includes('network') ||
+            error.message.includes('timeout') ||
+            error.message.includes('connection') ||
+            error.message.includes('TypeError') ||
+            error.message.includes('fetch') ||
+            error.message.includes('schema cache') ||
+            error.message.includes('503') ||
+            error.message.includes('502') ||
+            error.message.includes('Service Unavailable') ||
+            error.message.includes('Bad Gateway')
+          );
+
+          if (isNetworkError) {
+            consecutiveNetworkErrors++;
+            if (consecutiveNetworkErrors >= MAX_CONSECUTIVE_NETWORK_ERRORS && !navigator.onLine) {
+              console.warn('[Sync] Red totalmente desconectada tras múltiples intentos. Pausando cola.');
+              break;
+            }
+            console.warn(`[Sync] Fallo temporal en ${item.table}. Continuando con los demás elementos de la cola...`);
+          } else {
+            console.warn(`[Sync] Error permanente en ${item.table}: ${error.message}. Pasando al siguiente elemento.`);
+            consecutiveNetworkErrors = 0;
+          }
+
         } else {
+          // ÉXITO:
+          consecutiveNetworkErrors = 0;
+          successCount++;
+
           // Registrar log de auditoría automática de transacciones críticas
           if (['ordenes', 'tickets', 'gastos'].includes(item.table)) {
             try {
@@ -1984,57 +2259,69 @@ async function _processSyncQueueInternal() {
                 usuario_id: isValidUUID(activeUserId) ? activeUserId : null,
                 accion: item.action.toUpperCase(),
                 tabla_afectada: item.table,
-                registro_id: item.data.id,
+                registro_id: item.data ? (item.data.id || item.data.folio) : item.id,
                 detalles: {
-                  folio: item.data.folio || item.data.ordenFolio || null,
+                  folio: item.data ? (item.data.folio || item.data.ordenFolio || null) : null,
                   timestamp: Date.now()
                 }
               };
-              // Solo intentar insertar si tenemos una sesión autenticada activa en Supabase (evita 403 Forbidden)
-              let hasSession = false;
               if (typeof sb.auth.getSession === 'function') {
                 const sessionRes = await sb.auth.getSession().catch(() => null);
                 if (sessionRes && sessionRes.data && sessionRes.data.session) {
-                  hasSession = true;
+                  sb.from('auditoria_logs').insert(logPayload).then(() => {}).catch(() => {});
                 }
-              }
-              if (hasSession) {
-                await sb.from('auditoria_logs').insert(logPayload);
               }
             } catch(logErr) {
               console.warn('[Sync] Error al escribir log de auditoria:', logErr.message);
             }
           }
 
-          const latestQueue = getSyncQueue();
-          latestQueue.shift();
-          saveSyncQueue(latestQueue);
-          successCount++;
+          // Eliminar el elemento sincronizado con éxito de la cola
+          const q = getSyncQueue();
+          const targetIdx = q.findIndex(x => 
+            x.table === item.table && 
+            x.action === item.action && 
+            ((x.data && item.data && (x.data.id === item.data.id || x.data.idInterno === item.data.idInterno || x.data.serie === item.data.serie)) || (x.id && item.id && x.id === item.id))
+          );
+          if (targetIdx > -1) {
+            q.splice(targetIdx, 1);
+            saveSyncQueue(q);
+          }
         }
       } catch (e) {
-        console.error(`[Sync] Excepción en processSyncQueue:`, e.message);
-        if (e.message && (e.message.includes('Failed to fetch') || e.message.includes('network') || e.message.includes('fetch'))) {
+        console.error(`[Sync] Excepción en processSyncQueue para ${item.table}:`, e.message);
+        const q = getSyncQueue();
+        const targetIdx = q.findIndex(x => 
+          x.table === item.table && 
+          x.action === item.action && 
+          ((x.data && item.data && (x.data.id === item.data.id || x.data.idInterno === item.data.idInterno || x.data.serie === item.data.serie)) || (x.id && item.id && x.id === item.id))
+        );
+        if (targetIdx > -1) {
+          q[targetIdx].lastError = e.message;
+          q[targetIdx].lastErrorCode = e.code || 'N/A';
+          q[targetIdx].retries = (q[targetIdx].retries || 0) + 1;
+          q[targetIdx].lastAttempt = Date.now();
+          saveSyncQueue(q);
+        }
+        if (!navigator.onLine) {
           break;
-        } else {
-          const latestQueue = getSyncQueue();
-          latestQueue.shift();
-          saveSyncQueue(latestQueue);
         }
       }
-    }
+    } // Fin del for
 
     if (successCount > 0) {
       if (typeof window.cargarDatosDeSupabase === 'function') {
-        window.cargarDatosDeSupabase().then(() => {
+        try {
+          await window.cargarDatosDeSupabase();
           if (window._isSyncManualForced) {
             if (window.mostrarNotificacion) {
               window.mostrarNotificacion('¡Sincronización completada! Se sincronizaron ' + successCount + ' elemento(s) pendiente(s).', 'success');
             }
           }
-        }).catch(err => {
+        } catch (err) {
           console.error('[Sync] Error al recargar datos tras sincronización:', err);
           window.dispatchEvent(new Event('supabase_datos_cargados'));
-        });
+        }
       } else {
         window.dispatchEvent(new Event('supabase_datos_cargados'));
         if (window._isSyncManualForced) {
@@ -2197,30 +2484,30 @@ function updateSyncStatusUI() {
   }
 }
 
-window.forzarSincronizacionManual = function() {
+window.forzarSincronizacionManual = async function() {
   window._isSyncManualForced = true;
-  const queue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
 
-  const trySync = () => {
+  const trySync = async () => {
+    const queue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
     if (queue.length === 0) {
       if (window.mostrarNotificacion) {
         window.mostrarNotificacion('Descargando datos recientes de Supabase...', 'info');
       }
-      if (window.cargarDatosDeSupabase) {
-        window.cargarDatosDeSupabase().then(() => {
+      if (typeof window.cargarDatosDeSupabase === 'function') {
+        try {
+          await window.cargarDatosDeSupabase();
           if (window.mostrarNotificacion) {
             window.mostrarNotificacion('Datos actualizados correctamente.', 'success');
-          } else {
-            window.mostrarNotificacion('Datos actualizados correctamente.', 'success');
           }
-        }).catch(err => {
+        } catch (err) {
           console.error('[Sync] Error al descargar datos:', err);
           if (window.mostrarNotificacion) {
-            window.mostrarNotificacion('Error al descargar datos: ' + err.message, 'error');
+            window.mostrarNotificacion('Error al descargar datos: ' + (err?.message || err), 'error');
           }
-        }).finally(() => {
+          throw err;
+        } finally {
           window._isSyncManualForced = false;
-        });
+        }
       } else {
         window._isSyncManualForced = false;
       }
@@ -2228,35 +2515,43 @@ window.forzarSincronizacionManual = function() {
       if (window.mostrarNotificacion) {
         window.mostrarNotificacion('Iniciando sincronización de cambios locales...', 'info');
       }
-      processSyncQueue().finally(() => {
+      try {
+        await processSyncQueue();
+      } catch (err) {
+        console.error('[Sync] Error al procesar cola de sincronización:', err);
+        throw err;
+      } finally {
         window._isSyncManualForced = false;
-      });
+      }
     }
   };
 
   if (!navigator.onLine && !window.isConnectionVerifiedOnline) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
     
-    fetch('https://mupevytlssqcbhlmzmcp.supabase.co', {
-      method: 'GET',
-      mode: 'no-cors',
-      cache: 'no-store',
-      signal: controller.signal
-    }).then(() => {
+    try {
+      await fetch('https://mupevytlssqcbhlmzmcp.supabase.co', {
+        method: 'GET',
+        mode: 'no-cors',
+        cache: 'no-store',
+        signal: controller.signal
+      });
       clearTimeout(timeoutId);
       window.isConnectionVerifiedOnline = true;
-      updateSyncStatusUI();
-      trySync();
-    }).catch(() => {
+      if (typeof updateSyncStatusUI === 'function') updateSyncStatusUI();
+      return await trySync();
+    } catch (err) {
       clearTimeout(timeoutId);
       window.isConnectionVerifiedOnline = false;
       if (window.mostrarNotificacion) {
         window.mostrarNotificacion('No se puede sincronizar sin conexión a internet.', 'warning');
       }
-    });
+      window._isSyncManualForced = false;
+      throw new Error('No se puede sincronizar sin conexión a internet.');
+    }
   } else {
-    trySync();
+    return await trySync();
   }
 };
 
@@ -2270,6 +2565,8 @@ window.limpiarColaSincronizacion = function() {
 window.cerrarModalSyncDetalles = function() {
   const modal = document.getElementById('modal-sync-detalles');
   if (modal) modal.classList.remove('open');
+  const dynModal = document.getElementById('sapi-dynamic-sync-modal');
+  if (dynModal) dynModal.remove();
 };
 
 window.ejecutarForzarSyncDesdeModal = function() {
@@ -2277,10 +2574,48 @@ window.ejecutarForzarSyncDesdeModal = function() {
   window.forzarSincronizacionManual();
 };
 
+window.descartarErroresSincronizacion = function() {
+  let queue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+  const conError = queue.filter(item => item && item.lastError).length;
+  if (conError === 0) {
+    if (window.mostrarNotificacion) window.mostrarNotificacion('No hay elementos con error en la cola.', 'info');
+    return;
+  }
+  if (confirm(`¿Deseas descartar y eliminar los ${conError} elemento(s) que tienen error? Los cambios locales no subidos de esos elementos se omitirán.`)) {
+    queue = queue.filter(item => !item || !item.lastError);
+    localStorage.setItem('sapi_sync_queue', JSON.stringify(queue));
+    if (typeof window.verDetallesSincronizacion === 'function') {
+      window.verDetallesSincronizacion();
+    }
+    if (window.updateSyncStatusUI) window.updateSyncStatusUI();
+    if (window.mostrarNotificacion) {
+      window.mostrarNotificacion(`${conError} elemento(s) con error descartados.`, 'success');
+    }
+  }
+};
+
+window.reintentarItemSincronizacion = async function(table, itemId) {
+  let queue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+  const idx = queue.findIndex(q => q.table === table && q.data && (q.data.id === itemId || q.data.idInterno === itemId || q.data.serie === itemId));
+  if (idx > -1) {
+    delete queue[idx].lastError;
+    delete queue[idx].lastErrorCode;
+    queue[idx].retries = 0;
+    const targetItem = queue.splice(idx, 1)[0];
+    queue.unshift(targetItem);
+    localStorage.setItem('sapi_sync_queue', JSON.stringify(queue));
+    if (typeof window.verDetallesSincronizacion === 'function') {
+      window.verDetallesSincronizacion();
+    }
+    window.forzarSincronizacionManual();
+  }
+};
+
 window.verDetallesSincronizacion = function() {
   try {
     console.log('[Sync] verDetallesSincronizacion invocado.');
     const queue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+    const conError = queue.filter(item => item && item.lastError).length;
     
     const listaEl = document.getElementById('sync-detalles-lista');
     const titleEl = document.querySelector('#modal-sync-detalles h2');
@@ -2291,7 +2626,7 @@ window.verDetallesSincronizacion = function() {
       listaEl.innerHTML = '';
       if (queue.length === 0) {
         if (titleEl) titleEl.textContent = 'Estado del Sistema';
-        if (descEl) descEl.textContent = 'Todos tus cambios locales están guardados. Puedes forzar una descarga completa para obtener los últimos tickets creados desde otros dispositivos:';
+        if (descEl) descEl.textContent = 'Todos tus cambios locales están sincronizados con la nube. Puedes forzar una descarga completa para obtener las últimas actualizaciones:';
         if (actionBtn) actionBtn.textContent = 'Descargar Nube (Sincronizar)';
         
         const emptyEl = document.createElement('div');
@@ -2302,25 +2637,50 @@ window.verDetallesSincronizacion = function() {
         emptyEl.innerHTML = '<i data-lucide="cloud-lightning" style="width:36px;height:36px;margin:0 auto 0.5rem auto;display:block;color:var(--accent,#e8820c);"></i> No hay cambios locales pendientes.';
         listaEl.appendChild(emptyEl);
       } else {
-        if (titleEl) titleEl.textContent = 'Cambios Pendientes de Sincronizar';
-        if (descEl) descEl.textContent = 'Los siguientes cambios se realizaron de manera local y están esperando a ser subidos a Supabase:';
-        if (actionBtn) actionBtn.textContent = 'Sincronizar Ahora';
+        if (titleEl) titleEl.textContent = `Cambios Pendientes (${queue.length})`;
+        if (descEl) {
+          descEl.innerHTML = `Tienes <strong>${queue.length}</strong> cambio${queue.length > 1 ? 's' : ''} local${queue.length > 1 ? 'es' : ''} esperando a subir a Supabase${conError > 0 ? ` (<span style="color:#ef4444; font-weight:700;">${conError} con error</span>)` : ''}:`;
+        }
+        if (actionBtn) actionBtn.textContent = `Sincronizar Ahora (${queue.length})`;
         
+        // Banner para descartar errores si hay items fallidos
+        if (conError > 0) {
+          const bannerErr = document.createElement('div');
+          bannerErr.style.display = 'flex';
+          bannerErr.style.justifyContent = 'space-between';
+          bannerErr.style.alignItems = 'center';
+          bannerErr.style.background = 'rgba(239, 68, 68, 0.08)';
+          bannerErr.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+          bannerErr.style.borderRadius = '8px';
+          bannerErr.style.padding = '0.5rem 0.75rem';
+          bannerErr.style.fontSize = '0.78rem';
+          bannerErr.style.color = '#ef4444';
+          bannerErr.style.fontWeight = '600';
+          bannerErr.style.marginBottom = '0.5rem';
+          bannerErr.innerHTML = `
+            <span>⚠️ ${conError} elemento(s) no se pudieron subir.</span>
+            <button type="button" class="btn-secondary" onclick="window.descartarErroresSincronizacion()" style="padding:0.2rem 0.5rem; font-size:0.72rem; border-color:rgba(239,68,68,0.3); color:#ef4444; background:white;">Descartar Errores</button>
+          `;
+          listaEl.appendChild(bannerErr);
+        }
+
         queue.forEach(item => {
           if (!item) return;
           let desc = 'Sin descripción';
+          let itemId = null;
           if (item.data) {
-            desc = item.data.folio || item.data.asunto || item.data.nombre || item.data.razon_social || item.data.descripcion || item.data.concepto || item.data.cliente || item.data.id || 'Sin descripción';
+            itemId = item.data.id || item.data.idInterno || item.data.serie || item.data.folio;
+            desc = item.data.folio || item.data.asunto || item.data.nombre || item.data.razon_social || item.data.titulo || item.data.descripcion || item.data.concepto || item.data.cliente || item.data.id || 'Sin descripción';
           }
           
           const itemEl = document.createElement('div');
           itemEl.style.display = 'flex';
           itemEl.style.flexDirection = 'column';
-          itemEl.style.gap = '0.5rem';
-          itemEl.style.background = 'var(--bg-card, #ffffff)';
-          itemEl.style.border = '1px solid var(--border, #e5e7eb)';
+          itemEl.style.gap = '0.45rem';
+          itemEl.style.background = item.lastError ? 'rgba(239, 68, 68, 0.03)' : 'var(--bg-card, #ffffff)';
+          itemEl.style.border = item.lastError ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid var(--border, #e5e7eb)';
           itemEl.style.borderRadius = '10px';
-          itemEl.style.padding = '0.85rem 1rem';
+          itemEl.style.padding = '0.75rem 0.9rem';
           itemEl.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.04)';
           
           const headerEl = document.createElement('div');
@@ -2334,14 +2694,15 @@ window.verDetallesSincronizacion = function() {
           const badgeContainer = document.createElement('div');
           badgeContainer.style.display = 'flex';
           badgeContainer.style.alignItems = 'center';
-          badgeContainer.style.gap = '0.5rem';
+          badgeContainer.style.gap = '0.4rem';
+          badgeContainer.style.flexWrap = 'wrap';
           
           const tableBadge = document.createElement('span');
           tableBadge.textContent = item.table;
           tableBadge.style.background = 'rgba(232, 130, 12, 0.08)';
           tableBadge.style.color = 'var(--accent, #e8820c)';
           tableBadge.style.border = '1px solid rgba(232, 130, 12, 0.2)';
-          tableBadge.style.padding = '0.2rem 0.5rem';
+          tableBadge.style.padding = '0.15rem 0.45rem';
           tableBadge.style.borderRadius = '6px';
           tableBadge.style.textTransform = 'uppercase';
           tableBadge.style.fontWeight = '700';
@@ -2353,7 +2714,7 @@ window.verDetallesSincronizacion = function() {
           actionBadge.style.background = 'var(--bg-hover, #f3f4f6)';
           actionBadge.style.color = 'var(--text-secondary, #4b5563)';
           actionBadge.style.border = '1px solid var(--border, #e5e7eb)';
-          actionBadge.style.padding = '0.2rem 0.5rem';
+          actionBadge.style.padding = '0.15rem 0.45rem';
           actionBadge.style.borderRadius = '6px';
           actionBadge.style.textTransform = 'uppercase';
           actionBadge.style.fontWeight = '700';
@@ -2362,14 +2723,50 @@ window.verDetallesSincronizacion = function() {
           
           badgeContainer.appendChild(tableBadge);
           badgeContainer.appendChild(actionBadge);
+
+          if (item.retries > 0) {
+            const retriesBadge = document.createElement('span');
+            retriesBadge.textContent = `${item.retries} intento${item.retries > 1 ? 's' : ''}`;
+            retriesBadge.style.background = 'rgba(100, 116, 139, 0.1)';
+            retriesBadge.style.color = 'var(--text-muted, #64748b)';
+            retriesBadge.style.padding = '0.15rem 0.4rem';
+            retriesBadge.style.borderRadius = '6px';
+            retriesBadge.style.fontSize = '0.65rem';
+            retriesBadge.style.fontWeight = '600';
+            badgeContainer.appendChild(retriesBadge);
+          }
+
+          const actionIcons = document.createElement('div');
+          actionIcons.style.display = 'flex';
+          actionIcons.style.alignItems = 'center';
+          actionIcons.style.gap = '0.4rem';
+
+          if (item.lastError && itemId) {
+            const retryBtn = document.createElement('button');
+            retryBtn.type = 'button';
+            retryBtn.innerHTML = '⟳';
+            retryBtn.style.background = 'rgba(232, 130, 12, 0.1)';
+            retryBtn.style.border = '1px solid rgba(232, 130, 12, 0.25)';
+            retryBtn.style.color = 'var(--accent, #e8820c)';
+            retryBtn.style.cursor = 'pointer';
+            retryBtn.style.fontSize = '0.85rem';
+            retryBtn.style.borderRadius = '4px';
+            retryBtn.style.padding = '1px 6px';
+            retryBtn.title = 'Reintentar este elemento ahora';
+            retryBtn.onclick = function() {
+              window.reintentarItemSincronizacion(item.table, itemId);
+            };
+            actionIcons.appendChild(retryBtn);
+          }
           
           const deleteBtn = document.createElement('button');
+          deleteBtn.type = 'button';
           deleteBtn.innerHTML = '✕';
           deleteBtn.style.background = 'transparent';
           deleteBtn.style.border = 'none';
           deleteBtn.style.color = 'var(--text-muted)';
           deleteBtn.style.cursor = 'pointer';
-          deleteBtn.style.fontSize = '1rem';
+          deleteBtn.style.fontSize = '0.9rem';
           deleteBtn.style.padding = '0 0.2rem';
           deleteBtn.title = 'Eliminar este cambio pendiente (ignorar)';
           deleteBtn.onclick = function() {
@@ -2381,17 +2778,18 @@ window.verDetallesSincronizacion = function() {
               if (window.updateSyncStatusUI) window.updateSyncStatusUI();
             }
           };
+          actionIcons.appendChild(deleteBtn);
           
           headerEl.appendChild(badgeContainer);
-          headerEl.appendChild(deleteBtn);
+          headerEl.appendChild(actionIcons);
           
           const bodyEl = document.createElement('div');
           bodyEl.textContent = desc;
-          bodyEl.style.fontSize = '0.85rem';
+          bodyEl.style.fontSize = '0.84rem';
           bodyEl.style.fontWeight = '600';
           bodyEl.style.color = 'var(--text-primary)';
           bodyEl.style.wordBreak = 'break-word';
-          bodyEl.style.lineHeight = '1.4';
+          bodyEl.style.lineHeight = '1.35';
           
           itemEl.appendChild(headerEl);
           itemEl.appendChild(bodyEl);
@@ -2401,11 +2799,11 @@ window.verDetallesSincronizacion = function() {
             const errEl = document.createElement('div');
             errEl.style.fontSize = '0.72rem';
             errEl.style.color = '#ef4444';
-            errEl.style.marginTop = '0.25rem';
+            errEl.style.marginTop = '0.2rem';
             errEl.style.fontWeight = '600';
-            errEl.style.background = 'rgba(239, 68, 68, 0.05)';
-            errEl.style.border = '1px solid rgba(239, 68, 68, 0.12)';
-            errEl.style.padding = '0.35rem 0.5rem';
+            errEl.style.background = 'rgba(239, 68, 68, 0.06)';
+            errEl.style.border = '1px solid rgba(239, 68, 68, 0.15)';
+            errEl.style.padding = '0.3rem 0.5rem';
             errEl.style.borderRadius = '6px';
             errEl.innerHTML = `⚠️ Error: ${item.lastError} ${item.lastErrorCode ? `(Código: ${item.lastErrorCode})` : ''}`;
             itemEl.appendChild(errEl);
@@ -2427,25 +2825,31 @@ window.verDetallesSincronizacion = function() {
       if (window.mostrarNotificacion) {
         window.mostrarNotificacion('Error: No se encontró el modal de sincronización. Fuerza la recarga (Cmd+Shift+R).', 'error');
       }
-      console.error('[Sync] No se encontró modal-sync-detalles en el documento.');
     }
   } catch (err) {
     console.error('[Sync] Error al abrir detalles de sincronización:', err);
     if (window.mostrarNotificacion) {
       window.mostrarNotificacion('Error al abrir detalles de sincronización: ' + err.message, 'error');
     }
-    console.error('[Sync] Excepción en verDetallesSincronizacion:', err);
   }
 };
 
+let _onlineDebounceTimer = null;
 window.addEventListener('online', () => {
-  console.log('[Network] Conexión detectada. Iniciando sincronización...');
-  window.isConnectionVerifiedOnline = true;
-  updateSyncStatusUI();
-  processSyncQueue();
+  if (_onlineDebounceTimer) clearTimeout(_onlineDebounceTimer);
+  _onlineDebounceTimer = setTimeout(() => {
+    console.log('[Network] Conexión restablecida. Iniciando sincronización...');
+    window.isConnectionVerifiedOnline = true;
+    updateSyncStatusUI();
+    processSyncQueue();
+  }, 1500);
 });
 
 window.addEventListener('offline', () => {
+  if (_onlineDebounceTimer) {
+    clearTimeout(_onlineDebounceTimer);
+    _onlineDebounceTimer = null;
+  }
   console.log('[Network] Conexión perdida. Modo local activado.');
   window.isConnectionVerifiedOnline = false;
   updateSyncStatusUI();
@@ -2640,6 +3044,41 @@ window.cargarDatosDeSupabase = function() {
             }
           }
         }
+        const kitsCfg = configDb.find(c => c.id === 'kits_servicio' || c.id === 'machotes_servicio');
+        if (kitsCfg && Array.isArray(kitsCfg.data)) {
+          if (typeof safeSetJSON === 'function') {
+            safeSetJSON('sapi_kits_servicio', kitsCfg.data);
+          } else {
+            localStorage.setItem('sapi_kits_servicio', JSON.stringify(kitsCfg.data));
+          }
+        } else {
+          // En modo Real, si no hay kits registrados en Supabase, la lista en produccion es vacia
+          if (typeof safeSetJSON === 'function') {
+            safeSetJSON('sapi_kits_servicio', []);
+          } else {
+            localStorage.setItem('sapi_kits_servicio', JSON.stringify([]));
+          }
+        }
+
+        const kitsSandboxCfg = configDb.find(c => c.id === 'kits_servicio_sandbox');
+        if (kitsSandboxCfg && Array.isArray(kitsSandboxCfg.data)) {
+          if (typeof safeSetJSON === 'function') {
+            safeSetJSON('sapi_kits_servicio_sandbox', kitsSandboxCfg.data);
+          } else {
+            localStorage.setItem('sapi_kits_servicio_sandbox', JSON.stringify(kitsSandboxCfg.data));
+          }
+        } else {
+          // En modo Sandbox, si no hay kits registrados en Supabase, la lista de pruebas inicia vacía
+          if (typeof safeSetJSON === 'function') {
+            safeSetJSON('sapi_kits_servicio_sandbox', []);
+          } else {
+            localStorage.setItem('sapi_kits_servicio_sandbox', JSON.stringify([]));
+          }
+        }
+
+        if (typeof window.filtrarKitsServicio === 'function') {
+          window.filtrarKitsServicio();
+        }
       }
     } catch (cfgErr) {
       console.error('[Sync] Excepción al procesar config:', cfgErr.message);
@@ -2792,17 +3231,21 @@ window.cargarDatosDeSupabase = function() {
     let idsWithPedido = new Set();
     let idsWithCotizacion = new Set();
     try {
-      // 1. Descargar IDs que tienen PDF de forma rápida (sin Base64)
-      const dataPed = await fetchTablePaginated('tickets', 'id', null, false, q => q.not('pdf_pedido', 'is', null));
-      idsWithPedido = new Set(dataPed.map(x => x.id));
-      
-      const dataCot = await fetchTablePaginated('tickets', 'id', null, false, q => q.not('pdf_cotizacion', 'is', null));
-      idsWithCotizacion = new Set(dataCot.map(x => x.id));
-
-      // 2. Descargar columnas principales del ticket (excluyendo Base64 pesados de PDFs)
-      const columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, notas, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion, comentarios_internos, creado_por, comentarios_clientes';
-      ticketsDb = await fetchTablePaginated('tickets', columns);
+      // Descargar columnas principales del ticket en lotes directos de alta velocidad (sin ordenamiento lento de disco en BD)
+      let columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, notas, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion, comentarios_internos, creado_por, comentarios_clientes, fecha_modificacion, updated_at, modificado_por';
+      try {
+        ticketsDb = await fetchTablePaginated('tickets', columns, null, false, null, 50, 15000);
+      } catch (colErr) {
+        if (colErr && colErr.message && (colErr.message.includes('fecha_modificacion') || colErr.message.includes('updated_at') || colErr.message.includes('modificado_por') || colErr.message.includes('schema cache'))) {
+          console.warn('[Sync] Reintentando carga de tickets sin columnas de fecha_modificacion/updated_at/modificado_por...');
+          columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, notas, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion, comentarios_internos, creado_por, comentarios_clientes';
+          ticketsDb = await fetchTablePaginated('tickets', columns, null, false, null, 50, 15000);
+        } else {
+          throw colErr;
+        }
+      }
     } catch (e) {
+      console.warn('[Sync] Error al descargar tickets principales de Supabase:', e.message);
       ticketsError = e;
     }
 
@@ -2967,169 +3410,195 @@ window.cargarDatosDeSupabase = function() {
       console.error('[Sync] Exception loading levantamientos:', e);
     }
 
-    // Órdenes — mismo principio
+    // Envíos y Guías de Paquetería
+    try {
+      let enviosDb = null;
+      let envErr = null;
+      try {
+        enviosDb = await fetchTablePaginated('envios', '*');
+      } catch (err) {
+        envErr = err;
+      }
+      if (enviosDb && !envErr) {
+        const mapped = enviosDb.map(rowToEnvio);
+        localStorage.setItem('sapi_envios_db', JSON.stringify(mapped));
+        if (typeof window.sapiEnviosDb !== 'undefined') {
+          window.sapiEnviosDb = mapped;
+        }
+        // Sincronizar hacia los tickets locales si existen
+        try {
+          const localTickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+          let tktChanged = false;
+          mapped.forEach(env => {
+            if (env.ticketId) {
+              const t = localTickets.find(x => x.id === env.ticketId || x.folio === env.ticketId);
+              if (t) {
+                if (!t.envios) t.envios = [];
+                const existIdx = t.envios.findIndex(x => x.id === env.id);
+                if (existIdx >= 0) {
+                  t.envios[existIdx] = env;
+                } else {
+                  t.envios.push(env);
+                }
+                tktChanged = true;
+              }
+            }
+          });
+          if (tktChanged) {
+            localStorage.setItem('sapi_tickets', JSON.stringify(localTickets));
+            if (typeof tickets !== 'undefined') window.tickets = localTickets;
+          }
+        } catch(e) {}
+
+        if (typeof window.renderEnvios === 'function') {
+          window.renderEnvios();
+        }
+      }
+    } catch (e) {
+      console.warn('[Sync] Tabla envios no disponible o en migración:', e.message);
+    }
+
+    // Órdenes y subtablas asociadas descargadas de forma estable y secuencial
     let ordenes = null;
     let ordenesError = null;
+    let bitacorasDb = [];
+    let refsDb = [];
+    let firmasDb = [];
+
     try {
       ordenes = await fetchTablePaginated('ordenes', '*');
+      try { bitacorasDb = await fetchTablePaginated('orden_bitacora', '*'); } catch(e) {}
+      try { refsDb = await fetchTablePaginated('orden_refacciones', '*, refacciones(codigo, descripcion)'); } catch(e) {}
+      try { firmasDb = await fetchTablePaginated('orden_firmas', '*'); } catch(e) {}
     } catch (err) {
       ordenesError = err;
     }
+
     window.lastSyncOrdsLength = ordenes ? ordenes.length : -1;
     window.lastSyncOrdsError = ordenesError ? ordenesError.message : null;
     window.lastSyncTimestamp = new Date().toISOString();
     localStorage.setItem('sapi_last_sync_timestamp', window.lastSyncTimestamp);
     if (ordenes) {
       let bitacorasMap = {};
-      try {
-        let bitacorasDb = [];
-        try {
-          bitacorasDb = await fetchTablePaginated('orden_bitacora', '*');
-        } catch (err) {
-          console.error('[Sync] Error al descargar orden_bitacora:', err);
-        }
-        if (bitacorasDb && bitacorasDb.length > 0) {
-          bitacorasDb.forEach(b => {
-            if (!bitacorasMap[b.orden_id]) bitacorasMap[b.orden_id] = [];
-            
-            // Formatear fecha a YYYY-MM-DD para la app
-            const datePortion = b.fecha ? b.fecha.substring(0, 10) : '';
-            
-            let tecnico = b.tecnico;
-            let nota = b.nota || '';
-            let realizado = true;
-            let programadoEntrada = null;
-            let programadoSalida = null;
-            let desviacion = null;
+      if (bitacorasDb && bitacorasDb.length > 0) {
+        bitacorasDb.forEach(b => {
+          if (!bitacorasMap[b.orden_id]) bitacorasMap[b.orden_id] = [];
+          
+          // Formatear fecha a YYYY-MM-DD para la app
+          const datePortion = b.fecha ? b.fecha.substring(0, 10) : '';
+          
+          let tecnico = b.tecnico;
+          let nota = b.nota || '';
+          let realizado = true;
+          let programadoEntrada = null;
+          let programadoSalida = null;
+          let desviacion = null;
 
-            if (nota.includes('[Realizado: ')) {
-              const match = nota.match(/(?:\r?\n|^)\[Realizado: (.*?)\]/);
-              if (match) {
-                realizado = match[1] === 'true';
-                nota = nota.replace(/(?:\r?\n|^)\[Realizado: (.*?)\]/g, '');
-              }
-            } else {
-              // Retrocompatibilidad
-              const esPendiente = nota.includes('Programado por supervisor');
-              realizado = !esPendiente;
+          if (nota.includes('[Realizado: ')) {
+            const match = nota.match(/(?:\r?\n|^)\[Realizado: (.*?)\]/);
+            if (match) {
+              realizado = match[1] === 'true';
+              nota = nota.replace(/(?:\r?\n|^)\[Realizado: (.*?)\]/g, '');
             }
+          } else {
+            // Retrocompatibilidad
+            const esPendiente = nota.includes('Programado por supervisor');
+            realizado = !esPendiente;
+          }
 
-            if (nota.includes('[Prog: ')) {
-              const match = nota.match(/(?:\r?\n|^)\[Prog: (.*?)-(.*?)\]/);
-              if (match) {
-                programadoEntrada = match[1];
-                programadoSalida = match[2];
-                nota = nota.replace(/(?:\r?\n|^)\[Prog: (.*?)-(.*?)\]/g, '');
-              }
+          if (nota.includes('[Prog: ')) {
+            const match = nota.match(/(?:\r?\n|^)\[Prog: (.*?)-(.*?)\]/);
+            if (match) {
+              programadoEntrada = match[1];
+              programadoSalida = match[2];
+              nota = nota.replace(/(?:\r?\n|^)\[Prog: (.*?)-(.*?)\]/g, '');
             }
+          }
 
-            if (nota.includes('[Desv: ')) {
-              const match = nota.match(/(?:\r?\n|^)\[Desv: (.*?)\]/);
-              if (match) {
-                desviacion = match[1];
-                nota = nota.replace(/(?:\r?\n|^)\[Desv: (.*?)\]/g, '');
-              }
+          if (nota.includes('[Desv: ')) {
+            const match = nota.match(/(?:\r?\n|^)\[Desv: (.*?)\]/);
+            if (match) {
+              desviacion = match[1];
+              nota = nota.replace(/(?:\r?\n|^)\[Desv: (.*?)\]/g, '');
             }
+          }
 
-            if (!tecnico && nota.includes('[Técnico: ')) {
-              const match = nota.match(/\n\[Técnico: (.*?)\]$/);
-              if (match) {
-                tecnico = match[1];
-                nota = nota.replace(/\n\[Técnico: (.*?)\]$/, '');
-              }
+          if (!tecnico && nota.includes('[Técnico: ')) {
+            const match = nota.match(/\n\[Técnico: (.*?)\]$/);
+            if (match) {
+              tecnico = match[1];
+              nota = nota.replace(/\n\[Técnico: (.*?)\]$/, '');
             }
+          }
 
-            let asignadoPorName = null;
-            if (nota.includes('[AsignadoPor: ')) {
-              const match = nota.match(/(?:\r?\n|^)\[AsignadoPor: (.*?)\]/);
-              if (match) {
-                asignadoPorName = match[1];
-                nota = nota.replace(/(?:\r?\n|^)\[AsignadoPor: (.*?)\]/g, '');
-              }
+          let asignadoPorName = null;
+          if (nota.includes('[AsignadoPor: ')) {
+            const match = nota.match(/(?:\r?\n|^)\[AsignadoPor: (.*?)\]/);
+            if (match) {
+              asignadoPorName = match[1];
+              nota = nota.replace(/(?:\r?\n|^)\[AsignadoPor: (.*?)\]/g, '');
             }
+          }
 
-            bitacorasMap[b.orden_id].push({
-              id: b.id,
-              fecha: datePortion,
-              tecnico: tecnico,
-              nota: nota,
-              entrada: b.entrada,
-              salida: b.salida,
-              hora_inicio: b.hora_inicio,
-              horas_traslado: b.horas_traslado,
-              programadoHorasTraslado: b.programado_horas_traslado,
-              hora_fin_regreso: b.hora_fin_regreso,
-              horas_regreso: b.horas_regreso,
-              programadoHorasRegreso: b.programado_horas_regreso,
-              tipo: b.tipo || 'Servicio',
-              realizado: realizado,
-              programadoEntrada: programadoEntrada,
-              programadoSalida: programadoSalida,
-              desviacion: desviacion,
-              asignadoPorName: asignadoPorName
-            });
+          bitacorasMap[b.orden_id].push({
+            id: b.id,
+            fecha: datePortion,
+            tecnico: tecnico,
+            nota: nota,
+            entrada: b.entrada,
+            salida: b.salida,
+            hora_inicio: b.hora_inicio,
+            horas_traslado: b.horas_traslado,
+            programadoHorasTraslado: b.programado_horas_traslado,
+            hora_fin_regreso: b.hora_fin_regreso,
+            horas_regreso: b.horas_regreso,
+            programadoHorasRegreso: b.programado_horas_regreso,
+            tipo: b.tipo || 'Servicio',
+            realizado: realizado,
+            programadoEntrada: programadoEntrada,
+            programadoSalida: programadoSalida,
+            desviacion: desviacion,
+            asignadoPorName: asignadoPorName
           });
-        }
-      } catch (bitErr) {
-        console.error('[Sync] Error al descargar orden_bitacora:', bitErr);
+        });
       }
 
-      // Descargar Refacciones Asociadas
+      // Procesar Refacciones Asociadas
       let refaccionesMap = {};
-      try {
-        let refsDb = [];
-        try {
-          refsDb = await fetchTablePaginated('orden_refacciones', '*, refacciones(codigo, descripcion)');
-        } catch (refsErr) {
-          console.error('[Sync] Error al descargar orden_refacciones:', refsErr);
-        }
-        if (refsDb && refsDb.length > 0) {
-          refsDb.forEach(r => {
-            if (!refaccionesMap[r.orden_id]) refaccionesMap[r.orden_id] = { necesarias: [], utilizadas: [] };
-            
-            const refMeta = r.refacciones || {};
-            const refObj = {
-              clave: refMeta.codigo || null,
-              descripcion: refMeta.descripcion || 'Refacción',
-              cantidad: r.cantidad || 1,
-              precio: r.precio_unitario || 0,
-              estatusPedido: r.estatus_pedido || (r.estado === 'Necesaria' || r.estado === 'Solicitado' ? 'Por Pedir' : null),
-              estado: r.estado || null
-            };
-            
-            if (r.estado === 'Necesaria' || r.estado === 'Solicitado') {
-              refaccionesMap[r.orden_id].necesarias.push(refObj);
-            } else {
-              refaccionesMap[r.orden_id].utilizadas.push(refObj);
-            }
-          });
-        }
-      } catch (refsErr) {
-        console.error('[Sync] Error al descargar orden_refacciones:', refsErr);
+      if (refsDb && refsDb.length > 0) {
+        refsDb.forEach(r => {
+          if (!refaccionesMap[r.orden_id]) refaccionesMap[r.orden_id] = { necesarias: [], utilizadas: [] };
+          
+          const refMeta = r.refacciones || {};
+          const refObj = {
+            clave: refMeta.codigo || null,
+            descripcion: refMeta.descripcion || 'Refacción',
+            cantidad: r.cantidad || 1,
+            precio: r.precio_unitario || 0,
+            estatusPedido: r.estatus_pedido || (r.estado === 'Necesaria' || r.estado === 'Solicitado' ? 'Por Pedir' : null),
+            estado: r.estado || null
+          };
+          
+          if (r.estado === 'Necesaria' || r.estado === 'Solicitado') {
+            refaccionesMap[r.orden_id].necesarias.push(refObj);
+          } else {
+            refaccionesMap[r.orden_id].utilizadas.push(refObj);
+          }
+        });
       }
 
-      // Descargar Firmas Asociadas
+      // Procesar Firmas Asociadas
       let firmasMap = {};
-      try {
-        let firmasDb = [];
-        try {
-          firmasDb = await fetchTablePaginated('orden_firmas', '*');
-        } catch (firmErr) {
-          console.error('[Sync] Error al descargar orden_firmas:', firmErr);
-        }
-        if (firmasDb && firmasDb.length > 0) {
-          firmasDb.forEach(f => {
-            firmasMap[f.orden_id] = {
-              firma_tecnico_base64: f.firma_tecnico_url || null,
-              firma_tecnico_fecha: f.fecha_firma || null,
-              firma_cliente_base64: f.firma_cliente_url || null,
-              firma_cliente_nombre: f.nombre_firmante || null,
-              firma_cliente_fecha: f.fecha_firma || null
-            };
-          });
-        }
-      } catch (firmErr) {
-        console.error('[Sync] Error al descargar orden_firmas:', firmErr);
+      if (firmasDb && firmasDb.length > 0) {
+        firmasDb.forEach(f => {
+          firmasMap[f.orden_id] = {
+            firma_tecnico_base64: f.firma_tecnico_url || null,
+            firma_tecnico_fecha: f.fecha_firma || null,
+            firma_cliente_base64: f.firma_cliente_url || null,
+            firma_cliente_nombre: f.nombre_firmante || null,
+            firma_cliente_fecha: f.fecha_firma || null
+          };
+        });
       }
 
       let mapped = ordenes.map(o => {
@@ -3485,32 +3954,45 @@ window.cargarDatosDeSupabase = function() {
     window._supaCalendarioEventos = mergedEventos;
     localStorage.setItem('sapi_calendario_eventos', JSON.stringify(mergedEventos));
 
-    // Telemetry events
-    try {
-      const { data: telemetryDb, error: telemetryErr } = await sb.from('sapi_telemetry').select('*').limit(300).order('timestamp', { ascending: false });
-      if (!telemetryErr && telemetryDb && telemetryDb.length > 0) {
-        const mapped = telemetryDb.map(t => ({
-          id: t.id,
-          userId: t.user_id,
-          userName: t.user_name,
-          userRole: t.user_role,
-          action: t.action,
-          details: t.details || {},
-          timestamp: t.timestamp,
-          userAgent: t.user_agent
-        }));
-        localStorage.setItem('sapi_telemetry_events', JSON.stringify(mapped));
+    // Telemetry events: Ahora se consultan bajo demanda cuando el admin abre el módulo de telemetría
+    // evitando saturar conexiones y memoria en el inicio de sesión.
+    window.fetchTelemetryFromSupabase = async function(limitCount = 200) {
+      const client = window.supabaseClient;
+      if (!client) return;
+      try {
+        const { data: telemetryDb, error: telemetryErr } = await client
+          .from('sapi_telemetry')
+          .select('*')
+          .limit(limitCount)
+          .order('timestamp', { ascending: false });
+
+        if (!telemetryErr && telemetryDb && telemetryDb.length > 0) {
+          const mapped = telemetryDb.map(t => ({
+            id: t.id,
+            userId: t.user_id,
+            userName: t.user_name,
+            userRole: t.user_role,
+            action: t.action,
+            details: t.details || {},
+            timestamp: t.timestamp,
+            userAgent: t.user_agent
+          }));
+          localStorage.setItem('sapi_telemetry_events', JSON.stringify(mapped));
+          if (typeof window.renderTelemetryDashboard === 'function') {
+            window.renderTelemetryDashboard();
+          }
+        }
+      } catch (errT) {
+        console.warn('[Telemetry] Error al consultar telemetría de Supabase:', errT.message);
       }
-    } catch (errT) {
-      console.warn('[Sync] Tabla sapi_telemetry no disponible en Supabase (o RLS activa).', errT.message);
-    }
+    };
 
     // Cotizaciones SAP (Caché en memoria y localStorage para autocompletar)
     try {
       let cotizaciones = null;
       let cotizacionesErr = null;
       try {
-        cotizaciones = await fetchTablePaginated('cotizaciones_sap', '*', 'numero_cotizacion', false);
+        cotizaciones = await fetchTablePaginated('cotizaciones_sap', '*', null, false);
       } catch (err) {
         cotizacionesErr = err;
       }
@@ -3527,7 +4009,7 @@ window.cargarDatosDeSupabase = function() {
       let pedidos = null;
       let pedidosErr = null;
       try {
-        pedidos = await fetchTablePaginated('pedidos_sap', '*', 'numero_pedido', false);
+        pedidos = await fetchTablePaginated('pedidos_sap', '*', null, false);
       } catch (err) {
         pedidosErr = err;
       }
@@ -3755,47 +4237,6 @@ function setupRealtime() {
         localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(mappedClara));
         window._supaClaraTxs = mappedClara;
 
-      } else if (tableName === 'sapi_telemetry') {
-        let mapped = [];
-        const mapTelemetry = t => ({
-          id: t.id,
-          userId: t.user_id,
-          userName: t.user_name,
-          userRole: t.user_role,
-          action: t.action,
-          details: t.details || {},
-          timestamp: t.timestamp,
-          userAgent: t.user_agent
-        });
-
-        if (!isFallback) {
-          const current = JSON.parse(localStorage.getItem('sapi_telemetry_events') || '[]');
-          if (payload.eventType === 'DELETE') {
-            mapped = current.filter(t => t.id !== payload.old.id);
-          } else {
-            const item = mapTelemetry(payload.new);
-            const idx = current.findIndex(t => t.id === item.id);
-            if (idx > -1) {
-              current[idx] = item;
-            } else {
-              current.unshift(item);
-            }
-            mapped = current.slice(0, 300);
-          }
-        } else {
-          const { data: telemetryDb, error: telemetryErr } = await window.supabaseClient.from('sapi_telemetry').select('*').limit(300).order('timestamp', { ascending: false });
-          if (!telemetryErr && telemetryDb) {
-            mapped = telemetryDb.map(mapTelemetry);
-          }
-        }
-        localStorage.setItem('sapi_telemetry_events', JSON.stringify(mapped));
-
-        // Re-render dashboard live if they are currently on the telemetry tab
-        const activeView = document.querySelector('.view.active');
-        if (activeView && activeView.id === 'view-telemetry' && window.renderTelemetryDashboard) {
-          window.renderTelemetryDashboard();
-        }
-
       } else if (tableName === 'calendario_eventos') {
         let mapped = [];
         if (!isFallback) {
@@ -3818,42 +4259,95 @@ function setupRealtime() {
         localStorage.setItem('sapi_calendario_eventos', JSON.stringify(mapped));
         window._supaCalendarioEventos = mapped;
 
-      } else if (tableName === 'clara_cards') {
-        let mappedCards = [];
-        const mapCard = row => ({
-          id: row.id,
-          alias: row.alias,
-          usuario: row.usuario,
-          correo: row.correo,
-          estado: row.estado,
-          tipo: row.tipo,
-          tarjeta: padCard(row.tarjeta),
-          limite: Number(row.limite || 0),
-          saldoUtilizado: Number(row.saldo_utilizado || 0),
-          ultimaActualizacion: row.ultima_actualizacion,
-          dondeComprar: row.donde_comprar,
-          usuarioVinculadoId: row.usuario_vinculado_id || null
-        });
-
+      } else if (tableName === 'ideas_fallas') {
+        let mapped = [];
         if (!isFallback) {
-          const current = window._supaClaraCards || JSON.parse(localStorage.getItem('sapi_clara_cards') || '[]');
+          const current = JSON.parse(localStorage.getItem('sapi_ideas_fallas') || '[]');
           if (payload.eventType === 'DELETE') {
-            mappedCards = current.filter(c => c.id !== payload.old.id);
+            mapped = current.filter(i => i.id !== payload.old.id);
           } else {
-            const card = mapCard(payload.new);
-            const idx = current.findIndex(c => c.id === card.id);
+            const idea = payload.new;
+            const idx = current.findIndex(i => i.id === idea.id);
             if (idx > -1) {
-              current[idx] = card;
+              current[idx] = idea;
             } else {
-              current.unshift(card);
+              current.unshift(idea);
             }
-            mappedCards = current;
+            mapped = current;
           }
         } else {
-          mappedCards = data.map(mapCard);
+          mapped = data;
         }
-        localStorage.setItem('sapi_clara_cards', JSON.stringify(mappedCards));
-        window._supaClaraCards = mappedCards;
+        localStorage.setItem('sapi_ideas_fallas', JSON.stringify(mapped));
+        if (typeof window.ideasFallasDb !== 'undefined') {
+          window.ideasFallasDb = mapped;
+        }
+        if (typeof window.renderIdeasFallasList === 'function') {
+          window.renderIdeasFallasList();
+        }
+      }
+
+      if (tableName === 'envios') {
+        let mappedEnvios = [];
+        const current = JSON.parse(localStorage.getItem('sapi_envios_db') || '[]');
+        if (!isFallback) {
+          if (payload.eventType === 'DELETE') {
+            mappedEnvios = current.filter(e => e.id !== payload.old.id);
+          } else {
+            const envio = rowToEnvio(payload.new);
+            const idx = current.findIndex(e => e.id === envio.id);
+            if (idx > -1) {
+              current[idx] = envio;
+            } else {
+              current.unshift(envio);
+            }
+            mappedEnvios = current;
+          }
+        } else {
+          mappedEnvios = data.map(rowToEnvio);
+        }
+        localStorage.setItem('sapi_envios_db', JSON.stringify(mappedEnvios));
+        if (typeof window.sapiEnviosDb !== 'undefined') {
+          window.sapiEnviosDb = mappedEnvios;
+        }
+
+        if (typeof window.renderEnvios === 'function') {
+          window.renderEnvios();
+        }
+      }
+
+      if (tableName === 'config') {
+        if (!isFallback && payload.new) {
+          const cfgId = payload.new.id;
+          const cfgData = payload.new.data;
+          if (cfgId === 'main' && cfgData) {
+            localStorage.setItem('eurorep_config', JSON.stringify(cfgData));
+          } else if (cfgId === 'roles' && cfgData) {
+            localStorage.setItem('sapi_roles_config', JSON.stringify(cfgData));
+            if (typeof window.cargarRolesDesdeStorage === 'function') window.cargarRolesDesdeStorage();
+            if (window.currentSession && window.currentSession.viewMode && typeof window.applyRole === 'function') {
+              window.applyRole(window.currentSession.viewMode);
+            }
+          } else if ((cfgId === 'kits_servicio' || cfgId === 'machotes_servicio') && cfgData) {
+            if (typeof safeSetJSON === 'function') {
+              safeSetJSON('sapi_kits_servicio', cfgData);
+            } else {
+              localStorage.setItem('sapi_kits_servicio', JSON.stringify(cfgData));
+            }
+            if (typeof window.filtrarKitsServicio === 'function') {
+              window.filtrarKitsServicio();
+            }
+          } else if (cfgId === 'kits_servicio_sandbox' && cfgData) {
+            if (typeof safeSetJSON === 'function') {
+              safeSetJSON('sapi_kits_servicio_sandbox', cfgData);
+            } else {
+              localStorage.setItem('sapi_kits_servicio_sandbox', JSON.stringify(cfgData));
+            }
+            if (typeof window.filtrarKitsServicio === 'function') {
+              window.filtrarKitsServicio();
+            }
+          }
+        }
       }
       
       window.dispatchEvent(new Event('supabase_datos_cargados'));
@@ -3863,22 +4357,30 @@ function setupRealtime() {
   };
 
   try {
+    // Si no hay sesión de usuario activa, no abrir canal en vivo para proteger conexiones de Supabase
+    const sessionStr = localStorage.getItem('eurorep_session');
+    if (!sessionStr) {
+      return;
+    }
+
     if (window.supabaseRealtimeChannel) {
       window.supabaseClient.removeChannel(window.supabaseRealtimeChannel);
     }
     window.supabaseRealtimeChannel = window.supabaseClient.channel('custom-all-channel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, (payload) => handleUpdate('tickets', payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes' }, (payload) => handleUpdate('ordenes', payload))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'clara_transactions' }, (payload) => handleUpdate('clara_transactions', payload))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'clara_cards' }, (payload) => handleUpdate('clara_cards', payload))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sapi_telemetry' }, (payload) => handleUpdate('sapi_telemetry', payload))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'calendario_eventos' }, (payload) => handleUpdate('calendario_eventos', payload));
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'envios' }, (payload) => handleUpdate('envios', payload))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'calendario_eventos' }, (payload) => handleUpdate('calendario_eventos', payload))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ideas_fallas' }, (payload) => handleUpdate('ideas_fallas', payload))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'config' }, (payload) => handleUpdate('config', payload));
       
     window.supabaseRealtimeChannel.subscribe();
   } catch (err) {
     console.error('[Realtime] Excepción al suscribirse al canal en tiempo real:', err.message);
   }
 }
+
+window.setupRealtime = setupRealtime;
 
 // ─── Arrancar cuando el DOM esté listo ───────────────────────────────────────
 function arrancarSync() {
@@ -3904,7 +4406,9 @@ function arrancarSync() {
 
   setTimeout(() => {
     migrarDatosASupabase();
-    setupRealtime();
+    if (localStorage.getItem('eurorep_session')) {
+      setupRealtime();
+    }
     updateSyncStatusUI();
     processSyncQueue();
   }, 300);
@@ -3967,9 +4471,23 @@ window.uploadBase64ToStorage = async function(base64Data, bucketName, filePath) 
 };
 window.verDetallesSincronizacion = function() {
   try {
+    if (!document.getElementById('sapi-sync-spinner-style')) {
+      const styleEl = document.createElement('style');
+      styleEl.id = 'sapi-sync-spinner-style';
+      styleEl.textContent = `
+        @keyframes sapi-spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
+
     const queue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
     const oldModal = document.getElementById('sapi-dynamic-sync-modal');
     if (oldModal) oldModal.remove();
+
+    let isSyncing = false;
 
     const overlay = document.createElement('div');
     overlay.id = 'sapi-dynamic-sync-modal';
@@ -3986,7 +4504,9 @@ window.verDetallesSincronizacion = function() {
     overlay.style.justifyContent = 'center';
     overlay.style.padding = '1rem';
     
-    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+    overlay.onclick = function(e) {
+      if (e.target === overlay) overlay.remove();
+    };
 
     const modal = document.createElement('div');
     modal.style.backgroundColor = 'var(--bg-card, #ffffff)';
@@ -4020,7 +4540,9 @@ window.verDetallesSincronizacion = function() {
     closeBtn.style.fontSize = '1.2rem';
     closeBtn.style.cursor = 'pointer';
     closeBtn.style.color = 'var(--text-secondary, #6b7280)';
-    closeBtn.onclick = () => overlay.remove();
+    closeBtn.onclick = () => {
+      overlay.remove();
+    };
     
     header.appendChild(title);
     header.appendChild(closeBtn);
@@ -4030,71 +4552,49 @@ window.verDetallesSincronizacion = function() {
     body.style.maxHeight = '60vh';
     body.style.overflowY = 'auto';
     
-    if (queue.length === 0) {
-      body.innerHTML = `
-        <div style="text-align:center; color:var(--text-muted, #6b7280); padding: 2rem 1rem;">
-          <i data-lucide="check-circle" style="width:48px;height:48px;margin:0 auto 1rem auto;display:block;color:var(--green,#10b981);"></i>
-          <p style="margin:0; font-size:1.05rem; font-weight:500;">Todos tus cambios locales están guardados.</p>
-        </div>
-      `;
-    } else {
-      const p = document.createElement('p');
-      p.textContent = 'Los siguientes cambios se realizaron localmente y están esperando a subir:';
-      p.style.margin = '0 0 1rem 0';
-      p.style.fontSize = '0.9rem';
-      p.style.color = 'var(--text-secondary, #4b5563)';
-      body.appendChild(p);
-      
-      const list = document.createElement('div');
-      list.style.display = 'flex';
-      list.style.flexDirection = 'column';
-      list.style.gap = '0.75rem';
-      
-      queue.forEach((item, index) => {
-        const itemBox = document.createElement('div');
-        itemBox.style.border = '1px solid var(--border, #e5e7eb)';
-        itemBox.style.borderRadius = '10px';
-        itemBox.style.padding = '1rem';
-        itemBox.style.backgroundColor = 'var(--bg-hover, #f9fafb)';
-        
-        let desc = 'Sin descripción';
-        if (item && item.data) {
-          desc = item.data.folio || item.data.asunto || item.data.nombre || item.data.cliente || item.data.id || 'Registro en ' + item.table;
-        }
-        
-        itemBox.innerHTML = `
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
-            <div style="display:flex; gap:0.5rem;">
-              <span style="font-size:0.7rem; font-weight:700; background:rgba(232,130,12,0.1); color:var(--accent,#e8820c); padding:0.2rem 0.5rem; border-radius:6px; border:1px solid rgba(232,130,12,0.2);">${item.table || 'DESCONOCIDO'}</span>
-              <span style="font-size:0.7rem; font-weight:700; background:#e5e7eb; color:#4b5563; padding:0.2rem 0.5rem; border-radius:6px;">${item.action || 'UPSERT'}</span>
-            </div>
+    const renderBodyContent = (currentQueue) => {
+      if (currentQueue.length === 0) {
+        return `
+          <div style="text-align:center; color:var(--text-muted, #6b7280); padding: 2rem 1rem;">
+            <i data-lucide="check-circle" style="width:48px;height:48px;margin:0 auto 1rem auto;display:block;color:var(--green,#10b981);"></i>
+            <p style="margin:0; font-size:1.05rem; font-weight:500;">Todos tus cambios locales están guardados.</p>
           </div>
-          <div style="font-size:0.85rem; font-weight:600; word-break:break-word;">${desc}</div>
         `;
-
-        if (item.lastError) {
-          const errEl = document.createElement('div');
-          errEl.style.fontSize = '0.72rem';
-          errEl.style.color = '#ef4444';
-          errEl.style.marginTop = '0.4rem';
-          errEl.style.fontWeight = '600';
-          errEl.style.background = 'rgba(239, 68, 68, 0.05)';
-          errEl.style.border = '1px solid rgba(239, 68, 68, 0.12)';
-          errEl.style.padding = '0.4rem 0.5rem';
-          errEl.style.borderRadius = '6px';
-          errEl.style.display = 'flex';
-          errEl.style.gap = '0.4rem';
-          errEl.style.alignItems = 'flex-start';
-          errEl.innerHTML = `
-            <i data-lucide="alert-triangle" style="width:14px;height:14px;flex-shrink:0;margin-top:0.1rem;"></i>
-            <span>Error: ${item.lastError} ${item.lastErrorCode ? `(Código: ${item.lastErrorCode})` : ''}</span>
+      } else {
+        let html = `
+          <p style="margin:0 0 1rem 0; font-size:0.9rem; color:var(--text-secondary, #4b5563);">
+            Los siguientes cambios se realizaron localmente y están esperando a subir:
+          </p>
+          <div style="display:flex; flex-direction:column; gap:0.75rem;">
+        `;
+        currentQueue.forEach((item, index) => {
+          let desc = 'Sin descripción';
+          if (item && item.data) {
+            desc = item.data.folio || item.data.asunto || item.data.nombre || item.data.cliente || item.data.id || 'Registro en ' + item.table;
+          }
+          html += `
+            <div style="border:1px solid var(--border, #e5e7eb); border-radius:10px; padding:1rem; background-color:var(--bg-hover, #f9fafb);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                <div style="display:flex; gap:0.5rem;">
+                  <span style="font-size:0.7rem; font-weight:700; background:rgba(232,130,12,0.1); color:var(--accent,#e8820c); padding:0.2rem 0.5rem; border-radius:6px; border:1px solid rgba(232,130,12,0.2);">${item.table || 'DESCONOCIDO'}</span>
+                  <span style="font-size:0.7rem; font-weight:700; background:#e5e7eb; color:#4b5563; padding:0.2rem 0.5rem; border-radius:6px;">${item.action || 'UPSERT'}</span>
+                </div>
+                <button class="sapi-del-queue-btn" data-index="${index}" style="background:transparent; border:none; color:var(--text-muted, #9ca3af); cursor:pointer; font-size:1rem; padding:0 0.2rem;" title="Eliminar este cambio pendiente">✕</button>
+              </div>
+              <div style="font-size:0.85rem; font-weight:600; word-break:break-word;">${desc}</div>
+              ${item.lastError ? `
+                <div style="font-size:0.72rem; color:#ef4444; margin-top:0.4rem; font-weight:600; background:rgba(239, 68, 68, 0.05); border:1px solid rgba(239, 68, 68, 0.12); padding:0.4rem 0.5rem; border-radius:6px; display:flex; gap:0.4rem; align-items:flex-start;">
+                  <i data-lucide="alert-triangle" style="width:14px;height:14px;flex-shrink:0;margin-top:0.1rem;"></i>
+                  <span>Error: ${item.lastError} ${item.lastErrorCode ? `(Código: ${item.lastErrorCode})` : ''}</span>
+                </div>
+              ` : ''}
+            </div>
           `;
-          itemBox.appendChild(errEl);
-        }
-        list.appendChild(itemBox);
-      });
-      body.appendChild(list);
-    }
+        });
+        html += `</div>`;
+        return html;
+      }
+    };
 
     // Agregar banner de estado de sincronización (Online/Offline)
     const isOffline = !navigator.onLine && !window.isConnectionVerifiedOnline;
@@ -4149,7 +4649,11 @@ window.verDetallesSincronizacion = function() {
         </div>
       `;
     }
-    body.insertBefore(statusBanner, body.firstChild);
+    body.appendChild(statusBanner);
+
+    const bodyContentContainer = document.createElement('div');
+    bodyContentContainer.innerHTML = renderBodyContent(queue);
+    body.appendChild(bodyContentContainer);
     
     const footer = document.createElement('div');
     footer.style.padding = '1rem 1.5rem';
@@ -4162,15 +4666,142 @@ window.verDetallesSincronizacion = function() {
     const closeAction = document.createElement('button');
     closeAction.textContent = 'Cerrar';
     closeAction.className = 'btn-secondary';
-    closeAction.onclick = () => overlay.remove();
+    closeAction.onclick = () => {
+      overlay.remove();
+      if (isSyncing && window.mostrarNotificacion) {
+        window.mostrarNotificacion('La sincronización continúa en segundo plano...', 'info');
+      }
+    };
     
     const syncAction = document.createElement('button');
     syncAction.textContent = 'Sincronizar Ahora';
     syncAction.className = 'btn-primary';
-    syncAction.onclick = () => {
-      overlay.remove();
-      if (typeof window.forzarSincronizacionManual === 'function') {
-        window.forzarSincronizacionManual();
+
+    const setupDeleteHandlers = () => {
+      const delBtns = overlay.querySelectorAll('.sapi-del-queue-btn');
+      delBtns.forEach(btn => {
+        btn.onclick = function(e) {
+          if (confirm('¿Seguro que deseas eliminar este cambio local? Se perderán los datos.')) {
+            const idx = parseInt(this.getAttribute('data-index'), 10);
+            let currentQueue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+            currentQueue.splice(idx, 1);
+            localStorage.setItem('sapi_sync_queue', JSON.stringify(currentQueue));
+            overlay.remove();
+            window.verDetallesSincronizacion();
+            if (window.updateSyncStatusUI) window.updateSyncStatusUI();
+          }
+        };
+      });
+    };
+
+    syncAction.onclick = async () => {
+      if (isSyncing) return;
+      isSyncing = true;
+
+      // Mantener controles de cierre SIEMPRE habilitados para permitir al usuario trabajar libremente
+      closeBtn.disabled = false;
+      closeBtn.style.opacity = '1';
+      closeBtn.style.cursor = 'pointer';
+      closeAction.disabled = false;
+      closeAction.style.opacity = '1';
+      closeAction.style.cursor = 'pointer';
+
+      // Cambiar botón a estado de carga
+      syncAction.disabled = true;
+      syncAction.style.opacity = '0.85';
+      syncAction.style.cursor = 'wait';
+      syncAction.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid #ffffff;border-top-color:transparent;border-radius:50%;animation:sapi-spin 0.8s linear infinite;margin-right:8px;vertical-align:-2px;"></span> Sincronizando...';
+
+      // Actualizar banner con indicador de carga
+      statusBanner.style.backgroundColor = 'rgba(232, 130, 12, 0.08)';
+      statusBanner.style.border = '1px solid rgba(232, 130, 12, 0.3)';
+      statusBanner.innerHTML = `
+        <span style="display:inline-block;width:18px;height:18px;border:2.5px solid var(--accent, #e8820c);border-top-color:transparent;border-radius:50%;animation:sapi-spin 0.8s linear infinite;flex-shrink:0;margin-top:0.15rem;"></span>
+        <div>
+          <span style="font-weight:700; color:var(--text-primary,#111827);">Sincronizando con Supabase...</span>
+          <div id="sync-modal-progress-text" style="margin-top:0.2rem; font-size:0.82rem; color:var(--text-secondary,#4b5563);">Subiendo cambios locales y descargando las últimas actualizaciones. Por favor, espera...</div>
+        </div>
+      `;
+
+      try {
+        if (typeof window.forzarSincronizacionManual === 'function') {
+          await window.forzarSincronizacionManual();
+        }
+
+        // Obtener nueva hora de sincronización
+        const newLastSyncStr = localStorage.getItem('sapi_last_sync_timestamp') || new Date().toISOString();
+        let newLastSyncFormatted = newLastSyncStr;
+        try {
+          const d = new Date(newLastSyncStr);
+          newLastSyncFormatted = d.toLocaleString('es-MX', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+          });
+        } catch (e) {}
+
+        // Actualizar banner a éxito
+        statusBanner.style.backgroundColor = 'rgba(16, 185, 129, 0.08)';
+        statusBanner.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+        statusBanner.innerHTML = `
+          <i data-lucide="check-circle" style="width:18px; height:18px; color:var(--green,#10b981); flex-shrink:0; margin-top:0.1rem;"></i>
+          <div>
+            <span style="font-weight:700; color:var(--green,#10b981);">¡Sincronización completada con éxito!</span>
+            <div style="margin-top:0.2rem; font-size:0.82rem;">El sistema se encuentra sincronizado en tiempo real.</div>
+            <div style="margin-top:0.4rem; font-size:0.78rem; font-weight:700; color:var(--green,#10b981);">Última sincronización: ${newLastSyncFormatted}</div>
+          </div>
+        `;
+
+        const updatedQueue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+        title.textContent = updatedQueue.length === 0 ? 'Estado del Sistema' : 'Cambios Pendientes (' + updatedQueue.length + ')';
+        bodyContentContainer.innerHTML = renderBodyContent(updatedQueue);
+
+        // Re-habilitar controles
+        isSyncing = false;
+        closeBtn.disabled = false;
+        closeBtn.style.opacity = '1';
+        closeBtn.style.cursor = 'pointer';
+        closeAction.disabled = false;
+        closeAction.style.opacity = '1';
+        closeAction.style.cursor = 'pointer';
+
+        syncAction.disabled = false;
+        syncAction.style.opacity = '1';
+        syncAction.style.cursor = 'pointer';
+        syncAction.textContent = 'Sincronizar de nuevo';
+
+        setupDeleteHandlers();
+      } catch (err) {
+        console.error('[Sync Modal] Error durante sincronización manual:', err);
+        isSyncing = false;
+        closeBtn.disabled = false;
+        closeBtn.style.opacity = '1';
+        closeBtn.style.cursor = 'pointer';
+        closeAction.disabled = false;
+        closeAction.style.opacity = '1';
+        closeAction.style.cursor = 'pointer';
+
+        syncAction.disabled = false;
+        syncAction.style.opacity = '1';
+        syncAction.style.cursor = 'pointer';
+        syncAction.textContent = 'Reintentar Sincronización';
+
+        statusBanner.style.backgroundColor = 'rgba(239, 68, 68, 0.08)';
+        statusBanner.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+        statusBanner.innerHTML = `
+          <i data-lucide="alert-triangle" style="width:18px; height:18px; color:#ef4444; flex-shrink:0; margin-top:0.1rem;"></i>
+          <div>
+            <span style="font-weight:700; color:#ef4444;">Error al sincronizar</span>
+            <div style="margin-top:0.2rem; font-size:0.82rem; color:#ef4444;">${err.message || 'No se pudo completar la sincronización. Verifica tu conexión a internet.'}</div>
+          </div>
+        `;
+      } finally {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
       }
     };
     
@@ -4183,20 +4814,11 @@ window.verDetallesSincronizacion = function() {
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
 
-    const delBtns = overlay.querySelectorAll('.sapi-del-queue-btn');
-    delBtns.forEach(btn => {
-      btn.onclick = function(e) {
-        if (confirm('¿Seguro que deseas eliminar este cambio local? Se perderán los datos.')) {
-          const idx = parseInt(this.getAttribute('data-index'), 10);
-          let currentQueue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
-          currentQueue.splice(idx, 1);
-          localStorage.setItem('sapi_sync_queue', JSON.stringify(currentQueue));
-          overlay.remove();
-          window.verDetallesSincronizacion();
-          if (window.updateSyncStatusUI) window.updateSyncStatusUI();
-        }
-      };
-    });
+    setupDeleteHandlers();
+
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
 
   } catch (err) {
     console.error('[Sync] Excepción:', err);

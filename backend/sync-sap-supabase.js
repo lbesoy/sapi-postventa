@@ -476,7 +476,7 @@ async function fetchPedidosFromSAP() {
     try {
       res = await sapApi.get(`${SAP_URL}/SQLQueries('${QUERIES.pedidos}')/List`, {
         headers: { 'B1S-PageSize': 5000, 'Prefer': 'odata.maxpagesize=5000' },
-        timeout: 15000
+        timeout: 45000
       });
     } catch (errGet) {
       if (errGet.response && errGet.response.status === 404) {
@@ -528,7 +528,7 @@ async function fetchPedidosFromSAP() {
 
     while (url) {
       log(`- Obteniendo página ${page} de pedidos...`);
-      const qRes = await sapApi.get(url, { timeout: 15000 });
+      const qRes = await sapApi.get(url, { timeout: 45000 });
       const items = qRes.data.value || [];
       allOrders = allOrders.concat(items);
       url = qRes.data['odata.nextLink'] ? `${SAP_URL}/${qRes.data['odata.nextLink']}` : null;
