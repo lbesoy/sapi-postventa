@@ -1320,10 +1320,14 @@ body {
 
 /* ===== PRINT ===== */
 @media print {
-  @page { margin: 1.5cm; }
+  @page { 
+    margin: 1cm;
+    size: auto;
+  }
 
   html, body {
     background: white !important; 
+    color: #000000 !important;
     margin: 0 !important; 
     padding: 0 !important; 
     -webkit-print-color-adjust: exact !important; 
@@ -1334,23 +1338,40 @@ body {
     overflow: visible !important;
   }
 
-  /* Ocultar todos los elementos de primer nivel excepto el modal de detalle abierto */
-  body > *:not(.modal-overlay.open) {
-    display: none !important;
+  /* Mostrar los contenedores principales para permitir que el modal visible se imprima */
+  body, #app-wrapper, .main-wrapper, .content {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
   }
 
-  .sidebar, .main-wrapper, .topbar, .content, .btn-primary, .btn-secondary,
-  .modal-header button, .form-actions, #detalle-header-actions, .modal-close, .no-print { 
+  /* Ocultar navegacion, vistas de fondo, tarjetas de estadisticas, botones y elementos no imprimibles */
+  .sidebar, .topbar, .login-screen, #login-screen,
+  .btn-primary, .btn-secondary, .action-btn,
+  .modal-header button, .form-actions, #detalle-header-actions, .modal-close,
+  .no-print, .search-bar, .table-wrapper, .orders-table, .dashboard-grid, .stats-grid, .stats-grid-5, .stat-card, .section-header, .view,
+  .nav-item, .sidebar-logo, #chat-soporte-pane { 
     display: none !important; 
   }
-  
-  .modal-overlay { 
+
+  /* Ocultar modales cerrados o que no estan activos */
+  .modal-overlay:not(.open) { 
     display: none !important; 
   }
-  
+
+  /* Mostrar unicamente el modal abierto (.modal-overlay.open) */
   .modal-overlay.open { 
     display: block !important; 
-    position: absolute !important; 
+    visibility: visible !important;
+    position: static !important; 
     top: 0 !important;
     left: 0 !important;
     width: 100% !important;
@@ -1362,10 +1383,11 @@ body {
     border: none !important;
     overflow: visible !important;
   }
-  
-  .modal { 
+
+  .modal-overlay.open .modal { 
     display: block !important;
-    position: relative !important;
+    visibility: visible !important;
+    position: static !important;
     box-shadow: none !important; 
     border: none !important; 
     max-height: none !important; 
@@ -1373,23 +1395,46 @@ body {
     max-width: 100% !important; 
     margin: 0 !important; 
     padding: 0 !important; 
+    background: white !important;
+    color: #0f172a !important;
     animation: none !important;
     transform: none !important;
+    overflow: visible !important;
   }
-  
-  .modal-body { 
+
+  .modal-overlay.open .modal-header {
+    border-bottom: 2px solid #cbd5e1 !important;
+    padding-bottom: 0.5rem !important;
+    margin-bottom: 1rem !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+
+  .modal-overlay.open .modal-header h2,
+  .modal-overlay.open .modal-header h3 {
+    color: #0f172a !important;
+    font-size: 1.3rem !important;
+    font-weight: 700 !important;
+    display: block !important;
+  }
+
+  .modal-overlay.open .modal-body { 
     padding: 0 !important; 
     overflow: visible !important; 
     height: auto !important; 
     max-height: none !important; 
+    color: #0f172a !important;
+    display: block !important;
   }
-  
-  .print-only { display: block; }
-  /* Signature print handling */
+
+  .print-only { display: block !important; }
+
+  /* Ajustes para firmas y botones de seccion */
   #firma-canvas, canvas { display: none !important; }
   .detalle-section button { display: none !important; }
-  
-  /* Fix Grid Page Breaks */
+
+  /* Asegurar que el grid del detalle no se corte raro entre paginas */
   .detalle-grid {
     display: flex !important;
     flex-wrap: wrap !important;
@@ -1404,6 +1449,20 @@ body {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     display: block !important;
+    margin-bottom: 1rem !important;
+  }
+
+  /* Asegurar visibilidad de etiquetas y textos del detalle */
+  .detail-label, .form-group label {
+    color: #475569 !important;
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+  }
+
+  .detail-value {
+    color: #0f172a !important;
+    font-size: 0.9rem !important;
+    font-weight: 700 !important;
   }
 }
 

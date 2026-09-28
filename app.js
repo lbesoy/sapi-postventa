@@ -15284,6 +15284,25 @@ async function guardarProgramacionTecnico() {
     }
   }
 
+  if (typeof window.ejecutarAutomatizacion === 'function') {
+    for (const o of modifiedOrders) {
+      const t = (tickets || []).find(x => x.id === o.soporte || x.folio === o.soporte);
+      const toEmail = t?.contacto || '';
+      const ultimaBitacora = (o.bitacora && o.bitacora.length > 0) ? o.bitacora[o.bitacora.length - 1] : null;
+      window.ejecutarAutomatizacion('Visita técnica en campo programada', {
+        email: toEmail,
+        nombre_cliente: o.cliente || t?.cliente || 'Cliente',
+        folio_os: o.id || '',
+        folio_ticket: t ? t.folio : (o.soporte || ''),
+        fecha_programada: ultimaBitacora ? ultimaBitacora.fecha : '',
+        fecha_visita: ultimaBitacora ? ultimaBitacora.fecha : '',
+        tecnico_asignado: o.tecnico || '',
+        tecnico_nombre: o.tecnico || '',
+        link: window.location.origin + '/cliente'
+      });
+    }
+  }
+
   mostrarNotificacion('Asignación programada con éxito', 'success');
   document.getElementById('modal-programar-tecnico-overlay').classList.remove('open');
   if (typeof renderCalendario === 'function') {
@@ -24643,6 +24662,16 @@ window.agregarComentarioInterno = async function(ticketId) {
       if (typeof window.sincronizarNotificacionesInternas === 'function') window.sincronizarNotificacionesInternas();
       mostrarNotificacion('Comentario agregado.', 'success');
       
+      if (typeof window.ejecutarAutomatizacion === 'function') {
+        window.ejecutarAutomatizacion('Comentario guardado en chat del ticket', {
+          email: t.clienteEmail || t.solicitanteEmail || '',
+          nombre_cliente: t.cliente || '',
+          folio_ticket: t.folio || t.id,
+          comentario: nuevoComentario.texto,
+          link: window.location.origin + '/cliente'
+        });
+      }
+
       verDetalleTicket(ticketId);
     } catch (err) {
       console.error('Error al guardar comentario en Supabase:', err);
@@ -24653,6 +24682,17 @@ window.agregarComentarioInterno = async function(ticketId) {
     safeSetJSON('sapi_tickets', tickets);
     if (typeof window.sincronizarNotificacionesInternas === 'function') window.sincronizarNotificacionesInternas();
     mostrarNotificacion('Comentario guardado localmente.', 'success');
+    
+    if (typeof window.ejecutarAutomatizacion === 'function') {
+      window.ejecutarAutomatizacion('Comentario guardado en chat del ticket', {
+        email: t.clienteEmail || t.solicitanteEmail || '',
+        nombre_cliente: t.cliente || '',
+        folio_ticket: t.folio || t.id,
+        comentario: nuevoComentario.texto,
+        link: window.location.origin + '/cliente'
+      });
+    }
+
     verDetalleTicket(ticketId);
   }
 };
@@ -24886,7 +24926,7 @@ function verDetalleTicket(id) {
       <div class="detalle-section-title" style="display:flex; align-items:center; gap:0.5rem; color:var(--accent);"><i data-lucide="camera"></i> Evidencia Fotográfica</div>
       <div class="detalle-field" style="display:flex; flex-direction:column; gap:0.5rem;">
         <div id="detalle-evidence-container-${t.id}" style="width:100%; border-radius:10px; overflow:hidden; border:1px solid var(--border); background:rgba(0,0,0,0.35); display:flex; align-items:center; justify-content:center; min-height:180px; max-height:380px; position:relative; padding:0.5rem;">
-          <img id="detalle-evidence-img-${t.id}" src="${(t.pdfCotizacion && t.pdfCotizacion !== '__HAS_PDF__') ? t.pdfCotizacion : (t.foto || t.evidencia || '')}" alt="Evidencia de Falla" style="max-width:100%; max-height:360px; object-fit:contain; border-radius:6px; cursor:pointer; display:${(t.pdfCotizacion && t.pdfCotizacion !== '__HAS_PDF__') || t.foto || t.evidencia ? 'block' : 'none'}; box-shadow:0 4px 15px rgba(0,0,0,0.25);" onclick="window.previsualizarImagenCompleta(this.src, 'Evidencia Fotográfica - Ticket ${t.folio || ''}')" title="Clic para ver en pantalla completa" />
+          <img id="detalle-evidence-img-${t.id}" src="${(t.pdfCotizacion && t.pdfCotizacion !== '__HAS_PDF__') ? t.pdfCotizacion : (t.foto || t.evidencia || '')}" alt="Evidencia de Falla" style="max-width:100%; max-height:360px; object-fit:contain; border-radius:6px; cursor:pointer; display:${(t.pdfCotizacion && t.pdfCotizacion !== '__HAS_PDF__') || t.foto || t.evidencia ? 'block' : 'none'}; box-shadow:0 4px 15px rgba(0,0,0,0.25);" onclick="window.previsualizarImagenCompleta(this.src, 'Evidencia Fotográfica - Ticket ${t.folio || ''}')" title="Clic para ver en pantalla completa" onerror="this.style.display='none'; const sec=document.getElementById('section-detalle-evidencia-${t.id}'); if(sec) sec.style.display='none';" />
           <span id="detalle-evidence-loading-${t.id}" style="font-size:0.82rem; color:var(--text-muted); display:${(!t.pdfCotizacion || t.pdfCotizacion === '__HAS_PDF__') && !t.foto && !t.evidencia ? 'inline-flex' : 'none'}; align-items:center; gap:6px;">
             <i data-lucide="loader" class="rotating" style="width:16px;height:16px;color:var(--accent);"></i> Cargando evidencia fotográfica...
           </span>
@@ -25647,6 +25687,17 @@ async function avanzarCotizacionTicket(id) {
     await window.pushToSupabase('tickets', t);
   }
   mostrarNotificacion('Ticket avanzado a Cotización.', 'success');
+
+  if (typeof window.ejecutarAutomatizacion === 'function') {
+    window.ejecutarAutomatizacion('Carga de Cotización SAP en ticket', {
+      email: t.clienteEmail || t.solicitanteEmail || '',
+      nombre_cliente: t.cliente || '',
+      folio_ticket: t.folio || t.id,
+      monto_cotizacion: totalMonto ? `$${Number(totalMonto).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '',
+      link: window.location.origin + '/cliente'
+    });
+  }
+
   cerrarDetalleTicket();
   renderTickets();
   renderStats();
@@ -25723,6 +25774,16 @@ async function cerrarCotizacionTicket(id) {
   safeSetJSON('sapi_tickets', tickets);
   
   if (aceptada === 'si') {
+    if (typeof window.ejecutarAutomatizacion === 'function') {
+      window.ejecutarAutomatizacion('Cotización SAP aceptada por el cliente', {
+        email: t.contacto || '',
+        nombre_cliente: t.cliente || 'Cliente',
+        folio_ticket: t.folio,
+        monto_cotizacion: t.montoCotizacion ? window.formatMontoConComas(t.montoCotizacion) : '',
+        estatus_ticket: t.estado,
+        link: window.location.origin + '/cliente'
+      });
+    }
     if (window.esTicketDeServicioEnCampo(t)) {
       const ordenExistente = ordenes.find(o => o.soporte === t.id);
       if (!ordenExistente) {
@@ -36166,12 +36227,72 @@ window.ejecutarDiagnosticoLocal = async function() {
   }
 };
 
-// ===== CHAT DE SOPORTE GENERAL (EMPRESA SIDE) =====
+// ===== CHAT DE SOPORTE GENERAL & BANDEJA DE CORREO (EMPRESA SIDE) =====
 let activeChatTicketId = null;
+let activeSoporteTab = 'chats'; // 'chats' | 'correos'
+let activeEmailLogId = null;
+let isComposingEmail = false;
+let activeEmailFilter = 'todos'; // 'todos' | 'recibidos' | 'enviados'
+
+window.formatMontoConComas = function(val) {
+  if (val === undefined || val === null || val === '') return '$0.00';
+  let str = String(val).trim();
+  if (str.startsWith('$')) str = str.substring(1).trim();
+  str = str.replace(/,/g, '');
+  const num = Number(str);
+  if (isNaN(num)) return String(val);
+  return '$' + num.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+window.switchSoporteTab = function(tab) {
+  activeSoporteTab = tab;
+  
+  const btnChats = document.getElementById('btn-tab-soporte-chats');
+  const btnCorreos = document.getElementById('btn-tab-soporte-correos');
+  
+  if (btnChats && btnCorreos) {
+    if (tab === 'chats') {
+      btnChats.style.background = 'var(--accent)';
+      btnChats.style.color = 'white';
+      btnCorreos.style.background = 'transparent';
+      btnCorreos.style.color = 'var(--text-secondary)';
+    } else {
+      btnCorreos.style.background = 'var(--accent)';
+      btnCorreos.style.color = 'white';
+      btnChats.style.background = 'transparent';
+      btnChats.style.color = 'var(--text-secondary)';
+    }
+  }
+  
+  window.renderChatSoporteEmpresa();
+};
+
+window.setMailFilter = function(filter) {
+  activeEmailFilter = filter;
+  window.renderBandejaCorreoEmpresa();
+};
+
+window.registrarLogEmail = function(logItem) {
+  try {
+    const logs = safeGetJSON('sapi_email_logs', []);
+    logs.unshift(logItem);
+    safeSetJSON('sapi_email_logs', logs);
+    if (window.supabaseClient) {
+      window.supabaseClient.from('sapi_email_logs').insert(logItem).catch(() => {});
+    }
+  } catch (e) {
+    console.error('Error guardando log de email:', e);
+  }
+};
 
 window.renderChatSoporteEmpresa = function() {
   const listContainer = document.getElementById('chat-client-list');
   if (!listContainer) return;
+
+  if (activeSoporteTab === 'correos') {
+    window.renderBandejaCorreoEmpresa();
+    return;
+  }
 
   const activeSandbox = isTestModeActive();
   const chatTickets = tickets.filter(t => t.categoria === 'Soporte General' && isTestData(t) === activeSandbox);
@@ -36188,7 +36309,7 @@ window.renderChatSoporteEmpresa = function() {
         <p style="font-size:0.9rem; font-weight:500; margin:0;">No hay chats de soporte disponibles</p>
       </div>
     `;
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
     return;
   }
 
@@ -36242,7 +36363,1037 @@ window.renderChatSoporteEmpresa = function() {
     }
   }
 
-  lucide.createIcons();
+  if (window.lucide) lucide.createIcons();
+};
+
+window.obtenerEmailLogsSoporte = function() {
+  let logs = safeGetJSON('sapi_email_logs', []);
+  logs.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  return logs;
+};
+
+window.renderBandejaCorreoEmpresa = function() {
+  const listContainer = document.getElementById('chat-client-list');
+  const paneContainer = document.getElementById('chat-active-pane');
+  if (!listContainer || !paneContainer) return;
+
+  const logs = window.obtenerEmailLogsSoporte();
+
+  // Filtrado por pestaña Todos | Recibidos | Enviados
+  let filteredLogs = logs;
+  if (activeEmailFilter === 'recibidos') {
+    filteredLogs = logs.filter(l => l.tipo === 'recibido' || l.estatus === 'Recibido');
+  } else if (activeEmailFilter === 'enviados') {
+    filteredLogs = logs.filter(l => l.tipo !== 'recibido' && l.estatus !== 'Recibido');
+  }
+  
+  let headerHtml = `
+    <div style="padding:0.6rem 0.8rem; border-bottom:1px solid var(--border); background:var(--bg-card); display:flex; flex-direction:column; gap:0.5rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-weight:700; font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase;">Historial de Correos</span>
+        <button class="btn-primary" onclick="window.redactarNuevoCorreoSoporte()" style="padding:0.25rem 0.55rem; font-size:0.75rem; border-radius:6px; display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer;">
+          <i data-lucide="plus" style="width:12px; height:12px;"></i> Redactar
+        </button>
+      </div>
+      <div style="display:flex; gap:0.25rem; background:var(--bg-primary); padding:0.2rem; border-radius:6px; border:1px solid var(--border);">
+        <button onclick="window.setMailFilter('todos')" style="flex:1; padding:0.25rem 0.3rem; font-size:0.7rem; font-weight:600; border-radius:4px; border:none; cursor:pointer; ${activeEmailFilter === 'todos' ? 'background:var(--accent); color:white;' : 'background:transparent; color:var(--text-secondary);'}">Todos</button>
+        <button onclick="window.setMailFilter('recibidos')" style="flex:1; padding:0.25rem 0.3rem; font-size:0.7rem; font-weight:600; border-radius:4px; border:none; cursor:pointer; ${activeEmailFilter === 'recibidos' ? 'background:var(--accent); color:white;' : 'background:transparent; color:var(--text-secondary);'}">Recibidos</button>
+        <button onclick="window.setMailFilter('enviados')" style="flex:1; padding:0.25rem 0.3rem; font-size:0.7rem; font-weight:600; border-radius:4px; border:none; cursor:pointer; ${activeEmailFilter === 'enviados' ? 'background:var(--accent); color:white;' : 'background:transparent; color:var(--text-secondary);'}">Enviados</button>
+      </div>
+    </div>
+  `;
+
+  if (filteredLogs.length === 0) {
+    listContainer.innerHTML = headerHtml + `
+      <div style="text-align:center; padding:2rem 1rem; color:var(--text-muted); font-size:0.85rem; font-style:italic;">
+        ${activeEmailFilter === 'recibidos' ? 'No hay correos recibidos registrados.' : activeEmailFilter === 'enviados' ? 'No hay correos enviados registrados.' : 'No hay correos registrados en la bandeja.'}
+      </div>
+    `;
+  } else {
+    let itemsHtml = '';
+    filteredLogs.forEach(log => {
+      const isSelected = !isComposingEmail && log.id === activeEmailLogId;
+      const bgStyle = isSelected ? 'background:rgba(232, 130, 12, 0.12); border-left:3px solid var(--accent);' : 'border-left:3px solid transparent;';
+      const timeStr = formatFechaHoraAmigable(log.fecha);
+      const isRecibido = log.tipo === 'recibido' || log.estatus === 'Recibido';
+      const isSuccess = log.estatus !== 'Fallido';
+
+      const statusBadge = isRecibido
+        ? `<span style="padding:0.1rem 0.35rem; border-radius:4px; font-weight:600; font-size:0.65rem; background:rgba(59,130,246,0.15); color:#2563eb;">Recibido</span>`
+        : `<span style="padding:0.1rem 0.35rem; border-radius:4px; font-weight:600; font-size:0.65rem; ${isSuccess ? 'background:rgba(34,197,94,0.15); color:#16a34a;' : 'background:rgba(239,68,68,0.15); color:#ef4444;'}">${isSuccess ? 'Enviado' : 'Fallido'}</span>`;
+
+      const mainContact = isRecibido ? (log.de || log.cliente) : (log.para || log.cliente);
+
+      itemsHtml += `
+        <div onclick="window.seleccionarEmailLog('${log.id}')" style="padding:0.85rem 1rem; cursor:pointer; display:flex; flex-direction:column; gap:0.25rem; border-bottom:1px solid var(--border); transition:all 0.2s; ${bgStyle}">
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+            <span style="font-weight:700; font-size:0.85rem; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:170px;">${mainContact}</span>
+            <span style="font-size:0.65rem; color:var(--text-muted); font-family:monospace;">${timeStr}</span>
+          </div>
+          <div style="font-size:0.8rem; font-weight:600; color:var(--accent); text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:270px; text-align:left;">
+            ${log.asunto || 'Sin asunto'}
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.7rem; color:var(--text-muted);">
+            <span>${log.regla || log.evento || 'Manual'}</span>
+            ${statusBadge}
+          </div>
+        </div>
+      `;
+    });
+
+    listContainer.innerHTML = headerHtml + `<div style="flex:1; overflow-y:auto;">${itemsHtml}</div>`;
+  }
+
+  // Render Right Pane
+  if (isComposingEmail) {
+    if (!document.getElementById('form-componer-correo-soporte')) {
+      window.renderCorreoComposerPane();
+    }
+  } else if (activeEmailLogId) {
+    const activeLog = logs.find(l => l.id === activeEmailLogId);
+    if (activeLog) {
+      window.renderCorreoDetailPane(activeLog);
+    } else {
+      activeEmailLogId = null;
+      window.renderCorreoEmptyPane();
+    }
+  } else {
+    window.renderCorreoEmptyPane();
+  }
+
+  if (window.lucide) lucide.createIcons();
+};
+
+window.renderCorreoEmptyPane = function() {
+  const paneContainer = document.getElementById('chat-active-pane');
+  if (!paneContainer) return;
+  paneContainer.innerHTML = `
+    <div style="flex:1; display:flex; align-items:center; justify-content:center; flex-direction:column; color:var(--text-muted); gap:0.75rem; padding:2rem;">
+      <i data-lucide="mail" style="width:54px; height:54px; opacity:0.4;"></i>
+      <h3 style="font-size:1rem; font-weight:600; margin:0; color:var(--text-secondary);">Bandeja de Correo de Soporte</h3>
+      <p style="font-size:0.85rem; max-width:400px; text-align:center; margin:0;">Selecciona un correo del historial para inspeccionar sus detalles o redacta un nuevo mensaje desde <strong>Ptalctes@eurorep.mx</strong>.</p>
+      <button class="btn-primary" onclick="window.redactarNuevoCorreoSoporte()" style="margin-top:0.5rem; border-radius:8px; padding:0.5rem 1.25rem; font-size:0.85rem; display:inline-flex; align-items:center; gap:0.4rem;">
+        <i data-lucide="plus" style="width:14px; height:14px;"></i> Redactar Nuevo Correo
+      </button>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+};
+
+window.seleccionarEmailLog = function(logId) {
+  isComposingEmail = false;
+  activeEmailLogId = logId;
+  window.renderChatSoporteEmpresa();
+};
+
+window.redactarNuevoCorreoSoporte = function(emailTo = '', clienteNombre = '', subject = '') {
+  activeSoporteTab = 'correos';
+  isComposingEmail = true;
+  activeEmailLogId = null;
+  window._currentMailAttachments = [];
+
+  const existingForm = document.getElementById('form-componer-correo-soporte');
+  if (existingForm) {
+    existingForm.remove();
+  }
+
+  window.renderChatSoporteEmpresa();
+
+  setTimeout(() => {
+    const toInput = document.getElementById('mail-composer-to');
+    const clientInput = document.getElementById('mail-composer-cliente');
+    const subjectInput = document.getElementById('mail-composer-subject');
+    if (toInput && emailTo) toInput.value = emailTo;
+    if (clientInput && clienteNombre) clientInput.value = clienteNombre;
+    if (subjectInput && subject) subjectInput.value = subject.startsWith('Re:') ? subject : `Re: ${subject}`;
+  }, 50);
+};
+
+window.toggleMailField = function(field) {
+  const row = document.getElementById('row-mail-composer-' + field);
+  if (!row) return;
+  if (row.style.display === 'none' || !row.style.display) {
+    row.style.display = 'flex';
+    const input = document.getElementById('mail-composer-' + field);
+    if (input) input.focus();
+  } else {
+    row.style.display = 'none';
+    const input = document.getElementById('mail-composer-' + field);
+    if (input) input.value = '';
+  }
+};
+
+window.manejarArchivosAdjuntosCorreo = async function(event) {
+  if (!event.target.files || event.target.files.length === 0) return;
+  window._currentMailAttachments = window._currentMailAttachments || [];
+  const files = Array.from(event.target.files);
+  for (const file of files) {
+    try {
+      const base64Str = await readFileAsBase64(file);
+      const cleanBase64 = base64Str.includes(',') ? base64Str.split(',')[1] : base64Str;
+      window._currentMailAttachments.push({
+        filename: file.name,
+        content: cleanBase64,
+        size: file.size
+      });
+    } catch (err) {
+      console.error('Error cargando adjunto:', err);
+    }
+  }
+  window.renderMailAttachmentChips();
+};
+
+window.removerAdjuntoCorreo = function(index) {
+  if (window._currentMailAttachments && window._currentMailAttachments[index]) {
+    window._currentMailAttachments.splice(index, 1);
+    window.renderMailAttachmentChips();
+  }
+};
+
+window.renderMailAttachmentChips = function() {
+  const container = document.getElementById('mail-composer-attachment-chips');
+  if (!container) return;
+  const list = window._currentMailAttachments || [];
+  if (list.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = list.map((a, idx) => {
+    const sizeKb = Math.round((a.size || 0) / 1024);
+    return `
+      <span style="display:inline-flex; align-items:center; gap:0.35rem; padding:0.2rem 0.55rem; border-radius:14px; background:var(--bg-hover); border:1px solid var(--border); font-size:0.75rem; color:var(--text-primary);">
+        <i data-lucide="file-text" style="width:13px; height:13px; color:var(--accent);"></i>
+        <span>${a.filename}</span>
+        <span style="color:var(--text-muted); font-size:0.68rem;">(${sizeKb} KB)</span>
+        <button type="button" onclick="window.removerAdjuntoCorreo(${idx})" style="border:none; background:transparent; cursor:pointer; color:var(--red); font-size:0.8rem; line-height:1; padding:0 0.1rem; margin-left:0.2rem;">✕</button>
+      </span>
+    `;
+  }).join('');
+  if (window.lucide) lucide.createIcons();
+};
+
+window.aplicarPlantillaEnCompositor = function(templateId) {
+  if (!templateId) return;
+  const template = (emailTemplates || []).find(t => t.id === templateId);
+  if (!template) return;
+  
+  const subjectInput = document.getElementById('mail-composer-subject');
+  const bodyElem = document.getElementById('mail-composer-body');
+  const clientInput = document.getElementById('mail-composer-cliente');
+  const clienteName = clientInput?.value.trim() || 'Cliente';
+
+  let subject = template.asunto || '';
+  let body = template.cuerpo || '';
+
+  subject = subject.replace(/{{nombre_cliente}}/g, clienteName).replace(/{{folio_ticket}}/g, '');
+  body = body.replace(/{{nombre_cliente}}/g, clienteName).replace(/{{folio_ticket}}/g, '').replace(/\n/g, '<br>');
+
+  if (subjectInput) subjectInput.value = subject;
+  if (bodyElem) {
+    if (bodyElem.isContentEditable) {
+      bodyElem.innerHTML = body;
+    } else {
+      bodyElem.value = template.cuerpo || '';
+    }
+    window.insertarFirmaOficialEurorep();
+  }
+};
+
+window._linkModalCallback = null;
+
+window.abrirModalInsertarLink = function(defaultText = '', callback) {
+  let modalOverlay = document.getElementById('modal-insertar-link-overlay');
+  if (!modalOverlay) {
+    modalOverlay = document.createElement('div');
+    modalOverlay.id = 'modal-insertar-link-overlay';
+    modalOverlay.style.cssText = 'display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.45); z-index:9999; align-items:center; justify-content:center; backdrop-filter:blur(3px);';
+    modalOverlay.innerHTML = `
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.25rem 1.5rem; width:100%; max-width:420px; box-shadow:0 10px 25px rgba(0,0,0,0.25); text-align:left;">
+        <h4 style="font-size:0.95rem; font-weight:700; margin:0 0 1rem 0; color:var(--text-primary); display:flex; align-items:center; gap:0.4rem;">
+          <i data-lucide="link" style="width:16px; height:16px; color:var(--accent);"></i> Insertar Enlace Web
+        </h4>
+        <div style="display:flex; flex-direction:column; gap:0.75rem;">
+          <div>
+            <label style="font-size:0.78rem; font-weight:600; display:block; margin-bottom:0.25rem; color:var(--text-secondary);">Texto visible del enlace</label>
+            <input type="text" id="modal-link-text-input" placeholder="Ej. Portal de Clientes o Haz clic aquí" style="width:100%; padding:0.55rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary); font-size:0.85rem;" />
+          </div>
+          <div>
+            <label style="font-size:0.78rem; font-weight:600; display:block; margin-bottom:0.25rem; color:var(--text-secondary);">Dirección Web (URL)</label>
+            <input type="url" id="modal-link-url-input" placeholder="https://eurorep.mx" value="https://" style="width:100%; padding:0.55rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary); font-size:0.85rem;" />
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.25rem;">
+          <button type="button" onclick="document.getElementById('modal-insertar-link-overlay').style.display='none';" class="btn-secondary" style="padding:0.4rem 0.8rem; font-size:0.8rem; border-radius:6px; cursor:pointer;">Cancelar</button>
+          <button type="button" onclick="window.confirmarModalInsertarLink()" class="btn-primary" style="padding:0.4rem 1.1rem; font-size:0.8rem; border-radius:6px; cursor:pointer; font-weight:600;">Insertar Enlace</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modalOverlay);
+    if (window.lucide) lucide.createIcons();
+  }
+
+  window._linkModalCallback = callback;
+  const textInput = document.getElementById('modal-link-text-input');
+  const urlInput = document.getElementById('modal-link-url-input');
+  if (textInput) textInput.value = defaultText || 'Haz clic aquí';
+  if (urlInput) urlInput.value = 'https://';
+
+  modalOverlay.style.display = 'flex';
+  setTimeout(() => { if (urlInput) { urlInput.focus(); urlInput.select(); } }, 50);
+};
+
+window.confirmarModalInsertarLink = function() {
+  const textInput = document.getElementById('modal-link-text-input')?.value.trim();
+  const urlInput = document.getElementById('modal-link-url-input')?.value.trim();
+  const overlay = document.getElementById('modal-insertar-link-overlay');
+  
+  if (overlay) overlay.style.display = 'none';
+
+  if (urlInput && window._linkModalCallback) {
+    window._linkModalCallback(urlInput, textInput || 'Haz clic aquí');
+  }
+  window._linkModalCallback = null;
+};
+
+window.abrirModalInsertarTabla = function() {
+  let modalOverlay = document.getElementById('modal-insertar-tabla-overlay');
+  if (!modalOverlay) {
+    modalOverlay = document.createElement('div');
+    modalOverlay.id = 'modal-insertar-tabla-overlay';
+    modalOverlay.style.cssText = 'display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.45); z-index:9999; align-items:center; justify-content:center; backdrop-filter:blur(3px);';
+    modalOverlay.innerHTML = `
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.25rem 1.5rem; width:100%; max-width:440px; box-shadow:0 10px 25px rgba(0,0,0,0.25); text-align:left;">
+        <h4 style="font-size:0.95rem; font-weight:700; margin:0 0 1rem 0; color:var(--text-primary); display:flex; align-items:center; gap:0.4rem;">
+          <i data-lucide="table" style="width:16px; height:16px; color:var(--accent);"></i> Configurar e Insertar Tabla
+        </h4>
+        <div style="display:flex; flex-direction:column; gap:0.85rem;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+            <div>
+              <label style="font-size:0.78rem; font-weight:600; display:block; margin-bottom:0.25rem; color:var(--text-secondary);">Columnas</label>
+              <input type="number" id="modal-table-cols" min="1" max="10" value="3" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary); font-size:0.85rem;" />
+            </div>
+            <div>
+              <label style="font-size:0.78rem; font-weight:600; display:block; margin-bottom:0.25rem; color:var(--text-secondary);">Filas</label>
+              <input type="number" id="modal-table-rows" min="1" max="15" value="3" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary); font-size:0.85rem;" />
+            </div>
+          </div>
+          <div>
+            <label style="font-size:0.78rem; font-weight:600; display:block; margin-bottom:0.25rem; color:var(--text-secondary);">Estilo Visual</label>
+            <select id="modal-table-style" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary); font-size:0.85rem; outline:none;">
+              <option value="classic-gray" selected>Gris Corporativo Clásico</option>
+              <option value="modern-orange">Naranja SAPI Eurorep</option>
+              <option value="navy-blue">Azul Profesional</option>
+              <option value="minimal">Mínimo / Limpio (Sin Fondo)</option>
+            </select>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; align-items:center;">
+            <div>
+              <label style="font-size:0.78rem; font-weight:600; display:block; margin-bottom:0.25rem; color:var(--text-secondary);">Ancho de Tabla</label>
+              <select id="modal-table-width" style="width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary); font-size:0.85rem; outline:none;">
+                <option value="100%" selected>Ancho Completo (100%)</option>
+                <option value="auto">Ajustar a Contenido</option>
+              </select>
+            </div>
+            <div style="margin-top:1rem;">
+              <label style="font-size:0.8rem; font-weight:600; color:var(--text-primary); display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
+                <input type="checkbox" id="modal-table-header-check" checked style="accent-color:var(--accent); cursor:pointer;" />
+                Fila Encabezado
+              </label>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.25rem;">
+          <button type="button" onclick="document.getElementById('modal-insertar-tabla-overlay').style.display='none';" class="btn-secondary" style="padding:0.4rem 0.8rem; font-size:0.8rem; border-radius:6px; cursor:pointer;">Cancelar</button>
+          <button type="button" onclick="window.confirmarModalInsertarTabla()" class="btn-primary" style="padding:0.4rem 1.1rem; font-size:0.8rem; border-radius:6px; cursor:pointer; font-weight:600;">Insertar Tabla</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modalOverlay);
+    if (window.lucide) lucide.createIcons();
+  }
+
+  modalOverlay.style.display = 'flex';
+};
+
+window.confirmarModalInsertarTabla = function() {
+  const cols = Math.max(1, Math.min(10, parseInt(document.getElementById('modal-table-cols')?.value || 3)));
+  const rows = Math.max(1, Math.min(15, parseInt(document.getElementById('modal-table-rows')?.value || 3)));
+  const hasHeader = document.getElementById('modal-table-header-check')?.checked ?? true;
+  const stylePreset = document.getElementById('modal-table-style')?.value || 'classic-gray';
+  const widthVal = document.getElementById('modal-table-width')?.value || '100%';
+
+  const overlay = document.getElementById('modal-insertar-tabla-overlay');
+  if (overlay) overlay.style.display = 'none';
+
+  let headerBg = '#f8fafc';
+  let headerColor = '#334155';
+  let borderColor = '#cbd5e1';
+  let altRowBg = '#f8fafc';
+
+  if (stylePreset === 'modern-orange') {
+    headerBg = '#e8820c';
+    headerColor = '#ffffff';
+    borderColor = '#fdba74';
+    altRowBg = '#fff7ed';
+  } else if (stylePreset === 'navy-blue') {
+    headerBg = '#1e293b';
+    headerColor = '#ffffff';
+    borderColor = '#94a3b8';
+    altRowBg = '#f8fafc';
+  } else if (stylePreset === 'minimal') {
+    headerBg = 'transparent';
+    headerColor = 'var(--text-primary)';
+    borderColor = '#e2e8f0';
+    altRowBg = 'transparent';
+  }
+
+  let tableHtml = `<table style="width:${widthVal}; border-collapse:collapse; margin:14px 0; border:1px solid ${borderColor}; font-size:0.85rem; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">`;
+  
+  if (hasHeader) {
+    tableHtml += `<thead><tr style="background:${headerBg}; color:${headerColor};">`;
+    for (let c = 1; c <= cols; c++) {
+      tableHtml += `<th style="border:1px solid ${borderColor}; padding:8px 12px; font-weight:700; text-align:left;">Encabezado ${c}</th>`;
+    }
+    tableHtml += `</tr></thead>`;
+  }
+
+  tableHtml += `<tbody>`;
+  for (let r = 1; r <= rows; r++) {
+    const rowBg = (r % 2 === 0 && altRowBg !== 'transparent') ? `background:${altRowBg};` : '';
+    tableHtml += `<tr style="${rowBg}">`;
+    for (let c = 1; c <= cols; c++) {
+      tableHtml += `<td style="border:1px solid ${borderColor}; padding:8px 12px;">Dato ${r}.${c}</td>`;
+    }
+    tableHtml += `</tr>`;
+  }
+  tableHtml += `</tbody></table><br/>`;
+
+  const bodyElem = document.getElementById('mail-composer-body');
+  if (bodyElem) {
+    bodyElem.focus();
+    document.execCommand('insertHTML', false, tableHtml);
+  }
+};
+
+window.formatMailBody = function(action) {
+  const bodyElem = document.getElementById('mail-composer-body');
+  if (!bodyElem) return;
+  bodyElem.focus();
+
+  if (action === 'bold') {
+    document.execCommand('bold', false, null);
+  } else if (action === 'italic') {
+    document.execCommand('italic', false, null);
+  } else if (action === 'underline') {
+    document.execCommand('underline', false, null);
+  } else if (action === 'h2') {
+    document.execCommand('formatBlock', false, '<h2>');
+  } else if (action === 'ul') {
+    document.execCommand('insertUnorderedList', false, null);
+  } else if (action === 'link') {
+    const selText = window.getSelection() ? window.getSelection().toString() : '';
+    window.abrirModalInsertarLink(selText, (url, text) => {
+      bodyElem.focus();
+      if (selText) {
+        document.execCommand('createLink', false, url);
+      } else {
+        const linkHtml = `<a href="${url}" target="_blank" style="color:#e8820c; text-decoration:underline; font-weight:600;">${text}</a>`;
+        document.execCommand('insertHTML', false, linkHtml);
+      }
+    });
+  }
+};
+
+window.obtenerHtmlFirmaOficialEurorep = function() {
+  const logoSrc = window.location.origin + '/logo_transparent.png';
+  return `
+<div class="eurorep-signature-block" style="margin-top: 24px; padding-top: 14px; border-top: 2px solid #e8820c; display: flex; align-items: center; gap: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: left;">
+  <img src="${logoSrc}" alt="Eurorep Logo" style="height: 44px; width: auto; max-width: 140px; object-fit: contain; display: block;" />
+  <div style="border-left: 2px solid #cbd5e1; padding-left: 12px; font-size: 12px; color: #475569; line-height: 1.4;">
+    <strong style="font-size: 13px; color: #0f172a; display: block;">Equipo de Postventa & Soporte Técnico</strong>
+    <span style="font-weight: 700; color: #e8820c;">Euro Representaciones S.A. de C.V.</span><br />
+    <span><a href="mailto:Ptalctes@eurorep.mx" style="color:#2563eb; text-decoration:none;">Ptalctes@eurorep.mx</a> &nbsp;|&nbsp; <a href="https://eurorep.mx" target="_blank" style="color: #e8820c; text-decoration: none; font-weight: 600;">www.eurorep.mx</a></span>
+  </div>
+</div>`;
+};
+
+window.insertarFirmaOficialEurorep = function() {
+  const bodyElem = document.getElementById('mail-composer-body');
+  if (!bodyElem) return;
+  
+  const firmaHtml = window.obtenerHtmlFirmaOficialEurorep();
+
+  if (bodyElem.isContentEditable) {
+    if (!bodyElem.innerHTML.includes('eurorep-signature-block')) {
+      bodyElem.innerHTML += '<br/>' + firmaHtml;
+    }
+  } else {
+    if (!bodyElem.value.includes('eurorep-signature-block')) {
+      bodyElem.value += firmaHtml;
+    }
+  }
+  bodyElem.focus();
+};
+
+window.actualizarEstadoBotonesWord = function() {
+  const mapBtnCmd = {
+    'btn-word-bold': 'bold',
+    'btn-word-italic': 'italic',
+    'btn-word-underline': 'underline',
+    'btn-word-strikethrough': 'strikethrough',
+    'btn-word-justifyLeft': 'justifyLeft',
+    'btn-word-justifyCenter': 'justifyCenter',
+    'btn-word-justifyRight': 'justifyRight',
+    'btn-word-insertUnorderedList': 'insertUnorderedList',
+    'btn-word-insertOrderedList': 'insertOrderedList'
+  };
+
+  for (const [id, cmd] of Object.entries(mapBtnCmd)) {
+    const btn = document.getElementById(id);
+    if (!btn) continue;
+    let isActive = false;
+    try {
+      isActive = document.queryCommandState(cmd);
+    } catch (e) {}
+
+    if (isActive) {
+      btn.style.background = 'var(--accent, #e8820c)';
+      btn.style.color = '#ffffff';
+      btn.style.borderColor = 'var(--accent, #e8820c)';
+      btn.querySelectorAll('svg, i').forEach(el => el.style.color = '#ffffff');
+    } else {
+      btn.style.background = 'var(--bg-card)';
+      btn.style.color = 'var(--text-primary)';
+      btn.style.borderColor = 'var(--border)';
+      btn.querySelectorAll('svg, i').forEach(el => el.style.color = '');
+    }
+  }
+};
+
+
+window.getMailComposerSelectedCell = function() {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return null;
+  let node = sel.getRangeAt(0).commonAncestorContainer;
+  if (node.nodeType === 3) node = node.parentNode;
+  while (node && node.id !== 'mail-composer-body') {
+    if (node.tagName === 'TD' || node.tagName === 'TH') {
+      return node;
+    }
+    node = node.parentNode;
+  }
+  return null;
+};
+
+window.toggleMenuHerramientasTabla = function(forceShow = null) {
+  const menu = document.getElementById('dropdown-menu-herramientas-tabla');
+  if (!menu) return;
+  if (typeof forceShow === 'boolean') {
+    menu.style.display = forceShow ? 'block' : 'none';
+  } else {
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+  }
+};
+
+window.cambiarColorCeldaTabla = function(color) {
+  const cell = window.getMailComposerSelectedCell();
+  if (cell) {
+    cell.style.backgroundColor = color;
+  } else {
+    mostrarNotificacion('Haz clic dentro de una celda de la tabla para cambiar su color.', 'info');
+  }
+};
+
+window.combinarCeldasTabla = function() {
+  const cell = window.getMailComposerSelectedCell();
+  if (!cell) {
+    mostrarNotificacion('Haz clic dentro de la celda de la tabla que deseas combinar.', 'info');
+    return;
+  }
+  const nextCell = cell.nextElementSibling;
+  if (!nextCell) {
+    mostrarNotificacion('No hay una celda adyacente a la derecha para combinar.', 'warning');
+    return;
+  }
+  const currentColspan = parseInt(cell.getAttribute('colspan') || '1');
+  const nextColspan = parseInt(nextCell.getAttribute('colspan') || '1');
+  
+  cell.setAttribute('colspan', (currentColspan + nextColspan).toString());
+  if (nextCell.innerHTML.trim() && nextCell.innerHTML !== '&nbsp;') {
+    cell.innerHTML += ' ' + nextCell.innerHTML;
+  }
+  nextCell.remove();
+  mostrarNotificacion('Celdas combinadas exitosamente.', 'success');
+};
+
+window.dividirCeldaTabla = function() {
+  const cell = window.getMailComposerSelectedCell();
+  if (!cell) return;
+  const currentColspan = parseInt(cell.getAttribute('colspan') || '1');
+  if (currentColspan <= 1) {
+    mostrarNotificacion('Esta celda no está combinada.', 'info');
+    return;
+  }
+  cell.setAttribute('colspan', '1');
+  for (let i = 1; i < currentColspan; i++) {
+    const newCell = document.createElement(cell.tagName);
+    newCell.style.cssText = cell.style.cssText;
+    newCell.innerHTML = '&nbsp;';
+    cell.parentNode.insertBefore(newCell, cell.nextSibling);
+  }
+  mostrarNotificacion('Celda dividida.', 'success');
+};
+
+window.insertarFilaTabla = function(posicion = 'abajo') {
+  const cell = window.getMailComposerSelectedCell();
+  if (!cell) {
+    mostrarNotificacion('Haz clic dentro de una celda para insertar una fila.', 'info');
+    return;
+  }
+  const row = cell.closest('tr');
+  if (!row) return;
+  const newRow = row.cloneNode(true);
+  Array.from(newRow.children).forEach(c => {
+    c.innerHTML = '&nbsp;';
+    c.removeAttribute('colspan');
+    c.removeAttribute('rowspan');
+  });
+  if (posicion === 'arriba') {
+    row.parentNode.insertBefore(newRow, row);
+  } else {
+    row.parentNode.insertBefore(newRow, row.nextSibling);
+  }
+};
+
+window.insertarColumnaTabla = function(posicion = 'derecha') {
+  const cell = window.getMailComposerSelectedCell();
+  if (!cell) {
+    mostrarNotificacion('Haz clic dentro de una celda para insertar una columna.', 'info');
+    return;
+  }
+  const colIdx = cell.cellIndex;
+  const table = cell.closest('table');
+  if (!table) return;
+
+  Array.from(table.rows).forEach(r => {
+    const targetCell = r.cells[colIdx];
+    if (targetCell) {
+      const newCell = document.createElement(targetCell.tagName);
+      newCell.style.cssText = targetCell.style.cssText;
+      newCell.innerHTML = '&nbsp;';
+      if (posicion === 'izquierda') {
+        r.insertBefore(newCell, targetCell);
+      } else {
+        r.insertBefore(newCell, targetCell.nextSibling);
+      }
+    }
+  });
+};
+
+window.eliminarFilaTabla = function() {
+  const cell = window.getMailComposerSelectedCell();
+  if (!cell) return;
+  const row = cell.closest('tr');
+  if (row) row.remove();
+};
+
+window.eliminarColumnaTabla = function() {
+  const cell = window.getMailComposerSelectedCell();
+  if (!cell) return;
+  const colIdx = cell.cellIndex;
+  const table = cell.closest('table');
+  if (!table) return;
+
+  Array.from(table.rows).forEach(r => {
+    if (r.cells[colIdx]) r.cells[colIdx].remove();
+  });
+};
+
+window.eliminarTablaCompleta = function() {
+  const cell = window.getMailComposerSelectedCell();
+  if (!cell) return;
+  const table = cell.closest('table');
+  if (table) table.remove();
+};
+
+window.execWordCommand = function(cmd, value = null) {
+  const bodyElem = document.getElementById('mail-composer-body');
+  if (!bodyElem) return;
+
+  const sel = window.getSelection();
+  let isInside = false;
+  if (sel && sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0);
+    if (bodyElem.contains(range.commonAncestorContainer)) {
+      isInside = true;
+    }
+  }
+
+  if (!isInside) {
+    bodyElem.focus();
+    if (sel) {
+      const range = document.createRange();
+      range.selectNodeContents(bodyElem);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  }
+
+  if (cmd === 'insertTable') {
+    window.abrirModalInsertarTabla();
+    return;
+  } else if (cmd === 'backColor' || cmd === 'hiliteColor') {
+    const ok = document.execCommand('hiliteColor', false, value);
+    if (!ok) document.execCommand('backColor', false, value);
+  } else if (cmd === 'insertUnorderedList' || cmd === 'insertOrderedList') {
+    const isAlreadyActive = document.queryCommandState(cmd);
+    const execOk = document.execCommand(cmd, false, value);
+    if (!execOk || (!isAlreadyActive && !bodyElem.innerHTML.includes('<li') && !bodyElem.innerHTML.includes('<ul') && !bodyElem.innerHTML.includes('<ol'))) {
+      const tag = cmd === 'insertUnorderedList' ? 'ul' : 'ol';
+      const selectedText = sel ? sel.toString() : '';
+      const listHtml = `<${tag} style="margin:8px 0; padding-left:24px; list-style-type:${cmd === 'insertUnorderedList' ? 'disc' : 'decimal'};"><li style="margin-bottom:4px;">${selectedText || 'Elemento 1'}</li></${tag}><br/>`;
+      document.execCommand('insertHTML', false, listHtml);
+    }
+  } else {
+    document.execCommand(cmd, false, value);
+  }
+  window.actualizarEstadoBotonesWord();
+};
+
+window.renderCorreoComposerPane = function() {
+  const paneContainer = document.getElementById('chat-active-pane');
+  if (!paneContainer) return;
+
+  paneContainer.innerHTML = `
+    <style>
+      #mail-composer-body ul { list-style-type: disc !important; padding-left: 24px !important; margin: 8px 0 !important; }
+      #mail-composer-body ol { list-style-type: decimal !important; padding-left: 24px !important; margin: 8px 0 !important; }
+      #mail-composer-body li { display: list-item !important; margin-bottom: 4px !important; }
+    </style>
+    <div style="display:flex; flex-direction:column; height:100%; background:var(--bg-primary); border-radius:10px; overflow:hidden;">
+      <!-- Top Action Ribbon (Estilo Outlook / Mail Client Toolbar) -->
+      <div style="padding:0.6rem 1rem; border-bottom:1px solid var(--border); background:var(--bg-card); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+        <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+          <!-- Primary Send Button -->
+          <button type="button" onclick="document.getElementById('form-componer-correo-soporte').requestSubmit()" id="btn-send-manual-mail" class="btn-primary" style="padding:0.45rem 1.1rem; border-radius:6px; font-size:0.82rem; font-weight:700; display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer; background:var(--accent); color:white; border:none; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+            <i data-lucide="send" style="width:14px; height:14px;"></i> Enviar Correo
+          </button>
+
+          <!-- Attach File Button -->
+          <button type="button" onclick="document.getElementById('mail-composer-file-input').click()" class="btn-secondary" style="padding:0.45rem 0.8rem; border-radius:6px; font-size:0.8rem; font-weight:600; display:inline-flex; align-items:center; gap:0.35rem; cursor:pointer; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary);">
+            <i data-lucide="paperclip" style="width:14px; height:14px; color:var(--text-secondary);"></i> Adjuntar
+          </button>
+
+          <!-- Template Selector Dropdown -->
+          <div style="position:relative; display:inline-block;">
+            <select onchange="window.aplicarPlantillaEnCompositor(this.value); this.value='';" style="padding:0.45rem 0.8rem; border-radius:6px; font-size:0.8rem; font-weight:600; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary); cursor:pointer; outline:none;">
+              <option value="">Cargar Plantilla...</option>
+              ${(typeof emailTemplates !== 'undefined' ? emailTemplates : []).map(t => `<option value="${t.id}">${t.nombre}</option>`).join('')}
+            </select>
+          </div>
+
+          <!-- CC / CCO toggles -->
+          <button type="button" onclick="window.toggleMailField('cc')" style="padding:0.4rem 0.6rem; font-size:0.75rem; font-weight:600; border-radius:6px; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-secondary); cursor:pointer;">
+            + CC
+          </button>
+          <button type="button" onclick="window.toggleMailField('bcc')" style="padding:0.4rem 0.6rem; font-size:0.75rem; font-weight:600; border-radius:6px; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-secondary); cursor:pointer;">
+            + CCO
+          </button>
+        </div>
+
+        <!-- Discard / Cancel Button -->
+        <button type="button" onclick="isComposingEmail=false; window._currentMailAttachments=[]; window.renderChatSoporteEmpresa();" style="padding:0.4rem 0.8rem; font-size:0.8rem; font-weight:600; border-radius:6px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem;">
+          <i data-lucide="trash-2" style="width:14px; height:14px;"></i> Descartar
+        </button>
+      </div>
+
+      <!-- Hidden File Input for Attachments -->
+      <input type="file" id="mail-composer-file-input" multiple onchange="window.manejarArchivosAdjuntosCorreo(event)" style="display:none;" />
+
+      <!-- Form & Mail Client Header Fields -->
+      <form id="form-componer-correo-soporte" onsubmit="window.enviarCorreoManualSoporte(event)" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
+        <div style="padding:0.75rem 1.25rem; background:var(--bg-card); border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:0.4rem;">
+          
+          <!-- Field: De (From) -->
+          <div style="display:flex; align-items:center; font-size:0.82rem; min-height:30px;">
+            <span style="width:75px; font-weight:700; color:var(--text-muted);">De:</span>
+            <div style="display:inline-flex; align-items:center; gap:0.4rem; padding:0.2rem 0.65rem; border-radius:16px; background:rgba(232, 130, 12, 0.1); border:1px solid rgba(232, 130, 12, 0.25); font-weight:600; font-size:0.8rem; color:var(--accent);">
+              <i data-lucide="shield-check" style="width:13px; height:13px;"></i> Ptalctes@eurorep.mx <span style="font-size:0.72rem; color:var(--text-muted); font-weight:normal;">(SAPI Eurorep Postventa)</span>
+            </div>
+          </div>
+
+          <!-- Field: Para (To) -->
+          <div style="display:flex; align-items:center; font-size:0.85rem; border-bottom:1px solid var(--border); padding-bottom:0.2rem;">
+            <span style="width:75px; font-weight:700; color:var(--text-muted);">Para:</span>
+            <input type="email" id="mail-composer-to" required placeholder="correo@cliente.com" style="flex:1; border:none; background:transparent; font-size:0.88rem; color:var(--text-primary); outline:none; padding:0.3rem 0;" />
+          </div>
+
+          <!-- Field: CC (Collapsible) -->
+          <div id="row-mail-composer-cc" style="display:none; align-items:center; font-size:0.85rem; border-bottom:1px solid var(--border); padding-bottom:0.2rem;">
+            <span style="width:75px; font-weight:700; color:var(--text-muted);">CC:</span>
+            <input type="text" id="mail-composer-cc" placeholder="copia@empresa.com" style="flex:1; border:none; background:transparent; font-size:0.88rem; color:var(--text-primary); outline:none; padding:0.3rem 0;" />
+            <button type="button" onclick="window.toggleMailField('cc')" style="border:none; background:transparent; color:var(--text-muted); cursor:pointer; font-size:0.75rem;">✕</button>
+          </div>
+
+          <!-- Field: CCO (Collapsible) -->
+          <div id="row-mail-composer-bcc" style="display:none; align-items:center; font-size:0.85rem; border-bottom:1px solid var(--border); padding-bottom:0.2rem;">
+            <span style="width:75px; font-weight:700; color:var(--text-muted);">CCO:</span>
+            <input type="text" id="mail-composer-bcc" placeholder="copiaoculta@empresa.com" style="flex:1; border:none; background:transparent; font-size:0.88rem; color:var(--text-primary); outline:none; padding:0.3rem 0;" />
+            <button type="button" onclick="window.toggleMailField('bcc')" style="border:none; background:transparent; color:var(--text-muted); cursor:pointer; font-size:0.75rem;">✕</button>
+          </div>
+
+          <!-- Field: Cliente / Empresa -->
+          <div style="display:flex; align-items:center; font-size:0.85rem; border-bottom:1px solid var(--border); padding-bottom:0.2rem;">
+            <span style="width:75px; font-weight:700; color:var(--text-muted);">Cliente:</span>
+            <input type="text" id="mail-composer-cliente" placeholder="Nombre de la Empresa o Cliente (ej. Concretos del Norte)" style="flex:1; border:none; background:transparent; font-size:0.88rem; color:var(--text-primary); outline:none; padding:0.3rem 0;" />
+          </div>
+
+          <!-- Field: Asunto (Subject) -->
+          <div style="display:flex; align-items:center; font-size:0.85rem;">
+            <span style="width:75px; font-weight:700; color:var(--text-muted);">Asunto:</span>
+            <input type="text" id="mail-composer-subject" required placeholder="Agregar un asunto..." style="flex:1; border:none; background:transparent; font-size:0.95rem; font-weight:600; color:var(--text-primary); outline:none; padding:0.3rem 0;" />
+          </div>
+
+          <!-- Attachment chips container -->
+          <div id="mail-composer-attachment-chips" style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.25rem;"></div>
+        </div>
+
+        <!-- Word-Style Formatting Ribbon Toolbar -->
+        <div style="padding:0.4rem 0.8rem; background:var(--bg-hover); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:0.35rem; flex-wrap:wrap; font-size:0.8rem;">
+          <!-- Undo / Redo -->
+          <button type="button" title="Deshacer (Ctrl+Z)" onmousedown="event.preventDefault()" onclick="window.execWordCommand('undo')" style="padding:0.25rem 0.45rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; justify-content:center;"><i data-lucide="undo" style="width:13px; height:13px;"></i></button>
+          <button type="button" title="Rehacer (Ctrl+Y)" onmousedown="event.preventDefault()" onclick="window.execWordCommand('redo')" style="padding:0.25rem 0.45rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; justify-content:center;"><i data-lucide="redo" style="width:13px; height:13px;"></i></button>
+
+          <span style="width:1px; height:18px; background:var(--border); margin:0 0.15rem;"></span>
+
+          <!-- Font Family -->
+          <select onchange="window.execWordCommand('fontName', this.value)" title="Fuente" style="padding:0.25rem 0.4rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); font-size:0.78rem; cursor:pointer; outline:none;">
+            <option value="Segoe UI" selected>Segoe UI</option>
+            <option value="Arial">Arial</option>
+            <option value="Helvetica">Helvetica</option>
+            <option value="Verdana">Verdana</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Courier New">Courier New</option>
+          </select>
+
+          <!-- Font Size -->
+          <select onchange="window.execWordCommand('fontSize', this.value)" title="Tamaño de Fuente" style="padding:0.25rem 0.4rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); font-size:0.78rem; cursor:pointer; outline:none;">
+            <option value="2">Pequeño (12px)</option>
+            <option value="3" selected>Normal (14px)</option>
+            <option value="4">Mediano (16px)</option>
+            <option value="5">Grande (18px)</option>
+            <option value="6">Título (24px)</option>
+          </select>
+
+          <span style="width:1px; height:18px; background:var(--border); margin:0 0.15rem;"></span>
+
+          <!-- Styles -->
+          <button type="button" id="btn-word-bold" title="Negrita (Ctrl+B)" onmousedown="event.preventDefault()" onclick="window.execWordCommand('bold')" style="padding:0.25rem 0.5rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); font-weight:bold; cursor:pointer; font-size:0.8rem; transition:all 0.15s ease;">B</button>
+          <button type="button" id="btn-word-italic" title="Cursiva (Ctrl+I)" onmousedown="event.preventDefault()" onclick="window.execWordCommand('italic')" style="padding:0.25rem 0.5rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); font-style:italic; cursor:pointer; font-size:0.8rem; transition:all 0.15s ease;">I</button>
+          <button type="button" id="btn-word-underline" title="Subrayado (Ctrl+U)" onmousedown="event.preventDefault()" onclick="window.execWordCommand('underline')" style="padding:0.25rem 0.5rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); text-decoration:underline; cursor:pointer; font-size:0.8rem; transition:all 0.15s ease;">U</button>
+          <button type="button" id="btn-word-strikethrough" title="Tachado" onmousedown="event.preventDefault()" onclick="window.execWordCommand('strikethrough')" style="padding:0.25rem 0.5rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); text-decoration:line-through; cursor:pointer; font-size:0.8rem; transition:all 0.15s ease;">S</button>
+
+          <span style="width:1px; height:18px; background:var(--border); margin:0 0.15rem;"></span>
+
+          <!-- Text Color -->
+          <label title="Color de Texto" style="display:inline-flex; align-items:center; gap:0.25rem; padding:0.2rem 0.4rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; font-size:0.75rem;">
+            <i data-lucide="palette" style="width:13px; height:13px; color:var(--text-secondary);"></i> <input type="color" onchange="window.execWordCommand('foreColor', this.value)" style="width:16px; height:16px; border:none; padding:0; background:transparent; cursor:pointer;" value="#0f172a" />
+          </label>
+
+          <!-- Highlight Color -->
+          <label title="Color de Resaltador" style="display:inline-flex; align-items:center; gap:0.25rem; padding:0.2rem 0.4rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; font-size:0.75rem;">
+            <i data-lucide="highlighter" style="width:13px; height:13px; color:var(--text-secondary);"></i> <input type="color" onchange="window.execWordCommand('backColor', this.value)" style="width:16px; height:16px; border:none; padding:0; background:transparent; cursor:pointer;" value="#fef08a" />
+          </label>
+
+          <span style="width:1px; height:18px; background:var(--border); margin:0 0.15rem;"></span>
+
+          <!-- Alignments -->
+          <button type="button" id="btn-word-justifyLeft" title="Izquierda" onmousedown="event.preventDefault()" onclick="window.execWordCommand('justifyLeft')" style="padding:0.25rem 0.45rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; transition:all 0.15s ease;"><i data-lucide="align-left" style="width:13px; height:13px;"></i></button>
+          <button type="button" id="btn-word-justifyCenter" title="Centrar" onmousedown="event.preventDefault()" onclick="window.execWordCommand('justifyCenter')" style="padding:0.25rem 0.45rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; transition:all 0.15s ease;"><i data-lucide="align-center" style="width:13px; height:13px;"></i></button>
+          <button type="button" id="btn-word-justifyRight" title="Derecha" onmousedown="event.preventDefault()" onclick="window.execWordCommand('justifyRight')" style="padding:0.25rem 0.45rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; transition:all 0.15s ease;"><i data-lucide="align-right" style="width:13px; height:13px;"></i></button>
+
+          <span style="width:1px; height:18px; background:var(--border); margin:0 0.15rem;"></span>
+
+          <!-- Lists -->
+          <button type="button" id="btn-word-insertUnorderedList" title="Lista con Viñetas" onmousedown="event.preventDefault()" onclick="window.execWordCommand('insertUnorderedList')" style="padding:0.25rem 0.55rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; font-size:0.78rem; font-weight:600; display:inline-flex; align-items:center; gap:0.25rem; transition:all 0.15s ease;"><i data-lucide="list" style="width:13px; height:13px;"></i> Viñetas</button>
+          <button type="button" id="btn-word-insertOrderedList" title="Lista Numerada" onmousedown="event.preventDefault()" onclick="window.execWordCommand('insertOrderedList')" style="padding:0.25rem 0.55rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; font-size:0.78rem; font-weight:600; display:inline-flex; align-items:center; gap:0.25rem; transition:all 0.15s ease;"><i data-lucide="list-ordered" style="width:13px; height:13px;"></i> Números</button>
+
+          <span style="width:1px; height:18px; background:var(--border); margin:0 0.15rem;"></span>
+
+          <!-- Link & Table & Format Clear -->
+          <button type="button" title="Insertar Enlace Web" onmousedown="event.preventDefault()" onclick="window.formatMailBody('link')" style="padding:0.25rem 0.5rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; font-size:0.78rem; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="link" style="width:13px; height:13px;"></i> Enlace</button>
+          <button type="button" title="Insertar Tabla" onmousedown="event.preventDefault()" onclick="window.execWordCommand('insertTable')" style="padding:0.25rem 0.5rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; font-size:0.78rem; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="table" style="width:13px; height:13px;"></i> Tabla</button>
+
+          <!-- Table Tools Dropdown -->
+          <div style="position:relative; display:inline-block;">
+            <button type="button" id="btn-word-table-tools" title="Herramientas y Edición de Tabla" onmousedown="event.preventDefault()" onclick="window.toggleMenuHerramientasTabla()" style="padding:0.25rem 0.5rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; font-size:0.78rem; display:inline-flex; align-items:center; gap:0.25rem;">
+              <i data-lucide="table-properties" style="width:13px; height:13px;"></i> Edición de Tabla <i data-lucide="chevron-down" style="width:12px; height:12px;"></i>
+            </button>
+
+            <div id="dropdown-menu-herramientas-tabla" style="display:none; position:absolute; top:100%; left:0; margin-top:4px; background:var(--bg-card); border:1px solid var(--border); border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:1000; min-width:210px; padding:0.3rem 0; font-size:0.78rem;">
+              <div style="padding:0.3rem 0.6rem; font-weight:700; color:var(--text-muted); font-size:0.7rem; text-transform:uppercase; border-bottom:1px solid var(--border);">Celdas</div>
+              <button type="button" onmousedown="event.preventDefault()" onclick="window.combinarCeldasTabla(); window.toggleMenuHerramientasTabla(false);" style="width:100%; text-align:left; padding:0.4rem 0.75rem; border:none; background:transparent; color:var(--text-primary); cursor:pointer; display:flex; align-items:center; gap:0.5rem; font-size:0.78rem;">
+                <i data-lucide="combine" style="width:13px; height:13px;"></i> Combinar Celdas
+              </button>
+              <button type="button" onmousedown="event.preventDefault()" onclick="window.dividirCeldaTabla(); window.toggleMenuHerramientasTabla(false);" style="width:100%; text-align:left; padding:0.4rem 0.75rem; border:none; background:transparent; color:var(--text-primary); cursor:pointer; display:flex; align-items:center; gap:0.5rem; font-size:0.78rem;">
+                <i data-lucide="split" style="width:13px; height:13px;"></i> Dividir Celda
+              </button>
+              <label style="padding:0.4rem 0.75rem; display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-size:0.78rem; color:var(--text-primary);">
+                <span style="display:inline-flex; align-items:center; gap:0.5rem;"><i data-lucide="paint-bucket" style="width:13px; height:13px;"></i> Color de Fondo</span>
+                <input type="color" onchange="window.cambiarColorCeldaTabla(this.value); window.toggleMenuHerramientasTabla(false);" style="width:18px; height:18px; border:none; padding:0; background:transparent; cursor:pointer;" value="#f8fafc" />
+              </label>
+
+              <div style="padding:0.3rem 0.6rem; font-weight:700; color:var(--text-muted); font-size:0.7rem; text-transform:uppercase; border-top:1px solid var(--border); border-bottom:1px solid var(--border); margin-top:0.2rem;">Filas y Columnas</div>
+              <button type="button" onmousedown="event.preventDefault()" onclick="window.insertarFilaTabla('arriba'); window.toggleMenuHerramientasTabla(false);" style="width:100%; text-align:left; padding:0.4rem 0.75rem; border:none; background:transparent; color:var(--text-primary); cursor:pointer; display:flex; align-items:center; gap:0.5rem; font-size:0.78rem;">
+                <i data-lucide="arrow-up" style="width:13px; height:13px;"></i> Insertar Fila Arriba
+              </button>
+              <button type="button" onmousedown="event.preventDefault()" onclick="window.insertarFilaTabla('abajo'); window.toggleMenuHerramientasTabla(false);" style="width:100%; text-align:left; padding:0.4rem 0.75rem; border:none; background:transparent; color:var(--text-primary); cursor:pointer; display:flex; align-items:center; gap:0.5rem; font-size:0.78rem;">
+                <i data-lucide="arrow-down" style="width:13px; height:13px;"></i> Insertar Fila Abajo
+              </button>
+              <button type="button" onmousedown="event.preventDefault()" onclick="window.insertarColumnaTabla('izquierda'); window.toggleMenuHerramientasTabla(false);" style="width:100%; text-align:left; padding:0.4rem 0.75rem; border:none; background:transparent; color:var(--text-primary); cursor:pointer; display:flex; align-items:center; gap:0.5rem; font-size:0.78rem;">
+                <i data-lucide="arrow-left" style="width:13px; height:13px;"></i> Insertar Col. Izquierda
+              </button>
+              <button type="button" onmousedown="event.preventDefault()" onclick="window.insertarColumnaTabla('derecha'); window.toggleMenuHerramientasTabla(false);" style="width:100%; text-align:left; padding:0.4rem 0.75rem; border:none; background:transparent; color:var(--text-primary); cursor:pointer; display:flex; align-items:center; gap:0.5rem; font-size:0.78rem;">
+                <i data-lucide="arrow-right" style="width:13px; height:13px;"></i> Insertar Col. Derecha
+              </button>
+
+              <div style="padding:0.3rem 0.6rem; font-weight:700; color:var(--text-muted); font-size:0.7rem; text-transform:uppercase; border-top:1px solid var(--border); border-bottom:1px solid var(--border); margin-top:0.2rem;">Eliminar</div>
+              <button type="button" onmousedown="event.preventDefault()" onclick="window.eliminarFilaTabla(); window.toggleMenuHerramientasTabla(false);" style="width:100%; text-align:left; padding:0.4rem 0.75rem; border:none; background:transparent; color:var(--text-primary); cursor:pointer; display:flex; align-items:center; gap:0.5rem; font-size:0.78rem;">
+                <i data-lucide="rows" style="width:13px; height:13px; color:#ef4444;"></i> Eliminar Fila
+              </button>
+              <button type="button" onmousedown="event.preventDefault()" onclick="window.eliminarColumnaTabla(); window.toggleMenuHerramientasTabla(false);" style="width:100%; text-align:left; padding:0.4rem 0.75rem; border:none; background:transparent; color:var(--text-primary); cursor:pointer; display:flex; align-items:center; gap:0.5rem; font-size:0.78rem;">
+                <i data-lucide="columns" style="width:13px; height:13px; color:#ef4444;"></i> Eliminar Columna
+              </button>
+              <button type="button" onmousedown="event.preventDefault()" onclick="window.eliminarTablaCompleta(); window.toggleMenuHerramientasTabla(false);" style="width:100%; text-align:left; padding:0.4rem 0.75rem; border:none; background:transparent; color:#ef4444; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:0.5rem; font-size:0.78rem;">
+                <i data-lucide="trash" style="width:13px; height:13px; color:#ef4444;"></i> Eliminar Tabla Completa
+              </button>
+            </div>
+          </div>
+
+          <span style="width:1px; height:18px; background:var(--border); margin:0 0.15rem;"></span>
+
+          <!-- Eurorep Logo Signature Button -->
+          <button type="button" title="Insertar Pie de Firma Oficial Eurorep" onmousedown="event.preventDefault()" onclick="window.insertarFirmaOficialEurorep()" style="padding:0.25rem 0.65rem; border-radius:4px; border:1px solid rgba(232, 130, 12, 0.3); background:rgba(232, 130, 12, 0.12); color:var(--accent); font-weight:600; cursor:pointer; font-size:0.78rem; display:inline-flex; align-items:center; gap:0.3rem;">
+            <i data-lucide="file-signature" style="width:13px; height:13px;"></i> Firma Oficial Eurorep
+          </button>
+        </div>
+
+        <!-- Message Body Area (WYSIWYG Rich Editor Container) -->
+        <div style="flex:1; padding:1rem 1.25rem; display:flex; flex-direction:column; background:var(--bg-primary); overflow:hidden;">
+          <div id="mail-composer-body" contenteditable="true" style="width:100%; flex:1; border:none; background:transparent; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size:0.9rem; line-height:1.6; color:var(--text-primary); outline:none; overflow-y:auto; padding:0.25rem 0;" placeholder="Escribe el cuerpo del correo aquí..."></div>
+        </div>
+      </form>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+
+  const bodyElem = document.getElementById('mail-composer-body');
+  if (bodyElem) {
+    ['keyup', 'mouseup', 'click', 'focus', 'input', 'select'].forEach(evt => {
+      bodyElem.addEventListener(evt, window.actualizarEstadoBotonesWord);
+    });
+  }
+};
+
+window.enviarCorreoManualSoporte = async function(event) {
+  if (event) event.preventDefault();
+  
+  const to = document.getElementById('mail-composer-to')?.value.trim();
+  const cc = document.getElementById('mail-composer-cc')?.value.trim() || '';
+  const bcc = document.getElementById('mail-composer-bcc')?.value.trim() || '';
+  const clienteName = document.getElementById('mail-composer-cliente')?.value.trim();
+  const subject = document.getElementById('mail-composer-subject')?.value.trim();
+  const bodyElem = document.getElementById('mail-composer-body');
+  const rawBody = bodyElem?.isContentEditable ? bodyElem.innerHTML : (bodyElem?.value || '');
+  const textBody = bodyElem?.isContentEditable ? bodyElem.innerText.trim() : rawBody.trim();
+  const btn = document.getElementById('btn-send-manual-mail');
+  const rawAttachments = window._currentMailAttachments || [];
+
+  if (!to || !subject || (!rawBody && !textBody)) {
+    mostrarNotificacion('Por favor completa los campos obligatorios del correo.', 'warning');
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<i data-lucide="loader-2" class="spin" style="width:14px; height:14px;"></i> Enviando...`;
+    if (window.lucide) lucide.createIcons();
+  }
+
+  try {
+    let token = '';
+    if (window.supabaseClient && window.supabaseClient.auth) {
+      try {
+        const { data: sessionData } = await window.supabaseClient.auth.getSession();
+        token = sessionData?.session?.access_token || '';
+      } catch (authErr) {}
+    }
+
+    const formattedBody = rawBody.includes('<') ? rawBody : rawBody.replace(/\n/g, '<br>');
+    const htmlPayload = window.obtenerHtmlPlantillaProfesional ? window.obtenerHtmlPlantillaProfesional(formattedBody) : formattedBody;
+
+    const payload = {
+      to: to,
+      subject: subject,
+      htmlBody: htmlPayload
+    };
+    if (cc) payload.cc = cc;
+    if (bcc) payload.bcc = bcc;
+    if (rawAttachments.length > 0) {
+      payload.attachments = rawAttachments.map(a => ({
+        filename: a.filename,
+        content: a.content,
+        encoding: 'base64'
+      }));
+    }
+
+    const response = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : '',
+        'X-Sapi-Client-Token': 'SapiSecuredClientToken'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const isOk = response.ok;
+    const logEntry = {
+      id: 'email_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      tipo: 'enviado',
+      de: 'Ptalctes@eurorep.mx',
+      para: to,
+      cc: cc,
+      bcc: bcc,
+      cliente: clienteName || 'Cliente',
+      asunto: subject,
+      cuerpo: body,
+      htmlBody: htmlPayload,
+      fecha: new Date().toISOString(),
+      evento: 'Envío Directo',
+      regla: 'Manual Soporte',
+      estatus: isOk ? 'Enviado' : 'Fallido',
+      archivos: rawAttachments.map(a => a.filename)
+    };
+
+    window.registrarLogEmail(logEntry);
+
+    if (isOk) {
+      mostrarNotificacion('Correo enviado con éxito desde Ptalctes@eurorep.mx', 'success');
+      isComposingEmail = false;
+      window._currentMailAttachments = [];
+      activeEmailLogId = logEntry.id;
+    } else {
+      mostrarNotificacion('Error al enviar correo. Se registró el intento en la bandeja.', 'error');
+    }
+  } catch (err) {
+    console.error('Error enviando correo manual:', err);
+    mostrarNotificacion('Error al conectar con servidor de correos: ' + (err.message || err), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+    window.renderChatSoporteEmpresa();
+  }
 };
 
 window.seleccionarChatTicket = function(ticketId) {
@@ -36306,7 +37457,7 @@ window.renderChatActivePane = function(t) {
   const container = document.getElementById('support-general-chat-messages-container');
   if (container) container.scrollTop = container.scrollHeight;
 
-  lucide.createIcons();
+  if (window.lucide) lucide.createIcons();
 };
 
 window.enviarMensajeSoporteEmpresa = async function(ticketId) {
@@ -36776,6 +37927,24 @@ let defaultTemplates = [
     nombre: "Notificación de Nuevo Ticket Registrado (Interno)",
     asunto: "Eurorep SAPI - Se ha registrado un nuevo Ticket: {{folio_ticket}}",
     cuerpo: "Hola {{nombre_cliente}},\n\nQueremos informarte que nuestro equipo técnico interno ha registrado un nuevo ticket de servicio bajo tu cuenta:\n\nDetalles del Ticket:\n- Folio: {{folio_ticket}}\n- Estatus actual: {{estatus_ticket}}\n\nPuedes dar seguimiento a esta solicitud, agregar comentarios o adjuntar evidencias a través de nuestro portal de clientes.\n\nAcceder al ticket: {{link}}\n\nSaludos,\nEquipo de Postventa Eurorep"
+  },
+  {
+    id: "ticket_created_by_client",
+    nombre: "Confirmación de Recepción de Ticket - Cliente",
+    asunto: "Confirmación de Recepción - Ticket {{folio_ticket}}",
+    cuerpo: "Hola {{nombre_cliente}},\n\nHemos recibido tu solicitud de servicio correctamente.\n\nDetalles del Ticket:\n- Folio: {{folio_ticket}}\n- Asunto/Falla: {{asunto}}\n- Estatus: {{estatus_ticket}}\n\nNuestro equipo técnico revisará tu reporte a la brevedad y se pondrá en contacto contigo.\n\nPuedes dar seguimiento a tu ticket aquí: {{link}}\n\nSaludos,\nEquipo de Postventa Eurorep"
+  },
+  {
+    id: "service_scheduled",
+    nombre: "Notificación de Servicio Programado",
+    asunto: "Servicio Técnico Programado en Campo - Folio {{folio_os}}",
+    cuerpo: "Hola {{nombre_cliente}},\n\nTe informamos que se ha programado una visita técnica para atender tu equipo.\n\nDetalles del Servicio:\n- Folio OS: {{folio_os}}\n- Ticket asociado: {{folio_ticket}}\n- Fecha programada: {{fecha_programada}}\n- Técnico asignado: {{tecnico_asignado}}\n\nPor favor asegúrate de tener el equipo disponible en el sitio indicado.\n\nSaludos,\nServicio Técnico Eurorep"
+  },
+  {
+    id: "quote_accepted_by_client",
+    nombre: "Cotización SAP Aceptada por Cliente",
+    asunto: "Cotización Aceptada - Ticket {{folio_ticket}}",
+    cuerpo: "Hola {{nombre_cliente}},\n\nConfirmamos la recepción de la aprobación de la cotización para el ticket {{folio_ticket}}.\n\nDetalles:\n- Folio Ticket: {{folio_ticket}}\n- Estatus: Aceptada\n\nNuestro equipo procederá con la gestión de refacciones o programación del servicio correspondiente.\n\nPuedes consultar el ticket en el portal: {{link}}\n\nSaludos,\nEquipo de Postventa Eurorep"
   }
 ];
 
@@ -36817,6 +37986,30 @@ let defaultRules = [
     nombre: "Notificar al cliente sobre ticket creado por staff",
     evento: "Nuevo ticket registrado por equipo interno",
     plantillaId: "new_internal_ticket",
+    destinatario: "Contactos de la empresa",
+    activo: true
+  },
+  {
+    id: "rule_client_ticket",
+    nombre: "Confirmar recepción de ticket creado por el cliente",
+    evento: "Nuevo ticket creado por el cliente",
+    plantillaId: "ticket_created_by_client",
+    destinatario: "Contactos de la empresa",
+    activo: true
+  },
+  {
+    id: "rule_service_scheduled",
+    nombre: "Notificar al cliente cuando se programa visita técnica",
+    evento: "Visita técnica en campo programada",
+    plantillaId: "service_scheduled",
+    destinatario: "Contactos de la empresa",
+    activo: true
+  },
+  {
+    id: "rule_quote_accepted",
+    nombre: "Notificar aprobación de cotización SAP",
+    evento: "Cotización SAP aceptada por el cliente",
+    plantillaId: "quote_accepted_by_client",
     destinatario: "Contactos de la empresa",
     activo: true
   }
@@ -36936,6 +38129,19 @@ window.cargarConfiguracionesNube = async function() {
       automationRules = [...defaultRules];
     } else {
       automationRules = rulesData;
+    }
+
+    try {
+      const { data: emailLogsData } = await window.supabaseClient
+        .from('sapi_email_logs')
+        .select('*')
+        .order('fecha', { ascending: false })
+        .limit(100);
+      if (emailLogsData && emailLogsData.length > 0) {
+        safeSetJSON('sapi_email_logs', emailLogsData);
+      }
+    } catch (lErr) {
+      console.warn('[Automation] No se pudieron cargar logs de correo desde Supabase:', lErr);
     }
     
     console.log('[Automation] Datos cargados correctamente desde Supabase');
@@ -37334,6 +38540,10 @@ window.eliminarAutoRegla = async function(id) {
 
 window.obtenerHtmlPlantillaProfesional = function(cuerpoEmail) {
   const logoUrl = window.location.origin + '/logo_transparent.png';
+  const hasSignature = (cuerpoEmail || '').includes('eurorep-signature-block');
+  const signatureHtml = window.obtenerHtmlFirmaOficialEurorep ? window.obtenerHtmlFirmaOficialEurorep() : '';
+  const finalBody = hasSignature ? cuerpoEmail : (cuerpoEmail + '<br/>' + signatureHtml);
+
   return `
     <div style="background-color: #f1f5f9; padding: 20px 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
       <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
@@ -37345,7 +38555,7 @@ window.obtenerHtmlPlantillaProfesional = function(cuerpoEmail) {
         
         <!-- Contenido principal -->
         <div style="padding: 30px 24px; font-size: 14.5px; line-height: 1.6; color: #334155;">
-          ${cuerpoEmail}
+          ${finalBody}
         </div>
         
         <!-- Footer -->
@@ -37449,12 +38659,14 @@ window.formatText = function(action) {
       replacement = `<ul style="padding-left:1.25rem; margin-bottom:0.75rem; list-style-type:disc;">\n  <li>${selectedText || 'Elemento 1'}</li>\n  <li>Elemento 2</li>\n</ul>`;
       break;
     case 'link':
-      const url = prompt('Ingresa la URL del enlace:', 'https://');
-      if (url === null) return;
-      const anchorText = selectedText || prompt('Texto del enlace:', 'Haz clic aquí');
-      if (anchorText === null) return;
-      replacement = `<a href="${url}" target="_blank" style="color:var(--accent); text-decoration:underline; font-weight:600;">${anchorText}</a>`;
-      break;
+      window.abrirModalInsertarLink(selectedText, (url, text) => {
+        const replacement = `<a href="${url}" target="_blank" style="color:var(--accent); text-decoration:underline; font-weight:600;">${text}</a>`;
+        const currentVal = txt.value;
+        txt.value = currentVal.substring(0, start) + replacement + currentVal.substring(end);
+        txt.focus();
+        actualizarVistaPreviaEmail();
+      });
+      return;
     case 'image':
       const imageUrl = prompt('Ingresa la URL de la imagen:', 'https://');
       if (imageUrl === null) return;
@@ -37472,8 +38684,25 @@ window.formatText = function(action) {
 
 window.ejecutarAutomatizacion = async function(evento, contexto) {
   try {
-    const rules = safeGetJSON('sapi_automation_rules', defaultRules);
-    const templates = safeGetJSON('sapi_email_templates', defaultTemplates);
+    const savedRules = safeGetJSON('sapi_automation_rules', defaultRules);
+    const rules = [...savedRules];
+    if (Array.isArray(defaultRules)) {
+      defaultRules.forEach(dr => {
+        if (!rules.some(r => r.id === dr.id || r.evento === dr.evento)) {
+          rules.push(dr);
+        }
+      });
+    }
+
+    const savedTemplates = safeGetJSON('sapi_email_templates', defaultTemplates);
+    const templates = [...savedTemplates];
+    if (Array.isArray(defaultTemplates)) {
+      defaultTemplates.forEach(dt => {
+        if (!templates.some(t => t.id === dt.id)) {
+          templates.push(dt);
+        }
+      });
+    }
     
     // Find active rules for this trigger event
     const activeRules = rules.filter(r => r.evento === evento && r.activo === true);
@@ -37515,20 +38744,23 @@ window.ejecutarAutomatizacion = async function(evento, contexto) {
         '{{nombre_usuario}}': contexto.nombre_usuario || contexto.nombre || 'Usuario',
         '{{nombre_cliente}}': contexto.nombre_cliente || contexto.cliente || 'Cliente',
         '{{folio_ticket}}': contexto.folio_ticket || contexto.ticket || '',
-        '{{monto_cotizacion}}': contexto.monto_cotizacion || '',
+        '{{monto_cotizacion}}': contexto.monto_cotizacion ? window.formatMontoConComas(contexto.monto_cotizacion) : '',
         '{{folio_os}}': contexto.folio_os || '',
         '{{marca_modelo}}': contexto.marca_modelo || '',
         '{{serie}}': contexto.serie || '',
         '{{link}}': contexto.link || window.location.origin + '/cliente',
         '{{comentario}}': contexto.comentario || '',
         '{{estatus_ticket}}': contexto.estatus_ticket || '',
-        '{{fecha_visita}}': contexto.fecha_visita || '',
-        '{{tecnico_nombre}}': contexto.tecnico_nombre || '',
+        '{{fecha_visita}}': contexto.fecha_visita || contexto.fecha_programada || '',
+        '{{fecha_programada}}': contexto.fecha_programada || contexto.fecha_visita || '',
+        '{{tecnico_nombre}}': contexto.tecnico_nombre || contexto.tecnico_asignado || '',
+        '{{tecnico_asignado}}': contexto.tecnico_asignado || contexto.tecnico_nombre || '',
         '{{maquinaria}}': contexto.maquinaria || '',
         '{{categoria_ticket}}': contexto.categoria_ticket || '',
         '{{solicitante}}': contexto.solicitante || '',
         '{{descripcion_ticket}}': contexto.descripcion_ticket || '',
-        '{{asunto_ticket}}': contexto.asunto_ticket || ''
+        '{{asunto_ticket}}': contexto.asunto_ticket || contexto.asunto || '',
+        '{{asunto}}': contexto.asunto || contexto.asunto_ticket || ''
       };
       
       for (const [key, value] of Object.entries(placeholders)) {
@@ -37563,6 +38795,24 @@ window.ejecutarAutomatizacion = async function(evento, contexto) {
       } else {
         const errJson = await response.json().catch(() => ({}));
         console.error(`[Automation] Error enviando correo para la regla "${rule.nombre}":`, errJson);
+      }
+
+      if (typeof window.registrarLogEmail === 'function') {
+        window.registrarLogEmail({
+          id: 'email_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+          de: 'Ptalctes@eurorep.mx',
+          para: toEmail,
+          cliente: contexto.nombre_cliente || contexto.cliente || 'Cliente',
+          asunto: subject,
+          cuerpo: body,
+          htmlBody: payload.htmlBody,
+          fecha: new Date().toISOString(),
+          evento: evento || 'Automatización',
+          regla: rule ? rule.nombre : 'Regla de Automatización',
+          estatus: response.ok ? 'Enviado' : 'Fallido',
+          folio_ticket: contexto.folio_ticket || '',
+          folio_os: contexto.folio_os || ''
+        });
       }
     }
   } catch (err) {
@@ -39526,6 +40776,8 @@ window.renderEnvios = function() {
     return fB - fA;
   });
 
+  window._enviosFiltradosActuales = filtrados;
+
   if (filtrados.length === 0) {
     tbody.innerHTML = `
       <tr>
@@ -39633,6 +40885,106 @@ window.renderEnvios = function() {
 
   tbody.innerHTML = html;
   if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+// Exportar guías de envío a archivo Excel (.xlsx)
+window.exportarEnviosAExcel = function() {
+  const lista = window._enviosFiltradosActuales || window.obtenerTodosLosEnvios() || [];
+  if (lista.length === 0) {
+    if (typeof window.mostrarNotificacion === 'function') {
+      window.mostrarNotificacion('No hay guías de envío en la lista para exportar.', 'warning');
+    } else {
+      alert('No hay guías de envío en la lista para exportar.');
+    }
+    return;
+  }
+
+  const dataExport = lista.map((e, idx) => {
+    let partsStr = '';
+    if (Array.isArray(e.parts) && e.parts.length > 0) {
+      partsStr = e.parts.map(p => {
+        const cant = p.cantidad || 1;
+        const desc = p.descripcion || p.nombre || '';
+        const clave = p.clave || p.codigo || '';
+        return `${cant}x ${desc}${clave ? ` [${clave}]` : ''}`;
+      }).join('; ');
+    } else {
+      partsStr = 'Sin refacciones especificadas';
+    }
+
+    return {
+      '#': idx + 1,
+      'No. de Guía': e.guiaPedido || 'Sin guía',
+      'Paquetería': e.paqueteria || 'Por Definir',
+      'Estatus': e.estatus || 'En Preparación',
+      'Folio Ticket': e.ticketFolio || '',
+      'Asunto Ticket': e.ticketAsunto || '',
+      'Categoría Ticket': e.ticketCategoria || 'Refacción',
+      'Cliente': e.cliente || '',
+      'Destino / Sitio': e.sitio || 'General',
+      'Refacciones / Contenido': partsStr,
+      'Cant. Partes': (e.parts && Array.isArray(e.parts)) ? e.parts.length : 0,
+      'Fecha Envío': e.fechaEnvio || e.fechaPedido || '',
+      'Fecha Entrega': e.fechaLlegada || e.fechaEntrega || '',
+      'URL Rastreo': e.urlRastreo || '',
+      'Notas': e.notas || ''
+    };
+  });
+
+  const fechaHoy = new Date().toISOString().split('T')[0];
+  const filename = `Guias_Envio_Eurorep_${fechaHoy}.xlsx`;
+
+  if (typeof XLSX !== 'undefined') {
+    const ws = XLSX.utils.json_to_sheet(dataExport);
+
+    ws['!cols'] = [
+      { wch: 6 },   // #
+      { wch: 18 },  // No. de Guía
+      { wch: 16 },  // Paquetería
+      { wch: 16 },  // Estatus
+      { wch: 16 },  // Folio Ticket
+      { wch: 30 },  // Asunto Ticket
+      { wch: 20 },  // Categoría
+      { wch: 30 },  // Cliente
+      { wch: 22 },  // Destino / Sitio
+      { wch: 45 },  // Refacciones / Contenido
+      { wch: 12 },  // Cant. Partes
+      { wch: 14 },  // Fecha Envío
+      { wch: 14 },  // Fecha Entrega
+      { wch: 35 },  // URL Rastreo
+      { wch: 30 }   // Notas
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Guías de Envío');
+    XLSX.writeFile(wb, filename);
+
+    if (typeof window.mostrarNotificacion === 'function') {
+      window.mostrarNotificacion(`Se exportaron ${lista.length} guías de envío a Excel (${filename}).`, 'success');
+    }
+  } else {
+    // Fallback a CSV si XLSX no está disponible
+    const headers = Object.keys(dataExport[0]);
+    let csv = '\uFEFF' + headers.join(',') + '\n';
+    dataExport.forEach(row => {
+      const line = headers.map(h => `"${String(row[h] || '').replace(/"/g, '""')}"`).join(',');
+      csv += line + '\n';
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Guias_Envio_Eurorep_${fechaHoy}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    if (typeof window.mostrarNotificacion === 'function') {
+      window.mostrarNotificacion(`Se exportaron ${lista.length} guías de envío a CSV.`, 'success');
+    }
+  }
 };
 
 // Actualiza el badge en la barra lateral
@@ -43420,12 +44772,15 @@ window.filtrarKitsServicio = function() {
   });
 
   const countAll = kitsParaStats.length;
+  const count100 = kitsParaStats.filter(k => String(k.intervalo) === '100').length;
   const count250 = kitsParaStats.filter(k => String(k.intervalo) === '250').length;
   const count500 = kitsParaStats.filter(k => String(k.intervalo) === '500').length;
   const count1000 = kitsParaStats.filter(k => String(k.intervalo) === '1000').length;
 
   const statTotal = document.getElementById('kit-stat-total');
   if (statTotal) statTotal.textContent = countAll;
+  const stat100 = document.getElementById('kit-stat-100');
+  if (stat100) stat100.textContent = count100;
   const stat250 = document.getElementById('kit-stat-250');
   if (stat250) stat250.textContent = count250;
   const stat500 = document.getElementById('kit-stat-500');

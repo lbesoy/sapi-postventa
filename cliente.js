@@ -2057,6 +2057,19 @@ async function crearTicketCliente(e) {
     // Sincronizar en la nube
     await window.pushToSupabase('tickets', newTicket);
 
+    if (typeof window.ejecutarAutomatizacion === 'function') {
+      window.ejecutarAutomatizacion('Nuevo ticket creado por el cliente', {
+        email: emailContacto || (typeof currentSession !== 'undefined' && currentSession?.email) || '',
+        nombre_cliente: (typeof currentSession !== 'undefined' && currentSession?.nombre) || newTicket.cliente || 'Cliente',
+        folio_ticket: newTicket.folio,
+        asunto: newTicket.asunto,
+        asunto_ticket: newTicket.asunto,
+        descripcion_ticket: newTicket.descripcion,
+        estatus_ticket: newTicket.estado,
+        link: window.location.origin + '/cliente'
+      });
+    }
+
     showToast('Solicitud creada y enviada correctamente', 'success');
 
     // Limpiar Formulario
@@ -2642,56 +2655,80 @@ function abrirDetalleTicketCliente(id) {
     `;
   }
 
-  // Foto evidencia si existe
+  // Foto evidencia o documento si existe
   let photoHtml = '';
-  if (t.pdfCotizacion && !t.cotizacionSAP) {
-    const isPlaceholder = t.pdfCotizacion === '__HAS_PDF__';
-    photoHtml = `
-      <div style="margin-top:1.5rem;">
-        <h4 style="font-size:0.9rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.5rem;">Evidencia Fotográfica</h4>
-        <div id="t-evidence-img-container-${t.id}" style="width:100%; max-height:220px; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; background:#000;">
-          <img id="t-evidence-img-${t.id}" src="${isPlaceholder ? '' : t.pdfCotizacion}" alt="Evidencia" style="width:100%; height:100%; object-fit:contain; display:${isPlaceholder ? 'none' : 'block'}; cursor:pointer;" onclick="window.previsualizarImagenCompleta(this.src, 'Evidencia del Ticket')" title="Clic para ampliar" />
-          ${isPlaceholder ? `<span id="t-evidence-loading-${t.id}" style="font-size:0.8rem; color:var(--text-secondary);"><i data-lucide="loader" class="rotating" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; display:inline-block;"></i> Cargando imagen...</span>` : ''}
+  const rawEvidencia = (t.pdfCotizacion && t.pdfCotizacion !== '__HAS_PDF__') 
+    ? t.pdfCotizacion 
+    : (t.foto || t.evidencia || t.pdf_cotizacion || '');
+  const isPlaceholder = t.pdfCotizacion === '__HAS_PDF__';
+  const hasNotesEvidence = (!rawEvidencia && !isPlaceholder && t.notas && String(t.notas).toLowerCase().includes('evidencia fotográfica'));
+
+  if (rawEvidencia || isPlaceholder || hasNotesEvidence) {
+    const isPdfFile = rawEvidencia && (rawEvidencia.startsWith('data:application/pdf') || rawEvidencia.toLowerCase().includes('.pdf'));
+
+    if (isPdfFile) {
+      photoHtml = `
+        <div style="margin-top:1.5rem;" id="t-evidence-section-${t.id}">
+          <h4 style="font-size:0.9rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.5rem;">Documento de Evidencia</h4>
+          <div style="padding:0.85rem 1rem; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-card); display:flex; align-items:center; justify-content:space-between; gap:1rem;">
+            <div style="display:flex; align-items:center; gap:0.5rem; color:var(--text-primary); font-size:0.85rem; font-weight:600;">
+              <i data-lucide="file-text" style="width:20px; height:20px; color:var(--accent);"></i>
+              <span>Evidencia adjunta (PDF)</span>
+            </div>
+            <a href="${rawEvidencia}" target="_blank" download="Evidencia_Ticket_${t.folio || t.id}.pdf" class="btn-secondary" style="font-size:0.8rem; padding:0.4rem 0.8rem; display:inline-flex; align-items:center; gap:0.4rem; text-decoration:none;">
+              <i data-lucide="download" style="width:14px; height:14px;"></i> Ver / Descargar PDF
+            </a>
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    } else {
+      photoHtml = `
+        <div style="margin-top:1.5rem;" id="t-evidence-section-${t.id}">
+          <h4 style="font-size:0.9rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.5rem;">Evidencia Fotográfica</h4>
+          <div id="t-evidence-img-container-${t.id}" style="width:100%; max-height:280px; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; background:var(--bg-card); position:relative; min-height:60px; padding:0.5rem;">
+            <img id="t-evidence-img-${t.id}" src="${rawEvidencia}" alt="Evidencia de Falla" style="max-width:100%; max-height:260px; object-fit:contain; border-radius:6px; display:${rawEvidencia ? 'block' : 'none'}; cursor:pointer;" onclick="window.previsualizarImagenCompleta(this.src, 'Evidencia del Ticket ${t.folio || ''}')" title="Clic para ampliar" onerror="this.style.display='none'; const sec = document.getElementById('t-evidence-section-${t.id}'); if(sec) sec.style.display='none';" />
+            ${(isPlaceholder || hasNotesEvidence) ? `<span id="t-evidence-loading-${t.id}" style="font-size:0.8rem; color:var(--text-secondary); padding:0.5rem;"><i data-lucide="loader" class="rotating" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; display:inline-block;"></i> Cargando evidencia...</span>` : ''}
+          </div>
+        </div>
+      `;
+    }
   }
 
-    const listHtml = (t.comentariosClientes && t.comentariosClientes.length > 0)
-      ? t.comentariosClientes.map(c => {
-          const isMe = c.usuario !== 'Soporte' && c.usuario !== 'EuroRep' && !usuarios.some(u => u.nombre === c.usuario);
-          const alignStyle = isMe
-            ? 'align-self: flex-end; background: rgba(232, 130, 12, 0.08); border-left: 3px solid var(--accent);'
-            : 'align-self: flex-start; background: var(--bg-card); border-left: 3px solid var(--border);';
-          
-          return `
-            <div style="max-width: 85%; padding: 0.6rem 0.8rem; border-radius: 8px; box-shadow: var(--shadow-sm); ${alignStyle}">
-              <div style="display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 0.25rem; align-items: center;">
-                <span style="font-weight: 700; font-size: 0.75rem; color: ${isMe ? 'var(--accent)' : 'var(--text-primary)'};">${c.usuario}</span>
-                <span style="font-size: 0.65rem; color: var(--text-muted); font-family: monospace;">${formatFechaHoraAmigable(c.fecha)}</span>
-              </div>
-              <div style="font-size: 0.85rem; white-space: pre-wrap; color: var(--text-primary); line-height: 1.35; font-family: inherit;">${c.texto}</div>
-            </div>
-          `;
-        }).join('')
-      : `<div style="text-align: center; color: var(--text-muted); font-style: italic; font-size: 0.8rem; padding: 1.5rem 0;">No hay mensajes registrados.</div>`;
-
-    const commentsHtml = `
-      <div class="detalle-section" style="border-top:1px dashed var(--border); padding-top:1.25rem; margin-top:1.5rem; text-align: left;">
-        <div class="detalle-section-title" style="display:flex; align-items:center; gap:0.5rem; text-transform: uppercase; font-size:0.9rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.5rem;"><i data-lucide="message-square" style="width:16px;height:16px;"></i> Comentarios y Mensajes</div>
+  const listHtml = (t.comentariosClientes && t.comentariosClientes.length > 0)
+    ? t.comentariosClientes.map(c => {
+        const isMe = c.usuario !== 'Soporte' && c.usuario !== 'EuroRep' && !usuarios.some(u => u.nombre === c.usuario);
+        const alignStyle = isMe
+          ? 'align-self: flex-end; background: rgba(232, 130, 12, 0.08); border-left: 3px solid var(--accent);'
+          : 'align-self: flex-start; background: var(--bg-card); border-left: 3px solid var(--border);';
         
-        <div class="chat-container" style="max-height: 200px; overflow-y: auto; padding: 0.75rem; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
-          ${listHtml}
-        </div>
+        return `
+          <div style="max-width: 85%; padding: 0.6rem 0.8rem; border-radius: 8px; box-shadow: var(--shadow-sm); ${alignStyle}">
+            <div style="display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 0.25rem; align-items: center;">
+              <span style="font-weight: 700; font-size: 0.75rem; color: ${isMe ? 'var(--accent)' : 'var(--text-primary)'};">${c.usuario}</span>
+              <span style="font-size: 0.65rem; color: var(--text-muted); font-family: monospace;">${formatFechaHoraAmigable(c.fecha)}</span>
+            </div>
+            <div style="font-size: 0.85rem; white-space: pre-wrap; color: var(--text-primary); line-height: 1.35; font-family: inherit;">${c.texto}</div>
+          </div>
+        `;
+      }).join('')
+    : `<div style="text-align: center; color: var(--text-muted); font-style: italic; font-size: 0.8rem; padding: 1.5rem 0;">No hay mensajes registrados.</div>`;
 
-        <div class="chat-input-wrapper" style="display: flex; gap: 0.5rem; align-items: stretch;">
-          <textarea id="chat-new-comment-externo" placeholder="Escribe un mensaje..." rows="2" style="flex: 1; resize: none; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
-          <button type="button" class="btn-primary" onclick="window.agregarComentarioExterno('${t.id}')" style="background: var(--accent); border-color: var(--accent); border-radius: 8px; padding: 0 1rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem; cursor: pointer; font-weight: 600; font-size: 0.85rem; color: white;">
-            <i data-lucide="send" style="width: 14px; height: 14px;"></i> Enviar
-          </button>
-        </div>
+  const commentsHtml = `
+    <div class="detalle-section" style="border-top:1px dashed var(--border); padding-top:1.25rem; margin-top:1.5rem; text-align: left;">
+      <div class="detalle-section-title" style="display:flex; align-items:center; gap:0.5rem; text-transform: uppercase; font-size:0.9rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.5rem;"><i data-lucide="message-square" style="width:16px;height:16px;"></i> Comentarios y Mensajes</div>
+      
+      <div class="chat-container" style="max-height: 200px; overflow-y: auto; padding: 0.75rem; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+        ${listHtml}
       </div>
-    `;
+
+      <div class="chat-input-wrapper" style="display: flex; gap: 0.5rem; align-items: stretch;">
+        <textarea id="chat-new-comment-externo" placeholder="Escribe un mensaje..." rows="2" style="flex: 1; resize: none; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+        <button type="button" class="btn-primary" onclick="window.agregarComentarioExterno('${t.id}')" style="background: var(--accent); border-color: var(--accent); border-radius: 8px; padding: 0 1rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem; cursor: pointer; font-weight: 600; font-size: 0.85rem; color: white;">
+          <i data-lucide="send" style="width: 14px; height: 14px;"></i> Enviar
+        </button>
+      </div>
+    </div>
+  `;
 
   body.innerHTML = `
     ${trackerHtml}
@@ -2740,7 +2777,7 @@ function abrirDetalleTicketCliente(id) {
   abrirModal('modal-ticket');
   lucide.createIcons();
 
-  if (t.pdfCotizacion === '__HAS_PDF__') {
+  if (t.pdfCotizacion === '__HAS_PDF__' || (!t.pdfCotizacion && t.notas && String(t.notas).toLowerCase().includes('evidencia fotográfica'))) {
     // Descargar evidencia fotográfica bajo demanda
     setTimeout(async () => {
       try {
@@ -2753,24 +2790,43 @@ function abrirDetalleTicketCliente(id) {
         if (error) throw error;
         
         const base64 = data ? data.pdf_cotizacion : null;
+        const loaderEl = document.getElementById(`t-evidence-loading-${t.id}`);
+        const img = document.getElementById(`t-evidence-img-${t.id}`);
+        const sec = document.getElementById(`t-evidence-section-${t.id}`);
+
         if (base64) {
           t.pdfCotizacion = base64; // Guardar localmente
-          const img = document.getElementById(`t-evidence-img-${t.id}`);
-          const loaderEl = document.getElementById(`t-evidence-loading-${t.id}`);
-          if (img) {
-            img.src = base64;
-            img.style.display = 'block';
+          const isPdf = base64.startsWith('data:application/pdf') || base64.toLowerCase().includes('.pdf');
+          if (isPdf) {
+            if (sec) {
+              sec.innerHTML = `
+                <h4 style="font-size:0.9rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.5rem;">Documento de Evidencia</h4>
+                <div style="padding:0.85rem 1rem; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-card); display:flex; align-items:center; justify-content:space-between; gap:1rem;">
+                  <div style="display:flex; align-items:center; gap:0.5rem; color:var(--text-primary); font-size:0.85rem; font-weight:600;">
+                    <i data-lucide="file-text" style="width:20px; height:20px; color:var(--accent);"></i>
+                    <span>Evidencia adjunta (PDF)</span>
+                  </div>
+                  <a href="${base64}" target="_blank" download="Evidencia_Ticket_${t.folio || t.id}.pdf" class="btn-secondary" style="font-size:0.8rem; padding:0.4rem 0.8rem; display:inline-flex; align-items:center; gap:0.4rem; text-decoration:none;">
+                    <i data-lucide="download" style="width:14px; height:14px;"></i> Ver / Descargar PDF
+                  </a>
+                </div>
+              `;
+              lucide.createIcons();
+            }
+          } else {
+            if (img) {
+              img.src = base64;
+              img.style.display = 'block';
+            }
+            if (loaderEl) loaderEl.style.display = 'none';
           }
-          if (loaderEl) {
-            loaderEl.style.display = 'none';
-          }
+        } else {
+          if (sec) sec.style.display = 'none';
         }
       } catch (err) {
         console.error('Error cargando evidencia fotográfica:', err);
-        const loaderEl = document.getElementById(`t-evidence-loading-${t.id}`);
-        if (loaderEl) {
-          loaderEl.innerHTML = '<span style="color:var(--red);">Error al cargar imagen</span>';
-        }
+        const sec = document.getElementById(`t-evidence-section-${t.id}`);
+        if (sec) sec.style.display = 'none';
       }
     }, 50);
   }
@@ -4083,7 +4139,7 @@ async function abrirReportePdfCliente(e, orderId, soloVisualizar = false) {
         <div style="font-size: 0.75rem; color: #64748b; line-height: 1.4;">
           <strong>EURO REPRESENTACIONES S.A. DE C.V.</strong><br>
           Servicio Técnico Especializado en Maquinaria<br>
-          soporte@eurorep.mx | www.eurorep.mx
+          Ptalctes@eurorep.mx | www.eurorep.mx
         </div>
       </div>
       <div style="text-align: right;">
@@ -4554,6 +4610,17 @@ async function responderCotizacionCliente(ticketId, respuesta) {
 
     // Actualizar localStorage y array global
     localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+
+    if (respuesta === 'si' && typeof window.ejecutarAutomatizacion === 'function') {
+      window.ejecutarAutomatizacion('Cotización SAP aceptada por el cliente', {
+        email: t.contacto || (typeof currentSession !== 'undefined' && currentSession?.email) || '',
+        nombre_cliente: (typeof currentSession !== 'undefined' && currentSession?.nombre) || t.cliente || 'Cliente',
+        folio_ticket: t.folio,
+        monto_cotizacion: t.montoCotizacion ? (typeof window.formatMontoConComas === 'function' ? window.formatMontoConComas(t.montoCotizacion) : `$${Number(t.montoCotizacion).toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`) : '',
+        estatus_ticket: t.estado,
+        link: window.location.origin + '/cliente'
+      });
+    }
 
     showToast(respuesta === 'si' ? 'Cotización aceptada y aprobada con éxito.' : 'Cotización rechazada.', 'success');
 

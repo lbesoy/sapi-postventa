@@ -824,6 +824,29 @@ function isValidUUID(uuid) {
   return regex.test(uuid);
 }
 
+function toValidUUID(str) {
+  if (!str) return crypto.randomUUID();
+  if (typeof str !== 'string') str = String(str);
+  if (isValidUUID(str)) return str;
+
+  let h1 = 0x811c9dc5, h2 = 0x811c9dc5, h3 = 0x811c9dc5, h4 = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 0x01000193);
+    h2 = Math.imul(h2 ^ ch, 0x050c5d17);
+    h3 = Math.imul(h3 ^ ch, 0x01000193);
+    h4 = Math.imul(h4 ^ ch, 0x075bc2b1);
+  }
+  const hex1 = Math.abs(h1).toString(16).padStart(8, '0');
+  const hex2 = Math.abs(h2).toString(16).padStart(4, '0');
+  const hex3 = ('4' + Math.abs(h3).toString(16).padStart(3, '0')).slice(0, 4);
+  const hex4 = ('a' + Math.abs(h4).toString(16).padStart(3, '0')).slice(0, 4);
+  const hex5 = (Math.abs(h1 ^ h3).toString(16).padStart(8, '0') + Math.abs(h2 ^ h4).toString(16).padStart(4, '0')).slice(0, 12);
+  
+  return `${hex1}-${hex2}-${hex3}-${hex4}-${hex5}`;
+}
+window.toValidUUID = toValidUUID;
+
 function gastoToRow(g) {
   let ordenId = null;
   if (g.ordenFolio) {
@@ -1025,7 +1048,7 @@ function rowToCliente(c) {
 
 function eventoToRow(e) {
   return {
-    id: e.id,
+    id: toValidUUID(e.id),
     titulo: e.titulo || 'Evento',
     descripcion: e.descripcion || null,
     fecha_inicio: e.fechaInicio || e.start || new Date().toISOString(),
@@ -1174,6 +1197,8 @@ window.pushToSupabase = async function(tabla, item) {
       row = window.levantamientoToRow(item);
     } else if (tabla === 'envios' && typeof window.envioToRow === 'function') {
       row = window.envioToRow(item);
+    } else if (tabla === 'calendario_eventos' && typeof eventoToRow === 'function') {
+      row = eventoToRow(item);
     }
     
     // Upsert directo en la nube
@@ -1895,6 +1920,13 @@ async function _processSyncQueueInternal() {
             }
           }
 
+          if (upsertErr && (upsertErr.code === '22P02' || (upsertErr.message && (upsertErr.message.includes('uuid') || upsertErr.message.includes('22P02'))))) {
+            console.warn(`[Sync Queue] Sintaxis UUID inválida en ${resTabla} para id=${payload.id}. Convirtiendo a UUID válido y reintentando...`);
+            const fallbackPayload = { ...payload, id: toValidUUID(payload.id) };
+            const resFallback = await sb.from(resTabla).upsert(fallbackPayload, { onConflict: 'id' });
+            upsertErr = resFallback.error;
+          }
+
           if (upsertErr && (upsertErr.code === '23503' || (upsertErr.message && upsertErr.message.includes('foreign key')))) {
             console.warn(`[Sync Queue] Violación FK en ${resTabla}. Reintentando con claves foráneas neutralizadas...`);
             const fallbackPayload = { ...payload };
@@ -2184,7 +2216,8 @@ async function _processSyncQueueInternal() {
             }
           }
         } else if (item.action === 'delete') {
-          const { error: deleteErr } = await sb.from(resTabla).delete().eq('id', item.data.id);
+          const deleteId = (!isValidUUID(item.data.id)) ? toValidUUID(item.data.id) : item.data.id;
+          const { error: deleteErr } = await sb.from(resTabla).delete().eq('id', deleteId);
           error = deleteErr;
         }
 
