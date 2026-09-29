@@ -4116,10 +4116,17 @@ window.cargarDatosDeSupabase = function() {
         emailLogsErr = err;
       }
       if (!emailLogsErr && emailLogs && Array.isArray(emailLogs)) {
+        const isTargetMail = (l) => {
+          if (!l) return false;
+          if (String(l.id || '').startsWith('email_tk_')) return false;
+          const s = (String(l.de || '') + ' ' + String(l.para || '') + ' ' + String(l.cc || '') + ' ' + String(l.bcc || '') + ' ' + String(l.cliente || '')).toLowerCase();
+          return s.includes('ptalctes') || s.includes('portal tickets');
+        };
+        const filtered = emailLogs.filter(isTargetMail);
         if (typeof safeSetJSON === 'function') {
-          safeSetJSON('sapi_email_logs', emailLogs);
+          safeSetJSON('sapi_email_logs', filtered);
         } else {
-          localStorage.setItem('sapi_email_logs', JSON.stringify(emailLogs));
+          localStorage.setItem('sapi_email_logs', JSON.stringify(filtered));
         }
       }
     } catch (errEmail) {

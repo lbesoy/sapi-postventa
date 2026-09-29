@@ -36416,14 +36416,10 @@ window.esCorreoValidoPtalctes = function(l) {
   if (!l || !l.id) return false;
   if (String(l.id).startsWith('email_tk_')) return false; // Descartar sintéticos
   
-  // Si fue obtenido de Azure Graph directamente, pertenece a la sincronización del buzón
-  if (l.origen === 'azure_ms_graph' || String(l.id).startsWith('ms_')) {
-    return true;
-  }
-
   const isTarget = (str) => {
-    const s = String(str || '').toLowerCase();
-    return s.includes('ptalctes') || s.includes('portal tickets') || s.includes('eurorep.mx');
+    const s = String(str || '').toLowerCase().trim();
+    if (!s) return false;
+    return s.includes('ptalctes') || s.includes('portal tickets');
   };
 
   const de = String(l.de || '');
@@ -36440,7 +36436,7 @@ window.esCorreoValidoPtalctes = function(l) {
          isTarget(bcc) || 
          isTarget(cliente) ||
          isTarget(asunto) ||
-         isTarget(cuerpo);
+         cuerpo.toLowerCase().includes('ptalctes');
 };
 
 window.obtenerEmailLogsSoporte = function() {
@@ -36448,7 +36444,7 @@ window.obtenerEmailLogsSoporte = function() {
   const logMap = new Map();
   const validLocalLogs = [];
 
-  // Filtrar correos válidos de soporte
+  // Filtrar exclusivamente correos pertenecientes a ptalctes@eurorep.mx / Portal Tickets
   (localLogs || []).forEach(l => {
     if (window.esCorreoValidoPtalctes(l)) {
       logMap.set(l.id, l);
@@ -36456,7 +36452,7 @@ window.obtenerEmailLogsSoporte = function() {
     }
   });
 
-  // Limpiar en almacenamiento local si había residuos sintéticos
+  // Purgar inmediatamente cualquier correo ajeno descargado previamente (ej. de luciano, axel, etc.)
   if (validLocalLogs.length !== (localLogs || []).length) {
     if (typeof safeSetJSON === 'function') {
       safeSetJSON('sapi_email_logs', validLocalLogs);
@@ -36465,12 +36461,11 @@ window.obtenerEmailLogsSoporte = function() {
     }
   }
 
-  // Si hay correos en memoria de la sincronización de Azure
+  // Filtrar también cualquier registro en memoria
   if (Array.isArray(window._azureEmailLogs)) {
+    window._azureEmailLogs = window._azureEmailLogs.filter(e => window.esCorreoValidoPtalctes(e));
     window._azureEmailLogs.forEach(l => {
-      if (window.esCorreoValidoPtalctes(l)) {
-        logMap.set(l.id, l);
-      }
+      logMap.set(l.id, l);
     });
   }
 
@@ -36640,10 +36635,11 @@ window.sincronizarCorreosAzure = async function(silent = false) {
         }
       }
 
-      // Filtro para el buzón de soporte / postventa
+      // Filtro estricto: Únicamente correos de ptalctes@eurorep.mx / Portal Tickets
       const isTarget = (str) => {
-        const s = String(str || '').toLowerCase();
-        return s.includes('ptalctes') || s.includes('portal tickets') || s.includes('eurorep.mx');
+        const s = String(str || '').toLowerCase().trim();
+        if (!s) return false;
+        return s.includes('ptalctes') || s.includes('portal tickets');
       };
 
       msgs = msgs.filter(m => {
@@ -36709,6 +36705,8 @@ window.sincronizarCorreosAzure = async function(silent = false) {
           origen: 'azure_ms_graph'
         };
       });
+
+      rawEmails = rawEmails.filter(e => window.esCorreoValidoPtalctes(e));
     }
 
     if (rawEmails.length > 0) {
@@ -36736,14 +36734,17 @@ window.sincronizarCorreosAzure = async function(silent = false) {
       if (!silent) {
         mostrarNotificacion(`✅ Sincronizados ${rawEmails.length} correos de Ptalctes@eurorep.mx desde Microsoft Azure`, 'success');
       }
-    } else if (!isTokenValid) {
-      if (!silent) {
+    } else {
+      // Si no se encontraron correos de ptalctes en este lote, purgar la memoria y storage local de cualquier correo ajeno
+      const currentLogs = safeGetJSON('sapi_email_logs', []);
+      const cleanLogs = currentLogs.filter(e => window.esCorreoValidoPtalctes(e));
+      safeSetJSON('sapi_email_logs', cleanLogs);
+      window._azureEmailLogs = [];
+      if (!silent && isTokenValid) {
+        mostrarNotificacion('No se encontraron correos nuevos para Ptalctes@eurorep.mx en Microsoft Azure.', 'info');
+      } else if (!silent && !isTokenValid) {
         mostrarNotificacion('Conecta tu cuenta de Microsoft Azure para descargar los correos de Ptalctes@eurorep.mx.', 'warning');
         window.iniciarSesionMicrosoftAzureMail();
-      }
-    } else {
-      if (!silent) {
-        mostrarNotificacion('No se encontraron correos nuevos para Ptalctes@eurorep.mx en Microsoft Azure.', 'info');
       }
     }
   } catch (err) {

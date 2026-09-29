@@ -143,7 +143,10 @@ export default async function handler(req, res) {
       const subject = (m.subject || '').toLowerCase();
       const preview = (m.bodyPreview || '').toLowerCase();
 
-      const isTarget = (str) => str.includes('ptalctes') || str.includes('portal tickets') || str.includes('eurorep.mx');
+      const isTarget = (str) => {
+        const s = String(str || '').toLowerCase().trim();
+        return s.includes('ptalctes') || s.includes('portal tickets');
+      };
       
       return isTarget(fromAddr) ||
              isTarget(fromName) ||
