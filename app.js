@@ -36503,7 +36503,7 @@ window.iniciarSesionMicrosoftAzureMail = function() {
 
   const redirectUri = window.location.origin + window.location.pathname;
   const scopes = encodeURIComponent('Mail.Read Mail.Read.Shared Mail.ReadWrite Mail.ReadWrite.Shared Mail.Send Mail.Send.Shared Files.Read User.Read offline_access');
-  const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${encodeURIComponent(targetClientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&prompt=select_account%20consent&response_mode=fragment`;
+  const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${encodeURIComponent(targetClientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&prompt=select_account&response_mode=fragment`;
 
   const width = 600;
   const height = 650;
