@@ -278,6 +278,28 @@ export default async function handler(req, res) {
         .eq('id', record.id);
     }
 
+    // 8. Registrar historial en sapi_email_logs
+    try {
+      const emailLogRecord = {
+        id: 'email_notif_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+        tipo: 'enviado',
+        de: process.env.SMTP_EMAIL || 'Ptalctes@eurorep.mx',
+        para: emailsToNotify.join(', '),
+        cliente: record.cliente || 'Cliente',
+        asunto: subject,
+        cuerpo: latestComment ? (latestComment.texto || '') : `Notificación de estado: ${stage || 'Actualización'}`,
+        htmlBody: html,
+        fecha: new Date().toISOString(),
+        evento: isInternalComment ? 'Comentario Interno' : isExternalComment ? 'Comentario Cliente' : (stage || 'Notificación'),
+        regla: isInternalComment ? 'Aviso Comentario Interno' : isExternalComment ? 'Aviso Mensaje Soporte' : `Etapa ${stage || 'Actualizada'}`,
+        estatus: 'Enviado',
+        folio_ticket: record.folio || ''
+      };
+      await supabase.from('sapi_email_logs').insert(emailLogRecord);
+    } catch (logErr) {
+      console.warn('[Notification Webhook] Error registrando log en sapi_email_logs:', logErr.message);
+    }
+
     return res.status(200).json({ success: true, messageId: info.messageId });
   } catch (error) {
     console.error('[Notification Webhook Error]:', error);

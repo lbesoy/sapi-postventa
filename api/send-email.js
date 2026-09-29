@@ -123,6 +123,38 @@ export default async function handler(req, res) {
     const info = await transporter.sendMail(mailOptions);
     console.log('Message sent: %s', info.messageId);
 
+    // Registrar log en Supabase
+    try {
+      const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (supabaseUrl && supabaseKey) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        const { cliente, folio_ticket, folio_os, evento, regla, de } = req.body;
+        await supabase.from('sapi_email_logs').insert({
+          id: 'email_api_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+          tipo: 'enviado',
+          de: de || process.env.SMTP_EMAIL || 'Ptalctes@eurorep.mx',
+          para: to,
+          cc: cc || '',
+          bcc: bcc || '',
+          cliente: cliente || 'Cliente',
+          asunto: subject,
+          cuerpo: typeof htmlBody === 'string' ? htmlBody.replace(/<[^>]+>/g, ' ').substring(0, 1000) : '',
+          htmlBody: htmlBody,
+          fecha: new Date().toISOString(),
+          evento: evento || 'Envío API',
+          regla: regla || 'Directo',
+          estatus: 'Enviado',
+          folio_ticket: folio_ticket || '',
+          folio_os: folio_os || '',
+          archivos: Array.isArray(attachments) ? attachments.map(a => a.filename) : []
+        });
+      }
+    } catch (dbErr) {
+      console.warn('[send-email] No se pudo registrar en sapi_email_logs:', dbErr.message);
+    }
+
     return res.status(200).json({ success: true, messageId: info.messageId });
   } catch (error) {
     console.error('Error sending email:', error);

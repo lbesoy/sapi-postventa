@@ -4106,6 +4106,26 @@ window.cargarDatosDeSupabase = function() {
       console.warn('[Sync] Error al cargar ideas_fallas:', errIf);
     }
 
+    // Historial de Correos (Bandeja de Correo y Notificaciones)
+    try {
+      let emailLogs = null;
+      let emailLogsErr = null;
+      try {
+        emailLogs = await fetchTablePaginated('sapi_email_logs', '*', 'fecha', false, null, 150, 15000);
+      } catch (err) {
+        emailLogsErr = err;
+      }
+      if (!emailLogsErr && emailLogs && Array.isArray(emailLogs)) {
+        if (typeof safeSetJSON === 'function') {
+          safeSetJSON('sapi_email_logs', emailLogs);
+        } else {
+          localStorage.setItem('sapi_email_logs', JSON.stringify(emailLogs));
+        }
+      }
+    } catch (errEmail) {
+      console.warn('[Sync] Error al cargar sapi_email_logs:', errEmail);
+    }
+
   } catch (error) {
     console.error('[Supabase] Error cargando datos:', error.message);
     if (typeof localStorage !== 'undefined') {
@@ -4411,6 +4431,43 @@ function setupRealtime() {
           }
         }
       }
+
+      if (tableName === 'sapi_email_logs') {
+        let logs = [];
+        try {
+          logs = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_email_logs', []) : JSON.parse(localStorage.getItem('sapi_email_logs') || '[]');
+        } catch(e) { logs = []; }
+
+        if (!isFallback && payload) {
+          if (payload.eventType === 'DELETE' && payload.old) {
+            logs = logs.filter(l => l.id !== payload.old.id);
+          } else if (payload.eventType === 'INSERT' && payload.new) {
+            const idx = logs.findIndex(l => l.id === payload.new.id);
+            if (idx === -1) logs.unshift(payload.new);
+            else logs[idx] = payload.new;
+          } else if (payload.eventType === 'UPDATE' && payload.new) {
+            const idx = logs.findIndex(l => l.id === payload.new.id);
+            if (idx > -1) logs[idx] = payload.new;
+            else logs.unshift(payload.new);
+          }
+        } else {
+          logs = data || [];
+        }
+
+        logs.sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+        if (typeof safeSetJSON === 'function') {
+          safeSetJSON('sapi_email_logs', logs);
+        } else {
+          localStorage.setItem('sapi_email_logs', JSON.stringify(logs));
+        }
+
+        if (typeof window.renderChatSoporteEmpresa === 'function') {
+          const soporteView = document.getElementById('view-chat-soporte');
+          if (soporteView && soporteView.classList.contains('active')) {
+            window.renderChatSoporteEmpresa();
+          }
+        }
+      }
       
       window.dispatchEvent(new Event('supabase_datos_cargados'));
     } catch (e) {
@@ -4434,7 +4491,8 @@ function setupRealtime() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'envios' }, (payload) => handleUpdate('envios', payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'calendario_eventos' }, (payload) => handleUpdate('calendario_eventos', payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ideas_fallas' }, (payload) => handleUpdate('ideas_fallas', payload))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'config' }, (payload) => handleUpdate('config', payload));
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'config' }, (payload) => handleUpdate('config', payload))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sapi_email_logs' }, (payload) => handleUpdate('sapi_email_logs', payload));
       
     window.supabaseRealtimeChannel.subscribe();
   } catch (err) {

@@ -355,6 +355,9 @@ function safeSetJSON(key, value) {
   }
 }
 
+window.safeGetJSON = safeGetJSON;
+window.safeSetJSON = safeSetJSON;
+
 function ensureBackdoorUsersFallback(users) {
   if (typeof window.ensureBackdoorUsers === 'function') {
     return window.ensureBackdoorUsers(users);
@@ -16179,6 +16182,28 @@ async function procesarEnviarCorreo(e) {
     if (response.ok) {
       mostrarNotificacion("¡Correo enviado exitosamente con reporte PDF adjunto!", "success");
       cerrarModalCorreo();
+
+      if (typeof window.registrarLogEmail === 'function') {
+        window.registrarLogEmail({
+          id: 'email_rep_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+          tipo: 'enviado',
+          de: 'Ptalctes@eurorep.mx',
+          para: payload.to,
+          cc: payload.cc || '',
+          bcc: payload.bcc || '',
+          cliente: o.cliente || 'Cliente',
+          asunto: payload.subject,
+          cuerpo: `Reporte de Servicio finalizado para la Orden ${o.folio || ordenId}.`,
+          htmlBody: htmlBody,
+          fecha: new Date().toISOString(),
+          evento: 'Reporte de Servicio',
+          regla: 'Envío de Reporte PDF',
+          estatus: 'Enviado',
+          folio_os: o.folio || ordenId,
+          folio_ticket: o.folio_ticket || (o.ticket ? o.ticket.folio : ''),
+          archivos: base64Pdf ? [`Reporte_Servicio_${o.folio || ordenId}.pdf`] : []
+        });
+      }
     } else {
       console.error(result);
       mostrarNotificacion("Error al enviar el correo: " + (result.error || result.message || 'Error desconocido'), "error");
@@ -32748,7 +32773,8 @@ window.abrirOneDrivePicker = function() {
     } else {
       // Iniciar flujo de autenticación emergente (OAuth Implicit Flow)
       const redirectUri = window.location.origin + window.location.pathname;
-      const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${encodeURIComponent(odClientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=Files.Read&response_mode=fragment`;
+      const scopes = encodeURIComponent('Mail.Read Mail.ReadWrite Mail.Send Files.Read User.Read offline_access');
+      const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${encodeURIComponent(odClientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_mode=fragment`;
       
       const width = 600;
       const height = 600;
@@ -36274,11 +36300,25 @@ window.setMailFilter = function(filter) {
 
 window.registrarLogEmail = function(logItem) {
   try {
+    if (!logItem) return;
+    if (!logItem.id) {
+      logItem.id = 'email_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    }
+    if (!logItem.fecha) {
+      logItem.fecha = new Date().toISOString();
+    }
     const logs = safeGetJSON('sapi_email_logs', []);
-    logs.unshift(logItem);
+    const idx = logs.findIndex(l => l.id === logItem.id);
+    if (idx > -1) {
+      logs[idx] = logItem;
+    } else {
+      logs.unshift(logItem);
+    }
     safeSetJSON('sapi_email_logs', logs);
     if (window.supabaseClient) {
-      window.supabaseClient.from('sapi_email_logs').insert(logItem).catch(() => {});
+      window.supabaseClient.from('sapi_email_logs').upsert(logItem).catch((err) => {
+        console.warn('[EmailLogs] Falló inserción en Supabase:', err);
+      });
     }
   } catch (e) {
     console.error('Error guardando log de email:', e);
@@ -36295,7 +36335,7 @@ window.renderChatSoporteEmpresa = function() {
   }
 
   const activeSandbox = isTestModeActive();
-  const chatTickets = tickets.filter(t => t.categoria === 'Soporte General' && isTestData(t) === activeSandbox);
+  const chatTickets = (typeof tickets !== 'undefined' ? tickets : []).filter(t => t.categoria === 'Soporte General' && isTestData(t) === activeSandbox);
 
   if (chatTickets.length === 0) {
     listContainer.innerHTML = `
@@ -36317,10 +36357,10 @@ window.renderChatSoporteEmpresa = function() {
   chatTickets.sort((a, b) => {
     const lastA = a.comentariosClientes && a.comentariosClientes.length > 0 
       ? new Date(a.comentariosClientes[a.comentariosClientes.length - 1].fecha) 
-      : new Date(a.fechaCreacion);
+      : new Date(a.fechaCreacion || 0);
     const lastB = b.comentariosClientes && b.comentariosClientes.length > 0 
       ? new Date(b.comentariosClientes[b.comentariosClientes.length - 1].fecha) 
-      : new Date(b.fechaCreacion);
+      : new Date(b.fechaCreacion || 0);
     return lastB - lastA;
   });
 
@@ -36366,16 +36406,271 @@ window.renderChatSoporteEmpresa = function() {
   if (window.lucide) lucide.createIcons();
 };
 
+let mailSearchQuery = '';
+window.setMailSearch = function(query) {
+  mailSearchQuery = (query || '').toLowerCase().trim();
+  window.renderBandejaCorreoEmpresa();
+};
+
 window.obtenerEmailLogsSoporte = function() {
-  let logs = safeGetJSON('sapi_email_logs', []);
-  logs.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-  return logs;
+  const localLogs = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_email_logs', []) : JSON.parse(localStorage.getItem('sapi_email_logs') || '[]');
+  const logMap = new Map();
+
+  // Limpiar cualquier residuo de prueba anterior y cargar sólo correos reales
+  (localLogs || []).forEach(l => {
+    if (l && l.id && !String(l.id).startsWith('email_tk_')) {
+      logMap.set(l.id, l);
+    }
+  });
+
+  // Si hay correos en memoria de la sincronización de Azure
+  if (Array.isArray(window._azureEmailLogs)) {
+    window._azureEmailLogs.forEach(l => {
+      if (l && l.id) {
+        logMap.set(l.id, l);
+      }
+    });
+  }
+
+  const merged = Array.from(logMap.values());
+  merged.sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+  return merged;
+};
+
+window.iniciarSesionMicrosoftAzureMail = function() {
+  const odClientId = (typeof configData !== 'undefined' && configData.onedriveClientId && configData.onedriveClientId !== 'MOCK') 
+    ? configData.onedriveClientId 
+    : '';
+
+  let targetClientId = odClientId;
+  if (!targetClientId) {
+    const customId = prompt('Ingresa tu Client ID de Microsoft Azure (o configúralo en el menú de Configuración):', '');
+    if (customId && customId.trim()) {
+      targetClientId = customId.trim();
+      if (typeof configData !== 'undefined') {
+        configData.onedriveClientId = targetClientId;
+        safeSetJSON('eurorep_config', configData);
+      }
+    } else {
+      mostrarNotificacion('Se requiere un Client ID de Microsoft Azure para conectar la cuenta.', 'warning');
+      return;
+    }
+  }
+
+  const redirectUri = window.location.origin + window.location.pathname;
+  const scopes = encodeURIComponent('Mail.Read Mail.ReadWrite Mail.Send Files.Read User.Read offline_access');
+  const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${encodeURIComponent(targetClientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_mode=fragment`;
+
+  const width = 600;
+  const height = 650;
+  const left = window.screen.width / 2 - width / 2;
+  const top = window.screen.height / 2 - height / 2;
+  
+  const loginPopup = window.open(authUrl, 'MicrosoftAzureMailLogin', `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes`);
+  
+  if (!loginPopup) {
+    mostrarNotificacion('Por favor permite las ventanas emergentes para iniciar sesión con Microsoft Azure.', 'error');
+    return;
+  }
+
+  mostrarNotificacion('Abriendo inicio de sesión seguro de Microsoft Azure (Ptalctes@eurorep.mx)...', 'info');
+
+  const pollInterval = setInterval(() => {
+    try {
+      if (!loginPopup || loginPopup.closed) {
+        clearInterval(pollInterval);
+        return;
+      }
+      
+      const popupUrl = loginPopup.location.href;
+      if (popupUrl.indexOf(window.location.origin) === 0) {
+        const hash = loginPopup.location.hash;
+        if (hash) {
+          const params = new URLSearchParams(hash.substring(1));
+          const accessToken = params.get('access_token');
+          const expiresIn = params.get('expires_in');
+          
+          if (accessToken) {
+            sessionStorage.setItem('ms_access_token', accessToken);
+            if (expiresIn) {
+              sessionStorage.setItem('ms_access_token_expiry', Date.now() + Number(expiresIn) * 1000);
+            } else {
+              sessionStorage.setItem('ms_access_token_expiry', Date.now() + 3600 * 1000);
+            }
+            if (typeof onedriveRealToken !== 'undefined') {
+              onedriveRealToken = accessToken;
+            }
+            
+            clearInterval(pollInterval);
+            loginPopup.close();
+            
+            mostrarNotificacion('¡Conexión exitosa con Microsoft Azure! Sincronizando correos...', 'success');
+            window.sincronizarCorreosAzure(false);
+          }
+        }
+      }
+    } catch (e) {
+      // Ignorar Cross-Origin durante el proceso en microsoftonline.com
+    }
+  }, 500);
+};
+
+window.sincronizarCorreosAzure = async function(silent = false) {
+  const token = sessionStorage.getItem('ms_access_token');
+  const expiry = sessionStorage.getItem('ms_access_token_expiry');
+  const isTokenValid = token && (!expiry || Number(expiry) > Date.now());
+
+  if (!silent) {
+    mostrarNotificacion('Sincronizando correos reales desde Microsoft Azure (Office 365)...', 'info');
+  }
+
+  window._isSyncingAzureMail = true;
+  if (typeof window.renderBandejaCorreoEmpresa === 'function') {
+    window.renderBandejaCorreoEmpresa();
+  }
+
+  try {
+    let rawEmails = [];
+
+    // 1. Consultar endpoint serverless
+    try {
+      const resp = await fetch('/api/fetch-azure-emails', {
+        headers: {
+          'X-Ms-Graph-Token': isTokenValid ? token : '',
+          'X-Sapi-Client-Token': 'SapiSecuredClientToken'
+        }
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && Array.isArray(data.emails) && data.emails.length > 0) {
+          rawEmails = data.emails;
+        }
+      }
+    } catch (srvErr) {
+      console.warn('[Azure] Endpoint serverless no disponible:', srvErr);
+    }
+
+    // 2. Si hay token en cliente y el backend no trajo datos, consultar directamente a Microsoft Graph API
+    if (rawEmails.length === 0 && isTokenValid) {
+      const selectFields = 'id,subject,bodyPreview,body,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,hasAttachments,isRead';
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+        'Prefer': 'outlook.body-content-type="html"'
+      };
+
+      const [inboxRes, sentRes] = await Promise.all([
+        fetch(`https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=50&$select=${selectFields}&$orderby=receivedDateTime desc`, { headers }).catch(() => null),
+        fetch(`https://graph.microsoft.com/v1.0/me/mailFolders/sentitems/messages?$top=50&$select=${selectFields}&$orderby=sentDateTime desc`, { headers }).catch(() => null)
+      ]);
+
+      let msgs = [];
+      if (inboxRes && inboxRes.ok) {
+        const j = await inboxRes.json();
+        if (Array.isArray(j.value)) msgs = msgs.concat(j.value.map(m => ({ ...m, _folder: 'inbox' })));
+      } else {
+        const allRes = await fetch(`https://graph.microsoft.com/v1.0/me/messages?$top=50&$select=${selectFields}&$orderby=receivedDateTime desc`, { headers }).catch(() => null);
+        if (allRes && allRes.ok) {
+          const j = await allRes.json();
+          if (Array.isArray(j.value)) msgs = msgs.concat(j.value);
+        }
+      }
+
+      if (sentRes && sentRes.ok) {
+        const j = await sentRes.json();
+        if (Array.isArray(j.value)) msgs = msgs.concat(j.value.map(m => ({ ...m, _folder: 'sentitems' })));
+      }
+
+      rawEmails = msgs.map(m => {
+        const fromAddr = m.from?.emailAddress?.address || '';
+        const fromName = m.from?.emailAddress?.name || fromAddr;
+        const isSent = m._folder === 'sentitems' || fromAddr.toLowerCase().includes('ptalctes@eurorep.mx') || fromAddr.toLowerCase().includes('eurorep');
+        const toRecipients = Array.isArray(m.toRecipients) ? m.toRecipients.map(r => r.emailAddress?.address || r.emailAddress?.name).filter(Boolean) : [];
+        const ccRecipients = Array.isArray(m.ccRecipients) ? m.ccRecipients.map(r => r.emailAddress?.address || r.emailAddress?.name).filter(Boolean) : [];
+        const bccRecipients = Array.isArray(m.bccRecipients) ? m.bccRecipients.map(r => r.emailAddress?.address || r.emailAddress?.name).filter(Boolean) : [];
+        const clientName = isSent ? (m.toRecipients?.[0]?.emailAddress?.name || toRecipients.join(', ') || 'Cliente') : fromName;
+
+        return {
+          id: `ms_${m.id}`,
+          msId: m.id,
+          tipo: isSent ? 'enviado' : 'recibido',
+          de: fromAddr || fromName || 'Ptalctes@eurorep.mx',
+          para: toRecipients.join(', '),
+          cc: ccRecipients.join(', '),
+          bcc: bccRecipients.join(', '),
+          cliente: clientName,
+          asunto: m.subject || '(Sin Asunto)',
+          cuerpo: m.bodyPreview || '',
+          htmlBody: m.body?.contentType === 'html' ? m.body?.content : (m.body?.content || '').replace(/\n/g, '<br/>'),
+          fecha: m.receivedDateTime || m.sentDateTime || new Date().toISOString(),
+          evento: 'Microsoft Azure 365',
+          regla: 'Bandeja Exchange',
+          estatus: isSent ? 'Enviado' : 'Recibido',
+          archivos: m.hasAttachments ? ['Adjuntos en Microsoft 365'] : [],
+          isRead: m.isRead,
+          origen: 'azure_ms_graph'
+        };
+      });
+    }
+
+    if (rawEmails.length > 0) {
+      window._azureEmailLogs = rawEmails;
+      const currentLogs = safeGetJSON('sapi_email_logs', []);
+      const map = new Map();
+      rawEmails.forEach(e => map.set(e.id, e));
+      currentLogs.forEach(e => {
+        if (!map.has(e.id) && !String(e.id).startsWith('email_tk_')) {
+          map.set(e.id, e);
+        }
+      });
+      const merged = Array.from(map.values());
+      merged.sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+      safeSetJSON('sapi_email_logs', merged);
+
+      if (window.supabaseClient) {
+        window.supabaseClient.from('sapi_email_logs').upsert(rawEmails.slice(0, 30), { onConflict: 'id' }).catch(() => {});
+      }
+
+      if (!silent) {
+        mostrarNotificacion(`✅ Sincronizados ${rawEmails.length} correos reales desde Microsoft Azure (Office 365)`, 'success');
+      }
+    } else if (!isTokenValid) {
+      if (!silent) {
+        mostrarNotificacion('Conecta tu cuenta de Microsoft Azure para descargar los correos reales.', 'warning');
+        window.iniciarSesionMicrosoftAzureMail();
+      }
+    } else {
+      if (!silent) {
+        mostrarNotificacion('No se encontraron nuevos correos en la cuenta de Microsoft Azure.', 'info');
+      }
+    }
+  } catch (err) {
+    console.error('Error sincronizando correos con Azure:', err);
+    if (!silent) {
+      mostrarNotificacion('Error al conectar con Microsoft Azure: ' + (err.message || err), 'error');
+    }
+  } finally {
+    window._isSyncingAzureMail = false;
+    if (typeof window.renderBandejaCorreoEmpresa === 'function') {
+      window.renderBandejaCorreoEmpresa();
+    }
+  }
 };
 
 window.renderBandejaCorreoEmpresa = function() {
   const listContainer = document.getElementById('chat-client-list');
   const paneContainer = document.getElementById('chat-active-pane');
   if (!listContainer || !paneContainer) return;
+
+  const msToken = sessionStorage.getItem('ms_access_token');
+  const msExpiry = sessionStorage.getItem('ms_access_token_expiry');
+  const isMsConnected = !!(msToken && (!msExpiry || Number(msExpiry) > Date.now()));
+
+  // Auto-sincronizar en segundo plano si hay sesión activa de Microsoft y no se ha sincronizado en esta vista
+  if (isMsConnected && !window._hasAutoSyncedAzure && !window._isSyncingAzureMail) {
+    window._hasAutoSyncedAzure = true;
+    setTimeout(() => { window.sincronizarCorreosAzure(true); }, 300);
+  }
 
   const logs = window.obtenerEmailLogsSoporte();
 
@@ -36386,15 +36681,69 @@ window.renderBandejaCorreoEmpresa = function() {
   } else if (activeEmailFilter === 'enviados') {
     filteredLogs = logs.filter(l => l.tipo !== 'recibido' && l.estatus !== 'Recibido');
   }
+
+  // Filtrado por búsqueda de texto
+  if (mailSearchQuery) {
+    filteredLogs = filteredLogs.filter(l => {
+      const asunto = (l.asunto || '').toLowerCase();
+      const de = (l.de || '').toLowerCase();
+      const para = (l.para || '').toLowerCase();
+      const cliente = (l.cliente || '').toLowerCase();
+      const cuerpo = (l.cuerpo || '').toLowerCase();
+      const folio = (l.folio_ticket || l.folio_os || '').toLowerCase();
+      return asunto.includes(mailSearchQuery) ||
+             de.includes(mailSearchQuery) ||
+             para.includes(mailSearchQuery) ||
+             cliente.includes(mailSearchQuery) ||
+             cuerpo.includes(mailSearchQuery) ||
+             folio.includes(mailSearchQuery);
+    });
+  }
+
+  const azureStatusHtml = isMsConnected
+    ? `
+      <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,120,212,0.08); border:1px solid rgba(0,120,212,0.25); border-radius:6px; padding:0.25rem 0.5rem; font-size:0.72rem;">
+        <span style="display:inline-flex; align-items:center; gap:0.35rem; color:#0078d4; font-weight:600;">
+          <svg viewBox="0 0 23 23" style="width:12px; height:12px;"><path fill="#f25022" d="M1 1h10v10H1z"/><path fill="#00a4ef" d="M1 12h10v10H1z"/><path fill="#7fba00" d="M12 1h10v10H12z"/><path fill="#ffb900" d="M12 12h10v10H12z"/></svg>
+          Azure Conectado (Ptalctes@eurorep.mx)
+        </span>
+        <button type="button" onclick="window.sincronizarCorreosAzure(false)" style="border:none; background:transparent; color:#0078d4; cursor:pointer; font-weight:700; font-size:0.72rem; display:inline-flex; align-items:center; gap:0.2rem;" title="Sincronizar ahora con Microsoft Azure">
+          <i data-lucide="${window._isSyncingAzureMail ? 'loader-2' : 'refresh-cw'}" class="${window._isSyncingAzureMail ? 'spin' : ''}" style="width:12px; height:12px;"></i> Sincronizar
+        </button>
+      </div>
+    `
+    : `
+      <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,120,212,0.06); border:1px solid rgba(0,120,212,0.2); border-radius:6px; padding:0.3rem 0.5rem; font-size:0.72rem;">
+        <span style="display:inline-flex; align-items:center; gap:0.35rem; color:var(--text-secondary); font-weight:600;">
+          <svg viewBox="0 0 23 23" style="width:12px; height:12px;"><path fill="#f25022" d="M1 1h10v10H1z"/><path fill="#00a4ef" d="M1 12h10v10H1z"/><path fill="#7fba00" d="M12 1h10v10H12z"/><path fill="#ffb900" d="M12 12h10v10H12z"/></svg>
+          Microsoft Azure (Ptalctes)
+        </span>
+        <button type="button" onclick="window.iniciarSesionMicrosoftAzureMail()" class="btn-primary" style="padding:0.2rem 0.55rem; font-size:0.7rem; border-radius:4px; display:inline-flex; align-items:center; gap:0.25rem; background:#0078d4; color:white; border:none; cursor:pointer; font-weight:600;">
+          <i data-lucide="log-in" style="width:11px; height:11px;"></i> Conectar
+        </button>
+      </div>
+    `;
   
   let headerHtml = `
     <div style="padding:0.6rem 0.8rem; border-bottom:1px solid var(--border); background:var(--bg-card); display:flex; flex-direction:column; gap:0.5rem;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-weight:700; font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase;">Historial de Correos</span>
+        <span style="font-weight:700; font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase;">Historial de Correos (${filteredLogs.length})</span>
         <button class="btn-primary" onclick="window.redactarNuevoCorreoSoporte()" style="padding:0.25rem 0.55rem; font-size:0.75rem; border-radius:6px; display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer;">
           <i data-lucide="plus" style="width:12px; height:12px;"></i> Redactar
         </button>
       </div>
+
+      <!-- Barra de Estado Microsoft Azure -->
+      ${azureStatusHtml}
+
+      <!-- Buscador de Correos -->
+      <div style="position:relative; display:flex; align-items:center;">
+        <i data-lucide="search" style="position:absolute; left:0.5rem; width:13px; height:13px; color:var(--text-muted); pointer-events:none;"></i>
+        <input type="text" value="${mailSearchQuery}" oninput="window.setMailSearch(this.value)" placeholder="Buscar por asunto, cliente, email o folio..." style="width:100%; padding:0.3rem 0.5rem 0.3rem 1.8rem; font-size:0.75rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary); outline:none;" />
+        ${mailSearchQuery ? `<button onclick="window.setMailSearch('')" style="position:absolute; right:0.4rem; border:none; background:transparent; color:var(--text-muted); cursor:pointer; font-size:0.75rem;">✕</button>` : ''}
+      </div>
+
+      <!-- Pestañas Filtros -->
       <div style="display:flex; gap:0.25rem; background:var(--bg-primary); padding:0.2rem; border-radius:6px; border:1px solid var(--border);">
         <button onclick="window.setMailFilter('todos')" style="flex:1; padding:0.25rem 0.3rem; font-size:0.7rem; font-weight:600; border-radius:4px; border:none; cursor:pointer; ${activeEmailFilter === 'todos' ? 'background:var(--accent); color:white;' : 'background:transparent; color:var(--text-secondary);'}">Todos</button>
         <button onclick="window.setMailFilter('recibidos')" style="flex:1; padding:0.25rem 0.3rem; font-size:0.7rem; font-weight:600; border-radius:4px; border:none; cursor:pointer; ${activeEmailFilter === 'recibidos' ? 'background:var(--accent); color:white;' : 'background:transparent; color:var(--text-secondary);'}">Recibidos</button>
@@ -36404,11 +36753,23 @@ window.renderBandejaCorreoEmpresa = function() {
   `;
 
   if (filteredLogs.length === 0) {
-    listContainer.innerHTML = headerHtml + `
-      <div style="text-align:center; padding:2rem 1rem; color:var(--text-muted); font-size:0.85rem; font-style:italic;">
-        ${activeEmailFilter === 'recibidos' ? 'No hay correos recibidos registrados.' : activeEmailFilter === 'enviados' ? 'No hay correos enviados registrados.' : 'No hay correos registrados en la bandeja.'}
-      </div>
-    `;
+    if (!isMsConnected) {
+      listContainer.innerHTML = headerHtml + `
+        <div style="text-align:center; padding:2rem 1rem; color:var(--text-muted); display:flex; flex-direction:column; align-items:center; gap:0.75rem;">
+          <svg viewBox="0 0 23 23" style="width:38px; height:38px;"><path fill="#f25022" d="M1 1h10v10H1z"/><path fill="#00a4ef" d="M1 12h10v10H1z"/><path fill="#7fba00" d="M12 1h10v10H12z"/><path fill="#ffb900" d="M12 12h10v10H12z"/></svg>
+          <p style="font-size:0.85rem; margin:0; max-width:240px; color:var(--text-secondary); line-height:1.4;">Conecta la cuenta de <strong>Microsoft Azure (Ptalctes@eurorep.mx)</strong> para cargar los correos reales.</p>
+          <button class="btn-primary" onclick="window.iniciarSesionMicrosoftAzureMail()" style="background:#0078d4; border:none; padding:0.4rem 0.9rem; font-size:0.78rem; font-weight:700; border-radius:6px; display:inline-flex; align-items:center; gap:0.35rem; cursor:pointer; color:white;">
+            <i data-lucide="cloud" style="width:13px; height:13px;"></i> Conectar Microsoft Azure
+          </button>
+        </div>
+      `;
+    } else {
+      listContainer.innerHTML = headerHtml + `
+        <div style="text-align:center; padding:2rem 1rem; color:var(--text-muted); font-size:0.85rem; font-style:italic;">
+          ${mailSearchQuery ? 'No se encontraron correos que coincidan con la búsqueda.' : activeEmailFilter === 'recibidos' ? 'No hay correos recibidos en la cuenta de Microsoft.' : activeEmailFilter === 'enviados' ? 'No hay correos enviados registrados.' : 'No hay correos registrados en la bandeja.'}
+        </div>
+      `;
+    }
   } else {
     let itemsHtml = '';
     filteredLogs.forEach(log => {
@@ -36423,6 +36784,7 @@ window.renderBandejaCorreoEmpresa = function() {
         : `<span style="padding:0.1rem 0.35rem; border-radius:4px; font-weight:600; font-size:0.65rem; ${isSuccess ? 'background:rgba(34,197,94,0.15); color:#16a34a;' : 'background:rgba(239,68,68,0.15); color:#ef4444;'}">${isSuccess ? 'Enviado' : 'Fallido'}</span>`;
 
       const mainContact = isRecibido ? (log.de || log.cliente) : (log.para || log.cliente);
+      const folioBadge = log.folio_ticket ? `<span style="background:rgba(232,130,12,0.12); color:var(--accent); padding:0.05rem 0.3rem; border-radius:3px; font-size:0.65rem; font-weight:700;">${log.folio_ticket}</span>` : (log.folio_os ? `<span style="background:rgba(16,185,129,0.12); color:#10b981; padding:0.05rem 0.3rem; border-radius:3px; font-size:0.65rem; font-weight:700;">${log.folio_os}</span>` : '');
 
       itemsHtml += `
         <div onclick="window.seleccionarEmailLog('${log.id}')" style="padding:0.85rem 1rem; cursor:pointer; display:flex; flex-direction:column; gap:0.25rem; border-bottom:1px solid var(--border); transition:all 0.2s; ${bgStyle}">
@@ -36434,7 +36796,10 @@ window.renderBandejaCorreoEmpresa = function() {
             ${log.asunto || 'Sin asunto'}
           </div>
           <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.7rem; color:var(--text-muted);">
-            <span>${log.regla || log.evento || 'Manual'}</span>
+            <div style="display:flex; align-items:center; gap:0.35rem;">
+              <span>${log.regla || log.evento || 'Microsoft Azure'}</span>
+              ${folioBadge}
+            </div>
             ${statusBadge}
           </div>
         </div>
@@ -36462,6 +36827,340 @@ window.renderBandejaCorreoEmpresa = function() {
   }
 
   if (window.lucide) lucide.createIcons();
+};
+
+window.renderCorreoDetailPane = function(log) {
+  const pane = document.getElementById('chat-active-pane');
+  if (!pane || !log) return;
+
+  const isRecibido = log.tipo === 'recibido' || log.estatus === 'Recibido';
+  const isSuccess = log.estatus !== 'Fallido';
+  const timeFormatted = formatFechaHoraAmigable(log.fecha);
+  const fullDate = log.fecha ? new Date(log.fecha).toLocaleString('es-MX', { dateStyle: 'full', timeStyle: 'medium' }) : '';
+  
+  const senderDisplay = log.de || 'Ptalctes@eurorep.mx';
+  const recipientDisplay = log.para || log.cliente || '-';
+  const clientName = log.cliente || (isRecibido ? senderDisplay : recipientDisplay);
+  
+  // Iniciales del contacto
+  const contactNameForInitials = isRecibido ? (log.cliente || log.de || 'C') : (log.cliente || log.para || 'S');
+  const initials = contactNameForInitials.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'ER';
+
+  const statusBadge = isRecibido
+    ? `<span style="display:inline-flex; align-items:center; gap:0.3rem; padding:0.25rem 0.6rem; border-radius:12px; font-weight:700; font-size:0.75rem; background:rgba(59,130,246,0.12); color:#2563eb; border:1px solid rgba(59,130,246,0.25);"><i data-lucide="inbox" style="width:12px; height:12px;"></i> Recibido</span>`
+    : `<span style="display:inline-flex; align-items:center; gap:0.3rem; padding:0.25rem 0.6rem; border-radius:12px; font-weight:700; font-size:0.75rem; ${isSuccess ? 'background:rgba(34,197,94,0.12); color:#16a34a; border:1px solid rgba(34,197,94,0.25);' : 'background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.25);'}"><i data-lucide="${isSuccess ? 'send' : 'alert-triangle'}" style="width:12px; height:12px;"></i> ${isSuccess ? 'Enviado' : 'Fallido'}</span>`;
+
+  let linkedBadgesHtml = '';
+  if (log.folio_ticket) {
+    linkedBadgesHtml += `
+      <button type="button" onclick="window.abrirTicketDesdeCorreo('${log.folio_ticket}')" style="display:inline-flex; align-items:center; gap:0.3rem; padding:0.2rem 0.55rem; border-radius:6px; background:rgba(232, 130, 12, 0.12); border:1px solid rgba(232, 130, 12, 0.3); color:var(--accent); font-size:0.75rem; font-weight:700; cursor:pointer; transition:all 0.2s;">
+        <i data-lucide="tag" style="width:12px; height:12px;"></i> Ticket ${log.folio_ticket}
+      </button>
+    `;
+  }
+  if (log.folio_os) {
+    linkedBadgesHtml += `
+      <button type="button" onclick="window.abrirOrdenDesdeCorreo('${log.folio_os}')" style="display:inline-flex; align-items:center; gap:0.3rem; padding:0.2rem 0.55rem; border-radius:6px; background:rgba(16, 185, 129, 0.12); border:1px solid rgba(16, 185, 129, 0.3); color:#10b981; font-size:0.75rem; font-weight:700; cursor:pointer; transition:all 0.2s;">
+        <i data-lucide="file-check" style="width:12px; height:12px;"></i> OS ${log.folio_os}
+      </button>
+    `;
+  }
+
+  // Attachments
+  let attachmentsHtml = '';
+  if (Array.isArray(log.archivos) && log.archivos.length > 0) {
+    attachmentsHtml = `
+      <div style="padding:0.75rem 1.25rem; background:var(--bg-hover); border-top:1px solid var(--border); border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:0.4rem;">
+        <span style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; display:flex; align-items:center; gap:0.3rem;">
+          <i data-lucide="paperclip" style="width:12px; height:12px;"></i> Archivos Adjuntos (${log.archivos.length})
+        </span>
+        <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+          ${log.archivos.map(arch => `
+            <div style="display:inline-flex; align-items:center; gap:0.4rem; padding:0.3rem 0.65rem; border-radius:6px; background:var(--bg-card); border:1px solid var(--border); font-size:0.8rem; font-weight:600; color:var(--text-primary);">
+              <i data-lucide="file-text" style="width:14px; height:14px; color:var(--accent);"></i>
+              <span>${arch}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // Body rendering
+  let contentHtml = '';
+  if (log.htmlBody) {
+    contentHtml = log.htmlBody;
+  } else if (log.cuerpo) {
+    contentHtml = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:0.92rem; color:var(--text-primary); line-height:1.65; white-space:pre-wrap;">${log.cuerpo}</div>`;
+  } else {
+    contentHtml = `<em style="color:var(--text-muted); font-size:0.85rem;">(Mensaje sin contenido de texto)</em>`;
+  }
+
+  pane.innerHTML = `
+    <div style="display:flex; flex-direction:column; height:100%; background:var(--bg-primary); overflow:hidden;">
+      <!-- Top Actions Bar -->
+      <div style="padding:0.75rem 1.25rem; border-bottom:1px solid var(--border); background:var(--bg-card); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <button type="button" class="btn-primary" onclick="window.responderCorreoSoporte('${log.id}')" style="padding:0.4rem 0.9rem; font-size:0.8rem; font-weight:700; border-radius:6px; display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
+            <i data-lucide="reply" style="width:14px; height:14px;"></i> Responder
+          </button>
+          <button type="button" class="btn-secondary" onclick="window.reenviarCorreoSoporte('${log.id}')" style="padding:0.4rem 0.8rem; font-size:0.8rem; font-weight:600; border-radius:6px; display:inline-flex; align-items:center; gap:0.35rem; cursor:pointer; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary);">
+            <i data-lucide="forward" style="width:14px; height:14px;"></i> Reenviar
+          </button>
+          <button type="button" class="btn-secondary" onclick="window.copiarCuerpoCorreo('${log.id}')" style="padding:0.4rem 0.75rem; font-size:0.8rem; font-weight:600; border-radius:6px; display:inline-flex; align-items:center; gap:0.35rem; cursor:pointer; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary);">
+            <i data-lucide="copy" style="width:14px; height:14px;"></i> Copiar
+          </button>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          ${linkedBadgesHtml}
+          ${statusBadge}
+        </div>
+      </div>
+
+      <!-- Email Details Header -->
+      <div style="padding:1.25rem 1.5rem; background:var(--bg-card); border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:0.75rem;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem;">
+          <h2 style="font-size:1.15rem; font-weight:700; color:var(--text-primary); margin:0; line-height:1.35; flex:1;">
+            ${log.asunto || 'Sin Asunto'}
+          </h2>
+          <span style="font-size:0.75rem; color:var(--text-muted); font-family:monospace; white-space:nowrap;" title="${fullDate}">
+            ${timeFormatted}
+          </span>
+        </div>
+
+        <div style="display:flex; align-items:flex-start; gap:0.75rem; margin-top:0.25rem;">
+          <div style="width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg, var(--accent) 0%, #d97706 100%); color:white; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.9rem; flex-shrink:0; box-shadow:0 2px 5px rgba(0,0,0,0.15);">
+            ${initials}
+          </div>
+          <div style="flex:1; display:flex; flex-direction:column; gap:0.2rem; font-size:0.82rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem;">
+              <div>
+                <strong style="color:var(--text-primary); font-size:0.9rem;">${clientName}</strong>
+                <span style="color:var(--text-secondary); margin-left:0.35rem;">&lt;${senderDisplay}&gt;</span>
+              </div>
+              <span style="font-size:0.72rem; color:var(--text-muted); background:var(--bg-hover); padding:0.15rem 0.45rem; border-radius:4px; border:1px solid var(--border);">
+                ${log.regla || log.evento || 'Soporte'}
+              </span>
+            </div>
+            <div style="color:var(--text-secondary);">
+              <span style="font-weight:600; color:var(--text-muted);">Para:</span> ${recipientDisplay}
+              ${log.cc ? `<span style="margin-left:0.75rem;"><span style="font-weight:600; color:var(--text-muted);">CC:</span> ${log.cc}</span>` : ''}
+              ${log.bcc ? `<span style="margin-left:0.75rem;"><span style="font-weight:600; color:var(--text-muted);">CCO:</span> ${log.bcc}</span>` : ''}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Attachments Strip if any -->
+      ${attachmentsHtml}
+
+      <!-- Email Body Scroll Area -->
+      <div style="flex:1; overflow-y:auto; padding:1.5rem; background:var(--bg-primary);">
+        <div style="max-width:900px; margin:0 auto; background:var(--bg-card); padding:1.5rem 2rem; border-radius:10px; border:1px solid var(--border); box-shadow:0 2px 8px rgba(0,0,0,0.04); word-break:break-word;">
+          ${contentHtml}
+        </div>
+      </div>
+
+      <!-- Quick Reply Footer Box -->
+      <div style="padding:0.75rem 1.25rem; background:var(--bg-card); border-top:1px solid var(--border); display:flex; flex-direction:column; gap:0.5rem;">
+        <form onsubmit="window.enviarRespuestaRapidaCorreo(event, '${log.id}')" style="display:flex; gap:0.5rem; align-items:flex-end;">
+          <textarea id="mail-quick-reply-text" placeholder="Escribe una respuesta rápida a este correo..." rows="2" style="flex:1; padding:0.55rem 0.75rem; border-radius:8px; border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary); font-size:0.85rem; font-family:inherit; resize:none; outline:none; transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+          <button type="submit" id="btn-mail-quick-reply-send" class="btn-primary" style="padding:0.55rem 1.1rem; height:42px; border-radius:8px; font-size:0.82rem; font-weight:700; display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
+            <i data-lucide="send" style="width:14px; height:14px;"></i> Enviar
+          </button>
+        </form>
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+};
+
+window.responderCorreoSoporte = function(logId) {
+  const logs = window.obtenerEmailLogsSoporte();
+  const log = logs.find(l => l.id === logId);
+  if (!log) return;
+
+  const isRecibido = log.tipo === 'recibido' || log.estatus === 'Recibido';
+  const targetEmail = isRecibido ? (log.de || '') : (log.para || '');
+  const subject = log.asunto ? (log.asunto.startsWith('Re:') ? log.asunto : `Re: ${log.asunto}`) : 'Re: Seguimiento';
+
+  window.redactarNuevoCorreoSoporte(targetEmail, log.cliente || '', subject);
+
+  setTimeout(() => {
+    const bodyElem = document.getElementById('mail-composer-body');
+    if (bodyElem) {
+      const quoteHeader = `<br/><br/><blockquote><hr style="border:none; border-top:1px solid #cbd5e1; margin:14px 0;"/><strong style="color:#64748b; font-size:12px;">El ${new Date(log.fecha).toLocaleString('es-MX')}, ${log.de || log.cliente || 'Remitente'} escribió:</strong><br/>${log.htmlBody || (log.cuerpo || '').replace(/\n/g, '<br/>')}</blockquote>`;
+      if (bodyElem.isContentEditable) {
+        bodyElem.innerHTML = quoteHeader;
+      } else {
+        bodyElem.value = quoteHeader;
+      }
+      bodyElem.focus();
+    }
+  }, 100);
+};
+
+window.reenviarCorreoSoporte = function(logId) {
+  const logs = window.obtenerEmailLogsSoporte();
+  const log = logs.find(l => l.id === logId);
+  if (!log) return;
+
+  const subject = log.asunto ? (log.asunto.startsWith('Fwd:') ? log.asunto : `Fwd: ${log.asunto}`) : 'Fwd: Correo reenviado';
+  window.redactarNuevoCorreoSoporte('', log.cliente || '', subject);
+
+  setTimeout(() => {
+    const bodyElem = document.getElementById('mail-composer-body');
+    if (bodyElem) {
+      const forwardHeader = `<br/><br/>---------- Mensaje reenviado ----------<br/><b>De:</b> ${log.de || '-'}<br/><b>Fecha:</b> ${new Date(log.fecha).toLocaleString('es-MX')}<br/><b>Asunto:</b> ${log.asunto || '-'}<br/><b>Para:</b> ${log.para || '-'}<br/><br/>${log.htmlBody || (log.cuerpo || '').replace(/\n/g, '<br/>')}`;
+      if (bodyElem.isContentEditable) {
+        bodyElem.innerHTML = forwardHeader;
+      } else {
+        bodyElem.value = forwardHeader;
+      }
+      bodyElem.focus();
+    }
+  }, 100);
+};
+
+window.copiarCuerpoCorreo = function(logId) {
+  const logs = window.obtenerEmailLogsSoporte();
+  const log = logs.find(l => l.id === logId);
+  if (!log) return;
+
+  const textToCopy = log.cuerpo || (log.htmlBody ? log.htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '');
+  navigator.clipboard.writeText(textToCopy).then(() => {
+    mostrarNotificacion('Contenido del correo copiado al portapapeles.', 'success');
+  }).catch(() => {
+    mostrarNotificacion('No se pudo copiar el texto.', 'warning');
+  });
+};
+
+window.abrirTicketDesdeCorreo = function(folio) {
+  if (!folio) return;
+  const t = (typeof tickets !== 'undefined' ? tickets : []).find(tk => tk.folio === folio || tk.id === folio);
+  if (t) {
+    if (typeof abrirTicket === 'function') {
+      abrirTicket(t.id);
+    } else if (typeof window.abrirTicketPreloaded === 'function') {
+      window.abrirTicketPreloaded(t);
+    }
+  } else {
+    mostrarNotificacion(`No se encontró el ticket con folio ${folio}`, 'info');
+  }
+};
+
+window.abrirOrdenDesdeCorreo = function(folio) {
+  if (!folio) return;
+  const o = (typeof ordenes !== 'undefined' ? ordenes : []).find(ord => ord.folio === folio || ord.id === folio);
+  if (o) {
+    if (typeof editarOrden === 'function') {
+      editarOrden(o.id);
+    } else if (typeof window.abrirOrdenDesdePerfil === 'function') {
+      window.abrirOrdenDesdePerfil(o.id);
+    }
+  } else {
+    mostrarNotificacion(`No se encontró la orden de servicio con folio ${folio}`, 'info');
+  }
+};
+
+window.enviarRespuestaRapidaCorreo = async function(event, logId) {
+  if (event) event.preventDefault();
+  const textarea = document.getElementById('mail-quick-reply-text');
+  const btn = document.getElementById('btn-mail-quick-reply-send');
+  const replyText = textarea?.value.trim();
+  if (!replyText) {
+    mostrarNotificacion('Por favor escribe un mensaje para responder.', 'warning');
+    return;
+  }
+
+  const logs = window.obtenerEmailLogsSoporte();
+  const log = logs.find(l => l.id === logId);
+  if (!log) return;
+
+  const isRecibido = log.tipo === 'recibido' || log.estatus === 'Recibido';
+  const toEmail = isRecibido ? (log.de || '') : (log.para || '');
+  if (!toEmail || !toEmail.includes('@')) {
+    mostrarNotificacion('No hay una dirección de correo válida para responder automáticamente.', 'warning');
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<i data-lucide="loader-2" class="spin" style="width:13px; height:13px;"></i> Enviando...`;
+    if (window.lucide) lucide.createIcons();
+  }
+
+  try {
+    let token = '';
+    if (window.supabaseClient && window.supabaseClient.auth) {
+      try {
+        const { data: sessionData } = await window.supabaseClient.auth.getSession();
+        token = sessionData?.session?.access_token || '';
+      } catch (authErr) {}
+    }
+
+    const subject = log.asunto ? (log.asunto.startsWith('Re:') ? log.asunto : `Re: ${log.asunto}`) : 'Re: Seguimiento';
+    const formattedBody = replyText.replace(/\n/g, '<br>');
+    const htmlPayload = window.obtenerHtmlPlantillaProfesional ? window.obtenerHtmlPlantillaProfesional(formattedBody) : formattedBody;
+
+    const payload = {
+      to: toEmail,
+      subject: subject,
+      htmlBody: htmlPayload,
+      cliente: log.cliente || 'Cliente',
+      folio_ticket: log.folio_ticket || '',
+      folio_os: log.folio_os || ''
+    };
+
+    const response = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : '',
+        'X-Sapi-Client-Token': 'SapiSecuredClientToken'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const isOk = response.ok;
+    const newLogItem = {
+      id: 'email_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      tipo: 'enviado',
+      de: 'Ptalctes@eurorep.mx',
+      para: toEmail,
+      cliente: log.cliente || 'Cliente',
+      asunto: subject,
+      cuerpo: replyText,
+      htmlBody: htmlPayload,
+      fecha: new Date().toISOString(),
+      evento: 'Respuesta Rápida',
+      regla: 'Bandeja Soporte',
+      estatus: isOk ? 'Enviado' : 'Fallido',
+      folio_ticket: log.folio_ticket || '',
+      folio_os: log.folio_os || ''
+    };
+
+    window.registrarLogEmail(newLogItem);
+
+    if (isOk) {
+      mostrarNotificacion('Respuesta enviada con éxito desde Ptalctes@eurorep.mx', 'success');
+      if (textarea) textarea.value = '';
+      activeEmailLogId = newLogItem.id;
+      window.renderChatSoporteEmpresa();
+    } else {
+      mostrarNotificacion('Error al enviar la respuesta.', 'error');
+    }
+  } catch (err) {
+    console.error('Error en respuesta rápida:', err);
+    mostrarNotificacion('Error al conectar con servidor de correos: ' + (err.message || err), 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<i data-lucide="send" style="width:14px; height:14px;"></i> Enviar`;
+      if (window.lucide) lucide.createIcons();
+    }
+  }
 };
 
 window.renderCorreoEmptyPane = function() {
