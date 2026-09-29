@@ -36416,16 +36416,31 @@ window.esCorreoValidoPtalctes = function(l) {
   if (!l || !l.id) return false;
   if (String(l.id).startsWith('email_tk_')) return false; // Descartar sintéticos
   
-  const target = 'ptalctes@eurorep.mx';
-  const de = String(l.de || '').toLowerCase();
-  const para = String(l.para || '').toLowerCase();
-  const cc = String(l.cc || '').toLowerCase();
-  const bcc = String(l.bcc || '').toLowerCase();
+  // Si fue obtenido de Azure Graph directamente, pertenece a la sincronización del buzón
+  if (l.origen === 'azure_ms_graph' || String(l.id).startsWith('ms_')) {
+    return true;
+  }
 
-  return de.includes(target) || 
-         para.includes(target) || 
-         cc.includes(target) || 
-         bcc.includes(target);
+  const isTarget = (str) => {
+    const s = String(str || '').toLowerCase();
+    return s.includes('ptalctes') || s.includes('portal tickets') || s.includes('eurorep.mx');
+  };
+
+  const de = String(l.de || '');
+  const para = String(l.para || '');
+  const cc = String(l.cc || '');
+  const bcc = String(l.bcc || '');
+  const cliente = String(l.cliente || '');
+  const asunto = String(l.asunto || '');
+  const cuerpo = String(l.cuerpo || '');
+
+  return isTarget(de) || 
+         isTarget(para) || 
+         isTarget(cc) || 
+         isTarget(bcc) || 
+         isTarget(cliente) ||
+         isTarget(asunto) ||
+         isTarget(cuerpo);
 };
 
 window.obtenerEmailLogsSoporte = function() {
@@ -36433,7 +36448,7 @@ window.obtenerEmailLogsSoporte = function() {
   const logMap = new Map();
   const validLocalLogs = [];
 
-  // Filtrar estrictamente solo correos del buzón ptalctes@eurorep.mx
+  // Filtrar correos válidos de soporte
   (localLogs || []).forEach(l => {
     if (window.esCorreoValidoPtalctes(l)) {
       logMap.set(l.id, l);
@@ -36441,7 +36456,7 @@ window.obtenerEmailLogsSoporte = function() {
     }
   });
 
-  // Limpiar en almacenamiento local cualquier correo ajeno o sintético previo
+  // Limpiar en almacenamiento local si había residuos sintéticos
   if (validLocalLogs.length !== (localLogs || []).length) {
     if (typeof safeSetJSON === 'function') {
       safeSetJSON('sapi_email_logs', validLocalLogs);
@@ -36485,7 +36500,7 @@ window.iniciarSesionMicrosoftAzureMail = function() {
   }
 
   const redirectUri = window.location.origin + window.location.pathname;
-  const scopes = encodeURIComponent('Mail.Read Mail.ReadWrite Mail.Send Files.Read User.Read offline_access');
+  const scopes = encodeURIComponent('Mail.Read Mail.Read.Shared Mail.ReadWrite Mail.ReadWrite.Shared Mail.Send Mail.Send.Shared Files.Read User.Read offline_access');
   const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${encodeURIComponent(targetClientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_mode=fragment`;
 
   const width = 600;
@@ -36597,18 +36612,20 @@ window.sincronizarCorreosAzure = async function(silent = false) {
         return null;
       };
 
-      // Intentar primero con el buzón de ptalctes@eurorep.mx
+      // Intentar con el buzón directo de ptalctes@eurorep.mx
       let [inboxMsgs, sentMsgs] = await Promise.all([
         fetchGraphFolder('https://graph.microsoft.com/v1.0/users/Ptalctes@eurorep.mx', 'inbox'),
         fetchGraphFolder('https://graph.microsoft.com/v1.0/users/Ptalctes@eurorep.mx', 'sentitems')
       ]);
 
-      // Fallback a /me
-      if (inboxMsgs === null && sentMsgs === null) {
-        [inboxMsgs, sentMsgs] = await Promise.all([
+      // Si no devolvió datos por permisos delegados, consultar /me
+      if (!Array.isArray(inboxMsgs) || !Array.isArray(sentMsgs) || (inboxMsgs.length === 0 && sentMsgs.length === 0)) {
+        const [meInbox, meSent] = await Promise.all([
           fetchGraphFolder('https://graph.microsoft.com/v1.0/me', 'inbox'),
           fetchGraphFolder('https://graph.microsoft.com/v1.0/me', 'sentitems')
         ]);
+        if (Array.isArray(meInbox) && meInbox.length > 0) inboxMsgs = meInbox;
+        if (Array.isArray(meSent) && meSent.length > 0) sentMsgs = meSent;
       }
 
       let msgs = [];
@@ -36623,27 +36640,52 @@ window.sincronizarCorreosAzure = async function(silent = false) {
         }
       }
 
-      // Filtro estricto por ptalctes@eurorep.mx
-      const targetEmail = 'ptalctes@eurorep.mx';
+      // Filtro para el buzón de soporte / postventa
+      const isTarget = (str) => {
+        const s = String(str || '').toLowerCase();
+        return s.includes('ptalctes') || s.includes('portal tickets') || s.includes('eurorep.mx');
+      };
+
       msgs = msgs.filter(m => {
         if (!m) return false;
         const fromAddr = (m.from?.emailAddress?.address || m.sender?.emailAddress?.address || '').toLowerCase();
-        const toAddrs = Array.isArray(m.toRecipients) ? m.toRecipients.map(r => (r.emailAddress?.address || '').toLowerCase()) : [];
-        const ccAddrs = Array.isArray(m.ccRecipients) ? m.ccRecipients.map(r => (r.emailAddress?.address || '').toLowerCase()) : [];
-        const bccAddrs = Array.isArray(m.bccRecipients) ? m.bccRecipients.map(r => (r.emailAddress?.address || '').toLowerCase()) : [];
-        return fromAddr.includes(targetEmail) || 
-               toAddrs.some(a => a.includes(targetEmail)) || 
-               ccAddrs.some(a => a.includes(targetEmail)) || 
-               bccAddrs.some(a => a.includes(targetEmail));
+        const fromName = (m.from?.emailAddress?.name || m.sender?.emailAddress?.name || '').toLowerCase();
+        const toAddrs = Array.isArray(m.toRecipients) ? m.toRecipients.map(r => (r.emailAddress?.address || r.emailAddress?.name || '').toLowerCase()) : [];
+        const ccAddrs = Array.isArray(m.ccRecipients) ? m.ccRecipients.map(r => (r.emailAddress?.address || r.emailAddress?.name || '').toLowerCase()) : [];
+        const bccAddrs = Array.isArray(m.bccRecipients) ? m.bccRecipients.map(r => (r.emailAddress?.address || r.emailAddress?.name || '').toLowerCase()) : [];
+        const subject = (m.subject || '').toLowerCase();
+        const preview = (m.bodyPreview || '').toLowerCase();
+
+        return isTarget(fromAddr) || 
+               isTarget(fromName) ||
+               toAddrs.some(isTarget) || 
+               ccAddrs.some(isTarget) || 
+               bccAddrs.some(isTarget) ||
+               isTarget(subject) ||
+               preview.includes('ptalctes');
       });
 
       rawEmails = msgs.map(m => {
         const fromAddr = m.from?.emailAddress?.address || m.sender?.emailAddress?.address || '';
         const fromName = m.from?.emailAddress?.name || m.sender?.emailAddress?.name || fromAddr;
-        const isSent = m._folder === 'sentitems' || fromAddr.toLowerCase().includes(targetEmail);
         const toRecipients = Array.isArray(m.toRecipients) ? m.toRecipients.map(r => r.emailAddress?.address || r.emailAddress?.name).filter(Boolean) : [];
         const ccRecipients = Array.isArray(m.ccRecipients) ? m.ccRecipients.map(r => r.emailAddress?.address || r.emailAddress?.name).filter(Boolean) : [];
         const bccRecipients = Array.isArray(m.bccRecipients) ? m.bccRecipients.map(r => r.emailAddress?.address || r.emailAddress?.name).filter(Boolean) : [];
+
+        let isSent = false;
+        if (m._folder === 'sentitems') {
+          isSent = true;
+        } else if (m._folder === 'inbox') {
+          isSent = false;
+        } else {
+          const fromAddrLower = (fromAddr || '').toLowerCase();
+          const fromNameLower = (fromName || '').toLowerCase();
+          const isFromTarget = fromAddrLower.includes('ptalctes') || fromNameLower.includes('portal tickets');
+          const toAddrsLower = toRecipients.join(' ').toLowerCase();
+          const isToTarget = toAddrsLower.includes('ptalctes') || toAddrsLower.includes('portal tickets');
+          isSent = (isFromTarget && !isToTarget);
+        }
+
         const clientName = isSent ? (m.toRecipients?.[0]?.emailAddress?.name || toRecipients.join(', ') || 'Cliente') : fromName;
 
         return {

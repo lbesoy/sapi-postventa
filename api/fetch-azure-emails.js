@@ -132,19 +132,26 @@ export default async function handler(req, res) {
       } catch (e) {}
     }
 
-    // Filtro estricto: Sólo correos pertenecientes a ptalctes@eurorep.mx
-    const targetEmail = 'ptalctes@eurorep.mx';
+    // Filtro para el buzón de soporte / postventa ptalctes@eurorep.mx
     const involvesPtalctes = (m) => {
       if (!m) return false;
       const fromAddr = (m.from?.emailAddress?.address || m.sender?.emailAddress?.address || '').toLowerCase();
-      const toAddrs = Array.isArray(m.toRecipients) ? m.toRecipients.map(r => (r.emailAddress?.address || '').toLowerCase()) : [];
-      const ccAddrs = Array.isArray(m.ccRecipients) ? m.ccRecipients.map(r => (r.emailAddress?.address || '').toLowerCase()) : [];
-      const bccAddrs = Array.isArray(m.bccRecipients) ? m.bccRecipients.map(r => (r.emailAddress?.address || '').toLowerCase()) : [];
+      const fromName = (m.from?.emailAddress?.name || m.sender?.emailAddress?.name || '').toLowerCase();
+      const toAddrs = Array.isArray(m.toRecipients) ? m.toRecipients.map(r => (r.emailAddress?.address || r.emailAddress?.name || '').toLowerCase()) : [];
+      const ccAddrs = Array.isArray(m.ccRecipients) ? m.ccRecipients.map(r => (r.emailAddress?.address || r.emailAddress?.name || '').toLowerCase()) : [];
+      const bccAddrs = Array.isArray(m.bccRecipients) ? m.bccRecipients.map(r => (r.emailAddress?.address || r.emailAddress?.name || '').toLowerCase()) : [];
+      const subject = (m.subject || '').toLowerCase();
+      const preview = (m.bodyPreview || '').toLowerCase();
+
+      const isTarget = (str) => str.includes('ptalctes') || str.includes('portal tickets') || str.includes('eurorep.mx');
       
-      return fromAddr.includes(targetEmail) ||
-             toAddrs.some(a => a.includes(targetEmail)) ||
-             ccAddrs.some(a => a.includes(targetEmail)) ||
-             bccAddrs.some(a => a.includes(targetEmail));
+      return isTarget(fromAddr) ||
+             isTarget(fromName) ||
+             toAddrs.some(isTarget) ||
+             ccAddrs.some(isTarget) ||
+             bccAddrs.some(isTarget) ||
+             isTarget(subject) ||
+             preview.includes('ptalctes');
     };
 
     rawMessages = rawMessages.filter(involvesPtalctes);
@@ -162,7 +169,20 @@ export default async function handler(req, res) {
       const ccRecipients = Array.isArray(m.ccRecipients) ? m.ccRecipients.map(r => r.emailAddress?.address || r.emailAddress?.name).filter(Boolean) : [];
       const bccRecipients = Array.isArray(m.bccRecipients) ? m.bccRecipients.map(r => r.emailAddress?.address || r.emailAddress?.name).filter(Boolean) : [];
 
-      const isSent = m._folder === 'sentitems' || fromAddress.toLowerCase().includes(targetEmail);
+      let isSent = false;
+      if (m._folder === 'sentitems') {
+        isSent = true;
+      } else if (m._folder === 'inbox') {
+        isSent = false;
+      } else {
+        const fromAddrLower = (fromAddress || '').toLowerCase();
+        const fromNameLower = (fromName || '').toLowerCase();
+        const isFromTarget = fromAddrLower.includes('ptalctes') || fromNameLower.includes('portal tickets');
+        const toAddrsLower = toRecipients.join(' ').toLowerCase();
+        const isToTarget = toAddrsLower.includes('ptalctes') || toAddrsLower.includes('portal tickets');
+        isSent = (isFromTarget && !isToTarget);
+      }
+
       const clientName = isSent ? (m.toRecipients?.[0]?.emailAddress?.name || toRecipients.join(', ') || 'Cliente') : fromName;
 
       const mappedItem = {
