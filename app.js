@@ -36601,13 +36601,18 @@ window.sincronizarCorreosAzure = async function(silent = false) {
           const res = await fetch(`${base}/mailFolders/${folder}/messages?$top=50&$select=${selectFields}&$orderby=${folder === 'inbox' ? 'receivedDateTime' : 'sentDateTime'} desc`, { headers });
           if (res.ok) {
             const j = await res.json();
-            return Array.isArray(j.value) ? j.value.map(m => ({ ...m, _folder: folder })) : [];
+            const isDirectPtalctes = base.toLowerCase().includes('ptalctes');
+            return Array.isArray(j.value) ? j.value.map(m => ({ ...m, _folder: folder, _isDirectPtalctes: isDirectPtalctes })) : [];
+          } else {
+            console.warn(`[Azure Graph] ${base}/${folder} status:`, res.status);
           }
-        } catch (e) {}
+        } catch (e) {
+          console.warn(`[Azure Graph] Error fetching ${base}/${folder}:`, e);
+        }
         return null;
       };
 
-      // Intentar con el buzón directo de ptalctes@eurorep.mx
+      // Intentar primero con el buzón directo de ptalctes@eurorep.mx (Buzón compartido / secundario)
       let [inboxMsgs, sentMsgs] = await Promise.all([
         fetchGraphFolder('https://graph.microsoft.com/v1.0/users/Ptalctes@eurorep.mx', 'inbox'),
         fetchGraphFolder('https://graph.microsoft.com/v1.0/users/Ptalctes@eurorep.mx', 'sentitems')
@@ -36635,7 +36640,7 @@ window.sincronizarCorreosAzure = async function(silent = false) {
         }
       }
 
-      // Filtro estricto: Únicamente correos de ptalctes@eurorep.mx / Portal Tickets
+      // Filtro estricto: Únicamente correos pertenecientes a ptalctes@eurorep.mx / Portal Tickets
       const isTarget = (str) => {
         const s = String(str || '').toLowerCase().trim();
         if (!s) return false;
@@ -36644,6 +36649,7 @@ window.sincronizarCorreosAzure = async function(silent = false) {
 
       msgs = msgs.filter(m => {
         if (!m) return false;
+        if (m._isDirectPtalctes) return true; // Viene del buzón directo de ptalctes@eurorep.mx
         const fromAddr = (m.from?.emailAddress?.address || m.sender?.emailAddress?.address || '').toLowerCase();
         const fromName = (m.from?.emailAddress?.name || m.sender?.emailAddress?.name || '').toLowerCase();
         const toAddrs = Array.isArray(m.toRecipients) ? m.toRecipients.map(r => (r.emailAddress?.address || r.emailAddress?.name || '').toLowerCase()) : [];
@@ -36702,7 +36708,8 @@ window.sincronizarCorreosAzure = async function(silent = false) {
           estatus: isSent ? 'Enviado' : 'Recibido',
           archivos: m.hasAttachments ? ['Adjuntos en Microsoft 365'] : [],
           isRead: m.isRead,
-          origen: 'azure_ms_graph'
+          origen: 'azure_ms_graph',
+          esDeBuzonPtalctes: !!m._isDirectPtalctes
         };
       });
 
@@ -36810,9 +36817,14 @@ window.renderBandejaCorreoEmpresa = function() {
           <svg viewBox="0 0 23 23" style="width:12px; height:12px;"><path fill="#f25022" d="M1 1h10v10H1z"/><path fill="#00a4ef" d="M1 12h10v10H1z"/><path fill="#7fba00" d="M12 1h10v10H12z"/><path fill="#ffb900" d="M12 12h10v10H12z"/></svg>
           Azure Conectado (Ptalctes@eurorep.mx)
         </span>
-        <button type="button" onclick="window.sincronizarCorreosAzure(false)" style="border:none; background:transparent; color:#0078d4; cursor:pointer; font-weight:700; font-size:0.72rem; display:inline-flex; align-items:center; gap:0.2rem;" title="Sincronizar ahora con Microsoft Azure">
-          <i data-lucide="${window._isSyncingAzureMail ? 'loader-2' : 'refresh-cw'}" class="${window._isSyncingAzureMail ? 'spin' : ''}" style="width:12px; height:12px;"></i> Sincronizar
-        </button>
+        <div style="display:inline-flex; align-items:center; gap:0.45rem;">
+          <button type="button" onclick="window.sincronizarCorreosAzure(false)" style="border:none; background:transparent; color:#0078d4; cursor:pointer; font-weight:700; font-size:0.72rem; display:inline-flex; align-items:center; gap:0.2rem;" title="Sincronizar ahora con Microsoft Azure">
+            <i data-lucide="${window._isSyncingAzureMail ? 'loader-2' : 'refresh-cw'}" class="${window._isSyncingAzureMail ? 'spin' : ''}" style="width:12px; height:12px;"></i> Sincronizar
+          </button>
+          <button type="button" onclick="window.iniciarSesionMicrosoftAzureMail()" style="border:none; background:transparent; color:var(--text-muted); cursor:pointer; font-size:0.68rem; text-decoration:underline;" title="Reconectar y actualizar permisos de Microsoft Azure">
+            Reconectar
+          </button>
+        </div>
       </div>
     `
     : `
