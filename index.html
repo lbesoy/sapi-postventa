@@ -794,6 +794,9 @@
                 <button type="button" class="btn-secondary" id="btn-junta-fullscreen-toggle" onclick="window.toggleFullscreenJunta()" style="font-size:0.82rem; padding:0.45rem 0.65rem; display:inline-flex; align-items:center; justify-content:center;" title="Modo Proyector / Pantalla Completa">
                   <i data-lucide="maximize-2" id="icon-junta-fullscreen" style="width:16px; height:16px;"></i>
                 </button>
+                <button type="button" class="btn-primary" onclick="window.abrirModalResumenSemanal()" style="display:flex; align-items:center; gap:0.4rem; font-size:0.82rem; padding:0.45rem 0.85rem; background:var(--accent); border-color:var(--accent); color:white; font-weight:700;">
+                  <i data-lucide="bar-chart-3" style="width:15px;height:15px;"></i> Resumen Semanal
+                </button>
                 <button type="button" class="btn-secondary" onclick="window.renderJuntaRevision()" style="display:flex; align-items:center; gap:0.4rem; font-size:0.82rem; padding:0.45rem 0.75rem;">
                   <i data-lucide="refresh-cw" style="width:14px;height:14px;"></i> Actualizar
                 </button>
@@ -6098,6 +6101,212 @@
     </div>
   </div>
 
+  <!-- MODAL RESUMEN SEMANAL OPERATIVO -->
+  <div class="modal-overlay" id="modal-resumen-semanal-overlay" onclick="if(event.target===this) window.cerrarModalResumenSemanal()" style="z-index: 1200; backdrop-filter: blur(4px);">
+    <div class="modal" id="modal-resumen-semanal" style="max-width: 1050px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; padding: 0; border-radius: 16px; overflow: hidden; background: var(--bg-card); border: 1px solid var(--border);">
+      
+      <!-- HEADER -->
+      <div style="padding: 1.25rem 1.5rem; background: var(--bg-body, #f8fafc); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(37, 99, 235, 0.1); color: var(--accent); display: flex; align-items: center; justify-content: center;">
+            <i data-lucide="bar-chart-3" style="width: 22px; height: 22px;"></i>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text);">Resumen Semanal Operativo</h3>
+            <span id="resumen-semanal-rango-txt" style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Cargando período...</span>
+          </div>
+        </div>
+
+        <!-- CONTROLES DE FECHA / NAVEGACIÓN -->
+        <div style="display: flex; align-items: center; gap: 0.5rem; background: var(--bg-card); padding: 0.25rem 0.5rem; border-radius: 10px; border: 1px solid var(--border);">
+          <button type="button" class="btn-secondary" onclick="window.cargarResumenSemanal((window._resumenSemanalOffset || 0) - 1)" style="padding: 0.4rem 0.75rem; font-size: 0.82rem; display: flex; align-items: center; gap: 0.3rem;" title="Semana anterior">
+            <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i> Anterior
+          </button>
+          <button type="button" class="btn-secondary" onclick="window.cargarResumenSemanal(0)" style="padding: 0.4rem 0.75rem; font-size: 0.82rem; font-weight: 600;" title="Ir a la semana actual">
+            Hoy / Actual
+          </button>
+          <button type="button" class="btn-secondary" onclick="window.cargarResumenSemanal((window._resumenSemanalOffset || 0) + 1)" style="padding: 0.4rem 0.75rem; font-size: 0.82rem; display: flex; align-items: center; gap: 0.3rem;" title="Semana siguiente">
+            Siguiente <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
+          </button>
+          <button type="button" onclick="window.cerrarModalResumenSemanal()" style="background: transparent; border: none; font-size: 1.5rem; line-height: 1; cursor: pointer; color: var(--text-muted); margin-left: 0.5rem;" title="Cerrar">&times;</button>
+        </div>
+      </div>
+
+      <!-- BODY SCROLLABLE -->
+      <div style="padding: 1.5rem; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 1.5rem;">
+        
+        <!-- KPI METRICS GRID -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem;">
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+            <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(59, 130, 246, 0.1); color: #3b82f6; display: flex; align-items: center; justify-content: center;">
+              <i data-lucide="ticket" style="width: 22px; height: 22px;"></i>
+            </div>
+            <div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Tickets Abiertos</div>
+              <div id="resumen-kpi-tickets-abiertos" style="font-size: 1.6rem; font-weight: 800; color: #3b82f6;">0</div>
+            </div>
+          </div>
+
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+            <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(34, 197, 94, 0.1); color: #22c55e; display: flex; align-items: center; justify-content: center;">
+              <i data-lucide="check-circle-2" style="width: 22px; height: 22px;"></i>
+            </div>
+            <div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Tickets Cerrados</div>
+              <div id="resumen-kpi-tickets-cerrados" style="font-size: 1.6rem; font-weight: 800; color: #22c55e;">0</div>
+            </div>
+          </div>
+
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+            <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(168, 85, 247, 0.1); color: #a855f7; display: flex; align-items: center; justify-content: center;">
+              <i data-lucide="file-check-2" style="width: 22px; height: 22px;"></i>
+            </div>
+            <div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Órdenes Cerradas</div>
+              <div id="resumen-kpi-os-cerradas" style="font-size: 1.6rem; font-weight: 800; color: #a855f7;">0</div>
+            </div>
+          </div>
+
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+            <div id="resumen-kpi-variacion-icon-bg" style="width: 44px; height: 44px; border-radius: 10px; background: rgba(234, 179, 8, 0.1); color: #eab308; display: flex; align-items: center; justify-content: center;">
+              <i data-lucide="trending-up" style="width: 22px; height: 22px;"></i>
+            </div>
+            <div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Balance Pendientes</div>
+              <div id="resumen-kpi-variacion-neto" style="font-size: 1.6rem; font-weight: 800; color: var(--text);">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- GRÁFICAS ANALÍTICAS DE LA SEMANA -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.25rem;">
+          
+          <!-- GRÁFICA 1: BARRAS POR USUARIO -->
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <h4 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="bar-chart-2" style="width: 18px; height: 18px; color: var(--accent);"></i> Carga Comparativa por Usuario
+              </h4>
+              <span style="font-size: 0.78rem; color: var(--text-muted);">Inicio vs Entrantes vs Cerrados vs Activos</span>
+            </div>
+            <div style="position: relative; height: 250px; width: 100%;">
+              <canvas id="chart-resumen-usuarios-barras"></canvas>
+            </div>
+          </div>
+
+          <!-- GRÁFICA 2: DISTRIBUCIÓN OPERATIVA (DONUT) -->
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <h4 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="pie-chart" style="width: 18px; height: 18px; color: #a855f7;"></i> Distribución del Movimiento Semanal
+              </h4>
+              <span style="font-size: 0.78rem; color: var(--text-muted);">Proporción de tickets y órdenes</span>
+            </div>
+            <div style="position: relative; height: 250px; width: 100%; display: flex; align-items: center; justify-content: center;">
+              <canvas id="chart-resumen-movimiento-donut"></canvas>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- SECCIÓN 1: BALANCE DE PENDIENTES POR USUARIO -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 0.5rem;">
+              <i data-lucide="users" style="width: 18px; height: 18px; color: var(--accent);"></i> Balance de Pendientes por Usuario
+            </h4>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Compare con cuántos empezó y terminó la semana</span>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="table-styled" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+              <thead>
+                <tr style="background: var(--bg-body, #f1f5f9); border-bottom: 2px solid var(--border); text-align: left;">
+                  <th style="padding: 0.65rem 0.85rem; font-weight: 700;">Usuario / Responsable</th>
+                  <th style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 700;">Inicio Semana</th>
+                  <th style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 700; color: #3b82f6;">+ Entrantes</th>
+                  <th style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 700; color: #22c55e;">- Cerrados</th>
+                  <th id="th-resumen-semanal-fin" style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 700;">Actualmente</th>
+                  <th style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 700;">Variación Net</th>
+                </tr>
+              </thead>
+              <tbody id="resumen-semanal-usuarios-tbody">
+                <tr><td colspan="6" style="text-align:center; padding: 1.5rem; color: var(--text-muted);">Cargando usuarios...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 2: DETALLES DE ÓRDENES Y TICKETS -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1.25rem;">
+          
+          <!-- ÓRDENES DE SERVICIO CERRADAS -->
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
+            <h4 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--text); display: flex; align-items: center; justify-content: space-between;">
+              <span style="display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="file-check-2" style="width: 18px; height: 18px; color: #a855f7;"></i> Órdenes de Servicio Cerradas
+              </span>
+              <span id="resumen-os-badge" class="badge" style="background: rgba(168, 85, 247, 0.1); color: #a855f7; font-weight: 700;">0</span>
+            </h4>
+
+            <div style="max-height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                <thead style="position: sticky; top: 0; background: var(--bg-body, #f1f5f9); z-index: 1;">
+                  <tr style="border-bottom: 1px solid var(--border); text-align: left;">
+                    <th style="padding: 0.5rem 0.75rem;">Folio</th>
+                    <th style="padding: 0.5rem 0.75rem;">Cliente</th>
+                    <th style="padding: 0.5rem 0.75rem;">Equipo</th>
+                    <th style="padding: 0.5rem 0.75rem;">Fecha Cierre</th>
+                  </tr>
+                </thead>
+                <tbody id="resumen-os-cerradas-tbody">
+                  <tr><td colspan="4" style="text-align:center; padding: 1rem; color: var(--text-muted);">Sin órdenes cerradas en esta semana</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- TICKETS ABIERTOS / CERRADOS -->
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <h4 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="ticket" style="width: 18px; height: 18px; color: var(--accent);"></i> Movimiento de Tickets
+              </h4>
+              <div style="display: flex; gap: 0.4rem;">
+                <button type="button" id="tab-btn-tickets-cerrados" class="btn-secondary" onclick="window.setResumenTicketTab('cerrados')" style="padding: 0.25rem 0.6rem; font-size: 0.78rem; font-weight: 600;">Cerrados</button>
+                <button type="button" id="tab-btn-tickets-abiertos" class="btn-secondary" onclick="window.setResumenTicketTab('abiertos')" style="padding: 0.25rem 0.6rem; font-size: 0.78rem; font-weight: 600;">Nuevos / Abiertos</button>
+              </div>
+            </div>
+
+            <div style="max-height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                <thead style="position: sticky; top: 0; background: var(--bg-body, #f1f5f9); z-index: 1;">
+                  <tr style="border-bottom: 1px solid var(--border); text-align: left;">
+                    <th style="padding: 0.5rem 0.75rem;">Folio</th>
+                    <th style="padding: 0.5rem 0.75rem;">Cliente / Asunto</th>
+                    <th style="padding: 0.5rem 0.75rem;">Asignado</th>
+                    <th style="padding: 0.5rem 0.75rem;">Fecha</th>
+                  </tr>
+                </thead>
+                <tbody id="resumen-tickets-tbody">
+                  <tr><td colspan="4" style="text-align:center; padding: 1rem; color: var(--text-muted);">Sin tickets en este filtro</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- FOOTER -->
+      <div style="padding: 0.85rem 1.5rem; background: var(--bg-body, #f8fafc); border-top: 1px solid var(--border); display: flex; justify-content: flex-end;">
+        <button type="button" class="btn-secondary" onclick="window.cerrarModalResumenSemanal()" style="padding: 0.5rem 1.25rem; font-weight: 600;">Cerrar</button>
+      </div>
+
+    </div>
+  </div>
+
   <!-- MODAL AGREGAR SITIO -->
   <div class="modal-overlay" id="modal-agregar-sitio-overlay" onclick="cerrarModalSitio(event)" style="z-index: 300;">
     <div class="modal" style="max-width:400px;">
@@ -8484,9 +8693,9 @@
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=309",
+        "supabaseSync.js?v=310",
         "utils.js?v=7",
-        "app.js?v=361",
+        "app.js?v=367",
         "levantamientos.js?v=306",
         "tecnicos_reporte.js?v=303"
       ];

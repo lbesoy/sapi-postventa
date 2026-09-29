@@ -825,27 +825,29 @@ function isValidUUID(uuid) {
 }
 
 function toValidUUID(str) {
-  if (!str) return crypto.randomUUID();
+  if (!str) return '00000000-0000-4000-8000-000000000000';
   if (typeof str !== 'string') str = String(str);
-  if (isValidUUID(str)) return str;
+  if (isValidUUID(str)) return str.toLowerCase();
 
-  let h1 = 0x811c9dc5, h2 = 0x811c9dc5, h3 = 0x811c9dc5, h4 = 0x811c9dc5;
+  let h1 = 0x811c9dc5, h2 = 0xcbf29ce4, h3 = 0x811c9dc5 ^ 0x5bd1e995, h4 = 0x27d4eb2f;
   for (let i = 0; i < str.length; i++) {
     const ch = str.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 0x01000193);
-    h2 = Math.imul(h2 ^ ch, 0x050c5d17);
-    h3 = Math.imul(h3 ^ ch, 0x01000193);
-    h4 = Math.imul(h4 ^ ch, 0x075bc2b1);
+    h1 = Math.imul(h1 ^ ch, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ ch, 0x050c5d17) >>> 0;
+    h3 = Math.imul(h3 ^ (ch << 1), 0x265e5a51) >>> 0;
+    h4 = Math.imul(h4 ^ (ch << 2), 0x075bc2b1) >>> 0;
   }
-  const hex1 = Math.abs(h1).toString(16).padStart(8, '0');
-  const hex2 = Math.abs(h2).toString(16).padStart(4, '0');
-  const hex3 = ('4' + Math.abs(h3).toString(16).padStart(3, '0')).slice(0, 4);
-  const hex4 = ('a' + Math.abs(h4).toString(16).padStart(3, '0')).slice(0, 4);
-  const hex5 = (Math.abs(h1 ^ h3).toString(16).padStart(8, '0') + Math.abs(h2 ^ h4).toString(16).padStart(4, '0')).slice(0, 12);
   
-  return `${hex1}-${hex2}-${hex3}-${hex4}-${hex5}`;
+  const p1 = (h1 >>> 0).toString(16).padStart(8, '0').slice(-8);
+  const p2 = ((h2 >>> 16) & 0xffff).toString(16).padStart(4, '0').slice(-4);
+  const p3 = ('4' + ((h2 & 0x0fff)).toString(16).padStart(3, '0')).slice(-4);
+  const p4 = (((h3 >>> 28) & 0x3 | 0x8).toString(16) + ((h3 >>> 16) & 0x0fff).toString(16).padStart(3, '0')).slice(-4);
+  const p5 = ((h3 & 0xffff).toString(16).padStart(4, '0') + (h4 >>> 0).toString(16).padStart(8, '0')).slice(-12);
+
+  return `${p1}-${p2}-${p3}-${p4}-${p5}`.toLowerCase();
 }
 window.toValidUUID = toValidUUID;
+window.isValidUUID = isValidUUID;
 
 function gastoToRow(g) {
   let ordenId = null;
@@ -1051,16 +1053,16 @@ function eventoToRow(e) {
     id: toValidUUID(e.id),
     titulo: e.titulo || 'Evento',
     descripcion: e.descripcion || null,
-    fecha_inicio: e.fechaInicio || e.start || new Date().toISOString(),
-    fecha_fin: e.fechaFin || e.end || null,
-    todo_el_dia: !!(e.todoElDia || e.allDay),
+    fecha_inicio: e.fechaInicio || e.fecha_inicio || e.start || new Date().toISOString(),
+    fecha_fin: e.fechaFin || e.fecha_fin || e.end || null,
+    todo_el_dia: !!(e.todoElDia || e.todo_el_dia || e.allDay),
     tipo: ['Junta', 'Capacitación', 'Vacaciones', 'Descanso', 'Otro', 'Servicio', 'Levantamiento', 'Traslado'].includes(e.tipo) ? e.tipo : 'Otro',
-    tecnico_id: isValidUUID(e.tecnicoId) ? e.tecnicoId : null,
-    tecnico_nombre: e.tecnicoNombre || null,
-    creado_por: isValidUUID(e.creadoPor) ? e.creadoPor : null,
-    orden_id: e.ordenId || null,
+    tecnico_id: isValidUUID(e.tecnicoId || e.tecnico_id) ? (e.tecnicoId || e.tecnico_id) : null,
+    tecnico_nombre: e.tecnicoNombre || e.tecnico_nombre || null,
+    creado_por: isValidUUID(e.creadoPor || e.creado_por) ? (e.creadoPor || e.creado_por) : null,
+    orden_id: e.ordenId || e.orden_id || null,
     color: e.color || null,
-    fecha_creacion: e.fechaCreacion || new Date().toISOString()
+    fecha_creacion: e.fechaCreacion || e.fecha_creacion || new Date().toISOString()
   };
 }
 
@@ -1089,6 +1091,22 @@ function rowToEvento(r) {
 
 // ─── Cola de Sincronización Offline ──────────────────────────
 
+function isSameQueueItem(a, b) {
+  if (!a || !b) return false;
+  if (a.table !== b.table || a.action !== b.action) return false;
+  if (a.table === 'roles' || a.table === 'kits_servicio' || a.table === 'kits_servicio_sandbox' || a.table === 'machotes_servicio') return true;
+  const aId = a.data ? (a.data.id || a.data.idInterno || a.data.serie || a.data.folio || a.data.numero_cotizacion || a.data.numero_pedido) : (a.id || null);
+  const bId = b.data ? (b.data.id || b.data.idInterno || b.data.serie || b.data.folio || b.data.numero_cotizacion || b.data.numero_pedido) : (b.id || null);
+  if (aId !== null && bId !== null && aId !== undefined && bId !== undefined) {
+    return String(aId) === String(bId);
+  }
+  if (a.timestamp && b.timestamp) {
+    return a.timestamp === b.timestamp;
+  }
+  return false;
+}
+window.isSameQueueItem = isSameQueueItem;
+
 function getSyncQueue() {
   return JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
 }
@@ -1105,16 +1123,12 @@ function coalesceSyncQueue(queue) {
   
   for (const item of queue) {
     if (!item) continue;
-    const itemId = item.data ? (item.data.id || item.data.idInterno || item.data.serie) : (item.id || null);
+    const itemId = item.data ? (item.data.id || item.data.idInterno || item.data.serie || item.data.folio || item.data.numero_cotizacion || item.data.numero_pedido) : (item.id || null);
     if (itemId && item.table) {
-      const key = `${item.table}::${itemId}`;
+      const key = `${item.table}::${item.action}::${itemId}`;
       if (map.has(key)) {
         const prevIdx = map.get(key);
-        if (result[prevIdx].action === 'delete' && item.action === 'upsert') {
-          // Conservar delete si ya estaba borrado
-        } else {
-          result[prevIdx] = item;
-        }
+        result[prevIdx] = item;
       } else {
         map.set(key, result.length);
         result.push(item);
@@ -1128,21 +1142,16 @@ function coalesceSyncQueue(queue) {
 
 function addToSyncQueue(table, action, data) {
   const queue = getSyncQueue();
-  const existingIdx = queue.findIndex(item => {
-    if (item.table !== table) return false;
-    if (table === 'roles' || table === 'kits_servicio' || table === 'kits_servicio_sandbox' || table === 'machotes_servicio') return true;
-    const itemId = item.data ? (item.data.id || item.data.idInterno || item.data.serie) : null;
-    const dataId = data ? (data.id || data.idInterno || data.serie) : null;
-    return itemId === dataId && itemId !== null && itemId !== undefined;
-  });
+  const newItem = { table, action, data, timestamp: Date.now() };
+  const existingIdx = queue.findIndex(item => isSameQueueItem(item, newItem));
   if (existingIdx > -1) {
     if (queue[existingIdx].action === 'delete' && action === 'upsert') {
       // mantener el delete pendiente si ya está ahí
     } else {
-      queue[existingIdx] = { table, action, data, timestamp: Date.now() };
+      queue[existingIdx] = newItem;
     }
   } else {
-    queue.push({ table, action, data, timestamp: Date.now() });
+    queue.push(newItem);
   }
   saveSyncQueue(queue);
 }
@@ -1233,14 +1242,32 @@ window.pushToSupabase = async function(tabla, item) {
       }
     }
 
-    // Si hay error de clave foránea (ej. sitio_fkey, cliente_fkey) en envios u otras tablas
+    // Si hay error de sintaxis UUID (22P02)
+    if (error && (error.code === '22P02' || (error.message && (error.message.includes('uuid') || error.message.includes('22P02'))))) {
+      console.warn(`[Direct Push] Sintaxis UUID inválida en ${tabla} para id=${row.id}. Convirtiendo a UUID válido y reintentando...`);
+      const fallbackRow = { ...row };
+      if (tabla === 'calendario_eventos' || !isValidUUID(fallbackRow.id)) {
+        fallbackRow.id = toValidUUID(fallbackRow.id);
+      }
+      if (fallbackRow.creado_por && !isValidUUID(fallbackRow.creado_por)) fallbackRow.creado_por = null;
+      if (fallbackRow.tecnico_id && !isValidUUID(fallbackRow.tecnico_id)) fallbackRow.tecnico_id = null;
+      const resRetry = await sb.from(tabla).upsert(fallbackRow);
+      error = resRetry.error;
+    }
+
+    // Si hay error de clave foránea (ej. sitio_fkey, cliente_fkey, creado_por_fkey)
     if (error && (error.code === '23503' || (error.message && error.message.includes('foreign key')))) {
-      console.warn(`[Direct Push] Violación de clave foránea en ${tabla}. Reintentando con claves foráneas neutralizadas...`);
+      console.warn(`[Direct Push] Violación de clave foránea en ${tabla}: ${error.message}. Reintentando con claves foráneas neutralizadas...`);
       const fallbackRow = { ...row };
       if (fallbackRow.sitio !== undefined) fallbackRow.sitio = null;
       if (fallbackRow.sitio_id !== undefined) fallbackRow.sitio_id = null;
-      if (fallbackRow.cliente !== undefined && error.message.includes('cliente')) fallbackRow.cliente = null;
-      if (fallbackRow.ticket_id !== undefined && error.message.includes('ticket')) fallbackRow.ticket_id = null;
+      if (fallbackRow.cliente !== undefined) fallbackRow.cliente = null;
+      if (fallbackRow.ticket_id !== undefined) fallbackRow.ticket_id = null;
+      if (fallbackRow.creado_por !== undefined) fallbackRow.creado_por = null;
+      if (fallbackRow.tecnico_id !== undefined) fallbackRow.tecnico_id = null;
+      if (fallbackRow.orden_id !== undefined) fallbackRow.orden_id = null;
+      if (fallbackRow.usuario_id !== undefined) fallbackRow.usuario_id = null;
+      if (fallbackRow.usuario !== undefined) fallbackRow.usuario = null;
       const resFallback = await sb.from(tabla).upsert(fallbackRow);
       error = resFallback.error;
     }
@@ -1415,11 +1442,7 @@ async function _processSyncQueueInternal() {
 
       // Verificar si el item sigue presente en la cola (no fue eliminado manualmente)
       const freshQueue = getSyncQueue();
-      const currentIdx = freshQueue.findIndex(q => 
-        q.table === item.table && 
-        q.action === item.action && 
-        ((q.data && item.data && (q.data.id === item.data.id || q.data.idInterno === item.data.idInterno || q.data.serie === item.data.serie)) || (q.id && item.id && q.id === item.id))
-      );
+      const currentIdx = freshQueue.findIndex(q => isSameQueueItem(q, item));
       if (currentIdx === -1) {
         continue;
       }
@@ -1922,18 +1945,28 @@ async function _processSyncQueueInternal() {
 
           if (upsertErr && (upsertErr.code === '22P02' || (upsertErr.message && (upsertErr.message.includes('uuid') || upsertErr.message.includes('22P02'))))) {
             console.warn(`[Sync Queue] Sintaxis UUID inválida en ${resTabla} para id=${payload.id}. Convirtiendo a UUID válido y reintentando...`);
-            const fallbackPayload = { ...payload, id: toValidUUID(payload.id) };
+            const fallbackPayload = { ...payload };
+            if (resTabla === 'calendario_eventos' || !isValidUUID(fallbackPayload.id)) {
+              fallbackPayload.id = toValidUUID(fallbackPayload.id);
+            }
+            if (fallbackPayload.creado_por && !isValidUUID(fallbackPayload.creado_por)) fallbackPayload.creado_por = null;
+            if (fallbackPayload.tecnico_id && !isValidUUID(fallbackPayload.tecnico_id)) fallbackPayload.tecnico_id = null;
             const resFallback = await sb.from(resTabla).upsert(fallbackPayload, { onConflict: 'id' });
             upsertErr = resFallback.error;
           }
 
           if (upsertErr && (upsertErr.code === '23503' || (upsertErr.message && upsertErr.message.includes('foreign key')))) {
-            console.warn(`[Sync Queue] Violación FK en ${resTabla}. Reintentando con claves foráneas neutralizadas...`);
+            console.warn(`[Sync Queue] Violación FK en ${resTabla}: ${upsertErr.message}. Reintentando con claves foráneas neutralizadas...`);
             const fallbackPayload = { ...payload };
             if (fallbackPayload.sitio !== undefined) fallbackPayload.sitio = null;
             if (fallbackPayload.sitio_id !== undefined) fallbackPayload.sitio_id = null;
-            if (fallbackPayload.cliente !== undefined && upsertErr.message.includes('cliente')) fallbackPayload.cliente = null;
-            if (fallbackPayload.ticket_id !== undefined && upsertErr.message.includes('ticket')) fallbackPayload.ticket_id = null;
+            if (fallbackPayload.cliente !== undefined) fallbackPayload.cliente = null;
+            if (fallbackPayload.ticket_id !== undefined) fallbackPayload.ticket_id = null;
+            if (fallbackPayload.creado_por !== undefined) fallbackPayload.creado_por = null;
+            if (fallbackPayload.tecnico_id !== undefined) fallbackPayload.tecnico_id = null;
+            if (fallbackPayload.orden_id !== undefined) fallbackPayload.orden_id = null;
+            if (fallbackPayload.usuario_id !== undefined) fallbackPayload.usuario_id = null;
+            if (fallbackPayload.usuario !== undefined) fallbackPayload.usuario = null;
             const resFallback = await sb.from(resTabla).upsert(fallbackPayload, { onConflict: 'id' });
             upsertErr = resFallback.error;
           }
@@ -2216,8 +2249,16 @@ async function _processSyncQueueInternal() {
             }
           }
         } else if (item.action === 'delete') {
-          const deleteId = (!isValidUUID(item.data.id)) ? toValidUUID(item.data.id) : item.data.id;
-          const { error: deleteErr } = await sb.from(resTabla).delete().eq('id', deleteId);
+          let deleteId = item.data ? item.data.id : item.id;
+          if (resTabla === 'calendario_eventos' || resTabla === 'auditoria_logs') {
+            deleteId = toValidUUID(deleteId);
+          }
+          let { error: deleteErr } = await sb.from(resTabla).delete().eq('id', deleteId);
+          if (deleteErr && (deleteErr.code === '22P02' || (deleteErr.message && deleteErr.message.includes('uuid')))) {
+            deleteId = toValidUUID(deleteId);
+            const retryRes = await sb.from(resTabla).delete().eq('id', deleteId);
+            deleteErr = retryRes.error;
+          }
           error = deleteErr;
         }
 
@@ -2226,7 +2267,7 @@ async function _processSyncQueueInternal() {
           if (item.table === 'sapi_telemetry') {
             console.warn('[Sync] Telemetría no enviada, descartando sin notificar:', error.message);
             const q = getSyncQueue();
-            const idx = q.findIndex(x => x.table === item.table && x.action === item.action && x.data?.id === item.data?.id);
+            const idx = q.findIndex(x => isSameQueueItem(x, item));
             if (idx > -1) { q.splice(idx, 1); saveSyncQueue(q); }
             continue;
           }
@@ -2235,11 +2276,7 @@ async function _processSyncQueueInternal() {
           
           // Guardar el mensaje de error en este item específico de la cola
           const q = getSyncQueue();
-          const targetIdx = q.findIndex(x => 
-            x.table === item.table && 
-            x.action === item.action && 
-            ((x.data && item.data && (x.data.id === item.data.id || x.data.idInterno === item.data.idInterno || x.data.serie === item.data.serie)) || (x.id && item.id && x.id === item.id))
-          );
+          const targetIdx = q.findIndex(x => isSameQueueItem(x, item));
           if (targetIdx > -1) {
             q[targetIdx].lastError = error.message;
             q[targetIdx].lastErrorCode = error.code || 'N/A';
@@ -2311,11 +2348,7 @@ async function _processSyncQueueInternal() {
 
           // Eliminar el elemento sincronizado con éxito de la cola
           const q = getSyncQueue();
-          const targetIdx = q.findIndex(x => 
-            x.table === item.table && 
-            x.action === item.action && 
-            ((x.data && item.data && (x.data.id === item.data.id || x.data.idInterno === item.data.idInterno || x.data.serie === item.data.serie)) || (x.id && item.id && x.id === item.id))
-          );
+          const targetIdx = q.findIndex(x => isSameQueueItem(x, item));
           if (targetIdx > -1) {
             q.splice(targetIdx, 1);
             saveSyncQueue(q);
@@ -2324,11 +2357,7 @@ async function _processSyncQueueInternal() {
       } catch (e) {
         console.error(`[Sync] Excepción en processSyncQueue para ${item.table}:`, e.message);
         const q = getSyncQueue();
-        const targetIdx = q.findIndex(x => 
-          x.table === item.table && 
-          x.action === item.action && 
-          ((x.data && item.data && (x.data.id === item.data.id || x.data.idInterno === item.data.idInterno || x.data.serie === item.data.serie)) || (x.id && item.id && x.id === item.id))
-        );
+        const targetIdx = q.findIndex(x => isSameQueueItem(x, item));
         if (targetIdx > -1) {
           q[targetIdx].lastError = e.message;
           q[targetIdx].lastErrorCode = e.code || 'N/A';
@@ -4692,9 +4721,18 @@ window.verDetallesSincronizacion = function() {
     footer.style.padding = '1rem 1.5rem';
     footer.style.borderTop = '1px solid var(--border, #e5e7eb)';
     footer.style.display = 'flex';
-    footer.style.justifyContent = 'flex-end';
+    footer.style.justifyContent = 'space-between';
+    footer.style.alignItems = 'center';
     footer.style.gap = '0.75rem';
     footer.style.backgroundColor = 'var(--bg-body, #f3f4f6)';
+
+    const footerLeft = document.createElement('div');
+    footerLeft.style.display = 'flex';
+    footerLeft.style.gap = '0.5rem';
+
+    const footerRight = document.createElement('div');
+    footerRight.style.display = 'flex';
+    footerRight.style.gap = '0.75rem';
     
     const closeAction = document.createElement('button');
     closeAction.textContent = 'Cerrar';
@@ -4709,6 +4747,51 @@ window.verDetallesSincronizacion = function() {
     const syncAction = document.createElement('button');
     syncAction.textContent = 'Sincronizar Ahora';
     syncAction.className = 'btn-primary';
+
+    const updateFooterButtons = (currentQueue) => {
+      footerLeft.innerHTML = '';
+      if (currentQueue && currentQueue.length > 0) {
+        const hasErrors = currentQueue.some(x => x.lastError);
+        if (hasErrors) {
+          const discardErrorsBtn = document.createElement('button');
+          discardErrorsBtn.textContent = 'Descartar Errores';
+          discardErrorsBtn.className = 'btn-secondary';
+          discardErrorsBtn.style.color = '#ef4444';
+          discardErrorsBtn.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+          discardErrorsBtn.style.fontSize = '0.82rem';
+          discardErrorsBtn.style.padding = '0.4rem 0.75rem';
+          discardErrorsBtn.onclick = () => {
+            if (confirm('¿Deseas descartar únicamente los elementos que presentaron error?')) {
+              let q = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+              q = q.filter(x => !x.lastError);
+              localStorage.setItem('sapi_sync_queue', JSON.stringify(q));
+              overlay.remove();
+              window.verDetallesSincronizacion();
+              if (window.updateSyncStatusUI) window.updateSyncStatusUI();
+            }
+          };
+          footerLeft.appendChild(discardErrorsBtn);
+        }
+
+        const discardAllBtn = document.createElement('button');
+        discardAllBtn.textContent = 'Descartar Todo';
+        discardAllBtn.className = 'btn-secondary';
+        discardAllBtn.style.color = 'var(--text-muted, #6b7280)';
+        discardAllBtn.style.fontSize = '0.82rem';
+        discardAllBtn.style.padding = '0.4rem 0.75rem';
+        discardAllBtn.onclick = () => {
+          if (confirm('¿Seguro que deseas vaciar toda la cola de cambios pendientes?')) {
+            localStorage.setItem('sapi_sync_queue', JSON.stringify([]));
+            overlay.remove();
+            window.verDetallesSincronizacion();
+            if (window.updateSyncStatusUI) window.updateSyncStatusUI();
+          }
+        };
+        footerLeft.appendChild(discardAllBtn);
+      }
+    };
+
+    updateFooterButtons(queue);
 
     const setupDeleteHandlers = () => {
       const delBtns = overlay.querySelectorAll('.sapi-del-queue-btn');
@@ -4791,6 +4874,7 @@ window.verDetallesSincronizacion = function() {
         const updatedQueue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
         title.textContent = updatedQueue.length === 0 ? 'Estado del Sistema' : 'Cambios Pendientes (' + updatedQueue.length + ')';
         bodyContentContainer.innerHTML = renderBodyContent(updatedQueue);
+        updateFooterButtons(updatedQueue);
 
         // Re-habilitar controles
         isSyncing = false;
@@ -4838,8 +4922,10 @@ window.verDetallesSincronizacion = function() {
       }
     };
     
-    footer.appendChild(closeAction);
-    footer.appendChild(syncAction);
+    footerRight.appendChild(closeAction);
+    footerRight.appendChild(syncAction);
+    footer.appendChild(footerLeft);
+    footer.appendChild(footerRight);
 
     modal.appendChild(header);
     modal.appendChild(body);

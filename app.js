@@ -41607,6 +41607,56 @@ function normalizarTextoJunta(str) {
     .trim();
 }
 
+function unificarNombreUsuario(rawNombre) {
+  if (!rawNombre) return 'Sin Asignar';
+  const norm = String(rawNombre)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+  if (!norm || norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === 'sin_asignar') {
+    return 'Sin Asignar';
+  }
+
+  // 1. Buscar coincidencia en array de usuarios
+  if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
+    const userMatch = usuarios.find(u => u && u.nombre && String(u.nombre).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() === norm);
+    if (userMatch && userMatch.nombre) return userMatch.nombre.trim();
+
+    const normWords = norm.split(/\s+/).filter(w => w.length > 2);
+    if (normWords.length >= 2) {
+      const fuzzyUser = usuarios.find(u => {
+        if (!u || !u.nombre) return false;
+        const uNormWords = String(u.nombre).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().split(/\s+/).filter(w => w.length > 2);
+        const matches = normWords.filter(w => uNormWords.includes(w));
+        return matches.length >= 2;
+      });
+      if (fuzzyUser && fuzzyUser.nombre) return fuzzyUser.nombre.trim();
+    }
+  }
+
+  // 2. Buscar coincidencia en array de tecnicosDb
+  if (typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) {
+    const tecMatch = tecnicosDb.find(t => t && t.nombre && String(t.nombre).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() === norm);
+    if (tecMatch && tecMatch.nombre) return tecMatch.nombre.trim();
+
+    const normWords = norm.split(/\s+/).filter(w => w.length > 2);
+    if (normWords.length >= 2) {
+      const fuzzyTec = tecnicosDb.find(t => {
+        if (!t || !t.nombre) return false;
+        const tNormWords = String(t.nombre).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().split(/\s+/).filter(w => w.length > 2);
+        const matches = normWords.filter(w => tNormWords.includes(w));
+        return matches.length >= 2;
+      });
+      if (fuzzyTec && fuzzyTec.nombre) return fuzzyTec.nombre.trim();
+    }
+  }
+
+  return String(rawNombre).trim();
+}
+window.unificarNombreUsuario = unificarNombreUsuario;
+
 // Obtener información visual y rol del usuario / responsable
 window.obtenerInfoRolUsuario = function(nombre) {
   if (!nombre) return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
@@ -42528,7 +42578,7 @@ window.renderJuntaResponsablesTable = function(todos) {
   todos.forEach(item => {
     const rList = (item.responsablesList && item.responsablesList.length > 0) ? item.responsablesList : ['Sin Asignar'];
     rList.forEach(respKey => {
-      const rName = String(respKey || '').trim() || 'Sin Asignar';
+      const rName = (typeof unificarNombreUsuario === 'function') ? unificarNombreUsuario(respKey) : (String(respKey || '').trim() || 'Sin Asignar');
       if (!grupos[rName]) {
         grupos[rName] = {
           nombre: rName,
@@ -42588,6 +42638,7 @@ window.renderJuntaResponsablesTable = function(todos) {
           <th style="padding:0.6rem 0.75rem; font-weight:700; width:160px;">Total Pendientes</th>
           <th style="padding:0.6rem 0.75rem; font-weight:700; text-align:center;">Tickets</th>
           <th style="padding:0.6rem 0.75rem; font-weight:700; text-align:center;">Órdenes</th>
+          <th style="padding:0.6rem 0.75rem; font-weight:700; text-align:center;">Levantamientos</th>
           <th style="padding:0.6rem 0.75rem; font-weight:700; text-align:center;">Envíos</th>
           <th style="padding:0.6rem 0.75rem; font-weight:700; text-align:center;">Mayor Rezago</th>
           <th style="padding:0.6rem 0.75rem; font-weight:700; text-align:right;">Acción</th>
@@ -42658,6 +42709,9 @@ window.renderJuntaResponsablesTable = function(todos) {
         <td style="padding:0.55rem 0.75rem; text-align:center;">
           <span style="font-weight:700; color:#10b981;">${r.ordenesCount}</span>
           ${r.ordenesSinFirma > 0 ? `<div style="font-size:0.68rem; color:#f59e0b; font-weight:600;">${r.ordenesSinFirma} s/firma</div>` : ''}
+        </td>
+        <td style="padding:0.55rem 0.75rem; text-align:center;">
+          <span style="font-weight:700; color:#6366f1;">${r.levantamientosCount}</span>
         </td>
         <td style="padding:0.55rem 0.75rem; text-align:center;">
           <span style="font-weight:700; color:#f59e0b;">${r.enviosCount}</span>
@@ -46414,11 +46468,569 @@ window.duplicarKitServicio = function(kitId) {
   window.filtrarKitsServicio();
 };
 
+/* ==========================================================================
+   RESUMEN SEMANAL OPERATIVO
+   ========================================================================== */
+
+window._resumenSemanalOffset = 0;
+window._resumenSemanalTicketTab = 'cerrados'; // 'cerrados' | 'abiertos'
+window._resumenSemanalCacheData = null;
+
+window.abrirModalResumenSemanal = function() {
+  try {
+    const overlay = document.getElementById('modal-resumen-semanal-overlay');
+    if (overlay) {
+      overlay.classList.add('open');
+      overlay.style.display = 'flex';
+      overlay.style.opacity = '1';
+      overlay.style.visibility = 'visible';
+      window.cargarResumenSemanal(0);
+      if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        setTimeout(() => lucide.createIcons(), 50);
+      }
+    } else {
+      console.warn('modal-resumen-semanal-overlay no fue encontrado en el DOM.');
+    }
+  } catch(err) {
+    console.error('Error al abrir resumen semanal:', err);
+  }
+};
+
+window.cerrarModalResumenSemanal = function() {
+  const overlay = document.getElementById('modal-resumen-semanal-overlay');
+  if (overlay) {
+    overlay.classList.remove('open');
+    overlay.style.display = 'none';
+  }
+};
+
+window.obtenerRangoSemana = function(offsetSemanas = 0) {
+  const now = new Date();
+  const currentDay = now.getDay(); // 0: Sun, 1: Mon, ..., 6: Sat
+  const distanceToMonday = (currentDay === 0 ? -6 : 1 - currentDay);
+  
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + distanceToMonday + (offsetSemanas * 7), 0, 0, 0, 0);
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, 23, 59, 59, 999);
+
+  return { monday, sunday };
+};
+
+function parseFechaResumenMs(fechaVal) {
+  if (!fechaVal) return null;
+  if (fechaVal instanceof Date) return isNaN(fechaVal.getTime()) ? null : fechaVal.getTime();
+  if (typeof fechaVal === 'number') return fechaVal;
+  if (typeof fechaVal === 'string') {
+    const d = new Date(fechaVal);
+    if (!isNaN(d.getTime())) return d.getTime();
+    const parts = fechaVal.split(/[-/ T]/);
+    if (parts.length >= 3) {
+      if (parts[0].length === 4) {
+        return new Date(parts[0], parts[1] - 1, parts[2]).getTime();
+      } else if (parts[2].length === 4) {
+        return new Date(parts[2], parts[1] - 1, parts[0]).getTime();
+      }
+    }
+  }
+  return null;
+}
+
+window.obtenerTodosLosElementosGlobales = function() {
+  const all = [];
+  const isTest = typeof isTestModeActive === 'function' && typeof isTestData === 'function';
+
+  // 1. TICKETS
+  const tkts = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : (window.tickets || []);
+  tkts.forEach(t => {
+    if (!t) return;
+    if (isTest && isTestData(t) !== isTestModeActive()) return;
+
+    const fechaCreacionMs = parseFechaResumenMs(t.fechaCreacion || t.fecha || t.created_at || t.fecha_creacion);
+    const est = String(t.estado || '').trim();
+    const esCerrado = (est === 'Cerrado' || est === 'Cancelado');
+    const fechaCierreMs = esCerrado ? parseFechaResumenMs(t.fechaCierre || t.fecha_cierre || t.closed_at || t.updated_at || t.fechaModificacion) : null;
+
+    let resps = [];
+    if (Array.isArray(t.responsablesList) && t.responsablesList.length > 0) {
+      resps = t.responsablesList.map(unificarNombreUsuario);
+    } else {
+      const single = unificarNombreUsuario(t.asignado || t.asignadoA || t.responsable || t.tecnico || '');
+      if (single && single !== 'Sin Asignar') resps = [single];
+    }
+    if (resps.length === 0) resps = ['Sin Asignar'];
+
+    all.push({
+      tipo: 'ticket',
+      folio: t.folio || (t.id ? String(t.id).substring(0, 8) : 'N/A'),
+      titulo: t.titulo || t.asunto || t.descripcion || 'Ticket de Servicio',
+      cliente: t.cliente || t.nombreCliente || 'N/A',
+      equipo: t.maquina || t.equipo || 'N/A',
+      estado: est || 'Abierto',
+      fechaCreacionMs,
+      fechaCierreMs,
+      esCerrado,
+      responsables: resps,
+      rawItem: t
+    });
+  });
+
+  // 2. ÓRDENES DE SERVICIO
+  const ords = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes : (window.ordenes || []);
+  ords.forEach(o => {
+    if (!o) return;
+    if (isTest && isTestData(o) !== isTestModeActive()) return;
+
+    const fechaCreacionMs = parseFechaResumenMs(o.fechaCreacion || o.fecha || o.created_at || o.fecha_creacion);
+    const est = String(o.estado || o.estatus || '').trim();
+    const esCerrado = (est === 'Completada' || est === 'Cerrada' || est === 'Cerrado' || est === 'Finalizado');
+    const fechaCierreMs = esCerrado ? parseFechaResumenMs(o.fechaCierre || o.fecha_cierre || o.closed_at || o.updated_at) : null;
+
+    let resps = [];
+    if (Array.isArray(o.tecnicosAsignados) && o.tecnicosAsignados.length > 0) {
+      resps = o.tecnicosAsignados.map(unificarNombreUsuario);
+    } else {
+      const single = unificarNombreUsuario(o.tecnicoAsignado || o.tecnico || o.responsable || '');
+      if (single && single !== 'Sin Asignar') resps = [single];
+    }
+    if (resps.length === 0) resps = ['Sin Asignar'];
+
+    all.push({
+      tipo: 'orden',
+      folio: o.folio || o.id || 'N/A',
+      titulo: o.trabajoSolicitado || o.descripcion || 'Orden de Servicio',
+      cliente: o.cliente || 'N/A',
+      equipo: o.equipo || o.maquina || 'N/A',
+      estado: est || 'Abierta',
+      fechaCreacionMs,
+      fechaCierreMs,
+      esCerrado,
+      responsables: resps,
+      rawItem: o
+    });
+  });
+
+  // 3. LEVANTAMIENTOS
+  const levs = (typeof levantamientos !== 'undefined' && Array.isArray(levantamientos)) ? levantamientos : (window.levantamientos || []);
+  levs.forEach(l => {
+    if (!l) return;
+    if (isTest && isTestData(l) !== isTestModeActive()) return;
+
+    const fechaCreacionMs = parseFechaResumenMs(l.fechaCreacion || l.fecha || l.created_at);
+    const est = String(l.estado || '').trim();
+    const esCerrado = (est === 'Completado' || est === 'Cerrado' || est === 'Cotizado');
+    const fechaCierreMs = esCerrado ? parseFechaResumenMs(l.fechaCierre || l.fecha_cierre || l.closed_at || l.updated_at) : null;
+
+    let resps = [];
+    const single = unificarNombreUsuario(l.responsable || l.tecnico || l.asignado || '');
+    if (single && single !== 'Sin Asignar') resps = [single];
+    if (resps.length === 0) resps = ['Sin Asignar'];
+
+    all.push({
+      tipo: 'levantamiento',
+      folio: l.folio || l.id || 'N/A',
+      titulo: l.titulo || l.descripcion || 'Levantamiento técnico',
+      cliente: l.cliente || 'N/A',
+      equipo: l.equipo || l.maquina || 'N/A',
+      estado: est || 'Pendiente',
+      fechaCreacionMs,
+      fechaCierreMs,
+      esCerrado,
+      responsables: resps,
+      rawItem: l
+    });
+  });
+
+  return all;
+};
+
+window.cargarResumenSemanal = function(offsetSemanas = 0) {
+  window._resumenSemanalOffset = offsetSemanas;
+  const { monday, sunday } = window.obtenerRangoSemana(offsetSemanas);
+  const tInicio = monday.getTime();
+  const tFin = sunday.getTime();
+
+  // Formatear texto de rango
+  const opciones = { day: 'numeric', month: 'short', year: 'numeric' };
+  const strInicio = monday.toLocaleDateString('es-MX', opciones);
+  const strFin = sunday.toLocaleDateString('es-MX', opciones);
+  const tagSemana = offsetSemanas === 0 ? ' (Semana Actual)' : (offsetSemanas === -1 ? ' (Semana Pasada)' : '');
+  
+  const elRango = document.getElementById('resumen-semanal-rango-txt');
+  if (elRango) elRango.textContent = `Del ${strInicio} al ${strFin}${tagSemana}`;
+
+  const elThFin = document.getElementById('th-resumen-semanal-fin');
+  if (elThFin) {
+    elThFin.textContent = offsetSemanas === 0 ? 'Actualmente' : 'Fin Semana';
+  }
+
+  const todos = window.obtenerTodosLosElementosGlobales();
+
+  // 1. MÉTRICAS CLAVE (KPIs)
+  const ticketsAbiertosSemana = todos.filter(x => x.tipo === 'ticket' && x.fechaCreacionMs && x.fechaCreacionMs >= tInicio && x.fechaCreacionMs <= tFin);
+  const ticketsCerradosSemana = todos.filter(x => x.tipo === 'ticket' && x.fechaCierreMs && x.fechaCierreMs >= tInicio && x.fechaCierreMs <= tFin);
+  const osCerradasSemana = todos.filter(x => x.tipo === 'orden' && x.fechaCierreMs && x.fechaCierreMs >= tInicio && x.fechaCierreMs <= tFin);
+
+  const elTktsAb = document.getElementById('resumen-kpi-tickets-abiertos');
+  if (elTktsAb) elTktsAb.textContent = ticketsAbiertosSemana.length;
+  const elTktsCe = document.getElementById('resumen-kpi-tickets-cerrados');
+  if (elTktsCe) elTktsCe.textContent = ticketsCerradosSemana.length;
+  const elOsCe = document.getElementById('resumen-kpi-os-cerradas');
+  if (elOsCe) elOsCe.textContent = osCerradasSemana.length;
+
+  // 2. BALANCE POR USUARIO
+  const usuariosMap = {};
+  
+  if (typeof window.obtenerListaTecnicosJunta === 'function') {
+    const tecs = window.obtenerListaTecnicosJunta();
+    tecs.forEach(t => {
+      const u = unificarNombreUsuario(t);
+      if (u && u !== 'Sin Asignar' && u !== 'todos') {
+        if (!usuariosMap[u]) usuariosMap[u] = { nombre: u, inicio: 0, entrantes: 0, cerrados: 0, fin: 0 };
+      }
+    });
+  }
+
+  todos.forEach(item => {
+    item.responsables.forEach(uRaw => {
+      const u = unificarNombreUsuario(uRaw);
+      if (!usuariosMap[u]) {
+        usuariosMap[u] = { nombre: u, inicio: 0, entrantes: 0, cerrados: 0, fin: 0 };
+      }
+
+      const fCreac = item.fechaCreacionMs || 0;
+      const fCierre = item.fechaCierreMs;
+
+      // PENDIENTES AL INICIO DE LA SEMANA: Creados antes de tInicio Y (no cerrados aún O cerrados a partir de tInicio)
+      const estabaAbiertoInicio = (fCreac < tInicio) && (!item.esCerrado || (fCierre && fCierre >= tInicio));
+      if (estabaAbiertoInicio) {
+        usuariosMap[u].inicio++;
+      }
+
+      // ENTRANTES EN LA SEMANA: Creados durante esta semana
+      const fueCreadoEnSemana = (fCreac >= tInicio && fCreac <= tFin);
+      if (fueCreadoEnSemana) {
+        usuariosMap[u].entrantes++;
+      }
+
+      // RESUELTOS EN LA SEMANA: Cerrados durante esta semana
+      const fueCerradoEnSemana = (item.esCerrado && fCierre && fCierre >= tInicio && fCierre <= tFin);
+      if (fueCerradoEnSemana) {
+        usuariosMap[u].cerrados++;
+      }
+
+      // PENDIENTES AL FINAL DE LA SEMANA: Creados antes o durante esta semana Y (no cerrados aún O cerrados después de tFin)
+      const estabaAbiertoFin = (fCreac <= tFin) && (!item.esCerrado || (fCierre && fCierre > tFin));
+      if (estabaAbiertoFin) {
+        usuariosMap[u].fin++;
+      }
+    });
+  });
+
+  // Renderizar Tabla de Balance por Usuario
+  const listaUsuarios = Object.values(usuariosMap).filter(u => u.inicio > 0 || u.entrantes > 0 || u.cerrados > 0 || u.fin > 0 || u.nombre !== 'Sin Asignar');
+  listaUsuarios.sort((a, b) => b.fin - a.fin || b.inicio - a.inicio);
+
+  const tbodyUsers = document.getElementById('resumen-semanal-usuarios-tbody');
+  if (tbodyUsers) {
+    let totInicio = 0, totEntrantes = 0, totCerrados = 0, totFin = 0;
+
+    if (listaUsuarios.length === 0) {
+      tbodyUsers.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:1.25rem; color:var(--text-muted);">Sin actividad de usuarios en este período.</td></tr>';
+    } else {
+      tbodyUsers.innerHTML = listaUsuarios.map(u => {
+        totInicio += u.inicio;
+        totEntrantes += u.entrantes;
+        totCerrados += u.cerrados;
+        totFin += u.fin;
+
+        const delta = u.fin - u.inicio;
+        let deltaHtml = '<span style="color:var(--text-muted); font-weight:600;">0</span>';
+        if (delta < 0) {
+          deltaHtml = `<span style="color:#22c55e; font-weight:700;">${delta}</span>`;
+        } else if (delta > 0) {
+          deltaHtml = `<span style="color:#ef4444; font-weight:700;">+${delta}</span>`;
+        }
+
+        return `
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 0.65rem 0.85rem; font-weight: 600; color: var(--text);">${escapeHTML(u.nombre)}</td>
+            <td style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 600; background: rgba(0,0,0,0.02);">${u.inicio}</td>
+            <td style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 600; color: #3b82f6;">+${u.entrantes}</td>
+            <td style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 600; color: #22c55e;">-${u.cerrados}</td>
+            <td style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 700; background: rgba(0,0,0,0.02);">${u.fin}</td>
+            <td style="padding: 0.65rem 0.85rem; text-align: center;">${deltaHtml}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const deltaTotal = totFin - totInicio;
+      let deltaTotalHtml = '<span style="color:var(--text-muted); font-weight:700;">0</span>';
+      if (deltaTotal < 0) deltaTotalHtml = `<span style="color:#22c55e; font-weight:800;">${deltaTotal}</span>`;
+      else if (deltaTotal > 0) deltaTotalHtml = `<span style="color:#ef4444; font-weight:800;">+${deltaTotal}</span>`;
+
+      tbodyUsers.innerHTML += `
+        <tr style="background: var(--bg-body, #f1f5f9); font-weight: 800; border-top: 2px solid var(--border);">
+          <td style="padding: 0.75rem 0.85rem;">TOTAL OPERATIVO</td>
+          <td style="padding: 0.75rem 0.85rem; text-align: center;">${totInicio}</td>
+          <td style="padding: 0.75rem 0.85rem; text-align: center; color: #3b82f6;">+${totEntrantes}</td>
+          <td style="padding: 0.75rem 0.85rem; text-align: center; color: #22c55e;">-${totCerrados}</td>
+          <td style="padding: 0.75rem 0.85rem; text-align: center;">${totFin}</td>
+          <td style="padding: 0.75rem 0.85rem; text-align: center;">${deltaTotalHtml}</td>
+        </tr>
+      `;
+
+      // KPI Balance Global Delta
+      const elDeltaKpi = document.getElementById('resumen-kpi-variacion-neto');
+      const elDeltaIconBg = document.getElementById('resumen-kpi-variacion-icon-bg');
+      if (elDeltaKpi) {
+        if (deltaTotal < 0) {
+          elDeltaKpi.textContent = `${deltaTotal} Reducción`;
+          elDeltaKpi.style.color = '#22c55e';
+          if (elDeltaIconBg) { elDeltaIconBg.style.background = 'rgba(34, 197, 94, 0.1)'; elDeltaIconBg.style.color = '#22c55e'; }
+        } else if (deltaTotal > 0) {
+          elDeltaKpi.textContent = `+${deltaTotal} Acumulados`;
+          elDeltaKpi.style.color = '#ef4444';
+          if (elDeltaIconBg) { elDeltaIconBg.style.background = 'rgba(239, 68, 68, 0.1)'; elDeltaIconBg.style.color = '#ef4444'; }
+        } else {
+          elDeltaKpi.textContent = `0 Sin cambio`;
+          elDeltaKpi.style.color = 'var(--text)';
+          if (elDeltaIconBg) { elDeltaIconBg.style.background = 'rgba(100, 116, 139, 0.1)'; elDeltaIconBg.style.color = 'var(--text-muted)'; }
+        }
+      }
+    }
+  }
+
+  // 3. ÓRDENES DE SERVICIO CERRADAS EN LA SEMANA
+  const tbodyOS = document.getElementById('resumen-os-cerradas-tbody');
+  const badgeOS = document.getElementById('resumen-os-badge');
+  if (badgeOS) badgeOS.textContent = osCerradasSemana.length;
+
+  if (tbodyOS) {
+    if (osCerradasSemana.length === 0) {
+      tbodyOS.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:1.25rem; color:var(--text-muted);">Sin órdenes cerradas en esta semana</td></tr>';
+    } else {
+      tbodyOS.innerHTML = osCerradasSemana.map(o => {
+        const fechaStr = o.fechaCierreMs ? new Date(o.fechaCierreMs).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : 'Reciente';
+        return `
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 0.5rem 0.75rem; font-weight: 700; color: var(--accent);">${escapeHTML(o.folio)}</td>
+            <td style="padding: 0.5rem 0.75rem;">${escapeHTML(o.cliente)}</td>
+            <td style="padding: 0.5rem 0.75rem; color: var(--text-muted);">${escapeHTML(o.equipo)}</td>
+            <td style="padding: 0.5rem 0.75rem; font-weight: 600; color: #22c55e;">${fechaStr}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+
+  // 4. RENDERIZAR GRÁFICAS ANALÍTICAS
+  try {
+    renderizarGraficasResumenSemanal(listaUsuarios, ticketsAbiertosSemana.length, ticketsCerradosSemana.length, osCerradasSemana.length);
+  } catch(errG) {
+    console.warn('Error al renderizar gráficas del resumen semanal:', errG);
+  }
+
+  // Cache para las pestañas de tickets
+  window._resumenSemanalCacheData = {
+    ticketsAbiertos: ticketsAbiertosSemana,
+    ticketsCerrados: ticketsCerradosSemana
+  };
+
+  window.setResumenTicketTab(window._resumenSemanalTicketTab || 'cerrados');
+
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    setTimeout(() => lucide.createIcons(), 50);
+  }
+};
+
+window._resumenChartBarras = null;
+window._resumenChartDonut = null;
+
+function renderizarGraficasResumenSemanal(listaUsuarios, ticketsAbiertosCount, ticketsCerradosCount, osCerradasCount) {
+  if (typeof Chart === 'undefined') {
+    console.warn('Chart.js no está cargado');
+    return;
+  }
+
+  if (window._resumenChartBarras) {
+    window._resumenChartBarras.destroy();
+    window._resumenChartBarras = null;
+  }
+  if (window._resumenChartDonut) {
+    window._resumenChartDonut.destroy();
+    window._resumenChartDonut = null;
+  }
+
+  // 1. GRÁFICA BARRAS POR USUARIO
+  const canvasBarras = document.getElementById('chart-resumen-usuarios-barras');
+  if (canvasBarras && listaUsuarios && listaUsuarios.length > 0) {
+    const topUsuarios = [...listaUsuarios].sort((a, b) => b.fin - a.fin).slice(0, 10);
+    const labels = topUsuarios.map(u => u.nombre.length > 18 ? u.nombre.substring(0, 16) + '...' : u.nombre);
+    const dataInicio = topUsuarios.map(u => u.inicio);
+    const dataEntrantes = topUsuarios.map(u => u.entrantes);
+    const dataCerrados = topUsuarios.map(u => u.cerrados);
+    const dataActual = topUsuarios.map(u => u.fin);
+
+    const ctxBarras = canvasBarras.getContext('2d');
+    window._resumenChartBarras = new Chart(ctxBarras, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Inicio Semana',
+            data: dataInicio,
+            backgroundColor: 'rgba(148, 163, 184, 0.65)',
+            borderColor: '#94a3b8',
+            borderWidth: 1,
+            borderRadius: 4
+          },
+          {
+            label: '+ Entrantes',
+            data: dataEntrantes,
+            backgroundColor: 'rgba(59, 130, 246, 0.75)',
+            borderColor: '#3b82f6',
+            borderWidth: 1,
+            borderRadius: 4
+          },
+          {
+            label: '- Cerrados',
+            data: dataCerrados,
+            backgroundColor: 'rgba(34, 197, 94, 0.75)',
+            borderColor: '#22c55e',
+            borderWidth: 1,
+            borderRadius: 4
+          },
+          {
+            label: 'Actualmente / Fin',
+            data: dataActual,
+            backgroundColor: 'rgba(234, 179, 8, 0.85)',
+            borderColor: '#eab308',
+            borderWidth: 1,
+            borderRadius: 4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { boxWidth: 12, font: { size: 10, weight: '600' } }
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 9.5 } }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0, font: { size: 10 } }
+          }
+        }
+      }
+    });
+  }
+
+  // 2. GRÁFICA DONUT MOVIMIENTO SEMANAL
+  const canvasDonut = document.getElementById('chart-resumen-movimiento-donut');
+  if (canvasDonut) {
+    const ctxDonut = canvasDonut.getContext('2d');
+    const totalMov = ticketsAbiertosCount + ticketsCerradosCount + osCerradasCount;
+
+    window._resumenChartDonut = new Chart(ctxDonut, {
+      type: 'doughnut',
+      data: {
+        labels: ['Tickets Abiertos', 'Tickets Cerrados', 'Órdenes OS Cerradas'],
+        datasets: [{
+          data: totalMov > 0 ? [ticketsAbiertosCount, ticketsCerradosCount, osCerradasCount] : [0, 0, 0],
+          backgroundColor: [
+            'rgba(59, 130, 246, 0.85)',
+            'rgba(34, 197, 94, 0.85)',
+            'rgba(168, 85, 247, 0.85)'
+          ],
+          borderColor: [
+            '#3b82f6',
+            '#22c55e',
+            '#a855f7'
+          ],
+          borderWidth: 2,
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { boxWidth: 12, font: { size: 10.5, weight: '600' }, padding: 12 }
+          }
+        },
+        cutout: '65%'
+      }
+    });
+  }
+}
+
+window.setResumenTicketTab = function(tab) {
+  window._resumenSemanalTicketTab = tab;
+
+  const btnCerrados = document.getElementById('tab-btn-tickets-cerrados');
+  const btnAbiertos = document.getElementById('tab-btn-tickets-abiertos');
+
+  if (btnCerrados) {
+    btnCerrados.className = tab === 'cerrados' ? 'btn-primary' : 'btn-secondary';
+    btnCerrados.style.background = tab === 'cerrados' ? 'var(--accent)' : 'transparent';
+    btnCerrados.style.color = tab === 'cerrados' ? 'white' : 'var(--text)';
+  }
+  if (btnAbiertos) {
+    btnAbiertos.className = tab === 'abiertos' ? 'btn-primary' : 'btn-secondary';
+    btnAbiertos.style.background = tab === 'abiertos' ? 'var(--accent)' : 'transparent';
+    btnAbiertos.style.color = tab === 'abiertos' ? 'white' : 'var(--text)';
+  }
+
+  const tbody = document.getElementById('resumen-tickets-tbody');
+  if (!tbody) return;
+
+  const cache = window._resumenSemanalCacheData || { ticketsAbiertos: [], ticketsCerrados: [] };
+  const lista = tab === 'abiertos' ? cache.ticketsAbiertos : cache.ticketsCerrados;
+
+  if (!lista || lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:1.25rem; color:var(--text-muted);">Sin tickets ${tab === 'abiertos' ? 'abiertos' : 'cerrados'} en esta semana</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = lista.map(t => {
+    const fMs = tab === 'abiertos' ? t.fechaCreacionMs : t.fechaCierreMs;
+    const fechaStr = fMs ? new Date(fMs).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : 'Semana';
+    const respStr = t.responsables.join(', ');
+
+    return `
+      <tr style="border-bottom: 1px solid var(--border);">
+        <td style="padding: 0.5rem 0.75rem; font-weight: 700; color: var(--accent);">${escapeHTML(t.folio)}</td>
+        <td style="padding: 0.5rem 0.75rem;">
+          <div style="font-weight: 600; color: var(--text);">${escapeHTML(t.cliente)}</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">${escapeHTML(t.titulo)}</div>
+        </td>
+        <td style="padding: 0.5rem 0.75rem; font-size: 0.8rem; color: var(--text-muted);">${escapeHTML(respStr)}</td>
+        <td style="padding: 0.5rem 0.75rem; font-weight: 600; color: ${tab === 'abiertos' ? '#3b82f6' : '#22c55e'};">${fechaStr}</td>
+      </tr>
+    `;
+  }).join('');
+};
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', dispararInicializacionGlobal);
 } else {
   dispararInicializacionGlobal();
 }
+
 
 
 
