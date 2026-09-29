@@ -37287,9 +37287,57 @@ window.obtenerContenidoAdjuntoMicrosoftGraph = async function(msId, attachmentId
 
   let base64Content = null;
 
-  // 1. Obtener token de cliente si está disponible
-  let token = null;
-  if (window.msalInstance) {
+  // 1. REVISAR PRIMERO SI ES UN REPORTE DE SERVICIO DE SAPI (OS-*)
+  const isOsReport = cleanFileName.toLowerCase().includes('reporte_servicio') || /OS-?(\d+)/i.test(cleanFileName);
+  if (isOsReport) {
+    const matchOs = cleanFileName.match(/OS-?(\d+)/i);
+    if (matchOs) {
+      const numericPart = matchOs[1];
+      const fullFolio = `OS-${numericPart}`;
+      
+      let ordList = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? [...ordenes] : [];
+      if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) ordList = ordList.concat(window.ordenes);
+      try {
+        const local = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_ordenes', []) : JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+        if (Array.isArray(local)) ordList = ordList.concat(local);
+      } catch (e) {}
+
+      const ord = ordList.find(o => {
+        if (!o) return false;
+        const f = String(o.folio || '').trim();
+        const idStr = String(o.id || '').trim();
+        return f === fullFolio || f === numericPart || idStr === fullFolio || idStr === numericPart || f.replace(/\D/g, '') === numericPart || idStr.replace(/\D/g, '') === numericPart;
+      });
+
+      if (ord) {
+        try {
+          if (typeof verDetalle === 'function') {
+            verDetalle(ord.id);
+            const overlayDetalle = document.getElementById('modal-detalle-overlay');
+            if (overlayDetalle) overlayDetalle.classList.remove('open');
+          }
+          if (typeof generarBase64Pdf === 'function') {
+            const pdfB64 = await generarBase64Pdf(ord.id);
+            if (pdfB64) {
+              base64Content = pdfB64.includes(',') ? pdfB64.split(',')[1] : pdfB64;
+              cleanContentType = 'application/pdf';
+            }
+          }
+        } catch (pdfErr) {
+          console.warn('[PDF OS Generator] Error generando PDF de orden:', pdfErr);
+        }
+      }
+    }
+  }
+
+  // 2. OBTENER TOKEN DE MICROSOFT AZURE (SESSIONSTORAGE, ONEDRIVE, MSAL)
+  let token = sessionStorage.getItem('ms_access_token') || 
+              localStorage.getItem('ms_access_token') || 
+              (typeof onedriveRealToken !== 'undefined' ? onedriveRealToken : '') ||
+              localStorage.getItem('sapi_ms_graph_token') || 
+              sessionStorage.getItem('sapi_ms_graph_token');
+
+  if (!token && window.msalInstance) {
     const activeAccount = window.msalInstance.getActiveAccount() || (window.msalInstance.getAllAccounts ? window.msalInstance.getAllAccounts()[0] : null);
     if (activeAccount) {
       try {
@@ -37303,12 +37351,10 @@ window.obtenerContenidoAdjuntoMicrosoftGraph = async function(msId, attachmentId
       }
     }
   }
-  if (!token) {
-    token = localStorage.getItem('sapi_ms_graph_token') || sessionStorage.getItem('sapi_ms_graph_token');
-  }
 
-  // 2. Si hay token en cliente y msId, consultar directamente a Microsoft Graph
-  if (token && cleanMsId) {
+  // 3. CONSULTAR DIRECTAMENTE A MICROSOFT GRAPH API SI TENEMOS TOKEN Y MS_ID DE GRAPH REAL
+  const isRealGraphId = cleanMsId && !cleanMsId.startsWith('email_rep_') && !cleanMsId.startsWith('log_');
+  if (!base64Content && token && isRealGraphId) {
     const headers = {
       'Authorization': `Bearer ${token}`,
       'Accept': 'application/json'
@@ -37357,10 +37403,11 @@ window.obtenerContenidoAdjuntoMicrosoftGraph = async function(msId, attachmentId
     }
   }
 
-  // 3. Endpoint serverless
-  if (!base64Content && cleanMsId) {
+  // 4. CONSULTAR AL ENDPOINT SERVERLESS SI NO ES LOCAL
+  if (!base64Content && isRealGraphId) {
     try {
-      const bkHeaders = token ? { 'X-Ms-Graph-Token': token } : {};
+      const bkHeaders = { 'X-Sapi-Client-Token': 'SapiSecuredClientToken' };
+      if (token) bkHeaders['X-Ms-Graph-Token'] = token;
       const qUrl = `/api/download-azure-attachment?msId=${encodeURIComponent(cleanMsId)}&attachmentId=${encodeURIComponent(cleanAttId || '')}&fileName=${encodeURIComponent(cleanFileName || '')}`;
       const bkRes = await fetch(qUrl, { headers: bkHeaders });
       if (bkRes.ok) {
@@ -37375,23 +37422,7 @@ window.obtenerContenidoAdjuntoMicrosoftGraph = async function(msId, attachmentId
     }
   }
 
-  // 4. Fallback especial para reportes de servicio de SAPI
-  if (!base64Content && cleanFileName && /OS-?(\d+)/i.test(cleanFileName)) {
-    const matchOs = cleanFileName.match(/OS-?(\d+)/i);
-    if (matchOs) {
-      const folioNum = matchOs[1];
-      const ord = (typeof ordenes !== 'undefined' ? ordenes : []).find(o => String(o.folio || '').includes(folioNum) || String(o.id || '').includes(folioNum));
-      if (ord && typeof window.generarPDFOrdenServicioBase64 === 'function') {
-        const pdfB64 = await window.generarPDFOrdenServicioBase64(ord);
-        if (pdfB64) {
-          base64Content = pdfB64.includes(',') ? pdfB64.split(',')[1] : pdfB64;
-          cleanContentType = 'application/pdf';
-        }
-      }
-    }
-  }
-
-  // Ajustar contentType si está genérico según extensión
+  // 5. Ajustar contentType si está genérico según extensión
   const fnLower = cleanFileName.toLowerCase();
   if (cleanContentType === 'application/octet-stream' || !cleanContentType) {
     if (fnLower.endsWith('.pdf')) cleanContentType = 'application/pdf';
