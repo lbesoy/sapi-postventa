@@ -32,6 +32,9 @@ window.fetchTablePaginated = async (tableName, selectQuery = '*', orderColumn = 
     const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
     if (error) {
+      if (tableName === 'sapi_email_logs' && (error.message?.includes('schema cache') || error.code === '42P01' || error.message?.includes('404') || error.message?.includes('does not exist'))) {
+        return [];
+      }
       console.error(`[Sync] Error cargando ${tableName} página ${page}:`, error.message);
       throw error;
     }
@@ -4130,7 +4133,7 @@ window.cargarDatosDeSupabase = function() {
         }
       }
     } catch (errEmail) {
-      console.warn('[Sync] Error al cargar sapi_email_logs:', errEmail);
+      // Opcional: la tabla sapi_email_logs puede no estar creada en Supabase
     }
 
   } catch (error) {

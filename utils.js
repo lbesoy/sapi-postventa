@@ -170,4 +170,103 @@ window.getTicketModificadoPor = function(t) {
   return t.creadoPor || t.solicitante || t.usuario || '—';
 };
 
+// Helper para convertir URLs de imágenes a Base64 Data URI con soporte Supabase Storage, Fetch Blob y Canvas
+window.urlToDataUri = async function(url) {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed || trimmed === '__DELETED__') return null;
+  if (trimmed.startsWith('data:image')) return trimmed;
+
+  // Intento 1: Descarga directa mediante Supabase Storage Client (evita restricciones de CORS)
+  if (window.supabaseClient && trimmed.includes('/evidencias/')) {
+    try {
+      const parts = trimmed.split('/evidencias/');
+      let filePath = parts[1] || '';
+      if (filePath) {
+        filePath = decodeURIComponent(filePath.split('?')[0]);
+        const { data: blob, error } = await window.supabaseClient.storage.from('evidencias').download(filePath);
+        if (!error && blob && blob.size > 0) {
+          const dataUri = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          });
+          if (dataUri && dataUri.startsWith('data:image')) return dataUri;
+        }
+      }
+    } catch (err) {
+      console.warn('[urlToDataUri] Supabase storage download fallback:', err);
+    }
+  }
+
+  // Intento 2: Fetch como Blob estándar
+  try {
+    const res = await fetch(trimmed, { mode: 'cors' });
+    if (res.ok) {
+      const blob = await res.blob();
+      if (blob && blob.size > 0) {
+        const dataUri = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        });
+        if (dataUri && dataUri.startsWith('data:image')) return dataUri;
+      }
+    }
+  } catch (err) {
+    console.warn('[urlToDataUri] Fetch blob fallback:', err);
+  }
+
+  // Intento 3: Fetch con cache-busting
+  if (trimmed.startsWith('http')) {
+    try {
+      const cbUrl = trimmed.includes('?') ? `${trimmed}&_t=${Date.now()}` : `${trimmed}?_t=${Date.now()}`;
+      const res = await fetch(cbUrl, { mode: 'cors' });
+      if (res.ok) {
+        const blob = await res.blob();
+        if (blob && blob.size > 0) {
+          const dataUri = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          });
+          if (dataUri && dataUri.startsWith('data:image')) return dataUri;
+        }
+      }
+    } catch (err) {
+      console.warn('[urlToDataUri] Fetch cb fallback:', err);
+    }
+  }
+
+  // Intento 4: Elemento Image con crossOrigin y Canvas
+  try {
+    const dataUri = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width || 300;
+          canvas.height = img.naturalHeight || img.height || 200;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/jpeg', 0.95));
+        } catch (e) {
+          reject(e);
+        }
+      };
+      img.onerror = reject;
+      img.src = trimmed;
+    });
+    if (dataUri && dataUri.startsWith('data:image')) return dataUri;
+  } catch (err) {
+    console.warn('[urlToDataUri] Canvas conversion fallback:', err);
+  }
+
+  return trimmed;
+};
+
 

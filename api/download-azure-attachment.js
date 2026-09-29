@@ -95,7 +95,7 @@ export default async function handler(req, res) {
     }
 
     // Si no se encontró por ID o no se proporcionó ID, listar adjuntos del mensaje
-    if (!attachmentData) {
+    if (!attachmentData && msId && !msId.startsWith('email_rep_') && !msId.startsWith('log_')) {
       const listEndpoints = [
         `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(azureUserMail)}/messages/${msId}/attachments`,
         `https://graph.microsoft.com/v1.0/me/messages/${msId}/attachments`
@@ -107,12 +107,43 @@ export default async function handler(req, res) {
             const listJson = await r.json();
             const items = listJson.value || [];
             const match = items.find(a => (fileName && a.name === fileName) || (attachmentId && a.id === attachmentId)) || items[0];
-            if (match) {
+            if (match && match.contentBytes) {
               attachmentData = match;
               break;
             }
           }
         } catch (e) {}
+      }
+    }
+
+    // Si aún no se encontró, buscar en buzones sentitems e inbox por nombre de archivo
+    if (!attachmentData && fileName) {
+      const searchBases = [
+        `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(azureUserMail)}`,
+        `https://graph.microsoft.com/v1.0/me`
+      ];
+      const folders = ['sentitems', 'inbox'];
+      for (const base of searchBases) {
+        if (attachmentData) break;
+        for (const f of folders) {
+          try {
+            const sUrl = `${base}/mailFolders/${f}/messages?$top=30&$expand=attachments&$orderby=${f === 'inbox' ? 'receivedDateTime' : 'sentDateTime'} desc`;
+            const sRes = await fetch(sUrl, { headers });
+            if (sRes.ok) {
+              const sJson = await sRes.json();
+              const msgs = Array.isArray(sJson.value) ? sJson.value : [];
+              for (const m of msgs) {
+                const atts = Array.isArray(m.attachments) ? m.attachments : [];
+                const matchedAtt = atts.find(a => (a.name && (a.name === fileName || a.name.toLowerCase() === fileName.toLowerCase())) || (attachmentId && a.id === attachmentId));
+                if (matchedAtt && matchedAtt.contentBytes) {
+                  attachmentData = matchedAtt;
+                  break;
+                }
+              }
+              if (attachmentData) break;
+            }
+          } catch (e) {}
+        }
       }
     }
 

@@ -386,29 +386,32 @@ function getLocalDateString(date = new Date()) {
 
 function formatFechaAmigable(dateStr) {
   if (!dateStr) return '—';
-  // Si contiene T00:00:00, es una fecha pura sin hora (guardada a medianoche UTC), evitamos el desfase
-  if (dateStr.includes('T00:00:00')) {
-    const datePortion = dateStr.split('T')[0];
+  if (typeof dateStr === 'object' && dateStr instanceof Date) {
+    const pad = (num) => String(num).padStart(2, '0');
+    return `${pad(dateStr.getDate())}/${pad(dateStr.getMonth() + 1)}/${dateStr.getFullYear()}`;
+  }
+  const str = String(dateStr).trim();
+  // Si contiene T00:00:00 o cualquier formato ISO con T
+  if (str.includes('T')) {
+    const datePortion = str.split('T')[0];
     const parts = datePortion.split('-');
-    if (parts.length === 3) {
+    if (parts.length === 3 && parts[0].length === 4) {
       return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
-  }
-  // Si contiene T, es un timestamp completo y lo convertimos a la fecha local del navegador
-  if (dateStr.includes('T')) {
-    const d = new Date(dateStr);
-    if (!isNaN(d)) {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
       const pad = (num) => String(num).padStart(2, '0');
       return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
     }
   }
   // Si es fecha corta YYYY-MM-DD
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    if (parts[0].length === 4) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  const parts = str.split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
   }
-  return dateStr;
+  return str;
 }
+window.formatFechaAmigable = formatFechaAmigable;
 
 
 
@@ -15863,43 +15866,340 @@ function cerrarDetalle(e) {
 }
 
 async function generarBase64Pdf(ordenId) {
-  const original = document.getElementById('modal-detalle');
-  if (!original) return null;
-  
-  // Clonamos el elemento de detalle
-  const clone = original.cloneNode(true);
-  
-  // Limpiamos los botones y elementos de entrada que no deben ir en el PDF impreso
-  clone.querySelectorAll('.no-print, button, label, input, textarea, select').forEach(el => el.remove());
-  
-  // Quitamos clases que forzarían ocultamientos incorrectos
-  clone.querySelectorAll('.print-only').forEach(el => {
-    el.style.setProperty('display', 'block', 'important');
-  });
-  
-  // Ajustamos estilos del clon para que se renderice como un reporte de página completa
-  clone.style.width = '800px';
-  clone.style.maxHeight = 'none';
-  clone.style.overflow = 'visible';
-  clone.style.boxShadow = 'none';
-  clone.style.border = 'none';
-  clone.style.background = '#ffffff';
-  clone.style.padding = '20px';
-  
-  clone.querySelectorAll('img').forEach(img => {
-    img.setAttribute('crossorigin', 'anonymous');
-  });
+  let ordList = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? [...ordenes] : [];
+  if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) ordList = ordList.concat(window.ordenes);
+  try {
+    const local = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_ordenes', []) : JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+    if (Array.isArray(local)) ordList = ordList.concat(local);
+  } catch (e) {}
+
+  const o = ordList.find(x => x && (String(x.id) === String(ordenId) || String(x.folio) === String(ordenId) || String(x.folio || '').replace(/\D/g, '') === String(ordenId).replace(/\D/g, '')));
+  if (!o) {
+    console.warn('[generarBase64Pdf] Orden no encontrada para ID:', ordenId);
+    return null;
+  }
+
+  const formatFecha = (fStr) => {
+    if (!fStr) return '—';
+    if (typeof window.formatFechaAmigable === 'function') return window.formatFechaAmigable(fStr);
+    if (fStr.includes('T')) {
+      const parts = fStr.split('T')[0].split('-');
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return fStr;
+  };
+
+  const badgeEstado = (estado) => {
+    if (estado === 'En Proceso') return 'badge-proceso';
+    if (estado === 'Completado') return 'badge-completado';
+    return 'badge-pendiente';
+  };
+
+  const seccion = (title, content) => `
+    <div class="detalle-section" style="margin-bottom:1.5rem; page-break-inside:avoid; break-inside:avoid;">
+      <div class="detalle-section-title" style="font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#0f172a; margin-bottom:0.75rem; padding:0.35rem 0.6rem; background:#f1f5f9; border-left:4px solid #e8820c;">${title}</div>
+      ${content}
+    </div>`;
+
+  const field = (label, val, span = 1) => `
+    <div class="detalle-field col-span-${span}" style="border-bottom:1px solid #e2e8f0; padding-bottom:0.35rem; page-break-inside:avoid; break-inside:avoid; grid-column: span ${span};">
+      <div class="detalle-label" style="font-size:0.65rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:#64748b; margin-bottom:0.2rem;">${label}</div>
+      <div class="detalle-value" style="font-size:0.85rem; font-weight:600; word-break:break-word; color:#0f172a; line-height:1.3;">${val || '—'}</div>
+    </div>`;
+
+  const refTable = (items, hasPrice) => {
+    if (!items || !items.length) return '<p style="color:#64748b; font-size:0.82rem; margin:0;">Sin refacciones</p>';
+    return `<table style="width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:0.5rem;">
+      <thead><tr style="background:#f8fafc;">
+        <th style="padding:0.5rem 0.75rem; text-align:left; font-size:0.68rem; font-weight:600; color:#475569; text-transform:uppercase; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Descripción</th>
+        <th style="padding:0.5rem 0.75rem; text-align:left; font-size:0.68rem; font-weight:600; color:#475569; text-transform:uppercase; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Clave</th>
+        <th style="padding:0.5rem 0.75rem; text-align:left; font-size:0.68rem; font-weight:600; color:#475569; text-transform:uppercase; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Cant.</th>
+        ${hasPrice ? '<th style="padding:0.5rem 0.75rem; text-align:left; font-size:0.68rem; font-weight:600; color:#475569; text-transform:uppercase; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Precio</th>' : ''}
+      </tr></thead>
+      <tbody>${items.map(r => `<tr style="border-bottom:1px solid #e2e8f0;">
+        <td style="padding:0.5rem 0.75rem; color:#334155;">${r.descripcion||'—'}</td>
+        <td style="padding:0.5rem 0.75rem; color:#334155;">${r.clave||'—'}</td>
+        <td style="padding:0.5rem 0.75rem; color:#334155;">${r.cantidad||'—'}</td>
+        ${hasPrice ? `<td style="padding:0.5rem 0.75rem; color:#334155;">$${r.precio||'0'}</td>` : ''}
+      </tr>`).join('')}</tbody>
+    </table>`;
+  };
+
+  // Bitácora Diaria
+  let bitacoraHtml = '';
+  const bitacoraItems = [...(o.bitacora || [])];
+  if (bitacoraItems.length === 0) {
+    bitacoraHtml = '<p style="color:#64748b; font-size:0.8rem; font-style:italic; margin:0;">Sin registros en la bitácora.</p>';
+  } else {
+    const sortedBitacora = bitacoraItems.sort((a, b) => {
+      const dateA = a.fecha || '';
+      const dateB = b.fecha || '';
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      const timeA = a.entrada || '';
+      const timeB = b.entrada || '';
+      return timeA.localeCompare(timeB);
+    });
+
+    bitacoraHtml += `
+      <table style="width:100%; border-collapse:collapse; font-size:0.75rem; margin-top:0.5rem; color:#334155;">
+        <thead>
+          <tr style="background:#f8fafc; text-align:left; color:#475569;">
+            <th style="padding:0.5rem 0.75rem; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; font-weight:600; width:15%; text-transform:uppercase; font-size:0.68rem;">Fecha</th>
+            <th style="padding:0.5rem 0.75rem; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; font-weight:600; width:20%; text-transform:uppercase; font-size:0.68rem;">Técnico</th>
+            <th style="padding:0.5rem 0.75rem; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; font-weight:600; width:20%; text-transform:uppercase; font-size:0.68rem;">Horario</th>
+            <th style="padding:0.5rem 0.75rem; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; font-weight:600; width:15%; text-transform:uppercase; font-size:0.68rem;">Estado</th>
+            <th style="padding:0.5rem 0.75rem; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; font-weight:600; width:30%; text-transform:uppercase; font-size:0.68rem;">Actividad / Avances Reportados</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    sortedBitacora.forEach(b => {
+      let fFormateada = b.fecha;
+      try {
+        const dObj = new Date(b.fecha);
+        if (!isNaN(dObj)) {
+          fFormateada = dObj.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).replace('.', '');
+        }
+      } catch(e){}
+
+      let hrsStr = '—';
+      if (b.entrada && b.salida) {
+        hrsStr = `${b.entrada} - ${b.salida}`;
+      } else if (b.entrada || b.salida) {
+        hrsStr = `${b.entrada || '--:--'} - ${b.salida || '--:--'}`;
+      }
+
+      let estadoStr = b.realizado ? 'REPORTADO' : 'PROGRAMADO';
+      if (b.realizado && b.desviacion) {
+        estadoStr += ` (${b.desviacion})`;
+      }
+
+      bitacoraHtml += `
+        <tr style="border-bottom:1px solid #e2e8f0;">
+          <td style="padding:0.5rem 0.75rem; white-space:nowrap;">${fFormateada}</td>
+          <td style="padding:0.5rem 0.75rem; font-weight:500;">${b.tecnico || '—'}</td>
+          <td style="padding:0.5rem 0.75rem; white-space:nowrap;">${hrsStr}</td>
+          <td style="padding:0.5rem 0.75rem; font-size:0.7rem; font-weight:600;">${estadoStr}</td>
+          <td style="padding:0.5rem 0.75rem; white-space:pre-wrap; line-height:1.3; color:#334155;">${b.nota || '—'}</td>
+        </tr>
+      `;
+    });
+
+    bitacoraHtml += `</tbody></table>`;
+  }
+
+  // Evidencias Fotográficas
+  let ev = o.evidencias || {};
+  if (typeof ev === 'string') {
+    try { ev = JSON.parse(ev); } catch(e) { ev = {}; }
+  }
+  const rawAdicionales = Array.isArray(ev.adicionales) ? ev.adicionales : (ev.adicionales ? Object.values(ev.adicionales) : []);
+  const logoSrc = 'logo_transparent.png';
+
+  const toUri = window.urlToDataUri || (async (u) => u);
+  const [
+    logoDataUri,
+    fotoInicioDataUri,
+    fotoFinDataUri,
+    firmaTecnicoDataUri,
+    firmaClienteDataUri,
+    legacyEvidenciaDataUri,
+    ...adicionalesDataUris
+  ] = await Promise.all([
+    toUri(logoSrc),
+    toUri(ev.fotoInicio),
+    toUri(ev.fotoFin),
+    toUri(o.firma_tecnico_base64 || o.firma_tecnico_url || o.firma_tecnico),
+    toUri(o.firma_cliente_base64 || o.firma_cliente_url || o.firma_cliente),
+    toUri(o.evidenciaBase64 || o.evidencias_url),
+    ...rawAdicionales.map(u => toUri(u))
+  ]);
+
+  const fotoInicioFinal = fotoInicioDataUri || ev.fotoInicio;
+  const fotoFinFinal = fotoFinDataUri || ev.fotoFin;
+  const logoFinal = logoDataUri || logoSrc;
+  const firmaTecnicoFinal = firmaTecnicoDataUri || o.firma_tecnico_base64 || o.firma_tecnico_url || o.firma_tecnico;
+  const firmaClienteFinal = firmaClienteDataUri || o.firma_cliente_base64 || o.firma_cliente_url || o.firma_cliente;
+  const adicionalesFinales = rawAdicionales.map((url, idx) => adicionalesDataUris[idx] || url);
+
+  let printEvidenciasHtml = '';
+  const tieneInicio = !!fotoInicioFinal;
+  const tieneFin = !!fotoFinFinal;
+
+  if (tieneInicio || tieneFin || adicionalesFinales.length > 0 || legacyEvidenciaDataUri) {
+    printEvidenciasHtml += `<div style="display:block; margin-top:0.5rem;"><div style="display:block; text-align:left;">`;
+    if (tieneInicio) {
+      printEvidenciasHtml += `
+        <div style="display:inline-block; vertical-align:top; width:330px; margin-right:1.5rem; margin-bottom:1.5rem; border:1px solid #d1d5db; border-radius:6px; padding:0.75rem; background:#f9fafb; text-align:center; page-break-inside:avoid; break-inside:avoid; box-sizing:border-box;">
+          <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.5rem; text-transform:uppercase;">Foto de Inicio (Entrada)</div>
+          <div style="height:210px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; text-align:center; line-height:206px; padding:2px; box-sizing:border-box;">
+            <img crossorigin="anonymous" src="${fotoInicioFinal}" style="max-width:310px; max-height:200px; width:auto; height:auto; display:inline-block; vertical-align:middle;" />
+          </div>
+        </div>`;
+    }
+    if (tieneFin) {
+      printEvidenciasHtml += `
+        <div style="display:inline-block; vertical-align:top; width:330px; margin-bottom:1.5rem; border:1px solid #d1d5db; border-radius:6px; padding:0.75rem; background:#f9fafb; text-align:center; page-break-inside:avoid; break-inside:avoid; box-sizing:border-box;">
+          <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.5rem; text-transform:uppercase;">Foto de Fin (Salida)</div>
+          <div style="height:210px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; text-align:center; line-height:206px; padding:2px; box-sizing:border-box;">
+            <img crossorigin="anonymous" src="${fotoFinFinal}" style="max-width:310px; max-height:200px; width:auto; height:auto; display:inline-block; vertical-align:middle;" />
+          </div>
+        </div>`;
+    }
+    if (!tieneInicio && !tieneFin && legacyEvidenciaDataUri) {
+      printEvidenciasHtml += `
+        <div style="display:inline-block; vertical-align:top; width:330px; margin-bottom:1.5rem; border:1px solid #d1d5db; border-radius:6px; padding:0.75rem; background:#f9fafb; text-align:center; page-break-inside:avoid; break-inside:avoid; box-sizing:border-box;">
+          <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.5rem; text-transform:uppercase;">Evidencia Principal</div>
+          <div style="height:210px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; text-align:center; line-height:206px; padding:2px; box-sizing:border-box;">
+            <img crossorigin="anonymous" src="${legacyEvidenciaDataUri}" style="max-width:310px; max-height:200px; width:auto; height:auto; display:inline-block; vertical-align:middle;" />
+          </div>
+        </div>`;
+    }
+    printEvidenciasHtml += `</div>`;
+
+    if (adicionalesFinales.length > 0) {
+      printEvidenciasHtml += `
+        <div style="margin-top:1rem;">
+          <div style="font-size:0.75rem; font-weight:700; color:#374151; margin-bottom:0.75rem; text-transform:uppercase;">Evidencias Adicionales</div>
+          <div style="display:block; text-align:left;">
+      `;
+      adicionalesFinales.forEach((url, idx) => {
+        printEvidenciasHtml += `
+          <div style="display:inline-block; vertical-align:top; border:1px solid #d1d5db; border-radius:6px; padding:0.5rem; background:#f9fafb; text-align:center; width:210px; margin-right:1rem; margin-bottom:1rem; page-break-inside:avoid; break-inside:avoid; box-sizing:border-box;">
+            <div style="font-size:0.65rem; font-weight:600; color:#4b5563; margin-bottom:0.35rem;">Adicional ${idx + 1}</div>
+            <div style="height:140px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; text-align:center; line-height:136px; padding:2px; box-sizing:border-box;">
+              <img crossorigin="anonymous" src="${url}" style="max-width:196px; max-height:134px; width:auto; height:auto; display:inline-block; vertical-align:middle;" />
+            </div>
+          </div>
+        `;
+      });
+      printEvidenciasHtml += `</div></div>`;
+    }
+    printEvidenciasHtml += `</div>`;
+  } else {
+    printEvidenciasHtml = '<p style="color:#64748b; font-size:0.8rem; font-style:italic; margin:0;">Sin fotos de evidencia cargadas.</p>';
+  }
+
+  // Crear contenedor temporal para el renderizado del PDF
+  const reportContainer = document.createElement('div');
+  reportContainer.className = 'admin-pdf-render-container';
+  reportContainer.style.cssText = 'width:760px; background:#ffffff; color:#0f172a; padding:25px; font-family:Inter, Arial, sans-serif; box-sizing:border-box; line-height:1.4;';
+
+  reportContainer.innerHTML = `
+    <!-- Header -->
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.5rem; padding-bottom:1rem; border-bottom:2px solid #e8820c;">
+      <div style="text-align:left;">
+        <img crossorigin="anonymous" src="${logoFinal}" alt="Eurorep Logo" style="height:55px; object-fit:contain; margin-bottom:0.4rem;" />
+        <div style="font-size:0.75rem; color:#64748b; line-height:1.35;">
+          <strong>EURO REPRESENTACIONES S.A. DE C.V.</strong><br>
+          Servicio Técnico Especializado en Maquinaria<br>
+          Ptalctes@eurorep.mx | www.eurorep.mx
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <h2 style="margin:0; font-size:1.35rem; color:#0f172a; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;">Orden de Servicio</h2>
+        <div style="font-size:1.15rem; color:#e8820c; font-weight:700; margin-top:0.2rem;">${o.folio || ''}</div>
+        <div style="font-size:0.8rem; color:#64748b; margin-top:0.4rem;">
+          <strong>Fecha Emisión:</strong> ${formatFecha(o.fecha)}
+        </div>
+      </div>
+    </div>
+
+    <!-- Información General -->
+    ${seccion('Información General', `
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:0.6rem 1.25rem;">
+        ${field('Folio', o.folio, 1)} ${field('Pedido', o.pedido, 1)} ${field('Fecha', formatFecha(o.fecha), 1)}
+        ${field('Cliente', o.cliente, 2)} ${field('Ubicación (Ticket)', o.ubicacion, 1)}
+        ${field('Ubicación en Sitio', o.ubicacion_sitio, 3)}
+        ${field('Operador', o.operador, 1)} ${field('No. ECO', o.eco, 1)} ${field('Horómetro (Ticket)', o.horometro, 1)}
+        ${field('Horómetro Real', o.horometro_real, 1)}
+        ${field('Marca', (() => { 
+          const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+          let m = o.marca || (o.equipo ? o.equipo.split(' ')[0] : '');
+          return MARCAS_RENDER[m.toUpperCase()] || m || '—';
+        })(), 1)} ${field('Modelo', o.modelo, 1)} ${field('Serie', o.serie, 1)}
+        ${field('ID Máquina', (o.maquinaria_id || o.serie || '—'), 1)}
+        ${field('Técnico', o.tecnico, 1)}
+        ${field('Ticket Soporte', o.soporte || o.folio_ticket || '—', 1)}
+      </div>`)}
+
+    <!-- Kilómetros / Tipo -->
+    ${seccion('Kilómetros / Tipo', `
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:0.6rem 1.25rem;">
+        ${field('Origen → Trabajo', (o.km_ida != null && o.km_ida !== '') ? o.km_ida + ' km' : null, 1)}
+        ${field('Trabajo → Origen', (o.km_vuelta != null && o.km_vuelta !== '') ? o.km_vuelta + ' km' : null, 1)}
+        ${field('Total Km', (o.km_total != null && o.km_total !== '') ? o.km_total + ' km' : null, 1)}
+        ${field('Tipo de Visita', o.tipo || 'Servicio', 2)}
+        ${field('Estado', o.estado || 'Completado', 1)}
+      </div>`)}
+
+    <!-- Diagnóstico y Trabajos -->
+    ${seccion('Diagnóstico y Trabajos', `
+      ${field('Falla reportada', o.falla, 3)}
+      <div style="margin-top:0.5rem">${field('Trabajos realizados', o.trabajos, 3)}</div>
+      <div style="margin-top:0.5rem">${field('Dictamen', o.dictamen, 3)}</div>
+      <div style="margin-top:0.5rem">${field('Condiciones del equipo', o.condiciones, 3)}</div>
+      <div style="margin-top:0.5rem">${field('Observaciones', o.observaciones, 3)}</div>
+      <div style="margin-top:0.5rem">${field('Pendientes', o.pendientes, 3)}</div>`)}
+
+    <!-- Refacciones -->
+    ${seccion('Refacciones Utilizadas', refTable(o.ref_utilizadas, false))}
+    ${seccion('Refacciones Necesarias', refTable(o.ref_necesarias, false))}
+
+    ${(o.noches || o.alimentacion || o.traslado_costo) ? seccion('Servicio', `
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:0.6rem 1.25rem;">
+        ${field('No. Noches', o.noches, 1)} ${field('Alimentación', o.alimentacion ? o.alimentacion : '', 1)} ${field('Traslado', o.traslado_costo ? o.traslado_costo : '', 1)}
+      </div>`) : ''}
+
+    <!-- Bitácora -->
+    ${seccion('Bitácora Diaria', bitacoraHtml)}
+
+    <!-- Evidencias -->
+    ${seccion('Evidencias Fotográficas', printEvidenciasHtml)}
+
+    <!-- Firmas -->
+    ${seccion('Firmas de Conformidad', `
+      <div style="display:flex; flex-wrap:wrap; gap:2rem; margin-top:1rem; justify-content:center;">
+        <!-- TECNICO -->
+        <div style="flex:1; min-width:280px; max-width:340px; display:flex; flex-direction:column; align-items:center;">
+          <h4 style="margin-bottom:0.75rem; color:#0f172a; font-size:0.9rem; font-weight:700; text-align:center;">Firma del Técnico</h4>
+          ${firmaTecnicoFinal 
+            ? `<div style="border:1px solid #e2e8f0; border-radius:8px; padding:0.75rem; background:white; width:100%; text-align:center; box-sizing:border-box;">
+                 <img crossorigin="anonymous" src="${firmaTecnicoFinal}" alt="Firma del técnico" style="max-width:100%; max-height:110px; display:block; margin:0 auto;"/>
+                 <p style="text-align:center; color:#0f172a; font-weight:600; font-size:0.82rem; margin-top:0.4rem; margin-bottom:0;">${o.firma_tecnico_nombre || o.tecnico || 'Técnico Asignado'}</p>
+                 ${o.firma_tecnico_fecha ? `<p style="text-align:center; color:#64748b; font-size:0.72rem; margin-top:0.2rem; margin-bottom:0;">${new Date(o.firma_tecnico_fecha).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'})}</p>` : ''}
+               </div>`
+            : `<p style="color:#64748b; font-size:0.82rem; font-style:italic; text-align:center;">Sin firma del técnico</p>`
+          }
+        </div>
+
+        <!-- CLIENTE -->
+        <div style="flex:1; min-width:280px; max-width:340px; display:flex; flex-direction:column; align-items:center;">
+          <h4 style="margin-bottom:0.75rem; color:#0f172a; font-size:0.9rem; font-weight:700; text-align:center;">Firma del Cliente</h4>
+          ${firmaClienteFinal 
+            ? `<div style="border:1px solid #e2e8f0; border-radius:8px; padding:0.75rem; background:white; width:100%; text-align:center; box-sizing:border-box;">
+                 <img crossorigin="anonymous" src="${firmaClienteFinal}" alt="Firma del cliente" style="max-width:100%; max-height:110px; display:block; margin:0 auto;"/>
+                 <p style="text-align:center; color:#0f172a; font-weight:600; font-size:0.82rem; margin-top:0.4rem; margin-bottom:0;">${o.firma_cliente_nombre || o.cliente || 'Cliente'}</p>
+                 ${o.firma_cliente_fecha ? `<p style="text-align:center; color:#64748b; font-size:0.72rem; margin-top:0.2rem; margin-bottom:0;">${new Date(o.firma_cliente_fecha).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'})}</p>` : ''}
+               </div>`
+            : `<p style="color:#64748b; font-size:0.82rem; font-style:italic; text-align:center;">Sin firma del cliente</p>`
+          }
+        </div>
+      </div>
+    `)}
+  `;
 
   const tempContainer = document.createElement('div');
   tempContainer.style.position = 'absolute';
   tempContainer.style.left = '-9999px';
   tempContainer.style.top = '-9999px';
   tempContainer.style.background = '#ffffff';
-  tempContainer.appendChild(clone);
+  tempContainer.appendChild(reportContainer);
   document.body.appendChild(tempContainer);
 
   // Esperar a que todas las imágenes estén decodificadas y listas
-  const imgElements = Array.from(clone.querySelectorAll('img'));
+  const imgElements = Array.from(reportContainer.querySelectorAll('img'));
   await Promise.all(imgElements.map(img => {
     if (img.complete && img.naturalWidth > 0) {
       return typeof img.decode === 'function' ? img.decode().catch(() => {}) : Promise.resolve();
@@ -15911,19 +16211,32 @@ async function generarBase64Pdf(ordenId) {
     });
   }));
 
+  const folio = o.folio || ordenId;
   const opt = {
     margin:       10,
-    filename:     `Reporte_Servicio_${ordenId}.pdf`,
-    image:        { type: 'jpeg', quality: 0.98 },
+    filename:     `Reporte_Servicio_${folio}.pdf`,
+    image:        { type: 'jpeg', quality: 0.95 },
     html2canvas:  { scale: 2, useCORS: true, allowTaint: true, letterRendering: true, logging: false },
     jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' }
   };
 
   try {
-    // Si la librería html2pdf está disponible
-    if (typeof html2pdf === 'function') {
-      const pdfBase64 = await html2pdf().from(clone).set(opt).outputPdf('datauristring');
-      return pdfBase64.split(',')[1];
+    if (typeof html2pdf !== 'undefined') {
+      const worker = html2pdf().from(reportContainer).set(opt);
+      let pdfBase64 = null;
+      try {
+        pdfBase64 = await worker.output('datauristring');
+      } catch (e1) {
+        try {
+          pdfBase64 = await worker.outputPdf('datauristring');
+        } catch (e2) {
+          pdfBase64 = await worker.output('bloburl');
+        }
+      }
+      if (pdfBase64 && typeof pdfBase64 === 'string' && pdfBase64.includes(',')) {
+        return pdfBase64.split(',')[1];
+      }
+      return pdfBase64;
     } else {
       console.error('html2pdf library is not loaded');
       return null;
@@ -16130,7 +16443,7 @@ async function procesarEnviarCorreo(e) {
       <div style="border-top: 2px solid #e8820c; padding-top: 20px; margin-top: 20px;">
         <h2 style="color: #e8820c; text-align: center; margin-top: 0;">Orden de Servicio: ${o.folio || 'N/A'}</h2>
         <p><strong>Cliente:</strong> ${o.cliente || '—'}</p>
-        <p><strong>Fecha:</strong> ${o.fecha || '—'}</p>
+        <p><strong>Fecha:</strong> ${formatFechaAmigable(o.fecha)}</p>
         <p><strong>Equipo/Modelo:</strong> ${o.modelo || '—'} (Serie: ${o.serie || '—'})</p>
         <p><strong>Técnico Asignado:</strong> ${o.tecnico || '—'}</p>
         <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
@@ -37287,9 +37600,147 @@ window.obtenerContenidoAdjuntoMicrosoftGraph = async function(msId, attachmentId
 
   let base64Content = null;
 
-  // 1. REVISAR PRIMERO SI ES UN REPORTE DE SERVICIO DE SAPI (OS-*)
-  const isOsReport = cleanFileName.toLowerCase().includes('reporte_servicio') || /OS-?(\d+)/i.test(cleanFileName);
-  if (isOsReport) {
+  // Helper fetch with timeout
+  const fetchWithTimeout = async (url, options = {}, timeoutMs = 6000) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
+      return res;
+    } catch (e) {
+      clearTimeout(timeoutId);
+      return null;
+    }
+  };
+
+  // 1. OBTENER TOKEN DE MICROSOFT AZURE (SESSIONSTORAGE, ONEDRIVE, MSAL)
+  let token = sessionStorage.getItem('ms_access_token') || 
+              localStorage.getItem('ms_access_token') || 
+              (typeof onedriveRealToken !== 'undefined' ? onedriveRealToken : '') ||
+              localStorage.getItem('sapi_ms_graph_token') || 
+              sessionStorage.getItem('sapi_ms_graph_token');
+
+  if (!token && window.msalInstance) {
+    const activeAccount = window.msalInstance.getActiveAccount() || (window.msalInstance.getAllAccounts ? window.msalInstance.getAllAccounts()[0] : null);
+    if (activeAccount) {
+      try {
+        const response = await window.msalInstance.acquireTokenSilent({
+          scopes: ['Mail.Read', 'Mail.ReadWrite', 'Mail.Send', 'User.Read'],
+          account: activeAccount
+        });
+        token = response.accessToken;
+      } catch (e) {
+        console.warn('[Azure Graph] acquireTokenSilent error:', e);
+      }
+    }
+  }
+
+  // 2. CONSULTAR DIRECTAMENTE A MICROSOFT GRAPH API SI TENEMOS TOKEN Y MS_ID DE GRAPH REAL
+  const isRealGraphId = cleanMsId && !cleanMsId.startsWith('email_rep_') && !cleanMsId.startsWith('log_');
+  if (token && isRealGraphId) {
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/json'
+    };
+
+    if (cleanAttId && cleanAttId !== 'undefined' && cleanAttId !== 'null') {
+      const endpoints = [
+        `https://graph.microsoft.com/v1.0/users/Ptalctes@eurorep.mx/messages/${cleanMsId}/attachments/${cleanAttId}`,
+        `https://graph.microsoft.com/v1.0/me/messages/${cleanMsId}/attachments/${cleanAttId}`,
+        `https://graph.microsoft.com/v1.0/users/Ptalctes@eurorep.mx/messages/${cleanMsId}/attachments/${encodeURIComponent(cleanAttId)}`,
+        `https://graph.microsoft.com/v1.0/me/messages/${cleanMsId}/attachments/${encodeURIComponent(cleanAttId)}`
+      ];
+      for (const ep of endpoints) {
+        try {
+          const res = await fetchWithTimeout(ep, { headers }, 5000);
+          if (res && res.ok) {
+            const data = await res.json();
+            if (data.contentBytes) {
+              base64Content = data.contentBytes;
+              if (data.contentType) cleanContentType = data.contentType;
+              break;
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (!base64Content) {
+      const listEndpoints = [
+        `https://graph.microsoft.com/v1.0/users/Ptalctes@eurorep.mx/messages/${cleanMsId}/attachments`,
+        `https://graph.microsoft.com/v1.0/me/messages/${cleanMsId}/attachments`
+      ];
+      for (const lep of listEndpoints) {
+        try {
+          const res = await fetchWithTimeout(lep, { headers }, 6000);
+          if (res && res.ok) {
+            const listData = await res.json();
+            const items = Array.isArray(listData.value) ? listData.value : [];
+            const match = items.find(a => (cleanFileName && (a.name === cleanFileName || a.name.toLowerCase() === cleanFileName.toLowerCase())) || (cleanAttId && a.id === cleanAttId)) || items[0];
+            if (match && match.contentBytes) {
+              base64Content = match.contentBytes;
+              if (match.contentType) cleanContentType = match.contentType;
+              break;
+            }
+          }
+        } catch (e) {}
+      }
+    }
+  }
+
+  // 2.5 BUSCAR EN BANDEJAS DE GRAPH SI TENEMOS TOKEN PERO EL ID ERA LOCAL O NO SE ENCONTRÓ
+  if (!base64Content && token && cleanFileName) {
+    const searchBases = ['https://graph.microsoft.com/v1.0/users/Ptalctes@eurorep.mx', 'https://graph.microsoft.com/v1.0/me'];
+    const headers = { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' };
+    const folders = ['sentitems', 'inbox'];
+
+    for (const base of searchBases) {
+      if (base64Content) break;
+      for (const f of folders) {
+        try {
+          const sUrl = `${base}/mailFolders/${f}/messages?$top=25&$expand=attachments&$orderby=${f === 'inbox' ? 'receivedDateTime' : 'sentDateTime'} desc`;
+          const res = await fetchWithTimeout(sUrl, { headers }, 5000);
+          if (res && res.ok) {
+            const sJson = await res.json();
+            const msgs = Array.isArray(sJson.value) ? sJson.value : [];
+            for (const m of msgs) {
+              const atts = Array.isArray(m.attachments) ? m.attachments : [];
+              const matchedAtt = atts.find(a => (a.name && (a.name === cleanFileName || a.name.toLowerCase() === cleanFileName.toLowerCase())) || (cleanAttId && a.id === cleanAttId));
+              if (matchedAtt && matchedAtt.contentBytes) {
+                base64Content = matchedAtt.contentBytes;
+                if (matchedAtt.contentType) cleanContentType = matchedAtt.contentType;
+                break;
+              }
+            }
+            if (base64Content) break;
+          }
+        } catch (e) {}
+      }
+    }
+  }
+
+  // 3. CONSULTAR AL ENDPOINT SERVERLESS
+  if (!base64Content) {
+    try {
+      const bkHeaders = { 'X-Sapi-Client-Token': 'SapiSecuredClientToken' };
+      if (token) bkHeaders['X-Ms-Graph-Token'] = token;
+      const qUrl = `/api/download-azure-attachment?msId=${encodeURIComponent(cleanMsId || '')}&attachmentId=${encodeURIComponent(cleanAttId || '')}&fileName=${encodeURIComponent(cleanFileName || '')}`;
+      const bkRes = await fetchWithTimeout(qUrl, { headers: bkHeaders }, 6000);
+      if (bkRes && bkRes.ok) {
+        const bkData = await bkRes.json();
+        if (bkData.contentBytes) {
+          base64Content = bkData.contentBytes;
+          if (bkData.contentType) cleanContentType = bkData.contentType;
+        }
+      }
+    } catch (e) {
+      console.warn('[Download Proxy] Fallo al invocar endpoint serverless:', e);
+    }
+  }
+
+  // 4. FALLBACK PARA REPORTES DE SERVICIO DE SAPI (OS-*) SI NO SE OBTUVO DE GRAPH O ES LOCAL
+  if (!base64Content && (cleanFileName.toLowerCase().includes('reporte_servicio') || /OS-?(\d+)/i.test(cleanFileName))) {
     const matchOs = cleanFileName.match(/OS-?(\d+)/i);
     if (matchOs) {
       const numericPart = matchOs[1];
@@ -37317,7 +37768,9 @@ window.obtenerContenidoAdjuntoMicrosoftGraph = async function(msId, attachmentId
             if (overlayDetalle) overlayDetalle.classList.remove('open');
           }
           if (typeof generarBase64Pdf === 'function') {
-            const pdfB64 = await generarBase64Pdf(ord.id);
+            const genPromise = generarBase64Pdf(ord.id);
+            const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 5000));
+            const pdfB64 = await Promise.race([genPromise, timeoutPromise]);
             if (pdfB64) {
               base64Content = pdfB64.includes(',') ? pdfB64.split(',')[1] : pdfB64;
               cleanContentType = 'application/pdf';
@@ -37327,98 +37780,6 @@ window.obtenerContenidoAdjuntoMicrosoftGraph = async function(msId, attachmentId
           console.warn('[PDF OS Generator] Error generando PDF de orden:', pdfErr);
         }
       }
-    }
-  }
-
-  // 2. OBTENER TOKEN DE MICROSOFT AZURE (SESSIONSTORAGE, ONEDRIVE, MSAL)
-  let token = sessionStorage.getItem('ms_access_token') || 
-              localStorage.getItem('ms_access_token') || 
-              (typeof onedriveRealToken !== 'undefined' ? onedriveRealToken : '') ||
-              localStorage.getItem('sapi_ms_graph_token') || 
-              sessionStorage.getItem('sapi_ms_graph_token');
-
-  if (!token && window.msalInstance) {
-    const activeAccount = window.msalInstance.getActiveAccount() || (window.msalInstance.getAllAccounts ? window.msalInstance.getAllAccounts()[0] : null);
-    if (activeAccount) {
-      try {
-        const response = await window.msalInstance.acquireTokenSilent({
-          scopes: ['Mail.Read', 'Mail.ReadWrite', 'Mail.Send', 'User.Read'],
-          account: activeAccount
-        });
-        token = response.accessToken;
-      } catch (e) {
-        console.warn('[Azure Graph] acquireTokenSilent error:', e);
-      }
-    }
-  }
-
-  // 3. CONSULTAR DIRECTAMENTE A MICROSOFT GRAPH API SI TENEMOS TOKEN Y MS_ID DE GRAPH REAL
-  const isRealGraphId = cleanMsId && !cleanMsId.startsWith('email_rep_') && !cleanMsId.startsWith('log_');
-  if (!base64Content && token && isRealGraphId) {
-    const headers = {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json'
-    };
-
-    if (cleanAttId && cleanAttId !== 'undefined' && cleanAttId !== 'null') {
-      const endpoints = [
-        `https://graph.microsoft.com/v1.0/users/Ptalctes@eurorep.mx/messages/${cleanMsId}/attachments/${cleanAttId}`,
-        `https://graph.microsoft.com/v1.0/me/messages/${cleanMsId}/attachments/${cleanAttId}`
-      ];
-      for (const ep of endpoints) {
-        try {
-          const res = await fetch(ep, { headers });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.contentBytes) {
-              base64Content = data.contentBytes;
-              if (data.contentType) cleanContentType = data.contentType;
-              break;
-            }
-          }
-        } catch (e) {}
-      }
-    }
-
-    if (!base64Content) {
-      const listEndpoints = [
-        `https://graph.microsoft.com/v1.0/users/Ptalctes@eurorep.mx/messages/${cleanMsId}/attachments`,
-        `https://graph.microsoft.com/v1.0/me/messages/${cleanMsId}/attachments`
-      ];
-      for (const lep of listEndpoints) {
-        try {
-          const res = await fetch(lep, { headers });
-          if (res.ok) {
-            const listData = await res.json();
-            const items = Array.isArray(listData.value) ? listData.value : [];
-            const match = items.find(a => (cleanFileName && a.name === cleanFileName) || (cleanAttId && a.id === cleanAttId)) || items[0];
-            if (match && match.contentBytes) {
-              base64Content = match.contentBytes;
-              if (match.contentType) cleanContentType = match.contentType;
-              break;
-            }
-          }
-        } catch (e) {}
-      }
-    }
-  }
-
-  // 4. CONSULTAR AL ENDPOINT SERVERLESS SI NO ES LOCAL
-  if (!base64Content && isRealGraphId) {
-    try {
-      const bkHeaders = { 'X-Sapi-Client-Token': 'SapiSecuredClientToken' };
-      if (token) bkHeaders['X-Ms-Graph-Token'] = token;
-      const qUrl = `/api/download-azure-attachment?msId=${encodeURIComponent(cleanMsId)}&attachmentId=${encodeURIComponent(cleanAttId || '')}&fileName=${encodeURIComponent(cleanFileName || '')}`;
-      const bkRes = await fetch(qUrl, { headers: bkHeaders });
-      if (bkRes.ok) {
-        const bkData = await bkRes.json();
-        if (bkData.contentBytes) {
-          base64Content = bkData.contentBytes;
-          if (bkData.contentType) cleanContentType = bkData.contentType;
-        }
-      }
-    } catch (e) {
-      console.warn('[Download Proxy] Fallo al invocar endpoint serverless:', e);
     }
   }
 
@@ -37439,7 +37800,7 @@ window.obtenerContenidoAdjuntoMicrosoftGraph = async function(msId, attachmentId
   }
 
   if (!base64Content) {
-    throw new Error('No se pudo recuperar el archivo desde Microsoft Azure.');
+    throw new Error('No se pudo recuperar el archivo adjunto desde Microsoft Azure.');
   }
 
   return {
@@ -37510,7 +37871,14 @@ window.previsualizarAdjuntoMicrosoftGraph = async function(msId, attachmentId, f
   });
 
   try {
-    const data = await window.obtenerContenidoAdjuntoMicrosoftGraph(msId, attachmentId, fileName, contentType);
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Tiempo de espera agotado al obtener el archivo desde Microsoft Azure. Verifica tu conexión o intenta nuevamente.')), 12000)
+    );
+    const data = await Promise.race([
+      window.obtenerContenidoAdjuntoMicrosoftGraph(msId, attachmentId, fileName, contentType),
+      timeoutPromise
+    ]);
+
     const cleanB64 = data.base64Content.replace(/\s/g, '');
     const byteCharacters = atob(cleanB64);
     const byteNumbers = new Array(byteCharacters.length);
@@ -37557,7 +37925,14 @@ window.previsualizarAdjuntoMicrosoftGraph = async function(msId, attachmentId, f
     if (ct.includes('pdf') || fn.endsWith('.pdf')) {
       bodyEl.style.background = '#525659';
       bodyEl.innerHTML = `
-        <iframe src="${blobUrl}#toolbar=1&navpanes=1" style="width:100%; height:100%; border:none; display:block;" title="${data.fileName}"></iframe>
+        <object data="${blobUrl}" type="application/pdf" style="width:100%; height:100%; border:none; display:block;">
+          <iframe src="${blobUrl}#toolbar=1&navpanes=1" style="width:100%; height:100%; border:none;" title="${data.fileName}">
+            <div style="padding:2rem; text-align:center; color:white;">
+              <p>Tu navegador no permite embeber este visor de PDF directamente.</p>
+              <a href="${blobUrl}" target="_blank" class="btn-primary" style="padding:0.5rem 1rem; color:white; text-decoration:none; border-radius:6px; background:var(--accent);">Abrir en pestaña nueva</a>
+            </div>
+          </iframe>
+        </object>
       `;
     }
     // 2. Imágenes
@@ -37606,13 +37981,25 @@ window.previsualizarAdjuntoMicrosoftGraph = async function(msId, attachmentId, f
   } catch (err) {
     console.error('Error previsualizando adjunto:', err);
     const bodyEl = document.getElementById(`${modalId}-body`);
+    const statusEl = document.getElementById(`${modalId}-status`);
+    if (statusEl) statusEl.textContent = 'Error al cargar vista previa';
     if (bodyEl) {
       bodyEl.style.background = 'var(--bg-primary, #f8fafc)';
       bodyEl.innerHTML = `
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.75rem; text-align:center; padding:2rem; color:#ef4444;">
-          <i data-lucide="alert-circle" style="width:40px; height:40px;"></i>
-          <h4 style="margin:0; font-size:1rem; color:var(--text-primary);">No se pudo cargar la vista previa</h4>
-          <p style="margin:0; font-size:0.85rem; color:var(--text-secondary); max-width:380px;">${err.message || 'Error al conectar con Microsoft Azure'}</p>
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.85rem; text-align:center; padding:2.5rem; color:#ef4444; max-width:440px;">
+          <div style="width:48px; height:48px; border-radius:50%; background:rgba(239,68,68,0.1); display:flex; align-items:center; justify-content:center;">
+            <i data-lucide="alert-triangle" style="width:24px; height:24px; color:#ef4444;"></i>
+          </div>
+          <h4 style="margin:0; font-size:1.05rem; color:var(--text-primary); font-weight:700;">No se pudo cargar la vista previa</h4>
+          <p style="margin:0; font-size:0.85rem; color:var(--text-secondary); line-height:1.45;">${err.message || 'No se pudo recuperar el archivo desde Microsoft Azure.'}</p>
+          <div style="display:flex; gap:0.6rem; margin-top:0.5rem;">
+            <button type="button" onclick="document.getElementById('${modalId}')?.remove(); window.previsualizarAdjuntoMicrosoftGraph('${msId}', '${attachmentId}', '${fileName}', '${contentType}')" class="btn-primary" style="padding:0.45rem 1rem; font-size:0.8rem; font-weight:700; border-radius:6px; cursor:pointer;">
+              <i data-lucide="refresh-cw" style="width:13px; height:13px;"></i> Reintentar
+            </button>
+            <button type="button" onclick="document.getElementById('${modalId}')?.remove(); window.descargarAdjuntoMicrosoftGraph('${msId}', '${attachmentId}', '${fileName}', '${contentType}')" class="btn-secondary" style="padding:0.45rem 0.9rem; font-size:0.8rem; font-weight:600; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); cursor:pointer;">
+              <i data-lucide="download" style="width:13px; height:13px;"></i> Descargar
+            </button>
+          </div>
         </div>
       `;
       if (window.lucide) lucide.createIcons();
