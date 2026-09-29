@@ -37078,16 +37078,21 @@ window.renderCorreoDetailPane = function(log) {
 
             return `
               <div style="display:inline-flex; align-items:center; gap:0.5rem; padding:0.4rem 0.65rem; border-radius:8px; background:var(--bg-card); border:1px solid var(--border); box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                <div style="width:28px; height:28px; border-radius:6px; background:var(--bg-primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <div style="width:28px; height:28px; border-radius:6px; background:var(--bg-primary); display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer;" onclick="window.previsualizarAdjuntoMicrosoftGraph('${safeMsId}', '${safeAttId}', '${safeName}', '${safeContentType}')" title="Ver ${name}">
                   <i data-lucide="${meta.icon}" style="width:15px; height:15px; color:${meta.color};"></i>
                 </div>
-                <div style="display:flex; flex-direction:column; max-width:200px; overflow:hidden;">
-                  <span style="font-size:0.78rem; font-weight:600; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;" title="${name}">${name}</span>
+                <div style="display:flex; flex-direction:column; max-width:180px; overflow:hidden; cursor:pointer;" onclick="window.previsualizarAdjuntoMicrosoftGraph('${safeMsId}', '${safeAttId}', '${safeName}', '${safeContentType}')" title="Clic para ver ${name}">
+                  <span style="font-size:0.78rem; font-weight:600; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${name}</span>
                   ${sizeStr ? `<span style="font-size:0.68rem; color:var(--text-muted);">${sizeStr}</span>` : `<span style="font-size:0.68rem; color:var(--text-muted);">${meta.label}</span>`}
                 </div>
-                <button type="button" onclick="window.descargarAdjuntoMicrosoftGraph('${safeMsId}', '${safeAttId}', '${safeName}', '${safeContentType}')" style="margin-left:0.25rem; padding:0.25rem 0.5rem; border-radius:6px; background:var(--bg-hover); border:1px solid var(--border); color:var(--accent); font-size:0.72rem; font-weight:700; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer; transition:all 0.2s;" title="Descargar ${name}">
-                  <i data-lucide="download" style="width:12px; height:12px;"></i> Descargar
-                </button>
+                <div style="display:inline-flex; align-items:center; gap:0.25rem; margin-left:0.3rem;">
+                  <button type="button" onclick="window.previsualizarAdjuntoMicrosoftGraph('${safeMsId}', '${safeAttId}', '${safeName}', '${safeContentType}')" style="padding:0.25rem 0.55rem; border-radius:6px; background:var(--accent); border:none; color:white; font-size:0.72rem; font-weight:700; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer; transition:all 0.2s;" title="Ver archivo sin descargar">
+                    <i data-lucide="eye" style="width:12px; height:12px;"></i> Ver
+                  </button>
+                  <button type="button" onclick="window.descargarAdjuntoMicrosoftGraph('${safeMsId}', '${safeAttId}', '${safeName}', '${safeContentType}')" style="padding:0.25rem 0.45rem; border-radius:6px; background:var(--bg-hover); border:1px solid var(--border); color:var(--text-secondary); font-size:0.72rem; font-weight:600; display:inline-flex; align-items:center; cursor:pointer; transition:all 0.2s;" title="Descargar copia">
+                    <i data-lucide="download" style="width:12px; height:12px;"></i>
+                  </button>
+                </div>
               </div>
             `;
           }).join('')}
@@ -37274,146 +37279,335 @@ window.abrirOrdenDesdeCorreo = function(folio) {
   }
 };
 
-window.descargarAdjuntoMicrosoftGraph = async function(msId, attachmentId, fileName, contentType) {
+window.obtenerContenidoAdjuntoMicrosoftGraph = async function(msId, attachmentId, fileName, contentType) {
   const cleanMsId = decodeURIComponent(msId || '').trim();
   let cleanAttId = decodeURIComponent(attachmentId || '').trim();
   const cleanFileName = decodeURIComponent(fileName || 'archivo_adjunto').trim();
   let cleanContentType = decodeURIComponent(contentType || 'application/octet-stream').trim();
 
-  if (!cleanMsId && !cleanFileName) {
-    mostrarNotificacion('No se especificó un identificador válido para el archivo.', 'warning');
-    return;
+  let base64Content = null;
+
+  // 1. Obtener token de cliente si está disponible
+  let token = null;
+  if (window.msalInstance) {
+    const activeAccount = window.msalInstance.getActiveAccount() || (window.msalInstance.getAllAccounts ? window.msalInstance.getAllAccounts()[0] : null);
+    if (activeAccount) {
+      try {
+        const response = await window.msalInstance.acquireTokenSilent({
+          scopes: ['Mail.Read', 'Mail.ReadWrite', 'Mail.Send', 'User.Read'],
+          account: activeAccount
+        });
+        token = response.accessToken;
+      } catch (e) {
+        console.warn('[Azure Graph] acquireTokenSilent error:', e);
+      }
+    }
+  }
+  if (!token) {
+    token = localStorage.getItem('sapi_ms_graph_token') || sessionStorage.getItem('sapi_ms_graph_token');
   }
 
-  mostrarNotificacion(`Descargando "${cleanFileName}"...`, 'info');
+  // 2. Si hay token en cliente y msId, consultar directamente a Microsoft Graph
+  if (token && cleanMsId) {
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/json'
+    };
 
-  try {
-    let base64Content = null;
-
-    // 1. Obtener token de cliente si está disponible
-    let token = null;
-    if (window.msalInstance) {
-      const activeAccount = window.msalInstance.getActiveAccount() || (window.msalInstance.getAllAccounts ? window.msalInstance.getAllAccounts()[0] : null);
-      if (activeAccount) {
+    if (cleanAttId && cleanAttId !== 'undefined' && cleanAttId !== 'null') {
+      const endpoints = [
+        `https://graph.microsoft.com/v1.0/users/Ptalctes@eurorep.mx/messages/${cleanMsId}/attachments/${cleanAttId}`,
+        `https://graph.microsoft.com/v1.0/me/messages/${cleanMsId}/attachments/${cleanAttId}`
+      ];
+      for (const ep of endpoints) {
         try {
-          const response = await window.msalInstance.acquireTokenSilent({
-            scopes: ['Mail.Read', 'Mail.ReadWrite', 'Mail.Send', 'User.Read'],
-            account: activeAccount
-          });
-          token = response.accessToken;
-        } catch (e) {
-          console.warn('[Azure Graph] acquireTokenSilent error:', e);
-        }
-      }
-    }
-    if (!token) {
-      token = localStorage.getItem('sapi_ms_graph_token') || sessionStorage.getItem('sapi_ms_graph_token');
-    }
-
-    // 2. Si hay token en cliente y msId, consultar directamente a Microsoft Graph
-    if (token && cleanMsId) {
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
-      };
-
-      // Si tenemos un attachmentId específico
-      if (cleanAttId && cleanAttId !== 'undefined' && cleanAttId !== 'null') {
-        const endpoints = [
-          `https://graph.microsoft.com/v1.0/users/Ptalctes@eurorep.mx/messages/${cleanMsId}/attachments/${cleanAttId}`,
-          `https://graph.microsoft.com/v1.0/me/messages/${cleanMsId}/attachments/${cleanAttId}`
-        ];
-        for (const ep of endpoints) {
-          try {
-            const res = await fetch(ep, { headers });
-            if (res.ok) {
-              const data = await res.json();
-              if (data.contentBytes) {
-                base64Content = data.contentBytes;
-                if (data.contentType) cleanContentType = data.contentType;
-                break;
-              }
+          const res = await fetch(ep, { headers });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.contentBytes) {
+              base64Content = data.contentBytes;
+              if (data.contentType) cleanContentType = data.contentType;
+              break;
             }
-          } catch (e) {}
-        }
-      }
-
-      // Si aún no tenemos contenido, buscar en la lista de adjuntos del correo
-      if (!base64Content) {
-        const listEndpoints = [
-          `https://graph.microsoft.com/v1.0/users/Ptalctes@eurorep.mx/messages/${cleanMsId}/attachments`,
-          `https://graph.microsoft.com/v1.0/me/messages/${cleanMsId}/attachments`
-        ];
-        for (const lep of listEndpoints) {
-          try {
-            const res = await fetch(lep, { headers });
-            if (res.ok) {
-              const listData = await res.json();
-              const items = Array.isArray(listData.value) ? listData.value : [];
-              const match = items.find(a => (cleanFileName && a.name === cleanFileName) || (cleanAttId && a.id === cleanAttId)) || items[0];
-              if (match && match.contentBytes) {
-                base64Content = match.contentBytes;
-                if (match.contentType) cleanContentType = match.contentType;
-                break;
-              }
-            }
-          } catch (e) {}
-        }
-      }
-    }
-
-    // 3. Si no se pudo obtener por Graph directo en cliente, consultar al endpoint serverless
-    if (!base64Content && cleanMsId) {
-      try {
-        const bkHeaders = token ? { 'X-Ms-Graph-Token': token } : {};
-        const qUrl = `/api/download-azure-attachment?msId=${encodeURIComponent(cleanMsId)}&attachmentId=${encodeURIComponent(cleanAttId || '')}&fileName=${encodeURIComponent(cleanFileName || '')}`;
-        const bkRes = await fetch(qUrl, { headers: bkHeaders });
-        if (bkRes.ok) {
-          const bkData = await bkRes.json();
-          if (bkData.contentBytes) {
-            base64Content = bkData.contentBytes;
-            if (bkData.contentType) cleanContentType = bkData.contentType;
           }
-        }
-      } catch (e) {
-        console.warn('[Download Proxy] Fallo al invocar endpoint serverless:', e);
-      }
-    }
-
-    // 4. Fallback especial para reportes de servicio de SAPI (e.g. Reporte_Servicio_OS-*.pdf)
-    if (!base64Content && cleanFileName && /OS-?(\d+)/i.test(cleanFileName)) {
-      const matchOs = cleanFileName.match(/OS-?(\d+)/i);
-      if (matchOs) {
-        const folioNum = matchOs[1];
-        const ord = (typeof ordenes !== 'undefined' ? ordenes : []).find(o => String(o.folio || '').includes(folioNum) || String(o.id || '').includes(folioNum));
-        if (ord && typeof window.generarPDFOrdenServicioBase64 === 'function') {
-          const pdfB64 = await window.generarPDFOrdenServicioBase64(ord);
-          if (pdfB64) {
-            base64Content = pdfB64.includes(',') ? pdfB64.split(',')[1] : pdfB64;
-            cleanContentType = 'application/pdf';
-          }
-        }
+        } catch (e) {}
       }
     }
 
     if (!base64Content) {
-      throw new Error('No se pudo recuperar el archivo adjunto desde Microsoft Azure.');
+      const listEndpoints = [
+        `https://graph.microsoft.com/v1.0/users/Ptalctes@eurorep.mx/messages/${cleanMsId}/attachments`,
+        `https://graph.microsoft.com/v1.0/me/messages/${cleanMsId}/attachments`
+      ];
+      for (const lep of listEndpoints) {
+        try {
+          const res = await fetch(lep, { headers });
+          if (res.ok) {
+            const listData = await res.json();
+            const items = Array.isArray(listData.value) ? listData.value : [];
+            const match = items.find(a => (cleanFileName && a.name === cleanFileName) || (cleanAttId && a.id === cleanAttId)) || items[0];
+            if (match && match.contentBytes) {
+              base64Content = match.contentBytes;
+              if (match.contentType) cleanContentType = match.contentType;
+              break;
+            }
+          }
+        } catch (e) {}
+      }
     }
+  }
 
-    // Descargar archivo en el navegador
-    const cleanB64 = base64Content.replace(/\s/g, '');
+  // 3. Endpoint serverless
+  if (!base64Content && cleanMsId) {
+    try {
+      const bkHeaders = token ? { 'X-Ms-Graph-Token': token } : {};
+      const qUrl = `/api/download-azure-attachment?msId=${encodeURIComponent(cleanMsId)}&attachmentId=${encodeURIComponent(cleanAttId || '')}&fileName=${encodeURIComponent(cleanFileName || '')}`;
+      const bkRes = await fetch(qUrl, { headers: bkHeaders });
+      if (bkRes.ok) {
+        const bkData = await bkRes.json();
+        if (bkData.contentBytes) {
+          base64Content = bkData.contentBytes;
+          if (bkData.contentType) cleanContentType = bkData.contentType;
+        }
+      }
+    } catch (e) {
+      console.warn('[Download Proxy] Fallo al invocar endpoint serverless:', e);
+    }
+  }
+
+  // 4. Fallback especial para reportes de servicio de SAPI
+  if (!base64Content && cleanFileName && /OS-?(\d+)/i.test(cleanFileName)) {
+    const matchOs = cleanFileName.match(/OS-?(\d+)/i);
+    if (matchOs) {
+      const folioNum = matchOs[1];
+      const ord = (typeof ordenes !== 'undefined' ? ordenes : []).find(o => String(o.folio || '').includes(folioNum) || String(o.id || '').includes(folioNum));
+      if (ord && typeof window.generarPDFOrdenServicioBase64 === 'function') {
+        const pdfB64 = await window.generarPDFOrdenServicioBase64(ord);
+        if (pdfB64) {
+          base64Content = pdfB64.includes(',') ? pdfB64.split(',')[1] : pdfB64;
+          cleanContentType = 'application/pdf';
+        }
+      }
+    }
+  }
+
+  // Ajustar contentType si está genérico según extensión
+  const fnLower = cleanFileName.toLowerCase();
+  if (cleanContentType === 'application/octet-stream' || !cleanContentType) {
+    if (fnLower.endsWith('.pdf')) cleanContentType = 'application/pdf';
+    else if (fnLower.endsWith('.png')) cleanContentType = 'image/png';
+    else if (fnLower.endsWith('.jpg') || fnLower.endsWith('.jpeg')) cleanContentType = 'image/jpeg';
+    else if (fnLower.endsWith('.webp')) cleanContentType = 'image/webp';
+    else if (fnLower.endsWith('.gif')) cleanContentType = 'image/gif';
+    else if (fnLower.endsWith('.svg')) cleanContentType = 'image/svg+xml';
+    else if (fnLower.endsWith('.txt') || fnLower.endsWith('.log')) cleanContentType = 'text/plain';
+    else if (fnLower.endsWith('.csv')) cleanContentType = 'text/csv';
+    else if (fnLower.endsWith('.json')) cleanContentType = 'application/json';
+    else if (fnLower.endsWith('.xml')) cleanContentType = 'application/xml';
+    else if (fnLower.endsWith('.html') || fnLower.endsWith('.htm')) cleanContentType = 'text/html';
+  }
+
+  if (!base64Content) {
+    throw new Error('No se pudo recuperar el archivo desde Microsoft Azure.');
+  }
+
+  return {
+    base64Content: base64Content,
+    contentType: cleanContentType,
+    fileName: cleanFileName
+  };
+};
+
+window.previsualizarAdjuntoMicrosoftGraph = async function(msId, attachmentId, fileName, contentType) {
+  const decodedFileName = decodeURIComponent(fileName || 'Archivo Adjunto').trim();
+
+  // Crear modal overlay inmediatamente con estado de carga
+  const modalId = `modal-preview-attachment-${Date.now()}`;
+  const overlay = document.createElement('div');
+  overlay.id = modalId;
+  overlay.className = 'modal-overlay open';
+  overlay.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(15, 23, 42, 0.75); backdrop-filter:blur(5px); z-index:999999; display:flex; align-items:center; justify-content:center; padding:1.5rem; box-sizing:border-box;';
+
+  overlay.innerHTML = `
+    <div style="background:var(--bg-card, #ffffff); width:95%; max-width:1100px; height:90vh; max-height:900px; border-radius:12px; border:1px solid var(--border, #e2e8f0); box-shadow:0 20px 45px rgba(0,0,0,0.3); display:flex; flex-direction:column; overflow:hidden; animation:fadeIn 0.2s ease-out;">
+      <!-- Modal Header -->
+      <div style="padding:0.9rem 1.25rem; border-bottom:1px solid var(--border, #e2e8f0); background:var(--bg-primary, #f8fafc); display:flex; justify-content:space-between; align-items:center; gap:1rem;">
+        <div style="display:flex; align-items:center; gap:0.6rem; min-width:0;">
+          <div style="width:32px; height:32px; border-radius:6px; background:rgba(232, 130, 12, 0.12); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <i data-lucide="file-text" style="width:16px; height:16px; color:var(--accent, #e8820c);"></i>
+          </div>
+          <div style="min-width:0;">
+            <h3 style="margin:0; font-size:0.95rem; font-weight:700; color:var(--text-primary, #0f172a); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;" title="${decodedFileName}">${decodedFileName}</h3>
+            <span id="${modalId}-status" style="font-size:0.72rem; color:var(--text-muted, #64748b);">Cargando vista previa...</span>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.5rem; flex-shrink:0;">
+          <button id="${modalId}-btn-newtab" type="button" style="display:none; padding:0.35rem 0.7rem; border-radius:6px; background:var(--bg-hover, #f1f5f9); border:1px solid var(--border, #cbd5e1); font-size:0.75rem; font-weight:600; color:var(--text-primary, #0f172a); cursor:pointer; align-items:center; gap:0.3rem;" title="Abrir en pestaña completa">
+            <i data-lucide="external-link" style="width:13px; height:13px;"></i> Nueva pestaña
+          </button>
+          <button id="${modalId}-btn-download" type="button" style="display:none; padding:0.35rem 0.7rem; border-radius:6px; background:var(--accent, #e8820c); border:none; font-size:0.75rem; font-weight:700; color:white; cursor:pointer; align-items:center; gap:0.3rem;" title="Descargar archivo">
+            <i data-lucide="download" style="width:13px; height:13px;"></i> Descargar
+          </button>
+          <button type="button" onclick="document.getElementById('${modalId}')?.remove()" style="background:transparent; border:none; color:var(--text-muted, #64748b); font-size:1.4rem; cursor:pointer; padding:0.2rem 0.5rem; border-radius:6px; line-height:1;" title="Cerrar (Esc)">&times;</button>
+        </div>
+      </div>
+      <!-- Modal Content Body -->
+      <div id="${modalId}-body" style="flex:1; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#1e293b; overflow:auto; position:relative;">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:0.75rem; color:#94a3b8;">
+          <i data-lucide="loader-2" class="spin" style="width:36px; height:36px; color:var(--accent, #e8820c);"></i>
+          <span style="font-size:0.88rem; font-weight:500;">Obteniendo documento desde Microsoft 365...</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+
+  const handleKey = (e) => {
+    if (e.key === 'Escape') {
+      overlay.remove();
+      document.removeEventListener('keydown', handleKey);
+    }
+  };
+  document.addEventListener('keydown', handleKey);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.remove();
+      document.removeEventListener('keydown', handleKey);
+    }
+  });
+
+  try {
+    const data = await window.obtenerContenidoAdjuntoMicrosoftGraph(msId, attachmentId, fileName, contentType);
+    const cleanB64 = data.base64Content.replace(/\s/g, '');
     const byteCharacters = atob(cleanB64);
     const byteNumbers = new Array(byteCharacters.length);
     for (let i = 0; i < byteCharacters.length; i++) {
       byteNumbers[i] = byteCharacters.charCodeAt(i);
     }
     const byteArray = new Uint8Array(byteNumbers);
-    const blob = new Blob([byteArray], { type: cleanContentType });
+    const blob = new Blob([byteArray], { type: data.contentType });
+    const blobUrl = URL.createObjectURL(blob);
+
+    const bodyEl = document.getElementById(`${modalId}-body`);
+    const statusEl = document.getElementById(`${modalId}-status`);
+    const btnNewTab = document.getElementById(`${modalId}-btn-newtab`);
+    const btnDownload = document.getElementById(`${modalId}-btn-download`);
+
+    if (statusEl) {
+      const sizeKb = Math.round(blob.size / 1024);
+      statusEl.textContent = `${data.contentType} • ${sizeKb > 1024 ? (sizeKb / 1024).toFixed(1) + ' MB' : sizeKb + ' KB'}`;
+    }
+
+    if (btnNewTab) {
+      btnNewTab.style.display = 'inline-flex';
+      btnNewTab.onclick = () => window.open(blobUrl, '_blank');
+    }
+
+    if (btnDownload) {
+      btnDownload.style.display = 'inline-flex';
+      btnDownload.onclick = () => {
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = data.fileName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => document.body.removeChild(a), 500);
+      };
+    }
+
+    if (!bodyEl) return;
+
+    const fn = (data.fileName || '').toLowerCase();
+    const ct = (data.contentType || '').toLowerCase();
+
+    // 1. PDF
+    if (ct.includes('pdf') || fn.endsWith('.pdf')) {
+      bodyEl.style.background = '#525659';
+      bodyEl.innerHTML = `
+        <iframe src="${blobUrl}#toolbar=1&navpanes=1" style="width:100%; height:100%; border:none; display:block;" title="${data.fileName}"></iframe>
+      `;
+    }
+    // 2. Imágenes
+    else if (ct.startsWith('image/') || fn.endsWith('.png') || fn.endsWith('.jpg') || fn.endsWith('.jpeg') || fn.endsWith('.webp') || fn.endsWith('.gif') || fn.endsWith('.svg')) {
+      bodyEl.style.background = '#0f172a';
+      bodyEl.innerHTML = `
+        <div style="padding:1.5rem; display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
+          <img src="${blobUrl}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:6px; box-shadow:0 10px 25px rgba(0,0,0,0.5);" alt="${data.fileName}" />
+        </div>
+      `;
+    }
+    // 3. Archivos de texto, código, JSON, XML, CSV
+    else if (ct.startsWith('text/') || fn.endsWith('.txt') || fn.endsWith('.log') || fn.endsWith('.json') || fn.endsWith('.xml') || fn.endsWith('.csv')) {
+      const textDecoder = new TextDecoder('utf-8');
+      const textContent = textDecoder.decode(byteArray);
+      const escaped = textContent.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      bodyEl.style.background = 'var(--bg-primary, #f8fafc)';
+      bodyEl.style.display = 'block';
+      bodyEl.innerHTML = `
+        <div style="padding:1.5rem; width:100%; height:100%; box-sizing:border-box;">
+          <pre style="width:100%; height:100%; margin:0; padding:1.25rem; background:var(--bg-card, #ffffff); color:var(--text-primary, #0f172a); border:1px solid var(--border, #e2e8f0); border-radius:8px; overflow:auto; font-family:monospace; font-size:0.85rem; line-height:1.5; white-space:pre-wrap; box-sizing:border-box;">${escaped}</pre>
+        </div>
+      `;
+    }
+    // 4. Otros archivos
+    else {
+      bodyEl.style.background = 'var(--bg-primary, #f8fafc)';
+      bodyEl.innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; text-align:center; padding:2rem; color:var(--text-primary);">
+          <div style="width:64px; height:64px; border-radius:12px; background:rgba(232, 130, 12, 0.12); display:flex; align-items:center; justify-content:center;">
+            <i data-lucide="file-check" style="width:32px; height:32px; color:var(--accent);"></i>
+          </div>
+          <div style="max-width:400px;">
+            <h4 style="margin:0 0 0.5rem 0; font-size:1.05rem;">${data.fileName}</h4>
+            <p style="margin:0; font-size:0.85rem; color:var(--text-secondary); line-height:1.4;">Este tipo de archivo no cuenta con previsualización directa en el navegador, pero puedes descargarlo o abrirlo externamente.</p>
+          </div>
+          <button type="button" onclick="document.getElementById('${modalId}-btn-download')?.click()" class="btn-primary" style="padding:0.5rem 1.25rem; font-size:0.85rem; font-weight:700; border-radius:8px; display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
+            <i data-lucide="download" style="width:15px; height:15px;"></i> Descargar Archivo
+          </button>
+        </div>
+      `;
+    }
+
+    if (window.lucide) lucide.createIcons();
+
+  } catch (err) {
+    console.error('Error previsualizando adjunto:', err);
+    const bodyEl = document.getElementById(`${modalId}-body`);
+    if (bodyEl) {
+      bodyEl.style.background = 'var(--bg-primary, #f8fafc)';
+      bodyEl.innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.75rem; text-align:center; padding:2rem; color:#ef4444;">
+          <i data-lucide="alert-circle" style="width:40px; height:40px;"></i>
+          <h4 style="margin:0; font-size:1rem; color:var(--text-primary);">No se pudo cargar la vista previa</h4>
+          <p style="margin:0; font-size:0.85rem; color:var(--text-secondary); max-width:380px;">${err.message || 'Error al conectar con Microsoft Azure'}</p>
+        </div>
+      `;
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+};
+
+window.descargarAdjuntoMicrosoftGraph = async function(msId, attachmentId, fileName, contentType) {
+  const cleanFileName = decodeURIComponent(fileName || 'archivo_adjunto').trim();
+  mostrarNotificacion(`Descargando "${cleanFileName}"...`, 'info');
+
+  try {
+    const data = await window.obtenerContenidoAdjuntoMicrosoftGraph(msId, attachmentId, fileName, contentType);
+    const cleanB64 = data.base64Content.replace(/\s/g, '');
+    const byteCharacters = atob(cleanB64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: data.contentType });
     const blobUrl = URL.createObjectURL(blob);
 
     const a = document.createElement('a');
     a.href = blobUrl;
-    a.download = cleanFileName || 'archivo_adjunto';
+    a.download = data.fileName || cleanFileName;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
@@ -37421,7 +37615,7 @@ window.descargarAdjuntoMicrosoftGraph = async function(msId, attachmentId, fileN
       URL.revokeObjectURL(blobUrl);
     }, 1500);
 
-    mostrarNotificacion(`Descarga completada: ${cleanFileName}`, 'success');
+    mostrarNotificacion(`Descarga completada: ${data.fileName || cleanFileName}`, 'success');
   } catch (err) {
     console.error('Error descargando adjunto:', err);
     mostrarNotificacion(`Error al descargar: ${err.message || err}`, 'error');
