@@ -36416,6 +36416,8 @@ window.esCorreoValidoPtalctes = function(l) {
   if (!l || !l.id) return false;
   if (String(l.id).startsWith('email_tk_')) return false; // Descartar sintéticos
   
+  if (l.esDeBuzonPtalctes) return true;
+
   const isTarget = (str) => {
     const s = String(str || '').toLowerCase().trim();
     if (!s) return false;
@@ -36436,7 +36438,8 @@ window.esCorreoValidoPtalctes = function(l) {
          isTarget(bcc) || 
          isTarget(cliente) ||
          isTarget(asunto) ||
-         cuerpo.toLowerCase().includes('ptalctes');
+         cuerpo.toLowerCase().includes('ptalctes') ||
+         (String(l.id).startsWith('email_') && !String(l.id).startsWith('ms_') && l.tipo === 'enviado');
 };
 
 window.obtenerEmailLogsSoporte = function() {
@@ -36475,6 +36478,10 @@ window.obtenerEmailLogsSoporte = function() {
 };
 
 window.iniciarSesionMicrosoftAzureMail = function() {
+  // Limpiar tokens anteriores para forzar a Microsoft a solicitar consentimiento de los nuevos scopes compartidos
+  sessionStorage.removeItem('ms_access_token');
+  sessionStorage.removeItem('ms_access_token_expiry');
+
   const odClientId = (typeof configData !== 'undefined' && configData.onedriveClientId && configData.onedriveClientId !== 'MOCK') 
     ? configData.onedriveClientId 
     : '';
@@ -36496,7 +36503,7 @@ window.iniciarSesionMicrosoftAzureMail = function() {
 
   const redirectUri = window.location.origin + window.location.pathname;
   const scopes = encodeURIComponent('Mail.Read Mail.Read.Shared Mail.ReadWrite Mail.ReadWrite.Shared Mail.Send Mail.Send.Shared Files.Read User.Read offline_access');
-  const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${encodeURIComponent(targetClientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_mode=fragment`;
+  const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${encodeURIComponent(targetClientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&prompt=select_account%20consent&response_mode=fragment`;
 
   const width = 600;
   const height = 650;
@@ -36596,13 +36603,27 @@ window.sincronizarCorreosAzure = async function(silent = false) {
         'Prefer': 'outlook.body-content-type="html"'
       };
 
+      // Detectar si la sesión actual pertenece directamente a Ptalctes@eurorep.mx
+      let isDirectPtalctesAccount = false;
+      try {
+        const meProfileRes = await fetch('https://graph.microsoft.com/v1.0/me', { headers });
+        if (meProfileRes.ok) {
+          const meProfile = await meProfileRes.json();
+          const meMail = (meProfile.mail || meProfile.userPrincipalName || '').toLowerCase();
+          const meName = (meProfile.displayName || '').toLowerCase();
+          if (meMail.includes('ptalctes') || meName.includes('portal tickets')) {
+            isDirectPtalctesAccount = true;
+          }
+        }
+      } catch (e) {}
+
       const fetchGraphFolder = async (base, folder) => {
         try {
           const res = await fetch(`${base}/mailFolders/${folder}/messages?$top=50&$select=${selectFields}&$orderby=${folder === 'inbox' ? 'receivedDateTime' : 'sentDateTime'} desc`, { headers });
           if (res.ok) {
             const j = await res.json();
-            const isDirectPtalctes = base.toLowerCase().includes('ptalctes');
-            return Array.isArray(j.value) ? j.value.map(m => ({ ...m, _folder: folder, _isDirectPtalctes: isDirectPtalctes })) : [];
+            const isDirect = isDirectPtalctesAccount || base.toLowerCase().includes('ptalctes');
+            return Array.isArray(j.value) ? j.value.map(m => ({ ...m, _folder: folder, _isDirectPtalctes: isDirect })) : [];
           } else {
             console.warn(`[Azure Graph] ${base}/${folder} status:`, res.status);
           }
@@ -36636,7 +36657,8 @@ window.sincronizarCorreosAzure = async function(silent = false) {
         const allRes = await fetch(`https://graph.microsoft.com/v1.0/me/messages?$top=50&$select=${selectFields}&$orderby=receivedDateTime desc`, { headers }).catch(() => null);
         if (allRes && allRes.ok) {
           const j = await allRes.json();
-          if (Array.isArray(j.value)) msgs = msgs.concat(j.value);
+          const isDirect = isDirectPtalctesAccount;
+          if (Array.isArray(j.value)) msgs = msgs.concat(j.value.map(m => ({ ...m, _isDirectPtalctes: isDirect })));
         }
       }
 

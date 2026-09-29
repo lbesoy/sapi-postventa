@@ -87,6 +87,20 @@ export default async function handler(req, res) {
       'Prefer': 'outlook.body-content-type="html"'
     };
 
+    // 1.5 Detectar si el token pertenece directamente a Ptalctes@eurorep.mx
+    let isDirectPtalctesAccount = false;
+    try {
+      const meRes = await fetch('https://graph.microsoft.com/v1.0/me', { headers });
+      if (meRes.ok) {
+        const meJson = await meRes.json();
+        const meMail = (meJson.mail || meJson.userPrincipalName || '').toLowerCase();
+        if (meMail.includes('ptalctes')) {
+          isDirectPtalctesAccount = true;
+          endpointBase = 'https://graph.microsoft.com/v1.0/me';
+        }
+      }
+    } catch (e) {}
+
     // 2. Consultar mensajes recibidos y enviados desde Microsoft Graph
     const selectFields = 'id,subject,bodyPreview,body,from,sender,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,hasAttachments,isRead,conversationId';
     
@@ -96,7 +110,8 @@ export default async function handler(req, res) {
         const r = await fetch(`${base}/mailFolders/${folder}/messages?$top=50&$select=${selectFields}&$orderby=${folder === 'inbox' ? 'receivedDateTime' : 'sentDateTime'} desc`, { headers });
         if (r.ok) {
           const j = await r.json();
-          return Array.isArray(j.value) ? j.value.map(m => ({ ...m, _folder: folder })) : [];
+          const isDirect = isDirectPtalctesAccount || base.toLowerCase().includes('ptalctes');
+          return Array.isArray(j.value) ? j.value.map(m => ({ ...m, _folder: folder, _isDirectPtalctes: isDirect })) : [];
         }
       } catch (e) {}
       return null;
@@ -127,7 +142,8 @@ export default async function handler(req, res) {
         const allRes = await fetch(`${endpointBase}/messages?$top=50&$select=${selectFields}&$orderby=receivedDateTime desc`, { headers });
         if (allRes.ok) {
           const allJson = await allRes.json();
-          if (Array.isArray(allJson.value)) rawMessages = allJson.value;
+          const isDirect = isDirectPtalctesAccount || endpointBase.toLowerCase().includes('ptalctes');
+          if (Array.isArray(allJson.value)) rawMessages = allJson.value.map(m => ({ ...m, _isDirectPtalctes: isDirect }));
         }
       } catch (e) {}
     }
@@ -135,6 +151,8 @@ export default async function handler(req, res) {
     // Filtro para el buzón de soporte / postventa ptalctes@eurorep.mx
     const involvesPtalctes = (m) => {
       if (!m) return false;
+      if (m._isDirectPtalctes) return true; // Viene directamente del buzón ptalctes@eurorep.mx
+
       const fromAddr = (m.from?.emailAddress?.address || m.sender?.emailAddress?.address || '').toLowerCase();
       const fromName = (m.from?.emailAddress?.name || m.sender?.emailAddress?.name || '').toLowerCase();
       const toAddrs = Array.isArray(m.toRecipients) ? m.toRecipients.map(r => (r.emailAddress?.address || r.emailAddress?.name || '').toLowerCase()) : [];
