@@ -103,11 +103,12 @@ export default async function handler(req, res) {
 
     // 2. Consultar mensajes recibidos y enviados desde Microsoft Graph
     const selectFields = 'id,subject,bodyPreview,body,from,sender,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,hasAttachments,isRead,conversationId';
+    const expandQuery = '&$expand=attachments($select=id,name,contentType,size,isInline)';
     
     // Función auxiliar para consultar un endpoint con fallback
     const fetchFolderMessages = async (base, folder) => {
       try {
-        const r = await fetch(`${base}/mailFolders/${folder}/messages?$top=50&$select=${selectFields}&$orderby=${folder === 'inbox' ? 'receivedDateTime' : 'sentDateTime'} desc`, { headers });
+        const r = await fetch(`${base}/mailFolders/${folder}/messages?$top=50&$select=${selectFields}${expandQuery}&$orderby=${folder === 'inbox' ? 'receivedDateTime' : 'sentDateTime'} desc`, { headers });
         if (r.ok) {
           const j = await r.json();
           const isDirect = isDirectPtalctesAccount || base.toLowerCase().includes('ptalctes');
@@ -139,7 +140,7 @@ export default async function handler(req, res) {
     // Si aún no hay mensajes, intentar consulta general a /messages
     if (rawMessages.length === 0) {
       try {
-        const allRes = await fetch(`${endpointBase}/messages?$top=50&$select=${selectFields}&$orderby=receivedDateTime desc`, { headers });
+        const allRes = await fetch(`${endpointBase}/messages?$top=50&$select=${selectFields}${expandQuery}&$orderby=receivedDateTime desc`, { headers });
         if (allRes.ok) {
           const allJson = await allRes.json();
           const isDirect = isDirectPtalctesAccount || endpointBase.toLowerCase().includes('ptalctes');
@@ -206,6 +207,20 @@ export default async function handler(req, res) {
 
       const clientName = isSent ? (m.toRecipients?.[0]?.emailAddress?.name || toRecipients.join(', ') || 'Cliente') : fromName;
 
+      const rawAtts = Array.isArray(m.attachments) ? m.attachments : [];
+      const archivosDetalle = rawAtts.map(att => ({
+        id: att.id,
+        name: att.name || 'archivo_adjunto',
+        contentType: att.contentType || 'application/octet-stream',
+        size: att.size || 0,
+        isInline: !!att.isInline,
+        msId: m.id
+      }));
+
+      const archivos = archivosDetalle.length > 0
+        ? archivosDetalle.map(a => a.name)
+        : (m.hasAttachments ? ['Adjuntos en Microsoft 365'] : []);
+
       const mappedItem = {
         id: `ms_${m.id}`,
         msId: m.id,
@@ -222,7 +237,8 @@ export default async function handler(req, res) {
         evento: 'Microsoft Azure 365',
         regla: 'Bandeja Exchange',
         estatus: isSent ? 'Enviado' : 'Recibido',
-        archivos: m.hasAttachments ? ['Adjuntos en Microsoft 365'] : [],
+        archivos: archivos,
+        archivosDetalle: archivosDetalle,
         isRead: m.isRead,
         origen: 'azure_ms_graph'
       };
