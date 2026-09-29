@@ -36412,21 +36412,48 @@ window.setMailSearch = function(query) {
   window.renderBandejaCorreoEmpresa();
 };
 
+window.esCorreoValidoPtalctes = function(l) {
+  if (!l || !l.id) return false;
+  if (String(l.id).startsWith('email_tk_')) return false; // Descartar sintéticos
+  
+  const target = 'ptalctes@eurorep.mx';
+  const de = String(l.de || '').toLowerCase();
+  const para = String(l.para || '').toLowerCase();
+  const cc = String(l.cc || '').toLowerCase();
+  const bcc = String(l.bcc || '').toLowerCase();
+
+  return de.includes(target) || 
+         para.includes(target) || 
+         cc.includes(target) || 
+         bcc.includes(target);
+};
+
 window.obtenerEmailLogsSoporte = function() {
   const localLogs = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_email_logs', []) : JSON.parse(localStorage.getItem('sapi_email_logs') || '[]');
   const logMap = new Map();
+  const validLocalLogs = [];
 
-  // Limpiar cualquier residuo de prueba anterior y cargar sólo correos reales
+  // Filtrar estrictamente solo correos del buzón ptalctes@eurorep.mx
   (localLogs || []).forEach(l => {
-    if (l && l.id && !String(l.id).startsWith('email_tk_')) {
+    if (window.esCorreoValidoPtalctes(l)) {
       logMap.set(l.id, l);
+      validLocalLogs.push(l);
     }
   });
+
+  // Limpiar en almacenamiento local cualquier correo ajeno o sintético previo
+  if (validLocalLogs.length !== (localLogs || []).length) {
+    if (typeof safeSetJSON === 'function') {
+      safeSetJSON('sapi_email_logs', validLocalLogs);
+    } else {
+      localStorage.setItem('sapi_email_logs', JSON.stringify(validLocalLogs));
+    }
+  }
 
   // Si hay correos en memoria de la sincronización de Azure
   if (Array.isArray(window._azureEmailLogs)) {
     window._azureEmailLogs.forEach(l => {
-      if (l && l.id) {
+      if (window.esCorreoValidoPtalctes(l)) {
         logMap.set(l.id, l);
       }
     });
@@ -36504,7 +36531,7 @@ window.iniciarSesionMicrosoftAzureMail = function() {
             clearInterval(pollInterval);
             loginPopup.close();
             
-            mostrarNotificacion('¡Conexión exitosa con Microsoft Azure! Sincronizando correos...', 'success');
+            mostrarNotificacion('¡Conexión exitosa con Microsoft Azure! Sincronizando correos de Ptalctes@eurorep.mx...', 'success');
             window.sincronizarCorreosAzure(false);
           }
         }
@@ -36521,7 +36548,7 @@ window.sincronizarCorreosAzure = async function(silent = false) {
   const isTokenValid = token && (!expiry || Number(expiry) > Date.now());
 
   if (!silent) {
-    mostrarNotificacion('Sincronizando correos reales desde Microsoft Azure (Office 365)...', 'info');
+    mostrarNotificacion('Sincronizando correos de Ptalctes@eurorep.mx desde Microsoft Azure...', 'info');
   }
 
   window._isSyncingAzureMail = true;
@@ -36543,7 +36570,7 @@ window.sincronizarCorreosAzure = async function(silent = false) {
       if (resp.ok) {
         const data = await resp.json();
         if (data && Array.isArray(data.emails) && data.emails.length > 0) {
-          rawEmails = data.emails;
+          rawEmails = data.emails.filter(e => window.esCorreoValidoPtalctes(e));
         }
       }
     } catch (srvErr) {
@@ -36552,23 +36579,43 @@ window.sincronizarCorreosAzure = async function(silent = false) {
 
     // 2. Si hay token en cliente y el backend no trajo datos, consultar directamente a Microsoft Graph API
     if (rawEmails.length === 0 && isTokenValid) {
-      const selectFields = 'id,subject,bodyPreview,body,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,hasAttachments,isRead';
+      const selectFields = 'id,subject,bodyPreview,body,from,sender,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,hasAttachments,isRead';
       const headers = {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/json',
         'Prefer': 'outlook.body-content-type="html"'
       };
 
-      const [inboxRes, sentRes] = await Promise.all([
-        fetch(`https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=50&$select=${selectFields}&$orderby=receivedDateTime desc`, { headers }).catch(() => null),
-        fetch(`https://graph.microsoft.com/v1.0/me/mailFolders/sentitems/messages?$top=50&$select=${selectFields}&$orderby=sentDateTime desc`, { headers }).catch(() => null)
+      const fetchGraphFolder = async (base, folder) => {
+        try {
+          const res = await fetch(`${base}/mailFolders/${folder}/messages?$top=50&$select=${selectFields}&$orderby=${folder === 'inbox' ? 'receivedDateTime' : 'sentDateTime'} desc`, { headers });
+          if (res.ok) {
+            const j = await res.json();
+            return Array.isArray(j.value) ? j.value.map(m => ({ ...m, _folder: folder })) : [];
+          }
+        } catch (e) {}
+        return null;
+      };
+
+      // Intentar primero con el buzón de ptalctes@eurorep.mx
+      let [inboxMsgs, sentMsgs] = await Promise.all([
+        fetchGraphFolder('https://graph.microsoft.com/v1.0/users/Ptalctes@eurorep.mx', 'inbox'),
+        fetchGraphFolder('https://graph.microsoft.com/v1.0/users/Ptalctes@eurorep.mx', 'sentitems')
       ]);
 
+      // Fallback a /me
+      if (inboxMsgs === null && sentMsgs === null) {
+        [inboxMsgs, sentMsgs] = await Promise.all([
+          fetchGraphFolder('https://graph.microsoft.com/v1.0/me', 'inbox'),
+          fetchGraphFolder('https://graph.microsoft.com/v1.0/me', 'sentitems')
+        ]);
+      }
+
       let msgs = [];
-      if (inboxRes && inboxRes.ok) {
-        const j = await inboxRes.json();
-        if (Array.isArray(j.value)) msgs = msgs.concat(j.value.map(m => ({ ...m, _folder: 'inbox' })));
-      } else {
+      if (Array.isArray(inboxMsgs)) msgs = msgs.concat(inboxMsgs);
+      if (Array.isArray(sentMsgs)) msgs = msgs.concat(sentMsgs);
+
+      if (msgs.length === 0) {
         const allRes = await fetch(`https://graph.microsoft.com/v1.0/me/messages?$top=50&$select=${selectFields}&$orderby=receivedDateTime desc`, { headers }).catch(() => null);
         if (allRes && allRes.ok) {
           const j = await allRes.json();
@@ -36576,15 +36623,24 @@ window.sincronizarCorreosAzure = async function(silent = false) {
         }
       }
 
-      if (sentRes && sentRes.ok) {
-        const j = await sentRes.json();
-        if (Array.isArray(j.value)) msgs = msgs.concat(j.value.map(m => ({ ...m, _folder: 'sentitems' })));
-      }
+      // Filtro estricto por ptalctes@eurorep.mx
+      const targetEmail = 'ptalctes@eurorep.mx';
+      msgs = msgs.filter(m => {
+        if (!m) return false;
+        const fromAddr = (m.from?.emailAddress?.address || m.sender?.emailAddress?.address || '').toLowerCase();
+        const toAddrs = Array.isArray(m.toRecipients) ? m.toRecipients.map(r => (r.emailAddress?.address || '').toLowerCase()) : [];
+        const ccAddrs = Array.isArray(m.ccRecipients) ? m.ccRecipients.map(r => (r.emailAddress?.address || '').toLowerCase()) : [];
+        const bccAddrs = Array.isArray(m.bccRecipients) ? m.bccRecipients.map(r => (r.emailAddress?.address || '').toLowerCase()) : [];
+        return fromAddr.includes(targetEmail) || 
+               toAddrs.some(a => a.includes(targetEmail)) || 
+               ccAddrs.some(a => a.includes(targetEmail)) || 
+               bccAddrs.some(a => a.includes(targetEmail));
+      });
 
       rawEmails = msgs.map(m => {
-        const fromAddr = m.from?.emailAddress?.address || '';
-        const fromName = m.from?.emailAddress?.name || fromAddr;
-        const isSent = m._folder === 'sentitems' || fromAddr.toLowerCase().includes('ptalctes@eurorep.mx') || fromAddr.toLowerCase().includes('eurorep');
+        const fromAddr = m.from?.emailAddress?.address || m.sender?.emailAddress?.address || '';
+        const fromName = m.from?.emailAddress?.name || m.sender?.emailAddress?.name || fromAddr;
+        const isSent = m._folder === 'sentitems' || fromAddr.toLowerCase().includes(targetEmail);
         const toRecipients = Array.isArray(m.toRecipients) ? m.toRecipients.map(r => r.emailAddress?.address || r.emailAddress?.name).filter(Boolean) : [];
         const ccRecipients = Array.isArray(m.ccRecipients) ? m.ccRecipients.map(r => r.emailAddress?.address || r.emailAddress?.name).filter(Boolean) : [];
         const bccRecipients = Array.isArray(m.bccRecipients) ? m.bccRecipients.map(r => r.emailAddress?.address || r.emailAddress?.name).filter(Boolean) : [];
@@ -36617,9 +36673,13 @@ window.sincronizarCorreosAzure = async function(silent = false) {
       window._azureEmailLogs = rawEmails;
       const currentLogs = safeGetJSON('sapi_email_logs', []);
       const map = new Map();
-      rawEmails.forEach(e => map.set(e.id, e));
+      rawEmails.forEach(e => {
+        if (window.esCorreoValidoPtalctes(e)) {
+          map.set(e.id, e);
+        }
+      });
       currentLogs.forEach(e => {
-        if (!map.has(e.id) && !String(e.id).startsWith('email_tk_')) {
+        if (!map.has(e.id) && window.esCorreoValidoPtalctes(e)) {
           map.set(e.id, e);
         }
       });
@@ -36632,16 +36692,16 @@ window.sincronizarCorreosAzure = async function(silent = false) {
       }
 
       if (!silent) {
-        mostrarNotificacion(`✅ Sincronizados ${rawEmails.length} correos reales desde Microsoft Azure (Office 365)`, 'success');
+        mostrarNotificacion(`✅ Sincronizados ${rawEmails.length} correos de Ptalctes@eurorep.mx desde Microsoft Azure`, 'success');
       }
     } else if (!isTokenValid) {
       if (!silent) {
-        mostrarNotificacion('Conecta tu cuenta de Microsoft Azure para descargar los correos reales.', 'warning');
+        mostrarNotificacion('Conecta tu cuenta de Microsoft Azure para descargar los correos de Ptalctes@eurorep.mx.', 'warning');
         window.iniciarSesionMicrosoftAzureMail();
       }
     } else {
       if (!silent) {
-        mostrarNotificacion('No se encontraron nuevos correos en la cuenta de Microsoft Azure.', 'info');
+        mostrarNotificacion('No se encontraron correos nuevos para Ptalctes@eurorep.mx en Microsoft Azure.', 'info');
       }
     }
   } catch (err) {

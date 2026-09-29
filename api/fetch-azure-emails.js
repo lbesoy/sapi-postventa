@@ -45,9 +45,9 @@ export default async function handler(req, res) {
     const azureClientId = process.env.AZURE_CLIENT_ID || process.env.MICROSOFT_CLIENT_ID;
     const azureClientSecret = process.env.AZURE_CLIENT_SECRET || process.env.MICROSOFT_CLIENT_SECRET;
     const azureTenantId = process.env.AZURE_TENANT_ID || process.env.MICROSOFT_TENANT_ID || 'common';
-    const azureUserMail = process.env.AZURE_MAIL_USER || process.env.SMTP_EMAIL || 'Ptalctes@eurorep.mx';
+    const azureUserMail = (process.env.AZURE_MAIL_USER || process.env.SMTP_EMAIL || 'Ptalctes@eurorep.mx').toLowerCase();
 
-    let endpointBase = 'https://graph.microsoft.com/v1.0/me';
+    let endpointBase = `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(azureUserMail)}`;
     let headers = {};
 
     // 1. If no delegated token, try client credentials grant from Azure AD
@@ -68,7 +68,6 @@ export default async function handler(req, res) {
         if (tokenResp.ok) {
           const tokenJson = await tokenResp.json();
           graphToken = tokenJson.access_token;
-          endpointBase = `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(azureUserMail)}`;
         }
       } catch (tokenErr) {
         console.warn('[Azure Graph] Error obteniendo token por client_credentials:', tokenErr);
@@ -89,37 +88,66 @@ export default async function handler(req, res) {
     };
 
     // 2. Consultar mensajes recibidos y enviados desde Microsoft Graph
-    const selectFields = 'id,subject,bodyPreview,body,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,hasAttachments,isRead,conversationId';
+    const selectFields = 'id,subject,bodyPreview,body,from,sender,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,hasAttachments,isRead,conversationId';
     
-    const [inboxRes, sentRes] = await Promise.all([
-      fetch(`${endpointBase}/mailFolders/inbox/messages?$top=50&$select=${selectFields}&$orderby=receivedDateTime desc`, { headers }).catch(e => ({ ok: false, error: e })),
-      fetch(`${endpointBase}/mailFolders/sentitems/messages?$top=50&$select=${selectFields}&$orderby=sentDateTime desc`, { headers }).catch(e => ({ ok: false, error: e }))
+    // Función auxiliar para consultar un endpoint con fallback
+    const fetchFolderMessages = async (base, folder) => {
+      try {
+        const r = await fetch(`${base}/mailFolders/${folder}/messages?$top=50&$select=${selectFields}&$orderby=${folder === 'inbox' ? 'receivedDateTime' : 'sentDateTime'} desc`, { headers });
+        if (r.ok) {
+          const j = await r.json();
+          return Array.isArray(j.value) ? j.value.map(m => ({ ...m, _folder: folder })) : [];
+        }
+      } catch (e) {}
+      return null;
+    };
+
+    // Intentar primero con el buzón directo de ptalctes@eurorep.mx
+    let [inboxMessages, sentMessages] = await Promise.all([
+      fetchFolderMessages(endpointBase, 'inbox'),
+      fetchFolderMessages(endpointBase, 'sentitems')
     ]);
 
+    // Si falló por permisos de usuario delegado, intentar con /me
+    if (inboxMessages === null && sentMessages === null) {
+      endpointBase = 'https://graph.microsoft.com/v1.0/me';
+      [inboxMessages, sentMessages] = await Promise.all([
+        fetchFolderMessages(endpointBase, 'inbox'),
+        fetchFolderMessages(endpointBase, 'sentitems')
+      ]);
+    }
+
     let rawMessages = [];
+    if (Array.isArray(inboxMessages)) rawMessages = rawMessages.concat(inboxMessages);
+    if (Array.isArray(sentMessages)) rawMessages = rawMessages.concat(sentMessages);
 
-    if (inboxRes && inboxRes.ok) {
-      const inboxJson = await inboxRes.json();
-      if (Array.isArray(inboxJson.value)) {
-        rawMessages = rawMessages.concat(inboxJson.value.map(m => ({ ...m, _folder: 'inbox' })));
-      }
-    } else {
-      // Fallback a /messages general
-      const allRes = await fetch(`${endpointBase}/messages?$top=50&$select=${selectFields}&$orderby=receivedDateTime desc`, { headers }).catch(() => null);
-      if (allRes && allRes.ok) {
-        const allJson = await allRes.json();
-        if (Array.isArray(allJson.value)) {
-          rawMessages = rawMessages.concat(allJson.value);
+    // Si aún no hay mensajes, intentar consulta general a /messages
+    if (rawMessages.length === 0) {
+      try {
+        const allRes = await fetch(`${endpointBase}/messages?$top=50&$select=${selectFields}&$orderby=receivedDateTime desc`, { headers });
+        if (allRes.ok) {
+          const allJson = await allRes.json();
+          if (Array.isArray(allJson.value)) rawMessages = allJson.value;
         }
-      }
+      } catch (e) {}
     }
 
-    if (sentRes && sentRes.ok) {
-      const sentJson = await sentRes.json();
-      if (Array.isArray(sentJson.value)) {
-        rawMessages = rawMessages.concat(sentJson.value.map(m => ({ ...m, _folder: 'sentitems' })));
-      }
-    }
+    // Filtro estricto: Sólo correos pertenecientes a ptalctes@eurorep.mx
+    const targetEmail = 'ptalctes@eurorep.mx';
+    const involvesPtalctes = (m) => {
+      if (!m) return false;
+      const fromAddr = (m.from?.emailAddress?.address || m.sender?.emailAddress?.address || '').toLowerCase();
+      const toAddrs = Array.isArray(m.toRecipients) ? m.toRecipients.map(r => (r.emailAddress?.address || '').toLowerCase()) : [];
+      const ccAddrs = Array.isArray(m.ccRecipients) ? m.ccRecipients.map(r => (r.emailAddress?.address || '').toLowerCase()) : [];
+      const bccAddrs = Array.isArray(m.bccRecipients) ? m.bccRecipients.map(r => (r.emailAddress?.address || '').toLowerCase()) : [];
+      
+      return fromAddr.includes(targetEmail) ||
+             toAddrs.some(a => a.includes(targetEmail)) ||
+             ccAddrs.some(a => a.includes(targetEmail)) ||
+             bccAddrs.some(a => a.includes(targetEmail));
+    };
+
+    rawMessages = rawMessages.filter(involvesPtalctes);
 
     // 3. Normalizar correos de Microsoft a formato SAPI
     const emailMap = new Map();
@@ -127,14 +155,14 @@ export default async function handler(req, res) {
     rawMessages.forEach(m => {
       if (!m || !m.id || emailMap.has(m.id)) return;
 
-      const fromAddress = m.from?.emailAddress?.address || '';
-      const fromName = m.from?.emailAddress?.name || fromAddress;
+      const fromAddress = m.from?.emailAddress?.address || m.sender?.emailAddress?.address || '';
+      const fromName = m.from?.emailAddress?.name || m.sender?.emailAddress?.name || fromAddress;
       
       const toRecipients = Array.isArray(m.toRecipients) ? m.toRecipients.map(r => r.emailAddress?.address || r.emailAddress?.name).filter(Boolean) : [];
       const ccRecipients = Array.isArray(m.ccRecipients) ? m.ccRecipients.map(r => r.emailAddress?.address || r.emailAddress?.name).filter(Boolean) : [];
       const bccRecipients = Array.isArray(m.bccRecipients) ? m.bccRecipients.map(r => r.emailAddress?.address || r.emailAddress?.name).filter(Boolean) : [];
 
-      const isSent = m._folder === 'sentitems' || fromAddress.toLowerCase().includes('ptalctes@eurorep.mx') || fromAddress.toLowerCase().includes('eurorep');
+      const isSent = m._folder === 'sentitems' || fromAddress.toLowerCase().includes(targetEmail);
       const clientName = isSent ? (m.toRecipients?.[0]?.emailAddress?.name || toRecipients.join(', ') || 'Cliente') : fromName;
 
       const mappedItem = {
