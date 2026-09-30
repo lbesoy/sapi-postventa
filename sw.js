@@ -1,4 +1,4 @@
-const CACHE_NAME = 'eurorep-postventa-v392';
+const CACHE_NAME = 'eurorep-postventa-v414';
 const ASSETS = [
   '/',
   '/index.html',
@@ -7,7 +7,6 @@ const ASSETS = [
   '/utils.js',
   '/app.js',
   '/style.css',
-  '/cliente',
   '/cliente.html',
   '/cliente.css',
   '/cliente.js',
@@ -17,6 +16,14 @@ const ASSETS = [
   '/tecnicos_reporte.js',
   '/logo_transparent.png',
   '/Logo_de_Clara.svg',
+  '/manuales/manual_flujo_completo.html',
+  '/manuales/manual_administrador.html',
+  '/manuales/manual_tecnico.html',
+  '/manuales/manual_tickets.html',
+  '/manuales/manual_gastos.html',
+  '/manuales/diagrama_flujo.html',
+  '/manuales/manual_cliente.html',
+  '/manuales/manual_tecnico_desarrollador.html',
   'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
   'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js',
@@ -32,9 +39,13 @@ const ASSETS = [
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
+      .then(async cache => {
         console.log('[PWA] Precargando recursos estáticos indispensables...');
-        return cache.addAll(ASSETS);
+        await Promise.allSettled(
+          ASSETS.map(url => cache.add(url).catch(err => {
+            console.warn('[PWA] No se pudo precargar:', url, err);
+          }))
+        );
       })
       .then(() => self.skipWaiting())
   );

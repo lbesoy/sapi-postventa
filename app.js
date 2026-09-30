@@ -98,6 +98,14 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
       });
     };
 
+    if (document.readyState === 'complete') {
+      registerSW();
+    } else {
+      window.addEventListener('load', registerSW);
+    }
+  }
+}
+
 window.generarTicketsRefaccionesFaltantes = async function() {
   console.log('[App] Iniciando escaneo y generación de tickets de refacciones faltantes para órdenes...');
   let creados = 0;
@@ -206,44 +214,13 @@ window.generarTicketsRefaccionesFaltantes = async function() {
   }
 };
 
-    if (document.readyState === 'complete') {
-      registerSW();
-    } else {
-      window.addEventListener('load', registerSW);
-    }
-  }
-}
-
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.290'; // Incrementar esta versión para obligar a todos los usuarios a refrescar sesión y descargar el nuevo código
+const APP_VERSION = 'v1.3.341'; // Incrementar esta versión para obligar a todos los usuarios a descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
-    console.log(`[Version] Nueva versión detectada: ${APP_VERSION}. Purgando caché de LocalStorage para liberar espacio...`);
-    
-    // 1. Respaldar claves críticas de sesión, preferencias y tokens de Supabase Auth
-    const preserved = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key === 'eurorep_session' || key === 'eurorep_darkmode' || key === 'theme_mode' || key === 'sapi_roles_config' || key.startsWith('sb-'))) {
-        preserved[key] = localStorage.getItem(key);
-      }
-    }
-    
-    // 2. Limpiar todo el almacenamiento local
-    localStorage.clear();
-    
-    // 3. Restaurar claves preservadas
-    for (const key in preserved) {
-      localStorage.setItem(key, preserved[key]);
-    }
-    
+    console.log(`[Version] Nueva versión detectada: ${APP_VERSION}. Conservando datos y actualizando versión...`);
     localStorage.setItem('eurorep_app_version', APP_VERSION);
-    
-    // Forzar recarga limpia para cargar los nuevos scripts y datos frescos
-    setTimeout(() => {
-      window.location.reload(true);
-    }, 100);
   }
 }
 
@@ -559,10 +536,6 @@ window.migrarOrdenesExistentesMaquinaria = function() {
       o.equipo = t.equipo;
       
       modificados++;
-      
-      if (window.pushToSupabase) {
-        window.pushToSupabase('ordenes', o);
-      }
     }
   });
 
@@ -627,11 +600,6 @@ window.migrarUbicacionesMaquinariaDesdeTickets = function() {
               
               modificadosClientesDb = true;
               syncCount++;
-              
-              // Sincronizar máquina manual con Supabase
-              if (window.pushToSupabase) {
-                window.pushToSupabase('maquinaria', { ...m, cliente: c.id });
-              }
             }
           }
         });
@@ -659,11 +627,6 @@ window.migrarUbicacionesMaquinariaDesdeTickets = function() {
           
           modificadosMaquinariaDb = true;
           syncCount++;
-          
-          // Sincronizar máquina con Supabase
-          if (window.pushToSupabase) {
-            window.pushToSupabase('maquinaria', m);
-          }
         }
       }
     });
@@ -877,6 +840,14 @@ window.addEventListener('supabase_datos_cargados', async () => {
     configData = safeGetJSON('eurorep_config', {});
     cargarRolesDesdeStorage();
 
+    // Reparar y preservar de inmediato asignaciones, clientes y equipos
+    if (typeof window.sanitizarAsignacionesTickets === 'function') {
+      try { window.sanitizarAsignacionesTickets(); } catch (eSan) { console.warn('[App] Error al sanitizar tickets:', eSan); }
+    }
+    if (typeof window.sanitizarBitacorasOrdenes === 'function') {
+      try { window.sanitizarBitacorasOrdenes(); } catch (eBit) { console.warn('[App] Error al sanitizar bitácoras:', eBit); }
+    }
+
     // Ejecutar migraciones heredadas solo una vez por sesión y solo para administradores
     // Esto previene bucles infinitos de escritura y consultas redundantes en clientes no-admin
     const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
@@ -998,12 +969,16 @@ window.addEventListener('supabase_datos_cargados', async () => {
     if (typeof renderLevantamientos === 'function' && document.getElementById('view-levantamientos')?.classList.contains('active')) {
       renderLevantamientos();
     }
+    if (typeof renderRentas === 'function' && document.getElementById('view-rentas')?.classList.contains('active')) {
+      renderRentas();
+    }
     if (typeof renderChatSoporteEmpresa === 'function' && document.getElementById('view-chat-soporte')?.classList.contains('active')) {
       renderChatSoporteEmpresa();
     }
     if (document.getElementById('view-preferencias')?.classList.contains('active')) {
       if (typeof renderServiciosProgramadosTecnico === 'function') renderServiciosProgramadosTecnico();
       if (typeof renderIdeasFallas === 'function') renderIdeasFallas();
+      if (typeof window.renderManualesPorRol === 'function') window.renderManualesPorRol();
     }
     
     // Re-aplicar rol para asegurar que el role-switcher se muestre si el usuario recién se descargó
@@ -1309,38 +1284,38 @@ let ROLES = {
   superadmin: {
     label: 'Super Administrador',
     color: '#E8820C',
-    views: ['dashboard','servicios','envios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos','telemetry','chat-soporte'],
+    views: ['dashboard','servicios','rentas','envios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos','telemetry','chat-soporte'],
     canSwitchRoles: true,
   },
   admin: {
     label: 'Administrador',
     color: '#4f8ef7',
-    views: ['dashboard','servicios','envios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos','chat-soporte'],
+    views: ['dashboard','servicios','rentas','envios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','sitios','config','preferencias','gastos','chat-soporte'],
   },
   supervisor: {
     label: 'Supervisor',
     color: '#eab308',
-    views: ['dashboard','servicios','envios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','preferencias','gastos','chat-soporte'],
+    views: ['dashboard','servicios','rentas','envios','calendario','levantamientos','tickets','clientes','maquinaria','refacciones','tecnicos','preferencias','gastos','chat-soporte'],
   },
   tecnico: {
     label: 'Técnico / Instalador',
     color: '#10b981',
-    views: ['dashboard','servicios','envios','calendario','levantamientos','tickets','preferencias','gastos'],
+    views: ['dashboard','servicios','rentas','envios','calendario','levantamientos','tickets','preferencias','gastos'],
   },
   empresa: {
     label: 'Empresa / Cliente',
     color: '#8b5cf6',
-    views: ['dashboard','tickets','maquinaria','sitios','preferencias'],
+    views: ['dashboard','tickets','rentas','maquinaria','sitios','preferencias'],
   },
   consulta: {
     label: 'Consulta',
     color: '#64748b',
-    views: ['dashboard','servicios','envios','calendario','tickets','maquinaria','preferencias'],
+    views: ['dashboard','servicios','rentas','envios','calendario','tickets','maquinaria','preferencias'],
   },
 };
 
 const ROLES_LABELS = {
-  dashboard: 'Dashboard', servicios: 'Órdenes de Servicio', envios: 'Envíos y Guías de Entrega', calendario: 'Calendario',
+  dashboard: 'Dashboard', servicios: 'Órdenes de Servicio', rentas: 'Rentas de Maquinaria', envios: 'Envíos y Guías de Entrega', calendario: 'Calendario',
   tickets: 'Tickets', levantamientos: 'Levantamientos', clientes: 'Clientes', maquinaria: 'Maquinaria', refacciones: 'Refacciones',
   sitios: 'Mis Sitios', tecnicos: 'Técnicos', config: 'Configuración',
   preferencias: 'Preferencias', gastos: 'Control de Gastos', telemetry: 'Monitoreo Telemetría',
@@ -1413,6 +1388,17 @@ function cargarRolesDesdeStorage() {
     }
   });
 
+  // Garantizar vista de rentas para los roles autorizados tras la actualización
+  const rolesConRentas = ['superadmin', 'admin', 'supervisor', 'tecnico', 'empresa', 'consulta'];
+  rolesConRentas.forEach(rol => {
+    if (ROLES[rol] && Array.isArray(ROLES[rol].views)) {
+      if (!ROLES[rol].views.includes('rentas')) {
+        ROLES[rol].views.push('rentas');
+        configChanged = true;
+      }
+    }
+  });
+
   if (configChanged) {
     const configToSave = {
       roles: ROLES,
@@ -1429,6 +1415,9 @@ function cargarRolesDesdeStorage() {
   if (!isMigrated) {
     for (const r in ROLES) {
       if (ROLES[r] && Array.isArray(ROLES[r].views)) {
+        if (!ROLES[r].views.includes('rentas') && ['superadmin', 'admin', 'supervisor', 'tecnico', 'empresa', 'consulta'].includes(r)) {
+          ROLES[r].views.push('rentas');
+        }
         if (!ROLES[r].views.includes('envios') && ['superadmin', 'admin', 'supervisor', 'tecnico', 'consulta'].includes(r)) {
           ROLES[r].views.push('envios');
         }
@@ -2013,6 +2002,7 @@ function isTestData(item) {
         upper.startsWith('OS-PRUEBA') || 
         upper.startsWith('TKT-PRUEBA') || 
         upper.startsWith('LEV-PRUEBA') ||
+        upper.startsWith('REN-PRUEBA') ||
         upper.startsWith('TEST-') ||
         upper.startsWith('PRUEBA-') ||
         /^TKT-OS00\d+/i.test(upper) ||
@@ -2166,6 +2156,9 @@ function actualizarVistaActual() {
   }
   if (typeof window.filtrarKitsServicio === 'function') {
     try { window.filtrarKitsServicio(); } catch(e){}
+  }
+  if (typeof window.renderRentas === 'function') {
+    try { window.renderRentas(); } catch(e){}
   }
 }
 
@@ -2347,6 +2340,10 @@ function applyRole(rolKey) {
       filterClaraUserWrapper.style.display = isTecnico ? 'none' : 'flex';
     }
 
+    if (typeof window.renderManualesPorRol === 'function') {
+      window.renderManualesPorRol();
+    }
+
     lucide.createIcons();
   } catch (err) {
     console.error('Error applying role:', err);
@@ -2359,12 +2356,14 @@ function updateTopbarButtons(view, role) {
   const btnCliente = document.getElementById('btn-nuevo-cliente');
   const btnMaquina = document.getElementById('btn-agregar-maquina');
   const btnLevantamiento = document.getElementById('btn-nuevo-levantamiento');
+  const btnRenta = document.getElementById('btn-nueva-renta');
 
   if (btnOrden) btnOrden.style.display = 'none';
   if (btnTicket) btnTicket.style.display = 'none';
   if (btnCliente) btnCliente.style.display = 'none';
   if (btnMaquina) btnMaquina.style.display = 'none';
   if (btnLevantamiento) btnLevantamiento.style.display = 'none';
+  if (btnRenta) btnRenta.style.display = 'none';
 
   const allowedToCreateClientsAndMachines = ['superadmin', 'admin', 'supervisor'].includes(role);
 
@@ -2385,6 +2384,8 @@ function updateTopbarButtons(view, role) {
     if (typeof window.actualizarBadgeDepuradorOrdenes === 'function') window.actualizarBadgeDepuradorOrdenes();
   } else if (view === 'levantamientos') {
     if (btnLevantamiento && ['superadmin', 'admin', 'supervisor', 'tecnico'].includes(role)) btnLevantamiento.style.display = '';
+  } else if (view === 'rentas') {
+    if (btnRenta && ['superadmin', 'admin', 'supervisor', 'tecnico'].includes(role)) btnRenta.style.display = '';
   }
 }
 
@@ -2407,6 +2408,7 @@ function reRenderActiveView() {
       cargarListaQueriesSAP();
     }
     if (view === 'servicios') { renderTabla('servicios'); renderStats(); }
+    if (view === 'rentas' && typeof renderRentas === 'function') renderRentas();
     if (view === 'tickets') { renderTickets(); renderStats(); }
     if (view === 'levantamientos' && typeof renderLevantamientos === 'function') renderLevantamientos();
     if (view === 'tecnicos') {
@@ -2421,6 +2423,7 @@ function reRenderActiveView() {
     if (view === 'preferencias') {
       if (typeof renderServiciosProgramadosTecnico === 'function') renderServiciosProgramadosTecnico();
       if (typeof renderIdeasFallas === 'function') renderIdeasFallas();
+      if (typeof window.renderManualesPorRol === 'function') window.renderManualesPorRol();
     }
   } catch (err) {
     console.error(`Error re-rendering active view "${view}" after role switch:`, err);
@@ -5061,6 +5064,7 @@ function setupNav() {
           cargarListaQueriesSAP();
         }
         if (view === 'servicios') { renderTabla('servicios'); renderStats(); }
+        if (view === 'rentas' && typeof renderRentas === 'function') renderRentas();
         if (view === 'envios' && typeof renderEnvios === 'function') renderEnvios();
         if (view === 'tickets') { renderTickets(); renderStats(); }
         if (view === 'levantamientos' && typeof renderLevantamientos === 'function') renderLevantamientos();
@@ -5087,6 +5091,9 @@ function setupNav() {
           }
           if (typeof renderIdeasFallas === 'function') {
             renderIdeasFallas();
+          }
+          if (typeof window.renderManualesPorRol === 'function') {
+            window.renderManualesPorRol();
           }
         }
       } catch (err) {
@@ -9666,6 +9673,13 @@ function guardarNuevaMaquina(e) {
     if (fCli === clienteSeleccionado) {
       poblarMaquinasCliente('f-equipo', mName, fCli);
       if (typeof onEquipoOrdenChange === 'function') onEquipoOrdenChange();
+    }
+  }
+  if (document.getElementById('modal-nueva-renta')) {
+    const rCli = document.getElementById('renta-cliente')?.value;
+    if (rCli === clienteSeleccionado && typeof window.poblarRentaMaquinas === 'function') {
+      const targetMaqId = (typeof idInterno !== 'undefined' ? idInterno : (typeof finalIdInterno !== 'undefined' ? finalIdInterno : serie));
+      window.poblarRentaMaquinas(rCli, targetMaqId || mName);
     }
   }
 }
@@ -17440,7 +17454,15 @@ window.esTicketHijoRefacciones = function(t) {
   if (!t || typeof t !== 'object') return false;
   const tFolio = String(t.folio || '').trim();
   // Solo los tickets que tienen terminación -A / -a o vínculo explícito de subticket
-  return /-[Aa]$/i.test(tFolio) || tFolio.toUpperCase().includes('-A') || Boolean(t.parentTicketId || t.ticketPadreId || t.ticket_padre_id);
+  if (/-[Aa]$/i.test(tFolio) || tFolio.toUpperCase().includes('-A') || Boolean(t.parentTicketId || t.ticketPadreId || t.ticket_padre_id)) {
+    return true;
+  }
+  const asunto = String(t.asunto || '');
+  const desc = String(t.descripcion || '');
+  if (/(?:refacciones\s*para|ticket\s*padre|derivado\s*del|subticket)/i.test(asunto) || /(?:ticket\s*padre|derivado\s*del\s*ticket|subticket)/i.test(desc)) {
+    return true;
+  }
+  return false;
 };
 
 window.obtenerOrdenAsociadaTicket = function(t) {
@@ -17450,31 +17472,24 @@ window.obtenerOrdenAsociadaTicket = function(t) {
     return null;
   }
 
-  // 1. Recopilar todas las órdenes disponibles (variable global, window, y localStorage)
-  let pool = [];
-  if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
-    pool = pool.concat(ordenes);
-  }
-  if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) {
-    pool = pool.concat(window.ordenes);
-  }
-  try {
-    const local = (typeof safeGetJSON === 'function') 
-      ? safeGetJSON('sapi_ordenes', []) 
-      : JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
-    if (Array.isArray(local)) pool = pool.concat(local);
-  } catch (e) {}
+  // 1. Usar pool en memoria prioritariamente para evitar saturar el heap
+  let allOrds = (typeof ordenes !== 'undefined' && Array.isArray(ordenes) && ordenes.length > 0)
+    ? ordenes
+    : ((typeof window !== 'undefined' && Array.isArray(window.ordenes) && window.ordenes.length > 0)
+      ? window.ordenes
+      : null);
 
-  // Deduplicar órdenes por ID o Folio
-  const map = new Map();
-  for (const o of pool) {
-    if (o && (o.id || o.folio)) {
-      const key = o.id || o.folio;
-      if (!map.has(key)) map.set(key, o);
+  if (!allOrds) {
+    try {
+      allOrds = (typeof safeGetJSON === 'function') 
+        ? safeGetJSON('sapi_ordenes', []) 
+        : JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+    } catch (e) {
+      allOrds = [];
     }
   }
-  const allOrds = Array.from(map.values());
-  if (allOrds.length === 0) return null;
+
+  if (!allOrds || allOrds.length === 0) return null;
 
   const allTkts = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : [];
 
@@ -17636,29 +17651,29 @@ window.verOrdenDesdeTicket = function(ordenId) {
 window.obtenerTicketPadre = function(t) {
   if (!t || typeof t !== 'object') return null;
 
-  // Solo los tickets con -A (subtickets de refacciones) tienen ticket padre
+  // Solo los tickets con -A (subtickets de refacciones) o derivados tienen ticket padre
   if (typeof window.esTicketHijoRefacciones === 'function' && !window.esTicketHijoRefacciones(t)) {
     return null;
   }
 
   const tFolio = String(t.folio || '').trim();
 
-  let pool = [];
-  if (typeof tickets !== 'undefined' && Array.isArray(tickets)) pool = pool.concat(tickets);
-  if (typeof window !== 'undefined' && Array.isArray(window.tickets)) pool = pool.concat(window.tickets);
-  try {
-    const local = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_tickets', []) : JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
-    if (Array.isArray(local)) pool = pool.concat(local);
-  } catch (e) {}
+  // Usar pool en memoria prioritariamente
+  let allTkts = (typeof tickets !== 'undefined' && Array.isArray(tickets) && tickets.length > 0)
+    ? tickets
+    : ((typeof window !== 'undefined' && Array.isArray(window.tickets) && window.tickets.length > 0)
+      ? window.tickets
+      : null);
 
-  const map = new Map();
-  for (const tk of pool) {
-    if (tk && (tk.id || tk.folio)) {
-      const key = tk.id || tk.folio;
-      if (!map.has(key)) map.set(key, tk);
+  if (!allTkts) {
+    try {
+      allTkts = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_tickets', []) : JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+    } catch (e) {
+      allTkts = [];
     }
   }
-  const allTkts = Array.from(map.values());
+
+  if (!allTkts || allTkts.length === 0) return null;
   const norm = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
   // 1. Coincidencia directa por id/folio de padre
@@ -17668,7 +17683,22 @@ window.obtenerTicketPadre = function(t) {
     if (found) return found;
   }
 
-  // 2. Extracción de folio limpio quitando -A, TKT-, etc.
+  // 2. Búsqueda por mención explícita en Asunto o Descripción (ej: "Refacciones para TKT-26140" o "Ticket Padre TKT-26140")
+  const fullText = `${t.asunto || ''} ${t.descripcion || ''}`;
+  const explicitMatch = fullText.match(/(?:ticket\s*padre|refacciones\s*para|derivado\s*del\s*ticket\s*padre|derivado\s*del\s*ticket|origen)\s*(?:TKT-)?(\d{4,6})/i);
+  if (explicitMatch && explicitMatch[1]) {
+    const targetNum = explicitMatch[1];
+    const found = allTkts.find(x => {
+      if (!x || x.id === t.id) return false;
+      const xFol = String(x.folio || '').trim();
+      const xNum = xFol.replace(/[^0-9]/g, '');
+      const xNorm = norm(xFol);
+      return xFol === `TKT-${targetNum}` || xFol === `TKT-OS-${targetNum}` || xFol === targetNum || xNum === targetNum || xNorm === ('TKT' + targetNum);
+    });
+    if (found) return found;
+  }
+
+  // 3. Extracción de folio limpio quitando -A, TKT-, etc.
   let cleanBase = tFolio.replace(/-[Aa]$/i, '').trim();
   if (cleanBase.startsWith('[PRUEBA] ')) cleanBase = cleanBase.replace('[PRUEBA] ', '').trim();
   if (cleanBase.startsWith('[TEST] ')) cleanBase = cleanBase.replace('[TEST] ', '').trim();
@@ -17677,7 +17707,7 @@ window.obtenerTicketPadre = function(t) {
   const numMatch = cleanBase.match(/\d{4,6}/) || (t.asunto ? String(t.asunto).match(/\d{4,6}/) : null);
   const ticketNum = numMatch ? numMatch[0] : '';
 
-  if (ticketNum) {
+  if (ticketNum && ticketNum !== tFolio.replace(/[^0-9]/g, '')) {
     // Buscar en lista de tickets si existe TKT-26249, 26249 o TKT-OS-26249 (sin -A)
     const found = allTkts.find(x => {
       if (!x || x.id === t.id) return false;
@@ -17689,16 +17719,17 @@ window.obtenerTicketPadre = function(t) {
     if (found) return found;
   }
 
-  // 3. Buscar por cleanBase
+  // 4. Buscar por cleanBase
   if (cleanBase && cleanBase !== tFolio) {
     const normBase = norm(cleanBase);
     const found = allTkts.find(x => x && x.id !== t.id && (norm(x.folio) === normBase || x.id === cleanBase));
     if (found) return found;
   }
 
-  // 4. Fallback: número identificable de ticket padre
-  if (ticketNum) {
-    const parentFolio = `TKT-${ticketNum}`;
+  // 5. Fallback: número identificable de ticket padre
+  const fallbackNum = (explicitMatch && explicitMatch[1]) ? explicitMatch[1] : ticketNum;
+  if (fallbackNum) {
+    const parentFolio = `TKT-${fallbackNum}`;
     if (parentFolio !== tFolio && norm(parentFolio) !== norm(tFolio)) {
       return {
         id: parentFolio,
@@ -17710,6 +17741,166 @@ window.obtenerTicketPadre = function(t) {
   }
 
   return null;
+};
+
+// ===== RESOLUCIÓN EXHAUSTIVA DE CLIENTE PARA TICKETS =====
+window.resolverClienteTicket = function(t, depth = 0) {
+  if (!t || typeof t !== 'object') return '';
+  if (depth > 2) return t.cliente || '';
+
+  const allClients = (typeof clientesDb !== 'undefined' && Array.isArray(clientesDb) && clientesDb.length > 0)
+    ? clientesDb
+    : (() => {
+        try {
+          return JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+        } catch(e) { return []; }
+      })();
+
+  const isBlankCli = (val) => {
+    if (!val) return true;
+    const str = String(val).toLowerCase().trim();
+    return !str || str === 'sin cliente' || str === 'ninguno' || str === 'ninguno / uso interno' || str === 'genérico' || str === 'generico' || str === 'sin_cliente' || str === '-';
+  };
+
+  // 1. Si ya tiene t.cliente válido y no en blanco
+  if (!isBlankCli(t.cliente)) {
+    const rawVal = String(t.cliente).trim();
+    const matchedById = allClients.find(c => 
+      (c.id && String(c.id).toLowerCase().trim() === rawVal.toLowerCase()) ||
+      (c.idInterno && String(c.idInterno).toLowerCase().trim() === rawVal.toLowerCase()) ||
+      (c.rfc && String(c.rfc).toLowerCase().trim() === rawVal.toLowerCase())
+    );
+    if (matchedById && matchedById.nombre) {
+      return matchedById.nombre;
+    }
+    const matchedByName = allClients.find(c => c.nombre && String(c.nombre).toLowerCase().trim() === rawVal.toLowerCase());
+    if (matchedByName) return matchedByName.nombre;
+    return rawVal;
+  }
+
+  // 2. Resolver desde Ticket Padre
+  const parent = typeof window.obtenerTicketPadre === 'function' ? window.obtenerTicketPadre(t) : null;
+  if (parent && parent.id !== t.id && !isBlankCli(parent.cliente)) {
+    const pCli = window.resolverClienteTicket(parent, depth + 1);
+    if (pCli) return pCli;
+  }
+
+  // 3. Resolver desde Orden de Servicio Asociada
+  const assocOrder = typeof window.obtenerOrdenAsociadaTicket === 'function' ? window.obtenerOrdenAsociadaTicket(t) : null;
+  if (assocOrder && !isBlankCli(assocOrder.cliente)) {
+    const rawOrdCli = String(assocOrder.cliente).trim();
+    const matched = allClients.find(c => 
+      (c.id && String(c.id).toLowerCase().trim() === rawOrdCli.toLowerCase()) ||
+      (c.nombre && String(c.nombre).toLowerCase().trim() === rawOrdCli.toLowerCase())
+    );
+    return matched ? matched.nombre : rawOrdCli;
+  }
+
+  // 4. Resolver desde Máquina / Equipo (t.equipo)
+  const eqStr = String(t.equipo || '').trim();
+  if (eqStr && eqStr !== 'Otra / No registrada' && eqStr !== '—' && eqStr !== '-') {
+    let maquinasPool = (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb) && maquinariaDb.length > 0)
+      ? maquinariaDb
+      : (() => {
+          try {
+            return JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
+          } catch(e) { return []; }
+        })();
+
+    const eqLower = eqStr.toLowerCase();
+    for (const m of maquinasPool) {
+      if (!m) continue;
+      const mSerie = m.serie ? String(m.serie).toLowerCase().trim() : '';
+      const mIdInt = m.idInterno ? String(m.idInterno).toLowerCase().trim() : '';
+      const mId = m.id ? String(m.id).toLowerCase().trim() : '';
+      
+      let matches = false;
+      if (mSerie && mSerie.length >= 3 && eqLower.includes(mSerie)) matches = true;
+      if (mIdInt && mIdInt.length >= 3 && eqLower.includes(mIdInt)) matches = true;
+      if (mId && eqLower.includes(mId)) matches = true;
+
+      if (matches && m.cliente) {
+        const cliMatch = allClients.find(c => 
+          (c.id && String(c.id).toLowerCase().trim() === String(m.cliente).toLowerCase().trim()) ||
+          (c.nombre && String(c.nombre).toLowerCase().trim() === String(m.cliente).toLowerCase().trim())
+        );
+        return cliMatch ? cliMatch.nombre : m.cliente;
+      }
+    }
+
+    for (const c of allClients) {
+      if (c && Array.isArray(c.maquinas)) {
+        for (const m of c.maquinas) {
+          const mSerie = m.serie ? String(m.serie).toLowerCase().trim() : '';
+          const mIdInt = m.idInterno ? String(m.idInterno).toLowerCase().trim() : '';
+          if ((mSerie && mSerie.length >= 3 && eqLower.includes(mSerie)) || (mIdInt && mIdInt.length >= 3 && eqLower.includes(mIdInt))) {
+            return c.nombre;
+          }
+        }
+      }
+    }
+  }
+
+  // 5. Resolver desde Sitio / Ubicación (t.sitio)
+  const sitStr = String(t.sitio || '').trim();
+  if (sitStr && sitStr !== 'Ninguno' && sitStr !== '—' && sitStr !== '-') {
+    let sitiosPool = [];
+    if (typeof sitiosDb !== 'undefined' && Array.isArray(sitiosDb)) sitiosPool = sitiosPool.concat(sitiosDb);
+    try {
+      const localS = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+      if (Array.isArray(localS)) sitiosPool = sitiosPool.concat(localS);
+    } catch(e) {}
+
+    const sitLower = sitStr.toLowerCase();
+    const matchedSitio = sitiosPool.find(s => 
+      s && (
+        (s.id && String(s.id).toLowerCase() === sitLower) ||
+        (s.nombre && String(s.nombre).toLowerCase() === sitLower) ||
+        (s.direccion && String(s.direccion).toLowerCase() === sitLower)
+      )
+    );
+    if (matchedSitio && matchedSitio.cliente) {
+      const cliMatch = allClients.find(c => 
+        (c.id && String(c.id).toLowerCase().trim() === String(matchedSitio.cliente).toLowerCase().trim()) ||
+        (c.nombre && String(c.nombre).toLowerCase().trim() === String(matchedSitio.cliente).toLowerCase().trim())
+      );
+      return cliMatch ? cliMatch.nombre : matchedSitio.cliente;
+    }
+  }
+
+  // 6. Resolver desde Cotizaciones / Pedidos SAP
+  const sapVal = String(t.cotizacionSAP || t.pedidoSAP || '').trim();
+  if (sapVal) {
+    let quotes = window._cacheCotizacionesSap || [];
+    const qMatch = quotes.find(q => q && (q.numero_cotizacion === sapVal || q.numero_pedido === sapVal));
+    if (qMatch && qMatch.cliente) {
+      return qMatch.cliente;
+    }
+  }
+
+  // 7. Resolver desde Solicitante o Contacto
+  const solStr = String(t.solicitante || '').trim().toLowerCase();
+  if (solStr) {
+    const cliBySol = allClients.find(c => c.nombre && c.nombre.toLowerCase().trim() === solStr);
+    if (cliBySol) return cliBySol.nombre;
+
+    let usersPool = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : [];
+    const uMatch = usersPool.find(u => u && u.nombre && u.nombre.toLowerCase().trim() === solStr && u.empresa);
+    if (uMatch) return uMatch.empresa;
+  }
+
+  // 8. Buscar mención directa de cliente en Asunto / Descripción / Notas
+  const fullText = `${t.asunto || ''} ${t.descripcion || ''} ${t.notas || ''}`.toLowerCase();
+  for (const c of allClients) {
+    if (c && c.nombre && c.nombre.length >= 4) {
+      const cNorm = c.nombre.toLowerCase().trim();
+      if (fullText.includes(cNorm)) {
+        return c.nombre;
+      }
+    }
+  }
+
+  return '';
 };
 
 // ===== RENDER TICKETS =====
@@ -17995,7 +18186,8 @@ function renderTickets(ctx) {
     }
     const canEdit = currentSession.viewMode !== 'consulta';
     const canDelete = ['superadmin', 'admin'].includes(currentSession.viewMode);
-  
+    const isSuperadmin = (typeof currentSession !== 'undefined' && currentSession && (currentSession.viewMode === 'superadmin' || currentSession.rol === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.userId === 'superadmin'));
+
     body.innerHTML = filtered.map((t, i) => {
       if (!t) return '';
       const latestComment = (t.comentariosInternos && Array.isArray(t.comentariosInternos) && t.comentariosInternos.length > 0)
@@ -18033,7 +18225,7 @@ function renderTickets(ctx) {
           <div style="display:flex;gap:0.25rem; align-items:center;">
             <button class="action-btn" onclick="verDetalleTicket('${t.id}')" title="Ver Ticket"><i data-lucide="eye"></i></button>
             ${canEdit ? `<button class="action-btn" onclick="editarTicket('${t.id}')" title="Editar Ticket"><i data-lucide="pencil"></i></button>` : ''}
-            ${assocOrder ? `<button class="action-btn os-link-btn" onclick="event.stopPropagation(); window.verOrdenDesdeTicket('${assocOrder.id}')" title="Ver Orden de Servicio ${assocOrder.folio || ''}" style="color: #2563eb; background: rgba(37,99,235,0.08); border-color: rgba(37,99,235,0.25);"><i data-lucide="file-text"></i></button>` : (parentTicket ? `<button class="action-btn parent-tkt-btn" onclick="event.stopPropagation(); verDetalleTicket('${parentTicket.id}')" title="Ver Ticket Origen ${parentTicket.folio || ''}" style="color: #ea580c; background: rgba(234,88,12,0.08); border-color: rgba(234,88,12,0.25);"><i data-lucide="ticket"></i></button>` : '')}
+            ${assocOrder ? `<button class="action-btn os-link-btn" onclick="event.stopPropagation(); window.verOrdenDesdeTicket('${assocOrder.id}')" title="Ver Orden de Servicio ${assocOrder.folio || ''}" style="color: #2563eb; background: rgba(37,99,235,0.08); border-color: rgba(37,99,235,0.25);"><i data-lucide="file-text"></i></button>` : (parentTicket ? `<button class="action-btn parent-tkt-btn" onclick="event.stopPropagation(); verDetalleTicket('${parentTicket.id}')" title="Ver Ticket Origen ${parentTicket.folio || ''}" style="color: #ea580c; background: rgba(234,88,12,0.08); border-color: rgba(234,88,12,0.25);"><i data-lucide="ticket"></i></button>` : (isSuperadmin ? `<button class="action-btn" onclick="event.stopPropagation(); window.forzarCrearOrdenServicio('${t.id}')" title="Forzar Orden de Servicio (Superadmin)" style="color: #2563eb; background: rgba(37,99,235,0.08); border-color: rgba(37,99,235,0.25);"><i data-lucide="file-plus"></i></button>` : ''))}
           </div>
         </td>
         <td data-label="Folio" style="white-space: nowrap;">
@@ -18062,7 +18254,15 @@ function renderTickets(ctx) {
         </td>
         <td data-label="Solicitante">
           <div style="font-weight:500; min-width: 150px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.solicitante || ''}">${t.solicitante||'—'}</div>
-          ${t.cliente ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem; min-width: 150px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}"><i data-lucide="building-2" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${t.cliente}${t.sitio ? ` - ${t.sitio}` : ''}</div>` : ''}
+          ${(() => {
+            const resolvedCli = (typeof window.resolverClienteTicket === 'function' ? window.resolverClienteTicket(t) : '') || t.cliente || (parentTicket && parentTicket.cliente) || (assocOrder && assocOrder.cliente) || '';
+            const resolvedSit = t.sitio || (parentTicket && parentTicket.sitio) || (assocOrder && (assocOrder.ubicacion || assocOrder.ubicacion_sitio)) || '';
+            if (!resolvedCli) return '';
+            return `
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem; min-width: 150px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${resolvedCli}${resolvedSit ? ` - ${resolvedSit}` : ''}">
+                <i data-lucide="building-2" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"></i>${resolvedCli}${resolvedSit ? ` - ${resolvedSit}` : ''}
+              </div>`;
+          })()}
         </td>
         <td data-label="Área" style="white-space:nowrap;">${t.area||'—'}</td>
         <td data-label="Prioridad" class="col-prioridad" style="white-space:nowrap; display: ${isEmpresa ? 'none' : ''};"><span class="badge badge-${String(t.prioridad||'media').toLowerCase()}">${t.prioridad||'—'}</span></td>
@@ -18073,7 +18273,7 @@ function renderTickets(ctx) {
         <td data-label="Cotización SAP" style="white-space:nowrap; font-family: monospace;">${t.cotizacionSAP||'—'}</td>
         <td data-label="Monto" style="white-space:nowrap; font-weight: 600;">${(t.montoCotizacion !== undefined && t.montoCotizacion !== null) ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(t.montoCotizacion) : '—'}</td>
         <td data-label="Pedido SAP" style="white-space:nowrap; font-family: monospace;">${t.pedidoSAP||'—'}</td>
-        <td data-label="Asignado" class="col-asignado" style="white-space:nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis; display: ${isEmpresa ? 'none' : ''};" title="${t.asignado||''}">${t.asignado||'—'}</td>
+        <td data-label="Asignado" class="col-asignado" style="white-space:nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis; display: ${isEmpresa ? 'none' : ''};" title="${t.asignado || parentTicket?.asignado || assocOrder?.tecnico || ''}">${t.asignado || parentTicket?.asignado || assocOrder?.tecnico || '—'}</td>
         <td data-label="Fecha Creación" style="white-space:nowrap;">${formatFechaHoraAmigable(t.fechaCreacion || t.fecha)}</td>
         <td data-label="Última Modif." style="white-space:nowrap;">
           <div style="font-size:0.8rem; color:var(--text-secondary);">${formatFechaHoraAmigable(window.getTicketFechaModificacion ? window.getTicketFechaModificacion(t) : (t.fechaModificacion || t.fechaCreacion || t.fecha))}</div>
@@ -22370,11 +22570,16 @@ window.updateNotificationBell = function() {
   // Filtrar según el modo Sandbox activo
   const filteredTickets = getFilteredTickets();
   
-  // 1. Tickets sin asignar
+  // 1. Tickets sin asignar: Solo tickets nuevos en estado Abierto que requieren asignación inicial (excluyendo subtickets de refacciones que pertenecen a su propio flujo)
   const unassigned = filteredTickets.filter(t => {
+    if (!t) return false;
     const asignadoClean = String(t.asignado || '').trim().toLowerCase();
     const estadoClean = String(t.estado || '').trim().toLowerCase();
-    return (asignadoClean === 'sin asignar' || asignadoClean === '') && (estadoClean !== 'cerrado' && estadoClean !== 'finalizado');
+    const tFolio = String(t.folio || '').trim();
+    const isSubticket = /-[Aa]$/i.test(tFolio) || tFolio.toUpperCase().includes('-A') || t.categoria === 'Refacción';
+    return (asignadoClean === 'sin asignar' || asignadoClean === '' || asignadoClean === '-') && 
+           (estadoClean === 'abierto') && 
+           !isSubticket;
   });
 
   // 2. Pedidos pendientes (cotización aceptada por el cliente pero sin número de pedido SAP registrado)
@@ -23249,10 +23454,9 @@ function abrirTicket(id) {
       document.getElementById('t-prioridad').value = t.prioridad || 'Media';
       const selectAsignado = document.getElementById('t-asignado');
       if (selectAsignado) {
-        const infoAsig = window.obtenerInfoRolUsuario(t.asignado);
-        if (['supervisor', 'admin', 'superadmin'].includes(infoAsig.rol)) {
+        if (t.asignado && t.asignado !== 'Sin Asignar' && t.asignado !== 'sin_asignar' && t.asignado !== '-') {
           let exists = Array.from(selectAsignado.options).some(o => o.value === t.asignado);
-          if (!exists && t.asignado) {
+          if (!exists) {
             const opt = document.createElement('option');
             opt.value = t.asignado;
             opt.textContent = t.asignado;
@@ -23285,19 +23489,26 @@ function abrirTicket(id) {
         seleccionarCanal('');
       }
       
-      if (t.cliente) {
-        selectComboOption('t-cliente', t.cliente, t.cliente);
+      const pTicket = typeof window.obtenerTicketPadre === 'function' ? window.obtenerTicketPadre(t) : null;
+      const assocOrd = typeof window.obtenerOrdenAsociadaTicket === 'function' ? window.obtenerOrdenAsociadaTicket(t) : null;
+      const resolvedCli = typeof window.resolverClienteTicket === 'function' ? window.resolverClienteTicket(t) : '';
+      const effectiveCliente = resolvedCli || t.cliente || (pTicket && pTicket.cliente ? pTicket.cliente : (assocOrd && assocOrd.cliente ? assocOrd.cliente : ''));
+      const effectiveSitio = t.sitio || (pTicket && pTicket.sitio ? pTicket.sitio : (assocOrd && (assocOrd.ubicacion || assocOrd.ubicacion_sitio) ? (assocOrd.ubicacion || assocOrd.ubicacion_sitio) : ''));
+
+      if (effectiveCliente) {
+        selectComboOption('t-cliente', effectiveCliente, effectiveCliente);
       } else {
         selectComboOption('t-cliente', 'Ninguno / Uso Interno', 'Ninguno / Uso Interno');
       }
-      if (t.sitio) {
-        const escapedSitio = t.sitio.replace(/'/g, "\\'");
+      if (effectiveSitio) {
+        const escapedSitio = effectiveSitio.replace(/'/g, "\\'");
         selectComboOption('t-sitio', escapedSitio, escapedSitio, true);
       }
 
-      poblarMaquinasCliente('t-equipo', '', t.cliente);
-      if (t.equipo) {
-        t.equipo.split(', ').forEach(eqName => {
+      poblarMaquinasCliente('t-equipo', '', effectiveCliente || t.cliente);
+      const effectiveEquipo = (t.equipo && t.equipo !== 'Otra / No registrada') ? t.equipo : ((pTicket && pTicket.equipo && pTicket.equipo !== 'Otra / No registrada') ? pTicket.equipo : ((assocOrd && assocOrd.equipo) ? assocOrd.equipo : (t.equipo || '')));
+      if (effectiveEquipo) {
+        effectiveEquipo.split(', ').forEach(eqName => {
           if (eqName.trim()) {
             window.agregarMaquinaChip(eqName.trim());
           }
@@ -25169,8 +25380,15 @@ function verDetalleTicket(id) {
 
   const assocOrder = window.obtenerOrdenAsociadaTicket(t);
   const parentTicket = !assocOrder ? (typeof window.obtenerTicketPadre === 'function' ? window.obtenerTicketPadre(t) : null) : null;
+  const isSuperadmin = (typeof currentSession !== 'undefined' && currentSession && (currentSession.viewMode === 'superadmin' || currentSession.rol === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.userId === 'superadmin'));
   const isDecisionLocked = ['si', 'aprobada', 'no', 'rechazada'].includes(String(t.cotAceptada || '').toLowerCase().trim());
   document.getElementById('ticket-detalle-title').textContent = `Ticket ${t.folio}`;
+
+  const resolvedCli = typeof window.resolverClienteTicket === 'function' ? window.resolverClienteTicket(t) : '';
+  const clienteDisplay = resolvedCli || t.cliente || (parentTicket && parentTicket.cliente ? `${parentTicket.cliente} <span style="font-size:0.75rem; color:var(--accent); font-weight:normal;">(Heredado de Ticket Origen ${parentTicket.folio || parentTicket.id})</span>` : (assocOrder && assocOrder.cliente ? `${assocOrder.cliente} <span style="font-size:0.75rem; color:#2563eb; font-weight:normal;">(Heredado de OS ${assocOrder.folio || assocOrder.id})</span>` : ''));
+  const sitioDisplay = t.sitio || (parentTicket && parentTicket.sitio ? parentTicket.sitio : (assocOrder && (assocOrder.ubicacion || assocOrder.ubicacion_sitio) ? (assocOrder.ubicacion || assocOrder.ubicacion_sitio) : ''));
+  const equipoDisplay = (t.equipo && t.equipo !== 'Otra / No registrada') ? t.equipo : ((parentTicket && parentTicket.equipo && parentTicket.equipo !== 'Otra / No registrada') ? `${parentTicket.equipo} <span style="font-size:0.75rem; color:var(--accent); font-weight:normal;">(Ticket Origen)</span>` : ((assocOrder && assocOrder.equipo) ? `${assocOrder.equipo} <span style="font-size:0.75rem; color:#2563eb; font-weight:normal;">(Orden de Servicio)</span>` : (t.equipo || '—')));
+
   const field = (label, val, fullWidth = false) => `
     <div class="detalle-field" ${fullWidth ? 'style="grid-column: 1 / -1;"' : ''}>
       <div class="detalle-label">${label}</div>
@@ -25226,7 +25444,24 @@ function verDetalleTicket(id) {
         </button>
       </div>
     </div>
-    ` : '')}
+    ` : (isSuperadmin ? `
+    <div class="detalle-section" style="background: rgba(37, 99, 235, 0.04); border: 1px dashed rgba(37, 99, 235, 0.35); border-radius: 8px; padding: 0.75rem 1.1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 0.65rem;">
+        <div style="width: 32px; height: 32px; border-radius: 6px; background: rgba(37, 99, 235, 0.12); color: #2563eb; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <i data-lucide="file-plus" style="width: 16px; height: 16px;"></i>
+        </div>
+        <div>
+          <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: #2563eb;">Sin Orden de Servicio</div>
+          <div style="font-size: 0.82rem; color: var(--text-secondary);">Este ticket no cuenta con una orden de servicio generada.</div>
+        </div>
+      </div>
+      <div>
+        <button type="button" class="btn-primary" onclick="forzarCrearOrdenServicio('${t.id}')" style="display: inline-flex; align-items: center; gap: 6px; padding: 0.4rem 0.85rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; border-radius: 6px; background: #2563eb; color: #ffffff; border: none;">
+          <i data-lucide="file-plus" style="width: 14px; height: 14px;"></i> Forzar Orden de Servicio
+        </button>
+      </div>
+    </div>
+    ` : ''))}
     <div class="detalle-section">
       <div class="detalle-section-title">Datos del Ticket</div>
       <div class="detalle-grid">
@@ -25236,7 +25471,7 @@ function verDetalleTicket(id) {
         ${field('Última Modificación', formatFechaHoraAmigable(window.getTicketFechaModificacion ? window.getTicketFechaModificacion(t) : (t.fechaModificacion || t.fechaCreacion || t.fecha)))}
         ${field('Modificado por', window.getTicketModificadoPor ? window.getTicketModificadoPor(t) : (t.modificadoPor || t.creadoPor || '—'))}
         ${field('Asunto', `<strong style="color:var(--text-primary); font-size:0.95rem;">${t.asunto || '—'}</strong>`, true)}
-        ${t.cliente ? field('Cliente', `${t.cliente}${t.sitio ? ` (Sitio: ${t.sitio})` : ''}`) : ''}
+        ${field('Cliente', clienteDisplay ? `${clienteDisplay}${sitioDisplay ? ` (Sitio: ${sitioDisplay})` : ''}` : '—')}
         ${field('Canal', t.canal ? ({correo:'Correo',whatsapp:'WhatsApp',telefono:'Llamada Tel.'}[t.canal]||t.canal) : '—')}
         ${field('Contacto', t.contacto)}
         ${field('Estado', `<span class="badge badge-${badgeTicketEstado(t)}">${getTicketEstadoLabel(t)}</span>`)}
@@ -25246,7 +25481,7 @@ function verDetalleTicket(id) {
         ${field('Área', t.area)}
         ${field('Categoría', t.categoria)}
         ${field('Asignado a', t.asignado)}
-        ${field('Equipo / Máquina', t.equipo, true)}
+        ${field('Equipo / Máquina', equipoDisplay, true)}
       </div>
     </div>
     <div class="detalle-section">
@@ -25608,13 +25843,18 @@ function verDetalleTicket(id) {
     </div>
     <div style="font-family: monospace; font-size: 0.6rem; color: var(--text-muted); letter-spacing: 5px; text-align: center; margin-bottom: 1rem;">* ${t.folio} *</div>
 
-    <div class="form-actions" style="border-top:2px dashed var(--border);padding-top:1rem;margin-top:0.5rem; justify-content:center;">
+    <div class="form-actions" style="border-top:2px dashed var(--border);padding-top:1rem;margin-top:0.5rem; justify-content:center; gap:0.5rem; flex-wrap:wrap;">
       <button class="btn-secondary" onclick="cerrarDetalleTicket()">Cerrar Vista</button>
       <button class="btn-primary" onclick="cerrarDetalleTicket();editarTicket('${t.id}')"><i data-lucide="pencil" style="width:16px;height:16px;"></i> Editar</button>
-      ${currentSession.viewMode === 'superadmin' ? `
+      ${isSuperadmin ? `
         <button class="btn-secondary" style="border-color:var(--accent); color:var(--accent);" onclick="forzarEstadoTicket('${t.id}')">
           <i data-lucide="zap" style="width:16px;height:16px;margin-right:4px;"></i> Forzar Estado
         </button>
+        ${!assocOrder ? `
+          <button class="btn-secondary" style="border-color:#2563eb; color:#2563eb;" onclick="forzarCrearOrdenServicio('${t.id}')">
+            <i data-lucide="file-plus" style="width:16px;height:16px;margin-right:4px;"></i> Forzar Orden de Servicio
+          </button>
+        ` : ''}
       ` : ''}
     </div>
   `;
@@ -26373,6 +26613,375 @@ window.forzarEstadoTicket = async function(id) {
   });
 };
 
+window.forzarCrearOrdenServicio = async function(id) {
+  const isSuperadmin = (typeof currentSession !== 'undefined' && currentSession && 
+    (currentSession.viewMode === 'superadmin' || currentSession.rol === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.userId === 'superadmin'));
+  
+  if (!isSuperadmin) {
+    mostrarNotificacion('Solo los usuarios con rol Superadmin pueden forzar la creación de órdenes de servicio.', 'error');
+    return;
+  }
+
+  let t = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets.find(x => x && (x.id === id || x.folio === id)) : null;
+  if (!t) {
+    try {
+      const local = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_tickets', []) : JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+      t = local.find(x => x && (x.id === id || x.folio === id));
+    } catch(e){}
+  }
+  if (!t) {
+    mostrarNotificacion('No se encontró el ticket seleccionado.', 'error');
+    return;
+  }
+
+  const existingOrder = typeof window.obtenerOrdenAsociadaTicket === 'function' ? window.obtenerOrdenAsociadaTicket(t) : null;
+  if (existingOrder) {
+    const continuar = confirm(`Este ticket ya tiene una Orden de Servicio asociada (${existingOrder.folio || existingOrder.id}). ¿Estás seguro de que deseas forzar la creación de OTRA orden de servicio para este ticket?`);
+    if (!continuar) return;
+  }
+
+  // Obtener lista de máquinas del cliente o catálogo general
+  let maquinasOptions = [];
+  const clienteNombre = t.cliente || '';
+  if (clienteNombre && typeof clientesDb !== 'undefined' && Array.isArray(clientesDb)) {
+    const cObj = clientesDb.find(c => c.nombre === clienteNombre || c.id === clienteNombre || c.idInterno === clienteNombre || c.rfc === clienteNombre);
+    if (cObj && Array.isArray(cObj.maquinas)) {
+      maquinasOptions = cObj.maquinas;
+    }
+  }
+  if (maquinasOptions.length === 0 && typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb)) {
+    const normCli = String(clienteNombre).toLowerCase().trim();
+    if (normCli) {
+      maquinasOptions = maquinariaDb.filter(m => String(m.cliente || '').toLowerCase().trim() === normCli);
+    }
+  }
+
+  // Obtener lista de técnicos disponibles
+  const tecsSet = new Set();
+  if (typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) {
+    tecnicosDb.forEach(tec => {
+      const n = (typeof formatNombreCorto === 'function') ? formatNombreCorto(tec.nombre) : tec.nombre;
+      if (n) tecsSet.add(n);
+    });
+  }
+  if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
+    usuarios.filter(u => ['tecnico', 'supervisor', 'admin', 'superadmin'].includes(u.rol)).forEach(u => {
+      const n = (typeof formatNombreCorto === 'function') ? formatNombreCorto(u.nombre) : u.nombre;
+      if (n) tecsSet.add(n);
+    });
+  }
+  const listaTecnicos = Array.from(tecsSet).sort();
+
+  // Técnicos preasignados en el ticket
+  let tecsAsignadosTicket = [];
+  if (Array.isArray(t.tecnicosAsignados) && t.tecnicosAsignados.length > 0) {
+    tecsAsignadosTicket = t.tecnicosAsignados;
+  } else if (t.asignado) {
+    tecsAsignadosTicket = String(t.asignado).split(',').map(s => s.trim()).filter(Boolean);
+  }
+
+  const tieneRefacciones = Array.isArray(t.refaccionesSeleccionadas) && t.refaccionesSeleccionadas.length > 0;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.style.zIndex = '99999';
+  
+  overlay.innerHTML = `
+    <div class="modal-content" style="max-width:560px; padding:1.5rem; max-height:90vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--border); padding-bottom:0.6rem;">
+        <h3 style="margin:0; font-size:1.15rem; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+          <i data-lucide="file-plus" style="color:#2563eb;"></i> Forzar Orden de Servicio (Superadmin)
+        </h3>
+        <button class="close-btn" onclick="this.closest('.modal-overlay').remove()" style="background:none; border:none; cursor:pointer; color:var(--text-muted);">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div style="background: rgba(37, 99, 235, 0.06); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 8px; padding: 0.8rem 1rem; margin-bottom: 1.2rem;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.82rem;">
+          <div><span style="color:var(--text-muted);">Ticket:</span> <strong style="color:var(--text-primary);">${t.folio || t.id}</strong></div>
+          <div><span style="color:var(--text-muted);">Estado:</span> <span class="badge badge-${typeof badgeTicketEstado === 'function' ? badgeTicketEstado(t) : 'abierto'}">${typeof getTicketEstadoLabel === 'function' ? getTicketEstadoLabel(t) : (t.estado || 'Abierto')}</span></div>
+          <div style="grid-column: 1 / -1;"><span style="color:var(--text-muted);">Cliente:</span> <strong style="color:var(--text-primary);">${t.cliente || 'Sin cliente especificado'}</strong> ${t.sitio ? `(Sitio: ${t.sitio})` : ''}</div>
+          <div style="grid-column: 1 / -1;"><span style="color:var(--text-muted);">Asunto:</span> <span style="color:var(--text-secondary);">${t.asunto || '—'}</span></div>
+        </div>
+      </div>
+
+      <form id="form-forzar-orden" onsubmit="event.preventDefault();">
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; margin-bottom:0.35rem; display:block;">Tipo de Visita / Servicio *</label>
+          <select id="forzar-tipo-servicio" style="width:100%; padding:0.6rem; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-secondary); color:var(--text-primary);">
+            <option value="Servicio" ${(!t.tipo || t.tipo === 'Servicio') ? 'selected' : ''}>Servicio</option>
+            <option value="Servicio preventivo" ${(t.tipo === 'Servicio preventivo' || (t.categoria && t.categoria.includes('Preventivo'))) ? 'selected' : ''}>Servicio preventivo</option>
+            <option value="Servicio correctivo" ${(t.tipo === 'Servicio correctivo' || (t.categoria && t.categoria.includes('Correctivo'))) ? 'selected' : ''}>Servicio correctivo</option>
+            <option value="Inspección" ${t.tipo === 'Inspección' ? 'selected' : ''}>Inspección</option>
+            <option value="Entrega y puesta en marcha" ${(t.tipo === 'Entrega y puesta en marcha' || (t.categoria && t.categoria.includes('Puesta en Marcha'))) ? 'selected' : ''}>Entrega y puesta en marcha</option>
+            <option value="Pre-entrega" ${(t.tipo === 'Pre-entrega' || (t.categoria && t.categoria.includes('Pre-Entrega'))) ? 'selected' : ''}>Pre-entrega</option>
+            <option value="Garantía" ${(t.tipo === 'Garantía' || (t.categoria && t.categoria.includes('Garantía'))) ? 'selected' : ''}>Garantía</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; margin-bottom:0.35rem; display:block;">Equipo / Maquinaria</label>
+          <input type="text" id="forzar-equipo" value="${(t.equipo && t.equipo !== 'Otra / No registrada') ? t.equipo.replace(/"/g, '&quot;') : ''}" placeholder="Ej. [1234] CIFA K40H (SN: 9876)" style="width:100%; padding:0.6rem; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-secondary); color:var(--text-primary);" />
+          ${maquinasOptions.length > 0 ? `
+            <div style="margin-top: 0.35rem; font-size: 0.75rem; color: var(--text-muted);">
+              Sugerencias del cliente: 
+              <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
+                ${maquinasOptions.slice(0, 6).map(m => {
+                  const label = `${m.idInterno ? `[${m.idInterno}] ` : ''}${m.marca || ''} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+                  const safeLabel = label.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                  return `<button type="button" class="badge" style="cursor:pointer; background:var(--bg-card); border:1px solid var(--border); font-size:0.72rem; padding:2px 6px;" onclick="document.getElementById('forzar-equipo').value='${safeLabel}'">${label}</button>`;
+                }).join('')}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; margin-bottom:0.35rem; display:block;">Técnicos Asignados</label>
+          <div style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem; background: var(--bg-secondary);">
+            ${listaTecnicos.length > 0 ? listaTecnicos.map(tec => {
+              const checked = tecsAsignadosTicket.some(st => String(st).toLowerCase().trim() === String(tec).toLowerCase().trim() || String(st).includes(tec));
+              return `
+                <label style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; margin-bottom: 4px; cursor: pointer; color: var(--text-primary);">
+                  <input type="checkbox" name="forzar-tecnicos" value="${tec.replace(/"/g, '&quot;')}" ${checked ? 'checked' : ''} />
+                  <span>${tec}</span>
+                </label>
+              `;
+            }).join('') : '<span style="font-size:0.8rem; color:var(--text-muted);">No hay técnicos disponibles en la base de datos</span>'}
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; margin-bottom:0.35rem; display:block;">No. Pedido SAP <span style="font-size:0.72rem; color:var(--text-muted); font-weight:normal;">(Opcional)</span></label>
+          <input type="text" id="forzar-pedido-sap" value="${(t.pedidoSAP || '').replace(/"/g, '&quot;')}" placeholder="Ej. 10245" style="width:100%; padding:0.6rem; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-secondary); color:var(--text-primary);" />
+        </div>
+
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; margin-bottom:0.35rem; display:block;">Falla / Descripción del Servicio</label>
+          <textarea id="forzar-falla" rows="3" style="width:100%; padding:0.6rem; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-secondary); color:var(--text-primary); resize:vertical;">${((t.asunto ? t.asunto + '\n' : '') + (t.descripcion || '')).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+        </div>
+
+        ${tieneRefacciones ? `
+          <div class="form-group" style="margin-bottom:1.2rem; background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:0.65rem 0.85rem;">
+            <label style="display:flex; align-items:center; gap:8px; font-size:0.82rem; font-weight:600; color:var(--text-primary); cursor:pointer;">
+              <input type="checkbox" id="forzar-incluir-refacciones" checked />
+              <span>Copiar ${t.refaccionesSeleccionadas.length} refacción(es) del ticket a la Orden de Servicio</span>
+            </label>
+          </div>
+        ` : ''}
+
+        <div style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:1.5rem; border-top:1px solid var(--border); padding-top:1rem;">
+          <button type="button" class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+          <button type="button" class="btn-primary" style="background:#2563eb; border-color:#2563eb;" id="btn-forzar-orden-confirmar">
+            <i data-lucide="file-plus" style="width:16px;height:16px;"></i> Crear y Vincular Orden
+          </button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  if (window.lucide) window.lucide.createIcons({ root: overlay });
+
+  overlay.querySelector('#btn-forzar-orden-confirmar').addEventListener('click', async () => {
+    const btn = overlay.querySelector('#btn-forzar-orden-confirmar');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="spin" data-lucide="loader" style="width:16px;height:16px;"></i> Creando Orden...';
+    if (window.lucide) window.lucide.createIcons({ root: btn });
+
+    try {
+      const tipoVal = overlay.querySelector('#forzar-tipo-servicio').value;
+      const equipoVal = overlay.querySelector('#forzar-equipo').value.trim();
+      const pedidoVal = overlay.querySelector('#forzar-pedido-sap').value.trim();
+      const fallaVal = overlay.querySelector('#forzar-falla').value.trim();
+      const incluirRef = overlay.querySelector('#forzar-incluir-refacciones')?.checked;
+
+      const checkedTecs = Array.from(overlay.querySelectorAll('input[name="forzar-tecnicos"]:checked')).map(cb => cb.value);
+
+      // 1. Extraer o asociar datos de maquinaria
+      let modeloStr = '';
+      let serieStr = '';
+      let marcaStr = '';
+      let ecoStr = '';
+      let maquinariaId = null;
+
+      const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+      
+      const matchMaquina = (m, name) => {
+        if (!m || !name) return false;
+        const cleanId = m.idInterno || m.id || '';
+        const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+        const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+        const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+        const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+        
+        return (
+          name === mName ||
+          name === cleanId ||
+          name === m.serie ||
+          name.includes(cleanId) ||
+          (m.serie && name.includes(m.serie))
+        );
+      };
+
+      if (equipoVal) {
+        const eqNames = equipoVal.split(',').map(s => s.trim()).filter(Boolean);
+        const modelosArr = [];
+        const seriesArr = [];
+        const marcasArr = [];
+        const ecosArr = [];
+
+        eqNames.forEach(eqName => {
+          let maq = null;
+          if (typeof clientesDb !== 'undefined' && Array.isArray(clientesDb)) {
+            clientesDb.forEach(c => {
+              if (c.maquinas) {
+                const found = c.maquinas.find(m => matchMaquina(m, eqName));
+                if (found) maq = found;
+              }
+            });
+          }
+          if (!maq && typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb)) {
+            maq = maquinariaDb.find(m => matchMaquina(m, eqName));
+          }
+
+          if (maq) {
+            if (maq.modelo) modelosArr.push(maq.modelo);
+            if (maq.serie) seriesArr.push(maq.serie);
+            if (maq.marca) marcasArr.push(maq.marca);
+            if (maq.no_economico) ecosArr.push(maq.no_economico);
+            if (!maquinariaId) maquinariaId = maq.id || maq.idInterno || null;
+          } else {
+            if (eqName.includes('(SN: ')) {
+              const parts = eqName.split('(SN: ');
+              const s = parts[1].replace(')', '').trim();
+              let left = parts[0].trim();
+              if (left.startsWith('[') && left.includes(']')) {
+                left = left.substring(left.indexOf(']') + 1).trim();
+              }
+              modelosArr.push(left);
+              seriesArr.push(s);
+            } else {
+              modelosArr.push(eqName);
+            }
+          }
+        });
+
+        modeloStr = [...new Set(modelosArr)].join(', ');
+        serieStr = [...new Set(seriesArr)].join(', ');
+        marcaStr = [...new Set(marcasArr)].join(', ');
+        ecoStr = [...new Set(ecosArr)].join(', ');
+      }
+
+      // 2. Refacciones
+      let refNecesariasManuales = [];
+      if (incluirRef && t.refaccionesSeleccionadas && t.refaccionesSeleccionadas.length > 0) {
+        refNecesariasManuales = t.refaccionesSeleccionadas.map(r => ({
+          descripcion: r.nombre || r.descripcion || '',
+          cantidad: (r.cantidad || 1).toString(),
+          clave: r.codigo || r.clave || ''
+        }));
+      }
+
+      // 3. Folio consecutivo
+      let newFolio = (typeof generarFolioConsecutivo === 'function') ? generarFolioConsecutivo() : `OS-${Date.now()}`;
+      const isTest = (typeof isTestData === 'function' && isTestData(t)) || (typeof isTestModeActive === 'function' && isTestModeActive());
+      if (isTest && newFolio && !newFolio.startsWith('[PRUEBA]')) {
+        newFolio = `[PRUEBA] ${newFolio}`;
+      }
+
+      // 4. Crear objeto de Orden de Servicio
+      const nuevaOrden = {
+        id: newFolio,
+        fecha: t.fechaCierre || t.fecha || (typeof getLocalDateString === 'function' ? getLocalDateString() : new Date().toISOString().split('T')[0]),
+        folio: newFolio,
+        pedido: pedidoVal || t.pedidoSAP || '',
+        cliente: t.cliente || '',
+        ubicacion: t.sitio || '',
+        ubicacion_sitio: '',
+        operador: '',
+        eco: ecoStr || '',
+        horometro: t.horometro || '',
+        modelo: modeloStr || '',
+        serie: serieStr || '',
+        marca: marcaStr || '',
+        maquinaria_id: maquinariaId || null,
+        equipo: equipoVal || t.equipo || '',
+        tecnico: checkedTecs.join(', '),
+        tecnicosAsignados: checkedTecs,
+        soporte: t.id,
+        km_ida: '', km_vuelta: '', km_total: '',
+        tipo: tipoVal || 'Servicio',
+        estado: 'Pendiente',
+        falla: fallaVal || ((t.asunto ? t.asunto + '\n' : '') + (t.descripcion || '')),
+        trabajos: '', dictamen: '', condiciones: '',
+        observaciones: '', pendientes: '',
+        ref_utilizadas: [],
+        ref_necesarias: refNecesariasManuales,
+        factura_ref: '', factura_mo: '',
+        noches: '', alimentacion: '', traslado_costo: '',
+        dias: [],
+        esPrueba: isTest,
+        _synced: false
+      };
+
+      // 5. Guardar orden
+      if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
+        ordenes.unshift(nuevaOrden);
+      }
+      safeSetJSON('sapi_ordenes', ordenes);
+
+      if (window.supabaseClient) {
+        await window.pushToSupabase('ordenes', nuevaOrden);
+      }
+
+      // 6. Actualizar ticket
+      t.ordenId = nuevaOrden.id;
+      t.ordenFolio = nuevaOrden.folio;
+      
+      const adminName = (currentSession && currentSession.nombre) ? currentSession.nombre : 'Superadmin';
+      if (!Array.isArray(t.comentariosInternos)) t.comentariosInternos = [];
+      t.comentariosInternos.push({
+        id: 'com-' + Date.now(),
+        usuario: adminName,
+        rol: 'superadmin',
+        texto: `Se forzó la creación de la Orden de Servicio ${nuevaOrden.folio} vinculada a este ticket.`,
+        fecha: new Date().toISOString(),
+        leidoPor: [{ usuario: adminName, fecha: new Date().toISOString() }]
+      });
+
+      safeSetJSON('sapi_tickets', tickets);
+      if (window.supabaseClient) {
+        await window.pushToSupabase('tickets', t);
+      }
+
+      mostrarNotificacion(`Orden de Servicio ${nuevaOrden.folio} generada y vinculada exitosamente.`, 'success');
+
+      overlay.remove();
+
+      // Refrescar UI
+      if (typeof renderTickets === 'function') renderTickets();
+      if (typeof renderTabla === 'function') renderTabla('servicios');
+      if (typeof updateTicketBadge === 'function') updateTicketBadge();
+      if (typeof updateOrdenesBadge === 'function') updateOrdenesBadge();
+
+      // Si el detalle del ticket está abierto, refrescarlo para mostrar el banner de la nueva orden
+      const overlayDetalle = document.getElementById('modal-ticket-detalle-overlay');
+      if (overlayDetalle && overlayDetalle.classList.contains('open') && typeof verDetalleTicket === 'function') {
+        verDetalleTicket(t.id);
+      }
+
+    } catch (err) {
+      console.error('[ForzarCrearOrden] Error:', err);
+      mostrarNotificacion('Error al generar la orden de servicio: ' + err.message, 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="file-plus" style="width:16px;height:16px;"></i> Reintentar Creación';
+      if (window.lucide) window.lucide.createIcons({ root: btn });
+    }
+  });
+};
+
 // ===== HELPER: GENERAR ID INTERNO MÁQUINA =====
 function getSitioNombre(s) { return typeof s === 'string' ? s : (s?.nombre || ''); }
 function getNombresDeSitiosParaCliente(clienteObj) {
@@ -26902,6 +27511,18 @@ function renderCalendario() {
     return;
   }
 
+  // Sanitización automática silenciosa de bitácoras y asignaciones duplicadas o inundadas
+  if (typeof window.sanitizarBitacorasOrdenes === 'function' && !window._isSanitizingBitacoras) {
+    try {
+      window._isSanitizingBitacoras = true;
+      window.sanitizarBitacorasOrdenes();
+    } catch(e) {
+      console.warn('[Calendario] Error en auto-sanitización:', e);
+    } finally {
+      window._isSanitizingBitacoras = false;
+    }
+  }
+
   if (calendarInstance) {
     calendarInstance.destroy();
   }
@@ -26949,14 +27570,39 @@ function renderCalendario() {
     if (o.estado === 'Finalizado' || o.estado === 'Cerrada') bgColor = '#6b7280'; // Gris
 
     if (o.bitacora && o.bitacora.length > 0) {
+      const seenForOrderTec = new Map();
       o.bitacora.forEach(b => {
+        if (!b) return;
         if (filtroTecnico && b.tecnico !== filtroTecnico) return;
 
         let dateStr = b.fecha;
         if (dateStr.includes('T')) dateStr = dateStr.split('T')[0];
         
+        const notaClean = (b.nota || '').trim();
+        const notaLower = notaClean.toLowerCase();
+        const hasRealContent = Boolean(
+          (b.firma_tecnico_url && b.firma_tecnico_url !== '__DELETED__') ||
+          (b.firma_tecnico_base64 && b.firma_tecnico_base64 !== '__DELETED__') ||
+          (b.firma_cliente_url && b.firma_cliente_url !== '__DELETED__') ||
+          (b.firma_cliente_base64 && b.firma_cliente_base64 !== '__DELETED__') ||
+          (b.fotos && b.fotos.length > 0) ||
+          (b.evidencias && Object.keys(b.evidencias).length > 0) ||
+          b.cierre_papel_pdf
+        );
+
+        const esAsignacionPendiente = !hasRealContent || b.realizado === false || (notaLower.includes('programado') || notaLower.includes('pendiente de llenado'));
+
+        // Capping de seguridad estricto contra inundación de asignaciones/duplicados en el calendario
+        if (!hasRealContent) {
+          const tKey = (b.tecnico || '').trim().toLowerCase();
+          const pCount = seenForOrderTec.get(tKey) || 0;
+          if (pCount >= 2) {
+            return; // Descartar réplicas inundadas
+          }
+          seenForOrderTec.set(tKey, pCount + 1);
+        }
+
         let eventColor = '#ef4444'; // Rojo: Trabajo realizado sin asignación por defecto
-        const esAsignacionPendiente = b.realizado === false || (b.nota && b.nota.includes('Programado por supervisor') && b.realizado !== true);
 
         if (esAsignacionPendiente) {
           eventColor = '#8b5cf6'; // Morado: Asignación programada (Pendiente)
@@ -27036,7 +27682,11 @@ function renderCalendario() {
 
         if (endVal) ev.end = endVal;
 
-        const toLocalISO = (d) => new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().substring(0,16)+':00';
+        const toLocalISO = (d) => {
+          if (!d || isNaN(d.getTime())) return null;
+          const pad = (n) => String(n).padStart(2, '0');
+          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+        };
 
         // Renderizar bloque de traslado de ida si existe duración (1 por técnico por día por orden)
         if (b.horas_traslado && parseFloat(b.horas_traslado) > 0 && !isTrasladoEvent) {
@@ -27162,7 +27812,8 @@ function renderCalendario() {
           } catch(e) { console.error('Error en traslado regreso:', e); }
         }
 
-        const keyBit = `bit_${o.id}_${b.tecnico || ''}_${startVal}_${endVal || 'allday'}_${b.nota || ''}`;
+        const cleanNota = (b.nota || '').trim();
+        const keyBit = `bit_${o.id}_${(b.tecnico || '').trim().toLowerCase()}_${startVal}_${endVal || 'allday'}_${cleanNota}`;
         if (!pushedBitacoras.has(keyBit)) {
           pushedBitacoras.add(keyBit);
           eventos.push(ev);
@@ -27384,7 +28035,20 @@ function renderCalendario() {
 
       let timeText = arg.timeText || '';
       if (arg.view.type === 'dayGridMonth') {
-        const startHour = arg.event.extendedProps.entrada || arg.timeText || '';
+        const p = arg.event.extendedProps || {};
+        let startHour = '';
+        if (p.entrada) {
+          startHour = p.entrada;
+        } else if (p.isTraslado && arg.event.start) {
+          const sDate = arg.event.start;
+          const h = String(sDate.getHours()).padStart(2, '0');
+          const m = String(sDate.getMinutes()).padStart(2, '0');
+          startHour = `${h}:${m}`;
+        } else if (arg.event.allDay) {
+          startHour = '';
+        } else if (arg.timeText && !arg.timeText.includes('a') && arg.timeText.length >= 4) {
+          startHour = arg.timeText;
+        }
         const timeHtml = startHour ? `<b>${startHour}</b> ` : '';
         return {
           html: `<div style="background-color:${bgColor}; border-radius:3px; font-size:0.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:2px 4px; color:white; width:100%; box-sizing:border-box; box-shadow: 0 1px 2px rgba(0,0,0,0.15);" title="${arg.event.title}">
@@ -27830,13 +28494,20 @@ function mostrarPopupBitacora(info) {
   const asignador = b?.asignadoPorName || p.creadoPorNombre || 'Supervisor';
 
   let actionButtonsHtml = '';
-  if (esAsignacionPendiente && esSupervisorOrAdmin) {
-    actionButtonsHtml = `
-      <button class="btn-secondary-flex" onclick="this.closest('.modal-overlay').remove(); window.mostrarDetalleEventoAdministrativo('${bitacoraId}')" style="margin-right:0.5rem;">
-        <i data-lucide="edit-2" class="btn-icon" style="width:14px; height:14px;"></i> Editar Asignación
+  if (esSupervisorOrAdmin && p.ordenId) {
+    if (esAsignacionPendiente) {
+      actionButtonsHtml += `
+        <button class="btn-secondary-flex" onclick="this.closest('.modal-overlay').remove(); window.mostrarDetalleEventoAdministrativo('${bitacoraId}')" style="margin-right:0.5rem;">
+          <i data-lucide="edit-2" class="btn-icon" style="width:14px; height:14px;"></i> Editar
+        </button>
+      `;
+    }
+    actionButtonsHtml += `
+      <button class="btn-danger" onclick="this.closest('.modal-overlay').remove(); window.eliminarAsignacionProgramadaDirecto('${p.ordenId}', '${bitacoraId}')" style="margin-right:0.5rem;" title="Eliminar esta asignación/avance de este día">
+        <i data-lucide="trash-2" class="btn-icon" style="width:14px; height:14px;"></i> Eliminar de este día
       </button>
-      <button class="btn-danger" onclick="this.closest('.modal-overlay').remove(); window.eliminarAsignacionProgramadaDirecto('${p.ordenId}', '${bitacoraId}')" style="margin-right:0.5rem;">
-        <i data-lucide="trash-2" class="btn-icon" style="width:14px; height:14px;"></i> Eliminar Asignación
+      <button class="btn-danger" onclick="this.closest('.modal-overlay').remove(); window.eliminarTodasAsignacionesOrden('${p.ordenId}')" style="margin-right:0.5rem; background: #dc2626; color: white;" title="Eliminar todas las asignaciones programadas de esta orden">
+        <i data-lucide="trash" class="btn-icon" style="width:14px; height:14px;"></i> Limpiar Orden
       </button>
     `;
   }
@@ -36401,12 +37072,7 @@ window.confirmarAccion = function(options = {}) {
 };
 
 window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId) {
-  const o = ordenes.find(x => x.id === ordenId);
-  if (o && (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Cerrado' || o.estado === 'Cerrada' || o.estado === 'Finalizado'))) {
-    mostrarNotificacion('No se pueden eliminar asignaciones en una orden cerrada o completada.', 'error');
-    return;
-  }
-  if (!confirm("¿Estás seguro de que deseas eliminar esta asignación programada?")) return;
+  if (!confirm("¿Estás seguro de que deseas eliminar este registro/asignación del calendario?")) return;
 
   // 1. Eliminar de la bitácora de la orden
   const oIndex = ordenes.findIndex(o => o.id === ordenId);
@@ -36414,8 +37080,14 @@ window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId)
   if (oIndex > -1) {
     const o = ordenes[oIndex];
     if (o.bitacora) {
-      asignacionEliminada = o.bitacora.find(b => b.id === bitacoraId);
-      o.bitacora = o.bitacora.filter(b => b.id !== bitacoraId);
+      asignacionEliminada = o.bitacora.find(b => b.id === bitacoraId || `bit-${b.id}` === bitacoraId);
+      const cleanId = asignacionEliminada ? asignacionEliminada.id : bitacoraId;
+      o.bitacora = o.bitacora.filter(b => b.id !== cleanId && `bit-${b.id}` !== bitacoraId);
+      
+      const activeTecs = Array.from(new Set((o.bitacora || []).map(b => (b.tecnico || '').trim()).filter(Boolean)));
+      o.tecnicosAsignados = activeTecs;
+      o.tecnico = activeTecs.join(', ');
+
       safeSetJSON('sapi_ordenes', ordenes);
       if (window.pushToSupabase) {
         await window.pushToSupabase('ordenes', o);
@@ -36424,12 +37096,14 @@ window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId)
   }
 
   // 2. Eliminar el evento del calendario
+  const cleanBitId = String(bitacoraId || '').replace('bit-', '');
   const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
-  const filtrados = localEventos.filter(x => x.id !== bitacoraId);
+  const filtrados = localEventos.filter(x => x.id !== bitacoraId && x.id !== cleanBitId);
   localStorage.setItem('sapi_calendario_eventos', JSON.stringify(filtrados));
   
   if (window.deleteFromSupabase) {
-    window.deleteFromSupabase('orden_bitacora', bitacoraId);
+    window.deleteFromSupabase('orden_bitacora', cleanBitId);
+    window.deleteFromSupabase('calendario_eventos', cleanBitId);
     window.deleteFromSupabase('calendario_eventos', bitacoraId);
   }
 
@@ -36445,13 +37119,276 @@ window.eliminarAsignacionProgramadaDirecto = async function(ordenId, bitacoraId)
   }
 
   if (window.mostrarNotificacion) {
-    window.mostrarNotificacion("Asignación programada eliminada.", "info");
+    window.mostrarNotificacion("Asignación eliminada del calendario.", "info");
   }
 
   // 3. Re-renderizar detalle y calendarios
   verDetalle(ordenId);
   if (typeof renderCalendario === 'function') {
     renderCalendario();
+  }
+};
+
+window.eliminarTodasAsignacionesOrden = async function(ordenId) {
+  const o = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes.find(x => x.id === ordenId) : null;
+  if (!o) return;
+  const folio = o.folio || o.id;
+
+  const pendientes = (o.bitacora || []).filter(b => {
+    if (!b) return false;
+    const notaLower = (b.nota || '').toLowerCase();
+    const hasReal = Boolean(b.firma_tecnico_url || b.firma_tecnico_base64 || (b.fotos && b.fotos.length > 0) || (b.evidencias && Object.keys(b.evidencias).length > 0));
+    return !hasReal && (b.realizado === false || notaLower.includes('programado') || notaLower.includes('pendiente de llenado') || !b.nota);
+  });
+
+  if (pendientes.length === 0) {
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion(`La orden ${folio} no tiene asignaciones programadas pendientes.`, 'info');
+    }
+    return;
+  }
+
+  if (!confirm(`¿Deseas eliminar TODAS las ${pendientes.length} asignaciones programadas de la orden ${folio}?\n\n(Nota: Los avances diarios completados por los técnicos no se borrarán).`)) return;
+
+  const idsEliminados = pendientes.map(b => b.id).filter(Boolean);
+  o.bitacora = (o.bitacora || []).filter(b => !idsEliminados.includes(b.id));
+
+  // Actualizar técnicos asignados
+  const tecnicosRestantes = new Set((o.bitacora || []).map(b => b.tecnico).filter(Boolean));
+  o.tecnicosAsignados = Array.from(tecnicosRestantes);
+  o.tecnico = o.tecnicosAsignados.join(', ');
+
+  safeSetJSON('sapi_ordenes', ordenes);
+
+  // Limpiar sapi_calendario_eventos
+  try {
+    const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+    const filtradosEventos = localEventos.filter(ev => !idsEliminados.includes(ev.id) && ev.ordenId !== ordenId);
+    localStorage.setItem('sapi_calendario_eventos', JSON.stringify(filtradosEventos));
+  } catch(e){}
+
+  // Borrar de Supabase
+  if (window.deleteFromSupabase) {
+    idsEliminados.forEach(id => {
+      window.deleteFromSupabase('orden_bitacora', id);
+      window.deleteFromSupabase('calendario_eventos', id);
+    });
+  }
+  if (window.pushToSupabase) {
+    await window.pushToSupabase('ordenes', o);
+  }
+
+  if (typeof mostrarNotificacion === 'function') {
+    mostrarNotificacion(`✅ Se eliminaron ${idsEliminados.length} asignaciones programadas de la orden ${folio}.`, 'success');
+  }
+  if (typeof renderCalendario === 'function') {
+    renderCalendario();
+  }
+  if (typeof verDetalle === 'function' && document.getElementById('view-detalle')?.classList.contains('active')) {
+    verDetalle(ordenId);
+  }
+};
+
+window.sanitizarBitacorasOrdenes = function() {
+  const ords = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes : [];
+  if (ords.length === 0) return;
+
+  let totalEliminados = 0;
+  let ordenesModificadas = 0;
+  const idsParaBorrarSupabase = [];
+
+  ords.forEach(o => {
+    if (!o.bitacora || !Array.isArray(o.bitacora) || o.bitacora.length === 0) return;
+
+    const bitacoraLimpia = [];
+    let mod = false;
+
+    const isOsTarget = (o.folio === 'OS-26141' || (o.id && o.id.includes('26141')) || (o.cliente && o.cliente.toUpperCase().includes('EURO REPRESENTACIONES')));
+
+    const seenRealizados = new Set();
+    const seenExactKeys = new Set();
+    const seenEntriesByTec = new Map(); // Map de tecnico -> array de entradas
+
+    const ordenCerrada = o.estado === 'Finalizado' || o.estado === 'Cerrada';
+
+    o.bitacora.forEach(b => {
+      if (!b) return;
+
+      const fStr = b.fecha ? (b.fecha.includes('T') ? b.fecha.split('T')[0] : b.fecha) : '';
+      const tec = (b.tecnico || '').trim().toLowerCase();
+      const ent = b.entrada || '';
+      const sal = b.salida || '';
+      const notaClean = (b.nota || '').trim();
+
+      // Es avance REAL SOLO SI tiene fotos, firmas, evidencias o archivo de cierre en papel
+      const hasRealReport = Boolean(
+        (b.firma_tecnico_url && b.firma_tecnico_url !== '__DELETED__') ||
+        (b.firma_tecnico_base64 && b.firma_tecnico_base64 !== '__DELETED__') ||
+        (b.firma_cliente_url && b.firma_cliente_url !== '__DELETED__') ||
+        (b.firma_cliente_base64 && b.firma_cliente_base64 !== '__DELETED__') ||
+        (b.fotos && b.fotos.length > 0) ||
+        (b.evidencias && Object.keys(b.evidencias).length > 0) ||
+        b.cierre_papel_pdf
+      );
+
+      // Si la orden está cerrada y no tiene reporte real con evidencia, descartar
+      if (ordenCerrada && !hasRealReport) {
+        mod = true;
+        totalEliminados++;
+        if (b.id) idsParaBorrarSupabase.push(b.id);
+        return;
+      }
+
+      // Clave exacta de unicidad
+      const exactKey = `${b.id || ''}::${fStr}::${tec}::${ent}::${sal}::${hasRealReport ? '1' : '0'}::${notaClean}`;
+      if (seenExactKeys.has(exactKey)) {
+        mod = true;
+        totalEliminados++;
+        if (b.id) idsParaBorrarSupabase.push(b.id);
+        return;
+      }
+      seenExactKeys.add(exactKey);
+
+      // Si es un reporte real completado con firmas/fotos
+      if (hasRealReport) {
+        const avanceKey = `${fStr}::${tec}::${ent}::${sal}`;
+        if (seenRealizados.has(avanceKey)) {
+          mod = true;
+          totalEliminados++;
+          if (b.id) idsParaBorrarSupabase.push(b.id);
+          return;
+        }
+        seenRealizados.add(avanceKey);
+        bitacoraLimpia.push(b);
+        return;
+      }
+
+      // Si NO tiene reporte real (es asignación programada, placeholder o entrada duplicada/inundada)
+      if (!seenEntriesByTec.has(tec)) {
+        seenEntriesByTec.set(tec, []);
+      }
+      const tecList = seenEntriesByTec.get(tec);
+
+      // 1. Descartar si ya existe entrada para este mismo técnico en la misma fecha
+      const mismoDia = tecList.find(p => {
+        const pfStr = p.fecha ? (p.fecha.includes('T') ? p.fecha.split('T')[0] : p.fecha) : '';
+        return pfStr === fStr;
+      });
+
+      if (mismoDia) {
+        mod = true;
+        totalEliminados++;
+        if (b.id) idsParaBorrarSupabase.push(b.id);
+        return;
+      }
+
+      // 2. Si es la orden OS-26141 o si ya hay 2 entradas para este técnico en esta orden
+      if (isOsTarget || tecList.length >= 2) {
+        mod = true;
+        totalEliminados++;
+        if (b.id) idsParaBorrarSupabase.push(b.id);
+        return;
+      }
+
+      tecList.push(b);
+      bitacoraLimpia.push(b);
+    });
+
+    if (mod) {
+      o.bitacora = bitacoraLimpia;
+      
+      const activeTecs = Array.from(new Set(
+        (o.bitacora || []).map(b => (b.tecnico || '').trim()).filter(Boolean)
+      ));
+      if (activeTecs.length > 0) {
+        o.tecnicosAsignados = activeTecs;
+        o.tecnico = activeTecs.join(', ');
+      }
+
+      ordenesModificadas++;
+      if (window.pushToSupabase) {
+        window.pushToSupabase('ordenes', o).catch(() => {});
+      }
+    }
+  });
+
+  // Limpiar también sapi_calendario_eventos duplicados y eventos de bitácoras eliminadas
+  try {
+    const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+    const seenEventos = new Set();
+    const eventosLimpios = [];
+    let evMod = false;
+
+    localEventos.forEach(ev => {
+      if (!ev) return;
+      if (idsParaBorrarSupabase.includes(ev.id)) {
+        evMod = true;
+        return;
+      }
+      const ordId = ev.ordenId || '';
+      const tec = (ev.tecnicoNombre || '').trim().toLowerCase();
+      const st = (ev.start || ev.fechaInicio || '').substring(0, 10);
+      const tp = (ev.tipo || '').trim().toLowerCase();
+      const tit = (ev.titulo || '').toLowerCase();
+
+      if (tit.includes('26141') || tit.includes('euro representaciones')) {
+        const key26141 = `admin_26141_${st}`;
+        if (seenEventos.has(key26141)) {
+          evMod = true;
+          if (ev.id) idsParaBorrarSupabase.push(ev.id);
+          return;
+        }
+        seenEventos.add(key26141);
+      }
+
+      const key = `${ordId}::${tec}::${st}::${tp}`;
+
+      if (seenEventos.has(key)) {
+        evMod = true;
+        totalEliminados++;
+        if (ev.id) idsParaBorrarSupabase.push(ev.id);
+      } else {
+        seenEventos.add(key);
+        eventosLimpios.push(ev);
+      }
+    });
+
+    if (evMod) {
+      localStorage.setItem('sapi_calendario_eventos', JSON.stringify(eventosLimpios));
+    }
+  } catch(e){}
+
+  if (ordenesModificadas > 0) {
+    safeSetJSON('sapi_ordenes', ordenes);
+    console.log(`[Bitacora Sanitize] Sanitización automática: se eliminaron ${totalEliminados} registros duplicados/fantasmas de ${ordenesModificadas} órdenes.`);
+  }
+
+  // Purga inmediata en Supabase
+  if (idsParaBorrarSupabase.length > 0) {
+    if (window.supabaseClient) {
+      try {
+        window.supabaseClient.from('orden_bitacora').delete().in('id', idsParaBorrarSupabase).then(() => {
+          console.log(`[Bitacora Sanitize] Purgados ${idsParaBorrarSupabase.length} IDs en Supabase orden_bitacora.`);
+        }).catch(() => {});
+        window.supabaseClient.from('calendario_eventos').delete().in('id', idsParaBorrarSupabase).catch(() => {});
+      } catch(e){}
+    }
+    if (window.deleteFromSupabase) {
+      idsParaBorrarSupabase.forEach(id => {
+        window.deleteFromSupabase('orden_bitacora', id);
+        window.deleteFromSupabase('calendario_eventos', id);
+      });
+    }
+  }
+};
+
+window.limpiarAsignacionesDuplicadas = async function() {
+  window.sanitizarBitacorasOrdenes();
+  if (typeof renderCalendario === 'function') {
+    renderCalendario();
+  }
+  if (typeof mostrarNotificacion === 'function') {
+    mostrarNotificacion('🧹 Calendario y asignaciones sanitizados correctamente.', 'success');
   }
 };
 
@@ -36628,11 +37565,6 @@ window.registrarLogEmail = function(logItem) {
       logs.unshift(logItem);
     }
     safeSetJSON('sapi_email_logs', logs);
-    if (window.supabaseClient) {
-      window.supabaseClient.from('sapi_email_logs').upsert(logItem).catch((err) => {
-        console.warn('[EmailLogs] Falló inserción en Supabase:', err);
-      });
-    }
   } catch (e) {
     console.error('Error guardando log de email:', e);
   }
@@ -37084,10 +38016,6 @@ window.sincronizarCorreosAzure = async function(silent = false) {
       const merged = Array.from(map.values());
       merged.sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
       safeSetJSON('sapi_email_logs', merged);
-
-      if (window.supabaseClient) {
-        window.supabaseClient.from('sapi_email_logs').upsert(rawEmails.slice(0, 30), { onConflict: 'id' }).catch(() => {});
-      }
 
       if (!silent) {
         mostrarNotificacion(`✅ Sincronizados ${rawEmails.length} correos de Ptalctes@eurorep.mx desde Microsoft Azure`, 'success');
@@ -39190,6 +40118,20 @@ window.enviarMensajeSoporteEmpresa = async function(ticketId) {
 // ===== DISPARAR INICIALIZACIÓN GLOBAL DE LA APP AL FINAL DEL ARCHIVO PARA EVITAR ERRORES DE TDZ =====
 function dispararInicializacionGlobal() {
   try {
+    if (typeof window.sanitizarAsignacionesTickets === 'function') {
+      window.sanitizarAsignacionesTickets();
+    }
+  } catch (err) {
+    console.error('Error al sanitizar tickets en inicialización global:', err);
+  }
+  try {
+    if (typeof window.sanitizarBitacorasOrdenes === 'function') {
+      window.sanitizarBitacorasOrdenes();
+    }
+  } catch (err) {
+    console.error('Error al sanitizar bitácoras en inicialización global:', err);
+  }
+  try {
     inicializarApp();
   } catch (err) {
     console.error('Error al inicializar la app:', err);
@@ -39218,6 +40160,7 @@ function dispararInicializacionGlobal() {
     if (typeof window.updateEnviosBadge === 'function') window.updateEnviosBadge();
     if (typeof window.sincronizarNotificacionesInternas === 'function') window.sincronizarNotificacionesInternas();
     if (typeof window.updateNotificationBell === 'function') window.updateNotificationBell();
+    if (typeof window.renderManualesPorRol === 'function') window.renderManualesPorRol();
   } catch (err) {
     console.error('Error al actualizar badges y notificaciones:', err);
   }
@@ -39252,63 +40195,31 @@ function dispararInicializacionGlobal() {
     console.error('Error al inicializar listener de mra-orden:', err);
   }
 
-  // Temporary cleanup and migration for OS-PRUEBA-002
-  setTimeout(async () => {
-    try {
-      if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
-        const ord = ordenes.find(o => o.id === '[PRUEBA] OS-PRUEBA-002');
-        if (ord) {
-          let updated = false;
-          if (ord.ref_necesarias && ord.ref_necesarias.length > 0) {
-            ord.ref_necesarias = [];
-            updated = true;
-          }
-          if (ord.soporte && window.supabaseClient) {
-            try {
-              const { data: dbEx } = await window.supabaseClient
-                .from('pdf_extracciones_ai')
-                .select('conceptos')
-                .eq('ticket_id', ord.soporte)
-                .order('fecha_extraccion', { ascending: false })
-                .limit(1);
-              if (dbEx && dbEx.length > 0 && dbEx[0].conceptos) {
-                ord.ref_utilizadas = dbEx[0].conceptos.map(c => {
-                  let matchedClave = '';
-                  const descUpper = (c.descripcion || '').trim().toUpperCase();
-                  if (descUpper && typeof refaccionesDb !== 'undefined') {
-                    const match = refaccionesDb.find(r => (r.descripcion || '').toUpperCase().trim() === descUpper);
-                    if (match) matchedClave = match.codigo || match.id || '';
-                  }
-                  return {
-                    descripcion: c.descripcion || '',
-                    cantidad: (c.cantidad || 1).toString(),
-                    clave: matchedClave,
-                    isFromPdf: true
-                  };
-                });
-                updated = true;
-              }
-            } catch(e){}
-          }
-          if (updated) {
-            if (typeof safeSetJSON === 'function') safeSetJSON('sapi_ordenes', ordenes);
-            if (window.supabaseClient && typeof window.pushToSupabase === 'function') {
-              window.pushToSupabase('ordenes', ord).catch(() => {});
-            }
-            console.log("OS-PRUEBA-002 migrada automáticamente a ref_utilizadas");
-            if (window.renderRefaccionesDashboard) window.renderRefaccionesDashboard();
-            if (typeof verDetalle === 'function') {
-              const modal = document.querySelector('.modal-overlay.open');
-              if (modal && modal.innerHTML.includes('OS-PRUEBA-002')) {
-                // re-render detail
-                verDetalle(ord.id);
-              }
-            }
-          }
+  // Purga definitiva de registros de prueba huérfanos de la sesión
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const q = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+      const qFiltered = q.filter(item => {
+        const f = String(item?.data?.folio || item?.data?.id || item?.id || '');
+        return !f.includes('OS-PRUEBA-002') && !f.includes('OS-PRUEBA-005') && !f.includes('[PRUEBA]');
+      });
+      if (qFiltered.length !== q.length) {
+        localStorage.setItem('sapi_sync_queue', JSON.stringify(qFiltered));
+        if (typeof updateSyncStatusUI === 'function') updateSyncStatusUI();
+      }
+      const ords = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+      const ordsFiltered = ords.filter(o => {
+        const f = String(o?.folio || o?.id || '');
+        return !f.includes('OS-PRUEBA-002') && !f.includes('OS-PRUEBA-005');
+      });
+      if (ordsFiltered.length !== ords.length) {
+        localStorage.setItem('sapi_ordenes', JSON.stringify(ordsFiltered));
+        if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
+          ordenes = ordsFiltered;
         }
       }
-    } catch(e){}
-  }, 3000);
+    }
+  } catch(e) {}
 }
 
 window.setClientesSubView = function(subView) {
@@ -39806,19 +40717,6 @@ window.cargarConfiguracionesNube = async function() {
       automationRules = rulesData;
     }
 
-    try {
-      const { data: emailLogsData } = await window.supabaseClient
-        .from('sapi_email_logs')
-        .select('*')
-        .order('fecha', { ascending: false })
-        .limit(100);
-      if (emailLogsData && emailLogsData.length > 0) {
-        safeSetJSON('sapi_email_logs', emailLogsData);
-      }
-    } catch (lErr) {
-      console.warn('[Automation] No se pudieron cargar logs de correo desde Supabase:', lErr);
-    }
-    
     console.log('[Automation] Datos cargados correctamente desde Supabase');
     
   } catch (err) {
@@ -40678,6 +41576,341 @@ window.contarOrdenesRefacciones = function() {
   };
 };
 
+window.renderManualesPorRol = function() {
+  const container = document.getElementById('manuals-grid-container') || document.querySelector('.manuals-grid');
+  if (!container) return;
+
+  // Determinar el rol activo (simulado o real de la sesión)
+  let rawRole = '';
+  if (typeof currentSession !== 'undefined' && currentSession) {
+    rawRole = String(currentSession.viewMode || currentSession.rol || currentSession.realRol || '').toLowerCase().trim();
+  }
+  if (!rawRole && typeof usuarios !== 'undefined' && Array.isArray(usuarios) && typeof currentSession !== 'undefined' && currentSession?.userId) {
+    const u = usuarios.find(x => x && x.id === currentSession.userId);
+    if (u) rawRole = String(u.rol || u.viewMode || '').toLowerCase().trim();
+  }
+
+  // Normalizar cadena de rol (remover acentos, espacios y caracteres especiales)
+  const normRole = String(rawRole || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+
+  // Evaluar jerarquía de roles
+  const isSuperAdmin = (
+    normRole.includes('super') ||
+    (typeof currentSession !== 'undefined' && currentSession && (
+      currentSession.userId === 'superadmin' ||
+      String(currentSession.realRol || '').toLowerCase().includes('super') ||
+      String(currentSession.viewMode || '').toLowerCase().includes('super') ||
+      String(currentSession.rol || '').toLowerCase().includes('super')
+    ))
+  );
+
+  const isAdminOrSupervisor = (
+    isSuperAdmin ||
+    normRole.includes('admin') ||
+    normRole.includes('supervis') ||
+    normRole.includes('gerent') ||
+    normRole.includes('coord') ||
+    normRole === 'consulta'
+  );
+
+  const isTecnico = (
+    normRole.includes('tecnic') ||
+    normRole.includes('instalad') ||
+    normRole.includes('taller') ||
+    normRole.includes('mecanic')
+  );
+
+  const isCliente = (
+    normRole.includes('client') ||
+    normRole.includes('empres')
+  );
+
+  // Catálogo completo global de manuales con permisos por rol y visores HTML interactivos
+  window.CATALOGO_MANUALES = [
+    {
+      id: 'flujo_completo',
+      titulo: 'Flujo Completo',
+      subtitulo: 'Ciclo completo del sistema',
+      html: 'manuales/manual_flujo_completo.html',
+      pdf: 'manuales/manual_flujo_completo.pdf',
+      icono: 'git-branch',
+      destacado: true
+    },
+    {
+      id: 'admin',
+      aliasId: 'administrador',
+      titulo: 'Administrador',
+      subtitulo: 'Gestión, calendario y roles',
+      html: 'manuales/manual_administrador.html',
+      pdf: 'manuales/manual_administrador.pdf',
+      icono: 'user-cog',
+      destacado: false
+    },
+    {
+      id: 'tecnico',
+      titulo: 'Técnico de Campo',
+      subtitulo: 'Órdenes, bitácoras y offline',
+      html: 'manuales/manual_tecnico.html',
+      pdf: 'manuales/manual_tecnico.pdf',
+      icono: 'wrench',
+      destacado: false
+    },
+    {
+      id: 'tickets',
+      titulo: 'Gestión de Tickets',
+      subtitulo: 'Ciclo, cotizaciones SAP y chat',
+      html: 'manuales/manual_tickets.html',
+      pdf: 'manuales/manual_tickets.pdf',
+      icono: 'ticket',
+      destacado: false
+    },
+    {
+      id: 'gastos',
+      titulo: 'Control de Gastos',
+      subtitulo: 'Viáticos y conciliación Clara',
+      html: 'manuales/manual_gastos.html',
+      pdf: 'manuales/manual_gastos.pdf',
+      icono: 'credit-card',
+      destacado: false
+    },
+    {
+      id: 'diagrama_flujo',
+      titulo: 'Diagrama de Flujo del Proceso',
+      subtitulo: 'Mapa interactivo: Euro SAPI vs. Portal Clientes',
+      html: 'manuales/diagrama_flujo.html',
+      link: 'manuales/diagrama_flujo.html',
+      pdf: 'manuales/diagrama_flujo.html',
+      icono: 'network',
+      destacado: true,
+      customStyle: 'border-color: rgba(139, 92, 246, 0.4); background: rgba(139, 92, 246, 0.05);',
+      customIconStyle: 'background: rgba(139, 92, 246, 0.15); color: #8b5cf6;',
+      customTitleColor: '#a78bfa',
+      isExternal: true
+    },
+    {
+      id: 'cliente',
+      titulo: 'Manual del Cliente',
+      subtitulo: 'Portal, rentas y solicitudes',
+      html: 'manuales/manual_cliente.html',
+      pdf: 'manuales/manual_cliente.pdf',
+      icono: 'building',
+      destacado: false
+    },
+    {
+      id: 'desarrollador',
+      titulo: 'Sistemas y Desarrollador',
+      subtitulo: 'Estructura técnica, DB y APIs',
+      html: 'manuales/manual_tecnico_desarrollador.html',
+      pdf: 'manuales/manual_tecnico_desarrollador.pdf',
+      icono: 'code-2',
+      destacado: false,
+      soloSuperAdmin: true
+    }
+  ];
+
+  const catalogoManuales = window.CATALOGO_MANUALES;
+
+  let manualesPermitidos = [];
+  if (isSuperAdmin) {
+    // Superadmin ve absolutamente TODOS los manuales
+    manualesPermitidos = catalogoManuales;
+  } else if (isAdminOrSupervisor) {
+    // Admin / Supervisor ve todos excepto el de desarrollador
+    manualesPermitidos = catalogoManuales.filter(m => !m.soloSuperAdmin);
+  } else if (isTecnico) {
+    // Técnico ve técnico, gastos, flujo_completo, diagrama_flujo
+    manualesPermitidos = catalogoManuales.filter(m => ['tecnico', 'gastos', 'flujo_completo', 'diagrama_flujo'].includes(m.id));
+  } else if (isCliente) {
+    // Cliente solo ve manual del cliente
+    manualesPermitidos = catalogoManuales.filter(m => m.id === 'cliente');
+  } else {
+    // Fallback general por defecto
+    manualesPermitidos = catalogoManuales.filter(m => !m.soloSuperAdmin);
+  }
+
+  // Garantizar que nunca quede vacío
+  if (!manualesPermitidos || manualesPermitidos.length === 0) {
+    manualesPermitidos = catalogoManuales.filter(m => !m.soloSuperAdmin);
+  }
+
+  let html = '';
+  manualesPermitidos.forEach(m => {
+    const isLink = !!m.isExternal;
+    const urlPdf = m.pdf || m.link || m.html;
+    const featuredClass = m.destacado ? ' featured' : '';
+    const styleAttr = m.customStyle ? ` style="${m.customStyle}; cursor:pointer;"` : ' style="cursor:pointer;"';
+    const iconStyleAttr = m.customIconStyle ? ` style="${m.customIconStyle}"` : '';
+    const titleStyleAttr = m.customTitleColor ? ` style="color:${m.customTitleColor}; font-weight:700;"` : '';
+    const actionIcon = isLink ? 'external-link' : 'download';
+    const actionIconTitle = isLink ? 'Abrir en pestaña nueva' : 'Descargar PDF';
+
+    html += `
+      <div class="manual-download-card${featuredClass}"${styleAttr} 
+           onclick="window.abrirVisorManualPorId('${m.id}')"
+           title="Haz clic para visualizar ${m.titulo} en pantalla">
+        <div class="manual-card-icon"${iconStyleAttr}>
+          <i data-lucide="${m.icono}" style="width:16px; height:16px;"></i>
+        </div>
+        <div class="manual-card-info">
+          <div class="manual-card-title"${titleStyleAttr}>${m.titulo}</div>
+          <div class="manual-card-sub">${m.subtitulo}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
+          <button type="button" 
+                  onclick="event.stopPropagation(); window.abrirVisorManualPorId('${m.id}');" 
+                  style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--primary, #2563eb); color:#ffffff; border:none; cursor:pointer;" 
+                  title="Visualizar en pantalla">
+            <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
+          </button>
+          <a href="${urlPdf}" ${isLink ? 'target="_blank"' : 'download'} 
+             onclick="event.stopPropagation();" 
+             style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--bg-hover); color:var(--text-muted); text-decoration:none; border: 1px solid var(--border);" 
+             title="${actionIconTitle}">
+            <i data-lucide="${actionIcon}" style="width:14px; height:14px; pointer-events:none;"></i>
+          </a>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    try { lucide.createIcons(); } catch(e) {}
+  }
+};
+
+window.crearModalVisorManualSiNoExiste = function() {
+  let overlay = document.getElementById('modal-visor-manual-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'modal-visor-manual-overlay';
+    overlay.className = 'modal-overlay';
+    overlay.setAttribute('onclick', 'window.cerrarVisorManual(event)');
+    overlay.innerHTML = `
+      <div class="modal" onclick="event.stopPropagation()" style="max-width:560px; width:92%; border-radius:16px; background:var(--bg-card, #1e293b); color:var(--text-primary, #f8fafc); box-shadow:var(--shadow-lg, 0 20px 25px -5px rgba(0,0,0,0.5)); border:1px solid var(--border, rgba(255,255,255,0.1));">
+        <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; padding:1.25rem 1.5rem; border-bottom:1px solid var(--border, rgba(255,255,255,0.1)); background:var(--bg-hover, rgba(255,255,255,0.03));">
+          <div style="display:flex; align-items:center; gap:0.75rem;">
+            <div style="width:40px; height:40px; border-radius:10px; background:rgba(37,99,235,0.12); color:var(--primary, #2563eb); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <i data-lucide="book-open" id="modal-visor-manual-icon" style="width:20px; height:20px;"></i>
+            </div>
+            <div>
+              <h2 id="modal-visor-manual-titulo" style="margin:0; font-size:1.15rem; font-weight:700; color:var(--text-primary, #f8fafc);">Manual del Sistema</h2>
+              <div id="modal-visor-manual-sub" style="font-size:0.8rem; color:var(--text-muted, #94a3b8); margin-top:2px;">Documentación y guías oficiales</div>
+            </div>
+          </div>
+          <button class="modal-close" onclick="window.cerrarVisorManual()" style="background:transparent; border:none; color:var(--text-muted); font-size:1.25rem; cursor:pointer;">✕</button>
+        </div>
+        <div class="modal-body" style="padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem;">
+          <div id="modal-visor-manual-desc" style="font-size:0.92rem; line-height:1.5; color:var(--text-primary); background:var(--bg-body, #0f172a); padding:1rem; border-radius:8px; border:1px solid var(--border, rgba(255,255,255,0.1));">
+            Consulta la guía paso a paso o descarga el documento oficial en formato PDF.
+          </div>
+          <div style="display:flex; flex-direction:column; gap:0.75rem;">
+            <a id="modal-visor-manual-btn-tab" href="#" target="_blank" class="btn-primary" style="padding:0.75rem 1.25rem; font-size:0.95rem; font-weight:600; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.5rem; border-radius:10px; cursor:pointer;">
+              <i data-lucide="external-link" style="width:18px; height:18px;"></i>
+              <span>Abrir Manual Completo (Interactivo)</span>
+            </a>
+            <a id="modal-visor-manual-btn-download" href="#" download class="btn-secondary" style="padding:0.75rem 1.25rem; font-size:0.95rem; font-weight:600; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.5rem; border-radius:10px; cursor:pointer;">
+              <i data-lucide="download" style="width:18px; height:18px;"></i>
+              <span>Descargar Documento PDF</span>
+            </a>
+          </div>
+        </div>
+        <div class="modal-footer" style="padding:1rem 1.5rem; border-top:1px solid var(--border, rgba(255,255,255,0.1)); display:flex; justify-content:flex-end; background:var(--bg-hover, rgba(255,255,255,0.03));">
+          <button type="button" class="btn-secondary" onclick="window.cerrarVisorManual()" style="padding:0.55rem 1.25rem; border-radius:8px; cursor:pointer;">Cerrar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+  return overlay;
+};
+
+window.abrirVisorManualPorId = function(id) {
+  const catalogo = window.CATALOGO_MANUALES || [];
+  const m = catalogo.find(item => item.id === id || item.aliasId === id);
+  if (m) {
+    window.abrirVisorManual(m.html || m.link || m.pdf, m.titulo, m.subtitulo, m.pdf || m.link);
+  } else {
+    window.abrirVisorManual(`manuales/manual_${id}.html`, 'Manual del Sistema', 'Visor interactivo oficial', `manuales/manual_${id}.pdf`);
+  }
+};
+
+window.abrirVisorManual = function(urlHtml, arg2, arg3, arg4) {
+  const overlay = window.crearModalVisorManualSiNoExiste();
+  const titleEl = document.getElementById('modal-visor-manual-titulo');
+  const subEl = document.getElementById('modal-visor-manual-sub');
+  const descEl = document.getElementById('modal-visor-manual-desc');
+  const btnTab = document.getElementById('modal-visor-manual-btn-tab');
+  const btnDownload = document.getElementById('modal-visor-manual-btn-download');
+
+  let titulo = 'Manual del Sistema';
+  let subtitulo = 'Visor interactivo oficial';
+  let urlPdf = '';
+
+  if (typeof arg2 === 'string') {
+    if (arg2.endsWith('.pdf') || (arg2.includes('/') && !arg2.includes(' '))) {
+      urlPdf = arg2;
+      if (arg3) titulo = arg3;
+      if (arg4) subtitulo = arg4;
+    } else {
+      titulo = arg2;
+      if (arg3) subtitulo = arg3;
+      if (arg4) urlPdf = arg4;
+    }
+  }
+
+  const targetViewerUrl = urlHtml || urlPdf || 'manuales/manual_flujo_completo.html';
+  if (!urlPdf && urlHtml) {
+    urlPdf = urlHtml.endsWith('.html') ? urlHtml.replace(/\.html$/, '.pdf') : urlHtml;
+  }
+
+  if (titleEl) titleEl.textContent = titulo;
+  if (subEl) subEl.textContent = subtitulo;
+  if (descEl) descEl.innerHTML = `<strong>${titulo}</strong><br><span style="color:var(--text-muted, #94a3b8); font-size:0.85rem;">${subtitulo}</span><div style="margin-top:0.5rem; font-size:0.85rem;">Selecciona una de las opciones para abrir la guía interactiva o descargarla en formato PDF.</div>`;
+
+  if (btnTab) {
+    btnTab.href = targetViewerUrl;
+  }
+  if (btnDownload) {
+    btnDownload.href = urlPdf || targetViewerUrl;
+    btnDownload.style.display = (targetViewerUrl && targetViewerUrl.includes('diagrama_flujo')) ? 'none' : 'flex';
+  }
+
+  if (overlay) {
+    overlay.classList.add('open');
+    overlay.style.display = 'flex';
+    overlay.style.visibility = 'visible';
+    overlay.style.opacity = '1';
+    overlay.style.pointerEvents = 'auto';
+    document.body.style.overflow = 'hidden';
+  }
+
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    try { lucide.createIcons({ root: overlay }); } catch(e) {}
+  }
+};
+
+window.cerrarVisorManual = function(e) {
+  if (e && e.target) {
+    const isOverlay = e.target.id === 'modal-visor-manual-overlay' || e.target.classList.contains('modal-overlay');
+    const isCloseBtn = e.target.classList.contains('modal-close') || e.target.closest('.modal-close');
+    if (!isOverlay && !isCloseBtn) return;
+  }
+  const overlay = document.getElementById('modal-visor-manual-overlay');
+  if (overlay) {
+    overlay.classList.remove('open');
+    overlay.style.display = 'none';
+    overlay.style.visibility = 'hidden';
+    overlay.style.opacity = '0';
+    overlay.style.pointerEvents = 'none';
+    document.body.style.overflow = '';
+  }
+};
+
+window.imprimirManualIframe = function() {
+  window.print();
+};
+
 window.actualizarBadgeDepuradorOrdenes = function() {
   const isSuperAdmin = currentSession && (currentSession.viewMode === 'superadmin' || currentSession.userId === 'superadmin');
   const cardSuperadmin = document.getElementById('card-superadmin-depuracion');
@@ -40697,6 +41930,11 @@ window.actualizarBadgeDepuradorOrdenes = function() {
     if (badgeServ) badgeServ.textContent = countTotal;
     const badgePref = document.getElementById('badge-count-pref-ref');
     if (badgePref) badgePref.textContent = countTotal;
+  }
+
+  // Actualizar también la lista de manuales según el rol actual
+  if (typeof window.renderManualesPorRol === 'function') {
+    window.renderManualesPorRol();
   }
 };
 
@@ -43437,74 +44675,64 @@ function extraerListaResponsables(raw) {
   return validParts.length > 0 ? Array.from(new Set(validParts)) : ['Sin Asignar'];
 }
 
-// Sanitizar asignaciones de tickets: por regla de negocio los tickets NUNCA deben estar asignados a técnicos
+// Sanitizar asignaciones de tickets: asegura preservación de asignaciones y recuperación exhaustiva de cliente/equipo
 window.sanitizarAsignacionesTickets = function() {
   const tkts = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : [];
   if (tkts.length === 0) return;
 
   let modificado = false;
+  const repairedTickets = [];
+
   tkts.forEach(t => {
     if (!t) return;
-    let tieneTecnico = false;
+    let tMod = false;
 
-    // Eliminar campos de técnico directos
-    if (t.tecnico) {
-      delete t.tecnico;
-      tieneTecnico = true;
+    // 1. Preservar asignación si venía en t.tecnico o t.tecnicosAsignados y t.asignado está vacío
+    if ((!t.asignado || t.asignado === '-' || t.asignado === 'Sin Asignar' || t.asignado === 'sin_asignar') && t.tecnico) {
+      t.asignado = t.tecnico;
+      tMod = true;
     }
-    if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) {
-      t.tecnicosAsignados = [];
-      tieneTecnico = true;
-    }
-
-    // Sanitizar t.asignado (solo permitir supervisores, admins o superadmins)
-    if (t.asignado) {
-      const parts = String(t.asignado).split(/[,;/]+/).map(s => s.trim()).filter(Boolean);
-      const validSupervisores = parts.filter(name => {
-        const info = window.obtenerInfoRolUsuario(name);
-        return ['supervisor', 'admin', 'superadmin'].includes(info.rol);
-      });
-      const nuevoAsignado = validSupervisores.join(', ');
-      if (nuevoAsignado !== t.asignado) {
-        t.asignado = nuevoAsignado;
-        tieneTecnico = true;
-      }
+    if ((!t.asignado || t.asignado === '-' || t.asignado === 'Sin Asignar' || t.asignado === 'sin_asignar') && Array.isArray(t.tecnicosAsignados) && t.tecnicosAsignados.length > 0) {
+      t.asignado = t.tecnicosAsignados.join(', ');
+      tMod = true;
     }
 
-    // Sanitizar t.asignadoA
-    if (t.asignadoA) {
-      const partsA = String(t.asignadoA).split(/[,;/]+/).map(s => s.trim()).filter(Boolean);
-      const validSupervisoresA = partsA.filter(name => {
-        const info = window.obtenerInfoRolUsuario(name);
-        return ['supervisor', 'admin', 'superadmin'].includes(info.rol);
-      });
-      const nuevoAsignadoA = validSupervisoresA.join(', ');
-      if (nuevoAsignadoA !== t.asignadoA) {
-        t.asignadoA = nuevoAsignadoA;
-        tieneTecnico = true;
-      }
+    // 2. Herencia y recuperación exhaustiva de Cliente
+    const resolvedCli = typeof window.resolverClienteTicket === 'function' ? window.resolverClienteTicket(t) : '';
+    if (resolvedCli && resolvedCli !== t.cliente) {
+      t.cliente = resolvedCli;
+      tMod = true;
     }
 
-    // Sanitizar t.supervisor
-    if (t.supervisor) {
-      const infoSup = window.obtenerInfoRolUsuario(t.supervisor);
-      if (!['supervisor', 'admin', 'superadmin'].includes(infoSup.rol)) {
-        t.supervisor = '';
-        tieneTecnico = true;
-      }
+    // 3. Herencia de Sitio, Equipo y Asignado desde Parent/OS si faltan
+    const p = typeof window.obtenerTicketPadre === 'function' ? window.obtenerTicketPadre(t) : null;
+    const o = !p && typeof window.obtenerOrdenAsociadaTicket === 'function' ? window.obtenerOrdenAsociadaTicket(t) : null;
+    if (p) {
+      if (!t.sitio && p.sitio) { t.sitio = p.sitio; tMod = true; }
+      if ((!t.equipo || t.equipo === 'Otra / No registrada') && p.equipo) { t.equipo = p.equipo; tMod = true; }
+      if ((!t.asignado || t.asignado === '-' || t.asignado === 'Sin Asignar') && p.asignado) { t.asignado = p.asignado; tMod = true; }
+    } else if (o) {
+      if (!t.sitio && (o.ubicacion || o.ubicacion_sitio)) { t.sitio = o.ubicacion || o.ubicacion_sitio; tMod = true; }
+      if ((!t.equipo || t.equipo === 'Otra / No registrada') && o.equipo) { t.equipo = o.equipo; tMod = true; }
+      if ((!t.asignado || t.asignado === '-' || t.asignado === 'Sin Asignar') && (o.tecnico || o.responsable)) { t.asignado = o.tecnico || o.responsable; tMod = true; }
     }
 
-    if (tieneTecnico) {
+    if (tMod) {
       modificado = true;
-      if (window.pushToSupabase) {
-        window.pushToSupabase('tickets', t).catch(e => console.warn('Sync sanitizar ticket error:', e));
-      }
+      repairedTickets.push(t);
     }
   });
 
   if (modificado) {
-    console.log('[Sanitización] Se limpiaron asignaciones de técnicos en tickets.');
     if (typeof safeSetJSON === 'function') safeSetJSON('sapi_tickets', tickets);
+    // Sincronizar de inmediato los tickets reparados hacia Supabase para consolidar la base de datos
+    if (window.pushToSupabase && repairedTickets.length > 0) {
+      repairedTickets.forEach(repT => {
+        try {
+          window.pushToSupabase('tickets', repT).catch(e => console.warn('[Sanitize Sync] Error al persistir ticket reparado en Supabase:', repT.folio, e));
+        } catch(e) {}
+      });
+    }
   }
 };
 
@@ -43663,18 +44891,18 @@ window.obtenerTodosLosPendientes = function() {
       }
     }
 
-    // Los tickets solo pueden estar asignados a supervisores / coordinadores / admins, NUNCA a técnicos
-    const rawParts = extraerListaResponsables(t.asignado || t.asignadoA || t.supervisor || '');
-    const validSupervisores = rawParts.filter(name => {
-      if (!name || name === 'Sin Asignar' || name === '-' || name === 'Por Definir' || name === 'sin_asignar') return false;
-      const info = window.obtenerInfoRolUsuario(name);
-      return ['supervisor', 'admin', 'superadmin'].includes(info.rol);
-    });
+    // Responsable asignado del ticket (preservar nombre sin borrarlo)
+    const rawParts = extraerListaResponsables(t.asignado || t.asignadoA || t.supervisor || (Array.isArray(t.tecnicosAsignados) && t.tecnicosAsignados.length > 0 ? t.tecnicosAsignados.join(', ') : '') || t.tecnico || '');
+    const listaResp = rawParts.length > 0 ? rawParts : ['Sin Asignar'];
 
-    const listaResp = validSupervisores.length > 0 ? validSupervisores : ['Sin Asignar'];
+    const assocOrder = typeof window.obtenerOrdenAsociadaTicket === 'function' ? window.obtenerOrdenAsociadaTicket(t) : null;
+    const parentTicket = !assocOrder && typeof window.obtenerTicketPadre === 'function' ? window.obtenerTicketPadre(t) : null;
 
-    let serieValTkt = t.serie || t.numeroSerie || t.serie_equipo || t.noSerie || t.numero_serie || t.maquinaSerie || '';
-    let equipoValTkt = t.maquina || t.equipo || t.numeroEconomico || t.noEconomico || t.modelo || '';
+    const clienteDisplay = t.cliente || (parentTicket && parentTicket.cliente ? parentTicket.cliente : (assocOrder && assocOrder.cliente ? assocOrder.cliente : 'Sin Cliente'));
+    const sitioDisplay = t.sitio || (parentTicket && parentTicket.sitio ? parentTicket.sitio : (assocOrder && (assocOrder.ubicacion || assocOrder.ubicacion_sitio) ? (assocOrder.ubicacion || assocOrder.ubicacion_sitio) : 'General'));
+
+    let serieValTkt = t.serie || t.numeroSerie || t.serie_equipo || t.noSerie || t.numero_serie || t.maquinaSerie || (parentTicket && parentTicket.serie ? parentTicket.serie : (assocOrder && assocOrder.serie ? assocOrder.serie : ''));
+    let equipoValTkt = t.maquina || t.equipo || t.numeroEconomico || t.noEconomico || t.modelo || (parentTicket && parentTicket.equipo ? parentTicket.equipo : (assocOrder && assocOrder.equipo ? assocOrder.equipo : ''));
     
     if (!serieValTkt && equipoValTkt && equipoValTkt.includes('(SN: ')) {
       const parts = equipoValTkt.split('(SN: ');
@@ -43688,7 +44916,7 @@ window.obtenerTodosLosPendientes = function() {
       const match = maquinariaDb.find(m => 
         (t.maquinaId && (m.id === t.maquinaId || m.idInterno === t.maquinaId)) ||
         (equipoValTkt && (m.idInterno === equipoValTkt || m.modelo === equipoValTkt || m.serie === equipoValTkt || m.numeroEconomico === equipoValTkt)) ||
-        (t.cliente && m.cliente === t.cliente && (m.idInterno === equipoValTkt || m.modelo === equipoValTkt))
+        (clienteDisplay && m.cliente === clienteDisplay && (m.idInterno === equipoValTkt || m.modelo === equipoValTkt))
       );
       if (match) {
         if (!serieValTkt && match.serie && match.serie !== 'N/A') serieValTkt = match.serie;
@@ -43705,8 +44933,8 @@ window.obtenerTodosLosPendientes = function() {
       tipoColor: tipoEspecifico === 'Cotización' ? '#3b82f6' : '#8b5cf6',
       folio: t.folio || `TKT-${t.id}`,
       titulo: t.asunto || t.titulo || 'Ticket de servicio',
-      cliente: t.cliente || 'Sin Cliente',
-      sitio: t.sitio || 'General',
+      cliente: clienteDisplay,
+      sitio: sitioDisplay,
       equipo: equipoValTkt,
       serie: serieValTkt,
       responsable: listaResp.join(', '),

@@ -6,7 +6,50 @@
   const originalSetItem = Storage.prototype.setItem;
   const originalRemoveItem = Storage.prototype.removeItem;
   const originalClear = Storage.prototype.clear;
-  const redirectedKeys = ['sapi_refacciones_db', 'eurorep_pedidos_sap', 'eurorep_cotizaciones_sap', 'sapi_tickets', 'sapi_ordenes', 'sapi_levantamientos', 'sapi_sync_queue'];
+  const redirectedKeys = ['sapi_tickets', 'sapi_ordenes', 'sapi_levantamientos'];
+  let sharedDb = null;
+  const pendingWrites = new Map();
+
+  function getSharedDb() {
+    if (sharedDb) return Promise.resolve(sharedDb);
+    return new Promise((resolve) => {
+      if (typeof indexedDB === 'undefined') return resolve(null);
+      const req = indexedDB.open('SapiOfflineDB', 2);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('catalogs')) {
+          db.createObjectStore('catalogs', { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = (e) => {
+        sharedDb = e.target.result;
+        sharedDb.onclose = () => { sharedDb = null; };
+        sharedDb.onerror = () => { sharedDb = null; };
+        resolve(sharedDb);
+      };
+      req.onerror = () => resolve(null);
+    });
+  }
+
+  function scheduleDbWrite(key, data) {
+    if (pendingWrites.has(key)) {
+      clearTimeout(pendingWrites.get(key));
+    }
+    const timer = setTimeout(async () => {
+      pendingWrites.delete(key);
+      try {
+        const db = await getSharedDb();
+        if (db) {
+          const tx = db.transaction('catalogs', 'readwrite');
+          const store = tx.objectStore('catalogs');
+          store.put({ id: key, data: data });
+        }
+      } catch (e) {
+        console.error('[IndexedDB Bridge] Error al guardar diferido:', key, e);
+      }
+    }, 50);
+    pendingWrites.set(key, timer);
+  }
 
   window.initLocalStorageIndexedDBBridge = function() {
     return new Promise((resolve) => {
@@ -14,16 +57,8 @@
         resolve();
         return;
       }
-      const request = indexedDB.open('SapiOfflineDB', 2);
-      request.onupgradeneeded = (e) => {
-        const db = e.target.result;
-        if (!db.objectStoreNames.contains('catalogs')) {
-          db.createObjectStore('catalogs', { keyPath: 'id' });
-        }
-      };
-      request.onerror = () => resolve();
-      request.onsuccess = (e) => {
-        const db = e.target.result;
+      getSharedDb().then((db) => {
+        if (!db) return resolve();
         const tx = db.transaction('catalogs', 'readonly');
         const store = tx.objectStore('catalogs');
         let completed = 0;
@@ -64,7 +99,7 @@
             }
           };
         });
-      };
+      });
     });
   };
 
@@ -82,23 +117,12 @@
     if (this === localStorage && redirectedKeys.includes(key)) {
       window.localStorageCache[key] = value;
       originalRemoveItem.call(this, key);
-      (async () => {
-        try {
-          let parsedData = JSON.parse(value);
-          const db = await new Promise((res) => {
-            const req = indexedDB.open('SapiOfflineDB', 2);
-            req.onsuccess = (ev) => res(ev.target.result);
-            req.onerror = () => res(null);
-          });
-          if (db) {
-            const tx = db.transaction('catalogs', 'readwrite');
-            const store = tx.objectStore('catalogs');
-            store.put({ id: key, data: parsedData });
-          }
-        } catch (e) {
-          console.error('[IndexedDB Bridge] Error al guardar:', key, e);
-        }
-      })();
+      try {
+        let parsedData = JSON.parse(value);
+        scheduleDbWrite(key, parsedData);
+      } catch (e) {
+        console.error('[IndexedDB Bridge] Error al parsear para guardar:', key, e);
+      }
       return;
     }
     return originalSetItem.call(this, key, value);

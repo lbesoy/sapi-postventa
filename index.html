@@ -2,7 +2,16 @@
 <html lang="es">
 
 <head>
-  <script src="localstorage-bridge.js?v=1"></script>
+  <script>
+    // Limpieza preventiva inmediata contra saturación de memoria por colas offline corruptas
+    try {
+      var sq = localStorage.getItem('sapi_sync_queue');
+      if (sq && sq.length > 20000) {
+        localStorage.removeItem('sapi_sync_queue');
+      }
+    } catch(e) {}
+  </script>
+  <script src="localstorage-bridge.js?v=2"></script>
   <script>
 
     window.onerror = function(message, source, lineno, colno, error) {
@@ -22,30 +31,26 @@
       return false;
     };
     
-    // Desactivar caché de Service Worker en desarrollo local (localhost)
+    // Desactivar caché de Service Worker en desarrollo local (localhost) sin recargar en bucle
     if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          var unregistered = false;
           for (var i = 0; i < registrations.length; i++) {
             registrations[i].unregister();
-            unregistered = true;
           }
-          if (unregistered && 'caches' in window) {
+          if ('caches' in window) {
             caches.keys().then(function(names) {
               return Promise.all(names.map(function(name) { return caches.delete(name); }));
-            }).then(function() {
-              console.log('[Dev] Service Worker y Cachés eliminadas en localhost.');
-              window.location.reload(true);
             });
           }
         });
       }
     } else if (typeof window !== 'undefined') {
       // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
-      const currentAppVer = '1.3.299';
+      const currentAppVer = '1.3.338';
       const lastAppVer = localStorage.getItem('sapi_app_version');
       if (lastAppVer !== currentAppVer) {
+        localStorage.setItem('sapi_app_version', currentAppVer);
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.getRegistrations().then(function(registrations) {
             for (var i = 0; i < registrations.length; i++) {
@@ -55,18 +60,13 @@
               caches.keys().then(function(names) {
                 return Promise.all(names.map(function(name) { return caches.delete(name); }));
               }).then(function() {
-                localStorage.setItem('sapi_app_version', currentAppVer);
                 console.log('[Version] Cache y Service Worker purgados por actualización a ' + currentAppVer);
-                window.location.reload(true);
+                window.location.reload();
               });
             } else {
-              localStorage.setItem('sapi_app_version', currentAppVer);
-              window.location.reload(true);
+              window.location.reload();
             }
           });
-        } else {
-          localStorage.setItem('sapi_app_version', currentAppVer);
-          window.location.reload(true);
         }
       }
     }
@@ -88,7 +88,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
   <link rel="stylesheet" href="theme-base.css?v=2" />
-  <link rel="stylesheet" href="style.css?v=58" />
+  <link rel="stylesheet" href="style.css?v=62" />
   <!-- PWA & Mobile Web App Capabilities -->
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="logo_transparent.png" type="image/png" />
@@ -233,7 +233,7 @@
         </div>
       </div>
 
-      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: var(--text-muted);" id="login-app-version">v1.3.296</div>
+      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: var(--text-muted);" id="login-app-version">v1.3.341</div>
     </div>
   </div>
 
@@ -275,6 +275,10 @@
         <a href="#" class="nav-item" data-view="gastos" data-title="Control de Gastos" id="nav-gastos">
           <span class="nav-icon"><i data-lucide="receipt"></i></span><span>Control de Gastos</span>
         </a>
+        <a href="#" class="nav-item" data-view="rentas" data-title="Rentas" id="nav-rentas">
+          <span class="nav-icon"><i data-lucide="key-round"></i></span><span>Rentas</span>
+          <span class="nav-badge" id="nav-badge-rentas" style="display:none;"></span>
+        </a>
         <a href="#" class="nav-item" data-view="clientes" data-title="Clientes" id="nav-clientes">
           <span class="nav-icon"><i data-lucide="users"></i></span><span>Clientes</span>
         </a>
@@ -313,7 +317,7 @@
             <i data-lucide="log-out"></i>
             <span>Cerrar Sesión</span>
           </button>
-          <div class="sidebar-version" id="app-sidebar-version">v1.3.295</div>
+          <div class="sidebar-version" id="app-sidebar-version">v1.3.341</div>
         </div>
       </div>
     </aside>
@@ -401,6 +405,8 @@
               style="display:none;"><i data-lucide="plus" class="btn-icon"></i> <span class="btn-text">Nuevo Ticket</span></button>
             <button class="btn-primary btn-lev-action" id="btn-nuevo-levantamiento" onclick="window.abrirModalNuevoLevantamiento()"
               style="display:none;"><i data-lucide="plus" class="btn-icon"></i> <span class="btn-text">Nuevo Levantamiento</span></button>
+            <button class="btn-primary btn-renta-action" id="btn-nueva-renta" onclick="window.abrirModalNuevaRenta()"
+              style="display:none;"><i data-lucide="plus" class="btn-icon"></i> <span class="btn-text">Nueva Renta</span></button>
             <button class="btn-secondary btn-cliente-action" id="btn-agregar-maquina"
               onclick="abrirModalAgregarMaquina()" style="display:none;"><i data-lucide="settings-2"
                 class="btn-icon"></i> <span class="btn-text">Agregar Máquina</span></button>
@@ -2587,7 +2593,7 @@
                     <div class="toggle-label">Versión de la Aplicación</div>
                     <div class="toggle-sub">Versión actualmente cargada</div>
                   </div>
-                  <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); background: var(--bg-body); padding: 0.25rem 0.6rem; border: 1px solid var(--border); border-radius: 4px;" id="app-profile-version">v1.3.295</div>
+                  <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); background: var(--bg-body); padding: 0.25rem 0.6rem; border: 1px solid var(--border); border-radius: 4px;" id="app-profile-version">v1.3.341</div>
                 </div>
                 <div class="toggle-row" style="border-top: 1px dashed var(--border); padding-top: 0.85rem; margin-top: 0.25rem; flex-direction: column; align-items: stretch; gap: 0.5rem;">
                   <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -2603,9 +2609,9 @@
                 <div class="toggle-row" style="border-top: 1px dashed var(--border); padding-top: 0.85rem; margin-top: 0.25rem; flex-direction: column; align-items: stretch; gap: 0.4rem;">
                   <div class="toggle-label">Manuales de Ayuda y Uso</div>
                   <div class="toggle-sub">Descarga las guías de uso oficiales en formato PDF:</div>
-                  <div class="manuals-grid">
+                  <div class="manuals-grid" id="manuals-grid-container">
                     
-                    <a href="manuales/manual_flujo_completo.pdf" target="_blank" class="manual-download-card featured">
+                    <div class="manual-download-card featured" style="cursor:pointer;" onclick="window.abrirVisorManualPorId('flujo_completo')" title="Haz clic para visualizar Flujo Completo en pantalla">
                       <div class="manual-card-icon">
                         <i data-lucide="git-branch" style="width:16px; height:16px;"></i>
                       </div>
@@ -2613,10 +2619,20 @@
                         <div class="manual-card-title">Flujo Completo</div>
                         <div class="manual-card-sub">Ciclo completo del sistema</div>
                       </div>
-                      <i data-lucide="download" class="manual-card-download-icon"></i>
-                    </a>
+                      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
+                        <button type="button" 
+                                onclick="event.stopPropagation(); window.abrirVisorManualPorId('flujo_completo');" 
+                                style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--primary, #2563eb); color:#ffffff; border:none; cursor:pointer;" 
+                                title="Visualizar en pantalla">
+                          <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
+                        </button>
+                        <a href="manuales/manual_flujo_completo.pdf" download onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--bg-hover); color:var(--text-muted); text-decoration:none; border: 1px solid var(--border);" title="Descargar PDF">
+                          <i data-lucide="download" style="width:14px; height:14px; pointer-events:none;"></i>
+                        </a>
+                      </div>
+                    </div>
                     
-                    <a href="manuales/manual_administrador.pdf" target="_blank" class="manual-download-card">
+                    <div class="manual-download-card" style="cursor:pointer;" onclick="window.abrirVisorManualPorId('admin')" title="Haz clic para visualizar Administrador en pantalla">
                       <div class="manual-card-icon">
                         <i data-lucide="user-cog" style="width:16px; height:16px;"></i>
                       </div>
@@ -2624,10 +2640,20 @@
                         <div class="manual-card-title">Administrador</div>
                         <div class="manual-card-sub">Gestión, calendario y roles</div>
                       </div>
-                      <i data-lucide="download" class="manual-card-download-icon"></i>
-                    </a>
+                      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
+                        <button type="button" 
+                                onclick="event.stopPropagation(); window.abrirVisorManualPorId('admin');" 
+                                style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--primary, #2563eb); color:#ffffff; border:none; cursor:pointer;" 
+                                title="Visualizar en pantalla">
+                          <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
+                        </button>
+                        <a href="manuales/manual_administrador.pdf" download onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--bg-hover); color:var(--text-muted); text-decoration:none; border: 1px solid var(--border);" title="Descargar PDF">
+                          <i data-lucide="download" style="width:14px; height:14px; pointer-events:none;"></i>
+                        </a>
+                      </div>
+                    </div>
                     
-                    <a href="manuales/manual_tecnico.pdf" target="_blank" class="manual-download-card">
+                    <div class="manual-download-card" style="cursor:pointer;" onclick="window.abrirVisorManualPorId('tecnico')" title="Haz clic para visualizar Técnico de Campo en pantalla">
                       <div class="manual-card-icon">
                         <i data-lucide="wrench" style="width:16px; height:16px;"></i>
                       </div>
@@ -2635,10 +2661,41 @@
                         <div class="manual-card-title">Técnico de Campo</div>
                         <div class="manual-card-sub">Órdenes, bitácoras y offline</div>
                       </div>
-                      <i data-lucide="download" class="manual-card-download-icon"></i>
-                    </a>
+                      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
+                        <button type="button" 
+                                onclick="event.stopPropagation(); window.abrirVisorManualPorId('tecnico');" 
+                                style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--primary, #2563eb); color:#ffffff; border:none; cursor:pointer;" 
+                                title="Visualizar en pantalla">
+                          <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
+                        </button>
+                        <a href="manuales/manual_tecnico.pdf" download onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--bg-hover); color:var(--text-muted); text-decoration:none; border: 1px solid var(--border);" title="Descargar PDF">
+                          <i data-lucide="download" style="width:14px; height:14px; pointer-events:none;"></i>
+                        </a>
+                      </div>
+                    </div>
+
+                    <div class="manual-download-card" style="cursor:pointer;" onclick="window.abrirVisorManualPorId('tickets')" title="Haz clic para visualizar Gestión de Tickets en pantalla">
+                      <div class="manual-card-icon">
+                        <i data-lucide="ticket" style="width:16px; height:16px;"></i>
+                      </div>
+                      <div class="manual-card-info">
+                        <div class="manual-card-title">Gestión de Tickets</div>
+                        <div class="manual-card-sub">Ciclo, cotizaciones SAP y chat</div>
+                      </div>
+                      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
+                        <button type="button" 
+                                onclick="event.stopPropagation(); window.abrirVisorManualPorId('tickets');" 
+                                style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--primary, #2563eb); color:#ffffff; border:none; cursor:pointer;" 
+                                title="Visualizar en pantalla">
+                          <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
+                        </button>
+                        <a href="manuales/manual_tickets.pdf" download onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--bg-hover); color:var(--text-muted); text-decoration:none; border: 1px solid var(--border);" title="Descargar PDF">
+                          <i data-lucide="download" style="width:14px; height:14px; pointer-events:none;"></i>
+                        </a>
+                      </div>
+                    </div>
                     
-                    <a href="manuales/manual_gastos.pdf" target="_blank" class="manual-download-card">
+                    <div class="manual-download-card" style="cursor:pointer;" onclick="window.abrirVisorManualPorId('gastos')" title="Haz clic para visualizar Control de Gastos en pantalla">
                       <div class="manual-card-icon">
                         <i data-lucide="credit-card" style="width:16px; height:16px;"></i>
                       </div>
@@ -2646,10 +2703,20 @@
                         <div class="manual-card-title">Control de Gastos</div>
                         <div class="manual-card-sub">Viáticos y conciliación Clara</div>
                       </div>
-                      <i data-lucide="download" class="manual-card-download-icon"></i>
-                    </a>
+                      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
+                        <button type="button" 
+                                onclick="event.stopPropagation(); window.abrirVisorManualPorId('gastos');" 
+                                style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--primary, #2563eb); color:#ffffff; border:none; cursor:pointer;" 
+                                title="Visualizar en pantalla">
+                          <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
+                        </button>
+                        <a href="manuales/manual_gastos.pdf" download onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--bg-hover); color:var(--text-muted); text-decoration:none; border: 1px solid var(--border);" title="Descargar PDF">
+                          <i data-lucide="download" style="width:14px; height:14px; pointer-events:none;"></i>
+                        </a>
+                      </div>
+                    </div>
                     
-                    <a href="manuales/diagrama_flujo.html" target="_blank" class="manual-download-card featured" style="border-color: rgba(139, 92, 246, 0.4); background: rgba(139, 92, 246, 0.05);">
+                    <div class="manual-download-card featured" style="border-color: rgba(139, 92, 246, 0.4); background: rgba(139, 92, 246, 0.05); cursor:pointer;" onclick="window.abrirVisorManualPorId('diagrama_flujo')" title="Haz clic para visualizar Diagrama de Flujo en pantalla">
                       <div class="manual-card-icon" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6;">
                         <i data-lucide="network" style="width:16px; height:16px;"></i>
                       </div>
@@ -2657,10 +2724,41 @@
                         <div class="manual-card-title" style="color:#a78bfa; font-weight:700;">Diagrama de Flujo del Proceso</div>
                         <div class="manual-card-sub">Mapa interactivo: Euro SAPI vs. Portal Clientes</div>
                       </div>
-                      <i data-lucide="external-link" class="manual-card-download-icon" style="color:#8b5cf6;"></i>
-                    </a>
+                      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
+                        <button type="button" 
+                                onclick="event.stopPropagation(); window.abrirVisorManualPorId('diagrama_flujo');" 
+                                style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:#8b5cf6; color:#ffffff; border:none; cursor:pointer;" 
+                                title="Visualizar en pantalla">
+                          <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
+                        </button>
+                        <a href="manuales/diagrama_flujo.html" target="_blank" onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:rgba(139, 92, 246, 0.15); color:#8b5cf6; text-decoration:none; border: 1px solid rgba(139, 92, 246, 0.3);" title="Abrir en pestaña nueva">
+                          <i data-lucide="external-link" style="width:14px; height:14px; pointer-events:none;"></i>
+                        </a>
+                      </div>
+                    </div>
+
+                    <div class="manual-download-card" style="cursor:pointer;" onclick="window.abrirVisorManualPorId('cliente')" title="Haz clic para visualizar Manual del Cliente en pantalla">
+                      <div class="manual-card-icon">
+                        <i data-lucide="building" style="width:16px; height:16px;"></i>
+                      </div>
+                      <div class="manual-card-info">
+                        <div class="manual-card-title">Manual del Cliente</div>
+                        <div class="manual-card-sub">Portal, rentas y solicitudes</div>
+                      </div>
+                      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
+                        <button type="button" 
+                                onclick="event.stopPropagation(); window.abrirVisorManualPorId('cliente');" 
+                                style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--primary, #2563eb); color:#ffffff; border:none; cursor:pointer;" 
+                                title="Visualizar en pantalla">
+                          <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
+                        </button>
+                        <a href="manuales/manual_cliente.pdf" download onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--bg-hover); color:var(--text-muted); text-decoration:none; border: 1px solid var(--border);" title="Descargar PDF">
+                          <i data-lucide="download" style="width:14px; height:14px; pointer-events:none;"></i>
+                        </a>
+                      </div>
+                    </div>
                     
-                    <a href="manuales/manual_tecnico_desarrollador.pdf" target="_blank" class="manual-download-card">
+                    <div class="manual-download-card" style="cursor:pointer;" onclick="window.abrirVisorManualPorId('desarrollador')" title="Haz clic para visualizar Sistemas y Desarrollador en pantalla">
                       <div class="manual-card-icon">
                         <i data-lucide="code-2" style="width:16px; height:16px;"></i>
                       </div>
@@ -2668,8 +2766,18 @@
                         <div class="manual-card-title">Sistemas y Desarrollador</div>
                         <div class="manual-card-sub">Estructura técnica, base de datos y APIs</div>
                       </div>
-                      <i data-lucide="download" class="manual-card-download-icon"></i>
-                    </a>
+                      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
+                        <button type="button" 
+                                onclick="event.stopPropagation(); window.abrirVisorManualPorId('desarrollador');" 
+                                style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--primary, #2563eb); color:#ffffff; border:none; cursor:pointer;" 
+                                title="Visualizar en pantalla">
+                          <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
+                        </button>
+                        <a href="manuales/manual_tecnico_desarrollador.pdf" download onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--bg-hover); color:var(--text-muted); text-decoration:none; border: 1px solid var(--border);" title="Descargar PDF">
+                          <i data-lucide="download" style="width:14px; height:14px; pointer-events:none;"></i>
+                        </a>
+                      </div>
+                    </div>
                     
                   </div>
                 </div>
@@ -3329,6 +3437,100 @@
                 <p style="font-size:0.9rem; font-weight:500; margin:0;">Selecciona un cliente de la lista para ver el chat</p>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- RENTAS VIEW -->
+        <div id="view-rentas" class="view">
+          <div style="height: 1.5rem; width: 100%; flex-shrink: 0;"></div>
+
+          <!-- KPI Cards Grid -->
+          <div class="stats-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+            <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('todas')">
+              <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:var(--accent);"><i data-lucide="key-round"></i></div>
+              <div>
+                <div class="stat-label">Total Contratos</div>
+                <div class="stat-value" id="stat-rentas-total">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('activas')">
+              <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle-2"></i></div>
+              <div>
+                <div class="stat-label">Activas en Campo</div>
+                <div class="stat-value" id="stat-rentas-activas">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('por_vencer')">
+              <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:#f59e0b;"><i data-lucide="alert-triangle"></i></div>
+              <div>
+                <div class="stat-label">Por Vencer (&le; 7d)</div>
+                <div class="stat-value" id="stat-rentas-por-vencer">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('vencidas')">
+              <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-octagon"></i></div>
+              <div>
+                <div class="stat-label">Vencidas</div>
+                <div class="stat-value" id="stat-rentas-vencidas">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;">
+              <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="dollar-sign"></i></div>
+              <div>
+                <div class="stat-label">Ingresos Est. / Mes</div>
+                <div class="stat-value" id="stat-rentas-ingresos" style="font-size:1.15rem;">$0.00</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Controls Toolbar: Search, Filter Pills & Export -->
+          <div style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+            <!-- Left: Search & Filter Pills -->
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; flex: 1;">
+              <div style="position: relative; min-width: 260px; max-width: 380px; flex: 1;">
+                <i data-lucide="search" style="position: absolute; left: 10px; top: 9px; width: 15px; height: 15px; color: var(--text-muted);"></i>
+                <input type="text" id="search-rentas" placeholder="Buscar folio, cliente, equipo, serie, asesor..." oninput="window.renderRentas()" style="width: 100%; padding: 0.45rem 0.75rem 0.45rem 2.1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+              </div>
+              <div class="rentas-filter-pills-wrap" style="display: flex; gap: 0.35rem; background: var(--bg-hover); padding: 0.25rem; border-radius: 8px; border: 1px solid var(--border);">
+                <button type="button" class="btn-secondary rentas-filter-pill active" data-filtro="todas" onclick="window.setFiltroEstadoRentas('todas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: var(--accent, #E8820C); color: #fff;">Todas <span id="count-pill-rentas-todas" style="margin-left:3px; opacity:0.85;">0</span></button>
+                <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="activas" onclick="window.setFiltroEstadoRentas('activas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Activas <span id="count-pill-rentas-activas" style="margin-left:3px; opacity:0.85;">0</span></button>
+                <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="reservadas" onclick="window.setFiltroEstadoRentas('reservadas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Reservadas <span id="count-pill-rentas-reservadas" style="margin-left:3px; opacity:0.85;">0</span></button>
+                <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="por_vencer" onclick="window.setFiltroEstadoRentas('por_vencer')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Por Vencer <span id="count-pill-rentas-por-vencer" style="margin-left:3px; opacity:0.85;">0</span></button>
+                <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="vencidas" onclick="window.setFiltroEstadoRentas('vencidas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Vencidas <span id="count-pill-rentas-vencidas" style="margin-left:3px; opacity:0.85;">0</span></button>
+                <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="finalizadas" onclick="window.setFiltroEstadoRentas('finalizadas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Finalizadas <span id="count-pill-rentas-finalizadas" style="margin-left:3px; opacity:0.85;">0</span></button>
+              </div>
+            </div>
+
+            <!-- Right: Action buttons -->
+            <div style="display: flex; gap: 0.5rem;">
+              <button type="button" class="btn-secondary" onclick="window.exportarRentasExcel()" style="font-size: 0.85rem;">
+                <i data-lucide="download" style="width:14px;height:14px;"></i> Exportar Excel
+              </button>
+              <button type="button" class="btn-primary" onclick="window.abrirModalNuevaRenta()" style="font-size: 0.85rem;">
+                <i data-lucide="plus" style="width:14px;height:14px;"></i> Nueva Renta
+              </button>
+            </div>
+          </div>
+
+          <!-- Rentas Table -->
+          <div class="table-container" style="background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow-sm);">
+            <table class="orders-table" style="width:100%; border-collapse:collapse; text-align:left;">
+              <thead>
+                <tr>
+                  <th style="width: 100px;">Acciones</th>
+                  <th>Folio</th>
+                  <th>Cliente y Sitio</th>
+                  <th>Maquinaria / Equipo</th>
+                  <th>Periodo Vigencia</th>
+                  <th>Horómetro</th>
+                  <th>Tarifa y Depósito</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="rentas-table-body">
+                <!-- Se llena con JS -->
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -8533,6 +8735,7 @@
 
 
 
+
   <!-- MODAL CONFIRMACIÓN PERSONALIZADO -->
   <div id="modal-confirmacion-global" class="modal-overlay" style="z-index:999999; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(6px); transition: opacity 0.25s ease-in-out;">
     <div class="modal" style="max-width:440px; width:92%; border-radius:20px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4); padding:2rem; display:flex; flex-direction:column; gap:1.25rem; transform:scale(0.9); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); border-top: 4px solid var(--accent, #E8820C);">
@@ -8576,10 +8779,258 @@
     </div>
   </div>
 
+  <!-- MODAL VISOR DE MANUALES Y DOCUMENTOS -->
+  <div id="modal-visor-manual-overlay" class="modal-overlay" onclick="window.cerrarVisorManual(event)">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:560px; width:92%; border-radius:16px; background:var(--bg-card, #1e293b); color:var(--text-primary, #f8fafc); box-shadow:var(--shadow-lg, 0 20px 25px -5px rgba(0,0,0,0.5)); border:1px solid var(--border, rgba(255,255,255,0.1));">
+      <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; padding:1.25rem 1.5rem; border-bottom:1px solid var(--border, rgba(255,255,255,0.1)); background:var(--bg-hover, rgba(255,255,255,0.03));">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <div style="width:40px; height:40px; border-radius:10px; background:rgba(37,99,235,0.12); color:var(--primary, #2563eb); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <i data-lucide="book-open" id="modal-visor-manual-icon" style="width:20px; height:20px;"></i>
+          </div>
+          <div>
+            <h2 id="modal-visor-manual-titulo" style="margin:0; font-size:1.15rem; font-weight:700; color:var(--text-primary, #f8fafc);">Manual del Sistema</h2>
+            <div id="modal-visor-manual-sub" style="font-size:0.8rem; color:var(--text-muted, #94a3b8); margin-top:2px;">Documentación y guías oficiales</div>
+          </div>
+        </div>
+        <button class="modal-close" onclick="window.cerrarVisorManual()" style="background:transparent; border:none; color:var(--text-muted); font-size:1.25rem; cursor:pointer;">✕</button>
+      </div>
+      <div class="modal-body" style="padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem;">
+        <div id="modal-visor-manual-desc" style="font-size:0.92rem; line-height:1.5; color:var(--text-primary); background:var(--bg-body, #0f172a); padding:1rem; border-radius:8px; border:1px solid var(--border, rgba(255,255,255,0.1));">
+          Consulta la guía paso a paso o descarga el documento oficial en formato PDF.
+        </div>
+        <div style="display:flex; flex-direction:column; gap:0.75rem;">
+          <a id="modal-visor-manual-btn-tab" href="#" target="_blank" class="btn-primary" style="padding:0.75rem 1.25rem; font-size:0.95rem; font-weight:600; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.5rem; border-radius:10px; cursor:pointer;">
+            <i data-lucide="external-link" style="width:18px; height:18px;"></i>
+            <span>Abrir Manual Completo (Interactivo)</span>
+          </a>
+          <a id="modal-visor-manual-btn-download" href="#" download class="btn-secondary" style="padding:0.75rem 1.25rem; font-size:0.95rem; font-weight:600; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.5rem; border-radius:10px; cursor:pointer;">
+            <i data-lucide="download" style="width:18px; height:18px;"></i>
+            <span>Descargar Documento PDF</span>
+          </a>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding:1rem 1.5rem; border-top:1px solid var(--border, rgba(255,255,255,0.1)); display:flex; justify-content:flex-end; background:var(--bg-hover, rgba(255,255,255,0.03));">
+        <button type="button" class="btn-secondary" onclick="window.cerrarVisorManual()" style="padding:0.55rem 1.25rem; border-radius:8px; cursor:pointer;">Cerrar</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     // ============================================================
-    // DIAGRAMA DE FLUJO INTERACTIVO (GLOBAL HELPER)
+    window.CATALOGO_MANUALES = [
+      {
+        id: 'flujo_completo',
+        titulo: 'Flujo Completo',
+        subtitulo: 'Ciclo completo del sistema',
+        html: 'manuales/manual_flujo_completo.html',
+        pdf: 'manuales/manual_flujo_completo.pdf',
+        icono: 'git-branch',
+        destacado: true
+      },
+      {
+        id: 'admin',
+        aliasId: 'administrador',
+        titulo: 'Administrador',
+        subtitulo: 'Gestión, calendario y roles',
+        html: 'manuales/manual_administrador.html',
+        pdf: 'manuales/manual_administrador.pdf',
+        icono: 'user-cog',
+        destacado: false
+      },
+      {
+        id: 'tecnico',
+        titulo: 'Técnico de Campo',
+        subtitulo: 'Órdenes, bitácoras y offline',
+        html: 'manuales/manual_tecnico.html',
+        pdf: 'manuales/manual_tecnico.pdf',
+        icono: 'wrench',
+        destacado: false
+      },
+      {
+        id: 'tickets',
+        titulo: 'Gestión de Tickets',
+        subtitulo: 'Ciclo, cotizaciones SAP y chat',
+        html: 'manuales/manual_tickets.html',
+        pdf: 'manuales/manual_tickets.pdf',
+        icono: 'ticket',
+        destacado: false
+      },
+      {
+        id: 'gastos',
+        titulo: 'Control de Gastos',
+        subtitulo: 'Viáticos y conciliación Clara',
+        html: 'manuales/manual_gastos.html',
+        pdf: 'manuales/manual_gastos.pdf',
+        icono: 'credit-card',
+        destacado: false
+      },
+      {
+        id: 'diagrama_flujo',
+        titulo: 'Diagrama de Flujo del Proceso',
+        subtitulo: 'Mapa interactivo: Euro SAPI vs. Portal Clientes',
+        html: 'manuales/diagrama_flujo.html',
+        link: 'manuales/diagrama_flujo.html',
+        pdf: 'manuales/diagrama_flujo.html',
+        icono: 'network',
+        destacado: true,
+        customStyle: 'border-color: rgba(139, 92, 246, 0.4); background: rgba(139, 92, 246, 0.05);',
+        customIconStyle: 'background: rgba(139, 92, 246, 0.15); color: #8b5cf6;',
+        customTitleColor: '#a78bfa',
+        isExternal: true
+      },
+      {
+        id: 'cliente',
+        titulo: 'Manual del Cliente',
+        subtitulo: 'Portal, rentas y solicitudes',
+        html: 'manuales/manual_cliente.html',
+        pdf: 'manuales/manual_cliente.pdf',
+        icono: 'building',
+        destacado: false
+      },
+      {
+        id: 'desarrollador',
+        titulo: 'Sistemas y Desarrollador',
+        subtitulo: 'Estructura técnica, base de datos y APIs',
+        html: 'manuales/manual_tecnico_desarrollador.html',
+        pdf: 'manuales/manual_tecnico_desarrollador.pdf',
+        icono: 'code-2',
+        destacado: false,
+        soloSuperAdmin: true
+      }
+    ];
+
+    window.crearModalVisorManualSiNoExiste = function() {
+      let overlay = document.getElementById('modal-visor-manual-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'modal-visor-manual-overlay';
+        overlay.className = 'modal-overlay';
+        overlay.setAttribute('onclick', 'window.cerrarVisorManual(event)');
+        overlay.innerHTML = `
+          <div class="modal" onclick="event.stopPropagation()" style="max-width:560px; width:92%; border-radius:16px; background:var(--bg-card, #1e293b); color:var(--text-primary, #f8fafc); box-shadow:var(--shadow-lg, 0 20px 25px -5px rgba(0,0,0,0.5)); border:1px solid var(--border, rgba(255,255,255,0.1));">
+            <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; padding:1.25rem 1.5rem; border-bottom:1px solid var(--border, rgba(255,255,255,0.1)); background:var(--bg-hover, rgba(255,255,255,0.03));">
+              <div style="display:flex; align-items:center; gap:0.75rem;">
+                <div style="width:40px; height:40px; border-radius:10px; background:rgba(37,99,235,0.12); color:var(--primary, #2563eb); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                  <i data-lucide="book-open" id="modal-visor-manual-icon" style="width:20px; height:20px;"></i>
+                </div>
+                <div>
+                  <h2 id="modal-visor-manual-titulo" style="margin:0; font-size:1.15rem; font-weight:700; color:var(--text-primary, #f8fafc);">Manual del Sistema</h2>
+                  <div id="modal-visor-manual-sub" style="font-size:0.8rem; color:var(--text-muted, #94a3b8); margin-top:2px;">Documentación y guías oficiales</div>
+                </div>
+              </div>
+              <button class="modal-close" onclick="window.cerrarVisorManual()" style="background:transparent; border:none; color:var(--text-muted); font-size:1.25rem; cursor:pointer;">✕</button>
+            </div>
+            <div class="modal-body" style="padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem;">
+              <div id="modal-visor-manual-desc" style="font-size:0.92rem; line-height:1.5; color:var(--text-primary); background:var(--bg-body, #0f172a); padding:1rem; border-radius:8px; border:1px solid var(--border, rgba(255,255,255,0.1));">
+                Consulta la guía paso a paso o descarga el documento oficial en formato PDF.
+              </div>
+              <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                <a id="modal-visor-manual-btn-tab" href="#" target="_blank" class="btn-primary" style="padding:0.75rem 1.25rem; font-size:0.95rem; font-weight:600; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.5rem; border-radius:10px; cursor:pointer;">
+                  <i data-lucide="external-link" style="width:18px; height:18px;"></i>
+                  <span>Abrir Manual Completo (Interactivo)</span>
+                </a>
+                <a id="modal-visor-manual-btn-download" href="#" download class="btn-secondary" style="padding:0.75rem 1.25rem; font-size:0.95rem; font-weight:600; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.5rem; border-radius:10px; cursor:pointer;">
+                  <i data-lucide="download" style="width:18px; height:18px;"></i>
+                  <span>Descargar Documento PDF</span>
+                </a>
+              </div>
+            </div>
+            <div class="modal-footer" style="padding:1rem 1.5rem; border-top:1px solid var(--border, rgba(255,255,255,0.1)); display:flex; justify-content:flex-end; background:var(--bg-hover, rgba(255,255,255,0.03));">
+              <button type="button" class="btn-secondary" onclick="window.cerrarVisorManual()" style="padding:0.55rem 1.25rem; border-radius:8px; cursor:pointer;">Cerrar</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(overlay);
+      }
+      return overlay;
+    };
+
+    window.abrirVisorManualPorId = function(id) {
+      const catalogo = window.CATALOGO_MANUALES || [];
+      const m = catalogo.find(item => item.id === id || item.aliasId === id);
+      if (m) {
+        window.abrirVisorManual(m.html || m.link || m.pdf, m.titulo, m.subtitulo, m.pdf || m.link);
+      } else {
+        window.abrirVisorManual(`manuales/manual_${id}.html`, 'Manual del Sistema', 'Visor interactivo oficial', `manuales/manual_${id}.pdf`);
+      }
+    };
+
+    window.abrirVisorManual = function(urlHtml, arg2, arg3, arg4) {
+      const overlay = window.crearModalVisorManualSiNoExiste();
+      const titleEl = document.getElementById('modal-visor-manual-titulo');
+      const subEl = document.getElementById('modal-visor-manual-sub');
+      const descEl = document.getElementById('modal-visor-manual-desc');
+      const btnTab = document.getElementById('modal-visor-manual-btn-tab');
+      const btnDownload = document.getElementById('modal-visor-manual-btn-download');
+
+      let titulo = 'Manual del Sistema';
+      let subtitulo = 'Visor interactivo oficial';
+      let urlPdf = '';
+
+      if (typeof arg2 === 'string') {
+        if (arg2.endsWith('.pdf') || (arg2.includes('/') && !arg2.includes(' '))) {
+          urlPdf = arg2;
+          if (arg3) titulo = arg3;
+          if (arg4) subtitulo = arg4;
+        } else {
+          titulo = arg2;
+          if (arg3) subtitulo = arg3;
+          if (arg4) urlPdf = arg4;
+        }
+      }
+
+      const targetViewerUrl = urlHtml || urlPdf || 'manuales/manual_flujo_completo.html';
+      if (!urlPdf && urlHtml) {
+        urlPdf = urlHtml.endsWith('.html') ? urlHtml.replace(/\.html$/, '.pdf') : urlHtml;
+      }
+
+      if (titleEl) titleEl.textContent = titulo;
+      if (subEl) subEl.textContent = subtitulo;
+      if (descEl) descEl.innerHTML = `<strong>${titulo}</strong><br><span style="color:var(--text-muted, #94a3b8); font-size:0.85rem;">${subtitulo}</span><div style="margin-top:0.5rem; font-size:0.85rem;">Selecciona una de las opciones para abrir la guía interactiva o descargarla en formato PDF.</div>`;
+
+      if (btnTab) {
+        btnTab.href = targetViewerUrl;
+      }
+      if (btnDownload) {
+        btnDownload.href = urlPdf || targetViewerUrl;
+        btnDownload.style.display = (targetViewerUrl && targetViewerUrl.includes('diagrama_flujo')) ? 'none' : 'flex';
+      }
+
+      if (overlay) {
+        overlay.classList.add('open');
+        overlay.style.display = 'flex';
+        overlay.style.visibility = 'visible';
+        overlay.style.opacity = '1';
+        overlay.style.pointerEvents = 'auto';
+        document.body.style.overflow = 'hidden';
+      }
+
+      if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        try { lucide.createIcons({ root: overlay }); } catch(e) {}
+      }
+    };
+
+    window.cerrarVisorManual = function(e) {
+      if (e && e.target) {
+        const isOverlay = e.target.id === 'modal-visor-manual-overlay' || e.target.classList.contains('modal-overlay');
+        const isCloseBtn = e.target.classList.contains('modal-close') || e.target.closest('.modal-close');
+        if (!isOverlay && !isCloseBtn) return;
+      }
+      const overlay = document.getElementById('modal-visor-manual-overlay');
+      if (overlay) {
+        overlay.classList.remove('open');
+        overlay.style.display = 'none';
+        overlay.style.visibility = 'hidden';
+        overlay.style.opacity = '0';
+        overlay.style.pointerEvents = 'none';
+        document.body.style.overflow = '';
+      }
+    };
+
+    window.imprimirManualIframe = function() {
+      window.print();
+    };
+
     // ============================================================
     window.currentRutaDiagrama = 'all';
 
@@ -8693,9 +9144,10 @@
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=313",
+        "supabaseSync.js?v=326",
         "utils.js?v=8",
-        "app.js?v=381",
+        "app.js?v=412",
+        "rentas.js?v=11",
         "levantamientos.js?v=306",
         "tecnicos_reporte.js?v=303"
       ];
