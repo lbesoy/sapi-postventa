@@ -18150,16 +18150,20 @@ async function guardarTicket(e) {
   let newFolio = '';
   if (!editandoTicketId) {
     const isTest = isTestModeActive();
-    const yearStr = new Date().getFullYear().toString().slice(-2);
-    const prefix = isTest ? `TKT-PRUEBA-` : `TKT-${yearStr}`;
-    const ticketsDelAnio = tickets.filter(t => t.folio && t.folio.startsWith(prefix));
-    let maxConsecutivo = 0;
-    ticketsDelAnio.forEach(t => {
-      const numStr = t.folio.substring(prefix.length);
-      const num = parseInt(numStr, 10);
-      if (!isNaN(num) && num > maxConsecutivo) maxConsecutivo = num;
-    });
-    newFolio = `${prefix}${(maxConsecutivo + 1).toString().padStart(3, '0')}`;
+    if (typeof window.obtenerSiguienteFolioTicket === 'function') {
+      newFolio = await window.obtenerSiguienteFolioTicket(isTest);
+    } else {
+      const yearStr = new Date().getFullYear().toString().slice(-2);
+      const prefix = isTest ? `TKT-PRUEBA-` : `TKT-${yearStr}`;
+      const ticketsDelAnio = tickets.filter(t => t && t.folio && t.folio.startsWith(prefix));
+      let maxConsecutivo = 0;
+      ticketsDelAnio.forEach(t => {
+        const numStr = t.folio.substring(prefix.length);
+        const num = parseInt(numStr, 10);
+        if (!isNaN(num) && num > maxConsecutivo) maxConsecutivo = num;
+      });
+      newFolio = `${prefix}${(maxConsecutivo + 1).toString().padStart(3, '0')}`;
+    }
   }
 
   let asuntoVal = document.getElementById('t-asunto').value.trim();

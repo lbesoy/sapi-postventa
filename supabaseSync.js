@@ -1358,6 +1358,65 @@ function addToSyncQueue(table, action, data) {
   saveSyncQueue(queue);
 }
 
+window.obtenerSiguienteFolioTicket = async function(esPrueba = false) {
+  const sb = window.supabaseClient;
+  if (sb && typeof sb.rpc === 'function') {
+    try {
+      const { data, error } = await sb.rpc('obtener_siguiente_folio_ticket', { p_es_prueba: Boolean(esPrueba) });
+      if (!error && data && typeof data === 'string' && data.startsWith(esPrueba ? 'TKT-PRUEBA-' : 'TKT-')) {
+        return data;
+      }
+      if (error) {
+        console.warn('[Folio RPC] RPC obtener_siguiente_folio_ticket retornó advertencia:', error.message);
+      }
+    } catch (e) {
+      console.warn('[Folio RPC] Error ejecutando RPC en Supabase:', e);
+    }
+  }
+
+  // Fallback 1: Si hay cliente Supabase activo, consultar directamente el folio máximo de la tabla tickets
+  if (sb) {
+    try {
+      const yearStr = new Date().getFullYear().toString().slice(-2);
+      const prefix = esPrueba ? 'TKT-PRUEBA-' : `TKT-${yearStr}`;
+      const { data: maxRows, error: maxErr } = await sb
+        .from('tickets')
+        .select('folio')
+        .like('folio', `${prefix}%`)
+        .order('folio', { ascending: false })
+        .limit(30);
+      
+      if (!maxErr && Array.isArray(maxRows) && maxRows.length > 0) {
+        let maxNum = 0;
+        maxRows.forEach(r => {
+          if (r && r.folio && r.folio.startsWith(prefix)) {
+            const numPart = parseInt(r.folio.substring(prefix.length), 10);
+            if (!isNaN(numPart) && numPart > maxNum) maxNum = numPart;
+          }
+        });
+        if (maxNum > 0) {
+          return `${prefix}${(maxNum + 1).toString().padStart(3, '0')}`;
+        }
+      }
+    } catch (e) {
+      console.warn('[Folio Supabase Query] Error consultando máximo:', e);
+    }
+  }
+
+  // Fallback 2 (Offline): Calcular desde la memoria local / localStorage
+  const tkts = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : (JSON.parse(localStorage.getItem('sapi_tickets') || '[]'));
+  const yearStr = new Date().getFullYear().toString().slice(-2);
+  const prefix = esPrueba ? 'TKT-PRUEBA-' : `TKT-${yearStr}`;
+  const ticketsDelAnio = tkts.filter(t => t && t.folio && t.folio.startsWith(prefix));
+  let maxConsecutivo = 0;
+  ticketsDelAnio.forEach(t => {
+    const numStr = t.folio.substring(prefix.length);
+    const num = parseInt(numStr, 10);
+    if (!isNaN(num) && num > maxConsecutivo) maxConsecutivo = num;
+  });
+  return `${prefix}${(maxConsecutivo + 1).toString().padStart(3, '0')}`;
+};
+
 window.pushToSupabase = async function(tabla, item) {
   // La telemetría es no-crítica: se envía directo sin cola para evitar
   // acumulación de errores "Failed to fetch" en la UI.
@@ -1456,9 +1515,33 @@ window.pushToSupabase = async function(tabla, item) {
       }
     }
     
-    // Upsert directo en la nube
-    const upsertOptions = ((tabla === 'tickets' || tabla === 'ordenes') && row.folio) ? { onConflict: 'folio' } : undefined;
+    // Upsert directo en la nube por clave primaria ID para evitar sobreescrituras accidentales de folios
+    const upsertOptions = (row.id) ? { onConflict: 'id' } : undefined;
     let { error } = await sb.from(tabla).upsert(row, upsertOptions);
+
+    // Si hay error de colisión de unicidad de folio (23505) en tickets
+    if (error && (error.code === '23505' || String(error.message || '').toLowerCase().includes('duplicate') || String(error.message || '').toLowerCase().includes('folio')) && tabla === 'tickets') {
+      console.warn(`[Direct Push] Colisión de folio detectada en tickets para folio=${row.folio}. Solicitando nuevo folio atómico...`);
+      try {
+        const nuevoFolio = await window.obtenerSiguienteFolioTicket(item.esPrueba);
+        if (nuevoFolio && nuevoFolio !== row.folio) {
+          row.folio = nuevoFolio;
+          item.folio = nuevoFolio;
+          if (typeof tickets !== 'undefined' && Array.isArray(tickets)) {
+            const locTkt = tickets.find(t => t && t.id === item.id);
+            if (locTkt) locTkt.folio = nuevoFolio;
+          }
+          const resRetry = await sb.from(tabla).upsert(row, { onConflict: 'id' });
+          error = resRetry.error;
+          if (!error) {
+            console.log(`[Direct Push] Ticket recuperado exitosamente con nuevo folio asignado: ${nuevoFolio}`);
+            if (typeof renderTickets === 'function') renderTickets();
+          }
+        }
+      } catch (retryErr) {
+        console.error('[Direct Push] Error al intentar resolver colisión de folio:', retryErr);
+      }
+    }
 
     // Bucle dinámico de autorecuperación para columnas no migradas en Supabase (PGRST204 / schema cache)
     let colRetries = 0;

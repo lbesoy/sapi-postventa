@@ -2055,18 +2055,23 @@ async function crearTicketCliente(e) {
     const asuntoVal = document.getElementById('t-asunto').value.trim();
     const descripcionVal = document.getElementById('t-descripcion').value.trim();
 
-    // Generar Folio consecutivo local temporal
-    const yearStr = new Date().getFullYear().toString().slice(-2);
+    // Generar Folio consecutivo centralizado atómico o local temporal
     const isSandbox = isTestModeActive();
-    const prefix = isSandbox ? 'TKT-PRUEBA-' : `TKT-${yearStr}`;
-    const ticketsDelAnio = tickets.filter(t => t.folio && t.folio.startsWith(prefix));
-    let maxConsecutivo = 0;
-    ticketsDelAnio.forEach(t => {
-      const numStr = t.folio.substring(prefix.length);
-      const num = parseInt(numStr, 10);
-      if (!isNaN(num) && num > maxConsecutivo) maxConsecutivo = num;
-    });
-    const newFolio = `${prefix}${(maxConsecutivo + 1).toString().padStart(3, '0')}`;
+    let newFolio = '';
+    if (typeof window.obtenerSiguienteFolioTicket === 'function') {
+      newFolio = await window.obtenerSiguienteFolioTicket(isSandbox);
+    } else {
+      const yearStr = new Date().getFullYear().toString().slice(-2);
+      const prefix = isSandbox ? 'TKT-PRUEBA-' : `TKT-${yearStr}`;
+      const ticketsDelAnio = tickets.filter(t => t && t.folio && t.folio.startsWith(prefix));
+      let maxConsecutivo = 0;
+      ticketsDelAnio.forEach(t => {
+        const numStr = t.folio.substring(prefix.length);
+        const num = parseInt(numStr, 10);
+        if (!isNaN(num) && num > maxConsecutivo) maxConsecutivo = num;
+      });
+      newFolio = `${prefix}${(maxConsecutivo + 1).toString().padStart(3, '0')}`;
+    }
 
     // Obtener correo registrado con fallback dinámico de la sesión de Supabase si el caché local no lo tiene
     let emailContacto = currentSession.email || '';
