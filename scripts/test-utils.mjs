@@ -925,6 +925,64 @@ assert.doesNotThrow(() => {
 
 console.log('  ✅ Mapeo de Columnas SAP (No-Code) y Queries SQL SAP: OK');
 
+// 32. Refacciones de Órdenes de Servicio y Tickets
+const {
+  MARCAS_CATALOGO_OFICIAL: marcasModuloRefacciones,
+  popularSelectMarcas,
+  seleccionarMarcaRefaccion,
+  actualizarDescripcionesCombo,
+  seleccionarDescRefaccion,
+  refComboCounter,
+  agregarRef,
+  actualizarFilaDiscrepanciaRefaccion,
+  eliminarRef,
+  getRefacciones,
+  setRefacciones,
+  inicializarRefaccionesTicket,
+  agregarFilaRefaccionTicket,
+  eliminarFilaRefaccionTicket,
+  guardarRefaccionesTicketDesdeUI,
+  cerrarGarantiaInternaDirecto
+} = await import('../src/modules/refacciones_orden.js');
+
+// Test A: Constantes y funciones existen
+assert.ok(typeof marcasModuloRefacciones === 'object' && marcasModuloRefacciones !== null, 'marcasModuloRefacciones debe ser objeto');
+assert.equal(Object.keys(marcasModuloRefacciones).length, 26, 'marcasModuloRefacciones debe contener 26 marcas');
+assert.equal(marcasModuloRefacciones['PTZ'], 'PUTZMEISTER', 'PTZ debe ser PUTZMEISTER');
+assert.equal(marcasModuloRefacciones['SCH'], 'SCHWING', 'SCH debe ser SCHWING');
+assert.equal(typeof popularSelectMarcas, 'function', 'popularSelectMarcas debe ser función');
+assert.equal(typeof seleccionarMarcaRefaccion, 'function', 'seleccionarMarcaRefaccion debe ser función');
+assert.equal(typeof actualizarDescripcionesCombo, 'function', 'actualizarDescripcionesCombo debe ser función');
+assert.equal(typeof seleccionarDescRefaccion, 'function', 'seleccionarDescRefaccion debe ser función');
+assert.equal(typeof agregarRef, 'function', 'agregarRef debe ser función');
+assert.equal(typeof actualizarFilaDiscrepanciaRefaccion, 'function', 'actualizarFilaDiscrepanciaRefaccion debe ser función');
+assert.equal(typeof eliminarRef, 'function', 'eliminarRef debe ser función');
+assert.equal(typeof getRefacciones, 'function', 'getRefacciones debe ser función');
+assert.equal(typeof setRefacciones, 'function', 'setRefacciones debe ser función');
+assert.equal(typeof inicializarRefaccionesTicket, 'function', 'inicializarRefaccionesTicket debe ser función');
+assert.equal(typeof agregarFilaRefaccionTicket, 'function', 'agregarFilaRefaccionTicket debe ser función');
+assert.equal(typeof eliminarFilaRefaccionTicket, 'function', 'eliminarFilaRefaccionTicket debe ser función');
+assert.equal(typeof guardarRefaccionesTicketDesdeUI, 'function', 'guardarRefaccionesTicketDesdeUI debe ser función');
+assert.equal(typeof cerrarGarantiaInternaDirecto, 'function', 'cerrarGarantiaInternaDirecto debe ser función');
+
+// Test B: Invocación segura sin DOM
+assert.deepEqual(getRefacciones(), [], 'getRefacciones sin DOM debe retornar array vacío');
+assert.doesNotThrow(() => {
+  popularSelectMarcas('combo-marca', 'combo-desc');
+  seleccionarMarcaRefaccion(null, 'PTZ', 'PUTZMEISTER', 'm', 'd');
+  actualizarDescripcionesCombo('m', 'd');
+  seleccionarDescRefaccion(null, 'd', '123', 500);
+  agregarRef();
+  actualizarFilaDiscrepanciaRefaccion(null);
+  eliminarRef(null);
+  setRefacciones([]);
+  inicializarRefaccionesTicket('tk-1', []);
+  agregarFilaRefaccionTicket('tk-1', {});
+  eliminarFilaRefaccionTicket(null, 'tk-1');
+}, 'Las funciones de refacciones no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Refacciones de Órdenes de Servicio y Tickets: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 
