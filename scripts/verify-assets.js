@@ -124,6 +124,21 @@ allLocalScripts.forEach(script => {
     }
   }
 });
+
+// Comprobar también módulos en src/
+const srcDir = path.join(ROOT_DIR, 'src');
+if (fs.existsSync(srcDir)) {
+  const srcFiles = fs.readdirSync(srcDir).filter(f => f.endsWith('.js') || f.endsWith('.mjs'));
+  srcFiles.forEach(f => {
+    const fPath = path.join(srcDir, f);
+    try {
+      execSync(`node -c "${fPath}"`);
+      console.log(`   - src/${f}: Sintaxis válida`);
+    } catch (e) {
+      error(`Error de sintaxis en src/${f}: ${e.message}`);
+    }
+  });
+}
 console.log('');
 
 // 4. VERIFICAR PROTECCIÓN EN localstorage-bridge.js

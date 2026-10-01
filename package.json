@@ -5,7 +5,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "backend": "node backend/server.js",
-    "check": "node scripts/verify-assets.js"
+    "check": "node scripts/verify-assets.js",
+    "test": "node scripts/test-utils.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",
