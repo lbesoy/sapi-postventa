@@ -710,7 +710,59 @@ assert.ok(Array.isArray(emptyItems), 'obtenerTodosLosElementosGlobales debe reto
 
 console.log('  ✅ Resumen Semanal Operativo y Reportes Ejecutivos: OK');
 
+// 28. MÓDULO DE DEPURACIÓN DE ÓRDENES DE REFACCIONES, GARANTÍAS Y VISOR DE MANUALES
+console.log('🧪 Verificando Módulo de Depuración de Órdenes y Manuales (depurador_ordenes.js / src/modules/depurador_ordenes.js)...');
+const {
+  _depurarOrdenesCache,
+  _depurarSeleccionadas,
+  _depurarFiltradasActuales,
+  contarOrdenesRefacciones,
+  renderManualesPorRol,
+  crearModalVisorManualSiNoExiste,
+  abrirVisorManualPorId,
+  abrirVisorManual,
+  cerrarVisorManual,
+  actualizarBadgeDepuradorOrdenes,
+  abrirModalDepurarOrdenes,
+  cerrarModalDepurarOrdenes,
+  filtrarTablaDepurador,
+  toggleDepurarCheckAll,
+  toggleDepurarRowCheck,
+  actualizarBotonesAccionMasivaDepurador,
+  eliminarOrdenDesdeDepurador,
+  eliminarSeleccionadasDepurador,
+  eliminarTodasPendientesRefacciones,
+  exportarDepuradorAExcel
+} = await import('../src/modules/depurador_ordenes.js');
+
+// Test A: Funciones y estructuras de estado existen
+assert.ok(_depurarSeleccionadas instanceof Set, '_depurarSeleccionadas debe ser un Set');
+assert.ok(Array.isArray(_depurarOrdenesCache), '_depurarOrdenesCache debe ser un Array');
+assert.ok(Array.isArray(_depurarFiltradasActuales), '_depurarFiltradasActuales debe ser un Array');
+assert.equal(typeof contarOrdenesRefacciones, 'function', 'contarOrdenesRefacciones debe ser función');
+assert.equal(typeof renderManualesPorRol, 'function', 'renderManualesPorRol debe ser función');
+assert.equal(typeof abrirVisorManualPorId, 'function', 'abrirVisorManualPorId debe ser función');
+assert.equal(typeof abrirModalDepurarOrdenes, 'function', 'abrirModalDepurarOrdenes debe ser función');
+assert.equal(typeof toggleDepurarRowCheck, 'function', 'toggleDepurarRowCheck debe ser función');
+
+// Test B: contarOrdenesRefacciones
+const conteo = contarOrdenesRefacciones();
+assert.equal(typeof conteo.totalOrdenes, 'number', 'totalOrdenes debe ser número');
+assert.equal(typeof conteo.totalTickets, 'number', 'totalTickets debe ser número');
+assert.ok(Array.isArray(conteo.detalleRefacciones), 'detalleRefacciones debe ser un array');
+assert.ok(Array.isArray(conteo.detalleGarantias), 'detalleGarantias debe ser un array');
+assert.ok(Array.isArray(conteo.todas), 'todas debe ser un array');
+
+// Test C: toggleDepurarRowCheck
+toggleDepurarRowCheck('ORD-TEST-001', true);
+assert.ok(_depurarSeleccionadas.has('ORD-TEST-001'), 'ORD-TEST-001 debe estar en el set de seleccionadas');
+toggleDepurarRowCheck('ORD-TEST-001', false);
+assert.ok(!_depurarSeleccionadas.has('ORD-TEST-001'), 'ORD-TEST-001 debe haberse eliminado del set');
+
+console.log('  ✅ Depuración de Órdenes de Refacciones, Garantías y Visor de Manuales: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
+
 
 
 
