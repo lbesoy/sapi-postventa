@@ -229,6 +229,10 @@
           // Verificar bitácora
           if (o.bitacora && Array.isArray(o.bitacora)) {
             o.bitacora.forEach(b => {
+              if (typeof isTestData === 'function') {
+                const isEntryTest = isTestData(b) || (b.tecnico && typeof isTestUser === 'function' && isTestUser({ nombre: b.tecnico }));
+                if (isEntryTest !== isTest) return;
+              }
               if (b.tecnico && formatNombreCorto(b.tecnico) === formatNombreCorto(tShort)) {
                 let bDate = b.fecha || '';
                 if (bDate.includes('T')) bDate = bDate.split('T')[0];
@@ -283,6 +287,11 @@
         }
 
         calendarEvents.forEach(e => {
+          if (typeof isTestData === 'function') {
+            const isEvTest = isTestData(e) || (e.tecnicoNombre && typeof isTestUser === 'function' && isTestUser({ nombre: e.tecnicoNombre }));
+            if (isEvTest !== isTest) return;
+          }
+
           let isThisTec = false;
           if (e.tecnicoNombre && formatNombreCorto(e.tecnicoNombre) === formatNombreCorto(tShort)) {
             isThisTec = true;

@@ -1,3 +1,17 @@
+// --- Valid foreign key caches to prevent 409 Conflict / foreign_key_violation ---
+window._supaValidSitioIds = window._supaValidSitioIds || new Set();
+window._supaValidClienteIds = window._supaValidClienteIds || new Set();
+window._supaValidMaquinariaIds = window._supaValidMaquinariaIds || new Set();
+
+try {
+  const _sInit = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+  if (Array.isArray(_sInit)) _sInit.forEach(s => s && s.id && window._supaValidSitioIds.add(s.id));
+  const _cInit = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+  if (Array.isArray(_cInit)) _cInit.forEach(c => c && c.id && window._supaValidClienteIds.add(c.id));
+  const _mInit = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
+  if (Array.isArray(_mInit)) _mInit.forEach(m => m && m.id && window._supaValidMaquinariaIds.add(m.id));
+} catch (e) {}
+
 // --- Global Helper for Paginated Supabase Fetches ---
 window.fetchTablePaginated = async (tableName, selectQuery = '*', orderColumn = null, orderAscending = false, queryModifier = null, pageLimit = 1000, timeoutMs = 30000) => {
   const sb = window.supabaseClient;
@@ -287,13 +301,17 @@ function ticketToRow(t) {
   // Encontrar el ID del sitio por su nombre
   let sitioId = null;
   try {
-    const sitios = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
+    const sitios = (typeof sitiosDb !== 'undefined' && Array.isArray(sitiosDb)) ? sitiosDb : JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
     const match = sitios.find(s => (s.cliente === clienteId || s.cliente === t.cliente) && (s.nombre === t.sitio || s.direccion === t.sitio || s.id === t.sitio));
     if (match) {
       sitioId = match.id;
     } else if (t.sitio) {
       const existById = sitios.find(s => s.id === t.sitio);
       if (existById) sitioId = existById.id;
+    }
+    // Validar formato UUID y existencia para evitar violación de FK tickets_sitio_fkey
+    if (sitioId && (!isValidUUID(sitioId) || (window._supaValidSitioIds && window._supaValidSitioIds.size > 0 && !window._supaValidSitioIds.has(sitioId)))) {
+      sitioId = null;
     }
   } catch (e) {}
 
@@ -1183,10 +1201,18 @@ function rowToCliente(c) {
 }
 
 function eventoToRow(e) {
+  const isEvTest = !!(e.esPrueba || e.isTest || (e.tecnicoNombre && typeof isTestUser === 'function' && isTestUser({ nombre: e.tecnicoNombre })));
+  let desc = e.descripcion || null;
+  if (isEvTest && desc && !desc.includes('[PRUEBA]')) {
+    desc = `[PRUEBA] ${desc}`;
+  } else if (isEvTest && !desc) {
+    desc = '[PRUEBA]';
+  }
+
   return {
     id: toValidUUID(e.id),
     titulo: e.titulo || 'Evento',
-    descripcion: e.descripcion || null,
+    descripcion: desc,
     fecha_inicio: e.fechaInicio || e.fecha_inicio || e.start || new Date().toISOString(),
     fecha_fin: e.fechaFin || e.fecha_fin || e.end || null,
     todo_el_dia: !!(e.todoElDia || e.todo_el_dia || e.allDay),
@@ -1201,6 +1227,11 @@ function eventoToRow(e) {
 }
 
 function rowToEvento(r) {
+  const isEvTest = !!(
+    (r.descripcion && (r.descripcion.includes('[PRUEBA]') || r.descripcion.includes('[TEST]'))) ||
+    (r.titulo && (r.titulo.includes('[PRUEBA]') || r.titulo.includes('[TEST]'))) ||
+    (r.tecnico_nombre && typeof isTestUser === 'function' && isTestUser({ nombre: r.tecnico_nombre }))
+  );
   return {
     id: r.id,
     _synced: true,
@@ -1218,7 +1249,9 @@ function rowToEvento(r) {
     creadoPor: r.creado_por,
     ordenId: r.orden_id,
     color: r.color,
-    fechaCreacion: r.fecha_creacion
+    fechaCreacion: r.fecha_creacion,
+    esPrueba: isEvTest,
+    isTest: isEvTest
   };
 }
 
@@ -1379,6 +1412,48 @@ window.pushToSupabase = async function(tabla, item) {
       row = window.envioToRow(item);
     } else if (tabla === 'calendario_eventos' && typeof eventoToRow === 'function') {
       row = eventoToRow(item);
+    }
+    
+    // Pre-validación proactiva de claves foráneas para evitar HTTP 409 Conflict y violaciones FK
+    if (tabla === 'tickets') {
+      if (row.sitio) {
+        const isUuid = isValidUUID(row.sitio);
+        const validSitios = window._supaValidSitioIds || (typeof sitiosDb !== 'undefined' && Array.isArray(sitiosDb) ? new Set(sitiosDb.map(s => s.id).filter(Boolean)) : null);
+        if (!isUuid || (validSitios && validSitios.size > 0 && !validSitios.has(row.sitio))) {
+          row.sitio = null;
+        }
+      }
+      if (row.cliente) {
+        const isUuidCli = isValidUUID(row.cliente);
+        const validClientes = window._supaValidClienteIds || (typeof clientes !== 'undefined' && Array.isArray(clientes) ? new Set(clientes.map(c => c.id).filter(Boolean)) : null);
+        if (!isUuidCli && (!validClientes || !validClientes.has(row.cliente))) {
+          row.cliente = null;
+        }
+      }
+      if (row.creado_por && !isValidUUID(row.creado_por)) {
+        row.creado_por = null;
+      }
+    } else if (tabla === 'ordenes') {
+      if (row.sitio_id) {
+        const isUuidSitio = isValidUUID(row.sitio_id);
+        const validSitios = window._supaValidSitioIds || (typeof sitiosDb !== 'undefined' && Array.isArray(sitiosDb) ? new Set(sitiosDb.map(s => s.id).filter(Boolean)) : null);
+        if (!isUuidSitio || (validSitios && validSitios.size > 0 && !validSitios.has(row.sitio_id))) {
+          row.sitio_id = null;
+        }
+      }
+      if (row.maquinaria_id) {
+        const validMaq = window._supaValidMaquinariaIds || (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb) ? new Set(maquinariaDb.map(m => m.id).filter(Boolean)) : null);
+        if (validMaq && validMaq.size > 0 && !validMaq.has(row.maquinaria_id)) {
+          row.maquinaria_id = null;
+        }
+      }
+      if (row.cliente) {
+        const isUuidCli = isValidUUID(row.cliente);
+        const validClientes = window._supaValidClienteIds || (typeof clientes !== 'undefined' && Array.isArray(clientes) ? new Set(clientes.map(c => c.id).filter(Boolean)) : null);
+        if (!isUuidCli && (!validClientes || !validClientes.has(row.cliente))) {
+          row.cliente = null;
+        }
+      }
     }
     
     // Upsert directo en la nube
@@ -3459,6 +3534,7 @@ window.cargarDatosDeSupabase = function() {
       clientes = await fetchTablePaginated('clientes', '*');
     } catch(e){}
     if (clientes && clientes.length > 0) {
+      window._supaValidClienteIds = new Set(clientes.map(c => c.id).filter(Boolean));
       let sitiosDb = [];
       try { sitiosDb = await fetchTablePaginated('sitios', '*'); } catch(e){}
       let maqDb = [];
@@ -3696,6 +3772,7 @@ window.cargarDatosDeSupabase = function() {
       sitiosDb = await fetchTablePaginated('sitios', '*');
     } catch (e) {}
     if (sitiosDb && sitiosDb.length > 0) {
+      window._supaValidSitioIds = new Set(sitiosDb.map(s => s.id).filter(Boolean));
       const mapped = sitiosDb.map(s => ({ id: s.id, nombre: s.nombre, cliente: s.cliente, direccion: s.direccion, cp: s.cp, ciudad: s.ciudad, estado: s.estado, customData: s.custom_data }));
       localStorage.setItem('sapi_sitios_db', JSON.stringify(mapped));
     }
@@ -3706,6 +3783,7 @@ window.cargarDatosDeSupabase = function() {
       maqDb = await fetchTablePaginated('maquinaria', '*');
     } catch (e) {}
     if (maqDb && maqDb.length > 0) {
+      window._supaValidMaquinariaIds = new Set(maqDb.map(m => m.id).filter(Boolean));
       const mapped = maqDb.map(m => {
         let clienteNombre = m.cliente;
         try {

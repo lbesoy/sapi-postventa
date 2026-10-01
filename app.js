@@ -2105,6 +2105,33 @@ function isTestData(item) {
     }
   }
 
+  // Técnico explícito de prueba o evento asignado a técnico de prueba
+  const tec = item.tecnicoNombre || item.tecnico || item.asignado_a || item.asignadoA;
+  if (tec && typeof tec === 'string') {
+    const tecClean = tec.trim().toLowerCase();
+    if (
+      tecClean === 'test' || 
+      tecClean === 'prueba' || 
+      tecClean.startsWith('test ') || 
+      tecClean.endsWith(' test') || 
+      tecClean.includes('técnico de prueba') || 
+      tecClean.includes('tecnico de prueba') ||
+      tecClean.includes('[prueba]') ||
+      tecClean.includes('[test]')
+    ) {
+      return true;
+    }
+    if (typeof isTestUser === 'function' && isTestUser({ nombre: tec })) {
+      return true;
+    }
+  }
+
+  // Descripción o nota con etiqueta de prueba
+  const descNota = (item.descripcion || item.nota || '').toString().toUpperCase();
+  if (descNota.includes('[PRUEBA]') || descNota.includes('[TEST]')) {
+    return true;
+  }
+
   // Si es un ticket con orden vinculada de prueba
   if (item.ordenId && typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
     const assocOrd = ordenes.find(o => o && o.id === item.ordenId);
@@ -2129,8 +2156,8 @@ function isTestUser(user) {
     return window.isTestUser(user);
   }
   if (!user) return false;
-  const name = (user.nombre || '').toLowerCase();
-  const email = (user.email || user.correo || '').toLowerCase();
+  const name = (typeof user === 'string' ? user : (user.nombre || user.name || '')).toLowerCase();
+  const email = (typeof user === 'object' ? (user.email || user.correo || '') : '').toLowerCase();
   return name.includes('prueba') || name.includes('test') || email.includes('prueba') || email.includes('test');
 }
 

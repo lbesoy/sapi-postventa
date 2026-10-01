@@ -105,11 +105,10 @@ export function formatFechaHoraAmigable(dateStr) {
   return dateStr;
 }
 
-// Determina si un usuario es de prueba/sandbox
 export function isTestUser(user) {
   if (!user) return false;
-  const name = (user.nombre || '').toLowerCase();
-  const email = (user.email || '').toLowerCase();
+  const name = (typeof user === 'string' ? user : (user.nombre || user.name || '')).toLowerCase();
+  const email = (typeof user === 'object' ? (user.email || user.correo || '') : '').toLowerCase();
   return name.includes('prueba') || name.includes('test') || email.includes('prueba') || email.includes('test');
 }
 

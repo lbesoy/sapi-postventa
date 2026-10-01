@@ -22,5 +22,7 @@ backend/pdf_extractor
 
 # Exclusión de perfil local de Chrome para generación de capturas
 manuales/chrome_profile/
+.claude/
+
 
 

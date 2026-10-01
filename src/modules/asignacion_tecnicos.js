@@ -162,7 +162,10 @@ function calcularFechaParaDiaDeSemana(baseFechaStr, targetDayIndex) {
   const [year, month, day] = baseFechaStr.split('-').map(Number);
   const baseDate = new Date(year, month - 1, day);
   const baseDay = baseDate.getDay();
-  const diff = targetDayIndex - baseDay;
+  // Normalizar semana laboral de lunes (1) a domingo (7)
+  const normBase = baseDay === 0 ? 7 : baseDay;
+  const normTarget = targetDayIndex === 0 ? 7 : targetDayIndex;
+  const diff = normTarget - normBase;
   const targetDate = new Date(year, month - 1, day + diff);
 
   const y = targetDate.getFullYear();
@@ -1484,6 +1487,8 @@ async function guardarProgramacionTecnico() {
     let o = null;
     let nuevaEntradaId = crypto.randomUUID();
 
+    const isSandbox = _isTestMode() || (o && (typeof isTestData === 'function' ? isTestData(o) : false));
+
     if (!sinOrden) {
       o = ordenesList.find(ord => ord.id === specificOrdenId);
       if (o) {
@@ -1538,7 +1543,7 @@ async function guardarProgramacionTecnico() {
           fecha: f,
           tecnico: tecnico,
           tipo: specificTipo,
-          nota: "Programado por supervisor. Pendiente de llenado por el técnico.",
+          nota: isSandbox ? "[PRUEBA] Programado por supervisor. Pendiente de llenado por el técnico." : "Programado por supervisor. Pendiente de llenado por el técnico.",
           entrada: specificEntrada,
           salida: specificSalida,
           fecha_inicio_traslado: fInicioTraslado,
@@ -1548,6 +1553,8 @@ async function guardarProgramacionTecnico() {
           hora_fin_regreso: hFinRegreso,
           horas_regreso: hRegreso,
           realizado: false,
+          esPrueba: isSandbox,
+          isTest: isSandbox,
           asignadoPorName: _getUserName(),
           asignadoPorId: session.userId || null
         };
@@ -1575,6 +1582,11 @@ async function guardarProgramacionTecnico() {
       const finISO = `${f}T${salidaHora}:00`;
 
       const isTodoElDiaType = ['Vacaciones', 'Descanso'].includes(specificTipo);
+      const startDateTime = isTodoElDiaType ? f : inicioISO;
+      const endDateTime = isTodoElDiaType ? f : finISO;
+
+      const effectiveSandbox = isSandbox || (usr && _isTestUser(usr)) || (tecnico && _isTestUser({ nombre: tecnico }));
+
       const eventoObj = {
         id: nuevaEntradaId,
         titulo: sinOrden ? `${specificTipo}: ${tecnico}` : `${specificTipo}: ${(o && o.cliente) || 'Cliente'}`,
@@ -1582,16 +1594,20 @@ async function guardarProgramacionTecnico() {
         tecnicoId: tecnicoId,
         tecnicoNombre: tecnico,
         ordenId: sinOrden ? null : (o ? o.id : null),
-        fechaInicio: new Date(inicioISO).toISOString(),
-        start: new Date(inicioISO).toISOString(),
-        fechaFin: new Date(finISO).toISOString(),
-        end: new Date(finISO).toISOString(),
+        fechaInicio: startDateTime,
+        start: startDateTime,
+        fechaFin: endDateTime,
+        end: endDateTime,
+        entrada: specificEntrada || '',
+        salida: specificSalida || '',
         todoElDia: isTodoElDiaType,
         allDay: isTodoElDiaType,
-        descripcion: sinOrden ? `Evento administrativo: ${specificTipo}` : "Programado por supervisor. Pendiente de llenado por el técnico.",
+        descripcion: sinOrden ? (effectiveSandbox ? `[PRUEBA] Evento administrativo: ${specificTipo}` : `Evento administrativo: ${specificTipo}`) : (effectiveSandbox ? "[PRUEBA] Programado por supervisor." : "Programado por supervisor. Pendiente de llenado por el técnico."),
         creadoPor: session.userId || null,
         creadoPorNombre: _getUserName(),
-        color: (specificTipo === 'Vacaciones') ? '#f59e0b' : (specificTipo === 'Descanso' ? '#10b981' : '#3b82f6')
+        color: (specificTipo === 'Vacaciones') ? '#f59e0b' : (specificTipo === 'Descanso' ? '#10b981' : '#3b82f6'),
+        esPrueba: effectiveSandbox,
+        isTest: effectiveSandbox
       };
 
       const idx = localEventos.findIndex(x => x.id === eventoObj.id);

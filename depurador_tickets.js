@@ -1103,7 +1103,15 @@ window.sanitizarAsignacionesTickets = function() {
         if ((!t.equipo || t.equipo === 'Otra / No registrada') && p.equipo) { t.equipo = p.equipo; tMod = true; }
         if ((!t.asignado || t.asignado === '-' || t.asignado === 'Sin Asignar') && p.asignado) { t.asignado = p.asignado; tMod = true; }
       } else if (o) {
-        if (!t.sitio && (o.ubicacion || o.ubicacion_sitio)) { t.sitio = o.ubicacion || o.ubicacion_sitio; tMod = true; }
+        if (!t.sitio && (o.ubicacion || o.ubicacion_sitio)) {
+          const targetSitio = o.ubicacion || o.ubicacion_sitio;
+          const sitios = (typeof sitiosDb !== 'undefined' && Array.isArray(sitiosDb)) ? sitiosDb : (typeof safeGetJSON === 'function' ? safeGetJSON('sapi_sitios_db', []) : []);
+          const matchSitio = sitios.find(s => s.id === targetSitio || s.nombre === targetSitio || s.direccion === targetSitio);
+          if (matchSitio) {
+            t.sitio = matchSitio.nombre || matchSitio.id;
+            tMod = true;
+          }
+        }
         if ((!t.equipo || t.equipo === 'Otra / No registrada') && o.equipo) { t.equipo = o.equipo; tMod = true; }
         if ((!t.asignado || t.asignado === '-' || t.asignado === 'Sin Asignar') && (o.tecnico || o.responsable)) { t.asignado = o.tecnico || o.responsable; tMod = true; }
       }
@@ -1116,12 +1124,16 @@ window.sanitizarAsignacionesTickets = function() {
 
     if (modificado) {
       if (typeof safeSetJSON === 'function') safeSetJSON('sapi_tickets', tickets);
-      // Sincronizar de inmediato los tickets reparados hacia Supabase para consolidar la base de datos
+      // Sincronizar hacia Supabase solo si hay cambios y no se han sincronizado previamente en esta sesión
       if (window.pushToSupabase && repairedTickets.length > 0) {
+        window._ticketsSanitizadosPushed = window._ticketsSanitizadosPushed || new Set();
         repairedTickets.forEach(repT => {
-          try {
-            window.pushToSupabase('tickets', repT).catch(e => console.warn('[Sanitize Sync] Error al persistir ticket reparado en Supabase:', repT.folio, e));
-          } catch(e) {}
+          if (!window._ticketsSanitizadosPushed.has(repT.id)) {
+            window._ticketsSanitizadosPushed.add(repT.id);
+            try {
+              window.pushToSupabase('tickets', repT).catch(e => console.warn('[Sanitize Sync] Error al persistir ticket reparado en Supabase:', repT.folio, e));
+            } catch(e) {}
+          }
         });
       }
     }

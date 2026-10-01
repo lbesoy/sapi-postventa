@@ -178,6 +178,7 @@ function renderCalendario() {
     }
   }
 
+  const activeSandbox = typeof isTestModeActive === 'function' ? isTestModeActive() : false;
   const eventos = [];
   const pushedTraslados = new Set();
   const pushedBitacoras = new Set();
@@ -205,6 +206,12 @@ function renderCalendario() {
       o.bitacora.forEach(b => {
         if (!b) return;
         if (filtroTecnico && b.tecnico !== filtroTecnico) return;
+
+        // Filtrar estrictamente según el modo Sandbox activo
+        if (typeof isTestData === 'function') {
+          const isEntryTest = isTestData(b) || (b.tecnico && typeof isTestUser === 'function' && isTestUser({ nombre: b.tecnico }));
+          if (isEntryTest !== activeSandbox) return;
+        }
 
         let dateStr = b.fecha;
         if (dateStr.includes('T')) dateStr = dateStr.split('T')[0];
@@ -483,6 +490,12 @@ function renderCalendario() {
   try {
     const adminEvents = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
     adminEvents.forEach(e => {
+      // Filtrar estrictamente según el modo Sandbox activo
+      if (typeof isTestData === 'function') {
+        const isEvTest = isTestData(e) || (e.tecnicoNombre && typeof isTestUser === 'function' && isTestUser({ nombre: e.tecnicoNombre }));
+        if (isEvTest !== activeSandbox) return;
+      }
+
       // Si tiene ordenId, solo omitir si este mismo evento ya fue renderizado previamente desde la bitácora de la orden
       if (e.ordenId) {
         const yaRenderizado = eventos.some(ev => 
@@ -941,6 +954,8 @@ async function guardarActividadCalendario() {
     salida = fin.split('T')[1].substring(0, 5);
   }
 
+  const isSandbox = (typeof isTestModeActive === 'function' ? isTestModeActive() : false) || (tecnicoNombre && typeof isTestUser === 'function' && isTestUser({ nombre: tecnicoNombre }));
+
   const eventoObj = {
     id: id || crypto.randomUUID(),
     titulo: titulo,
@@ -956,10 +971,12 @@ async function guardarActividadCalendario() {
     salida: salida,
     todoElDia: todoElDia,
     allDay: todoElDia,
-    descripcion: descripcion || null,
+    descripcion: isSandbox && descripcion && !descripcion.includes('[PRUEBA]') ? `[PRUEBA] ${descripcion}` : (descripcion || null),
     creadoPor: activeUserId,
     creadoPorNombre: activeUserName,
-    color: null
+    color: null,
+    esPrueba: isSandbox,
+    isTest: isSandbox
   };
 
   // Guardar de forma reactiva y offline-first
@@ -988,9 +1005,11 @@ async function guardarActividadCalendario() {
           fecha: fechaISO,
           tecnico: tecnicoNombre || 'Sin Asignar',
           tipo: tipo,
-          nota: descripcion || "Programado por supervisor. Pendiente de llenado por el técnico.",
+          nota: isSandbox ? (descripcion ? (descripcion.includes('[PRUEBA]') ? descripcion : `[PRUEBA] ${descripcion}`) : "[PRUEBA] Programado por supervisor.") : (descripcion || "Programado por supervisor. Pendiente de llenado por el técnico."),
           entrada: entrada,
           salida: salida,
+          esPrueba: isSandbox,
+          isTest: isSandbox,
           fecha_inicio_traslado: mraFechaInicioTraslado || null,
           hora_inicio: mraHoraInicio || null,
           horas_traslado: mraHorasTraslado ? parseFloat(mraHorasTraslado) : null,

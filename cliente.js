@@ -108,6 +108,33 @@ function isTestData(item) {
     }
   }
 
+  // Técnico explícito de prueba o evento asignado a técnico de prueba
+  const tec = item.tecnicoNombre || item.tecnico || item.asignado_a || item.asignadoA;
+  if (tec && typeof tec === 'string') {
+    const tecClean = tec.trim().toLowerCase();
+    if (
+      tecClean === 'test' || 
+      tecClean === 'prueba' || 
+      tecClean.startsWith('test ') || 
+      tecClean.endsWith(' test') || 
+      tecClean.includes('técnico de prueba') || 
+      tecClean.includes('tecnico de prueba') ||
+      tecClean.includes('[prueba]') ||
+      tecClean.includes('[test]')
+    ) {
+      return true;
+    }
+    if (typeof isTestUser === 'function' && isTestUser({ nombre: tec })) {
+      return true;
+    }
+  }
+
+  // Descripción o nota con etiqueta de prueba
+  const descNota = (item.descripcion || item.nota || '').toString().toUpperCase();
+  if (descNota.includes('[PRUEBA]') || descNota.includes('[TEST]')) {
+    return true;
+  }
+
   if (item.ordenId && typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
     const assocOrd = ordenes.find(o => o && o.id === item.ordenId);
     if (assocOrd && (assocOrd.esPrueba === true || assocOrd.isTest === true || (assocOrd.folio && assocOrd.folio.toUpperCase().includes('PRUEBA')))) {
