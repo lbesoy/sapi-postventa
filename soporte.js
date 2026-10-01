@@ -1908,7 +1908,8 @@ function formatMailBody(action) {
 };
 
 function obtenerHtmlFirmaOficialEurorep() {
-  const logoSrc = window.location.origin + '/logo_transparent.png';
+  const origin = (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : 'https://eurorep.mx';
+  const logoSrc = origin + '/logo_transparent.png';
   return `
 <div class="eurorep-signature-block" style="margin-top: 24px; padding-top: 14px; border-top: 2px solid #e8820c; display: flex; align-items: center; gap: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: left;">
   <img src="${logoSrc}" alt="Eurorep Logo" style="height: 44px; width: auto; max-width: 140px; object-fit: contain; display: block;" />

@@ -625,7 +625,45 @@ assert.ok(!esMismoCliente(null, c1), 'Comparar con null debe retornar false');
 
 console.log('  ✅ Telemetría SuperAdmin, Fusión de Clientes y Diagnósticos: OK');
 
+// 26. MÓDULO DE AUTOMATIZACIONES, REGLAS Y PLANTILLAS DE CORREO
+console.log('🧪 Verificando Módulo de Automatizaciones y Plantillas (automatizaciones.js / src/modules/automatizaciones.js)...');
+const {
+  defaultTemplates,
+  defaultRules,
+  isCloudSyncActive,
+  obtenerHtmlPlantillaProfesional,
+  ejecutarAutomatizacion,
+  guardarAutoPlantilla,
+  toggleReglaActiva
+} = await import('../src/modules/automatizaciones.js');
+
+// Test A: Catálogos maestros de plantillas y reglas
+assert.ok(Array.isArray(defaultTemplates), 'defaultTemplates debe ser un array');
+assert.ok(defaultTemplates.length >= 8, 'defaultTemplates debe tener al menos 8 plantillas base');
+const welcomeTpl = defaultTemplates.find(t => t.id === 'welcome');
+assert.ok(welcomeTpl, 'Debe existir plantilla welcome');
+assert.ok(welcomeTpl.asunto.includes('Eurorep'), 'Asunto de bienvenida debe mencionar Eurorep');
+
+assert.ok(Array.isArray(defaultRules), 'defaultRules debe ser un array');
+assert.ok(defaultRules.length >= 8, 'defaultRules debe tener al menos 8 reglas base');
+
+// Test B: Funciones y helpers disponibles
+assert.equal(typeof isCloudSyncActive, 'function', 'isCloudSyncActive debe ser función');
+assert.equal(typeof obtenerHtmlPlantillaProfesional, 'function', 'obtenerHtmlPlantillaProfesional debe ser función');
+assert.equal(typeof ejecutarAutomatizacion, 'function', 'ejecutarAutomatizacion debe ser función');
+assert.equal(typeof toggleReglaActiva, 'function', 'toggleReglaActiva debe ser función');
+
+// Test C: Generador de HTML profesional de correo
+const testBody = 'Estimado cliente,\n\nSu cotización está lista.\n\nSaludos.';
+const htmlMail = obtenerHtmlPlantillaProfesional(testBody);
+assert.ok(htmlMail.includes('Eurorep'), 'HTML de correo debe contener branding de Eurorep');
+assert.ok(htmlMail.includes('Su cotización está lista'), 'HTML de correo debe contener el cuerpo transformado');
+assert.ok(htmlMail.includes('<div') && htmlMail.includes('max-width: 600px'), 'HTML debe generar estructura de maquetado profesional');
+
+console.log('  ✅ Automatizaciones, Reglas de Eventos y Plantillas de Correo: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
+
 
 
 
