@@ -282,4 +282,39 @@ const pendientes = obtenerTodosLosPendientes();
 assert.ok(Array.isArray(pendientes), 'obtenerTodosLosPendientes debe devolver un array');
 console.log('  ✅ Juntas de Revisión (obtenerTodosLosPendientes, reestablecerTicket26477 y exports): OK');
 
+// 20. Módulo de Depuración y Auditoría de Tickets
+const { analizarInformacionTicket, contarTicketsADepuracion, sanitizarAsignacionesTickets, abrirModalDepurarTickets, exportarDepuradorTicketsAExcel } = await import('../src/modules/depurador_tickets.js');
+assert.equal(typeof analizarInformacionTicket, 'function', 'analizarInformacionTicket debe ser una función');
+assert.equal(typeof contarTicketsADepuracion, 'function', 'contarTicketsADepuracion debe ser una función');
+assert.equal(typeof sanitizarAsignacionesTickets, 'function', 'sanitizarAsignacionesTickets debe ser una función');
+assert.equal(typeof abrirModalDepurarTickets, 'function', 'abrirModalDepurarTickets debe ser una función');
+assert.equal(typeof exportarDepuradorTicketsAExcel, 'function', 'exportarDepuradorTicketsAExcel debe ser una función');
+
+// Test A: Análisis forense de ticket con datos SAP
+const diagTkt = analizarInformacionTicket({ folio: 'TKT-26477', cotizacionSAP: '109923', pedidoSAP: '45001', comentariosInternos: [{ texto: 'ok' }] });
+assert.equal(diagTkt.tieneInfo, true, 'Ticket con cotización SAP debe marcar tieneInfo=true');
+assert.equal(diagTkt.cotizacionSAP, '109923', 'Cotización SAP debe extraerse correctamente');
+assert.equal(diagTkt.pedidoSAP, '45001', 'Pedido SAP debe extraerse correctamente');
+assert.equal(diagTkt.numComentarios, 1, 'Debe contar 1 comentario');
+console.log('  ✅ Depurador de Tickets (analizarInformacionTicket, sanitizarAsignacionesTickets y exports): OK');
+
+// 21. Módulo de Envíos y Guías de Paquetería
+const { obtenerUrlRastreoPaqueteria, asegurarGuiaEnvioParaTicket, obtenerTodosLosEnvios, renderEnvios, exportarEnviosAExcel } = await import('../src/modules/envios.js');
+assert.equal(typeof obtenerUrlRastreoPaqueteria, 'function', 'obtenerUrlRastreoPaqueteria debe ser una función');
+assert.equal(typeof asegurarGuiaEnvioParaTicket, 'function', 'asegurarGuiaEnvioParaTicket debe ser una función');
+assert.equal(typeof obtenerTodosLosEnvios, 'function', 'obtenerTodosLosEnvios debe ser una función');
+assert.equal(typeof renderEnvios, 'function', 'renderEnvios debe ser una función');
+assert.equal(typeof exportarEnviosAExcel, 'function', 'exportarEnviosAExcel debe ser una función');
+
+// Test A: Generación de URLs de rastreo multicarrier
+const urlDhl = obtenerUrlRastreoPaqueteria('DHL Express', '77889900');
+assert.ok(urlDhl.includes('dhl.com') && urlDhl.includes('77889900'), 'URL de DHL debe incluir tracking-id');
+
+const urlFedex = obtenerUrlRastreoPaqueteria('FedEx', '1122334455');
+assert.ok(urlFedex.includes('fedex.com') && urlFedex.includes('1122334455'), 'URL de FedEx debe incluir trknbr');
+
+const urlEstafeta = obtenerUrlRastreoPaqueteria('Estafeta', 'EST-9988');
+assert.ok(urlEstafeta.includes('estafeta.com') && urlEstafeta.includes('EST-9988'), 'URL de Estafeta debe incluir guia');
+console.log('  ✅ Envíos y Guías de Paquetería (obtenerUrlRastreoPaqueteria multicarrier y exports): OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');

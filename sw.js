@@ -13,6 +13,8 @@ const ASSETS = [
   '/soporte.js',
   '/kits.js',
   '/juntas.js',
+  '/depurador_tickets.js',
+  '/envios.js',
   '/rentas.js',
   '/style.css',
   '/cliente.html',
