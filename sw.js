@@ -6,6 +6,8 @@ const ASSETS = [
   '/theme-base.css',
   '/utils.js',
   '/app.js',
+  '/gastos.js',
+  '/rentas.js',
   '/style.css',
   '/cliente.html',
   '/cliente.css',

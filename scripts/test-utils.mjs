@@ -129,4 +129,11 @@ assert.equal(typeof getSharedDb, 'function', 'getSharedDb debe ser una función'
 assert.equal(typeof scheduleDbWrite, 'function', 'scheduleDbWrite debe ser una función');
 console.log('  ✅ Storage Bridge (claves críticas y funciones): OK');
 
+// 13. Módulo de Gastos y Conciliación Clara
+const { defaultClaraCards } = await import('../src/modules/gastos.js');
+assert.ok(Array.isArray(defaultClaraCards), 'defaultClaraCards debe ser un array');
+assert.ok(defaultClaraCards.length >= 10, 'defaultClaraCards debe contener catálogo base de tarjetas');
+assert.ok(defaultClaraCards[0].alias, 'Las tarjetas deben tener propiedad alias');
+console.log('  ✅ Gastos y Tarjetas Clara (catálogo base y exports): OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
