@@ -150,18 +150,6 @@ function renderCalendario() {
     return;
   }
 
-  // Sanitización automática silenciosa de bitácoras y asignaciones duplicadas o inundadas
-  if (typeof window.sanitizarBitacorasOrdenes === 'function' && !window._isSanitizingBitacoras) {
-    try {
-      window._isSanitizingBitacoras = true;
-      window.sanitizarBitacorasOrdenes();
-    } catch(e) {
-      console.warn('[Calendario] Error en auto-sanitización:', e);
-    } finally {
-      window._isSanitizingBitacoras = false;
-    }
-  }
-
   if (calendarInstance) {
     calendarInstance.destroy();
   }

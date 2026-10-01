@@ -1526,15 +1526,8 @@ window.pushToSupabase = async function(tabla, item) {
 
         const currentBitIds = filasBitacora.map(f => f.id).filter(Boolean);
         if (currentBitIds.length > 0) {
-          try {
-            await sb.from('orden_bitacora').delete().eq('orden_id', item.id).not('id', 'in', `(${currentBitIds.map(id => `"${id}"`).join(',')})`);
-          } catch(e) {}
           const { error: upsertBitErr } = await sb.from('orden_bitacora').upsert(filasBitacora, { onConflict: 'id' });
           if (upsertBitErr) console.warn('[Direct Push] Error al guardar orden_bitacora en Supabase:', upsertBitErr.message);
-        } else {
-          try {
-            await sb.from('orden_bitacora').delete().eq('orden_id', item.id);
-          } catch(e) {}
         }
       } catch (errBit) {
         console.warn('[Direct Push] Error sincronizando orden_bitacora directa:', errBit);

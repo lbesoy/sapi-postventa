@@ -844,9 +844,6 @@ window.addEventListener('supabase_datos_cargados', async () => {
     if (typeof window.sanitizarAsignacionesTickets === 'function') {
       try { window.sanitizarAsignacionesTickets(); } catch (eSan) { console.warn('[App] Error al sanitizar tickets:', eSan); }
     }
-    if (typeof window.sanitizarBitacorasOrdenes === 'function') {
-      try { window.sanitizarBitacorasOrdenes(); } catch (eBit) { console.warn('[App] Error al sanitizar bitácoras:', eBit); }
-    }
 
     // Ejecutar migraciones heredadas solo una vez por sesión y solo para administradores
     // Esto previene bucles infinitos de escritura y consultas redundantes en clientes no-admin
@@ -26266,212 +26263,14 @@ window.eliminarTodasAsignacionesOrden = async function(ordenId) {
 };
 
 window.sanitizarBitacorasOrdenes = function() {
-  if (window._isSanitizingBitacoras) return;
-  const now = Date.now();
-  if (window._lastBitacoraSanitizeTime && (now - window._lastBitacoraSanitizeTime < 10000)) {
-    return;
-  }
-  window._isSanitizingBitacoras = true;
-  window._lastBitacoraSanitizeTime = now;
-
-  try {
-    const ords = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes : [];
-    if (ords.length === 0) return;
-
-    let totalEliminados = 0;
-    let ordenesModificadas = 0;
-    const idsParaBorrarSupabase = [];
-
-    ords.forEach(o => {
-      if (!o.bitacora || !Array.isArray(o.bitacora) || o.bitacora.length === 0) return;
-
-      const bitacoraLimpia = [];
-      let mod = false;
-
-      const isOsTarget = (o.folio === 'OS-26141' || (o.id && o.id.includes('26141')));
-
-      const seenRealizados = new Set();
-      const seenExactKeys = new Set();
-      const seenEntriesByTec = new Map(); // Map de tecnico -> array de entradas
-
-      const ordenCerrada = o.estado === 'Finalizado' || o.estado === 'Cerrada';
-
-      o.bitacora.forEach(b => {
-        if (!b) return;
-
-        const fStr = b.fecha ? (b.fecha.includes('T') ? b.fecha.split('T')[0] : b.fecha) : '';
-        const tec = (b.tecnico || '').trim().toLowerCase();
-        const ent = b.entrada || '';
-        const sal = b.salida || '';
-        const notaClean = (b.nota || '').trim();
-
-        // Es avance REAL SOLO SI tiene fotos, firmas, evidencias o archivo de cierre en papel
-        const hasRealReport = Boolean(
-          (b.firma_tecnico_url && b.firma_tecnico_url !== '__DELETED__') ||
-          (b.firma_tecnico_base64 && b.firma_tecnico_base64 !== '__DELETED__') ||
-          (b.firma_cliente_url && b.firma_cliente_url !== '__DELETED__') ||
-          (b.firma_cliente_base64 && b.firma_cliente_base64 !== '__DELETED__') ||
-          (b.fotos && b.fotos.length > 0) ||
-          (b.evidencias && Object.keys(b.evidencias).length > 0) ||
-          b.cierre_papel_pdf
-        );
-
-        // Si la orden está cerrada y no tiene reporte real con evidencia, descartar
-        if (ordenCerrada && !hasRealReport) {
-          mod = true;
-          totalEliminados++;
-          if (b.id) idsParaBorrarSupabase.push(b.id);
-          return;
-        }
-
-        // Clave exacta de unicidad
-        const exactKey = `${b.id || ''}::${fStr}::${tec}::${ent}::${sal}::${hasRealReport ? '1' : '0'}::${notaClean}`;
-        if (seenExactKeys.has(exactKey)) {
-          mod = true;
-          totalEliminados++;
-          if (b.id) idsParaBorrarSupabase.push(b.id);
-          return;
-        }
-        seenExactKeys.add(exactKey);
-
-        // Si es un reporte real completado con firmas/fotos
-        if (hasRealReport) {
-          const avanceKey = `${fStr}::${tec}::${ent}::${sal}`;
-          if (seenRealizados.has(avanceKey)) {
-            mod = true;
-            totalEliminados++;
-            if (b.id) idsParaBorrarSupabase.push(b.id);
-            return;
-          }
-          seenRealizados.add(avanceKey);
-          bitacoraLimpia.push(b);
-          return;
-        }
-
-        // Si NO tiene reporte real (es asignación programada, placeholder o entrada duplicada/inundada)
-        if (!seenEntriesByTec.has(tec)) {
-          seenEntriesByTec.set(tec, []);
-        }
-        const tecList = seenEntriesByTec.get(tec);
-
-        // 1. Descartar si ya existe entrada para este mismo técnico en la misma fecha
-        const mismoDia = tecList.find(p => {
-          const pfStr = p.fecha ? (p.fecha.includes('T') ? p.fecha.split('T')[0] : p.fecha) : '';
-          return pfStr === fStr;
-        });
-
-        if (mismoDia) {
-          mod = true;
-          totalEliminados++;
-          if (b.id) idsParaBorrarSupabase.push(b.id);
-          return;
-        }
-
-        // 2. Si es la orden OS-26141 o si ya hay 2 entradas para este técnico en esta orden
-        if (isOsTarget || tecList.length >= 2) {
-          mod = true;
-          totalEliminados++;
-          if (b.id) idsParaBorrarSupabase.push(b.id);
-          return;
-        }
-
-        tecList.push(b);
-        bitacoraLimpia.push(b);
-      });
-
-      if (mod) {
-        o.bitacora = bitacoraLimpia;
-        
-        const activeTecs = Array.from(new Set(
-          (o.bitacora || []).map(b => (b.tecnico || '').trim()).filter(Boolean)
-        ));
-        if (activeTecs.length > 0) {
-          o.tecnicosAsignados = activeTecs;
-          o.tecnico = activeTecs.join(', ');
-        }
-
-        ordenesModificadas++;
-        if (window.pushToSupabase) {
-          window.pushToSupabase('ordenes', o).catch(() => {});
-        }
-      }
-    });
-
-    // Limpiar también sapi_calendario_eventos duplicados y eventos de bitácoras eliminadas
-    try {
-      const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
-      const seenEventos = new Set();
-      const eventosLimpios = [];
-      let evMod = false;
-
-      localEventos.forEach(ev => {
-        if (!ev) return;
-        if (idsParaBorrarSupabase.includes(ev.id)) {
-          evMod = true;
-          return;
-        }
-        const ordId = ev.ordenId || '';
-        const tec = (ev.tecnicoNombre || '').trim().toLowerCase();
-        const st = (ev.start || ev.fechaInicio || '').substring(0, 10);
-        const tp = (ev.tipo || '').trim().toLowerCase();
-        const tit = (ev.titulo || '').toLowerCase();
-
-        if (tit.includes('26141')) {
-          const key26141 = `admin_26141_${st}`;
-          if (seenEventos.has(key26141)) {
-            evMod = true;
-            if (ev.id) idsParaBorrarSupabase.push(ev.id);
-            return;
-          }
-          seenEventos.add(key26141);
-        }
-
-        const key = `${ordId}::${tec}::${st}::${tp}`;
-
-        if (seenEventos.has(key)) {
-          evMod = true;
-          totalEliminados++;
-          if (ev.id) idsParaBorrarSupabase.push(ev.id);
-        } else {
-          seenEventos.add(key);
-          eventosLimpios.push(ev);
-        }
-      });
-
-      if (evMod) {
-        localStorage.setItem('sapi_calendario_eventos', JSON.stringify(eventosLimpios));
-      }
-    } catch(e){}
-
-    if (ordenesModificadas > 0) {
-      safeSetJSON('sapi_ordenes', ordenes);
-      console.log(`[Bitacora Sanitize] Sanitización automática: se eliminaron ${totalEliminados} registros duplicados/fantasmas de ${ordenesModificadas} órdenes.`);
-    }
-
-    // Purga directa en Supabase en lotes seguros de 50
-    if (idsParaBorrarSupabase.length > 0 && window.supabaseClient) {
-      try {
-        const chunkSize = 50;
-        for (let i = 0; i < idsParaBorrarSupabase.length; i += chunkSize) {
-          const chunk = idsParaBorrarSupabase.slice(i, i + chunkSize);
-          window.supabaseClient.from('orden_bitacora').delete().in('id', chunk).catch(() => {});
-          window.supabaseClient.from('calendario_eventos').delete().in('id', chunk).catch(() => {});
-        }
-        console.log(`[Bitacora Sanitize] Purgados ${idsParaBorrarSupabase.length} IDs en Supabase.`);
-      } catch(e){}
-    }
-  } finally {
-    window._isSanitizingBitacoras = false;
-  }
+  // Función de purga/sanitización automática DESACTIVADA PERMANENTEMENTE.
+  // Protege todas las asignaciones legítimas, evitando cualquier eliminación local o en Supabase.
+  return;
 };
 
 window.limpiarAsignacionesDuplicadas = async function() {
-  window.sanitizarBitacorasOrdenes();
   if (typeof renderCalendario === 'function') {
     renderCalendario();
-  }
-  if (typeof mostrarNotificacion === 'function') {
-    mostrarNotificacion('🧹 Calendario y asignaciones sanitizados correctamente.', 'success');
   }
 };
 
@@ -26606,14 +26405,6 @@ function dispararInicializacionGlobal() {
     }
   } catch (err) {
     console.error('Error al reestablecer TKT-26477:', err);
-  }
-  try {
-    if (typeof window.sanitizarBitacorasOrdenes === 'function') {
-      window.sanitizarBitacorasOrdenes();
-    }
-  } catch (err) {
-    console.error('Error al sanitizar bitácoras en inicialización global:', err);
-  }
   try {
     inicializarApp();
   } catch (err) {
