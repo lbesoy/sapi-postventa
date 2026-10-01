@@ -16,6 +16,81 @@ function _safeGet(key, fallback) {
   }
   return fallback;
 }
+
+function escapeHTML(str) {
+  if (typeof window !== 'undefined' && typeof window.escapeHTML === 'function') {
+    return window.escapeHTML(str);
+  }
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function calcularDiasJunta(fechaStr) {
+  if (typeof window !== 'undefined' && typeof window.calcularDiasJunta === 'function') {
+    return window.calcularDiasJunta(fechaStr);
+  }
+  if (!fechaStr) return 0;
+  try {
+    const d = new Date(fechaStr);
+    if (isNaN(d.getTime())) return 0;
+    const diffMs = new Date() - d;
+    return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+  } catch(e) {
+    return 0;
+  }
+}
+
+function formatearTiempoRelativoJunta(dias, fechaStr) {
+  if (typeof window !== 'undefined' && typeof window.formatearTiempoRelativoJunta === 'function') {
+    return window.formatearTiempoRelativoJunta(dias, fechaStr);
+  }
+  if (dias === 0) return 'Hoy';
+  if (dias === 1) return 'Ayer (1 día)';
+  if (dias < 7) return `Hace ${dias} días`;
+  if (dias < 14) return `Hace ${dias} días (1 sem)`;
+  if (dias < 30) return `Hace ${dias} días (${Math.floor(dias/7)} sem)`;
+  return `Hace ${dias} días (${Math.floor(dias/30)} meses)`;
+}
+
+function normalizarTextoJunta(str) {
+  if (typeof window !== 'undefined' && typeof window.normalizarTextoJunta === 'function') {
+    return window.normalizarTextoJunta(str);
+  }
+  return String(str || '')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function unificarNombreUsuario(rawNombre) {
+  if (typeof window !== 'undefined' && typeof window.unificarNombreUsuario === 'function') {
+    return window.unificarNombreUsuario(rawNombre);
+  }
+  return String(rawNombre || 'Sin Asignar').trim();
+}
+
+function obtenerInfoRolUsuario(nombre) {
+  if (typeof window !== 'undefined' && typeof window.obtenerInfoRolUsuario === 'function') {
+    return window.obtenerInfoRolUsuario(nombre);
+  }
+  return { rol: 'tecnico', label: 'Técnico', color: '#10b981', icon: 'wrench' };
+}
+
+function extraerListaResponsables(raw) {
+  if (typeof window !== 'undefined' && typeof window.extraerListaResponsables === 'function') {
+    return window.extraerListaResponsables(raw);
+  }
+  if (!raw) return ['Sin Asignar'];
+  const parts = String(raw).trim().split(/[,;/]+/).map(s => s.trim()).filter(Boolean);
+  return parts.length > 0 ? parts : ['Sin Asignar'];
+}
+
 window.reestablecerTicket26477 = async function() {
   try {
     let tkts = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : [];

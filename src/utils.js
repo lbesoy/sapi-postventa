@@ -274,6 +274,196 @@ export async function urlToDataUri(url) {
   return trimmed;
 }
 
+// Escape HTML special characters
+export function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Helper para calcular días transcurridos
+export function calcularDiasJunta(fechaStr) {
+  if (!fechaStr) return 0;
+  try {
+    const d = new Date(fechaStr);
+    if (isNaN(d.getTime())) return 0;
+    const diffMs = new Date() - d;
+    return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+  } catch(e) {
+    return 0;
+  }
+}
+
+export function formatearTiempoRelativoJunta(dias, fechaStr) {
+  if (dias === 0) return 'Hoy';
+  if (dias === 1) return 'Ayer (1 día)';
+  if (dias < 7) return `Hace ${dias} días`;
+  if (dias < 14) return `Hace ${dias} días (1 sem)`;
+  if (dias < 30) return `Hace ${dias} días (${Math.floor(dias/7)} sem)`;
+  return `Hace ${dias} días (${Math.floor(dias/30)} meses)`;
+}
+
+export function normalizarTextoJunta(str) {
+  return String(str || '')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+export function unificarNombreUsuario(rawNombre) {
+  if (!rawNombre) return 'Sin Asignar';
+  const norm = String(rawNombre)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+  if (!norm || norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === 'sin_asignar') {
+    return 'Sin Asignar';
+  }
+
+  // 1. Buscar coincidencia en array de usuarios
+  if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
+    const userMatch = usuarios.find(u => u && u.nombre && String(u.nombre).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() === norm);
+    if (userMatch && userMatch.nombre) return userMatch.nombre.trim();
+
+    const normWords = norm.split(/\s+/).filter(w => w.length > 2);
+    if (normWords.length >= 2) {
+      const fuzzyUser = usuarios.find(u => {
+        if (!u || !u.nombre) return false;
+        const uNormWords = String(u.nombre).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().split(/\s+/).filter(w => w.length > 2);
+        const matches = normWords.filter(w => uNormWords.includes(w));
+        return matches.length >= 2;
+      });
+      if (fuzzyUser && fuzzyUser.nombre) return fuzzyUser.nombre.trim();
+    }
+  }
+
+  // 2. Buscar coincidencia en array de tecnicosDb
+  if (typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) {
+    const tecMatch = tecnicosDb.find(t => t && t.nombre && String(t.nombre).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() === norm);
+    if (tecMatch && tecMatch.nombre) return tecMatch.nombre.trim();
+
+    const normWords = norm.split(/\s+/).filter(w => w.length > 2);
+    if (normWords.length >= 2) {
+      const fuzzyTec = tecnicosDb.find(t => {
+        if (!t || !t.nombre) return false;
+        const tNormWords = String(t.nombre).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().split(/\s+/).filter(w => w.length > 2);
+        const matches = normWords.filter(w => tNormWords.includes(w));
+        return matches.length >= 2;
+      });
+      if (fuzzyTec && fuzzyTec.nombre) return fuzzyTec.nombre.trim();
+    }
+  }
+
+  return String(rawNombre).trim();
+}
+
+export function obtenerInfoRolUsuario(nombre) {
+  if (!nombre) return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
+  
+  const norm = normalizarTextoJunta(nombre);
+  if (norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === '' || norm === 'sin_asignar') {
+    return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
+  }
+
+  let user = null;
+  if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
+    user = usuarios.find(u => u && u.nombre && normalizarTextoJunta(u.nombre) === norm);
+    if (!user) {
+      const normWords = norm.split(/\s+/).filter(w => w.length > 2);
+      if (normWords.length > 0) {
+        user = usuarios.find(u => {
+          if (!u || !u.nombre) return false;
+          const uNormWords = normalizarTextoJunta(u.nombre).split(/\s+/).filter(w => w.length > 2);
+          const matches = normWords.filter(w => uNormWords.includes(w));
+          return matches.length >= 2 || (normWords.length === 1 && matches.length === 1);
+        });
+      }
+    }
+  }
+
+  if (user && user.rol) {
+    const rolKey = String(user.rol).toLowerCase();
+    let label = 'Técnico';
+    let color = '#10b981';
+    let icon = 'wrench';
+
+    if (rolKey === 'superadmin') {
+      label = 'Super Admin';
+      color = '#E8820C';
+      icon = 'shield-alert';
+    } else if (rolKey === 'admin') {
+      label = 'Administrador';
+      color = '#4f8ef7';
+      icon = 'shield';
+    } else if (rolKey === 'supervisor') {
+      label = 'Supervisor';
+      color = '#ca8a04';
+      icon = 'user-check';
+    } else if (rolKey === 'tecnico') {
+      label = 'Técnico';
+      color = '#10b981';
+      icon = 'wrench';
+    } else if (rolKey === 'empresa') {
+      label = 'Cliente';
+      color = '#8b5cf6';
+      icon = 'building';
+    } else if (rolKey === 'consulta') {
+      label = 'Solo Consulta';
+      color = '#64748b';
+      icon = 'eye';
+    } else {
+      const conf = (typeof ROLES !== 'undefined' && ROLES[rolKey]) ? ROLES[rolKey] : null;
+      label = conf ? conf.label : (rolKey.charAt(0).toUpperCase() + rolKey.slice(1));
+      color = conf ? conf.color : '#10b981';
+    }
+
+    return { rol: rolKey, label, color, icon };
+  }
+
+  if (typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) {
+    let isTec = tecnicosDb.some(t => t && t.nombre && (
+      normalizarTextoJunta(t.nombre) === norm || 
+      normalizarTextoJunta(t.nombre).includes(norm) || 
+      norm.includes(normalizarTextoJunta(t.nombre)) ||
+      (typeof formatNombreCorto === 'function' && normalizarTextoJunta(formatNombreCorto(t.nombre)) === norm)
+    ));
+    if (!isTec) {
+      const normWords = norm.split(/\s+/).filter(w => w.length > 2);
+      if (normWords.length > 0) {
+        isTec = tecnicosDb.some(t => {
+          if (!t || !t.nombre) return false;
+          const tNormWords = normalizarTextoJunta(t.nombre).split(/\s+/).filter(w => w.length > 2);
+          const matches = normWords.filter(w => tNormWords.includes(w));
+          return matches.length >= 2 || (normWords.length === 1 && matches.length === 1);
+        });
+      }
+    }
+    if (isTec) {
+      return { rol: 'tecnico', label: 'Técnico', color: '#10b981', icon: 'wrench' };
+    }
+  }
+
+  return { rol: 'tecnico', label: 'Técnico', color: '#10b981', icon: 'wrench' };
+}
+
+export function extraerListaResponsables(raw) {
+  if (!raw) return ['Sin Asignar'];
+  const rawStr = String(raw).trim();
+  if (!rawStr || rawStr === '-' || rawStr.toLowerCase() === 'sin asignar' || rawStr.toLowerCase() === 'sin_asignar') {
+    return ['Sin Asignar'];
+  }
+  const parts = rawStr.split(/[,;/]+/).map(s => s.trim()).filter(Boolean);
+  const validParts = parts.filter(s => s !== '-' && s.toLowerCase() !== 'sin asignar' && s.toLowerCase() !== 'sin_asignar');
+  return validParts.length > 0 ? Array.from(new Set(validParts)) : ['Sin Asignar'];
+}
+
 // Vinculación automática a window para 100% retrocompatibilidad con código existente
 if (typeof window !== 'undefined') {
   window.cleanMojibake = cleanMojibake;
@@ -285,4 +475,11 @@ if (typeof window !== 'undefined') {
   window.getCurrentUserDisplayName = getCurrentUserDisplayName;
   window.getTicketModificadoPor = getTicketModificadoPor;
   window.urlToDataUri = urlToDataUri;
+  window.escapeHTML = escapeHTML;
+  window.calcularDiasJunta = calcularDiasJunta;
+  window.formatearTiempoRelativoJunta = formatearTiempoRelativoJunta;
+  window.normalizarTextoJunta = normalizarTextoJunta;
+  window.unificarNombreUsuario = unificarNombreUsuario;
+  window.obtenerInfoRolUsuario = obtenerInfoRolUsuario;
+  window.extraerListaResponsables = extraerListaResponsables;
 }

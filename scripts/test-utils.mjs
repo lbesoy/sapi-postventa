@@ -7,7 +7,12 @@ import {
   isTestUser,
   getTicketFechaModificacion,
   getCurrentUserDisplayName,
-  getTicketModificadoPor
+  getTicketModificadoPor,
+  escapeHTML,
+  calcularDiasJunta,
+  formatearTiempoRelativoJunta,
+  unificarNombreUsuario,
+  extraerListaResponsables
 } from '../src/utils.js';
 
 console.log('🧪 Ejecutando pruebas unitarias para src/utils.js...');
@@ -18,6 +23,26 @@ assert.equal(cleanMojibake('CotizaciÃ³n'), 'Cotización', 'cleanMojibake debe 
 assert.equal(cleanMojibake('GarcÃa'), 'García', 'cleanMojibake debe reparar ía');
 assert.equal(cleanMojibake('Texto Normal'), 'Texto Normal', 'cleanMojibake no debe alterar texto normal');
 console.log('  ✅ cleanMojibake: OK');
+
+// 1.1 escapeHTML
+assert.equal(escapeHTML('<b>Hola & "Adiós"</b>'), '&lt;b&gt;Hola &amp; &quot;Adiós&quot;&lt;/b&gt;', 'escapeHTML debe escapar etiquetas y comillas');
+assert.equal(escapeHTML(null), '', 'escapeHTML con null debe retornar string vacío');
+assert.equal(escapeHTML(undefined), '', 'escapeHTML con undefined debe retornar string vacío');
+console.log('  ✅ escapeHTML: OK');
+
+// 1.2 calcularDiasJunta y formatearTiempoRelativoJunta
+assert.equal(calcularDiasJunta(''), 0, 'calcularDiasJunta con vacío debe ser 0');
+assert.equal(calcularDiasJunta(new Date().toISOString()), 0, 'calcularDiasJunta de hoy debe ser 0');
+assert.equal(formatearTiempoRelativoJunta(0), 'Hoy', 'formatearTiempoRelativoJunta de 0 días debe ser Hoy');
+assert.equal(formatearTiempoRelativoJunta(1), 'Ayer (1 día)', 'formatearTiempoRelativoJunta de 1 día debe ser Ayer');
+assert.equal(formatearTiempoRelativoJunta(5), 'Hace 5 días', 'formatearTiempoRelativoJunta de 5 días');
+console.log('  ✅ calcularDiasJunta y formatearTiempoRelativoJunta: OK');
+
+// 1.3 extraerListaResponsables
+assert.deepEqual(extraerListaResponsables('Juan Pérez, Carlos Gómez'), ['Juan Pérez', 'Carlos Gómez'], 'extraerListaResponsables desglosa responsables');
+assert.deepEqual(extraerListaResponsables(''), ['Sin Asignar'], 'extraerListaResponsables vacío retorna Sin Asignar');
+assert.deepEqual(extraerListaResponsables('Sin Asignar'), ['Sin Asignar'], 'extraerListaResponsables Sin Asignar');
+console.log('  ✅ extraerListaResponsables: OK');
 
 // 2. normStr
 assert.equal(normStr('  TÉCNICO Especial  '), 'tecnico especial', 'normStr debe normalizar acentos y espacios');

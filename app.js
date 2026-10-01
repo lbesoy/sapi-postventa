@@ -430,6 +430,81 @@ let gastos = safeGetJSON('sapi_gastos', []);
 let usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
 let currentSession = safeGetJSON('eurorep_session', null) || { userId: '', viewMode: 'consulta' };
 
+// Helpers compartidos de escapeHTML y Juntas
+function escapeHTML(str) {
+  if (typeof window !== 'undefined' && typeof window.escapeHTML === 'function') {
+    return window.escapeHTML(str);
+  }
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+window.escapeHTML = escapeHTML;
+
+function calcularDiasJunta(fechaStr) {
+  if (typeof window !== 'undefined' && typeof window.calcularDiasJunta === 'function') {
+    return window.calcularDiasJunta(fechaStr);
+  }
+  if (!fechaStr) return 0;
+  try {
+    const d = new Date(fechaStr);
+    if (isNaN(d.getTime())) return 0;
+    return Math.max(0, Math.floor((new Date() - d) / (1000 * 60 * 60 * 24)));
+  } catch(e) { return 0; }
+}
+window.calcularDiasJunta = calcularDiasJunta;
+
+function formatearTiempoRelativoJunta(dias, fechaStr) {
+  if (typeof window !== 'undefined' && typeof window.formatearTiempoRelativoJunta === 'function') {
+    return window.formatearTiempoRelativoJunta(dias, fechaStr);
+  }
+  if (dias === 0) return 'Hoy';
+  if (dias === 1) return 'Ayer (1 día)';
+  if (dias < 7) return `Hace ${dias} días`;
+  if (dias < 14) return `Hace ${dias} días (1 sem)`;
+  if (dias < 30) return `Hace ${dias} días (${Math.floor(dias/7)} sem)`;
+  return `Hace ${dias} días (${Math.floor(dias/30)} meses)`;
+}
+window.formatearTiempoRelativoJunta = formatearTiempoRelativoJunta;
+
+function normalizarTextoJunta(str) {
+  if (typeof window !== 'undefined' && typeof window.normalizarTextoJunta === 'function') {
+    return window.normalizarTextoJunta(str);
+  }
+  return String(str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+window.normalizarTextoJunta = normalizarTextoJunta;
+
+function unificarNombreUsuario(rawNombre) {
+  if (typeof window !== 'undefined' && typeof window.unificarNombreUsuario === 'function') {
+    return window.unificarNombreUsuario(rawNombre);
+  }
+  return String(rawNombre || 'Sin Asignar').trim();
+}
+window.unificarNombreUsuario = unificarNombreUsuario;
+
+function obtenerInfoRolUsuario(nombre) {
+  if (typeof window !== 'undefined' && typeof window.obtenerInfoRolUsuario === 'function') {
+    return window.obtenerInfoRolUsuario(nombre);
+  }
+  return { rol: 'tecnico', label: 'Técnico', color: '#10b981', icon: 'wrench' };
+}
+window.obtenerInfoRolUsuario = obtenerInfoRolUsuario;
+
+function extraerListaResponsables(raw) {
+  if (typeof window !== 'undefined' && typeof window.extraerListaResponsables === 'function') {
+    return window.extraerListaResponsables(raw);
+  }
+  if (!raw) return ['Sin Asignar'];
+  const parts = String(raw).trim().split(/[,;/]+/).map(s => s.trim()).filter(Boolean);
+  return parts.length > 0 ? parts : ['Sin Asignar'];
+}
+window.extraerListaResponsables = extraerListaResponsables;
+
 // Clara Mock Transactions
 let defaultClaraMockTxs = [
   { id: 'tx_clara_1', fecha: '2026-05-22', merchant: 'GASOLINERIA ES 08996', monto: 1174.79, cardLast4: '9112', usuario: 'Victor Gonzalez Zamora', categoria: 'Combustibles' },
