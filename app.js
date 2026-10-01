@@ -26405,6 +26405,7 @@ function dispararInicializacionGlobal() {
     }
   } catch (err) {
     console.error('Error al reestablecer TKT-26477:', err);
+  }
   try {
     inicializarApp();
   } catch (err) {

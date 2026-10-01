@@ -2285,15 +2285,8 @@ async function _processSyncQueueInternal() {
 
               const currentBitIds = filasBitacora.map(f => f.id).filter(Boolean);
               if (currentBitIds.length > 0) {
-                try {
-                  await sb.from('orden_bitacora').delete().eq('orden_id', ordId).not('id', 'in', `(${currentBitIds.map(id => `"${id}"`).join(',')})`);
-                } catch(e) {}
                 const { error: upsertBitErr } = await sb.from('orden_bitacora').upsert(filasBitacora, { onConflict: 'id' });
                 if (upsertBitErr) throw upsertBitErr;
-              } else {
-                try {
-                  await sb.from('orden_bitacora').delete().eq('orden_id', ordId);
-                } catch(e) {}
               }
 
               // 2. SINCRONIZAR REFACCIONES UTILIZADAS Y NECESARIAS
@@ -3905,11 +3898,13 @@ window.cargarDatosDeSupabase = function() {
     if (ordenes) {
       let bitacorasMap = {};
       if (bitacorasDb && bitacorasDb.length > 0) {
-        const zombieBitacoraIds = [];
-        const seenPendingByOrdTec = new Map();
-        const seenExact = new Set();
+        const seenBitacoraIds = new Set();
 
         bitacorasDb.forEach(b => {
+          if (!b || !b.id) return;
+          if (seenBitacoraIds.has(b.id)) return;
+          seenBitacoraIds.add(b.id);
+
           if (!bitacorasMap[b.orden_id]) bitacorasMap[b.orden_id] = [];
           
           // Formatear fecha a YYYY-MM-DD para la app
@@ -3968,33 +3963,6 @@ window.cargarDatosDeSupabase = function() {
             }
           }
 
-          const tecKey = (tecnico || '').trim().toLowerCase();
-          const exactKey = `${b.orden_id}::${datePortion}::${tecKey}::${b.entrada || ''}::${b.salida || ''}`;
-
-          if (seenExact.has(exactKey)) {
-            if (b.id) zombieBitacoraIds.push(b.id);
-            return;
-          }
-          seenExact.add(exactKey);
-
-          const hasRealEvidence = Boolean(
-            (b.firma_tecnico_url && b.firma_tecnico_url !== '__DELETED__') ||
-            (b.firma_cliente_url && b.firma_cliente_url !== '__DELETED__') ||
-            (b.fotos && b.fotos.length > 0) ||
-            (b.evidencias && Object.keys(b.evidencias).length > 0)
-          );
-
-          // Si no tiene reporte real con evidencia y ya hay 2 para este técnico en esta orden
-          if (!hasRealEvidence) {
-            const ordTecKey = `${b.orden_id}::${tecKey}`;
-            const pCount = seenPendingByOrdTec.get(ordTecKey) || 0;
-            if (pCount >= 2) {
-              if (b.id) zombieBitacoraIds.push(b.id);
-              return;
-            }
-            seenPendingByOrdTec.set(ordTecKey, pCount + 1);
-          }
-
           bitacorasMap[b.orden_id].push({
             id: b.id,
             fecha: datePortion,
@@ -4016,18 +3984,6 @@ window.cargarDatosDeSupabase = function() {
             asignadoPorName: asignadoPorName
           });
         });
-
-        // Limpiar zombies en Supabase en segundo plano en lotes seguros de 50
-        if (zombieBitacoraIds.length > 0 && window.supabaseClient) {
-          try {
-            const chunkSize = 50;
-            for (let i = 0; i < zombieBitacoraIds.length; i += chunkSize) {
-              const chunk = zombieBitacoraIds.slice(i, i + chunkSize);
-              window.supabaseClient.from('orden_bitacora').delete().in('id', chunk).catch(() => {});
-            }
-            console.log(`[Sync] Purgadas ${zombieBitacoraIds.length} bitácoras duplicadas/inundadas en Supabase.`);
-          } catch(e){}
-        }
       }
 
       // Procesar Refacciones Asociadas
