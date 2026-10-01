@@ -818,6 +818,53 @@ assert.doesNotThrow(() => {
 
 console.log('  ✅ Dashboard Ejecutivo, Estadísticas y Gráficas V2: OK');
 
+// 30. Gestión de Usuarios, Roles, Permisos y Sesiones CRUD
+const {
+  renderUsuariosList,
+  abrirModalUsuario,
+  toggleEmpresaField,
+  cerrarModalUsuario,
+  onCambioFusionDestinoModal,
+  ejecutarFusionDesdeEditarUsuario,
+  adminRestablecerPasswordClick,
+  guardarUsuario,
+  editarUsuario,
+  eliminarUsuario,
+  abrirSesionModal,
+  cerrarSesionModal,
+  cambiarUsuario,
+  agregarUsuario
+} = await import('../src/modules/usuarios.js');
+
+// Test A: Funciones existen
+assert.equal(typeof renderUsuariosList, 'function', 'renderUsuariosList debe ser función');
+assert.equal(typeof abrirModalUsuario, 'function', 'abrirModalUsuario debe ser función');
+assert.equal(typeof toggleEmpresaField, 'function', 'toggleEmpresaField debe ser función');
+assert.equal(typeof cerrarModalUsuario, 'function', 'cerrarModalUsuario debe ser función');
+assert.equal(typeof onCambioFusionDestinoModal, 'function', 'onCambioFusionDestinoModal debe ser función');
+assert.equal(typeof ejecutarFusionDesdeEditarUsuario, 'function', 'ejecutarFusionDesdeEditarUsuario debe ser función');
+assert.equal(typeof adminRestablecerPasswordClick, 'function', 'adminRestablecerPasswordClick debe ser función');
+assert.equal(typeof guardarUsuario, 'function', 'guardarUsuario debe ser función');
+assert.equal(typeof editarUsuario, 'function', 'editarUsuario debe ser función');
+assert.equal(typeof eliminarUsuario, 'function', 'eliminarUsuario debe ser función');
+assert.equal(typeof abrirSesionModal, 'function', 'abrirSesionModal debe ser función');
+assert.equal(typeof cerrarSesionModal, 'function', 'cerrarSesionModal debe ser función');
+assert.equal(typeof cambiarUsuario, 'function', 'cambiarUsuario debe ser función');
+assert.equal(typeof agregarUsuario, 'function', 'agregarUsuario debe ser función');
+
+// Test B: Invocación segura sin DOM
+assert.doesNotThrow(() => {
+  renderUsuariosList();
+  abrirModalUsuario();
+  toggleEmpresaField();
+  cerrarModalUsuario();
+  onCambioFusionDestinoModal();
+  abrirSesionModal();
+  cerrarSesionModal();
+}, 'Las funciones de usuarios no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Gestión de Usuarios, Roles, Permisos y Sesiones CRUD: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 
