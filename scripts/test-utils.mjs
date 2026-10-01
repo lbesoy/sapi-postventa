@@ -173,4 +173,30 @@ assert.equal(dispConMant.porcentaje, 75, 'Porcentaje debe ser 75%');
 assert.ok(dispConMant.color.includes('ef4444'), 'Color rojo cuando porcentaje < 80%');
 console.log('  ✅ Clientes y Maquinaria (calcularDisponibilidadFlota y exports): OK');
 
+// 15. Módulo de Catálogo de Maquinaria, Refacciones y Sitios
+const { renderMaquinaria, setMaqView, toggleSortMaquinaria, generarIdInternoMaquina, renderRefacciones, renderSitios } = await import('../src/modules/maquinaria.js');
+assert.equal(typeof renderMaquinaria, 'function', 'renderMaquinaria debe ser una función');
+assert.equal(typeof setMaqView, 'function', 'setMaqView debe ser una función');
+assert.equal(typeof toggleSortMaquinaria, 'function', 'toggleSortMaquinaria debe ser una función');
+assert.equal(typeof generarIdInternoMaquina, 'function', 'generarIdInternoMaquina debe ser una función');
+assert.equal(typeof renderRefacciones, 'function', 'renderRefacciones debe ser una función');
+assert.equal(typeof renderSitios, 'function', 'renderSitios debe ser una función');
+
+// Test A: Generar ID interno de maquinaria para marca y año base
+const idNuevo1 = generarIdInternoMaquina('Caterpillar', '2026', [], []);
+assert.equal(idNuevo1, 'CA26001', 'generarIdInternoMaquina debe generar CA26001');
+
+// Test B: Generar ID interno correlativo cuando ya existen máquinas previas
+const maqExistentes = [
+  { idInterno: 'CA26001' },
+  { idInterno: 'CA26002' }
+];
+const idNuevo2 = generarIdInternoMaquina('CAT', '2026', [], maqExistentes);
+assert.equal(idNuevo2, 'CA26003', 'generarIdInternoMaquina debe incrementar correlativo a CA26003');
+
+// Test C: Generar ID interno con marca de 1 letra o vacía
+const idGenerico = generarIdInternoMaquina('', '2025', [], []);
+assert.ok(idGenerico.startsWith('XX25'), 'generarIdInternoMaquina con marca vacía usa XX');
+console.log('  ✅ Catálogo de Maquinaria, Refacciones y Sitios (generarIdInternoMaquina y exports): OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
