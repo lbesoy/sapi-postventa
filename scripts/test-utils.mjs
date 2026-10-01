@@ -104,4 +104,19 @@ const emptyStats = calcularEstadisticasLevantamientos(null);
 assert.equal(emptyStats.total, 0, 'Manejo de nulos seguro');
 console.log('  ✅ Levantamientos (calcularEstadisticasLevantamientos): OK');
 
-console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS BASE, RENTAS Y LEVANTAMIENTOS PASARON CON ÉXITO!\n');
+// 11. Reporte Semanal de Técnicos
+const { obtenerLunes, formatShortDate, formatISODate, formatNombreCorto } = await import('../src/modules/tecnicos_reporte.js');
+
+const viernes = new Date(2026, 9, 2); // 2 de octubre 2026
+const lunes = obtenerLunes(viernes);
+assert.equal(lunes.getDay(), 1, 'El día retornado por obtenerLunes debe ser Lunes (día 1)');
+
+const fechaTest = new Date(2026, 9, 2);
+assert.equal(formatShortDate(fechaTest), '02/10/2026', 'formatShortDate debe ser DD/MM/YYYY');
+assert.equal(formatISODate(fechaTest), '2026-10-02', 'formatISODate debe ser YYYY-MM-DD');
+
+assert.equal(formatNombreCorto('Juan Carlos Pérez García'), 'Juan Carlos', 'formatNombreCorto toma nombre corto');
+assert.equal(formatNombreCorto(''), '', 'formatNombreCorto vacío');
+console.log('  ✅ Reporte de Técnicos (obtenerLunes, formatShortDate, formatNombreCorto): OK');
+
+console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
