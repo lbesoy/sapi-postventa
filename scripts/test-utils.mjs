@@ -416,5 +416,58 @@ assert.equal(calcularFechaParaDiaDeSemana('2026-10-01', 1), '2026-09-28', 'El lu
 assert.equal(calcularFechaParaDiaDeSemana('2026-10-01', 5), '2026-10-02', 'El viernes de esa semana debe ser 2026-10-02');
 console.log('  ✅ Asignación y Programación de Técnicos (horaAMinutos, hayTraslapoHorario, fechas y exports): OK');
 
+// 23. Módulo de Integración y Sincronización SAP
+const {
+  API_CONFIG,
+  fetchSapApi,
+  fetchClientesSAP,
+  fetchRefaccionesSAP,
+  fetchTecnicosSAP,
+  fetchSitiosSAP,
+  fetchMaquinariaSAP,
+  forzarSincronizacionSAP,
+  sincronizarModuloSAP,
+  sincronizarUnCliente,
+  sincronizarConGitHub,
+  renderLinkedCotizaciones,
+  togglePasarCotizacionBtn,
+  deleteLinkedCotizacion,
+  viewLinkedCotizacionPdf,
+  vincularNuevaCotizacion,
+  initSearchableSelect,
+  poblarCotizacionesDropdown,
+  poblarPedidosDropdown,
+  onModalPedidoSelected,
+  onQuickPedidoSelected,
+  autoExtraerDesdePdfPedido,
+  clearPdfPedidoInput,
+  validarPedidoConSAP,
+  syncSapPedidoManual,
+  onModalCotizacionSelected,
+  onQuickCotizacionSelected,
+  autoExtraerDesdePdfCotizacion,
+  clearPdfInput,
+  checkPdfSapMatchCount,
+  validarCotizacionConSAP,
+  syncSapCotizacionManual
+} = await import('../src/modules/sap_sync.js');
+
+assert.equal(typeof fetchClientesSAP, 'function', 'fetchClientesSAP debe ser una función');
+assert.equal(typeof fetchRefaccionesSAP, 'function', 'fetchRefaccionesSAP debe ser una función');
+assert.equal(typeof initSearchableSelect, 'function', 'initSearchableSelect debe ser una función');
+assert.equal(typeof checkPdfSapMatchCount, 'function', 'checkPdfSapMatchCount debe ser una función');
+assert.equal(typeof validarCotizacionConSAP, 'function', 'validarCotizacionConSAP debe ser una función');
+assert.equal(typeof validarPedidoConSAP, 'function', 'validarPedidoConSAP debe ser una función');
+assert.equal(typeof sincronizarConGitHub, 'function', 'sincronizarConGitHub debe ser una función');
+
+// Test A: API_CONFIG base
+assert.ok(API_CONFIG && typeof API_CONFIG.BASE_URL === 'string', 'API_CONFIG debe tener BASE_URL');
+assert.equal(API_CONFIG.USE_SAP_BACKEND, true, 'USE_SAP_BACKEND debe estar activo por defecto');
+
+// Test B: checkPdfSapMatchCount con bypass cuando no hay PDF cargado
+assert.equal(checkPdfSapMatchCount('1101234', 1500, 'Cliente Test'), 3, 'Sin PDF en cache debe retornar 3 (bypass)');
+
+console.log('  ✅ Integración y Sincronización SAP (API_CONFIG, checkPdfSapMatchCount, catálogos y exports): OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
