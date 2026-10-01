@@ -1352,7 +1352,7 @@ window.pushToSupabase = async function(tabla, item) {
   // Determinar si la operación debe ser ONLINE-ONLY (directa a Supabase sin encolar offline)
   let isOnlineOnly = false;
   
-  if (tabla === 'tickets' || tabla === 'ordenes' || tabla === 'ideas_fallas' || tabla === 'envios' || tabla === 'rentas') {
+  if (tabla === 'tickets' || tabla === 'ordenes' || tabla === 'ideas_fallas' || tabla === 'envios' || tabla === 'rentas' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora') {
     isOnlineOnly = true;
   }
 
@@ -1479,6 +1479,68 @@ window.pushToSupabase = async function(tabla, item) {
       throw error;
     }
     
+    // Si la tabla es ordenes y tiene bitacora, sincronizar orden_bitacora directamente
+    if (tabla === 'ordenes' && item && item.bitacora && Array.isArray(item.bitacora)) {
+      try {
+        const cleanFecha = (f) => {
+          if (!f) return new Date().toISOString();
+          if (f.includes('T')) return f;
+          return `${f}T12:00:00.000Z`;
+        };
+
+        const filasBitacora = (item.bitacora || []).map(b => {
+          const dbTecnico = getValidDbTecnico(b.tecnico) || b.tecnico;
+          let dbNota = b.nota || '';
+          if (b.tecnico && !dbNota.includes('[Técnico: ')) {
+            dbNota += `\n[Técnico: ${b.tecnico}]`;
+          }
+          if (typeof b.realizado !== 'undefined') {
+            dbNota += `\n[Realizado: ${b.realizado}]`;
+          }
+          if (b.programadoEntrada && b.programadoSalida) {
+            dbNota += `\n[Prog: ${b.programadoEntrada}-${b.programadoSalida}]`;
+          }
+          if (b.desviacion) {
+            dbNota += `\n[Desv: ${b.desviacion}]`;
+          }
+          if (b.asignadoPorName) {
+            dbNota += `\n[AsignadoPor: ${b.asignadoPorName}]`;
+          }
+          return {
+            id: b.id || toValidUUID(),
+            orden_id: item.id,
+            fecha: cleanFecha(b.fecha),
+            tecnico: dbTecnico || null,
+            nota: dbNota,
+            entrada: b.entrada || null,
+            salida: b.salida || null,
+            hora_inicio: b.hora_inicio || null,
+            horas_traslado: b.horas_traslado || null,
+            programado_horas_traslado: b.programadoHorasTraslado || null,
+            hora_fin_regreso: b.hora_fin_regreso || null,
+            horas_regreso: b.horas_regreso || null,
+            programado_horas_regreso: b.programadoHorasRegreso || null,
+            tipo: b.tipo || 'Servicio'
+          };
+        });
+
+        const currentBitIds = filasBitacora.map(f => f.id).filter(Boolean);
+        if (currentBitIds.length > 0) {
+          try {
+            await sb.from('orden_bitacora').delete().eq('orden_id', item.id).not('id', 'in', `(${currentBitIds.map(id => `"${id}"`).join(',')})`);
+          } catch(e) {}
+          const { error: upsertBitErr } = await sb.from('orden_bitacora').upsert(filasBitacora, { onConflict: 'id' });
+          if (upsertBitErr) console.warn('[Direct Push] Error al guardar orden_bitacora en Supabase:', upsertBitErr.message);
+        } else {
+          try {
+            await sb.from('orden_bitacora').delete().eq('orden_id', item.id);
+          } catch(e) {}
+        }
+      } catch (errBit) {
+        console.warn('[Direct Push] Error sincronizando orden_bitacora directa:', errBit);
+      }
+    }
+    
     // Marcar el elemento local en localStorage como sincronizado (_synced = true)
     try {
       const storageKey = tabla === 'tickets' ? 'sapi_tickets' : (tabla === 'ordenes' ? 'sapi_ordenes' : (tabla === 'envios' ? 'sapi_envios_db' : null));
@@ -1507,7 +1569,7 @@ window.deleteFromSupabase = async function(tabla, id) {
   // Determinar si la operación debe ser ONLINE-ONLY
   let isOnlineOnly = false;
   
-  if (tabla === 'tickets' || tabla === 'ordenes' || tabla === 'ideas_fallas' || tabla === 'envios' || tabla === 'rentas') {
+  if (tabla === 'tickets' || tabla === 'ordenes' || tabla === 'ideas_fallas' || tabla === 'envios' || tabla === 'rentas' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora') {
     isOnlineOnly = true;
   }
 

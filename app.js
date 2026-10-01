@@ -17467,10 +17467,6 @@ window.esTicketHijoRefacciones = function(t) {
 
 window.obtenerOrdenAsociadaTicket = function(t) {
   if (!t || typeof t !== 'object') return null;
-  // Solo los tickets con -A (subtickets de refacciones) tienen relación con órdenes de servicio
-  if (typeof window.esTicketHijoRefacciones === 'function' && !window.esTicketHijoRefacciones(t)) {
-    return null;
-  }
 
   // 1. Usar pool en memoria prioritariamente para evitar saturar el heap
   let allOrds = (typeof ordenes !== 'undefined' && Array.isArray(ordenes) && ordenes.length > 0)
@@ -22756,7 +22752,9 @@ window.renderServiciosProgramadosTecnico = function() {
     if (estadoClean === 'finalizado' || estadoClean === 'cerrada' || estadoClean === 'completada') return false;
 
     const orderTecnicoClean = String(o.tecnico || '').trim().toLowerCase();
-    const isAssignedToOrder = orderTecnicoClean === miNombreClean;
+    const isAssignedToOrder = orderTecnicoClean === miNombreClean ||
+      (Array.isArray(o.tecnicosAsignados) && o.tecnicosAsignados.some(t => String(t).trim().toLowerCase() === miNombreClean)) ||
+      orderTecnicoClean.split(',').map(s => s.trim()).includes(miNombreClean);
 
     let hasPendingBitacora = false;
     if (o.bitacora && Array.isArray(o.bitacora)) {
@@ -22791,6 +22789,26 @@ window.renderServiciosProgramadosTecnico = function() {
             }
           }
         }
+      }
+      if (scheduledTimeText === 'No especificada') {
+        try {
+          const localEvents = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+          const myEv = localEvents.find(e => (e.ordenId === o.id || e.orden_id === o.id) && String(e.tecnicoNombre || e.tecnico_nombre || '').trim().toLowerCase() === miNombreClean);
+          if (myEv) {
+            const startVal = myEv.fechaInicio || myEv.fecha_inicio || myEv.start;
+            if (startVal) {
+              const dObj = new Date(startVal);
+              scheduledDateText = dObj.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+              const ent = `${String(dObj.getHours()).padStart(2,'0')}:${String(dObj.getMinutes()).padStart(2,'0')}`;
+              scheduledTimeText = `${ent} hs`;
+              const endVal = myEv.fechaFin || myEv.fecha_fin || myEv.end;
+              if (endVal) {
+                const dEnd = new Date(endVal);
+                scheduledTimeText += ` - ${String(dEnd.getHours()).padStart(2,'0')}:${String(dEnd.getMinutes()).padStart(2,'0')} hs`;
+              }
+            }
+          }
+        } catch(e){}
       }
 
       html += `
@@ -24795,6 +24813,59 @@ async function guardarTicket(e) {
   
   if (window.supabaseClient) {
     await window.pushToSupabase('tickets', ticket);
+  }
+
+  // Sincronizar automáticamente con la Orden de Servicio vinculada si existe
+  try {
+    const assocOrd = (typeof window.obtenerOrdenAsociadaTicket === 'function')
+      ? window.obtenerOrdenAsociadaTicket(ticket)
+      : (typeof ordenes !== 'undefined' && Array.isArray(ordenes) ? ordenes.find(o => o && (o.soporte === ticket.id || o.soporte === ticket.folio || o.id === ticket.ordenId || o.folio === ticket.ordenFolio)) : null);
+
+    if (assocOrd) {
+      let ordMod = false;
+      const resolvedCli = typeof window.resolverClienteTicket === 'function' ? window.resolverClienteTicket(ticket) : '';
+      const cliTarget = resolvedCli || ticket.cliente;
+      if (cliTarget && assocOrd.cliente !== cliTarget) {
+        assocOrd.cliente = cliTarget;
+        ordMod = true;
+      }
+      if (ticket.sitio && assocOrd.ubicacion !== ticket.sitio) {
+        assocOrd.ubicacion = ticket.sitio;
+        ordMod = true;
+      }
+      if (ticket.asignado && ticket.asignado !== 'Sin asignar' && ticket.asignado !== '-') {
+        if (assocOrd.tecnico !== ticket.asignado) {
+          assocOrd.tecnico = ticket.asignado;
+          assocOrd.tecnicosAsignados = ticket.asignado.split(',').map(s => s.trim()).filter(Boolean);
+          ordMod = true;
+        }
+      }
+      if (ticket.categoria) {
+        const tipoTarget = ticket.categoria === 'Servicio Técnico' ? 'Servicio' : ticket.categoria;
+        if (assocOrd.tipo !== tipoTarget) {
+          assocOrd.tipo = tipoTarget;
+          ordMod = true;
+        }
+      }
+      if (ticket.equipo && assocOrd.equipo !== ticket.equipo) {
+        assocOrd.equipo = ticket.equipo;
+        ordMod = true;
+      }
+      if (!assocOrd.soporte) {
+        assocOrd.soporte = ticket.id || ticket.folio;
+        ordMod = true;
+      }
+      if (ordMod) {
+        assocOrd._synced = false;
+        safeSetJSON('sapi_ordenes', ordenes);
+        if (window.supabaseClient) {
+          await window.pushToSupabase('ordenes', assocOrd);
+        }
+        if (typeof renderTabla === 'function') renderTabla('servicios');
+      }
+    }
+  } catch (errSyncOrd) {
+    console.warn('[Ticket] Error al sincronizar orden vinculada:', errSyncOrd);
   }
 
   // Generar Orden de Servicio automáticamente solo si es de Servicio en campo (NO para Garantías ni Refacciones)
@@ -27878,9 +27949,17 @@ function renderCalendario() {
   try {
     const adminEvents = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
     adminEvents.forEach(e => {
-      // Si tiene ordenId, no lo renderizamos como evento administrativo duplicado,
-      // porque ya se renderiza de manera más precisa desde la bitácora de la orden
-      if (e.ordenId) return;
+      // Si tiene ordenId, solo omitir si ya fue renderizado previamente desde la bitácora de la orden
+      if (e.ordenId) {
+        const startDateOnly = (e.fechaInicio || e.start || '').substring(0, 10);
+        const yaRenderizado = eventos.some(ev => 
+          ev.extendedProps && 
+          ev.extendedProps.ordenId === e.ordenId && 
+          String(ev.extendedProps.tecnico || '').trim().toLowerCase() === String(e.tecnicoNombre || '').trim().toLowerCase() &&
+          (ev.start || '').startsWith(startDateOnly)
+        );
+        if (yaRenderizado) return;
+      }
 
       // Filtrar por técnico si hay filtro activo
       if (filtroTecnico) {
@@ -37228,7 +37307,7 @@ window.sanitizarBitacorasOrdenes = function() {
       const bitacoraLimpia = [];
       let mod = false;
 
-      const isOsTarget = (o.folio === 'OS-26141' || (o.id && o.id.includes('26141')) || (o.cliente && o.cliente.toUpperCase().includes('EURO REPRESENTACIONES')));
+      const isOsTarget = (o.folio === 'OS-26141' || (o.id && o.id.includes('26141')));
 
       const seenRealizados = new Set();
       const seenExactKeys = new Set();
@@ -37356,7 +37435,7 @@ window.sanitizarBitacorasOrdenes = function() {
         const tp = (ev.tipo || '').trim().toLowerCase();
         const tit = (ev.titulo || '').toLowerCase();
 
-        if (tit.includes('26141') || tit.includes('euro representaciones')) {
+        if (tit.includes('26141')) {
           const key26141 = `admin_26141_${st}`;
           if (seenEventos.has(key26141)) {
             evMod = true;
@@ -40146,6 +40225,13 @@ function dispararInicializacionGlobal() {
     }
   } catch (err) {
     console.error('Error al sanitizar tickets en inicialización global:', err);
+  }
+  try {
+    if (typeof window.reestablecerTicket26477 === 'function') {
+      window.reestablecerTicket26477();
+    }
+  } catch (err) {
+    console.error('Error al reestablecer TKT-26477:', err);
   }
   try {
     if (typeof window.sanitizarBitacorasOrdenes === 'function') {
@@ -44754,11 +44840,18 @@ window.sanitizarAsignacionesTickets = function() {
         tMod = true;
       }
 
-      // 2. Herencia y recuperación exhaustiva de Cliente
-      const resolvedCli = typeof window.resolverClienteTicket === 'function' ? window.resolverClienteTicket(t) : '';
-      if (resolvedCli && resolvedCli !== t.cliente) {
-        t.cliente = resolvedCli;
-        tMod = true;
+      // 2. Herencia y recuperación exhaustiva de Cliente (solo si el cliente está en blanco o sin definir)
+      const isBlankCliVal = (val) => {
+        if (!val) return true;
+        const str = String(val).toLowerCase().trim();
+        return !str || str === 'sin cliente' || str === 'ninguno' || str === 'genérico' || str === 'generico' || str === 'sin_cliente' || str === '-';
+      };
+      if (isBlankCliVal(t.cliente)) {
+        const resolvedCli = typeof window.resolverClienteTicket === 'function' ? window.resolverClienteTicket(t) : '';
+        if (resolvedCli && resolvedCli !== t.cliente) {
+          t.cliente = resolvedCli;
+          tMod = true;
+        }
       }
 
       // 3. Herencia de Sitio, Equipo y Asignado desde Parent/OS si faltan
@@ -44793,6 +44886,109 @@ window.sanitizarAsignacionesTickets = function() {
     }
   } finally {
     window._isSanitizingTickets = false;
+  }
+};
+
+// ===== RESTABLECER TICKET TKT-26477 Y SU ORDEN DE SERVICIO (RUBBLE MASTER HMH GMB) =====
+window.reestablecerTicket26477 = async function() {
+  try {
+    let tkts = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : [];
+    if (tkts.length === 0) {
+      try {
+        tkts = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_tickets', []) : JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+      } catch (e) { tkts = []; }
+    }
+    
+    let t = tkts.find(x => x && (x.folio === 'TKT-26477' || x.id === '48c975ea-de3d-4857-bc2f-3bc98569f708' || String(x.folio || '').includes('26477')));
+    
+    let ords = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes : [];
+    if (ords.length === 0) {
+      try {
+        ords = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_ordenes', []) : JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+      } catch (e) { ords = []; }
+    }
+
+    let ord = ords.find(o => o && (o.id === 'OS-26256' || o.folio === 'OS-26256' || o.soporte === 'TKT-26477' || (t && o.soporte === t.id) || String(o.folio || '').includes('26256') || (t && t.ordenId && o.id === t.ordenId)));
+
+    let ticketUpdated = false;
+    let ordUpdated = false;
+
+    if (t) {
+      const clienteEsperado = 'RUBBLE MASTER HMH GMB';
+      const sitioEsperado = 'San Jose del Marques, Hidalgo';
+      const catEsperada = 'Servicio Técnico';
+      const tecEsperado = 'Juan carlos Ramírez';
+
+      if (t.cliente !== clienteEsperado || t.sitio !== sitioEsperado || t.categoria !== catEsperada || t.asignado !== tecEsperado) {
+        t.cliente = clienteEsperado;
+        t.sitio = sitioEsperado;
+        t.categoria = catEsperada;
+        t.asignado = tecEsperado;
+        t.tecnicosAsignados = [tecEsperado];
+        t.modificadoPor = 'Rodrigo Alonso Narvaez';
+        t.fechaModificacion = '2026-09-30T16:41:00.000Z';
+        t.updated_at = new Date().toISOString();
+        t._synced = false;
+        ticketUpdated = true;
+      }
+    }
+
+    if (ord) {
+      const clienteEsperado = 'RUBBLE MASTER HMH GMB';
+      const ubicacionEsperada = 'San Jose del Marques, Hidalgo';
+      const tecEsperado = 'Juan carlos Ramírez';
+
+      if (ord.cliente !== clienteEsperado || ord.ubicacion !== ubicacionEsperada || ord.tecnico !== tecEsperado) {
+        ord.cliente = clienteEsperado;
+        ord.ubicacion = ubicacionEsperada;
+        ord.tipo = 'Servicio';
+        ord.tecnico = tecEsperado;
+        ord.tecnicosAsignados = [tecEsperado];
+        if (t) {
+          ord.soporte = t.id || t.folio;
+          t.ordenId = ord.id;
+          t.ordenFolio = ord.folio;
+        }
+        ord._synced = false;
+        ordUpdated = true;
+      }
+    }
+
+    if (ticketUpdated) {
+      if (typeof tickets !== 'undefined' && Array.isArray(tickets)) {
+        tickets = tkts;
+      }
+      safeSetJSON('sapi_tickets', tkts);
+      if (window.supabaseClient) {
+        try {
+          await window.pushToSupabase('tickets', t);
+        } catch (e) {
+          console.warn('[Patch] Error al persistir TKT-26477 en Supabase:', e);
+        }
+      }
+    }
+
+    if (ordUpdated) {
+      if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
+        ordenes = ords;
+      }
+      safeSetJSON('sapi_ordenes', ords);
+      if (window.supabaseClient) {
+        try {
+          await window.pushToSupabase('ordenes', ord);
+        } catch (e) {
+          console.warn('[Patch] Error al persistir orden OS-26256 en Supabase:', e);
+        }
+      }
+    }
+
+    if (ticketUpdated || ordUpdated) {
+      console.log('[Patch] TKT-26477 y su Orden de Servicio reestablecidos a RUBBLE MASTER HMH GMB.');
+      if (typeof renderTickets === 'function') renderTickets();
+      if (typeof renderTabla === 'function') renderTabla('servicios');
+    }
+  } catch (err) {
+    console.warn('[Patch] Error en reestablecerTicket26477:', err);
   }
 };
 
