@@ -18,61 +18,6 @@ function _safeGet(key, fallback) {
 import { cleanMojibake, normStr, safeFormatDate, formatFechaHoraAmigable, urlToDataUri, escapeHTML, calcularDiasJunta, formatearTiempoRelativoJunta, normalizarTextoJunta, unificarNombreUsuario, obtenerInfoRolUsuario, extraerListaResponsables } from "../utils.js";
 import { supabaseClient } from "../supabaseClient.js";
 
-function _escapeHTML(str) {
-  if (typeof escapeHTML === 'function') return escapeHTML(str);
-  if (typeof window !== 'undefined' && typeof window.escapeHTML === 'function') return window.escapeHTML(str);
-  if (str === null || str === undefined) return '';
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-}
-
-function _calcularDiasJunta(fechaStr) {
-  if (typeof calcularDiasJunta === 'function') return calcularDiasJunta(fechaStr);
-  if (typeof window !== 'undefined' && typeof window.calcularDiasJunta === 'function') return window.calcularDiasJunta(fechaStr);
-  if (!fechaStr) return 0;
-  try {
-    const d = new Date(fechaStr);
-    if (isNaN(d.getTime())) return 0;
-    return Math.max(0, Math.floor((new Date() - d) / (1000 * 60 * 60 * 24)));
-  } catch(e) { return 0; }
-}
-
-function _formatearTiempoRelativoJunta(dias, fechaStr) {
-  if (typeof formatearTiempoRelativoJunta === 'function') return formatearTiempoRelativoJunta(dias, fechaStr);
-  if (typeof window !== 'undefined' && typeof window.formatearTiempoRelativoJunta === 'function') return window.formatearTiempoRelativoJunta(dias, fechaStr);
-  if (dias === 0) return 'Hoy';
-  if (dias === 1) return 'Ayer (1 día)';
-  if (dias < 7) return `Hace ${dias} días`;
-  if (dias < 14) return `Hace ${dias} días (1 sem)`;
-  if (dias < 30) return `Hace ${dias} días (${Math.floor(dias/7)} sem)`;
-  return `Hace ${dias} días (${Math.floor(dias/30)} meses)`;
-}
-
-function _normalizarTextoJunta(str) {
-  if (typeof normalizarTextoJunta === 'function') return normalizarTextoJunta(str);
-  if (typeof window !== 'undefined' && typeof window.normalizarTextoJunta === 'function') return window.normalizarTextoJunta(str);
-  return String(str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-}
-
-function _unificarNombreUsuario(rawNombre) {
-  if (typeof unificarNombreUsuario === 'function') return unificarNombreUsuario(rawNombre);
-  if (typeof window !== 'undefined' && typeof window.unificarNombreUsuario === 'function') return window.unificarNombreUsuario(rawNombre);
-  return String(rawNombre || 'Sin Asignar').trim();
-}
-
-function _obtenerInfoRolUsuario(nombre) {
-  if (typeof obtenerInfoRolUsuario === 'function') return obtenerInfoRolUsuario(nombre);
-  if (typeof window !== 'undefined' && typeof window.obtenerInfoRolUsuario === 'function') return window.obtenerInfoRolUsuario(nombre);
-  return { rol: 'tecnico', label: 'Técnico', color: '#10b981', icon: 'wrench' };
-}
-
-function _extraerListaResponsables(raw) {
-  if (typeof extraerListaResponsables === 'function') return extraerListaResponsables(raw);
-  if (typeof window !== 'undefined' && typeof window.extraerListaResponsables === 'function') return window.extraerListaResponsables(raw);
-  if (!raw) return ['Sin Asignar'];
-  const parts = String(raw).trim().split(/[,;/]+/).map(s => s.trim()).filter(Boolean);
-  return parts.length > 0 ? parts : ['Sin Asignar'];
-}
-
 /**
  * Módulo de Juntas de Revisión, Panel Operativo Semanal y Rescate Histórico - Eurorep / SAPI
  * Cubre análisis de cuellos de botella, tabla de responsables, modo proyector/pantalla completa,
