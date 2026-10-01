@@ -240,4 +240,32 @@ assert.equal(formatMontoConComas(null), '$0.00', 'formatMontoConComas con null d
 assert.equal(formatMontoConComas(''), '$0.00', 'formatMontoConComas con vacío debe dar $0.00');
 console.log('  ✅ Chat de Soporte y Bandeja de Correo (formatMontoConComas y exports): OK');
 
+// 18. Módulo de Kits de Servicio y Machotes de Mantenimiento
+const { KITS_PRECARGADOS_DEFAULT, detectarSistemaRefaccion, loadKitsServicio, saveKitsServicio, filtrarKitsServicio, abrirModalKitsServicio } = await import('../src/modules/kits.js');
+assert.ok(Array.isArray(KITS_PRECARGADOS_DEFAULT), 'KITS_PRECARGADOS_DEFAULT debe ser un array');
+assert.equal(KITS_PRECARGADOS_DEFAULT.length, 36, 'Deben existir 36 machotes de kits precargados estándar');
+assert.equal(typeof detectarSistemaRefaccion, 'function', 'detectarSistemaRefaccion debe ser una función');
+assert.equal(typeof loadKitsServicio, 'function', 'loadKitsServicio debe ser una función');
+assert.equal(typeof saveKitsServicio, 'function', 'saveKitsServicio debe ser una función');
+assert.equal(typeof filtrarKitsServicio, 'function', 'filtrarKitsServicio debe ser una función');
+assert.equal(typeof abrirModalKitsServicio, 'function', 'abrirModalKitsServicio debe ser una función');
+
+// Test A: Detección inteligente de sistemas por palabras clave
+assert.equal(detectarSistemaRefaccion('Filtro de aceite de motor John Deere'), 'Motor', 'Debe detectar sistema Motor');
+assert.equal(detectarSistemaRefaccion('Filtro primario de combustible diésel'), 'Combustible', 'Debe detectar sistema Combustible');
+assert.equal(detectarSistemaRefaccion('Filtro de aire de admisión primario'), 'Aire / Admisión', 'Debe detectar sistema Aire / Admisión');
+assert.equal(detectarSistemaRefaccion('Filtro hidráulico de retorno alta presión'), 'Hidráulico', 'Debe detectar sistema Hidráulico');
+assert.equal(detectarSistemaRefaccion('Banda de transmisión en V dentada'), 'Transmisión', 'Debe detectar sistema Transmisión');
+assert.equal(detectarSistemaRefaccion('Alternador eléctrico 24V y batería'), 'Eléctrico', 'Debe detectar sistema Eléctrico');
+assert.equal(detectarSistemaRefaccion('Placa de desgaste y martillo de trituración'), 'Desgaste / Cuchillas', 'Debe detectar Desgaste / Cuchillas');
+assert.equal(detectarSistemaRefaccion('Tornillo genérico M10x50'), 'General', 'Debe clasificar como General por defecto');
+
+// Test B: Validación de integridad de los kits precargados
+const kitRubble = KITS_PRECARGADOS_DEFAULT.find(k => k.id === 'kit-rm120x-250h');
+assert.ok(kitRubble, 'Debe existir el kit oficial RM120X 250h');
+assert.equal(kitRubble.marca, 'RUBBLE MASTER', 'Marca debe ser RUBBLE MASTER');
+assert.equal(kitRubble.intervalo, '250', 'Intervalo debe ser 250h');
+assert.ok(kitRubble.piezas.length >= 3, 'El kit 250h debe contener al menos 3 refacciones');
+console.log('  ✅ Kits de Servicio y Machotes (detectarSistemaRefaccion, catálogo 36 kits y exports): OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
