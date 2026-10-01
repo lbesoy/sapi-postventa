@@ -272,29 +272,43 @@
           }
         });
 
-        // Verificar vacaciones en el calendario
-        const calendarEvents = window._supaCalendarioEventos || [];
+        // Verificar actividades y eventos en el calendario
+        let calendarEvents = [];
+        if (window._supaCalendarioEventos && Array.isArray(window._supaCalendarioEventos) && window._supaCalendarioEventos.length > 0) {
+          calendarEvents = window._supaCalendarioEventos;
+        } else {
+          try {
+            calendarEvents = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+          } catch(e) {}
+        }
+
         calendarEvents.forEach(e => {
-          if (e.tipo === 'Vacaciones') {
-            let isThisTec = false;
-            if (e.tecnicoNombre && formatNombreCorto(e.tecnicoNombre) === formatNombreCorto(tShort)) {
+          let isThisTec = false;
+          if (e.tecnicoNombre && formatNombreCorto(e.tecnicoNombre) === formatNombreCorto(tShort)) {
+            isThisTec = true;
+          } else if (e.tecnicoId) {
+            const matchedUser = usuarios.find(u => u.id === e.tecnicoId);
+            if (matchedUser && formatNombreCorto(matchedUser.nombre) === formatNombreCorto(tShort)) {
               isThisTec = true;
-            } else if (e.tecnicoId) {
-              const matchedUser = usuarios.find(u => u.id === e.tecnicoId);
-              if (matchedUser && formatNombreCorto(matchedUser.nombre) === formatNombreCorto(tShort)) {
-                isThisTec = true;
-              }
             }
+          }
+          
+          if (isThisTec) {
+            let eStart = e.fechaInicio || e.start || '';
+            if (eStart.includes('T')) eStart = eStart.split('T')[0];
+            let eEnd = e.fechaFin || e.end || '';
+            if (eEnd.includes('T')) eEnd = eEnd.split('T')[0];
+            if (!eEnd) eEnd = eStart;
             
-            if (isThisTec) {
-              let eStart = e.fechaInicio || '';
-              if (eStart.includes('T')) eStart = eStart.split('T')[0];
-              let eEnd = e.fechaFin || '';
-              if (eEnd.includes('T')) eEnd = eEnd.split('T')[0];
-              if (!eEnd) eEnd = eStart;
-              
-              if (isoDate >= eStart && isoDate <= eEnd) {
+            if (isoDate >= eStart && isoDate <= eEnd) {
+              if (e.tipo === 'Vacaciones') {
                 conVacaciones = true;
+              } else {
+                conProgramado = true;
+                const actLabel = `${e.tipo || 'Actividad'}${e.titulo ? ': ' + e.titulo : ''}`;
+                if (!infoServiciosProgramados.includes(actLabel) && (!e.ordenId || infoServiciosProgramados.length === 0)) {
+                  infoServiciosProgramados.push(actLabel);
+                }
               }
             }
           }

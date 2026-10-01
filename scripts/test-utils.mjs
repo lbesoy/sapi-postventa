@@ -369,4 +369,52 @@ const urlEstafeta = obtenerUrlRastreoPaqueteria('Estafeta', 'EST-9988');
 assert.ok(urlEstafeta.includes('estafeta.com') && urlEstafeta.includes('EST-9988'), 'URL de Estafeta debe incluir guia');
 console.log('  ✅ Envíos y Guías de Paquetería (obtenerUrlRastreoPaqueteria multicarrier y exports): OK');
 
+// 22. Módulo de Asignación Semanal y Programación de Técnicos
+const {
+  abrirAsignarTecnicos,
+  cerrarAsignarTecnicos,
+  guardarAsignacionTecnicos,
+  obtenerDiaDeSemanaLocal,
+  calcularFechaParaDiaDeSemana,
+  horaAMinutos,
+  hayTraslapoHorario,
+  renderCalendarioSemanalModal,
+  toggleDiaSemanaModal,
+  agregarActividadSemanal,
+  quitarActividadSemanal,
+  onTipoDiaChange,
+  onTipoPrincipalChange,
+  toggleMismaOrden,
+  navegarSemana,
+  seleccionarDiasSemana,
+  abrirProgramarTecnico,
+  calcularLlegadaTraslados,
+  actualizarTecnicosDisponibles,
+  guardarProgramacionTecnico
+} = await import('../src/modules/asignacion_tecnicos.js');
+
+assert.equal(typeof abrirAsignarTecnicos, 'function', 'abrirAsignarTecnicos debe ser una función');
+assert.equal(typeof abrirProgramarTecnico, 'function', 'abrirProgramarTecnico debe ser una función');
+assert.equal(typeof actualizarTecnicosDisponibles, 'function', 'actualizarTecnicosDisponibles debe ser una función');
+assert.equal(typeof guardarProgramacionTecnico, 'function', 'guardarProgramacionTecnico debe ser una función');
+
+// Test A: Conversión de horas a minutos
+assert.equal(horaAMinutos('08:30'), 510, '08:30 debe ser 510 minutos');
+assert.equal(horaAMinutos('00:00'), 0, '00:00 debe ser 0 minutos');
+assert.equal(horaAMinutos('17:45'), 1065, '17:45 debe ser 1065 minutos');
+assert.equal(horaAMinutos(null), null, 'null debe retornar null');
+
+// Test B: Detección matemática de traslapes de horario
+assert.equal(hayTraslapoHorario('09:00', '12:00', '11:00', '14:00'), true, 'Debe detectar traslape parcial');
+assert.equal(hayTraslapoHorario('09:00', '12:00', '09:30', '11:30'), true, 'Debe detectar traslape contenido');
+assert.equal(hayTraslapoHorario('08:00', '10:00', '10:00', '12:00'), false, 'Mismo límite (10:00) no es traslape');
+assert.equal(hayTraslapoHorario('08:00', '10:00', '13:00', '15:00'), false, 'Horarios disjuntos no se traslapan');
+
+// Test C: Cálculos de días y fechas semanales
+assert.equal(obtenerDiaDeSemanaLocal('2026-10-01'), 4, '2026-10-01 es Jueves (día 4)');
+assert.equal(calcularFechaParaDiaDeSemana('2026-10-01', 1), '2026-09-28', 'El lunes de esa semana debe ser 2026-09-28');
+assert.equal(calcularFechaParaDiaDeSemana('2026-10-01', 5), '2026-10-02', 'El viernes de esa semana debe ser 2026-10-02');
+console.log('  ✅ Asignación y Programación de Técnicos (horaAMinutos, hayTraslapoHorario, fechas y exports): OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
+

@@ -147,7 +147,15 @@ function renderCalendario() {
     return;
   }
 
+  let prevView = null;
+  let prevDate = null;
   if (calendarInstance) {
+    try {
+      prevView = calendarInstance.view?.type;
+      prevDate = calendarInstance.getDate();
+    } catch (e) {
+      console.warn('Could not get calendar view/date:', e);
+    }
     calendarInstance.destroy();
   }
 
@@ -194,7 +202,6 @@ function renderCalendario() {
     if (o.estado === 'Finalizado' || o.estado === 'Cerrada') bgColor = '#6b7280'; // Gris
 
     if (o.bitacora && o.bitacora.length > 0) {
-      const seenForOrderTec = new Map();
       o.bitacora.forEach(b => {
         if (!b) return;
         if (filtroTecnico && b.tecnico !== filtroTecnico) return;
@@ -215,16 +222,6 @@ function renderCalendario() {
         );
 
         const esAsignacionPendiente = !hasRealContent || b.realizado === false || (notaLower.includes('programado') || notaLower.includes('pendiente de llenado'));
-
-        // Capping de seguridad estricto contra inundación de asignaciones/duplicados en el calendario
-        if (!hasRealContent) {
-          const tKey = (b.tecnico || '').trim().toLowerCase();
-          const pCount = seenForOrderTec.get(tKey) || 0;
-          if (pCount >= 2) {
-            return; // Descartar réplicas inundadas
-          }
-          seenForOrderTec.set(tKey, pCount + 1);
-        }
 
         let eventColor = '#ef4444'; // Rojo: Trabajo realizado sin asignación por defecto
 
@@ -486,14 +483,12 @@ function renderCalendario() {
   try {
     const adminEvents = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
     adminEvents.forEach(e => {
-      // Si tiene ordenId, solo omitir si ya fue renderizado previamente desde la bitácora de la orden
+      // Si tiene ordenId, solo omitir si este mismo evento ya fue renderizado previamente desde la bitácora de la orden
       if (e.ordenId) {
-        const startDateOnly = (e.fechaInicio || e.start || '').substring(0, 10);
         const yaRenderizado = eventos.some(ev => 
-          ev.extendedProps && 
-          ev.extendedProps.ordenId === e.ordenId && 
-          String(ev.extendedProps.tecnico || '').trim().toLowerCase() === String(e.tecnicoNombre || '').trim().toLowerCase() &&
-          (ev.start || '').startsWith(startDateOnly)
+          ev.id === e.id || 
+          ev.id === `bit-${e.id}` || 
+          ev.extendedProps?.id === e.id
         );
         if (yaRenderizado) return;
       }
@@ -513,13 +508,21 @@ function renderCalendario() {
       else if (e.tipo === 'Servicio') eventColor = '#eab308'; // Amarillo: Servicio
       else eventColor = '#3b82f6'; // Azul: Trabajo/Actividad sin asignación
 
+      const isAllDay = Boolean(e.todoElDia || e.allDay);
+      let startVal = e.fechaInicio || e.start || '';
+      let endVal = e.fechaFin || e.end || null;
+      if (isAllDay && startVal) {
+        startVal = startVal.substring(0, 10);
+        if (endVal) endVal = endVal.substring(0, 10);
+      }
+
       const tecPrefix = e.tecnicoNombre ? `${e.tecnicoNombre.split(' ')[0]} | ` : '';
       eventos.push({
         id: e.id,
         title: `${tecPrefix}${e.tipo} | ${e.titulo || ''}`,
-        start: e.fechaInicio || e.start,
-        end: e.fechaFin || e.end || null,
-        allDay: e.todoElDia || e.allDay || false,
+        start: startVal,
+        end: endVal,
+        allDay: isAllDay,
         backgroundColor: eventColor,
         borderColor: eventColor,
         textColor: '#ffffff',
@@ -531,8 +534,11 @@ function renderCalendario() {
           tipo: e.tipo,
           tecnicoId: e.tecnicoId,
           tecnicoNombre: e.tecnicoNombre,
+          tecnico: e.tecnicoNombre || 'Sin asignar',
           creadoPor: e.creadoPor,
           ordenId: e.ordenId,
+          entrada: e.entrada || '',
+          salida: e.salida || '',
           color: e.color
         }
       });
@@ -617,11 +623,13 @@ function renderCalendario() {
   });
 
   const isMobileCalendar = window.innerWidth <= 768;
+  const initialViewType = prevView || (isMobileCalendar ? 'listWeek' : 'dayGridMonth');
   calendarInstance = new FullCalendar.Calendar(container, {
     locale: 'es',
     allDayText: 'Todo el día',
     noEventsText: 'No hay eventos para mostrar',
-    initialView: isMobileCalendar ? 'listWeek' : 'dayGridMonth',
+    initialView: initialViewType,
+    initialDate: prevDate || undefined,
     firstDay: 1, // Start on Monday
     headerToolbar: isMobileCalendar ? {
       left: 'prev,next',
@@ -914,6 +922,25 @@ async function guardarActividadCalendario() {
   const activeUserId = currentSession.userId || null;
   const activeUserName = obtenerNombreUsuarioActual();
 
+  let cleanInicio = inicio;
+  let cleanFin = fin || null;
+  if (todoElDia) {
+    cleanInicio = inicio.substring(0, 10);
+    cleanFin = fin ? fin.substring(0, 10) : null;
+  } else {
+    if (inicio && inicio.length === 16) cleanInicio = `${inicio}:00`;
+    if (fin && fin.length === 16) cleanFin = `${fin}:00`;
+  }
+
+  let entrada = '';
+  let salida = '';
+  if (!todoElDia && inicio && inicio.includes('T')) {
+    entrada = inicio.split('T')[1].substring(0, 5);
+  }
+  if (!todoElDia && fin && fin.includes('T')) {
+    salida = fin.split('T')[1].substring(0, 5);
+  }
+
   const eventoObj = {
     id: id || crypto.randomUUID(),
     titulo: titulo,
@@ -921,10 +948,12 @@ async function guardarActividadCalendario() {
     tecnicoId: tecnicoId || null,
     tecnicoNombre: tecnicoNombre,
     ordenId: ordenId || null,
-    fechaInicio: new Date(inicio).toISOString(),
-    start: new Date(inicio).toISOString(),
-    fechaFin: fin ? new Date(fin).toISOString() : null,
-    end: fin ? new Date(fin).toISOString() : null,
+    fechaInicio: cleanInicio,
+    start: cleanInicio,
+    fechaFin: cleanFin,
+    end: cleanFin,
+    entrada: entrada,
+    salida: salida,
     todoElDia: todoElDia,
     allDay: todoElDia,
     descripcion: descripcion || null,
@@ -952,26 +981,13 @@ async function guardarActividadCalendario() {
         if (!o.bitacora) o.bitacora = [];
         
         const existIdx = o.bitacora.findIndex(b => b.id === eventoObj.id);
-        
-        let entrada = '';
-        let salida = '';
-        try {
-          if (inicio) {
-            const dIni = new Date(inicio);
-            entrada = `${String(dIni.getHours()).padStart(2, '0')}:${String(dIni.getMinutes()).padStart(2, '0')}`;
-          }
-          if (fin) {
-            const dFin = new Date(fin);
-            salida = `${String(dFin.getHours()).padStart(2, '0')}:${String(dFin.getMinutes()).padStart(2, '0')}`;
-          }
-        } catch(e){}
-
         const fechaISO = inicio.substring(0, 10);
 
         const nuevaEntrada = {
           id: eventoObj.id,
           fecha: fechaISO,
           tecnico: tecnicoNombre || 'Sin Asignar',
+          tipo: tipo,
           nota: descripcion || "Programado por supervisor. Pendiente de llenado por el técnico.",
           entrada: entrada,
           salida: salida,

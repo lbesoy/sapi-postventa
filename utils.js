@@ -50,6 +50,12 @@ window.normStr = function(s) {
   return (s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 };
 
+// Helpers de fecha y hora local para México
+window.getLocalDateString = function(date = new Date()) {
+  const offsetDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return offsetDate.toISOString().split('T')[0];
+};
+
 // Formatea fechas sin lanzar excepciones RangeError
 window.safeFormatDate = function(fechaStr, options = { day:'numeric', month:'short' }, defaultVal = 'N/A') {
   if (!fechaStr) return defaultVal;

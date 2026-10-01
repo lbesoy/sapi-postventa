@@ -75,6 +75,12 @@ export function safeFormatDate(fechaStr, options = { day:'numeric', month:'short
   }
 }
 
+// Helpers de fecha y hora local para México
+export function getLocalDateString(date = new Date()) {
+  const offsetDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return offsetDate.toISOString().split('T')[0];
+}
+
 // Formatea fechas y horas de forma amigable (DD/MM/YYYY HH:MM o DD/MM/YYYY)
 export function formatFechaHoraAmigable(dateStr) {
   if (!dateStr) return '—';
@@ -467,6 +473,7 @@ export function extraerListaResponsables(raw) {
 // Vinculación automática a window para 100% retrocompatibilidad con código existente
 if (typeof window !== 'undefined') {
   window.cleanMojibake = cleanMojibake;
+  window.getLocalDateString = getLocalDateString;
   window.normStr = normStr;
   window.safeFormatDate = safeFormatDate;
   window.formatFechaHoraAmigable = formatFechaHoraAmigable;
