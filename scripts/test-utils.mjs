@@ -569,6 +569,63 @@ assert.ok(!coincideMarca('PTZ', 'SCHWING'), 'PUTZMEISTER no debe coincidir con S
 
 console.log('  ✅ Microsoft OneDrive, Extracción Fiscal SAT y Resolución de Refacciones: OK');
 
+// 25. MÓDULO DE TELEMETRÍA, AUDITORÍA Y HERRAMIENTAS SUPERADMIN
+console.log('🧪 Verificando Módulo de Telemetría SuperAdmin (telemetria.js / src/modules/telemetria.js)...');
+const {
+  trackTelemetryEvent,
+  seedMockTelemetryData,
+  filterTelemetryLogs,
+  clearTelemetryLogs,
+  getRelativeTime,
+  renderTelemetryEventsFeed,
+  renderTelemetryDashboard,
+  obtenerTodosLosClientes,
+  abrirModalFusionarClientes,
+  cerrarModalFusionarClientes,
+  esMismoCliente,
+  mostrarCargando,
+  filtrarFusionClientes,
+  mostrarListaFusion,
+  seleccionarClienteFusion,
+  actualizarResumenFusion,
+  confirmarFusionClientes,
+  deduplicarOrdenesLocales,
+  regenerarOrdenesDesdeTickets,
+  confirmarAccion,
+  eliminarAsignacionProgramadaDirecto,
+  eliminarTodasAsignacionesOrden,
+  sanitizarBitacorasOrdenes,
+  limpiarAsignacionesDuplicadas,
+  ejecutarDiagnosticoLocal
+} = await import('../src/modules/telemetria.js');
+
+// Test A: Funciones existen
+assert.equal(typeof trackTelemetryEvent, 'function', 'trackTelemetryEvent debe ser función');
+assert.equal(typeof getRelativeTime, 'function', 'getRelativeTime debe ser función');
+assert.equal(typeof esMismoCliente, 'function', 'esMismoCliente debe ser función');
+assert.equal(typeof confirmarAccion, 'function', 'confirmarAccion debe ser función');
+assert.equal(typeof deduplicarOrdenesLocales, 'function', 'deduplicarOrdenesLocales debe ser función');
+assert.equal(typeof ejecutarDiagnosticoLocal, 'function', 'ejecutarDiagnosticoLocal debe ser función');
+
+// Test B: getRelativeTime
+const nowIso = new Date().toISOString();
+assert.equal(getRelativeTime(nowIso), 'Hace unos momentos', 'getRelativeTime reciente debe retornar "Hace unos momentos"');
+const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+assert.equal(getRelativeTime(tenMinsAgo), 'Hace 10 min', 'getRelativeTime de 10m debe retornar "Hace 10 min"');
+const oneHourAgo = new Date(Date.now() - 3600 * 1000).toISOString();
+assert.equal(getRelativeTime(oneHourAgo), 'Hace 1 hora', 'getRelativeTime de 1h debe retornar "Hace 1 hora"');
+
+// Test C: esMismoCliente
+const c1 = { id: 'CLI-001', nombre: 'CEMEX S.A.B.', legacy: false };
+const c2 = { id: 'CLI-001', nombre: 'CEMEX S.A.B.', legacy: false };
+const c3 = { id: 'CLI-002', nombre: 'HOLCIM APASCO', legacy: false };
+assert.ok(esMismoCliente(c1, c2), 'Mismo objeto cliente debe retornar true');
+assert.ok(!esMismoCliente(c1, c3), 'Clientes distintos no deben coincidir');
+assert.ok(!esMismoCliente(null, c1), 'Comparar con null debe retornar false');
+
+console.log('  ✅ Telemetría SuperAdmin, Fusión de Clientes y Diagnósticos: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
+
 
 
