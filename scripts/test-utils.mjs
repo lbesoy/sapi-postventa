@@ -136,4 +136,41 @@ assert.ok(defaultClaraCards.length >= 10, 'defaultClaraCards debe contener catá
 assert.ok(defaultClaraCards[0].alias, 'Las tarjetas deben tener propiedad alias');
 console.log('  ✅ Gastos y Tarjetas Clara (catálogo base y exports): OK');
 
+// 14. Módulo de Clientes y Gestión de Maquinaria
+const { calcularDisponibilidadFlota, renderClientes, verDetalleCliente, abrirModalCliente } = await import('../src/modules/clientes.js');
+assert.equal(typeof calcularDisponibilidadFlota, 'function', 'calcularDisponibilidadFlota debe ser una función');
+assert.equal(typeof renderClientes, 'function', 'renderClientes debe ser una función');
+assert.equal(typeof verDetalleCliente, 'function', 'verDetalleCliente debe ser una función');
+assert.equal(typeof abrirModalCliente, 'function', 'abrirModalCliente debe ser una función');
+
+// Test A: Flota vacía
+const dispVacia = calcularDisponibilidadFlota([]);
+assert.equal(dispVacia.total, 0, 'Total flota vacía debe ser 0');
+assert.equal(dispVacia.porcentaje, 100, 'Porcentaje flota vacía debe ser 100%');
+
+// Test B: Flota con máquinas 100% operativas (sin órdenes activas)
+const flotaTest = [
+  { idInterno: 'M-01', serie: 'SN001', modelo: 'Montacargas 1' },
+  { idInterno: 'M-02', serie: 'SN002', modelo: 'Montacargas 2' },
+  { idInterno: 'M-03', serie: 'SN003', modelo: 'Montacargas 3' },
+  { idInterno: 'M-04', serie: 'SN004', modelo: 'Montacargas 4' }
+];
+const dispOperativas = calcularDisponibilidadFlota(flotaTest, []);
+assert.equal(dispOperativas.total, 4, 'Total debe ser 4');
+assert.equal(dispOperativas.operativos, 4, 'Operativos debe ser 4');
+assert.equal(dispOperativas.mantenimiento, 0, 'Mantenimiento debe ser 0');
+assert.equal(dispOperativas.porcentaje, 100, 'Porcentaje debe ser 100%');
+
+// Test C: Flota con 1 máquina en mantenimiento (orden activa abierta)
+const ordenesActivas = [
+  { maquinaria_id: 'M-02', estado: 'En Proceso' }
+];
+const dispConMant = calcularDisponibilidadFlota(flotaTest, ordenesActivas);
+assert.equal(dispConMant.total, 4, 'Total debe ser 4');
+assert.equal(dispConMant.operativos, 3, 'Operativos debe ser 3');
+assert.equal(dispConMant.mantenimiento, 1, 'Mantenimiento debe ser 1');
+assert.equal(dispConMant.porcentaje, 75, 'Porcentaje debe ser 75%');
+assert.ok(dispConMant.color.includes('ef4444'), 'Color rojo cuando porcentaje < 80%');
+console.log('  ✅ Clientes y Maquinaria (calcularDisponibilidadFlota y exports): OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
