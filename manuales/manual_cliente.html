@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual de Uso: Portal del Cliente — Eurorep SAPI</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --secondary: #475569;
+      --bg: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --card-bg: #f8fafc;
+      --code-bg: #f1f5f9;
+      --accent: #f59e0b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --purple: #8b5cf6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+      padding: 24px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* Top Floating / Header Bar */
+    .viewer-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 24px;
+      position: sticky;
+      top: 12px;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+      backdrop-filter: blur(8px);
+    }
+
+    .doc-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 9999px;
+      background: #e0f2fe;
+      color: #0369a1;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+
+    .btn-pdf {
+      background: var(--primary);
+      color: #ffffff;
+      border: 1px solid var(--primary);
+    }
+    .btn-pdf:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-print {
+      background: #ffffff;
+      color: var(--secondary);
+      border: 1px solid var(--border);
+    }
+    .btn-print:hover {
+      background: #f1f5f9;
+      color: var(--text);
+    }
+
+    /* Content Typography */
+    #content {
+      margin-top: 10px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-top: 10px;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 3px solid var(--primary);
+      letter-spacing: -0.5px;
+    }
+
+    h2 {
+      font-size: 21px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 36px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1.5px solid var(--border);
+    }
+
+    h3 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #334155;
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+
+    h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #475569;
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin-bottom: 16px;
+      color: #334155;
+    }
+
+    strong {
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+
+    ul, ol {
+      margin-top: 8px;
+      margin-bottom: 18px;
+      padding-left: 28px;
+      color: #334155;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    /* Tablas */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0 28px 0;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+      text-align: left;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      color: #334155;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    /* Código */
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      background: var(--code-bg);
+      color: #e11d48;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #e2e8f0;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 16px 20px;
+      border-radius: 10px;
+      overflow-x: auto;
+      margin: 18px 0 24px 0;
+    }
+
+    pre code {
+      background: transparent;
+      color: #38bdf8;
+      padding: 0;
+      border: none;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    /* Alert Cards */
+    .alert-card {
+      margin: 20px 0 24px 0;
+      padding: 16px 20px;
+      border-radius: 8px;
+      border-left: 4px solid;
+      font-size: 14.5px;
+    }
+
+    .alert-note {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      color: #1e40af;
+    }
+
+    .alert-tip {
+      background: #f0fdf4;
+      border-color: #10b981;
+      color: #065f46;
+    }
+
+    .alert-important {
+      background: #fefce8;
+      border-color: #eab308;
+      color: #854d0e;
+    }
+
+    .alert-warning {
+      background: #fff7ed;
+      border-color: #f97316;
+      color: #9a3412;
+    }
+
+    .alert-caution {
+      background: #fef2f2;
+      border-color: #ef4444;
+      color: #991b1b;
+    }
+
+    .alert-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Imágenes */
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin: 14px 0;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.04);
+    }
+
+    /* Links */
+    a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    @media print {
+      .viewer-topbar { display: none; }
+      body { padding: 0; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="viewer-topbar">
+    <div class="doc-badge">EUROREP SAPI — POSTVENTA</div>
+    <div class="topbar-actions">
+      <button class="btn-action btn-print" onclick="window.print()">
+        🖨️ Imprimir
+      </button>
+      <a href="manual_cliente.pdf" download class="btn-action btn-pdf">
+        ⬇️ Descargar PDF
+      </a>
+    </div>
+  </div>
+
+  <div id="content">
+    <h1>Manual de Uso: Portal del Cliente (SAPI Postventa)</h1>
+<p>Esta guía te guiará paso a paso sobre cómo utilizar el <strong>Portal del Cliente de Eurorep</strong>, desde dónde podrás gestionar de forma autónoma las solicitudes de servicio para tus equipos, dar seguimiento a tus contratos de renta, consultar cotizaciones de SAP, adjuntar tus órdenes de compra, chatear con soporte en tiempo real y descargar tus hojas de servicio oficiales.</p>
+<hr>
+<h2>🔑 1. Acceso y Registro al Portal</h2>
+<p>El portal del cliente está disponible a través del navegador web en cualquier computadora, tableta o celular ingresando a la dirección provista por tu ejecutivo de Eurorep (ejemplo: <code>cliente.html</code> o la URL institucional).</p>
+<h3>Cómo registrarse (Si es tu primera vez):</h3>
+<ol>
+<li>En la pantalla de inicio del portal, haz clic en <strong>"Registrarse"</strong> o <strong>"Crear Cuenta"</strong>.</li>
+<li>Completa los siguientes campos obligatorios:</li>
+</ol>
+<ul>
+<li><strong>Nombre completo</strong>: Tu nombre y apellido de contacto.</li>
+<li><strong>Correo electrónico</strong>: Será tu usuario único para iniciar sesión.</li>
+<li><strong>Teléfono de contacto</strong>: Número directo o celular para urgencias operativas.</li>
+<li><strong>Empresa / Razón Social</strong>: Selecciona o escribe el nombre de la empresa a la que perteneces (este nombre debe coincidir con el registro en el sistema de Eurorep).</li>
+<li><strong>Contraseña</strong>: Define una contraseña segura de al menos 6 caracteres.</li>
+</ul>
+<ol>
+<li>Haz clic en <strong>"Registrarse"</strong>. Tu cuenta quedará creada en estado "Pendiente de Aprobación".</li>
+</ol>
+<div class="alert-card alert-note"><div class="alert-title">ℹ️ NOTA</div>Un administrador de Eurorep validará que pertenezcas a la empresa indicada y activará tu cuenta en un lapso máximo de 24 horas. Recibirás una notificación cuando tu acceso esté completamente habilitado.</div>
+<h3>Cómo iniciar sesión:</h3>
+<ol>
+<li>Escribe tu <strong>correo electrónico</strong> y <strong>contraseña</strong> registrados.</li>
+<li>Haz clic en <strong>"Iniciar Sesión"</strong>.</li>
+<li>Accederás de inmediato a tu Panel de Control (Dashboard).</li>
+</ol>
+<hr>
+<h2>📊 2. Panel Principal (Dashboard)</h2>
+<p>Al ingresar, verás un resumen ejecutivo de la actividad de tu parque de maquinaria y solicitudes activas:</p>
+<ul>
+<li><strong>Mis Equipos</strong>: Cantidad total de maquinaria propia registrada con Eurorep.</li>
+<li><strong>Rentas Activas</strong>: Cantidad de equipos en arrendamiento vigentes en tus diferentes obras y sitios.</li>
+<li><strong>Tickets Abiertos</strong>: Reportes de falla o solicitudes de mantenimiento que están siendo atendidos actualmente.</li>
+<li><strong>Servicios Realizados</strong>: Cantidad acumulada de mantenimientos preventivos y correctivos ejecutados con éxito.</li>
+<li><strong>Anillo de Salud de la Flota</strong>: Un indicador visual que clasifica tus equipos en tres estados operativos:</li>
+<li>🟢 <strong>Operativos / Al Día</strong>: Equipos con mantenimientos al corriente y sin incidencias.</li>
+<li>🟡 <strong>Mantenimiento Próximo</strong>: Equipos que se acercan a su ciclo de servicio preventivo por horas de trabajo (horómetro).</li>
+<li>🔴 <strong>Con Falla / Reporte Activo</strong>: Equipos con tickets abiertos en proceso de atención.</li>
+</ul>
+<hr>
+<h2>🚜 3. Mis Equipos (Control de Maquinaria Propia)</h2>
+<p>En el menú lateral, selecciona <strong>"Mis Equipos"</strong> para visualizar todo tu parque de maquinaria:</p>
+<ul>
+<li><strong>Tarjetas de Equipo</strong>: Cada máquina muestra su <strong>Número de Serie</strong>, <strong>Marca</strong>, <strong>Modelo</strong>, <strong>Ubicación actual (Sitio / Obra)</strong> y <strong>Último Horómetro Registrado</strong>.</li>
+<li><strong>Buscador Rápido</strong>: Puedes escribir el número de serie o modelo en la barra superior para localizar una máquina en segundos.</li>
+<li><strong>Reportar Falla Rápida</strong>:</li>
+</ul>
+<ol>
+<li>Localiza el equipo en la lista.</li>
+<li>Haz clic en el botón rojo <strong>"Reportar Falla"</strong> dentro de su tarjeta.</li>
+<li>El sistema abrirá automáticamente el formulario de creación de ticket con los datos del equipo y sitio ya precargados, ahorrándote tiempo de captura.</li>
+</ol>
+<hr>
+<h2>📑 4. Módulo de Rentas (Equipos en Arrendamiento)</h2>
+<p>Si cuentas con maquinaria en esquema de renta con Eurorep, puedes supervisarla desde la sección <strong>"Mis Rentas"</strong>:</p>
+<h3>Información disponible de cada renta:</h3>
+<ul>
+<li><strong>Equipo y Serie</strong>: Maquinaria asignada en arrendamiento.</li>
+<li><strong>Contrato y Vigencia</strong>: Fecha de inicio, fecha estimada de entrega y días restantes de contrato.</li>
+<li><strong>Sitio Asignado</strong>: Ubicación física y responsable en obra.</li>
+<li><strong>Estatus de la Renta</strong>: <em>Activa</em>, <em>Por Vencer</em>, <em>En Devolución</em> o <em>Finalizada</em>.</li>
+</ul>
+<h3>Hojas de Entrega (Check-in) y Devolución (Check-out):</h3>
+<ul>
+<li>Al recibir un equipo en obra, el técnico genera una hoja de entrega (<strong>Check-in</strong>) con la inspección física, horómetro inicial y fotografías de respaldo. Puedes consultarla y descargarla en PDF.</li>
+<li>Al finalizar el periodo de renta, puedes solicitar la recolección del equipo y el sistema generará el acta de recepción (<strong>Check-out</strong>) con el horómetro final y evaluación física.</li>
+</ul>
+<hr>
+<h2>📍 5. Sitios y Plantas (Control de Ubicaciones)</h2>
+<p>En la sección <strong>"Sitios"</strong>, puedes ver todas las plantas, minas, obras o almacenes registrados para tu empresa:</p>
+<ul>
+<li><strong>Dirección Completa y Referencias</strong>: Instrucciones de acceso para los técnicos de servicio.</li>
+<li><strong>Equipos por Sitio</strong>: Cantidad y listado de máquinas que se encuentran operando físicamente en cada ubicación.</li>
+<li><strong>Mapa de Sitios</strong>: Vista satelital e interactiva de tus diferentes frentes de trabajo.</li>
+</ul>
+<hr>
+<h2>🎫 6. Cómo Reportar una Falla o Solicitar Servicio (Crear un Ticket)</h2>
+<p>Si requieres asistencia técnica, cotización de refacciones o mantenimiento preventivo, sigue estos sencillos pasos:</p>
+<ol>
+<li>Ve a la sección <strong>"Tickets"</strong> en el menú lateral.</li>
+<li>Haz clic en el botón <strong>"Nuevo Ticket"</strong> (esquina superior derecha).</li>
+<li>Completa el formulario de solicitud:</li>
+</ol>
+<ul>
+<li><strong>Asunto</strong>: Título descriptivo breve (ej. <em>"Fuga de aceite en cilindro de elevación"</em>).</li>
+<li><strong>Sitio / Ubicación</strong>: Selecciona la obra o planta donde se encuentra la máquina.</li>
+<li><strong>Equipo / Maquinaria</strong>: Elige el número de serie o modelo de tu lista de equipos.</li>
+<li><strong>Horómetro Actual</strong>: Ingresa las horas que marca el horómetro físico del equipo (indispensable para programar los kits de servicio adecuados).</li>
+<li><strong>Categoría</strong>: Selecciona el tipo de solicitud:</li>
+<li><em>Servicio Correctivo</em> (Falla o avería).</li>
+<li><em>Servicio Preventivo</em> (Servicio programado de 250h, 500h o 1000h).</li>
+<li><em>Refacciones</em> (Solicitud de piezas de repuesto).</li>
+<li><em>Garantía</em> (Reclamación amparada por garantía de equipo nuevo).</li>
+<li><strong>Prioridad</strong>: Selecciona el nivel de urgencia (<em>Baja</em>, <em>Media</em>, <em>Alta</em>, <em>Crítica</em>).</li>
+<li><strong>Descripción</strong>: Explica detalladamente los síntomas, mensajes de error en panel o piezas requeridas.</li>
+<li><strong>Adjuntar Evidencia Fotográfica</strong>: Sube fotos legibles del problema o del componente dañado directamente desde tu celular o computadora.</li>
+</ul>
+<ol>
+<li>Haz clic en <strong>"Enviar Solicitud"</strong>.</li>
+<li>El sistema generará un número de folio único (ej. <code>T-26012</code>) y notificará al equipo de postventa de Eurorep.</li>
+</ol>
+<hr>
+<h2>📋 7. Seguimiento, Cotizaciones SAP y Órdenes de Compra</h2>
+<p>En la sección <strong>"Tickets"</strong> podrás consultar el avance de cada una de tus solicitudes:</p>
+<h3>1. Chat de Seguimiento del Ticket:</h3>
+<ul>
+<li>Abre cualquier ticket para comunicarte directamente con el coordinador de Eurorep mediante la caja de comentarios.</li>
+<li>Podrás enviar mensajes, resolver dudas técnicas y acordar fechas de visita.</li>
+</ul>
+<h3>2. Aprobación de Cotizaciones SAP:</h3>
+<p>Cuando un requerimiento implique refacciones o servicios con costo:</p>
+<ol>
+<li>El equipo comercial de Eurorep subirá la <strong>Cotización Oficial de SAP Business One</strong> en PDF.</li>
+<li>Verás en pantalla el importe total cotizado y el botón para abrir el PDF.</li>
+<li>Dispondrás de dos botones de acción:</li>
+</ol>
+<ul>
+<li><strong>Aceptar Cotización</strong>: Autoriza la cotización para proceder con la liberación de refacciones y programación del servicio.</li>
+<li><strong>Rechazar Cotización</strong>: Si no estás conforme, presiona este botón y escribe obligatoriamente el motivo del rechazo para que el área comercial revise alternativas.</li>
+</ul>
+<h3>3. Adjuntar Orden de Compra (OC) y Comprobante de Pago:</h3>
+<ul>
+<li>Una vez aceptada la cotización, puedes adjuntar el archivo PDF de tu <strong>Orden de Compra interna (OC)</strong> o el comprobante de transferencia bancaria directamente en el ticket, agilizando el despacho de refacciones.</li>
+</ul>
+<hr>
+<h2>📝 8. Hojas de Servicio (Órdenes de Servicio)</h2>
+<p>Cada vez que un técnico de Eurorep realiza una intervención técnica en tu obra o taller, se genera una <strong>Orden de Servicio</strong> digital:</p>
+<ol>
+<li>Ingresa a la sección <strong>"Órdenes de Servicio"</strong> en el menú lateral.</li>
+<li>Podrás consultar el listado histórico de intervenciones con su estatus (<em>En Proceso</em>, <em>Completado</em>).</li>
+<li>Haz clic sobre cualquier orden para ver:</li>
+</ol>
+<ul>
+<li>Horas de trabajo y traslado del técnico.</li>
+<li>Bitácora detallada de las maniobras realizadas.</li>
+<li>Refacciones de catálogo instaladas.</li>
+<li>Fotografías de antes y después del servicio.</li>
+<li>Firma digital de conformidad recabada en obra.</li>
+</ul>
+<ol>
+<li>Haz clic en <strong>"Descargar PDF"</strong> para obtener el documento oficial de servicio para tu control interno contable y de auditoría.</li>
+</ol>
+<hr>
+<h2>💬 9. Soporte y Atención en Línea</h2>
+<p>Si requieres resolver dudas generales o comunicarte con administración sin abrir un ticket de falla:</p>
+<ul>
+<li>Ve a la sección <strong>"Soporte"</strong> en el menú lateral.</li>
+<li>Inicia una conversación por chat en tiempo real con nuestro equipo de atención a clientes.</li>
+</ul>
+<hr>
+<h2>⚙️ 10. Preferencias y Personalización</h2>
+<p>En la sección <strong>"Preferencias"</strong>:</p>
+<ul>
+<li><strong>Tema Visual</strong>: Puedes alternar entre <strong>Modo Oscuro</strong> y <strong>Modo Claro</strong> según tu preferencia visual.</li>
+<li><strong>Descarga de Manual</strong>: Descarga esta guía oficial en formato PDF en cualquier momento para tu equipo de trabajo.</li>
+</ul>
+  </div>
+</body>
+</html>

@@ -6,7 +6,7 @@
   const originalSetItem = Storage.prototype.setItem;
   const originalRemoveItem = Storage.prototype.removeItem;
   const originalClear = Storage.prototype.clear;
-  const redirectedKeys = ['sapi_tickets', 'sapi_ordenes', 'sapi_levantamientos'];
+  const redirectedKeys = ['sapi_refacciones_db', 'eurorep_pedidos_sap', 'eurorep_cotizaciones_sap', 'sapi_tickets', 'sapi_ordenes', 'sapi_levantamientos', 'sapi_sync_queue'];
   let sharedDb = null;
   const pendingWrites = new Map();
 
@@ -14,20 +14,24 @@
     if (sharedDb) return Promise.resolve(sharedDb);
     return new Promise((resolve) => {
       if (typeof indexedDB === 'undefined') return resolve(null);
-      const req = indexedDB.open('SapiOfflineDB', 2);
-      req.onupgradeneeded = (e) => {
-        const db = e.target.result;
-        if (!db.objectStoreNames.contains('catalogs')) {
-          db.createObjectStore('catalogs', { keyPath: 'id' });
-        }
-      };
-      req.onsuccess = (e) => {
-        sharedDb = e.target.result;
-        sharedDb.onclose = () => { sharedDb = null; };
-        sharedDb.onerror = () => { sharedDb = null; };
-        resolve(sharedDb);
-      };
-      req.onerror = () => resolve(null);
+      try {
+        const req = indexedDB.open('SapiOfflineDB', 2);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('catalogs')) {
+            db.createObjectStore('catalogs', { keyPath: 'id' });
+          }
+        };
+        req.onsuccess = (e) => {
+          sharedDb = e.target.result;
+          sharedDb.onclose = () => { sharedDb = null; };
+          sharedDb.onerror = () => { sharedDb = null; };
+          resolve(sharedDb);
+        };
+        req.onerror = () => resolve(null);
+      } catch (err) {
+        resolve(null);
+      }
     });
   }
 
@@ -59,47 +63,52 @@
       }
       getSharedDb().then((db) => {
         if (!db) return resolve();
-        const tx = db.transaction('catalogs', 'readonly');
-        const store = tx.objectStore('catalogs');
-        let completed = 0;
-        
-        redirectedKeys.forEach(key => {
-          const req = store.get(key);
-          req.onsuccess = () => {
-            if (req.result && req.result.data) {
-              window.localStorageCache[key] = JSON.stringify(req.result.data);
-              originalRemoveItem.call(localStorage, key);
-            } else {
-              // MIGRACIÓN: Si existe en localStorage real pero no en IndexedDB
-              const localVal = originalGetItem.call(localStorage, key);
-              if (localVal) {
-                window.localStorageCache[key] = localVal;
-                try {
-                  const txWrite = db.transaction('catalogs', 'readwrite');
-                  const storeWrite = txWrite.objectStore('catalogs');
-                  storeWrite.put({ id: key, data: JSON.parse(localVal) });
-                  originalRemoveItem.call(localStorage, key);
-                  console.log(`[Bridge Migration] Migrado ${key} a IndexedDB y liberado localStorage.`);
-                } catch (e) {
-                  console.error(`[Bridge Migration] Error migrando ${key}:`, e);
+        try {
+          const tx = db.transaction('catalogs', 'readonly');
+          const store = tx.objectStore('catalogs');
+          let completed = 0;
+          
+          redirectedKeys.forEach(key => {
+            const req = store.get(key);
+            req.onsuccess = () => {
+              if (req.result && req.result.data) {
+                window.localStorageCache[key] = JSON.stringify(req.result.data);
+                originalRemoveItem.call(localStorage, key);
+              } else {
+                // MIGRACIÓN: Si existe en localStorage real pero no en IndexedDB
+                const localVal = originalGetItem.call(localStorage, key);
+                if (localVal) {
+                  window.localStorageCache[key] = localVal;
+                  try {
+                    const txWrite = db.transaction('catalogs', 'readwrite');
+                    const storeWrite = txWrite.objectStore('catalogs');
+                    storeWrite.put({ id: key, data: JSON.parse(localVal) });
+                    originalRemoveItem.call(localStorage, key);
+                    console.log(`[Bridge Migration] Migrado ${key} a IndexedDB y liberado localStorage.`);
+                  } catch (e) {
+                    console.error(`[Bridge Migration] Error migrando ${key}:`, e);
+                  }
                 }
               }
-            }
-            completed++;
-            if (completed === redirectedKeys.length) {
-              window.localStorageCacheLoaded = true;
-              resolve();
-            }
-          };
-          req.onerror = () => {
-            completed++;
-            if (completed === redirectedKeys.length) {
-              window.localStorageCacheLoaded = true;
-              resolve();
-            }
-          };
-        });
-      });
+              completed++;
+              if (completed === redirectedKeys.length) {
+                window.localStorageCacheLoaded = true;
+                resolve();
+              }
+            };
+            req.onerror = () => {
+              completed++;
+              if (completed === redirectedKeys.length) {
+                window.localStorageCacheLoaded = true;
+                resolve();
+              }
+            };
+          });
+        } catch (txErr) {
+          console.warn('[IndexedDB Bridge] Advertencia abriendo store catalogs:', txErr);
+          resolve();
+        }
+      }).catch(() => resolve());
     });
   };
 
@@ -125,7 +134,11 @@
       }
       return;
     }
-    return originalSetItem.call(this, key, value);
+    try {
+      return originalSetItem.call(this, key, value);
+    } catch (quotaErr) {
+      console.warn('[LocalStorage] Advertencia: Cuota de almacenamiento excedida para ' + key + ':', quotaErr?.message);
+    }
   };
 
   Storage.prototype.removeItem = function(key) {

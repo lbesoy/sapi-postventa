@@ -1163,6 +1163,11 @@
           index++;
           loadNext();
         };
+        s.onerror = function(err) {
+          console.error('[Script Loader Cliente] Error al cargar recurso:', scripts[index], err);
+          index++;
+          loadNext();
+        };
         document.body.appendChild(s);
       }
       loadNext();

@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual del Técnico de Campo y Taller — Eurorep SAPI</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --secondary: #475569;
+      --bg: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --card-bg: #f8fafc;
+      --code-bg: #f1f5f9;
+      --accent: #f59e0b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --purple: #8b5cf6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+      padding: 24px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* Top Floating / Header Bar */
+    .viewer-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 24px;
+      position: sticky;
+      top: 12px;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+      backdrop-filter: blur(8px);
+    }
+
+    .doc-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 9999px;
+      background: #e0f2fe;
+      color: #0369a1;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+
+    .btn-pdf {
+      background: var(--primary);
+      color: #ffffff;
+      border: 1px solid var(--primary);
+    }
+    .btn-pdf:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-print {
+      background: #ffffff;
+      color: var(--secondary);
+      border: 1px solid var(--border);
+    }
+    .btn-print:hover {
+      background: #f1f5f9;
+      color: var(--text);
+    }
+
+    /* Content Typography */
+    #content {
+      margin-top: 10px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-top: 10px;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 3px solid var(--primary);
+      letter-spacing: -0.5px;
+    }
+
+    h2 {
+      font-size: 21px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 36px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1.5px solid var(--border);
+    }
+
+    h3 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #334155;
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+
+    h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #475569;
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin-bottom: 16px;
+      color: #334155;
+    }
+
+    strong {
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+
+    ul, ol {
+      margin-top: 8px;
+      margin-bottom: 18px;
+      padding-left: 28px;
+      color: #334155;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    /* Tablas */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0 28px 0;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+      text-align: left;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      color: #334155;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    /* Código */
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      background: var(--code-bg);
+      color: #e11d48;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #e2e8f0;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 16px 20px;
+      border-radius: 10px;
+      overflow-x: auto;
+      margin: 18px 0 24px 0;
+    }
+
+    pre code {
+      background: transparent;
+      color: #38bdf8;
+      padding: 0;
+      border: none;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    /* Alert Cards */
+    .alert-card {
+      margin: 20px 0 24px 0;
+      padding: 16px 20px;
+      border-radius: 8px;
+      border-left: 4px solid;
+      font-size: 14.5px;
+    }
+
+    .alert-note {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      color: #1e40af;
+    }
+
+    .alert-tip {
+      background: #f0fdf4;
+      border-color: #10b981;
+      color: #065f46;
+    }
+
+    .alert-important {
+      background: #fefce8;
+      border-color: #eab308;
+      color: #854d0e;
+    }
+
+    .alert-warning {
+      background: #fff7ed;
+      border-color: #f97316;
+      color: #9a3412;
+    }
+
+    .alert-caution {
+      background: #fef2f2;
+      border-color: #ef4444;
+      color: #991b1b;
+    }
+
+    .alert-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Imágenes */
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin: 14px 0;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.04);
+    }
+
+    /* Links */
+    a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    @media print {
+      .viewer-topbar { display: none; }
+      body { padding: 0; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="viewer-topbar">
+    <div class="doc-badge">EUROREP SAPI — POSTVENTA</div>
+    <div class="topbar-actions">
+      <button class="btn-action btn-print" onclick="window.print()">
+        🖨️ Imprimir
+      </button>
+      <a href="manual_tecnico.pdf" download class="btn-action btn-pdf">
+        ⬇️ Descargar PDF
+      </a>
+    </div>
+  </div>
+
+  <div id="content">
+    <h1>Manual de Uso: Técnico de Campo y Taller (SAPI Postventa)</h1>
+<p>Esta guía te explicará detalladamente cómo utilizar la plataforma <strong>SAPI Postventa</strong> en tu dispositivo móvil o tableta durante tus servicios de campo, inspecciones de renta y diagnósticos en taller, incluso cuando trabajes en zonas remotas, minas o sótanos <strong>sin conexión a internet</strong>.</p>
+<hr>
+<h2>📱 1. Acceso e Instalación de la Aplicación en tu Celular (PWA)</h2>
+<p>La plataforma está diseñada como una Aplicación Web Progresiva (PWA) optimizada para dispositivos móviles:</p>
+<ol>
+<li>Abre el navegador web en tu celular (Google Chrome en Android o Safari en iPhone/iPad).</li>
+<li>Ingresa a la dirección del portal provista por tu supervisor.</li>
+<li>Inicia sesión con tu correo institucional y contraseña.</li>
+</ol>
+<div class="alert-card alert-tip"><div class="alert-title">💡 CONSEJO PRÁCTICO</div><strong>Instálala como aplicación nativa en tu pantalla de inicio</strong>:
+<em> <strong>En Android (Chrome)</strong>: Toca el menú de tres puntos (arriba a la derecha) y presiona <strong>"Instalar aplicación"</strong> o <strong>"Agregar a la pantalla principal"</strong>.
+</em> <strong>En iOS / iPhone (Safari)</strong>: Toca el botón de Compartir (icono cuadrado con flecha hacia arriba) y selecciona <strong>"Agregar al inicio"</strong>.
+De esta manera tendrás un acceso directo en tu celular que abrirá a pantalla completa y almacenará datos de forma ultrarrápida.</div>
+<hr>
+<h2>📶 2. Preparación Obligatoria Offline (¡Antes de Salir al Servicio!)</h2>
+<div class="alert-card alert-important"><div class="alert-title">⚠️ IMPORTANTE</div><strong>PROTOCOLO DE PRECARGA EN TALLER</strong>:
+Si vas a viajar a una obra, mina, sótano o carretera donde la cobertura celular sea nula o inestable:
+1. <strong>Mientras sigues en el taller o tengas conexión Wi-Fi/4G estable</strong>, abre la aplicación en tu celular.
+2. Entra a la sección <strong>"Órdenes de Servicio"</strong> y abre cada una de las órdenes que tengas asignadas para tu jornada o viaje.
+3. Al abrir la orden con señal, el sistema descarga automáticamente a la base de datos interna de tu teléfono (IndexedDB / LocalStorage) los datos del cliente, la máquina, el historial de fallas y el catálogo completo de refacciones de SAP.
+4. <strong>Si no precargas la orden con internet antes de salir</strong>: Al llegar a la obra sin señal no podrás abrir el formato de servicio ni registrar tu reporte técnico.</div>
+<hr>
+<h2>📅 3. Mi Agenda (Calendario de Actividades)</h2>
+<p>En la sección <strong>"Calendario"</strong> verás tus actividades y servicios organizados:</p>
+<ul>
+<li><strong>Servicios de Campo (Órdenes)</strong>: Días y horas estimadas de tus mantenimientos. Al tocar el evento podrás ver la dirección de la obra y el contacto del cliente.</li>
+<li><strong>Inspecciones (Levantamientos y Rentas)</strong>: Revisiones técnicas o entregas de maquinaria.</li>
+<li><strong>Eventos Administrativos</strong>: Juntas de equipo, capacitaciones, descansos y periodos de vacaciones programados.</li>
+</ul>
+<hr>
+<h2>🛠️ 4. Flujo Operativo de la Orden de Servicio en Campo (Paso a Paso)</h2>
+<p>El flujo de trabajo técnico es obligatorio y debe completarse con precisión para garantizar la validez del reporte:</p>
+<pre><code class="language-">[Foto de Entrada] ➔ [Bitácora Diaria] ➔ [Checklist 15 Puntos] ➔ [Horómetro] ➔ [Refacciones SAP] ➔ [Foto de Salida] ➔ [Firmas]</code></pre>
+<hr>
+<h3>Paso 4.1: ¡Lo Primero al Llegar! Evidencia Inicial (Foto de Entrada)</h3>
+<div class="alert-card alert-important"><div class="alert-title">⚠️ IMPORTANTE</div><strong>Antes de tocar la máquina, desarmar componentes o iniciar cualquier maniobra</strong>:
+1. Abre el detalle de la <strong>Orden de Servicio</strong> en tu celular.
+2. Desplázate a la sección <strong>"Evidencias Fotográficas"</strong>.
+3. Toca en la tarjeta <strong>"Foto de Inicio (Entrada)"</strong> y haz clic en <strong>"Cargar Foto"</strong>.
+4. Toma la fotografía que muestre el estado general y físico en que recibes el equipo en obra.</div>
+<hr>
+<h3>Paso 4.2: Registro de Bitácora Diaria y Tiempos de Traslado</h3>
+<p>Al terminar la jornada de cada día (incluso si el servicio dura varios días y aún no se concluye):</p>
+<ol>
+<li>En la orden, ve a la sección <strong>"Bitácora Diaria"</strong> y toca <strong>"Registrar Avance Diario"</strong>.</li>
+<li>Completa los campos:</li>
+</ol>
+<ul>
+<li><strong>Resumen del Avance</strong>: Describe detalladamente las maniobras efectuadas en el día (ej. <em>"Se desmontó bomba principal, se limpiaron líneas y se cambiaron sellos desgastados"</em>).</li>
+<li><strong>Hora de Entrada / Salida</strong>: Hora exacta de inicio y fin de labores en el sitio.</li>
+<li><strong>Horas de Traslado (Ida y Vuelta)</strong>: Horas invertidas en el traslado hacia y desde la obra.</li>
+</ul>
+<ol>
+<li>Guarda la nota. La información se sumará automáticamente a tu reporte semanal de horas laboradas.</li>
+</ol>
+<hr>
+<h3>Paso 4.3: Checklist Técnico de 15 Puntos de Inspección</h3>
+<p>Durante el servicio debes realizar la inspección técnica preventiva de 15 puntos clave del equipo:</p>
+<ol>
+<li><strong>Nivel de Aceite de Motor</strong>.</li>
+<li><strong>Nivel de Líquido Refrigerante / Anticongelante</strong>.</li>
+<li><strong>Nivel de Aceite Hidráulico</strong>.</li>
+<li><strong>Filtros de Aire (Primario y Secundario)</strong>.</li>
+<li><strong>Filtros de Combustible y Trampa de Agua</strong>.</li>
+<li><strong>Estado de Mangueras y Conexiones Hidráulicas</strong>.</li>
+<li><strong>Detección de Fugas Visibles de Fluidos</strong>.</li>
+<li><strong>Estado y Carga de la Batería / Bornes</strong>.</li>
+<li><strong>Sistema Eléctrico y Luces de Trabajo</strong>.</li>
+<li><strong>Presión y Desgaste de Neumáticos / Orugas</strong>.</li>
+<li><strong>Mandos, Palancas y Joysticks de Control</strong>.</li>
+<li><strong>Sistemas de Seguridad y Paro de Emergencia</strong>.</li>
+<li><strong>Estructura, Chasis y Pasadores de Articulación</strong>.</li>
+<li><strong>Engrase General de Puntos de Pivote</strong>.</li>
+<li><strong>Limpieza General del Compartimento de Motor</strong>.</li>
+</ol>
+<p>Marca el estado de cada punto (<em>Correcto</em>, <em>Atención Requerida</em>, <em>No Aplica</em>) e incluye comentarios si detectas anomalías.</p>
+<hr>
+<h3>Paso 4.4: Horómetro Real y Ciclos de Mantenimiento Preventivo</h3>
+<ol>
+<li><strong>Lectura del Horómetro Físico</strong>: Captura el número exacto de horas acumuladas que marca el contador del horómetro de la máquina.</li>
+<li><strong>Foto de Respaldo</strong>: Sube una foto nítida del display o reloj del horómetro.</li>
+<li><strong>Cálculo de Ciclos</strong>: El sistema registrará el horómetro para programar automáticamente las alertas de los ciclos de mantenimiento preventivo subsecuentes (250h, 500h, 1000h, 2000h).</li>
+</ol>
+<hr>
+<h3>Paso 4.5: Consumo de Refacciones y Solicitud de Piezas Faltantes</h3>
+<h4>A. Refacciones Utilizadas (Consumidas en sitio):</h4>
+<ol>
+<li>En la sección <strong>"Refacciones Utilizadas"</strong>, presiona <strong>"+ Agregar Refacción"</strong>.</li>
+<li>Utiliza el buscador en tiempo real para localizar la pieza por código o descripción en el catálogo oficial de SAP.</li>
+<li>Ingresa la <strong>Cantidad</strong> instalada y confirma. Estas piezas se descontarán automáticamente del inventario.</li>
+</ol>
+<h4>B. Refacciones Necesarias (Piezas Faltantes para Futura Reparación):</h4>
+<ul>
+<li>Si durante la inspección detectas que la máquina requiere piezas adicionales que no llevabas en tu unidad móvil, agrégalas en <strong>"Refacciones Necesarias"</strong>.</li>
+<li>> [!NOTE]</li>
+</ul>
+<blockquote>Al registrar refacciones necesarias, el sistema generará automáticamente un <strong>Ticket-A de Refacciones</strong> para que el área de administración y ventas cotice las piezas al cliente y programe una segunda visita.</blockquote>
+<hr>
+<h3>Paso 4.6: Evidencias Fotográficas Finales (Foto de Salida)</h3>
+<ol>
+<li>Ve a <strong>"Evidencias Fotográficas"</strong>.</li>
+<li>En la tarjeta <strong>"Foto de Fin (Salida)"</strong>, sube la fotografía del equipo reparado, limpio y listo para operar.</li>
+<li>Agrega fotos adicionales de los componentes reemplazados o piezas dañadas en <strong>"Fotos Adicionales"</strong>.</li>
+</ol>
+<hr>
+<h3>Paso 4.7: Firmas Digitales de Conformidad y Cierre</h3>
+<p>Una vez completados todos los apartados anteriores:</p>
+<ol>
+<li>Dirígete a la sección <strong>"Firmas de Conformidad"</strong>.</li>
+<li>Escribe el <strong>Nombre Completo</strong> y <strong>Cargo / Puesto</strong> del encargado del cliente en obra.</li>
+<li>Pídele que dibuje su firma de aceptación con el dedo sobre el recuadro blanco de la pantalla.</li>
+<li>Escribe tu nombre de técnico y plasma tu propia firma digital en el recuadro correspondiente.</li>
+<li>Haz clic en <strong>"Finalizar y Cerrar Orden"</strong>. El estatus pasará a <strong>Completado</strong>.</li>
+</ol>
+<hr>
+<h2>📑 5. Levantamientos Técnicos e Inspección de Rentas (Check-in / Check-out)</h2>
+<p>Si acudes a una obra a entregar o recibir una máquina en renta:</p>
+<ul>
+<li><strong>Check-in (Entrega)</strong>: Llena la hoja de inspección, anota el horómetro y combustible de inicio, toma las fotografías perimetrales y recaba la firma de recepción del cliente.</li>
+<li><strong>Check-out (Devolución)</strong>: Realiza la revisión final, captura el horómetro de entrega, registra posibles daños o componentes faltantes y recaba la firma de entrega.</li>
+</ul>
+<hr>
+<h2>💵 6. Control de Gastos y Viáticos en Campo</h2>
+<p>Para registrar tus consumos durante el viaje de servicio:</p>
+<ol>
+<li>Entra a la sección <strong>"Control de Gastos"</strong>.</li>
+<li>Toca en <strong>"Registrar Gasto"</strong>.</li>
+<li>Captura la fecha, concepto (<em>Gasolina</em>, <em>Casetas</em>, <em>Comidas</em>, <em>Hotel</em>), monto exacto y toma una foto clara del ticket de compra.</li>
+<li>Si cuentas con factura electrónica (archivos XML o PDF), puedes subirlos directamente desde tu celular en la pestaña <strong>"Subir Facturas"</strong>.</li>
+<li>Si utilizas la tarjeta corporativa <strong>Clara</strong>, entra a <strong>"Transacciones Clara"</strong>, busca el cargo y presiona <strong>"Comprobar"</strong> adjuntando el ticket o factura.</li>
+</ol>
+<hr>
+<h2>🔄 7. Indicadores Visuales y Sincronización Fuera de Línea</h2>
+<p>Cuando trabajes sin señal de internet:</p>
+<ul>
+<li><strong>Nube Amarilla Tachada (<code>cloud-off</code>)</strong>: Indica que tus bitácoras, fotos, firmas o refacciones están guardadas de forma 100% segura en la memoria local de tu teléfono, pero pendientes de subirse al servidor.</li>
+<li><strong>Nube Verde (<code>cloud-check</code>)</strong>: Indica que todos tus datos ya fueron transferidos con éxito a la nube de Supabase.</li>
+<li><strong>Forzar Sincronización Manual</strong>:</li>
+</ul>
+<ol>
+<li>Al regresar a una zona con señal o Wi-Fi, toca el <strong>icono de conexión</strong> en la barra superior.</li>
+<li>Se abrirá la ventana <strong>"Cambios Pendientes de Sincronizar"</strong>.</li>
+<li>Presiona el botón <strong>"Intentar Sincronizar Ahora"</strong>.</li>
+<li>La lista se procesará y quedará vacía con el estatus en color verde.</li>
+</ol>
+<ul>
+<li>> [!CAUTION]</li>
+</ul>
+<blockquote><strong>Nunca borres el historial ni los datos del navegador de tu teléfono</strong> si tienes cambios pendientes con la nube amarilla, para evitar la pérdida accidental de evidencias no sincronizadas.</blockquote>
+  </div>
+</body>
+</html>

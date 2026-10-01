@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual de Flujo Completo del Sistema — Eurorep SAPI</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --secondary: #475569;
+      --bg: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --card-bg: #f8fafc;
+      --code-bg: #f1f5f9;
+      --accent: #f59e0b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --purple: #8b5cf6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+      padding: 24px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* Top Floating / Header Bar */
+    .viewer-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 24px;
+      position: sticky;
+      top: 12px;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+      backdrop-filter: blur(8px);
+    }
+
+    .doc-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 9999px;
+      background: #e0f2fe;
+      color: #0369a1;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+
+    .btn-pdf {
+      background: var(--primary);
+      color: #ffffff;
+      border: 1px solid var(--primary);
+    }
+    .btn-pdf:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-print {
+      background: #ffffff;
+      color: var(--secondary);
+      border: 1px solid var(--border);
+    }
+    .btn-print:hover {
+      background: #f1f5f9;
+      color: var(--text);
+    }
+
+    /* Content Typography */
+    #content {
+      margin-top: 10px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-top: 10px;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 3px solid var(--primary);
+      letter-spacing: -0.5px;
+    }
+
+    h2 {
+      font-size: 21px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 36px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1.5px solid var(--border);
+    }
+
+    h3 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #334155;
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+
+    h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #475569;
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin-bottom: 16px;
+      color: #334155;
+    }
+
+    strong {
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+
+    ul, ol {
+      margin-top: 8px;
+      margin-bottom: 18px;
+      padding-left: 28px;
+      color: #334155;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    /* Tablas */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0 28px 0;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+      text-align: left;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      color: #334155;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    /* Código */
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      background: var(--code-bg);
+      color: #e11d48;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #e2e8f0;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 16px 20px;
+      border-radius: 10px;
+      overflow-x: auto;
+      margin: 18px 0 24px 0;
+    }
+
+    pre code {
+      background: transparent;
+      color: #38bdf8;
+      padding: 0;
+      border: none;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    /* Alert Cards */
+    .alert-card {
+      margin: 20px 0 24px 0;
+      padding: 16px 20px;
+      border-radius: 8px;
+      border-left: 4px solid;
+      font-size: 14.5px;
+    }
+
+    .alert-note {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      color: #1e40af;
+    }
+
+    .alert-tip {
+      background: #f0fdf4;
+      border-color: #10b981;
+      color: #065f46;
+    }
+
+    .alert-important {
+      background: #fefce8;
+      border-color: #eab308;
+      color: #854d0e;
+    }
+
+    .alert-warning {
+      background: #fff7ed;
+      border-color: #f97316;
+      color: #9a3412;
+    }
+
+    .alert-caution {
+      background: #fef2f2;
+      border-color: #ef4444;
+      color: #991b1b;
+    }
+
+    .alert-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Imágenes */
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin: 14px 0;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.04);
+    }
+
+    /* Links */
+    a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    @media print {
+      .viewer-topbar { display: none; }
+      body { padding: 0; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="viewer-topbar">
+    <div class="doc-badge">EUROREP SAPI — POSTVENTA</div>
+    <div class="topbar-actions">
+      <button class="btn-action btn-print" onclick="window.print()">
+        🖨️ Imprimir
+      </button>
+      <a href="manual_flujo_completo.pdf" download class="btn-action btn-pdf">
+        ⬇️ Descargar PDF
+      </a>
+    </div>
+  </div>
+
+  <div id="content">
+    <h1>Manual de Flujo Completo del Sistema (SAPI Postventa)</h1>
+<p>Este manual documenta de forma exhaustiva el <strong>ciclo de vida completo end-to-end</strong> de un requerimiento técnico o contrato de renta dentro de la plataforma <strong>SAPI Postventa (Eurorep CRM)</strong>, detallando la interacción coordinada entre el <strong>Cliente</strong>, la <strong>Mesa de Ayuda Comercial</strong>, la <strong>Coordinación Operativa</strong>, los <strong>Técnicos de Campo</strong>, el departamento de <strong>Contabilidad / Nómina</strong> y la integración automatizada con <strong>Supabase</strong>, <strong>Microsoft OneDrive</strong> y <strong>SAP Business One</strong>.</p>
+<hr>
+<h2>🔄 1. Mapa General del Flujo de Trabajo End-to-End</h2>
+<p>El ciclo operativo de SAPI sigue una secuencia estructurada y validada para garantizar la calidad en el servicio, la disponibilidad del parque de maquinaria y la precisión fiscal y contable:</p>
+<pre><code class="language-">[1. Requerimiento / Renta] ➔ [2. Cotización SAP] ➔ [3. Autorización y OC] ➔ [4. Calendario]
+                                                                                │
+                                                                                ▼
+[8. OneDrive &amp; SAP B1] ◄── [7. Control Gastos] ◄── [6. Ejecución Campo] ◄── [5. Carga Offline]
+        │
+        ▼
+[9. Tickets-A de Refacciones de Campo]</code></pre>
+<hr>
+<h2>📱 2. Las 8 Fases del Ciclo Operativo</h2>
+<hr>
+<h3>Fase 1: Entrada de Requerimiento (Cliente o Mesa de Ayuda)</h3>
+<p>Todo servicio inicia con la detección de una necesidad operativa por dos vías:</p>
+<ul>
+<li><strong>Vía A: Ticket de Soporte Técnico</strong>:</li>
+</ul>
+<ol>
+<li>El cliente entra a su portal (<code>cliente.html</code>) o el coordinador atiende una llamada en la oficina.</li>
+<li>Se selecciona la <strong>Maquinaria</strong>, la <strong>Ubicación (Sitio/Obra)</strong> y se captura el <strong>Horómetro Actual</strong>.</li>
+<li>Se define la categoría (<em>Correctivo</em>, <em>Preventivo</em>, <em>Refacciones</em>, <em>Garantía</em>) y se suben fotos de la falla.</li>
+<li>El ticket se guarda con estatus <strong>Reportado</strong>.</li>
+</ol>
+<ul>
+<li><strong>Vía B: Contrato de Renta de Maquinaria</strong>:</li>
+</ul>
+<ol>
+<li>La administración genera el contrato de arrendamiento vinculando el cliente, sitio y equipo disponible.</li>
+<li>Se programa la entrega y se emite la hoja de inspección inicial (<strong>Check-in</strong>).</li>
+</ol>
+<hr>
+<h3>Fase 2: Diagnóstico y Cotización Comercial en SAP B1</h3>
+<p>Antes de enviar personal a campo (a excepción de diagnósticos de urgencia):</p>
+<ol>
+<li>El equipo técnico y comercial evalúa las piezas requeridas y tiempos estimados.</li>
+<li>Se elabora la <strong>Cotización de Venta en SAP Business One</strong>.</li>
+<li>En la ficha del ticket en SAPI, el administrador vincula el número de cotización sincronizado, captura el monto y sube el PDF comercial oficial.</li>
+<li>El ticket cambia a estatus <strong>Cotizado</strong> y se envía una notificación al portal del cliente.</li>
+</ol>
+<hr>
+<h3>Fase 3: Autorización del Cliente, Carga de OC y Generación de Pedido SAP</h3>
+<ol>
+<li>El cliente revisa la cotización y los conceptos desglosados en su portal.</li>
+<li>Si está de acuerdo, presiona el botón <strong>"Aceptar Cotización"</strong> y el ticket pasa a estatus <strong>En Proceso</strong>.</li>
+<li>El cliente puede adjuntar de forma inmediata el PDF de su <strong>Orden de Compra interna (OC)</strong> o el comprobante de transferencia bancaria.</li>
+<li>Con esta aprobación, la administración ingresa a SAP Business One y genera el <strong>Pedido de Venta (Sales Order)</strong> para apartar las refacciones en almacén.</li>
+<li>El administrador vincula el número de pedido y su PDF en el ticket, avanzando a estatus <strong>Orden de Servicio</strong>.</li>
+</ol>
+<hr>
+<h3>Fase 4: Programación y Asignación en el Calendario Operativo</h3>
+<ol>
+<li>El coordinador abre el <strong>Calendario Operativo</strong> en SAPI.</li>
+<li>Selecciona la fecha y asigna a uno o más técnicos de campo.</li>
+<li>Vincula la <strong>Orden de Servicio (OS)</strong> y el Ticket liberado.</li>
+<li>El sistema notifica al técnico y coloca el servicio en su agenda móvil personal.</li>
+</ol>
+<hr>
+<h3>Fase 5: Preparación y Descarga Offline (¡OBLIGATORIO ANTES DE SALIR!)</h3>
+<div class="alert-card alert-important"><div class="alert-title">⚠️ IMPORTANTE</div><strong>Protocolo de Precarga en Taller</strong>:
+Si el técnico se trasladará a una zona con poca o nula cobertura celular (minas, sótanos, autopistas remotas):
+<em> <strong>Mientras permanezca en el taller o tenga señal Wi-Fi</strong>, el técnico debe abrir la aplicación en su teléfono y cargar la Orden de Servicio asignada.
+</em> Esto almacena toda la información del cliente, especificaciones de la máquina y el catálogo completo de refacciones de SAP en la memoria local (IndexedDB) de su dispositivo móvil.</div>
+<hr>
+<h3>Fase 6: Ejecución Técnica del Servicio en Obra</h3>
+<p>En el frente de trabajo, el técnico sigue el protocolo obligatorio paso a paso en su aplicación móvil:</p>
+<ol>
+<li><strong>Foto de Inicio (Entrada)</strong>: Toma y subida de la evidencia fotográfica del estado del equipo antes de iniciar cualquier maniobra.</li>
+<li><strong>Bitácora Diaria y Tiempos de Traslado</strong>: Registro diario de horas de entrada/salida a la obra, horas de traslado de ida y vuelta, y descripción del trabajo ejecutado.</li>
+<li><strong>Checklist Técnico de 15 Puntos</strong>: Evaluación visual y funcional de motor, niveles de fluidos, sistema hidráulico, sistema eléctrico, mangueras, fugas, batería y seguridad.</li>
+<li><strong>Horómetro Real</strong>: Captura obligatoria de las horas de trabajo acumuladas y foto del marcador físico.</li>
+<li><strong>Consumo de Refacciones de SAP</strong>: Búsqueda e incorporación de las piezas instaladas tomadas del inventario oficial.</li>
+<li><strong>Evidencias Finales (Foto de Salida)</strong>: Fotografías del trabajo terminado y de componentes reemplazados.</li>
+<li><strong>Firmas Digitales de Conformidad</strong>: Captura en pantalla de la firma digital del encargado del cliente y del técnico de servicio. Al guardar, la orden cambia a <strong>Completado</strong>.</li>
+</ol>
+<hr>
+<h3>Fase 7: Rendición de Gastos de Viaje y Conciliación Clara</h3>
+<p>Durante o al finalizar el servicio:</p>
+<ol>
+<li>El técnico captura sus comprobantes de viáticos (gasolina, casetas, alimentos, hotel) en el módulo de <strong>Control de Gastos</strong>.</li>
+<li>Si utilizó la tarjeta de crédito corporativa <strong>Clara</strong>, localiza la transacción bancaria y presiona <strong>"Comprobar"</strong> adjuntando el ticket o factura electrónica XML/PDF.</li>
+<li>El administrador utiliza el módulo de <strong>Conciliación de Gastos</strong> para validar las transacciones contra los archivos del SAT y autorizar los reembolsos o integrarlos a la nómina semanal.</li>
+</ol>
+<hr>
+<h3>Fase 8: Cierre Técnico, Reporte PDF, OneDrive y Sincronización SAP</h3>
+<p>Al validarse la orden de servicio en campo:</p>
+<ol>
+<li><strong>Generación del Reporte Oficial</strong>: El motor del sistema compila automáticamente el <strong>Reporte Técnico de Servicio Eurorep en formato PDF</strong>, integrando logotipos, bitácoras, evidencias fotográficas, refacciones y firmas digitales vectoriales.</li>
+<li><strong>Almacenamiento Corporativo en OneDrive</strong>: El archivo PDF se deposita de manera automatizada en el repositorio de <strong>Microsoft OneDrive</strong> bajo la estructura:</li>
+</ol>
+<p><code>OneDrive/Eurorep CRM/Clientes/[Nombre del Cliente]/[Folio OS].pdf</code></p>
+<ol>
+<li><strong>Sincronización con SAP B1</strong>: Las refacciones consumidas se descargan del inventario de SAP y el ticket se marca como <strong>Cerrado</strong> para proceder a su facturación final.</li>
+<li><strong>Disponibilidad para el Cliente</strong>: El cliente puede visualizar y descargar su reporte técnico oficial directamente desde su portal.</li>
+</ol>
+<hr>
+<h2>🧩 3. Ciclo Post-Servicio: Autogeneración de Tickets-A de Refacciones</h2>
+<p>Si durante la inspección en campo el técnico detectó piezas con desgaste prematuro y las anotó en la sección de <strong>"Refacciones Necesarias"</strong>:</p>
+<ol>
+<li>El sistema crea de forma automática un <strong>Ticket-A</strong> (folio <code>TKT-[OS]-A</code>) en estatus <strong>Refacciones</strong>.</li>
+<li>Los equipos quedan protegidos contra desvinculación accidental.</li>
+<li>El área de ventas cotiza de inmediato estas refacciones en SAP B1 y el ciclo comercial se reinicia de forma proactiva, evitando que la máquina sufra un paro no programado en el futuro.</li>
+</ol>
+<hr>
+<h2>👥 4. Matriz de Roles y Responsabilidades</h2>
+<table><thead><tr><th>Rol</th><th>Pantallas Clave</th><th>Responsabilidades Principales</th></tr></thead><tbody><tr><td><strong>Cliente</strong></td><td><code>cliente.html</code></td><td>Reportar tickets, monitorear rentas, autorizar cotizaciones, subir Órdenes de Compra y descargar reportes PDF.</td></tr><tr><td><strong>Coordinador / Admin</strong></td><td><code>index.html</code> (Admin)</td><td>Asignar tickets, programar calendario, gestionar rentas, auditar órdenes completadas, conciliar gastos y sincronizar SAP.</td></tr><tr><td><strong>Técnico de Campo</strong></td><td><code>index.html</code> (Móvil)</td><td>Precargar órdenes offline, tomar foto de inicio, registrar bitácoras, checklist de 15 puntos, horómetro, refacciones, firmas y viáticos.</td></tr><tr><td><strong>Superadministrador</strong></td><td><code>index.html</code> (Superadmin)</td><td>Auditoría global, gestión de roles y accesos, depurador de inconsistencias de base de datos, sandbox de pruebas y soporte técnico.</td></tr></tbody></table>
+  </div>
+</body>
+</html>

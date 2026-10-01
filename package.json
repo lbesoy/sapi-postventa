@@ -1,7 +1,8 @@
 {
   "scripts": {
     "dev": "npx -y serve . -l 5000",
-    "backend": "node backend/server.js"
+    "backend": "node backend/server.js",
+    "check": "node scripts/verify-assets.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",

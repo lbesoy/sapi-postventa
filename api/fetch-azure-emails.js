@@ -273,9 +273,9 @@ export default async function handler(req, res) {
           estatus: e.estatus,
           archivos: e.archivos
         }));
-        await supabase.from('sapi_email_logs').upsert(toSave, { onConflict: 'id' }).catch(() => {});
+        await supabase.from('sapi_email_logs').upsert(toSave, { onConflict: 'id' });
       } catch (dbErr) {
-        console.warn('[Azure Sync] Error guardando en Supabase:', dbErr.message);
+        console.warn('[Azure Sync] Aviso al guardar en Supabase:', dbErr.message);
       }
     }
 

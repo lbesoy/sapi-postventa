@@ -27,7 +27,14 @@
                          '<strong>Mensaje:</strong> ' + message + '<br>' +
                          '<strong>Archivo:</strong> ' + source + ' (Línea ' + lineno + ', Columna ' + colno + ')<br>' +
                          '<strong>Stack:</strong><br><pre style="margin:5px 0 0 0; white-space:pre-wrap; font-size:11px; background:rgba(0,0,0,0.15); padding:8px; border-radius:4px;">' + (error ? error.stack : 'No disponible') + '</pre>';
-      document.body.appendChild(errDiv);
+      var mount = document.body || document.documentElement;
+      if (mount) {
+        mount.appendChild(errDiv);
+      } else {
+        window.addEventListener('DOMContentLoaded', function() {
+          (document.body || document.documentElement).appendChild(errDiv);
+        });
+      }
       return false;
     };
     
@@ -77,13 +84,13 @@
   <meta name="description" content="Sistema de seguimiento de órdenes de servicio para Eurorep Refacciones" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js" defer></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <script src="https://js.live.net/v7.2/OneDrive.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
@@ -354,7 +361,7 @@
           </div>
 
           <!-- Internal Notification Bell -->
-          <div id="internal-notification-bell-container" style="position:relative; cursor:pointer; display:flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; background:var(--bg-card); border:1px solid var(--border); transition:var(--transition); margin-right: 0.5rem;" onclick="window.toggleInternalNotificationDropdown(event)">
+          <div id="internal-notification-bell-container" title="Notificaciones Internas" style="position:relative; cursor:pointer; display:flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; background:var(--bg-card); border:1px solid var(--border); transition:var(--transition); margin-right: 0.5rem;" onclick="window.toggleInternalNotificationDropdown(event)">
             <img src="logo_transparent.png" style="width: 20px; height: 20px; object-fit: contain;" alt="Eurorep" />
             <span id="internal-notification-badge" style="position:absolute; top:-3px; right:-3px; background:#8b5cf6; color:white; font-size:0.65rem; font-weight:700; border-radius:50%; min-width:16px; height:16px; display:none; align-items:center; justify-content:center; padding:2px; box-shadow:0 0 8px rgba(139,92,246,0.4); border:2px solid var(--bg-secondary);">0</span>
             
@@ -9161,6 +9168,11 @@
         s.src = scripts[index];
         s.async = false; // ensure preservation of execution order
         s.onload = function() {
+          index++;
+          loadNext();
+        };
+        s.onerror = function(err) {
+          console.error('[Script Loader] Error al cargar recurso esencial:', scripts[index], err);
           index++;
           loadNext();
         };

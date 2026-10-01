@@ -24,6 +24,7 @@ let maquinariaDb = [];
 let sitiosDb = [];
 let tickets = [];
 let ordenes = [];
+let rentas = [];
 
 let nombreEmpresaLogged = null;
 const CLOSED_ORDER_STATUSES = ['finalizado', 'firmado', 'cerrado', 'completado', 'closed', 'cerrada', 'signed'];
@@ -32,6 +33,7 @@ let currentTicketFiltroPrio = '';
 let currentTicketOrden = 'reciente';
 let selectedTicketPhotoBase64 = null;
 let currentMaquinariaFiltro = 'todos';
+let currentRentasFiltro = 'todas';
 let currentServiciosFiltro = 'todos';
 let currentServiciosFiltroTipo = '';
 let currentServiciosOrden = 'reciente';
@@ -81,6 +83,7 @@ function isTestData(item) {
         upper.includes('[TEST]') || 
         upper.includes('OS-PRUEBA') || 
         upper.includes('TKT-PRUEBA') || 
+        upper.includes('REN-PRUEBA') || 
         upper.includes('LEV-PRUEBA') ||
         upper.startsWith('TEST-') ||
         upper.startsWith('PRUEBA-') ||
@@ -94,7 +97,7 @@ function isTestData(item) {
   }
 
   const folioUpper = String(item.folio || '').trim().toUpperCase();
-  if (/^TKT-OS00\d+/i.test(folioUpper) || /^OS-PRUEBA/i.test(folioUpper) || /^TKT-PRUEBA/i.test(folioUpper)) {
+  if (/^TKT-OS00\d+/i.test(folioUpper) || /^OS-PRUEBA/i.test(folioUpper) || /^TKT-PRUEBA/i.test(folioUpper) || /^REN-PRUEBA/i.test(folioUpper)) {
     return true;
   }
 
@@ -490,6 +493,8 @@ function cargarDatosLocales() {
     sitiosDb = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
     tickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
     ordenes = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+    rentas = JSON.parse(localStorage.getItem('sapi_rentas') || '[]');
+    window.rentas = rentas;
   } catch(e) {
     console.error('Error al cargar datos desde LocalStorage', e);
   }
@@ -826,6 +831,7 @@ function navegarA(targetView) {
   const titleMap = {
     'dashboard': 'Dashboard',
     'maquinaria': 'Mis Equipos',
+    'rentas': 'Mis Equipos en Renta',
     'tickets': 'Tickets',
     'servicios': 'Órdenes de Servicio',
     'sitios': 'Mis Sitios',
@@ -952,23 +958,63 @@ function doRender() {
     return ocli === nombreEmpresaLogged || (clienteObj && o.cliente === clienteObj.id) || fromTicket;
   });
 
+  // Rentas del cliente
+  const misRentas = (rentas || []).filter(r => {
+    if (!r) return false;
+    const rCli = String(r.cliente || '').toLowerCase().trim();
+    if (nombreEmpresaLogged === 'todos') {
+      return allowedNames.includes(rCli) || allowedIds.includes(r.cliente) || (r.cliente_id && allowedIds.includes(r.cliente_id));
+    }
+    return rCli === nombreEmpresaLogged || (clienteObj && (r.cliente === clienteObj.id || r.cliente_id === clienteObj.id));
+  });
+
   // --- FILTRADO POR MODO SANDBOX ---
   const activeSandbox = isTestModeActive();
   const misEquiposFiltered = misEquipos.filter(m => isTestData(m) === activeSandbox);
+  const misRentasFiltered = misRentas.filter(r => isTestData(r) === activeSandbox);
   const misTicketsFiltered = misTickets.filter(t => isTestData(t) === activeSandbox && t.categoria !== 'Soporte General');
   const misOrdenesFiltered = misOrdenes.filter(o => isTestData(o) === activeSandbox);
+
+  // Calcular estado dinámico para cada renta
+  misRentasFiltered.forEach(r => {
+    r._estadoCalculado = (typeof window.calcularEstadoRenta === 'function')
+      ? window.calcularEstadoRenta(r)
+      : (typeof calcularEstadoRenta === 'function' ? calcularEstadoRenta(r) : (r.estado || 'Activa'));
+  });
 
   // --- RENDERIZAR METRICAS (KPIs) ---
   const activeTicketsCount = misTicketsFiltered.filter(t => t.estado && t.estado.toLowerCase() !== 'cerrado').length;
   const activeServicesCount = misOrdenesFiltered.filter(o => o.estado && !CLOSED_ORDER_STATUSES.includes(o.estado.toLowerCase())).length;
+  const activeRentasCount = misRentasFiltered.filter(r => r._estadoCalculado === 'Activa' || r._estadoCalculado === 'Por Vencer').length;
 
   const kpiEquipos = document.getElementById('kpi-equipos');
+  const kpiRentas = document.getElementById('kpi-rentas');
   const kpiTickets = document.getElementById('kpi-tickets');
   const kpiServicios = document.getElementById('kpi-servicios');
 
   if (kpiEquipos) kpiEquipos.textContent = misEquiposFiltered.length;
+  if (kpiRentas) kpiRentas.textContent = activeRentasCount;
   if (kpiTickets) kpiTickets.textContent = activeTicketsCount;
   if (kpiServicios) kpiServicios.textContent = activeServicesCount;
+
+  // Actualizar badge de Rentas en Sidebar
+  const navBadgeRentas = document.getElementById('nav-badge-rentas-cliente');
+  if (navBadgeRentas) {
+    const rentasPorVencer = misRentasFiltered.filter(r => r._estadoCalculado === 'Por Vencer' || r._estadoCalculado === 'Vencida').length;
+    if (rentasPorVencer > 0) {
+      navBadgeRentas.textContent = rentasPorVencer;
+      navBadgeRentas.style.display = 'inline-flex';
+      navBadgeRentas.style.background = '#ef4444';
+      navBadgeRentas.style.color = '#fff';
+    } else if (activeRentasCount > 0) {
+      navBadgeRentas.textContent = activeRentasCount;
+      navBadgeRentas.style.display = 'inline-flex';
+      navBadgeRentas.style.background = 'rgba(16,185,129,0.2)';
+      navBadgeRentas.style.color = '#10b981';
+    } else {
+      navBadgeRentas.style.display = 'none';
+    }
+  }
 
   // --- CALCULAR KPI DE FLOTA CIRCULAR ---
   const fleetKpiEl = document.getElementById('fleet-health-kpi-container');
@@ -1030,6 +1076,7 @@ function doRender() {
   // --- EJECUTAR COMPONENTES INDIVIDUALES ---
   renderDashboardSection(misOrdenesFiltered, activeServicesCount);
   renderMachinerySection(misEquiposFiltered, misOrdenesFiltered);
+  renderRentasSection(misRentasFiltered);
   renderTicketsSection(misSitios, misEquiposFiltered, misTicketsFiltered);
   renderServicesSection(misOrdenesFiltered);
   renderLocationsSection(misSitios, misEquiposFiltered);
@@ -2378,6 +2425,510 @@ function renderLocationsSection(misSitios, misEquipos) {
   tbody.innerHTML = html;
   lucide.createIcons();
 }
+
+// ============================================================
+// 6. RENTAS UI (PORTAL DE CLIENTES)
+// ============================================================
+
+function filtrarRentasClienteEstado(filtro) {
+  currentRentasFiltro = filtro;
+
+  // Actualizar botones de filtro
+  const filtros = ['todas', 'activas', 'reservadas', 'por_vencer', 'finalizadas'];
+  filtros.forEach(f => {
+    const btn = document.getElementById('btn-renta-filtro-' + f);
+    if (btn) {
+      if (f === filtro) {
+        btn.classList.add('active');
+        btn.style.background = 'var(--accent)';
+        btn.style.color = '#fff';
+      } else {
+        btn.classList.remove('active');
+        btn.style.background = '';
+        btn.style.color = '';
+      }
+    }
+  });
+
+  // Resaltar tarjeta KPI si aplica
+  const cards = ['todas', 'activas', 'por_vencer', 'finalizadas'];
+  cards.forEach(c => {
+    const card = document.getElementById('card-renta-' + (c === 'por_vencer' ? 'por-vencer' : c));
+    if (card) {
+      if (c === filtro) {
+        card.style.transform = 'translateY(-2px)';
+        card.style.boxShadow = '0 6px 20px rgba(232, 130, 12, 0.2)';
+      } else {
+        card.style.transform = '';
+        card.style.boxShadow = '';
+      }
+    }
+  });
+
+  doRender();
+}
+window.filtrarRentasClienteEstado = filtrarRentasClienteEstado;
+
+function renderRentasSection(misRentas) {
+  const container = document.getElementById('rentas-cards-container');
+  if (!container) return;
+
+  const list = Array.isArray(misRentas) ? [...misRentas] : [];
+
+  // Calcular métricas / contadores
+  const total = list.length;
+  const activas = list.filter(r => r._estadoCalculado === 'Activa' || r._estadoCalculado === 'Por Vencer').length;
+  const porVencer = list.filter(r => r._estadoCalculado === 'Por Vencer').length;
+  const finalizadas = list.filter(r => r._estadoCalculado === 'Finalizada').length;
+
+  const cntTotal = document.getElementById('cnt-renta-total');
+  const cntActivas = document.getElementById('cnt-renta-activas');
+  const cntPorVencer = document.getElementById('cnt-renta-por-vencer');
+  const cntFinalizadas = document.getElementById('cnt-renta-finalizadas');
+
+  if (cntTotal) cntTotal.textContent = total;
+  if (cntActivas) cntActivas.textContent = activas;
+  if (cntPorVencer) cntPorVencer.textContent = porVencer;
+  if (cntFinalizadas) cntFinalizadas.textContent = finalizadas;
+
+  // Filtrar por píldora / estado seleccionado
+  let filtered = list;
+  if (currentRentasFiltro === 'activas') {
+    filtered = list.filter(r => r._estadoCalculado === 'Activa');
+  } else if (currentRentasFiltro === 'reservadas') {
+    filtered = list.filter(r => r._estadoCalculado === 'Reservada');
+  } else if (currentRentasFiltro === 'por_vencer') {
+    filtered = list.filter(r => r._estadoCalculado === 'Por Vencer');
+  } else if (currentRentasFiltro === 'finalizadas') {
+    filtered = list.filter(r => r._estadoCalculado === 'Finalizada');
+  }
+
+  // Filtrar por buscador
+  const searchInput = document.getElementById('renta-search-input');
+  const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  if (q) {
+    filtered = filtered.filter(r => {
+      const folio = String(r.folio || '').toLowerCase();
+      const eq = String(r.equipo || '').toLowerCase();
+      const sn = String(r.serie || '').toLowerCase();
+      const sit = String(r.sitio || '').toLowerCase();
+      const cli = String(r.cliente || '').toLowerCase();
+      const asesor = String(r.asesor_comercial || '').toLowerCase();
+      const notas = String(r.notas || '').toLowerCase();
+      return folio.includes(q) || eq.includes(q) || sn.includes(q) || sit.includes(q) || cli.includes(q) || asesor.includes(q) || notas.includes(q);
+    });
+  }
+
+  // Ordenar: activas y por vencer primero, luego más recientes
+  filtered.sort((a, b) => {
+    const ordenEstados = { 'Por Vencer': 1, 'Activa': 2, 'Reservada': 3, 'Vencida': 4, 'Finalizada': 5, 'Cancelada': 6 };
+    const pA = ordenEstados[a._estadoCalculado] || 99;
+    const pB = ordenEstados[b._estadoCalculado] || 99;
+    if (pA !== pB) return pA - pB;
+    return new Date(b.created_at || b.fecha_inicio || 0) - new Date(a.created_at || a.fecha_inicio || 0);
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="grid-column: 1/-1;">
+        <i data-lucide="key-round" style="width:48px; height:48px; opacity:0.35;"></i>
+        <p style="margin-top:0.75rem; font-weight:600; font-size:1.05rem;">No se encontraron equipos en renta</p>
+        <p style="font-size:0.85rem; color:var(--text-secondary);">No hay maquinaria que coincida con los filtros seleccionados.</p>
+      </div>
+    `;
+    safeCreateIcons();
+    return;
+  }
+
+  let html = '';
+  filtered.forEach(r => {
+    const estado = r._estadoCalculado || 'Activa';
+    let badgeHtml = '';
+    if (typeof window.obtenerBadgeRenta === 'function') {
+      badgeHtml = window.obtenerBadgeRenta(estado);
+    } else {
+      badgeHtml = `<span class="badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-weight:600;">${estado}</span>`;
+    }
+
+    const fIni = r.fecha_inicio ? r.fecha_inicio.substring(0, 10).split('-').reverse().join('/') : '-';
+    const fFin = r.fecha_fin_estimada ? r.fecha_fin_estimada.substring(0, 10).split('-').reverse().join('/') : 'Indefinido';
+    const tarifaMonto = Number(r.monto_renta || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const tipoTarifa = r.tarifa_tipo ? `/${r.tarifa_tipo}` : '';
+
+    const eqNombre = r.equipo || 'Maquinaria en Arrendamiento';
+    const eqSerie = r.serie || 'S/N';
+    const sitioNombre = r.sitio || 'Ubicación General';
+
+    // Cálculo de días restantes
+    let diasRestantesTexto = '';
+    if (r.fecha_fin_estimada && estado !== 'Finalizada' && estado !== 'Cancelada') {
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      const fFinDate = new Date(r.fecha_fin_estimada + 'T23:59:59');
+      const diff = Math.ceil((fFinDate.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+      if (diff > 0) {
+        diasRestantesTexto = `<span style="font-size:0.75rem; color:${diff <= 7 ? '#f59e0b' : 'var(--text-secondary)'}; font-weight:600;"><i data-lucide="clock" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:2px;"></i> ${diff} días restantes</span>`;
+      } else if (diff === 0) {
+        diasRestantesTexto = `<span style="font-size:0.75rem; color:#ef4444; font-weight:700;"><i data-lucide="alert-circle" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:2px;"></i> Vence hoy</span>`;
+      } else {
+        diasRestantesTexto = `<span style="font-size:0.75rem; color:#ef4444; font-weight:700;"><i data-lucide="alert-octagon" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:2px;"></i> Vencido hace ${Math.abs(diff)} días</span>`;
+      }
+    }
+
+    // Horómetro
+    let horoTexto = '';
+    if (r.horometro_final != null) {
+      const horasUso = Math.max(0, Number(r.horometro_final) - Number(r.horometro_inicial || 0));
+      horoTexto = `Fin: <strong>${r.horometro_final} hrs</strong> <span style="color:var(--text-muted); font-size:0.72rem;">(Uso: ${horasUso.toFixed(1)}h)</span>`;
+    } else {
+      horoTexto = `Inicial: <strong>${r.horometro_inicial || 0} hrs</strong>`;
+    }
+
+    const eqEscaped = String(eqNombre).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const snEscaped = String(eqSerie).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const sitEscaped = String(sitioNombre).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+    html += `
+      <div class="machinery-card" style="display:flex; flex-direction:column; justify-content:space-between; border-radius:12px; background:var(--bg-card); border:1px solid var(--border); padding:1.25rem; transition: transform 0.2s, box-shadow 0.2s;">
+        
+        <!-- Header de la Tarjeta -->
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem; gap:0.5rem;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <div style="background:rgba(232, 130, 12, 0.1); color:var(--accent); width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <i data-lucide="key-round" style="width:18px; height:18px;"></i>
+              </div>
+              <div>
+                <span style="font-family:var(--font-mono, monospace); font-weight:700; font-size:0.85rem; color:var(--text-primary);">${r.folio || 'REN-0000'}</span>
+                <div style="font-size:0.75rem; color:var(--text-muted);">${r.asesor_comercial ? `Asesor: ${r.asesor_comercial}` : 'Eurorep Arrendamiento'}</div>
+              </div>
+            </div>
+            <div>${badgeHtml}</div>
+          </div>
+
+          <!-- Título del Equipo -->
+          <h3 style="font-size:1.05rem; font-weight:700; color:var(--text-primary); margin:0 0 0.35rem 0; line-height:1.3;">
+            ${eqNombre}
+          </h3>
+
+          <div style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.85rem; display:flex; flex-wrap:wrap; gap:0.75rem;">
+            <span style="font-family:var(--font-mono, monospace);"><i data-lucide="hash" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:2px; color:var(--text-muted);"></i> SN: <strong>${eqSerie}</strong></span>
+            <span><i data-lucide="map-pin" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:2px; color:var(--accent);"></i> ${sitioNombre}</span>
+          </div>
+
+          <!-- Info Grid -->
+          <div style="background:var(--bg-primary); border:1px solid var(--border); border-radius:8px; padding:0.75rem; margin-bottom:1rem; font-size:0.8rem; display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem;">
+            <div>
+              <span style="color:var(--text-muted); display:block; font-size:0.7rem; text-transform:uppercase; font-weight:600;">Periodo</span>
+              <span style="font-weight:600; color:var(--text-primary);">${fIni} ➔ ${fFin}</span>
+              ${diasRestantesTexto ? `<div style="margin-top:2px;">${diasRestantesTexto}</div>` : ''}
+            </div>
+            <div>
+              <span style="color:var(--text-muted); display:block; font-size:0.7rem; text-transform:uppercase; font-weight:600;">Tarifa</span>
+              <span style="font-weight:700; color:#10b981; font-size:0.95rem;">$${tarifaMonto}</span>
+              <span style="font-size:0.7rem; color:var(--text-muted);">${tipoTarifa}</span>
+            </div>
+            <div style="grid-column: 1 / -1; border-top:1px dashed var(--border); padding-top:0.4rem; display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <span style="color:var(--text-muted); font-size:0.7rem; text-transform:uppercase; font-weight:600;">Horómetro:</span>
+                <span style="font-size:0.78rem; color:var(--text-primary); margin-left:4px;">${horoTexto}</span>
+              </div>
+              ${r.limite_horas_mes ? `<span style="font-size:0.72rem; color:var(--text-secondary);">Límite: ${r.limite_horas_mes}h</span>` : ''}
+            </div>
+          </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div style="display:flex; flex-direction:column; gap:0.45rem; border-top:1px solid var(--border); padding-top:0.85rem;">
+          <div style="display:flex; gap:0.45rem;">
+            <button class="btn-primary" onclick="verDetalleRentaCliente('${r.id}')" style="flex:1; justify-content:center; font-size:0.8rem; padding:0.45rem 0.6rem; border-radius:6px;">
+              <i data-lucide="eye"></i> Ver Ficha
+            </button>
+            <button class="btn-secondary" onclick="solicitarSoporteParaRenta('${eqEscaped}', '${snEscaped}', '${sitEscaped}')" style="flex:1; justify-content:center; font-size:0.8rem; padding:0.45rem 0.6rem; border-radius:6px; color:#f59e0b; border-color:rgba(245,158,11,0.3);" title="Reportar falla o pedir mantenimiento para este equipo">
+              <i data-lucide="alert-triangle"></i> Soporte
+            </button>
+          </div>
+          <button class="btn-secondary" onclick="window.generarContratoRentaPDF ? window.generarContratoRentaPDF('${r.id}') : showToast('Generador de contrato no disponible', 'info')" style="width:100%; justify-content:center; font-size:0.78rem; padding:0.35rem; border-radius:6px; color:var(--text-secondary);">
+            <i data-lucide="file-text"></i> Descargar Contrato PDF
+          </button>
+        </div>
+
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+  safeCreateIcons();
+}
+window.renderRentasSection = renderRentasSection;
+
+function verDetalleRentaCliente(idRenta) {
+  const r = (rentas || window.rentas || []).find(x => x && x.id === idRenta);
+  if (!r) {
+    showToast('Contrato de renta no encontrado.', 'error');
+    return;
+  }
+
+  const titleEl = document.getElementById('modal-renta-folio');
+  const subEl = document.getElementById('modal-renta-sub');
+  const bodyEl = document.getElementById('modal-renta-body');
+  const actionsLeftEl = document.getElementById('modal-renta-actions-left');
+
+  const estadoCalc = (typeof window.calcularEstadoRenta === 'function') ? window.calcularEstadoRenta(r) : (r.estado || 'Activa');
+  let badgeHtml = '';
+  if (typeof window.obtenerBadgeRenta === 'function') {
+    badgeHtml = window.obtenerBadgeRenta(estadoCalc);
+  } else {
+    badgeHtml = `<span class="badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-weight:600;">${estadoCalc}</span>`;
+  }
+
+  if (titleEl) titleEl.innerHTML = `Contrato: <span style="font-family:var(--font-mono, monospace); font-weight:800; color:var(--accent);">${r.folio || 'REN-0000'}</span> ${badgeHtml}`;
+  if (subEl) subEl.textContent = `Cliente: ${r.cliente || 'Empresa'} • Sitio: ${r.sitio || 'General'}`;
+
+  const fIni = r.fecha_inicio ? r.fecha_inicio.substring(0, 10).split('-').reverse().join('/') : 'N/A';
+  const fFin = r.fecha_fin_estimada ? r.fecha_fin_estimada.substring(0, 10).split('-').reverse().join('/') : 'Indefinida';
+  const fDev = r.fecha_devolucion_real ? r.fecha_devolucion_real.substring(0, 10).split('-').reverse().join('/') : '-';
+
+  let horasUso = 0;
+  if (r.horometro_final != null) {
+    horasUso = Math.max(0, Number(r.horometro_final) - Number(r.horometro_inicial || 0));
+  }
+  const horasExcedentes = (r.limite_horas_mes && horasUso > r.limite_horas_mes) ? (horasUso - r.limite_horas_mes) : 0;
+  const cargoExcedente = horasExcedentes * (Number(r.costo_hora_excedente) || 0);
+
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:1.25rem;">
+        
+        <!-- Grid Superior -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:1rem;">
+          
+          <!-- Card Equipo -->
+          <div style="background:var(--bg-primary); border:1px solid var(--border); border-radius:8px; padding:1rem;">
+            <h4 style="margin:0 0 0.75rem 0; font-size:0.85rem; color:var(--accent); display:flex; align-items:center; gap:0.4rem; text-transform:uppercase; letter-spacing:0.5px;">
+              <i data-lucide="settings-2" style="width:15px; height:15px;"></i> Equipo en Arrendamiento
+            </h4>
+            <div style="font-size:0.85rem; line-height:1.7;">
+              <div><strong>Equipo:</strong> ${r.equipo || 'Maquinaria'}</div>
+              <div><strong>No. de Serie:</strong> <span style="font-family:var(--font-mono, monospace); font-weight:600;">${r.serie || 'S/N'}</span></div>
+              <div><strong>Frente / Sitio:</strong> ${r.sitio || 'General'}</div>
+              <div><strong>Horómetro Inicial:</strong> ${r.horometro_inicial || 0} hrs</div>
+              ${r.horometro_final != null ? `<div><strong>Horómetro Final:</strong> ${r.horometro_final} hrs</div>` : ''}
+              ${r.horometro_final != null ? `<div style="color:#10b981; font-weight:700;"><strong>Horas Utilizadas:</strong> ${horasUso.toFixed(1)} hrs</div>` : ''}
+            </div>
+          </div>
+
+          <!-- Card Económica -->
+          <div style="background:var(--bg-primary); border:1px solid var(--border); border-radius:8px; padding:1rem;">
+            <h4 style="margin:0 0 0.75rem 0; font-size:0.85rem; color:var(--accent); display:flex; align-items:center; gap:0.4rem; text-transform:uppercase; letter-spacing:0.5px;">
+              <i data-lucide="dollar-sign" style="width:15px; height:15px;"></i> Condiciones Comerciales
+            </h4>
+            <div style="font-size:0.85rem; line-height:1.7;">
+              <div><strong>Tarifa Pactada:</strong> <span style="color:#10b981; font-weight:700;">$${Number(r.monto_renta || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN</span> (${r.tarifa_tipo || 'mensual'})</div>
+              ${r.deposito_garantia ? `<div><strong>Depósito en Garantía:</strong> $${Number(r.deposito_garantia).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>` : ''}
+              <div><strong>Límite de Uso:</strong> ${r.limite_horas_mes || 200} hrs/${r.tarifa_tipo || 'mes'}</div>
+              ${r.costo_hora_excedente ? `<div><strong>Costo por Hora Extra:</strong> $${Number(r.costo_hora_excedente).toLocaleString('es-MX', { minimumFractionDigits: 2 })}/hr</div>` : ''}
+              ${horasExcedentes > 0 ? `<div style="color:#ef4444; font-weight:700;"><strong>Excedente (${horasExcedentes.toFixed(1)} hrs):</strong> $${cargoExcedente.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>` : ''}
+            </div>
+          </div>
+
+          <!-- Card Periodo -->
+          <div style="background:var(--bg-primary); border:1px solid var(--border); border-radius:8px; padding:1rem;">
+            <h4 style="margin:0 0 0.75rem 0; font-size:0.85rem; color:var(--accent); display:flex; align-items:center; gap:0.4rem; text-transform:uppercase; letter-spacing:0.5px;">
+              <i data-lucide="calendar" style="width:15px; height:15px;"></i> Vigencia del Contrato
+            </h4>
+            <div style="font-size:0.85rem; line-height:1.7;">
+              <div><strong>Fecha de Entrega:</strong> ${fIni}</div>
+              <div><strong>Fecha Fin Estimada:</strong> ${fFin}</div>
+              <div><strong>Fecha Devolución Real:</strong> ${fDev}</div>
+              <div><strong>Asesor Comercial:</strong> ${r.asesor_comercial || 'Eurorep'}</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Checklists de Entrega y Devolución -->
+        <div style="background:var(--bg-primary); border:1px solid var(--border); border-radius:8px; padding:1rem;">
+          <h4 style="margin:0 0 0.75rem 0; font-size:0.85rem; color:var(--accent); display:flex; align-items:center; gap:0.4rem; text-transform:uppercase; letter-spacing:0.5px;">
+            <i data-lucide="clipboard-check" style="width:15px; height:15px;"></i> Checklist de Inspección Física
+          </h4>
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:1rem; font-size:0.85rem;">
+            <div style="border-right:1px solid var(--border); padding-right:0.75rem;">
+              <strong style="color:var(--text-primary); display:block; margin-bottom:0.35rem;"><i data-lucide="truck" style="width:13px;height:13px;display:inline-block;vertical-align:middle;"></i> Entrega Inicial (Check-in):</strong>
+              <div><strong>Condición Física:</strong> ${r.checklist_entrega?.condicion || 'Excelente'}</div>
+              <div><strong>Nivel de Combustible:</strong> ${r.checklist_entrega?.combustible || '100%'}</div>
+              <div><strong>Accesorios Entregados:</strong> ${r.checklist_entrega?.accesorios || 'Estándar'}</div>
+              <div><strong>Responsable de Entrega:</strong> ${r.checklist_entrega?.responsable || r.asesor_comercial || 'Eurorep'}</div>
+            </div>
+            <div>
+              <strong style="color:var(--text-primary); display:block; margin-bottom:0.35rem;"><i data-lucide="check-square" style="width:13px;height:13px;display:inline-block;vertical-align:middle;"></i> Recepción / Retorno (Check-out):</strong>
+              ${r.checklist_devolucion ? `
+                <div><strong>Condición Final:</strong> ${r.checklist_devolucion.condicion || 'Buen estado'}</div>
+                <div><strong>Combustible de Retorno:</strong> ${r.checklist_devolucion.combustible || 'N/A'}</div>
+                <div><strong>Daños o Faltantes:</strong> ${r.checklist_devolucion.danos || 'Ninguno'}</div>
+                <div><strong>Recibido por:</strong> ${r.checklist_devolucion.recibido_por || 'Eurorep'}</div>
+              ` : '<div style="color:var(--text-muted); font-style:italic;">Equipo actualmente operando en tus instalaciones.</div>'}
+            </div>
+          </div>
+        </div>
+
+        ${r.notas ? `
+          <div style="background:rgba(232,130,12,0.06); border:1px dashed var(--accent); border-radius:8px; padding:0.75rem 1rem; font-size:0.85rem;">
+            <strong style="color:var(--accent); display:block; margin-bottom:0.25rem;">Observaciones y Términos Específicos:</strong>
+            <p style="margin:0; color:var(--text-secondary); white-space:pre-wrap;">${r.notas}</p>
+          </div>
+        ` : ''}
+
+      </div>
+    `;
+  }
+
+  const eqEscaped = String(r.equipo || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  const snEscaped = String(r.serie || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  const sitEscaped = String(r.sitio || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+  if (actionsLeftEl) {
+    actionsLeftEl.innerHTML = `
+      <button class="btn-primary" onclick="solicitarSoporteParaRenta('${eqEscaped}', '${snEscaped}', '${sitEscaped}')" style="font-size:0.82rem; background:#f59e0b; border-color:#f59e0b;">
+        <i data-lucide="alert-triangle"></i> Reportar Falla de este Equipo
+      </button>
+      <button class="btn-secondary" onclick="window.generarContratoRentaPDF ? window.generarContratoRentaPDF('${r.id}') : showToast('Generador de PDF no disponible', 'info')" style="font-size:0.82rem;">
+        <i data-lucide="printer"></i> Descargar Contrato PDF
+      </button>
+    `;
+  }
+
+  abrirModal('modal-renta-detalle-cliente');
+  safeCreateIcons();
+}
+window.verDetalleRentaCliente = verDetalleRentaCliente;
+
+function solicitarSoporteParaRenta(equipo, serie, sitio) {
+  cerrarModal('modal-renta-detalle-cliente');
+  navegarA('tickets');
+
+  setTimeout(() => {
+    const asuntoEl = document.getElementById('t-asunto');
+    const descEl = document.getElementById('t-descripcion');
+    const prioEl = document.getElementById('t-prioridad');
+    const catEl = document.getElementById('t-categoria');
+    const sitioEl = document.getElementById('t-sitio');
+
+    if (asuntoEl) asuntoEl.value = `Soporte en Equipo en Renta: ${equipo}`;
+    if (prioEl) prioEl.value = 'Media';
+    if (catEl) catEl.value = 'Correctivo';
+
+    if (descEl) {
+      descEl.value = `Solicito asistencia técnica para el equipo en renta:\n- Equipo: ${equipo}\n- No. de Serie: ${serie || 'S/N'}\n- Ubicación / Sitio: ${sitio || 'Ubicación General'}\n\nDescripción de la falla o requerimiento:\n`;
+      descEl.focus();
+    }
+
+    if (sitioEl && sitio) {
+      for (let i = 0; i < sitioEl.options.length; i++) {
+        if (sitioEl.options[i].text.toLowerCase().includes(sitio.toLowerCase())) {
+          sitioEl.selectedIndex = i;
+          break;
+        }
+      }
+    }
+
+    showToast(`Formulario de ticket pre-cargado para: ${equipo}`, 'info');
+  }, 150);
+}
+window.solicitarSoporteParaRenta = solicitarSoporteParaRenta;
+
+function abrirModalSolicitarRenta() {
+  const form = document.getElementById('form-solicitar-renta-cliente');
+  if (form) form.reset();
+
+  // Fecha de inicio sugerida: mañana
+  const manana = new Date();
+  manana.setDate(manana.getDate() + 1);
+  const fIniInput = document.getElementById('sol-renta-fecha-inicio');
+  if (fIniInput) fIniInput.value = manana.toISOString().substring(0, 10);
+
+  // Poblar sitios del cliente
+  const selectSitio = document.getElementById('sol-renta-sitio');
+  if (selectSitio) {
+    const allowedNames = getAllowedCompanyNames();
+    const allowedIds = clientesDb
+      .filter(c => allowedNames.includes(String(c.nombre || '').toLowerCase().trim()))
+      .map(c => c.id);
+    const clienteObj = nombreEmpresaLogged === 'todos' ? null : clientesDb.find(c => String(c.nombre || '').toLowerCase().trim() === nombreEmpresaLogged);
+
+    const misSitios = sitiosDb.filter(s => {
+      const sCli = String(s.cliente || '').toLowerCase().trim();
+      if (nombreEmpresaLogged === 'todos') {
+        return allowedNames.includes(sCli) || allowedIds.includes(s.cliente);
+      }
+      return sCli === nombreEmpresaLogged || (clienteObj && s.cliente === clienteObj.id);
+    });
+
+    selectSitio.innerHTML = '<option value="">-- Ubicación General / A convenir --</option>';
+    misSitios.forEach(s => {
+      const sNom = s.nombre || s.direccion || '';
+      if (sNom) {
+        selectSitio.innerHTML += `<option value="${sNom}">${sNom} (${s.direccion || 'Sin dirección'})</option>`;
+      }
+    });
+  }
+
+  abrirModal('modal-solicitar-renta-cliente');
+  safeCreateIcons();
+}
+window.abrirModalSolicitarRenta = abrirModalSolicitarRenta;
+
+async function solicitarNuevaRentaSubmit(event) {
+  event.preventDefault();
+
+  const tipoEquipo = document.getElementById('sol-renta-tipo-equipo')?.value.trim() || 'Equipo de Arrendamiento';
+  const fechaInicio = document.getElementById('sol-renta-fecha-inicio')?.value || '';
+  const duracion = document.getElementById('sol-renta-duracion')?.value || '1 mes';
+  const sitio = document.getElementById('sol-renta-sitio')?.value || 'Ubicación General';
+  const notas = document.getElementById('sol-renta-notas')?.value.trim() || '';
+
+  const activeUser = (typeof simUser !== 'undefined' && simUser) ? simUser : (typeof currentSession !== 'undefined' ? currentSession : null);
+  const clienteNombre = nombreEmpresaLogged && nombreEmpresaLogged !== 'todos' 
+    ? nombreEmpresaLogged 
+    : (activeUser ? (activeUser.empresa || activeUser.nombre) : 'Cliente');
+
+  const folio = 'TKT-REN-' + Date.now().toString().slice(-5);
+  const nuevoTicket = {
+    id: 'ticket_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+    folio: folio,
+    cliente: clienteNombre,
+    solicitante: activeUser ? activeUser.nombre : clienteNombre,
+    email: activeUser ? activeUser.email : '',
+    sitio: sitio,
+    equipo: tipoEquipo,
+    prioridad: 'Media',
+    categoria: 'Rentas',
+    asunto: `Solicitud de Renta: ${tipoEquipo}`,
+    descripcion: `SOLICITUD DE COTIZACIÓN / ARRENDAMIENTO:\n- Equipo Requerido: ${tipoEquipo}\n- Fecha de Inicio Estimada: ${fechaInicio}\n- Duración Estimada: ${duracion}\n- Sitio de Operación: ${sitio}\n\nRequerimientos Adicionales:\n${notas || 'Sin comentarios adicionales.'}`,
+    estado: 'Reportado',
+    fechaCreacion: new Date().toISOString(),
+    esPrueba: isTestModeActive(),
+    origen: 'Portal Clientes - Módulo Rentas'
+  };
+
+  // Guardar localmente
+  tickets.unshift(nuevoTicket);
+  localStorage.setItem('sapi_tickets', JSON.stringify(tickets));
+
+  // Push a Supabase
+  if (window.supabaseClient && typeof window.pushToSupabase === 'function') {
+    try {
+      await window.pushToSupabase('tickets', nuevoTicket);
+    } catch(err) {
+      console.warn('[Rentas] Error enviando solicitud a Supabase:', err);
+    }
+  }
+
+  cerrarModal('modal-solicitar-renta-cliente');
+  showToast('¡Solicitud de renta enviada con éxito! Nuestro equipo comercial se comunicará contigo.', 'success');
+  doRender();
+}
+window.solicitarNuevaRentaSubmit = solicitarNuevaRentaSubmit;
 
 // Reportar falla rápido desde Dashboard
 function abrirReportarFallaRapida() {
@@ -5009,42 +5560,88 @@ window.agregarComentarioCliente = async function(ticketId) {
   }
 };
 
-// ============================================================
-// DIAGRAMA DE FLUJO INTERACTIVO (CLIENTE)
-// ============================================================
-window.abrirModalDiagramaFlujo = function() {
-  const modal = document.getElementById('modal-diagrama-flujo-overlay');
-  if (modal) {
-    modal.classList.add('open');
-    if (window.lucide) lucide.createIcons();
+window.crearModalVisorManualClienteSiNoExiste = function() {
+  let overlay = document.getElementById('modal-visor-manual-cliente-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'modal-visor-manual-cliente-overlay';
+    overlay.className = 'modal-overlay';
+    overlay.setAttribute('onclick', 'window.cerrarVisorManualCliente(event)');
+    overlay.innerHTML = `
+      <div class="modal" onclick="event.stopPropagation()" style="max-width:560px; width:92%; border-radius:16px; background:var(--bg-card, #1e293b); color:var(--text-primary, #f8fafc); box-shadow:var(--shadow-lg, 0 20px 25px -5px rgba(0,0,0,0.5)); border:1px solid var(--border, rgba(255,255,255,0.1));">
+        <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; padding:1.25rem 1.5rem; border-bottom:1px solid var(--border, rgba(255,255,255,0.1)); background:var(--bg-hover, rgba(255,255,255,0.03));">
+          <div style="display:flex; align-items:center; gap:0.75rem;">
+            <div style="width:40px; height:40px; border-radius:10px; background:rgba(37,99,235,0.12); color:var(--primary, #2563eb); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <i data-lucide="book-open" style="width:20px; height:20px;"></i>
+            </div>
+            <div>
+              <h2 style="margin:0; font-size:1.15rem; font-weight:700; color:var(--text-primary, #f8fafc);">Manual del Cliente (SAPI)</h2>
+              <div style="font-size:0.8rem; color:var(--text-muted, #94a3b8); margin-top:2px;">Guía oficial del portal para clientes</div>
+            </div>
+          </div>
+          <button class="modal-close" onclick="window.cerrarVisorManualCliente()" style="background:transparent; border:none; color:var(--text-muted); font-size:1.25rem; cursor:pointer;">✕</button>
+        </div>
+        <div class="modal-body" style="padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem;">
+          <div style="font-size:0.92rem; line-height:1.5; color:var(--text-primary); background:var(--bg-body, #0f172a); padding:1rem; border-radius:8px; border:1px solid var(--border, rgba(255,255,255,0.1));">
+            Consulta la guía paso a paso para solicitar servicios técnicos, consultar maquinaria en renta y cotizaciones, o descarga el manual oficial en PDF.
+          </div>
+          <div style="display:flex; flex-direction:column; gap:0.75rem;">
+            <a href="manuales/manual_cliente.html" target="_blank" class="btn-primary" style="padding:0.75rem 1.25rem; font-size:0.95rem; font-weight:600; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.5rem; border-radius:10px; cursor:pointer;">
+              <i data-lucide="external-link" style="width:18px; height:18px;"></i>
+              <span>Abrir Manual Completo (Interactivo)</span>
+            </a>
+            <a href="manuales/manual_cliente.pdf" download class="btn-secondary" style="padding:0.75rem 1.25rem; font-size:0.95rem; font-weight:600; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.5rem; border-radius:10px; cursor:pointer;">
+              <i data-lucide="download" style="width:18px; height:18px;"></i>
+              <span>Descargar Documento PDF</span>
+            </a>
+          </div>
+        </div>
+        <div class="modal-footer" style="padding:1rem 1.5rem; border-top:1px solid var(--border, rgba(255,255,255,0.1)); display:flex; justify-content:flex-end; background:var(--bg-hover, rgba(255,255,255,0.03));">
+          <button type="button" class="btn-secondary" onclick="window.cerrarVisorManualCliente()" style="padding:0.55rem 1.25rem; border-radius:8px; cursor:pointer;">Cerrar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+  return overlay;
+};
+
+window.abrirVisorManualCliente = function() {
+  const overlay = window.crearModalVisorManualClienteSiNoExiste();
+  if (overlay) {
+    overlay.classList.add('open');
+    overlay.style.display = 'flex';
+    overlay.style.visibility = 'visible';
+    overlay.style.opacity = '1';
+    overlay.style.pointerEvents = 'auto';
+    document.body.style.overflow = 'hidden';
+  }
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    try { lucide.createIcons({ root: overlay }); } catch(e) {}
   }
 };
 
-window.cerrarModalDiagramaFlujo = function(e) {
-  if (e && e.target && !e.target.classList.contains('modal-overlay') && !e.target.classList.contains('btn-close-modal') && !e.target.closest('.btn-close-modal')) return;
-  const modal = document.getElementById('modal-diagrama-flujo-overlay');
-  if (modal) modal.classList.remove('open');
+window.cerrarVisorManualCliente = function(e) {
+  if (e && e.target) {
+    const isOverlay = e.target.id === 'modal-visor-manual-cliente-overlay' || e.target.classList.contains('modal-overlay');
+    const isCloseBtn = e.target.classList.contains('modal-close') || e.target.closest('.modal-close');
+    if (!isOverlay && !isCloseBtn) return;
+  }
+  const overlay = document.getElementById('modal-visor-manual-cliente-overlay');
+  if (overlay) {
+    overlay.classList.remove('open');
+    overlay.style.display = 'none';
+    overlay.style.visibility = 'hidden';
+    overlay.style.opacity = '0';
+    overlay.style.pointerEvents = 'none';
+    document.body.style.overflow = '';
+  }
 };
 
-let currentDiagramZoomCliente = 1;
-window.zoomDiagramaFlujo = function(delta) {
-  const content = document.getElementById('flowchart-modal-content');
-  if (!content) return;
-  currentDiagramZoomCliente = Math.max(0.6, Math.min(1.8, currentDiagramZoomCliente + delta));
-  content.style.transform = `scale(${currentDiagramZoomCliente})`;
-  content.style.transformOrigin = 'top center';
-  const label = document.getElementById('diagrama-zoom-label');
-  if (label) label.textContent = `${Math.round(currentDiagramZoomCliente * 100)}%`;
+window.imprimirManualClienteIframe = function() {
+  window.print();
 };
 
-window.resetZoomDiagramaFlujo = function() {
-  const content = document.getElementById('flowchart-modal-content');
-  if (!content) return;
-  currentDiagramZoomCliente = 1;
-  content.style.transform = 'scale(1)';
-  const label = document.getElementById('diagrama-zoom-label');
-  if (label) label.textContent = '100%';
-};
 
 
 

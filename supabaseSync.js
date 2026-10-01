@@ -285,7 +285,7 @@ function ticketToRow(t) {
   } catch (e) {}
 
   // Encontrar el ID del sitio por su nombre
-  let sitioId = t.sitio || null;
+  let sitioId = null;
   try {
     const sitios = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
     const match = sitios.find(s => (s.cliente === clienteId || s.cliente === t.cliente) && (s.nombre === t.sitio || s.direccion === t.sitio || s.id === t.sitio));
@@ -1382,7 +1382,8 @@ window.pushToSupabase = async function(tabla, item) {
     }
     
     // Upsert directo en la nube
-    let { error } = await sb.from(tabla).upsert(row);
+    const upsertOptions = ((tabla === 'tickets' || tabla === 'ordenes') && row.folio) ? { onConflict: 'folio' } : undefined;
+    let { error } = await sb.from(tabla).upsert(row, upsertOptions);
 
     // Bucle dinámico de autorecuperación para columnas no migradas en Supabase (PGRST204 / schema cache)
     let colRetries = 0;
@@ -3552,13 +3553,13 @@ window.cargarDatosDeSupabase = function() {
     let idsWithCotizacion = new Set();
     try {
       // Descargar columnas principales del ticket con orden indexado en created_at para prevenir timeouts en Postgres
-      let columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, notas, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion, creado_por, fecha_modificacion, updated_at, modificado_por';
+      let columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, notas, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion, creado_por, fecha_modificacion, updated_at, modificado_por, comentarios_internos, comentarios_clientes';
       try {
         ticketsDb = await fetchTablePaginated('tickets', columns, 'created_at', false, null, 50, 20000);
       } catch (colErr) {
         console.warn('[Sync] Reintentando carga de tickets con columnas ultraligeras...', colErr?.message);
         try {
-          columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion, creado_por';
+          columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion, creado_por, comentarios_internos, comentarios_clientes';
           ticketsDb = await fetchTablePaginated('tickets', columns, 'created_at', false, null, 40, 20000);
         } catch (colErr2) {
           console.warn('[Sync] Reintentando consulta directa indexada de tickets...', colErr2?.message);
@@ -3961,12 +3962,15 @@ window.cargarDatosDeSupabase = function() {
           });
         });
 
-        // Limpiar zombies en Supabase en segundo plano
+        // Limpiar zombies en Supabase en segundo plano en lotes seguros de 50
         if (zombieBitacoraIds.length > 0 && window.supabaseClient) {
           try {
-            window.supabaseClient.from('orden_bitacora').delete().in('id', zombieBitacoraIds).then(() => {
-              console.log(`[Sync] Purgadas ${zombieBitacoraIds.length} bitácoras duplicadas/inundadas en Supabase.`);
-            }).catch(() => {});
+            const chunkSize = 50;
+            for (let i = 0; i < zombieBitacoraIds.length; i += chunkSize) {
+              const chunk = zombieBitacoraIds.slice(i, i + chunkSize);
+              window.supabaseClient.from('orden_bitacora').delete().in('id', chunk).catch(() => {});
+            }
+            console.log(`[Sync] Purgadas ${zombieBitacoraIds.length} bitácoras duplicadas/inundadas en Supabase.`);
           } catch(e){}
         }
       }
@@ -4452,31 +4456,14 @@ window.cargarDatosDeSupabase = function() {
       console.warn('[Sync] Error al cargar ideas_fallas:', errIf);
     }
 
-    // Historial de Correos (Bandeja de Correo y Notificaciones)
+    // Historial de Correos (Bandeja de Correo y Notificaciones - gestionado localmente)
     try {
-      let emailLogs = null;
-      let emailLogsErr = null;
-      try {
-        emailLogs = await fetchTablePaginated('sapi_email_logs', '*', 'fecha', false, null, 150, 15000);
-      } catch (err) {
-        emailLogsErr = err;
-      }
-      if (!emailLogsErr && emailLogs && Array.isArray(emailLogs)) {
-        const isTargetMail = (l) => {
-          if (!l) return false;
-          if (String(l.id || '').startsWith('email_tk_')) return false;
-          const s = (String(l.de || '') + ' ' + String(l.para || '') + ' ' + String(l.cc || '') + ' ' + String(l.bcc || '') + ' ' + String(l.cliente || '')).toLowerCase();
-          return s.includes('ptalctes') || s.includes('portal tickets');
-        };
-        const filtered = emailLogs.filter(isTargetMail);
-        if (typeof safeSetJSON === 'function') {
-          safeSetJSON('sapi_email_logs', filtered);
-        } else {
-          localStorage.setItem('sapi_email_logs', JSON.stringify(filtered));
-        }
+      const localLogs = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_email_logs', []) : JSON.parse(localStorage.getItem('sapi_email_logs') || '[]');
+      if (Array.isArray(localLogs) && localLogs.length > 0) {
+        window._sapiEmailLogs = localLogs;
       }
     } catch (errEmail) {
-      // Opcional: la tabla sapi_email_logs puede no estar creada en Supabase
+      // Ignorar
     }
 
   } catch (error) {
@@ -4873,8 +4860,7 @@ function setupRealtime() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'envios' }, (payload) => handleUpdate('envios', payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'calendario_eventos' }, (payload) => handleUpdate('calendario_eventos', payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ideas_fallas' }, (payload) => handleUpdate('ideas_fallas', payload))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'config' }, (payload) => handleUpdate('config', payload))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sapi_email_logs' }, (payload) => handleUpdate('sapi_email_logs', payload));
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'config' }, (payload) => handleUpdate('config', payload));
       
     window.supabaseRealtimeChannel.subscribe();
   } catch (err) {

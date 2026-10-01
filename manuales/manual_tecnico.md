@@ -1,146 +1,164 @@
-# Manual de Uso: Técnico de Campo (SAPI Postventa)
+# Manual de Uso: Técnico de Campo y Taller (SAPI Postventa)
 
-Esta guía te explicará paso a paso cómo utilizar la plataforma **SAPI Postventa** en tu dispositivo móvil o tableta durante tus servicios de campo, incluso si no tienes acceso a internet.
-
----
-
-## 🔑 1. Acceso e Instalación
-
-1. Abre el navegador de tu celular y entra a la dirección provista por tu administrador.
-2. Inicia sesión con tu correo electrónico y tu contraseña.
-3. > [!TIP]
-   > Para tener la aplicación siempre a la mano en tu celular como si fuera una app nativa:
-   > * En **Android / Chrome**: Toca el menú de tres puntos arriba a la derecha y selecciona *"Instalar aplicación"* o *"Agregar a la pantalla principal"*.
-   > * En **iOS / Safari**: Toca el botón de compartir (flecha hacia arriba) y selecciona *"Agregar al inicio"*.
+Esta guía te explicará detalladamente cómo utilizar la plataforma **SAPI Postventa** en tu dispositivo móvil o tableta durante tus servicios de campo, inspecciones de renta y diagnósticos en taller, incluso cuando trabajes en zonas remotas, minas o sótanos **sin conexión a internet**.
 
 ---
 
-## 📅 2. Mi Agenda (Calendario de Actividades)
+## 📱 1. Acceso e Instalación de la Aplicación en tu Celular (PWA)
 
-En la sección **"Calendario"** verás tus actividades organizadas por día:
-* El calendario muestra en colores diferentes tus tareas asignadas: **Juntas**, **Capacitaciones**, **Descansos**, **Vacaciones**, **Servicios (Órdenes)** e **Inspecciones (Levantamientos)**.
-* Toca cualquier evento para ver el detalle de la hora de inicio, dirección de la obra y notas de oficina.
+La plataforma está diseñada como una Aplicación Web Progresiva (PWA) optimizada para dispositivos móviles:
+
+1. Abre el navegador web en tu celular (Google Chrome en Android o Safari en iPhone/iPad).
+2. Ingresa a la dirección del portal provista por tu supervisor.
+3. Inicia sesión con tu correo institucional y contraseña.
+4. > [!TIP]
+   > **Instálala como aplicación nativa en tu pantalla de inicio**:
+   > * **En Android (Chrome)**: Toca el menú de tres puntos (arriba a la derecha) y presiona **"Instalar aplicación"** o **"Agregar a la pantalla principal"**.
+   > * **En iOS / iPhone (Safari)**: Toca el botón de Compartir (icono cuadrado con flecha hacia arriba) y selecciona **"Agregar al inicio"**.
+   > De esta manera tendrás un acceso directo en tu celular que abrirá a pantalla completa y almacenará datos de forma ultrarrápida.
 
 ---
 
-## 📋 3. Flujo Obligatorio de una Orden de Servicio (Paso a Paso)
+## 📶 2. Preparación Obligatoria Offline (¡Antes de Salir al Servicio!)
 
-El flujo de trabajo digital en campo es obligatorio y debe seguirse estrictamente en el siguiente orden para cada servicio asignado:
-
-### Paso 3.1: Planificación y Carga de Órdenes (¡OBLIGATORIO ANTES DE SALIR!)
 > [!IMPORTANT]
-> **Antes de trasladarte al sitio de la obra, debes verificar si la zona tendrá o no cobertura de internet (Wi-Fi o datos móviles)**:
-> * **Si la zona del servicio NO tiene internet (Sótano, mina, carretera remota, etc.)**: DEBES abrir la aplicación en tu celular y cargar la Orden de Servicio asignada **mientras sigues en el taller o tengas señal**. Al hacer esto, la orden, los datos del cliente, la máquina y los catálogos se almacenan en la memoria local de tu teléfono.
-> * **Si no abres la orden con señal antes de salir**: Al llegar a la obra sin internet no podrás cargar el formato del servicio ni registrar tu trabajo en la aplicación.
+> **PROTOCOLO DE PRECARGA EN TALLER**:
+> Si vas a viajar a una obra, mina, sótano o carretera donde la cobertura celular sea nula o inestable:
+> 1. **Mientras sigues en el taller o tengas conexión Wi-Fi/4G estable**, abre la aplicación en tu celular.
+> 2. Entra a la sección **"Órdenes de Servicio"** y abre cada una de las órdenes que tengas asignadas para tu jornada o viaje.
+> 3. Al abrir la orden con señal, el sistema descarga automáticamente a la base de datos interna de tu teléfono (IndexedDB / LocalStorage) los datos del cliente, la máquina, el historial de fallas y el catálogo completo de refacciones de SAP.
+> 4. **Si no precargas la orden con internet antes de salir**: Al llegar a la obra sin señal no podrás abrir el formato de servicio ni registrar tu reporte técnico.
 
 ---
 
-### Paso 3.2: Ver tus Órdenes de Servicio en Sitio
-1. Ve a la sección **"Órdenes de Servicio"** en el menú lateral.
-2. Verás la lista de tus folios asignados (ej. `OS-26001`). Los folios en amarillo están **Pendientes**, en azul **En Proceso** y en verde **Completados**.
+## 📅 3. Mi Agenda (Calendario de Actividades)
 
-![Lista de Órdenes de Servicio](images/tecnico_ordenes_lista.jpg)
+En la sección **"Calendario"** verás tus actividades y servicios organizados:
+* **Servicios de Campo (Órdenes)**: Días y horas estimadas de tus mantenimientos. Al tocar el evento podrás ver la dirección de la obra y el contacto del cliente.
+* **Inspecciones (Levantamientos y Rentas)**: Revisiones técnicas o entregas de maquinaria.
+* **Eventos Administrativos**: Juntas de equipo, capacitaciones, descansos y periodos de vacaciones programados.
 
 ---
 
-### Paso 3.3: ¡LO PRIMERO AL LLEGAR! Evidencia Inicial (Foto de Inicio)
+## 🛠️ 4. Flujo Operativo de la Orden de Servicio en Campo (Paso a Paso)
+
+El flujo de trabajo técnico es obligatorio y debe completarse con precisión para garantizar la validez del reporte:
+
+```
+[Foto de Entrada] ➔ [Bitácora Diaria] ➔ [Checklist 15 Puntos] ➔ [Horómetro] ➔ [Refacciones SAP] ➔ [Foto de Salida] ➔ [Firmas]
+```
+
+---
+
+### Paso 4.1: ¡Lo Primero al Llegar! Evidencia Inicial (Foto de Entrada)
 > [!IMPORTANT]
-> **Antes de tocar la máquina o iniciar cualquier trabajo técnico**, debes tomar y subir la fotografía de recepción en su campo específico.
-1. Abre el detalle de la **Orden de Servicio** en tu pantalla.
-2. Desplázate a la sección **"Evidencias Fotográficas"**.
-3. Localiza la tarjeta específica llamada **"Foto de Inicio (Entrada)"** y haz clic en **"Cargar Foto"**.
-4. Toma la fotografía o selecciónala de tu galería para registrar el estado de recepción del equipo.
+> **Antes de tocar la máquina, desarmar componentes o iniciar cualquier maniobra**:
+> 1. Abre el detalle de la **Orden de Servicio** en tu celular.
+> 2. Desplázate a la sección **"Evidencias Fotográficas"**.
+> 3. Toca en la tarjeta **"Foto de Inicio (Entrada)"** y haz clic en **"Cargar Foto"**.
+> 4. Toma la fotografía que muestre el estado general y físico en que recibes el equipo en obra.
 
 ---
 
-### Paso 3.4: Registro Diario de Actividades (Bitácora Diaria)
-Al finalizar cada día de trabajo, debes reportar tu avance de jornada (incluso si el servicio no está terminado):
-1. Dentro del detalle de la orden, ve a la sección **"Bitácora Diaria"** y haz clic en **"Registrar Avance Diario"**.
+### Paso 4.2: Registro de Bitácora Diaria y Tiempos de Traslado
+Al terminar la jornada de cada día (incluso si el servicio dura varios días y aún no se concluye):
+1. En la orden, ve a la sección **"Bitácora Diaria"** y toca **"Registrar Avance Diario"**.
 2. Completa los campos:
-   * **Nota / Avance del día**: Escribe un reporte detallado del trabajo del día (ej. *"Se desmontó bomba hidráulica, se detectó daño en sellos y desgaste en flecha"*).
-   * **Hora de Entrada / Salida**: Registra la hora exacta en la que entraste y saliste de la obra.
-   * **Horas Traslado (Ida) / (Regreso)**: Captura las horas de traslado invertidas de ida y vuelta a la obra.
-3. Haz clic en **"Guardar Nota"**.
-
-![Registro de Bitácora Diaria](images/tecnico_bitacora_modal.jpg)
+   * **Resumen del Avance**: Describe detalladamente las maniobras efectuadas en el día (ej. *"Se desmontó bomba principal, se limpiaron líneas y se cambiaron sellos desgastados"*).
+   * **Hora de Entrada / Salida**: Hora exacta de inicio y fin de labores en el sitio.
+   * **Horas de Traslado (Ida y Vuelta)**: Horas invertidas en el traslado hacia y desde la obra.
+3. Guarda la nota. La información se sumará automáticamente a tu reporte semanal de horas laboradas.
 
 ---
 
-### Paso 3.5: Completar la Orden de Servicio (Servicio Terminado)
-Si ya concluiste el trabajo del servicio por completo, debes llenar todos los datos de cierre obligatorios en la orden:
-1. **Horómetro Actual (Obligatorio)**: Captura el valor numérico exacto de horas que marca el contador del equipo en la pestaña de información general.
-2. **Kilómetros / Tipo**: Registra el kilometraje final y el tipo de traslado realizado.
-3. **Diagnóstico y Trabajos**: Escribe el diagnóstico definitivo de la falla y la solución implementada.
-4. **Refacciones Utilizadas**: 
-   * Ve a la sección **"Refacciones Utilizadas"** y toca **"+ Agregar"**.
-   * Busca por código o descripción en tiempo real del catálogo oficial de SAP, selecciona la cantidad y agrégala.
-5. **Refacciones Necesarias**: Si el equipo requiere más piezas para futuras reparaciones, regístralas de igual forma en la sección de piezas necesarias.
+### Paso 4.3: Checklist Técnico de 15 Puntos de Inspección
+Durante el servicio debes realizar la inspección técnica preventiva de 15 puntos clave del equipo:
+1. **Nivel de Aceite de Motor**.
+2. **Nivel de Líquido Refrigerante / Anticongelante**.
+3. **Nivel de Aceite Hidráulico**.
+4. **Filtros de Aire (Primario y Secundario)**.
+5. **Filtros de Combustible y Trampa de Agua**.
+6. **Estado de Mangueras y Conexiones Hidráulicas**.
+7. **Detección de Fugas Visibles de Fluidos**.
+8. **Estado y Carga de la Batería / Bornes**.
+9. **Sistema Eléctrico y Luces de Trabajo**.
+10. **Presión y Desgaste de Neumáticos / Orugas**.
+11. **Mandos, Palancas y Joysticks de Control**.
+12. **Sistemas de Seguridad y Paro de Emergencia**.
+13. **Estructura, Chasis y Pasadores de Articulación**.
+14. **Engrase General de Puntos de Pivote**.
+15. **Limpieza General del Compartimento de Motor**.
 
-<table style="border: none; border-collapse: collapse; width: 100%;">
-  <tr style="border: none;">
-    <td style="border: none; text-align: center; width: 50%; padding: 5px; vertical-align: top;">
-      <img src="images/tecnico_orden_detalle.jpg" alt="Llenado del Reporte" style="width: 180px; display: block; margin: 0 auto;" />
-      <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; font-weight: 600;">Formulario de Reporte Técnico</div>
-    </td>
-    <td style="border: none; text-align: center; width: 50%; padding: 5px; vertical-align: top;">
-      <img src="images/tecnico_orden_refacciones.jpg" alt="Llenado de Refacciones" style="width: 180px; display: block; margin: 0 auto;" />
-      <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; font-weight: 600;">Registro de Refacciones Utilizadas</div>
-    </td>
-  </tr>
-</table>
+Marca el estado de cada punto (*Correcto*, *Atención Requerida*, *No Aplica*) e incluye comentarios si detectas anomalías.
 
 ---
 
-### Paso 3.6: Cargar Evidencias Fotográficas Finales
-1. Ve a la sección **"Evidencias Fotográficas"**.
-2. Localiza la tarjeta llamada **"Foto de Fin (Salida)"** y toca en **"Cargar Foto"** para subir la evidencia final del equipo reparado. Puedes subir otras imágenes complementarias en la opción de **"Fotos Adicionales"**.
-3. Sube una fotografía de respaldo del horómetro físico del equipo.
+### Paso 4.4: Horómetro Real y Ciclos de Mantenimiento Preventivo
+1. **Lectura del Horómetro Físico**: Captura el número exacto de horas acumuladas que marca el contador del horómetro de la máquina.
+2. **Foto de Respaldo**: Sube una foto nítida del display o reloj del horómetro.
+3. **Cálculo de Ciclos**: El sistema registrará el horómetro para programar automáticamente las alertas de los ciclos de mantenimiento preventivo subsecuentes (250h, 500h, 1000h, 2000h).
 
 ---
 
-### Paso 3.7: Firmas de Conformidad y Cierre de Orden
-Una vez completados todos los campos anteriores, el sistema habilitará la sección de firmas de conformidad:
-1. Ve a la sección **"Firmas de Conformidad"**.
-2. Escribe el **Nombre del Cliente** y su **Puesto** (de la persona que recibe el servicio en sitio).
-3. Pídele que dibuje su firma con su dedo directamente sobre el recuadro blanco (lienzo).
-4. Escribe tu nombre de técnico y dibuja tu firma en el recuadro correspondiente.
-5. Haz clic en **"Guardar Firma Técnico"** y posteriormente en **"Finalizar y Cerrar Orden"**.
-6. El estatus cambiará a **Completado** y se enviará la información a administración para sincronización con SAP.
+### Paso 4.5: Consumo de Refacciones y Solicitud de Piezas Faltantes
 
-![Sección de Firmas de Conformidad](images/tecnico_firmas_seccion.jpg)
+#### A. Refacciones Utilizadas (Consumidas en sitio):
+1. En la sección **"Refacciones Utilizadas"**, presiona **"+ Agregar Refacción"**.
+2. Utiliza el buscador en tiempo real para localizar la pieza por código o descripción en el catálogo oficial de SAP.
+3. Ingresa la **Cantidad** instalada y confirma. Estas piezas se descontarán automáticamente del inventario.
 
----
-
-## 📶 4. Uso de la Aplicación Sin Internet (Modo Offline)
-
-El sistema está diseñado para funcionar en sótanos, carreteras u obras mineras sin señal telefónica.
-
-* **Operación Normal**: Puedes registrar bitácoras, subir fotos y recabar firmas sin conexión a internet.
-* **Indicador de Sincronización**: Al guardar un registro sin red, verás un icono de **nube tachada** en color amarillo. Esto indica que los datos están guardados en tu celular de forma segura, pero pendientes de sincronizar con el servidor.
-* **Sincronización Automática**: Al recuperar señal celular o Wi-Fi, la aplicación subirá los datos de manera transparente y el icono cambiará a verde indicando sincronización exitosa.
-* > [!WARNING]
-  > **No borres el historial ni borres la caché del navegador de tu celular** si tienes archivos o bitácoras marcadas con la nube amarilla sin sincronizar, de lo contrario podrías perder la información guardada localmente.
+#### B. Refacciones Necesarias (Piezas Faltantes para Futura Reparación):
+* Si durante la inspección detectas que la máquina requiere piezas adicionales que no llevabas en tu unidad móvil, agrégalas en **"Refacciones Necesarias"**.
+* > [!NOTE]
+  > Al registrar refacciones necesarias, el sistema generará automáticamente un **Ticket-A de Refacciones** para que el área de administración y ventas cotice las piezas al cliente y programe una segunda visita.
 
 ---
 
-## 🔄 5. Sincronización Manual y Estado de Conexión (¿Cómo forzar sincronización?)
+### Paso 4.6: Evidencias Fotográficas Finales (Foto de Salida)
+1. Ve a **"Evidencias Fotográficas"**.
+2. En la tarjeta **"Foto de Fin (Salida)"**, sube la fotografía del equipo reparado, limpio y listo para operar.
+3. Agrega fotos adicionales de los componentes reemplazados o piezas dañadas en **"Fotos Adicionales"**.
 
-Si trabajaste fuera de línea y necesitas verificar el estado de tus registros locales o forzar la subida de tus reportes al recuperar señal:
+---
 
-### A. Detección de Cambios Locales (Fila sin actualizar)
-En las tablas de listados (como **Levantamientos**), todas las filas que aún no se sincronizan con los servidores de Supabase de la empresa mostrarán un **icono de nube tachada en amarillo** (`cloud-off`) al lado del folio de la orden o levantamiento:
+### Paso 4.7: Firmas Digitales de Conformidad y Cierre
+Una vez completados todos los apartados anteriores:
+1. Dirígete a la sección **"Firmas de Conformidad"**.
+2. Escribe el **Nombre Completo** y **Cargo / Puesto** del encargado del cliente en obra.
+3. Pídele que dibuje su firma de aceptación con el dedo sobre el recuadro blanco de la pantalla.
+4. Escribe tu nombre de técnico y plasma tu propia firma digital en el recuadro correspondiente.
+5. Haz clic en **"Finalizar y Cerrar Orden"**. El estatus pasará a **Completado**.
 
-![Fila Pendiente de Sincronizar](images/tecnico_fila_pendiente.jpg)
+---
 
-### B. Indicador en Barra Superior
-En la barra superior de la app, al lado de tu nombre de usuario, verás el estado actual del portal:
-* **Sin conexión** (icono rojo de Wi-Fi tachado): Muestra la hora de la última sincronización.
-* **Cambios pendientes** (icono naranja): Muestra una burbuja numérica con el número de bitácoras y fotos guardadas localmente esperando ser subidas.
+## 📑 5. Levantamientos Técnicos e Inspección de Rentas (Check-in / Check-out)
 
-### C. Forzar la Sincronización Manual
-1. Toca directamente sobre el **Indicador de Conexión** (el icono de Wi-Fi o nube) en la barra superior.
-2. Se abrirá la ventana emergente **"Cambios Pendientes de Sincronizar"** con la lista detallada de tus bitácoras y registros locales guardados.
-3. Asegúrate de estar en una zona con señal celular estable o Wi-Fi y haz clic en el botón **"Intentar Sincronizar Ahora"**.
-4. La lista se vaciará y el indicador superior cambiará a **"Conectado"** (icono verde), indicando que todos tus reportes están a salvo en la nube.
+Si acudes a una obra a entregar o recibir una máquina en renta:
+* **Check-in (Entrega)**: Llena la hoja de inspección, anota el horómetro y combustible de inicio, toma las fotografías perimetrales y recaba la firma de recepción del cliente.
+* **Check-out (Devolución)**: Realiza la revisión final, captura el horómetro de entrega, registra posibles daños o componentes faltantes y recaba la firma de entrega.
 
-![Modal de Sincronización Manual](images/tecnico_sync_modal.jpg)
+---
+
+## 💵 6. Control de Gastos y Viáticos en Campo
+
+Para registrar tus consumos durante el viaje de servicio:
+1. Entra a la sección **"Control de Gastos"**.
+2. Toca en **"Registrar Gasto"**.
+3. Captura la fecha, concepto (*Gasolina*, *Casetas*, *Comidas*, *Hotel*), monto exacto y toma una foto clara del ticket de compra.
+4. Si cuentas con factura electrónica (archivos XML o PDF), puedes subirlos directamente desde tu celular en la pestaña **"Subir Facturas"**.
+5. Si utilizas la tarjeta corporativa **Clara**, entra a **"Transacciones Clara"**, busca el cargo y presiona **"Comprobar"** adjuntando el ticket o factura.
+
+---
+
+## 🔄 7. Indicadores Visuales y Sincronización Fuera de Línea
+
+Cuando trabajes sin señal de internet:
+* **Nube Amarilla Tachada (`cloud-off`)**: Indica que tus bitácoras, fotos, firmas o refacciones están guardadas de forma 100% segura en la memoria local de tu teléfono, pero pendientes de subirse al servidor.
+* **Nube Verde (`cloud-check`)**: Indica que todos tus datos ya fueron transferidos con éxito a la nube de Supabase.
+* **Forzar Sincronización Manual**:
+  1. Al regresar a una zona con señal o Wi-Fi, toca el **icono de conexión** en la barra superior.
+  2. Se abrirá la ventana **"Cambios Pendientes de Sincronizar"**.
+  3. Presiona el botón **"Intentar Sincronizar Ahora"**.
+  4. La lista se procesará y quedará vacía con el estatus en color verde.
+* > [!CAUTION]
+  > **Nunca borres el historial ni los datos del navegador de tu teléfono** si tienes cambios pendientes con la nube amarilla, para evitar la pérdida accidental de evidencias no sincronizadas.

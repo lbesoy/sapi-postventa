@@ -1,80 +1,116 @@
-# Manual de Uso: Control de Gastos e Integración Clara (SAPI Postventa)
+# Manual de Uso: Control de Gastos, Viáticos e Integración Clara (SAPI Postventa)
 
-Esta guía te guiará paso a paso sobre cómo registrar tus gastos de viaje, comprobar tu tarjeta corporativa Clara, digitalizar facturas y realizar la conciliación automatizada en la plataforma **SAPI Postventa**.
+Esta guía te guiará paso a paso en el uso del módulo de **Control de Gastos y Viáticos** de **SAPI Postventa**, desde la captura móvil de tickets en campo por parte de los técnicos, la vinculación y comprobación de tarjetas corporativas **Clara**, la lectura automática de facturas electrónicas XML/PDF del SAT, hasta la conciliación y auditoría financiera por parte de la administración.
 
 ---
 
-## 💵 1. Registro Manual de Gastos (Viáticos)
+## 🎯 1. Propósito del Módulo de Control de Gastos
 
-Si realizaste un gasto en campo pagado en efectivo o con tu tarjeta personal (casetas, gasolina, alimentos, etc.) que deba ser reembolsado o comprobado, sigue estos pasos:
+El módulo de finanzas y viáticos de SAPI Postventa tiene como objetivo:
+* Permitir a los técnicos de campo comprobar sus gastos de viaje de forma inmediata desde su celular sin esperar a regresar a la oficina.
+* Eliminar la captura manual de datos fiscales mediante un extractor inteligente de facturas XML y PDF.
+* Descargar y conciliar en tiempo real los cargos efectuados con las tarjetas de crédito corporativas **Clara**.
+* Generar reportes contables auditados para el reembolso de viáticos y control de nómina semanal.
+
+---
+
+## 💵 2. Registro Manual de Gastos de Viaje (Técnicos)
+
+Si realizaste un gasto en efectivo o con recursos propios durante una orden de servicio (gasolina, casetas, alimentos, hospedaje o refacciones de emergencia):
 
 1. Ve a la sección **"Control de Gastos"** en el menú lateral.
-2. Haz clic en **"Registrar Gasto"**.
+2. Haz clic en el botón **"Registrar Gasto"**.
 3. Completa los campos solicitados:
-   * **Fecha del Gasto**: El día en que realizaste la compra.
-   * **Concepto**: Breve descripción (ej. *"Gasolina para traslado a Obra Querétaro"*).
-   * **Categoría**: Elige entre *Gasolina*, *Casetas*, *Alimentos*, *Hospedaje*, *Herramientas* u *Otros*.
-   * **Monto ($)**: El total exacto con centavos.
-   * **Moneda**: MXN (por defecto) o USD.
-   * **Evidencia**: Haz clic para cargar una foto legible del ticket de compra o recibo desde tu celular.
+   * **Fecha del Gasto**: Día exacto de la compra.
+   * **Concepto**: Breve descripción del consumo (ej. *"Combustible para camioneta de servicio en traslado a Mina Guanajuato"*).
+   * **Categoría**: Selecciona entre:
+     * *Gasolina / Combustible*
+     * *Casetas de Peaje*
+     * *Alimentos / Viáticos*
+     * *Hospedaje / Hotel*
+     * *Materiales / Herramientas Menores*
+     * *Otros Gastos Operativos*
+   * **Monto Total**: Importe numérico exacto con centavos.
+   * **Moneda**: MXN (Pesos Mexicanos) o USD (Dólares).
+   * **Evidencia Fotográfica**: Toma una fotografía nítida del ticket físico de compra o nota de remisión.
 4. Haz clic en **"Guardar Gasto"**.
 5. > [!NOTE]
-   > Tu gasto quedará guardado con estatus **"Pendiente de Aprobación"** hasta que el área de administración lo revise. Recibirás una notificación si es rechazado por falta de claridad en el ticket o datos incorrectos.
+   > El gasto quedará registrado con estatus **"Pendiente de Aprobación"** en tu lista personal hasta que sea auditado por el área administrativa.
 
 ---
 
-## 💳 2. Tarjetas Corporativas Clara (Vinculación y Comprobación)
+## 💳 3. Integración con Tarjetas Corporativas Clara
 
-Si cuentas con una tarjeta de crédito corporativa **Clara** asignada por Eurorep, puedes vincularla a tu usuario para conciliar tus transacciones directamente:
+Si Eurorep te ha asignado una tarjeta de crédito corporativa **Clara** (física o virtual), puedes vincularla para comprobar tus compras de forma directa:
 
-### Paso 2.1: Vincular tu Tarjeta Clara (Se realiza una sola vez)
-1. Dentro de la sección de Gastos, ve a la pestaña **"Mis Tarjetas Clara"**.
+### 3.1 Vincular tu Tarjeta Clara (Configuración única):
+1. En el módulo de gastos, ingresa a la pestaña **"Mis Tarjetas Clara"**.
 2. Haz clic en **"Vincular Tarjeta"**.
-3. Escribe los **últimos 4 dígitos** de tu tarjeta física o virtual Clara.
-4. Asigna un **Alias** (ej. *"Tarjeta de Campo - [Tu Nombre]"*).
-5. Haz clic en **"Vincular"**. A partir de este momento, el sistema jalará tus transacciones de Clara en tiempo real.
+3. Captura los **últimos 4 dígitos** de la tarjeta y asigna un **Alias** identificador (ej. *"Tarjeta Campo - [Tu Nombre]"*).
+4. Presiona **"Vincular"**. A partir de este momento, los cargos de dicha tarjeta se sincronizarán con tu cuenta.
 
-### Paso 2.2: Comprobar una Transacción de Clara
-1. Ve a la pestaña **"Transacciones Clara"**. Verás la lista de cargos realizados a tu tarjeta.
-2. Identifica la transacción correspondiente (ej. *"Cargos Oxxo - $150.00"*).
-3. Haz clic en el botón **"Comprobar"** al lado de la transacción.
-4. Sube la foto del ticket físico o, de preferencia, sube la **Factura XML/PDF** asociada (ver sección 3).
-5. Guarda la comprobación. El estatus de la transacción cambiará a **Comprobada** y se enviará a revisión.
-
-![Control de Gastos y Tarjeta Clara](images/control_gastos.jpg)
+### 3.2 Comprobar un Cargo de Tarjeta Clara:
+1. Dirígete a la pestaña **"Transacciones Clara"**.
+2. Verás el listado de cargos bancarios descargados en tiempo real (comercio, fecha y monto).
+3. Localiza el cargo que deseas comprobar y presiona el botón **"Comprobar"**.
+4. Sube la foto del ticket o, preferentemente, selecciona la factura electrónica XML/PDF previamente cargada.
+5. Al guardar, el cargo cambiará a estatus **Comprobada** y estará listo para la conciliación contable.
 
 ---
 
-## 📄 3. Extractor Inteligente de Facturas (XML y PDF)
+## 📄 4. Extractor Inteligente de Facturas Electrónicas (CFDI XML y PDF)
 
-Para evitar la captura manual de montos, RFC y folios fiscales, el sistema cuenta con un lector automático de facturas electrónicas:
+Para agilizar la comprobación fiscal y evitar errores de dedo, el sistema cuenta con un motor de lectura automática de comprobantes digitales del SAT:
 
-1. En el módulo de gastos, dirígete a la pestaña **"Subir Facturas"**.
-2. Arrastra o selecciona tus archivos de factura (**formato .XML o .PDF**) en el recuadro de carga. Puedes subir varios archivos al mismo tiempo.
+1. Ve a la pestaña **"Subir Facturas"**.
+2. Arrastra o selecciona tus archivos de factura (**formatos .XML y .PDF**). Puedes cargar múltiples archivos de forma simultánea.
 3. Haz clic en **"Procesar Facturas"**.
-4. El backend de SAPI analizará los archivos mediante un extractor inteligente y obtendrá de forma automática:
-   * **Nombre del Emisor (Proveedor)**.
+4. El motor analizará la estructura fiscal y extraerá automáticamente:
+   * **Razón Social del Emisor (Proveedor)**.
    * **RFC del Emisor**.
-   * **Fecha de Emisión**.
-   * **Subtotal, Impuestos (IVA/IEPS) y Monto Total**.
-   * **UUID (Folio Fiscal digital de 36 caracteres)**.
-5. Verás en pantalla una tabla con los datos extraídos para que los confirmes. Si todo es correcto, haz clic en **"Aceptar y Guardar"**. Las facturas quedarán almacenadas en tu inventario digital listas para ser conciliadas.
+   * **Fecha y Hora de Emisión**.
+   * **Subtotal, Desglose de Impuestos (IVA, IEPS, Retenciones) y Monto Total**.
+   * **Folio Fiscal Digital (UUID de 36 caracteres)**.
+5. El sistema mostrará una tabla de previsualización con los datos extraídos. Verifica que todo sea correcto y presiona **"Guardar Facturas"**. Las facturas quedarán almacenadas en el inventario digital listas para ser enlazadas a los gastos.
 
 ---
 
-## 🔄 4. Conciliación de Gastos (Administradores)
+## 🔄 5. Módulo de Conciliación de Gastos (Administración y Finanzas)
 
-Este proceso es exclusivo para administradores y supervisores de oficina, y sirve para auditar que todas las compras reportadas correspondan con facturas del SAT válidas:
+La conciliación es el proceso mediante el cual la oficina de administración audita y enlaza los cargos bancarios con sus facturas fiscales oficiales correspondientes:
 
-1. Ve a la sección **"Control de Gastos"** con perfil administrador.
+1. Inicia sesión con perfil `admin`, `supervisor` o `superadmin` y entra a **"Control de Gastos"**.
 2. Abre la pestaña **"Conciliación de Gastos"**.
-3. El sistema te mostrará una pantalla dividida en dos columnas:
-   * **Columna Izquierda (Transacciones y Gastos Reportados)**: Cargos a tarjetas Clara y viáticos manuales pendientes de comprobación.
-   * **Columna Derecha (Facturas Subidas e Inventariadas)**: Las facturas XML/PDF procesadas por el sistema.
-4. **Auto-Conciliación (Sugerencias del Sistema)**:
-   * El sistema analizará las fechas, montos y RFC del emisor. Si encuentra coincidencias perfectas o aproximadas, resaltará la sugerencia en color verde.
-   * Haz clic en **"Aceptar Conciliación Sugerida"** para enlazar la transacción Clara con la factura electrónica correspondiente.
-5. **Conciliación Manual**:
-   * Si el sistema no encuentra una coincidencia automática, selecciona la transacción en la columna izquierda y haz clic en la factura correspondiente en la columna derecha.
-   * Haz clic en **"Conciliar Seleccionados"**.
-6. Una vez conciliado, el gasto cambia a estatus **Aprobado** y se archiva en el historial contable, liberando el saldo de comprobación del técnico.
+3. La interfaz se divide en dos paneles interactivos:
+   * **Panel Izquierdo (Transacciones y Gastos Reportados)**: Lista de cargos de tarjetas Clara y viáticos manuales en espera de auditoría.
+   * **Panel Derecho (Facturas SAT Disponibles)**: Inventario de facturas XML/PDF procesadas por los técnicos.
+
+### Auto-Conciliación Inteligente:
+* El sistema ejecuta un algoritmo de coincidencia que analiza automáticamente montos idénticos, fechas cercanas (±3 días) y RFC del emisor.
+* Si el sistema detecta una coincidencia certera, la resaltará con un borde **verde brillante** y mostrará el botón **"Aceptar Sugerencia de Conciliación"**.
+* Al hacer clic, la transacción bancaria y la factura fiscal quedan automáticamente asociadas y validadas.
+
+### Conciliación Manual:
+* Si no hubo coincidencia automática (por ejemplo, propinas adicionales no facturadas o compras combinadas):
+  1. Selecciona la transacción en la columna izquierda.
+  2. Selecciona la factura fiscal correspondiente en la columna derecha.
+  3. Presiona el botón **"Conciliar Registros Seleccionados"**.
+
+---
+
+## 📊 6. Ciclo de Estatus del Gasto y Reportes de Nómina
+
+Cada gasto reportado transita por los siguientes estados:
+
+```
+[Pendiente / Reportado] ➔ [Comprobado] ➔ [Conciliado] ➔ [Aprobado]
+```
+
+* **Pendiente**: Registrado en campo sin comprobante adjunto.
+* **Comprobado**: Cuenta con ticket fotográfico o factura preliminar.
+* **Conciliado**: Enlazado con su comprobante fiscal CFDI (XML) validado en SAT.
+* **Aprobado**: Validado por el administrador para su inclusión en la nómina semanal o reembolso.
+* **Rechazado**: Si el comprobante es ilegible, no deducible o no corresponde a la operación (se envía notificación al técnico con el motivo).
+
+### Exportación a Contabilidad:
+* En cualquier momento, el administrador puede aplicar filtros por **Técnico**, **Rango de Fechas** o **Periodo de Nómina Semanal** y presionar **"Exportar a Excel / CSV"** para enviar la relación de gastos al departamento contable de Eurorep.

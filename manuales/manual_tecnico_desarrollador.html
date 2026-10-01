@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual Técnico y de Arquitectura para Desarrolladores — Eurorep SAPI</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --secondary: #475569;
+      --bg: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --card-bg: #f8fafc;
+      --code-bg: #f1f5f9;
+      --accent: #f59e0b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --purple: #8b5cf6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+      padding: 24px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* Top Floating / Header Bar */
+    .viewer-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 24px;
+      position: sticky;
+      top: 12px;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+      backdrop-filter: blur(8px);
+    }
+
+    .doc-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 9999px;
+      background: #e0f2fe;
+      color: #0369a1;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+
+    .btn-pdf {
+      background: var(--primary);
+      color: #ffffff;
+      border: 1px solid var(--primary);
+    }
+    .btn-pdf:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-print {
+      background: #ffffff;
+      color: var(--secondary);
+      border: 1px solid var(--border);
+    }
+    .btn-print:hover {
+      background: #f1f5f9;
+      color: var(--text);
+    }
+
+    /* Content Typography */
+    #content {
+      margin-top: 10px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-top: 10px;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 3px solid var(--primary);
+      letter-spacing: -0.5px;
+    }
+
+    h2 {
+      font-size: 21px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 36px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1.5px solid var(--border);
+    }
+
+    h3 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #334155;
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+
+    h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #475569;
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin-bottom: 16px;
+      color: #334155;
+    }
+
+    strong {
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+
+    ul, ol {
+      margin-top: 8px;
+      margin-bottom: 18px;
+      padding-left: 28px;
+      color: #334155;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    /* Tablas */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0 28px 0;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+      text-align: left;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      color: #334155;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    /* Código */
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      background: var(--code-bg);
+      color: #e11d48;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #e2e8f0;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 16px 20px;
+      border-radius: 10px;
+      overflow-x: auto;
+      margin: 18px 0 24px 0;
+    }
+
+    pre code {
+      background: transparent;
+      color: #38bdf8;
+      padding: 0;
+      border: none;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    /* Alert Cards */
+    .alert-card {
+      margin: 20px 0 24px 0;
+      padding: 16px 20px;
+      border-radius: 8px;
+      border-left: 4px solid;
+      font-size: 14.5px;
+    }
+
+    .alert-note {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      color: #1e40af;
+    }
+
+    .alert-tip {
+      background: #f0fdf4;
+      border-color: #10b981;
+      color: #065f46;
+    }
+
+    .alert-important {
+      background: #fefce8;
+      border-color: #eab308;
+      color: #854d0e;
+    }
+
+    .alert-warning {
+      background: #fff7ed;
+      border-color: #f97316;
+      color: #9a3412;
+    }
+
+    .alert-caution {
+      background: #fef2f2;
+      border-color: #ef4444;
+      color: #991b1b;
+    }
+
+    .alert-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Imágenes */
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin: 14px 0;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.04);
+    }
+
+    /* Links */
+    a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    @media print {
+      .viewer-topbar { display: none; }
+      body { padding: 0; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="viewer-topbar">
+    <div class="doc-badge">EUROREP SAPI — POSTVENTA</div>
+    <div class="topbar-actions">
+      <button class="btn-action btn-print" onclick="window.print()">
+        🖨️ Imprimir
+      </button>
+      <a href="manual_tecnico_desarrollador.pdf" download class="btn-action btn-pdf">
+        ⬇️ Descargar PDF
+      </a>
+    </div>
+  </div>
+
+  <div id="content">
+    <h1>Manual de Arquitectura Técnica y Referencia para Desarrolladores (SAPI Postventa)</h1>
+<div class="alert-card alert-caution"><div class="alert-title">⛔ PRECAUCIÓN / SEGURIDAD</div><strong>DOCUMENTO ESTRICTAMENTE CONFIDENCIAL — ACCESO EXCLUSIVO: SUPERADMINISTRADOR / SISTEMAS</strong>
+Esta guía documenta la arquitectura interna, diseño de bases de datos, lógica de políticas RLS en Supabase, el motor de sincronización con SAP Business One Service Layer, la arquitectura offline PWA y las pautas para mantenimiento y extensión del código fuente de <strong>SAPI Postventa (Eurorep CRM)</strong>.</div>
+<hr>
+<h2>🏗️ 1. Arquitectura General del Sistema</h2>
+<p>SAPI Postventa opera bajo un modelo de arquitectura distribuida de tres niveles:</p>
+<pre><code class="language-mermaid">graph TD
+    subgraph Frontend [Cliente / Navegador SPA &amp; PWA]
+        AdminApp[Admin App: index.html + app.js]
+        ClientApp[Client Portal: cliente.html + cliente.js]
+        SW[Service Worker: sw.js]
+        LocalStore[(Storage: IndexedDB + localStorage)]
+    end
+
+    subgraph Backend [Middleware Node.js / Express]
+        Server[Express Server: backend/server.js]
+        SyncEngine[Sync Engine: backend/sync-sap-supabase.js]
+        PDFEngine[PDF Extractor: backend/extract-pdf]
+    end
+
+    subgraph Database [BaaS Cloud - Supabase]
+        Postgres[(PostgreSQL 15 + RLS)]
+        Auth[Supabase Auth]
+        Realtime[Supabase Realtime Engine]
+        Storage[Storage Buckets: evidencias, cotizaciones, facturas]
+    end
+
+    subgraph ERP [ERP Empresarial]
+        SAP[SAP Business One Service Layer]
+        HANA[SAP HANA / SQL Server Database]
+    end
+
+    subgraph CloudStorage [Almacenamiento Corporativo]
+        OneDrive[Microsoft OneDrive / Graph API]
+    end
+
+    AdminApp &lt;--&gt; Postgres
+    AdminApp &lt;--&gt; Auth
+    AdminApp &lt;--&gt; Storage
+    ClientApp &lt;--&gt; Postgres
+    ClientApp &lt;--&gt; Auth
+    AdminApp &lt;--&gt; Server
+    Server &lt;--&gt; SAP
+    SyncEngine &lt;--&gt; SAP
+    SyncEngine &lt;--&gt; Postgres
+    Server &lt;--&gt; OneDrive</code></pre>
+<hr>
+<h2>🗄️ 2. Diccionario de Datos y Schemas de Base de Datos (PostgreSQL en Supabase)</h2>
+<h3>2.1 Tabla: <code>user_roles</code></h3>
+<p>Almacena la relación entre usuarios autenticados (<code>auth.users</code>) y sus roles operativos:</p>
+<ul>
+<li><code>id</code> (UUID, PK, FK -> <code>auth.users.id</code>).</li>
+<li><code>email</code> (TEXT, UNIQUE).</li>
+<li><code>nombre</code> (TEXT).</li>
+<li><code>rol</code> (TEXT: <code>'superadmin'</code>, <code>'admin'</code>, <code>'supervisor'</code>, <code>'tecnico'</code>, <code>'consulta'</code>, <code>'cliente'</code>, <code>'empresa'</code>).</li>
+<li><code>empresa</code> (TEXT, Razón social para vincular clientes a sus registros).</li>
+<li><code>activo</code> (BOOLEAN, Estado de aprobación de cuenta).</li>
+<li><code>created_at</code> (TIMESTAMPTZ).</li>
+</ul>
+<h3>2.2 Tabla: <code>clientes</code></h3>
+<p>Socios de negocios sincronizados desde SAP B1:</p>
+<ul>
+<li><code>id</code> (UUID, PK) o <code>CardCode</code> (TEXT, PK alternativo).</li>
+<li><code>nombre</code> / <code>CardName</code> (TEXT).</li>
+<li><code>rfc</code> / <code>LicTradNum</code> (TEXT).</li>
+<li><code>telefono</code> (TEXT), <code>email</code> (TEXT), <code>contacto</code> (TEXT).</li>
+<li><code>saldo_actual</code> (NUMERIC), <code>saldo_oc_abiertas</code> (NUMERIC).</li>
+</ul>
+<h3>2.3 Tabla: <code>sitios</code></h3>
+<p>Frentes de trabajo, obras y plantas por cliente:</p>
+<ul>
+<li><code>id</code> (UUID, PK).</li>
+<li><code>cliente</code> (TEXT, Nombre o CardCode de la empresa).</li>
+<li><code>nombre</code> (TEXT, Identificador de la obra o planta).</li>
+<li><code>direccion</code> (TEXT), <code>ciudad</code> (TEXT), <code>estado</code> (TEXT).</li>
+<li><code>latitud</code> (NUMERIC), <code>longitud</code> (NUMERIC, Coordenadas GPS).</li>
+<li><code>contacto</code> (TEXT), <code>telefono</code> (TEXT).</li>
+</ul>
+<h3>2.4 Tabla: <code>maquinaria</code></h3>
+<p>Parque de maquinaria y equipos:</p>
+<ul>
+<li><code>id</code> (UUID, PK).</li>
+<li><code>serie</code> (TEXT, UNIQUE, Número de serie físico).</li>
+<li><code>marca</code> (TEXT), <code>modelo</code> (TEXT), <code>anio</code> (INTEGER).</li>
+<li><code>cliente</code> (TEXT), <code>sitio</code> (TEXT, Ubicación actual).</li>
+<li><code>horometro</code> (NUMERIC, Última lectura acumulada).</li>
+<li><code>estatus</code> (TEXT: <code>'operativo'</code>, <code>'mantenimiento'</code>, <code>'en_renta'</code>, <code>'falla_reportada'</code>).</li>
+</ul>
+<h3>2.5 Tabla: <code>rentas</code></h3>
+<p>Contratos de arrendamiento de maquinaria:</p>
+<ul>
+<li><code>id</code> (UUID, PK).</li>
+<li><code>folio_renta</code> (TEXT, Folio único ej. <code>RNT-26001</code>).</li>
+<li><code>cliente</code> (TEXT), <code>sitio</code> (TEXT).</li>
+<li><code>maquinaria_id</code> (UUID, FK -> <code>maquinaria.id</code>), <code>serie</code> (TEXT).</li>
+<li><code>fecha_inicio</code> (DATE), <code>fecha_fin_estimada</code> (DATE), <code>fecha_devolucion</code> (DATE).</li>
+<li><code>horometro_inicio</code> (NUMERIC), <code>horometro_fin</code> (NUMERIC).</li>
+<li><code>combustible_inicio</code> (TEXT), <code>combustible_fin</code> (TEXT).</li>
+<li><code>fotos_checkin</code> (JSONB), <code>fotos_checkout</code> (JSONB).</li>
+<li><code>firma_cliente_checkin</code> (TEXT), <code>firma_cliente_checkout</code> (TEXT).</li>
+<li><code>estatus</code> (TEXT: <code>'activa'</code>, <code>'por_vencer'</code>, <code>'en_devolucion'</code>, <code>'finalizada'</code>).</li>
+</ul>
+<h3>2.6 Tabla: <code>tickets</code></h3>
+<p>Expedientes de soporte técnico y solicitudes de servicio:</p>
+<ul>
+<li><code>id</code> (UUID, PK).</li>
+<li><code>folio</code> (TEXT, UNIQUE, ej. <code>T-26045</code> o <code>TKT-26045-A</code>).</li>
+<li><code>cliente</code> (TEXT), <code>sitio</code> (TEXT), <code>maquinaria</code> (TEXT), <code>serie</code> (TEXT).</li>
+<li><code>horometro_reportado</code> (NUMERIC).</li>
+<li><code>categoria</code> (TEXT: <code>'Correctivo'</code>, <code>'Preventivo'</code>, <code>'Refacciones'</code>, <code>'Garantía'</code>).</li>
+<li><code>prioridad</code> (TEXT: <code>'Baja'</code>, <code>'Media'</code>, <code>'Alta'</code>, <code>'Crítica'</code>).</li>
+<li><code>asunto</code> (TEXT), <code>descripcion</code> (TEXT).</li>
+<li><code>evidencias</code> (JSONB, URLs de fotografías en Supabase Storage).</li>
+<li><code>estatus</code> (TEXT: <code>'Reportado'</code>, <code>'En Curso'</code>, <code>'Cotizado'</code>, <code>'En Proceso'</code>, <code>'Orden de Servicio'</code>, <code>'Cerrado'</code>, <code>'Refacciones'</code>).</li>
+<li><code>tecnico_asignado</code> (TEXT), <code>tecnico_id</code> (UUID).</li>
+<li><code>cotizacion_sap</code> (TEXT), <code>monto_cotizacion</code> (NUMERIC), <code>url_cotizacion_pdf</code> (TEXT).</li>
+<li><code>pedido_sap</code> (TEXT), <code>url_pedido_pdf</code> (TEXT).</li>
+<li><code>orden_compra_cliente_url</code> (TEXT), <code>comprobante_pago_url</code> (TEXT).</li>
+<li><code>is_ticket_a</code> (BOOLEAN, Flag indicador de ticket autogenerado de refacciones de campo).</li>
+<li><code>created_at</code> (TIMESTAMPTZ), <code>updated_at</code> (TIMESTAMPTZ).</li>
+</ul>
+<h3>2.7 Tabla: <code>tickets_comentarios</code></h3>
+<p>Historial de mensajería del ticket:</p>
+<ul>
+<li><code>id</code> (UUID, PK).</li>
+<li><code>ticket_id</code> (UUID, FK -> <code>tickets.id</code>).</li>
+<li><code>autor</code> (TEXT), <code>usuario_id</code> (UUID, FK -> <code>auth.users.id</code>).</li>
+<li><code>mensaje</code> (TEXT).</li>
+<li><code>is_staff_only</code> (BOOLEAN: <code>true</code> para notas internas, <code>false</code> para chat público).</li>
+<li><code>created_at</code> (TIMESTAMPTZ).</li>
+</ul>
+<h3>2.8 Tabla: <code>ordenes</code></h3>
+<p>Hojas de servicio oficiales de campo:</p>
+<ul>
+<li><code>id</code> (UUID, PK).</li>
+<li><code>folio</code> (TEXT, UNIQUE, ej. <code>OS-26045</code>).</li>
+<li><code>ticket_id</code> (UUID, FK -> <code>tickets.id</code>).</li>
+<li><code>cliente</code> (TEXT), <code>sitio</code> (TEXT), <code>maquinaria</code> (TEXT), <code>serie</code> (TEXT).</li>
+<li><code>tecnico</code> (TEXT), <code>tecnicos_adicionales</code> (JSONB).</li>
+<li><code>fecha_servicio</code> (DATE).</li>
+<li><code>horometro_inicio</code> (NUMERIC), <code>horometro_final</code> (NUMERIC).</li>
+<li><code>km_recorridos</code> (NUMERIC), <code>tipo_traslado</code> (TEXT).</li>
+<li><code>bitacora_diaria</code> (JSONB, Array de notas de avance diario, horas de entrada/salida y traslados).</li>
+<li><code>checklist_inspeccion</code> (JSONB, Evaluación de los 15 puntos técnicos).</li>
+<li><code>diagnostico</code> (TEXT), <code>trabajos_realizados</code> (TEXT).</li>
+<li><code>refacciones_utilizadas</code> (JSONB, Piezas consumidas con código SAP y cantidad).</li>
+<li><code>refacciones_necesarias</code> (JSONB, Piezas faltantes detectadas en campo).</li>
+<li><code>evidencias_fotos</code> (JSONB, <code>foto_inicio</code>, <code>foto_fin</code>, <code>fotos_adicionales</code>, <code>foto_horometro</code>).</li>
+<li><code>firma_cliente</code> (TEXT, DataURL base64), <code>nombre_firma_cliente</code> (TEXT), <code>puesto_firma_cliente</code> (TEXT).</li>
+<li><code>firma_tecnico</code> (TEXT, DataURL base64).</li>
+<li><code>estatus</code> (TEXT: <code>'Pendiente'</code>, <code>'En Proceso'</code>, <code>'Completado'</code>).</li>
+<li><code>url_pdf_onedrive</code> (TEXT, Ruta en Microsoft OneDrive).</li>
+</ul>
+<h3>2.9 Tablas de Finanzas: <code>gastos</code>, <code>clara_cards</code>, <code>clara_transactions</code>, <code>facturas_sat</code></h3>
+<ul>
+<li><code>gastos</code>: Registro de viáticos con <code>concepto</code>, <code>categoria</code>, <code>monto</code>, <code>moneda</code>, <code>evidencia_url</code>, <code>estatus</code> (<code>'pendiente'</code>, <code>'comprobado'</code>, <code>'conciliado'</code>, <code>'aprobado'</code>), <code>usuario_id</code>.</li>
+<li><code>clara_cards</code>: Tarjetas corporativas con <code>last_four</code>, <code>alias</code>, <code>usuario_vinculado_id</code>.</li>
+<li><code>clara_transactions</code>: Cargos bancarios con <code>transaction_id</code>, <code>amount</code>, <code>merchant_name</code>, <code>status</code>, <code>factura_uuid_vinculada</code>.</li>
+<li><code>facturas_sat</code>: CFDI procesados con <code>uuid</code>, <code>rfc_emisor</code>, <code>razon_social_emisor</code>, <code>fecha_emision</code>, <code>subtotal</code>, <code>iva</code>, <code>total</code>, <code>xml_url</code>, <code>pdf_url</code>.</li>
+</ul>
+<hr>
+<h2>🔒 3. Modelo de Seguridad y Políticas de RLS en Supabase</h2>
+<p>El sistema utiliza <strong>Row-Level Security (RLS)</strong> estricto en PostgreSQL delegando la validación al motor de base de datos:</p>
+<h3>Helpers STABLE en PostgreSQL:</h3>
+<pre><code class="language-sql">CREATE OR REPLACE FUNCTION public.get_my_role()
+RETURNS text LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT rol FROM public.user_roles WHERE id = auth.uid();
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_my_empresa()
+RETURNS text LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT empresa FROM public.user_roles WHERE id = auth.uid();
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_my_name()
+RETURNS text LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT nombre FROM public.user_roles WHERE id = auth.uid();
+$$;</code></pre>
+<h3>Reglas RLS Clave:</h3>
+<ol>
+<li><strong>Notas Internas de Tickets (<code>tickets_comentarios</code>)</strong>:</li>
+</ol>
+<pre><code class="language-sql">   CREATE POLICY "Lectura comentarios de tickets" ON public.tickets_comentarios
+   FOR SELECT USING (
+     (is_staff_only = false) OR 
+     (public.get_my_role() IN ('superadmin', 'admin', 'supervisor', 'tecnico'))
+   );</code></pre>
+<ol>
+<li><strong>Aislamiento Multitenant de Clientes</strong>:</li>
+</ol>
+<pre><code class="language-sql">   CREATE POLICY "Clientes solo ven sus equipos y órdenes" ON public.ordenes
+   FOR SELECT USING (
+     (public.get_my_role() IN ('superadmin', 'admin', 'supervisor', 'tecnico')) OR
+     (LOWER(cliente) = LOWER(public.get_my_empresa()))
+   );</code></pre>
+<hr>
+<h2>🔄 4. Motor de Sincronización SAP B1 y Gestión de Sesiones</h2>
+<p>El script <code>backend/sync-sap-supabase.js</code> coordina la ingesta de datos desde SAP Service Layer:</p>
+<h3>4.1 Persistencia de Sesión SAP (Reutilización de Cookie):</h3>
+<ul>
+<li>Para no agotar licencias ni ralentizar el ERP, la sesión de SAP Service Layer (<code>B1SESSION</code> cookie) se almacena en la tabla <code>config</code> de Supabase bajo la clave <code>sap_session</code>.</li>
+<li>Al iniciar una llamada a la Service Layer, Axios inyecta la cookie persistida.</li>
+<li>Si el servidor responde <code>401 Unauthorized</code>, un interceptor de Axios realiza un re-login automático con las credenciales de servicio, guarda la nueva cookie en Supabase y repite la petición original de forma transparente.</li>
+</ul>
+<h3>4.2 Ingesta por Lotes (Batching de 500 registros):</h3>
+<ul>
+<li>Los catálogos masivos (Artículos/Refacciones con más de 10,000 registros) se dividen en chunks de 500 registros procesados mediante <code>Promise.allSettled</code> para no saturar los límites de memoria de Node.js ni la API REST de Supabase.</li>
+</ul>
+<hr>
+<h2>📶 5. Arquitectura Offline y Manejo de Datos en el Cliente</h2>
+<p>Para garantizar el funcionamiento 100% desconectado de los técnicos:</p>
+<pre><code class="language-">[UI Input en Campo] ──&gt; [IndexedDB (sapi_db) &amp; LocalStorage] ──&gt; [sapi_sync_queue]
+                                                                        │
+                             (Al detectar conexión a internet)           ▼
+                        [Subida de Fotos Base64 -&gt; Supabase Storage]
+                                                                        │
+                                                                        ▼
+                        [Upsert de Datos JSON -&gt; Supabase Postgres]</code></pre>
+<ul>
+<li><strong>Almacenamiento de Fotos Offline</strong>: Las imágenes capturadas con la cámara del celular se convierten a DataURL Base64 y se guardan temporalmente en IndexedDB.</li>
+<li><strong>Cola de Sincronización (<code>sapi_sync_queue</code>)</strong>: Guarda las transacciones pendientes con timestamp y tipo de operación.</li>
+<li><strong>Manejador de Recuperación</strong>: Al dispararse el evento <code>window.addEventListener('online', ...)</code>, el módulo <code>supabaseSync.js</code> recorre la cola, sube los blobs binarios a Supabase Storage Bucket <code>evidencias</code>, actualiza las URLs públicas resultantes en el payload y ejecuta el <code>upsert</code> en la base de datos PostgreSQL.</li>
+</ul>
+<hr>
+<h2>🛠️ 6. Compilación de Documentación a PDF con Puppeteer</h2>
+<p>La suite de manuales oficiales en PDF se compila automáticamente mediante el script <code>manuales/generate_manuals_pdf.js</code> utilizando Google Chrome headless y <code>puppeteer-core</code>:</p>
+<ul>
+<li>Interpreta los archivos Markdown en <code>manuales/*.md</code>.</li>
+<li>Renderiza el contenido con estilos tipográficos institucionales, resaltado de sintaxis, alertas GitHub Flavored Markdown y membretes de Eurorep.</li>
+<li>Exporta los archivos PDF finales optimizados listos para su distribución y descarga directa en el portal.</li>
+</ul>
+<hr>
+<h2>🧪 7. Modo Sandbox y Herramientas de Depuración</h2>
+<ul>
+<li><strong>Modo Sandbox (<code>sapi_sandbox</code>)</strong>:</li>
+<li>Permite ejecutar la aplicación utilizando un prefijo o esquema de base de datos aislado (<code>sandbox_ordenes</code>, <code>sandbox_tickets</code>) para pruebas y capacitación sin contaminar los registros de producción.</li>
+<li><strong>Depurador de Inconsistencias</strong>:</li>
+<li>Las funciones <code>window.contarOrdenesRefacciones()</code>, <code>window.actualizarBadgeDepuradorOrdenes()</code> y <code>window.abrirModalDepurarOrdenes()</code> en <code>app.js</code> permiten al Superadmin auditar relaciones huérfanas entre tickets y órdenes de servicio y regenerar enlaces faltantes.</li>
+</ul>
+<hr>
+<h2>⚠️ 8. Reglas de Despliegue y Control de Versiones</h2>
+<div class="alert-card alert-important"><div class="alert-title">⚠️ IMPORTANTE</div><strong>POLÍTICA ESTRICTA DE DESPLIEGUE</strong>:
+<em> No ejecutar comandos de <code>git push</code> ni despliegues automáticos a repositorios remotos o Vercel sin la confirmación y autorización expresa del usuario administrador.
+</em> Todo desarrollo, prueba y verificación debe realizarse estrictamente en el entorno local.</div>
+  </div>
+</body>
+</html>

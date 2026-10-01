@@ -884,7 +884,7 @@ window.enviarARevisionLevantamiento = async function(id) {
 window.abrirModalNuevoLevantamiento = window_abrirModalNuevoLevantamiento;
 window.renderLevantamientos = renderLevantamientos;
 window.verDetalleLevantamiento = verDetalleLevantamiento;
-window.completarLevantamiento = completarLevantamiento;
+window.completarLevantamiento = typeof completarLevantamiento !== 'undefined' ? completarLevantamiento : window.completarLevantamiento;
 window.guardarNuevoLevantamiento = guardarNuevoLevantamiento;
 window.enviarARevisionLevantamiento = window.enviarARevisionLevantamiento;
 

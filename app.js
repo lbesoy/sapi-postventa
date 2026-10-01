@@ -229,7 +229,7 @@ if (typeof window !== 'undefined') {
   if (typeof window.lucide === 'undefined' || typeof window.lucide.createIcons !== 'function') {
     window.lucide = window.lucide || {};
     window.lucide.createIcons = function() {
-      console.warn('[Lucide] Biblioteca no cargada o createIcons no disponible. Omitiendo renderizado de iconos.');
+      // Esperar a que la biblioteca Lucide termine de inicializarse
     };
   }
 }
@@ -853,9 +853,10 @@ window.addEventListener('supabase_datos_cargados', async () => {
     const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
     const isAdmin = ['superadmin', 'admin'].includes(session.viewMode || session.rol);
     
+    const hasSessionStorage = typeof sessionStorage !== 'undefined';
     if (isAdmin) {
-      if (!sessionStorage.getItem('eurorep_migrations_executed')) {
-        sessionStorage.setItem('eurorep_migrations_executed', 'true');
+      if (!hasSessionStorage || !sessionStorage.getItem('eurorep_migrations_executed')) {
+        if (hasSessionStorage) sessionStorage.setItem('eurorep_migrations_executed', 'true');
         console.log('[App] Iniciando migraciones heredadas únicas de la sesión para administrador...');
         window.migrarOrdenesExistentesMaquinaria();
         if (typeof window.migrarUbicacionesMaquinariaDesdeTickets === 'function') {
@@ -866,8 +867,8 @@ window.addEventListener('supabase_datos_cargados', async () => {
         }
       }
       
-      if (!sessionStorage.getItem('eurorep_ref_tickets_migrated_v9')) {
-        sessionStorage.setItem('eurorep_ref_tickets_migrated_v9', 'true');
+      if (!hasSessionStorage || !sessionStorage.getItem('eurorep_ref_tickets_migrated_v9')) {
+        if (hasSessionStorage) sessionStorage.setItem('eurorep_ref_tickets_migrated_v9', 'true');
         
         let modifiedAny = false;
         tickets = tickets.map(t => {
@@ -5935,7 +5936,6 @@ function renderDashboardV2() {
 
   // --- Gráficas (Requiere Chart.js) ---
   if (typeof Chart === 'undefined') {
-    console.warn("Chart.js no está cargado.");
     return;
   }
 
@@ -22129,13 +22129,21 @@ window.syncSapCotizacionManual = function(ticketId = null) {
 
 // ===== INTERNAL NOTIFICATION BELL =====
 window.toggleInternalNotificationDropdown = function(event) {
-  if (event) event.stopPropagation();
+  if (event) {
+    if (typeof event.stopPropagation === 'function') event.stopPropagation();
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+  }
+  const otherDd = document.getElementById('notification-dropdown');
+  if (otherDd) otherDd.style.display = 'none';
+
   const dd = document.getElementById('internal-notification-dropdown');
   if (dd) {
     const isHidden = dd.style.display === 'none' || dd.style.display === '';
     if (isHidden) {
       if (typeof window.sincronizarNotificacionesInternas === 'function') {
         window.sincronizarNotificacionesInternas();
+      } else if (typeof window.updateInternalNotificationBell === 'function') {
+        window.updateInternalNotificationBell();
       }
     }
     dd.style.display = isHidden ? 'block' : 'none';
@@ -22152,10 +22160,13 @@ document.addEventListener('click', function(e) {
 
 window.sincronizarNotificacionesInternas = function() {
   const isSuperadmin = (currentSession && (currentSession.viewMode === 'superadmin' || currentSession.rol === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.userId === 'superadmin'));
+  const isAdmin = (currentSession && (currentSession.viewMode === 'admin' || currentSession.rol === 'admin' || currentSession.realRol === 'admin'));
   const isSupervisor = (currentSession && (currentSession.viewMode === 'supervisor' || currentSession.rol === 'supervisor'));
-  const currentUser = usuarios.find(u => u && u.id === currentSession?.userId);
-  const currentUserName = currentUser ? currentUser.nombre : 'Usuario';
-  const quinceDiasMs = 15 * 24 * 60 * 60 * 1000;
+  const isAdminOrSuper = isSuperadmin || isAdmin;
+
+  const currentUser = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios.find(u => u && u.id === currentSession?.userId) : null;
+  const currentUserName = currentUser ? currentUser.nombre : (currentSession?.nombre || 'Usuario');
+  const sesentaDiasMs = 60 * 24 * 60 * 60 * 1000;
   const ahora = Date.now();
 
   let allNotifications = [];
@@ -22170,7 +22181,7 @@ window.sincronizarNotificacionesInternas = function() {
   } catch(e) {}
 
   allNotifications.forEach(n => {
-    if (n.leida && n.id) {
+    if (n && n.leida && n.id) {
       readKeys.add(n.id);
     }
   });
@@ -22180,9 +22191,10 @@ window.sincronizarNotificacionesInternas = function() {
   const mapNotifs = new Map();
   allNotifications.forEach(n => {
     if (n && n.id) {
-      if (isSuperadmin && n.fecha) {
+      // Si ya fue leída y tiene más de 60 días, descartar para mantener ligero el almacenamiento
+      if (n.leida && n.fecha) {
         const tNotif = new Date(n.fecha).getTime();
-        if (!isNaN(tNotif) && (ahora - tNotif > quinceDiasMs)) return;
+        if (!isNaN(tNotif) && (ahora - tNotif > sesentaDiasMs)) return;
       }
       mapNotifs.set(n.id, n);
     }
@@ -22193,15 +22205,18 @@ window.sincronizarNotificacionesInternas = function() {
       t.comentariosInternos.forEach(c => {
         if (!c || (!c.texto && !c.usuario)) return;
         const fechaComentario = c.fecha || t.fechaModificacion || t.fecha || new Date().toISOString();
-        if (isSuperadmin) {
-          const timestamp = new Date(fechaComentario).getTime();
-          if (!isNaN(timestamp) && (ahora - timestamp > quinceDiasMs)) {
-            return; // Omitir comentarios de más de 15 días para superadmin
-          }
-        }
         const notifId = `${t.id}_comment_${c.fecha}_${c.usuario}`;
         const lectores = Array.isArray(c.leidoPor) ? c.leidoPor : [];
-        const isReadByMe = readKeys.has(notifId) || lectores.some(l => (typeof l === 'string' ? l === currentUserName : l && l.usuario === currentUserName));
+        const isAuthor = (c.usuario === currentUserName);
+        const isReadByMe = isAuthor || readKeys.has(notifId) || lectores.some(l => (typeof l === 'string' ? l === currentUserName : l && l.usuario === currentUserName));
+        
+        // Si ya está leída y tiene más de 60 días, omitir
+        if (isReadByMe) {
+          const timestamp = new Date(fechaComentario).getTime();
+          if (!isNaN(timestamp) && (ahora - timestamp > sesentaDiasMs)) {
+            return;
+          }
+        }
         
         mapNotifs.set(notifId, {
           id: notifId,
@@ -22342,26 +22357,30 @@ window.updateInternalNotificationBell = function() {
 
   const isTest = (typeof isTestModeActive === 'function') ? isTestModeActive() : false;
   const isSuperadmin = (currentSession && (currentSession.viewMode === 'superadmin' || currentSession.rol === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.userId === 'superadmin'));
+  const isAdmin = (currentSession && (currentSession.viewMode === 'admin' || currentSession.rol === 'admin' || currentSession.realRol === 'admin'));
   const isSupervisor = (currentSession && (currentSession.viewMode === 'supervisor' || currentSession.rol === 'supervisor'));
-  const currentUser = usuarios.find(u => u && u.id === currentSession?.userId);
-  const currentUserName = currentUser ? currentUser.nombre : 'Usuario';
+  const isAdminOrSuper = isSuperadmin || isAdmin;
+
+  const currentUser = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios.find(u => u && u.id === currentSession?.userId) : null;
+  const currentUserName = currentUser ? currentUser.nombre : (currentSession?.nombre || 'Usuario');
 
   let filtered = allNotifications.filter(n => !!n.esPrueba === isTest);
 
-  const quinceDiasMs = 15 * 24 * 60 * 60 * 1000;
+  const sesentaDiasMs = 60 * 24 * 60 * 60 * 1000;
   const ahora = Date.now();
 
-  // Si es Superadmin o Supervisor, ve las notificaciones de TODOS
-  // Si es Superadmin, se descartan notificaciones de más de 15 días de antigüedad
-  if (isSuperadmin) {
+  // Si es Superadmin, Admin o Supervisor, ve las notificaciones de TODOS
+  if (isAdminOrSuper || isSupervisor) {
     filtered = filtered.filter(n => {
+      if (!n.leida) return true; // Las no leídas siempre se muestran
       if (!n.fecha) return true;
       const t = new Date(n.fecha).getTime();
-      return !isNaN(t) && (ahora - t <= quinceDiasMs);
+      return !isNaN(t) && (ahora - t <= sesentaDiasMs);
     });
-  } else if (!isSupervisor) {
+  } else {
     // Si es otro usuario regular, ve las de sus tickets o creadas por otros
-    const myTicketIds = new Set((tickets || []).filter(t => t.asignado === currentUserName || t.supervisor === currentUserName).map(t => t.id));
+    const currentTickets = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : [];
+    const myTicketIds = new Set(currentTickets.filter(t => t && (t.asignado === currentUserName || t.supervisor === currentUserName)).map(t => t.id));
     filtered = filtered.filter(n => myTicketIds.has(n.ticketId) || n.usuario !== currentUserName);
   }
 
@@ -22505,18 +22524,9 @@ window.marcarTodasInternasLeidas = function() {
   } catch(e) {}
 
   const isTest = (typeof isTestModeActive === 'function') ? isTestModeActive() : false;
-  const isSuperadmin = (currentSession && (currentSession.viewMode === 'superadmin' || currentSession.rol === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.userId === 'superadmin'));
-  const quinceDiasMs = 15 * 24 * 60 * 60 * 1000;
-  const ahora = Date.now();
 
   allNotifications = allNotifications.map(n => {
     if (!!n.esPrueba === isTest) {
-      if (isSuperadmin && n.fecha) {
-        const t = new Date(n.fecha).getTime();
-        if (!isNaN(t) && (ahora - t > quinceDiasMs)) {
-          return n;
-        }
-      }
       n.leida = true;
       if (n.id) readKeys.add(n.id);
     }
@@ -22530,7 +22540,13 @@ window.marcarTodasInternasLeidas = function() {
 
 // ===== NOTIFICATION BELL (TICKETS SIN ASIGNAR) =====
 window.toggleNotificationDropdown = function(event) {
-  if (event) event.stopPropagation();
+  if (event) {
+    if (typeof event.stopPropagation === 'function') event.stopPropagation();
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+  }
+  const intDd = document.getElementById('internal-notification-dropdown');
+  if (intDd) intDd.style.display = 'none';
+
   const dd = document.getElementById('notification-dropdown');
   if (dd) {
     const isHidden = dd.style.display === 'none' || dd.style.display === '';
@@ -37190,195 +37206,202 @@ window.eliminarTodasAsignacionesOrden = async function(ordenId) {
 };
 
 window.sanitizarBitacorasOrdenes = function() {
-  const ords = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes : [];
-  if (ords.length === 0) return;
+  if (window._isSanitizingBitacoras) return;
+  const now = Date.now();
+  if (window._lastBitacoraSanitizeTime && (now - window._lastBitacoraSanitizeTime < 10000)) {
+    return;
+  }
+  window._isSanitizingBitacoras = true;
+  window._lastBitacoraSanitizeTime = now;
 
-  let totalEliminados = 0;
-  let ordenesModificadas = 0;
-  const idsParaBorrarSupabase = [];
+  try {
+    const ords = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes : [];
+    if (ords.length === 0) return;
 
-  ords.forEach(o => {
-    if (!o.bitacora || !Array.isArray(o.bitacora) || o.bitacora.length === 0) return;
+    let totalEliminados = 0;
+    let ordenesModificadas = 0;
+    const idsParaBorrarSupabase = [];
 
-    const bitacoraLimpia = [];
-    let mod = false;
+    ords.forEach(o => {
+      if (!o.bitacora || !Array.isArray(o.bitacora) || o.bitacora.length === 0) return;
 
-    const isOsTarget = (o.folio === 'OS-26141' || (o.id && o.id.includes('26141')) || (o.cliente && o.cliente.toUpperCase().includes('EURO REPRESENTACIONES')));
+      const bitacoraLimpia = [];
+      let mod = false;
 
-    const seenRealizados = new Set();
-    const seenExactKeys = new Set();
-    const seenEntriesByTec = new Map(); // Map de tecnico -> array de entradas
+      const isOsTarget = (o.folio === 'OS-26141' || (o.id && o.id.includes('26141')) || (o.cliente && o.cliente.toUpperCase().includes('EURO REPRESENTACIONES')));
 
-    const ordenCerrada = o.estado === 'Finalizado' || o.estado === 'Cerrada';
+      const seenRealizados = new Set();
+      const seenExactKeys = new Set();
+      const seenEntriesByTec = new Map(); // Map de tecnico -> array de entradas
 
-    o.bitacora.forEach(b => {
-      if (!b) return;
+      const ordenCerrada = o.estado === 'Finalizado' || o.estado === 'Cerrada';
 
-      const fStr = b.fecha ? (b.fecha.includes('T') ? b.fecha.split('T')[0] : b.fecha) : '';
-      const tec = (b.tecnico || '').trim().toLowerCase();
-      const ent = b.entrada || '';
-      const sal = b.salida || '';
-      const notaClean = (b.nota || '').trim();
+      o.bitacora.forEach(b => {
+        if (!b) return;
 
-      // Es avance REAL SOLO SI tiene fotos, firmas, evidencias o archivo de cierre en papel
-      const hasRealReport = Boolean(
-        (b.firma_tecnico_url && b.firma_tecnico_url !== '__DELETED__') ||
-        (b.firma_tecnico_base64 && b.firma_tecnico_base64 !== '__DELETED__') ||
-        (b.firma_cliente_url && b.firma_cliente_url !== '__DELETED__') ||
-        (b.firma_cliente_base64 && b.firma_cliente_base64 !== '__DELETED__') ||
-        (b.fotos && b.fotos.length > 0) ||
-        (b.evidencias && Object.keys(b.evidencias).length > 0) ||
-        b.cierre_papel_pdf
-      );
+        const fStr = b.fecha ? (b.fecha.includes('T') ? b.fecha.split('T')[0] : b.fecha) : '';
+        const tec = (b.tecnico || '').trim().toLowerCase();
+        const ent = b.entrada || '';
+        const sal = b.salida || '';
+        const notaClean = (b.nota || '').trim();
 
-      // Si la orden está cerrada y no tiene reporte real con evidencia, descartar
-      if (ordenCerrada && !hasRealReport) {
-        mod = true;
-        totalEliminados++;
-        if (b.id) idsParaBorrarSupabase.push(b.id);
-        return;
-      }
+        // Es avance REAL SOLO SI tiene fotos, firmas, evidencias o archivo de cierre en papel
+        const hasRealReport = Boolean(
+          (b.firma_tecnico_url && b.firma_tecnico_url !== '__DELETED__') ||
+          (b.firma_tecnico_base64 && b.firma_tecnico_base64 !== '__DELETED__') ||
+          (b.firma_cliente_url && b.firma_cliente_url !== '__DELETED__') ||
+          (b.firma_cliente_base64 && b.firma_cliente_base64 !== '__DELETED__') ||
+          (b.fotos && b.fotos.length > 0) ||
+          (b.evidencias && Object.keys(b.evidencias).length > 0) ||
+          b.cierre_papel_pdf
+        );
 
-      // Clave exacta de unicidad
-      const exactKey = `${b.id || ''}::${fStr}::${tec}::${ent}::${sal}::${hasRealReport ? '1' : '0'}::${notaClean}`;
-      if (seenExactKeys.has(exactKey)) {
-        mod = true;
-        totalEliminados++;
-        if (b.id) idsParaBorrarSupabase.push(b.id);
-        return;
-      }
-      seenExactKeys.add(exactKey);
-
-      // Si es un reporte real completado con firmas/fotos
-      if (hasRealReport) {
-        const avanceKey = `${fStr}::${tec}::${ent}::${sal}`;
-        if (seenRealizados.has(avanceKey)) {
+        // Si la orden está cerrada y no tiene reporte real con evidencia, descartar
+        if (ordenCerrada && !hasRealReport) {
           mod = true;
           totalEliminados++;
           if (b.id) idsParaBorrarSupabase.push(b.id);
           return;
         }
-        seenRealizados.add(avanceKey);
-        bitacoraLimpia.push(b);
-        return;
-      }
 
-      // Si NO tiene reporte real (es asignación programada, placeholder o entrada duplicada/inundada)
-      if (!seenEntriesByTec.has(tec)) {
-        seenEntriesByTec.set(tec, []);
-      }
-      const tecList = seenEntriesByTec.get(tec);
-
-      // 1. Descartar si ya existe entrada para este mismo técnico en la misma fecha
-      const mismoDia = tecList.find(p => {
-        const pfStr = p.fecha ? (p.fecha.includes('T') ? p.fecha.split('T')[0] : p.fecha) : '';
-        return pfStr === fStr;
-      });
-
-      if (mismoDia) {
-        mod = true;
-        totalEliminados++;
-        if (b.id) idsParaBorrarSupabase.push(b.id);
-        return;
-      }
-
-      // 2. Si es la orden OS-26141 o si ya hay 2 entradas para este técnico en esta orden
-      if (isOsTarget || tecList.length >= 2) {
-        mod = true;
-        totalEliminados++;
-        if (b.id) idsParaBorrarSupabase.push(b.id);
-        return;
-      }
-
-      tecList.push(b);
-      bitacoraLimpia.push(b);
-    });
-
-    if (mod) {
-      o.bitacora = bitacoraLimpia;
-      
-      const activeTecs = Array.from(new Set(
-        (o.bitacora || []).map(b => (b.tecnico || '').trim()).filter(Boolean)
-      ));
-      if (activeTecs.length > 0) {
-        o.tecnicosAsignados = activeTecs;
-        o.tecnico = activeTecs.join(', ');
-      }
-
-      ordenesModificadas++;
-      if (window.pushToSupabase) {
-        window.pushToSupabase('ordenes', o).catch(() => {});
-      }
-    }
-  });
-
-  // Limpiar también sapi_calendario_eventos duplicados y eventos de bitácoras eliminadas
-  try {
-    const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
-    const seenEventos = new Set();
-    const eventosLimpios = [];
-    let evMod = false;
-
-    localEventos.forEach(ev => {
-      if (!ev) return;
-      if (idsParaBorrarSupabase.includes(ev.id)) {
-        evMod = true;
-        return;
-      }
-      const ordId = ev.ordenId || '';
-      const tec = (ev.tecnicoNombre || '').trim().toLowerCase();
-      const st = (ev.start || ev.fechaInicio || '').substring(0, 10);
-      const tp = (ev.tipo || '').trim().toLowerCase();
-      const tit = (ev.titulo || '').toLowerCase();
-
-      if (tit.includes('26141') || tit.includes('euro representaciones')) {
-        const key26141 = `admin_26141_${st}`;
-        if (seenEventos.has(key26141)) {
-          evMod = true;
-          if (ev.id) idsParaBorrarSupabase.push(ev.id);
+        // Clave exacta de unicidad
+        const exactKey = `${b.id || ''}::${fStr}::${tec}::${ent}::${sal}::${hasRealReport ? '1' : '0'}::${notaClean}`;
+        if (seenExactKeys.has(exactKey)) {
+          mod = true;
+          totalEliminados++;
+          if (b.id) idsParaBorrarSupabase.push(b.id);
           return;
         }
-        seenEventos.add(key26141);
-      }
+        seenExactKeys.add(exactKey);
 
-      const key = `${ordId}::${tec}::${st}::${tp}`;
+        // Si es un reporte real completado con firmas/fotos
+        if (hasRealReport) {
+          const avanceKey = `${fStr}::${tec}::${ent}::${sal}`;
+          if (seenRealizados.has(avanceKey)) {
+            mod = true;
+            totalEliminados++;
+            if (b.id) idsParaBorrarSupabase.push(b.id);
+            return;
+          }
+          seenRealizados.add(avanceKey);
+          bitacoraLimpia.push(b);
+          return;
+        }
 
-      if (seenEventos.has(key)) {
-        evMod = true;
-        totalEliminados++;
-        if (ev.id) idsParaBorrarSupabase.push(ev.id);
-      } else {
-        seenEventos.add(key);
-        eventosLimpios.push(ev);
+        // Si NO tiene reporte real (es asignación programada, placeholder o entrada duplicada/inundada)
+        if (!seenEntriesByTec.has(tec)) {
+          seenEntriesByTec.set(tec, []);
+        }
+        const tecList = seenEntriesByTec.get(tec);
+
+        // 1. Descartar si ya existe entrada para este mismo técnico en la misma fecha
+        const mismoDia = tecList.find(p => {
+          const pfStr = p.fecha ? (p.fecha.includes('T') ? p.fecha.split('T')[0] : p.fecha) : '';
+          return pfStr === fStr;
+        });
+
+        if (mismoDia) {
+          mod = true;
+          totalEliminados++;
+          if (b.id) idsParaBorrarSupabase.push(b.id);
+          return;
+        }
+
+        // 2. Si es la orden OS-26141 o si ya hay 2 entradas para este técnico en esta orden
+        if (isOsTarget || tecList.length >= 2) {
+          mod = true;
+          totalEliminados++;
+          if (b.id) idsParaBorrarSupabase.push(b.id);
+          return;
+        }
+
+        tecList.push(b);
+        bitacoraLimpia.push(b);
+      });
+
+      if (mod) {
+        o.bitacora = bitacoraLimpia;
+        
+        const activeTecs = Array.from(new Set(
+          (o.bitacora || []).map(b => (b.tecnico || '').trim()).filter(Boolean)
+        ));
+        if (activeTecs.length > 0) {
+          o.tecnicosAsignados = activeTecs;
+          o.tecnico = activeTecs.join(', ');
+        }
+
+        ordenesModificadas++;
+        if (window.pushToSupabase) {
+          window.pushToSupabase('ordenes', o).catch(() => {});
+        }
       }
     });
 
-    if (evMod) {
-      localStorage.setItem('sapi_calendario_eventos', JSON.stringify(eventosLimpios));
+    // Limpiar también sapi_calendario_eventos duplicados y eventos de bitácoras eliminadas
+    try {
+      const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+      const seenEventos = new Set();
+      const eventosLimpios = [];
+      let evMod = false;
+
+      localEventos.forEach(ev => {
+        if (!ev) return;
+        if (idsParaBorrarSupabase.includes(ev.id)) {
+          evMod = true;
+          return;
+        }
+        const ordId = ev.ordenId || '';
+        const tec = (ev.tecnicoNombre || '').trim().toLowerCase();
+        const st = (ev.start || ev.fechaInicio || '').substring(0, 10);
+        const tp = (ev.tipo || '').trim().toLowerCase();
+        const tit = (ev.titulo || '').toLowerCase();
+
+        if (tit.includes('26141') || tit.includes('euro representaciones')) {
+          const key26141 = `admin_26141_${st}`;
+          if (seenEventos.has(key26141)) {
+            evMod = true;
+            if (ev.id) idsParaBorrarSupabase.push(ev.id);
+            return;
+          }
+          seenEventos.add(key26141);
+        }
+
+        const key = `${ordId}::${tec}::${st}::${tp}`;
+
+        if (seenEventos.has(key)) {
+          evMod = true;
+          totalEliminados++;
+          if (ev.id) idsParaBorrarSupabase.push(ev.id);
+        } else {
+          seenEventos.add(key);
+          eventosLimpios.push(ev);
+        }
+      });
+
+      if (evMod) {
+        localStorage.setItem('sapi_calendario_eventos', JSON.stringify(eventosLimpios));
+      }
+    } catch(e){}
+
+    if (ordenesModificadas > 0) {
+      safeSetJSON('sapi_ordenes', ordenes);
+      console.log(`[Bitacora Sanitize] Sanitización automática: se eliminaron ${totalEliminados} registros duplicados/fantasmas de ${ordenesModificadas} órdenes.`);
     }
-  } catch(e){}
 
-  if (ordenesModificadas > 0) {
-    safeSetJSON('sapi_ordenes', ordenes);
-    console.log(`[Bitacora Sanitize] Sanitización automática: se eliminaron ${totalEliminados} registros duplicados/fantasmas de ${ordenesModificadas} órdenes.`);
-  }
-
-  // Purga inmediata en Supabase
-  if (idsParaBorrarSupabase.length > 0) {
-    if (window.supabaseClient) {
+    // Purga directa en Supabase en lotes seguros de 50
+    if (idsParaBorrarSupabase.length > 0 && window.supabaseClient) {
       try {
-        window.supabaseClient.from('orden_bitacora').delete().in('id', idsParaBorrarSupabase).then(() => {
-          console.log(`[Bitacora Sanitize] Purgados ${idsParaBorrarSupabase.length} IDs en Supabase orden_bitacora.`);
-        }).catch(() => {});
-        window.supabaseClient.from('calendario_eventos').delete().in('id', idsParaBorrarSupabase).catch(() => {});
+        const chunkSize = 50;
+        for (let i = 0; i < idsParaBorrarSupabase.length; i += chunkSize) {
+          const chunk = idsParaBorrarSupabase.slice(i, i + chunkSize);
+          window.supabaseClient.from('orden_bitacora').delete().in('id', chunk).catch(() => {});
+          window.supabaseClient.from('calendario_eventos').delete().in('id', chunk).catch(() => {});
+        }
+        console.log(`[Bitacora Sanitize] Purgados ${idsParaBorrarSupabase.length} IDs en Supabase.`);
       } catch(e){}
     }
-    if (window.deleteFromSupabase) {
-      idsParaBorrarSupabase.forEach(id => {
-        window.deleteFromSupabase('orden_bitacora', id);
-        window.deleteFromSupabase('calendario_eventos', id);
-      });
-    }
+  } finally {
+    window._isSanitizingBitacoras = false;
   }
 };
 
@@ -40672,11 +40695,33 @@ CREATE POLICY "Acceso total a autenticados" ON sapi_automation_rules FOR ALL TO 
 
 // Cargar configuraciones de Supabase o fallback a localStorage
 window.cargarConfiguracionesNube = async function() {
+  const safeRender = () => {
+    if (typeof window.renderAutomationRules === 'function') window.renderAutomationRules();
+    else if (typeof renderAutomationRules === 'function') renderAutomationRules();
+    if (typeof window.renderEmailTemplates === 'function') window.renderEmailTemplates();
+    else if (typeof renderEmailTemplates === 'function') renderEmailTemplates();
+  };
+
   if (!window.supabaseClient) {
     emailTemplates = safeGetJSON('sapi_email_templates', defaultTemplates);
     automationRules = safeGetJSON('sapi_automation_rules', defaultRules);
-    renderAutomationRules();
-    renderEmailTemplates();
+    safeRender();
+    return;
+  }
+  
+  // Si no hay sesión autenticada activa en Supabase, usar persistencia local sin disparar errores 401
+  try {
+    const sessionRes = await window.supabaseClient.auth.getSession().catch(() => null);
+    if (!sessionRes || !sessionRes.data || !sessionRes.data.session) {
+      emailTemplates = safeGetJSON('sapi_email_templates', defaultTemplates);
+      automationRules = safeGetJSON('sapi_automation_rules', defaultRules);
+      safeRender();
+      return;
+    }
+  } catch (eSes) {
+    emailTemplates = safeGetJSON('sapi_email_templates', defaultTemplates);
+    automationRules = safeGetJSON('sapi_automation_rules', defaultRules);
+    safeRender();
     return;
   }
   
@@ -40732,8 +40777,11 @@ window.cargarConfiguracionesNube = async function() {
     }
   }
   
-  renderAutomationRules();
-  renderEmailTemplates();
+  if (typeof renderAutomationRules === 'function') renderAutomationRules();
+  else if (typeof window.renderAutomationRules === 'function') window.renderAutomationRules();
+
+  if (typeof renderEmailTemplates === 'function') renderEmailTemplates();
+  else if (typeof window.renderEmailTemplates === 'function') window.renderEmailTemplates();
 };
 
 // Navegación de Sub-Vistas del Portal
@@ -44677,62 +44725,74 @@ function extraerListaResponsables(raw) {
 
 // Sanitizar asignaciones de tickets: asegura preservación de asignaciones y recuperación exhaustiva de cliente/equipo
 window.sanitizarAsignacionesTickets = function() {
-  const tkts = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : [];
-  if (tkts.length === 0) return;
+  if (window._isSanitizingTickets) return;
+  const now = Date.now();
+  if (window._lastTicketsSanitizeTime && (now - window._lastTicketsSanitizeTime < 10000)) {
+    return;
+  }
+  window._isSanitizingTickets = true;
+  window._lastTicketsSanitizeTime = now;
 
-  let modificado = false;
-  const repairedTickets = [];
+  try {
+    const tkts = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : [];
+    if (tkts.length === 0) return;
 
-  tkts.forEach(t => {
-    if (!t) return;
-    let tMod = false;
+    let modificado = false;
+    const repairedTickets = [];
 
-    // 1. Preservar asignación si venía en t.tecnico o t.tecnicosAsignados y t.asignado está vacío
-    if ((!t.asignado || t.asignado === '-' || t.asignado === 'Sin Asignar' || t.asignado === 'sin_asignar') && t.tecnico) {
-      t.asignado = t.tecnico;
-      tMod = true;
+    tkts.forEach(t => {
+      if (!t) return;
+      let tMod = false;
+
+      // 1. Preservar asignación si venía en t.tecnico o t.tecnicosAsignados y t.asignado está vacío
+      if ((!t.asignado || t.asignado === '-' || t.asignado === 'Sin Asignar' || t.asignado === 'sin_asignar') && t.tecnico) {
+        t.asignado = t.tecnico;
+        tMod = true;
+      }
+      if ((!t.asignado || t.asignado === '-' || t.asignado === 'Sin Asignar' || t.asignado === 'sin_asignar') && Array.isArray(t.tecnicosAsignados) && t.tecnicosAsignados.length > 0) {
+        t.asignado = t.tecnicosAsignados.join(', ');
+        tMod = true;
+      }
+
+      // 2. Herencia y recuperación exhaustiva de Cliente
+      const resolvedCli = typeof window.resolverClienteTicket === 'function' ? window.resolverClienteTicket(t) : '';
+      if (resolvedCli && resolvedCli !== t.cliente) {
+        t.cliente = resolvedCli;
+        tMod = true;
+      }
+
+      // 3. Herencia de Sitio, Equipo y Asignado desde Parent/OS si faltan
+      const p = typeof window.obtenerTicketPadre === 'function' ? window.obtenerTicketPadre(t) : null;
+      const o = !p && typeof window.obtenerOrdenAsociadaTicket === 'function' ? window.obtenerOrdenAsociadaTicket(t) : null;
+      if (p) {
+        if (!t.sitio && p.sitio) { t.sitio = p.sitio; tMod = true; }
+        if ((!t.equipo || t.equipo === 'Otra / No registrada') && p.equipo) { t.equipo = p.equipo; tMod = true; }
+        if ((!t.asignado || t.asignado === '-' || t.asignado === 'Sin Asignar') && p.asignado) { t.asignado = p.asignado; tMod = true; }
+      } else if (o) {
+        if (!t.sitio && (o.ubicacion || o.ubicacion_sitio)) { t.sitio = o.ubicacion || o.ubicacion_sitio; tMod = true; }
+        if ((!t.equipo || t.equipo === 'Otra / No registrada') && o.equipo) { t.equipo = o.equipo; tMod = true; }
+        if ((!t.asignado || t.asignado === '-' || t.asignado === 'Sin Asignar') && (o.tecnico || o.responsable)) { t.asignado = o.tecnico || o.responsable; tMod = true; }
+      }
+
+      if (tMod) {
+        modificado = true;
+        repairedTickets.push(t);
+      }
+    });
+
+    if (modificado) {
+      if (typeof safeSetJSON === 'function') safeSetJSON('sapi_tickets', tickets);
+      // Sincronizar de inmediato los tickets reparados hacia Supabase para consolidar la base de datos
+      if (window.pushToSupabase && repairedTickets.length > 0) {
+        repairedTickets.forEach(repT => {
+          try {
+            window.pushToSupabase('tickets', repT).catch(e => console.warn('[Sanitize Sync] Error al persistir ticket reparado en Supabase:', repT.folio, e));
+          } catch(e) {}
+        });
+      }
     }
-    if ((!t.asignado || t.asignado === '-' || t.asignado === 'Sin Asignar' || t.asignado === 'sin_asignar') && Array.isArray(t.tecnicosAsignados) && t.tecnicosAsignados.length > 0) {
-      t.asignado = t.tecnicosAsignados.join(', ');
-      tMod = true;
-    }
-
-    // 2. Herencia y recuperación exhaustiva de Cliente
-    const resolvedCli = typeof window.resolverClienteTicket === 'function' ? window.resolverClienteTicket(t) : '';
-    if (resolvedCli && resolvedCli !== t.cliente) {
-      t.cliente = resolvedCli;
-      tMod = true;
-    }
-
-    // 3. Herencia de Sitio, Equipo y Asignado desde Parent/OS si faltan
-    const p = typeof window.obtenerTicketPadre === 'function' ? window.obtenerTicketPadre(t) : null;
-    const o = !p && typeof window.obtenerOrdenAsociadaTicket === 'function' ? window.obtenerOrdenAsociadaTicket(t) : null;
-    if (p) {
-      if (!t.sitio && p.sitio) { t.sitio = p.sitio; tMod = true; }
-      if ((!t.equipo || t.equipo === 'Otra / No registrada') && p.equipo) { t.equipo = p.equipo; tMod = true; }
-      if ((!t.asignado || t.asignado === '-' || t.asignado === 'Sin Asignar') && p.asignado) { t.asignado = p.asignado; tMod = true; }
-    } else if (o) {
-      if (!t.sitio && (o.ubicacion || o.ubicacion_sitio)) { t.sitio = o.ubicacion || o.ubicacion_sitio; tMod = true; }
-      if ((!t.equipo || t.equipo === 'Otra / No registrada') && o.equipo) { t.equipo = o.equipo; tMod = true; }
-      if ((!t.asignado || t.asignado === '-' || t.asignado === 'Sin Asignar') && (o.tecnico || o.responsable)) { t.asignado = o.tecnico || o.responsable; tMod = true; }
-    }
-
-    if (tMod) {
-      modificado = true;
-      repairedTickets.push(t);
-    }
-  });
-
-  if (modificado) {
-    if (typeof safeSetJSON === 'function') safeSetJSON('sapi_tickets', tickets);
-    // Sincronizar de inmediato los tickets reparados hacia Supabase para consolidar la base de datos
-    if (window.pushToSupabase && repairedTickets.length > 0) {
-      repairedTickets.forEach(repT => {
-        try {
-          window.pushToSupabase('tickets', repT).catch(e => console.warn('[Sanitize Sync] Error al persistir ticket reparado en Supabase:', repT.folio, e));
-        } catch(e) {}
-      });
-    }
+  } finally {
+    window._isSanitizingTickets = false;
   }
 };
 

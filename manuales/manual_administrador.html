@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual de Administración y Supervisión Operativa — Eurorep SAPI</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --secondary: #475569;
+      --bg: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --card-bg: #f8fafc;
+      --code-bg: #f1f5f9;
+      --accent: #f59e0b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --purple: #8b5cf6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+      padding: 24px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* Top Floating / Header Bar */
+    .viewer-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 24px;
+      position: sticky;
+      top: 12px;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+      backdrop-filter: blur(8px);
+    }
+
+    .doc-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 9999px;
+      background: #e0f2fe;
+      color: #0369a1;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+
+    .btn-pdf {
+      background: var(--primary);
+      color: #ffffff;
+      border: 1px solid var(--primary);
+    }
+    .btn-pdf:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-print {
+      background: #ffffff;
+      color: var(--secondary);
+      border: 1px solid var(--border);
+    }
+    .btn-print:hover {
+      background: #f1f5f9;
+      color: var(--text);
+    }
+
+    /* Content Typography */
+    #content {
+      margin-top: 10px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-top: 10px;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 3px solid var(--primary);
+      letter-spacing: -0.5px;
+    }
+
+    h2 {
+      font-size: 21px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 36px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1.5px solid var(--border);
+    }
+
+    h3 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #334155;
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+
+    h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #475569;
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin-bottom: 16px;
+      color: #334155;
+    }
+
+    strong {
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+
+    ul, ol {
+      margin-top: 8px;
+      margin-bottom: 18px;
+      padding-left: 28px;
+      color: #334155;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    /* Tablas */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0 28px 0;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+      text-align: left;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      color: #334155;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    /* Código */
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      background: var(--code-bg);
+      color: #e11d48;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #e2e8f0;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 16px 20px;
+      border-radius: 10px;
+      overflow-x: auto;
+      margin: 18px 0 24px 0;
+    }
+
+    pre code {
+      background: transparent;
+      color: #38bdf8;
+      padding: 0;
+      border: none;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    /* Alert Cards */
+    .alert-card {
+      margin: 20px 0 24px 0;
+      padding: 16px 20px;
+      border-radius: 8px;
+      border-left: 4px solid;
+      font-size: 14.5px;
+    }
+
+    .alert-note {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      color: #1e40af;
+    }
+
+    .alert-tip {
+      background: #f0fdf4;
+      border-color: #10b981;
+      color: #065f46;
+    }
+
+    .alert-important {
+      background: #fefce8;
+      border-color: #eab308;
+      color: #854d0e;
+    }
+
+    .alert-warning {
+      background: #fff7ed;
+      border-color: #f97316;
+      color: #9a3412;
+    }
+
+    .alert-caution {
+      background: #fef2f2;
+      border-color: #ef4444;
+      color: #991b1b;
+    }
+
+    .alert-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Imágenes */
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin: 14px 0;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.04);
+    }
+
+    /* Links */
+    a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    @media print {
+      .viewer-topbar { display: none; }
+      body { padding: 0; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="viewer-topbar">
+    <div class="doc-badge">EUROREP SAPI — POSTVENTA</div>
+    <div class="topbar-actions">
+      <button class="btn-action btn-print" onclick="window.print()">
+        🖨️ Imprimir
+      </button>
+      <a href="manual_administrador.pdf" download class="btn-action btn-pdf">
+        ⬇️ Descargar PDF
+      </a>
+    </div>
+  </div>
+
+  <div id="content">
+    <h1>Manual de Uso: Administrador y Supervisor Operativo (SAPI Postventa)</h1>
+<p>Esta guía te proporcionará el conocimiento completo y detallado para operar la consola administrativa y operativa de <strong>SAPI Postventa (Eurorep CRM)</strong>. Desde aquí coordinarás el parque de maquinaria, contratos de renta, asignación de órdenes de servicio, auditoría de reportes técnicos, cálculo de nómina semanal de viáticos, integración con SAP Business One y el control integral de accesos y seguridad.</p>
+<hr>
+<h2>📊 1. Monitoreo Global, Dashboards y Geolocalización</h2>
+<p>Al iniciar sesión con perfil <code>superadmin</code>, <code>admin</code> o <code>supervisor</code>, accederás al <strong>Dashboard Administrativo</strong>:</p>
+<ul>
+<li><strong>KPIs Operativos en Tiempo Real</strong>:</li>
+<li><strong>Tickets Abiertos</strong>: Solicitudes de clientes pendientes de diagnóstico o cotización.</li>
+<li><strong>Órdenes en Proceso</strong>: Servicios de campo activos en ejecución técnica.</li>
+<li><strong>Rentas Vigentes</strong>: Equipos colocados en arrendamiento en obras y plantas.</li>
+<li><strong>Técnicos Disponibles</strong>: Técnicos sin asignación activa en el día en curso.</li>
+<li><strong>Mapa de Maquinaria y Sitios (Leaflet)</strong>:</li>
+<li>Visualización geográfica interactiva de todas las máquinas registradas y frentes de trabajo (obras, plantas y minas).</li>
+<li>Los marcadores se colorean según el estado del equipo (<em>Operativo</em>, <em>En Mantenimiento</em>, <em>En Renta</em>, <em>Con Falla Reportada</em>).</li>
+<li><strong>Alertas de SLA y Compromiso</strong>:</li>
+<li>Notificaciones visuales si existen tickets de prioridad <em>Crítica</em> sin asignar o servicios que superan el tiempo límite comprometido.</li>
+</ul>
+<hr>
+<h2>📑 2. Módulo de Gestión de Rentas de Maquinaria</h2>
+<p>El módulo de rentas centraliza el control físico, temporal y contractual de los equipos en arrendamiento:</p>
+<h3>2.1 Alta de Contrato de Renta:</h3>
+<ol>
+<li>Dirígete a la sección <strong>"Rentas"</strong> en el menú lateral y haz clic en <strong>"Nueva Renta"</strong>.</li>
+<li>Selecciona el <strong>Cliente / Razón Social</strong> y el <strong>Sitio de Entrega</strong>.</li>
+<li>Elige la <strong>Maquinaria</strong> del inventario disponible (el sistema filtrará automáticamente los equipos que no tengan otro contrato activo).</li>
+<li>Define la <strong>Fecha de Inicio</strong>, <strong>Fecha Estimada de Devolución</strong>, <strong>Tarifa de Renta</strong> y el límite de horas permitidas por turno/mes.</li>
+<li>Haz clic en <strong>"Crear Contrato de Renta"</strong>.</li>
+</ol>
+<h3>2.2 Proceso de Entrega (Check-in):</h3>
+<p>Al entregar el equipo al cliente en sitio:</p>
+<ul>
+<li>Se ejecuta el checklist de inspección inicial de entrega.</li>
+<li>Se registra el <strong>Horómetro de Entrega</strong>, nivel de combustible (1/4, 1/2, 3/4, Lleno) y estado de limpieza.</li>
+<li>Se capturan fotografías del estado físico del equipo (frente, laterales, cabina, tren de rodaje/llantas, motor).</li>
+<li>Se recaba la firma digital de recepción del cliente.</li>
+</ul>
+<h3>2.3 Proceso de Recepción (Check-out) y Devolución:</h3>
+<p>Al concluir el contrato de renta:</p>
+<ol>
+<li>Abre la renta activa y selecciona <strong>"Procesar Devolución (Check-out)"</strong>.</li>
+<li>Captura el <strong>Horómetro Final</strong> de recepción y nivel de combustible.</li>
+<li>El sistema calcula de forma automatizada las <strong>Horas Totales Trabajadas</strong> y si existen <strong>Horas Excedentes</strong> con respecto a la cuota contratada para su facturación adicional.</li>
+<li>Se registran las fotos finales y reporte de daños o faltantes en caso de existir.</li>
+<li>El equipo vuelve a quedar disponible en el catálogo general.</li>
+</ol>
+<hr>
+<h2>📍 3. Gestión Multi-Sitio y Catálogos de Clientes</h2>
+<p>Para garantizar que los técnicos lleguen con precisión al lugar del servicio:</p>
+<ul>
+<li><strong>Catálogo de Sitios por Cliente</strong>: En la sección <strong>"Sitios"</strong>, cada empresa puede tener múltiples frentes de trabajo (ej. <em>Planta Monterrey</em>, <em>Mina El Rosario</em>, <em>Bodega Tultitlán</em>).</li>
+<li><strong>Georreferenciación</strong>: Permite capturar coordenadas GPS (Latitud y Longitud) y referencias de acceso terrestre.</li>
+<li><strong>Asignación Automática</strong>: Al seleccionar una máquina en un ticket u orden de servicio, el sistema sugiere automáticamente su último sitio asignado.</li>
+</ul>
+<hr>
+<h2>🎫 4. Gestión Integral del Ciclo de Tickets de Soporte</h2>
+<p>El módulo de tickets es el núcleo de la trazabilidad entre el cliente, ventas y servicio técnico:</p>
+<h3>4.1 Recepción y Asignación de Tickets:</h3>
+<ol>
+<li>Ve a <strong>"Tickets"</strong> en el menú lateral.</li>
+<li>Abre cualquier ticket con estatus <strong>Reportado</strong>.</li>
+<li>Revisa la descripción de la falla, evidencias fotográficas y horómetro reportado.</li>
+<li>En el selector <strong>"Asignado A"</strong>, elige al técnico responsable. El sistema enviará el servicio al calendario personal del técnico.</li>
+</ol>
+<h3>4.2 Integración Comercial con SAP Business One:</h3>
+<ol>
+<li>Si el ticket requiere refacciones o cobro de servicio:</li>
+</ol>
+<ul>
+<li>Realiza la cotización en SAP B1.</li>
+<li>En la ficha del ticket, selecciona el número de <strong>Cotización SAP</strong> sincronizado, ingresa el monto total y sube el PDF de la cotización.</li>
+<li>Cambia el estatus a <strong>Cotizado</strong> para que el cliente reciba la notificación en su portal.</li>
+</ul>
+<ol>
+<li><strong>Aprobación del Cliente</strong>:</li>
+</ol>
+<ul>
+<li>Cuando el cliente aprueba la cotización desde su portal, el ticket pasa a estatus <strong>En Proceso</strong>.</li>
+<li>El cliente puede adjuntar su <strong>Orden de Compra (OC)</strong> o ficha bancaria.</li>
+</ul>
+<ol>
+<li><strong>Liberación con Pedido SAP</strong>:</li>
+</ol>
+<ul>
+<li>Genera el pedido de venta en SAP Business One.</li>
+<li>Vincula el número de <strong>Pedido SAP</strong> en el ticket y sube el PDF del pedido para liberar la refacción en almacén.</li>
+<li>El ticket avanza a estatus <strong>Orden de Servicio</strong> para programarse en campo.</li>
+</ul>
+<h3>4.3 Gestión de Tickets-A (Refacciones de Campo):</h3>
+<ul>
+<li>Cuando un técnico reporta en campo refacciones adicionales necesarias (<code>Refacciones Necesarias</code> en su orden móvil), el sistema autogenera un <strong>Ticket-A</strong> con folio <code>TKT-[OS]-A</code>.</li>
+<li>Este ticket inicia directamente en estatus <strong>Refacciones</strong> con los equipos bloqueados para evitar desvinculaciones accidentales.</li>
+<li>El administrador procede a cotizar las piezas en SAP y continuar el ciclo comercial.</li>
+</ul>
+<h3>4.4 Comunicación: Chat Externo vs. Notas Internas:</h3>
+<ul>
+<li><strong>Chat Externo</strong>: Mensajes visibles para el cliente (acuerdos de visita, aclaraciones de cotización).</li>
+<li><strong>Notas Internas</strong>: Comentarios privados protegidos por políticas RLS en Supabase, accesibles únicamente para administradores, supervisores y técnicos.</li>
+</ul>
+<hr>
+<h2>📅 5. Programación y Control del Calendario Operativo</h2>
+<p>El calendario central (basado en FullCalendar) permite coordinar la agenda operativa del equipo:</p>
+<ol>
+<li>Ve a la sección <strong>"Calendario"</strong>.</li>
+<li><strong>Creación de Asignaciones de Servicio</strong>:</li>
+</ol>
+<ul>
+<li>Haz clic sobre la fecha y técnico deseado.</li>
+<li>Vincula la <strong>Orden de Servicio (OS)</strong> y el <strong>Ticket</strong> correspondiente.</li>
+<li>Define la ventana de tiempo (fecha/hora inicio y fin).</li>
+<li>Al guardar, la asignación se sincroniza de inmediato con el dispositivo móvil del técnico.</li>
+</ul>
+<ol>
+<li><strong>Bloqueos de Agenda e Incidencias</strong>:</li>
+</ol>
+<ul>
+<li>Puedes programar eventos de tipo: <em>Vacaciones</em>, <em>Descanso</em>, <em>Incapacidad</em>, <em>Capacitación</em>, <em>Junta Operativa</em>.</li>
+<li>Los técnicos con eventos de descanso o vacaciones quedan bloqueados para asignación de nuevos servicios en esas fechas.</li>
+</ul>
+<hr>
+<h2>📝 6. Auditoría, Depuración y Cierre de Órdenes de Servicio</h2>
+<p>Una vez que el técnico concluye una orden de servicio en campo (estatus <strong>Completado</strong>), el administrador debe auditarla:</p>
+<h3>Puntos de Auditoría Obligatorios:</h3>
+<ol>
+<li><strong>Bitácoras Diarias y Tiempos</strong>: Validar horas efectivas de trabajo en sitio, horas de traslado de ida y regreso, y descripción narrativa de actividades.</li>
+<li><strong>Checklist de 15 Puntos de Inspección</strong>: Verificar que el técnico haya evaluado el estado físico de los componentes mecánicos, hidráulicos y eléctricos.</li>
+<li><strong>Horómetro Final y Kilometraje</strong>: Comprobar congruencia en el horómetro capturado contra el historial previo del equipo.</li>
+<li><strong>Refacciones Consumidas</strong>: Verificar los códigos y cantidades de piezas tomadas del catálogo de SAP.</li>
+<li><strong>Firmas Digitales</strong>: Confirmar la presencia de la firma de conformidad del cliente en obra y la firma del técnico.</li>
+</ol>
+<h3>Herramienta de Depuración de Órdenes (Solo Superadmin):</h3>
+<ul>
+<li>En la barra superior y en preferencias, el Superadmin cuenta con el <strong>Depurador de Órdenes y Tickets</strong>.</li>
+<li>Permite auditar órdenes huérfanas, regenerar relaciones de tickets de refacciones faltantes y corregir inconsistencias en la base de datos de Supabase.</li>
+</ul>
+<hr>
+<h2>💵 7. Reporte Semanal de Técnicos y Control de Nómina de Viáticos</h2>
+<p>Esta herramienta automatiza la conciliación semanal de servicios y viáticos para el pago a técnicos:</p>
+<ol>
+<li>En la vista de servicios o técnicos, haz clic en <strong>"Reporte Semanal de Técnicos"</strong>.</li>
+<li><strong>Selector de Semana</strong>: Selecciona cualquier fecha; el sistema calculará la semana de Lunes a Domingo.</li>
+<li><strong>Matriz de Control</strong>:</li>
+</ol>
+<ul>
+<li>Muestra cada técnico en una fila y cada día de la semana en columnas.</li>
+<li><strong>Indicadores por color</strong>:</li>
+<li>🟡 <em>Amarillo</em>: Servicio realizado en campo.</li>
+<li>🔵 <em>Azul</em>: Servicio programado pendiente.</li>
+<li>🟣 <em>Morado</em>: Días de vacaciones o descanso.</li>
+<li><strong>Días con Servicio</strong>: Sumatoria automática de jornadas en campo.</li>
+<li><strong>Pago Sugerido ($)</strong>: Estimación económica basada en tarifas de servicio y viáticos aprobados.</li>
+<li><strong>Observaciones</strong>: Campo editable para notas contables.</li>
+</ul>
+<ol>
+<li><strong>Exportación</strong>: Haz clic en <strong>"Exportar CSV"</strong> para descargar el archivo compatible con Excel para el área de recursos humanos y finanzas.</li>
+</ol>
+<hr>
+<h2>⚙️ 8. Mapeo Dinámico de Columnas y Catálogos</h2>
+<p>Para personalizar cómo se presentan las tablas de datos sin modificar código:</p>
+<ol>
+<li>Ve a <strong>"Ajustes de Tablas / Mapeos"</strong>.</li>
+<li>Selecciona la entidad deseada (<em>Clientes</em>, <em>Maquinaria</em>, <em>Refacciones</em>, <em>Sitios</em>).</li>
+<li>Configura qué campos de Supabase o SAP se muestran, su orden y sus etiquetas en pantalla.</li>
+<li>Guarda la configuración para aplicarla instantáneamente a toda la organización.</li>
+</ol>
+<hr>
+<h2>🔄 9. Sincronización con SAP Business One (Service Layer)</h2>
+<p>El middleware de integración mantiene sincronizados los catálogos clave entre SAP B1 y Supabase:</p>
+<ul>
+<li><strong>Módulos Sincronizables</strong>: Socios de Negocios (Clientes), Artículos y Refacciones (con listas de precios y marcas <code>@OK_MARCA</code>), Sitios de Entrega, Empleados Técnicos, Cotizaciones y Pedidos.</li>
+<li><strong>Sincronización Manual</strong>: En <strong>Preferencias > Integración SAP</strong>, presiona <strong>"Sincronizar Todo"</strong> o el botón individual por módulo para forzar una actualización inmediata.</li>
+<li><strong>Manejo de Sesión SAP</strong>: El sistema utiliza cookies de sesión reutilizables almacenadas en Supabase (<code>config &gt; sap_session</code>) para evitar bloqueos por inicios de sesión concurrentes en SAP.</li>
+</ul>
+<hr>
+<h2>👥 10. Gestión de Usuarios, Roles y Modo Sandbox</h2>
+<h3>Control de Roles y Accesos:</h3>
+<ul>
+<li>Asigna roles específicos a los usuarios:</li>
+<li><code>superadmin</code>: Acceso irrestricto a toda la plataforma, configuración de sistemas, depuradores y manuales de desarrollo.</li>
+<li><code>admin</code> / <code>supervisor</code>: Control operativo, asignación de órdenes, auditoría de tickets, rentas, finanzas y reportes.</li>
+<li><code>tecnico</code>: Vista móvil enfocada en órdenes asignadas, bitácoras, checklist y viáticos.</li>
+<li><code>cliente</code>: Acceso restringido a sus equipos, rentas, tickets y órdenes propias.</li>
+<li><strong>Simulador de Perfiles (Role Switcher)</strong>: El Superadmin puede simular la vista de cualquier técnico o rol desde el selector superior para auditar su experiencia de usuario sin cerrar sesión.</li>
+<li><strong>Aprobación de Clientes</strong>: Autoriza o rechaza los registros de nuevos clientes en la pestaña de usuarios.</li>
+</ul>
+<h3>Modo Sandbox (Entorno de Pruebas):</h3>
+<ul>
+<li>Permite activar un entorno aislado para capacitación de personal o pruebas operativas sin alterar la base de datos de producción de Supabase ni emitir peticiones reales a SAP.</li>
+</ul>
+  </div>
+</body>
+</html>

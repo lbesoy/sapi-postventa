@@ -1,148 +1,122 @@
 # Manual de Flujo Completo del Sistema (SAPI Postventa)
 
-Este manual describe el ciclo de vida completo de un servicio de mantenimiento dentro de la plataforma **SAPI Postventa** de Eurorep, detallando la interacción de cada rol (Cliente, Administrador, Técnico) y la integración automatizada del sistema con Supabase, Microsoft OneDrive y SAP Business One.
+Este manual documenta de forma exhaustiva el **ciclo de vida completo end-to-end** de un requerimiento técnico o contrato de renta dentro de la plataforma **SAPI Postventa (Eurorep CRM)**, detallando la interacción coordinada entre el **Cliente**, la **Mesa de Ayuda Comercial**, la **Coordinación Operativa**, los **Técnicos de Campo**, el departamento de **Contabilidad / Nómina** y la integración automatizada con **Supabase**, **Microsoft OneDrive** y **SAP Business One**.
 
 ---
 
-## 🔄 Diagrama del Flujo de Trabajo End-to-End
+## 🔄 1. Mapa General del Flujo de Trabajo End-to-End
 
-El ciclo de servicio sigue una secuencia lineal obligatoria para garantizar la trazabilidad del trabajo y la facturación:
+El ciclo operativo de SAPI sigue una secuencia estructurada y validada para garantizar la calidad en el servicio, la disponibilidad del parque de maquinaria y la precisión fiscal y contable:
 
-1. **Solicitud** (Cliente crea Ticket en el Portal) 
-2. **Procesamiento de Ticket** (Administrador analiza el ticket, agrega refacciones, vincula cotización SAP y pedido SAP)
-3. **Programación** (Administrador programa y asigna la OS en el Calendario)
-4. **Planificación** (Técnico precarga la OS para trabajo Offline)
-5. **Ejecución en Campo** (Firma de Inicio, Bitácora Diaria, Refacciones, Firma de Cierre)
-6. **Gastos** (Registro de gastos y conciliación de tarjetas Clara)
-7. **Cierre y Sincronización** (Generación de Reporte PDF, guardado en OneDrive y sincronización con SAP)
-
----
-
-## 📱 Fase 1: Creación del Ticket de Servicio (Portal de Clientes)
-
-Todo servicio inicia con una solicitud de asistencia técnica por parte del cliente o registrada manualmente por la oficina:
-
-1. El cliente inicia sesión en el **Portal de Clientes** de SAPI.
-2. Hace clic en **"Nuevo Ticket"** y llena el formulario:
-   * **Categoría**: Correctivo, Preventivo o Refacción.
-   * **Maquinaria / Equipo**: Selecciona la máquina registrada en su catálogo de SAP.
-   * **Asunto y Descripción**: Detalla los síntomas de la falla detectada.
-   * **Evidencia**: Sube una fotografía o PDF de la falla (opcional).
-3. Al guardar, el ticket se registra en Supabase y se genera una notificación para administración.
-
-![Formulario de Nuevo Ticket del Cliente](images/nuevo_ticket.jpg)
+```
+[1. Requerimiento / Renta] ➔ [2. Cotización SAP] ➔ [3. Autorización y OC] ➔ [4. Calendario]
+                                                                                │
+                                                                                ▼
+[8. OneDrive & SAP B1] ◄── [7. Control Gastos] ◄── [6. Ejecución Campo] ◄── [5. Carga Offline]
+        │
+        ▼
+[9. Tickets-A de Refacciones de Campo]
+```
 
 ---
 
-## 🛠️ Fase 2: Análisis Técnico y Procesamiento del Ticket (Portal del Administrador)
-
-Antes de programar el servicio, la oficina de administración y el equipo técnico procesan la solicitud para asociarle las refacciones comerciales y comerciales requeridas en SAP:
-
-### 2.1 Selección y Registro de Refacciones
-1. El administrador abre el detalle del ticket asignado (estatus **Abierto**).
-2. En la sección **"Procesar Ticket: Selección de Refacciones"**, hace clic en **"Agregar Refacción"**.
-3. Busca y agrega las piezas necesarias de los catálogos integrados y hace clic en **"Guardar Refacciones"** (el ticket cambia a estatus **Refacciones**).
-
-![Selección de Refacciones](images/admin_ticket_refacciones.jpg)
-
-### 2.2 Vinculación de Cotización SAP
-1. Se realiza la cotización formal en SAP Business One.
-2. En el detalle del ticket, el administrador selecciona el número de **Cotización SAP** de la lista desplegable sincronizada (o bien presiona *"Sincronizar con SAP"* si es reciente).
-3. Captura el **Monto de la Cotización** y sube el archivo de **Cotización (PDF)**. El sistema cuenta con un motor de auto-extracción que lee el PDF del SAT y autocompleta los conceptos.
-4. Hace clic en **"Pasar a Cotización"** (el ticket cambia a estatus **Cotización** y se notifica al cliente).
-
-![Vinculación de Cotización SAP](images/admin_ticket_cotizacion.jpg)
-
-### 2.3 Aprobación del Cliente y Registro de Pedido SAP
-1. El cliente revisa la cotización en su portal y la **Aprueba** (o rechaza indicando el motivo).
-2. Al ser aprobada, se genera la orden de compra en SAP Business One.
-3. El administrador vincula el número de **Pedido SAP (Orden de Compra)** en la ficha del ticket y sube el PDF del pedido. Al guardar, el ticket queda liberado en estatus **Pedido** y listo para programarse.
-
-![Administrador Procesando Ticket](images/admin_ticket_procesar.jpg)
+## 📱 2. Las 8 Fases del Ciclo Operativo
 
 ---
 
-## 📅 Fase 3: Asignación y Programación (Portal del Administrador)
-
-Una vez que el ticket tiene un Pedido SAP asociado y las piezas están listas, se procede con la programación del servicio de campo:
-
-1. El administrador abre la sección de **"Calendario"** y hace clic en **"Programar Asignación"** (o directamente sobre una fecha).
-2. En el formulario de asignación:
-   * **Asociar Ticket / Orden**: Selecciona el ticket liberado del listado para vincularlo a una **Orden de Servicio (OS)** específica.
-   * **Técnico(s) Asignado(s)**: Elige a uno o varios técnicos de campo.
-   * **Fechas y Horarios**: Establece el inicio y fin estimado del servicio.
-3. Al guardar, la asignación se pinta en el calendario global y se distribuye automáticamente a los dispositivos móviles de los técnicos designados.
-
-![Asignación de Orden de Servicio en Calendario](images/calendario_asignar.jpg)
+### Fase 1: Entrada de Requerimiento (Cliente o Mesa de Ayuda)
+Todo servicio inicia con la detección de una necesidad operativa por dos vías:
+* **Vía A: Ticket de Soporte Técnico**:
+  1. El cliente entra a su portal (`cliente.html`) o el coordinador atiende una llamada en la oficina.
+  2. Se selecciona la **Maquinaria**, la **Ubicación (Sitio/Obra)** y se captura el **Horómetro Actual**.
+  3. Se define la categoría (*Correctivo*, *Preventivo*, *Refacciones*, *Garantía*) y se suben fotos de la falla.
+  4. El ticket se guarda con estatus **Reportado**.
+* **Vía B: Contrato de Renta de Maquinaria**:
+  1. La administración genera el contrato de arrendamiento vinculando el cliente, sitio y equipo disponible.
+  2. Se programa la entrega y se emite la hoja de inspección inicial (**Check-in**).
 
 ---
 
-## 📶 Fase 4: Preparación y Carga de Órdenes (Técnico de Campo)
+### Fase 2: Diagnóstico y Cotización Comercial en SAP B1
+Antes de enviar personal a campo (a excepción de diagnósticos de urgencia):
+1. El equipo técnico y comercial evalúa las piezas requeridas y tiempos estimados.
+2. Se elabora la **Cotización de Venta en SAP Business One**.
+3. En la ficha del ticket en SAPI, el administrador vincula el número de cotización sincronizado, captura el monto y sube el PDF comercial oficial.
+4. El ticket cambia a estatus **Cotizado** y se envía una notificación al portal del cliente.
 
+---
+
+### Fase 3: Autorización del Cliente, Carga de OC y Generación de Pedido SAP
+1. El cliente revisa la cotización y los conceptos desglosados en su portal.
+2. Si está de acuerdo, presiona el botón **"Aceptar Cotización"** y el ticket pasa a estatus **En Proceso**.
+3. El cliente puede adjuntar de forma inmediata el PDF de su **Orden de Compra interna (OC)** o el comprobante de transferencia bancaria.
+4. Con esta aprobación, la administración ingresa a SAP Business One y genera el **Pedido de Venta (Sales Order)** para apartar las refacciones en almacén.
+5. El administrador vincula el número de pedido y su PDF en el ticket, avanzando a estatus **Orden de Servicio**.
+
+---
+
+### Fase 4: Programación y Asignación en el Calendario Operativo
+1. El coordinador abre el **Calendario Operativo** en SAPI.
+2. Selecciona la fecha y asigna a uno o más técnicos de campo.
+3. Vincula la **Orden de Servicio (OS)** y el Ticket liberado.
+4. El sistema notifica al técnico y coloca el servicio en su agenda móvil personal.
+
+---
+
+### Fase 5: Preparación y Descarga Offline (¡OBLIGATORIO ANTES DE SALIR!)
 > [!IMPORTANT]
-> **Antes de trasladarse al sitio de la obra (taller, mina, obra remota)**:
-> El técnico asignado debe verificar si la zona del servicio cuenta o no con cobertura de internet.
-> * **Si el sitio estará Fuera de Línea (Offline)**: El técnico debe abrir la aplicación en su celular **mientras siga en el taller o tenga señal Wi-Fi** y cargar la Orden de Servicio asignada. Al hacer esto, toda la información de la máquina, catálogo de refacciones de SAP y formularios se guardan de forma local en la base de datos interna de su navegador (IndexedDB).
+> **Protocolo de Precarga en Taller**:
+> Si el técnico se trasladará a una zona con poca o nula cobertura celular (minas, sótanos, autopistas remotas):
+> * **Mientras permanezca en el taller o tenga señal Wi-Fi**, el técnico debe abrir la aplicación en su teléfono y cargar la Orden de Servicio asignada.
+> * Esto almacena toda la información del cliente, especificaciones de la máquina y el catálogo completo de refacciones de SAP en la memoria local (IndexedDB) de su dispositivo móvil.
 
 ---
 
-## 🛠️ Fase 5: Ejecución del Servicio y Reporte de Campo (Técnico de Campo)
+### Fase 6: Ejecución Técnica del Servicio en Obra
+En el frente de trabajo, el técnico sigue el protocolo obligatorio paso a paso en su aplicación móvil:
 
-Una vez en el sitio de la obra, el técnico sigue el flujo operativo en su dispositivo móvil:
-
-### 1. Foto de Inicio (Entrada) - ¡Lo primero al llegar!
-Antes de tocar la máquina, el técnico debe abrir la sección de **Evidencias Fotográficas** del servicio, localizar la tarjeta específica **"Foto de Inicio (Entrada)"** y tomar la fotografía del estado en que recibe el equipo.
-
-### 2. Registro de Actividades Diarias (Bitácora Diaria)
-Al terminar la jornada de cada día (incluso si la reparación no ha terminado), el técnico registra su bitácora en la sección correspondiente indicando:
-* Resumen del avance del día.
-* Hora de Entrada y Salida reales del sitio.
-* Horas de Traslado de Ida y Vuelta invertidas.
-
-### 3. Registro de Reporte Técnico y Refacciones (Cierre)
-Cuando el servicio está completamente concluido, el técnico abre el formulario de edición de la orden y registra:
-* **Horómetro Real (Obligatorio)**: Las horas de uso que registra el contador físico del equipo.
-* **Diagnóstico y Trabajos**: Falla detectada y trabajos correctivos aplicados.
-* **Refacciones Utilizadas**: Agrega las piezas desde el buscador integrado conectado al catálogo oficial de SAP.
-
-<table style="border: none; border-collapse: collapse; width: 100%;">
-  <tr style="border: none;">
-    <td style="border: none; text-align: center; width: 50%; padding: 5px; vertical-align: top;">
-      <img src="images/tecnico_orden_detalle.jpg" alt="Llenado del Reporte" style="width: 180px; display: block; margin: 0 auto;" />
-      <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; font-weight: 600;">Formulario de Reporte Técnico</div>
-    </td>
-    <td style="border: none; text-align: center; width: 50%; padding: 5px; vertical-align: top;">
-      <img src="images/tecnico_orden_refacciones.jpg" alt="Llenado de Refacciones" style="width: 180px; display: block; margin: 0 auto;" />
-      <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; font-weight: 600;">Registro de Refacciones Utilizadas</div>
-    </td>
-  </tr>
-</table>
-
-### 4. Firmas de Conformidad y Cierre
-Una vez completados los requisitos anteriores, se habilitará la sección de **Firmas de Conformidad**. El técnico ingresa el nombre del responsable del cliente en obra, recaba la firma digital de conformidad del cliente en pantalla y firma él mismo como técnico autorizado. Al presionar **"Finalizar y Cerrar Orden"**, el servicio cambia a estatus **Completado**.
+1. **Foto de Inicio (Entrada)**: Toma y subida de la evidencia fotográfica del estado del equipo antes de iniciar cualquier maniobra.
+2. **Bitácora Diaria y Tiempos de Traslado**: Registro diario de horas de entrada/salida a la obra, horas de traslado de ida y vuelta, y descripción del trabajo ejecutado.
+3. **Checklist Técnico de 15 Puntos**: Evaluación visual y funcional de motor, niveles de fluidos, sistema hidráulico, sistema eléctrico, mangueras, fugas, batería y seguridad.
+4. **Horómetro Real**: Captura obligatoria de las horas de trabajo acumuladas y foto del marcador físico.
+5. **Consumo de Refacciones de SAP**: Búsqueda e incorporación de las piezas instaladas tomadas del inventario oficial.
+6. **Evidencias Finales (Foto de Salida)**: Fotografías del trabajo terminado y de componentes reemplazados.
+7. **Firmas Digitales de Conformidad**: Captura en pantalla de la firma digital del encargado del cliente y del técnico de servicio. Al guardar, la orden cambia a **Completado**.
 
 ---
 
-## 💳 Fase 6: Reporte y Conciliación de Gastos (Técnico / Administración)
-
-Durante el viaje de servicio, el técnico puede reportar sus viáticos y consumos:
-
-1. El técnico ingresa a la pestaña de **"Gastos"** del portal.
-2. Puede registrar de forma manual sus comprobantes (hoteles, casetas, comidas).
-3. **Conciliación Inteligente Clara**: Si el técnico tiene asignada una tarjeta corporativa Clara, las transacciones se descargan en tiempo real en la plataforma. El técnico o el administrador pueden arrastrar el ticket/factura digital y asociarla al gasto, cuadrando la transacción de forma automatizada.
-
-![Control y Conciliación de Gastos](images/control_gastos.jpg)
+### Fase 7: Rendición de Gastos de Viaje y Conciliación Clara
+Durante o al finalizar el servicio:
+1. El técnico captura sus comprobantes de viáticos (gasolina, casetas, alimentos, hotel) en el módulo de **Control de Gastos**.
+2. Si utilizó la tarjeta de crédito corporativa **Clara**, localiza la transacción bancaria y presiona **"Comprobar"** adjuntando el ticket o factura electrónica XML/PDF.
+3. El administrador utiliza el módulo de **Conciliación de Gastos** para validar las transacciones contra los archivos del SAT y autorizar los reembolsos o integrarlos a la nómina semanal.
 
 ---
 
-## 🔄 Fase 7: OneDrive, Sincronización SAP y Cierre Administrativo
+### Fase 8: Cierre Técnico, Reporte PDF, OneDrive y Sincronización SAP
+Al validarse la orden de servicio en campo:
+1. **Generación del Reporte Oficial**: El motor del sistema compila automáticamente el **Reporte Técnico de Servicio Eurorep en formato PDF**, integrando logotipos, bitácoras, evidencias fotográficas, refacciones y firmas digitales vectoriales.
+2. **Almacenamiento Corporativo en OneDrive**: El archivo PDF se deposita de manera automatizada en el repositorio de **Microsoft OneDrive** bajo la estructura:
+   `OneDrive/Eurorep CRM/Clientes/[Nombre del Cliente]/[Folio OS].pdf`
+3. **Sincronización con SAP B1**: Las refacciones consumidas se descargan del inventario de SAP y el ticket se marca como **Cerrado** para proceder a su facturación final.
+4. **Disponibilidad para el Cliente**: El cliente puede visualizar y descargar su reporte técnico oficial directamente desde su portal.
 
-Al cerrarse la orden en campo con estatus **Completado**:
+---
 
-1. **Generación automática de PDF**: El motor del backend procesa toda la información (datos generales, bitácoras diarias, refacciones SAP, firmas digitales de cliente y técnico) y compila el **Reporte Técnico de Servicio Oficial Eurorep en PDF**.
-2. **Almacenamiento en OneDrive**: El PDF generado se sube a la carpeta compartida de **Microsoft OneDrive** corporativo de Eurorep, organizado automáticamente bajo la ruta:
-   `OneDrive/Eurorep CRM/Clientes/[Nombre Cliente]/[Folio OS].pdf`
-3. **Actualización en SAP B1**: La información de refacciones consumidas y estatus de orden se sincroniza con el ERP SAP de la empresa, cerrando el ciclo de servicio para proceder a la facturación.
-4. **Sincronización Offline**: Si el técnico trabajó sin internet, todos los cambios locales se guardan en la cola y se suben al servidor automáticamente en cuanto el teléfono recupera señal, o bien el técnico puede forzar la sincronización manual pulsando en el indicador superior de conexión.
+## 🧩 3. Ciclo Post-Servicio: Autogeneración de Tickets-A de Refacciones
 
-![Modal de Sincronización Manual](images/tecnico_sync_modal.jpg)
+Si durante la inspección en campo el técnico detectó piezas con desgaste prematuro y las anotó en la sección de **"Refacciones Necesarias"**:
+1. El sistema crea de forma automática un **Ticket-A** (folio `TKT-[OS]-A`) en estatus **Refacciones**.
+2. Los equipos quedan protegidos contra desvinculación accidental.
+3. El área de ventas cotiza de inmediato estas refacciones en SAP B1 y el ciclo comercial se reinicia de forma proactiva, evitando que la máquina sufra un paro no programado en el futuro.
+
+---
+
+## 👥 4. Matriz de Roles y Responsabilidades
+
+| Rol | Pantallas Clave | Responsabilidades Principales |
+| :--- | :--- | :--- |
+| **Cliente** | `cliente.html` | Reportar tickets, monitorear rentas, autorizar cotizaciones, subir Órdenes de Compra y descargar reportes PDF. |
+| **Coordinador / Admin** | `index.html` (Admin) | Asignar tickets, programar calendario, gestionar rentas, auditar órdenes completadas, conciliar gastos y sincronizar SAP. |
+| **Técnico de Campo** | `index.html` (Móvil) | Precargar órdenes offline, tomar foto de inicio, registrar bitácoras, checklist de 15 puntos, horómetro, refacciones, firmas y viáticos. |
+| **Superadministrador** | `index.html` (Superadmin) | Auditoría global, gestión de roles y accesos, depurador de inconsistencias de base de datos, sandbox de pruebas y soporte técnico. |

@@ -3191,3 +3191,38 @@ body.light-mode .lane-client .flowchart-lane-header {
   transform: translateY(0) !important;
 }
 
+/* ===== MODAL VISOR DE MANUALES Y DOCUMENTOS ===== */
+#modal-visor-manual-overlay,
+#modal-visor-manual-cliente-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999999 !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 1rem !important;
+  box-sizing: border-box !important;
+  transition: opacity 0.2s ease-in-out !important;
+}
+
+#modal-visor-manual-overlay:not(.open),
+#modal-visor-manual-cliente-overlay:not(.open) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+#modal-visor-manual-overlay.open,
+#modal-visor-manual-cliente-overlay.open {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}

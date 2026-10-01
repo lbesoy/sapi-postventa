@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual de Gestión y Ciclo de Tickets — Eurorep SAPI</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --secondary: #475569;
+      --bg: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --card-bg: #f8fafc;
+      --code-bg: #f1f5f9;
+      --accent: #f59e0b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --purple: #8b5cf6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+      padding: 24px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* Top Floating / Header Bar */
+    .viewer-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 24px;
+      position: sticky;
+      top: 12px;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+      backdrop-filter: blur(8px);
+    }
+
+    .doc-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 9999px;
+      background: #e0f2fe;
+      color: #0369a1;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+
+    .btn-pdf {
+      background: var(--primary);
+      color: #ffffff;
+      border: 1px solid var(--primary);
+    }
+    .btn-pdf:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-print {
+      background: #ffffff;
+      color: var(--secondary);
+      border: 1px solid var(--border);
+    }
+    .btn-print:hover {
+      background: #f1f5f9;
+      color: var(--text);
+    }
+
+    /* Content Typography */
+    #content {
+      margin-top: 10px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-top: 10px;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 3px solid var(--primary);
+      letter-spacing: -0.5px;
+    }
+
+    h2 {
+      font-size: 21px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 36px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1.5px solid var(--border);
+    }
+
+    h3 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #334155;
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+
+    h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #475569;
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin-bottom: 16px;
+      color: #334155;
+    }
+
+    strong {
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+
+    ul, ol {
+      margin-top: 8px;
+      margin-bottom: 18px;
+      padding-left: 28px;
+      color: #334155;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    /* Tablas */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0 28px 0;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+      text-align: left;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      color: #334155;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    /* Código */
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      background: var(--code-bg);
+      color: #e11d48;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #e2e8f0;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 16px 20px;
+      border-radius: 10px;
+      overflow-x: auto;
+      margin: 18px 0 24px 0;
+    }
+
+    pre code {
+      background: transparent;
+      color: #38bdf8;
+      padding: 0;
+      border: none;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    /* Alert Cards */
+    .alert-card {
+      margin: 20px 0 24px 0;
+      padding: 16px 20px;
+      border-radius: 8px;
+      border-left: 4px solid;
+      font-size: 14.5px;
+    }
+
+    .alert-note {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      color: #1e40af;
+    }
+
+    .alert-tip {
+      background: #f0fdf4;
+      border-color: #10b981;
+      color: #065f46;
+    }
+
+    .alert-important {
+      background: #fefce8;
+      border-color: #eab308;
+      color: #854d0e;
+    }
+
+    .alert-warning {
+      background: #fff7ed;
+      border-color: #f97316;
+      color: #9a3412;
+    }
+
+    .alert-caution {
+      background: #fef2f2;
+      border-color: #ef4444;
+      color: #991b1b;
+    }
+
+    .alert-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Imágenes */
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin: 14px 0;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.04);
+    }
+
+    /* Links */
+    a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    @media print {
+      .viewer-topbar { display: none; }
+      body { padding: 0; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="viewer-topbar">
+    <div class="doc-badge">EUROREP SAPI — POSTVENTA</div>
+    <div class="topbar-actions">
+      <button class="btn-action btn-print" onclick="window.print()">
+        🖨️ Imprimir
+      </button>
+      <a href="manual_tickets.pdf" download class="btn-action btn-pdf">
+        ⬇️ Descargar PDF
+      </a>
+    </div>
+  </div>
+
+  <div id="content">
+    <h1>Manual de Gestión: Ciclo de Vida, Cotizaciones y Etapas de Tickets (SAPI Postventa)</h1>
+<p>Esta guía describe a fondo el funcionamiento, arquitectura y operación del sistema de <strong>Tickets de Soporte</strong> en la plataforma <strong>SAPI Postventa (Eurorep CRM)</strong>, detallando sus vías de creación, las 6 etapas obligatorias de su ciclo de vida, la integración de cotizaciones y pedidos de SAP Business One, la autogeneración de Tickets-A de refacciones de campo y los canales de comunicación seguros.</p>
+<hr>
+<h2>🎯 1. Concepto y Propósito del Ticket en SAPI</h2>
+<p>Un ticket es el punto de inicio de cualquier solicitud de soporte técnico, mantenimiento preventivo, reclamación de garantía o suministro de refacciones en Eurorep. Actúa como el expediente digital unificado que enlaza al <strong>Cliente</strong>, al <strong>Equipo Comercial/Administrativo</strong> y al <strong>Técnico de Campo</strong>.</p>
+<p>El ticket agrupa y preserva toda la trazabilidad de una incidencia:</p>
+<ul>
+<li>Datos de la máquina y ubicación del sitio/obra.</li>
+<li>Horómetro físico registrado al momento de la falla.</li>
+<li>Diagnóstico preliminar y evidencias fotográficas.</li>
+<li>Cotizaciones oficiales emitidas en SAP Business One.</li>
+<li>Órdenes de Compra (OC) y comprobantes de pago bancarios del cliente.</li>
+<li>Pedidos formales de venta y hojas de servicio (Órdenes de Servicio) programadas en campo.</li>
+<li>Bitácoras de chat público y notas internas confidenciales del staff.</li>
+</ul>
+<hr>
+<h2>🔌 2. Vías de Creación de Tickets ("¿Cómo se originan?")</h2>
+<p>Los tickets pueden generarse en el sistema mediante tres mecanismos independientes:</p>
+<h3>2.1 Creación Autónoma por el Cliente (Portal de Clientes)</h3>
+<p>El cliente detecta una avería o requiere un servicio preventivo e ingresa a su portal web (<code>cliente.html</code>):</p>
+<ol>
+<li>Selecciona la pestaña <strong>"Tickets"</strong> y hace clic en <strong>"Nuevo Ticket"</strong>.</li>
+<li>Elige el <strong>Sitio / Obra</strong> y la <strong>Maquinaria</strong> de su catálogo de equipos vinculados.</li>
+<li>Ingresa el <strong>Horómetro Actual</strong> de la máquina.</li>
+<li>Selecciona la <strong>Categoría</strong> (<em>Servicio Correctivo</em>, <em>Servicio Preventivo</em>, <em>Refacciones</em>, <em>Garantía</em>), define la <strong>Prioridad</strong> y redacta la descripción del fallo.</li>
+<li>Adjunta fotografías del problema.</li>
+<li>Al presionar <strong>"Enviar Solicitud"</strong>, el ticket se guarda en Supabase con estatus <strong>Reportado</strong> y notifica al área de postventa.</li>
+</ol>
+<h3>2.2 Creación Administrativa (Mesa de Ayuda Interna)</h3>
+<p>Si el cliente realiza el reporte por vía telefónica, correo electrónico o mensajería instantánea:</p>
+<ol>
+<li>El personal de oficina ingresa al panel administrativo (<code>index.html</code>) en la sección <strong>"Tickets"</strong>.</li>
+<li>Presiona <strong>"Nuevo Ticket"</strong>, asocia la empresa, máquina, sitio y captura las notas recibidas.</li>
+</ol>
+<h3>2.3 Creación Automatizada: Tickets-A de Refacciones de Campo</h3>
+<ul>
+<li>Cuando un técnico ejecuta un servicio en una obra y detecta componentes con desgaste que requieren reemplazo futuro, los captura en el apartado <strong>"Refacciones Necesarias"</strong> de su orden móvil.</li>
+<li>Al sincronizarse la orden, el motor en segundo plano (<code>generarTicketsRefaccionesFaltantes</code>) detecta los requerimientos y crea de forma automática un <strong>Ticket-A</strong> para gestionar la cotización y suministro comercial de dichas refacciones.</li>
+</ul>
+<hr>
+<h2>🔄 3. El Ciclo de Vida y las 6 Etapas (Estatus) del Ticket</h2>
+<p>Todo ticket avanza por un flujo estructurado de <strong>6 etapas secuenciales</strong>:</p>
+<pre><code class="language-">[Reportado] ➔ [En Curso] ➔ [Cotizado] ➔ [En Proceso] ➔ [Orden de Servicio] ➔ [Cerrado]</code></pre>
+<hr>
+<h3>Etapa 1: Reportado (Abierto)</h3>
+<ul>
+<li><strong>Significado</strong>: El ticket ha sido registrado y se encuentra en la bandeja de entrada pendiente de revisión. No tiene técnico asignado ni cotización asociada.</li>
+<li><strong>Detonante de Entrada</strong>: Creación del ticket (por cliente o mesa de ayuda).</li>
+<li><strong>Rol Responsable</strong>: Administrador / Coordinador de Servicio (debe evaluar la falla, verificar disponibilidad de personal y determinar la prioridad).</li>
+</ul>
+<hr>
+<h3>Etapa 2: En Curso (Asignado)</h3>
+<ul>
+<li><strong>Significado</strong>: Se ha designado un técnico de campo o taller como responsable directo de atender el diagnóstico o servicio.</li>
+<li><strong>Detonante de Entrada</strong>: El administrador selecciona al técnico en el campo <strong>"Asignado A"</strong> dentro del detalle del ticket.</li>
+<li><strong>Rol Responsable</strong>: Técnico de Campo (revisa los antecedentes del equipo y se coordina con el sitio).</li>
+</ul>
+<hr>
+<h3>Etapa 3: Cotizado (Con Cotización SAP B1)</h3>
+<ul>
+<li><strong>Significado</strong>: El área comercial o de refacciones ha elaborado la cotización formal en SAP Business One y la ha publicado en el ticket para revisión del cliente.</li>
+<li><strong>Detonante de Entrada</strong>: El administrador vincula el número de <strong>Cotización SAP</strong>, ingresa el monto total (en MXN o USD), sube el archivo PDF oficial de la cotización y guarda los cambios.</li>
+<li><strong>Rol Responsable</strong>: Cliente (recibe la notificación en su portal y debe evaluar la propuesta económica).</li>
+</ul>
+<hr>
+<h3>Etapa 4: En Proceso (Aprobado por el Cliente)</h3>
+<ul>
+<li><strong>Significado</strong>: El cliente ha revisado la cotización y ha otorgado su autorización formal para proceder con los trabajos o suministro de piezas.</li>
+<li><strong>Detonante de Entrada</strong>: El cliente hace clic en el botón <strong>"Aceptar Cotización"</strong> dentro de su portal de tickets. Opcionalmente puede adjuntar el PDF de su <strong>Orden de Compra (OC)</strong> o comprobante de pago bancario.</li>
+<li><strong>Rol Responsable</strong>: Administrador (debe capturar el Pedido de Venta formal en SAP Business One para apartar las refacciones en almacén).</li>
+<li>> [!WARNING]</li>
+</ul>
+<blockquote>Si el cliente presiona <strong>"Rechazar Cotización"</strong>, el ticket no avanzará a <em>En Proceso</em>. El cliente deberá indicar obligatoriamente el motivo de rechazo y el ticket regresará a la mesa comercial para una re-cotización o aclaración técnica.</blockquote>
+<hr>
+<h3>Etapa 5: Orden de Servicio (Pedido / En Ejecución Técnica)</h3>
+<ul>
+<li><strong>Significado</strong>: El pedido de SAP ha sido generado, las refacciones han sido liberadas por el almacén y se ha programado formalmente la <strong>Orden de Servicio (OS)</strong> en el calendario operativo.</li>
+<li><strong>Detonante de Entrada</strong>: El administrador vincula el número de <strong>Pedido SAP</strong>, sube el PDF del pedido y programa la fecha del servicio en el Calendario asignando a los técnicos en campo.</li>
+<li><strong>Rol Responsable</strong>: Técnico de Campo (acude a la obra, realiza la intervención física, captura bitácoras, checklist de 15 puntos, horómetro, refacciones consumidas y recaba la firma digital de conformidad).</li>
+</ul>
+<hr>
+<h3>Etapa 6: Cerrado (Concluido y Facturado)</h3>
+<ul>
+<li><strong>Significado</strong>: El servicio técnico ha finalizado al 100%, el reporte técnico oficial ha sido generado y firmado, las refacciones fueron descontadas de inventario y se procede al cierre administrativo y contable.</li>
+<li><strong>Detonante de Entrada</strong>: La orden de servicio asociada pasa a estatus <strong>Completado</strong> con firmas de cliente y técnico. El administrador verifica la consistencia de los datos y cambia el estatus del ticket a <strong>Cerrado</strong>.</li>
+<li><strong>Efectos Automatizados</strong>:</li>
+</ul>
+<ol>
+<li>El sistema genera el <strong>Reporte Técnico Oficial en PDF</strong>.</li>
+<li>El PDF se almacena automáticamente en el repositorio corporativo de <strong>Microsoft OneDrive</strong> (<code>OneDrive/Eurorep CRM/Clientes/[Cliente]/[Folio].pdf</code>).</li>
+<li>El cliente puede descargar su hoja de servicio desde su portal en cualquier momento.</li>
+</ol>
+<hr>
+<h2>📊 4. Matriz de Transiciones y Gatillos de Estatus</h2>
+<table><thead><tr><th>Estatus Inicial</th><th>Estatus Destino</th><th>Acción / Gatillo Requerido</th><th>Rol Ejecutor</th></tr></thead><tbody><tr><td><strong>-</strong></td><td><strong>Reportado</strong></td><td>Creación inicial del ticket en portal o panel</td><td>Cliente / Admin</td></tr><tr><td><strong>Reportado</strong></td><td><strong>En Curso</strong></td><td>Asignación de técnico responsable</td><td>Administrador</td></tr><tr><td><strong>En Curso</strong></td><td><strong>Cotizado</strong></td><td>Vinculación de Cotización SAP, monto y PDF</td><td>Administrador</td></tr><tr><td><strong>Cotizado</strong></td><td><strong>En Proceso</strong></td><td>Aprobación de cotización (botón en portal)</td><td>Cliente</td></tr><tr><td><strong>En Proceso</strong></td><td><strong>Orden de Servicio</strong></td><td>Registro de Pedido SAP y fecha en Calendario</td><td>Administrador</td></tr><tr><td><strong>Orden de Servicio</strong></td><td><strong>Cerrado</strong></td><td>Cierre de OS con firmas digitales completas</td><td>Técnico / Admin</td></tr></tbody></table>
+<hr>
+<h2>🎫 5. Gestión Especial de Tickets-A (Refacciones de Campo)</h2>
+<p>Los <strong>Tickets-A</strong> son expedientes creados de manera automatizada para dar seguimiento comercial y logístico a las piezas complementarias solicitadas por los técnicos durante una visita a obra:</p>
+<ul>
+<li><strong>Nomenclatura Específica</strong>: Se generan con el prefijo <code>TKT-</code>, el número de orden de servicio origen y el sufijo <code>-A</code> (ejemplo: <code>TKT-26058-A</code>).</li>
+<li><strong>Asunto Automatizado</strong>: Título estándar: <code>Refacciones para OS [Folio]</code>.</li>
+<li><strong>Estatus de Inicio Inmediato</strong>: Inician de forma directa en estatus <strong>Refacciones</strong> con las piezas listadas como "Por Pedir".</li>
+<li><strong>Protección de Maquinaria Vinculada</strong>: Para asegurar la integridad técnica del diagnóstico emitido en obra, el sistema <strong>bloquea la eliminación de las máquinas asociadas</strong> (los chips de maquinaria no muestran el botón de remoción).</li>
+<li><strong>Ciclo Comercial de un Ticket-A</strong>: El administrador toma este ticket, cotiza las refacciones en SAP B1, sube el PDF comercial, el cliente lo aprueba y se programa una segunda visita para la instalación final.</li>
+</ul>
+<hr>
+<h2>💬 6. Canales de Comunicación en el Ticket (Chat Externo vs. Notas Internas)</h2>
+<p>Cada ticket cuenta con dos áreas de mensajería claramente diferenciadas para garantizar la privacidad de los procesos internos de Eurorep:</p>
+<h3>1. Comentarios de Seguimiento (Chat Externo con el Cliente):</h3>
+<ul>
+<li><strong>Visibilidad</strong>: Accesible tanto para los usuarios de la empresa cliente como para todo el staff de Eurorep.</li>
+<li><strong>Uso</strong>: Coordinar horarios de acceso a la planta, resolver dudas técnicas sobre la cotización y confirmar llegadas de refacciones.</li>
+</ul>
+<h3>2. Notas Internas (Chat Privado de Staff):</h3>
+<ul>
+<li><strong>Visibilidad</strong>: Estrictamente confidencial. Oculto para el cliente. Solo visible para usuarios con rol <code>superadmin</code>, <code>admin</code>, <code>supervisor</code> o <code>tecnico</code>.</li>
+<li><strong>Uso</strong>: Anotaciones de logística interna (ej. <em>"Validar si el cliente tiene saldo vencido en SAP antes de mandar al técnico"</em>, <em>"Verificar si la bomba entra por garantía de fábrica"</em>).</li>
+<li>> [!IMPORTANT]</li>
+</ul>
+<blockquote>Las notas internas están protegidas directamente en la base de datos de PostgreSQL mediante políticas <strong>Row-Level Security (RLS)</strong> en Supabase. Aunque un cliente intente inspeccionar las peticiones HTTP de la API, la base de datos nunca entregará los registros clasificados como notas internas.</blockquote>
+<hr>
+<h2>🔍 7. Herramientas de Depuración y Diagnóstico (Superadmin)</h2>
+<p>Para garantizar que no existan inconsistencias en la base de datos:</p>
+<ul>
+<li>El Superadmin dispone del botón <strong>"Depurar Tickets y Órdenes"</strong> en la barra superior.</li>
+<li>La herramienta analiza todos los folios, detecta órdenes con refacciones pendientes que no cuenten con su Ticket-A correspondiente y ofrece la opción de regenerarlos automáticamente en un solo clic.</li>
+</ul>
+  </div>
+</body>
+</html>

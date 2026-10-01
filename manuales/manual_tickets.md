@@ -1,128 +1,148 @@
-# Manual de Gestión: Ciclo de Vida y Etapas de Tickets
+# Manual de Gestión: Ciclo de Vida, Cotizaciones y Etapas de Tickets (SAPI Postventa)
 
-Esta guía describe el funcionamiento detallado del sistema de **Tickets de Soporte** en la plataforma de Eurorep (SAPI Postventa), explicando cómo se originan (cómo salen), sus etapas (estatus), y los detonantes que los guían hacia el cierre del servicio técnico.
-
----
-
-## 🎯 ¿Qué es un Ticket en SAPI?
-
-Un ticket es el punto de inicio de cualquier solicitud de asistencia técnica en Eurorep. Actúa como el canal central de comunicación y trazabilidad que une al **Cliente**, al **Administrador / Coordinador** y al **Técnico de Campo**.
-
-El ticket agrupa toda la información de una incidencia: datos de la máquina, horómetro de la avería, ubicación geográfica del fallo, cotizaciones comerciales asociadas en SAP, órdenes de servicio generadas y la conversación histórica entre el cliente y el personal de soporte.
+Esta guía describe a fondo el funcionamiento, arquitectura y operación del sistema de **Tickets de Soporte** en la plataforma **SAPI Postventa (Eurorep CRM)**, detallando sus vías de creación, las 6 etapas obligatorias de su ciclo de vida, la integración de cotizaciones y pedidos de SAP Business One, la autogeneración de Tickets-A de refacciones de campo y los canales de comunicación seguros.
 
 ---
 
-## 🔌 Origen del Ticket: ¿Cómo se crean ("cómo salen")?
+## 🎯 1. Concepto y Propósito del Ticket en SAPI
 
-Los tickets de servicio pueden generarse por dos vías independientes dentro del sistema:
+Un ticket es el punto de inicio de cualquier solicitud de soporte técnico, mantenimiento preventivo, reclamación de garantía o suministro de refacciones en Eurorep. Actúa como el expediente digital unificado que enlaza al **Cliente**, al **Equipo Comercial/Administrativo** y al **Técnico de Campo**.
 
-### 1. Creación Autónoma por el Cliente (Portal de Clientes)
-El cliente detecta un fallo o requiere mantenimiento y genera la solicitud ingresando a su portal (`cliente.html`):
-* Va a la pestaña **Tickets** y presiona **Nueva Solicitud**.
-* Selecciona la **Ubicación (Sitio)** y la **Maquinaria** de su catálogo de equipos enlazados.
-* > [!NOTE]
-  > Si la máquina seleccionada está registrada, el sistema le pedirá capturar el **Horómetro Actual** físico de la máquina. Esto es crítico para calcular los ciclos de mantenimiento preventivo automáticos.
-* Captura la **Categoría** (*Correctivo*, *Preventivo*, *Refacciones* u *Otros*), la **Prioridad** (*Baja*, *Media*, *Alta*), un **Asunto Breve** y una **Descripción Detallada** del fallo.
-* Adjunta una fotografía como evidencia directa del problema (opcional).
-
-### 2. Creación por Administración (Portal del Administrador)
-Si el cliente reporta el problema de forma externa (por teléfono, correo de postventa o WhatsApp), el administrador lo registra manualmente en el Panel de Control (`index.html`):
-* Selecciona **Tickets** y hace clic en **Registrar Ticket**.
-* Asocia el cliente, equipo, ubicación y captura la descripción y evidencias reportadas.
+El ticket agrupa y preserva toda la trazabilidad de una incidencia:
+* Datos de la máquina y ubicación del sitio/obra.
+* Horómetro físico registrado al momento de la falla.
+* Diagnóstico preliminar y evidencias fotográficas.
+* Cotizaciones oficiales emitidas en SAP Business One.
+* Órdenes de Compra (OC) y comprobantes de pago bancarios del cliente.
+* Pedidos formales de venta y hojas de servicio (Órdenes de Servicio) programadas en campo.
+* Bitácoras de chat público y notas internas confidenciales del staff.
 
 ---
 
-## 🔄 El Ciclo de Vida y las 6 Etapas (Estatus) del Ticket
+## 🔌 2. Vías de Creación de Tickets ("¿Cómo se originan?")
 
-Una vez creado, el ticket avanza por un flujo estructurado de **6 etapas**. Cada etapa representa el estado actual de la solicitud y define quién es el responsable de realizar la siguiente acción:
+Los tickets pueden generarse en el sistema mediante tres mecanismos independientes:
+
+### 2.1 Creación Autónoma por el Cliente (Portal de Clientes)
+El cliente detecta una avería o requiere un servicio preventivo e ingresa a su portal web (`cliente.html`):
+1. Selecciona la pestaña **"Tickets"** y hace clic en **"Nuevo Ticket"**.
+2. Elige el **Sitio / Obra** y la **Maquinaria** de su catálogo de equipos vinculados.
+3. Ingresa el **Horómetro Actual** de la máquina.
+4. Selecciona la **Categoría** (*Servicio Correctivo*, *Servicio Preventivo*, *Refacciones*, *Garantía*), define la **Prioridad** y redacta la descripción del fallo.
+5. Adjunta fotografías del problema.
+6. Al presionar **"Enviar Solicitud"**, el ticket se guarda en Supabase con estatus **Reportado** y notifica al área de postventa.
+
+### 2.2 Creación Administrativa (Mesa de Ayuda Interna)
+Si el cliente realiza el reporte por vía telefónica, correo electrónico o mensajería instantánea:
+1. El personal de oficina ingresa al panel administrativo (`index.html`) en la sección **"Tickets"**.
+2. Presiona **"Nuevo Ticket"**, asocia la empresa, máquina, sitio y captura las notas recibidas.
+
+### 2.3 Creación Automatizada: Tickets-A de Refacciones de Campo
+* Cuando un técnico ejecuta un servicio en una obra y detecta componentes con desgaste que requieren reemplazo futuro, los captura en el apartado **"Refacciones Necesarias"** de su orden móvil.
+* Al sincronizarse la orden, el motor en segundo plano (`generarTicketsRefaccionesFaltantes`) detecta los requerimientos y crea de forma automática un **Ticket-A** para gestionar la cotización y suministro comercial de dichas refacciones.
+
+---
+
+## 🔄 3. El Ciclo de Vida y las 6 Etapas (Estatus) del Ticket
+
+Todo ticket avanza por un flujo estructurado de **6 etapas secuenciales**:
 
 ```
 [Reportado] ➔ [En Curso] ➔ [Cotizado] ➔ [En Proceso] ➔ [Orden de Servicio] ➔ [Cerrado]
 ```
 
-### 1. Reportado (o Abierto)
-* **¿Qué significa?** El ticket ha sido registrado en Supabase y está en fila de espera. No cuenta con técnicos asignados, cotizaciones vinculadas ni órdenes de servicio activas.
-* **Detonante:** Creación del ticket (por cliente o administración).
-* **Rol Responsable:** Administrador (debe revisar el fallo, validar que no sea duplicado y decidir la asignación).
+---
 
-### 2. En Curso (Asignado)
-* **¿Qué significa?** Se ha asignado un técnico de campo responsable de atender el reporte.
-* **Detonante:** El administrador selecciona un nombre en la lista **"Asignado A"** dentro del detalle del ticket en su panel.
-* **Rol Responsable:** Técnico de Campo (debe coordinarse con la obra para realizar la visita y el diagnóstico preliminar en sitio).
+### Etapa 1: Reportado (Abierto)
+* **Significado**: El ticket ha sido registrado y se encuentra en la bandeja de entrada pendiente de revisión. No tiene técnico asignado ni cotización asociada.
+* **Detonante de Entrada**: Creación del ticket (por cliente o mesa de ayuda).
+* **Rol Responsable**: Administrador / Coordinador de Servicio (debe evaluar la falla, verificar disponibilidad de personal y determinar la prioridad).
 
-### 3. Cotizado
-* **¿Qué significa?** El área comercial o de refacciones de Eurorep ha elaborado una cotización en SAP Business One por los trabajos o refacciones necesarias, y la ha vinculado al ticket.
-* **Detonante:** El administrador selecciona la **Cotización SAP** desde el listado sincronizado del ticket, ingresa el monto en pesos y sube el PDF de la cotización.
-* **Rol Responsable:** Cliente (debe revisar la propuesta comercial y el PDF desde su portal).
+---
 
-### 4. En Proceso (Aprobado)
-* **¿Qué significa?** El cliente ha revisado la cotización asociada y la ha autorizado de forma oficial en la plataforma.
-* **Detonante:** El cliente presiona el botón **Aceptar Cotización** en su portal de tickets.
-* **Rol Responsable:** Administrador (debe validar la aprobación e ingresar a SAP Business One para generar el **Pedido de Venta** u Orden de Compra formal para liberar las refacciones en almacén).
+### Etapa 2: En Curso (Asignado)
+* **Significado**: Se ha designado un técnico de campo o taller como responsable directo de atender el diagnóstico o servicio.
+* **Detonante de Entrada**: El administrador selecciona al técnico en el campo **"Asignado A"** dentro del detalle del ticket.
+* **Rol Responsable**: Técnico de Campo (revisa los antecedentes del equipo y se coordina con el sitio).
+
+---
+
+### Etapa 3: Cotizado (Con Cotización SAP B1)
+* **Significado**: El área comercial o de refacciones ha elaborado la cotización formal en SAP Business One y la ha publicado en el ticket para revisión del cliente.
+* **Detonante de Entrada**: El administrador vincula el número de **Cotización SAP**, ingresa el monto total (en MXN o USD), sube el archivo PDF oficial de la cotización y guarda los cambios.
+* **Rol Responsable**: Cliente (recibe la notificación en su portal y debe evaluar la propuesta económica).
+
+---
+
+### Etapa 4: En Proceso (Aprobado por el Cliente)
+* **Significado**: El cliente ha revisado la cotización y ha otorgado su autorización formal para proceder con los trabajos o suministro de piezas.
+* **Detonante de Entrada**: El cliente hace clic en el botón **"Aceptar Cotización"** dentro de su portal de tickets. Opcionalmente puede adjuntar el PDF de su **Orden de Compra (OC)** o comprobante de pago bancario.
+* **Rol Responsable**: Administrador (debe capturar el Pedido de Venta formal en SAP Business One para apartar las refacciones en almacén).
 * > [!WARNING]
-  > Si el cliente presiona **Rechazar Cotización**, el ticket no pasará a *En Proceso*. El cliente deberá escribir obligatoriamente un motivo de rechazo y el ticket volverá a bandeja administrativa en espera de una re-cotización.
-
-### 5. Orden de Servicio (Pedido / En Servicio)
-* **¿Qué significa?** Se ha formalizado el pedido en SAP y el servicio de campo está en fase de ejecución técnica o programación en el calendario.
-* **Detonante:** El administrador vincula el número de **Pedido SAP** en el ticket, sube el PDF del pedido y programa una **Orden de Servicio (OS)** en el Calendario asignando fechas y técnicos en campo.
-* **Rol Responsable:** Técnico de Campo (debe acudir a la obra, registrar bitácoras, evidencias fotográficas, refacciones usadas en campo y recabar la firma digital del cliente).
-
-### 6. Cerrado
-* **¿Qué significa?** El servicio técnico ha finalizado por completo, las refacciones fueron descargadas de inventario y el reporte técnico ha sido guardado.
-* **Detonante:** Todas las órdenes de servicio asociadas al ticket han sido firmadas de conformidad y marcadas como **Completadas**. El administrador cambia el estatus del ticket a **Cerrado**.
-* **Resultado:** El sistema genera el **Reporte Técnico PDF definitivo**, lo almacena automáticamente en la carpeta de **Microsoft OneDrive** del cliente y actualiza el estatus final en SAP Business One.
+  > Si el cliente presiona **"Rechazar Cotización"**, el ticket no avanzará a *En Proceso*. El cliente deberá indicar obligatoriamente el motivo de rechazo y el ticket regresará a la mesa comercial para una re-cotización o aclaración técnica.
 
 ---
 
-## 📉 Resumen de Transiciones de Estatus (Gatillos)
+### Etapa 5: Orden de Servicio (Pedido / En Ejecución Técnica)
+* **Significado**: El pedido de SAP ha sido generado, las refacciones han sido liberadas por el almacén y se ha programado formalmente la **Orden de Servicio (OS)** en el calendario operativo.
+* **Detonante de Entrada**: El administrador vincula el número de **Pedido SAP**, sube el PDF del pedido y programa la fecha del servicio en el Calendario asignando a los técnicos en campo.
+* **Rol Responsable**: Técnico de Campo (acude a la obra, realiza la intervención física, captura bitácoras, checklist de 15 puntos, horómetro, refacciones consumidas y recaba la firma digital de conformidad).
 
-| Estatus Inicial | Estatus Destino | Acción / Detonante Requerido | Rol Responsable |
+---
+
+### Etapa 6: Cerrado (Concluido y Facturado)
+* **Significado**: El servicio técnico ha finalizado al 100%, el reporte técnico oficial ha sido generado y firmado, las refacciones fueron descontadas de inventario y se procede al cierre administrativo y contable.
+* **Detonante de Entrada**: La orden de servicio asociada pasa a estatus **Completado** con firmas de cliente y técnico. El administrador verifica la consistencia de los datos y cambia el estatus del ticket a **Cerrado**.
+* **Efectos Automatizados**:
+  1. El sistema genera el **Reporte Técnico Oficial en PDF**.
+  2. El PDF se almacena automáticamente en el repositorio corporativo de **Microsoft OneDrive** (`OneDrive/Eurorep CRM/Clientes/[Cliente]/[Folio].pdf`).
+  3. El cliente puede descargar su hoja de servicio desde su portal en cualquier momento.
+
+---
+
+## 📊 4. Matriz de Transiciones y Gatillos de Estatus
+
+| Estatus Inicial | Estatus Destino | Acción / Gatillo Requerido | Rol Ejecutor |
 | :--- | :--- | :--- | :--- |
-| **-** | **Reportado** | Crear ticket en portal de clientes o administrador | Cliente / Oficina |
-| **Reportado** | **En Curso** | Asignar un técnico de campo en la ficha del ticket | Administrador |
-| **En Curso** | **Cotizado** | Vincular Cotización SAP, monto y PDF en el ticket | Administrador |
-| **Cotizado** | **En Proceso** | El cliente presiona "Aceptar Cotización" en su portal | Cliente |
-| **En Proceso** | **Orden de Servicio** | Vincular Pedido SAP y generar la asignación en el calendario | Administrador |
-| **Orden de Servicio** | **Cerrado** | Finalizar órdenes de servicio con firma digital y cerrar ticket | Técnico / Admin |
+| **-** | **Reportado** | Creación inicial del ticket en portal o panel | Cliente / Admin |
+| **Reportado** | **En Curso** | Asignación de técnico responsable | Administrador |
+| **En Curso** | **Cotizado** | Vinculación de Cotización SAP, monto y PDF | Administrador |
+| **Cotizado** | **En Proceso** | Aprobación de cotización (botón en portal) | Cliente |
+| **En Proceso** | **Orden de Servicio** | Registro de Pedido SAP y fecha en Calendario | Administrador |
+| **Orden de Servicio** | **Cerrado** | Cierre de OS con firmas digitales completas | Técnico / Admin |
 
 ---
 
-## 🎫 4. Tickets de Refacciones de Campo ("Tickets-A")
+## 🎫 5. Gestión Especial de Tickets-A (Refacciones de Campo)
 
-Los **Tickets-A** son un tipo especial de ticket autogenerado por el sistema. Nacen de la necesidad de dar seguimiento comercial y logístico a las **refacciones adicionales** que un técnico detecta que hacen falta durante una visita de campo.
+Los **Tickets-A** son expedientes creados de manera automatizada para dar seguimiento comercial y logístico a las piezas complementarias solicitadas por los técnicos durante una visita a obra:
 
-### ¿Cómo se originan?
-1. Durante la ejecución de un servicio en la obra (Fase 5), el técnico inspecciona la máquina y determina que se requieren refacciones complementarias (que no se tenían presupuestadas o que se necesitarán para una futura reparación).
-2. El técnico registra estas refacciones en la sección de **"Refacciones Necesarias"** de su Orden de Servicio (OS) móvil.
-3. Al guardarse y sincronizarse la orden, el sistema corre un proceso automático de escaneo en segundo plano (`generarTicketsRefaccionesFaltantes`).
-4. Si el sistema encuentra una orden con refacciones solicitadas en campo y detecta que aún no hay un ticket de seguimiento comercial para ellas, **crea el ticket de forma automática**.
-
-### Características y Reglas Especiales de los Tickets-A:
-* **Nomenclatura (Sufijo `-A`):** El folio de estos tickets se genera automáticamente a partir del folio de la orden de servicio de origen, agregando el prefijo `TKT-` y el sufijo `-A` (ejemplo: `TKT-26045-A` para la orden `26045`).
-* **Asunto Automatizado:** Se titula siempre bajo el formato: `Refacciones para [Folio de la OS]`.
-* **Estado Inicial Directo:** A diferencia de los tickets normales que inician en *Reportado*, los Tickets-A inician directamente en el estatus **Refacciones**, con las piezas mapeadas como "Por Pedir".
-* **Bloqueo de Modificación de Equipos:** Dado que este ticket proviene de un diagnóstico técnico de campo sobre máquinas específicas previamente validadas por el técnico en su orden, el sistema **no permite remover o eliminar las máquinas asociadas** en la interfaz administrativa (el botón de borrado `&times;` de los chips de máquina se bloquea automáticamente).
-
-### ¿Qué se hace con un Ticket-A después de que se genera?
-Una vez creado el Ticket-A, el administrador continúa con el flujo estándar de procesamiento de postventa:
-1. Cotiza las refacciones en SAP Business One.
-2. Sube y vincula la cotización al ticket (pasa a estatus **Cotizado**).
-3. El cliente la aprueba desde su portal (pasa a estatus **En Proceso**).
-4. El administrador vincula el pedido SAP (pasa a estatus **Orden de Servicio**).
-5. Se programa una nueva asignación en el calendario para que el técnico acuda a instalar las refacciones solicitadas.
+* **Nomenclatura Específica**: Se generan con el prefijo `TKT-`, el número de orden de servicio origen y el sufijo `-A` (ejemplo: `TKT-26058-A`).
+* **Asunto Automatizado**: Título estándar: `Refacciones para OS [Folio]`.
+* **Estatus de Inicio Inmediato**: Inician de forma directa en estatus **Refacciones** con las piezas listadas como "Por Pedir".
+* **Protección de Maquinaria Vinculada**: Para asegurar la integridad técnica del diagnóstico emitido en obra, el sistema **bloquea la eliminación de las máquinas asociadas** (los chips de maquinaria no muestran el botón de remoción).
+* **Ciclo Comercial de un Ticket-A**: El administrador toma este ticket, cotiza las refacciones en SAP B1, sube el PDF comercial, el cliente lo aprueba y se programa una segunda visita para la instalación final.
 
 ---
 
-## 💬 Chat del Ticket: Externo vs. Notas Internas (Staff)
+## 💬 6. Canales de Comunicación en el Ticket (Chat Externo vs. Notas Internas)
 
-El ticket sirve también como el diario de comunicación del servicio. Para evitar filtraciones de información logística o comentarios técnicos preliminares, el chat está dividido en dos pestañas con permisos estrictos:
+Cada ticket cuenta con dos áreas de mensajería claramente diferenciadas para garantizar la privacidad de los procesos internos de Eurorep:
 
-### 1. Comentarios de Seguimiento (Chat Externo)
-* **Visibilidad:** Visible tanto para el Cliente como para todo el Staff de Eurorep.
-* **Propósito:** Compartir actualizaciones directas (ej. *"Ya vamos en camino a la mina"*, *"¿Nos pueden confirmar si ya hay acceso al sitio?"*) y responder dudas sobre la cotización.
+### 1. Comentarios de Seguimiento (Chat Externo con el Cliente):
+* **Visibilidad**: Accesible tanto para los usuarios de la empresa cliente como para todo el staff de Eurorep.
+* **Uso**: Coordinar horarios de acceso a la planta, resolver dudas técnicas sobre la cotización y confirmar llegadas de refacciones.
 
-### 2. Notas Internas (Chat Privado de Staff)
-* **Visibilidad:** Oculto para el cliente. Solo visible para Administradores, Supervisores y Técnicos de Eurorep.
-* **Propósito:** Coordinación interna del staff (ej. *"El equipo se retrasará porque el técnico está en mina sin señal"*, *"Revisar si esta refacción entra por garantía o cargo al cliente"*).
+### 2. Notas Internas (Chat Privado de Staff):
+* **Visibilidad**: Estrictamente confidencial. Oculto para el cliente. Solo visible para usuarios con rol `superadmin`, `admin`, `supervisor` o `tecnico`.
+* **Uso**: Anotaciones de logística interna (ej. *"Validar si el cliente tiene saldo vencido en SAP antes de mandar al técnico"*, *"Verificar si la bomba entra por garantía de fábrica"*).
 * > [!IMPORTANT]
-  > Los comentarios en esta sección están protegidos a nivel de base de datos en Supabase mediante políticas RLS, asegurando que un cliente nunca pueda descargarlos interceptando las consultas de la API.
+  > Las notas internas están protegidas directamente en la base de datos de PostgreSQL mediante políticas **Row-Level Security (RLS)** en Supabase. Aunque un cliente intente inspeccionar las peticiones HTTP de la API, la base de datos nunca entregará los registros clasificados como notas internas.
+
+---
+
+## 🔍 7. Herramientas de Depuración y Diagnóstico (Superadmin)
+
+Para garantizar que no existan inconsistencias en la base de datos:
+* El Superadmin dispone del botón **"Depurar Tickets y Órdenes"** en la barra superior.
+* La herramienta analiza todos los folios, detecta órdenes con refacciones pendientes que no cuenten con su Ticket-A correspondiente y ofrece la opción de regenerarlos automáticamente en un solo clic.
