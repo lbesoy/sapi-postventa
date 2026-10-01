@@ -224,4 +224,20 @@ const natalicioJuarez2026 = getNthDayOfMonth(2026, 2, 1, 3); // mes 2 es marzo, 
 assert.equal(natalicioJuarez2026, '2026-03-16', 'Tercer lunes de marzo 2026 debe ser 16 de marzo');
 console.log('  ✅ Calendario FullCalendar (getFestivosMexico, getSemanaSanta, getNthDayOfMonth): OK');
 
+// 17. Módulo de Chat de Soporte y Bandeja de Correo
+const { formatMontoConComas, switchSoporteTab, setMailFilter, renderBandejaCorreoEmpresa, renderChatSoporteEmpresa } = await import('../src/modules/soporte.js');
+assert.equal(typeof formatMontoConComas, 'function', 'formatMontoConComas debe ser una función');
+assert.equal(typeof switchSoporteTab, 'function', 'switchSoporteTab debe ser una función');
+assert.equal(typeof setMailFilter, 'function', 'setMailFilter debe ser una función');
+assert.equal(typeof renderBandejaCorreoEmpresa, 'function', 'renderBandejaCorreoEmpresa debe ser una función');
+assert.equal(typeof renderChatSoporteEmpresa, 'function', 'renderChatSoporteEmpresa debe ser una función');
+
+// Test A: Formateo numérico a moneda mexicana
+assert.equal(formatMontoConComas(15420.5), '$15,420.50', 'formatMontoConComas debe formatear con comas y 2 decimales');
+assert.equal(formatMontoConComas('1500'), '$1,500.00', 'formatMontoConComas con string numérico');
+assert.equal(formatMontoConComas('$2,500.00'), '$2,500.00', 'formatMontoConComas ya formateado');
+assert.equal(formatMontoConComas(null), '$0.00', 'formatMontoConComas con null debe dar $0.00');
+assert.equal(formatMontoConComas(''), '$0.00', 'formatMontoConComas con vacío debe dar $0.00');
+console.log('  ✅ Chat de Soporte y Bandeja de Correo (formatMontoConComas y exports): OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');

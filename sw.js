@@ -10,6 +10,7 @@ const ASSETS = [
   '/clientes.js',
   '/maquinaria.js',
   '/calendario.js',
+  '/soporte.js',
   '/rentas.js',
   '/style.css',
   '/cliente.html',
