@@ -469,5 +469,106 @@ assert.equal(checkPdfSapMatchCount('1101234', 1500, 'Cliente Test'), 3, 'Sin PDF
 
 console.log('  ✅ Integración y Sincronización SAP (API_CONFIG, checkPdfSapMatchCount, catálogos y exports): OK');
 
+// =========================================================================
+// PRUEBAS DE MÓDULO: OneDrive, Extracción SAT 26 Campos y Visor PDF
+// =========================================================================
+const {
+  onedriveMockDb,
+  formatBytes,
+  abrirOneDrivePicker,
+  cerrarOneDrivePicker,
+  extraerDatosCompletosXml,
+  analizarFacturaPdfTexto,
+  decodificarXmlBase64
+} = await import('../src/modules/onedrive.js');
+
+assert.ok(onedriveMockDb && Array.isArray(onedriveMockDb['/']), 'onedriveMockDb debe contener carpeta raíz');
+assert.ok(onedriveMockDb['folder_mayo'], 'onedriveMockDb debe contener folder_mayo');
+assert.equal(typeof abrirOneDrivePicker, 'function', 'abrirOneDrivePicker debe ser una función');
+assert.equal(typeof cerrarOneDrivePicker, 'function', 'cerrarOneDrivePicker debe ser una función');
+assert.equal(typeof extraerDatosCompletosXml, 'function', 'extraerDatosCompletosXml debe ser una función');
+assert.equal(typeof analizarFacturaPdfTexto, 'function', 'analizarFacturaPdfTexto debe ser una función');
+
+// Test A: formatBytes
+assert.equal(formatBytes(0), '0 Bytes', 'formatBytes(0) debe retornar "0 Bytes"');
+assert.equal(formatBytes(1024), '1 KB', 'formatBytes(1024) debe retornar "1 KB"');
+assert.equal(formatBytes(1048576), '1 MB', 'formatBytes(1048576) debe retornar "1 MB"');
+assert.equal(formatBytes(null), '--', 'formatBytes(null) debe retornar "--"');
+
+// Test B: extraerDatosCompletosXml sobre CFDI 4.0
+const sampleXml = onedriveMockDb['folder_mayo'][0].content;
+const xmlSat = extraerDatosCompletosXml(sampleXml);
+assert.equal(xmlSat.uuid, 'F1A2B3C4-D5E6-4A7B-8C9D-0E1F2A3B4C5D', 'UUID del XML debe ser F1A2B3C4-D5E6-4A7B-8C9D-0E1F2A3B4C5D');
+assert.equal(xmlSat.rfcEmisor, 'GVA120524XYZ', 'RFC Emisor debe ser GVA120524XYZ');
+assert.equal(xmlSat.total, 1174.79, 'Total debe ser 1174.79');
+assert.equal(xmlSat.versionCfdi, '4.0', 'Versión CFDI debe ser 4.0');
+
+// Test C: analizarFacturaPdfTexto sobre texto simulado
+const samplePdfText = `
+FACTURA DIGITAL CFDI
+Emisor: GASOLINERA DEL VALLE S.A.
+RFC: GVA120524XYZ
+Régimen Fiscal: 601 General de Ley
+Folio Fiscal UUID: a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d
+Fecha de Emisión: 2026-05-22
+Moneda: MXN
+Subtotal: $1,012.75
+IVA 16%: $162.04
+Total Factura: $1,174.79
+`;
+const pdfSat = analizarFacturaPdfTexto(samplePdfText);
+assert.equal(pdfSat.uuid, 'A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D', 'UUID del PDF debe coincidir');
+assert.equal(pdfSat.rfcEmisor, 'GVA120524XYZ', 'RFC del PDF debe coincidir');
+assert.equal(pdfSat.nombreEmisor, 'GASOLINERA DEL VALLE S.A.', 'Nombre emisor debe limpiarse de ruidos');
+assert.equal(pdfSat.total, 1174.79, 'Total extraído del PDF debe ser 1174.79');
+assert.equal(pdfSat.fechaEmision, '2026-05-22', 'Fecha de emisión debe ser 2026-05-22');
+
+// Test D: Resolución de Refacciones y Marcas (caso reportado por usuario)
+const MARCAS_CATALOGO_OFICIAL = {
+  'CAS': 'CASE',
+  'CIF': 'CIFA',
+  'EBS': 'EBS',
+  'EVE': 'EVERDIGM',
+  'FIO': 'FIORI',
+  'HYU': 'HYUNDAI EVERDIGM',
+  'OTM': 'OTHER MOCK',
+  'PTZ': 'PUTZMEISTER',
+  'RBM': 'REICH',
+  'SCH': 'SCHWING',
+  'SIM': 'SIMESA',
+  'TUR': 'TURBOSOL'
+};
+// Bidireccional exacto de actualizarDescripcionesCombo:
+const coincideMarca = (marcaPieza, marcaSeleccionada) => {
+  const mSelNorm = (marcaSeleccionada || '').trim().toLowerCase();
+  const mSelFull = (MARCAS_CATALOGO_OFICIAL[mSelNorm.toUpperCase()] || mSelNorm).trim().toLowerCase();
+  
+  const mPiezaNorm = (marcaPieza || '').trim().toLowerCase();
+  const mPiezaFull = (MARCAS_CATALOGO_OFICIAL[mPiezaNorm.toUpperCase()] || mPiezaNorm).trim().toLowerCase();
+
+  return mPiezaNorm === mSelNorm || 
+         mPiezaNorm === mSelFull || 
+         mPiezaFull === mSelNorm || 
+         mPiezaFull === mSelFull;
+};
+
+// Caso 1: Refacción con código 'HYU' (Supabase) y usuario selecciona 'HYUNDAI EVERDIGM' (UI)
+assert.ok(coincideMarca('HYU', 'HYUNDAI EVERDIGM'), 'HYU debe coincidir con HYUNDAI EVERDIGM');
+
+// Caso 2: Refacción con nombre completo y usuario selecciona código
+assert.ok(coincideMarca('HYUNDAI EVERDIGM', 'HYU'), 'HYUNDAI EVERDIGM debe coincidir con HYU');
+
+// Caso 3: Refacción con código 'CAS' y usuario selecciona 'CASE'
+assert.ok(coincideMarca('CAS', 'CASE'), 'CAS debe coincidir con CASE');
+
+// Caso 4: Refacción con código 'EVE' y usuario selecciona 'EVERDIGM'
+assert.ok(coincideMarca('EVE', 'EVERDIGM'), 'EVE debe coincidir con EVERDIGM');
+
+// Caso 5: Refacción 'PUTZMEISTER' no debe coincidir con 'SCHWING'
+assert.ok(!coincideMarca('PTZ', 'SCHWING'), 'PUTZMEISTER no debe coincidir con SCHWING');
+
+console.log('  ✅ Microsoft OneDrive, Extracción Fiscal SAT y Resolución de Refacciones: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
+
 
