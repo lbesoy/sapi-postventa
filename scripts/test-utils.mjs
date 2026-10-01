@@ -268,4 +268,18 @@ assert.equal(kitRubble.intervalo, '250', 'Intervalo debe ser 250h');
 assert.ok(kitRubble.piezas.length >= 3, 'El kit 250h debe contener al menos 3 refacciones');
 console.log('  ✅ Kits de Servicio y Machotes (detectarSistemaRefaccion, catálogo 36 kits y exports): OK');
 
+// 19. Módulo de Juntas de Revisión y Rescate Histórico
+const { reestablecerTicket26477, obtenerTodosLosPendientes, renderJuntaRevision, copiarMinutaJunta, toggleFullscreenJunta, toggleJuntaAnalytics } = await import('../src/modules/juntas.js');
+assert.equal(typeof reestablecerTicket26477, 'function', 'reestablecerTicket26477 debe ser una función');
+assert.equal(typeof obtenerTodosLosPendientes, 'function', 'obtenerTodosLosPendientes debe ser una función');
+assert.equal(typeof renderJuntaRevision, 'function', 'renderJuntaRevision debe ser una función');
+assert.equal(typeof copiarMinutaJunta, 'function', 'copiarMinutaJunta debe ser una función');
+assert.equal(typeof toggleFullscreenJunta, 'function', 'toggleFullscreenJunta debe ser una función');
+assert.equal(typeof toggleJuntaAnalytics, 'function', 'toggleJuntaAnalytics debe ser una función');
+
+// Test A: Ejecución segura de obtenerTodosLosPendientes sin fallar ante entorno vacío
+const pendientes = obtenerTodosLosPendientes();
+assert.ok(Array.isArray(pendientes), 'obtenerTodosLosPendientes debe devolver un array');
+console.log('  ✅ Juntas de Revisión (obtenerTodosLosPendientes, reestablecerTicket26477 y exports): OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');

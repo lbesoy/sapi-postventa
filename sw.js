@@ -12,6 +12,7 @@ const ASSETS = [
   '/calendario.js',
   '/soporte.js',
   '/kits.js',
+  '/juntas.js',
   '/rentas.js',
   '/style.css',
   '/cliente.html',
