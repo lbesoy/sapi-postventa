@@ -662,7 +662,56 @@ assert.ok(htmlMail.includes('<div') && htmlMail.includes('max-width: 600px'), 'H
 
 console.log('  ✅ Automatizaciones, Reglas de Eventos y Plantillas de Correo: OK');
 
+// 27. MÓDULO DE RESUMEN SEMANAL OPERATIVO Y REPORTES EJECUTIVOS
+console.log('🧪 Verificando Módulo de Resumen Semanal Operativo (resumen_semanal.js / src/modules/resumen_semanal.js)...');
+const {
+  abrirModalResumenSemanal,
+  cerrarModalResumenSemanal,
+  obtenerRangoSemana,
+  parseFechaResumenMs,
+  obtenerTodosLosElementosGlobales,
+  cargarResumenSemanal,
+  renderizarGraficasResumenSemanal,
+  setResumenTicketTab
+} = await import('../src/modules/resumen_semanal.js');
+
+// Test A: Funciones existen
+assert.equal(typeof abrirModalResumenSemanal, 'function', 'abrirModalResumenSemanal debe ser función');
+assert.equal(typeof cerrarModalResumenSemanal, 'function', 'cerrarModalResumenSemanal debe ser función');
+assert.equal(typeof obtenerRangoSemana, 'function', 'obtenerRangoSemana debe ser función');
+assert.equal(typeof parseFechaResumenMs, 'function', 'parseFechaResumenMs debe ser función');
+assert.equal(typeof obtenerTodosLosElementosGlobales, 'function', 'obtenerTodosLosElementosGlobales debe ser función');
+assert.equal(typeof cargarResumenSemanal, 'function', 'cargarResumenSemanal debe ser función');
+assert.equal(typeof renderizarGraficasResumenSemanal, 'function', 'renderizarGraficasResumenSemanal debe ser función');
+assert.equal(typeof setResumenTicketTab, 'function', 'setResumenTicketTab debe ser función');
+
+// Test B: obtenerRangoSemana
+const { monday: m0, sunday: s0 } = obtenerRangoSemana(0);
+assert.ok(m0 instanceof Date, 'monday debe ser una instancia de Date');
+assert.ok(s0 instanceof Date, 'sunday debe ser una instancia de Date');
+assert.equal(m0.getDay(), 1, 'monday debe ser lunes (day 1)');
+assert.equal(s0.getDay(), 0, 'sunday debe ser domingo (day 0)');
+assert.ok(s0.getTime() > m0.getTime(), 'sunday debe ser posterior a monday');
+
+const { monday: mPast } = obtenerRangoSemana(-1);
+assert.equal(mPast.getDay(), 1, 'semana pasada monday debe ser lunes');
+assert.ok(m0.getTime() - mPast.getTime() >= 6 * 24 * 3600 * 1000, 'diferencia debe ser de 7 días');
+
+// Test C: parseFechaResumenMs
+const isoMs = parseFechaResumenMs('2026-06-15T10:00:00Z');
+assert.equal(typeof isoMs, 'number', 'parseFechaResumenMs de ISO debe retornar number');
+assert.ok(isoMs > 0, 'ms debe ser mayor a 0');
+assert.equal(parseFechaResumenMs(null), null, 'parseFechaResumenMs de null debe ser null');
+assert.equal(parseFechaResumenMs('invalid-date'), null, 'parseFechaResumenMs de invalido debe ser null');
+
+// Test D: obtenerTodosLosElementosGlobales
+const emptyItems = obtenerTodosLosElementosGlobales();
+assert.ok(Array.isArray(emptyItems), 'obtenerTodosLosElementosGlobales debe retornar array');
+
+console.log('  ✅ Resumen Semanal Operativo y Reportes Ejecutivos: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
+
 
 
 
