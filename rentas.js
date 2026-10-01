@@ -282,27 +282,31 @@
    * Actualizar contador de badge en barra lateral
    */
   function actualizarBadgeRentasSidebar() {
-    const badge = document.getElementById('nav-badge-rentas');
-    if (!badge) return;
-    let list = Array.isArray(window.rentas) ? window.rentas : [];
-    if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
-      const activeSandbox = isTestModeActive();
-      list = list.filter(r => isTestData(r) === activeSandbox);
-    }
-    const activasOVencidas = list.filter(r => {
-      const st = calcularEstadoRenta(r);
-      return st === 'Vencida' || st === 'Por Vencer';
-    }).length;
+    try {
+      const badge = document.getElementById('nav-badge-rentas');
+      if (!badge) return;
+      let list = Array.isArray(window.rentas) ? window.rentas : [];
+      if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+        const activeSandbox = isTestModeActive();
+        list = list.filter(r => isTestData(r) === activeSandbox);
+      }
+      const activasOVencidas = list.filter(r => {
+        const st = calcularEstadoRenta(r);
+        return st === 'Vencida' || st === 'Por Vencer';
+      }).length;
 
-    if (activasOVencidas > 0) {
-      badge.textContent = activasOVencidas;
-      badge.classList.add('visible');
-      badge.style.display = 'inline-flex';
-      badge.style.background = '#ef4444';
-      badge.style.color = '#fff';
-    } else {
-      badge.style.display = 'none';
-      badge.classList.remove('visible');
+      if (activasOVencidas > 0) {
+        badge.textContent = activasOVencidas;
+        badge.classList.add('visible');
+        badge.style.display = 'inline-flex';
+        badge.style.background = '#ef4444';
+        badge.style.color = '#fff';
+      } else {
+        badge.style.display = 'none';
+        badge.classList.remove('visible');
+      }
+    } catch (e) {
+      console.warn('[Rentas] Error actualizando badge sidebar:', e);
     }
   }
   window.actualizarBadgeRentasSidebar = actualizarBadgeRentasSidebar;

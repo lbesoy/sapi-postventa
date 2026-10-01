@@ -394,7 +394,11 @@ window.formatFechaAmigable = formatFechaAmigable;
 
 // ===== DATA =====
 let ordenes = safeGetJSON('sapi_ordenes', []);
-setTimeout(deduplicarOrdenesLocales, 2000); // Eliminar duplicados fantasmas en segundo plano tras inicializar
+setTimeout(() => {
+  if (typeof window.deduplicarOrdenesLocales === 'function') {
+    window.deduplicarOrdenesLocales();
+  }
+}, 2000); // Eliminar duplicados fantasmas en segundo plano tras inicializar
 // Limpieza única de tickets fantasmas de la caché local debido a la reasignación de folios en Supabase
 if (typeof localStorage !== 'undefined' && !localStorage.getItem('eurorep_tickets_cleaned_v2')) {
   localStorage.removeItem('sapi_tickets');
@@ -2000,18 +2004,29 @@ function isTestUser(user) {
 }
 
 function isTestModeActive() {
-  const user = usuarios.find(u => u.id === currentSession.userId);
-  if (user) {
-    if (user.rol === 'superadmin') {
-      return localStorage.getItem('eurorep_test_mode') === 'true';
+  try {
+    const userList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios))
+      ? usuarios
+      : ((typeof window !== 'undefined' && Array.isArray(window.usuarios)) ? window.usuarios : []);
+    const sess = (typeof currentSession !== 'undefined' && currentSession) ? currentSession : (typeof window !== 'undefined' ? window.currentSession : null);
+    
+    if (sess && sess.userId && userList.length > 0) {
+      const user = userList.find(u => u.id === sess.userId);
+      if (user) {
+        if (user.rol === 'superadmin') {
+          return (typeof localStorage !== 'undefined') ? localStorage.getItem('eurorep_test_mode') === 'true' : false;
+        }
+        return typeof isTestUser === 'function' ? isTestUser(user) : false;
+      }
     }
-    return isTestUser(user);
-  }
-  if (currentSession && currentSession.userId) {
-    if (currentSession.realRol === 'superadmin') {
-      return localStorage.getItem('eurorep_test_mode') === 'true';
+    if (sess && sess.userId) {
+      if (sess.realRol === 'superadmin') {
+        return (typeof localStorage !== 'undefined') ? localStorage.getItem('eurorep_test_mode') === 'true' : false;
+      }
+      return typeof isTestUser === 'function' ? isTestUser({ nombre: sess.nombre, email: sess.userId + '@temp.com' }) : false;
     }
-    return isTestUser({ nombre: currentSession.nombre, email: currentSession.userId + '@temp.com' });
+  } catch (e) {
+    console.warn('[isTestModeActive] Error evaluando modo prueba:', e);
   }
   return false;
 }
