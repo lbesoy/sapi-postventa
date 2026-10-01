@@ -85,4 +85,23 @@ assert.ok(obtenerBadgeRenta('Activa').includes('Activa'), 'Badge Activa debe con
 assert.ok(obtenerBadgeRenta('Vencida').includes('Vencida'), 'Badge Vencida debe contener etiqueta');
 console.log('  ✅ Rentas (calcularEstadoRenta y obtenerBadgeRenta): OK');
 
-console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS BASE Y RENTAS PASARON CON ÉXITO!\n');
+// 10. Levantamientos - calcularEstadisticasLevantamientos
+const { calcularEstadisticasLevantamientos } = await import('../src/modules/levantamientos.js');
+
+const dummyLevs = [
+  { id: '1', estado: 'Pendiente' },
+  { id: '2', estado: 'Completado' },
+  { id: '3', estado: 'En Proceso' },
+  { id: '4', estado: 'Completado' }
+];
+
+const stats = calcularEstadisticasLevantamientos(dummyLevs);
+assert.equal(stats.total, 4, 'Total de levantamientos debe ser 4');
+assert.equal(stats.pendientes, 2, 'Pendientes debe ser 2 (Pendiente y En Proceso)');
+assert.equal(stats.completados, 2, 'Completados debe ser 2');
+
+const emptyStats = calcularEstadisticasLevantamientos(null);
+assert.equal(emptyStats.total, 0, 'Manejo de nulos seguro');
+console.log('  ✅ Levantamientos (calcularEstadisticasLevantamientos): OK');
+
+console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS BASE, RENTAS Y LEVANTAMIENTOS PASARON CON ÉXITO!\n');
