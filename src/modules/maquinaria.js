@@ -303,11 +303,12 @@ function renderMaquinaria() {
   if (thId) thId.style.display = isEmpresa ? 'none' : '';
 
   // RENDERIZAR CABECERAS PERSONALIZADAS
+  const cfg = (typeof configData !== 'undefined' ? configData : (typeof window !== 'undefined' && window.configData ? window.configData : null));
   const trHeaderMaq = document.querySelector('#view-maquinaria .data-table thead tr');
   if (trHeaderMaq) {
     trHeaderMaq.querySelectorAll('.custom-th-maq').forEach(el => el.remove());
-    if (configData.mappings?.maquinaria?.customCols) {
-      configData.mappings.maquinaria.customCols.forEach(col => {
+    if (cfg?.mappings?.maquinaria?.customCols) {
+      cfg.mappings.maquinaria.customCols.forEach(col => {
         const th = document.createElement('th');
         th.className = 'custom-th-maq';
         th.textContent = col.label;
@@ -317,7 +318,7 @@ function renderMaquinaria() {
   }
 
   if (filtered.length === 0) {
-    const colspan = (isEmpresa ? 10 : 11) + (configData.mappings?.maquinaria?.customCols?.length || 0);
+    const colspan = (isEmpresa ? 10 : 11) + (cfg?.mappings?.maquinaria?.customCols?.length || 0);
     body.innerHTML = `<tr><td colspan="${colspan}" class="empty-state">No se encontró maquinaria.</td></tr>`;
     actualizarMapaMaquinaria(filtered);
     return;
@@ -327,8 +328,8 @@ function renderMaquinaria() {
     const logoPath = getLogoMarca(m.marca);
     
     let customTds = '';
-    if (configData.mappings?.maquinaria?.customCols) {
-      configData.mappings.maquinaria.customCols.forEach(col => {
+    if (cfg?.mappings?.maquinaria?.customCols) {
+      cfg.mappings.maquinaria.customCols.forEach(col => {
         customTds += `<td data-label="${col.label}" style="font-size:0.85rem;">${m.customData && m.customData[col.label] ? m.customData[col.label] : 'N/A'}</td>`;
       });
     }
@@ -1569,6 +1570,28 @@ function renderRefacciones(resetPage = false) {
 
   const q = (document.getElementById('search-refacciones')?.value || '').toLowerCase();
 
+  // Obtener catálogo desde window.refaccionesDb o refaccionesDb
+  let catalogo = (typeof window !== 'undefined' && Array.isArray(window.refaccionesDb) && window.refaccionesDb.length > 0)
+    ? window.refaccionesDb
+    : ((typeof refaccionesDb !== 'undefined' && Array.isArray(refaccionesDb) && refaccionesDb.length > 0) ? refaccionesDb : []);
+
+  // Si aún está vacío en memoria, intentar cargar desde IndexedDB reactivamente
+  if (catalogo.length === 0 && typeof window !== 'undefined' && typeof window.loadRefaccionesLocal === 'function' && !window._cargandoRefaccionesLocal) {
+    window._cargandoRefaccionesLocal = true;
+    window.loadRefaccionesLocal().then(data => {
+      window._cargandoRefaccionesLocal = false;
+      if (data && data.length > 0) {
+        window.refaccionesDb = data;
+        if (typeof refaccionesDb !== 'undefined') refaccionesDb = data;
+        console.log(`[renderRefacciones] Catálogo recuperado reactivamente desde IndexedDB (${data.length} registros).`);
+        renderRefacciones();
+      }
+    }).catch(err => {
+      window._cargandoRefaccionesLocal = false;
+      console.warn('[renderRefacciones] Error al cargar refacciones desde IndexedDB:', err);
+    });
+  }
+
   // Mapa de códigos → nombre completo (para resolver datos del caché de Supabase)
   const MARCAS_RENDER = {
     'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING',
@@ -1593,10 +1616,16 @@ function renderRefacciones(resetPage = false) {
     111: 'Anticipo'
   };
 
-  console.log(`[renderRefacciones] refaccionesDb length: ${refaccionesDb.length}`);
+  if (catalogo.length === 0 && window._cargandoRefaccionesLocal) {
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--text-muted);"><i data-lucide="loader" class="spin"></i> Cargando catálogo de refacciones...</td></tr>';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    return;
+  }
+
+  console.log(`[renderRefacciones] refaccionesDb length: ${catalogo.length}`);
 
   // Filtrar: sin marca → excluir; busqueda
-  const filtered = refaccionesDb.filter(r => {
+  const filtered = catalogo.filter(r => {
     // Resolve marca for filtering (may be code or full name in cache)
     const marcaRaw = (r.marca || r.marcaCodigo || '').trim();
     const marcaCode = marcaRaw.toUpperCase();
@@ -1648,8 +1677,9 @@ function renderRefacciones(resetPage = false) {
     itemOrigen = itemOrigen || 'N/A';
 
     let customTds = '';
-    if (configData?.mappings?.refacciones?.customCols) {
-      configData.mappings.refacciones.customCols.forEach(col => {
+    const cfgRef = (typeof configData !== 'undefined' ? configData : (typeof window !== 'undefined' && window.configData ? window.configData : null));
+    if (cfgRef?.mappings?.refacciones?.customCols) {
+      cfgRef.mappings.refacciones.customCols.forEach(col => {
         customTds += `<td style="font-size:0.85rem; color:var(--text-secondary);">${r.customData && r.customData[col.label] ? r.customData[col.label] : 'N/A'}</td>`;
       });
     }
@@ -2055,6 +2085,13 @@ if (typeof window !== "undefined") {
   window.renombrarSitioEmpresa = renombrarSitioEmpresa;
   window.guardarRenombreSitio = guardarRenombreSitio;
   window.generarIdInternoMaquina = generarIdInternoMaquina;
+}
+
+if (typeof document !== "undefined") {
+  if (document.getElementById('view-refacciones')?.classList.contains('active')) {
+    renderRefacciones();
+    if (typeof renderRefaccionesPendientes === 'function') renderRefaccionesPendientes();
+  }
 }
 
 

@@ -4140,6 +4140,17 @@ window.cargarDatosDeSupabase = function() {
           ItmsGrpCod: r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
         }));
         await window.saveRefaccionesLocal(mapped);
+        window.refaccionesDb = mapped;
+        if (typeof refaccionesDb !== 'undefined') {
+          refaccionesDb = mapped;
+        }
+        console.log(`[Sync] Catálogo de refacciones cargado en memoria (${mapped.length} registros).`);
+        if (typeof window.renderRefacciones === 'function' && document.getElementById('view-refacciones')?.classList.contains('active')) {
+          try { window.renderRefacciones(); } catch (eR) {}
+        }
+        if (typeof window.renderRefaccionesPendientes === 'function' && document.getElementById('view-refacciones')?.classList.contains('active')) {
+          try { window.renderRefaccionesPendientes(); } catch (eR) {}
+        }
       }
     } else {
       console.log('[Sync] Omitiendo descarga del catálogo de refacciones para rol cliente/empresa.');

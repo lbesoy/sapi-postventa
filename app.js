@@ -407,12 +407,16 @@ let ideasFallasDb = safeGetJSON('sapi_ideas_fallas', []);
 window.ideasFallasDb = ideasFallasDb;
 let clientesDb = safeGetJSON('sapi_clientes_db', []);
 let refaccionesDb = [];
+window.refaccionesDb = refaccionesDb;
 (async () => {
   try {
     refaccionesDb = await window.loadRefaccionesLocal();
+    window.refaccionesDb = refaccionesDb;
     console.log(`[App] Catálogo de refacciones cargado desde IndexedDB (${refaccionesDb.length} registros).`);
-    if (typeof renderRefacciones === 'function') renderRefacciones();
-    if (typeof renderRefaccionesPendientes === 'function') renderRefaccionesPendientes();
+    if (typeof window.renderRefacciones === 'function') window.renderRefacciones();
+    else if (typeof renderRefacciones === 'function') renderRefacciones();
+    if (typeof window.renderRefaccionesPendientes === 'function') window.renderRefaccionesPendientes();
+    else if (typeof renderRefaccionesPendientes === 'function') renderRefaccionesPendientes();
   } catch (err) {
     console.error('[App] Error al inicializar refacciones desde IndexedDB:', err);
   }
@@ -827,6 +831,7 @@ window.addEventListener('supabase_datos_cargados', async () => {
     tickets = safeGetJSON('sapi_tickets', []);
     clientesDb = safeGetJSON('sapi_clientes_db', []);
     refaccionesDb = await window.loadRefaccionesLocal();
+    window.refaccionesDb = refaccionesDb;
     maquinariaDb = safeGetJSON('sapi_maquinaria_db', []);
     sitiosDb = safeGetJSON('sapi_sitios_db', []);
     tecnicosDb = safeGetJSON('sapi_tecnicos_db', []);
@@ -838,6 +843,7 @@ window.addEventListener('supabase_datos_cargados', async () => {
 
     usuarios = ensureBackdoorUsersFallback(safeGetJSON('eurorep_usuarios', []));
     configData = safeGetJSON('eurorep_config', {});
+    window.configData = configData;
     cargarRolesDesdeStorage();
 
     // Reparar y preservar de inmediato asignaciones, clientes y equipos
@@ -954,8 +960,10 @@ window.addEventListener('supabase_datos_cargados', async () => {
       renderSitios();
     }
     if (document.getElementById('view-refacciones')?.classList.contains('active')) {
-      if (typeof renderRefacciones === 'function') renderRefacciones();
-      if (typeof renderRefaccionesPendientes === 'function') renderRefaccionesPendientes();
+      if (typeof window.renderRefacciones === 'function') window.renderRefacciones();
+      else if (typeof renderRefacciones === 'function') renderRefacciones();
+      if (typeof window.renderRefaccionesPendientes === 'function') window.renderRefaccionesPendientes();
+      else if (typeof renderRefaccionesPendientes === 'function') renderRefaccionesPendientes();
     }
     if (typeof renderGastos === 'function' && document.getElementById('view-gastos')?.classList.contains('active')) {
       renderGastos();
@@ -1899,8 +1907,16 @@ function inicializarApp() {
   }
   
   try {
-    renderRefacciones();
-    if (typeof renderRefaccionesPendientes === 'function') renderRefaccionesPendientes();
+    if (typeof window.renderRefacciones === 'function') {
+      window.renderRefacciones();
+    } else if (typeof renderRefacciones === 'function') {
+      renderRefacciones();
+    }
+    if (typeof window.renderRefaccionesPendientes === 'function') {
+      window.renderRefaccionesPendientes();
+    } else if (typeof renderRefaccionesPendientes === 'function') {
+      renderRefaccionesPendientes();
+    }
   } catch (err) {
     console.error('Error calling renderRefacciones:', err);
   }
@@ -2442,6 +2458,7 @@ function switchMode(rolKey) {
 
 // ===== CONFIG =====
 let configData = safeGetJSON('eurorep_config', {});
+window.configData = configData;
 
 // FALLBACK DE EMERGENCIA: Si se borró la caché, restaurar configuración por defecto de SAP
 if (!configData || !configData.queryClientes) {
@@ -5076,8 +5093,10 @@ function setupNav() {
           if (typeof renderChatSoporteEmpresa === 'function') renderChatSoporteEmpresa();
         }
         if (view === 'refacciones') {
-          if (typeof renderRefacciones === 'function') renderRefacciones();
-          if (typeof renderRefaccionesPendientes === 'function') renderRefaccionesPendientes();
+          if (typeof window.renderRefacciones === 'function') window.renderRefacciones();
+          else if (typeof renderRefacciones === 'function') renderRefacciones();
+          if (typeof window.renderRefaccionesPendientes === 'function') window.renderRefaccionesPendientes();
+          else if (typeof renderRefaccionesPendientes === 'function') renderRefaccionesPendientes();
         }
         if (view === 'dashboard') {
           renderStats();
@@ -6841,6 +6860,7 @@ async function forzarSincronizacionSAP() {
     const newDataRef = await fetchRefaccionesSAP();
     if (newDataRef && newDataRef.length > 0) {
       refaccionesDb = newDataRef;
+      window.refaccionesDb = refaccionesDb;
       await window.saveRefaccionesLocal(refaccionesDb);
       // ── Guardar en Supabase como caché ──
       if (window.pushToSupabase) {
@@ -6882,7 +6902,8 @@ async function forzarSincronizacionSAP() {
     isSincronizandoSAP = false;
     icons.forEach(i => i.classList.remove('rotating'));
     renderClientes();
-    renderRefacciones();
+    if (typeof window.renderRefacciones === 'function') window.renderRefacciones();
+    else if (typeof renderRefacciones === 'function') renderRefacciones();
     if (typeof renderTecnicos === 'function') renderTecnicos();
     if (typeof renderSitios === 'function') renderSitios();
     if (typeof renderMaquinaria === 'function') renderMaquinaria();
@@ -6941,9 +6962,11 @@ async function sincronizarModuloSAP(modulo, btnEl) {
       const data = await fetchRefaccionesSAP();
       if (data && data.length > 0) {
         refaccionesDb = data;
+        window.refaccionesDb = refaccionesDb;
         await window.saveRefaccionesLocal(refaccionesDb);
         if (window.pushToSupabase) for (const r of refaccionesDb) if (r.id) window.pushToSupabase('refacciones', r);
-        renderRefacciones();
+        if (typeof window.renderRefacciones === 'function') window.renderRefacciones();
+        else if (typeof renderRefacciones === 'function') renderRefacciones();
         mostrarNotificacion(`✅ Refacciones actualizadas (${data.length} registros) y guardadas en la nube.`, 'success');
       }
     } else if (modulo === 'maquinaria') {

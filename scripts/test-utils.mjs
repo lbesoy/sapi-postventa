@@ -197,7 +197,34 @@ assert.equal(idNuevo2, 'CA26003', 'generarIdInternoMaquina debe incrementar corr
 // Test C: Generar ID interno con marca de 1 letra o vacía
 const idGenerico = generarIdInternoMaquina('', '2025', [], []);
 assert.ok(idGenerico.startsWith('XX25'), 'generarIdInternoMaquina con marca vacía usa XX');
-console.log('  ✅ Catálogo de Maquinaria, Refacciones y Sitios (generarIdInternoMaquina y exports): OK');
+
+// Test D: renderRefacciones con catálogo poblado en window.refaccionesDb
+const mockBody = { innerHTML: '', closest: () => null };
+const mockSearch = { value: '' };
+const prevDoc = global.document;
+global.document = {
+  getElementById: (id) => {
+    if (id === 'tabla-body-refacciones') return mockBody;
+    if (id === 'search-refacciones') return mockSearch;
+    if (id === 'refacciones-footer') return { innerHTML: '' };
+    return null;
+  },
+  addEventListener: () => {}
+};
+if (!global.window) global.window = {};
+global.window.refaccionesDb = [
+  { id: '1', codigo: 'REF-01', descripcion: 'Manguera de Presión', marca: 'PUTZMEISTER', marcaCodigo: 'PTZ', grupo: 'Refacciones Bomba', precio: 1500, stock: 5 }
+];
+global.lucide = { createIcons: () => {} };
+
+renderRefacciones();
+assert.ok(mockBody.innerHTML.includes('Manguera de Presión'), 'renderRefacciones debe renderizar items desde window.refaccionesDb');
+assert.ok(mockBody.innerHTML.includes('PUTZMEISTER'), 'renderRefacciones debe mostrar la marca resuelta');
+
+// Restaurar mock
+global.document = prevDoc;
+
+console.log('  ✅ Catálogo de Maquinaria, Refacciones y Sitios (generarIdInternoMaquina, renderRefacciones y exports): OK');
 
 // 16. Módulo de Calendario FullCalendar y Eventos
 const { renderCalendario, getFestivosMexico, getSemanaSanta, getNthDayOfMonth, actualizarFiltrosCalendario } = await import('../src/modules/calendario.js');
