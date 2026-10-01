@@ -833,7 +833,10 @@ const {
   abrirSesionModal,
   cerrarSesionModal,
   cambiarUsuario,
-  agregarUsuario
+  agregarUsuario,
+  renderTecnicosConfig,
+  agregarTecnicoConfig,
+  eliminarTecnicoConfig
 } = await import('../src/modules/usuarios.js');
 
 // Test A: Funciones existen
@@ -851,6 +854,9 @@ assert.equal(typeof abrirSesionModal, 'function', 'abrirSesionModal debe ser fun
 assert.equal(typeof cerrarSesionModal, 'function', 'cerrarSesionModal debe ser función');
 assert.equal(typeof cambiarUsuario, 'function', 'cambiarUsuario debe ser función');
 assert.equal(typeof agregarUsuario, 'function', 'agregarUsuario debe ser función');
+assert.equal(typeof renderTecnicosConfig, 'function', 'renderTecnicosConfig debe ser función');
+assert.equal(typeof agregarTecnicoConfig, 'function', 'agregarTecnicoConfig debe ser función');
+assert.equal(typeof eliminarTecnicoConfig, 'function', 'eliminarTecnicoConfig debe ser función');
 
 // Test B: Invocación segura sin DOM
 assert.doesNotThrow(() => {
@@ -861,9 +867,63 @@ assert.doesNotThrow(() => {
   onCambioFusionDestinoModal();
   abrirSesionModal();
   cerrarSesionModal();
+  renderTecnicosConfig();
 }, 'Las funciones de usuarios no deben arrojar error en ausencia de DOM');
 
 console.log('  ✅ Gestión de Usuarios, Roles, Permisos y Sesiones CRUD: OK');
+
+// 31. Mapeo de Columnas SAP (No-Code) y Queries SQL SAP
+const {
+  abrirModalMapeo,
+  getLabelsForModule,
+  applyTableHeaders,
+  cerrarModalMapeo,
+  switchMapeoTab,
+  addCustomColumnUI,
+  removeCustomColumn,
+  getCustomColumnsForModule,
+  guardarMapeoColumnas,
+  listaQueriesCargada,
+  cargarListaQueriesSAP,
+  cargarDetalleQuery,
+  limpiarFormularioQuery,
+  programarQuerySAP,
+  probarQuerySAP,
+  eliminarQuerySAP
+} = await import('../src/modules/sap_mapper.js');
+
+// Test A: Funciones y estructuras exportadas existen
+assert.equal(typeof abrirModalMapeo, 'function', 'abrirModalMapeo debe ser función');
+assert.equal(typeof getLabelsForModule, 'function', 'getLabelsForModule debe ser función');
+assert.equal(typeof applyTableHeaders, 'function', 'applyTableHeaders debe ser función');
+assert.equal(typeof cerrarModalMapeo, 'function', 'cerrarModalMapeo debe ser función');
+assert.equal(typeof switchMapeoTab, 'function', 'switchMapeoTab debe ser función');
+assert.equal(typeof addCustomColumnUI, 'function', 'addCustomColumnUI debe ser función');
+assert.equal(typeof removeCustomColumn, 'function', 'removeCustomColumn debe ser función');
+assert.equal(typeof getCustomColumnsForModule, 'function', 'getCustomColumnsForModule debe ser función');
+assert.equal(typeof guardarMapeoColumnas, 'function', 'guardarMapeoColumnas debe ser función');
+assert.equal(typeof cargarListaQueriesSAP, 'function', 'cargarListaQueriesSAP debe ser función');
+assert.equal(typeof cargarDetalleQuery, 'function', 'cargarDetalleQuery debe ser función');
+assert.equal(typeof limpiarFormularioQuery, 'function', 'limpiarFormularioQuery debe ser función');
+assert.equal(typeof programarQuerySAP, 'function', 'programarQuerySAP debe ser función');
+assert.equal(typeof probarQuerySAP, 'function', 'probarQuerySAP debe ser función');
+assert.equal(typeof eliminarQuerySAP, 'function', 'eliminarQuerySAP debe ser función');
+assert.ok(Array.isArray(listaQueriesCargada), 'listaQueriesCargada debe ser un Array');
+
+// Test B: Invocación segura sin DOM
+assert.doesNotThrow(() => {
+  abrirModalMapeo();
+  applyTableHeaders();
+  cerrarModalMapeo();
+  switchMapeoTab('clientes');
+  addCustomColumnUI('clientes');
+  removeCustomColumn('clientes', 'test-col');
+  getCustomColumnsForModule('clientes');
+  getLabelsForModule('clientes');
+  limpiarFormularioQuery();
+}, 'Las funciones del mapeo SAP no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Mapeo de Columnas SAP (No-Code) y Queries SQL SAP: OK');
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 

@@ -3523,572 +3523,119 @@ window.guardarOneDriveConfig = function() {
   }, 2000);
 };
 
-// ==========================================
-// MAPEO DE COLUMNAS SAP (NO-CODE)
-// ==========================================
-function abrirModalMapeo() {
-  document.getElementById('modal-mapeo-columnas').classList.add('open');
-  const mappings = configData.mappings || { clientes: {}, maquinaria: {} };
-  
-  const setMapVal = (id, val) => {
-    const el = document.getElementById(id);
-    if (el) el.value = val;
-  };
-  
-  // Cargar Clientes
-  if(mappings.clientes) {
-    setMapVal('map-cli-id', mappings.clientes.id || 'CardCode');
-    setMapVal('map-cli-nombre', mappings.clientes.nombre || 'CardName');
-    setMapVal('map-cli-rfc', mappings.clientes.rfc || 'LicTradNum');
-    setMapVal('map-cli-email', mappings.clientes.email || 'E_Mail');
-    setMapVal('map-cli-grupo', mappings.clientes.grupoSinergia || 'U_OK_Grupo');
-    setMapVal('map-cli-saldo', mappings.clientes.saldoCuenta || 'Balance');
-  }
+// =========================================================================
+// MÓDULO MAPEO DE COLUMNAS SAP Y QUERIES SQL (NO-CODE)
+// Extraído modularmente a sap_mapper.js / src/modules/sap_mapper.js (-568 líneas)
+// =========================================================================
 
-  // Cargar Maquinaria
-  if(mappings.maquinaria) {
-    setMapVal('map-maq-id', mappings.maquinaria.id || 'ManufacturerSerialNum');
-    setMapVal('map-maq-itemcode', mappings.maquinaria.itemcode || 'ItemCode');
-    setMapVal('map-maq-desc', mappings.maquinaria.desc || 'ItemDescription');
-    setMapVal('map-maq-cliente', mappings.maquinaria.clienteId || 'CustomerCode');
-  }
-
-  // Cargar Sitios
-  if(mappings.sitios) {
-    setMapVal('map-sit-id', mappings.sitios.id || 'Address');
-    setMapVal('map-sit-nombre', mappings.sitios.nombre || 'Street');
-    setMapVal('map-sit-cliente', mappings.sitios.clienteId || 'BPCode');
-    setMapVal('map-sit-cp', mappings.sitios.cp || 'ZipCode');
-    setMapVal('map-sit-ciudad', mappings.sitios.ciudad || 'City');
-    setMapVal('map-sit-direccion', mappings.sitios.direccion || 'Block');
-  }
-
-  // Cargar Ordenes
-  if(mappings.ordenes) {
-    setMapVal('map-ord-id', mappings.ordenes.id || 'ServiceCallID');
-    setMapVal('map-ord-cliente', mappings.ordenes.clienteId || 'CustomerCode');
-    setMapVal('map-ord-maquina', mappings.ordenes.maquina || 'ManufacturerSerialNum');
-    setMapVal('map-ord-tecnico', mappings.ordenes.tecnico || 'TechnicianCode');
-    setMapVal('map-ord-estado', mappings.ordenes.estado || 'Status');
-    setMapVal('map-ord-falla', mappings.ordenes.falla || 'Description');
-  }
-
-  // Cargar Técnicos
-  if(mappings.tecnicos) {
-    setMapVal('map-tec-id', mappings.tecnicos.id || 'EmployeeID');
-    setMapVal('map-tec-nombre', mappings.tecnicos.nombre || 'FirstName');
-    setMapVal('map-tec-telefono', mappings.tecnicos.telefono || 'MobilePhone');
-    setMapVal('map-tec-email', mappings.tecnicos.email || 'eMail');
-  }
-
-  // Cargar Refacciones
-  if(mappings.refacciones) {
-    setMapVal('map-ref-id', mappings.refacciones.id || 'ItemCode');
-    setMapVal('map-ref-nombre', mappings.refacciones.nombre || 'ItemName');
-    setMapVal('map-ref-grupo', mappings.refacciones.grupo || 'ItmsGrpNam');
-    setMapVal('map-ref-precio', mappings.refacciones.precio || 'Price');
-    setMapVal('map-ref-stock', mappings.refacciones.stock || 'OnHand');
-    setMapVal('map-ref-origen', mappings.refacciones.origen || 'Origen');
-  }
-
-  // Cargar Labels (Si existen)
-  const modules = ['clientes', 'maquinaria', 'sitios', 'ordenes', 'tecnicos', 'refacciones'];
-  modules.forEach(mod => {
-    if (mappings[mod] && mappings[mod].labels) {
-      for (const [key, val] of Object.entries(mappings[mod].labels)) {
-        const lblInput = document.getElementById('lbl-' + mod + '-' + key);
-        if (lblInput) lblInput.value = val;
-      }
-    }
-  });
-
-
-  // Cargar Columnas Personalizadas Existentes
-  const modulos = ['clientes', 'maquinaria', 'sitios', 'ordenes', 'tecnicos', 'refacciones'];
-  modulos.forEach(mod => {
-    const table = document.querySelector(`#mapeo-content-${mod} table`);
-    if (table) {
-      table.querySelectorAll('.custom-added-col').forEach(el => el.remove()); // Limpiar anteriores
-      if (mappings[mod] && mappings[mod].customCols) {
-        mappings[mod].customCols.forEach(col => {
-          addCustomColumnUI(mod, col.label, col.key);
-        });
-      }
-    }
-  });
-}
-
-function getLabelsForModule(mod) {
-  const labels = {};
-  document.querySelectorAll('input[id^="lbl-' + mod + '-"]').forEach(el => {
-    const key = el.id.replace('lbl-' + mod + '-', '');
-    labels[key] = el.value.trim();
-  });
-  return labels;
-}
-
-function applyTableHeaders() {
-  const mappings = configData.mappings;
-  if (!mappings) return;
-  
-  const modules = ['clientes', 'maquinaria', 'sitios', 'ordenes', 'tecnicos', 'refacciones'];
-  modules.forEach(mod => {
-    if (mappings[mod] && mappings[mod].labels) {
-      for (const [key, val] of Object.entries(mappings[mod].labels)) {
-        const th = document.getElementById('th-' + mod + '-' + key);
-        if (th && val) {
-          // Keep the sort icon if it exists
-          const icon = th.querySelector('i');
-          th.textContent = val + ' ';
-          if (icon) th.appendChild(icon);
-        }
-      }
-    }
-  });
-}
-
-function cerrarModalMapeo() {
-  document.getElementById('modal-mapeo-columnas').classList.remove('open');
-}
-
-function switchMapeoTab(tabId) {
-  document.querySelectorAll('.mapeo-tab-content').forEach(el => el.style.display = 'none');
-  document.querySelectorAll('[id^="tab-mapeo-"]').forEach(el => el.classList.remove('active'));
-  
-  document.getElementById('mapeo-content-' + tabId).style.display = 'block';
-  document.getElementById('tab-mapeo-' + tabId).classList.add('active');
-}
-
-function addCustomColumnUI(module, label = '', key = '') {
-  const table = document.querySelector(`#mapeo-content-${module} table`);
-  if (!table) return;
-  
-  const theadTr = table.querySelector('thead tr');
-  const tbodyTrs = table.querySelectorAll('tbody tr');
-  const inputRow = tbodyTrs[0];
-  const exampleRow = tbodyTrs[1];
-
-  const colId = 'custom-' + Date.now() + Math.floor(Math.random() * 1000);
-
-  // 1. Agregar el <th>
-  const th = document.createElement('th');
-  th.style = "padding: 1rem; border-bottom: 1px solid var(--border); background: var(--bg-body); border-right: 1px solid var(--border); min-width: 200px;";
-  th.className = "custom-added-col";
-  th.dataset.colId = colId;
-  th.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <input type="text" class="custom-label map-label-edit" placeholder="Nombre Columna" value="${label}" style="font-size:0.85rem; font-weight:600; color:var(--text-secondary); background:transparent; border:none; width:80%; outline:none;"/>
-      <button onclick="removeCustomColumn('${module}', '${colId}')" style="background:none; border:none; color:var(--red); cursor:pointer; font-size:1.1rem; padding:0 5px;" title="Eliminar Columna">✕</button>
-    </div>
-  `;
-  theadTr.appendChild(th);
-
-  // 2. Agregar el <td> del input
-  const tdInput = document.createElement('td');
-  tdInput.style = "padding: 0.75rem; border-right: 1px solid var(--border); background: var(--bg-card);";
-  tdInput.className = "custom-added-col";
-  tdInput.dataset.colId = colId;
-  tdInput.innerHTML = `
-    <div style="display:flex; flex-direction:column; gap:0.25rem;">
-      <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;" title="Deja en blanco si es un valor propio de la App">Columna SAP o Int:</span>
-      <input type="text" class="custom-key" placeholder="(En blanco = Valor Interno)" value="${key}" style="font-family: monospace; width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:4px; font-size:0.85rem; background:var(--bg-body); color:var(--text-primary);"/>
-    </div>
-  `;
-  inputRow.appendChild(tdInput);
-
-  // 3. Agregar el <td> del ejemplo
-  const tdExample = document.createElement('td');
-  tdExample.style = "padding: 0.75rem; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border); text-align:center;";
-  tdExample.className = "custom-added-col";
-  tdExample.dataset.colId = colId;
-  tdExample.innerHTML = `<i>(Personalizado)</i>`;
-  exampleRow.appendChild(tdExample);
-}
-
-function removeCustomColumn(module, colId) {
-  const table = document.querySelector(`#mapeo-content-${module} table`);
-  if (!table) return;
-  const elements = table.querySelectorAll(`[data-col-id="${colId}"]`);
-  elements.forEach(el => el.remove());
-}
-
-function getCustomColumnsForModule(module) {
-  const table = document.querySelector(`#mapeo-content-${module} table`);
-  if (!table) return [];
-  
-  const cols = [];
-  const headers = table.querySelectorAll('th.custom-added-col');
-  headers.forEach(th => {
-    const colId = th.dataset.colId;
-    const label = th.querySelector('.custom-label').value.trim();
-    const tdInput = table.querySelector(`td.custom-added-col[data-col-id="${colId}"]`);
-    let key = '';
-    if(tdInput) {
-       key = tdInput.querySelector('.custom-key').value.trim();
-    }
-    // Permitir llave vacía para columnas "Internas" que no se conectan a SAP
-    if (label) {
-      cols.push({ label, key });
-    }
-  });
-  return cols;
-}
-
-function guardarMapeoColumnas() {
-  const getMapVal = (id, def) => {
-    const el = document.getElementById(id);
-    if (!el) return ''; // Eliminado intencionalmente
-    return el.value.trim() || def; // En blanco usa default
-  };
-
-  const mappings = {
-    clientes: {
-      id: getMapVal('map-cli-id', 'CardCode'),
-      nombre: getMapVal('map-cli-nombre', 'CardName'),
-      rfc: getMapVal('map-cli-rfc', 'LicTradNum'),
-      email: getMapVal('map-cli-email', 'E_Mail'),
-      grupoSinergia: getMapVal('map-cli-grupo', 'U_OK_Grupo'),
-      saldoCuenta: getMapVal('map-cli-saldo', 'Balance'),
-      customCols: getCustomColumnsForModule('clientes'), labels: getLabelsForModule('clientes')
-    },
-    maquinaria: {
-      id: getMapVal('map-maq-id', 'ManufacturerSerialNum'),
-      itemcode: getMapVal('map-maq-itemcode', 'ItemCode'),
-      desc: getMapVal('map-maq-desc', 'ItemDescription'),
-      clienteId: getMapVal('map-maq-cliente', 'CustomerCode'),
-      customCols: getCustomColumnsForModule('maquinaria'), labels: getLabelsForModule('maquinaria')
-    },
-    sitios: {
-      id: getMapVal('map-sit-id', 'Address'),
-      nombre: getMapVal('map-sit-nombre', 'Street'),
-      clienteId: getMapVal('map-sit-cliente', 'BPCode'),
-      cp: getMapVal('map-sit-cp', 'ZipCode'),
-      ciudad: getMapVal('map-sit-ciudad', 'City'),
-      direccion: getMapVal('map-sit-direccion', 'Block'),
-      customCols: getCustomColumnsForModule('sitios'), labels: getLabelsForModule('sitios')
-    },
-    ordenes: {
-      id: getMapVal('map-ord-id', 'ServiceCallID'),
-      clienteId: getMapVal('map-ord-cliente', 'CustomerCode'),
-      maquina: getMapVal('map-ord-maquina', 'ManufacturerSerialNum'),
-      tecnico: getMapVal('map-ord-tecnico', 'TechnicianCode'),
-      estado: getMapVal('map-ord-estado', 'Status'),
-      falla: getMapVal('map-ord-falla', 'Description'),
-      customCols: getCustomColumnsForModule('ordenes'), labels: getLabelsForModule('ordenes')
-    },
-    tecnicos: {
-      id: getMapVal('map-tec-id', 'EmployeeID'),
-      nombre: getMapVal('map-tec-nombre', 'FirstName'),
-      telefono: getMapVal('map-tec-telefono', 'MobilePhone'),
-      email: getMapVal('map-tec-email', 'eMail'),
-      customCols: getCustomColumnsForModule('tecnicos'), labels: getLabelsForModule('tecnicos')
-    },
-    refacciones: {
-      id: getMapVal('map-ref-id', 'ItemCode'),
-      nombre: getMapVal('map-ref-nombre', 'ItemName'),
-      grupo: getMapVal('map-ref-grupo', 'ItmsGrpNam'),
-      precio: getMapVal('map-ref-precio', 'Price'),
-      stock: getMapVal('map-ref-stock', 'OnHand'),
-      origen: getMapVal('map-ref-origen', 'Origen'),
-      customCols: getCustomColumnsForModule('refacciones'), labels: getLabelsForModule('refacciones')
-    }
-  };
-  
-  configData.mappings = mappings;
-  localStorage.setItem('eurorep_config', JSON.stringify(configData));
-  if (window.pushToSupabase) window.pushToSupabase('config', configData);
-  
-  applyTableHeaders();
-  cerrarModalMapeo();
-  alert("Mapeo de columnas guardado correctamente. El CRM usará esta estructura al consultar SAP.");
-}
-
-let listaQueriesCargada = [];
-
-async function cargarListaQueriesSAP() {
-  try {
-    const res = await fetchSapApi(`/sap/queries?_t=${Date.now()}`, {
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
-      }
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Fallo al obtener queries');
-
-    listaQueriesCargada = data.data || [];
-    
-    // Rellenar todos los selectores de Queries en la UI
-    const selectors = document.querySelectorAll('.query-sap-selector, #query-selector');
-    selectors.forEach(selector => {
-      const placeholder = selector.id === 'query-selector' ? '-- Seleccionar un Query existente --' : '-- Sin asignar --';
-      selector.innerHTML = `<option value="">${placeholder}</option>`;
-      listaQueriesCargada.forEach(q => {
-        selector.innerHTML += `<option value="${q.SqlCode}">${q.SqlCode} - ${q.SqlName}</option>`;
-      });
-    });
-
-    // Re-aplicar valores guardados
-    if (configData.queryClientes) document.getElementById('cfg-query-clientes').value = configData.queryClientes;
-    if (configData.queryMaquinaria) document.getElementById('cfg-query-maquinaria').value = configData.queryMaquinaria;
-    if (configData.querySitios) document.getElementById('cfg-query-sitios').value = configData.querySitios;
-    if (configData.queryOrdenes) document.getElementById('cfg-query-ordenes').value = configData.queryOrdenes;
-
-    if (configData.queryRefacciones) document.getElementById('cfg-query-refacciones').value = configData.queryRefacciones;
-
-    mostrarNotificacion('Lista de Queries actualizada desde SAP.', 'success');
-  } catch (err) {
-    console.error("Error al cargar lista de queries:", err);
-    mostrarNotificacion('No se pudo actualizar la lista de queries.', 'error');
+function abrirModalMapeo(...args) {
+  if (typeof window !== "undefined" && typeof window.abrirModalMapeo === "function" && window.abrirModalMapeo !== abrirModalMapeo) {
+    return window.abrirModalMapeo(...args);
   }
 }
 
-function cargarDetalleQuery(sqlCode) {
-  if (!sqlCode) {
-    limpiarFormularioQuery();
-    return;
+function getLabelsForModule(...args) {
+  if (typeof window !== "undefined" && typeof window.getLabelsForModule === "function" && window.getLabelsForModule !== getLabelsForModule) {
+    return window.getLabelsForModule(...args);
   }
-  const q = listaQueriesCargada.find(x => x.SqlCode === sqlCode);
-  if (q) {
-    const qCode = document.getElementById('query-code');
-    const qName = document.getElementById('query-name');
-    const qSql = document.getElementById('query-sql');
-    const qResults = document.getElementById('query-results-container');
-    
-    if (qCode) qCode.value = q.SqlCode;
-    if (qName) qName.value = q.SqlName || '';
-    if (qSql) qSql.value = q.SqlText || '';
-    if (qCode) qCode.readOnly = true;
-    if (qResults) qResults.style.display = 'none';
+  return {};
+}
+
+function applyTableHeaders(...args) {
+  if (typeof window !== "undefined" && typeof window.applyTableHeaders === "function" && window.applyTableHeaders !== applyTableHeaders) {
+    return window.applyTableHeaders(...args);
   }
 }
 
-function limpiarFormularioQuery() {
-  const qSelector = document.getElementById('query-selector');
-  const qCode = document.getElementById('query-code');
-  const qName = document.getElementById('query-name');
-  const qSql = document.getElementById('query-sql');
-  const qResults = document.getElementById('query-results-container');
-
-  if (qSelector) qSelector.value = '';
-  if (qCode) {
-    qCode.value = '';
-    qCode.readOnly = false;
-  }
-  if (qName) qName.value = '';
-  if (qSql) qSql.value = '';
-  if (qResults) qResults.style.display = 'none';
-}
-
-async function programarQuerySAP() {
-  const qCode = document.getElementById('query-code');
-  const qName = document.getElementById('query-name');
-  const qSql = document.getElementById('query-sql');
-  
-  let sqlCode = qCode ? qCode.value.trim() : '';
-  let sqlName = qName ? qName.value.trim() : '';
-  let rawSqlText = qSql ? qSql.value.trim() : '';
-
-  if (!sqlCode || !rawSqlText) {
-    mostrarNotificacion('El Código del Query y la Sentencia SQL son obligatorios.', 'error');
-    return;
-  }
-
-  // 1. Limpieza automática del código SQL para SAP Service Layer
-  // Eliminar comentarios de bloque /* ... */
-  let sqlText = rawSqlText.replace(/\/\*[\s\S]*?\*\//g, '');
-  // Eliminar comentarios de línea -- ...
-  sqlText = sqlText.replace(/--.*$/gm, '');
-  // Limpiar espacios extra y saltos de línea
-  sqlText = sqlText.replace(/\s+/g, ' ').trim();
-
-  // 2. Validación proactiva de sintaxis no soportada por Service Layer
-  const upperSql = sqlText.toUpperCase();
-  if (upperSql.includes('CASE ') && upperSql.includes(' WHEN ')) {
-    alert('⚠️ ERROR DE SINTAXIS\n\nSAP Service Layer no soporta condicionales "CASE WHEN". \n\nPor favor, crea una Vista en la base de datos de SAP que contenga tu lógica CASE WHEN, y luego consúltala aquí usando:\nSELECT * FROM "TuVista"');
-    return;
-  }
-
-  const btn = event.target;
-  const orig = btn.innerHTML;
-  btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;margin-right:5px;"></div> Enviando...';
-  btn.disabled = true;
-
-  try {
-    const res = await fetchSapApi(`/sap/queries`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sqlCode, sqlName, sqlText })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      // Intenta extraer el detalle exacto del error de SAP
-      let errMsg = 'Error desconocido';
-      if (data.details && data.details.error && data.details.error.message && data.details.error.message.value) {
-        errMsg = data.details.error.message.value;
-      } else if (data.error) {
-        errMsg = data.error;
-      } else if (typeof data.details === 'string') {
-        errMsg = data.details;
-      }
-      throw new Error(errMsg);
-    }
-    
-    mostrarNotificacion('Query programado correctamente en SAP.', 'success');
-    if (qCode) qCode.value = '';
-    if (qName) qName.value = '';
-    if (qSql) qSql.value = '';
-    
-    // Auto-refresh the lists to show the new query
-    cargarListaQueriesSAP();
-  } catch (err) {
-    console.error(err);
-    mostrarNotificacion('Fallo en SAP: ' + err.message, 'error');
-  } finally {
-    btn.innerHTML = orig;
-    btn.disabled = false;
-    lucide.createIcons();
+function cerrarModalMapeo(...args) {
+  if (typeof window !== "undefined" && typeof window.cerrarModalMapeo === "function" && window.cerrarModalMapeo !== cerrarModalMapeo) {
+    return window.cerrarModalMapeo(...args);
   }
 }
 
-async function probarQuerySAP() {
-  const qCode = document.getElementById('query-code');
-  const sqlCode = qCode ? qCode.value.trim() : '';
-  if (!sqlCode) {
-    mostrarNotificacion('Ingresa el Código del Query para ejecutarlo.', 'error');
-    return;
-  }
-
-  const btn = event.target;
-  const orig = btn.innerHTML;
-  btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;margin-right:5px;"></div> Ejecutando...';
-  btn.disabled = true;
-  
-  const resultsContainer = document.getElementById('query-results-container');
-  const resultsOutput = document.getElementById('query-results-output');
-  if (resultsContainer) resultsContainer.style.display = 'none';
-
-  try {
-    const res = await fetchSapApi(`/sap/queries/${encodeURIComponent(sqlCode)}/execute?_t=${Date.now()}`, {
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
-      }
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      let errMsg = data.error || 'Error ejecutando el query';
-      if (data.details && data.details.error && data.details.error.message && data.details.error.message.value) {
-        errMsg = data.details.error.message.value;
-      } else if (typeof data.details === 'string') {
-        errMsg = data.details;
-      }
-      throw new Error(errMsg);
-    }
-    
-    if (resultsOutput) resultsOutput.textContent = JSON.stringify(data.data, null, 2);
-    if (resultsContainer) resultsContainer.style.display = 'block';
-    mostrarNotificacion('Query ejecutado correctamente.', 'success');
-  } catch (err) {
-    console.error(err);
-    // Verificar si el error es de que el query no existe
-    let userMsg = err.message;
-    if (userMsg.includes('does not exist') || userMsg.includes('Not Found') || userMsg.includes('-2028')) {
-      userMsg = 'Este query NO existe en SAP. Asegúrate de presionar "Guardar y Enviar a SAP" primero y que se haya guardado con éxito (alerta verde en la esquina).';
-    }
-    if (resultsOutput) resultsOutput.textContent = `Fallo al Ejecutar:\n${userMsg}`;
-    if (resultsContainer) resultsContainer.style.display = 'block';
-    mostrarNotificacion('Error al ejecutar el query.', 'error');
-  } finally {
-    btn.innerHTML = orig;
-    btn.disabled = false;
-    lucide.createIcons();
+function switchMapeoTab(...args) {
+  if (typeof window !== "undefined" && typeof window.switchMapeoTab === "function" && window.switchMapeoTab !== switchMapeoTab) {
+    return window.switchMapeoTab(...args);
   }
 }
 
-async function eliminarQuerySAP() {
-  const qCode = document.getElementById('query-code');
-  const sqlCode = qCode ? qCode.value.trim() : '';
-  if (!sqlCode) {
-    mostrarNotificacion('Selecciona un Query para eliminar.', 'error');
-    return;
-  }
-  
-  const confirmado = await window.confirmarAccion({
-    titulo: 'Eliminar Query',
-    mensaje: `¿Estás seguro de que deseas eliminar el query "${sqlCode}" directamente de SAP? Esta acción no se puede deshacer.`,
-    esPeligroso: true,
-    icono: 'alert-triangle'
-  });
-  if (!confirmado) return;
-  
-  const btn = event.target.closest('button');
-  const orig = btn.innerHTML;
-  btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;margin-right:5px;"></div> Eliminando...';
-  btn.disabled = true;
-
-  try {
-    const res = await fetchSapApi(`/sap/queries/${encodeURIComponent(sqlCode)}`, {
-      method: 'DELETE'
-    });
-    const data = await res.json();
-    
-    if (!res.ok) {
-      let errMsg = 'Error desconocido';
-      if (data.details && data.details.error && data.details.error.message && data.details.error.message.value) {
-        errMsg = data.details.error.message.value;
-      } else if (data.error) {
-        errMsg = data.error;
-      }
-      throw new Error(errMsg);
-    }
-    
-    mostrarNotificacion('Query eliminado correctamente de SAP.', 'success');
-    limpiarFormularioQuery();
-    cargarListaQueriesSAP();
-  } catch (err) {
-    console.error(err);
-    mostrarNotificacion('Fallo al eliminar en SAP: ' + err.message, 'error');
-  } finally {
-    btn.innerHTML = orig;
-    btn.disabled = false;
-    lucide.createIcons();
+function addCustomColumnUI(...args) {
+  if (typeof window !== "undefined" && typeof window.addCustomColumnUI === "function" && window.addCustomColumnUI !== addCustomColumnUI) {
+    return window.addCustomColumnUI(...args);
   }
 }
 
-function renderTecnicosConfig() {
-  const list = document.getElementById('cfg-tecnicos-list');
-  if (!list) return;
-  if (!tecnicosConfig.length) {
-    list.innerHTML = '<p style="color:var(--text-muted);font-size:0.82rem;">Sin técnicos registrados aún.</p>';
-    return;
+function removeCustomColumn(...args) {
+  if (typeof window !== "undefined" && typeof window.removeCustomColumn === "function" && window.removeCustomColumn !== removeCustomColumn) {
+    return window.removeCustomColumn(...args);
   }
-  list.innerHTML = tecnicosConfig.map((t, i) => `
-    <div class="usuario-row" style="margin-bottom:0.4rem;">
-      <div class="usuario-avatar">${t[0].toUpperCase()}</div>
-      <div><div class="usuario-name">${t}</div></div>
-      <button onclick="eliminarTecnicoConfig(${i})" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.25rem;border-radius:4px;" title="Eliminar">
-        <i data-lucide="x" style="width:0.85rem;height:0.85rem;stroke:currentColor;stroke-width:2;"></i>
-      </button>
-    </div>
-  `).join('');
-  lucide.createIcons();
 }
 
-function agregarTecnicoConfig() {
-  const input = document.getElementById('cfg-nuevo-tecnico');
-  const nombre = input.value.trim();
-  if (!nombre) return;
-  tecnicosConfig.push(nombre);
-  localStorage.setItem('eurorep_tecnicos', JSON.stringify(tecnicosConfig));
-  input.value = '';
-  renderTecnicosConfig();
+function getCustomColumnsForModule(...args) {
+  if (typeof window !== "undefined" && typeof window.getCustomColumnsForModule === "function" && window.getCustomColumnsForModule !== getCustomColumnsForModule) {
+    return window.getCustomColumnsForModule(...args);
+  }
+  return [];
 }
 
-function eliminarTecnicoConfig(i) {
-  tecnicosConfig.splice(i, 1);
-  localStorage.setItem('eurorep_tecnicos', JSON.stringify(tecnicosConfig));
-  renderTecnicosConfig();
+function guardarMapeoColumnas(...args) {
+  if (typeof window !== "undefined" && typeof window.guardarMapeoColumnas === "function" && window.guardarMapeoColumnas !== guardarMapeoColumnas) {
+    return window.guardarMapeoColumnas(...args);
+  }
+}
+
+function cargarListaQueriesSAP(...args) {
+  if (typeof window !== "undefined" && typeof window.cargarListaQueriesSAP === "function" && window.cargarListaQueriesSAP !== cargarListaQueriesSAP) {
+    return window.cargarListaQueriesSAP(...args);
+  }
+}
+
+function cargarDetalleQuery(...args) {
+  if (typeof window !== "undefined" && typeof window.cargarDetalleQuery === "function" && window.cargarDetalleQuery !== cargarDetalleQuery) {
+    return window.cargarDetalleQuery(...args);
+  }
+}
+
+function limpiarFormularioQuery(...args) {
+  if (typeof window !== "undefined" && typeof window.limpiarFormularioQuery === "function" && window.limpiarFormularioQuery !== limpiarFormularioQuery) {
+    return window.limpiarFormularioQuery(...args);
+  }
+}
+
+function programarQuerySAP(...args) {
+  if (typeof window !== "undefined" && typeof window.programarQuerySAP === "function" && window.programarQuerySAP !== programarQuerySAP) {
+    return window.programarQuerySAP(...args);
+  }
+}
+
+function probarQuerySAP(...args) {
+  if (typeof window !== "undefined" && typeof window.probarQuerySAP === "function" && window.probarQuerySAP !== probarQuerySAP) {
+    return window.probarQuerySAP(...args);
+  }
+}
+
+function eliminarQuerySAP(...args) {
+  if (typeof window !== "undefined" && typeof window.eliminarQuerySAP === "function" && window.eliminarQuerySAP !== eliminarQuerySAP) {
+    return window.eliminarQuerySAP(...args);
+  }
+}
+
+function renderTecnicosConfig(...args) {
+  if (typeof window !== "undefined" && typeof window.renderTecnicosConfig === "function" && window.renderTecnicosConfig !== renderTecnicosConfig) {
+    return window.renderTecnicosConfig(...args);
+  }
+}
+
+function agregarTecnicoConfig(...args) {
+  if (typeof window !== "undefined" && typeof window.agregarTecnicoConfig === "function" && window.agregarTecnicoConfig !== agregarTecnicoConfig) {
+    return window.agregarTecnicoConfig(...args);
+  }
+}
+
+function eliminarTecnicoConfig(...args) {
+  if (typeof window !== "undefined" && typeof window.eliminarTecnicoConfig === "function" && window.eliminarTecnicoConfig !== eliminarTecnicoConfig) {
+    return window.eliminarTecnicoConfig(...args);
+  }
 }
 
 // =========================================================================

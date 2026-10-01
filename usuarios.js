@@ -901,6 +901,63 @@ function cambiarUsuario(userId) {
 
 function agregarUsuario() { abrirModalUsuario(); }
 
+// ===== CONFIG TÉCNICOS (Eurorep) =====
+if (typeof globalThis.tecnicosConfig === "undefined") {
+  globalThis.tecnicosConfig = (typeof localStorage !== "undefined")
+    ? JSON.parse(localStorage.getItem("eurorep_tecnicos") || "[]")
+    : [];
+}
+
+function renderTecnicosConfig() {
+  if (typeof document === "undefined") return;
+  const list = document.getElementById("cfg-tecnicos-list");
+  if (!list) return;
+  const tecs = (typeof tecnicosConfig !== "undefined" && Array.isArray(tecnicosConfig)) ? tecnicosConfig : (window.tecnicosConfig || []);
+  if (!tecs.length) {
+    list.innerHTML = "<p style=\"color:var(--text-muted);font-size:0.82rem;\">Sin técnicos registrados aún.</p>";
+    return;
+  }
+  list.innerHTML = tecs.map((t, i) => `
+    <div class="usuario-row" style="margin-bottom:0.4rem;">
+      <div class="usuario-avatar">${(t || "?")[0].toUpperCase()}</div>
+      <div><div class="usuario-name">${t}</div></div>
+      <button onclick="eliminarTecnicoConfig(${i})" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.25rem;border-radius:4px;" title="Eliminar">
+        <i data-lucide="x" style="width:0.85rem;height:0.85rem;stroke:currentColor;stroke-width:2;"></i>
+      </button>
+    </div>
+  `).join("");
+  if (window.lucide) lucide.createIcons();
+}
+
+function agregarTecnicoConfig() {
+  if (typeof document === "undefined") return;
+  const input = document.getElementById("cfg-nuevo-tecnico");
+  if (!input) return;
+  const nombre = input.value.trim();
+  if (!nombre) return;
+  if (typeof tecnicosConfig !== "undefined" && Array.isArray(tecnicosConfig)) {
+    tecnicosConfig.push(nombre);
+    if (typeof localStorage !== "undefined") localStorage.setItem("eurorep_tecnicos", JSON.stringify(tecnicosConfig));
+  } else if (typeof window !== "undefined" && Array.isArray(window.tecnicosConfig)) {
+    window.tecnicosConfig.push(nombre);
+    if (typeof localStorage !== "undefined") localStorage.setItem("eurorep_tecnicos", JSON.stringify(window.tecnicosConfig));
+  }
+  input.value = "";
+  renderTecnicosConfig();
+}
+
+function eliminarTecnicoConfig(i) {
+  if (typeof tecnicosConfig !== "undefined" && Array.isArray(tecnicosConfig)) {
+    tecnicosConfig.splice(i, 1);
+    if (typeof localStorage !== "undefined") localStorage.setItem("eurorep_tecnicos", JSON.stringify(tecnicosConfig));
+  } else if (typeof window !== "undefined" && Array.isArray(window.tecnicosConfig)) {
+    window.tecnicosConfig.splice(i, 1);
+    if (typeof localStorage !== "undefined") localStorage.setItem("eurorep_tecnicos", JSON.stringify(window.tecnicosConfig));
+  }
+  renderTecnicosConfig();
+}
+
+
 
   // Exponer en global/window para retrocompatibilidad total
   if (typeof global !== "undefined") {
@@ -919,5 +976,8 @@ function agregarUsuario() { abrirModalUsuario(); }
     global.cambiarUsuario = cambiarUsuario;
     global.agregarUsuario = agregarUsuario;
     global.editandoUserId = editandoUserId;
+    global.renderTecnicosConfig = renderTecnicosConfig;
+    global.agregarTecnicoConfig = agregarTecnicoConfig;
+    global.eliminarTecnicoConfig = eliminarTecnicoConfig;
   }
 })(typeof window !== "undefined" ? window : globalThis);
