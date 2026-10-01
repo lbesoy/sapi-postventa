@@ -761,6 +761,63 @@ assert.ok(!_depurarSeleccionadas.has('ORD-TEST-001'), 'ORD-TEST-001 debe haberse
 
 console.log('  ✅ Depuración de Órdenes de Refacciones, Garantías y Visor de Manuales: OK');
 
+// 29. Dashboard Ejecutivo, Estadísticas y Gráficas V2
+const {
+  abrirDesgloseDashboard,
+  renderStats,
+  _renderStatsInternal,
+  getFilteredByTimeframe,
+  renderDashboardV2,
+  setDashView,
+  renderDashboardTecnicos,
+  onDashFilterChange,
+  _v2Charts
+} = await import('../src/modules/dashboard.js');
+
+// Test A: Funciones y estructuras exportadas existen
+assert.equal(typeof abrirDesgloseDashboard, 'function', 'abrirDesgloseDashboard debe ser función');
+assert.equal(typeof renderStats, 'function', 'renderStats debe ser función');
+assert.equal(typeof _renderStatsInternal, 'function', '_renderStatsInternal debe ser función');
+assert.equal(typeof getFilteredByTimeframe, 'function', 'getFilteredByTimeframe debe ser función');
+assert.equal(typeof renderDashboardV2, 'function', 'renderDashboardV2 debe ser función');
+assert.equal(typeof setDashView, 'function', 'setDashView debe ser función');
+assert.equal(typeof renderDashboardTecnicos, 'function', 'renderDashboardTecnicos debe ser función');
+assert.equal(typeof onDashFilterChange, 'function', 'onDashFilterChange debe ser función');
+assert.ok(typeof _v2Charts === 'object' && _v2Charts !== null, '_v2Charts debe ser un objeto');
+
+// Test B: getFilteredByTimeframe filtra adecuadamente por periodo
+const hoy = new Date().toISOString().substring(0, 10);
+const ayer = new Date(Date.now() - 86400000).toISOString().substring(0, 10);
+const haceUnMes = new Date(Date.now() - 40 * 86400000).toISOString().substring(0, 10);
+
+const itemsPrueba = [
+  { id: '1', fecha: hoy },
+  { id: '2', fecha: ayer },
+  { id: '3', fecha: haceUnMes }
+];
+
+const todos = getFilteredByTimeframe(itemsPrueba, 'all');
+assert.equal(todos.length, 3, 'Timeframe all debe retornar todos los items');
+
+const filtradosHoy = getFilteredByTimeframe(itemsPrueba, 'today');
+assert.ok(filtradosHoy.some(i => i.id === '1'), 'Timeframe today debe incluir item de hoy');
+assert.ok(!filtradosHoy.some(i => i.id === '3'), 'Timeframe today no debe incluir item de hace un mes');
+
+const filtradosVacio = getFilteredByTimeframe([], 'today');
+assert.deepEqual(filtradosVacio, [], 'getFilteredByTimeframe con array vacío debe retornar []');
+
+// Test C: Invocación segura sin DOM de renderStats y renderDashboardV2
+assert.doesNotThrow(() => {
+  renderStats();
+  renderDashboardV2();
+  setDashView('v2');
+  renderDashboardTecnicos();
+  onDashFilterChange();
+  abrirDesgloseDashboard('maquinas', '');
+}, 'Las funciones del dashboard no deben lanzar error en ausencia de DOM');
+
+console.log('  ✅ Dashboard Ejecutivo, Estadísticas y Gráficas V2: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 
