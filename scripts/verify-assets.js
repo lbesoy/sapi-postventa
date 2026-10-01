@@ -125,19 +125,26 @@ allLocalScripts.forEach(script => {
   }
 });
 
-// Comprobar también módulos en src/
+// Comprobar también módulos en src/ (recursivo)
 const srcDir = path.join(ROOT_DIR, 'src');
 if (fs.existsSync(srcDir)) {
-  const srcFiles = fs.readdirSync(srcDir).filter(f => f.endsWith('.js') || f.endsWith('.mjs'));
-  srcFiles.forEach(f => {
-    const fPath = path.join(srcDir, f);
-    try {
-      execSync(`node -c "${fPath}"`);
-      console.log(`   - src/${f}: Sintaxis válida`);
-    } catch (e) {
-      error(`Error de sintaxis en src/${f}: ${e.message}`);
-    }
-  });
+  function checkDir(dir, prefix = 'src/') {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    entries.forEach(entry => {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        checkDir(fullPath, `${prefix}${entry.name}/`);
+      } else if (entry.name.endsWith('.js') || entry.name.endsWith('.mjs')) {
+        try {
+          execSync(`node -c "${fullPath}"`);
+          console.log(`   - ${prefix}${entry.name}: Sintaxis válida`);
+        } catch (e) {
+          error(`Error de sintaxis en ${prefix}${entry.name}: ${e.message}`);
+        }
+      }
+    });
+  }
+  checkDir(srcDir);
 }
 console.log('');
 

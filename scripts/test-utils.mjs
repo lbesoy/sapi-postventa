@@ -56,4 +56,33 @@ console.log('  ✅ getTicketModificadoPor: OK');
 assert.equal(typeof getCurrentUserDisplayName(), 'string', 'getCurrentUserDisplayName debe retornar string sin crashear');
 console.log('  ✅ getCurrentUserDisplayName: OK');
 
-console.log('\n🎉 ¡TODAS LAS PRUEBAS DE UTILS.JS PASARON CON ÉXITO!\n');
+// 8. supabaseClient
+const { supabaseClient, SUPABASE_URL } = await import('../src/supabaseClient.js');
+assert.ok(supabaseClient, 'supabaseClient debe estar inicializado');
+assert.equal(typeof supabaseClient.from, 'function', 'supabaseClient debe tener método .from()');
+assert.ok(SUPABASE_URL.includes('mupevytlssqcbhlmzmcp'), 'SUPABASE_URL debe apuntar al proyecto correcto');
+console.log('  ✅ supabaseClient: OK');
+
+// 9. Rentas - calcularEstadoRenta y obtenerBadgeRenta
+if (typeof globalThis.window === 'undefined') {
+  globalThis.window = globalThis;
+}
+const { calcularEstadoRenta, obtenerBadgeRenta } = await import('../src/modules/rentas.js');
+
+// Test A: Renta con estado explícito Finalizada o Cancelada
+assert.equal(calcularEstadoRenta({ estado: 'Finalizada' }), 'Finalizada', 'Estado Finalizada debe respetarse');
+assert.equal(calcularEstadoRenta({ estado: 'Cancelada' }), 'Cancelada', 'Estado Cancelada debe respetarse');
+
+// Test B: Renta futura -> Reservada
+const fechaFutura = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
+assert.equal(calcularEstadoRenta({ fecha_inicio: fechaFutura }), 'Reservada', 'Renta con inicio futuro debe ser Reservada');
+
+// Test C: Renta vencida
+assert.equal(calcularEstadoRenta({ fecha_inicio: '2020-01-01', fecha_fin_estimada: '2020-02-01' }), 'Vencida', 'Renta con fecha fin pasada debe ser Vencida');
+
+// Test D: obtenerBadgeRenta
+assert.ok(obtenerBadgeRenta('Activa').includes('Activa'), 'Badge Activa debe contener etiqueta');
+assert.ok(obtenerBadgeRenta('Vencida').includes('Vencida'), 'Badge Vencida debe contener etiqueta');
+console.log('  ✅ Rentas (calcularEstadoRenta y obtenerBadgeRenta): OK');
+
+console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS BASE Y RENTAS PASARON CON ÉXITO!\n');
