@@ -119,4 +119,14 @@ assert.equal(formatNombreCorto('Juan Carlos Pérez García'), 'Juan Carlos', 'fo
 assert.equal(formatNombreCorto(''), '', 'formatNombreCorto vacío');
 console.log('  ✅ Reporte de Técnicos (obtenerLunes, formatShortDate, formatNombreCorto): OK');
 
+// 12. Storage Bridge (IndexedDB y LocalStorage redirection)
+const { redirectedKeys, scheduleDbWrite, getSharedDb } = await import('../src/storage/bridge.js');
+assert.ok(Array.isArray(redirectedKeys), 'redirectedKeys debe ser un array');
+assert.ok(redirectedKeys.includes('sapi_refacciones_db'), 'redirectedKeys debe contener sapi_refacciones_db');
+assert.ok(redirectedKeys.includes('sapi_sync_queue'), 'redirectedKeys debe contener sapi_sync_queue');
+assert.ok(redirectedKeys.includes('sapi_tickets'), 'redirectedKeys debe contener sapi_tickets');
+assert.equal(typeof getSharedDb, 'function', 'getSharedDb debe ser una función');
+assert.equal(typeof scheduleDbWrite, 'function', 'scheduleDbWrite debe ser una función');
+console.log('  ✅ Storage Bridge (claves críticas y funciones): OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
