@@ -10,7 +10,7 @@
       }
     } catch(e) {}
   </script>
-  <script src="localstorage-bridge.js?v=2"></script>
+  <script src="localstorage-bridge.js?v=3"></script>
   <script>
 
     // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
@@ -1143,7 +1143,11 @@
       window.print();
     };
 
-    window.initLocalStorageIndexedDBBridge().then(function() {
+    var bridgePromise = (typeof window.initLocalStorageIndexedDBBridge === 'function')
+      ? window.initLocalStorageIndexedDBBridge()
+      : Promise.resolve();
+
+    bridgePromise.then(function() {
       var scripts = [
         "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",

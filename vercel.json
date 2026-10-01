@@ -1,3 +1,6 @@
 {
-  "cleanUrls": true
+  "framework": null,
+  "cleanUrls": true,
+  "buildCommand": null,
+  "outputDirectory": "."
 }

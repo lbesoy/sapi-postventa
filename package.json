@@ -2,7 +2,7 @@
   "scripts": {
     "dev": "vite",
     "dev:serve": "npx -y serve . -l 5000",
-    "build": "vite build",
+    "build:vite": "vite build",
     "preview": "vite preview",
     "backend": "node backend/server.js",
     "check": "node scripts/verify-assets.js",

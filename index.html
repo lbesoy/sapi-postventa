@@ -11,7 +11,7 @@
       }
     } catch(e) {}
   </script>
-  <script src="localstorage-bridge.js?v=2"></script>
+  <script src="localstorage-bridge.js?v=3"></script>
   <script>
 
     window.onerror = function(message, source, lineno, colno, error) {
@@ -9146,7 +9146,11 @@
       });
     };
 
-    window.initLocalStorageIndexedDBBridge().then(function() {
+    var bridgePromise = (typeof window.initLocalStorageIndexedDBBridge === 'function')
+      ? window.initLocalStorageIndexedDBBridge()
+      : Promise.resolve();
+
+    bridgePromise.then(function() {
       var scripts = [
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
