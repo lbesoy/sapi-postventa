@@ -199,4 +199,29 @@ const idGenerico = generarIdInternoMaquina('', '2025', [], []);
 assert.ok(idGenerico.startsWith('XX25'), 'generarIdInternoMaquina con marca vacía usa XX');
 console.log('  ✅ Catálogo de Maquinaria, Refacciones y Sitios (generarIdInternoMaquina y exports): OK');
 
+// 16. Módulo de Calendario FullCalendar y Eventos
+const { renderCalendario, getFestivosMexico, getSemanaSanta, getNthDayOfMonth, actualizarFiltrosCalendario } = await import('../src/modules/calendario.js');
+assert.equal(typeof renderCalendario, 'function', 'renderCalendario debe ser una función');
+assert.equal(typeof getFestivosMexico, 'function', 'getFestivosMexico debe ser una función');
+assert.equal(typeof getSemanaSanta, 'function', 'getSemanaSanta debe ser una función');
+assert.equal(typeof getNthDayOfMonth, 'function', 'getNthDayOfMonth debe ser una función');
+assert.equal(typeof actualizarFiltrosCalendario, 'function', 'actualizarFiltrosCalendario debe ser una función');
+
+// Test A: Días festivos de México para 2026
+const festivos2026 = getFestivosMexico(2026);
+assert.ok(Array.isArray(festivos2026), 'getFestivosMexico debe retornar un array');
+assert.ok(festivos2026.length >= 10, 'Deben existir al menos 10 festivos oficiales en 2026');
+assert.equal(festivos2026[0].title, 'Año Nuevo', 'El primer festivo debe ser Año Nuevo');
+assert.equal(festivos2026[0].start, '2026-01-01', 'Año Nuevo debe ser 2026-01-01');
+
+// Test B: Cálculo de Semana Santa (Algoritmo de Gauss)
+const ss2026 = getSemanaSanta(2026);
+assert.equal(ss2026.jueves, '2026-04-02', 'Jueves Santo 2026 debe ser 2026-04-02');
+assert.equal(ss2026.viernes, '2026-04-03', 'Viernes Santo 2026 debe ser 2026-04-03');
+
+// Test C: Encontrar N-ésimo día de la semana en un mes (ej. tercer lunes de marzo = Natalicio de Benito Juárez)
+const natalicioJuarez2026 = getNthDayOfMonth(2026, 2, 1, 3); // mes 2 es marzo, día 1 es lunes, el 3er lunes
+assert.equal(natalicioJuarez2026, '2026-03-16', 'Tercer lunes de marzo 2026 debe ser 16 de marzo');
+console.log('  ✅ Calendario FullCalendar (getFestivosMexico, getSemanaSanta, getNthDayOfMonth): OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');

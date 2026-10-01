@@ -9,6 +9,7 @@ const ASSETS = [
   '/gastos.js',
   '/clientes.js',
   '/maquinaria.js',
+  '/calendario.js',
   '/rentas.js',
   '/style.css',
   '/cliente.html',
