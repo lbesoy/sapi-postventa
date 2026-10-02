@@ -27,6 +27,9 @@ const _safeSet = (k, v) => {
   if (typeof localStorage !== "undefined") localStorage.setItem(k, JSON.stringify(v));
 };
 
+const _escapeHTML = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
+
+
 // ===== REFACCIONES (ORDEN SERVICIO & TICKETS) =====
 const MARCAS_CATALOGO_OFICIAL = {
   'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING',
@@ -257,7 +260,264 @@ function seleccionarDescRefaccion(optionEl, comboIdDesc, clave, precio) {
   }
 };
 
+function aplicarDatosRefaccionEnFila(row, refItem, actualizarInputClave = true) {
+  if (typeof document === "undefined" || !row || !refItem) return;
+
+  const clave = (refItem.codigo || refItem.idInterno || refItem.id || refItem.clave || '').toString().trim();
+  const desc = (refItem.descripcion || refItem.nombre || '').toString().trim();
+  const marca = (refItem.marcaCodigo || refItem.marca || '').toString().trim();
+  const precio = (refItem.precio !== undefined && refItem.precio !== null) ? refItem.precio : 0;
+
+  const inClave = row.querySelector('.ref-clave');
+  const valorClaveActual = inClave ? inClave.value : clave;
+
+  // 1. Marca
+  const hiddenMarca = row.querySelector('.ref-marca');
+  const comboSpanMarca = hiddenMarca
+    ? document.getElementById(hiddenMarca.id + '-display')
+    : row.querySelector('.group-ref-marca .combo-box span');
+
+  let brandCode = marca.toUpperCase();
+  let brandDisplay = MARCAS_CATALOGO_OFICIAL[brandCode] || marca;
+  for (const [k, v] of Object.entries(MARCAS_CATALOGO_OFICIAL)) {
+    if (v.toLowerCase() === marca.toLowerCase() ||
+        marca.toLowerCase().includes(v.toLowerCase()) ||
+        v.toLowerCase().includes(marca.toLowerCase())) {
+      brandCode = k;
+      brandDisplay = v;
+      break;
+    }
+  }
+
+  if (hiddenMarca && brandCode) {
+    hiddenMarca.value = brandCode;
+    if (comboSpanMarca) comboSpanMarca.textContent = brandDisplay;
+  }
+
+  // 2. Descripción combo (recargar opciones de la marca)
+  const hiddenDesc = row.querySelector('.ref-desc-hidden') || row.querySelector('.ref-desc');
+  const comboSpanDesc = hiddenDesc
+    ? document.getElementById(hiddenDesc.id + '-display')
+    : row.querySelector('.group-ref-desc .combo-box span');
+
+  if (hiddenMarca && hiddenDesc && typeof window.actualizarDescripcionesCombo === 'function') {
+    window.actualizarDescripcionesCombo(hiddenMarca.id, hiddenDesc.id);
+  }
+
+  if (hiddenDesc && desc) {
+    hiddenDesc.value = desc;
+  }
+  if (comboSpanDesc && desc) {
+    comboSpanDesc.textContent = desc;
+  }
+
+  // Restaurar y asegurar valor de Clave (ya que actualizarDescripcionesCombo lo limpia)
+  if (inClave) {
+    inClave.value = actualizarInputClave ? (clave || valorClaveActual) : valorClaveActual;
+  }
+
+  // Asegurar que la opción exista en el menú desplegable de descripciones
+  if (hiddenDesc) {
+    const comboOptions = document.getElementById(hiddenDesc.id + '-options');
+    if (comboOptions && desc) {
+      let optExists = false;
+      comboOptions.querySelectorAll('.combo-option').forEach(opt => {
+        if ((opt.dataset.desc || opt.textContent).trim().startsWith(desc)) optExists = true;
+      });
+      if (!optExists) {
+        const legacyHtml = `<div class="combo-option" data-desc="${desc}" onclick="window.seleccionarDescRefaccion(this, '${hiddenDesc.id}', '${clave}', ${precio})">${desc} ${clave ? `[${clave}]` : ''}</div>`;
+        if (comboOptions.innerHTML.includes('Seleccione una marca') || comboOptions.innerHTML.includes('No hay refacciones')) {
+          comboOptions.innerHTML = legacyHtml;
+        } else {
+          comboOptions.innerHTML += legacyHtml;
+        }
+      }
+    }
+  }
+
+  // 3. Precio (si aplica en sección utilizadas)
+  const inPrecio = row.querySelector('.ref-precio');
+  if (inPrecio && (precio !== undefined && precio !== null && precio !== '')) {
+    inPrecio.value = precio;
+  }
+
+  // 4. Sistema (si aplica)
+  const selectSist = row.querySelector('.ref-sistema, .kit-row-sistema');
+  if (selectSist && typeof window.detectarSistemaRefaccion === 'function' && desc) {
+    selectSist.value = window.detectarSistemaRefaccion(desc);
+  }
+
+  // 5. Discrepancia
+  if (typeof window.actualizarFilaDiscrepanciaRefaccion === 'function') {
+    window.actualizarFilaDiscrepanciaRefaccion(row);
+  }
+}
+
+function buscarRefaccionPorClave(inputEl, dropdownId) {
+  if (typeof document === 'undefined' || !inputEl) return;
+  const dropdown = document.getElementById(dropdownId);
+  if (!dropdown) return;
+
+  const val = (inputEl.value || '').trim();
+  if (!val) {
+    dropdown.style.display = 'none';
+    dropdown.innerHTML = '';
+    return;
+  }
+
+  const catalogo = (typeof window !== 'undefined' && Array.isArray(window.refaccionesDb) && window.refaccionesDb.length > 0)
+    ? window.refaccionesDb
+    : ((typeof refaccionesDb !== 'undefined' && Array.isArray(refaccionesDb) && refaccionesDb.length > 0)
+      ? refaccionesDb
+      : (typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]') : []));
+
+  if (typeof refaccionesDb !== 'undefined' && catalogo.length > 0) refaccionesDb = catalogo;
+  if (typeof window !== 'undefined' && catalogo.length > 0) window.refaccionesDb = catalogo;
+
+  // Cerrar otros dropdowns de clave
+  document.querySelectorAll('.kit-clave-dropdown').forEach(dd => {
+    if (dd.id !== dropdownId) dd.style.display = 'none';
+  });
+
+  const valNorm = val.toLowerCase();
+  const valUpper = val.toUpperCase();
+
+  // Buscar coincidencias (código o descripción)
+  const matches = catalogo.filter(r => {
+    const c = (r.codigo || r.idInterno || r.id || r.clave || '').toString().toLowerCase();
+    const d = (r.descripcion || r.nombre || '').toString().toLowerCase();
+    return c.includes(valNorm) || d.includes(valNorm);
+  }).slice(0, 15);
+
+  // Si hay coincidencia exacta de clave/código, auto-rellenar los datos de la fila de inmediato
+  const exactMatch = catalogo.find(r => {
+    const c = (r.codigo || r.idInterno || r.id || r.clave || '').toString().trim().toUpperCase();
+    return c === valUpper;
+  });
+  if (exactMatch) {
+    const row = inputEl.closest('.ref-row');
+    if (row) {
+      aplicarDatosRefaccionEnFila(row, exactMatch, false);
+    }
+  }
+
+  if (matches.length === 0) {
+    dropdown.innerHTML = `<div style="padding: 8px 10px; font-size:0.75rem; color:var(--text-muted); text-align:center;">No se encontró "${_escapeHTML(val)}"</div>`;
+    dropdown.style.display = 'block';
+    return;
+  }
+
+  let html = '';
+  matches.forEach(m => {
+    const clave = (m.codigo || m.idInterno || m.id || m.clave || 'S/C').toString();
+    const desc = (m.descripcion || m.nombre || 'Sin descripción').toString();
+    const marca = (m.marcaCodigo || m.marca || '').toString();
+    const precio = parseFloat(m.precio || 0) || 0;
+    const safeDesc = desc.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const safeClave = clave.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const safeMarca = marca.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+    html += `
+      <div class="kit-clave-option" onclick="window.seleccionarRefaccionPorClaveFila('${dropdownId}', '${safeClave}', '${safeDesc}', '${safeMarca}', ${precio})">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
+          <span style="font-family: monospace; font-weight: 700; color: #2563eb; font-size:0.79rem;">${_escapeHTML(clave)}</span>
+          <span style="font-size: 0.67rem; font-weight: 600; color: var(--text-muted); background: var(--bg-secondary); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border);">${_escapeHTML(marca || 'GEN')}</span>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top:2px;" title="${_escapeHTML(desc)}">${_escapeHTML(desc)}</div>
+      </div>
+    `;
+  });
+
+  dropdown.innerHTML = html;
+  dropdown.style.display = 'block';
+}
+
+function seleccionarRefaccionPorClaveFila(dropdownId, clave, desc, marca, precio) {
+  if (typeof document === 'undefined') return;
+  const dropdown = document.getElementById(dropdownId);
+  if (dropdown) {
+    dropdown.style.display = 'none';
+    dropdown.innerHTML = '';
+  }
+
+  const row = dropdown ? dropdown.closest('.ref-row') : null;
+  if (!row) return;
+
+  aplicarDatosRefaccionEnFila(row, {
+    codigo: clave,
+    descripcion: desc,
+    marca: marca,
+    marcaCodigo: marca,
+    precio: precio
+  }, true);
+}
+
+function teclaClaveRefaccion(e, inputEl, dropdownId) {
+  if (typeof document === 'undefined' || !e) return;
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const dropdown = document.getElementById(dropdownId);
+    if (dropdown && dropdown.style.display !== 'none') {
+      const firstOpt = dropdown.querySelector('.kit-clave-option');
+      if (firstOpt) {
+        firstOpt.click();
+        return;
+      }
+    }
+    const val = inputEl ? (inputEl.value || '').trim() : '';
+    if (val) {
+      const catalogo = (typeof window !== 'undefined' && Array.isArray(window.refaccionesDb) && window.refaccionesDb.length > 0)
+        ? window.refaccionesDb
+        : ((typeof refaccionesDb !== 'undefined' && Array.isArray(refaccionesDb) && refaccionesDb.length > 0)
+          ? refaccionesDb
+          : (typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]') : []));
+
+      const exactMatch = catalogo.find(r => (r.codigo || r.idInterno || r.id || r.clave || '').toString().trim().toUpperCase() === val.toUpperCase());
+      if (exactMatch && inputEl) {
+        aplicarDatosRefaccionEnFila(inputEl.closest('.ref-row'), exactMatch, true);
+        if (dropdown) dropdown.style.display = 'none';
+      }
+    }
+  } else if (e.key === 'Escape') {
+    const dropdown = document.getElementById(dropdownId);
+    if (dropdown) dropdown.style.display = 'none';
+  }
+}
+
+function alSalirClaveRefaccion(inputEl, dropdownId) {
+  if (typeof document === 'undefined') return;
+  setTimeout(() => {
+    const dropdown = document.getElementById(dropdownId);
+    if (dropdown) dropdown.style.display = 'none';
+
+    const val = inputEl ? (inputEl.value || '').trim() : '';
+    if (val) {
+      const catalogo = (typeof window !== 'undefined' && Array.isArray(window.refaccionesDb) && window.refaccionesDb.length > 0)
+        ? window.refaccionesDb
+        : ((typeof refaccionesDb !== 'undefined' && Array.isArray(refaccionesDb) && refaccionesDb.length > 0)
+          ? refaccionesDb
+          : (typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('sapi_refacciones_db') || '[]') : []));
+
+      const exactMatch = catalogo.find(r => (r.codigo || r.idInterno || r.id || r.clave || '').toString().trim().toUpperCase() === val.toUpperCase());
+      if (exactMatch && inputEl) {
+        aplicarDatosRefaccionEnFila(inputEl.closest('.ref-row'), exactMatch, false);
+      }
+    }
+  }, 220);
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.group-ref-clave')) {
+      document.querySelectorAll('.kit-clave-dropdown').forEach(dd => {
+        dd.style.display = 'none';
+      });
+    }
+  });
+}
+
 let refComboCounter = 0;
+
 
 function agregarRef(section) {
   if (typeof document === "undefined") return;
@@ -269,6 +529,7 @@ function agregarRef(section) {
   refComboCounter++;
   const idComboMarca = `ref-marca-combo-${refComboCounter}`;
   const idComboDesc = `ref-desc-combo-${refComboCounter}`;
+  const idDropdownClave = `ref-clave-drop-${refComboCounter}`;
   
   let html = `
     <!-- MARCA COMBO -->
@@ -307,7 +568,26 @@ function agregarRef(section) {
       <input type="hidden" class="ref-desc-hidden ref-desc" id="${idComboDesc}" />
     </div>
 
-    <input type="text" placeholder="Clave" class="ref-clave" style="width:70px; padding: 0.45rem 0.4rem; font-size:0.8rem;" readonly />
+    <!-- CLAVE INPUT & DROPDOWN -->
+    <div style="position:relative; width:95px; flex-shrink:0;" class="group-ref-clave">
+      <input 
+        type="text" 
+        placeholder="Clave" 
+        class="ref-clave" 
+        style="width:100%; padding: 0.45rem 0.4rem; font-size:0.8rem; box-sizing:border-box;" 
+        autocomplete="off"
+        oninput="window.buscarRefaccionPorClave(this, '${idDropdownClave}')"
+        onfocus="window.buscarRefaccionPorClave(this, '${idDropdownClave}')"
+        onkeydown="window.teclaClaveRefaccion(event, this, '${idDropdownClave}')"
+        onblur="window.alSalirClaveRefaccion(this, '${idDropdownClave}')"
+      />
+      <div 
+        id="${idDropdownClave}" 
+        class="kit-clave-dropdown" 
+        style="display:none; position:absolute; top:calc(100% + 4px); right:0; width:320px; z-index:100005;"
+        onclick="event.stopPropagation()"
+      ></div>
+    </div>
     <input type="number" placeholder="Cant." class="ref-cant" style="width:50px; padding: 0.45rem 0.4rem; font-size:0.8rem;" min="0" value="1"/>`;
     
   if (section === 'utilizadas') {
@@ -588,6 +868,7 @@ function agregarFilaRefaccionTicket(ticketId, initialData = {}) {
   window.refComboCounter++;
   const idComboMarca = `ref-tkt-marca-${window.refComboCounter}`;
   const idComboDesc = `ref-tkt-desc-${window.refComboCounter}`;
+  const idDropdownClave = `ref-tkt-clave-drop-${window.refComboCounter}`;
   
   let html = `
     <!-- MARCA COMBO -->
@@ -626,7 +907,27 @@ function agregarFilaRefaccionTicket(ticketId, initialData = {}) {
       <input type="hidden" class="ref-desc-hidden ref-desc" id="${idComboDesc}" />
     </div>
 
-    <input type="text" placeholder="Clave" class="ref-clave" style="width:70px; padding: 0.45rem 0.4rem; font-size:0.8rem;" readonly />
+    <!-- CLAVE INPUT & DROPDOWN -->
+    <div style="position:relative; width:95px; flex-shrink:0;" class="group-ref-clave">
+      <input 
+        type="text" 
+        placeholder="Clave" 
+        class="ref-clave" 
+        value="${initialData.codigo || ''}"
+        style="width:100%; padding: 0.45rem 0.4rem; font-size:0.8rem; box-sizing:border-box;" 
+        autocomplete="off"
+        oninput="window.buscarRefaccionPorClave(this, '${idDropdownClave}')"
+        onfocus="window.buscarRefaccionPorClave(this, '${idDropdownClave}')"
+        onkeydown="window.teclaClaveRefaccion(event, this, '${idDropdownClave}')"
+        onblur="window.alSalirClaveRefaccion(this, '${idDropdownClave}')"
+      />
+      <div 
+        id="${idDropdownClave}" 
+        class="kit-clave-dropdown" 
+        style="display:none; position:absolute; top:calc(100% + 4px); right:0; width:320px; z-index:100005;"
+        onclick="event.stopPropagation()"
+      ></div>
+    </div>
     <input type="number" placeholder="Cant." class="ref-cant" style="width:50px; padding: 0.45rem 0.4rem; font-size:0.8rem;" min="1" value="1"/>
     <button type="button" class="btn-del-ref" onclick="window.eliminarFilaRefaccionTicket(this, '${ticketId}')">✕</button>
   `;
@@ -798,6 +1099,11 @@ if (typeof window !== "undefined") {
   window.eliminarFilaRefaccionTicket = eliminarFilaRefaccionTicket;
   window.guardarRefaccionesTicketDesdeUI = guardarRefaccionesTicketDesdeUI;
   window.cerrarGarantiaInternaDirecto = cerrarGarantiaInternaDirecto;
+  window.aplicarDatosRefaccionEnFila = aplicarDatosRefaccionEnFila;
+  window.buscarRefaccionPorClave = buscarRefaccionPorClave;
+  window.seleccionarRefaccionPorClaveFila = seleccionarRefaccionPorClaveFila;
+  window.teclaClaveRefaccion = teclaClaveRefaccion;
+  window.alSalirClaveRefaccion = alSalirClaveRefaccion;
 }
 
 export {
@@ -816,5 +1122,11 @@ export {
   agregarFilaRefaccionTicket,
   eliminarFilaRefaccionTicket,
   guardarRefaccionesTicketDesdeUI,
-  cerrarGarantiaInternaDirecto
+  cerrarGarantiaInternaDirecto,
+  aplicarDatosRefaccionEnFila,
+  buscarRefaccionPorClave,
+  seleccionarRefaccionPorClaveFila,
+  teclaClaveRefaccion,
+  alSalirClaveRefaccion
 };
+

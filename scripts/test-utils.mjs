@@ -942,7 +942,12 @@ const {
   agregarFilaRefaccionTicket,
   eliminarFilaRefaccionTicket,
   guardarRefaccionesTicketDesdeUI,
-  cerrarGarantiaInternaDirecto
+  cerrarGarantiaInternaDirecto,
+  aplicarDatosRefaccionEnFila,
+  buscarRefaccionPorClave,
+  seleccionarRefaccionPorClaveFila,
+  teclaClaveRefaccion,
+  alSalirClaveRefaccion
 } = await import('../src/modules/refacciones_orden.js');
 
 // Test A: Constantes y funciones existen
@@ -964,6 +969,11 @@ assert.equal(typeof agregarFilaRefaccionTicket, 'function', 'agregarFilaRefaccio
 assert.equal(typeof eliminarFilaRefaccionTicket, 'function', 'eliminarFilaRefaccionTicket debe ser función');
 assert.equal(typeof guardarRefaccionesTicketDesdeUI, 'function', 'guardarRefaccionesTicketDesdeUI debe ser función');
 assert.equal(typeof cerrarGarantiaInternaDirecto, 'function', 'cerrarGarantiaInternaDirecto debe ser función');
+assert.equal(typeof aplicarDatosRefaccionEnFila, 'function', 'aplicarDatosRefaccionEnFila debe ser función');
+assert.equal(typeof buscarRefaccionPorClave, 'function', 'buscarRefaccionPorClave debe ser función');
+assert.equal(typeof seleccionarRefaccionPorClaveFila, 'function', 'seleccionarRefaccionPorClaveFila debe ser función');
+assert.equal(typeof teclaClaveRefaccion, 'function', 'teclaClaveRefaccion debe ser función');
+assert.equal(typeof alSalirClaveRefaccion, 'function', 'alSalirClaveRefaccion debe ser función');
 
 // Test B: Invocación segura sin DOM
 assert.deepEqual(getRefacciones(), [], 'getRefacciones sin DOM debe retornar array vacío');
@@ -979,6 +989,11 @@ assert.doesNotThrow(() => {
   inicializarRefaccionesTicket('tk-1', []);
   agregarFilaRefaccionTicket('tk-1', {});
   eliminarFilaRefaccionTicket(null, 'tk-1');
+  buscarRefaccionPorClave(null, 'dropdown-test');
+  seleccionarRefaccionPorClaveFila('dropdown-test', '96901116N', 'ABRAZADERA', 'CAS', 100);
+  aplicarDatosRefaccionEnFila(null, null);
+  teclaClaveRefaccion({ key: 'Enter', preventDefault: () => {} }, null, 'dropdown-test');
+  alSalirClaveRefaccion(null, 'dropdown-test');
 }, 'Las funciones de refacciones no deben arrojar error en ausencia de DOM');
 
 console.log('  ✅ Refacciones de Órdenes de Servicio y Tickets: OK');
