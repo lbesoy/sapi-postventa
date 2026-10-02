@@ -1043,6 +1043,39 @@ assert.doesNotThrow(() => {
 
 console.log('  ✅ Centro de Notificaciones y Campanitas de Tickets: OK');
 
+console.log('Test 34: Configuración de Permisos, Roles y Técnicos');
+const {
+  renderPermisosRoles,
+  guardarPermisosRoles,
+  currentTecView,
+  setTecView,
+  renderTecnicos,
+  verDetalleTecnico,
+  cerrarDetalleTecnico
+} = await import('../src/modules/config_tecnicos.js');
+
+// Test A: Funciones y variables existen
+assert.equal(typeof renderPermisosRoles, 'function', 'renderPermisosRoles debe ser función');
+assert.equal(typeof guardarPermisosRoles, 'function', 'guardarPermisosRoles debe ser función');
+assert.equal(typeof currentTecView, 'string', 'currentTecView debe ser string');
+assert.equal(typeof setTecView, 'function', 'setTecView debe ser función');
+assert.equal(typeof renderTecnicos, 'function', 'renderTecnicos debe ser función');
+assert.equal(typeof verDetalleTecnico, 'function', 'verDetalleTecnico debe ser función');
+assert.equal(typeof cerrarDetalleTecnico, 'function', 'cerrarDetalleTecnico debe ser función');
+
+// Test B: Invocación defensiva en Node.js (sin DOM)
+assert.doesNotThrow(() => {
+  renderPermisosRoles();
+  guardarPermisosRoles();
+  setTecView('galeria');
+  setTecView('lista');
+  renderTecnicos();
+  verDetalleTecnico('Técnico Demo');
+  cerrarDetalleTecnico(null);
+}, 'Las funciones de configuración de técnicos y roles no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Configuración de Permisos, Roles y Técnicos: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 
