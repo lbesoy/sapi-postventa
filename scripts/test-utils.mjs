@@ -998,7 +998,53 @@ assert.doesNotThrow(() => {
 
 console.log('  ✅ Refacciones de Órdenes de Servicio y Tickets: OK');
 
+console.log('Test 33: Centro de Notificaciones Internas y Campanitas de Tickets');
+const {
+  toggleInternalNotificationDropdown,
+  sincronizarNotificacionesInternas,
+  generarNotificacionInterna,
+  generarNotificacionComentarioInterno,
+  updateInternalNotificationBell,
+  verTicketYMarcarInternaLeida,
+  marcarTodasInternasLeidas,
+  toggleNotificationDropdown,
+  updateNotificationBell,
+  abrirTicketDesdeNotification,
+  abrirOrdenDesdePerfil
+} = await import('../src/modules/notificaciones.js');
+
+// Test A: Funciones existen
+assert.equal(typeof toggleInternalNotificationDropdown, 'function', 'toggleInternalNotificationDropdown debe ser función');
+assert.equal(typeof sincronizarNotificacionesInternas, 'function', 'sincronizarNotificacionesInternas debe ser función');
+assert.equal(typeof generarNotificacionInterna, 'function', 'generarNotificacionInterna debe ser función');
+assert.equal(typeof generarNotificacionComentarioInterno, 'function', 'generarNotificacionComentarioInterno debe ser función');
+assert.equal(typeof updateInternalNotificationBell, 'function', 'updateInternalNotificationBell debe ser función');
+assert.equal(typeof verTicketYMarcarInternaLeida, 'function', 'verTicketYMarcarInternaLeida debe ser función');
+assert.equal(typeof marcarTodasInternasLeidas, 'function', 'marcarTodasInternasLeidas debe ser función');
+assert.equal(typeof toggleNotificationDropdown, 'function', 'toggleNotificationDropdown debe ser función');
+assert.equal(typeof updateNotificationBell, 'function', 'updateNotificationBell debe ser función');
+assert.equal(typeof abrirTicketDesdeNotification, 'function', 'abrirTicketDesdeNotification debe ser función');
+assert.equal(typeof abrirOrdenDesdePerfil, 'function', 'abrirOrdenDesdePerfil debe ser función');
+
+// Test B: Invocación defensiva en Node.js (sin DOM)
+assert.doesNotThrow(() => {
+  toggleInternalNotificationDropdown(null);
+  sincronizarNotificacionesInternas();
+  generarNotificacionInterna({ id: 't-1', folio: 'T-100', asunto: 'Prueba' }, 'Juan', 'Pedro');
+  generarNotificacionComentarioInterno({ id: 't-1', folio: 'T-100', asunto: 'Prueba' }, { usuario: 'Carlos', fecha: '2026-10-02T12:00:00Z', texto: 'Comentario' });
+  updateInternalNotificationBell();
+  verTicketYMarcarInternaLeida('t-1', 'notif-1');
+  marcarTodasInternasLeidas();
+  toggleNotificationDropdown(null);
+  updateNotificationBell();
+  abrirTicketDesdeNotification('t-1');
+  abrirOrdenDesdePerfil('o-1');
+}, 'Las funciones de notificaciones no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Centro de Notificaciones y Campanitas de Tickets: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
+
 
 
 
