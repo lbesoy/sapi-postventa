@@ -1177,7 +1177,93 @@ assert.doesNotThrow(() => {
   renderEnvioCards({ envios: [] });
 }, 'Las funciones de servicios_programados no deben arrojar error en ausencia de DOM');
 
-console.log('  ✅ Servicios Programados de Técnico y Gestión de Envíos en Tickets: OK');
+console.log('Test 37: Listados, Filtros, Menús de Ordenación y Badges de Tickets');
+const {
+  updateTicketBadge,
+  updateOrdenesBadge,
+  actualizarFiltrosPersonal,
+  ticketSortColumn,
+  ticketSortDirection,
+  onSortTicketsChange,
+  toggleSortMenu,
+  setSortDirection,
+  seleccionarColumnaOrden,
+  actualizarUISortMenu,
+  actualizarCabeceraOrdenacion,
+  ordenarTicketsPor,
+  toggleTipoFilterMenu,
+  setTicketTipoFilter,
+  actualizarUITipoFilter,
+  toggleSupervisorFilterMenu,
+  setTicketSupervisorFilter,
+  actualizarUISupervisorFilter,
+  toggleAntiguedadFilterMenu,
+  cambiarModoAntiguedad,
+  setAntiguedadRango,
+  setAntiguedadFilter,
+  actualizarUIAntiguedadFilter,
+  esTicketHijoRefacciones,
+  obtenerOrdenAsociadaTicket,
+  verOrdenDesdeTicket,
+  obtenerTicketPadre,
+  resolverClienteTicket,
+  renderTickets,
+  esTicketEnTransito,
+  badgeTicketEstado,
+  getTicketEstadoLabel,
+  filtrarTickets,
+  setFiltroTickets,
+  seleccionarCanal,
+  updateFileLabel
+} = await import('../src/modules/tickets_listado.js');
+
+// Test A: Funciones y variables existen
+assert.equal(typeof updateTicketBadge, 'function', 'updateTicketBadge debe ser función');
+assert.equal(typeof updateOrdenesBadge, 'function', 'updateOrdenesBadge debe ser función');
+assert.equal(typeof actualizarFiltrosPersonal, 'function', 'actualizarFiltrosPersonal debe ser función');
+assert.equal(typeof ordenarTicketsPor, 'function', 'ordenarTicketsPor debe ser función');
+assert.equal(typeof renderTickets, 'function', 'renderTickets debe ser función');
+assert.equal(typeof badgeTicketEstado, 'function', 'badgeTicketEstado debe ser función');
+assert.equal(typeof getTicketEstadoLabel, 'function', 'getTicketEstadoLabel debe ser función');
+assert.equal(typeof esTicketHijoRefacciones, 'function', 'esTicketHijoRefacciones debe ser función');
+assert.equal(typeof resolverClienteTicket, 'function', 'resolverClienteTicket debe ser función');
+assert.equal(typeof filtrarTickets, 'function', 'filtrarTickets debe ser función');
+assert.equal(typeof setFiltroTickets, 'function', 'setFiltroTickets debe ser función');
+
+// Test B: Lógica de badgeTicketEstado
+assert.equal(badgeTicketEstado({ estado: 'Abierto' }), 'abierto', 'Estado Abierto debe dar clase abierto');
+assert.equal(badgeTicketEstado({ estado: 'Cotización' }), 'en-proceso', 'Estado Cotización estándar debe dar clase en-proceso');
+assert.equal(badgeTicketEstado({ estado: 'Cotización', cotAceptada: 'si' }), 'cerrado-aprobado', 'Cotización aprobada debe dar cerrado-aprobado');
+assert.equal(badgeTicketEstado({ estado: 'Cotización', cotAceptada: 'no' }), 'cerrado-rechazado', 'Cotización rechazada debe dar cerrado-rechazado');
+assert.equal(badgeTicketEstado({ estado: 'Refacciones' }), 'refacciones', 'Estado Refacciones debe dar clase refacciones');
+assert.equal(badgeTicketEstado({ estado: 'Cerrado', cotAceptada: 'si' }), 'cerrado-aprobado', 'Cerrado aprobado debe dar cerrado-aprobado');
+assert.equal(badgeTicketEstado({ estado: 'Cerrado', cotAceptada: 'no' }), 'cerrado-rechazado', 'Cerrado rechazado debe dar cerrado-rechazado');
+
+// Test C: Lógica de getTicketEstadoLabel
+assert.equal(getTicketEstadoLabel({ estado: 'Abierto' }), 'Abierto', 'Label de Abierto debe ser Abierto');
+assert.equal(getTicketEstadoLabel({ estado: 'Cerrado', cotAceptada: 'si' }), 'Aceptado', 'Label de Cerrado aceptado debe ser Aceptado');
+assert.equal(getTicketEstadoLabel({ estado: 'Cerrado', cotAceptada: 'no' }), 'Rechazado', 'Label de Cerrado rechazado debe ser Rechazado');
+assert.equal(getTicketEstadoLabel(null), '—', 'Label de null debe ser raya');
+
+// Test D: Lógica de esTicketHijoRefacciones
+assert.equal(esTicketHijoRefacciones({ folio: 'TK-12345-A' }), true, 'Folio terminado en -A es ticket hijo');
+assert.equal(esTicketHijoRefacciones({ folio: 'TK-12345' }), false, 'Folio normal no es ticket hijo');
+assert.equal(esTicketHijoRefacciones(null), false, 'null no es ticket hijo');
+
+// Test E: Lógica de resolverClienteTicket
+assert.equal(resolverClienteTicket({ cliente: 'Holcim México' }), 'Holcim México', 'Cliente directo');
+assert.equal(resolverClienteTicket(null), '', 'null retorna string vacío');
+
+// Test F: Invocación defensiva de lógica de datos en Node.js (sin DOM)
+assert.doesNotThrow(() => {
+  obtenerOrdenAsociadaTicket({ folio: 'TK-1' });
+  obtenerTicketPadre({ folio: 'TK-1-A' });
+  esTicketEnTransito({ envios: [] });
+}, 'Las funciones lógicas de tickets_listado no deben arrojar error en ausencia de DOM');
+assert.ok(ticketSortColumn !== undefined, 'ticketSortColumn debe estar definido');
+assert.ok(ticketSortDirection !== undefined, 'ticketSortDirection debe estar definido');
+
+console.log('  ✅ Listados, Filtros, Menús de Ordenación y Badges de Tickets: OK');
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
