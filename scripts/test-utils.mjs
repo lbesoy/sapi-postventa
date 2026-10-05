@@ -1568,6 +1568,54 @@ assert.doesNotThrow(() => {
 
 console.log('  ✅ Formulario, Días Panels, KM y Guardado de Órdenes: OK');
 
+// ============================================================================
+// TEST 43: Listados, Filtros, Menús de Ordenación y Tabla de Órdenes
+// ============================================================================
+console.log('Test 43: Listados, Filtros, Menús de Ordenación y Tabla de Órdenes');
+const {
+  filtroEstadoServicios,
+  filtroTicketsV2,
+  currentOrdSortCol,
+  currentOrdSortDir,
+  setFiltroEstadoServicios,
+  setFiltroTicketsV2,
+  toggleSortOrdenes,
+  renderTabla,
+  badgeEstado,
+  filtrarOrdenes
+} = await import('../src/modules/ordenes_listado.js');
+
+// Test A: Funciones y exports existen
+assert.equal(typeof setFiltroEstadoServicios, 'function', 'setFiltroEstadoServicios debe ser función');
+assert.equal(typeof setFiltroTicketsV2, 'function', 'setFiltroTicketsV2 debe ser función');
+assert.equal(typeof toggleSortOrdenes, 'function', 'toggleSortOrdenes debe ser función');
+assert.equal(typeof renderTabla, 'function', 'renderTabla debe ser función');
+assert.equal(typeof badgeEstado, 'function', 'badgeEstado debe ser función');
+assert.equal(typeof filtrarOrdenes, 'function', 'filtrarOrdenes debe ser función');
+
+// Test B: badgeEstado
+assert.equal(badgeEstado('En Proceso'), 'badge-proceso', 'badgeEstado En Proceso debe retornar badge-proceso');
+assert.equal(badgeEstado('Completado'), 'badge-completado', 'badgeEstado Completado debe retornar badge-completado');
+assert.equal(badgeEstado('Cerrada'), 'badge-completado', 'badgeEstado Cerrada debe retornar badge-completado');
+assert.equal(badgeEstado('Cerrado'), 'badge-completado', 'badgeEstado Cerrado debe retornar badge-completado');
+assert.equal(badgeEstado('Pendiente'), 'badge-pendiente', 'badgeEstado Pendiente debe retornar badge-pendiente');
+
+// Test C: Invocación defensiva en Node.js (sin DOM)
+assert.doesNotThrow(() => {
+  renderTabla();
+  renderTabla('servicios');
+  renderTabla('v2');
+  filtrarOrdenes();
+  filtrarOrdenes('servicios');
+  setFiltroEstadoServicios('Completado');
+  setFiltroTicketsV2('abiertos');
+  toggleSortOrdenes('cliente');
+  toggleSortOrdenes('cliente');
+  toggleSortOrdenes('fecha');
+}, 'Las funciones de ordenes_listado no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Listados, Filtros, Menús de Ordenación y Tabla de Órdenes: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 

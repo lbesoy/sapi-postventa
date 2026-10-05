@@ -3902,305 +3902,40 @@ function onDashFilterChange(...args) {
   }
 }
 
-// ===== TABLE =====
-
-let filtroEstadoServicios = '';
-function setFiltroEstadoServicios(estado) {
-  filtroEstadoServicios = estado;
-  filtrarOrdenes('servicios');
-  renderTabla('v2');
+// ============================================================
+// MÓDULO DE LISTADOS, FILTROS, MENÚS DE ORDENACIÓN Y TABLA DE ÓRDENES
+// Extraído modularmente a ordenes_listado.js / src/modules/ordenes_listado.js
+// ============================================================
+function setFiltroEstadoServicios(...args) {
+  if (typeof window !== "undefined" && typeof window.setFiltroEstadoServicios === "function" && window.setFiltroEstadoServicios !== setFiltroEstadoServicios) {
+    return window.setFiltroEstadoServicios(...args);
+  }
 }
-
-let filtroTicketsV2 = 'todos';
-function setFiltroTicketsV2(estado) {
-  filtroTicketsV2 = estado;
-  renderTickets('v2');
+function setFiltroTicketsV2(...args) {
+  if (typeof window !== "undefined" && typeof window.setFiltroTicketsV2 === "function" && window.setFiltroTicketsV2 !== setFiltroTicketsV2) {
+    return window.setFiltroTicketsV2(...args);
+  }
 }
-
-function toggleSortOrdenes(col) {
-  if (currentOrdSortCol === col) {
-    currentOrdSortDir = currentOrdSortDir === 'asc' ? 'desc' : 'asc';
-  } else {
-    currentOrdSortCol = col;
-    currentOrdSortDir = 'asc';
+function toggleSortOrdenes(...args) {
+  if (typeof window !== "undefined" && typeof window.toggleSortOrdenes === "function" && window.toggleSortOrdenes !== toggleSortOrdenes) {
+    return window.toggleSortOrdenes(...args);
   }
-  filtrarOrdenes('servicios');
-  filtrarOrdenes();
 }
-
-function renderTabla(ctx) {
-  try { actualizarFiltrosPersonal(); } catch (e) {}
-  const isServiciosView = ctx === 'servicios';
-  if (isServiciosView) {
-    const btnRegen = document.getElementById('btn-regenerar-ordenes');
-    if (btnRegen) {
-      const isAdmin = currentSession && ['superadmin', 'admin'].includes(currentSession.viewMode);
-      btnRegen.style.display = isAdmin ? 'flex' : 'none';
-    }
-    const btnDepurar = document.getElementById('btn-depurar-ordenes-ref');
-    if (btnDepurar) {
-      const isSuperAdmin = currentSession && (currentSession.viewMode === 'superadmin' || currentSession.userId === 'superadmin');
-      btnDepurar.style.display = isSuperAdmin ? 'flex' : 'none';
-      if (isSuperAdmin && typeof window.actualizarBadgeDepuradorOrdenes === 'function') {
-        window.actualizarBadgeDepuradorOrdenes();
-      }
-    }
+function renderTabla(...args) {
+  if (typeof window !== "undefined" && typeof window.renderTabla === "function" && window.renderTabla !== renderTabla) {
+    return window.renderTabla(...args);
   }
-  const isV2 = ctx === 'v2';
-  const bodyId = isServiciosView ? 'tabla-body-servicios' : (isV2 ? 'v2-tabla-body' : 'tabla-body');
-  const searchId = isServiciosView ? 'search-servicios' : (isV2 ? 'v2-search-ordenes' : 'search-input');
-  const q = (document.getElementById(searchId)?.value || '').toLowerCase();
-  const qClean = q.trim();
-  const qNorm = qClean.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const qNum = qClean.replace(/[^0-9]/g, '');
-  
-  let filtradas = getFilteredOrders().filter(o => {
-    if (!qClean) return true;
-    const oFol = String(o.folio || o.numero_orden || o.id || '').toLowerCase();
-    const oFolNorm = oFol.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const oFolNum = oFol.replace(/[^0-9]/g, '');
-
-    const matchFolio = oFol.includes(qClean) || 
-                       (qNorm && oFolNorm.includes(qNorm)) || 
-                       (qNorm && qNorm.includes(oFolNorm)) ||
-                       (qNum.length >= 4 && oFolNum === qNum);
-    const matchCliente = String(o.cliente || '').toLowerCase().includes(qClean);
-    const matchTecnico = String(o.tecnico || '').toLowerCase().includes(qClean);
-    const matchUbicacion = String(o.ubicacion || '').toLowerCase().includes(qClean);
-    const matchModelo = String(o.modelo || '').toLowerCase().includes(qClean);
-    const matchTipo = String(o.tipo || '').toLowerCase().includes(qClean);
-    const matchEstado = String(o.estado || '').toLowerCase().includes(qClean);
-
-    // Buscar por ticket origen (folio, id, asunto, solicitante)
-    let matchTicket = false;
-    const rawSoporte = String(o.soporte || o.ticket_id || o.ticket_folio || '').toLowerCase();
-    const rawSoporteNorm = rawSoporte.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const rawSoporteNum = rawSoporte.replace(/[^0-9]/g, '');
-    if (rawSoporte && (rawSoporte.includes(qClean) || (qNorm && rawSoporteNorm.includes(qNorm)) || (qNum.length >= 4 && rawSoporteNum === qNum))) {
-      matchTicket = true;
-    }
-
-    if (!matchTicket && (o.soporte || o.ticket_id || o.ticket_folio)) {
-      const targetTktId = o.soporte || o.ticket_id;
-      const targetTktFolio = o.ticket_folio;
-      const tk = (typeof tickets !== 'undefined' && tickets) 
-        ? tickets.find(x => x.id === targetTktId || x.folio === targetTktId || (targetTktFolio && x.folio === targetTktFolio))
-        : null;
-      if (tk) {
-        if (String(tk.folio || '').toLowerCase().includes(qClean)) matchTicket = true;
-        if (String(tk.asunto || '').toLowerCase().includes(qClean)) matchTicket = true;
-        if (String(tk.solicitante || '').toLowerCase().includes(qClean)) matchTicket = true;
-      }
-    }
-
-    return matchCliente || matchTecnico || matchFolio || matchUbicacion || matchModelo || matchTipo || matchEstado || matchTicket;
-  });
-
-  if (isServiciosView && filtroEstadoServicios) {
-    filtradas = filtradas.filter(o => (o.estado || '').toLowerCase() === filtroEstadoServicios.toLowerCase());
-  }
-
-  let tecFilter = document.getElementById('filter-ord-tecnico')?.value;
-  let supFilter = document.getElementById('filter-ord-supervisor')?.value;
-  
-  const currentUser = usuarios.find(u => u.id === currentSession.userId);
-  const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
-  
-  if (isEmpresa) {
-    let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
-    if (nombreEmpresaLogged) {
-      nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
-      filtradas = filtradas.filter(o => {
-        const ocli = String(o.cliente || '').toLowerCase().trim();
-        let fromTicket = false;
-        if (o.soporte) {
-          const tick = tickets.find(t => t.id === o.soporte);
-          if (tick) {
-            const tcli = String(tick.cliente || '').toLowerCase().trim();
-            const tsol = String(tick.solicitante || '').toLowerCase().trim();
-            if (tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged) fromTicket = true;
-          }
-        }
-        return ocli === nombreEmpresaLogged || fromTicket;
-      });
-    } else {
-      filtradas = [];
-    }
-  }
-
-  const userRole = currentSession.viewMode || '';
-  if (userRole === 'tecnico') {
-    if (isTestModeActive()) {
-      tecFilter = '';
-    } else {
-      tecFilter = currentUser ? currentUser.nombre : '';
-    }
-  }
-  if (userRole === 'supervisor') {
-    supFilter = document.getElementById('filter-ord-supervisor')?.value || '';
-  }
-  
-  if (tecFilter || supFilter) {
-    const tecNameLower = tecFilter ? window.normStr(tecFilter) : '';
-    const supNameLower = supFilter ? window.normStr(supFilter) : '';
-    
-    filtradas = filtradas.filter(o => {
-      let passTec = true;
-      let passSup = true;
-      
-      if (tecFilter && tecNameLower) {
-         let assigned = [];
-         if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
-         else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
-         const assignedLower = assigned.map(s => window.normStr(s));
-         let isCreator = false;
-         let isTkAssigned = false;
-         if (o.creadoPor && window.normStr(o.creadoPor) === tecNameLower) isCreator = true;
-         if (o.soporte) {
-            const tk = tickets.find(x => x.id === o.soporte);
-            if (tk) {
-               if ((tk.solicitante && window.normStr(tk.solicitante) === tecNameLower) || 
-                   (tk.creadoPor && window.normStr(tk.creadoPor) === tecNameLower)) isCreator = true;
-               let tkAssigned = [];
-               if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(resolveTecnicoNombre);
-               else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
-               const tkAssignedLower = tkAssigned.map(s => window.normStr(s));
-               if (tkAssignedLower.includes(tecNameLower)) isTkAssigned = true;
-            }
-         }
-         passTec = assignedLower.includes(tecNameLower) || isCreator || isTkAssigned;
-      }
-      
-      if (supFilter && supNameLower) {
-         let passSupClient = false;
-         const cli = clientesDb.find(c => c.nombre === o.cliente);
-         if (cli) {
-            const supUser = usuarios.find(u => u && ((u.nombre && window.normStr(u.nombre) === supNameLower) || u.id === supFilter));
-            const supId = supUser ? supUser.id : supFilter;
-            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (window.normStr(cli.supervisorAsignado) === supNameLower) || (cli.supervisorAsignado === supFilter);
-         }
-         
-         let assigned = [];
-         if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(resolveTecnicoNombre);
-         else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
-         const assignedLower = assigned.map(s => window.normStr(s));
-         
-         let passSupTicket = assignedLower.includes(supNameLower);
-         let isCreator = false;
-         if (o.soporte) {
-            const tk = tickets.find(x => x.id === o.soporte);
-            if (tk) {
-               if ((tk.solicitante && window.normStr(tk.solicitante) === supNameLower) || 
-                   (tk.creadoPor && window.normStr(tk.creadoPor) === supNameLower)) isCreator = true;
-               let tkAssigned = [];
-               if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(resolveTecnicoNombre);
-               else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
-               const tkAssignedLower = tkAssigned.map(s => window.normStr(s));
-               if (tkAssignedLower.includes(supNameLower)) passSupTicket = true;
-            }
-         }
-         passSup = passSupClient || passSupTicket || isCreator;
-      }
-      
-      return passTec && passSup;
-    });
-  }
-
-  // ORDENAMIENTO
-  if (currentOrdSortCol !== 'reciente') {
-    filtradas.sort((a, b) => {
-      let valA = a[currentOrdSortCol] || '';
-      let valB = b[currentOrdSortCol] || '';
-      
-      if (currentOrdSortCol === 'id') {
-        const numA = parseInt(valA.replace(/\D/g, '')) || 0;
-        const numB = parseInt(valB.replace(/\D/g, '')) || 0;
-        return currentOrdSortDir === 'asc' ? numA - numB : numB - numA;
-      } else if (currentOrdSortCol === 'fecha') {
-        const dateA = new Date(valA).getTime() || 0;
-        const dateB = new Date(valB).getTime() || 0;
-        return currentOrdSortDir === 'asc' ? dateA - dateB : dateB - dateA;
-      } else {
-        valA = valA.toString().toLowerCase();
-        valB = valB.toString().toLowerCase();
-        if (valA < valB) return currentOrdSortDir === 'asc' ? -1 : 1;
-        if (valA > valB) return currentOrdSortDir === 'asc' ? 1 : -1;
-        return 0;
-      }
-    });
-  } else {
-    // Ordenamiento por defecto (recientes primero)
-    filtradas.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-  }
-
-  // Actualizar iconos de ordenamiento
-  ['id', 'cliente', 'ubicacion', 'modelo', 'tecnico', 'tipo', 'estado', 'fecha'].forEach(col => {
-    const icon = document.getElementById('sort-icon-ord-' + col);
-    if (icon) {
-      const isCurrent = currentOrdSortCol === col;
-      const iconName = isCurrent ? (currentOrdSortDir === 'asc' ? 'arrow-up' : 'arrow-down') : 'arrow-up-down';
-      const color = isCurrent ? 'var(--accent)' : 'var(--text-muted)';
-      icon.outerHTML = `<i id="sort-icon-ord-${col}" data-lucide="${iconName}" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:${color};"></i>`;
-    }
-  });
-
-  const body = document.getElementById(bodyId);
-  if (!body) return;
-  if (!filtradas.length) {
-    body.innerHTML = `<tr><td colspan="10" class="empty-state">No hay órdenes${q ? ' que coincidan' : ' registradas'}.</td></tr>`;
-    return;
-  }
-  const isConsulta = currentSession.viewMode === 'consulta';
-  const isTecnico = currentSession.viewMode === 'tecnico';
-  const canEdit = !isConsulta && !isTecnico && !isEmpresa;
-  const canDelete = ['superadmin', 'admin'].includes(currentSession.viewMode);
-
-  body.innerHTML = filtradas.map(o => {
-    let orderCanEdit = canEdit;
-    if (((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__') || o.cierre_papel_pdf) && !['superadmin', 'admin'].includes(currentSession.viewMode)) {
-      orderCanEdit = false;
-    }
-    const ticketAsoc = (o.soporte || o.ticket_id || o.ticket_folio)
-      ? tickets.find(x => x.id === o.soporte || x.folio === o.soporte || (o.ticket_id && x.id === o.ticket_id) || (o.ticket_folio && x.folio === o.ticket_folio))
-      : null;
-    const ticketHtml = ticketAsoc
-      ? `<a href="#" onclick="verDetalleTicket('${ticketAsoc.id}'); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;" title="${ticketAsoc.asunto || ''}">${ticketAsoc.folio}</a>`
-      : (o.soporte ? `<span style="font-family:monospace; font-size:0.8rem; color:var(--text-muted);">${o.soporte}</span>` : '-');
-    
-    return `
-    <tr>
-      <td data-label="Acciones" style="white-space:nowrap; width:60px;">
-        <div style="display:flex;gap:0.25rem;">
-          <button class="action-btn" onclick="verDetalle('${o.id}')" title="Ver"><i data-lucide="eye"></i></button>
-          ${orderCanEdit ? `<button class="action-btn" onclick="editarOrden('${o.id}')" title="Editar"><i data-lucide="pencil"></i></button>` : ''}
-        </div>
-      </td>
-      <td data-label="Folio"><strong>${o.folio||'-'}</strong></td>
-      <td data-label="Ticket">${ticketHtml}</td>
-      <td data-label="Cliente">${o.cliente||'-'}</td>
-      <td data-label="Ubicación">${o.ubicacion||'-'}</td>
-      <td data-label="Modelo">${o.modelo||'-'}</td>
-
-      <td data-label="Tipo"><span class="badge badge-${(o.tipo||'otro').toLowerCase().replace('é','e').replace('í','i')}">${o.tipo||'-'}</span></td>
-      <td data-label="Estado"><span class="badge ${badgeEstado(o.estado)}">${o.estado||'-'}</span></td>
-      <td data-label="Fecha">${formatFechaAmigable(o.fecha)}</td>
-      <td data-label="" style="width:40px; text-align:center;">
-        ${canDelete ? `<button class="action-btn del" onclick="eliminarOrden('${o.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
-      </td>
-    </tr>
-    `;
-  }).join('');
-  if (!ctx) renderStats();
-  lucide.createIcons();
 }
-
-function badgeEstado(estado) {
-  if (estado === 'En Proceso') return 'badge-proceso';
-  if ((estado === 'Completado' || estado === 'Cerrada' || estado === 'Cerrado')) return 'badge-completado';
-  return 'badge-pendiente';
+function badgeEstado(...args) {
+  if (typeof window !== "undefined" && typeof window.badgeEstado === "function" && window.badgeEstado !== badgeEstado) {
+    return window.badgeEstado(...args);
+  }
 }
-
-function filtrarOrdenes(ctx) { renderTabla(ctx); }
+function filtrarOrdenes(...args) {
+  if (typeof window !== "undefined" && typeof window.filtrarOrdenes === "function" && window.filtrarOrdenes !== filtrarOrdenes) {
+    return window.filtrarOrdenes(...args);
+  }
+}
 
 // ============================================================
 // MÓDULO DE SINCRONIZACIÓN SAP (CATÁLOGOS MAESTROS)
