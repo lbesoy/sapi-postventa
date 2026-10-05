@@ -1758,6 +1758,58 @@ assert.doesNotThrow(() => {
 
 console.log('  ✅ Preferencias, Configuración General, Recuperación de Contraseña y Diagrama de Flujo: OK');
 
+// ============================================================================
+// TEST 46: Sitios de Obra, Subvistas de Clientes y Portal de Usuarios
+// ============================================================================
+console.log('Test 46: Sitios de Obra, Subvistas de Clientes y Portal de Usuarios');
+const {
+  getSitioNombre: getSitioNombreModule,
+  getNombresDeSitiosParaCliente,
+  generarIdInternoMaquina: generarIdInternoMaquinaModule,
+  agregarSitioClienteDesdeEmpresa,
+  agregarSitioCliente,
+  cerrarModalSitio,
+  guardarSitioCliente,
+  setClientesSubView,
+  renderPortalUsuariosList,
+  aprobarUsuarioPortal
+} = await import('../src/modules/sitios_clientes.js');
+
+// Test A: Funciones y exports existen
+assert.equal(typeof getSitioNombreModule, 'function', 'getSitioNombre debe ser función');
+assert.equal(typeof getNombresDeSitiosParaCliente, 'function', 'getNombresDeSitiosParaCliente debe ser función');
+assert.equal(typeof generarIdInternoMaquinaModule, 'function', 'generarIdInternoMaquina debe ser función');
+assert.equal(typeof agregarSitioClienteDesdeEmpresa, 'function', 'agregarSitioClienteDesdeEmpresa debe ser función');
+assert.equal(typeof agregarSitioCliente, 'function', 'agregarSitioCliente debe ser función');
+assert.equal(typeof cerrarModalSitio, 'function', 'cerrarModalSitio debe ser función');
+assert.equal(typeof guardarSitioCliente, 'function', 'guardarSitioCliente debe ser función');
+assert.equal(typeof setClientesSubView, 'function', 'setClientesSubView debe ser función');
+assert.equal(typeof renderPortalUsuariosList, 'function', 'renderPortalUsuariosList debe ser función');
+assert.equal(typeof aprobarUsuarioPortal, 'function', 'aprobarUsuarioPortal debe ser función');
+
+// Test B: Lógica de getSitioNombre y generarIdInternoMaquina
+assert.equal(getSitioNombreModule('Obra Centro'), 'Obra Centro', 'getSitioNombre de string debe retornar el string');
+assert.equal(getSitioNombreModule({ nombre: 'Obra Sur' }), 'Obra Sur', 'getSitioNombre de objeto debe retornar el nombre');
+assert.equal(getSitioNombreModule(null), '', 'getSitioNombre de null debe retornar cadena vacía');
+
+globalThis.window.clientesDb = [];
+globalThis.window.maquinariaDb = [];
+const idMaq = generarIdInternoMaquinaModule('KOMATSU', '2026');
+assert.ok(typeof idMaq === 'string' && idMaq.startsWith('KO26'), 'generarIdInternoMaquina debe generar prefijo KO26');
+
+// Test C: Invocación defensiva en Node.js (sin DOM)
+assert.doesNotThrow(() => {
+  getNombresDeSitiosParaCliente(null);
+  agregarSitioClienteDesdeEmpresa();
+  agregarSitioCliente('');
+  cerrarModalSitio();
+  setClientesSubView('catalogo');
+  setClientesSubView('portal');
+  renderPortalUsuariosList();
+}, 'Las funciones de sitios_clientes no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Sitios de Obra, Subvistas de Clientes y Portal de Usuarios: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 
