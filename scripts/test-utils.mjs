@@ -1503,6 +1503,71 @@ assert.doesNotThrow(() => {
 
 console.log('  ✅ Bitácora de Avances y Reportes de Órdenes: OK');
 
+console.log('Test 42: Formulario, Días Panels, KM y Guardado de Órdenes');
+const {
+  DIAS,
+  initDiasPanels,
+  calcularHorasDia,
+  autoCompletarFechas,
+  selDia,
+  calcKmTotal,
+  getDiasData,
+  setDiasData,
+  generarFolioConsecutivo,
+  abrirFormulario,
+  autoFillFromPdfExtraction,
+  onSoporteChange,
+  editarOrden,
+  cerrarFormulario,
+  guardarOrdenes,
+  guardarOrden,
+  eliminarOrden,
+  completarReporteDesdeDetalle
+} = await import('../src/modules/ordenes_form.js');
+
+// Test A: Existencia y tipo de las funciones exportadas
+assert.ok(Array.isArray(DIAS) && DIAS.length === 7, 'DIAS debe ser un array de 7 días');
+assert.equal(typeof initDiasPanels, 'function', 'initDiasPanels debe ser función');
+assert.equal(typeof calcularHorasDia, 'function', 'calcularHorasDia debe ser función');
+assert.equal(typeof autoCompletarFechas, 'function', 'autoCompletarFechas debe ser función');
+assert.equal(typeof selDia, 'function', 'selDia debe ser función');
+assert.equal(typeof calcKmTotal, 'function', 'calcKmTotal debe ser función');
+assert.equal(typeof getDiasData, 'function', 'getDiasData debe ser función');
+assert.equal(typeof setDiasData, 'function', 'setDiasData debe ser función');
+assert.equal(typeof generarFolioConsecutivo, 'function', 'generarFolioConsecutivo debe ser función');
+assert.equal(typeof abrirFormulario, 'function', 'abrirFormulario debe ser función');
+assert.equal(typeof autoFillFromPdfExtraction, 'function', 'autoFillFromPdfExtraction debe ser función');
+assert.equal(typeof onSoporteChange, 'function', 'onSoporteChange debe ser función');
+assert.equal(typeof editarOrden, 'function', 'editarOrden debe ser función');
+assert.equal(typeof cerrarFormulario, 'function', 'cerrarFormulario debe ser función');
+assert.equal(typeof guardarOrdenes, 'function', 'guardarOrdenes debe ser función');
+assert.equal(typeof guardarOrden, 'function', 'guardarOrden debe ser función');
+assert.equal(typeof eliminarOrden, 'function', 'eliminarOrden debe ser función');
+assert.equal(typeof completarReporteDesdeDetalle, 'function', 'completarReporteDesdeDetalle debe ser función');
+
+// Test B: Lógica de negocio de generarFolioConsecutivo
+const nuevoFolio = generarFolioConsecutivo();
+assert.ok(typeof nuevoFolio === 'string' && nuevoFolio.startsWith('OS-'), 'generarFolioConsecutivo debe generar un folio que comience con OS-');
+
+// Test C: Invocación defensiva en Node.js (sin DOM)
+assert.doesNotThrow(() => {
+  initDiasPanels();
+  calcularHorasDia('lunes');
+  autoCompletarFechas('lunes', '2026-10-05');
+  calcKmTotal();
+  getDiasData();
+  setDiasData({});
+  abrirFormulario('ORD-NONEXISTENT');
+  autoFillFromPdfExtraction('TK-1');
+  onSoporteChange();
+  editarOrden('ORD-NONEXISTENT');
+  cerrarFormulario({ preventDefault: () => {} });
+  guardarOrdenes();
+  completarReporteDesdeDetalle('ORD-NONEXISTENT');
+}, 'Las funciones de ordenes_form no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Formulario, Días Panels, KM y Guardado de Órdenes: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 
