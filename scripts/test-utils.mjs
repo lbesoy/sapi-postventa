@@ -1343,6 +1343,66 @@ assert.doesNotThrow(() => {
 
 console.log('  ✅ Formulario, Combos y Guardado de Tickets: OK');
 
+console.log('Test 39: Detalle, Comentarios y Adjuntos de Tickets');
+const {
+  renderComentariosInternosHtml,
+  switchCommentTab,
+  agregarComentarioInterno,
+  agregarComentarioExterno,
+  verDetalleTicket,
+  visualizarPdfOnDemand,
+  visualizarDestinoPdfActual,
+  descargarPdfOnDemand,
+  avanzarCotizacionTicket,
+  cerrarCotizacionTicket,
+  cerrarDetalleTicket,
+  forzarEstadoTicket,
+  forzarCrearOrdenServicio
+} = await import('../src/modules/tickets_detalle.js');
+
+// Test A: Existencia y tipo de las funciones exportadas
+assert.equal(typeof renderComentariosInternosHtml, 'function', 'renderComentariosInternosHtml debe ser función');
+assert.equal(typeof switchCommentTab, 'function', 'switchCommentTab debe ser función');
+assert.equal(typeof agregarComentarioInterno, 'function', 'agregarComentarioInterno debe ser función');
+assert.equal(typeof agregarComentarioExterno, 'function', 'agregarComentarioExterno debe ser función');
+assert.equal(typeof verDetalleTicket, 'function', 'verDetalleTicket debe ser función');
+assert.equal(typeof visualizarPdfOnDemand, 'function', 'visualizarPdfOnDemand debe ser función');
+assert.equal(typeof visualizarDestinoPdfActual, 'function', 'visualizarDestinoPdfActual debe ser función');
+assert.equal(typeof descargarPdfOnDemand, 'function', 'descargarPdfOnDemand debe ser función');
+assert.equal(typeof avanzarCotizacionTicket, 'function', 'avanzarCotizacionTicket debe ser función');
+assert.equal(typeof cerrarCotizacionTicket, 'function', 'cerrarCotizacionTicket debe ser función');
+assert.equal(typeof cerrarDetalleTicket, 'function', 'cerrarDetalleTicket debe ser función');
+assert.equal(typeof forzarEstadoTicket, 'function', 'forzarEstadoTicket debe ser función');
+assert.equal(typeof forzarCrearOrdenServicio, 'function', 'forzarCrearOrdenServicio debe ser función');
+
+// Test B: renderComentariosInternosHtml genera HTML válido para ticket de prueba
+const dummyTicket = {
+  id: 't-test-1',
+  comentariosInternos: [
+    { usuario: 'Soporte Eurorep', texto: 'Comentario de prueba interno', fecha: '2026-10-05T12:00:00Z' }
+  ],
+  comentariosClientes: [
+    { usuario: 'Cliente Demo', texto: 'Mensaje externo del cliente', fecha: '2026-10-05T12:30:00Z' }
+  ]
+};
+const htmlGenerado = renderComentariosInternosHtml(dummyTicket);
+assert.ok(typeof htmlGenerado === 'string' && htmlGenerado.includes('Comentario de prueba interno'), 'renderComentariosInternosHtml debe incluir el texto del comentario');
+
+// Test C: Invocación defensiva en Node.js (sin DOM)
+assert.doesNotThrow(() => {
+  switchCommentTab('internos');
+  switchCommentTab('externos');
+  verDetalleTicket('TK-NONEXISTENT');
+  visualizarPdfOnDemand('TK-1', 'cotizacion');
+  visualizarDestinoPdfActual();
+  descargarPdfOnDemand('TK-1', 'cotizacion');
+  cerrarDetalleTicket({ preventDefault: () => {} });
+  forzarEstadoTicket('TK-1');
+  forzarCrearOrdenServicio('TK-1');
+}, 'Las funciones de tickets_detalle no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Detalle, Comentarios y Adjuntos de Tickets: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 
