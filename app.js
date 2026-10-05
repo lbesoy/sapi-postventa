@@ -3515,13 +3515,13 @@ function dispararInicializacionGlobal() {
 // Extraído modularmente a sitios_clientes.js / src/modules/sitios_clientes.js
 // ============================================================
 window.setClientesSubView = function(...args) {
-  if (typeof window.setClientesSubView === "function") return window.setClientesSubView(...args);
+  if (window.SitiosClientes && typeof window.SitiosClientes.setClientesSubView === "function") return window.SitiosClientes.setClientesSubView(...args);
 };
 window.renderPortalUsuariosList = function(...args) {
-  if (typeof window.renderPortalUsuariosList === "function") return window.renderPortalUsuariosList(...args);
+  if (window.SitiosClientes && typeof window.SitiosClientes.renderPortalUsuariosList === "function") return window.SitiosClientes.renderPortalUsuariosList(...args);
 };
 window.aprobarUsuarioPortal = async function(...args) {
-  if (typeof window.aprobarUsuarioPortal === "function") return window.aprobarUsuarioPortal(...args);
+  if (window.SitiosClientes && typeof window.SitiosClientes.aprobarUsuarioPortal === "function") return await window.SitiosClientes.aprobarUsuarioPortal(...args);
 };
 
 // =========================================================================
@@ -3531,28 +3531,25 @@ window.aprobarUsuarioPortal = async function(...args) {
 
 // ============================================================
 // DIAGRAMA DE FLUJO INTERACTIVO (PREFERENCIAS)
-// ============================================================
-// ============================================================
-// DIAGRAMA DE FLUJO INTERACTIVO (PREFERENCIAS)
 // Extraído modularmente a preferencias.js / src/modules/preferencias.js
 // ============================================================
 window.abrirModalDiagramaFlujo = function(...args) {
-  if (typeof window.abrirModalDiagramaFlujo === "function") return window.abrirModalDiagramaFlujo(...args);
+  if (window.Preferencias && typeof window.Preferencias.abrirModalDiagramaFlujo === "function") return window.Preferencias.abrirModalDiagramaFlujo(...args);
 };
 window.cerrarModalDiagramaFlujo = function(...args) {
-  if (typeof window.cerrarModalDiagramaFlujo === "function") return window.cerrarModalDiagramaFlujo(...args);
+  if (window.Preferencias && typeof window.Preferencias.cerrarModalDiagramaFlujo === "function") return window.Preferencias.cerrarModalDiagramaFlujo(...args);
 };
 window.zoomDiagramaFlujo = function(...args) {
-  if (typeof window.zoomDiagramaFlujo === "function") return window.zoomDiagramaFlujo(...args);
+  if (window.Preferencias && typeof window.Preferencias.zoomDiagramaFlujo === "function") return window.Preferencias.zoomDiagramaFlujo(...args);
 };
 window.resetZoomDiagramaFlujo = function(...args) {
-  if (typeof window.resetZoomDiagramaFlujo === "function") return window.resetZoomDiagramaFlujo(...args);
+  if (window.Preferencias && typeof window.Preferencias.resetZoomDiagramaFlujo === "function") return window.Preferencias.resetZoomDiagramaFlujo(...args);
 };
 window.toggleSimbologiaFlujo = function(...args) {
-  if (typeof window.toggleSimbologiaFlujo === "function") return window.toggleSimbologiaFlujo(...args);
+  if (window.Preferencias && typeof window.Preferencias.toggleSimbologiaFlujo === "function") return window.Preferencias.toggleSimbologiaFlujo(...args);
 };
 window.filtrarRutaDiagrama = function(...args) {
-  if (typeof window.filtrarRutaDiagrama === "function") return window.filtrarRutaDiagrama(...args);
+  if (window.Preferencias && typeof window.Preferencias.filtrarRutaDiagrama === "function") return window.Preferencias.filtrarRutaDiagrama(...args);
 };
 
 // =========================================================================
