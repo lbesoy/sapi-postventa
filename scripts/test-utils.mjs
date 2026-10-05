@@ -1467,6 +1467,42 @@ assert.doesNotThrow(() => {
 
 console.log('  ✅ Detalle, Evidencias Fotográficas y Canvas de Firmas de Órdenes: OK');
 
+console.log('Test 41: Bitácora de Avances y Reportes de Órdenes');
+const {
+  calcularRangoFechasLaboral,
+  abrirBitacora,
+  iniciarReporteDesdeAsignacion,
+  editarBitacora,
+  cerrarBitacora,
+  actualizarEventoCalendarioDesdeBitacora,
+  guardarNotaBitacora
+} = await import('../src/modules/ordenes_bitacora.js');
+
+// Test A: Existencia y tipo de las funciones exportadas
+assert.equal(typeof calcularRangoFechasLaboral, 'function', 'calcularRangoFechasLaboral debe ser función');
+assert.equal(typeof abrirBitacora, 'function', 'abrirBitacora debe ser función');
+assert.equal(typeof iniciarReporteDesdeAsignacion, 'function', 'iniciarReporteDesdeAsignacion debe ser función');
+assert.equal(typeof editarBitacora, 'function', 'editarBitacora debe ser función');
+assert.equal(typeof cerrarBitacora, 'function', 'cerrarBitacora debe ser función');
+assert.equal(typeof actualizarEventoCalendarioDesdeBitacora, 'function', 'actualizarEventoCalendarioDesdeBitacora debe ser función');
+assert.equal(typeof guardarNotaBitacora, 'function', 'guardarNotaBitacora debe ser función');
+
+// Test B: Lógica de negocio de calcularRangoFechasLaboral
+const rangoLaboral = calcularRangoFechasLaboral(3);
+assert.ok(rangoLaboral && rangoLaboral.min && rangoLaboral.max, 'calcularRangoFechasLaboral debe retornar { min, max }');
+assert.ok(rangoLaboral.min <= rangoLaboral.max, 'min debe ser menor o igual a max');
+
+// Test C: Invocación defensiva en Node.js (sin DOM)
+assert.doesNotThrow(() => {
+  abrirBitacora('ORD-NONEXISTENT');
+  iniciarReporteDesdeAsignacion('ORD-NONEXISTENT', 'BIT-1');
+  editarBitacora('ORD-NONEXISTENT', 'BIT-1');
+  cerrarBitacora({ preventDefault: () => {} });
+  actualizarEventoCalendarioDesdeBitacora(null, null);
+}, 'Las funciones de ordenes_bitacora no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Bitácora de Avances y Reportes de Órdenes: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 
