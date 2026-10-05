@@ -1265,6 +1265,84 @@ assert.ok(ticketSortDirection !== undefined, 'ticketSortDirection debe estar def
 
 console.log('  ✅ Listados, Filtros, Menús de Ordenación y Badges de Tickets: OK');
 
+console.log('Test 38: Formulario, Combos y Guardado de Tickets');
+const {
+  abrirTicket,
+  abrirTicketPreloaded,
+  toggleResolucionTicket,
+  toggleMotivoRechazo,
+  editarTicket,
+  cerrarTicket,
+  poblarSoportesPorCliente,
+  poblarMaquinasCliente,
+  onEquipoOrdenChange,
+  onEquipoTicketChange,
+  onEquipoTicketChangeMultiple,
+  actualizarCamposMaquinaOrden,
+  agregarMaquinaChipOrden,
+  onEquipoOrdenChangeMultiple,
+  toggleCombo,
+  filterCombo,
+  selectComboOption,
+  agregarSitioCombo,
+  agregarEmpresaCombo,
+  readFileAsBase64,
+  guardarTicket,
+  eliminarTicket
+} = await import('../src/modules/tickets_form.js');
+
+// Test A: Existencia y tipo de las funciones exportadas
+assert.equal(typeof abrirTicket, 'function', 'abrirTicket debe ser función');
+assert.equal(typeof abrirTicketPreloaded, 'function', 'abrirTicketPreloaded debe ser función');
+assert.equal(typeof toggleResolucionTicket, 'function', 'toggleResolucionTicket debe ser función');
+assert.equal(typeof toggleMotivoRechazo, 'function', 'toggleMotivoRechazo debe ser función');
+assert.equal(typeof editarTicket, 'function', 'editarTicket debe ser función');
+assert.equal(typeof cerrarTicket, 'function', 'cerrarTicket debe ser función');
+assert.equal(typeof poblarSoportesPorCliente, 'function', 'poblarSoportesPorCliente debe ser función');
+assert.equal(typeof poblarMaquinasCliente, 'function', 'poblarMaquinasCliente debe ser función');
+assert.equal(typeof onEquipoOrdenChange, 'function', 'onEquipoOrdenChange debe ser función');
+assert.equal(typeof onEquipoTicketChange, 'function', 'onEquipoTicketChange debe ser función');
+assert.equal(typeof onEquipoTicketChangeMultiple, 'function', 'onEquipoTicketChangeMultiple debe ser función');
+assert.equal(typeof actualizarCamposMaquinaOrden, 'function', 'actualizarCamposMaquinaOrden debe ser función');
+assert.equal(typeof agregarMaquinaChipOrden, 'function', 'agregarMaquinaChipOrden debe ser función');
+assert.equal(typeof onEquipoOrdenChangeMultiple, 'function', 'onEquipoOrdenChangeMultiple debe ser función');
+assert.equal(typeof toggleCombo, 'function', 'toggleCombo debe ser función');
+assert.equal(typeof filterCombo, 'function', 'filterCombo debe ser función');
+assert.equal(typeof selectComboOption, 'function', 'selectComboOption debe ser función');
+assert.equal(typeof agregarSitioCombo, 'function', 'agregarSitioCombo debe ser función');
+assert.equal(typeof agregarEmpresaCombo, 'function', 'agregarEmpresaCombo debe ser función');
+assert.equal(typeof readFileAsBase64, 'function', 'readFileAsBase64 debe ser función');
+assert.equal(typeof guardarTicket, 'function', 'guardarTicket debe ser función');
+assert.equal(typeof eliminarTicket, 'function', 'eliminarTicket debe ser función');
+
+// Test B: readFileAsBase64 retorna promesa sin arrojar error
+const b64Res = await readFileAsBase64(null);
+assert.equal(typeof b64Res, 'string', 'readFileAsBase64 debe retornar string en ambiente sin FileReader');
+
+// Test C: Invocación defensiva en Node.js (sin DOM)
+assert.doesNotThrow(() => {
+  abrirTicket('TK-NONEXISTENT');
+  abrirTicketPreloaded({});
+  toggleResolucionTicket();
+  toggleMotivoRechazo();
+  cerrarTicket({ preventDefault: () => {} });
+  poblarSoportesPorCliente('Cliente Test');
+  poblarMaquinasCliente('select-id', 'M-1', 'Cliente Test');
+  onEquipoOrdenChange();
+  onEquipoTicketChange();
+  onEquipoTicketChangeMultiple();
+  actualizarCamposMaquinaOrden();
+  agregarMaquinaChipOrden('Maquina A');
+  onEquipoOrdenChangeMultiple();
+  toggleCombo('combo-test');
+  filterCombo('combo-test', 'query');
+  selectComboOption('combo-test', 'val', 'Label');
+  agregarSitioCombo('combo-test');
+  agregarEmpresaCombo('combo-test');
+}, 'Las funciones de tickets_form no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Formulario, Combos y Guardado de Tickets: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 
