@@ -1131,7 +1131,53 @@ assert.doesNotThrow(() => {
   procesarEnviarCorreo(null);
 }, 'Las funciones de ordenes_estados no deben arrojar error en ausencia de DOM');
 
-console.log('  ✅ Automatización de Estados, Reportes PDF y Envío de Órdenes: OK');
+console.log('Test 36: Servicios Programados de Técnico y Gestión de Envíos en Tickets');
+const {
+  renderServiciosProgramadosTecnico,
+  renderTicketRefaccionesList,
+  obtenerEnviosDesdeDOM,
+  actualizarVisibilidadDestinoPiezas,
+  actualizarEstatusRefaccionesDesdeGuias,
+  esTicketDeServicioEnCampo,
+  renderEnvioCards
+} = await import('../src/modules/servicios_programados.js');
+
+// Test A: Funciones existen
+assert.equal(typeof renderServiciosProgramadosTecnico, 'function', 'renderServiciosProgramadosTecnico debe ser función');
+assert.equal(typeof renderTicketRefaccionesList, 'function', 'renderTicketRefaccionesList debe ser función');
+assert.equal(typeof obtenerEnviosDesdeDOM, 'function', 'obtenerEnviosDesdeDOM debe ser función');
+assert.equal(typeof actualizarVisibilidadDestinoPiezas, 'function', 'actualizarVisibilidadDestinoPiezas debe ser función');
+assert.equal(typeof actualizarEstatusRefaccionesDesdeGuias, 'function', 'actualizarEstatusRefaccionesDesdeGuias debe ser función');
+assert.equal(typeof esTicketDeServicioEnCampo, 'function', 'esTicketDeServicioEnCampo debe ser función');
+assert.equal(typeof renderEnvioCards, 'function', 'renderEnvioCards debe ser función');
+
+// Test B: Lógica de negocio de esTicketDeServicioEnCampo
+assert.equal(esTicketDeServicioEnCampo(null), false, 'null debe ser false');
+assert.equal(esTicketDeServicioEnCampo({ folio: 'TK-100-A' }), false, 'Subticket -A debe ser false');
+assert.equal(esTicketDeServicioEnCampo({ folio: 'REF-2026-01' }), false, 'Folio REF- debe ser false');
+assert.equal(esTicketDeServicioEnCampo({ area: 'Refacciones y Almacén' }), false, 'Área refacciones debe ser false');
+assert.equal(esTicketDeServicioEnCampo({ categoria: 'Garantía', tipo: 'Garantía' }), false, 'Garantía administrativa debe ser false');
+assert.equal(esTicketDeServicioEnCampo({ destinoPiezas: 'cliente' }), false, 'Destino directo a cliente debe ser false');
+assert.equal(esTicketDeServicioEnCampo({ guiaPedido: 'GUIA123', categoria: 'Venta' }), false, 'Venta con envío sin servicio debe ser false');
+
+// Casos positivos de servicio en campo
+assert.equal(esTicketDeServicioEnCampo({ categoria: 'Servicio Técnico', tipo: 'Preventivo' }), true, 'Servicio Técnico debe ser true');
+assert.equal(esTicketDeServicioEnCampo({ categoria: 'Mantenimiento en Campo' }), true, 'Mantenimiento debe ser true');
+assert.equal(esTicketDeServicioEnCampo({ categoria: 'Puesta en Marcha' }), true, 'Puesta en marcha debe ser true');
+assert.equal(esTicketDeServicioEnCampo({ area: 'Operaciones', tipo: 'Correctivo' }), true, 'Correctivo en operaciones debe ser true');
+assert.equal(esTicketDeServicioEnCampo({ categoria: 'Reparación de Bomba' }), true, 'Reparación debe ser true');
+
+// Test C: Invocación defensiva en Node.js (sin DOM)
+assert.deepEqual(obtenerEnviosDesdeDOM(), [], 'obtenerEnviosDesdeDOM sin DOM debe retornar array vacío');
+assert.doesNotThrow(() => {
+  renderServiciosProgramadosTecnico();
+  renderTicketRefaccionesList({ id: 't1', refaccionesSeleccionadas: [] });
+  actualizarVisibilidadDestinoPiezas({ destinoPiezas: 'tecnico' });
+  actualizarEstatusRefaccionesDesdeGuias({ refaccionesSeleccionadas: [] });
+  renderEnvioCards({ envios: [] });
+}, 'Las funciones de servicios_programados no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Servicios Programados de Técnico y Gestión de Envíos en Tickets: OK');
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
