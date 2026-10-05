@@ -6,7 +6,7 @@
  * filtros por estado, técnico, supervisor, búsqueda multifactorial, y ordenamiento dinámico.
  */
 
-import { normStr, formatFechaAmigable } from '../utils.js';
+import { normStr, safeFormatDate, formatFechaHoraAmigable } from '../utils.js';
 
 let filtroEstadoServicios = '';
 let filtroTicketsV2 = 'todos';
@@ -20,8 +20,9 @@ function safeNormStr(s) {
 }
 
 function safeFormatFechaAmigable(f) {
-  if (typeof formatFechaAmigable === 'function') return formatFechaAmigable(f);
   if (typeof window !== 'undefined' && typeof window.formatFechaAmigable === 'function') return window.formatFechaAmigable(f);
+  if (typeof formatFechaHoraAmigable === 'function') return formatFechaHoraAmigable(f);
+  if (typeof safeFormatDate === 'function') return safeFormatDate(f);
   return f || '';
 }
 

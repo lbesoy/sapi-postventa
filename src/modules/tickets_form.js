@@ -970,6 +970,47 @@ function actualizarCamposMaquinaOrden() {
   document.getElementById('f-eco').value = [...new Set(ecos)].join(', ');
 };
 
+function agregarMaquinaChip(maquinaName) {
+  if (typeof document === 'undefined') return;
+  if (!maquinaName) return;
+  const container = document.getElementById('t-equipos-seleccionados');
+  if (!container) return;
+  
+  const existing = Array.from(container.querySelectorAll('.maquina-chip')).some(c => c.getAttribute('data-value') === maquinaName);
+  if (existing) return;
+  
+  const currentTicket = (typeof editandoTicketId !== 'undefined' && editandoTicketId && typeof tickets !== 'undefined') ? tickets.find(x => x.id === editandoTicketId) : null;
+  const isRefTicket = currentTicket && currentTicket.folio && currentTicket.folio.endsWith('-A');
+
+  const chip = document.createElement('div');
+  chip.className = 'maquina-chip';
+  chip.setAttribute('data-value', maquinaName);
+  chip.style.cssText = `
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-hover, #f3f4f6);
+    border: 1px solid var(--border, #e5e7eb);
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-primary, #1f2937);
+    gap: 0.25rem;
+    box-shadow: var(--shadow-sm);
+  `;
+  
+  const deleteBtn = isRefTicket ? '' : `<span onclick="this.parentElement.remove(); if (typeof window.alCambiarCategoriaTicket === 'function' && document.getElementById('t-categoria')?.value === 'Servicio Técnico') window.alCambiarCategoriaTicket();" style="cursor:pointer; font-weight:bold; color:var(--red, #ef4444); margin-left:4px; font-size:1.1rem; line-height:1;">&times;</span>`;
+
+  chip.innerHTML = `
+    <span>\${maquinaName}</span>
+    \${deleteBtn}
+  `;
+  container.appendChild(chip);
+  if (typeof window.alCambiarCategoriaTicket === 'function' && document.getElementById('t-categoria')?.value === 'Servicio Técnico') {
+    window.alCambiarCategoriaTicket();
+  }
+}
+
 function agregarMaquinaChipOrden(maquinaName) {
   if (typeof document === 'undefined') return;
   if (!maquinaName) return;
@@ -1881,6 +1922,7 @@ export {
   onEquipoTicketChange,
   onEquipoTicketChangeMultiple,
   actualizarCamposMaquinaOrden,
+  agregarMaquinaChip,
   agregarMaquinaChipOrden,
   onEquipoOrdenChangeMultiple,
   toggleCombo,
@@ -1906,6 +1948,7 @@ if (typeof window !== "undefined") {
   window.onEquipoTicketChange = onEquipoTicketChange;
   window.onEquipoTicketChangeMultiple = onEquipoTicketChangeMultiple;
   window.actualizarCamposMaquinaOrden = actualizarCamposMaquinaOrden;
+  window.agregarMaquinaChip = agregarMaquinaChip;
   window.agregarMaquinaChipOrden = agregarMaquinaChipOrden;
   window.onEquipoOrdenChangeMultiple = onEquipoOrdenChangeMultiple;
   window.toggleCombo = toggleCombo;

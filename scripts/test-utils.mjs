@@ -1808,9 +1808,64 @@ assert.doesNotThrow(() => {
   renderPortalUsuariosList();
 }, 'Las funciones de sitios_clientes no deben arrojar error en ausencia de DOM');
 
-console.log('  ✅ Sitios de Obra, Subvistas de Clientes y Portal de Usuarios: OK');
+// 47. MÓDULO DE MIGRACIONES DE DATOS Y CHIPS DE MÁQUINAS EN TICKETS
+console.log('🧪 Verificando Módulo de Migraciones y Tickets Form (app_migrations.js / tickets_form.js)...');
+const {
+  generarTicketsRefaccionesFaltantes,
+  migrarOrdenesExistentesMaquinaria,
+  migrarUbicacionesMaquinariaDesdeTickets,
+  recuperarMaquinariaDesdeTickets,
+  reintentarSincronizacionGastosLocales
+} = await import('../src/modules/app_migrations.js');
+const {
+  agregarMaquinaChip
+} = await import('../src/modules/tickets_form.js');
+
+// Test A: Existencia y firma de funciones
+assert.equal(typeof generarTicketsRefaccionesFaltantes, 'function', 'generarTicketsRefaccionesFaltantes debe ser función');
+assert.equal(typeof migrarOrdenesExistentesMaquinaria, 'function', 'migrarOrdenesExistentesMaquinaria debe ser función');
+assert.equal(typeof migrarUbicacionesMaquinariaDesdeTickets, 'function', 'migrarUbicacionesMaquinariaDesdeTickets debe ser función');
+assert.equal(typeof recuperarMaquinariaDesdeTickets, 'function', 'recuperarMaquinariaDesdeTickets debe ser función');
+assert.equal(typeof reintentarSincronizacionGastosLocales, 'function', 'reintentarSincronizacionGastosLocales debe ser función');
+assert.equal(typeof agregarMaquinaChip, 'function', 'agregarMaquinaChip debe ser función');
+
+// Test B: generarTicketsRefaccionesFaltantes genera ticket para orden con refacciones pendientes
+globalThis.window.ordenes = [
+  {
+    id: 'ord_test_99',
+    folio: 'OS-999',
+    cliente: 'Constructora Alfa',
+    ubicacion: 'Sitio Norte',
+    tecnico: 'Juan Pérez',
+    ref_necesarias: [
+      { clave: 'FLT-01', descripcion: 'Filtro Hidráulico', cantidad: 2, marca: 'CAT' }
+    ]
+  }
+];
+globalThis.window.tickets = [];
+await generarTicketsRefaccionesFaltantes();
+
+assert.equal(globalThis.window.tickets.length, 1, 'Debe generarse exactamente 1 ticket para la orden');
+const tktGenerado = globalThis.window.tickets[0];
+assert.equal(tktGenerado.folio, 'TKT-OS-999-A', 'El folio generado debe ser TKT-OS-999-A');
+assert.equal(tktGenerado.cliente, 'Constructora Alfa', 'El cliente del ticket debe coincidir');
+assert.equal(tktGenerado.categoria, 'Refacción', 'La categoría del ticket debe ser Refacción');
+assert.equal(tktGenerado.refaccionesSeleccionadas.length, 1, 'Debe incluir las refacciones mapeadas');
+assert.equal(tktGenerado.refaccionesSeleccionadas[0].clave, 'FLT-01', 'La clave de refacción debe coincidir');
+
+// Test C: Invocación defensiva en Node.js (sin DOM)
+assert.doesNotThrow(() => {
+  migrarOrdenesExistentesMaquinaria();
+  migrarUbicacionesMaquinariaDesdeTickets();
+  recuperarMaquinariaDesdeTickets();
+  reintentarSincronizacionGastosLocales();
+  agregarMaquinaChip('MOCK-MAQ-1');
+}, 'Las funciones de migraciones y agregarMaquinaChip no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Migraciones de Catálogos, Generación de Tickets de Refacciones y Chips: OK');
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
+
 
 
 

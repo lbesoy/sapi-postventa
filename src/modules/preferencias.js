@@ -9,7 +9,20 @@
  * 4. Modal de Diagrama de Flujo Interactivo con Zoom y Filtros de Ruta
  */
 
-import { safeGetJSON } from '../utils.js';
+function safeGetJSON(key, defaultVal) {
+  if (typeof window !== 'undefined' && typeof window.safeGetJSON === 'function') {
+    return window.safeGetJSON(key, defaultVal);
+  }
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const val = localStorage.getItem(key);
+      return val ? JSON.parse(val) : defaultVal;
+    }
+    return defaultVal;
+  } catch (e) {
+    return defaultVal;
+  }
+}
 
 let currentDiagramZoom = 1;
 
