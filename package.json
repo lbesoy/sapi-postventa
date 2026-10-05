@@ -1,10 +1,12 @@
 {
   "scripts": {
     "dev": "vite",
+    "dev:3005": "vite --port 3005",
     "dev:serve": "npx -y serve . -l 5000",
     "build:vite": "vite build",
     "preview": "vite preview",
     "backend": "node backend/server.js",
+    "backend:3005": "PORT=3005 node backend/server.js",
     "check": "node scripts/verify-assets.js",
     "test": "node scripts/test-utils.mjs"
   },

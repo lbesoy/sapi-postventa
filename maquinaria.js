@@ -1571,54 +1571,92 @@ function renderRefacciones(resetPage = false) {
     ? window.refaccionesDb
     : ((typeof refaccionesDb !== 'undefined' && Array.isArray(refaccionesDb) && refaccionesDb.length > 0) ? refaccionesDb : []);
 
-  // Si aún está vacío en memoria, intentar cargar desde IndexedDB reactivamente
-  if (catalogo.length === 0 && typeof window !== 'undefined' && typeof window.loadRefaccionesLocal === 'function' && !window._cargandoRefaccionesLocal) {
+  // Si aún está vacío en memoria, intentar cargar desde IndexedDB o Supabase reactivamente
+  if (catalogo.length === 0 && typeof window !== 'undefined' && !window._cargandoRefaccionesLocal) {
     window._cargandoRefaccionesLocal = true;
-    window.loadRefaccionesLocal().then(data => {
-      window._cargandoRefaccionesLocal = false;
-      if (data && data.length > 0) {
-        window.refaccionesDb = data;
-        if (typeof refaccionesDb !== 'undefined') refaccionesDb = data;
-        console.log(`[renderRefacciones] Catálogo recuperado reactivamente desde IndexedDB (${data.length} registros).`);
+    
+    // Ocultar footer mientras carga
+    const footerEl = document.getElementById('refacciones-footer');
+    if (footerEl) footerEl.style.display = 'none';
+
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--text-muted);"><i data-lucide="loader" class="spin"></i> Cargando catálogo de refacciones...</td></tr>';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    const fetchDirectoSupabase = async () => {
+      const sb = window.supabaseClient;
+      if (!sb) return [];
+      try {
+        let allRef = [];
+        let page = 0;
+        let fetchMore = true;
+        while (fetchMore) {
+          const { data: chunk, error } = await sb.from('refacciones').select('*').range(page * 1000, (page + 1) * 1000 - 1);
+          if (!error && chunk && chunk.length > 0) {
+            allRef = allRef.concat(chunk);
+            if (chunk.length < 1000) fetchMore = false;
+            else page++;
+          } else {
+            fetchMore = false;
+          }
+        }
+        if (allRef.length > 0) {
+          const mapped = allRef.map(r => ({
+            id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, 
+            marca: r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.custom_data?.marca || '', 
+            grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
+            ItmsGrpCod: r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
+          }));
+          return mapped;
+        }
+      } catch (e) {
+        console.warn('[renderRefacciones] Error descargando de Supabase:', e);
+      }
+      return [];
+    };
+
+    (async () => {
+      try {
+        let data = [];
+        if (typeof window.loadRefaccionesLocal === 'function') {
+          data = await window.loadRefaccionesLocal().catch(() => []);
+        }
+        if (!data || data.length === 0) {
+          console.log('[renderRefacciones] IndexedDB vacío. Consultando directamente a Supabase...');
+          data = await fetchDirectoSupabase();
+        }
+        if (data && data.length > 0) {
+          window.refaccionesDb = data;
+          if (typeof refaccionesDb !== 'undefined') refaccionesDb = data;
+          if (typeof window.saveRefaccionesLocal === 'function') await window.saveRefaccionesLocal(data);
+          console.log(`[renderRefacciones] Catálogo recuperado (${data.length} registros).`);
+        }
+      } catch (err) {
+        console.warn('[renderRefacciones] Error al recuperar catálogo:', err);
+      } finally {
+        window._cargandoRefaccionesLocal = false;
         renderRefacciones();
       }
-    }).catch(err => {
-      window._cargandoRefaccionesLocal = false;
-      console.warn('[renderRefacciones] Error al cargar refacciones desde IndexedDB:', err);
-    });
+    })();
+    return;
   }
 
-  // Mapa de códigos → nombre completo (para resolver datos del caché de Supabase)
-  const MARCAS_RENDER = {
-    'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING',
-    'CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE',
-    'OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER',
-    'RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL',
-    'SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER',
-    'KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA',
-    'EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
-  };
-  // Mapa de código numérico de grupo → nombre (exacto de SAP)
-  const GRUPOS_RENDER = {
-    101: 'Refacciones Cimentación',
-    102: 'Refacciones Plantas Concreto',
-    103: 'Refacciones Trituracion SAPI',
-    104: 'Refacciones Concreto',
-    105: 'Refacciones Ollas Revolvedoras',
-    106: 'Refacciones Bombas Concreto',
-    108: 'Herramienta',
-    109: 'Tubería',
-    110: 'Refacciones King Kong',
-    111: 'Anticipo'
-  };
-
   if (catalogo.length === 0 && window._cargandoRefaccionesLocal) {
+    const footerEl = document.getElementById('refacciones-footer');
+    if (footerEl) footerEl.style.display = 'none';
     body.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--text-muted);"><i data-lucide="loader" class="spin"></i> Cargando catálogo de refacciones...</td></tr>';
     if (typeof lucide !== 'undefined') lucide.createIcons();
     return;
   }
 
   console.log(`[renderRefacciones] refaccionesDb length: ${catalogo.length}`);
+
+  const MARCAS_RENDER = {
+    'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM',
+    'MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS',
+    'TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM',
+    'POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG',
+    'HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
+  };
 
   // Filtrar: sin marca → excluir; busqueda
   const filtered = catalogo.filter(r => {
@@ -1705,6 +1743,7 @@ function renderRefacciones(resetPage = false) {
     footer.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:0.75rem 1rem; font-size:0.82rem; color:var(--text-muted); border-top:1px solid var(--border); flex-wrap:wrap; gap:0.5rem;';
     body.closest('.table-wrapper')?.after(footer);
   }
+  footer.style.display = total > 0 ? 'flex' : 'none';
   footer.innerHTML = `
     <span>Mostrando <strong>${start + 1}–${Math.min(start + REFACCIONES_PAGE_SIZE, total)}</strong> de <strong>${total}</strong> refacciones</span>
     <div style="display:flex; gap:0.5rem; align-items:center;">

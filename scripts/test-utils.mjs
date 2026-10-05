@@ -1076,6 +1076,63 @@ assert.doesNotThrow(() => {
 
 console.log('  ✅ Configuración de Permisos, Roles y Técnicos: OK');
 
+console.log('Test 35: Automatización de Estados, Reportes PDF y Envío de Órdenes');
+const {
+  calcularEstadoOrden,
+  cerrarDetalle,
+  generarBase64Pdf,
+  toggleCampoCorreo,
+  ejecutarComandoEditor,
+  abrirPaletaColor,
+  ejecutarColorEditor,
+  imprimirOrden,
+  enviarCorreoOrden,
+  cerrarModalCorreo,
+  procesarEnviarCorreo
+} = await import('../src/modules/ordenes_estados.js');
+
+// Test A: Funciones existen
+assert.equal(typeof calcularEstadoOrden, 'function', 'calcularEstadoOrden debe ser función');
+assert.equal(typeof cerrarDetalle, 'function', 'cerrarDetalle debe ser función');
+assert.equal(typeof generarBase64Pdf, 'function', 'generarBase64Pdf debe ser función');
+assert.equal(typeof toggleCampoCorreo, 'function', 'toggleCampoCorreo debe ser función');
+assert.equal(typeof ejecutarComandoEditor, 'function', 'ejecutarComandoEditor debe ser función');
+assert.equal(typeof abrirPaletaColor, 'function', 'abrirPaletaColor debe ser función');
+assert.equal(typeof ejecutarColorEditor, 'function', 'ejecutarColorEditor debe ser función');
+assert.equal(typeof imprimirOrden, 'function', 'imprimirOrden debe ser función');
+assert.equal(typeof enviarCorreoOrden, 'function', 'enviarCorreoOrden debe ser función');
+assert.equal(typeof cerrarModalCorreo, 'function', 'cerrarModalCorreo debe ser función');
+assert.equal(typeof procesarEnviarCorreo, 'function', 'procesarEnviarCorreo debe ser función');
+
+// Test B: Reglas de negocio de calcularEstadoOrden
+assert.equal(calcularEstadoOrden({}), 'Pendiente', 'Orden sin datos debe ser Pendiente');
+assert.equal(calcularEstadoOrden({ trabajos: 'Ajuste de frenos' }), 'En proceso', 'Orden con trabajos debe ser En proceso');
+assert.equal(calcularEstadoOrden({ bitacora: [{ fecha: '2026-10-05' }] }), 'En proceso', 'Orden con bitacora debe ser En proceso');
+assert.equal(calcularEstadoOrden({ firma_tecnico_base64: 'data:image/png;base64,abc' }), 'En proceso', 'Orden con firma técnico debe ser En proceso');
+assert.equal(calcularEstadoOrden({
+  firma_cliente_base64: 'data:image/png;base64,xyz',
+  ref_necesarias: [{ descripcion: 'Bomba', cantidad: 1 }]
+}), 'Refacciones pendientes', 'Orden firmada con ref_necesarias debe ser Refacciones pendientes');
+assert.equal(calcularEstadoOrden({
+  firma_cliente_base64: 'data:image/png;base64,xyz',
+  ref_necesarias: []
+}), 'Completado', 'Orden firmada sin ref_necesarias debe ser Completado');
+
+// Test C: Invocación defensiva en Node.js (sin DOM)
+assert.doesNotThrow(() => {
+  cerrarDetalle(null);
+  toggleCampoCorreo('cc');
+  ejecutarComandoEditor('bold');
+  abrirPaletaColor(null, 'foreColor');
+  ejecutarColorEditor('foreColor', '#ff0000');
+  imprimirOrden();
+  enviarCorreoOrden('ord-123');
+  cerrarModalCorreo();
+  procesarEnviarCorreo(null);
+}, 'Las funciones de ordenes_estados no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Automatización de Estados, Reportes PDF y Envío de Órdenes: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 
