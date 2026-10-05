@@ -1403,6 +1403,70 @@ assert.doesNotThrow(() => {
 
 console.log('  ✅ Detalle, Comentarios y Adjuntos de Tickets: OK');
 
+console.log('Test 40: Detalle, Evidencias Fotográficas y Canvas de Firmas de Órdenes');
+const {
+  renderEvidenciasFotograficas,
+  previsualizarImagenCompleta,
+  abrirImagenEnPestana,
+  subirEvidenciaFoto,
+  subirFotoRefaccion,
+  eliminarEvidenciaFoto,
+  verDetalle,
+  agregarRenglonTecnicoCierre,
+  abrirCierrePapel,
+  cerrarCierrePapel,
+  confirmarCierrePapel,
+  inicializarCanvasFirma,
+  borrarCanvasFirma,
+  guardarFirmaCanvas,
+  limpiarFirma
+} = await import('../src/modules/ordenes_detalle.js');
+
+// Test A: Existencia y tipo de las funciones exportadas
+assert.equal(typeof renderEvidenciasFotograficas, 'function', 'renderEvidenciasFotograficas debe ser función');
+assert.equal(typeof previsualizarImagenCompleta, 'function', 'previsualizarImagenCompleta debe ser función');
+assert.equal(typeof abrirImagenEnPestana, 'function', 'abrirImagenEnPestana debe ser función');
+assert.equal(typeof subirEvidenciaFoto, 'function', 'subirEvidenciaFoto debe ser función');
+assert.equal(typeof subirFotoRefaccion, 'function', 'subirFotoRefaccion debe ser función');
+assert.equal(typeof eliminarEvidenciaFoto, 'function', 'eliminarEvidenciaFoto debe ser función');
+assert.equal(typeof verDetalle, 'function', 'verDetalle debe ser función');
+assert.equal(typeof agregarRenglonTecnicoCierre, 'function', 'agregarRenglonTecnicoCierre debe ser función');
+assert.equal(typeof abrirCierrePapel, 'function', 'abrirCierrePapel debe ser función');
+assert.equal(typeof cerrarCierrePapel, 'function', 'cerrarCierrePapel debe ser función');
+assert.equal(typeof confirmarCierrePapel, 'function', 'confirmarCierrePapel debe ser función');
+assert.equal(typeof inicializarCanvasFirma, 'function', 'inicializarCanvasFirma debe ser función');
+assert.equal(typeof borrarCanvasFirma, 'function', 'borrarCanvasFirma debe ser función');
+assert.equal(typeof guardarFirmaCanvas, 'function', 'guardarFirmaCanvas debe ser función');
+assert.equal(typeof limpiarFirma, 'function', 'limpiarFirma debe ser función');
+
+// Test B: renderEvidenciasFotograficas genera HTML para orden
+const dummyOrden = {
+  id: 'ord-test-1',
+  estado: 'En Proceso',
+  evidencias: {
+    fotoInicio: 'data:image/webp;base64,AAAA',
+    fotoFin: null,
+    adicionales: []
+  }
+};
+const evHtml = renderEvidenciasFotograficas(dummyOrden);
+assert.ok(typeof evHtml === 'string', 'renderEvidenciasFotograficas debe retornar string HTML');
+
+// Test C: Invocación defensiva en Node.js (sin DOM)
+assert.doesNotThrow(() => {
+  previsualizarImagenCompleta('https://example.com/foto.jpg', 'Prueba');
+  abrirImagenEnPestana('ticket-id');
+  verDetalle('ORD-NONEXISTENT');
+  agregarRenglonTecnicoCierre();
+  abrirCierrePapel('ord-1');
+  cerrarCierrePapel({ preventDefault: () => {} });
+  inicializarCanvasFirma('cliente');
+  borrarCanvasFirma('cliente');
+  guardarFirmaCanvas('ord-1', 'cliente');
+}, 'Las funciones de ordenes_detalle no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Detalle, Evidencias Fotográficas y Canvas de Firmas de Órdenes: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 
