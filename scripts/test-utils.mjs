@@ -1616,6 +1616,81 @@ assert.doesNotThrow(() => {
 
 console.log('  ✅ Listados, Filtros, Menús de Ordenación y Tabla de Órdenes: OK');
 
+// ============================================================================
+// TEST 44: Ideas, Fallas, Mejoras y Priorización Drag & Drop
+// ============================================================================
+console.log('Test 44: Ideas, Fallas, Mejoras y Priorización Drag & Drop');
+const {
+  editandoIdeaFallaId,
+  ifArchivosAdjuntosTemp,
+  renderIfArchivosPreview,
+  eliminarIfArchivoTemp,
+  handleIfFilesSelect,
+  handleIfFilesDrop,
+  procesarFilesIf,
+  abrirModalResolucionIdeaFalla,
+  cerrarModalResolucionIdeaFalla,
+  guardarResolucionIdeaFalla,
+  puedeEditarIdeaFalla,
+  abrirModalIdeaFalla,
+  cerrarModalIdeaFalla,
+  guardarIdeaFalla,
+  cambiarEstadoIdeaFalla,
+  eliminarIdeaFalla,
+  filtrarIdeaFallaPorKpi,
+  renderIdeasFallas,
+  cambiarPrioridadIdeaFalla,
+  handleDragStart,
+  handleDragOver,
+  handleDragEnter,
+  handleDragLeave,
+  handleDrop,
+  sincronizarConGitHub
+} = await import('../src/modules/ideas_fallas.js');
+
+// Test A: Funciones y exports existen
+assert.equal(typeof puedeEditarIdeaFalla, 'function', 'puedeEditarIdeaFalla debe ser función');
+assert.equal(typeof abrirModalIdeaFalla, 'function', 'abrirModalIdeaFalla debe ser función');
+assert.equal(typeof cerrarModalIdeaFalla, 'function', 'cerrarModalIdeaFalla debe ser función');
+assert.equal(typeof guardarIdeaFalla, 'function', 'guardarIdeaFalla debe ser función');
+assert.equal(typeof cambiarEstadoIdeaFalla, 'function', 'cambiarEstadoIdeaFalla debe ser función');
+assert.equal(typeof eliminarIdeaFalla, 'function', 'eliminarIdeaFalla debe ser función');
+assert.equal(typeof renderIdeasFallas, 'function', 'renderIdeasFallas debe ser función');
+assert.equal(typeof sincronizarConGitHub, 'function', 'sincronizarConGitHub debe ser función');
+
+// Test B: Regla de negocio de puedeEditarIdeaFalla
+// Caso sin sesión: false
+globalThis.window = globalThis.window || {};
+globalThis.window.currentSession = null;
+assert.equal(puedeEditarIdeaFalla({ creado_por_id: 'usr-1' }), false, 'Sin sesión no debe permitir editar');
+
+// Caso sesión Superadmin: siempre true
+globalThis.window.currentSession = { viewMode: 'superadmin', userId: 'super-1', nombre: 'Admin' };
+assert.equal(puedeEditarIdeaFalla({ creado_por_id: 'usr-1', creado_por: 'Otro' }), true, 'Superadmin siempre puede editar');
+
+// Caso sesión normal mismo autor: true
+globalThis.window.currentSession = { viewMode: 'tecnico', userId: 'tec-1', nombre: 'Juan Pérez' };
+globalThis.window.usuarios = [{ id: 'tec-1', nombre: 'Juan Pérez' }];
+assert.equal(puedeEditarIdeaFalla({ creado_por_id: 'tec-1' }), true, 'El creador debe poder editar');
+assert.equal(puedeEditarIdeaFalla({ creado_por_id: 'tec-2', creado_por: 'Pedro' }), false, 'Otro usuario no debe poder editar');
+
+// Test C: Invocación defensiva en Node.js (sin DOM)
+assert.doesNotThrow(() => {
+  renderIfArchivosPreview();
+  eliminarIfArchivoTemp(0);
+  abrirModalResolucionIdeaFalla('test-1');
+  cerrarModalResolucionIdeaFalla();
+  abrirModalIdeaFalla('test-1');
+  cerrarModalIdeaFalla();
+  renderIdeasFallas();
+  filtrarIdeaFallaPorKpi('ideas');
+  filtrarIdeaFallaPorKpi('fallas');
+  filtrarIdeaFallaPorKpi('pendientes');
+  filtrarIdeaFallaPorKpi('completados');
+}, 'Las funciones de ideas_fallas no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Ideas, Fallas, Mejoras y Priorización Drag & Drop: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 
