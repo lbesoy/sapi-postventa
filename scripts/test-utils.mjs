@@ -1645,7 +1645,7 @@ const {
   handleDragEnter,
   handleDragLeave,
   handleDrop,
-  sincronizarConGitHub
+  sincronizarConGitHub: syncGithubModule
 } = await import('../src/modules/ideas_fallas.js');
 
 // Test A: Funciones y exports existen
@@ -1656,7 +1656,7 @@ assert.equal(typeof guardarIdeaFalla, 'function', 'guardarIdeaFalla debe ser fun
 assert.equal(typeof cambiarEstadoIdeaFalla, 'function', 'cambiarEstadoIdeaFalla debe ser función');
 assert.equal(typeof eliminarIdeaFalla, 'function', 'eliminarIdeaFalla debe ser función');
 assert.equal(typeof renderIdeasFallas, 'function', 'renderIdeasFallas debe ser función');
-assert.equal(typeof sincronizarConGitHub, 'function', 'sincronizarConGitHub debe ser función');
+assert.equal(typeof syncGithubModule, 'function', 'syncGithubModule debe ser función');
 
 // Test B: Regla de negocio de puedeEditarIdeaFalla
 // Caso sin sesión: false
@@ -1690,6 +1690,73 @@ assert.doesNotThrow(() => {
 }, 'Las funciones de ideas_fallas no deben arrojar error en ausencia de DOM');
 
 console.log('  ✅ Ideas, Fallas, Mejoras y Priorización Drag & Drop: OK');
+
+// ============================================================================
+// TEST 45: Preferencias, Configuración General, Recuperación de Contraseña y Diagrama de Flujo
+// ============================================================================
+console.log('Test 45: Preferencias, Configuración General, Recuperación de Contraseña y Diagrama de Flujo');
+const {
+  cargarConfig,
+  guardarConfig,
+  toggleOneDriveDemoMode,
+  guardarOneDriveConfig,
+  initTableResizers,
+  inicializarTableResizersEvent,
+  inicializarPasswordRecovery,
+  abrirRecuperarPassword,
+  volverLoginDesdeRecovery,
+  enviarRecoveryLink,
+  guardarNuevaPassword,
+  abrirModalDiagramaFlujo,
+  cerrarModalDiagramaFlujo,
+  zoomDiagramaFlujo,
+  resetZoomDiagramaFlujo,
+  toggleSimbologiaFlujo,
+  filtrarRutaDiagrama
+} = await import('../src/modules/preferencias.js');
+
+// Test A: Funciones y exports existen
+assert.equal(typeof cargarConfig, 'function', 'cargarConfig debe ser función');
+assert.equal(typeof guardarConfig, 'function', 'guardarConfig debe ser función');
+assert.equal(typeof toggleOneDriveDemoMode, 'function', 'toggleOneDriveDemoMode debe ser función');
+assert.equal(typeof guardarOneDriveConfig, 'function', 'guardarOneDriveConfig debe ser función');
+assert.equal(typeof initTableResizers, 'function', 'initTableResizers debe ser función');
+assert.equal(typeof inicializarPasswordRecovery, 'function', 'inicializarPasswordRecovery debe ser función');
+assert.equal(typeof abrirRecuperarPassword, 'function', 'abrirRecuperarPassword debe ser función');
+assert.equal(typeof abrirModalDiagramaFlujo, 'function', 'abrirModalDiagramaFlujo debe ser función');
+assert.equal(typeof zoomDiagramaFlujo, 'function', 'zoomDiagramaFlujo debe ser función');
+assert.equal(typeof resetZoomDiagramaFlujo, 'function', 'resetZoomDiagramaFlujo debe ser función');
+
+// Test B: Lógica de zoom con límites min/max
+resetZoomDiagramaFlujo();
+assert.equal(resetZoomDiagramaFlujo(), 1, 'resetZoomDiagramaFlujo debe restablecer el zoom a 1');
+const zoomPlus = zoomDiagramaFlujo(0.2);
+assert.ok(Math.abs(zoomPlus - 1.2) < 0.001, 'zoomDiagramaFlujo(+0.2) debe dar 1.2');
+const zoomMax = zoomDiagramaFlujo(10);
+assert.equal(zoomMax, 1.8, 'zoomDiagramaFlujo debe limitar a máximo 1.8');
+const zoomMin = zoomDiagramaFlujo(-10);
+assert.equal(zoomMin, 0.6, 'zoomDiagramaFlujo debe limitar a mínimo 0.6');
+resetZoomDiagramaFlujo();
+
+// Test C: Invocación defensiva en Node.js (sin DOM)
+assert.doesNotThrow(() => {
+  cargarConfig();
+  guardarConfig();
+  toggleOneDriveDemoMode();
+  guardarOneDriveConfig();
+  initTableResizers();
+  inicializarTableResizersEvent();
+  inicializarPasswordRecovery();
+  abrirRecuperarPassword();
+  volverLoginDesdeRecovery();
+  abrirModalDiagramaFlujo();
+  cerrarModalDiagramaFlujo();
+  toggleSimbologiaFlujo();
+  filtrarRutaDiagrama('normal');
+  filtrarRutaDiagrama('garantia');
+}, 'Las funciones de preferencias no deben arrojar error en ausencia de DOM');
+
+console.log('  ✅ Preferencias, Configuración General, Recuperación de Contraseña y Diagrama de Flujo: OK');
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 

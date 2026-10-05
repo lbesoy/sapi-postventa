@@ -2444,57 +2444,9 @@ if (!configData || !configData.queryClientes) {
 
 let tecnicosConfig = safeGetJSON('eurorep_tecnicos', []);
 
-function cargarConfig() {
-  // Las opciones de query se cargarán de forma asíncrona pero las pedimos primero si estamos en configuración.
-  // Sin embargo, si abrimos la configuración manual, las volvemos a cargar.
-  
-  if (configData.empresa) document.getElementById('cfg-empresa').value = configData.empresa;
-  if (configData.rfc) document.getElementById('cfg-rfc').value = configData.rfc;
-  if (configData.tel) document.getElementById('cfg-tel').value = configData.tel;
-  if (configData.email) document.getElementById('cfg-email').value = configData.email;
-  if (configData.direccion) document.getElementById('cfg-direccion').value = configData.direccion;
-  if (configData.queryMaquinaria) document.getElementById('cfg-query-maquinaria').value = configData.queryMaquinaria;
-  if (configData.querySitios) document.getElementById('cfg-query-sitios').value = configData.querySitios;
-  if (configData.queryOrdenes) document.getElementById('cfg-query-ordenes').value = configData.queryOrdenes;
-
-  if (configData.queryRefacciones) document.getElementById('cfg-query-refacciones').value = configData.queryRefacciones;
-
-
-  const dmToggle = document.getElementById('cfg-darkmode');
-  if (dmToggle) {
-    dmToggle.checked = localStorage.getItem('eurorep_darkmode') !== 'false';
-    dmToggle.addEventListener('change', (e) => {
-      if (e.target.checked) {
-        document.body.classList.remove('light-mode');
-        localStorage.setItem('eurorep_darkmode', 'true');
-      } else {
-        document.body.classList.add('light-mode');
-        localStorage.setItem('eurorep_darkmode', 'false');
-      }
-    });
-  }
-
-  // Cargar configuración de OneDrive
-  const odClientId = configData.onedriveClientId || 'MOCK';
-  const odForceMock = configData.onedriveForceMock !== false;
-  const odFolderId = configData.onedriveFolderId || '';
-  const odFolderConciliadosId = configData.onedriveFolderConciliadosId || '';
-  
-  const inputOdClientId = document.getElementById('cfg-onedrive-client-id');
-  const inputOdForceMock = document.getElementById('cfg-onedrive-force-mock');
-  const inputOdFolderId = document.getElementById('cfg-onedrive-folder-id');
-  const inputOdFolderConciliadosId = document.getElementById('cfg-onedrive-folder-conciliados-id');
-  
-  if (inputOdClientId) inputOdClientId.value = odClientId;
-  if (inputOdFolderId) inputOdFolderId.value = odFolderId;
-  if (inputOdFolderConciliadosId) inputOdFolderConciliadosId.value = odFolderConciliadosId;
-  if (inputOdForceMock) {
-    inputOdForceMock.checked = odForceMock;
-    setTimeout(() => { window.toggleOneDriveDemoMode(); }, 0);
-  }
-  
-  if (typeof renderIdeasFallas === 'function') {
-    renderIdeasFallas();
+function cargarConfig(...args) {
+  if (typeof window !== "undefined" && typeof window.cargarConfig === "function" && window.cargarConfig !== cargarConfig) {
+    return window.cargarConfig(...args);
   }
 }
 
@@ -2552,82 +2504,21 @@ function sincronizarConGitHub(...args) {
     return window.sincronizarConGitHub(...args);
   }
 }
-function guardarConfig() {
-
-  configData = {
-    empresa: document.getElementById('cfg-empresa').value.trim(),
-    rfc: document.getElementById('cfg-rfc').value.trim(),
-    tel: document.getElementById('cfg-tel').value.trim(),
-    email: document.getElementById('cfg-email').value.trim(),
-    direccion: document.getElementById('cfg-direccion').value.trim(),
-    queryClientes: document.getElementById('cfg-query-clientes').value.trim(),
-    queryMaquinaria: document.getElementById('cfg-query-maquinaria').value.trim(),
-    querySitios: document.getElementById('cfg-query-sitios').value.trim(),
-    queryOrdenes: document.getElementById('cfg-query-ordenes').value.trim(),
-    queryRefacciones: document.getElementById('cfg-query-refacciones').value.trim()
-  };
-
-  localStorage.setItem('eurorep_config', JSON.stringify(configData));
-  if (window.pushToSupabase) window.pushToSupabase('config', configData);
-  const btn = event.target;
-  const orig = btn.innerHTML;
-  btn.innerHTML = '<i data-lucide="check" class="btn-icon"></i> Guardado';
-  btn.style.background = 'var(--green)';
-  lucide.createIcons();
-  setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; lucide.createIcons(); }, 2000);
-}
-
-window.toggleOneDriveDemoMode = function() {
-  const checkbox = document.getElementById('cfg-onedrive-force-mock');
-  const container = document.getElementById('onedrive-redirect-uri-container');
-  const folderContainer = document.getElementById('onedrive-folder-id-container');
-  const conciliadosContainer = document.getElementById('onedrive-folder-conciliados-id-container');
-  const text = document.getElementById('onedrive-redirect-uri-text');
-  
-  if (!checkbox) return;
-  
-  if (checkbox.checked) {
-    if (container) container.style.display = 'none';
-    if (folderContainer) folderContainer.style.display = 'none';
-    if (conciliadosContainer) conciliadosContainer.style.display = 'none';
-  } else {
-    if (container) container.style.display = 'block';
-    if (folderContainer) folderContainer.style.display = 'block';
-    if (conciliadosContainer) conciliadosContainer.style.display = 'block';
-    if (text) {
-      text.textContent = window.location.origin;
-    }
+function guardarConfig(...args) {
+  if (typeof window !== "undefined" && typeof window.guardarConfig === "function" && window.guardarConfig !== guardarConfig) {
+    return window.guardarConfig(...args);
   }
-};
-
-window.guardarOneDriveConfig = function() {
-  const clientId = document.getElementById('cfg-onedrive-client-id').value.trim();
-  const forceMock = document.getElementById('cfg-onedrive-force-mock').checked;
-  const folderId = document.getElementById('cfg-onedrive-folder-id')?.value.trim() || '';
-  const folderConciliadosId = document.getElementById('cfg-onedrive-folder-conciliados-id')?.value.trim() || '';
-
-  configData.onedriveClientId = clientId || 'MOCK';
-  configData.onedriveForceMock = forceMock;
-  configData.onedriveFolderId = folderId;
-  configData.onedriveFolderConciliadosId = folderConciliadosId;
-
-  localStorage.setItem('eurorep_config', JSON.stringify(configData));
-  if (window.pushToSupabase) window.pushToSupabase('config', configData);
-
-  const btn = event.target;
-  const orig = btn.innerHTML;
-  btn.innerHTML = '<i data-lucide="check" class="btn-icon"></i> Guardado';
-  btn.style.background = 'var(--green)';
-  lucide.createIcons();
-  
-  mostrarNotificacion('Configuración de OneDrive guardada correctamente.', 'success');
-  
-  setTimeout(() => { 
-    btn.innerHTML = orig; 
-    btn.style.background = ''; 
-    lucide.createIcons(); 
-  }, 2000);
-};
+}
+function toggleOneDriveDemoMode(...args) {
+  if (typeof window !== "undefined" && typeof window.toggleOneDriveDemoMode === "function" && window.toggleOneDriveDemoMode !== toggleOneDriveDemoMode) {
+    return window.toggleOneDriveDemoMode(...args);
+  }
+}
+function guardarOneDriveConfig(...args) {
+  if (typeof window !== "undefined" && typeof window.guardarOneDriveConfig === "function" && window.guardarOneDriveConfig !== guardarOneDriveConfig) {
+    return window.guardarOneDriveConfig(...args);
+  }
+}
 
 // =========================================================================
 // MÓDULO MAPEO DE COLUMNAS SAP Y QUERIES SQL (NO-CODE)
@@ -4175,83 +4066,19 @@ async function guardarSitioCliente(e) {
 }
 
 // ===== COLUMNAS AJUSTABLES =====
-function initTableResizers() {
-  const tables = document.querySelectorAll('.data-table');
-  tables.forEach((table, tableIndex) => {
-    const theadRow = table.querySelector('thead tr');
-    if (!theadRow) return;
-
-    // Load saved widths
-    const storageKey = `table_widths_${tableIndex}`;
-    const savedWidths = JSON.parse(localStorage.getItem(storageKey) || '{}');
-
-    Array.from(theadRow.children).forEach((th, thIndex) => {
-      // Evitar duplicar
-      if (th.querySelector('.column-resizer')) {
-        th.querySelector('.column-resizer').remove();
-      }
-
-      th.style.position = 'relative';
-      
-      // Apply saved width if exists
-      if (savedWidths[thIndex]) {
-        th.style.width = savedWidths[thIndex];
-        th.style.minWidth = savedWidths[thIndex];
-      } else {
-        const currentWidth = window.getComputedStyle(th).width;
-        if (currentWidth && currentWidth !== '0px' && currentWidth !== 'auto') {
-          th.style.minWidth = currentWidth;
-        }
-      }
-
-      const resizer = document.createElement('div');
-      resizer.classList.add('column-resizer');
-      resizer.style.width = '6px';
-      resizer.style.height = '100%';
-      resizer.style.position = 'absolute';
-      resizer.style.right = '0';
-      resizer.style.top = '0';
-      resizer.style.cursor = 'col-resize';
-      resizer.style.userSelect = 'none';
-      resizer.style.zIndex = '1';
-      
-      resizer.addEventListener('mouseenter', () => resizer.style.borderRight = '2px solid var(--accent)');
-      resizer.addEventListener('mouseleave', () => resizer.style.borderRight = 'none');
-      
-      th.appendChild(resizer);
-      
-      let startX = 0;
-      let startWidth = 0;
-      
-      const mouseMoveHandler = function(e) {
-        const dx = e.clientX - startX;
-        const newWidth = `${startWidth + dx}px`;
-        th.style.width = newWidth;
-        th.style.minWidth = newWidth;
-      };
-      
-      const mouseUpHandler = function() {
-        document.removeEventListener('mousemove', mouseMoveHandler);
-        document.removeEventListener('mouseup', mouseUpHandler);
-        
-        // Save new width
-        savedWidths[thIndex] = th.style.width;
-        localStorage.setItem(storageKey, JSON.stringify(savedWidths));
-      };
-      
-      resizer.addEventListener('mousedown', function(e) {
-        startX = e.clientX;
-        startWidth = th.offsetWidth;
-        document.addEventListener('mousemove', mouseMoveHandler);
-        document.addEventListener('mouseup', mouseUpHandler);
-        e.stopPropagation(); // Evita que se active el sort al arrastrar
-      });
-    });
-  });
+// ============================================================
+// REDIMENSIONAMIENTO DE TABLAS
+// Extraído modularmente a preferencias.js / src/modules/preferencias.js
+// ============================================================
+function initTableResizers(...args) {
+  if (typeof window !== "undefined" && typeof window.initTableResizers === "function" && window.initTableResizers !== initTableResizers) {
+    return window.initTableResizers(...args);
+  }
 }
-
-function inicializarTableResizersEvent() {
-  setTimeout(initTableResizers, 500);
+function inicializarTableResizersEvent(...args) {
+  if (typeof window !== "undefined" && typeof window.inicializarTableResizersEvent === "function" && window.inicializarTableResizersEvent !== inicializarTableResizersEvent) {
+    return window.inicializarTableResizersEvent(...args);
+  }
 }
 
 
@@ -4262,110 +4089,33 @@ function inicializarTableResizersEvent() {
 
 // ===== PASSWORD RECOVERY FLOW =====
 
-function inicializarPasswordRecovery() {
-  if (window.supabaseClient) {
-    window.supabaseClient.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        // Mostrar la pantalla de actualización de contraseña
-        document.getElementById('login-screen').style.display = 'flex';
-        document.getElementById('login-step-form').style.display = 'none';
-        document.getElementById('login-step-recovery').style.display = 'none';
-        document.getElementById('login-step-crear').style.display = 'none';
-        document.getElementById('login-step-update-password').style.display = 'block';
-        
-        mostrarNotificacion('Sesión verificada. Ya puedes cambiar tu contraseña.', 'success');
-      }
-    });
+// ============================================================
+// FLUJO DE RECUPERACIÓN DE CONTRASEÑA
+// Extraído modularmente a preferencias.js / src/modules/preferencias.js
+// ============================================================
+function inicializarPasswordRecovery(...args) {
+  if (typeof window !== "undefined" && typeof window.inicializarPasswordRecovery === "function" && window.inicializarPasswordRecovery !== inicializarPasswordRecovery) {
+    return window.inicializarPasswordRecovery(...args);
   }
 }
-
-
-function abrirRecuperarPassword(e) {
-  e.preventDefault();
-  document.getElementById('login-step-form').style.display = 'none';
-  document.getElementById('login-step-recovery').style.display = 'block';
-  document.getElementById('recovery-email').value = document.getElementById('login-email').value || '';
-}
-
-function volverLoginDesdeRecovery() {
-  document.getElementById('login-step-recovery').style.display = 'none';
-  document.getElementById('login-step-form').style.display = 'block';
-  document.getElementById('recovery-error').textContent = '';
-}
-
-async function enviarRecoveryLink(e) {
-  e.preventDefault();
-  const errEl = document.getElementById('recovery-error');
-  let email = document.getElementById('recovery-email').value.trim();
-  
-  if (!email) return;
-  
-  // Si no contiene '@' o es un correo de celular ficticio (ej: 5548350555@eurorep.mx)
-  const partBeforeAt = email.split('@')[0];
-  const esTelefono = !email.includes('@') || (email.toLowerCase().endsWith('@eurorep.mx') && /^\d+$/.test(partBeforeAt));
-  
-  if (esTelefono) {
-    const telefonoLimpio = partBeforeAt.replace(/\s+/g, '');
-    errEl.innerHTML = `Las cuentas registradas con número celular no pueden recibir correos de recuperación.<br><br>Por favor, contacta al administrador de Eurorep por WhatsApp para restablecer tu contraseña:<br><br><a href="https://wa.me/525512345678?text=Hola,%20necesito%20restablecer%20mi%20contrase%C3%B1a%20para%20la%20cuenta%20de%20tel%C3%A9fono%20${telefonoLimpio}" target="_blank" class="btn-primary" style="display:inline-flex; align-items:center; gap:0.5rem; text-decoration:none; padding:0.5rem 1rem; border-radius:6px; font-weight:600; margin-top:0.5rem; justify-content:center; width:100%; box-sizing:border-box;"><i data-lucide="message-circle" style="width:1.2rem; height:1.2rem; color:#fff;"></i> Solicitar por WhatsApp</a>`;
-    errEl.style.color = 'var(--text-primary)';
-    if (window.lucide) {
-      window.lucide.createIcons();
-    }
-    return;
-  }
-  
-  errEl.textContent = 'Enviando enlace...';
-  errEl.style.color = 'var(--text-secondary)';
-  
-  try {
-    const { data, error } = await window.supabaseClient.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + window.location.pathname
-    });
-    
-    if (error) {
-      errEl.textContent = 'Error: ' + error.message;
-      errEl.style.color = 'var(--red)';
-    } else {
-      errEl.textContent = '¡Enlace enviado! Revisa tu bandeja de entrada o spam. Ya puedes cerrar esta ventana.';
-      errEl.style.color = 'var(--green)';
-    }
-  } catch (error) {
-    errEl.textContent = 'Error de red. Intenta de nuevo.';
-    errEl.style.color = 'var(--red)';
+function abrirRecuperarPassword(...args) {
+  if (typeof window !== "undefined" && typeof window.abrirRecuperarPassword === "function" && window.abrirRecuperarPassword !== abrirRecuperarPassword) {
+    return window.abrirRecuperarPassword(...args);
   }
 }
-
-async function guardarNuevaPassword(e) {
-  e.preventDefault();
-  const errEl = document.getElementById('update-pass-error');
-  const newPass = document.getElementById('new-password').value;
-  
-  if (newPass.length < 6) {
-    errEl.textContent = 'La contraseña debe tener al menos 6 caracteres.';
-    errEl.style.color = 'var(--red)';
-    return;
+function volverLoginDesdeRecovery(...args) {
+  if (typeof window !== "undefined" && typeof window.volverLoginDesdeRecovery === "function" && window.volverLoginDesdeRecovery !== volverLoginDesdeRecovery) {
+    return window.volverLoginDesdeRecovery(...args);
   }
-  
-  errEl.textContent = 'Actualizando contraseña...';
-  errEl.style.color = 'var(--text-secondary)';
-  
-  try {
-    const { data, error } = await window.supabaseClient.auth.updateUser({
-      password: newPass
-    });
-    
-    if (error) {
-      errEl.textContent = 'Error al actualizar: ' + error.message;
-      errEl.style.color = 'var(--red)';
-    } else {
-      mostrarNotificacion('¡Contraseña actualizada exitosamente!', 'success');
-      document.getElementById('login-step-update-password').style.display = 'none';
-      document.getElementById('login-step-form').style.display = 'block';
-      document.getElementById('login-password').value = '';
-    }
-  } catch (error) {
-    errEl.textContent = 'Error de red. Intenta de nuevo.';
-    errEl.style.color = 'var(--red)';
+}
+function enviarRecoveryLink(...args) {
+  if (typeof window !== "undefined" && typeof window.enviarRecoveryLink === "function" && window.enviarRecoveryLink !== enviarRecoveryLink) {
+    return window.enviarRecoveryLink(...args);
+  }
+}
+function guardarNuevaPassword(...args) {
+  if (typeof window !== "undefined" && typeof window.guardarNuevaPassword === "function" && window.guardarNuevaPassword !== guardarNuevaPassword) {
+    return window.guardarNuevaPassword(...args);
   }
 }
 
@@ -4763,93 +4513,27 @@ window.aprobarUsuarioPortal = async function(id) {
 // ============================================================
 // DIAGRAMA DE FLUJO INTERACTIVO (PREFERENCIAS)
 // ============================================================
-window.abrirModalDiagramaFlujo = function() {
-  const modal = document.getElementById('modal-diagrama-flujo-overlay');
-  const mainContent = document.getElementById('flowchart-main-content');
-  const modalContent = document.getElementById('flowchart-modal-content');
-  if (modal && mainContent && modalContent) {
-    modalContent.innerHTML = mainContent.innerHTML;
-    modal.classList.add('open');
-    if (window.lucide) lucide.createIcons();
-  }
+// ============================================================
+// DIAGRAMA DE FLUJO INTERACTIVO (PREFERENCIAS)
+// Extraído modularmente a preferencias.js / src/modules/preferencias.js
+// ============================================================
+window.abrirModalDiagramaFlujo = function(...args) {
+  if (typeof window.abrirModalDiagramaFlujo === "function") return window.abrirModalDiagramaFlujo(...args);
 };
-
-window.cerrarModalDiagramaFlujo = function(e) {
-  if (e && e.target && !e.target.classList.contains('modal-overlay') && !e.target.classList.contains('close-btn') && !e.target.closest('.close-btn')) return;
-  const modal = document.getElementById('modal-diagrama-flujo-overlay');
-  if (modal) modal.classList.remove('open');
+window.cerrarModalDiagramaFlujo = function(...args) {
+  if (typeof window.cerrarModalDiagramaFlujo === "function") return window.cerrarModalDiagramaFlujo(...args);
 };
-
-let currentDiagramZoom = 1;
-window.zoomDiagramaFlujo = function(delta) {
-  const content = document.getElementById('flowchart-modal-content');
-  if (!content) return;
-  currentDiagramZoom = Math.max(0.6, Math.min(1.8, currentDiagramZoom + delta));
-  content.style.transform = `scale(${currentDiagramZoom})`;
-  content.style.transformOrigin = 'top center';
-  const label = document.getElementById('diagrama-zoom-label');
-  if (label) label.textContent = `${Math.round(currentDiagramZoom * 100)}%`;
+window.zoomDiagramaFlujo = function(...args) {
+  if (typeof window.zoomDiagramaFlujo === "function") return window.zoomDiagramaFlujo(...args);
 };
-
-window.resetZoomDiagramaFlujo = function() {
-  const content = document.getElementById('flowchart-modal-content');
-  if (!content) return;
-  currentDiagramZoom = 1;
-  content.style.transform = 'scale(1)';
-  const label = document.getElementById('diagrama-zoom-label');
-  if (label) label.textContent = '100%';
+window.resetZoomDiagramaFlujo = function(...args) {
+  if (typeof window.resetZoomDiagramaFlujo === "function") return window.resetZoomDiagramaFlujo(...args);
 };
-
-window.toggleSimbologiaFlujo = function() {
-  const legend = document.getElementById('flowchart-legend-box');
-  if (legend) {
-    legend.style.display = legend.style.display === 'none' ? 'flex' : 'none';
-  }
+window.toggleSimbologiaFlujo = function(...args) {
+  if (typeof window.toggleSimbologiaFlujo === "function") return window.toggleSimbologiaFlujo(...args);
 };
-
-window.filtrarRutaDiagrama = function(ruta, btn) {
-  document.querySelectorAll('.flowchart-filter-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-
-  const container = document.getElementById('flowchart-main-content');
-  const modalContainer = document.getElementById('flowchart-modal-content');
-  
-  [container, modalContainer].forEach(root => {
-    if (!root) return;
-    const nodes = root.querySelectorAll('.flowchart-card-node, .flow-connector-bridge, .flow-connector-v');
-    nodes.forEach(n => {
-      n.style.opacity = '1';
-      n.style.filter = 'none';
-    });
-
-    if (ruta === 'normal') {
-      root.querySelectorAll('.step-levantamiento, .step-garantia, .step-subticket').forEach(el => {
-        el.style.opacity = '0.25';
-        el.style.filter = 'grayscale(80%)';
-      });
-    } else if (ruta === 'levantamiento') {
-      nodes.forEach(el => {
-        if (!el.closest('.step-levantamiento') && !el.closest('.step-entrada')) {
-          el.style.opacity = '0.25';
-          el.style.filter = 'grayscale(80%)';
-        }
-      });
-    } else if (ruta === 'garantia') {
-      nodes.forEach(el => {
-        if (!el.closest('.step-garantia') && !el.closest('.step-os') && !el.closest('.step-cierre')) {
-          el.style.opacity = '0.25';
-          el.style.filter = 'grayscale(80%)';
-        }
-      });
-    } else if (ruta === 'subticket') {
-      nodes.forEach(el => {
-        if (!el.closest('.step-subticket') && !el.closest('.step-cotizacion') && !el.closest('.step-os')) {
-          el.style.opacity = '0.25';
-          el.style.filter = 'grayscale(80%)';
-        }
-      });
-    }
-  });
+window.filtrarRutaDiagrama = function(...args) {
+  if (typeof window.filtrarRutaDiagrama === "function") return window.filtrarRutaDiagrama(...args);
 };
 
 // =========================================================================
