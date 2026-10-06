@@ -118,8 +118,8 @@ assert.ok(obtenerBadgeRenta('Activa').includes('Activa'), 'Badge Activa debe con
 assert.ok(obtenerBadgeRenta('Vencida').includes('Vencida'), 'Badge Vencida debe contener etiqueta');
 console.log('  ✅ Rentas (calcularEstadoRenta y obtenerBadgeRenta): OK');
 
-// 10. Levantamientos - calcularEstadisticasLevantamientos
-const { calcularEstadisticasLevantamientos } = await import('../src/modules/levantamientos.js');
+// 10. Levantamientos - calcularEstadisticasLevantamientos y actualizarBadgeLevantamientos
+const { calcularEstadisticasLevantamientos, actualizarBadgeLevantamientos } = await import('../src/modules/levantamientos.js');
 
 const dummyLevs = [
   { id: '1', estado: 'Pendiente' },
@@ -135,7 +135,21 @@ assert.equal(stats.completados, 2, 'Completados debe ser 2');
 
 const emptyStats = calcularEstadisticasLevantamientos(null);
 assert.equal(emptyStats.total, 0, 'Manejo de nulos seguro');
-console.log('  ✅ Levantamientos (calcularEstadisticasLevantamientos): OK');
+
+// Test B: actualizarBadgeLevantamientos desde el inicio sin entrar a la vista
+const mockBadgeLev = { textContent: '', style: {}, classList: { add: () => {}, remove: () => {} } };
+const origDocLev = global.document;
+global.document = {
+  getElementById: (id) => (id === 'nav-badge-levantamientos' ? mockBadgeLev : null)
+};
+global.window = global.window || {};
+global.window.levantamientos = dummyLevs;
+global.currentSession = { viewMode: 'admin' };
+actualizarBadgeLevantamientos();
+assert.equal(mockBadgeLev.textContent, 2, 'Badge de levantamientos debe mostrar 2 pendientes de inmediato sin entrar a la vista');
+assert.equal(mockBadgeLev.style.display, 'inline-flex', 'Badge de levantamientos debe ser visible con display inline-flex');
+global.document = origDocLev;
+console.log('  ✅ Levantamientos (calcularEstadisticasLevantamientos y actualizarBadgeLevantamientos): OK');
 
 // 11. Reporte Semanal de Técnicos
 const { obtenerLunes, formatShortDate, formatISODate, formatNombreCorto } = await import('../src/modules/tecnicos_reporte.js');
@@ -375,12 +389,13 @@ assert.equal(diagTkt.numComentarios, 1, 'Debe contar 1 comentario');
 console.log('  ✅ Depurador de Tickets (analizarInformacionTicket, sanitizarAsignacionesTickets y exports): OK');
 
 // 21. Módulo de Envíos y Guías de Paquetería
-const { obtenerUrlRastreoPaqueteria, asegurarGuiaEnvioParaTicket, obtenerTodosLosEnvios, renderEnvios, exportarEnviosAExcel } = await import('../src/modules/envios.js');
+const { obtenerUrlRastreoPaqueteria, asegurarGuiaEnvioParaTicket, obtenerTodosLosEnvios, renderEnvios, exportarEnviosAExcel, updateEnviosBadge } = await import('../src/modules/envios.js');
 assert.equal(typeof obtenerUrlRastreoPaqueteria, 'function', 'obtenerUrlRastreoPaqueteria debe ser una función');
 assert.equal(typeof asegurarGuiaEnvioParaTicket, 'function', 'asegurarGuiaEnvioParaTicket debe ser una función');
 assert.equal(typeof obtenerTodosLosEnvios, 'function', 'obtenerTodosLosEnvios debe ser una función');
 assert.equal(typeof renderEnvios, 'function', 'renderEnvios debe ser una función');
 assert.equal(typeof exportarEnviosAExcel, 'function', 'exportarEnviosAExcel debe ser una función');
+assert.equal(typeof updateEnviosBadge, 'function', 'updateEnviosBadge debe ser una función');
 
 // Test A: Generación de URLs de rastreo multicarrier
 const urlDhl = obtenerUrlRastreoPaqueteria('DHL Express', '77889900');
@@ -391,7 +406,23 @@ assert.ok(urlFedex.includes('fedex.com') && urlFedex.includes('1122334455'), 'UR
 
 const urlEstafeta = obtenerUrlRastreoPaqueteria('Estafeta', 'EST-9988');
 assert.ok(urlEstafeta.includes('estafeta.com') && urlEstafeta.includes('EST-9988'), 'URL de Estafeta debe incluir guia');
-console.log('  ✅ Envíos y Guías de Paquetería (obtenerUrlRastreoPaqueteria multicarrier y exports): OK');
+
+// Test B: updateEnviosBadge desde el inicio sin entrar a la vista
+const mockBadgeEnv = { textContent: '', style: {}, classList: { add: () => {}, remove: () => {} } };
+const origDocEnv = global.document;
+global.document = {
+  getElementById: (id) => (id === 'nav-badge-envios' ? mockBadgeEnv : null)
+};
+global.window = global.window || {};
+global.window.tickets = [
+  { id: 't1', folio: 'TKT-100', guiaPedido: 'GUIA-123', envios: [{ id: 'e1', guiaPedido: 'GUIA-123', llego: false }] },
+  { id: 't2', folio: 'TKT-101', guiaPedido: '', envios: [] }
+];
+updateEnviosBadge();
+assert.equal(mockBadgeEnv.textContent, 1, 'Badge de envíos debe mostrar 1 en tránsito de inmediato sin entrar a la vista');
+assert.equal(mockBadgeEnv.style.display, 'inline-flex', 'Badge de envíos debe ser visible con display inline-flex');
+global.document = origDocEnv;
+console.log('  ✅ Envíos y Guías de Paquetería (obtenerUrlRastreoPaqueteria multicarrier y updateEnviosBadge): OK');
 
 // 22. Módulo de Asignación Semanal y Programación de Técnicos
 const {

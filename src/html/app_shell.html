@@ -856,6 +856,9 @@
       function loadNext() {
         if (index >= scripts.length) {
           if (typeof lucide !== 'undefined') lucide.createIcons();
+          if (typeof window.actualizarTodosLosBadges === 'function') {
+            try { window.actualizarTodosLosBadges(); } catch (eB) { console.warn('[App] Error actualizando badges post-carga:', eB); }
+          }
           return;
         }
         var s = document.createElement('script');

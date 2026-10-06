@@ -122,9 +122,16 @@ function asegurarGuiaEnvioParaTicket(ticket) {
 
 // Obtiene la lista unificada de todas las guías de envío registradas
 function obtenerTodosLosEnvios() {
-  const tkts = (typeof tickets !== 'undefined' && tickets && tickets.length > 0) 
+  let tkts = (typeof tickets !== 'undefined' && Array.isArray(tickets) && tickets.length > 0) 
     ? tickets 
-    : JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+    : ((Array.isArray(window.tickets) && window.tickets.length > 0)
+      ? window.tickets
+      : ((typeof safeGetJSON === 'function' ? safeGetJSON('sapi_tickets', []) : (typeof window.safeGetJSON === 'function' ? window.safeGetJSON('sapi_tickets', []) : JSON.parse(localStorage.getItem('sapi_tickets') || '[]'))) || []));
+
+  if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+    const activeSandbox = isTestModeActive();
+    tkts = tkts.filter(t => isTestData(t) === activeSandbox);
+  }
 
   const enviosList = [];
 
@@ -223,7 +230,11 @@ function obtenerTodosLosEnvios() {
 
   // Incluir envíos independientes desde sapi_envios_db si no están ya en la lista
   try {
-    const dbEnvios = JSON.parse(localStorage.getItem('sapi_envios_db') || '[]');
+    let dbEnvios = JSON.parse(localStorage.getItem('sapi_envios_db') || '[]');
+    if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+      const activeSandbox = isTestModeActive();
+      dbEnvios = dbEnvios.filter(dbe => isTestData(dbe) === activeSandbox);
+    }
     dbEnvios.forEach(dbe => {
       if (!enviosList.some(x => x.id === dbe.id)) {
         enviosList.push(dbe);
@@ -515,6 +526,7 @@ function exportarEnviosAExcel() {
 
 // Actualiza el badge en la barra lateral
 function updateEnviosBadge(count) {
+  if (typeof document === 'undefined') return;
   const badge = document.getElementById('nav-badge-envios');
   if (!badge) return;
   const num = (count !== undefined) ? count : window.obtenerTodosLosEnvios().filter(e => e.estatus === 'En Tránsito').length;
@@ -1100,6 +1112,15 @@ if (typeof window !== 'undefined') {
   window.currentEnviosSearchQuery = currentEnviosSearchQuery;
   window._enviosFiltradosActuales = _enviosFiltradosActuales;
   window.editandoEnvioId = editandoEnvioId;
+
+  // Actualizar badge inmediatamente al cargar el script
+  if (typeof document !== 'undefined' && typeof updateEnviosBadge === 'function') {
+    try {
+      updateEnviosBadge();
+    } catch (e) {
+      console.warn('[Envios] Error al actualizar badge al iniciar:', e);
+    }
+  }
 }
 
 export {

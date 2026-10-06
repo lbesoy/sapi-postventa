@@ -107,9 +107,14 @@ function renderLevantamientos() {
 }
 
 window.actualizarBadgeLevantamientos = function() {
+  if (typeof document === 'undefined') return;
   const badge = document.getElementById('nav-badge-levantamientos');
   if (!badge) return;
-  let list = (typeof levantamientos !== 'undefined' && Array.isArray(levantamientos)) ? levantamientos : (window.levantamientos || []);
+  let list = (typeof levantamientos !== 'undefined' && Array.isArray(levantamientos) && levantamientos.length > 0)
+    ? levantamientos
+    : ((Array.isArray(window.levantamientos) && window.levantamientos.length > 0)
+      ? window.levantamientos
+      : ((typeof safeGetJSON === 'function' ? safeGetJSON('sapi_levantamientos', []) : (typeof window.safeGetJSON === 'function' ? window.safeGetJSON('sapi_levantamientos', []) : JSON.parse(localStorage.getItem('sapi_levantamientos') || '[]'))) || []));
   
   // Filter by Sandbox mode
   if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
@@ -117,13 +122,18 @@ window.actualizarBadgeLevantamientos = function() {
     list = list.filter(l => isTestData(l) === activeSandbox);
   }
 
+  const sess = (typeof currentSession !== 'undefined' && currentSession)
+    ? currentSession
+    : (window.currentSession || (typeof safeGetJSON === 'function' ? safeGetJSON('eurorep_session', null) : null) || JSON.parse(localStorage.getItem('eurorep_session') || 'null'));
+
   // Filtrar por rol de técnico (solo ver levantamientos asignados a sí mismo)
-  const isTecnico = (typeof currentSession !== 'undefined' && currentSession.viewMode === 'tecnico');
+  const isTecnico = sess && sess.viewMode === 'tecnico';
   let miNombreLower = '';
-  if (isTecnico && typeof currentSession !== 'undefined') {
-    let miNombre = currentSession.nombre || '';
-    if (!miNombre && typeof usuarios !== 'undefined') {
-      const u = usuarios.find(usr => usr.id === currentSession.userId);
+  if (isTecnico && sess) {
+    let miNombre = sess.nombre || '';
+    const userList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : (window.usuarios || (typeof safeGetJSON === 'function' ? safeGetJSON('eurorep_usuarios', []) : []));
+    if (!miNombre && userList) {
+      const u = userList.find(usr => usr.id === sess.userId);
       if (u) miNombre = u.nombre || '';
     }
     miNombreLower = miNombre.trim().toLowerCase();
@@ -137,10 +147,11 @@ window.actualizarBadgeLevantamientos = function() {
     });
   }
 
-  const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String((typeof currentSession !== 'undefined' && currentSession.viewMode) || '').toLowerCase().trim());
-  if (isEmpresa && typeof usuarios !== 'undefined' && typeof currentSession !== 'undefined') {
-    const currentUser = usuarios.find(u => u.id === currentSession.userId);
-    let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+  const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(sess?.viewMode || '').toLowerCase().trim());
+  if (isEmpresa && sess) {
+    const userList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : (window.usuarios || (typeof safeGetJSON === 'function' ? safeGetJSON('eurorep_usuarios', []) : []));
+    const currentUser = userList.find(u => u.id === sess.userId);
+    let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : (sess.empresa || sess.nombre || null);
     if (nombreEmpresaLogged) {
       nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
       list = list.filter(l => {
@@ -887,4 +898,14 @@ window.verDetalleLevantamiento = verDetalleLevantamiento;
 window.completarLevantamiento = typeof completarLevantamiento !== 'undefined' ? completarLevantamiento : window.completarLevantamiento;
 window.guardarNuevoLevantamiento = guardarNuevoLevantamiento;
 window.enviarARevisionLevantamiento = window.enviarARevisionLevantamiento;
+
+// Actualizar badge inmediatamente al cargar el script
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && typeof window.actualizarBadgeLevantamientos === 'function') {
+  try {
+    window.actualizarBadgeLevantamientos();
+  } catch (e) {
+    console.warn('[Levantamientos] Error al actualizar badge al iniciar:', e);
+  }
+}
+
 

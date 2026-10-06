@@ -649,6 +649,11 @@ window.addEventListener('supabase_datos_cargados', async () => {
       if (typeof applyRole === 'function') applyRole(currentSession.viewMode);
     }
 
+    // Actualizar todos los badges reactivamente con los datos recién sincronizados
+    if (typeof window.actualizarTodosLosBadges === 'function') {
+      window.actualizarTodosLosBadges();
+    }
+
     // Calcular y reportar uso de almacenamiento local en megabytes
     try {
       let lsBytes = 0;
@@ -1039,6 +1044,9 @@ function entrarApp(user) {
     const appWrapper = document.getElementById('app-wrapper');
     if (appWrapper) appWrapper.classList.add('visible');
     applyRole(user.rol);
+    if (typeof window.actualizarTodosLosBadges === 'function') {
+      try { window.actualizarTodosLosBadges(); } catch (eB) {}
+    }
   } catch (err) {
     console.error('Error during app layout transition:', err);
   }
@@ -1062,6 +1070,9 @@ function entrarApp(user) {
            try { renderTickets('dash-tickets'); } catch (e) { console.error('Error rendering dash tickets:', e); }
         }
         try { renderStats(); } catch (e) { console.error('Error rendering stats:', e); }
+        if (typeof window.actualizarTodosLosBadges === 'function') {
+           try { window.actualizarTodosLosBadges(); } catch (eB) {}
+        }
         if (btnLogin) btnLogin.innerHTML = '<i data-lucide="log-in" class="btn-icon"></i> Iniciar Sesión';
      }).catch(err => {
         console.error('Error in cargarDatosDeSupabase:', err);
@@ -1076,6 +1087,9 @@ function entrarApp(user) {
         try { renderTickets('dash-tickets'); } catch (e) { console.error('Error rendering dash tickets:', e); }
      }
      try { renderStats(); } catch (e) { console.error('Error rendering stats:', e); }
+     if (typeof window.actualizarTodosLosBadges === 'function') {
+        try { window.actualizarTodosLosBadges(); } catch (eB) {}
+     }
   }
   
   try {
@@ -1644,6 +1658,213 @@ function getFilteredClaraTxs() {
   }
 }
 
+// Early fallback para Levantamientos badge si levantamientos.js aún no termina de cargar
+if (typeof window !== 'undefined' && typeof window.actualizarBadgeLevantamientos !== 'function') {
+  window.actualizarBadgeLevantamientos = function() {
+    try {
+      if (typeof document === 'undefined') return;
+      const badge = document.getElementById('nav-badge-levantamientos');
+      if (!badge) return;
+      let list = (typeof levantamientos !== 'undefined' && Array.isArray(levantamientos) && levantamientos.length > 0)
+        ? levantamientos
+        : ((Array.isArray(window.levantamientos) && window.levantamientos.length > 0)
+          ? window.levantamientos
+          : ((typeof safeGetJSON === 'function' ? safeGetJSON('sapi_levantamientos', []) : (typeof window.safeGetJSON === 'function' ? window.safeGetJSON('sapi_levantamientos', []) : JSON.parse(localStorage.getItem('sapi_levantamientos') || '[]'))) || []));
+
+      if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+        const activeSandbox = isTestModeActive();
+        list = list.filter(l => isTestData(l) === activeSandbox);
+      }
+
+      const sess = (typeof currentSession !== 'undefined' && currentSession)
+        ? currentSession
+        : (window.currentSession || (typeof safeGetJSON === 'function' ? safeGetJSON('eurorep_session', null) : null) || JSON.parse(localStorage.getItem('eurorep_session') || 'null'));
+
+      const isTecnico = sess && sess.viewMode === 'tecnico';
+      let miNombreLower = '';
+      if (isTecnico && sess) {
+        let miNombre = sess.nombre || '';
+        const userList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : (window.usuarios || (typeof safeGetJSON === 'function' ? safeGetJSON('eurorep_usuarios', []) : []));
+        if (!miNombre && userList) {
+          const u = userList.find(usr => usr.id === sess.userId);
+          if (u) miNombre = u.nombre || '';
+        }
+        miNombreLower = miNombre.trim().toLowerCase();
+      }
+
+      if (isTecnico && miNombreLower) {
+        list = list.filter(l => {
+          if (!l.tecnico_asignado) return false;
+          const asignados = l.tecnico_asignado.split(',').map(s => s.trim().toLowerCase());
+          return asignados.includes(miNombreLower);
+        });
+      }
+
+      const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(sess?.viewMode || '').toLowerCase().trim());
+      if (isEmpresa && sess) {
+        const userList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : (window.usuarios || (typeof safeGetJSON === 'function' ? safeGetJSON('eurorep_usuarios', []) : []));
+        const currentUser = userList.find(u => u.id === sess.userId);
+        let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : (sess.empresa || sess.nombre || null);
+        if (nombreEmpresaLogged) {
+          nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
+          list = list.filter(l => {
+            const cli = String(l.cliente || '').toLowerCase().trim();
+            return cli === nombreEmpresaLogged;
+          });
+        } else {
+          list = [];
+        }
+      }
+
+      const pendientes = list.filter(l => l.estado !== 'Completado' && l.estado !== 'Cancelado').length;
+      if (pendientes > 0) {
+        badge.textContent = pendientes;
+        badge.classList.add('visible');
+        badge.style.display = 'inline-flex';
+      } else {
+        badge.textContent = '';
+        badge.classList.remove('visible');
+        badge.style.display = 'none';
+      }
+    } catch (e) {
+      console.warn('[Badge Levantamientos Early] Error:', e);
+    }
+  };
+}
+
+// Early fallback para Envíos badge si envios.js aún no termina de cargar
+if (typeof window !== 'undefined' && typeof window.updateEnviosBadge !== 'function') {
+  window.updateEnviosBadge = function(count) {
+    try {
+      if (typeof document === 'undefined') return;
+      const badge = document.getElementById('nav-badge-envios');
+      if (!badge) return;
+      if (count !== undefined) {
+        if (count > 0) {
+          badge.textContent = count;
+          badge.classList.add('visible');
+          badge.style.display = 'inline-flex';
+        } else {
+          badge.textContent = '';
+          badge.classList.remove('visible');
+          badge.style.display = 'none';
+        }
+        return;
+      }
+
+      let tkts = (typeof tickets !== 'undefined' && Array.isArray(tickets) && tickets.length > 0) 
+        ? tickets 
+        : ((Array.isArray(window.tickets) && window.tickets.length > 0)
+          ? window.tickets
+          : ((typeof safeGetJSON === 'function' ? safeGetJSON('sapi_tickets', []) : (typeof window.safeGetJSON === 'function' ? window.safeGetJSON('sapi_tickets', []) : JSON.parse(localStorage.getItem('sapi_tickets') || '[]'))) || []));
+
+      if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+        const activeSandbox = isTestModeActive();
+        tkts = tkts.filter(t => isTestData(t) === activeSandbox);
+      }
+
+      let countTransito = 0;
+      tkts.forEach(t => {
+        let envios = t.envios || [];
+        const hasDirectParts = Array.isArray(t.refaccionesSeleccionadas) && t.refaccionesSeleccionadas.length > 0;
+        const isSubticketA = t.folio && t.folio.endsWith('-A');
+        const hasExplicitGuia = !!(t.guiaPedido && t.guiaPedido.trim());
+        const partsList = t.refaccionesSeleccionadas || [];
+        const hasAnyParts = partsList.length > 0;
+        const shouldHaveEnvio = (envios.length > 0) || hasDirectParts || hasAnyParts || isSubticketA || hasExplicitGuia;
+        if (!shouldHaveEnvio) return;
+
+        if (envios.length === 0) {
+          const isEntregado = (hasAnyParts && partsList.every(p => p.estatusPedido === 'Entregado al Técnico')) || t.estatusPedido === 'Entregado al Técnico';
+          envios = [{
+            guiaPedido: t.guiaPedido || '',
+            llego: !!isEntregado,
+            parts: partsList
+          }];
+        }
+
+        envios.forEach(e => {
+          const guiaValida = e.guiaPedido && String(e.guiaPedido).trim().length > 0;
+          const partesEntregadas = Array.isArray(e.parts) && e.parts.length > 0 && e.parts.every(p => p.estatusPedido === 'Entregado al Técnico');
+          if (!e.llego && !partesEntregadas && guiaValida) {
+            countTransito++;
+          }
+        });
+      });
+
+      try {
+        let dbEnvios = JSON.parse(localStorage.getItem('sapi_envios_db') || '[]');
+        if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+          const activeSandbox = isTestModeActive();
+          dbEnvios = dbEnvios.filter(dbe => isTestData(dbe) === activeSandbox);
+        }
+        dbEnvios.forEach(dbe => {
+          if (dbe.estatus === 'En Tránsito') countTransito++;
+        });
+      } catch(e) {}
+
+      if (countTransito > 0) {
+        badge.textContent = countTransito;
+        badge.classList.add('visible');
+        badge.style.display = 'inline-flex';
+      } else {
+        badge.textContent = '';
+        badge.classList.remove('visible');
+        badge.style.display = 'none';
+      }
+    } catch (e) {
+      console.warn('[Badge Envios Early] Error:', e);
+    }
+  };
+}
+
+// ===== ACTUALIZACIÓN CENTRALIZADA DE TODOS LOS BADGES DEL SIDEBAR =====
+window.actualizarTodosLosBadges = function() {
+  try {
+    if (typeof updateTicketBadge === 'function') updateTicketBadge();
+  } catch (e) { console.warn('[Badges] Error en updateTicketBadge:', e); }
+
+  try {
+    if (typeof updateOrdenesBadge === 'function') updateOrdenesBadge();
+  } catch (e) { console.warn('[Badges] Error en updateOrdenesBadge:', e); }
+
+  try {
+    if (typeof window.actualizarBadgeLevantamientos === 'function') {
+      window.actualizarBadgeLevantamientos();
+    }
+  } catch (e) { console.warn('[Badges] Error en actualizarBadgeLevantamientos:', e); }
+
+  try {
+    if (typeof window.updateEnviosBadge === 'function') {
+      window.updateEnviosBadge();
+    }
+  } catch (e) { console.warn('[Badges] Error en updateEnviosBadge:', e); }
+
+  try {
+    if (typeof window.actualizarBadgeRentasSidebar === 'function') {
+      window.actualizarBadgeRentasSidebar();
+    }
+  } catch (e) { console.warn('[Badges] Error en actualizarBadgeRentasSidebar:', e); }
+
+  try {
+    if (typeof window.actualizarBadgeJuntaRevision === 'function') {
+      window.actualizarBadgeJuntaRevision();
+    }
+  } catch (e) { console.warn('[Badges] Error en actualizarBadgeJuntaRevision:', e); }
+
+  try {
+    if (typeof window.actualizarBadgeDepuradorOrdenes === 'function') {
+      window.actualizarBadgeDepuradorOrdenes();
+    }
+  } catch (e) { console.warn('[Badges] Error en actualizarBadgeDepuradorOrdenes:', e); }
+
+  try {
+    if (typeof window.actualizarBadgeDepuradorTickets === 'function') {
+      window.actualizarBadgeDepuradorTickets();
+    }
+  } catch (e) { console.warn('[Badges] Error en actualizarBadgeDepuradorTickets:', e); }
+};
+
 function toggleTestMode(isActive) {
   localStorage.setItem('eurorep_test_mode', isActive ? 'true' : 'false');
   actualizarVistaActual();
@@ -1663,10 +1884,14 @@ function actualizarVistaActual() {
   try { renderDashboardTecnicos(); } catch(e){}
   try { renderTecnicos(); } catch(e){}
   try { 
-    updateTicketBadge(); 
-    updateOrdenesBadge(); 
-    if (typeof window.updateEnviosBadge === 'function') window.updateEnviosBadge(); 
-    if (typeof window.actualizarBadgeLevantamientos === 'function') window.actualizarBadgeLevantamientos();
+    if (typeof window.actualizarTodosLosBadges === 'function') {
+      window.actualizarTodosLosBadges();
+    } else {
+      updateTicketBadge(); 
+      updateOrdenesBadge(); 
+      if (typeof window.updateEnviosBadge === 'function') window.updateEnviosBadge(); 
+      if (typeof window.actualizarBadgeLevantamientos === 'function') window.actualizarBadgeLevantamientos();
+    }
   } catch(e){}
   if (typeof window.renderEnvios === 'function') {
     try { window.renderEnvios(); } catch(e){}
@@ -3341,10 +3566,14 @@ function dispararInicializacionGlobal() {
     console.error('Error al inicializar recuperación de contraseña:', err);
   }
   try {
-    if (typeof updateTicketBadge === 'function') updateTicketBadge();
-    if (typeof updateOrdenesBadge === 'function') updateOrdenesBadge();
-    if (typeof window.actualizarBadgeLevantamientos === 'function') window.actualizarBadgeLevantamientos();
-    if (typeof window.updateEnviosBadge === 'function') window.updateEnviosBadge();
+    if (typeof window.actualizarTodosLosBadges === 'function') {
+      window.actualizarTodosLosBadges();
+    } else {
+      if (typeof updateTicketBadge === 'function') updateTicketBadge();
+      if (typeof updateOrdenesBadge === 'function') updateOrdenesBadge();
+      if (typeof window.actualizarBadgeLevantamientos === 'function') window.actualizarBadgeLevantamientos();
+      if (typeof window.updateEnviosBadge === 'function') window.updateEnviosBadge();
+    }
     if (typeof window.sincronizarNotificacionesInternas === 'function') window.sincronizarNotificacionesInternas();
     if (typeof window.updateNotificationBell === 'function') window.updateNotificationBell();
     if (typeof window.renderManualesPorRol === 'function') window.renderManualesPorRol();
