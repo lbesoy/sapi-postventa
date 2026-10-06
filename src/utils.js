@@ -488,4 +488,27 @@ if (typeof window !== 'undefined') {
   window.unificarNombreUsuario = unificarNombreUsuario;
   window.obtenerInfoRolUsuario = obtenerInfoRolUsuario;
   window.extraerListaResponsables = extraerListaResponsables;
+  window.loadScriptOnDemand = loadScriptOnDemand;
+}
+
+const _loadedScripts = new Set();
+export function loadScriptOnDemand(src) {
+  if (typeof document === 'undefined') return Promise.resolve();
+  if (_loadedScripts.has(src)) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) {
+      _loadedScripts.add(src);
+      return resolve();
+    }
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.onload = () => {
+      _loadedScripts.add(src);
+      resolve();
+    };
+    s.onerror = (err) => reject(err);
+    document.body.appendChild(s);
+  });
 }

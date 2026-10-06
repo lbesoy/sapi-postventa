@@ -465,4 +465,26 @@ window.extraerListaResponsables = function(raw) {
   return validParts.length > 0 ? Array.from(new Set(validParts)) : ['Sin Asignar'];
 };
 
+const _loadedScripts = new Set();
+window.loadScriptOnDemand = function(src) {
+  if (typeof document === 'undefined') return Promise.resolve();
+  if (_loadedScripts.has(src)) return Promise.resolve();
+  return new Promise(function(resolve, reject) {
+    var existing = document.querySelector('script[src="' + src + '"]');
+    if (existing) {
+      _loadedScripts.add(src);
+      return resolve();
+    }
+    var s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.onload = function() {
+      _loadedScripts.add(src);
+      resolve();
+    };
+    s.onerror = function(err) { reject(err); };
+    document.body.appendChild(s);
+  });
+};
+
 

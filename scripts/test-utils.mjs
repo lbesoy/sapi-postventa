@@ -12,10 +12,18 @@ import {
   calcularDiasJunta,
   formatearTiempoRelativoJunta,
   unificarNombreUsuario,
-  extraerListaResponsables
+  extraerListaResponsables,
+  loadScriptOnDemand
 } from '../src/utils.js';
 
 console.log('🧪 Ejecutando pruebas unitarias para src/utils.js...');
+
+// 0. loadScriptOnDemand (Lazy Loading)
+assert.equal(typeof loadScriptOnDemand, 'function', 'loadScriptOnDemand debe ser función');
+await assert.doesNotReject(async () => {
+  await loadScriptOnDemand('test-script.js');
+}, 'loadScriptOnDemand debe resolver de forma segura en entornos sin DOM');
+console.log('  ✅ loadScriptOnDemand (Lazy Loading): OK');
 
 // 1. cleanMojibake
 assert.equal(cleanMojibake('CamiÃ³n'), 'Camión', 'cleanMojibake debe reparar ó mojibake');
