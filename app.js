@@ -58,6 +58,16 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
         })
         .catch(err => console.error('[PWA] Error al registrar Service Worker:', err));
 
+      // Escuchar eventos de Background Sync provenientes del Service Worker
+      if (typeof window.registrarListenerBackgroundSync === 'function') {
+        window.registrarListenerBackgroundSync(data => {
+          console.log('[PWA] Sincronización en segundo plano disparada por Service Worker:', data);
+          if (typeof window.processSyncQueue === 'function') {
+            window.processSyncQueue();
+          }
+        });
+      }
+
       // Forzar verificación de actualización cuando la app vuelve al primer plano
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {

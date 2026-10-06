@@ -1285,6 +1285,9 @@ function getSyncQueue() {
 function saveSyncQueue(queue) {
   localStorage.setItem('sapi_sync_queue', JSON.stringify(queue));
   updateSyncStatusUI();
+  if (Array.isArray(queue) && queue.length > 0 && typeof window.solicitarBackgroundSync === 'function') {
+    window.solicitarBackgroundSync('sapi-background-sync');
+  }
 }
 
 window.limpiarColaSincronizacion = function() {

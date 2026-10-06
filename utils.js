@@ -487,4 +487,77 @@ window.loadScriptOnDemand = function(src) {
   });
 };
 
+window.solicitarBackgroundSync = async function(tag) {
+  tag = tag || 'sapi-background-sync';
+  if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'SyncManager' in window) {
+    try {
+      var reg = await navigator.serviceWorker.ready;
+      if (reg.sync && typeof reg.sync.register === 'function') {
+        await reg.sync.register(tag);
+        console.log('[Offline Sync] Tarea en segundo plano registrada:', tag);
+        return true;
+      }
+    } catch (err) {
+      console.warn('[Offline Sync] Error al registrar Background Sync:', err);
+    }
+  }
+  return false;
+};
+
+window.registrarListenerBackgroundSync = function(callback) {
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+    var handler = function(event) {
+      if (event.data && event.data.type === 'BACKGROUND_SYNC_TRIGGERED') {
+        if (typeof callback === 'function') {
+          callback(event.data);
+        }
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handler);
+    return function() {
+      navigator.serviceWorker.removeEventListener('message', handler);
+    };
+  }
+  return function() {};
+};
+
+window.verificarConexionRed = async function(timeoutMs) {
+  timeoutMs = timeoutMs || 3000;
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return false;
+  }
+  if (typeof fetch === 'undefined') {
+    return true;
+  }
+  try {
+    var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timeoutId = controller ? setTimeout(function() { controller.abort(); }, timeoutMs) : null;
+    var options = { method: 'HEAD', cache: 'no-store' };
+    if (controller) options.signal = controller.signal;
+    
+    var res = await fetch('/sw.js?ping=' + Date.now(), options);
+    if (timeoutId) clearTimeout(timeoutId);
+    return res.ok || res.status === 304;
+  } catch (err) {
+    return typeof navigator !== 'undefined' ? Boolean(navigator.onLine) : false;
+  }
+};
+
+window.obtenerEstadoOffline = function() {
+  var isOnline = (typeof navigator !== 'undefined' && typeof navigator.onLine === 'boolean') ? navigator.onLine : true;
+  var queueCount = 0;
+  if (typeof localStorage !== 'undefined') {
+    try {
+      var q = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+      queueCount = Array.isArray(q) ? q.length : 0;
+    } catch (e) {}
+  }
+  var bgSyncSupported = typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'SyncManager' in window;
+  return {
+    online: isOnline,
+    queueCount: queueCount,
+    backgroundSyncSupported: Boolean(bgSyncSupported)
+  };
+};
+
 

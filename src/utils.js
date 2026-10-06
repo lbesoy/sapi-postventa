@@ -489,6 +489,10 @@ if (typeof window !== 'undefined') {
   window.obtenerInfoRolUsuario = obtenerInfoRolUsuario;
   window.extraerListaResponsables = extraerListaResponsables;
   window.loadScriptOnDemand = loadScriptOnDemand;
+  window.solicitarBackgroundSync = solicitarBackgroundSync;
+  window.registrarListenerBackgroundSync = registrarListenerBackgroundSync;
+  window.verificarConexionRed = verificarConexionRed;
+  window.obtenerEstadoOffline = obtenerEstadoOffline;
 }
 
 const _loadedScripts = new Set();
@@ -511,4 +515,96 @@ export function loadScriptOnDemand(src) {
     s.onerror = (err) => reject(err);
     document.body.appendChild(s);
   });
+}
+
+/**
+ * Solicita el registro de una tarea de Background Sync en el Service Worker.
+ * Si el navegador soporta SyncManager, el Service Worker despertará automáticamente
+ * cuando la conexión a Internet se recupere para procesar la cola pendiente.
+ * @param {string} [tag='sapi-background-sync'] - Etiqueta de la tarea de sincronización
+ * @returns {Promise<boolean>} Retorna true si se registró exitosamente
+ */
+export async function solicitarBackgroundSync(tag = 'sapi-background-sync') {
+  if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'SyncManager' in window) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg.sync && typeof reg.sync.register === 'function') {
+        await reg.sync.register(tag);
+        console.log(`[Offline Sync] Tarea en segundo plano registrada: ${tag}`);
+        return true;
+      }
+    } catch (err) {
+      console.warn('[Offline Sync] Error al registrar Background Sync:', err);
+    }
+  }
+  return false;
+}
+
+/**
+ * Escucha los mensajes de Background Sync enviados por el Service Worker hacia la ventana activa.
+ * @param {Function} callback - Función que se ejecuta cuando el SW notifica que la conexión se recuperó
+ * @returns {Function} Función para desuscribirse del listener
+ */
+export function registrarListenerBackgroundSync(callback) {
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+    const handler = (event) => {
+      if (event.data && event.data.type === 'BACKGROUND_SYNC_TRIGGERED') {
+        if (typeof callback === 'function') {
+          callback(event.data);
+        }
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handler);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handler);
+    };
+  }
+  return () => {};
+}
+
+/**
+ * Comprueba de forma activa si existe conectividad real a internet mediante un ping ligero.
+ * @param {number} [timeoutMs=3000] - Tiempo de espera máximo en milisegundos
+ * @returns {Promise<boolean>}
+ */
+export async function verificarConexionRed(timeoutMs = 3000) {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return false;
+  }
+  if (typeof fetch === 'undefined') {
+    return true;
+  }
+  try {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    const options = { method: 'HEAD', cache: 'no-store' };
+    if (controller) options.signal = controller.signal;
+    
+    const res = await fetch('/sw.js?ping=' + Date.now(), options);
+    if (timeoutId) clearTimeout(timeoutId);
+    return res.ok || res.status === 304;
+  } catch (err) {
+    return typeof navigator !== 'undefined' ? Boolean(navigator.onLine) : false;
+  }
+}
+
+/**
+ * Retorna el estado consolidado de la conectividad y de la cola de sincronización offline.
+ * @returns {{ online: boolean, queueCount: number, backgroundSyncSupported: boolean }}
+ */
+export function obtenerEstadoOffline() {
+  const isOnline = (typeof navigator !== 'undefined' && typeof navigator.onLine === 'boolean') ? navigator.onLine : true;
+  let queueCount = 0;
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const q = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
+      queueCount = Array.isArray(q) ? q.length : 0;
+    } catch (e) {}
+  }
+  const bgSyncSupported = typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'SyncManager' in window;
+  return {
+    online: isOnline,
+    queueCount,
+    backgroundSyncSupported: Boolean(bgSyncSupported)
+  };
 }

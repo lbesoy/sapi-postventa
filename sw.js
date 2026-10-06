@@ -1,12 +1,37 @@
-const CACHE_NAME = 'eurorep-postventa-v415';
+const CACHE_NAME = 'eurorep-postventa-v416';
 const ASSETS = [
   '/',
   '/index.html',
   '/localstorage-bridge.js',
   '/theme-base.css',
+  '/store.js',
   '/utils.js',
+  '/sap_sync.js',
+  '/sap_mapper.js',
+  '/notificaciones.js',
+  '/config_tecnicos.js',
+  '/ordenes_estados.js',
+  '/ordenes_listado.js',
+  '/ordenes_form.js',
+  '/ordenes_detalle.js',
+  '/ordenes_bitacora.js',
+  '/servicios_programados.js',
+  '/tickets_listado.js',
+  '/tickets_form.js',
+  '/tickets_detalle.js',
+  '/app_migrations.js',
   '/app.js',
+  '/dashboard.js',
+  '/usuarios.js',
+  '/refacciones_orden.js',
   '/gastos.js',
+  '/onedrive.js',
+  '/telemetria.js',
+  '/automatizaciones.js',
+  '/resumen_semanal.js',
+  '/ideas_fallas.js',
+  '/preferencias.js',
+  '/sitios_clientes.js',
   '/clientes.js',
   '/maquinaria.js',
   '/calendario.js',
@@ -14,7 +39,9 @@ const ASSETS = [
   '/kits.js',
   '/juntas.js',
   '/depurador_tickets.js',
+  '/depurador_ordenes.js',
   '/envios.js',
+  '/asignacion_tecnicos.js',
   '/rentas.js',
   '/style.css',
   '/cliente.html',
@@ -105,4 +132,25 @@ self.addEventListener('fetch', e => {
         });
       })
   );
+});
+
+// Sincronización en segundo plano (Background Sync API)
+self.addEventListener('sync', e => {
+  if (e.tag === 'sapi-background-sync' || e.tag === 'sync-queue') {
+    console.log('[PWA SW] Evento de sincronización en segundo plano recibido:', e.tag);
+    e.waitUntil(
+      self.clients.matchAll({ includeUncontrolled: true, type: 'window' }).then(clients => {
+        clients.forEach(client => {
+          client.postMessage({ type: 'BACKGROUND_SYNC_TRIGGERED', tag: e.tag, timestamp: Date.now() });
+        });
+      })
+    );
+  }
+});
+
+// Recepción de mensajes desde clientes de la aplicación
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

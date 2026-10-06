@@ -1923,6 +1923,40 @@ assert.equal(TiposModelos.version, '1.0.0', 'TiposModelos debe tener versión 1.
 
 console.log('  ✅ Definiciones de Tipos JSDoc y Modelos de Negocio: OK');
 
+// 50. MÓDULO DE OFFLINE-FIRST Y BACKGROUND SYNC
+console.log('🧪 Verificando Arquitectura Offline-First y Background Sync (sw.js / src/utils.js)...');
+const {
+  solicitarBackgroundSync,
+  registrarListenerBackgroundSync,
+  verificarConexionRed,
+  obtenerEstadoOffline
+} = await import('../src/utils.js');
+
+assert.equal(typeof solicitarBackgroundSync, 'function', 'solicitarBackgroundSync debe ser función');
+assert.equal(typeof registrarListenerBackgroundSync, 'function', 'registrarListenerBackgroundSync debe ser función');
+assert.equal(typeof verificarConexionRed, 'function', 'verificarConexionRed debe ser función');
+assert.equal(typeof obtenerEstadoOffline, 'function', 'obtenerEstadoOffline debe ser función');
+
+// Test A: Estado offline reporta estructura correcta
+const estado = obtenerEstadoOffline();
+assert.equal(typeof estado, 'object', 'obtenerEstadoOffline debe retornar un objeto');
+assert.equal(typeof estado.online, 'boolean', 'estado.online debe ser booleano');
+assert.equal(typeof estado.queueCount, 'number', 'estado.queueCount debe ser numérico');
+assert.equal(typeof estado.backgroundSyncSupported, 'boolean', 'estado.backgroundSyncSupported debe ser booleano');
+
+// Test B: registrarListenerBackgroundSync retorna función de desuscripción segura
+const unsubscribeSync = registrarListenerBackgroundSync(() => {});
+assert.equal(typeof unsubscribeSync, 'function', 'registrarListenerBackgroundSync debe retornar función de desuscripción');
+unsubscribeSync(); // Ejecución segura sin excepciones
+
+// Test C: solicitarBackgroundSync responde con promesa booleana segura
+const syncPromise = solicitarBackgroundSync('test-tag');
+assert(syncPromise instanceof Promise, 'solicitarBackgroundSync debe retornar una Promesa');
+const syncResult = await syncPromise;
+assert.equal(typeof syncResult, 'boolean', 'El resultado de solicitarBackgroundSync debe ser booleano');
+
+console.log('  ✅ Arquitectura Offline-First y Background Sync: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 
