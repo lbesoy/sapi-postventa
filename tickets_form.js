@@ -1934,7 +1934,11 @@ async function eliminarTicket(id) {
     eliminarTicket: eliminarTicket
   };
 
+  if (typeof root !== "undefined") {
+    root.TicketsForm = exports;
+  }
   if (typeof window !== "undefined") {
+    window.TicketsForm = exports;
     window.abrirTicket = abrirTicket;
     window.abrirTicketPreloaded = abrirTicketPreloaded;
     window.toggleResolucionTicket = toggleResolucionTicket;

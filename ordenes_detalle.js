@@ -2008,6 +2008,7 @@ async function limpiarFirma(ordenId, tipo) {
     window.borrarCanvasFirma = borrarCanvasFirma;
     window.guardarFirmaCanvas = guardarFirmaCanvas;
     window.limpiarFirma = limpiarFirma;
+    window.OrdenesDetalle = exports;
   }
 
   return exports;

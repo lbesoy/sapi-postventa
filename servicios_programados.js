@@ -625,6 +625,7 @@
     Object.assign(root, exports);
   }
   if (typeof window !== 'undefined') {
+    window.ServiciosProgramados = exports;
     Object.assign(window, exports);
   }
   if (typeof module !== 'undefined' && module.exports) {

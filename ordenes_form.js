@@ -1057,6 +1057,7 @@ function completarReporteDesdeDetalle(id) {
     window.guardarOrden = guardarOrden;
     window.eliminarOrden = eliminarOrden;
     window.completarReporteDesdeDetalle = completarReporteDesdeDetalle;
+    window.OrdenesForm = exports;
   }
 
   return exports;

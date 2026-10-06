@@ -343,6 +343,12 @@ if (typeof window !== 'undefined') {
   window.ordenes = ordenes;
   window.usuarios = usuarios;
   window.currentSession = currentSession;
+  window.tecnicosDb = tecnicosDb;
+  window.sitiosDb = sitiosDb;
+  window.maquinariaDb = maquinariaDb;
+  window.clientesDb = clientesDb;
+  window.gastos = gastos;
+  window.levantamientos = levantamientos;
 }
 
 // Helpers compartidos de escapeHTML y Juntas
@@ -2037,9 +2043,10 @@ function cambiarPrioridadIdeaFalla(...args) {
   }
 }
 function sincronizarConGitHub(...args) {
-  if (typeof window !== "undefined" && typeof window.sincronizarConGitHub === "function" && window.sincronizarConGitHub !== sincronizarConGitHub) {
-    return window.sincronizarConGitHub(...args);
-  }
+  if (typeof window !== "undefined" && window.SapSync && typeof window.SapSync.sincronizarConGitHub === "function") return window.SapSync.sincronizarConGitHub(...args);
+}
+if (typeof window !== "undefined") {
+  window.sincronizarConGitHub = sincronizarConGitHub;
 }
 function guardarConfig(...args) {
   if (typeof window !== "undefined" && typeof window.guardarConfig === "function" && window.guardarConfig !== guardarConfig) {
@@ -2063,95 +2070,69 @@ function guardarOneDriveConfig(...args) {
 // =========================================================================
 
 function abrirModalMapeo(...args) {
-  if (typeof window !== "undefined" && typeof window.abrirModalMapeo === "function" && window.abrirModalMapeo !== abrirModalMapeo) {
-    return window.abrirModalMapeo(...args);
-  }
+  if (typeof window !== "undefined" && window.SapMapper && typeof window.SapMapper.abrirModalMapeo === "function") return window.SapMapper.abrirModalMapeo(...args);
 }
-
 function getLabelsForModule(...args) {
-  if (typeof window !== "undefined" && typeof window.getLabelsForModule === "function" && window.getLabelsForModule !== getLabelsForModule) {
-    return window.getLabelsForModule(...args);
-  }
+  if (typeof window !== "undefined" && window.SapMapper && typeof window.SapMapper.getLabelsForModule === "function") return window.SapMapper.getLabelsForModule(...args);
   return {};
 }
-
 function applyTableHeaders(...args) {
-  if (typeof window !== "undefined" && typeof window.applyTableHeaders === "function" && window.applyTableHeaders !== applyTableHeaders) {
-    return window.applyTableHeaders(...args);
-  }
+  if (typeof window !== "undefined" && window.SapMapper && typeof window.SapMapper.applyTableHeaders === "function") return window.SapMapper.applyTableHeaders(...args);
 }
-
 function cerrarModalMapeo(...args) {
-  if (typeof window !== "undefined" && typeof window.cerrarModalMapeo === "function" && window.cerrarModalMapeo !== cerrarModalMapeo) {
-    return window.cerrarModalMapeo(...args);
-  }
+  if (typeof window !== "undefined" && window.SapMapper && typeof window.SapMapper.cerrarModalMapeo === "function") return window.SapMapper.cerrarModalMapeo(...args);
 }
-
 function switchMapeoTab(...args) {
-  if (typeof window !== "undefined" && typeof window.switchMapeoTab === "function" && window.switchMapeoTab !== switchMapeoTab) {
-    return window.switchMapeoTab(...args);
-  }
+  if (typeof window !== "undefined" && window.SapMapper && typeof window.SapMapper.switchMapeoTab === "function") return window.SapMapper.switchMapeoTab(...args);
 }
-
 function addCustomColumnUI(...args) {
-  if (typeof window !== "undefined" && typeof window.addCustomColumnUI === "function" && window.addCustomColumnUI !== addCustomColumnUI) {
-    return window.addCustomColumnUI(...args);
-  }
+  if (typeof window !== "undefined" && window.SapMapper && typeof window.SapMapper.addCustomColumnUI === "function") return window.SapMapper.addCustomColumnUI(...args);
 }
-
 function removeCustomColumn(...args) {
-  if (typeof window !== "undefined" && typeof window.removeCustomColumn === "function" && window.removeCustomColumn !== removeCustomColumn) {
-    return window.removeCustomColumn(...args);
-  }
+  if (typeof window !== "undefined" && window.SapMapper && typeof window.SapMapper.removeCustomColumn === "function") return window.SapMapper.removeCustomColumn(...args);
 }
-
 function getCustomColumnsForModule(...args) {
-  if (typeof window !== "undefined" && typeof window.getCustomColumnsForModule === "function" && window.getCustomColumnsForModule !== getCustomColumnsForModule) {
-    return window.getCustomColumnsForModule(...args);
-  }
+  if (typeof window !== "undefined" && window.SapMapper && typeof window.SapMapper.getCustomColumnsForModule === "function") return window.SapMapper.getCustomColumnsForModule(...args);
   return [];
 }
-
 function guardarMapeoColumnas(...args) {
-  if (typeof window !== "undefined" && typeof window.guardarMapeoColumnas === "function" && window.guardarMapeoColumnas !== guardarMapeoColumnas) {
-    return window.guardarMapeoColumnas(...args);
-  }
+  if (typeof window !== "undefined" && window.SapMapper && typeof window.SapMapper.guardarMapeoColumnas === "function") return window.SapMapper.guardarMapeoColumnas(...args);
 }
-
 function cargarListaQueriesSAP(...args) {
-  if (typeof window !== "undefined" && typeof window.cargarListaQueriesSAP === "function" && window.cargarListaQueriesSAP !== cargarListaQueriesSAP) {
-    return window.cargarListaQueriesSAP(...args);
-  }
+  if (typeof window !== "undefined" && window.SapMapper && typeof window.SapMapper.cargarListaQueriesSAP === "function") return window.SapMapper.cargarListaQueriesSAP(...args);
 }
-
 function cargarDetalleQuery(...args) {
-  if (typeof window !== "undefined" && typeof window.cargarDetalleQuery === "function" && window.cargarDetalleQuery !== cargarDetalleQuery) {
-    return window.cargarDetalleQuery(...args);
-  }
+  if (typeof window !== "undefined" && window.SapMapper && typeof window.SapMapper.cargarDetalleQuery === "function") return window.SapMapper.cargarDetalleQuery(...args);
 }
-
 function limpiarFormularioQuery(...args) {
-  if (typeof window !== "undefined" && typeof window.limpiarFormularioQuery === "function" && window.limpiarFormularioQuery !== limpiarFormularioQuery) {
-    return window.limpiarFormularioQuery(...args);
-  }
+  if (typeof window !== "undefined" && window.SapMapper && typeof window.SapMapper.limpiarFormularioQuery === "function") return window.SapMapper.limpiarFormularioQuery(...args);
 }
-
 function programarQuerySAP(...args) {
-  if (typeof window !== "undefined" && typeof window.programarQuerySAP === "function" && window.programarQuerySAP !== programarQuerySAP) {
-    return window.programarQuerySAP(...args);
-  }
+  if (typeof window !== "undefined" && window.SapMapper && typeof window.SapMapper.programarQuerySAP === "function") return window.SapMapper.programarQuerySAP(...args);
 }
-
 function probarQuerySAP(...args) {
-  if (typeof window !== "undefined" && typeof window.probarQuerySAP === "function" && window.probarQuerySAP !== probarQuerySAP) {
-    return window.probarQuerySAP(...args);
-  }
+  if (typeof window !== "undefined" && window.SapMapper && typeof window.SapMapper.probarQuerySAP === "function") return window.SapMapper.probarQuerySAP(...args);
+}
+function eliminarQuerySAP(...args) {
+  if (typeof window !== "undefined" && window.SapMapper && typeof window.SapMapper.eliminarQuerySAP === "function") return window.SapMapper.eliminarQuerySAP(...args);
 }
 
-function eliminarQuerySAP(...args) {
-  if (typeof window !== "undefined" && typeof window.eliminarQuerySAP === "function" && window.eliminarQuerySAP !== eliminarQuerySAP) {
-    return window.eliminarQuerySAP(...args);
-  }
+if (typeof window !== "undefined") {
+  window.abrirModalMapeo = abrirModalMapeo;
+  window.getLabelsForModule = getLabelsForModule;
+  window.applyTableHeaders = applyTableHeaders;
+  window.cerrarModalMapeo = cerrarModalMapeo;
+  window.switchMapeoTab = switchMapeoTab;
+  window.addCustomColumnUI = addCustomColumnUI;
+  window.removeCustomColumn = removeCustomColumn;
+  window.getCustomColumnsForModule = getCustomColumnsForModule;
+  window.guardarMapeoColumnas = guardarMapeoColumnas;
+  window.cargarListaQueriesSAP = cargarListaQueriesSAP;
+  window.cargarDetalleQuery = cargarDetalleQuery;
+  window.limpiarFormularioQuery = limpiarFormularioQuery;
+  window.programarQuerySAP = programarQuerySAP;
+  window.probarQuerySAP = probarQuerySAP;
+  window.eliminarQuerySAP = eliminarQuerySAP;
 }
 
 function renderTecnicosConfig(...args) {
@@ -2424,34 +2405,32 @@ function onDashFilterChange(...args) {
 // Extraído modularmente a ordenes_listado.js / src/modules/ordenes_listado.js
 // ============================================================
 function setFiltroEstadoServicios(...args) {
-  if (typeof window !== "undefined" && typeof window.setFiltroEstadoServicios === "function" && window.setFiltroEstadoServicios !== setFiltroEstadoServicios) {
-    return window.setFiltroEstadoServicios(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesListado && typeof window.OrdenesListado.setFiltroEstadoServicios === "function") return window.OrdenesListado.setFiltroEstadoServicios(...args);
 }
 function setFiltroTicketsV2(...args) {
-  if (typeof window !== "undefined" && typeof window.setFiltroTicketsV2 === "function" && window.setFiltroTicketsV2 !== setFiltroTicketsV2) {
-    return window.setFiltroTicketsV2(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesListado && typeof window.OrdenesListado.setFiltroTicketsV2 === "function") return window.OrdenesListado.setFiltroTicketsV2(...args);
 }
 function toggleSortOrdenes(...args) {
-  if (typeof window !== "undefined" && typeof window.toggleSortOrdenes === "function" && window.toggleSortOrdenes !== toggleSortOrdenes) {
-    return window.toggleSortOrdenes(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesListado && typeof window.OrdenesListado.toggleSortOrdenes === "function") return window.OrdenesListado.toggleSortOrdenes(...args);
 }
 function renderTabla(...args) {
-  if (typeof window !== "undefined" && typeof window.renderTabla === "function" && window.renderTabla !== renderTabla) {
-    return window.renderTabla(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesListado && typeof window.OrdenesListado.renderTabla === "function") return window.OrdenesListado.renderTabla(...args);
 }
 function badgeEstado(...args) {
-  if (typeof window !== "undefined" && typeof window.badgeEstado === "function" && window.badgeEstado !== badgeEstado) {
-    return window.badgeEstado(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesListado && typeof window.OrdenesListado.badgeEstado === "function") return window.OrdenesListado.badgeEstado(...args);
+  return "abierto";
 }
 function filtrarOrdenes(...args) {
-  if (typeof window !== "undefined" && typeof window.filtrarOrdenes === "function" && window.filtrarOrdenes !== filtrarOrdenes) {
-    return window.filtrarOrdenes(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesListado && typeof window.OrdenesListado.filtrarOrdenes === "function") return window.OrdenesListado.filtrarOrdenes(...args);
+}
+
+if (typeof window !== "undefined") {
+  window.setFiltroEstadoServicios = setFiltroEstadoServicios;
+  window.setFiltroTicketsV2 = setFiltroTicketsV2;
+  window.toggleSortOrdenes = toggleSortOrdenes;
+  window.renderTabla = renderTabla;
+  window.badgeEstado = badgeEstado;
+  window.filtrarOrdenes = filtrarOrdenes;
 }
 
 // ============================================================
@@ -2468,34 +2447,31 @@ function filtrarOrdenes(...args) {
 // Extraído modularmente a config_tecnicos.js / src/modules/config_tecnicos.js
 // ============================================================
 function renderPermisosRoles(...args) {
-  if (typeof window !== "undefined" && typeof window.renderPermisosRoles === "function" && window.renderPermisosRoles !== renderPermisosRoles) {
-    return window.renderPermisosRoles(...args);
-  }
+  if (typeof window !== "undefined" && window.ConfigTecnicos && typeof window.ConfigTecnicos.renderPermisosRoles === "function") return window.ConfigTecnicos.renderPermisosRoles(...args);
 }
 function guardarPermisosRoles(...args) {
-  if (typeof window !== "undefined" && typeof window.guardarPermisosRoles === "function" && window.guardarPermisosRoles !== guardarPermisosRoles) {
-    return window.guardarPermisosRoles(...args);
-  }
+  if (typeof window !== "undefined" && window.ConfigTecnicos && typeof window.ConfigTecnicos.guardarPermisosRoles === "function") return window.ConfigTecnicos.guardarPermisosRoles(...args);
 }
 function setTecView(...args) {
-  if (typeof window !== "undefined" && typeof window.setTecView === "function" && window.setTecView !== setTecView) {
-    return window.setTecView(...args);
-  }
+  if (typeof window !== "undefined" && window.ConfigTecnicos && typeof window.ConfigTecnicos.setTecView === "function") return window.ConfigTecnicos.setTecView(...args);
 }
 function renderTecnicos(...args) {
-  if (typeof window !== "undefined" && typeof window.renderTecnicos === "function" && window.renderTecnicos !== renderTecnicos) {
-    return window.renderTecnicos(...args);
-  }
+  if (typeof window !== "undefined" && window.ConfigTecnicos && typeof window.ConfigTecnicos.renderTecnicos === "function") return window.ConfigTecnicos.renderTecnicos(...args);
 }
 function verDetalleTecnico(...args) {
-  if (typeof window !== "undefined" && typeof window.verDetalleTecnico === "function" && window.verDetalleTecnico !== verDetalleTecnico) {
-    return window.verDetalleTecnico(...args);
-  }
+  if (typeof window !== "undefined" && window.ConfigTecnicos && typeof window.ConfigTecnicos.verDetalleTecnico === "function") return window.ConfigTecnicos.verDetalleTecnico(...args);
 }
 function cerrarDetalleTecnico(...args) {
-  if (typeof window !== "undefined" && typeof window.cerrarDetalleTecnico === "function" && window.cerrarDetalleTecnico !== cerrarDetalleTecnico) {
-    return window.cerrarDetalleTecnico(...args);
-  }
+  if (typeof window !== "undefined" && window.ConfigTecnicos && typeof window.ConfigTecnicos.cerrarDetalleTecnico === "function") return window.ConfigTecnicos.cerrarDetalleTecnico(...args);
+}
+
+if (typeof window !== "undefined") {
+  window.renderPermisosRoles = renderPermisosRoles;
+  window.guardarPermisosRoles = guardarPermisosRoles;
+  window.setTecView = setTecView;
+  window.renderTecnicos = renderTecnicos;
+  window.verDetalleTecnico = verDetalleTecnico;
+  window.cerrarDetalleTecnico = cerrarDetalleTecnico;
 }
 
 // =========================================================================
@@ -2607,89 +2583,75 @@ function cerrarGarantiaInternaDirecto(...args) {
 // Extraído modularmente a ordenes_form.js / src/modules/ordenes_form.js
 // ============================================================
 function initDiasPanels(...args) {
-  if (typeof window !== "undefined" && typeof window.initDiasPanels === "function" && window.initDiasPanels !== initDiasPanels) {
-    return window.initDiasPanels(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.initDiasPanels === "function") return window.OrdenesForm.initDiasPanels(...args);
 }
 function calcularHorasDia(...args) {
-  if (typeof window !== "undefined" && typeof window.calcularHorasDia === "function" && window.calcularHorasDia !== calcularHorasDia) {
-    return window.calcularHorasDia(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.calcularHorasDia === "function") return window.OrdenesForm.calcularHorasDia(...args);
 }
 function autoCompletarFechas(...args) {
-  if (typeof window !== "undefined" && typeof window.autoCompletarFechas === "function" && window.autoCompletarFechas !== autoCompletarFechas) {
-    return window.autoCompletarFechas(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.autoCompletarFechas === "function") return window.OrdenesForm.autoCompletarFechas(...args);
 }
 function selDia(...args) {
-  if (typeof window !== "undefined" && typeof window.selDia === "function" && window.selDia !== selDia) {
-    return window.selDia(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.selDia === "function") return window.OrdenesForm.selDia(...args);
 }
 function calcKmTotal(...args) {
-  if (typeof window !== "undefined" && typeof window.calcKmTotal === "function" && window.calcKmTotal !== calcKmTotal) {
-    return window.calcKmTotal(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.calcKmTotal === "function") return window.OrdenesForm.calcKmTotal(...args);
 }
 function getDiasData(...args) {
-  if (typeof window !== "undefined" && typeof window.getDiasData === "function" && window.getDiasData !== getDiasData) {
-    return window.getDiasData(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.getDiasData === "function") return window.OrdenesForm.getDiasData(...args);
 }
 function setDiasData(...args) {
-  if (typeof window !== "undefined" && typeof window.setDiasData === "function" && window.setDiasData !== setDiasData) {
-    return window.setDiasData(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.setDiasData === "function") return window.OrdenesForm.setDiasData(...args);
 }
 function generarFolioConsecutivo(...args) {
-  if (typeof window !== "undefined" && typeof window.generarFolioConsecutivo === "function" && window.generarFolioConsecutivo !== generarFolioConsecutivo) {
-    return window.generarFolioConsecutivo(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.generarFolioConsecutivo === "function") return window.OrdenesForm.generarFolioConsecutivo(...args);
 }
 function abrirFormulario(...args) {
-  if (typeof window !== "undefined" && typeof window.abrirFormulario === "function" && window.abrirFormulario !== abrirFormulario) {
-    return window.abrirFormulario(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.abrirFormulario === "function") return window.OrdenesForm.abrirFormulario(...args);
 }
 function autoFillFromPdfExtraction(...args) {
-  if (typeof window !== "undefined" && typeof window.autoFillFromPdfExtraction === "function" && window.autoFillFromPdfExtraction !== autoFillFromPdfExtraction) {
-    return window.autoFillFromPdfExtraction(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.autoFillFromPdfExtraction === "function") return window.OrdenesForm.autoFillFromPdfExtraction(...args);
 }
 function onSoporteChange(...args) {
-  if (typeof window !== "undefined" && typeof window.onSoporteChange === "function" && window.onSoporteChange !== onSoporteChange) {
-    return window.onSoporteChange(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.onSoporteChange === "function") return window.OrdenesForm.onSoporteChange(...args);
 }
 function editarOrden(...args) {
-  if (typeof window !== "undefined" && typeof window.editarOrden === "function" && window.editarOrden !== editarOrden) {
-    return window.editarOrden(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.editarOrden === "function") return window.OrdenesForm.editarOrden(...args);
 }
 function cerrarFormulario(...args) {
-  if (typeof window !== "undefined" && typeof window.cerrarFormulario === "function" && window.cerrarFormulario !== cerrarFormulario) {
-    return window.cerrarFormulario(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.cerrarFormulario === "function") return window.OrdenesForm.cerrarFormulario(...args);
 }
 function guardarOrdenes(...args) {
-  if (typeof window !== "undefined" && typeof window.guardarOrdenes === "function" && window.guardarOrdenes !== guardarOrdenes) {
-    return window.guardarOrdenes(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.guardarOrdenes === "function") return window.OrdenesForm.guardarOrdenes(...args);
 }
 function guardarOrden(...args) {
-  if (typeof window !== "undefined" && typeof window.guardarOrden === "function" && window.guardarOrden !== guardarOrden) {
-    return window.guardarOrden(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.guardarOrden === "function") return window.OrdenesForm.guardarOrden(...args);
 }
 function eliminarOrden(...args) {
-  if (typeof window !== "undefined" && typeof window.eliminarOrden === "function" && window.eliminarOrden !== eliminarOrden) {
-    return window.eliminarOrden(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.eliminarOrden === "function") return window.OrdenesForm.eliminarOrden(...args);
 }
 function completarReporteDesdeDetalle(...args) {
-  if (typeof window !== "undefined" && typeof window.completarReporteDesdeDetalle === "function" && window.completarReporteDesdeDetalle !== completarReporteDesdeDetalle) {
-    return window.completarReporteDesdeDetalle(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesForm && typeof window.OrdenesForm.completarReporteDesdeDetalle === "function") return window.OrdenesForm.completarReporteDesdeDetalle(...args);
+}
+
+if (typeof window !== "undefined") {
+  window.initDiasPanels = initDiasPanels;
+  window.calcularHorasDia = calcularHorasDia;
+  window.autoCompletarFechas = autoCompletarFechas;
+  window.selDia = selDia;
+  window.calcKmTotal = calcKmTotal;
+  window.getDiasData = getDiasData;
+  window.setDiasData = setDiasData;
+  window.generarFolioConsecutivo = generarFolioConsecutivo;
+  window.abrirFormulario = abrirFormulario;
+  window.autoFillFromPdfExtraction = autoFillFromPdfExtraction;
+  window.onSoporteChange = onSoporteChange;
+  window.editarOrden = editarOrden;
+  window.cerrarFormulario = cerrarFormulario;
+  window.guardarOrdenes = guardarOrdenes;
+  window.guardarOrden = guardarOrden;
+  window.eliminarOrden = eliminarOrden;
+  window.completarReporteDesdeDetalle = completarReporteDesdeDetalle;
 }
 
 // ============================================================
@@ -2697,79 +2659,67 @@ function completarReporteDesdeDetalle(...args) {
 // Extraído modularmente a ordenes_detalle.js / src/modules/ordenes_detalle.js
 // ============================================================
 function renderEvidenciasFotograficas(...args) {
-  if (typeof window !== "undefined" && typeof window.renderEvidenciasFotograficas === "function" && window.renderEvidenciasFotograficas !== renderEvidenciasFotograficas) {
-    return window.renderEvidenciasFotograficas(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesDetalle && typeof window.OrdenesDetalle.renderEvidenciasFotograficas === "function") return window.OrdenesDetalle.renderEvidenciasFotograficas(...args);
 }
 function previsualizarImagenCompleta(...args) {
-  if (typeof window !== "undefined" && typeof window.previsualizarImagenCompleta === "function" && window.previsualizarImagenCompleta !== previsualizarImagenCompleta) {
-    return window.previsualizarImagenCompleta(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesDetalle && typeof window.OrdenesDetalle.previsualizarImagenCompleta === "function") return window.OrdenesDetalle.previsualizarImagenCompleta(...args);
 }
 function abrirImagenEnPestana(...args) {
-  if (typeof window !== "undefined" && typeof window.abrirImagenEnPestana === "function" && window.abrirImagenEnPestana !== abrirImagenEnPestana) {
-    return window.abrirImagenEnPestana(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesDetalle && typeof window.OrdenesDetalle.abrirImagenEnPestana === "function") return window.OrdenesDetalle.abrirImagenEnPestana(...args);
 }
 function subirEvidenciaFoto(...args) {
-  if (typeof window !== "undefined" && typeof window.subirEvidenciaFoto === "function" && window.subirEvidenciaFoto !== subirEvidenciaFoto) {
-    return window.subirEvidenciaFoto(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesDetalle && typeof window.OrdenesDetalle.subirEvidenciaFoto === "function") return window.OrdenesDetalle.subirEvidenciaFoto(...args);
 }
 function subirFotoRefaccion(...args) {
-  if (typeof window !== "undefined" && typeof window.subirFotoRefaccion === "function" && window.subirFotoRefaccion !== subirFotoRefaccion) {
-    return window.subirFotoRefaccion(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesDetalle && typeof window.OrdenesDetalle.subirFotoRefaccion === "function") return window.OrdenesDetalle.subirFotoRefaccion(...args);
 }
 function eliminarEvidenciaFoto(...args) {
-  if (typeof window !== "undefined" && typeof window.eliminarEvidenciaFoto === "function" && window.eliminarEvidenciaFoto !== eliminarEvidenciaFoto) {
-    return window.eliminarEvidenciaFoto(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesDetalle && typeof window.OrdenesDetalle.eliminarEvidenciaFoto === "function") return window.OrdenesDetalle.eliminarEvidenciaFoto(...args);
 }
 function verDetalle(...args) {
-  if (typeof window !== "undefined" && typeof window.verDetalle === "function" && window.verDetalle !== verDetalle) {
-    return window.verDetalle(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesDetalle && typeof window.OrdenesDetalle.verDetalle === "function") return window.OrdenesDetalle.verDetalle(...args);
 }
 function agregarRenglonTecnicoCierre(...args) {
-  if (typeof window !== "undefined" && typeof window.agregarRenglonTecnicoCierre === "function" && window.agregarRenglonTecnicoCierre !== agregarRenglonTecnicoCierre) {
-    return window.agregarRenglonTecnicoCierre(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesDetalle && typeof window.OrdenesDetalle.agregarRenglonTecnicoCierre === "function") return window.OrdenesDetalle.agregarRenglonTecnicoCierre(...args);
 }
 function abrirCierrePapel(...args) {
-  if (typeof window !== "undefined" && typeof window.abrirCierrePapel === "function" && window.abrirCierrePapel !== abrirCierrePapel) {
-    return window.abrirCierrePapel(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesDetalle && typeof window.OrdenesDetalle.abrirCierrePapel === "function") return window.OrdenesDetalle.abrirCierrePapel(...args);
 }
 function cerrarCierrePapel(...args) {
-  if (typeof window !== "undefined" && typeof window.cerrarCierrePapel === "function" && window.cerrarCierrePapel !== cerrarCierrePapel) {
-    return window.cerrarCierrePapel(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesDetalle && typeof window.OrdenesDetalle.cerrarCierrePapel === "function") return window.OrdenesDetalle.cerrarCierrePapel(...args);
 }
 function confirmarCierrePapel(...args) {
-  if (typeof window !== "undefined" && typeof window.confirmarCierrePapel === "function" && window.confirmarCierrePapel !== confirmarCierrePapel) {
-    return window.confirmarCierrePapel(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesDetalle && typeof window.OrdenesDetalle.confirmarCierrePapel === "function") return window.OrdenesDetalle.confirmarCierrePapel(...args);
 }
 function inicializarCanvasFirma(...args) {
-  if (typeof window !== "undefined" && typeof window.inicializarCanvasFirma === "function" && window.inicializarCanvasFirma !== inicializarCanvasFirma) {
-    return window.inicializarCanvasFirma(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesDetalle && typeof window.OrdenesDetalle.inicializarCanvasFirma === "function") return window.OrdenesDetalle.inicializarCanvasFirma(...args);
 }
 function borrarCanvasFirma(...args) {
-  if (typeof window !== "undefined" && typeof window.borrarCanvasFirma === "function" && window.borrarCanvasFirma !== borrarCanvasFirma) {
-    return window.borrarCanvasFirma(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesDetalle && typeof window.OrdenesDetalle.borrarCanvasFirma === "function") return window.OrdenesDetalle.borrarCanvasFirma(...args);
 }
 function guardarFirmaCanvas(...args) {
-  if (typeof window !== "undefined" && typeof window.guardarFirmaCanvas === "function" && window.guardarFirmaCanvas !== guardarFirmaCanvas) {
-    return window.guardarFirmaCanvas(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesDetalle && typeof window.OrdenesDetalle.guardarFirmaCanvas === "function") return window.OrdenesDetalle.guardarFirmaCanvas(...args);
 }
 function limpiarFirma(...args) {
-  if (typeof window !== "undefined" && typeof window.limpiarFirma === "function" && window.limpiarFirma !== limpiarFirma) {
-    return window.limpiarFirma(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesDetalle && typeof window.OrdenesDetalle.limpiarFirma === "function") return window.OrdenesDetalle.limpiarFirma(...args);
+}
+
+if (typeof window !== "undefined") {
+  window.renderEvidenciasFotograficas = renderEvidenciasFotograficas;
+  window.previsualizarImagenCompleta = previsualizarImagenCompleta;
+  window.abrirImagenEnPestana = abrirImagenEnPestana;
+  window.subirEvidenciaFoto = subirEvidenciaFoto;
+  window.subirFotoRefaccion = subirFotoRefaccion;
+  window.eliminarEvidenciaFoto = eliminarEvidenciaFoto;
+  window.verDetalle = verDetalle;
+  window.agregarRenglonTecnicoCierre = agregarRenglonTecnicoCierre;
+  window.abrirCierrePapel = abrirCierrePapel;
+  window.cerrarCierrePapel = cerrarCierrePapel;
+  window.confirmarCierrePapel = confirmarCierrePapel;
+  window.inicializarCanvasFirma = inicializarCanvasFirma;
+  window.borrarCanvasFirma = borrarCanvasFirma;
+  window.guardarFirmaCanvas = guardarFirmaCanvas;
+  window.limpiarFirma = limpiarFirma;
 }
 
 
@@ -2783,39 +2733,35 @@ function limpiarFirma(...args) {
 // Extraído modularmente a ordenes_bitacora.js / src/modules/ordenes_bitacora.js
 // ============================================================
 function calcularRangoFechasLaboral(...args) {
-  if (typeof window !== "undefined" && typeof window.calcularRangoFechasLaboral === "function" && window.calcularRangoFechasLaboral !== calcularRangoFechasLaboral) {
-    return window.calcularRangoFechasLaboral(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesBitacora && typeof window.OrdenesBitacora.calcularRangoFechasLaboral === "function") return window.OrdenesBitacora.calcularRangoFechasLaboral(...args);
 }
 function abrirBitacora(...args) {
-  if (typeof window !== "undefined" && typeof window.abrirBitacora === "function" && window.abrirBitacora !== abrirBitacora) {
-    return window.abrirBitacora(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesBitacora && typeof window.OrdenesBitacora.abrirBitacora === "function") return window.OrdenesBitacora.abrirBitacora(...args);
 }
 function iniciarReporteDesdeAsignacion(...args) {
-  if (typeof window !== "undefined" && typeof window.iniciarReporteDesdeAsignacion === "function" && window.iniciarReporteDesdeAsignacion !== iniciarReporteDesdeAsignacion) {
-    return window.iniciarReporteDesdeAsignacion(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesBitacora && typeof window.OrdenesBitacora.iniciarReporteDesdeAsignacion === "function") return window.OrdenesBitacora.iniciarReporteDesdeAsignacion(...args);
 }
 function editarBitacora(...args) {
-  if (typeof window !== "undefined" && typeof window.editarBitacora === "function" && window.editarBitacora !== editarBitacora) {
-    return window.editarBitacora(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesBitacora && typeof window.OrdenesBitacora.editarBitacora === "function") return window.OrdenesBitacora.editarBitacora(...args);
 }
 function cerrarBitacora(...args) {
-  if (typeof window !== "undefined" && typeof window.cerrarBitacora === "function" && window.cerrarBitacora !== cerrarBitacora) {
-    return window.cerrarBitacora(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesBitacora && typeof window.OrdenesBitacora.cerrarBitacora === "function") return window.OrdenesBitacora.cerrarBitacora(...args);
 }
 function actualizarEventoCalendarioDesdeBitacora(...args) {
-  if (typeof window !== "undefined" && typeof window.actualizarEventoCalendarioDesdeBitacora === "function" && window.actualizarEventoCalendarioDesdeBitacora !== actualizarEventoCalendarioDesdeBitacora) {
-    return window.actualizarEventoCalendarioDesdeBitacora(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesBitacora && typeof window.OrdenesBitacora.actualizarEventoCalendarioDesdeBitacora === "function") return window.OrdenesBitacora.actualizarEventoCalendarioDesdeBitacora(...args);
 }
 function guardarNotaBitacora(...args) {
-  if (typeof window !== "undefined" && typeof window.guardarNotaBitacora === "function" && window.guardarNotaBitacora !== guardarNotaBitacora) {
-    return window.guardarNotaBitacora(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesBitacora && typeof window.OrdenesBitacora.guardarNotaBitacora === "function") return window.OrdenesBitacora.guardarNotaBitacora(...args);
+}
+
+if (typeof window !== "undefined") {
+  window.calcularRangoFechasLaboral = calcularRangoFechasLaboral;
+  window.abrirBitacora = abrirBitacora;
+  window.iniciarReporteDesdeAsignacion = iniciarReporteDesdeAsignacion;
+  window.editarBitacora = editarBitacora;
+  window.cerrarBitacora = cerrarBitacora;
+  window.actualizarEventoCalendarioDesdeBitacora = actualizarEventoCalendarioDesdeBitacora;
+  window.guardarNotaBitacora = guardarNotaBitacora;
 }
 
 // ============================================================
@@ -2823,59 +2769,51 @@ function guardarNotaBitacora(...args) {
 // Extraído modularmente a ordenes_estados.js / src/modules/ordenes_estados.js
 // ============================================================
 function calcularEstadoOrden(...args) {
-  if (typeof window !== "undefined" && typeof window.calcularEstadoOrden === "function" && window.calcularEstadoOrden !== calcularEstadoOrden) {
-    return window.calcularEstadoOrden(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesEstados && typeof window.OrdenesEstados.calcularEstadoOrden === "function") return window.OrdenesEstados.calcularEstadoOrden(...args);
 }
 function cerrarDetalle(...args) {
-  if (typeof window !== "undefined" && typeof window.cerrarDetalle === "function" && window.cerrarDetalle !== cerrarDetalle) {
-    return window.cerrarDetalle(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesEstados && typeof window.OrdenesEstados.cerrarDetalle === "function") return window.OrdenesEstados.cerrarDetalle(...args);
 }
 function generarBase64Pdf(...args) {
-  if (typeof window !== "undefined" && typeof window.generarBase64Pdf === "function" && window.generarBase64Pdf !== generarBase64Pdf) {
-    return window.generarBase64Pdf(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesEstados && typeof window.OrdenesEstados.generarBase64Pdf === "function") return window.OrdenesEstados.generarBase64Pdf(...args);
 }
 function toggleCampoCorreo(...args) {
-  if (typeof window !== "undefined" && typeof window.toggleCampoCorreo === "function" && window.toggleCampoCorreo !== toggleCampoCorreo) {
-    return window.toggleCampoCorreo(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesEstados && typeof window.OrdenesEstados.toggleCampoCorreo === "function") return window.OrdenesEstados.toggleCampoCorreo(...args);
 }
 function ejecutarComandoEditor(...args) {
-  if (typeof window !== "undefined" && typeof window.ejecutarComandoEditor === "function" && window.ejecutarComandoEditor !== ejecutarComandoEditor) {
-    return window.ejecutarComandoEditor(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesEstados && typeof window.OrdenesEstados.ejecutarComandoEditor === "function") return window.OrdenesEstados.ejecutarComandoEditor(...args);
 }
 function abrirPaletaColor(...args) {
-  if (typeof window !== "undefined" && typeof window.abrirPaletaColor === "function" && window.abrirPaletaColor !== abrirPaletaColor) {
-    return window.abrirPaletaColor(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesEstados && typeof window.OrdenesEstados.abrirPaletaColor === "function") return window.OrdenesEstados.abrirPaletaColor(...args);
 }
 function ejecutarColorEditor(...args) {
-  if (typeof window !== "undefined" && typeof window.ejecutarColorEditor === "function" && window.ejecutarColorEditor !== ejecutarColorEditor) {
-    return window.ejecutarColorEditor(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesEstados && typeof window.OrdenesEstados.ejecutarColorEditor === "function") return window.OrdenesEstados.ejecutarColorEditor(...args);
 }
 function imprimirOrden(...args) {
-  if (typeof window !== "undefined" && typeof window.imprimirOrden === "function" && window.imprimirOrden !== imprimirOrden) {
-    return window.imprimirOrden(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesEstados && typeof window.OrdenesEstados.imprimirOrden === "function") return window.OrdenesEstados.imprimirOrden(...args);
 }
 function enviarCorreoOrden(...args) {
-  if (typeof window !== "undefined" && typeof window.enviarCorreoOrden === "function" && window.enviarCorreoOrden !== enviarCorreoOrden) {
-    return window.enviarCorreoOrden(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesEstados && typeof window.OrdenesEstados.enviarCorreoOrden === "function") return window.OrdenesEstados.enviarCorreoOrden(...args);
 }
 function cerrarModalCorreo(...args) {
-  if (typeof window !== "undefined" && typeof window.cerrarModalCorreo === "function" && window.cerrarModalCorreo !== cerrarModalCorreo) {
-    return window.cerrarModalCorreo(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesEstados && typeof window.OrdenesEstados.cerrarModalCorreo === "function") return window.OrdenesEstados.cerrarModalCorreo(...args);
 }
 function procesarEnviarCorreo(...args) {
-  if (typeof window !== "undefined" && typeof window.procesarEnviarCorreo === "function" && window.procesarEnviarCorreo !== procesarEnviarCorreo) {
-    return window.procesarEnviarCorreo(...args);
-  }
+  if (typeof window !== "undefined" && window.OrdenesEstados && typeof window.OrdenesEstados.procesarEnviarCorreo === "function") return window.OrdenesEstados.procesarEnviarCorreo(...args);
+}
+
+if (typeof window !== "undefined") {
+  window.calcularEstadoOrden = calcularEstadoOrden;
+  window.cerrarDetalle = cerrarDetalle;
+  window.generarBase64Pdf = generarBase64Pdf;
+  window.toggleCampoCorreo = toggleCampoCorreo;
+  window.ejecutarComandoEditor = ejecutarComandoEditor;
+  window.abrirPaletaColor = abrirPaletaColor;
+  window.ejecutarColorEditor = ejecutarColorEditor;
+  window.imprimirOrden = imprimirOrden;
+  window.enviarCorreoOrden = enviarCorreoOrden;
+  window.cerrarModalCorreo = cerrarModalCorreo;
+  window.procesarEnviarCorreo = procesarEnviarCorreo;
 }
 
 // ============================================================
@@ -2883,181 +2821,150 @@ function procesarEnviarCorreo(...args) {
 // Extraído modularmente a tickets_listado.js / src/modules/tickets_listado.js
 // ============================================================
 function updateTicketBadge(...args) {
-  if (typeof window !== "undefined" && typeof window.updateTicketBadge === "function" && window.updateTicketBadge !== updateTicketBadge) {
-    return window.updateTicketBadge(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.updateTicketBadge === "function") return window.TicketsListado.updateTicketBadge(...args);
 }
 function updateOrdenesBadge(...args) {
-  if (typeof window !== "undefined" && typeof window.updateOrdenesBadge === "function" && window.updateOrdenesBadge !== updateOrdenesBadge) {
-    return window.updateOrdenesBadge(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.updateOrdenesBadge === "function") return window.TicketsListado.updateOrdenesBadge(...args);
 }
 function actualizarFiltrosPersonal(...args) {
-  if (typeof window !== "undefined" && typeof window.actualizarFiltrosPersonal === "function" && window.actualizarFiltrosPersonal !== actualizarFiltrosPersonal) {
-    return window.actualizarFiltrosPersonal(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.actualizarFiltrosPersonal === "function") return window.TicketsListado.actualizarFiltrosPersonal(...args);
 }
 function onSortTicketsChange(...args) {
-  if (typeof window !== "undefined" && typeof window.onSortTicketsChange === "function" && window.onSortTicketsChange !== onSortTicketsChange) {
-    return window.onSortTicketsChange(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.onSortTicketsChange === "function") return window.TicketsListado.onSortTicketsChange(...args);
 }
 function toggleSortMenu(...args) {
-  if (typeof window !== "undefined" && typeof window.toggleSortMenu === "function" && window.toggleSortMenu !== toggleSortMenu) {
-    return window.toggleSortMenu(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.toggleSortMenu === "function") return window.TicketsListado.toggleSortMenu(...args);
 }
 function setSortDirection(...args) {
-  if (typeof window !== "undefined" && typeof window.setSortDirection === "function" && window.setSortDirection !== setSortDirection) {
-    return window.setSortDirection(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.setSortDirection === "function") return window.TicketsListado.setSortDirection(...args);
 }
 function seleccionarColumnaOrden(...args) {
-  if (typeof window !== "undefined" && typeof window.seleccionarColumnaOrden === "function" && window.seleccionarColumnaOrden !== seleccionarColumnaOrden) {
-    return window.seleccionarColumnaOrden(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.seleccionarColumnaOrden === "function") return window.TicketsListado.seleccionarColumnaOrden(...args);
 }
 function actualizarUISortMenu(...args) {
-  if (typeof window !== "undefined" && typeof window.actualizarUISortMenu === "function" && window.actualizarUISortMenu !== actualizarUISortMenu) {
-    return window.actualizarUISortMenu(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.actualizarUISortMenu === "function") return window.TicketsListado.actualizarUISortMenu(...args);
 }
 function actualizarCabeceraOrdenacion(...args) {
-  if (typeof window !== "undefined" && typeof window.actualizarCabeceraOrdenacion === "function" && window.actualizarCabeceraOrdenacion !== actualizarCabeceraOrdenacion) {
-    return window.actualizarCabeceraOrdenacion(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.actualizarCabeceraOrdenacion === "function") return window.TicketsListado.actualizarCabeceraOrdenacion(...args);
 }
 function ordenarTicketsPor(...args) {
-  if (typeof window !== "undefined" && typeof window.ordenarTicketsPor === "function" && window.ordenarTicketsPor !== ordenarTicketsPor) {
-    return window.ordenarTicketsPor(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.ordenarTicketsPor === "function") return window.TicketsListado.ordenarTicketsPor(...args);
 }
 function toggleTipoFilterMenu(...args) {
-  if (typeof window !== "undefined" && typeof window.toggleTipoFilterMenu === "function" && window.toggleTipoFilterMenu !== toggleTipoFilterMenu) {
-    return window.toggleTipoFilterMenu(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.toggleTipoFilterMenu === "function") return window.TicketsListado.toggleTipoFilterMenu(...args);
 }
 function setTicketTipoFilter(...args) {
-  if (typeof window !== "undefined" && typeof window.setTicketTipoFilter === "function" && window.setTicketTipoFilter !== setTicketTipoFilter) {
-    return window.setTicketTipoFilter(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.setTicketTipoFilter === "function") return window.TicketsListado.setTicketTipoFilter(...args);
 }
 function actualizarUITipoFilter(...args) {
-  if (typeof window !== "undefined" && typeof window.actualizarUITipoFilter === "function" && window.actualizarUITipoFilter !== actualizarUITipoFilter) {
-    return window.actualizarUITipoFilter(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.actualizarUITipoFilter === "function") return window.TicketsListado.actualizarUITipoFilter(...args);
 }
 function toggleSupervisorFilterMenu(...args) {
-  if (typeof window !== "undefined" && typeof window.toggleSupervisorFilterMenu === "function" && window.toggleSupervisorFilterMenu !== toggleSupervisorFilterMenu) {
-    return window.toggleSupervisorFilterMenu(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.toggleSupervisorFilterMenu === "function") return window.TicketsListado.toggleSupervisorFilterMenu(...args);
 }
 function setTicketSupervisorFilter(...args) {
-  if (typeof window !== "undefined" && typeof window.setTicketSupervisorFilter === "function" && window.setTicketSupervisorFilter !== setTicketSupervisorFilter) {
-    return window.setTicketSupervisorFilter(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.setTicketSupervisorFilter === "function") return window.TicketsListado.setTicketSupervisorFilter(...args);
 }
 function actualizarUISupervisorFilter(...args) {
-  if (typeof window !== "undefined" && typeof window.actualizarUISupervisorFilter === "function" && window.actualizarUISupervisorFilter !== actualizarUISupervisorFilter) {
-    return window.actualizarUISupervisorFilter(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.actualizarUISupervisorFilter === "function") return window.TicketsListado.actualizarUISupervisorFilter(...args);
 }
 function toggleAntiguedadFilterMenu(...args) {
-  if (typeof window !== "undefined" && typeof window.toggleAntiguedadFilterMenu === "function" && window.toggleAntiguedadFilterMenu !== toggleAntiguedadFilterMenu) {
-    return window.toggleAntiguedadFilterMenu(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.toggleAntiguedadFilterMenu === "function") return window.TicketsListado.toggleAntiguedadFilterMenu(...args);
 }
 function cambiarModoAntiguedad(...args) {
-  if (typeof window !== "undefined" && typeof window.cambiarModoAntiguedad === "function" && window.cambiarModoAntiguedad !== cambiarModoAntiguedad) {
-    return window.cambiarModoAntiguedad(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.cambiarModoAntiguedad === "function") return window.TicketsListado.cambiarModoAntiguedad(...args);
 }
 function setAntiguedadRango(...args) {
-  if (typeof window !== "undefined" && typeof window.setAntiguedadRango === "function" && window.setAntiguedadRango !== setAntiguedadRango) {
-    return window.setAntiguedadRango(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.setAntiguedadRango === "function") return window.TicketsListado.setAntiguedadRango(...args);
 }
 function setAntiguedadFilter(...args) {
-  if (typeof window !== "undefined" && typeof window.setAntiguedadFilter === "function" && window.setAntiguedadFilter !== setAntiguedadFilter) {
-    return window.setAntiguedadFilter(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.setAntiguedadFilter === "function") return window.TicketsListado.setAntiguedadFilter(...args);
 }
 function actualizarUIAntiguedadFilter(...args) {
-  if (typeof window !== "undefined" && typeof window.actualizarUIAntiguedadFilter === "function" && window.actualizarUIAntiguedadFilter !== actualizarUIAntiguedadFilter) {
-    return window.actualizarUIAntiguedadFilter(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.actualizarUIAntiguedadFilter === "function") return window.TicketsListado.actualizarUIAntiguedadFilter(...args);
 }
 function esTicketHijoRefacciones(...args) {
-  if (typeof window !== "undefined" && typeof window.esTicketHijoRefacciones === "function" && window.esTicketHijoRefacciones !== esTicketHijoRefacciones) {
-    return window.esTicketHijoRefacciones(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.esTicketHijoRefacciones === "function") return window.TicketsListado.esTicketHijoRefacciones(...args);
   return false;
 }
 function obtenerOrdenAsociadaTicket(...args) {
-  if (typeof window !== "undefined" && typeof window.obtenerOrdenAsociadaTicket === "function" && window.obtenerOrdenAsociadaTicket !== obtenerOrdenAsociadaTicket) {
-    return window.obtenerOrdenAsociadaTicket(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.obtenerOrdenAsociadaTicket === "function") return window.TicketsListado.obtenerOrdenAsociadaTicket(...args);
   return null;
 }
 function verOrdenDesdeTicket(...args) {
-  if (typeof window !== "undefined" && typeof window.verOrdenDesdeTicket === "function" && window.verOrdenDesdeTicket !== verOrdenDesdeTicket) {
-    return window.verOrdenDesdeTicket(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.verOrdenDesdeTicket === "function") return window.TicketsListado.verOrdenDesdeTicket(...args);
 }
 function obtenerTicketPadre(...args) {
-  if (typeof window !== "undefined" && typeof window.obtenerTicketPadre === "function" && window.obtenerTicketPadre !== obtenerTicketPadre) {
-    return window.obtenerTicketPadre(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.obtenerTicketPadre === "function") return window.TicketsListado.obtenerTicketPadre(...args);
   return null;
 }
 function resolverClienteTicket(...args) {
-  if (typeof window !== "undefined" && typeof window.resolverClienteTicket === "function" && window.resolverClienteTicket !== resolverClienteTicket) {
-    return window.resolverClienteTicket(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.resolverClienteTicket === "function") return window.TicketsListado.resolverClienteTicket(...args);
   return "";
 }
 function renderTickets(...args) {
-  if (typeof window !== "undefined" && typeof window.renderTickets === "function" && window.renderTickets !== renderTickets) {
-    return window.renderTickets(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.renderTickets === "function") return window.TicketsListado.renderTickets(...args);
 }
 function esTicketEnTransito(...args) {
-  if (typeof window !== "undefined" && typeof window.esTicketEnTransito === "function" && window.esTicketEnTransito !== esTicketEnTransito) {
-    return window.esTicketEnTransito(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.esTicketEnTransito === "function") return window.TicketsListado.esTicketEnTransito(...args);
   return false;
 }
 function badgeTicketEstado(...args) {
-  if (typeof window !== "undefined" && typeof window.badgeTicketEstado === "function" && window.badgeTicketEstado !== badgeTicketEstado) {
-    return window.badgeTicketEstado(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.badgeTicketEstado === "function") return window.TicketsListado.badgeTicketEstado(...args);
   return "abierto";
 }
 function getTicketEstadoLabel(...args) {
-  if (typeof window !== "undefined" && typeof window.getTicketEstadoLabel === "function" && window.getTicketEstadoLabel !== getTicketEstadoLabel) {
-    return window.getTicketEstadoLabel(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.getTicketEstadoLabel === "function") return window.TicketsListado.getTicketEstadoLabel(...args);
   return "—";
 }
 function filtrarTickets(...args) {
-  if (typeof window !== "undefined" && typeof window.filtrarTickets === "function" && window.filtrarTickets !== filtrarTickets) {
-    return window.filtrarTickets(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.filtrarTickets === "function") return window.TicketsListado.filtrarTickets(...args);
 }
 function setFiltroTickets(...args) {
-  if (typeof window !== "undefined" && typeof window.setFiltroTickets === "function" && window.setFiltroTickets !== setFiltroTickets) {
-    return window.setFiltroTickets(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.setFiltroTickets === "function") return window.TicketsListado.setFiltroTickets(...args);
 }
 function seleccionarCanal(...args) {
-  if (typeof window !== "undefined" && typeof window.seleccionarCanal === "function" && window.seleccionarCanal !== seleccionarCanal) {
-    return window.seleccionarCanal(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.seleccionarCanal === "function") return window.TicketsListado.seleccionarCanal(...args);
 }
 function updateFileLabel(...args) {
-  if (typeof window !== "undefined" && typeof window.updateFileLabel === "function" && window.updateFileLabel !== updateFileLabel) {
-    return window.updateFileLabel(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsListado && typeof window.TicketsListado.updateFileLabel === "function") return window.TicketsListado.updateFileLabel(...args);
+}
+
+if (typeof window !== "undefined") {
+  window.updateTicketBadge = updateTicketBadge;
+  window.updateOrdenesBadge = updateOrdenesBadge;
+  window.actualizarFiltrosPersonal = actualizarFiltrosPersonal;
+  window.onSortTicketsChange = onSortTicketsChange;
+  window.toggleSortMenu = toggleSortMenu;
+  window.setSortDirection = setSortDirection;
+  window.seleccionarColumnaOrden = seleccionarColumnaOrden;
+  window.actualizarUISortMenu = actualizarUISortMenu;
+  window.actualizarCabeceraOrdenacion = actualizarCabeceraOrdenacion;
+  window.ordenarTicketsPor = ordenarTicketsPor;
+  window.toggleTipoFilterMenu = toggleTipoFilterMenu;
+  window.setTicketTipoFilter = setTicketTipoFilter;
+  window.actualizarUITipoFilter = actualizarUITipoFilter;
+  window.toggleSupervisorFilterMenu = toggleSupervisorFilterMenu;
+  window.setTicketSupervisorFilter = setTicketSupervisorFilter;
+  window.actualizarUISupervisorFilter = actualizarUISupervisorFilter;
+  window.toggleAntiguedadFilterMenu = toggleAntiguedadFilterMenu;
+  window.cambiarModoAntiguedad = cambiarModoAntiguedad;
+  window.setAntiguedadRango = setAntiguedadRango;
+  window.setAntiguedadFilter = setAntiguedadFilter;
+  window.actualizarUIAntiguedadFilter = actualizarUIAntiguedadFilter;
+  window.esTicketHijoRefacciones = esTicketHijoRefacciones;
+  window.obtenerOrdenAsociadaTicket = obtenerOrdenAsociadaTicket;
+  window.verOrdenDesdeTicket = verOrdenDesdeTicket;
+  window.obtenerTicketPadre = obtenerTicketPadre;
+  window.resolverClienteTicket = resolverClienteTicket;
+  window.renderTickets = renderTickets;
+  window.esTicketEnTransito = esTicketEnTransito;
+  window.badgeTicketEstado = badgeTicketEstado;
+  window.getTicketEstadoLabel = getTicketEstadoLabel;
+  window.filtrarTickets = filtrarTickets;
+  window.setFiltroTickets = setFiltroTickets;
+  window.seleccionarCanal = seleccionarCanal;
+  window.updateFileLabel = updateFileLabel;
 }
 
 // ============================================================
@@ -3075,41 +2982,37 @@ function updateFileLabel(...args) {
 // Extraído modularmente a servicios_programados.js / src/modules/servicios_programados.js
 // ============================================================
 function renderServiciosProgramadosTecnico(...args) {
-  if (typeof window !== "undefined" && typeof window.renderServiciosProgramadosTecnico === "function" && window.renderServiciosProgramadosTecnico !== renderServiciosProgramadosTecnico) {
-    return window.renderServiciosProgramadosTecnico(...args);
-  }
+  if (typeof window !== "undefined" && window.ServiciosProgramados && typeof window.ServiciosProgramados.renderServiciosProgramadosTecnico === "function") return window.ServiciosProgramados.renderServiciosProgramadosTecnico(...args);
 }
 function renderTicketRefaccionesList(...args) {
-  if (typeof window !== "undefined" && typeof window.renderTicketRefaccionesList === "function" && window.renderTicketRefaccionesList !== renderTicketRefaccionesList) {
-    return window.renderTicketRefaccionesList(...args);
-  }
+  if (typeof window !== "undefined" && window.ServiciosProgramados && typeof window.ServiciosProgramados.renderTicketRefaccionesList === "function") return window.ServiciosProgramados.renderTicketRefaccionesList(...args);
 }
 function obtenerEnviosDesdeDOM(...args) {
-  if (typeof window !== "undefined" && typeof window.obtenerEnviosDesdeDOM === "function" && window.obtenerEnviosDesdeDOM !== obtenerEnviosDesdeDOM) {
-    return window.obtenerEnviosDesdeDOM(...args);
-  }
+  if (typeof window !== "undefined" && window.ServiciosProgramados && typeof window.ServiciosProgramados.obtenerEnviosDesdeDOM === "function") return window.ServiciosProgramados.obtenerEnviosDesdeDOM(...args);
   return [];
 }
 function actualizarVisibilidadDestinoPiezas(...args) {
-  if (typeof window !== "undefined" && typeof window.actualizarVisibilidadDestinoPiezas === "function" && window.actualizarVisibilidadDestinoPiezas !== actualizarVisibilidadDestinoPiezas) {
-    return window.actualizarVisibilidadDestinoPiezas(...args);
-  }
+  if (typeof window !== "undefined" && window.ServiciosProgramados && typeof window.ServiciosProgramados.actualizarVisibilidadDestinoPiezas === "function") return window.ServiciosProgramados.actualizarVisibilidadDestinoPiezas(...args);
 }
 function actualizarEstatusRefaccionesDesdeGuias(...args) {
-  if (typeof window !== "undefined" && typeof window.actualizarEstatusRefaccionesDesdeGuias === "function" && window.actualizarEstatusRefaccionesDesdeGuias !== actualizarEstatusRefaccionesDesdeGuias) {
-    return window.actualizarEstatusRefaccionesDesdeGuias(...args);
-  }
+  if (typeof window !== "undefined" && window.ServiciosProgramados && typeof window.ServiciosProgramados.actualizarEstatusRefaccionesDesdeGuias === "function") return window.ServiciosProgramados.actualizarEstatusRefaccionesDesdeGuias(...args);
 }
 function esTicketDeServicioEnCampo(...args) {
-  if (typeof window !== "undefined" && typeof window.esTicketDeServicioEnCampo === "function" && window.esTicketDeServicioEnCampo !== esTicketDeServicioEnCampo) {
-    return window.esTicketDeServicioEnCampo(...args);
-  }
+  if (typeof window !== "undefined" && window.ServiciosProgramados && typeof window.ServiciosProgramados.esTicketDeServicioEnCampo === "function") return window.ServiciosProgramados.esTicketDeServicioEnCampo(...args);
   return false;
 }
 function renderEnvioCards(...args) {
-  if (typeof window !== "undefined" && typeof window.renderEnvioCards === "function" && window.renderEnvioCards !== renderEnvioCards) {
-    return window.renderEnvioCards(...args);
-  }
+  if (typeof window !== "undefined" && window.ServiciosProgramados && typeof window.ServiciosProgramados.renderEnvioCards === "function") return window.ServiciosProgramados.renderEnvioCards(...args);
+}
+
+if (typeof window !== "undefined") {
+  window.renderServiciosProgramadosTecnico = renderServiciosProgramadosTecnico;
+  window.renderTicketRefaccionesList = renderTicketRefaccionesList;
+  window.obtenerEnviosDesdeDOM = obtenerEnviosDesdeDOM;
+  window.actualizarVisibilidadDestinoPiezas = actualizarVisibilidadDestinoPiezas;
+  window.actualizarEstatusRefaccionesDesdeGuias = actualizarEstatusRefaccionesDesdeGuias;
+  window.esTicketDeServicioEnCampo = esTicketDeServicioEnCampo;
+  window.renderEnvioCards = renderEnvioCards;
 }
 
 // ============================================================
@@ -3117,114 +3020,95 @@ function renderEnvioCards(...args) {
 // Extraído modularmente a tickets_form.js / src/modules/tickets_form.js
 // ============================================================
 function abrirTicket(...args) {
-  if (typeof window !== "undefined" && typeof window.abrirTicket === "function" && window.abrirTicket !== abrirTicket) {
-    return window.abrirTicket(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.abrirTicket === "function") return window.TicketsForm.abrirTicket(...args);
 }
 function abrirTicketPreloaded(...args) {
-  if (typeof window !== "undefined" && typeof window.abrirTicketPreloaded === "function" && window.abrirTicketPreloaded !== abrirTicketPreloaded) {
-    return window.abrirTicketPreloaded(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.abrirTicketPreloaded === "function") return window.TicketsForm.abrirTicketPreloaded(...args);
 }
 function toggleResolucionTicket(...args) {
-  if (typeof window !== "undefined" && typeof window.toggleResolucionTicket === "function" && window.toggleResolucionTicket !== toggleResolucionTicket) {
-    return window.toggleResolucionTicket(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.toggleResolucionTicket === "function") return window.TicketsForm.toggleResolucionTicket(...args);
 }
 function toggleMotivoRechazo(...args) {
-  if (typeof window !== "undefined" && typeof window.toggleMotivoRechazo === "function" && window.toggleMotivoRechazo !== toggleMotivoRechazo) {
-    return window.toggleMotivoRechazo(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.toggleMotivoRechazo === "function") return window.TicketsForm.toggleMotivoRechazo(...args);
 }
 function editarTicket(...args) {
-  if (typeof window !== "undefined" && typeof window.editarTicket === "function" && window.editarTicket !== editarTicket) {
-    return window.editarTicket(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.editarTicket === "function") return window.TicketsForm.editarTicket(...args);
 }
 function cerrarTicket(...args) {
-  if (typeof window !== "undefined" && typeof window.cerrarTicket === "function" && window.cerrarTicket !== cerrarTicket) {
-    return window.cerrarTicket(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.cerrarTicket === "function") return window.TicketsForm.cerrarTicket(...args);
 }
 function poblarSoportesPorCliente(...args) {
-  if (typeof window !== "undefined" && typeof window.poblarSoportesPorCliente === "function" && window.poblarSoportesPorCliente !== poblarSoportesPorCliente) {
-    return window.poblarSoportesPorCliente(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.poblarSoportesPorCliente === "function") return window.TicketsForm.poblarSoportesPorCliente(...args);
 }
 function poblarMaquinasCliente(...args) {
-  if (typeof window !== "undefined" && typeof window.poblarMaquinasCliente === "function" && window.poblarMaquinasCliente !== poblarMaquinasCliente) {
-    return window.poblarMaquinasCliente(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.poblarMaquinasCliente === "function") return window.TicketsForm.poblarMaquinasCliente(...args);
 }
 function onEquipoOrdenChange(...args) {
-  if (typeof window !== "undefined" && typeof window.onEquipoOrdenChange === "function" && window.onEquipoOrdenChange !== onEquipoOrdenChange) {
-    return window.onEquipoOrdenChange(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.onEquipoOrdenChange === "function") return window.TicketsForm.onEquipoOrdenChange(...args);
 }
 function onEquipoTicketChange(...args) {
-  if (typeof window !== "undefined" && typeof window.onEquipoTicketChange === "function" && window.onEquipoTicketChange !== onEquipoTicketChange) {
-    return window.onEquipoTicketChange(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.onEquipoTicketChange === "function") return window.TicketsForm.onEquipoTicketChange(...args);
 }
 function onEquipoTicketChangeMultiple(...args) {
-  if (typeof window !== "undefined" && typeof window.onEquipoTicketChangeMultiple === "function" && window.onEquipoTicketChangeMultiple !== onEquipoTicketChangeMultiple) {
-    return window.onEquipoTicketChangeMultiple(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.onEquipoTicketChangeMultiple === "function") return window.TicketsForm.onEquipoTicketChangeMultiple(...args);
 }
 function actualizarCamposMaquinaOrden(...args) {
-  if (typeof window !== "undefined" && typeof window.actualizarCamposMaquinaOrden === "function" && window.actualizarCamposMaquinaOrden !== actualizarCamposMaquinaOrden) {
-    return window.actualizarCamposMaquinaOrden(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.actualizarCamposMaquinaOrden === "function") return window.TicketsForm.actualizarCamposMaquinaOrden(...args);
 }
 function agregarMaquinaChipOrden(...args) {
-  if (typeof window !== "undefined" && typeof window.agregarMaquinaChipOrden === "function" && window.agregarMaquinaChipOrden !== agregarMaquinaChipOrden) {
-    return window.agregarMaquinaChipOrden(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.agregarMaquinaChipOrden === "function") return window.TicketsForm.agregarMaquinaChipOrden(...args);
 }
 function onEquipoOrdenChangeMultiple(...args) {
-  if (typeof window !== "undefined" && typeof window.onEquipoOrdenChangeMultiple === "function" && window.onEquipoOrdenChangeMultiple !== onEquipoOrdenChangeMultiple) {
-    return window.onEquipoOrdenChangeMultiple(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.onEquipoOrdenChangeMultiple === "function") return window.TicketsForm.onEquipoOrdenChangeMultiple(...args);
 }
 function toggleCombo(...args) {
-  if (typeof window !== "undefined" && typeof window.toggleCombo === "function" && window.toggleCombo !== toggleCombo) {
-    return window.toggleCombo(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.toggleCombo === "function") return window.TicketsForm.toggleCombo(...args);
 }
 function filterCombo(...args) {
-  if (typeof window !== "undefined" && typeof window.filterCombo === "function" && window.filterCombo !== filterCombo) {
-    return window.filterCombo(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.filterCombo === "function") return window.TicketsForm.filterCombo(...args);
 }
 function selectComboOption(...args) {
-  if (typeof window !== "undefined" && typeof window.selectComboOption === "function" && window.selectComboOption !== selectComboOption) {
-    return window.selectComboOption(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.selectComboOption === "function") return window.TicketsForm.selectComboOption(...args);
 }
 function agregarSitioCombo(...args) {
-  if (typeof window !== "undefined" && typeof window.agregarSitioCombo === "function" && window.agregarSitioCombo !== agregarSitioCombo) {
-    return window.agregarSitioCombo(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.agregarSitioCombo === "function") return window.TicketsForm.agregarSitioCombo(...args);
 }
 function agregarEmpresaCombo(...args) {
-  if (typeof window !== "undefined" && typeof window.agregarEmpresaCombo === "function" && window.agregarEmpresaCombo !== agregarEmpresaCombo) {
-    return window.agregarEmpresaCombo(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.agregarEmpresaCombo === "function") return window.TicketsForm.agregarEmpresaCombo(...args);
 }
 function readFileAsBase64(...args) {
-  if (typeof window !== "undefined" && typeof window.readFileAsBase64 === "function" && window.readFileAsBase64 !== readFileAsBase64) {
-    return window.readFileAsBase64(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.readFileAsBase64 === "function") return window.TicketsForm.readFileAsBase64(...args);
 }
 function guardarTicket(...args) {
-  if (typeof window !== "undefined" && typeof window.guardarTicket === "function" && window.guardarTicket !== guardarTicket) {
-    return window.guardarTicket(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.guardarTicket === "function") return window.TicketsForm.guardarTicket(...args);
 }
 function eliminarTicket(...args) {
-  if (typeof window !== "undefined" && typeof window.eliminarTicket === "function" && window.eliminarTicket !== eliminarTicket) {
-    return window.eliminarTicket(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsForm && typeof window.TicketsForm.eliminarTicket === "function") return window.TicketsForm.eliminarTicket(...args);
+}
+
+if (typeof window !== "undefined") {
+  window.abrirTicket = abrirTicket;
+  window.abrirTicketPreloaded = abrirTicketPreloaded;
+  window.toggleResolucionTicket = toggleResolucionTicket;
+  window.toggleMotivoRechazo = toggleMotivoRechazo;
+  window.editarTicket = editarTicket;
+  window.cerrarTicket = cerrarTicket;
+  window.poblarSoportesPorCliente = poblarSoportesPorCliente;
+  window.poblarMaquinasCliente = poblarMaquinasCliente;
+  window.onEquipoOrdenChange = onEquipoOrdenChange;
+  window.onEquipoTicketChange = onEquipoTicketChange;
+  window.onEquipoTicketChangeMultiple = onEquipoTicketChangeMultiple;
+  window.actualizarCamposMaquinaOrden = actualizarCamposMaquinaOrden;
+  window.agregarMaquinaChipOrden = agregarMaquinaChipOrden;
+  window.onEquipoOrdenChangeMultiple = onEquipoOrdenChangeMultiple;
+  window.toggleCombo = toggleCombo;
+  window.filterCombo = filterCombo;
+  window.selectComboOption = selectComboOption;
+  window.agregarSitioCombo = agregarSitioCombo;
+  window.agregarEmpresaCombo = agregarEmpresaCombo;
+  window.readFileAsBase64 = readFileAsBase64;
+  window.guardarTicket = guardarTicket;
+  window.eliminarTicket = eliminarTicket;
 }
 
 // ============================================================
@@ -3232,69 +3116,59 @@ function eliminarTicket(...args) {
 // Extraído modularmente a tickets_detalle.js / src/modules/tickets_detalle.js
 // ============================================================
 function renderComentariosInternosHtml(...args) {
-  if (typeof window !== "undefined" && typeof window.renderComentariosInternosHtml === "function" && window.renderComentariosInternosHtml !== renderComentariosInternosHtml) {
-    return window.renderComentariosInternosHtml(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsDetalle && typeof window.TicketsDetalle.renderComentariosInternosHtml === "function") return window.TicketsDetalle.renderComentariosInternosHtml(...args);
 }
 function switchCommentTab(...args) {
-  if (typeof window !== "undefined" && typeof window.switchCommentTab === "function" && window.switchCommentTab !== switchCommentTab) {
-    return window.switchCommentTab(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsDetalle && typeof window.TicketsDetalle.switchCommentTab === "function") return window.TicketsDetalle.switchCommentTab(...args);
 }
 function agregarComentarioInterno(...args) {
-  if (typeof window !== "undefined" && typeof window.agregarComentarioInterno === "function" && window.agregarComentarioInterno !== agregarComentarioInterno) {
-    return window.agregarComentarioInterno(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsDetalle && typeof window.TicketsDetalle.agregarComentarioInterno === "function") return window.TicketsDetalle.agregarComentarioInterno(...args);
 }
 function agregarComentarioExterno(...args) {
-  if (typeof window !== "undefined" && typeof window.agregarComentarioExterno === "function" && window.agregarComentarioExterno !== agregarComentarioExterno) {
-    return window.agregarComentarioExterno(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsDetalle && typeof window.TicketsDetalle.agregarComentarioExterno === "function") return window.TicketsDetalle.agregarComentarioExterno(...args);
 }
 function verDetalleTicket(...args) {
-  if (typeof window !== "undefined" && typeof window.verDetalleTicket === "function" && window.verDetalleTicket !== verDetalleTicket) {
-    return window.verDetalleTicket(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsDetalle && typeof window.TicketsDetalle.verDetalleTicket === "function") return window.TicketsDetalle.verDetalleTicket(...args);
 }
 function visualizarPdfOnDemand(...args) {
-  if (typeof window !== "undefined" && typeof window.visualizarPdfOnDemand === "function" && window.visualizarPdfOnDemand !== visualizarPdfOnDemand) {
-    return window.visualizarPdfOnDemand(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsDetalle && typeof window.TicketsDetalle.visualizarPdfOnDemand === "function") return window.TicketsDetalle.visualizarPdfOnDemand(...args);
 }
 function visualizarDestinoPdfActual(...args) {
-  if (typeof window !== "undefined" && typeof window.visualizarDestinoPdfActual === "function" && window.visualizarDestinoPdfActual !== visualizarDestinoPdfActual) {
-    return window.visualizarDestinoPdfActual(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsDetalle && typeof window.TicketsDetalle.visualizarDestinoPdfActual === "function") return window.TicketsDetalle.visualizarDestinoPdfActual(...args);
 }
 function descargarPdfOnDemand(...args) {
-  if (typeof window !== "undefined" && typeof window.descargarPdfOnDemand === "function" && window.descargarPdfOnDemand !== descargarPdfOnDemand) {
-    return window.descargarPdfOnDemand(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsDetalle && typeof window.TicketsDetalle.descargarPdfOnDemand === "function") return window.TicketsDetalle.descargarPdfOnDemand(...args);
 }
 function avanzarCotizacionTicket(...args) {
-  if (typeof window !== "undefined" && typeof window.avanzarCotizacionTicket === "function" && window.avanzarCotizacionTicket !== avanzarCotizacionTicket) {
-    return window.avanzarCotizacionTicket(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsDetalle && typeof window.TicketsDetalle.avanzarCotizacionTicket === "function") return window.TicketsDetalle.avanzarCotizacionTicket(...args);
 }
 function cerrarCotizacionTicket(...args) {
-  if (typeof window !== "undefined" && typeof window.cerrarCotizacionTicket === "function" && window.cerrarCotizacionTicket !== cerrarCotizacionTicket) {
-    return window.cerrarCotizacionTicket(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsDetalle && typeof window.TicketsDetalle.cerrarCotizacionTicket === "function") return window.TicketsDetalle.cerrarCotizacionTicket(...args);
 }
 function cerrarDetalleTicket(...args) {
-  if (typeof window !== "undefined" && typeof window.cerrarDetalleTicket === "function" && window.cerrarDetalleTicket !== cerrarDetalleTicket) {
-    return window.cerrarDetalleTicket(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsDetalle && typeof window.TicketsDetalle.cerrarDetalleTicket === "function") return window.TicketsDetalle.cerrarDetalleTicket(...args);
 }
 function forzarEstadoTicket(...args) {
-  if (typeof window !== "undefined" && typeof window.forzarEstadoTicket === "function" && window.forzarEstadoTicket !== forzarEstadoTicket) {
-    return window.forzarEstadoTicket(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsDetalle && typeof window.TicketsDetalle.forzarEstadoTicket === "function") return window.TicketsDetalle.forzarEstadoTicket(...args);
 }
 function forzarCrearOrdenServicio(...args) {
-  if (typeof window !== "undefined" && typeof window.forzarCrearOrdenServicio === "function" && window.forzarCrearOrdenServicio !== forzarCrearOrdenServicio) {
-    return window.forzarCrearOrdenServicio(...args);
-  }
+  if (typeof window !== "undefined" && window.TicketsDetalle && typeof window.TicketsDetalle.forzarCrearOrdenServicio === "function") return window.TicketsDetalle.forzarCrearOrdenServicio(...args);
+}
+
+if (typeof window !== "undefined") {
+  window.renderComentariosInternosHtml = renderComentariosInternosHtml;
+  window.switchCommentTab = switchCommentTab;
+  window.agregarComentarioInterno = agregarComentarioInterno;
+  window.agregarComentarioExterno = agregarComentarioExterno;
+  window.verDetalleTicket = verDetalleTicket;
+  window.visualizarPdfOnDemand = visualizarPdfOnDemand;
+  window.visualizarDestinoPdfActual = visualizarDestinoPdfActual;
+  window.descargarPdfOnDemand = descargarPdfOnDemand;
+  window.avanzarCotizacionTicket = avanzarCotizacionTicket;
+  window.cerrarCotizacionTicket = cerrarCotizacionTicket;
+  window.cerrarDetalleTicket = cerrarDetalleTicket;
+  window.forzarEstadoTicket = forzarEstadoTicket;
+  window.forzarCrearOrdenServicio = forzarCrearOrdenServicio;
 }
 
 

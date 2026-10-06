@@ -777,6 +777,20 @@ if (typeof window !== "undefined") {
   window.enviarCorreoOrden = enviarCorreoOrden;
   window.cerrarModalCorreo = cerrarModalCorreo;
   window.procesarEnviarCorreo = procesarEnviarCorreo;
+  const allModuleExports = {
+    calcularEstadoOrden,
+    cerrarDetalle,
+    generarBase64Pdf,
+    toggleCampoCorreo,
+    ejecutarComandoEditor,
+    abrirPaletaColor,
+    ejecutarColorEditor,
+    imprimirOrden,
+    enviarCorreoOrden,
+    cerrarModalCorreo,
+    procesarEnviarCorreo
+  };
+  window.OrdenesEstados = allModuleExports;
 }
 
 export {

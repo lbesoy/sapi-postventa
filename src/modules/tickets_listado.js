@@ -40,10 +40,74 @@ function safeResolveTecnicoNombre(id) {
 
 let ticketFiltroActivo = (typeof window !== "undefined" && window.ticketFiltroActivo) || "todos";
 
+function safeGetTickets() {
+  if (typeof tickets !== "undefined" && Array.isArray(tickets)) return tickets;
+  if (typeof window !== "undefined" && Array.isArray(window.tickets)) return window.tickets;
+  if (typeof safeGetJSON === "function") return safeGetJSON('sapi_tickets', []);
+  if (typeof localStorage !== "undefined") {
+    try { return JSON.parse(localStorage.getItem('sapi_tickets') || '[]'); } catch(e) { return []; }
+  }
+  return [];
+}
+function safeGetUsuarios() {
+  if (typeof usuarios !== "undefined" && Array.isArray(usuarios)) return usuarios;
+  if (typeof window !== "undefined" && Array.isArray(window.usuarios)) return window.usuarios;
+  if (typeof safeGetJSON === "function") return safeGetJSON('eurorep_usuarios', []);
+  if (typeof localStorage !== "undefined") {
+    try { return JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]'); } catch(e) { return []; }
+  }
+  return [];
+}
+function safeGetTecnicosDb() {
+  if (typeof tecnicosDb !== "undefined" && Array.isArray(tecnicosDb)) return tecnicosDb;
+  if (typeof window !== "undefined" && Array.isArray(window.tecnicosDb)) return window.tecnicosDb;
+  if (typeof safeGetJSON === "function") return safeGetJSON('sapi_tecnicos_db', []);
+  if (typeof localStorage !== "undefined") {
+    try { return JSON.parse(localStorage.getItem('sapi_tecnicos_db') || '[]'); } catch(e) { return []; }
+  }
+  return [];
+}
+function safeGetClientesDb() {
+  if (typeof clientesDb !== "undefined" && Array.isArray(clientesDb)) return clientesDb;
+  if (typeof window !== "undefined" && Array.isArray(window.clientesDb)) return window.clientesDb;
+  if (typeof safeGetJSON === "function") return safeGetJSON('sapi_clientes_db', []);
+  if (typeof localStorage !== "undefined") {
+    try { return JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]'); } catch(e) { return []; }
+  }
+  return [];
+}
+function safeGetOrdenes() {
+  if (typeof ordenes !== "undefined" && Array.isArray(ordenes)) return ordenes;
+  if (typeof window !== "undefined" && Array.isArray(window.ordenes)) return window.ordenes;
+  if (typeof safeGetJSON === "function") return safeGetJSON('sapi_ordenes', []);
+  if (typeof localStorage !== "undefined") {
+    try { return JSON.parse(localStorage.getItem('sapi_ordenes') || '[]'); } catch(e) { return []; }
+  }
+  return [];
+}
+function safeGetCurrentSession() {
+  if (typeof currentSession !== "undefined" && currentSession) return currentSession;
+  if (typeof window !== "undefined" && window.currentSession) return window.currentSession;
+  if (typeof safeGetJSON === "function") return safeGetJSON('eurorep_session', null) || { userId: '', viewMode: 'consulta' };
+  if (typeof localStorage !== "undefined") {
+    try { return JSON.parse(localStorage.getItem('eurorep_session') || 'null') || { userId: '', viewMode: 'consulta' }; } catch(e) { return { userId: '', viewMode: 'consulta' }; }
+  }
+  return { userId: '', viewMode: 'consulta' };
+}
+
+function safeGetFilteredTickets() {
+  if (typeof getFilteredTickets === "function") return getFilteredTickets();
+  if (typeof window !== "undefined" && typeof window.getFilteredTickets === "function") return window.getFilteredTickets();
+  return safeGetTickets();
+}
+
 // ===== TICKETS DATA =====
 function updateTicketBadge() {
   if (typeof document === 'undefined') return;
-  let filtered = getFilteredTickets();
+  const usuarios = safeGetUsuarios();
+  const currentSession = safeGetCurrentSession();
+  const clientesDb = safeGetClientesDb();
+  let filtered = safeGetFilteredTickets();
   
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
@@ -155,7 +219,11 @@ function updateTicketBadge() {
 
 function updateOrdenesBadge() {
   if (typeof document === 'undefined') return;
-  let filtered = getFilteredOrders();
+  const usuarios = safeGetUsuarios();
+  const currentSession = safeGetCurrentSession();
+  const clientesDb = safeGetClientesDb();
+  const ordenes = safeGetOrdenes();
+  let filtered = (typeof getFilteredOrders === 'function') ? getFilteredOrders() : ((typeof window !== 'undefined' && typeof window.getFilteredOrders === 'function') ? window.getFilteredOrders() : ordenes);
   
   const currentUser = usuarios.find(u => u.id === currentSession.userId);
   const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
@@ -263,6 +331,12 @@ function updateOrdenesBadge() {
 function actualizarFiltrosPersonal() {
   if (typeof document === 'undefined') return;
   try {
+    const usuarios = safeGetUsuarios();
+    const currentSession = safeGetCurrentSession();
+    const tecnicosDb = safeGetTecnicosDb();
+    const tickets = safeGetTickets();
+    const ordenes = safeGetOrdenes();
+    const clientesDb = safeGetClientesDb();
     const currentUser = usuarios.find(u => u && u.id === currentSession.userId);
     const userRole = currentSession.viewMode || '';
     const isTecnico = userRole === 'tecnico';
@@ -1405,6 +1479,9 @@ function resolverClienteTicket(t, depth = 0) {
 // ===== RENDER TICKETS =====
 function renderTickets(ctx) {
   if (typeof document === 'undefined') return;
+  const usuarios = safeGetUsuarios();
+  const currentSession = safeGetCurrentSession();
+  const clientesDb = safeGetClientesDb();
   const isDashView = ctx === 'dash-tickets';
   const isV2 = ctx === 'v2';
   const bodyId = isDashView ? 'tabla-body-dash-tickets' : (isV2 ? 'v2-tickets-body' : 'tickets-body');
@@ -1420,7 +1497,7 @@ function renderTickets(ctx) {
     if (!body) return;
     const q = (document.getElementById(searchId)?.value || '').toLowerCase();
     
-    let filtered = getFilteredTickets().filter(t =>
+    let filtered = safeGetFilteredTickets().filter(t =>
       t && t.categoria !== 'Soporte General' && (
         !q ||
         String(t.asunto||'').toLowerCase().includes(q) ||
@@ -1716,8 +1793,8 @@ function renderTickets(ctx) {
         `;
       }
 
-      const assocOrder = window.obtenerOrdenAsociadaTicket(t);
-      const parentTicket = !assocOrder ? (typeof window.obtenerTicketPadre === 'function' ? window.obtenerTicketPadre(t) : null) : null;
+      const assocOrder = (typeof obtenerOrdenAsociadaTicket === 'function' ? obtenerOrdenAsociadaTicket(t) : (typeof window !== 'undefined' && typeof window.obtenerOrdenAsociadaTicket === 'function' ? window.obtenerOrdenAsociadaTicket(t) : null));
+      const parentTicket = !assocOrder ? (typeof obtenerTicketPadre === 'function' ? obtenerTicketPadre(t) : (typeof window !== 'undefined' && typeof window.obtenerTicketPadre === 'function' ? window.obtenerTicketPadre(t) : null)) : null;
 
       return `
       <tr style="cursor:pointer; transition: background 0.2s;" onclick="if(!event.target.closest('.action-btn, .os-link-btn, .parent-tkt-btn')){ verDetalleTicket('${t.id}'); }" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
@@ -1972,6 +2049,7 @@ const allModuleExports = {
 };
 
 if (typeof window !== "undefined") {
+  window.TicketsListado = allModuleExports;
   Object.assign(window, allModuleExports);
 }
 

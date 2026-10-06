@@ -2070,6 +2070,21 @@ export {
 };
 
 if (typeof window !== "undefined") {
+  window.TicketsDetalle = {
+    renderComentariosInternosHtml,
+    switchCommentTab,
+    agregarComentarioInterno,
+    agregarComentarioExterno,
+    verDetalleTicket,
+    visualizarPdfOnDemand,
+    visualizarDestinoPdfActual,
+    descargarPdfOnDemand,
+    avanzarCotizacionTicket,
+    cerrarCotizacionTicket,
+    cerrarDetalleTicket,
+    forzarEstadoTicket,
+    forzarCrearOrdenServicio
+  };
   window.renderComentariosInternosHtml = renderComentariosInternosHtml;
   window.switchCommentTab = switchCommentTab;
   window.agregarComentarioInterno = agregarComentarioInterno;

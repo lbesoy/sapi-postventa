@@ -362,6 +362,19 @@
   }
 
   // Exponer a window
+  const allModuleExports = {
+    filtroEstadoServicios: filtroEstadoServicios,
+    filtroTicketsV2: filtroTicketsV2,
+    currentOrdSortCol: currentOrdSortCol,
+    currentOrdSortDir: currentOrdSortDir,
+    setFiltroEstadoServicios: setFiltroEstadoServicios,
+    setFiltroTicketsV2: setFiltroTicketsV2,
+    toggleSortOrdenes: toggleSortOrdenes,
+    renderTabla: renderTabla,
+    badgeEstado: badgeEstado,
+    filtrarOrdenes: filtrarOrdenes
+  };
+  window.OrdenesListado = allModuleExports;
   window.filtroEstadoServicios = filtroEstadoServicios;
   window.filtroTicketsV2 = filtroTicketsV2;
   window.currentOrdSortCol = currentOrdSortCol;

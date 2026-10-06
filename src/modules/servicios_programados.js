@@ -622,6 +622,15 @@ if (typeof window !== 'undefined') {
   window.actualizarEstatusRefaccionesDesdeGuias = actualizarEstatusRefaccionesDesdeGuias;
   window.esTicketDeServicioEnCampo = esTicketDeServicioEnCampo;
   window.renderEnvioCards = renderEnvioCards;
+  window.ServiciosProgramados = {
+    renderServiciosProgramadosTecnico,
+    renderTicketRefaccionesList,
+    obtenerEnviosDesdeDOM,
+    actualizarVisibilidadDestinoPiezas,
+    actualizarEstatusRefaccionesDesdeGuias,
+    esTicketDeServicioEnCampo,
+    renderEnvioCards
+  };
 }
 
 export {

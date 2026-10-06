@@ -498,6 +498,16 @@ if (typeof window !== 'undefined') {
   window.renderTecnicos = renderTecnicos;
   window.verDetalleTecnico = verDetalleTecnico;
   window.cerrarDetalleTecnico = cerrarDetalleTecnico;
+  const allModuleExports = {
+    renderPermisosRoles,
+    guardarPermisosRoles,
+    currentTecView,
+    setTecView,
+    renderTecnicos,
+    verDetalleTecnico,
+    cerrarDetalleTecnico
+  };
+  window.ConfigTecnicos = allModuleExports;
 }
 
 export {

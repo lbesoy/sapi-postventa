@@ -571,6 +571,7 @@ function guardarNotaBitacora() {
     window.cerrarBitacora = cerrarBitacora;
     window.actualizarEventoCalendarioDesdeBitacora = actualizarEventoCalendarioDesdeBitacora;
     window.guardarNotaBitacora = guardarNotaBitacora;
+    window.OrdenesBitacora = exports;
   }
 
   return exports;

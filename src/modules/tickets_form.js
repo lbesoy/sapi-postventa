@@ -1936,6 +1936,31 @@ export {
 };
 
 if (typeof window !== "undefined") {
+  window.TicketsForm = {
+    abrirTicket,
+    abrirTicketPreloaded,
+    toggleResolucionTicket,
+    toggleMotivoRechazo,
+    editarTicket,
+    cerrarTicket,
+    poblarSoportesPorCliente,
+    poblarMaquinasCliente,
+    onEquipoOrdenChange,
+    onEquipoTicketChange,
+    onEquipoTicketChangeMultiple,
+    actualizarCamposMaquinaOrden,
+    agregarMaquinaChip,
+    agregarMaquinaChipOrden,
+    onEquipoOrdenChangeMultiple,
+    toggleCombo,
+    filterCombo,
+    selectComboOption,
+    agregarSitioCombo,
+    agregarEmpresaCombo,
+    readFileAsBase64,
+    guardarTicket,
+    eliminarTicket
+  };
   window.abrirTicket = abrirTicket;
   window.abrirTicketPreloaded = abrirTicketPreloaded;
   window.toggleResolucionTicket = toggleResolucionTicket;

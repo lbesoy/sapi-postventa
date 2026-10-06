@@ -809,4 +809,19 @@ if (typeof window !== "undefined") {
     window.cerrarModalCorreo = cerrarModalCorreo;
     window.procesarEnviarCorreo = procesarEnviarCorreo;
   }
+  const allModuleExports = {
+    calcularEstadoOrden,
+    cerrarDetalle,
+    generarBase64Pdf,
+    toggleCampoCorreo,
+    ejecutarComandoEditor,
+    abrirPaletaColor,
+    ejecutarColorEditor,
+    imprimirOrden,
+    enviarCorreoOrden,
+    cerrarModalCorreo,
+    procesarEnviarCorreo
+  };
+  if (typeof global !== "undefined") global.OrdenesEstados = allModuleExports;
+  if (typeof window !== "undefined") window.OrdenesEstados = allModuleExports;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -1057,4 +1057,25 @@ if (typeof window !== "undefined") {
   window.guardarOrden = guardarOrden;
   window.eliminarOrden = eliminarOrden;
   window.completarReporteDesdeDetalle = completarReporteDesdeDetalle;
+  window.OrdenesForm = {
+    DIAS,
+    editandoId,
+    initDiasPanels,
+    calcularHorasDia,
+    autoCompletarFechas,
+    selDia,
+    calcKmTotal,
+    getDiasData,
+    setDiasData,
+    generarFolioConsecutivo,
+    abrirFormulario,
+    autoFillFromPdfExtraction,
+    onSoporteChange,
+    editarOrden,
+    cerrarFormulario,
+    guardarOrdenes,
+    guardarOrden,
+    eliminarOrden,
+    completarReporteDesdeDetalle
+  };
 }

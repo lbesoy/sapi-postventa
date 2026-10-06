@@ -2564,5 +2564,30 @@
   global.checkPdfSapMatchCount = checkPdfSapMatchCount;
   global.validarCotizacionConSAP = validarCotizacionConSAP;
   global.syncSapCotizacionManual = syncSapCotizacionManual;
-
+  const allModuleExports = {
+    sincronizarConGitHub,
+    renderLinkedCotizaciones,
+    togglePasarCotizacionBtn,
+    deleteLinkedCotizacion,
+    viewLinkedCotizacionPdf,
+    vincularNuevaCotizacion,
+    initSearchableSelect,
+    poblarCotizacionesDropdown,
+    poblarPedidosDropdown,
+    onModalPedidoSelected,
+    onQuickPedidoSelected,
+    autoExtraerDesdePdfPedido,
+    clearPdfPedidoInput,
+    validarPedidoConSAP,
+    syncSapPedidoManual,
+    onModalCotizacionSelected,
+    onQuickCotizacionSelected,
+    autoExtraerDesdePdfCotizacion,
+    clearPdfInput,
+    checkPdfSapMatchCount,
+    validarCotizacionConSAP,
+    syncSapCotizacionManual
+  };
+  global.SapSync = allModuleExports;
+  if (typeof window !== 'undefined') window.SapSync = allModuleExports;
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));

@@ -522,4 +522,15 @@ if (typeof window !== 'undefined') {
     window.verDetalleTecnico = verDetalleTecnico;
     window.cerrarDetalleTecnico = cerrarDetalleTecnico;
   }
+  const allModuleExports = {
+    renderPermisosRoles,
+    guardarPermisosRoles,
+    currentTecView,
+    setTecView,
+    renderTecnicos,
+    verDetalleTecnico,
+    cerrarDetalleTecnico
+  };
+  if (typeof global !== "undefined") global.ConfigTecnicos = allModuleExports;
+  if (typeof window !== "undefined") window.ConfigTecnicos = allModuleExports;
 })(typeof window !== "undefined" ? window : globalThis);

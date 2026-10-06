@@ -647,6 +647,20 @@ if (typeof window !== 'undefined') {
   window.updateNotificationBell = updateNotificationBell;
   window.abrirTicketDesdeNotification = abrirTicketDesdeNotification;
   window.abrirOrdenDesdePerfil = abrirOrdenDesdePerfil;
+  const allModuleExports = {
+    toggleInternalNotificationDropdown,
+    sincronizarNotificacionesInternas,
+    generarNotificacionInterna,
+    generarNotificacionComentarioInterno,
+    updateInternalNotificationBell,
+    verTicketYMarcarInternaLeida,
+    marcarTodasInternasLeidas,
+    toggleNotificationDropdown,
+    updateNotificationBell,
+    abrirTicketDesdeNotification,
+    abrirOrdenDesdePerfil
+  };
+  window.Notificaciones = allModuleExports;
 }
 
 export {

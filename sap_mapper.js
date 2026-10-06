@@ -578,4 +578,23 @@ async function eliminarQuerySAP() {
     global.probarQuerySAP = probarQuerySAP;
     global.eliminarQuerySAP = eliminarQuerySAP;
   }
+  const allModuleExports = {
+    abrirModalMapeo,
+    getLabelsForModule,
+    applyTableHeaders,
+    cerrarModalMapeo,
+    switchMapeoTab,
+    addCustomColumnUI,
+    removeCustomColumn,
+    getCustomColumnsForModule,
+    guardarMapeoColumnas,
+    cargarListaQueriesSAP,
+    cargarDetalleQuery,
+    limpiarFormularioQuery,
+    programarQuerySAP,
+    probarQuerySAP,
+    eliminarQuerySAP
+  };
+  if (typeof global !== "undefined") global.SapMapper = allModuleExports;
+  if (typeof window !== "undefined") window.SapMapper = allModuleExports;
 })(typeof window !== "undefined" ? window : globalThis);

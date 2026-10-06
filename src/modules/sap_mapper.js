@@ -588,6 +588,25 @@ if (typeof window !== "undefined") {
   window.programarQuerySAP = programarQuerySAP;
   window.probarQuerySAP = probarQuerySAP;
   window.eliminarQuerySAP = eliminarQuerySAP;
+  const allModuleExports = {
+    abrirModalMapeo,
+    getLabelsForModule,
+    applyTableHeaders,
+    cerrarModalMapeo,
+    switchMapeoTab,
+    addCustomColumnUI,
+    removeCustomColumn,
+    getCustomColumnsForModule,
+    guardarMapeoColumnas,
+    listaQueriesCargada,
+    cargarListaQueriesSAP,
+    cargarDetalleQuery,
+    limpiarFormularioQuery,
+    programarQuerySAP,
+    probarQuerySAP,
+    eliminarQuerySAP
+  };
+  window.SapMapper = allModuleExports;
 }
 
 export {

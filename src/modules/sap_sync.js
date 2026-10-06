@@ -2566,6 +2566,41 @@ if (typeof window !== 'undefined') {
   window.checkPdfSapMatchCount = checkPdfSapMatchCount;
   window.validarCotizacionConSAP = validarCotizacionConSAP;
   window.syncSapCotizacionManual = syncSapCotizacionManual;
+  const allModuleExports = {
+    API_CONFIG,
+    fetchSapApi,
+    fetchClientesSAP,
+    fetchRefaccionesSAP,
+    fetchTecnicosSAP,
+    fetchSitiosSAP,
+    fetchMaquinariaSAP,
+    forzarSincronizacionSAP,
+    sincronizarModuloSAP,
+    sincronizarUnCliente,
+    sincronizarConGitHub,
+    renderLinkedCotizaciones,
+    togglePasarCotizacionBtn,
+    deleteLinkedCotizacion,
+    viewLinkedCotizacionPdf,
+    vincularNuevaCotizacion,
+    initSearchableSelect,
+    poblarCotizacionesDropdown,
+    poblarPedidosDropdown,
+    onModalPedidoSelected,
+    onQuickPedidoSelected,
+    autoExtraerDesdePdfPedido,
+    clearPdfPedidoInput,
+    validarPedidoConSAP,
+    syncSapPedidoManual,
+    onModalCotizacionSelected,
+    onQuickCotizacionSelected,
+    autoExtraerDesdePdfCotizacion,
+    clearPdfInput,
+    checkPdfSapMatchCount,
+    validarCotizacionConSAP,
+    syncSapCotizacionManual
+  };
+  window.SapSync = allModuleExports;
 }
 
 export {

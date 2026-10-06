@@ -570,4 +570,13 @@ if (typeof window !== "undefined") {
   window.cerrarBitacora = cerrarBitacora;
   window.actualizarEventoCalendarioDesdeBitacora = actualizarEventoCalendarioDesdeBitacora;
   window.guardarNotaBitacora = guardarNotaBitacora;
+  window.OrdenesBitacora = {
+    calcularRangoFechasLaboral,
+    abrirBitacora,
+    iniciarReporteDesdeAsignacion,
+    editarBitacora,
+    cerrarBitacora,
+    actualizarEventoCalendarioDesdeBitacora,
+    guardarNotaBitacora
+  };
 }

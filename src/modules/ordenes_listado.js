@@ -371,6 +371,18 @@ function renderTabla(ctx) {
 
 // Asignación al objeto global window para interoperabilidad en navegador clásico
 if (typeof window !== 'undefined') {
+  window.OrdenesListado = {
+    filtroEstadoServicios,
+    filtroTicketsV2,
+    currentOrdSortCol,
+    currentOrdSortDir,
+    setFiltroEstadoServicios,
+    setFiltroTicketsV2,
+    toggleSortOrdenes,
+    renderTabla,
+    badgeEstado,
+    filtrarOrdenes
+  };
   window.filtroEstadoServicios = filtroEstadoServicios;
   window.filtroTicketsV2 = filtroTicketsV2;
   window.currentOrdSortCol = currentOrdSortCol;

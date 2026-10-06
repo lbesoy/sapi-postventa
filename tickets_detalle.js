@@ -2068,7 +2068,11 @@ async function forzarCrearOrdenServicio(id) {
     forzarCrearOrdenServicio: forzarCrearOrdenServicio
   };
 
+  if (typeof root !== "undefined") {
+    root.TicketsDetalle = exports;
+  }
   if (typeof window !== "undefined") {
+    window.TicketsDetalle = exports;
     window.renderComentariosInternosHtml = renderComentariosInternosHtml;
     window.switchCommentTab = switchCommentTab;
     window.agregarComentarioInterno = agregarComentarioInterno;

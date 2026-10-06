@@ -2009,4 +2009,22 @@ if (typeof window !== "undefined") {
   window.borrarCanvasFirma = borrarCanvasFirma;
   window.guardarFirmaCanvas = guardarFirmaCanvas;
   window.limpiarFirma = limpiarFirma;
+  const allModuleExports = {
+    renderEvidenciasFotograficas,
+    previsualizarImagenCompleta,
+    abrirImagenEnPestana,
+    subirEvidenciaFoto,
+    subirFotoRefaccion,
+    eliminarEvidenciaFoto,
+    verDetalle,
+    agregarRenglonTecnicoCierre,
+    abrirCierrePapel,
+    cerrarCierrePapel,
+    confirmarCierrePapel,
+    inicializarCanvasFirma,
+    borrarCanvasFirma,
+    guardarFirmaCanvas,
+    limpiarFirma
+  };
+  window.OrdenesDetalle = allModuleExports;
 }

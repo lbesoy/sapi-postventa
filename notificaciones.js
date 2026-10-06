@@ -678,4 +678,19 @@ if (typeof window !== 'undefined') {
     window.abrirTicketDesdeNotification = abrirTicketDesdeNotification;
     window.abrirOrdenDesdePerfil = abrirOrdenDesdePerfil;
   }
+  const allModuleExports = {
+    toggleInternalNotificationDropdown,
+    sincronizarNotificacionesInternas,
+    generarNotificacionInterna,
+    generarNotificacionComentarioInterno,
+    updateInternalNotificationBell,
+    verTicketYMarcarInternaLeida,
+    marcarTodasInternasLeidas,
+    toggleNotificationDropdown,
+    updateNotificationBell,
+    abrirTicketDesdeNotification,
+    abrirOrdenDesdePerfil
+  };
+  if (typeof global !== "undefined") global.Notificaciones = allModuleExports;
+  if (typeof window !== "undefined") window.Notificaciones = allModuleExports;
 })(typeof window !== "undefined" ? window : globalThis);
