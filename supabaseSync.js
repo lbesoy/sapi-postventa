@@ -101,19 +101,11 @@ window.saveCatalogOffline = async function(catalogKey, dataArray) {
         req.onerror = () => reject(req.error);
       });
       console.log(`[IndexedDB] Catálogo ${catalogKey} guardado con éxito.`);
-      if (typeof localStorage !== 'undefined') {
-        const redirectedKeys = ['sapi_tickets', 'sapi_ordenes', 'sapi_levantamientos'];
-        if (redirectedKeys.includes(catalogKey)) {
-          if (typeof window.localStorageCache === 'undefined') {
-            window.localStorageCache = {};
-          }
-          window.localStorageCache[catalogKey] = JSON.stringify(dataArray);
-        } else {
-          localStorage.removeItem(catalogKey);
-          if (window.localStorageCache && window.localStorageCache[catalogKey]) {
-            delete window.localStorageCache[catalogKey];
-          }
+      if (typeof window !== 'undefined') {
+        if (typeof window.localStorageCache === 'undefined') {
+          window.localStorageCache = {};
         }
+        window.localStorageCache[catalogKey] = typeof dataArray === 'string' ? dataArray : JSON.stringify(dataArray);
       }
       return;
     }
@@ -123,7 +115,7 @@ window.saveCatalogOffline = async function(catalogKey, dataArray) {
   // Fallback
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(catalogKey, JSON.stringify(dataArray));
+      localStorage.setItem(catalogKey, typeof dataArray === 'string' ? dataArray : JSON.stringify(dataArray));
     }
   } catch (err) {
     console.error(`[LocalStorage] Fallo crítico al guardar catálogo ${catalogKey}:`, err);
@@ -131,6 +123,12 @@ window.saveCatalogOffline = async function(catalogKey, dataArray) {
 };
 
 window.loadCatalogOffline = async function(catalogKey, defaultValue = []) {
+  if (typeof window !== 'undefined' && window.localStorageCache && window.localStorageCache[catalogKey]) {
+    try {
+      const cached = window.localStorageCache[catalogKey];
+      return typeof cached === 'string' ? JSON.parse(cached) : cached;
+    } catch (e) {}
+  }
   try {
     const db = await window.getSapiIndexedDB();
     if (db) {
@@ -142,7 +140,12 @@ window.loadCatalogOffline = async function(catalogKey, defaultValue = []) {
         req.onerror = () => resolve(null);
       });
       if (result) {
-        return result;
+        const parsed = typeof result === 'string' ? JSON.parse(result) : result;
+        if (typeof window !== 'undefined') {
+          if (!window.localStorageCache) window.localStorageCache = {};
+          window.localStorageCache[catalogKey] = typeof result === 'string' ? result : JSON.stringify(result);
+        }
+        return parsed;
       }
     }
   } catch (err) {

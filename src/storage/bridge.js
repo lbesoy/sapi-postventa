@@ -79,7 +79,7 @@ export function initLocalStorageIndexedDBBridge() {
           const req = store.get(key);
           req.onsuccess = () => {
             if (req.result && req.result.data) {
-              window.localStorageCache[key] = JSON.stringify(req.result.data);
+              window.localStorageCache[key] = typeof req.result.data === 'string' ? req.result.data : JSON.stringify(req.result.data);
               if (typeof localStorage !== 'undefined') {
                 originalRemoveItem.call(localStorage, key);
               }

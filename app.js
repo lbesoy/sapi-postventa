@@ -291,7 +291,7 @@ let levantamientos = safeGetJSON('sapi_levantamientos', []);
 let ideasFallasDb = safeGetJSON('sapi_ideas_fallas', []);
 window.ideasFallasDb = ideasFallasDb;
 let clientesDb = safeGetJSON('sapi_clientes_db', []);
-let refaccionesDb = [];
+let refaccionesDb = safeGetJSON('sapi_refacciones_db', []);
 window.refaccionesDb = refaccionesDb;
 (async () => {
   try {

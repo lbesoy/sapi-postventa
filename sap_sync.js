@@ -701,6 +701,12 @@
                   if (typeof global !== 'undefined' && global.cargarDatosDeSupabase) {
                     await global.cargarDatosDeSupabase();
                   }
+                  if (modulo === 'refacciones' && typeof window !== 'undefined' && typeof window.descargarRefaccionesSupabase === 'function') {
+                    const data = await window.descargarRefaccionesSupabase();
+                    if (data && data.length > 0 && typeof window.renderRefacciones === 'function') {
+                      window.renderRefacciones();
+                    }
+                  }
                   _notify('✅ Sincronización SAP finalizada con éxito.', 'success');
                   if (typeof global !== 'undefined' && global.validarCotizacionConSAP) {
                     global.validarCotizacionConSAP(true);

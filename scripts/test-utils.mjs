@@ -284,6 +284,18 @@ assert.ok(!mockBody.innerHTML.includes('Codo 90 Putzmeister'), 'renderRefaccione
 // Reset search
 mockSearch.value = '';
 
+// Test F: Hidratación síncrona desde localStorageCache cuando window.refaccionesDb está inicialmente vacío
+global.window.refaccionesDb = [];
+global.window.localStorageCache = {
+  'sapi_refacciones_db': JSON.stringify([
+    { id: '10', codigo: 'REF-HIDRA', descripcion: 'Filtro Hidráulico Sincronizado', marca: 'CASE', marcaCodigo: 'CASE', grupo: 'Filtros', precio: 890, stock: 12 }
+  ])
+};
+mockBody.innerHTML = '';
+renderRefacciones();
+assert.ok(mockBody.innerHTML.includes('Filtro Hidráulico Sincronizado'), 'renderRefacciones debe hidratar síncronamente desde localStorageCache');
+assert.equal(global.window.refaccionesDb.length, 1, 'window.refaccionesDb debe poblarse con el catálogo hidratado');
+
 // Restaurar mock
 global.document = prevDoc;
 

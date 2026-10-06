@@ -702,6 +702,12 @@ async function sincronizarConGitHub(modulo = 'all', btnEl = null) {
                 if (typeof window !== 'undefined' && window.cargarDatosDeSupabase) {
                   await window.cargarDatosDeSupabase();
                 }
+                if (modulo === 'refacciones' && typeof window !== 'undefined' && typeof window.descargarRefaccionesSupabase === 'function') {
+                  const data = await window.descargarRefaccionesSupabase();
+                  if (data && data.length > 0 && typeof window.renderRefacciones === 'function') {
+                    window.renderRefacciones();
+                  }
+                }
                 _notify('✅ Sincronización SAP finalizada con éxito.', 'success');
                 if (typeof window !== 'undefined' && window.validarCotizacionConSAP) {
                   window.validarCotizacionConSAP(true);

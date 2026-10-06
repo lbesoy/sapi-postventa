@@ -72,7 +72,7 @@
             const req = store.get(key);
             req.onsuccess = () => {
               if (req.result && req.result.data) {
-                window.localStorageCache[key] = JSON.stringify(req.result.data);
+                window.localStorageCache[key] = typeof req.result.data === 'string' ? req.result.data : JSON.stringify(req.result.data);
                 originalRemoveItem.call(localStorage, key);
               } else {
                 // MIGRACIÓN: Si existe en localStorage real pero no en IndexedDB

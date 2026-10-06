@@ -1602,10 +1602,31 @@ function renderRefacciones(resetPage = false) {
     ? window.refaccionesDb
     : ((typeof refaccionesDb !== 'undefined' && Array.isArray(refaccionesDb) && refaccionesDb.length > 0) ? refaccionesDb : []);
 
-  // Si aún está vacío en memoria, intentar cargar desde IndexedDB o Supabase reactivamente (solo 1 intento automático)
+  // Si está vacío en memoria, verificar síncronamente en el caché del bridge de localStorage
+  if (catalogo.length === 0 && typeof window !== 'undefined') {
+    let localData = null;
+    if (window.localStorageCache && window.localStorageCache['sapi_refacciones_db']) {
+      try {
+        const raw = window.localStorageCache['sapi_refacciones_db'];
+        localData = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      } catch (e) {}
+    }
+    if ((!localData || !localData.length) && typeof localStorage !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('sapi_refacciones_db');
+        if (raw) localData = JSON.parse(raw);
+      } catch (e) {}
+    }
+    if (Array.isArray(localData) && localData.length > 0) {
+      window.refaccionesDb = localData;
+      if (typeof refaccionesDb !== 'undefined') refaccionesDb = localData;
+      catalogo = localData;
+    }
+  }
+
+  // Si aún está vacío en memoria, intentar cargar desde IndexedDB o Supabase reactivamente
   if (catalogo.length === 0 && typeof window !== 'undefined' && !window._cargandoRefaccionesLocal && !window._refaccionesCargaIntentada) {
     window._cargandoRefaccionesLocal = true;
-    window._refaccionesCargaIntentada = true;
     
     // Ocultar footer mientras carga
     const footerEl = document.getElementById('refacciones-footer');
@@ -1655,8 +1676,8 @@ function renderRefacciones(resetPage = false) {
         if (typeof window.loadRefaccionesLocal === 'function') {
           data = await window.loadRefaccionesLocal().catch(() => []);
         }
-        if (!data || data.length <= 1000) {
-          console.log('[renderRefacciones] IndexedDB vacío o incompleto (<=1000 registros). Consultando catálogo completo a Supabase...');
+        if (!data || data.length === 0) {
+          console.log('[renderRefacciones] IndexedDB vacío. Consultando catálogo completo a Supabase...');
           data = await fetchDirectoSupabase();
         }
         if (data && data.length > 0) {
@@ -1669,6 +1690,7 @@ function renderRefacciones(resetPage = false) {
         console.warn('[renderRefacciones] Error al recuperar catálogo:', err);
       } finally {
         window._cargandoRefaccionesLocal = false;
+        window._refaccionesCargaIntentada = true;
         renderRefacciones();
       }
     })();
