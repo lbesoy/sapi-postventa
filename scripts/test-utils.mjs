@@ -1864,7 +1864,50 @@ assert.doesNotThrow(() => {
 
 console.log('  ✅ Migraciones de Catálogos, Generación de Tickets de Refacciones y Chips: OK');
 
+// 48. MÓDULO DE ESTADO REACTIVO CENTRALIZADO (STORE)
+console.log('🧪 Verificando Módulo de Estado Reactivo Centralizado (src/store.js / store.js)...');
+const { createStore, store } = await import('../src/store.js');
+
+assert.equal(typeof createStore, 'function', 'createStore debe ser una función');
+assert.equal(typeof store, 'object', 'store debe ser un objeto');
+assert.equal(typeof store.getState, 'function', 'store.getState debe ser función');
+assert.equal(typeof store.setState, 'function', 'store.setState debe ser función');
+assert.equal(typeof store.subscribe, 'function', 'store.subscribe debe ser función');
+assert.equal(typeof store.addTicket, 'function', 'store.addTicket debe ser función');
+assert.equal(typeof store.updateTicket, 'function', 'store.updateTicket debe ser función');
+assert.equal(typeof store.removeTicket, 'function', 'store.removeTicket debe ser función');
+
+// Test A: Crear store aislado y probar reactividad
+const localStore = createStore({ tickets: [{ id: 't1', folio: 'TKT-01' }], ordenes: [] });
+let listenerCalled = 0;
+let lastTickets = null;
+
+const unsub = localStore.subscribe('tickets', (updated) => {
+  listenerCalled++;
+  lastTickets = updated;
+});
+
+localStore.addTicket({ id: 't2', folio: 'TKT-02' });
+assert.equal(listenerCalled, 1, 'El suscriptor debe ejecutarse en addTicket');
+assert.equal(localStore.getState('tickets').length, 2, 'Debe haber 2 tickets en el estado');
+assert.equal(lastTickets[0].folio, 'TKT-02', 'El nuevo ticket debe estar al inicio');
+
+localStore.updateTicket('t1', { estado: 'Cerrado' });
+assert.equal(listenerCalled, 2, 'El suscriptor debe ejecutarse en updateTicket');
+assert.equal(localStore.getState('tickets').find(t => t.id === 't1').estado, 'Cerrado');
+
+localStore.removeTicket('t2');
+assert.equal(listenerCalled, 3, 'El suscriptor debe ejecutarse en removeTicket');
+assert.equal(localStore.getState('tickets').length, 1);
+
+unsub();
+localStore.addTicket({ id: 't3', folio: 'TKT-03' });
+assert.equal(listenerCalled, 3, 'El suscriptor desuscrito no debe ejecutarse de nuevo');
+
+console.log('  ✅ Estado Reactivo Centralizado (Store, Pub/Sub y Entidades): OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
+
 
 
 
