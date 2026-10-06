@@ -1,0 +1,129 @@
+    <!-- MODAL CLIENTE -->
+    <div class="modal-overlay" id="modal-cliente-overlay" onclick="cerrarCliente(event)">
+      <div class="modal" id="modal-cliente" style="max-width:700px;">
+        <div class="modal-header">
+          <h2 id="cliente-modal-title">Nuevo Cliente</h2>
+          <button class="modal-close" onclick="cerrarCliente()">✕</button>
+        </div>
+        <div class="modal-body">
+          <form id="form-cliente" onsubmit="guardarCliente(event)">
+
+            <div class="form-section">
+              <div class="form-section-title"><i data-lucide="building-2" class="section-icon"></i> Información de la
+                Empresa</div>
+              <div class="form-grid">
+                <div class="form-group" style="grid-column: 1/-1;">
+                  <label>Nombre de la Empresa</label>
+                  <input type="text" id="cl-nombre" placeholder="Ej. Eurorep S.A. de C.V." required />
+                </div>
+                <div class="form-group">
+                  <label>RFC (Opcional)</label>
+                  <input type="text" id="cl-rfc" placeholder="ABCD123456..." />
+                </div>
+                <div class="form-group">
+                  <label>Estado de la República</label>
+                  <select id="cl-ubicacion" required>
+                    <option value="" disabled selected>Seleccione un estado</option>
+                    <option value="Aguascalientes">Aguascalientes</option>
+                    <option value="Baja California">Baja California</option>
+                    <option value="Baja California Sur">Baja California Sur</option>
+                    <option value="Campeche">Campeche</option>
+                    <option value="Chiapas">Chiapas</option>
+                    <option value="Chihuahua">Chihuahua</option>
+                    <option value="Ciudad de México">Ciudad de México</option>
+                    <option value="Coahuila">Coahuila</option>
+                    <option value="Colima">Colima</option>
+                    <option value="Durango">Durango</option>
+                    <option value="Estado de México">Estado de México</option>
+                    <option value="Guanajuato">Guanajuato</option>
+                    <option value="Guerrero">Guerrero</option>
+                    <option value="Hidalgo">Hidalgo</option>
+                    <option value="Jalisco">Jalisco</option>
+                    <option value="Michoacán">Michoacán</option>
+                    <option value="Morelos">Morelos</option>
+                    <option value="Nayarit">Nayarit</option>
+                    <option value="Nuevo León">Nuevo León</option>
+                    <option value="Oaxaca">Oaxaca</option>
+                    <option value="Puebla">Puebla</option>
+                    <option value="Querétaro">Querétaro</option>
+                    <option value="Quintana Roo">Quintana Roo</option>
+                    <option value="San Luis Potosí">San Luis Potosí</option>
+                    <option value="Sinaloa">Sinaloa</option>
+                    <option value="Sonora">Sonora</option>
+                    <option value="Tabasco">Tabasco</option>
+                    <option value="Tamaulipas">Tamaulipas</option>
+                    <option value="Tlaxcala">Tlaxcala</option>
+                    <option value="Veracruz">Veracruz</option>
+                    <option value="Yucatán">Yucatán</option>
+                    <option value="Zacatecas">Zacatecas</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-title"><i data-lucide="contact" class="section-icon"></i> Contacto Principal
+              </div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Nombre del Contacto</label>
+                  <input type="text" id="cl-contacto" placeholder="Nombre completo" required />
+                </div>
+                <div class="form-group">
+                  <label>Teléfono / Móvil</label>
+                  <input type="tel" id="cl-telefono" placeholder="55 1234 5678" />
+                </div>
+                <div class="form-group" style="grid-column: 1/-1;">
+                  <label>Correo Electrónico</label>
+                  <input type="email" id="cl-email" placeholder="correo@empresa.com" />
+                </div>
+                <div class="form-group" style="grid-column: 1/-1;">
+                  <label>Método de Contacto Preferido</label>
+                  <select id="cl-metodo-contacto">
+                    <option value="Correo">Correo Electrónico</option>
+                    <option value="WhatsApp">WhatsApp</option>
+                    <option value="Teléfono">Llamada Telefónica</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-title"><i data-lucide="users-2" class="section-icon"></i> Personal Asignado</div>
+              <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+                <div class="form-group">
+                  <label>Supervisores Asignados</label>
+                  <select id="cl-supervisor" multiple size="4" style="height:auto;">
+                  </select>
+                  <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">Mantén presionada la tecla
+                    Ctrl (o Cmd en Mac) para seleccionar varios.</div>
+                </div>
+                <div class="form-group">
+                  <label>Técnicos / Supervisores</label>
+                  <select id="cl-tecnico" multiple size="4" style="height:auto;">
+                  </select>
+                  <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">Mantén presionada la tecla
+                    Ctrl (o Cmd en Mac) para seleccionar varios.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-title" style="display:flex; justify-content:space-between; align-items:center;">
+                <span><i data-lucide="settings-2" class="section-icon"></i> Maquinaria Registrada</span>
+                <button type="button" class="btn-secondary" style="font-size:0.75rem; padding:0.25rem 0.6rem;"
+                  onclick="agregarMaquinaField()">+ Agregar Máquina</button>
+              </div>
+              <div id="maquinas-container" style="display:flex;flex-direction:column;gap:1rem;">
+                <!-- Renderizado por JS -->
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="btn-secondary" onclick="cerrarCliente()">Cancelar</button>
+              <button type="submit" class="btn-primary">Guardar Cliente</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>

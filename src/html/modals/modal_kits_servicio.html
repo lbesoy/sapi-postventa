@@ -1,0 +1,277 @@
+  <!-- MODAL: KITS DE SERVICIO PREVENTIVO POR MAQUINARIA (250h, 500h, 1000h) -->
+  <div id="modal-kits-servicio-overlay" class="modal-overlay" style="z-index: 999999; display: none;" onclick="window.cerrarModalKitsServicio(event)">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width: 1280px; width: 95vw; height: 90vh; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 12px 48px rgba(0,0,0,0.45);">
+      
+      <!-- Modal Header -->
+      <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <div style="background:rgba(37, 99, 235, 0.12); color:#2563eb; padding:0.55rem; border-radius:10px; display:flex; align-items:center; justify-content:center;">
+            <i data-lucide="package" style="width:22px; height:22px;"></i>
+          </div>
+          <div>
+            <h3 style="font-size:1.15rem; margin:0; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+              Machotes de Servicio Preventivo por Maquinaria
+              <span style="font-size:0.72rem; font-weight:600; background:rgba(37,99,235,0.12); color:#2563eb; border:1px solid rgba(37,99,235,0.25); padding:2px 8px; border-radius:12px;">100h • 250h • 500h • 1000h</span>
+              <span id="kit-modal-mode-badge" style="font-size:0.72rem; font-weight:700; padding:2px 8px; border-radius:12px; background:rgba(16,185,129,0.12); color:#059669; border:1px solid rgba(16,185,129,0.3);">Modo Real</span>
+            </h3>
+            <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
+              Catálogo de plantillas y machotes oficiales de refacciones para servicios preventivos por modelo y horómetro.
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <button type="button" class="btn-primary" onclick="window.abrirModalFormularioKit()" style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.82rem; padding:0.4rem 0.85rem; font-weight:600; background:#2563eb; border:none; border-radius:6px; color:#fff; cursor:pointer;">
+            <i data-lucide="plus" style="width:14px; height:14px;"></i> Nuevo Machote
+          </button>
+          <button type="button" id="btn-toggle-manual-kits" class="btn-secondary" onclick="window.toggleManualMachotes()" style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.8rem; padding:0.4rem 0.75rem; border-radius:6px; cursor:pointer;" title="Ver guía rápida de cómo agregar y gestionar machotes">
+            <i data-lucide="book-open" style="width:13px; height:13px;"></i> Mini Manual
+          </button>
+          <button type="button" class="btn-secondary" onclick="window.restablecerKitsOficiales()" style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.8rem; padding:0.4rem 0.75rem; border-radius:6px; cursor:pointer;" title="Restaura los machotes estándar oficiales de fábrica para la flota Eurorep">
+            <i data-lucide="rotate-ccw" style="width:13px; height:13px;"></i> Restablecer Oficiales
+          </button>
+          <button type="button" class="btn-secondary" onclick="window.exportarKitsAExcel()" style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.8rem; padding:0.4rem 0.75rem; background:#10b981; color:#fff; border-color:#10b981; border-radius:6px; font-weight:600; cursor:pointer;" title="Exportar catálogo completo de machotes a Excel (.xlsx)">
+            <i data-lucide="file-spreadsheet" style="width:13px; height:13px;"></i> Excel
+          </button>
+          <button type="button" class="modal-close" onclick="window.cerrarModalKitsServicio(event)" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:1.4rem; padding:0.25rem 0.5rem; line-height: 1; margin-left:0.4rem;">✕</button>
+        </div>
+      </div>
+
+      <!-- Filter Toolbar -->
+      <div style="padding: 0.75rem 1.5rem; background: var(--bg-body); border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; flex-shrink: 0;">
+        <div style="display:flex; align-items:center; gap:0.85rem; flex-wrap: wrap;">
+          
+          <!-- Selector de Marca -->
+          <div style="display:flex; align-items:center; gap:0.35rem;">
+            <label for="filter-kit-marca" style="font-size:0.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Marca:</label>
+            <select id="filter-kit-marca" onchange="window.alCambiarFiltroMarcaKits()" style="font-size:0.82rem; padding:0.35rem 0.65rem; border:1px solid var(--border); border-radius:6px; background:var(--bg-card); color:var(--text-primary); font-weight:600; min-width:160px; outline:none;">
+              <option value="all">Todas las Marcas</option>
+            </select>
+          </div>
+
+          <!-- Selector de Modelo -->
+          <div style="display:flex; align-items:center; gap:0.35rem;">
+            <label for="filter-kit-modelo" style="font-size:0.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Modelo / Equipo:</label>
+            <select id="filter-kit-modelo" onchange="window.filtrarKitsServicio()" style="font-size:0.82rem; padding:0.35rem 0.65rem; border:1px solid var(--border); border-radius:6px; background:var(--bg-card); color:var(--text-primary); font-weight:600; min-width:180px; outline:none;">
+              <option value="all">Todos los Modelos</option>
+            </select>
+          </div>
+
+          <!-- Selector de Intervalo (Pills) -->
+          <div class="kit-interval-pills" style="display:flex; gap:0.3rem; background:var(--bg-card); padding:3px; border-radius:8px; border:1px solid var(--border);">
+            <button type="button" class="kit-interval-btn active" data-hours="all" onclick="window.setKitFiltroHoras('all', this)" style="border:none; background:transparent; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:600; color:var(--text-primary); cursor:pointer; transition:all 0.2s;">
+              Todos (<span id="kit-stat-total">0</span>)
+            </button>
+            <button type="button" class="kit-interval-btn" data-hours="100" onclick="window.setKitFiltroHoras('100', this)" style="border:none; background:transparent; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:600; color:var(--text-secondary); cursor:pointer; transition:all 0.2s;">
+              100h (<span id="kit-stat-100">0</span>)
+            </button>
+            <button type="button" class="kit-interval-btn" data-hours="250" onclick="window.setKitFiltroHoras('250', this)" style="border:none; background:transparent; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:600; color:var(--text-secondary); cursor:pointer; transition:all 0.2s;">
+              250h (<span id="kit-stat-250">0</span>)
+            </button>
+            <button type="button" class="kit-interval-btn" data-hours="500" onclick="window.setKitFiltroHoras('500', this)" style="border:none; background:transparent; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:600; color:var(--text-secondary); cursor:pointer; transition:all 0.2s;">
+              500h (<span id="kit-stat-500">0</span>)
+            </button>
+            <button type="button" class="kit-interval-btn" data-hours="1000" onclick="window.setKitFiltroHoras('1000', this)" style="border:none; background:transparent; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:600; color:var(--text-secondary); cursor:pointer; transition:all 0.2s;">
+              1000h (<span id="kit-stat-1000">0</span>)
+            </button>
+          </div>
+        </div>
+
+        <!-- Buscador en tiempo real -->
+        <div style="display:flex; align-items:center; gap:0.5rem; flex:1; max-width:340px;">
+          <div class="search-bar" style="width:100%; margin:0;">
+            <input type="text" id="search-kit-input" placeholder="Buscar refaccion, codigo SAP o modelo..." oninput="window.filtrarKitsServicio()" style="font-size:0.85rem; padding:0.4rem 0.75rem; width:100%; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary);" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Body (Cards Container) -->
+      <div id="kits-servicio-container" style="flex: 1; overflow-y: auto; padding: 1.5rem; background: var(--bg-primary);">
+        
+        <!-- PANEL DESPLEGABLE: MINI MANUAL DE MACHOTES -->
+        <div id="panel-manual-machotes" style="display: none; background: var(--bg-card); border: 1px solid var(--border); border-left: 4px solid #2563eb; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 4px 16px rgba(0,0,0,0.05);">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
+            <div style="display:flex; align-items:center; gap:0.65rem;">
+              <div style="background: rgba(37,99,235,0.1); color: #2563eb; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                <i data-lucide="book-open" style="width: 18px; height: 18px;"></i>
+              </div>
+              <div>
+                <h4 style="margin: 0; font-size: 1.02rem; font-weight: 700; color: var(--text-primary);">Mini Manual: ¿Cómo Agregar y Gestionar Machotes de Servicio?</h4>
+                <p style="margin: 2px 0 0 0; font-size: 0.78rem; color: var(--text-muted);">Guía paso a paso para estructurar plantillas de mantenimiento preventivo por horómetro y sincronizarlas en Supabase.</p>
+              </div>
+            </div>
+            <button type="button" onclick="window.toggleManualMachotes(false)" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.1rem; padding:2px 6px;" title="Cerrar Manual">✕</button>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.9rem;">
+            
+            <!-- Paso 1 -->
+            <div style="background: var(--bg-body); border: 1px solid var(--border); border-radius: 9px; padding: 0.85rem 1rem;">
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+                <span style="background:#2563eb; color:#fff; font-size:0.72rem; font-weight:800; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;">1</span>
+                <h5 style="margin:0; font-size:0.85rem; font-weight:700; color:var(--text-primary);">Crear Machote</h5>
+              </div>
+              <p style="margin:0; font-size:0.78rem; color:var(--text-secondary); line-height:1.45;">
+                Haz clic en el botón superior <strong>«+ Nuevo Machote»</strong> para abrir el formulario de configuración.
+              </p>
+            </div>
+
+            <!-- Paso 2 -->
+            <div style="background: var(--bg-body); border: 1px solid var(--border); border-radius: 9px; padding: 0.85rem 1rem;">
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+                <span style="background:#2563eb; color:#fff; font-size:0.72rem; font-weight:800; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;">2</span>
+                <h5 style="margin:0; font-size:0.85rem; font-weight:700; color:var(--text-primary);">Marca, Modelo y Horas</h5>
+              </div>
+              <p style="margin:0; font-size:0.78rem; color:var(--text-secondary); line-height:1.45;">
+                Selecciona la <strong>Marca</strong> (Rubble Master, Fiori, etc.), escribe el <strong>Modelo</strong> y elige el intervalo (<strong>250h, 500h, 1000h</strong>).
+              </p>
+            </div>
+
+            <!-- Paso 3 -->
+            <div style="background: var(--bg-body); border: 1px solid var(--border); border-radius: 9px; padding: 0.85rem 1rem;">
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+                <span style="background:#2563eb; color:#fff; font-size:0.72rem; font-weight:800; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;">3</span>
+                <h5 style="margin:0; font-size:0.85rem; font-weight:700; color:var(--text-primary);">Buscador de Claves SAP</h5>
+              </div>
+              <p style="margin:0; font-size:0.78rem; color:var(--text-secondary); line-height:1.45;">
+                En la sección de refacciones escribe la <strong>Clave SAP</strong> o descripción. Selecciónala de la lista de autocompletado e indica la cantidad.
+              </p>
+            </div>
+
+            <!-- Paso 4 -->
+            <div style="background: var(--bg-body); border: 1px solid var(--border); border-radius: 9px; padding: 0.85rem 1rem;">
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+                <span style="background:#2563eb; color:#fff; font-size:0.72rem; font-weight:800; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;">4</span>
+                <h5 style="margin:0; font-size:0.85rem; font-weight:700; color:var(--text-primary);">Guardar y Sincronizar</h5>
+              </div>
+              <p style="margin:0; font-size:0.78rem; color:var(--text-secondary); line-height:1.45;">
+                Guarda los cambios. El machote quedará disponible de inmediato y sincronizado en la nube (Supabase).
+              </p>
+            </div>
+
+          </div>
+
+          <!-- Barra de Consejos y Atajos -->
+          <div style="margin-top: 0.85rem; padding: 0.6rem 0.85rem; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.65rem;">
+            <div style="display:flex; align-items:center; gap:0.5rem; font-size:0.77rem; color:var(--text-secondary);">
+              <i data-lucide="zap" style="width:14px; height:14px; color:#d97706; flex-shrink:0;"></i>
+              <span><strong>Atajos:</strong> Usa <strong>«Copiar Machote»</strong> para WhatsApp/correo técnico o el icono de duplicar para derivar un machote a otro intervalo.</span>
+            </div>
+            <div style="display:flex; gap:0.5rem;">
+              <button type="button" class="btn-primary" onclick="window.abrirModalFormularioKit()" style="font-size:0.75rem; padding:0.3rem 0.75rem; background:#2563eb; border:none; border-radius:6px; color:#fff; cursor:pointer;">
+                + Crear Machote Ahora
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="kits-servicio-grid" style="display: flex; flex-direction: column; gap: 1.75rem;">
+          <!-- Renderizado dinamico de tarjetas de kits agrupadas por marca -->
+        </div>
+      </div>
+
+      <!-- Footer Info -->
+      <div style="padding: 0.6rem 1.5rem; background: var(--bg-secondary); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size:0.78rem; color:var(--text-muted); flex-shrink: 0;">
+        <span>Nota: Haz clic en <strong>«Copiar Machote»</strong> en cualquier tarjeta para copiar la plantilla estructurada lista para enviar por WhatsApp o correo técnico.</span>
+        <button class="btn-secondary btn-cancelar-modal" onclick="window.cerrarModalKitsServicio(event)" style="font-size:0.8rem; padding:0.3rem 0.75rem;">Cerrar</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SUBMODAL: FORMULARIO CREAR / EDITAR KIT DE SERVICIO -->
+  <div id="modal-editar-kit-overlay" class="modal-overlay" style="z-index: 1000000; display: none;" onclick="window.cerrarModalFormularioKit(event)">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width: 840px; width: 95vw; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+      
+      <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <div style="background:rgba(37, 99, 235, 0.12); color:#2563eb; padding:0.45rem; border-radius:8px; display:flex;">
+            <i data-lucide="edit-3" style="width:18px; height:18px;"></i>
+          </div>
+          <h3 id="modal-kit-form-titulo" style="font-size:1.1rem; margin:0; font-weight:700; color:var(--text-primary);">Nuevo Machote de Servicio Preventivo</h3>
+        </div>
+        <button type="button" class="modal-close" onclick="window.cerrarModalFormularioKit(event)" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:1.4rem; padding:0.25rem 0.5rem; line-height: 1;">✕</button>
+      </div>
+
+      <div style="flex:1; overflow-y:auto; padding: 1.25rem 1.5rem; display:flex; flex-direction:column; gap:1rem;">
+        <input type="hidden" id="kit-form-id" value="" />
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+          <div>
+            <label style="display:block; font-size:0.75rem; font-weight:600; color:var(--text-muted); margin-bottom:0.3rem;">Modelo de Maquinaria Compatible *</label>
+            <select id="kit-form-modelo" onchange="window.alCambiarModeloKit(this.value)" style="width:100%; padding:0.5rem 0.75rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.85rem; font-weight:600; cursor:pointer;" required>
+              <option value="">Seleccionar Modelo...</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block; font-size:0.75rem; font-weight:600; color:var(--text-muted); margin-bottom:0.3rem;">Marca del Fabricante *</label>
+            <select id="kit-form-marca" onchange="window.alCambiarMarcaKit(this.value)" style="width:100%; padding:0.5rem 0.75rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.85rem; font-weight:600; cursor:pointer;" required>
+              <option value="">Seleccionar Marca...</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:1rem;">
+          <div>
+            <label style="display:block; font-size:0.75rem; font-weight:600; color:var(--text-muted); margin-bottom:0.3rem;">Nombre del Machote *</label>
+            <input type="text" id="kit-form-nombre" placeholder="ej. Machote Preventivo 250h - RM120X" style="width:100%; padding:0.45rem 0.75rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.85rem;" required />
+          </div>
+          <div>
+            <label style="display:block; font-size:0.75rem; font-weight:600; color:var(--text-muted); margin-bottom:0.3rem;">Intervalo de Horas *</label>
+            <select id="kit-form-intervalo" onchange="window.alCambiarIntervaloKit(this.value)" style="width:100%; padding:0.45rem 0.75rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.85rem; font-weight:600;">
+              <option value="100">100 Horas (Servicio Preventivo Inicial)</option>
+              <option value="250">250 Horas (Servicio Preventivo Menor)</option>
+              <option value="500">500 Horas (Servicio Preventivo Intermedio)</option>
+              <option value="1000">1000 Horas (Servicio Preventivo Mayor)</option>
+              <option value="2000">2000 Horas (Servicio Completo / General)</option>
+              <option value="custom">Otro Intervalo Personalizado</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label style="display:block; font-size:0.75rem; font-weight:600; color:var(--text-muted); margin-bottom:0.3rem;">Descripcion y Alcance del Mantenimiento</label>
+          <textarea id="kit-form-descripcion" rows="2" placeholder="Reemplazo de filtros de motor, inspeccion de bandas y toma de muestra de fluidos..." style="width:100%; padding:0.45rem 0.75rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.85rem; resize:vertical;"></textarea>
+        </div>
+
+        <!-- Seccion de Refacciones del Machote -->
+        <div class="form-section" style="margin-top:0.25rem; border-top:1px solid var(--border); padding-top:0.85rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+            <div>
+              <div class="form-section-title" style="margin:0; display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; font-weight:700; color:var(--text-primary);">
+                <i data-lucide="settings" style="width:16px; height:16px; color:#2563eb;"></i> Refacciones y Consumibles
+              </div>
+              <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px;">Selecciona la marca y la refacción del catálogo oficial SAP o ingresa refacciones del machote.</div>
+            </div>
+          </div>
+
+          <!-- Encabezados de columnas de refacciones -->
+          <div style="display:grid; grid-template-columns: 140px 1fr 115px 55px 28px; gap:0.5rem; font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em; padding: 0.35rem 0.2rem; border-bottom:1px solid var(--border); margin-bottom:0.4rem; align-items:center;">
+            <div>Marca</div>
+            <div>Descripción de Refacción</div>
+            <div style="text-align:center;">Clave</div>
+            <div style="text-align:center;">Cant.</div>
+            <div></div>
+          </div>
+
+          <!-- Lista de refacciones (idéntica a Órdenes de Servicio y Tickets) -->
+          <div id="ref-kit-list" class="refacciones-list" style="display:flex; flex-direction:column; gap:0.35rem; min-height:60px;">
+            <!-- Filas dinámicas insertadas con window.agregarFilaPiezaKit -->
+          </div>
+
+          <div style="margin-top:0.6rem;">
+            <button type="button" class="btn-add-ref" onclick="event.preventDefault(); event.stopPropagation(); window.agregarFilaPiezaKit();" style="display:inline-flex; align-items:center; gap:0.35rem; font-weight:600; cursor:pointer;">
+              <i data-lucide="plus" style="width:14px;height:14px;"></i> + Agregar Refacción
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer" style="padding: 0.75rem 1.5rem; background: var(--bg-secondary); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button type="button" class="btn-secondary btn-cancelar-modal" onclick="window.cerrarModalFormularioKit(event)" style="font-size:0.85rem; padding:0.4rem 1rem;">Cancelar</button>
+        <button type="button" class="btn-primary" onclick="window.guardarKitServicio()" style="font-size:0.85rem; padding:0.4rem 1.25rem; font-weight:600; background:#2563eb; color:#fff; border:none; border-radius:6px; cursor:pointer;">Guardar Machote</button>
+      </div>
+
+    </div>
+  </div>

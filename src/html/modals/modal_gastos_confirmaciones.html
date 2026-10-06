@@ -1,0 +1,151 @@
+  <!-- MODAL CONFIRMAR IMPORTACIÓN DE MOVIMIENTOS -->
+  <div id="modal-importar-movimientos" class="modal-overlay" style="align-items:center; justify-content:center;">
+    <div class="modal" style="max-width:550px; width:90%; border-radius:16px;">
+      <div class="modal-header">
+        <h2>Confirmar Importación de Movimientos</h2>
+        <button class="modal-close" onclick="window.cerrarModalImportacion()">✕</button>
+      </div>
+      <div class="modal-body" style="padding:1.5rem 0;">
+        <p style="margin-bottom:1.25rem; color:var(--text-secondary); font-size:0.9rem;">Se han procesado correctamente los registros de tu archivo:</p>
+        
+        <div style="background:var(--bg-hover); border-radius:12px; padding:1.25rem; margin-bottom:1.25rem; display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; border:1px solid var(--border);">
+          <div>
+            <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; letter-spacing:0.05em;">Total de Movimientos</span>
+            <h4 id="import-preview-count" style="font-size:1.6rem; margin:0.35rem 0 0 0; font-weight:800; color:var(--text-primary);">0</h4>
+          </div>
+          <div>
+            <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; letter-spacing:0.05em;">Monto Total</span>
+            <h4 id="import-preview-amount" style="font-size:1.6rem; margin:0.35rem 0 0 0; font-weight:800; color:#10b981;">$0.00</h4>
+          </div>
+        </div>
+        
+        <p style="font-size:0.85rem; color:var(--text-muted); line-height:1.4;" id="import-preview-duplicates-msg"></p>
+      </div>
+      <div class="form-actions" style="display:flex; justify-content:flex-end; gap:0.75rem; border-top:1px solid var(--border); padding-top:1.25rem;">
+        <button type="button" class="btn-secondary" onclick="window.cerrarModalImportacion()">Cancelar</button>
+        <button type="button" class="btn-primary" id="btn-import-confirm" onclick="window.confirmarImportacion()">Guardar Movimientos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CONFIRMAR IMPORTACIÓN DE TARJETAS -->
+  <div id="modal-importar-tarjetas" class="modal-overlay" style="align-items:center; justify-content:center;">
+    <div class="modal" style="max-width:550px; width:90%; border-radius:16px;">
+      <div class="modal-header">
+        <h2>Confirmar Importación de Tarjetas</h2>
+        <button class="modal-close" onclick="window.cerrarModalImportarTarjetas()">✕</button>
+      </div>
+      <div class="modal-body" style="padding:1.5rem 0;">
+        <p style="margin-bottom:1.25rem; color:var(--text-secondary); font-size:0.9rem;">Se han procesado correctamente las tarjetas de tu archivo:</p>
+        
+        <div style="background:var(--bg-hover); border-radius:12px; padding:1.25rem; margin-bottom:1.25rem; display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; border:1px solid var(--border);">
+          <div>
+            <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; letter-spacing:0.05em;">Total Tarjetas</span>
+            <h4 id="import-cards-preview-count" style="font-size:1.6rem; margin:0.35rem 0 0 0; font-weight:800; color:var(--text-primary);">0</h4>
+          </div>
+          <div>
+            <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; letter-spacing:0.05em;">Límite de Crédito</span>
+            <h4 id="import-cards-preview-amount" style="font-size:1.6rem; margin:0.35rem 0 0 0; font-weight:800; color:#10b981;">$0.00</h4>
+          </div>
+        </div>
+        
+        <p style="font-size:0.85rem; color:var(--text-muted); line-height:1.4;" id="import-cards-preview-duplicates-msg"></p>
+      </div>
+      <div class="form-actions" style="display:flex; justify-content:flex-end; gap:0.75rem; border-top:1px solid var(--border); padding-top:1.25rem;">
+        <button type="button" class="btn-secondary" onclick="window.cerrarModalImportarTarjetas()">Cancelar</button>
+        <button type="button" class="btn-primary" id="btn-import-cards-confirm" onclick="window.confirmarImportacionTarjetas()">Guardar Tarjetas</button>
+      </div>
+    </div>
+  </div>
+  <!-- MODAL DETALLES DE SINCRONIZACIÓN -->
+  <div id="modal-sync-detalles" class="modal-overlay" onclick="if(event.target === this) window.cerrarModalSyncDetalles()" style="z-index:99999;">
+    <div class="modal" style="max-width:550px; width:90%; border-radius:16px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); box-shadow:var(--shadow-lg);">
+      <div class="modal-header">
+        <h2 style="margin:0; font-size:1.2rem; font-weight:700;">Cambios Pendientes de Sincronizar</h2>
+        <button class="modal-close" onclick="window.cerrarModalSyncDetalles()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom:1.25rem; color:var(--text-secondary); font-size:0.9rem; line-height:1.45;">Los siguientes cambios se realizaron de manera local y están esperando a ser subidos a Supabase:</p>
+        <div id="sync-detalles-lista" style="max-height:220px; overflow-y:auto; border:1px solid var(--border); border-radius:12px; padding:1rem; background:var(--bg-hover, #f9fafb); display:flex; flex-direction:column; gap:0.75rem; margin-bottom:1.25rem; box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);">
+          <!-- Se inyecta la lista aquí -->
+        </div>
+        <div style="display:flex; align-items:center; gap:0.75rem; background:rgba(232, 130, 12, 0.05); border:1px solid rgba(232, 130, 12, 0.15); border-radius:10px; padding:0.85rem 1rem; color:var(--text-muted); font-size:0.8rem; line-height:1.45;">
+          <i data-lucide="info" style="width:16px; height:16px; color:var(--accent); flex-shrink:0;"></i>
+          <span>El sistema reintenta la sincronización automáticamente en segundo plano cuando detecta internet estable.</span>
+        </div>
+      </div>
+      <div class="form-actions" style="padding: 1rem 1.5rem 1.5rem 1.5rem; margin-top: 0;">
+        <button type="button" class="btn-secondary" onclick="window.cerrarModalSyncDetalles()">Cerrar</button>
+        <button type="button" class="btn-primary" onclick="window.ejecutarForzarSyncDesdeModal()">Intentar Sincronizar Ahora</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL GASTOS RECHAZADOS -->
+  <div id="modal-gastos-rechazados" class="modal-overlay" onclick="if(event.target === this) window.cerrarModalRechazados()" style="z-index:99999;">
+    <div class="modal" style="max-width:650px; width:90%; border-radius:16px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); box-shadow:var(--shadow-lg);">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <i data-lucide="alert-triangle" style="color:var(--red); width:20px; height:20px;"></i>
+          <h2 style="margin:0; font-size:1.2rem; font-weight:700;">Gastos Rechazados</h2>
+        </div>
+        <button class="modal-close" onclick="window.cerrarModalRechazados()">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 1rem 1.5rem 1.5rem 1.5rem;">
+        <p style="margin-bottom:1.25rem; color:var(--text-secondary); font-size:0.9rem; line-height:1.45;">A continuación se muestran los gastos que han sido rechazados por administración. Haz clic en cualquiera de ellos para ver los motivos del rechazo, corregir los datos o volver a vincular los archivos.</p>
+        
+        <div id="gastos-rechazados-lista" style="max-height:300px; overflow-y:auto; border:1px solid var(--border); border-radius:12px; background:var(--bg-hover); display:flex; flex-direction:column; gap:0.75rem; padding:1rem;">
+          <!-- Se inyectará la lista aquí -->
+        </div>
+      </div>
+      <div class="form-actions" style="border-top:1px solid var(--border); padding: 1.25rem 1.5rem 1.5rem 1.5rem; margin-top: 0;">
+        <button type="button" class="btn-secondary" onclick="window.cerrarModalRechazados()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+
+
+
+  <!-- MODAL CONFIRMACIÓN PERSONALIZADO -->
+  <div id="modal-confirmacion-global" class="modal-overlay" style="z-index:999999; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); backdrop-filter:blur(6px); transition: opacity 0.25s ease-in-out;">
+    <div class="modal" style="max-width:440px; width:92%; border-radius:20px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4); padding:2rem; display:flex; flex-direction:column; gap:1.25rem; transform:scale(0.9); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); border-top: 4px solid var(--accent, #E8820C);">
+      <div style="display:flex; gap:1rem; align-items:flex-start;">
+        <div id="modal-confirm-icon-container" style="background:rgba(232,130,12,0.1); color:var(--accent, #E8820C); border-radius:12px; width:48px; height:48px; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+          <i id="modal-confirm-icon" data-lucide="help-circle" style="width:24px; height:24px;"></i>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:0.35rem; flex:1;">
+          <h3 id="modal-confirm-title" style="margin:0; font-size:1.25rem; font-weight:700; color:var(--text-primary); font-family:var(--font-title, inherit); letter-spacing:-0.02em;">Confirmación</h3>
+          <p id="modal-confirm-message" style="margin:0; color:var(--text-secondary); font-size:0.95rem; line-height:1.6; font-weight:400;"></p>
+        </div>
+      </div>
+      <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:0.5rem; border-top:1px solid var(--border); padding-top:1.25rem;">
+        <button type="button" id="modal-confirm-btn-cancel" class="btn-secondary" style="margin:0; padding:0.6rem 1.25rem; height:auto; font-size:0.9rem; font-weight:600; border-radius:10px; transition: all 0.2s;">Cancelar</button>
+        <button type="button" id="modal-confirm-btn-accept" class="btn-primary" style="margin:0; padding:0.6rem 1.25rem; height:auto; font-size:0.9rem; font-weight:600; border-radius:10px; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.15);">Aceptar</button>
+      </div>
+    </div>
+  </div>
+  <!-- MODAL PIEZA PENDIENTE -->
+  <div id="modal-pieza-pendiente" class="modal-overlay" style="z-index:99999;" onclick="if(event.target === this) window.cerrarModalPiezaPendiente()">
+    <div class="modal" style="max-width:500px; width:90%; border-radius:16px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); box-shadow:var(--shadow-lg);">
+      <div class="modal-header">
+        <h2 style="margin:0; font-size:1.2rem; font-weight:700;">Detalle de Refacción</h2>
+        <button class="modal-close" onclick="window.cerrarModalPiezaPendiente()">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 1.5rem; display:flex; flex-direction:column; gap:1rem;">
+        <div id="modal-pieza-pendiente-info"></div>
+        <div>
+          <label class="form-label" style="font-weight:600; margin-bottom:0.5rem; display:block;">Estatus del Pedido</label>
+          <select id="modal-pieza-pendiente-estatus" class="form-select">
+            <option value="Por Pedir">Por Pedir</option>
+            <option value="En Tránsito / Pedido">En Tránsito</option>
+            <option value="Entregado al Técnico">Entregado</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-actions" style="border-top:1px solid var(--border); padding: 1.25rem 1.5rem; margin-top: 0; display:flex; gap:0.5rem; justify-content:flex-end;">
+        <button type="button" class="btn-secondary" onclick="window.cerrarModalPiezaPendiente()">Cancelar</button>
+        <button type="button" class="btn-primary" onclick="window.guardarEstatusModalPiezaPendiente()">Guardar Cambios</button>
+      </div>
+    </div>
+  </div>

@@ -1,0 +1,35 @@
+  <!-- MODAL VISOR DE MANUALES Y DOCUMENTOS -->
+  <div id="modal-visor-manual-overlay" class="modal-overlay" onclick="window.cerrarVisorManual(event)">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:560px; width:92%; border-radius:16px; background:var(--bg-card, #1e293b); color:var(--text-primary, #f8fafc); box-shadow:var(--shadow-lg, 0 20px 25px -5px rgba(0,0,0,0.5)); border:1px solid var(--border, rgba(255,255,255,0.1));">
+      <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; padding:1.25rem 1.5rem; border-bottom:1px solid var(--border, rgba(255,255,255,0.1)); background:var(--bg-hover, rgba(255,255,255,0.03));">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <div style="width:40px; height:40px; border-radius:10px; background:rgba(37,99,235,0.12); color:var(--primary, #2563eb); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <i data-lucide="book-open" id="modal-visor-manual-icon" style="width:20px; height:20px;"></i>
+          </div>
+          <div>
+            <h2 id="modal-visor-manual-titulo" style="margin:0; font-size:1.15rem; font-weight:700; color:var(--text-primary, #f8fafc);">Manual del Sistema</h2>
+            <div id="modal-visor-manual-sub" style="font-size:0.8rem; color:var(--text-muted, #94a3b8); margin-top:2px;">Documentación y guías oficiales</div>
+          </div>
+        </div>
+        <button class="modal-close" onclick="window.cerrarVisorManual()" style="background:transparent; border:none; color:var(--text-muted); font-size:1.25rem; cursor:pointer;">✕</button>
+      </div>
+      <div class="modal-body" style="padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem;">
+        <div id="modal-visor-manual-desc" style="font-size:0.92rem; line-height:1.5; color:var(--text-primary); background:var(--bg-body, #0f172a); padding:1rem; border-radius:8px; border:1px solid var(--border, rgba(255,255,255,0.1));">
+          Consulta la guía paso a paso o descarga el documento oficial en formato PDF.
+        </div>
+        <div style="display:flex; flex-direction:column; gap:0.75rem;">
+          <a id="modal-visor-manual-btn-tab" href="#" target="_blank" class="btn-primary" style="padding:0.75rem 1.25rem; font-size:0.95rem; font-weight:600; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.5rem; border-radius:10px; cursor:pointer;">
+            <i data-lucide="external-link" style="width:18px; height:18px;"></i>
+            <span>Abrir Manual Completo (Interactivo)</span>
+          </a>
+          <a id="modal-visor-manual-btn-download" href="#" download class="btn-secondary" style="padding:0.75rem 1.25rem; font-size:0.95rem; font-weight:600; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.5rem; border-radius:10px; cursor:pointer;">
+            <i data-lucide="download" style="width:18px; height:18px;"></i>
+            <span>Descargar Documento PDF</span>
+          </a>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding:1rem 1.5rem; border-top:1px solid var(--border, rgba(255,255,255,0.1)); display:flex; justify-content:flex-end; background:var(--bg-hover, rgba(255,255,255,0.03));">
+        <button type="button" class="btn-secondary" onclick="window.cerrarVisorManual()" style="padding:0.55rem 1.25rem; border-radius:8px; cursor:pointer;">Cerrar</button>
+      </div>
+    </div>
+  </div>

@@ -1,0 +1,45 @@
+    <!-- MODAL CIERRE EN PAPEL -->
+    <div class="modal-overlay" id="modal-cierre-papel-overlay" onclick="cerrarCierrePapel(event)" style="z-index: 600;">
+      <div class="modal" id="modal-cierre-papel" style="max-width: 780px;">
+        <div class="modal-header">
+          <h2>Cierre de Orden en Papel</h2>
+          <button class="modal-close" onclick="cerrarCierrePapel()">✕</button>
+        </div>
+        <div class="modal-body">
+          <form id="form-cierre-papel" onsubmit="confirmarCierrePapel(event)">
+            <input type="hidden" id="cp-orden-id" />
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Archivo PDF Escaneado *</label>
+              <input type="file" id="cp-pdf-file" accept="application/pdf" required style="width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary);" />
+              <small style="color:var(--text-muted); font-size:0.75rem; display:block; margin-top:0.25rem;">Suba el reporte en formato PDF firmado físicamente en campo.</small>
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Estado de la Orden *</label>
+              <select id="cp-estado" required style="width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary);">
+                <option value="Completado">Completado</option>
+                <option value="Refacciones pendientes">Refacciones pendientes</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">
+                Personal de Trabajo (Horas, Fecha, Ida, Regreso, Trayectos)
+                <button type="button" class="btn-primary" onclick="agregarRenglonTecnicoCierre()" style="font-size:0.75rem; padding:0.25rem 0.5rem; display:inline-flex; align-items:center; gap:0.2rem; background:var(--accent); border:none; height:auto;">
+                  <i data-lucide="plus" style="width:12px; height:12px;"></i> Agregar
+                </button>
+              </label>
+              <div id="cp-tecnicos-lista" style="display:flex; flex-direction:column; gap:0.5rem; max-height:180px; overflow-y:auto; padding:0.4rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary);">
+                <!-- Dynamic rows of technicians will be appended here -->
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 1.5rem;">
+              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Motivo de Cierre en Papel (¿Por qué no es digital?) *</label>
+              <textarea id="cp-motivo" placeholder="Ej. El cliente no cuenta con firma digital / Error de red en zona de trabajo / Orden antigua cerrada físicamente..." required rows="4" style="width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary); resize:vertical; box-sizing:border-box; font-family:inherit;"></textarea>
+            </div>
+            <div class="form-actions" style="display:flex; justify-content:flex-end; gap:0.5rem;">
+              <button type="button" class="btn-secondary" onclick="cerrarCierrePapel()">Cancelar</button>
+              <button type="submit" class="btn-primary"><i data-lucide="check-circle" class="btn-icon"></i> Guardar Cierre</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>

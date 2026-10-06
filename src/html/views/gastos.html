@@ -1,0 +1,318 @@
+        <div id="view-gastos" class="view">
+          <!-- TABS AND ALERT -->
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom: 1.5rem; width:100%;">
+            <div class="view-toggle"
+              style="display:flex; gap:0.5rem; background: var(--bg-hover); padding: 0.3rem; border-radius: var(--radius-md); border: 1px solid var(--border); width: fit-content; margin: 0;">
+              <button class="btn-secondary active" id="btn-tab-gastos-historial" onclick="switchGastosTab('historial')"
+                style="padding:0.4rem 1rem; border:none; background:var(--bg-card); box-shadow:0 1px 3px rgba(0,0,0,0.1); color:var(--text-primary); font-weight:600;">
+                <i data-lucide="history" style="width:16px;height:16px;margin-right:6px;vertical-align:text-bottom;"></i>
+                Mis Gastos / Comprobaciones
+              </button>
+              <button class="btn-secondary" id="btn-tab-gastos-clara" onclick="switchGastosTab('clara')"
+                style="padding:0.4rem 1rem; border:none; background:transparent; color:var(--text-muted); font-weight:500; display:inline-flex; align-items:center; gap:0.25rem;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; margin-right:4px;">
+                  <img src="Logo_de_Clara.svg" alt="Clara" style="height: 12px; width: auto; vertical-align: middle; filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.15));" />
+                </span>
+                Conciliación Clara <span class="nav-badge" id="badge-clara-txs" style="margin-left: 5px; background: var(--purple); color: #fff;">0</span>
+              </button>
+              <button class="btn-secondary" id="btn-tab-gastos-tarjetas" onclick="switchGastosTab('tarjetas')"
+                style="padding:0.4rem 1rem; border:none; background:transparent; color:var(--text-muted); font-weight:500; display:inline-flex; align-items:center; gap:0.25rem;">
+                <i data-lucide="credit-card" style="width:16px; height:16px; margin-right:6px; vertical-align:text-bottom;"></i>
+                Tarjetas Clara
+              </button>
+            </div>
+            
+            <button class="btn-secondary" id="btn-gastos-rechados-alerta" onclick="window.abrirModalRechazados()" style="position:relative; display:flex; align-items:center; gap:0.5rem; border:1px solid rgba(239,68,68,0.25); background:rgba(239,68,68,0.05); color:var(--red); font-weight:600; border-radius:8px; height:38px; padding:0 1rem; cursor:pointer;">
+              <i data-lucide="alert-triangle" style="width:16px; height:16px; color:var(--red);"></i> Gastos Rechazados
+              <span id="badge-rechazos-count" style="display:none; background:var(--red); color:white; font-size:0.65rem; font-weight:700; border-radius:99px; min-width:18px; height:18px; padding: 0 4px; align-items:center; justify-content:center; position:absolute; top:-8px; right:-8px; border: 2px solid var(--bg-card); box-shadow:0 2px 4px rgba(0,0,0,0.15);">0</span>
+            </button>
+          </div>
+
+          <!-- TAB 1: HISTORIAL DE GASTOS -->
+          <div id="gastos-tab-historial">
+            <div class="section-header"
+              style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom: 1.5rem;">
+              <h2>Control de Gastos</h2>
+              <div style="display:flex; gap:0.5rem; align-items:center;">
+                <button class="btn-secondary btn-clara-action" onclick="document.getElementById('clara-upload-input').click()" id="btn-subir-movimientos-csv">
+                  <i data-lucide="upload" class="btn-icon"></i> Subir CSV/Excel
+                </button>
+                <button class="btn-primary" onclick="abrirModalGasto()" id="btn-registrar-gasto">
+                  <i data-lucide="plus-circle" class="btn-icon"></i> Registrar Gasto
+                </button>
+              </div>
+            </div>
+
+            <!-- KPIs -->
+            <div class="stats-grid" style="margin-bottom: 1.5rem;">
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:var(--orange);"><i data-lucide="clock"></i></div>
+                <div>
+                  <div class="stat-label">Pendientes de Revisión</div>
+                  <div class="stat-value" id="kpi-gastos-pendiente">$0.00</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:var(--green);"><i data-lucide="check-circle-2"></i></div>
+                <div>
+                  <div class="stat-label">Comprobados / Aprobados</div>
+                  <div class="stat-value" id="kpi-gastos-aprobado">$0.00</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:var(--red);"><i data-lucide="x-circle"></i></div>
+                <div>
+                  <div class="stat-label">Rechazados</div>
+                  <div class="stat-value" id="kpi-gastos-rechazado">$0.00</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- FILTERS BAR -->
+            <div class="search-bar-container" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem; align-items:center; background:var(--bg-card); padding:1rem; border-radius:var(--radius-lg); border:1px solid var(--border);">
+              <div class="search-bar" style="flex:1; min-width:200px; margin:0;">
+                <input type="text" id="search-gastos" placeholder="Buscar por concepto o técnico..." oninput="renderGastos()" />
+              </div>
+              <select id="filter-gasto-estado" class="form-select" onchange="renderGastos()" style="min-width:120px;">
+                <option value="">Todos los Estados</option>
+                <option value="Pendiente">Pendientes</option>
+                <option value="Aprobado">Aprobados</option>
+                <option value="Rechazado">Rechazados</option>
+              </select>
+              <select id="filter-gasto-categoria" class="form-select" onchange="renderGastos()" style="min-width:120px;">
+                <option value="">Todas las Categorías</option>
+                <option value="Combustible">Combustible</option>
+                <option value="Alimentación">Alimentación</option>
+                <option value="Hospedaje">Hospedaje</option>
+                <option value="Casetas / Peajes">Casetas / Peajes</option>
+                <option value="Otros">Otros</option>
+              </select>
+              <select id="filter-gasto-metodo" class="form-select" onchange="renderGastos()" style="min-width:140px;">
+                <option value="">Todos los Métodos</option>
+                <option value="Tarjeta Clara">Tarjeta Clara</option>
+                <option value="Reembolso (Efectivo/Personal)">Reembolsos</option>
+              </select>
+              <select id="filter-gasto-tecnico" class="form-select" onchange="renderGastos()" style="min-width:150px; display:none;">
+                <option value="">Todos los Técnicos</option>
+              </select>
+            </div>
+
+            <!-- DESKTOP TABLE -->
+            <div class="table-wrapper gastos-desktop-table">
+              <table class="orders-table" style="width:100%;">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th class="col-tecnico-header">Técnico</th>
+                    <th>Método</th>
+                    <th>Categoría</th>
+                    <th>Descripción</th>
+                    <th style="text-align:right;">Monto</th>
+                    <th>Orden</th>
+                    <th>Factura (SAT)</th>
+                    <th style="text-align:center;">Estado</th>
+                    <th style="text-align:center;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tabla-gastos-body">
+                </tbody>
+              </table>
+            </div>
+
+            <!-- MOBILE CARDS LIST -->
+            <div class="gastos-mobile-cards" id="gastos-mobile-cards-list">
+            </div>
+          </div>
+
+          <!-- TAB 2: CONCILIACION CLARA (ESTILO MOVIMIENTOS CLARA) -->
+          <div id="gastos-tab-clara" style="display:none;">
+            <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom: 1.25rem;">
+              <div>
+                <h2 style="font-size:1.8rem; font-weight:700; margin:0; color:var(--text-primary); letter-spacing:-0.02em;">Movimientos</h2>
+                <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:0.25rem;">Visualiza y concilia los cargos automáticos de tus tarjetas Clara corporativas.</p>
+              </div>
+            </div>
+
+            <!-- FILTERS BAR ESTILO CLARA -->
+            <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; margin-bottom:0.75rem;">
+              <div class="search-bar" style="flex:1; max-width:360px; margin:0; position:relative; display:flex; align-items:center;">
+                <i data-lucide="search" style="position:absolute; left:0.75rem; width:1rem; height:1rem; color:var(--text-muted);"></i>
+                <input type="text" id="search-clara-txs" placeholder="Buscar por movimiento o comercio" oninput="window.aplicarFiltrosClara ? window.aplicarFiltrosClara() : renderClaraTxs()" style="padding-left:2.25rem; width:100%; border-radius:8px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); height:38px; font-family:inherit; font-size:0.88rem;" />
+              </div>
+              <div style="position:relative;">
+                <button class="btn-secondary" id="btn-clara-add-filter" type="button" onclick="window.toggleClaraFiltersDropdown(event)" style="display:flex; align-items:center; gap:0.5rem; border-radius:8px; height:38px; padding:0 1rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; color:var(--text-primary); font-weight:500; font-size:0.85rem; transition:var(--transition); position:relative; font-family:inherit;">
+                  <i data-lucide="filter" style="width:14px; height:14px;"></i> Añadir filtro
+                  <span id="badge-clara-active-filters-count" style="background:var(--accent); color:white; font-size:0.65rem; font-weight:700; border-radius:99px; width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; position:absolute; top:-6px; right:-6px; box-shadow:0 2px 4px rgba(0,0,0,0.2);">1</span>
+                </button>
+                
+                <!-- DROPDOWN DE FILTROS -->
+                <div id="clara-filters-dropdown" style="display:none; position:absolute; top:44px; right:0; background:var(--bg-card); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid var(--border); border-radius:12px; padding:1.25rem; width:280px; box-shadow:var(--shadow); z-index:1000; flex-direction:column; gap:1rem;">
+                  <div style="font-weight:600; font-size:0.85rem; color:var(--text-primary); border-bottom:1px solid var(--border); padding-bottom:0.5rem; display:flex; justify-content:space-between; align-items:center;">
+                    <span>Filtros de Movimientos</span>
+                    <button type="button" onclick="window.resetearFiltrosClara(event)" style="background:none; border:none; color:var(--accent); cursor:pointer; font-size:0.75rem; font-weight:600; font-family:inherit;">Limpiar</button>
+                  </div>
+                  
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <label style="display:block; font-size:0.72rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">Categoría</label>
+                    <select id="filter-clara-category" onchange="window.aplicarFiltrosClara()" style="width:100%; height:36px; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.8rem; padding:0 0.5rem; font-family:inherit; cursor:pointer;">
+                      <option value="">Todas</option>
+                      <option value="Combustibles">Combustibles</option>
+                      <option value="Transporte">Transporte</option>
+                      <option value="Venta Minorista">Venta Minorista</option>
+                      <option value="Servicios Profesionales">Servicios Profesionales</option>
+                    </select>
+                  </div>
+                  
+                  <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <label style="display:block; font-size:0.72rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">Revisión de Gastos</label>
+                    <select id="filter-clara-status" onchange="window.aplicarFiltrosClara()" style="width:100%; height:36px; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.8rem; padding:0 0.5rem; font-family:inherit; cursor:pointer;">
+                      <option value="">Todos</option>
+                      <option value="Sin Justificar">Sin Justificar (Pendiente)</option>
+                      <option value="En revisión">En revisión</option>
+                      <option value="Aprobada">Aprobada</option>
+                      <option value="Rechazada">Rechazada</option>
+                    </select>
+                  </div>
+                  
+                  <div id="filter-clara-user-wrapper" style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <label style="display:block; font-size:0.72rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">Tarjetahabiente</label>
+                    <select id="filter-clara-user" onchange="window.aplicarFiltrosClara()" style="width:100%; height:36px; border-radius:6px; border:1px solid var(--border); background:var(--bg-body); color:var(--text-primary); font-size:0.8rem; padding:0 0.5rem; font-family:inherit; cursor:pointer;">
+                      <option value="">Todos</option>
+                      <option value="Victor Gonzalez Zamora">Victor Gonzalez Zamora</option>
+                      <option value="Roque Falcon Chavez">Roque Falcon Chavez</option>
+                      <option value="Octavio Rivero">Octavio Rivero</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ACTIVE FILTERS ESTILO CLARA -->
+            <div id="clara-active-filters-tags" style="display:flex; gap:0.75rem; align-items:center; margin-bottom:1.5rem; font-size:0.85rem; flex-wrap:wrap;">
+              <div style="background:rgba(79,142,247,0.1); color:var(--accent); border:1px solid rgba(79,142,247,0.2); border-radius:99px; padding:0.2rem 0.75rem; display:inline-flex; align-items:center; gap:0.35rem; font-weight:500;">
+                <span>Fechas <strong>Estado de cuenta actual</strong></span>
+                <i data-lucide="x" style="width:12px; height:12px; cursor:pointer;" onclick="mostrarNotificacion('Filtro de fechas fijo')"></i>
+              </div>
+            </div>
+
+            <!-- KPIs ESTILO CLARA -->
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.25rem 1.5rem; margin-bottom:1.5rem; box-shadow:var(--shadow-sm);">
+              <div style="display:flex; gap:3rem; flex-wrap:wrap; align-items:center;">
+                <div>
+                  <div style="font-size:0.78rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.25rem;">Gasto total</div>
+                  <div style="font-size:1.8rem; font-weight:800; color:var(--text-primary); letter-spacing:-0.02em;" id="clara-kpi-gasto-total">$0.00</div>
+                </div>
+                <div>
+                  <div style="font-size:0.78rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.25rem;">Realizados</div>
+                  <div style="font-size:1.8rem; font-weight:800; color:var(--text-primary); letter-spacing:-0.02em;" id="clara-kpi-realizados">0</div>
+                </div>
+                <div>
+                  <div style="font-size:0.78rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.25rem;">Sin factura</div>
+                  <div style="font-size:1.8rem; font-weight:800; color:var(--red); letter-spacing:-0.02em;" id="clara-kpi-sin-factura">0</div>
+                </div>
+                <div>
+                  <div style="font-size:0.78rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.25rem; display:inline-flex; align-items:center; gap:4px;">Sin evidencia <i data-lucide="info" style="width:12px; height:12px; opacity:0.6;"></i></div>
+                  <div style="font-size:1.8rem; font-weight:800; color:var(--text-primary); letter-spacing:-0.02em;" id="clara-kpi-sin-evidencia">0</div>
+                </div>
+              </div>
+              
+              <div style="display:flex; gap:0.5rem; align-items:center;">
+                <button class="btn-secondary btn-clara-icon" title="Enviar estado de cuenta por correo" onclick="mostrarNotificacion('Estado de cuenta enviado por correo electrónico')">
+                  <i data-lucide="mail" class="btn-icon"></i>
+                </button>
+                <button class="btn-primary btn-clara-action" onclick="mostrarNotificacion('Descargando reporte de movimientos...')">
+                  <i data-lucide="download" class="btn-icon"></i> Descargar
+                </button>
+                <button class="btn-secondary btn-clara-action" onclick="document.getElementById('clara-upload-input').click()" id="btn-importar-clara-txs">
+                  <i data-lucide="upload" class="btn-icon"></i> Importar
+                </button>
+                <input type="file" id="clara-upload-input" style="display:none;" accept=".xlsx,.xls,.csv" onchange="window.procesarArchivoMovimientos(event)" />
+              </div>
+            </div>
+
+            <!-- TABLA DE MOVIMIENTOS ESTILO CLARA -->
+            <div class="table-wrapper" style="border:1px solid var(--border); border-radius:12px; overflow:auto; background:var(--bg-card); box-shadow:var(--shadow-sm); margin-bottom:2rem;">
+              <table class="orders-table" style="width:100%; border-collapse:collapse; text-align:left;">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--border); background:var(--bg-hover);">
+                    <th style="padding:0.75rem 1rem; width:40px; vertical-align:middle;"><input type="checkbox" style="cursor:pointer;" /></th>
+                    <th onclick="window.sortClaraTable('movimiento')" style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle; cursor:pointer; user-select:none; transition:var(--transition);" id="th-clara-movimiento">Movimiento <span class="sort-icon"></span></th>
+                    <th onclick="window.sortClaraTable('monto')" style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:right; vertical-align:middle; cursor:pointer; user-select:none; transition:var(--transition);" id="th-clara-monto">Monto <span class="sort-icon"></span></th>
+                    <th onclick="window.sortClaraTable('fecha')" style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle; cursor:pointer; user-select:none; transition:var(--transition);" id="th-clara-fecha">Fecha <span class="sort-icon"></span></th>
+                    <th onclick="window.sortClaraTable('usuario')" style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle; cursor:pointer; user-select:none; transition:var(--transition);" id="th-clara-usuario">Usuario <span class="sort-icon"></span></th>
+                    <th onclick="window.sortClaraTable('tarjeta')" style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle; cursor:pointer; user-select:none; transition:var(--transition);" id="th-clara-tarjeta">Tarjeta <span class="sort-icon"></span></th>
+                    <th onclick="window.sortClaraTable('evidencia')" style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:center; vertical-align:middle; cursor:pointer; user-select:none; transition:var(--transition);" id="th-clara-evidencia">Evidencia <span class="sort-icon"></span></th>
+                    <th onclick="window.sortClaraTable('revision')" style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:center; vertical-align:middle; cursor:pointer; user-select:none; transition:var(--transition);" id="th-clara-revision">Revisión de gastos <span class="sort-icon"></span></th>
+                  </tr>
+                </thead>
+                <tbody id="clara-movimientos-table-body">
+                  <!-- Injected via renderClaraTxs() -->
+                </tbody>
+              </table>
+            </div>
+            <!-- HIDDEN TEST CONTAINER FOR JSDOM TESTS COMPATIBILITY -->
+            <div id="clara-txs-list" style="display:none;"></div>
+          </div>
+
+          <!-- TAB 3: TARJETAS CLARA -->
+          <div id="gastos-tab-tarjetas" style="display:none;">
+            <div class="section-header"
+              style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom: 1.5rem;">
+              <h2>Tarjetas Corporativas Clara</h2>
+              <div style="display:flex; gap:0.5rem; align-items:center;">
+                <button class="btn-secondary btn-clara-action" onclick="window.abrirSeleccionadorArchivoTarjetas()" id="btn-importar-tarjetas-excel">
+                  <i data-lucide="upload" class="btn-icon"></i> Importar Tarjetas
+                </button>
+                <input type="file" id="tarjetas-upload-input" style="display:none;" accept=".xlsx,.xls,.csv" onchange="window.procesarArchivoTarjetas(event)" />
+              </div>
+            </div>
+
+
+
+            <!-- KPIs DE TARJETAS -->
+            <div class="stats-grid" style="margin-bottom: 1.5rem;">
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:var(--accent);"><i data-lucide="credit-card"></i></div>
+                <div>
+                  <div class="stat-label">Total de Tarjetas</div>
+                  <div class="stat-value" id="kpi-tarjetas-total">0</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:var(--green);"><i data-lucide="wallet"></i></div>
+                <div>
+                  <div class="stat-label">Límite de Crédito Total</div>
+                  <div class="stat-value" id="kpi-tarjetas-limite">$0.00</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:var(--red);"><i data-lucide="trending-up"></i></div>
+                <div>
+                  <div class="stat-label">Saldo Total Utilizado</div>
+                  <div class="stat-value" id="kpi-tarjetas-utilizado">$0.00</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TABLA DE TARJETAS -->
+            <div class="table-wrapper" style="border:1px solid var(--border); border-radius:12px; overflow:auto; background:var(--bg-card); box-shadow:var(--shadow-sm); margin-bottom:2rem;">
+              <table class="orders-table" style="width:100%; border-collapse:collapse; text-align:left;">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--border); background:var(--bg-hover);">
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Alias / Titular</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Correo</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Tarjeta</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Tipo / Estado</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); vertical-align:middle;">Usuario Vinculado</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:right; vertical-align:middle;">Límite</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:right; vertical-align:middle;">Utilizado</th>
+                    <th style="padding:0.75rem 1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); text-align:right; vertical-align:middle;">Disponible</th>
+                  </tr>
+                </thead>
+                <tbody id="tarjetas-table-body">
+                  <!-- Injected via renderClaraCards() -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>

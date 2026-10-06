@@ -1,0 +1,21 @@
+  <!-- MODAL DESGLOSE DASHBOARD -->
+  <div class="modal-overlay" id="modal-dashboard-desglose" onclick="if(event.target===this) this.classList.remove('open')">
+    <div class="modal" style="max-width: 900px;">
+      <div class="modal-header">
+        <h2 id="modal-dashboard-desglose-title">Desglose</h2>
+        <button class="modal-close" onclick="document.getElementById('modal-dashboard-desglose').classList.remove('open')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="table-wrapper">
+          <table class="orders-table" id="tabla-dashboard-desglose" style="width: 100%;">
+            <thead id="tabla-dashboard-desglose-head">
+            </thead>
+            <tbody id="tabla-dashboard-desglose-body">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>

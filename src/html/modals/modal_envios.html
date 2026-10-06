@@ -1,0 +1,138 @@
+  <!-- MODAL: CREAR / EDITAR GUÍA DE ENVÍO Y PAQUETERÍA -->
+  <div id="modal-envio-overlay" class="modal-overlay" style="z-index: 99999; display: none;" onclick="window.cerrarModalEnvio(event)">
+    <div class="modal" style="max-width: 680px; width: 95vw; max-height: 90vh; overflow-y: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+      <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <div style="background:rgba(234, 88, 12, 0.15); color:var(--accent); padding:0.4rem; border-radius:6px; display:flex;">
+            <i data-lucide="truck" style="width:18px; height:18px;"></i>
+          </div>
+          <h3 style="font-size:1.05rem; margin:0; font-weight:700; color:var(--text-primary);">Gestión de Guía de Envío</h3>
+        </div>
+        <button type="button" class="modal-close" onclick="window.cerrarModalEnvio(event)" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:1.3rem;">✕</button>
+      </div>
+
+      <form id="form-envio" onsubmit="window.guardarModalEnvio(event)" style="padding: 1.25rem 1.5rem;">
+        <input type="hidden" id="envio-modal-id" value="" />
+        <input type="hidden" id="envio-modal-ticket-id" value="" />
+
+        <!-- Sección 1: Ticket y Destinatario -->
+        <div style="margin-bottom: 1rem;">
+          <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Ticket Comercial Asociado *</label>
+          <select id="envio-input-ticket" class="form-select" onchange="window.onCambioTicketEnvio(this.value)" required style="width:100%;">
+            <option value="">-- Seleccionar Ticket Comercial --</option>
+          </select>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem; margin-bottom: 1rem;">
+          <div>
+            <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Cliente</label>
+            <input type="text" id="envio-input-cliente" class="form-input" placeholder="Nombre de la empresa o cliente" readonly style="background:var(--bg-body); cursor:not-allowed;" />
+          </div>
+          <div>
+            <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Sitio / Ubicación de Entrega</label>
+            <input type="text" id="envio-input-destino" class="form-input" placeholder="Sitio o dirección de entrega" />
+          </div>
+        </div>
+
+        <!-- Sección 2: Transportista y Guía -->
+        <div style="border-top:1px solid var(--border); padding-top:1rem; margin-bottom:1rem;">
+          <div style="font-size:0.85rem; font-weight:700; color:var(--text-primary); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.4rem;">
+            <i data-lucide="package" style="width:14px; height:14px; color:var(--accent);"></i> Datos de la Paquetería
+          </div>
+          
+          <div style="display:grid; grid-template-columns: 1fr 1.2fr; gap:0.75rem; margin-bottom:0.75rem;">
+            <div>
+              <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Empresa de Paquetería *</label>
+              <select id="envio-input-paqueteria" class="form-select" onchange="window.onCambioPaqueteriaEnvio()" style="width:100%;">
+                <option value="DHL">DHL Express</option>
+                <option value="FedEx">FedEx</option>
+                <option value="Estafeta">Estafeta</option>
+                <option value="Paquetexpress">Paquetexpress</option>
+                <option value="Redpack">Redpack</option>
+                <option value="Castores">Transportes Castores</option>
+                <option value="Tresguerras">Tresguerras</option>
+                <option value="Sendex">Sendex</option>
+                <option value="UPS">UPS</option>
+                <option value="Transporte Propio">Transporte Propio (Eurorep)</option>
+                <option value="Otra">Otra Paquetería</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Número de Guía / Tracking *</label>
+              <input type="text" id="envio-input-guia" class="form-input" placeholder="Ej: 3948271049" oninput="window.onCambioPaqueteriaEnvio()" required />
+            </div>
+          </div>
+
+          <div>
+            <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Enlace directo de Rastreo (URL)</label>
+            <input type="url" id="envio-input-url-rastreo" class="form-input" placeholder="https://www.dhl.com/tracking..." />
+          </div>
+        </div>
+
+        <!-- Sección 3: Fechas y Estatus -->
+        <div style="border-top:1px solid var(--border); padding-top:1rem; margin-bottom:1rem;">
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
+            <div>
+              <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Fecha de Embarque / Envío</label>
+              <input type="date" id="envio-input-fecha-envio" class="form-input" />
+            </div>
+            <div>
+              <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Fecha Estimada de Entrega</label>
+              <input type="date" id="envio-input-fecha-entrega" class="form-input" />
+            </div>
+          </div>
+
+          <div style="background:var(--bg-body); padding:0.75rem; border-radius:8px; border:1px solid var(--border); display:flex; flex-direction:column; gap:0.5rem;">
+            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; font-weight:700; cursor:pointer; color:var(--text-primary); margin:0;">
+              <input type="checkbox" id="envio-input-llego" onchange="window.onToggleLlegoEnvio(this.checked)" style="width:16px; height:16px; cursor:pointer;" />
+              <span>Marcar este envío como Entregado / Recibido</span>
+            </label>
+            <div id="envio-container-fecha-llegada" style="display:none; padding-left:1.5rem; margin-top:0.25rem;">
+              <label style="display:block; font-size:0.78rem; font-weight:600; margin-bottom:0.25rem; color:var(--text-secondary);">Fecha Real de Entrega</label>
+              <input type="date" id="envio-input-fecha-llegada" class="form-input" style="max-width:200px;" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección 4: Refacciones Incluidas -->
+        <div style="border-top:1px solid var(--border); padding-top:1rem; margin-bottom:1rem;">
+          <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Refacciones incluidas en este paquete</label>
+          <div id="envio-parts-selection">
+            <div style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">Selecciona un ticket para ver sus refacciones asociadas.</div>
+          </div>
+        </div>
+
+        <!-- Sección 5: Notas -->
+        <div style="margin-bottom:1.25rem;">
+          <label style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-secondary);">Notas u Observaciones del Despacho</label>
+          <textarea id="envio-input-notas" class="form-input" rows="2" placeholder="Observaciones adicionales, paquete consolidado, persona que recibe, etc."></textarea>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem; border-top:1px solid var(--border); padding-top:1rem;">
+          <button type="button" class="btn-secondary" onclick="window.cerrarModalEnvio(event)">Cancelar</button>
+          <button type="submit" class="btn-primary" style="display:inline-flex; align-items:center; gap:0.4rem;">
+            <i data-lucide="check"></i> <span>Guardar Guía de Envío</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: DETALLE VISUAL DE GUÍA DE ENVÍO -->
+  <div id="modal-detalle-envio-overlay" class="modal-overlay" style="z-index: 99999; display: none;" onclick="window.cerrarDetalleEnvio(event)">
+    <div class="modal" style="max-width: 620px; width: 95vw; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+      <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <div style="background:rgba(234, 88, 12, 0.15); color:var(--accent); padding:0.4rem; border-radius:6px; display:flex;">
+            <i data-lucide="package-search" style="width:18px; height:18px;"></i>
+          </div>
+          <h3 id="detalle-envio-title" style="font-size:1.05rem; margin:0; font-weight:700; color:var(--text-primary);">Detalle del Envío</h3>
+        </div>
+        <button type="button" class="modal-close" onclick="window.cerrarDetalleEnvio(event)" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:1.3rem;">✕</button>
+      </div>
+
+      <div id="detalle-envio-body" style="padding: 1.25rem 1.5rem;">
+        <!-- Contenido dinámico -->
+      </div>
+    </div>
+  </div>

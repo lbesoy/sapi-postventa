@@ -1,0 +1,243 @@
+    <!-- MODAL FORMULARIO -->
+    <div class="modal-overlay" id="modal-overlay" onclick="cerrarFormulario(event)">
+      <div class="modal" id="modal-form">
+        <div class="modal-header">
+          <h2 id="modal-title">Nueva Orden de Servicio</h2>
+          <button class="modal-close" onclick="cerrarFormulario()">✕</button>
+        </div>
+        <div class="modal-body">
+          <form id="form-orden" onsubmit="guardarOrden(event)">
+
+            <!-- SECCIÓN 1: DATOS GENERALES -->
+            <div class="form-section">
+              <div class="form-section-title"><i data-lucide="user" class="section-icon"></i> Información del Cliente
+              </div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Folio (Bitácora No.)</label>
+                  <input type="text" id="f-folio" placeholder="Ej. 1570-C" required />
+                </div>
+                <div class="form-group" style="position:relative;" id="group-f-cliente">
+                  <label>Cliente *</label>
+                  <div class="combo-box" tabindex="0" id="f-cliente-combo" onclick="toggleCombo('f-cliente')">
+                    <span id="f-cliente-display">Seleccionar cliente...</span>
+                    <i data-lucide="chevron-down" style="width:16px;height:16px;"></i>
+                  </div>
+                  <div class="combo-menu" id="f-cliente-menu">
+                    <div class="combo-search">
+                      <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted)"></i>
+                      <input type="text" id="f-cliente-search" placeholder="Buscar o agregar..."
+                        oninput="filterCombo('f-cliente', this.value)" onclick="event.stopPropagation()">
+                      <button type="button" onclick="agregarEmpresaCombo('f-cliente'); event.stopPropagation();"
+                        title="Agregar nueva empresa"><i data-lucide="plus"></i></button>
+                    </div>
+                    <div class="combo-options" id="f-cliente-options">
+                      <!-- Opciones dinámicas -->
+                    </div>
+                  </div>
+                  <input type="hidden" id="f-cliente" required>
+                </div>
+                <div class="form-group">
+                  <label>Ticket (Soporte) *</label>
+                  <select id="f-soporte" onchange="onSoporteChange()" required>
+                    <option value="">Ninguno</option>
+                  </select>
+                  <div id="soporte-meta"
+                    style="display:none; font-size:0.85rem; color:var(--text-muted); margin-top:0.4rem;"></div>
+                  <input type="hidden" id="f-pedido" />
+                </div>
+                <div class="form-group full-width">
+                  <label>Equipo / Máquina (Autocompletar)</label>
+                  <div id="f-equipos-seleccionados" class="chips-container" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.5rem;"></div>
+                  <select id="f-equipo" onchange="window.onEquipoOrdenChangeMultiple()">
+                    <option value="">Seleccione una máquina registrada...</option>
+                    <option value="Otra / No registrada">Otra / Captura manual</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Ubicación</label>
+                  <input type="text" id="f-ubicacion" placeholder="Ciudad, Estado" />
+                </div>
+                <div class="form-group">
+                  <label>Ubicación en Sitio</label>
+                  <input type="text" id="f-ubicacion-sitio" placeholder="Registrada en sitio" />
+                </div>
+                <div class="form-group">
+                  <label>Operador</label>
+                  <input type="text" id="f-operador" />
+                </div>
+                <div class="form-group">
+                  <label>No. ECO</label>
+                  <input type="text" id="f-eco" />
+                </div>
+                <div class="form-group">
+                  <label>Horómetro (Ticket)</label>
+                  <input type="text" id="f-horometro" placeholder="Ej. 1304" />
+                </div>
+                <div class="form-group">
+                  <label>Horómetro Real <span style="color:var(--red)">*</span></label>
+                  <input type="text" id="f-horometro-real" placeholder="Lectura en campo" required />
+                </div>
+                <div class="form-group">
+                  <label>Modelo</label>
+                  <input type="text" id="f-modelo" placeholder="Ej. X-50" />
+                </div>
+                <div class="form-group">
+                  <label>Serie</label>
+                  <input type="text" id="f-serie" />
+                </div>
+              </div>
+            </div>
+
+            <!-- SECCIÓN 2: KM Y TIPO -->
+            <div class="form-section">
+              <div class="form-section-title"><i data-lucide="map-pin" class="section-icon"></i> Kilómetros de Recorrido
+              </div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Origen → Trabajo (km)</label>
+                  <input type="number" id="f-km-ida" min="0" oninput="calcKmTotal()" />
+                </div>
+                <div class="form-group">
+                  <label>Trabajo → Origen (km)</label>
+                  <input type="number" id="f-km-vuelta" min="0" oninput="calcKmTotal()" />
+                </div>
+                <div class="form-group">
+                  <label>Total Km</label>
+                  <input type="number" id="f-km-total" readonly style="background:var(--bg-secondary);" />
+                </div>
+              </div>
+            </div>
+
+            <!-- SECCIÓN 3: TIPO DE VISITA -->
+            <div class="form-section">
+              <div class="form-section-title"><i data-lucide="tag" class="section-icon"></i> Tipo de Visita</div>
+              <div class="tipo-chips">
+                <label class="chip"><input type="radio" name="tipo" value="Servicio preventivo" checked /><span>Servicio preventivo</span></label>
+                <label class="chip"><input type="radio" name="tipo" value="Garantía" /><span>Garantía</span></label>
+                <label class="chip"><input type="radio" name="tipo" value="Inspección" /><span>Inspección</span></label>
+                <label class="chip"><input type="radio" name="tipo" value="Entrega y puesta en marcha" /><span>Entrega y puesta en marcha</span></label>
+                <label class="chip"><input type="radio" name="tipo" value="Pre-entrega" /><span>Pre-entrega</span></label>
+                <label class="chip"><input type="radio" name="tipo" value="Entrega Refacciones" /><span>Entrega Refacciones</span></label>
+              </div>
+            </div>
+
+            <!-- SECCIÓN 4: FALLA Y TRABAJOS -->
+            <div class="form-section">
+              <div class="form-section-title"><i data-lucide="wrench" class="section-icon"></i> Diagnóstico y Trabajos
+              </div>
+              <div class="form-group full-width">
+                <label>Falla reportada</label>
+                <textarea id="f-falla" rows="2" placeholder="Descripción de la falla..."></textarea>
+              </div>
+              <div class="form-group full-width">
+                <label>Trabajos realizados</label>
+                <textarea id="f-trabajos" rows="4" placeholder="Describe los trabajos realizados..."></textarea>
+              </div>
+            </div>
+
+            <!-- SECCIÓN 5: OBSERVACIONES -->
+            <div class="form-section">
+              <div class="form-section-title"><i data-lucide="file-pen-line" class="section-icon"></i> Observaciones y
+                Dictamen</div>
+              <div class="form-group full-width">
+                <label>Dictamen</label>
+                <textarea id="f-dictamen" rows="2"></textarea>
+              </div>
+              <div class="form-group full-width">
+                <label>Condiciones en las que se deja el equipo</label>
+                <textarea id="f-condiciones" rows="2"></textarea>
+              </div>
+              <div class="form-group full-width">
+                <label>Observaciones</label>
+                <textarea id="f-observaciones" rows="2"></textarea>
+              </div>
+              <div class="form-group full-width">
+                <label>Pendientes</label>
+                <textarea id="f-pendientes" rows="2"></textarea>
+              </div>
+            </div>
+
+            <!-- SECCIÓN 6: REFACCIONES -->
+            <div class="form-section">
+              <div class="form-section-title"><i data-lucide="settings" class="section-icon"></i> Refacciones</div>
+              <div class="refacciones-cols">
+                <div>
+                  <div class="ref-subtitle">Utilizadas</div>
+                  <div id="ref-utilizadas-list">
+                    <!-- Las filas se insertan dinámicamente con agregarRef -->
+                  </div>
+                  <button type="button" class="btn-add-ref" onclick="agregarRef('utilizadas')">+ Agregar</button>
+
+                </div>
+                <div>
+                  <div class="ref-subtitle">Necesarias</div>
+                  <div id="ref-necesarias-list">
+                    <!-- Las filas se insertan dinámicamente con agregarRef -->
+                  </div>
+                  <button type="button" class="btn-add-ref" onclick="agregarRef('necesarias')">+ Agregar</button>
+
+                </div>
+              </div>
+            </div>
+
+            <!-- SECCIÓN 7: FECHA DE SERVICIO -->
+            <div class="form-section">
+              <div class="form-section-title"><i data-lucide="calendar" class="section-icon"></i> Fecha de Servicio
+              </div>
+              <div class="dias-tabs" id="dias-tabs" style="display: none;">
+                <button type="button" class="dia-tab active" onclick="selDia(this,'lunes')">Lun</button>
+                <button type="button" class="dia-tab" onclick="selDia(this,'martes')">Mar</button>
+                <button type="button" class="dia-tab" onclick="selDia(this,'miercoles')">Mié</button>
+                <button type="button" class="dia-tab" onclick="selDia(this,'jueves')">Jue</button>
+                <button type="button" class="dia-tab" onclick="selDia(this,'viernes')">Vie</button>
+                <button type="button" class="dia-tab" onclick="selDia(this,'sabado')">Sáb</button>
+                <button type="button" class="dia-tab" onclick="selDia(this,'domingo')">Dom</button>
+              </div>
+              <div id="dia-panels" style="display: none;">
+                <!-- generado por JS -->
+              </div>
+              <div class="form-grid" style="margin-top:1rem">
+                <div class="form-group">
+                  <label>No. de Noches</label>
+                  <input type="number" id="f-noches" min="0" value="0" />
+                </div>
+                <div class="form-group">
+                  <label>Alimentación</label>
+                  <input type="number" id="f-alimentacion" min="0" step="0.01" />
+                </div>
+                <div class="form-group">
+                  <label>Traslado</label>
+                  <input type="number" id="f-traslado-costo" min="0" step="0.01" />
+                </div>
+                <div class="form-group" style="display:flex; align-items:center; gap:0.5rem; margin-top:1.5rem;">
+                  <input type="checkbox" id="f-reembolso-km" style="width:auto; height:auto; transform:scale(1.2);" disabled="disabled" />
+                  <label for="f-reembolso-km" style="margin:0; opacity:0.8;">¿Aplica Reembolso KM? <span style="font-size:0.75rem; color:var(--accent); font-weight:normal;">(Se auto-calcula desde el PDF del Ticket)</span></label>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECCIÓN 8: ESTADO -->
+            <div class="form-section" id="section-estado-orden" style="display:none;">
+              <div class="form-section-title"><i data-lucide="circle-dot" class="section-icon"></i> Estado de la Orden
+              </div>
+              <div class="form-group">
+                <label>Estado</label>
+                <select id="f-estado">
+                  <option value="Pendiente">Pendiente</option>
+                  <option value="En proceso">En proceso</option>
+                  <option value="Refacciones pendientes">Refacciones pendientes</option>
+                  <option value="Completado">Completado</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="btn-secondary" onclick="cerrarFormulario()">Cancelar</button>
+              <button type="submit" class="btn-primary"><i data-lucide="save" class="btn-icon"></i> Guardar
+                Orden</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>

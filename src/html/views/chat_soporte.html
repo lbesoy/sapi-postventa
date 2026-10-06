@@ -1,0 +1,35 @@
+        <div id="view-chat-soporte" class="view" style="overflow: hidden; height: calc(100vh - 61px); padding: 1rem;">
+          <div style="display:flex; height: 100%; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--bg-card); box-shadow:var(--shadow-md);">
+            <!-- Left Sidebar: Client List & Mailbox -->
+            <div style="width:340px; border-right:1px solid var(--border); display:flex; flex-direction:column; background:var(--bg-hover);">
+              <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:0.6rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <h3 style="font-size:0.88rem; font-weight:700; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:0.4rem; margin:0;">
+                    <i data-lucide="headset"></i> Soporte
+                  </h3>
+                  <span style="font-size:0.7rem; color:var(--text-muted); font-family:monospace;">Ptalctes@eurorep.mx</span>
+                </div>
+                <div style="display:flex; background:var(--bg-card); border-radius:8px; padding:3px; border:1px solid var(--border);">
+                  <button id="btn-tab-soporte-chats" onclick="window.switchSoporteTab('chats')" style="flex:1; padding:0.4rem; border:none; border-radius:6px; background:var(--accent); color:white; font-weight:600; font-size:0.78rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:0.35rem; transition:all 0.2s;">
+                    <i data-lucide="message-square" style="width:13px; height:13px;"></i> Chats Portal
+                  </button>
+                  <button id="btn-tab-soporte-correos" onclick="window.switchSoporteTab('correos')" style="flex:1; padding:0.4rem; border:none; border-radius:6px; background:transparent; color:var(--text-secondary); font-weight:600; font-size:0.78rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:0.35rem; transition:all 0.2s;">
+                    <i data-lucide="mail" style="width:13px; height:13px;"></i> Bandeja Correo
+                  </button>
+                </div>
+              </div>
+              <div id="chat-client-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; padding:0.5rem 0;">
+                <!-- JS Rendered Client Chats or Email Inbox -->
+              </div>
+            </div>
+            <!-- Right Pane: Active Chat -->
+            <div id="chat-active-pane" style="flex:1; display:flex; flex-direction:column; background:var(--bg-primary);">
+              <div style="flex:1; display:flex; align-items:center; justify-content:center; flex-direction:column; color:var(--text-muted); gap:0.5rem;">
+                <i data-lucide="message-square" style="width:48px; height:48px; opacity:0.5;"></i>
+                <p style="font-size:0.9rem; font-weight:500; margin:0;">Selecciona un cliente de la lista para ver el chat</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RENTAS VIEW -->

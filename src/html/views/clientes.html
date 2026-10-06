@@ -1,0 +1,233 @@
+        <div id="view-clientes" class="view">
+          <!-- Pastillas de Navegación de Clientes -->
+          <div class="clientes-tabs" style="display:flex; gap:0.5rem; margin-bottom:1.5rem; border-bottom:1px solid var(--border); padding-bottom:0.75rem;">
+            <button class="btn-pastilla active" id="btn-tab-cli-catalogo" onclick="setClientesSubView('catalogo')"
+              style="padding:0.5rem 1.25rem; border-radius:30px; font-size:0.85rem; font-weight:600; cursor:pointer; border:1px solid var(--accent); background:var(--accent); color:#fff; transition:all 0.2s; display:flex; align-items:center; gap:0.4rem;">
+              <i data-lucide="building-2" style="width:14px;height:14px;"></i> Catálogo SAP
+            </button>
+            <button class="btn-pastilla" id="btn-tab-cli-portal" onclick="setClientesSubView('portal')"
+              style="padding:0.5rem 1.25rem; border-radius:30px; font-size:0.85rem; font-weight:600; cursor:pointer; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); transition:all 0.2s; display:flex; align-items:center; gap:0.4rem;">
+              <i data-lucide="globe" style="width:14px;height:14px;"></i> Administrar Portal
+            </button>
+          </div>
+
+          <!-- CONTENEDOR 1: CATÁLOGO SAP -->
+          <div id="clientes-catalogo-container">
+            <!-- INDICADOR KPI DISPONIBILIDAD DE FLOTA -->
+            <div id="cli-kpis-flota-container" style="margin-bottom: 1.25rem;"></div>
+
+            <div class="section-header"
+              style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+              <h2>Catálogo de Clientes</h2>
+              <div
+                style="display:flex; gap:0.5rem; flex-wrap:nowrap; align-items:center; flex:1; justify-content:flex-end;">
+                <div class="search-bar"
+                  style="width:100%; max-width:400px; margin:0; position:relative; display:flex; align-items:center;">
+                  <i data-lucide="search"
+                    style="position:absolute; left:0.75rem; width:1rem; height:1rem; color:var(--text-muted);"></i>
+                  <input type="text" id="busqueda-cliente" placeholder="Buscar por nombre, RFC o correo..."
+                    oninput="currentPageClientes = 1; renderClientes()" style="padding-left:2.25rem; width:100%;">
+                </div>
+                <div class="view-toggle"
+                  style="display:flex; gap:0.5rem; border-right: 1px solid var(--border); padding-right: 0.5rem; margin-right: 0.5rem;">
+                  <button class="btn-secondary active" id="btn-cli-galeria" onclick="setCliView('galeria')"
+                    title="Vista Galería"
+                    style="padding:0.4rem; background:var(--accent-light); border-color:var(--accent); color:var(--accent);"><i
+                      data-lucide="layout-grid" style="width:18px;height:18px;"></i></button>
+                  <button class="btn-secondary" id="btn-cli-lista" onclick="setCliView('lista')" title="Vista Lista"
+                    style="padding:0.4rem;"><i data-lucide="list" style="width:18px;height:18px;"></i></button>
+                </div>
+                <button class="action-btn" onclick="abrirModalFusionarClientes()"
+                  id="btn-fusionar-clientes"
+                  title="Fusionar cliente duplicado con el original de SAP"
+                  style="height:38px; display:none; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--orange, #f59e0b); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
+                  <i data-lucide="git-merge" class="btn-icon" style="width:14px;height:14px;"></i> Fusionar Duplicados
+                </button>
+                <button class="action-btn" onclick="sincronizarConGitHub('clientes', this)"
+                  title="Actualizar Clientes desde SAP"
+                  style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
+                  <i data-lucide="refresh-cw" class="btn-icon" style="width:14px;height:14px;"></i> Actualizar SAP
+                </button>
+              </div>
+            </div>
+
+            <div class="clientes-grid" id="clientes-grid">
+              <div class="empty-state" style="grid-column:1/-1;padding:2rem;">Cargando clientes...</div>
+            </div>
+
+            <div class="table-wrapper" id="clientes-list-wrapper" style="display:none; margin-top:1rem;">
+              <table class="orders-table">
+                <thead>
+                  <tr>
+                    <th id="th-cli-id" onclick="toggleSortClientes('id')" style="cursor:pointer; user-select:none;">ID SAP
+                      <i data-lucide="arrow-up-down"
+                        style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                        id="sort-icon-cli-id"></i></th>
+                    <th id="th-cli-nombre" onclick="toggleSortClientes('nombre')"
+                      style="cursor:pointer; user-select:none;">Empresa <i data-lucide="arrow-up-down"
+                        style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                        id="sort-icon-cli-nombre"></i></th>
+                    <th id="th-cli-rfc" onclick="toggleSortClientes('rfc')" style="cursor:pointer; user-select:none;">RFC
+                      <i data-lucide="arrow-up-down"
+                        style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                        id="sort-icon-cli-rfc"></i></th>
+                    <th id="th-cli-contacto" onclick="toggleSortClientes('contacto')"
+                      style="cursor:pointer; user-select:none;">Contacto <i data-lucide="arrow-up-down"
+                        style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                        id="sort-icon-cli-contacto"></i></th>
+                    <th id="th-cli-email" onclick="toggleSortClientes('email')" style="cursor:pointer; user-select:none;">
+                      Correo <i data-lucide="arrow-up-down"
+                        style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                        id="sort-icon-cli-email"></i></th>
+                    <th id="th-cli-telefono" onclick="toggleSortClientes('telefono')"
+                      style="cursor:pointer; user-select:none;">Teléfono <i data-lucide="arrow-up-down"
+                        style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                        id="sort-icon-cli-telefono"></i></th>
+                    <th id="th-cli-grupoSinergia" onclick="toggleSortClientes('grupoSinergia')"
+                      style="cursor:pointer; user-select:none;">Grupo SAP <i data-lucide="arrow-up-down"
+                        style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                        id="sort-icon-cli-grupoSinergia"></i></th>
+                    <th id="th-cli-saldoCuenta" onclick="toggleSortClientes('saldoCuenta')"
+                      style="cursor:pointer; user-select:none; text-align:right;">Saldo SAP <i data-lucide="arrow-up-down"
+                        style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                        id="sort-icon-cli-saldoCuenta"></i></th>
+                    <th id="th-cli-saldoOrdenes" onclick="toggleSortClientes('saldoOrdenes')"
+                      style="cursor:pointer; user-select:none; text-align:right;">Órdenes Abiertas <i
+                        data-lucide="arrow-up-down"
+                        style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                        id="sort-icon-cli-saldoOrdenes"></i></th>
+                    <th style="text-align:center;">Máquinas</th>
+                  </tr>
+                </thead>
+                <tbody id="clientes-table-body">
+                  <!-- Llenado dinámico -->
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pagination-controls" id="clientes-pagination"
+              style="display:flex; justify-content:center; align-items:center; gap:1rem; margin-top:2rem; margin-bottom:1rem;">
+              <!-- Controles inyectados vía JS -->
+            </div>
+          </div>
+
+          <!-- CONTENEDOR 2: ADMINISTRAR PORTAL -->
+          <div id="clientes-portal-container" style="display:none;">
+            <!-- Sub-Pastillas de Navegación del Portal -->
+            <div class="portal-sub-tabs" style="display:flex; gap:0.5rem; margin-bottom:1.5rem; border-bottom:1px solid var(--border); padding-bottom:0.75rem;">
+              <button class="btn-sub-pastilla active" id="btn-subtab-usuarios" onclick="setPortalSubView('usuarios')"
+                style="padding:0.5rem 1.25rem; border-radius:30px; font-size:0.8rem; font-weight:600; cursor:pointer; border:1px solid var(--accent); background:rgba(232, 130, 12, 0.08); color:var(--accent); border-color:var(--accent); transition:all 0.2s; display:flex; align-items:center; gap:0.35rem;">
+                <i data-lucide="users" style="width:14px;height:14px;"></i> Usuarios del Portal
+              </button>
+              <button class="btn-sub-pastilla" id="btn-subtab-automatizaciones" onclick="setPortalSubView('automatizaciones')"
+                style="padding:0.5rem 1.25rem; border-radius:30px; font-size:0.8rem; font-weight:600; cursor:pointer; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); transition:all 0.2s; display:flex; align-items:center; gap:0.35rem;">
+                <i data-lucide="cpu" style="width:14px;height:14px;"></i> Automatizaciones y Plantillas
+              </button>
+            </div>
+
+            <!-- SUB-SECCION 1: USUARIOS -->
+            <div id="portal-usuarios-subcontent">
+              <div class="section-header"
+                style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+                <h2>Usuarios del Portal de Clientes</h2>
+                <div
+                  style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; flex:1; justify-content:flex-end;">
+                  <div class="search-bar"
+                    style="width:100%; max-width:260px; margin:0; position:relative; display:flex; align-items:center;">
+                    <i data-lucide="search"
+                      style="position:absolute; left:0.75rem; width:1rem; height:1rem; color:var(--text-muted);"></i>
+                    <input type="text" id="busqueda-usuario-portal" placeholder="Buscar usuario..."
+                      oninput="renderPortalUsuariosList()" style="padding-left:2.25rem; width:100%; height:38px;">
+                  </div>
+                  <select id="filtro-estado-usuario-portal" class="view-filter"
+                    style="width: 170px; padding: 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; background: var(--bg-card); color: var(--text-primary); outline: none; height:38px;"
+                    onchange="renderPortalUsuariosList()">
+                    <option value="todos">Todos los Estados</option>
+                    <option value="activos">Activos</option>
+                    <option value="pendientes">Pendientes / Inactivos</option>
+                  </select>
+                  <select id="filtro-rol-usuario-portal" class="view-filter"
+                    style="width: 170px; padding: 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; background: var(--bg-card); color: var(--text-primary); outline: none; height:38px;"
+                    onchange="renderPortalUsuariosList()">
+                    <option value="todos">Todos los Roles</option>
+                    <option value="empresa">Empresa / Cliente</option>
+                    <option value="cliente-consultor">Cliente Consultor</option>
+                  </select>
+                  <select id="filtro-empresa-usuario-portal" class="view-filter"
+                    style="width: 180px; padding: 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; background: var(--bg-card); color: var(--text-primary); outline: none; height:38px;"
+                    onchange="renderPortalUsuariosList()">
+                    <option value="todas">Todas las Empresas</option>
+                  </select>
+                  <button class="btn-primary" onclick="window._modalUsuarioContexto = 'portal'; abrirModalUsuario()" style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; border-radius:var(--radius-sm); font-size:0.8rem; white-space:nowrap; cursor:pointer;">
+                    <i data-lucide="user-plus" class="btn-icon" style="width:14px;height:14px;"></i> Agregar Usuario
+                  </button>
+                </div>
+              </div>
+
+              <div class="table-wrapper" style="margin-top:1.25rem; border:1px solid var(--border); border-radius:8px; overflow-x:auto; background:var(--bg-card); box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+                <table class="orders-table" style="width:100%; border-collapse:collapse; text-align:left; font-size:0.85rem; min-width: 900px;">
+                  <thead>
+                    <tr style="background:var(--bg-hover, #f8fafc); border-bottom:2px solid var(--border);">
+                      <th style="width: 18%; padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Nombre</th>
+                      <th style="width: 20%; padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Correo Electrónico</th>
+                      <th style="width: 12%; padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Rol en Portal</th>
+                      <th style="width: 30%; padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Empresas Asociadas</th>
+                      <th style="width: 10%; padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Estatus</th>
+                      <th style="width: 10%; padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="clientes-portal-table-body">
+                    <!-- Injected via renderPortalUsuariosList() -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- SUB-SECCION 2: AUTOMATIZACIONES -->
+            <div id="portal-automatizaciones-subcontent" style="display:none; margin-top:1rem;">
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem; flex-wrap:wrap;">
+                
+                <!-- Columna Izquierda: Reglas de Automatización -->
+                <div class="config-card" style="margin:0; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--bg-card); padding:1.25rem;">
+                  <div class="config-card-header" style="padding-bottom:0.75rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem;">
+                    <div style="display:flex; gap:0.75rem; align-items:center;">
+                      <div class="config-card-icon" style="background:rgba(16,185,129,0.1);color:#10b981;padding:0.4rem;border-radius:6px;display:flex;align-items:center;justify-content:center;height:32px;width:32px;"><i data-lucide="cpu" style="width:18px;height:18px;"></i></div>
+                      <div style="flex:1;">
+                        <h3 style="margin:0; font-size:0.95rem; color:var(--text-primary); font-weight:600;">Reglas de Automatización</h3>
+                        <span style="font-size:0.72rem; color:var(--text-muted); display:block;">Acciones automáticas disparadas por eventos del sistema</span>
+                      </div>
+                    </div>
+                    <button class="action-btn" onclick="abrirModalAutoRegla()" style="height:32px; font-size:0.75rem; display:flex; align-items:center; gap:0.25rem; padding:0 0.5rem; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.2); color:#10b981; border-radius:var(--radius-sm); cursor:pointer;">
+                      <i data-lucide="plus" style="width:14px;height:14px;"></i> Nueva Regla
+                    </button>
+                  </div>
+                  <div id="automation-rules-list" style="display:flex; flex-direction:column; gap:0.75rem;">
+                    <!-- Injected via renderAutomationRules() -->
+                  </div>
+                </div>
+
+                <!-- Columna Derecha: Plantillas de Correo (Machotes) -->
+                <div class="config-card" style="margin:0; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--bg-card); padding:1.25rem;">
+                  <div class="config-card-header" style="padding-bottom:0.75rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem;">
+                    <div style="display:flex; gap:0.75rem; align-items:center;">
+                      <div class="config-card-icon" style="background:rgba(139,92,246,0.1);color:#8b5cf6;padding:0.4rem;border-radius:6px;display:flex;align-items:center;justify-content:center;height:32px;width:32px;"><i data-lucide="mail" style="width:18px;height:18px;"></i></div>
+                      <div style="flex:1;">
+                        <h3 style="margin:0; font-size:0.95rem; color:var(--text-primary); font-weight:600;">Plantillas de Correo (Machotes)</h3>
+                        <span style="font-size:0.72rem; color:var(--text-muted); display:block;">Cuerpo y asunto de las notificaciones enviadas</span>
+                      </div>
+                    </div>
+                    <button class="action-btn" onclick="abrirModalAutoPlantilla()" style="height:32px; font-size:0.75rem; display:flex; align-items:center; gap:0.25rem; padding:0 0.5rem; background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.2); color:#8b5cf6; border-radius:var(--radius-sm); cursor:pointer;">
+                      <i data-lucide="plus" style="width:14px;height:14px;"></i> Nueva Plantilla
+                    </button>
+                  </div>
+                  <div id="email-templates-list" style="display:flex; flex-direction:column; gap:0.75rem;">
+                    <!-- Injected via renderEmailTemplates() -->
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MAQUINARIA VIEW -->

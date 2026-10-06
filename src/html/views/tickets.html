@@ -1,0 +1,282 @@
+        <div id="view-tickets" class="view">
+          <div class="stats-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('todos')">
+              <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="ticket"></i></div>
+              <div>
+                <div class="stat-label">Total Tickets</div>
+                <div class="stat-value" id="stat-tkt-total">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('Abierto')">
+              <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-circle"></i></div>
+              <div>
+                <div class="stat-label">Abiertos</div>
+                <div class="stat-value" id="stat-tkt-abiertos">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('Refacciones')">
+              <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:#f59e0b;"><i data-lucide="settings"></i></div>
+              <div>
+                <div class="stat-label">Refacciones</div>
+                <div class="stat-value" id="stat-tkt-refacciones">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('Cotización')">
+              <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i data-lucide="file-text"></i></div>
+              <div>
+                <div class="stat-label">Cotización</div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                  <div class="stat-value" id="stat-tkt-cotizacion" style="line-height: 1;">0</div>
+                  <span id="stat-tkt-cotizacion-monto" style="font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.4rem; border-radius: 6px; background: rgba(232,130,12,0.08); color: #E8820C; border: 1px solid rgba(232,130,12,0.15); display: none; white-space: nowrap;"></span>
+                </div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('Cerrado - Aprobado')">
+              <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle"></i></div>
+              <div>
+                <div class="stat-label">Aceptados</div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                  <div class="stat-value" id="stat-tkt-cerrados-aprobados" style="line-height: 1;">0</div>
+                  <span id="stat-tkt-cerrados-aprobados-monto" style="font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.4rem; border-radius: 6px; background: rgba(16,185,129,0.08); color: #10b981; border: 1px solid rgba(16,185,129,0.15); display: none; white-space: nowrap;"></span>
+                </div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroTickets('Cerrado - Rechazado')">
+              <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="x-circle"></i></div>
+              <div>
+                <div class="stat-label">Rechazados</div>
+                <div class="stat-value" id="stat-tkt-cerrados-rechazados">0</div>
+              </div>
+            </div>
+          </div>
+          <div class="tickets-kanban-header">
+            <div class="ticket-filters">
+              <button class="filter-btn active" data-filter="todos" onclick="filtrarTickets(this)">Todos</button>
+              <button class="filter-btn" data-filter="Abierto" onclick="filtrarTickets(this)">Abiertos</button>
+              <button class="filter-btn" data-filter="Refacciones" onclick="filtrarTickets(this)">Refacciones</button>
+              <button class="filter-btn" data-filter="Cotización" onclick="filtrarTickets(this)">Cotización</button>
+              <button class="filter-btn" data-filter="Cerrado" onclick="filtrarTickets(this)">Cerrados</button>
+            </div>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+              <div class="tipo-filter-dropdown" style="position: relative; display: inline-block;">
+                <button type="button" id="btn-tkt-tipo-filter" onclick="window.toggleTipoFilterMenu(event)" class="form-select" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.65rem; font-size: 0.8rem; height: 38px; border-radius: 8px; user-select: none; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); transition: all 0.2s;">
+                  <i data-lucide="tag" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
+                  <span id="label-tkt-tipo-filter" style="font-weight: 500;">Todos los Tipos</span>
+                  <i data-lucide="chevron-down" style="width: 12px; height: 12px; opacity: 0.6; flex-shrink: 0;"></i>
+                </button>
+                <div id="menu-tkt-tipo-filter" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; min-width: 240px; max-width: 280px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 30px -5px rgba(0,0,0,0.18); padding: 0.6rem; z-index: 1050;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; padding: 0 0.2rem;">
+                    <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Tipo / Categoría</span>
+                    <button type="button" onclick="window.setTicketTipoFilter('')" style="background: none; border: none; color: var(--accent); font-size: 0.72rem; font-weight: 600; cursor: pointer; padding: 0;">Limpiar</button>
+                  </div>
+                  <div id="tipo-filter-options-list" style="display: flex; flex-direction: column; gap: 2px; max-height: 280px; overflow-y: auto; padding-right: 2px;">
+                    <!-- Opciones de tipo dinámicas -->
+                  </div>
+                </div>
+                <select id="filter-tkt-tipo" onchange="renderTickets()" style="display: none;">
+                  <option value="">Todos los Tipos</option>
+                </select>
+              </div>
+
+              <div class="sup-filter-dropdown col-asignado" style="position: relative; display: inline-block;">
+                <button type="button" id="btn-tkt-sup-filter" onclick="window.toggleSupervisorFilterMenu(event)" class="form-select" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.65rem; font-size: 0.8rem; height: 38px; border-radius: 8px; user-select: none; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); transition: all 0.2s;">
+                  <i data-lucide="user" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
+                  <span id="label-tkt-sup-filter" style="font-weight: 500;">Cualquier Supervisor</span>
+                  <i data-lucide="chevron-down" style="width: 12px; height: 12px; opacity: 0.6; flex-shrink: 0;"></i>
+                </button>
+                <div id="menu-tkt-sup-filter" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; min-width: 240px; max-width: 280px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 30px -5px rgba(0,0,0,0.18); padding: 0.6rem; z-index: 1050;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; padding: 0 0.2rem;">
+                    <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Supervisor Asignado</span>
+                    <button type="button" onclick="window.setTicketSupervisorFilter('')" style="background: none; border: none; color: var(--accent); font-size: 0.72rem; font-weight: 600; cursor: pointer; padding: 0;">Limpiar</button>
+                  </div>
+                  <div id="sup-filter-options-list" style="display: flex; flex-direction: column; gap: 2px; max-height: 280px; overflow-y: auto; padding-right: 2px;">
+                    <!-- Opciones de supervisor dinámicas -->
+                  </div>
+                </div>
+                <select id="filter-tkt-supervisor" onchange="renderTickets()" style="display: none;">
+                  <option value="">Cualquier Supervisor</option>
+                </select>
+              </div>
+              <div class="antiguedad-filter-dropdown" style="position: relative; display: inline-block;">
+                <button type="button" id="btn-antiguedad-filter" onclick="window.toggleAntiguedadFilterMenu(event)" class="form-select" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.65rem; font-size: 0.8rem; height: 38px; border-radius: 8px; user-select: none; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); transition: all 0.2s;">
+                  <i data-lucide="clock" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
+                  <span id="label-antiguedad-filter">Antigüedad</span>
+                  <i data-lucide="chevron-down" style="width: 12px; height: 12px; opacity: 0.6; flex-shrink: 0;"></i>
+                </button>
+                <div id="menu-antiguedad-filter" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; min-width: 230px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15); padding: 0.6rem; z-index: 1050;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; padding: 0 0.2rem;">
+                    <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Rango de Días</span>
+                    <button type="button" onclick="window.setAntiguedadFilter('')" style="background: none; border: none; color: var(--accent); font-size: 0.72rem; font-weight: 600; cursor: pointer; padding: 0;">Limpiar</button>
+                  </div>
+                  <div style="display: flex; gap: 3px; background: var(--bg-hover); padding: 3px; border-radius: 6px; margin-bottom: 0.5rem;">
+                    <button type="button" id="tab-antiguedad-mod" class="antiguedad-mode-btn" onclick="window.cambiarModoAntiguedad('mod')" style="flex: 1; padding: 0.3rem 0.4rem; font-size: 0.75rem; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; background: var(--bg-card); color: var(--accent); box-shadow: var(--shadow-sm); transition: all 0.15s;">Última Modif.</button>
+                    <button type="button" id="tab-antiguedad-crea" class="antiguedad-mode-btn" onclick="window.cambiarModoAntiguedad('crea')" style="flex: 1; padding: 0.3rem 0.4rem; font-size: 0.75rem; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.15s;">Creación</button>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <button type="button" class="antiguedad-opt-row" data-rango="" onclick="window.setAntiguedadRango('')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: var(--bg-hover); color: var(--accent); font-size: 0.8rem; font-weight: 600; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <span>Todas las fechas</span>
+                      <i data-lucide="check" style="width: 13px; height: 13px;" class="antiguedad-check"></i>
+                    </button>
+                    <button type="button" class="antiguedad-opt-row" data-rango="1_7" onclick="window.setAntiguedadRango('1_7')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <span>1 a 7 días</span>
+                      <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="antiguedad-check"></i>
+                    </button>
+                    <button type="button" class="antiguedad-opt-row" data-rango="8_15" onclick="window.setAntiguedadRango('8_15')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <span>8 a 15 días</span>
+                      <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="antiguedad-check"></i>
+                    </button>
+                    <button type="button" class="antiguedad-opt-row" data-rango="gt_15" onclick="window.setAntiguedadRango('gt_15')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <span>Más de 15 días</span>
+                      <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="antiguedad-check"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="sort-filter-dropdown" style="position: relative; display: inline-block;">
+                <button type="button" id="btn-sort-tickets" onclick="window.toggleSortMenu(event)" class="form-select" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.65rem; font-size: 0.8rem; height: 38px; border-radius: 8px; user-select: none; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); transition: all 0.2s;">
+                  <i data-lucide="arrow-up-down" style="width: 14px; height: 14px; flex-shrink: 0; color: var(--accent);"></i>
+                  <span id="label-sort-tickets" style="font-weight: 500;">Folio (Mayor)</span>
+                  <i data-lucide="chevron-down" style="width: 12px; height: 12px; opacity: 0.6; flex-shrink: 0;"></i>
+                </button>
+                <div id="menu-sort-tickets" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; min-width: 260px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 30px -5px rgba(0,0,0,0.18); padding: 0.6rem; z-index: 1050;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; padding: 0 0.2rem;">
+                    <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Ordenar por</span>
+                    <div style="display: flex; gap: 2px; background: var(--bg-hover); padding: 2px; border-radius: 6px;">
+                      <button type="button" id="btn-sort-dir-desc" onclick="window.setSortDirection('desc')" style="padding: 0.2rem 0.45rem; font-size: 0.72rem; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; background: var(--bg-card); color: var(--accent); box-shadow: var(--shadow-sm); transition: all 0.15s;">↓ Desc</button>
+                      <button type="button" id="btn-sort-dir-asc" onclick="window.setSortDirection('asc')" style="padding: 0.2rem 0.45rem; font-size: 0.72rem; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.15s;">↑ Asc</button>
+                    </div>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 2px; max-height: 290px; overflow-y: auto; padding-right: 2px;">
+                    <button type="button" class="sort-opt-row" data-col="folio" onclick="window.seleccionarColumnaOrden('folio')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: var(--bg-hover); color: var(--accent); font-size: 0.8rem; font-weight: 600; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="hash" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Folio</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">Mayor a Menor</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="fecha-mod" onclick="window.seleccionarColumnaOrden('fecha-mod')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="clock" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Última Modif.</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">Más reciente</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="fecha" onclick="window.seleccionarColumnaOrden('fecha')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="calendar" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Fecha Creación</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">Más reciente</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="monto" onclick="window.seleccionarColumnaOrden('monto')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="dollar-sign" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Monto Cotización</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">Mayor a Menor</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="prioridad" onclick="window.seleccionarColumnaOrden('prioridad')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="alert-circle" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Prioridad</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">Alta a Baja</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="comentario" onclick="window.seleccionarColumnaOrden('comentario')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="message-square" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Último Comentario</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">Más reciente</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="asunto" onclick="window.seleccionarColumnaOrden('asunto')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="file-text" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Asunto</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">A → Z</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="solicitante" onclick="window.seleccionarColumnaOrden('solicitante')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="user" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Solicitante / Empresa</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">A → Z</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="estado" onclick="window.seleccionarColumnaOrden('estado')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="activity" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Estado</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">A → Z</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                    <button type="button" class="sort-opt-row" data-col="tipo" onclick="window.seleccionarColumnaOrden('tipo')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.6rem; border-radius: 6px; border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: left; transition: all 0.15s;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="tag" style="width: 14px; height: 14px; opacity: 0.8;"></i>
+                        <span>Tipo</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span class="sort-opt-sublabel" style="font-size: 0.7rem; opacity: 0.8;">A → Z</span>
+                        <i data-lucide="check" style="width: 13px; height: 13px; display: none;" class="sort-check"></i>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="search-bar" style="margin:0;">
+                <input type="text" id="search-tickets" placeholder="Buscar ticket..." oninput="renderTickets()" style="width: 180px; height: 38px; padding: 0.4rem 0.75rem; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary);" />
+              </div>
+            </div>
+          </div>
+          <div class="table-wrapper" style="margin-top:1rem;">
+            <table class="orders-table">
+              <thead>
+                <tr>
+                  <th style="width: 60px;">Acciones</th>
+                  <th id="th-ord-folio" onclick="ordenarTicketsPor('folio')" style="min-width: 140px; width: 145px; white-space: nowrap; cursor:pointer; user-select:none;">#</th>
+                  <th id="th-ord-asunto" onclick="ordenarTicketsPor('asunto')" style="min-width: 170px; cursor:pointer; user-select:none;">Asunto</th>
+                  <th id="th-ord-solicitante" onclick="ordenarTicketsPor('solicitante')" style="min-width: 160px; cursor:pointer; user-select:none;">Solicitante / Empresa</th>
+                  <th id="th-ord-area" onclick="ordenarTicketsPor('area')" style="width: 90px; cursor:pointer; user-select:none;">Área</th>
+                  <th id="th-ord-prioridad" onclick="ordenarTicketsPor('prioridad')" class="col-prioridad" style="width: 85px; cursor:pointer; user-select:none;">Prioridad</th>
+                  <th id="th-ord-estado" onclick="ordenarTicketsPor('estado')" style="width: 105px; cursor:pointer; user-select:none;">Estado</th>
+                  <th id="th-ord-comentario" onclick="ordenarTicketsPor('comentario')" class="col-comentario-interno" style="min-width: 220px; max-width: 320px; cursor:pointer; user-select:none;">Último Comentario</th>
+                  <th id="th-ord-cotizacion" onclick="ordenarTicketsPor('cotizacion')" style="width: 115px; cursor:pointer; user-select:none;">Cotización SAP</th>
+                  <th id="th-ord-monto-cotizacion" onclick="ordenarTicketsPor('monto')" style="width: 95px; cursor:pointer; user-select:none;">Monto</th>
+                  <th id="th-ord-pedido" onclick="ordenarTicketsPor('pedido')" style="width: 105px; cursor:pointer; user-select:none;">Pedido SAP</th>
+                  <th id="th-ord-asignado" onclick="ordenarTicketsPor('asignado')" class="col-asignado" style="width: 120px; max-width: 130px; cursor:pointer; user-select:none;">Asignado</th>
+                  <th id="th-ord-fecha" onclick="ordenarTicketsPor('fecha')" style="width: 125px; cursor:pointer; user-select:none;">Fecha Creación</th>
+                  <th id="th-ord-fecha-modificacion" onclick="ordenarTicketsPor('fecha-modificacion')" style="width: 135px; cursor:pointer; user-select:none;">Última Modif.</th>
+                  <th style="width: 40px; text-align:center;"></th>
+                </tr>
+              </thead>
+              <tbody id="tickets-body"></tbody>
+            </table>
+          </div>
+        </div>

@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <script>
+    // Limpieza preventiva inmediata contra saturación de memoria por colas offline corruptas
+    try {
+      var sq = localStorage.getItem('sapi_sync_queue');
+      if (sq && sq.length > 20000) {
+        localStorage.removeItem('sapi_sync_queue');
+      }
+    } catch(e) {}
+  </script>
+  <script src="localstorage-bridge.js?v=3"></script>
+  <script>
+
+    window.onerror = function(message, source, lineno, colno, error) {
+      console.error("ERROR GLOBAL DETECTADO:", message, "\nArchivo:", source, "\nLínea:", lineno, "\nColumna:", colno, "\nError:", error);
+      
+      var errDiv = document.createElement('div');
+      errDiv.id = 'floating-error-banner';
+      errDiv.style = 'position:fixed; top:10px; left:10px; right:10px; background:#ef4444; color:white; padding:15px; border-radius:8px; font-family:monospace; font-size:12px; z-index:999999; box-shadow:0 10px 30px rgba(0,0,0,0.3); max-height:85vh; overflow-y:auto; line-height:1.4;';
+      errDiv.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:8px; margin-bottom:8px; font-weight:bold; font-size:13px;">' +
+                         '<span>⚠️ ERROR DE RUNTIME DETECTADO</span>' +
+                         '<button onclick="this.parentElement.parentElement.remove()" style="background:none; border:none; color:white; font-size:16px; cursor:pointer; font-weight:bold;">✕</button>' +
+                         '</div>' +
+                         '<strong>Mensaje:</strong> ' + message + '<br>' +
+                         '<strong>Archivo:</strong> ' + source + ' (Línea ' + lineno + ', Columna ' + colno + ')<br>' +
+                         '<strong>Stack:</strong><br><pre style="margin:5px 0 0 0; white-space:pre-wrap; font-size:11px; background:rgba(0,0,0,0.15); padding:8px; border-radius:4px;">' + (error ? error.stack : 'No disponible') + '</pre>';
+      var mount = document.body || document.documentElement;
+      if (mount) {
+        mount.appendChild(errDiv);
+      } else {
+        window.addEventListener('DOMContentLoaded', function() {
+          (document.body || document.documentElement).appendChild(errDiv);
+        });
+      }
+      return false;
+    };
+    
+    // Desactivar caché de Service Worker en desarrollo local (localhost) sin recargar en bucle
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (var i = 0; i < registrations.length; i++) {
+            registrations[i].unregister();
+          }
+          if ('caches' in window) {
+            caches.keys().then(function(names) {
+              return Promise.all(names.map(function(name) { return caches.delete(name); }));
+            });
+          }
+        });
+      }
+    } else if (typeof window !== 'undefined') {
+      // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
+      const currentAppVer = '1.3.338';
+      const lastAppVer = localStorage.getItem('sapi_app_version');
+      if (lastAppVer !== currentAppVer) {
+        localStorage.setItem('sapi_app_version', currentAppVer);
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for (var i = 0; i < registrations.length; i++) {
+              registrations[i].unregister();
+            }
+            if ('caches' in window) {
+              caches.keys().then(function(names) {
+                return Promise.all(names.map(function(name) { return caches.delete(name); }));
+              }).then(function() {
+                console.log('[Version] Cache y Service Worker purgados por actualización a ' + currentAppVer);
+                window.location.reload();
+              });
+            } else {
+              window.location.reload();
+            }
+          });
+        }
+      }
+    }
+  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Eurorep – Seguimiento de Servicios</title>
+  <meta name="description" content="Sistema de seguimiento de órdenes de servicio para Eurorep Refacciones" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js" defer></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://js.live.net/v7.2/OneDrive.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
+  <link rel="stylesheet" href="theme-base.css?v=2" />
+  <link rel="stylesheet" href="style.css?v=62" />
+  <!-- PWA & Mobile Web App Capabilities -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="logo_transparent.png" type="image/png" />
+  <link rel="shortcut icon" href="logo_transparent.png" type="image/png" />
+  <meta name="theme-color" content="#e8820c" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="sapi postventa" />
+</head>
+
+<body>
+
+  <!-- ===== LOGIN SCREEN ===== -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-bg-grid"></div>
+    <div class="login-container">
+
+      <!-- Logo -->
+      <div class="login-logo-wrap">
+        <img src="logo_transparent.png" alt="Eurorep" class="login-logo-img" />
+      </div>
+
+      <!-- PASO 1: Formulario de Login -->
+      <div id="login-step-form">
+        <h2 class="login-title">Bienvenido</h2>
+        <p class="login-sub">Ingresa a tu cuenta para continuar</p>
+
+        <form onsubmit="iniciarSesionSubmit(event)" class="login-crear-form" style="margin-top:1rem;">
+          <div class="form-group">
+            <label>Correo electrónico o Teléfono</label>
+            <div style="position:relative;">
+              <i data-lucide="user"
+                style="position:absolute;left:12px;top:10px;width:1rem;height:1rem;color:var(--text-muted);"></i>
+              <input type="text" id="login-email" placeholder="usuario@eurorep.mx o 5512345678"
+                style="padding-left:2.5rem;" autocapitalize="none" autocorrect="off" spellcheck="false" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Contraseña</label>
+            <div style="position:relative;">
+              <i data-lucide="lock"
+                style="position:absolute;left:12px;top:10px;width:1rem;height:1rem;color:var(--text-muted);"></i>
+              <input type="password" id="login-password" placeholder="••••••••" style="padding-left:2.5rem;" required />
+            </div>
+          </div>
+          <div id="login-error" class="pin-error" style="text-align:left;margin-top:0.25rem;"></div>
+          <button type="submit" class="btn-primary"
+            style="width:100%;margin-top:0.5rem;justify-content:center;padding:0.75rem;">
+            <i data-lucide="log-in" class="btn-icon"></i> Iniciar Sesión
+          </button>
+        </form>
+        
+        <div style="text-align:center; margin-top:1rem;">
+          <a href="#" onclick="abrirRecuperarPassword(event)" style="color:var(--accent); font-size:0.85rem; text-decoration:none;">¿Olvidaste tu contraseña?</a>
+        </div>
+
+        <div class="login-divider" style="margin-top:1.5rem;"><span>Opciones</span></div>
+        <button class="login-setup-btn" onclick="loginCrearUsuario()">
+          <i data-lucide="user-plus"></i> Registrar nuevo usuario
+        </button>
+      </div>
+
+      <!-- RECUPERAR CONTRASEÑA -->
+      <div id="login-step-recovery" style="display:none;">
+        <button class="btn-secondary" style="margin-bottom:1.5rem;padding:0.4rem;border:none;"
+          onclick="volverLoginDesdeRecovery()"><i data-lucide="arrow-left"></i> Volver</button>
+        <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:0.5rem;color:var(--text-primary);">Recuperar
+          Contraseña</h2>
+        <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1.5rem;line-height:1.4;">Ingresa tu correo o teléfono asociado para restablecer tu contraseña.</p>
+        <form onsubmit="enviarRecoveryLink(event)">
+          <div class="form-group">
+            <label>Correo Electrónico o Teléfono</label>
+            <div style="position:relative;">
+              <i data-lucide="mail"
+                style="position:absolute;left:12px;top:10px;width:1rem;height:1rem;color:var(--text-muted);"></i>
+              <input type="text" id="recovery-email" placeholder="usuario@eurorep.mx o 5512345678" style="padding-left:2.5rem;"
+                required />
+            </div>
+          </div>
+          <div id="recovery-error" class="pin-error" style="text-align:left;margin-top:0.25rem;"></div>
+          <button type="submit" class="btn-primary"
+            style="width:100%;margin-top:0.5rem;justify-content:center;padding:0.75rem;">
+            <i data-lucide="send" class="btn-icon"></i> Enviar Enlace
+          </button>
+        </form>
+      </div>
+
+      <!-- ACTUALIZAR CONTRASEÑA (DESDE ENLACE) -->
+      <div id="login-step-update-password" style="display:none;">
+        <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:0.5rem;color:var(--text-primary);">Crear Nueva
+          Contraseña</h2>
+        <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1.5rem;line-height:1.4;">Tu sesión ha sido verificada. Ingresa tu nueva contraseña.</p>
+        <form onsubmit="guardarNuevaPassword(event)">
+          <div class="form-group">
+            <label>Nueva Contraseña</label>
+            <div style="position:relative;">
+              <i data-lucide="lock"
+                style="position:absolute;left:12px;top:10px;width:1rem;height:1rem;color:var(--text-muted);"></i>
+              <input type="password" id="new-password" placeholder="••••••••" style="padding-left:2.5rem;"
+                required minlength="6"/>
+            </div>
+          </div>
+          <div id="update-pass-error" class="pin-error" style="text-align:left;margin-top:0.25rem;"></div>
+          <button type="submit" class="btn-primary"
+            style="width:100%;margin-top:0.5rem;justify-content:center;padding:0.75rem;">
+            <i data-lucide="save" class="btn-icon"></i> Guardar y Entrar
+          </button>
+        </form>
+      </div>
+
+      <!-- PASO 2: Crear usuario (setup) -->
+      <div id="login-step-crear" class="login-step-crear" style="display:none;">
+        <button class="login-back-btn" onclick="volverSeleccion()">
+          <i data-lucide="arrow-left"></i> Volver al Login
+        </button>
+        <h2 class="login-title" style="font-size:1.2rem;margin-bottom:0.25rem;">Crear Usuario</h2>
+        <p class="login-sub" style="margin-bottom:1.5rem;">Crea tu cuenta para acceder al sistema</p>
+        <div class="login-crear-form">
+          <div class="form-group">
+            <label>Nombre completo</label>
+            <input type="text" id="lc-nombre" placeholder="Ej. Juan García" required />
+          </div>
+          <div class="form-group">
+            <label>Correo electrónico o Teléfono (Usuario)</label>
+            <input type="text" id="lc-email" placeholder="correo@empresa.com o 5512345678" autocapitalize="none" autocorrect="off" spellcheck="false" required />
+          </div>
+          <div class="form-group">
+            <label>Contraseña</label>
+            <input type="password" id="lc-pin" placeholder="••••••••" required />
+          </div>
+          <div class="form-group">
+            <label>Confirmar Contraseña</label>
+            <input type="password" id="lc-pin2" placeholder="••••••••" required />
+          </div>
+          <div id="lc-error" class="pin-error"></div>
+          <button class="btn-primary"
+            style="width:100%;justify-content:center;display:flex;align-items:center;gap:0.4rem;"
+            onclick="confirmarCrearUsuario()">
+            <i data-lucide="user-plus" class="btn-icon"></i> Crear Usuario
+          </button>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: var(--text-muted);" id="login-app-version">v1.3.341</div>
+    </div>
+  </div>
+
+  <!-- APP (hidden until login) -->
+  <div id="app-wrapper">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <img src="logo_transparent.png" alt="Eurorep" class="sidebar-logo-img" />
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-view="dashboard" data-title="Dashboards" id="nav-dashboard">
+          <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span><span>Dashboards</span>
+        </a>
+        <a href="#" class="nav-item" data-view="tickets" data-title="Tickets" id="nav-tickets">
+          <span class="nav-icon"><i data-lucide="ticket"></i></span><span>Tickets</span>
+          <span class="nav-badge" id="nav-badge-tickets" style="display:none;"></span>
+        </a>
+        <a href="#" class="nav-item" data-view="levantamientos" data-title="Levantamientos" id="nav-levantamientos">
+          <span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span>Levantamientos</span>
+          <span class="nav-badge" id="nav-badge-levantamientos" style="display:none;"></span>
+        </a>
+        <a href="#" class="nav-item" data-view="servicios" data-title="Órdenes de Servicio" id="nav-servicios">
+          <span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span>Órdenes de Servicio</span>
+          <span class="nav-badge" id="nav-badge-ordenes" style="display:none;"></span>
+        </a>
+        <a href="#" class="nav-item" data-view="envios" data-title="Envíos" id="nav-envios">
+          <span class="nav-icon"><i data-lucide="truck"></i></span><span>Envíos</span>
+          <span class="nav-badge" id="nav-badge-envios" style="display:none;"></span>
+        </a>
+        <a href="#" class="nav-item" data-view="calendario" data-title="Calendario" id="nav-calendario">
+          <span class="nav-icon"><i data-lucide="calendar"></i></span><span>Calendario</span>
+        </a>
+        <a href="#" class="nav-item" data-view="chat-soporte" data-title="Chat de Soporte" id="nav-chat-soporte">
+          <span class="nav-icon"><i data-lucide="message-square"></i></span><span>Chat de Soporte</span>
+          <span class="nav-badge" id="nav-badge-chat-soporte" style="display:none;"></span>
+        </a>
+        <a href="#" class="nav-item" data-view="gastos" data-title="Control de Gastos" id="nav-gastos">
+          <span class="nav-icon"><i data-lucide="receipt"></i></span><span>Control de Gastos</span>
+        </a>
+        <a href="#" class="nav-item" data-view="rentas" data-title="Rentas" id="nav-rentas">
+          <span class="nav-icon"><i data-lucide="key-round"></i></span><span>Rentas</span>
+          <span class="nav-badge" id="nav-badge-rentas" style="display:none;"></span>
+        </a>
+        <a href="#" class="nav-item" data-view="clientes" data-title="Clientes" id="nav-clientes">
+          <span class="nav-icon"><i data-lucide="users"></i></span><span>Clientes</span>
+        </a>
+        <a href="#" class="nav-item" data-view="maquinaria" data-title="Maquinaria" id="nav-maquinaria">
+          <span class="nav-icon"><i data-lucide="settings-2"></i></span><span id="nav-maquinaria-text">Maquinaria</span>
+        </a>
+        <a href="#" class="nav-item" data-view="refacciones" data-title="Refacciones" id="nav-refacciones">
+          <span class="nav-icon"><i data-lucide="package-search"></i></span><span>Refacciones</span>
+        </a>
+        <a href="#" class="nav-item" data-view="sitios" data-title="Mis Sitios" id="nav-sitios" style="display:none;">
+          <span class="nav-icon"><i data-lucide="map-pin"></i></span><span>Mis Sitios</span>
+        </a>
+        <a href="#" class="nav-item" data-view="tecnicos" data-title="Técnicos" id="nav-tecnicos">
+          <span class="nav-icon"><i data-lucide="user-cog"></i></span><span
+            style="font-size: 0.82rem; white-space: nowrap; letter-spacing: -0.2px;">Técnico / Supervisor</span>
+        </a>
+        <a href="#" class="nav-item" data-view="telemetry" data-title="Monitoreo Telemetría" id="nav-telemetry" style="display:none;">
+          <span class="nav-icon"><i data-lucide="activity" style="color:var(--accent);"></i></span><span>Monitoreo (Super)</span>
+        </a>
+      </nav>
+      <div class="sidebar-bottom">
+        <a href="#" class="nav-item nav-preferencias" data-view="preferencias" data-title="Preferencias"
+          id="nav-preferencias">
+          <span class="nav-icon">
+            <i data-lucide="sliders" class="icon-desktop"></i>
+            <i data-lucide="user" class="icon-mobile"></i>
+          </span>
+          <span class="label-desktop">Preferencias</span>
+          <span class="label-mobile">Perfil</span>
+        </a>
+        <a href="#" class="nav-item nav-config" data-view="config" data-title="Configuración" id="nav-config">
+          <span class="nav-icon"><i data-lucide="settings"></i></span><span>Configuración</span>
+        </a>
+        <div class="sidebar-footer">
+          <button class="logout-btn" onclick="cerrarSesion()">
+            <i data-lucide="log-out"></i>
+            <span>Cerrar Sesión</span>
+          </button>
+          <div class="sidebar-version" id="app-sidebar-version">v1.3.341</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <div class="main-wrapper">
+
+      <!-- TOPBAR -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Abrir Menú">
+            <i data-lucide="menu"></i>
+          </button>
+          <h1 id="page-title">Dashboard Órdenes</h1>
+        </div>
+
+        <div class="topbar-right" id="topbar-right">
+          <!-- MODO PRUEBAS (visible solo para superadmin) -->
+          <div id="test-mode-container" style="display: none; align-items: center; gap: 0.5rem; margin-right: 1rem; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 999px; padding: 0.25rem 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+            <label class="toggle-switch">
+              <input type="checkbox" id="test-mode-checkbox" onchange="toggleTestMode(this.checked)">
+              <span class="toggle-track"></span>
+            </label>
+            <span style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 4px; user-select: none;">
+              <i data-lucide="beaker" style="width: 13px; height: 13px; color: var(--accent);"></i> Sandbox
+            </span>
+          </div>
+
+          <!-- Indicador de Sincronización / Red -->
+          <div id="sync-status-indicator" class="sync-status-indicator" onclick="window.verDetallesSincronizacion()" title="Sincronización con Supabase. Clic para ver detalles.">
+            <i id="sync-status-icon" data-lucide="wifi" style="width: 16px; height: 16px;"></i>
+            <span id="sync-status-text">Conectado</span>
+            <span id="sync-pending-badge" class="sync-pending-badge" style="display: none;">0</span>
+          </div>
+
+          <!-- Internal Notification Bell -->
+          <div id="internal-notification-bell-container" title="Notificaciones Internas" style="position:relative; cursor:pointer; display:flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; background:var(--bg-card); border:1px solid var(--border); transition:var(--transition); margin-right: 0.5rem;" onclick="window.toggleInternalNotificationDropdown(event)">
+            <img src="logo_transparent.png" style="width: 20px; height: 20px; object-fit: contain;" alt="Eurorep" />
+            <span id="internal-notification-badge" style="position:absolute; top:-3px; right:-3px; background:#8b5cf6; color:white; font-size:0.65rem; font-weight:700; border-radius:50%; min-width:16px; height:16px; display:none; align-items:center; justify-content:center; padding:2px; box-shadow:0 0 8px rgba(139,92,246,0.4); border:2px solid var(--bg-secondary);">0</span>
+            
+            <!-- Floating Dropdown Menu -->
+            <div id="internal-notification-dropdown" class="notification-dropdown-menu" style="display:none; position:absolute; top:42px; right:0; width:320px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.5); z-index:1000; overflow:hidden; cursor:default;" onclick="event.stopPropagation()">
+              <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02);">
+                <span style="font-weight:700; font-size:0.85rem; color:var(--text-primary); display:flex; align-items:center; gap:0.25rem;"><i data-lucide="shield-alert" style="width:14px; height:14px; color:#8b5cf6;"></i> Notificaciones Internas</span>
+                <span id="internal-notification-dropdown-count" style="font-size:0.7rem; background:rgba(139,92,246,0.15); color:#8b5cf6; padding:2px 6px; border-radius:10px; font-weight:600;">0</span>
+              </div>
+              <div id="internal-notification-items-container" style="max-height:280px; overflow-y:auto; display:flex; flex-direction:column; padding:0.5rem 0;">
+                <!-- JS Rendered Internal Notification Items -->
+              </div>
+              <div style="padding:0.5rem 1rem; border-top:1px solid var(--border); text-align:center; background:rgba(255,255,255,0.01);">
+                <button type="button" class="btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.7rem; border-radius:4px; width:100%;" onclick="window.marcarTodasInternasLeidas()">Marcar todas como leídas</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notification Bell -->
+          <div id="notification-bell-container" style="position:relative; cursor:pointer; display:flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; background:var(--bg-card); border:1px solid var(--border); transition:var(--transition); margin-right: 0.5rem;" onclick="window.toggleNotificationDropdown(event)">
+            <i data-lucide="bell" style="width: 16px; height: 16px; color:var(--text-secondary);"></i>
+            <span id="notification-badge" style="position:absolute; top:-3px; right:-3px; background:var(--red); color:white; font-size:0.65rem; font-weight:700; border-radius:50%; min-width:16px; height:16px; display:none; align-items:center; justify-content:center; padding:2px; box-shadow:0 0 8px rgba(239,68,68,0.4); border:2px solid var(--bg-secondary);">0</span>
+            
+            <!-- Floating Dropdown Menu -->
+            <div id="notification-dropdown" class="notification-dropdown-menu" style="display:none; position:absolute; top:42px; right:0; width:320px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.5); z-index:1000; overflow:hidden; cursor:default;" onclick="event.stopPropagation()">
+              <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02);">
+                <span style="font-weight:700; font-size:0.85rem; color:var(--text-primary); display:flex; align-items:center; gap:0.25rem;"><i data-lucide="bell-ring" style="width:14px; height:14px; color:var(--accent);"></i> Notificaciones Activas</span>
+                <span id="notification-dropdown-count" style="font-size:0.7rem; background:rgba(232,130,12,0.15); color:var(--accent); padding:2px 6px; border-radius:10px; font-weight:600;">0</span>
+              </div>
+              <div id="notification-items-container" style="max-height:280px; overflow-y:auto; display:flex; flex-direction:column; padding:0.5rem 0;">
+                <!-- JS Rendered Notification Items -->
+              </div>
+            </div>
+          </div>
+
+          <div class="session-badge" id="session-badge" onclick="abrirSesionModal()">
+            <div class="session-avatar" id="session-avatar">S</div>
+            <div class="session-info">
+              <div class="session-name" id="session-name">Usuario</div>
+              <div class="session-role" id="session-role">Super Administrador</div>
+            </div>
+            <i data-lucide="chevron-down" style="width:0.85rem;height:0.85rem;stroke:currentColor;stroke-width:2;"></i>
+          </div>
+          <div id="topbar-actions" style="display:flex;gap:0.5rem;">
+            <button class="btn-primary" id="btn-nueva-orden" onclick="abrirFormulario()"><i data-lucide="plus"
+                class="btn-icon"></i> <span class="btn-text">Nueva Orden</span></button>
+            <button class="btn-primary btn-ticket-action" id="btn-nuevo-ticket" onclick="abrirTicket()"
+              style="display:none;"><i data-lucide="plus" class="btn-icon"></i> <span class="btn-text">Nuevo Ticket</span></button>
+            <button class="btn-primary btn-lev-action" id="btn-nuevo-levantamiento" onclick="window.abrirModalNuevoLevantamiento()"
+              style="display:none;"><i data-lucide="plus" class="btn-icon"></i> <span class="btn-text">Nuevo Levantamiento</span></button>
+            <button class="btn-primary btn-renta-action" id="btn-nueva-renta" onclick="window.abrirModalNuevaRenta()"
+              style="display:none;"><i data-lucide="plus" class="btn-icon"></i> <span class="btn-text">Nueva Renta</span></button>
+            <button class="btn-secondary btn-cliente-action" id="btn-agregar-maquina"
+              onclick="abrirModalAgregarMaquina()" style="display:none;"><i data-lucide="settings-2"
+                class="btn-icon"></i> <span class="btn-text">Agregar Máquina</span></button>
+          </div>
+        </div>
+      </header>
+
+      <!-- VIEWS -->
+      <main class="content">
+
+        <!-- DASHBOARD VIEW -->
+<!-- @@include "views/dashboard.html" -->
+<!-- @@include "views/servicios.html" -->
+<!-- @@include "views/envios.html" -->
+<!-- @@include "views/calendario.html" -->
+<!-- @@include "views/gastos.html" -->
+<!-- @@include "views/clientes.html" -->
+<!-- @@include "views/maquinaria.html" -->
+<!-- @@include "views/refacciones.html" -->
+<!-- @@include "views/sitios.html" -->
+<!-- @@include "views/tecnicos.html" -->
+<!-- @@include "views/config.html" -->
+<!-- @@include "views/telemetry.html" -->
+<!-- @@include "views/chat_soporte.html" -->
+<!-- @@include "views/rentas.html" -->
+<!-- @@include "views/levantamientos.html" -->
+<!-- @@include "views/tickets.html" -->
+      </main>
+    </div>
+
+<!-- @@include "modals/modal_orden_form.html" -->
+<!-- @@include "modals/modal_orden_detalle.html" -->
+<!-- @@include "modals/modal_cierre_papel.html" -->
+<!-- @@include "modals/modal_programar_tecnico.html" -->
+<!-- @@include "modals/modal_registrar_actividad.html" -->
+<!-- @@include "modals/modal_asignar_tecnicos.html" -->
+<!-- @@include "modals/modal_bitacora.html" -->
+<!-- @@include "modals/modal_cliente.html" -->
+<!-- @@include "modals/modal_maquinaria.html" -->
+<!-- @@include "modals/modal_automatizaciones.html" -->
+<!-- @@include "modals/modal_cliente_detalle_fusion.html" -->
+<!-- @@include "modals/modal_maquina_sitio.html" -->
+<!-- @@include "modals/modal_ticket_form.html" -->
+<!-- @@include "modals/modal_ticket_detalle.html" -->
+<!-- @@include "modals/modal_ideas_fallas.html" -->
+<!-- @@include "modals/modal_fusionar_maquinas.html" -->
+<!-- @@include "modals/modal_usuarios.html" -->
+<!-- @@include "modals/modal_resumen_semanal.html" -->
+<!-- @@include "modals/modal_sitio.html" -->
+<!-- @@include "modals/modal_desglose_sap.html" -->
+<!-- @@include "modals/modal_diagrama_flujo.html" -->
+<!-- @@include "modals/modal_depurador_ordenes.html" -->
+<!-- @@include "modals/modal_kits_servicio.html" -->
+<!-- @@include "modals/modal_envios.html" -->
+<!-- @@include "modals/modal_mapeo_columnas.html" -->
+<!-- @@include "modals/modal_desglose_dashboard.html" -->
+<!-- @@include "modals/modal_gastos.html" -->
+<!-- @@include "modals/modal_pdf_visor.html" -->
+<!-- @@include "modals/modal_correo.html" -->
+<!-- @@include "modals/modal_gastos_confirmaciones.html" -->
+<!-- @@include "modals/modal_visor_manual.html" -->
+
+  <script>
+    // ============================================================
+    window.CATALOGO_MANUALES = [
+      {
+        id: 'flujo_completo',
+        titulo: 'Flujo Completo',
+        subtitulo: 'Ciclo completo del sistema',
+        html: 'manuales/manual_flujo_completo.html',
+        pdf: 'manuales/manual_flujo_completo.pdf',
+        icono: 'git-branch',
+        destacado: true
+      },
+      {
+        id: 'admin',
+        aliasId: 'administrador',
+        titulo: 'Administrador',
+        subtitulo: 'Gestión, calendario y roles',
+        html: 'manuales/manual_administrador.html',
+        pdf: 'manuales/manual_administrador.pdf',
+        icono: 'user-cog',
+        destacado: false
+      },
+      {
+        id: 'tecnico',
+        titulo: 'Técnico de Campo',
+        subtitulo: 'Órdenes, bitácoras y offline',
+        html: 'manuales/manual_tecnico.html',
+        pdf: 'manuales/manual_tecnico.pdf',
+        icono: 'wrench',
+        destacado: false
+      },
+      {
+        id: 'tickets',
+        titulo: 'Gestión de Tickets',
+        subtitulo: 'Ciclo, cotizaciones SAP y chat',
+        html: 'manuales/manual_tickets.html',
+        pdf: 'manuales/manual_tickets.pdf',
+        icono: 'ticket',
+        destacado: false
+      },
+      {
+        id: 'gastos',
+        titulo: 'Control de Gastos',
+        subtitulo: 'Viáticos y conciliación Clara',
+        html: 'manuales/manual_gastos.html',
+        pdf: 'manuales/manual_gastos.pdf',
+        icono: 'credit-card',
+        destacado: false
+      },
+      {
+        id: 'diagrama_flujo',
+        titulo: 'Diagrama de Flujo del Proceso',
+        subtitulo: 'Mapa interactivo: Euro SAPI vs. Portal Clientes',
+        html: 'manuales/diagrama_flujo.html',
+        link: 'manuales/diagrama_flujo.html',
+        pdf: 'manuales/diagrama_flujo.html',
+        icono: 'network',
+        destacado: true,
+        customStyle: 'border-color: rgba(139, 92, 246, 0.4); background: rgba(139, 92, 246, 0.05);',
+        customIconStyle: 'background: rgba(139, 92, 246, 0.15); color: #8b5cf6;',
+        customTitleColor: '#a78bfa',
+        isExternal: true
+      },
+      {
+        id: 'cliente',
+        titulo: 'Manual del Cliente',
+        subtitulo: 'Portal, rentas y solicitudes',
+        html: 'manuales/manual_cliente.html',
+        pdf: 'manuales/manual_cliente.pdf',
+        icono: 'building',
+        destacado: false
+      },
+      {
+        id: 'desarrollador',
+        titulo: 'Sistemas y Desarrollador',
+        subtitulo: 'Estructura técnica, base de datos y APIs',
+        html: 'manuales/manual_tecnico_desarrollador.html',
+        pdf: 'manuales/manual_tecnico_desarrollador.pdf',
+        icono: 'code-2',
+        destacado: false,
+        soloSuperAdmin: true
+      }
+    ];
+
+    window.crearModalVisorManualSiNoExiste = function() {
+      let overlay = document.getElementById('modal-visor-manual-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'modal-visor-manual-overlay';
+        overlay.className = 'modal-overlay';
+        overlay.setAttribute('onclick', 'window.cerrarVisorManual(event)');
+        overlay.innerHTML = `
+          <div class="modal" onclick="event.stopPropagation()" style="max-width:560px; width:92%; border-radius:16px; background:var(--bg-card, #1e293b); color:var(--text-primary, #f8fafc); box-shadow:var(--shadow-lg, 0 20px 25px -5px rgba(0,0,0,0.5)); border:1px solid var(--border, rgba(255,255,255,0.1));">
+            <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; padding:1.25rem 1.5rem; border-bottom:1px solid var(--border, rgba(255,255,255,0.1)); background:var(--bg-hover, rgba(255,255,255,0.03));">
+              <div style="display:flex; align-items:center; gap:0.75rem;">
+                <div style="width:40px; height:40px; border-radius:10px; background:rgba(37,99,235,0.12); color:var(--primary, #2563eb); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                  <i data-lucide="book-open" id="modal-visor-manual-icon" style="width:20px; height:20px;"></i>
+                </div>
+                <div>
+                  <h2 id="modal-visor-manual-titulo" style="margin:0; font-size:1.15rem; font-weight:700; color:var(--text-primary, #f8fafc);">Manual del Sistema</h2>
+                  <div id="modal-visor-manual-sub" style="font-size:0.8rem; color:var(--text-muted, #94a3b8); margin-top:2px;">Documentación y guías oficiales</div>
+                </div>
+              </div>
+              <button class="modal-close" onclick="window.cerrarVisorManual()" style="background:transparent; border:none; color:var(--text-muted); font-size:1.25rem; cursor:pointer;">✕</button>
+            </div>
+            <div class="modal-body" style="padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem;">
+              <div id="modal-visor-manual-desc" style="font-size:0.92rem; line-height:1.5; color:var(--text-primary); background:var(--bg-body, #0f172a); padding:1rem; border-radius:8px; border:1px solid var(--border, rgba(255,255,255,0.1));">
+                Consulta la guía paso a paso o descarga el documento oficial en formato PDF.
+              </div>
+              <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                <a id="modal-visor-manual-btn-tab" href="#" target="_blank" class="btn-primary" style="padding:0.75rem 1.25rem; font-size:0.95rem; font-weight:600; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.5rem; border-radius:10px; cursor:pointer;">
+                  <i data-lucide="external-link" style="width:18px; height:18px;"></i>
+                  <span>Abrir Manual Completo (Interactivo)</span>
+                </a>
+                <a id="modal-visor-manual-btn-download" href="#" download class="btn-secondary" style="padding:0.75rem 1.25rem; font-size:0.95rem; font-weight:600; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.5rem; border-radius:10px; cursor:pointer;">
+                  <i data-lucide="download" style="width:18px; height:18px;"></i>
+                  <span>Descargar Documento PDF</span>
+                </a>
+              </div>
+            </div>
+            <div class="modal-footer" style="padding:1rem 1.5rem; border-top:1px solid var(--border, rgba(255,255,255,0.1)); display:flex; justify-content:flex-end; background:var(--bg-hover, rgba(255,255,255,0.03));">
+              <button type="button" class="btn-secondary" onclick="window.cerrarVisorManual()" style="padding:0.55rem 1.25rem; border-radius:8px; cursor:pointer;">Cerrar</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(overlay);
+      }
+      return overlay;
+    };
+
+    window.abrirVisorManualPorId = function(id) {
+      const catalogo = window.CATALOGO_MANUALES || [];
+      const m = catalogo.find(item => item.id === id || item.aliasId === id);
+      if (m) {
+        window.abrirVisorManual(m.html || m.link || m.pdf, m.titulo, m.subtitulo, m.pdf || m.link);
+      } else {
+        window.abrirVisorManual(`manuales/manual_${id}.html`, 'Manual del Sistema', 'Visor interactivo oficial', `manuales/manual_${id}.pdf`);
+      }
+    };
+
+    window.abrirVisorManual = function(urlHtml, arg2, arg3, arg4) {
+      const overlay = window.crearModalVisorManualSiNoExiste();
+      const titleEl = document.getElementById('modal-visor-manual-titulo');
+      const subEl = document.getElementById('modal-visor-manual-sub');
+      const descEl = document.getElementById('modal-visor-manual-desc');
+      const btnTab = document.getElementById('modal-visor-manual-btn-tab');
+      const btnDownload = document.getElementById('modal-visor-manual-btn-download');
+
+      let titulo = 'Manual del Sistema';
+      let subtitulo = 'Visor interactivo oficial';
+      let urlPdf = '';
+
+      if (typeof arg2 === 'string') {
+        if (arg2.endsWith('.pdf') || (arg2.includes('/') && !arg2.includes(' '))) {
+          urlPdf = arg2;
+          if (arg3) titulo = arg3;
+          if (arg4) subtitulo = arg4;
+        } else {
+          titulo = arg2;
+          if (arg3) subtitulo = arg3;
+          if (arg4) urlPdf = arg4;
+        }
+      }
+
+      const targetViewerUrl = urlHtml || urlPdf || 'manuales/manual_flujo_completo.html';
+      if (!urlPdf && urlHtml) {
+        urlPdf = urlHtml.endsWith('.html') ? urlHtml.replace(/\.html$/, '.pdf') : urlHtml;
+      }
+
+      if (titleEl) titleEl.textContent = titulo;
+      if (subEl) subEl.textContent = subtitulo;
+      if (descEl) descEl.innerHTML = `<strong>${titulo}</strong><br><span style="color:var(--text-muted, #94a3b8); font-size:0.85rem;">${subtitulo}</span><div style="margin-top:0.5rem; font-size:0.85rem;">Selecciona una de las opciones para abrir la guía interactiva o descargarla en formato PDF.</div>`;
+
+      if (btnTab) {
+        btnTab.href = targetViewerUrl;
+      }
+      if (btnDownload) {
+        btnDownload.href = urlPdf || targetViewerUrl;
+        btnDownload.style.display = (targetViewerUrl && targetViewerUrl.includes('diagrama_flujo')) ? 'none' : 'flex';
+      }
+
+      if (overlay) {
+        overlay.classList.add('open');
+        overlay.style.display = 'flex';
+        overlay.style.visibility = 'visible';
+        overlay.style.opacity = '1';
+        overlay.style.pointerEvents = 'auto';
+        document.body.style.overflow = 'hidden';
+      }
+
+      if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        try { lucide.createIcons({ root: overlay }); } catch(e) {}
+      }
+    };
+
+    window.cerrarVisorManual = function(e) {
+      if (e && e.target) {
+        const isOverlay = e.target.id === 'modal-visor-manual-overlay' || e.target.classList.contains('modal-overlay');
+        const isCloseBtn = e.target.classList.contains('modal-close') || e.target.closest('.modal-close');
+        if (!isOverlay && !isCloseBtn) return;
+      }
+      const overlay = document.getElementById('modal-visor-manual-overlay');
+      if (overlay) {
+        overlay.classList.remove('open');
+        overlay.style.display = 'none';
+        overlay.style.visibility = 'hidden';
+        overlay.style.opacity = '0';
+        overlay.style.pointerEvents = 'none';
+        document.body.style.overflow = '';
+      }
+    };
+
+    window.imprimirManualIframe = function() {
+      window.print();
+    };
+
+    // ============================================================
+    window.currentRutaDiagrama = 'all';
+
+    window.abrirModalDiagramaFlujo = function() {
+      const modal = document.getElementById('modal-diagrama-flujo-overlay');
+      const mainContent = document.getElementById('flowchart-main-content');
+      const modalContent = document.getElementById('flowchart-modal-content');
+      if (modal && mainContent && modalContent) {
+        modalContent.innerHTML = mainContent.innerHTML;
+        modal.style.display = 'flex';
+        modal.classList.add('open');
+        if (window.lucide) lucide.createIcons();
+        if (window.currentRutaDiagrama) {
+          window.filtrarRutaDiagrama(window.currentRutaDiagrama);
+        }
+      }
+    };
+
+    window.cerrarModalDiagramaFlujo = function(e) {
+      if (e && e.target && !e.target.classList.contains('modal-overlay') && !e.target.classList.contains('modal-close') && !e.target.closest('.modal-close')) return;
+      const modal = document.getElementById('modal-diagrama-flujo-overlay');
+      if (modal) {
+        modal.classList.remove('open');
+        modal.style.display = 'none';
+      }
+    };
+
+    window.zoomDiagramaFlujo = function(delta) {
+      const content = document.getElementById('flowchart-modal-content');
+      if (!content) return;
+      window.currentDiagramZoom = Math.max(0.6, Math.min(1.8, (window.currentDiagramZoom || 1) + delta));
+      content.style.transform = `scale(${window.currentDiagramZoom})`;
+      content.style.transformOrigin = 'top center';
+      const label = document.getElementById('diagrama-zoom-label');
+      if (label) label.textContent = `${Math.round(window.currentDiagramZoom * 100)}%`;
+    };
+
+    window.resetZoomDiagramaFlujo = function() {
+      const content = document.getElementById('flowchart-modal-content');
+      if (!content) return;
+      window.currentDiagramZoom = 1;
+      content.style.transform = 'scale(1)';
+      const label = document.getElementById('diagrama-zoom-label');
+      if (label) label.textContent = '100%';
+    };
+
+    window.toggleSimbologiaFlujo = function() {
+      const legend = document.getElementById('flowchart-legend-box');
+      if (legend) {
+        legend.style.display = legend.style.display === 'none' ? 'flex' : 'none';
+      }
+    };
+
+    window.filtrarRutaDiagrama = function(ruta, btn) {
+      window.currentRutaDiagrama = ruta || 'all';
+      if (btn) {
+        document.querySelectorAll('.flowchart-filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+
+      const container = document.getElementById('flowchart-main-content');
+      const modalContainer = document.getElementById('flowchart-modal-content');
+      
+      [container, modalContainer].forEach(root => {
+        if (!root) return;
+        
+        // Restablecer visibilidad completa de todos los elementos
+        root.querySelectorAll('*').forEach(el => {
+          el.classList.remove('flowchart-step-hidden');
+          if (el.style.display === 'none') {
+            el.style.removeProperty('display');
+          }
+          if (el.style.opacity) el.style.removeProperty('opacity');
+          if (el.style.filter) el.style.removeProperty('filter');
+        });
+
+        const grid = root.querySelector('.flowchart-columns-grid');
+        if (grid) grid.style.gridTemplateColumns = '';
+
+        const ocultar = (selector) => {
+          root.querySelectorAll(selector).forEach(el => {
+            el.classList.add('flowchart-step-hidden');
+            el.style.setProperty('display', 'none', 'important');
+          });
+        };
+
+        if (ruta === 'con_portal') {
+          // Flujo Estándar con Portal de Clientes: Ocultar Levantamiento previo, Llamada/WhatsApp y Subtickets
+          ocultar('.step-levantamiento, .step-llamada-directa, .step-subticket');
+        } else if (ruta === 'sin_portal') {
+          // Flujo Estándar Sin Portal de Clientes: Ocultar Levantamiento previo, Subtickets y todo el panel del Portal de Clientes
+          ocultar('.lane-client, .bridge-to-internal, .step-levantamiento, .step-portal-entrada, .step-subticket');
+          if (grid) grid.style.gridTemplateColumns = '1fr';
+        } else if (ruta === 'levantamiento') {
+          // Flujo Levantamiento
+          ocultar('.step-llamada-directa, .step-portal-entrada, .lane-client, .step-garantia, .step-subticket');
+          if (grid) grid.style.gridTemplateColumns = '1fr';
+        } else if (ruta === 'garantia') {
+          // Flujo Garantía
+          ocultar('.step-levantamiento, .step-cotizacion, .step-os, .step-subticket');
+        } else if (ruta === 'subticket') {
+          // Subticket de refacciones extra generado en campo
+          ocultar('.step-levantamiento, .step-llamada-directa, .step-portal-entrada, .lane-client, .step-garantia');
+          if (grid) grid.style.gridTemplateColumns = '1fr';
+        }
+      });
+    };
+
+    var bridgePromise = (typeof window.initLocalStorageIndexedDBBridge === 'function')
+      ? window.initLocalStorageIndexedDBBridge()
+      : Promise.resolve();
+
+    bridgePromise.then(function() {
+      var scripts = [
+        "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
+        "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
+        "supabaseClient.js?v=2",
+        "supabaseSync.js?v=327",
+        "utils.js?v=8",
+        "sap_sync.js?v=1",
+        "sap_mapper.js?v=1",
+        "notificaciones.js?v=1",
+        "config_tecnicos.js?v=1",
+        "ordenes_estados.js?v=1",
+        "ordenes_listado.js?v=1",
+        "ordenes_form.js?v=1",
+        "ordenes_detalle.js?v=1",
+        "ordenes_bitacora.js?v=1",
+        "servicios_programados.js?v=1",
+        "tickets_listado.js?v=1",
+        "tickets_form.js?v=1",
+        "tickets_detalle.js?v=1",
+        "app_migrations.js?v=1",
+        "app.js?v=433",
+        "dashboard.js?v=1",
+        "usuarios.js?v=1",
+        "refacciones_orden.js?v=1",
+        "gastos.js?v=1",
+        "onedrive.js?v=1",
+        "telemetria.js?v=1",
+        "automatizaciones.js?v=1",
+        "resumen_semanal.js?v=1",
+        "ideas_fallas.js?v=1",
+        "preferencias.js?v=1",
+        "sitios_clientes.js?v=1",
+        "clientes.js?v=1",
+        "maquinaria.js?v=1",
+        "calendario.js?v=1",
+        "soporte.js?v=1",
+        "kits.js?v=1",
+        "juntas.js?v=1",
+        "depurador_tickets.js?v=2",
+        "depurador_ordenes.js?v=1",
+        "envios.js?v=1",
+        "asignacion_tecnicos.js?v=1",
+        "rentas.js?v=12",
+        "levantamientos.js?v=306",
+        "tecnicos_reporte.js?v=303"
+      ];
+      var index = 0;
+      function loadNext() {
+        if (index >= scripts.length) {
+          if (typeof lucide !== 'undefined') lucide.createIcons();
+          return;
+        }
+        var s = document.createElement('script');
+        s.src = scripts[index];
+        s.async = false; // ensure preservation of execution order
+        s.onload = function() {
+          index++;
+          loadNext();
+        };
+        s.onerror = function(err) {
+          console.error('[Script Loader] Error al cargar recurso esencial:', scripts[index], err);
+          index++;
+          loadNext();
+        };
+        document.body.appendChild(s);
+      }
+      loadNext();
+    });
+  </script>
+  <datalist id="datalist-refacciones-claves"></datalist>
+</body>
+
+</html>

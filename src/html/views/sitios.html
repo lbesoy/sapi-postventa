@@ -1,0 +1,51 @@
+        <div id="view-sitios" class="view">
+          <div class="section-header"
+            style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+            <h2>Mis Sitios Registrados</h2>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; flex:1; justify-content:flex-end;">
+              <div class="search-bar" style="width:100%; max-width:280px; margin:0; position:relative; display:flex; align-items:center;">
+                <i data-lucide="search" style="position:absolute; left:0.75rem; width:1rem; height:1rem; color:var(--text-muted);"></i>
+                <input type="text" id="search-sitios" placeholder="Buscar sitio, cliente, CP..." oninput="renderSitios()" style="padding-left:2.25rem; width:100%;">
+              </div>
+              <div style="display:flex; align-items:center; gap:0.3rem;">
+                <span style="font-size:0.8rem; color:var(--text-muted); font-weight:500; white-space:nowrap;">Ordenar por:</span>
+                <select id="sort-sitios" onchange="renderSitios()" style="height:38px; padding:0 0.5rem; border-radius:4px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); font-size:0.85rem; outline:none; cursor:pointer;">
+                  <option value="nombre-asc">Nombre (A-Z)</option>
+                  <option value="nombre-desc">Nombre (Z-A)</option>
+                  <option value="cliente-asc">Cliente (A-Z)</option>
+                  <option value="cliente-desc">Cliente (Z-A)</option>
+                  <option value="cp-asc">Código Postal (Menor a Mayor)</option>
+                  <option value="cp-desc">Código Postal (Mayor a Menor)</option>
+                </select>
+              </div>
+              <button class="btn-primary" onclick="agregarSitioClienteDesdeEmpresa()">+ Agregar Sitio</button>
+              <button class="action-btn btn-sync-sap" onclick="sincronizarConGitHub('sitios', this)"
+                title="Sincronizar con SAP"
+                style="height: 38px; display:flex; align-items:center; justify-content:center; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; transition:var(--transition); padding: 0 0.75rem; gap: 0.4rem; white-space: nowrap; font-size: 0.8rem;">
+                <i data-lucide="refresh-cw" class="icon-sync-sap btn-icon" style="width:14px; height:14px;"></i>
+                Actualizar SAP
+              </button>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table class="orders-table">
+              <thead>
+                <tr>
+                  <th id="th-sit-nombre">Nombre del Sitio </th>
+                  <th id="th-sit-cliente">Empresa / Cliente </th>
+                  <th id="th-sit-cp">Código Postal </th>
+                  <th id="th-sit-ciudad">Ciudad / Estado </th>
+                  <th id="th-sit-maquinaria">Máquinas</th>
+                  <th style="width:100px;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-body-sitios">
+                <tr>
+                  <td colspan="6" class="empty-state">No tienes sitios registrados.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TECNICOS VIEW -->

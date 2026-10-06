@@ -1,0 +1,22 @@
+    <!-- MODAL ASIGNAR TECNICOS (CALENDARIO) -->
+    <div class="modal-overlay" id="modal-asignar-tecnicos-overlay" onclick="cerrarAsignarTecnicos(event)"
+      style="z-index: 500;">
+      <div class="modal" id="modal-asignar-tecnicos" style="max-width:400px;">
+        <div class="modal-header">
+          <h2>Asignar Técnicos</h2>
+          <button class="modal-close" onclick="cerrarAsignarTecnicos()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group full-width" style="margin-top:0.75rem;">
+            <label>Selecciona los técnicos para la orden:</label>
+            <div id="at-tecnicos-container"
+              style="display:grid; grid-template-columns: 1fr; gap:0.5rem; margin-top:0.5rem; padding: 0.75rem; border: 1px solid var(--border); border-radius: 4px; background: rgba(0,0,0,0.02); max-height: 250px; overflow-y: auto;">
+            </div>
+          </div>
+          <div class="form-actions" style="margin-top:1rem; justify-content:center;">
+            <button class="btn-secondary" onclick="cerrarAsignarTecnicos()">Cancelar</button>
+            <button class="btn-primary" onclick="guardarAsignacionTecnicos()">Guardar Asignación</button>
+          </div>
+        </div>
+      </div>
+    </div>

@@ -1,0 +1,34 @@
+  <!-- MODAL: DIAGRAMA DE FLUJO INTERACTIVO (PANTALLA COMPLETA) -->
+  <div id="modal-diagrama-flujo-overlay" class="modal-overlay" style="z-index: 999999; display: none;" onclick="window.cerrarModalDiagramaFlujo(event)">
+    <div class="modal" style="max-width: 1200px; width: 95vw; height: 90vh; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+      <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <div style="background:rgba(139, 92, 246, 0.15); color:#8b5cf6; padding:0.4rem; border-radius:6px; display:flex;">
+            <i data-lucide="git-fork" style="width:18px; height:18px;"></i>
+          </div>
+          <div>
+            <h3 style="font-size:1.05rem; margin:0; font-weight:700; color:var(--text-primary);">Diagrama de Flujo del Proceso</h3>
+            <div style="font-size:0.75rem; color:var(--text-secondary);">Euro SAPI (Portal Interno) vs. Portal de Clientes</div>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <!-- Controles de Zoom -->
+          <div style="display:flex; align-items:center; background:var(--bg-body); border:1px solid var(--border); border-radius:6px; padding:0.2rem 0.4rem; gap:0.3rem;">
+            <button type="button" onclick="window.zoomDiagramaFlujo(-0.1)" class="flowchart-btn-tool" style="padding:0.2rem 0.4rem;" title="Reducir zoom"><i data-lucide="minus" style="width:12px; height:12px;"></i></button>
+            <span id="diagrama-zoom-label" style="font-size:0.72rem; font-weight:600; min-width:35px; text-align:center; color:var(--text-primary);">100%</span>
+            <button type="button" onclick="window.zoomDiagramaFlujo(0.1)" class="flowchart-btn-tool" style="padding:0.2rem 0.4rem;" title="Aumentar zoom"><i data-lucide="plus" style="width:12px; height:12px;"></i></button>
+            <button type="button" onclick="window.resetZoomDiagramaFlujo()" class="flowchart-btn-tool" style="padding:0.2rem 0.4rem; font-size:0.7rem;" title="Restablecer">100%</button>
+          </div>
+
+          <button type="button" class="modal-close" onclick="window.cerrarModalDiagramaFlujo(event)" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:1.4rem; padding:0.25rem 0.5rem; line-height: 1;">✕</button>
+        </div>
+      </div>
+
+      <div class="modal-body" style="flex: 1; overflow: auto; padding: 1.5rem; background: var(--bg-primary);">
+        <div id="flowchart-modal-content" style="transition:transform 0.15s ease-out; transform-origin: top center;">
+          <!-- Se inyecta dinámicamente el contenido del diagrama -->
+        </div>
+      </div>
+    </div>
+  </div>

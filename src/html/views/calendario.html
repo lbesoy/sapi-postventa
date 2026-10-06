@@ -1,0 +1,61 @@
+        <div id="view-calendario" class="view">
+          <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+            <h2>Calendario de Servicios</h2>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; flex:1; justify-content:flex-end;">
+              <select id="filter-cal-cliente" class="form-select" onchange="renderCalendario()">
+                <option value="">Todos los Clientes</option>
+              </select>
+              <select id="filter-cal-tecnico" class="form-select" onchange="renderCalendario()">
+                <option value="">Todos los Técnicos</option>
+              </select>
+              <button class="btn-primary" id="btn-programar-tecnico" style="display:none;" onclick="abrirProgramarTecnico()">
+                <i data-lucide="calendar-plus" class="btn-icon"></i> Programar Asignación
+              </button>
+              <button class="btn-primary" id="btn-registrar-actividad" style="display:none; background:var(--purple); border-color:var(--purple);" onclick="abrirRegistrarActividad()">
+                <i data-lucide="calendar-plus" class="btn-icon"></i> Registrar Actividad
+              </button>
+            </div>
+          </div>
+
+          <!-- SIMBOLOGÍA DE COLORES DEL CALENDARIO -->
+          <div class="calendar-legend" style="display: flex; gap: 0.75rem 1.25rem; flex-wrap: wrap; margin-bottom: 1.25rem; padding: 0.75rem 1rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); font-size: 0.78rem; align-items: center; width: 100%;">
+            <div style="font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 0.25rem; margin-right: 0.25rem;">
+              <i data-lucide="info" style="width: 14px; height: 14px; color: var(--accent);"></i> Leyenda de Colores:
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #f59e0b; flex-shrink: 0;"></span>
+              <span style="color: var(--text-primary); font-weight: 500;">Vacaciones</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #8b5cf6; flex-shrink: 0;"></span>
+              <span style="color: var(--text-primary); font-weight: 500;">Asignación Programada (Pendiente)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #10b981; flex-shrink: 0;"></span>
+              <span style="color: var(--text-primary); font-weight: 500;">Asignación Completada al 100%</span>
+            </div>
+             <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #3b82f6; flex-shrink: 0;"></span>
+              <span style="color: var(--text-primary); font-weight: 500;">Asignación Completada (Diferencia de horas)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #ef4444; flex-shrink: 0;"></span>
+              <span style="color: var(--text-primary); font-weight: 500;">Trabajo Realizado sin Asignación</span>
+            </div>
+             <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #475569; flex-shrink: 0;"></span>
+              <span style="color: var(--text-primary); font-weight: 500;">Traslado</span>
+            </div>
+             <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #d946ef; flex-shrink: 0;"></span>
+              <span style="color: var(--text-primary); font-weight: 500;">Levantamiento</span>
+            </div>
+          </div>
+
+          <div id="calendar-container"
+            style="background:var(--bg-card); padding:1rem; border-radius:var(--radius-lg); border:1px solid var(--border); box-shadow:var(--shadow-sm); min-height:600px;">
+            <!-- The calendar will be injected here -->
+          </div>
+        </div>
+
+        <!-- GASTOS VIEW -->

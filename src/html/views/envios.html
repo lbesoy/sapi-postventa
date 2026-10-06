@@ -1,0 +1,98 @@
+        <div id="view-envios" class="view">
+          <!-- Stats Grid -->
+          <div class="stats-grid-5" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 1.5rem;">
+            <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('filter-envios-estado').value='todos'; window.renderEnvios();">
+              <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="package"></i></div>
+              <div>
+                <div class="stat-label">Total Guías</div>
+                <div class="stat-value" id="stat-envios-total">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('filter-envios-estado').value='En Preparación'; window.renderEnvios();">
+              <div class="stat-icon" style="background:rgba(234,179,8,0.12);color:#eab308;"><i data-lucide="clock"></i></div>
+              <div>
+                <div class="stat-label">En Preparación</div>
+                <div class="stat-value" id="stat-envios-preparando">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('filter-envios-estado').value='En Tránsito'; window.renderEnvios();">
+              <div class="stat-icon" style="background:rgba(14,165,233,0.12);color:#0ea5e9;"><i data-lucide="navigation"></i></div>
+              <div>
+                <div class="stat-label">En Tránsito</div>
+                <div class="stat-value" id="stat-envios-transito">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('filter-envios-estado').value='Entregado'; window.renderEnvios();">
+              <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle-2"></i></div>
+              <div>
+                <div class="stat-label">Entregados</div>
+                <div class="stat-value" id="stat-envios-entregados">0</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section Controls & Filter Bar -->
+          <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+            <h2>Control de Envíos y Guías de Entrega</h2>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; flex:1; justify-content:flex-end;">
+              <div class="search-bar" style="width:100%; max-width:320px; margin:0;">
+                <input type="text" id="search-envios" placeholder="Buscar por guía, ticket, cliente, pieza..." oninput="window.renderEnvios()" autocomplete="off" />
+              </div>
+
+              <select id="filter-envios-estado" class="form-select" onchange="window.renderEnvios()" style="min-width:140px; height:38px;">
+                <option value="todos">Todos los Estados</option>
+                <option value="En Preparación">En Preparación</option>
+                <option value="En Tránsito">En Tránsito</option>
+                <option value="Entregado">Entregados</option>
+              </select>
+
+              <select id="filter-envios-paqueteria" class="form-select" onchange="window.renderEnvios()" style="min-width:150px; height:38px;">
+                <option value="todas">Todas las Paqueterías</option>
+                <option value="DHL">DHL</option>
+                <option value="FedEx">FedEx</option>
+                <option value="Estafeta">Estafeta</option>
+                <option value="Paquetexpress">Paquetexpress</option>
+                <option value="Redpack">Redpack</option>
+                <option value="Castores">Castores</option>
+                <option value="Tresguerras">Tresguerras</option>
+                <option value="Propio">Transporte Propio</option>
+              </select>
+
+              <button type="button" class="btn-secondary" onclick="window.exportarEnviosAExcel()" style="height:38px; display:inline-flex; align-items:center; gap:0.4rem; padding:0 0.85rem; font-size:0.85rem; white-space:nowrap; background:#10b981; color:#ffffff; border-color:#10b981; font-weight:600; cursor:pointer;" title="Descargar lista actual de guías de envío a Excel (.xlsx)">
+                <i data-lucide="file-spreadsheet" style="width:15px; height:15px;"></i> <span>Exportar a Excel</span>
+              </button>
+
+              <button type="button" class="btn-primary" onclick="window.abrirModalNuevoEnvio()" style="height:38px; display:inline-flex; align-items:center; gap:0.4rem; padding:0 0.85rem; font-size:0.85rem; white-space:nowrap;">
+                <i data-lucide="plus" style="width:15px; height:15px;"></i> <span>+ Nueva Guía</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Tabla de Envíos -->
+          <div class="table-wrapper">
+            <table id="tabla-envios" class="orders-table">
+              <thead>
+                <tr>
+                  <th style="width: 75px; text-align:center;">Acciones</th>
+                  <th style="white-space:nowrap;">No. de Guía</th>
+                  <th style="white-space:nowrap;">Paquetería</th>
+                  <th style="white-space:nowrap;">Ticket</th>
+                  <th style="white-space:nowrap;">Cliente</th>
+                  <th style="white-space:nowrap;">Destino</th>
+                  <th>Refacciones / Contenido</th>
+                  <th style="white-space:nowrap;">Fecha Envío</th>
+                  <th style="white-space:nowrap;">Fecha Entrega</th>
+                  <th style="white-space:nowrap;">Estatus</th>
+                  <th style="width: 50px; text-align:center;">PDF</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-body-envios">
+                <tr>
+                  <td colspan="11" class="empty-state">Cargando envíos...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- CLIENTES VIEW -->

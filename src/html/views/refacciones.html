@@ -1,0 +1,125 @@
+        <div id="view-refacciones" class="view">
+
+          <!-- TABS -->
+          <div class="view-toggle"
+            style="display:flex; gap:0.5rem; background: var(--bg-hover); padding: 0.3rem; border-radius: var(--radius-md); border: 1px solid var(--border); width: fit-content; margin-bottom: 1.5rem;">
+            <button class="btn-secondary active" id="btn-tab-ref-catalogo" onclick="switchRefTab('catalogo')"
+              style="padding:0.4rem 1rem; border:none; background:var(--bg-card); box-shadow:0 1px 3px rgba(0,0,0,0.1); color:var(--text-primary); font-weight:600;"><i
+                data-lucide="book" style="width:16px;height:16px;margin-right:6px;vertical-align:text-bottom;"></i>
+              Catálogo SAP</button>
+            <button class="btn-secondary" id="btn-tab-ref-pendientes" onclick="switchRefTab('pendientes')"
+              style="padding:0.4rem 1rem; border:none; background:transparent; color:var(--text-muted); font-weight:500;"><i
+                data-lucide="clock" style="width:16px;height:16px;margin-right:6px;vertical-align:text-bottom;"></i>
+              Piezas Pendientes (Órdenes)</button>
+          </div>
+
+          <div id="ref-tab-catalogo">
+            <div class="section-header"
+              style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+              <h2>Catálogo de Refacciones</h2>
+              <div id="debug-refacciones" style="font-family:monospace; font-size:12px; color:#f59e0b; background:rgba(245,158,11,0.1); padding:8px 12px; border-radius:6px; border:1px dashed #f59e0b; margin-top:0.5rem; width:100%; display:none;"></div>
+              <div
+                style="display:flex; gap:0.5rem; flex-wrap:nowrap; align-items:center; flex:1; justify-content:flex-end;">
+                <div class="search-bar" style="width:100%; max-width:400px; margin:0;">
+                  <input type="text" id="search-refacciones" placeholder="Buscar refacción por código o nombre..."
+                    oninput="renderRefacciones()" />
+                </div>
+                <button class="action-btn" onclick="sincronizarConGitHub('refacciones', this)"
+                  title="Actualizar Refacciones desde SAP"
+                  style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
+                  <i data-lucide="refresh-cw" class="btn-icon" style="width:14px;height:14px;"></i> Actualizar SAP
+                </button>
+              </div>
+            </div>
+            <div class="table-wrapper">
+              <table class="orders-table">
+                <thead>
+                  <tr>
+                    <th id="th-ref-nombre">Descripción</th>
+                    <th id="th-ref-marca">Marca</th>
+                    <th id="th-ref-name">Nombre (Fabricante)</th>
+                    <th id="th-ref-grupo">Grupo</th>
+                    <th id="th-ref-precio">Precio</th>
+                    <th id="th-ref-stock">Stock</th>
+                    <th id="th-ref-origen">Origen</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tabla-body-refacciones">
+                  <tr>
+                    <td colspan="6" class="empty-state">Cargando refacciones...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div> <!-- End table-wrapper -->
+          </div> <!-- End ref-tab-catalogo -->
+
+          <div id="ref-tab-pendientes" style="display:none;">
+            <div class="section-header" style="margin-bottom: 1.5rem; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+              <div>
+                <h2>Tickets de Refacciones (Solicitudes de Técnicos)</h2>
+                <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Aquí se listan y gestionan las solicitudes grupales de refacciones generadas automáticamente desde las órdenes de servicio. Puedes cambiar el estatus de cada pieza haciendo clic en su etiqueta.</p>
+              </div>
+              <div class="view-toggle" style="display:flex; gap:0.5rem; background: var(--bg-hover); padding: 0.3rem; border-radius: var(--radius-md); border: 1px solid var(--border); width: fit-content;">
+                <button class="btn-secondary active" id="btn-ref-view-table" onclick="window.setRefaccionesViewMode('table')"
+                  style="padding:0.35rem 0.75rem; border:none; background:var(--bg-card); box-shadow:0 1px 3px rgba(0,0,0,0.1); color:var(--text-primary); font-weight:600; font-size:0.8rem; display:flex; align-items:center; gap:0.35rem; cursor:pointer;">
+                  <i data-lucide="list" style="width:14px;height:14px;"></i>
+                  Tabla de Tickets
+                </button>
+                <button class="btn-secondary" id="btn-ref-view-pieces" onclick="window.setRefaccionesViewMode('pieces')"
+                  style="padding:0.35rem 0.75rem; border:none; background:transparent; color:var(--text-muted); font-weight:500; font-size:0.8rem; display:flex; align-items:center; gap:0.35rem; cursor:pointer;">
+                  <i data-lucide="wrench" style="width:14px;height:14px;"></i>
+                  Vista por Piezas
+                </button>
+              </div>
+            </div>
+            
+            <div id="ref-pendientes-grid" style="display: none;">
+              <!-- Deprecated/hidden grid container -->
+            </div>
+
+            <div id="ref-pendientes-pieces-container" style="display:none; margin-top: 1rem;">
+              <div class="table-wrapper">
+                <table class="orders-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 80px; text-align:center;">Acción</th>
+                      <th style="width: 150px;">Ticket / Relación</th>
+                      <th style="width: 250px;">Refacción</th>
+                      <th style="width: 155px;">Clave / Marca</th>
+                      <th style="width: 220px;">Empresa / Cliente</th>
+                      <th style="width: 200px;">Equipo / Sitio</th>
+                      <th style="width: 160px; text-align:center;">Estado Pieza</th>
+                      <th style="width: 120px; text-align:center;">Fecha Solicitud</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ref-pendientes-pieces-body">
+                    <!-- Filas de piezas insertadas dinamicamente -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div id="ref-pendientes-table-container" style="display:none; margin-top: 1rem;">
+              <div class="table-wrapper">
+                <table class="orders-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 80px; text-align:center;">Acción</th>
+                      <th style="width: 140px;">Ticket</th>
+                      <th style="width: 250px;">Asunto</th>
+                      <th style="width: 220px;">Empresa / Cliente</th>
+                      <th style="width: 200px;">Equipo / Sitio</th>
+                      <th style="width: 150px; text-align:center;">Estado Ticket</th>
+                      <th>Refacciones Solicitadas</th>
+                      <th style="width: 120px; text-align:center;">Fecha</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ref-pendientes-table-body">
+                    <!-- Filas insertadas dinamicamente -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div> <!-- End view-refacciones -->

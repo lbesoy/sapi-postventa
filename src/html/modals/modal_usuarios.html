@@ -1,0 +1,188 @@
+    <!-- MODAL USUARIO -->
+    <div class="modal-overlay" id="modal-usuario-overlay" onclick="cerrarModalUsuario(event)">
+      <div class="modal" style="max-width:520px;">
+        <div class="modal-header">
+          <h2 id="usuario-modal-title">Nuevo Usuario</h2>
+          <button class="modal-close" onclick="cerrarModalUsuario()">✕</button>
+        </div>
+        <div class="modal-body">
+          <form id="form-usuario" onsubmit="guardarUsuario(event)">
+            <div class="form-section">
+              <div class="form-section-title"><i data-lucide="user" class="section-icon"></i> Datos del Usuario</div>
+              <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+                <div class="form-group" style="grid-column:1/-1;">
+                  <label>Nombre completo *</label>
+                  <input type="text" id="u-nombre" placeholder="Ej. Juan García" required />
+                </div>
+                <div class="form-group">
+                  <label>Correo Electrónico o Teléfono</label>
+                  <input type="text" id="u-email" placeholder="correo@empresa.com o 5512345678" />
+                </div>
+                <div class="form-group">
+                  <label>Celular</label>
+                  <input type="tel" id="u-telefono" placeholder="55 1234 5678" />
+                </div>
+              </div>
+            </div>
+            <div class="form-section">
+              <div class="form-section-title"><i data-lucide="shield" class="section-icon"></i> Rol y Acceso</div>
+              <div class="roles-grid">
+                <label class="rol-card">
+                  <input type="radio" name="u-rol" value="admin" onchange="toggleEmpresaField(this)" />
+                  <div class="rol-card-inner">
+                    <div class="rol-card-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i
+                        data-lucide="user-circle"></i></div>
+                    <div class="rol-card-name">Administrador</div>
+                    <div class="rol-card-desc">Control Total y Configuración</div>
+                  </div>
+                </label>
+                <label class="rol-card">
+                  <input type="radio" name="u-rol" value="supervisor" onchange="toggleEmpresaField(this)" />
+                  <div class="rol-card-inner">
+                    <div class="rol-card-icon" style="background:rgba(234,179,8,0.12);color:#eab308;"><i
+                        data-lucide="clipboard-check"></i></div>
+                    <div class="rol-card-name">Supervisor</div>
+                    <div class="rol-card-desc">Dashboard, Órdenes, Tickets, Clientes</div>
+                  </div>
+                </label>
+                <label class="rol-card">
+                  <input type="radio" name="u-rol" value="tecnico" onchange="toggleEmpresaField(this)" />
+                  <div class="rol-card-inner">
+                    <div class="rol-card-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i
+                        data-lucide="hard-hat"></i></div>
+                    <div class="rol-card-name">Técnico / Instalador</div>
+                    <div class="rol-card-desc">Solo sus Órdenes de Servicio y Tickets asignados</div>
+                  </div>
+                </label>
+                <label class="rol-card">
+                  <input type="radio" name="u-rol" value="empresa" onchange="toggleEmpresaField(this)" />
+                  <div class="rol-card-inner">
+                    <div class="rol-card-icon" style="background:rgba(139,92,246,0.12);color:#8b5cf6;"><i
+                        data-lucide="building-2"></i></div>
+                    <div class="rol-card-name">Empresa / Cliente</div>
+                    <div class="rol-card-desc">Solo sus Tickets. Vista de seguimiento</div>
+                  </div>
+                </label>
+                <label class="rol-card">
+                  <input type="radio" name="u-rol" value="cliente-consultor" onchange="toggleEmpresaField(this)" />
+                  <div class="rol-card-inner">
+                    <div class="rol-card-icon" style="background:rgba(236,72,153,0.12);color:#ec4899;"><i
+                        data-lucide="eye"></i></div>
+                    <div class="rol-card-name">Cliente Consultor</div>
+                    <div class="rol-card-desc">Acceso al portal, solo consulta (sin crear tickets)</div>
+                  </div>
+                </label>
+                <label class="rol-card">
+                  <input type="radio" name="u-rol" value="consulta" onchange="toggleEmpresaField(this)" />
+                  <div class="rol-card-inner">
+                    <div class="rol-card-icon" style="background:rgba(100,116,139,0.12);color:#64748b;"><i
+                        data-lucide="eye"></i></div>
+                    <div class="rol-card-name">Consulta</div>
+                    <div class="rol-card-desc">Vista general, sin crear tickets/órdenes</div>
+                  </div>
+                </label>
+              </div>
+              <div id="u-empresa-sugerida" style="font-size:0.85rem; color:var(--orange); margin-top:1rem; margin-bottom:1rem; display:none; padding: 0.75rem 1rem; background: rgba(232, 130, 12, 0.08); border-radius: var(--radius-sm); border: 1px dashed rgba(232, 130, 12, 0.3);"></div>
+              <div id="u-empresa-container" class="form-group"
+                style="display:none; margin-top:1rem; padding-top:1rem; border-top:1px dashed var(--border);">
+                <label style="margin-bottom:0.5rem; display:block;">Empresas Asociadas * <span
+                    style="color:var(--text-muted);font-weight:normal;font-size:0.75rem;">(Seleccione una o más empresas)</span></label>
+                <input type="text" id="u-empresa-search" placeholder="🔍 Buscar empresa..." style="margin-bottom:0.5rem; padding:0.5rem; width:100%; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-primary); color:var(--text-primary);" />
+                <div id="u-empresa-checkboxes" style="max-height:180px; overflow-y:auto; border:1px solid var(--border); padding:0.75rem; border-radius:var(--radius-md); background:var(--bg-hover); display:flex; flex-direction:column; gap:0.5rem;">
+                  <!-- Checkboxes populated dynamically -->
+                </div>
+              </div>
+            </div>
+            <div class="form-section">
+              <div class="form-section-title"><i data-lucide="power" class="section-icon"></i> Estatus del Usuario</div>
+              <div class="toggle-row"
+                style="margin-top: 1rem; border: 1px solid var(--border); padding: 1rem; border-radius: var(--radius-md); background: var(--bg-card);">
+                <div>
+                  <div class="toggle-label" style="font-weight: 600;">Cuenta Activa</div>
+                  <div class="toggle-sub">Permite que el usuario inicie sesión.</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="u-activo" checked />
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.4rem;">Las contraseñas ahora son
+                gestionadas por cada usuario desde el inicio de sesión oficial.</p>
+            </div>
+            <!-- SECCIÓN: Restablecer Contraseña (Solo cuando se edita un usuario existente) -->
+            <div class="form-section" id="u-reset-pass-section" style="display:none; border-top: 1px dashed var(--border); padding-top: 1rem; margin-top: 1.5rem;">
+              <div class="form-section-title"><i data-lucide="key-round" class="section-icon"></i> Restablecer Contraseña (Administrador)</div>
+              <p style="color:var(--text-secondary);font-size:0.78rem;margin-top:0.25rem;line-height:1.4;">Establece una nueva contraseña para este usuario inmediatamente.</p>
+              <div style="display:flex; gap:0.75rem; margin-top:1rem; align-items:flex-end;">
+                <div class="form-group" style="flex:1; margin-bottom:0;">
+                  <label>Nueva Contraseña (mín. 6 caracteres) *</label>
+                  <input type="password" id="u-new-password" placeholder="••••••••" minlength="6" />
+                </div>
+                <button type="button" class="btn-primary" onclick="adminRestablecerPasswordClick(event)" style="padding:0.75rem 1.25rem; white-space:nowrap;">
+                  <i data-lucide="lock" class="btn-icon"></i> Actualizar
+                </button>
+              </div>
+              <div id="u-reset-pass-error" class="pin-error" style="text-align:left;margin-top:0.5rem;font-size:0.8rem;"></div>
+            </div>
+            <!-- SECCIÓN: Fusionar Cuenta (Solo cuando se edita un usuario existente por Administradores) -->
+            <div class="form-section" id="u-fusion-section" style="display:none; border-top: 1px dashed var(--border); padding-top: 1rem; margin-top: 1.5rem; background: rgba(232, 130, 12, 0.04); border-radius: var(--radius-md); padding: 1rem; border: 1px dashed rgba(232, 130, 12, 0.35);">
+              <div class="form-section-title" style="color:var(--orange, #E8820C);"><i data-lucide="git-merge" class="section-icon"></i> Fusionar Esta Cuenta con Otra</div>
+              <p style="color:var(--text-secondary);font-size:0.78rem;margin-top:0.25rem;line-height:1.4;">
+                Transfiere todo el historial (órdenes de servicio, tickets, bitácoras, gastos, calendario y accesos) de <strong id="u-fusion-origen-label" style="color:var(--text-primary);">este usuario</strong> a otra cuenta y elimina este registro duplicado.
+              </p>
+              
+              <div style="margin-top:0.85rem;">
+                <label style="display:block; font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.35rem;">Cuenta destino receptora (conservará todo el historial) *</label>
+                <select id="u-fusion-destino-select" class="form-input" onchange="window.onCambioFusionDestinoModal()" style="width:100%; border-radius:var(--radius-md); padding:0.65rem 0.85rem; background:var(--bg-hover); color:var(--text-primary); border:1px solid var(--border); font-size:0.85rem;">
+                  <option value="">-- Selecciona el usuario destino --</option>
+                </select>
+              </div>
+
+              <div id="u-fusion-preview-box" style="display:none; margin-top:0.75rem; padding:0.75rem 1rem; border-radius:var(--radius-sm); background:rgba(232, 130, 12, 0.08); border:1px solid rgba(232, 130, 12, 0.25); font-size:0.8rem; line-height:1.4; color:var(--text-primary);">
+                <div id="u-fusion-preview-text"></div>
+              </div>
+
+              <div style="margin-top:0.85rem; display:flex; justify-content:flex-end;">
+                <button type="button" id="btn-ejecutar-fusion-modal" class="btn-secondary" onclick="window.ejecutarFusionDesdeEditarUsuario(event)" style="border-color:var(--orange, #E8820C); color:var(--orange, #E8820C); font-weight:600; display:inline-flex; align-items:center; gap:0.4rem; padding:0.6rem 1.1rem; font-size:0.82rem;">
+                  <i data-lucide="git-merge" style="width:15px; height:15px;"></i> Transferir Historial y Fusionar
+                </button>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn-secondary" onclick="cerrarModalUsuario()">Cancelar</button>
+              <button type="submit" class="btn-primary"><i data-lucide="save" class="btn-icon"></i> Guardar
+                Usuario</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL SESIÓN (cambiar usuario) -->
+    <div class="modal-overlay" id="modal-sesion-overlay" onclick="cerrarSesionModal(event)">
+      <div class="modal" style="max-width:420px;">
+        <div class="modal-header">
+          <h2>Cambiar Usuario</h2>
+          <button class="modal-close" onclick="cerrarSesionModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div id="sesion-usuarios-list"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /app-wrapper -->
+
+  <!-- MODAL DETALLE TÉCNICO -->
+  <div class="modal-overlay" id="modal-detalle-tecnico-overlay" onclick="cerrarDetalleTecnico(event)" style="z-index: 400;">
+    <div class="modal" id="modal-detalle-tecnico" style="max-width: 700px; padding:0;">
+      <div class="modal-header" style="border-bottom: 1px solid var(--border); padding: 1.25rem 1.5rem;">
+        <h2 id="tecnico-detalle-title" style="display:flex; align-items:center; gap:0.5rem;"><i data-lucide="user"
+            style="color:var(--accent);"></i> Perfil del Técnico</h2>
+        <button class="modal-close" onclick="cerrarDetalleTecnico()">✕</button>
+      </div>
+      <div class="modal-body" id="detalle-tecnico-body" style="padding: 1.5rem; max-height: 70vh; overflow-y:auto;">
+        <!-- Llenado dinámicamente -->
+      </div>
+    </div>
+  </div>

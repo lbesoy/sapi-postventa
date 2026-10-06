@@ -1,0 +1,206 @@
+    <!-- MODAL PROGRAMAR TECNICO (CALENDARIO) -->
+    <div class="modal-overlay" id="modal-programar-tecnico-overlay" onclick="if(event.target===this) this.classList.remove('open')">
+      <div class="modal" id="modal-programar-tecnico" style="max-width:500px;">
+        <div class="modal-header">
+          <h2>Programar Asignación</h2>
+          <button class="modal-close" onclick="document.getElementById('modal-programar-tecnico-overlay').classList.remove('open')">✕</button>
+        </div>
+        <div class="modal-body">
+          <!-- CALENDARIO DE LA SEMANA / WEEK PREVIEW -->
+          <div class="form-group full-width" style="margin-bottom:1rem; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.75rem; background: rgba(255,255,255,0.01);">
+            <style>
+              .pt-dia-card {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                background: var(--bg-body);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-md);
+                padding: 0.5rem 0.15rem;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                user-select: none;
+                text-align: center;
+                box-sizing: border-box;
+                min-width: 0;
+              }
+              .pt-dia-card:hover {
+                border-color: var(--accent);
+                background: rgba(255,255,255,0.02);
+                transform: translateY(-1px);
+              }
+              .pt-dia-card.active {
+                border-color: var(--accent);
+                background: var(--accent-light);
+                box-shadow: 0 0 0 1px var(--accent);
+              }
+              .pt-dia-card.today {
+                box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);
+              }
+              .pt-dia-card.today:not(.active) {
+                border-color: var(--text-muted);
+              }
+              @media (max-width: 480px) {
+                .pt-dia-card {
+                  padding: 0.35rem 0.1rem;
+                }
+                .pt-dia-card div {
+                  font-size: 85% !important;
+                }
+              }
+            </style>
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+              <label style="font-weight:600; margin:0; font-size:0.8rem; color:var(--text-primary);"><i data-lucide="calendar-range" style="width:14px; height:14px; margin-right:4px; vertical-align:middle; color:var(--accent);"></i> Calendario de la Semana</label>
+              
+              <!-- Quick Select Buttons inside Header -->
+              <div style="display:flex; gap:0.25rem;">
+                <button type="button" class="btn-secondary" style="font-size:0.68rem; padding:0.25rem 0.4rem; height:auto; line-height:1;" onclick="seleccionarDiasSemana('todos')">Lun-Vie</button>
+                <button type="button" class="btn-secondary" style="font-size:0.68rem; padding:0.25rem 0.4rem; height:auto; line-height:1;" onclick="seleccionarDiasSemana('todos-sab')">Lun-Sáb</button>
+                <button type="button" class="btn-secondary" style="font-size:0.68rem; padding:0.25rem 0.4rem; height:auto; line-height:1;" onclick="seleccionarDiasSemana('ninguno')">Ninguno</button>
+              </div>
+            </div>
+
+            <!-- Week Navigator -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; background:rgba(255,255,255,0.02); border:1px solid var(--border); padding:0.4rem 0.6rem; border-radius:var(--radius-sm);">
+              <button type="button" class="action-btn" onclick="navegarSemana(-1)" style="padding:0.2rem; display:flex; align-items:center; justify-content:center; border-radius:3px;">
+                <i data-lucide="chevron-left" style="width:14px; height:14px;"></i>
+              </button>
+              <span id="pt-semana-label" style="font-size:0.78rem; font-weight:600; color:var(--text-primary);">Semana...</span>
+              <button type="button" class="action-btn" onclick="navegarSemana(1)" style="padding:0.2rem; display:flex; align-items:center; justify-content:center; border-radius:3px;">
+                <i data-lucide="chevron-right" style="width:14px; height:14px;"></i>
+              </button>
+            </div>
+            
+            <!-- Horizontal 7-Day Calendar Grid -->
+            <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:0.3rem; width:100%;">
+              <div id="pt-calendario-semanal-grid" style="display:contents;">
+                <!-- Dynamically generated Day Cards -->
+              </div>
+            </div>
+            
+            <small style="color:var(--text-muted);font-size:0.72rem; margin-top:0.5rem; display:block;">Haz clic en los días para seleccionarlos. Se crearán asignaciones independientes para cada día activo.</small>
+          </div>
+
+          <div class="form-group" style="margin-bottom:1rem;">
+            <label><i data-lucide="user-check" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Técnico Disponible</label>
+            <select id="pt-tecnico" class="form-select" required disabled>
+              <option value="">Selecciona una fecha primero...</option>
+            </select>
+            <small style="color:var(--text-muted);font-size:0.75rem; margin-top:0.25rem; display:block;">Solo muestra técnicos sin traslape de horario en esta fecha. Ingresa las horas para mayor precisión.</small>
+          </div>
+
+          <!-- DETALLE DE ÓRDENES POR DÍA -->
+          <div id="pt-detalles-dias-container" class="form-group full-width" style="margin-bottom: 1rem; display: none; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.75rem; background: rgba(255,255,255,0.01);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap; gap:0.5rem;">
+              <label style="font-weight:600; margin:0; font-size:0.8rem; color:var(--text-primary);">
+                <i data-lucide="list-checks" style="width:14px; height:14px; margin-right:4px; vertical-align:middle; color:var(--accent);"></i> Distribución de Órdenes
+              </label>
+              
+              <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.75rem; cursor:pointer; font-weight:normal; margin:0; color:var(--text-secondary);">
+                <input type="checkbox" id="pt-usar-misma-orden" onchange="toggleMismaOrden()" checked style="width:13px; height:13px; margin:0;" />
+                Misma orden todos los días
+              </label>
+            </div>
+            
+            <div id="pt-detalles-dias-list-wrapper" style="display:none; border-top: 1px dashed var(--border); padding-top: 0.75rem; margin-top: 0.5rem; flex-direction:column; gap:0.5rem;">
+              <div id="pt-detalles-dias-list" style="display:flex; flex-direction:column; gap:0.5rem;">
+                <!-- Filas dinámicas generadas en JS -->
+              </div>
+              <small style="color:var(--text-muted);font-size:0.72rem; margin-top:0.25rem; display:block;">Puedes asignar una orden de servicio diferente para cada día activo de la semana.</small>
+            </div>
+          </div>
+
+          <!-- Hidden Inputs and checkboxes to maintain compatibility -->
+          <input type="hidden" id="pt-fecha" required />
+          <div style="display:none;">
+            <input type="checkbox" id="pt-rep-1" value="1" onchange="actualizarTecnicosDisponibles()"/>
+            <input type="checkbox" id="pt-rep-2" value="2" onchange="actualizarTecnicosDisponibles()"/>
+            <input type="checkbox" id="pt-rep-3" value="3" onchange="actualizarTecnicosDisponibles()"/>
+            <input type="checkbox" id="pt-rep-4" value="4" onchange="actualizarTecnicosDisponibles()"/>
+            <input type="checkbox" id="pt-rep-5" value="5" onchange="actualizarTecnicosDisponibles()"/>
+            <input type="checkbox" id="pt-rep-6" value="6" onchange="actualizarTecnicosDisponibles()"/>
+            <input type="checkbox" id="pt-rep-0" value="0" onchange="actualizarTecnicosDisponibles()"/>
+          </div>
+
+
+
+          <div style="display:grid; grid-template-columns:1fr; gap:1rem; margin-bottom:0.5rem;" id="pt-grupo-tipo-principal">
+            <div class="form-group">
+              <label><i data-lucide="tag" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Tipo de Asignación</label>
+              <select id="pt-tipo" class="form-select" required onchange="onTipoPrincipalChange()">
+                <option value="Servicio">Servicio</option>
+                <option value="Levantamiento">Levantamiento</option>
+                <option value="Capacitación">Capacitación</option>
+                <option value="Traslado">Traslado</option>
+                <option value="Junta">Junta</option>
+                <option value="Vacaciones">Vacaciones</option>
+                <option value="Descanso">Descanso</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" id="pt-grupo-orden-principal" style="margin-bottom:1rem;">
+            <label><i data-lucide="file-text" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Orden de Servicio (Abierta)</label>
+            <div class="custom-combo" style="position:relative; width:100%;">
+              <div class="combo-box" tabindex="0" id="pt-orden-combo" onclick="toggleCombo('pt-orden')">
+                <span id="pt-orden-display" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:calc(100% - 20px);">Selecciona una orden...</span>
+                <i data-lucide="chevron-down" style="width:16px; height:16px;"></i>
+              </div>
+              <div class="combo-menu" id="pt-orden-menu">
+                <div class="combo-search">
+                  <i data-lucide="search" style="width:14px; height:14px; color:var(--text-muted);"></i>
+                  <input type="text" id="pt-orden-search" placeholder="Buscar..." oninput="filterCombo('pt-orden', this.value)" onclick="event.stopPropagation()">
+                </div>
+                <div class="combo-options" id="pt-orden-options">
+                  <div class="combo-option" style="color:var(--text-muted)">Cargando órdenes...</div>
+                </div>
+              </div>
+              <input type="hidden" id="pt-orden" required>
+            </div>
+          </div>
+
+
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;" id="pt-grupo-horario-principal">
+            <div class="form-group">
+              <label><i data-lucide="clock" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Hora Inicio Estimada</label>
+              <input type="time" id="pt-entrada" onchange="actualizarTecnicosDisponibles()" />
+            </div>
+            <div class="form-group">
+              <label><i data-lucide="clock" style="width:14px; height:14px; margin-right:4px; vertical-align:middle;"></i> Hora Fin Estimada</label>
+              <input type="time" id="pt-salida" onchange="actualizarTecnicosDisponibles(); calcularLlegadaTraslados();" />
+            </div>
+          </div>
+
+          <a href="#" id="pt-main-traslado-link" onclick="window.toggleMainTraslado(); return false;" style="font-size:0.75rem; color:var(--accent); text-decoration:underline; display:none; margin-top:0.5rem; align-self:flex-start;">+ Traslado (Opcional)</a>
+          
+          <div id="pt-main-traslado-container" style="display:none; margin-top:0.75rem; border-top:1px dashed var(--border); padding-top:0.75rem; flex-direction:column; gap:0.5rem;">
+            <div style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.25rem;">Traslado Homogéneo para la Semana</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; align-items:center;">
+              <span style="font-size:0.7rem; font-weight:600; color:var(--text-secondary);">Ida Hora:</span>
+              <span style="font-size:0.7rem; font-weight:600; color:var(--text-secondary);">Ida Hrs:</span>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+              <input type="time" id="pt-main-traslado-ida-hora" class="form-control" style="font-size:0.75rem; padding:0.3rem 0.5rem; height:30px; width:100%;">
+              <input type="number" id="pt-main-traslado-ida-horas" step="0.5" min="0" placeholder="Ej. 1.5" class="form-control" style="font-size:0.75rem; padding:0.3rem 0.5rem; height:30px; width:100%;">
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; align-items:center; margin-top:0.25rem;">
+              <span style="font-size:0.7rem; font-weight:600; color:var(--text-secondary);">Regreso Hora:</span>
+              <span style="font-size:0.7rem; font-weight:600; color:var(--text-secondary);">Regreso Hrs:</span>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+              <input type="time" id="pt-main-traslado-regreso-hora" class="form-control" style="font-size:0.75rem; padding:0.3rem 0.5rem; height:30px; width:100%;">
+              <input type="number" id="pt-main-traslado-regreso-horas" step="0.5" min="0" placeholder="Ej. 1.5" class="form-control" style="font-size:0.75rem; padding:0.3rem 0.5rem; height:30px; width:100%;">
+            </div>
+          </div>
+          <div style="margin-top:1.5rem; text-align:right;">
+            <button id="btn-guardar-programacion" class="btn-primary" onclick="guardarProgramacionTecnico()">
+              <i data-lucide="save" class="btn-icon"></i> Programar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>

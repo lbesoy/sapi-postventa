@@ -1,0 +1,86 @@
+        <div id="view-servicios" class="view">
+          <div class="stats-grid-5" style="margin-bottom: 1.5rem;">
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('')">
+              <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="file-text"></i></div>
+              <div>
+                <div class="stat-label">Total Órdenes</div>
+                <div class="stat-value" id="stat-serv-total">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('Pendiente')">
+              <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-circle"></i></div>
+              <div>
+                <div class="stat-label">Pendientes</div>
+                <div class="stat-value" id="stat-serv-pendientes">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('En proceso')">
+              <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:#E8820C;"><i data-lucide="clock"></i></div>
+              <div>
+                <div class="stat-label">En Proceso</div>
+                <div class="stat-value" id="stat-serv-proceso">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('Refacciones pendientes')">
+              <div class="stat-icon" style="background:rgba(236,72,153,0.12);color:#ec4899;"><i data-lucide="package"></i></div>
+              <div>
+                <div class="stat-label">Refacciones Pendientes</div>
+                <div class="stat-value" id="stat-serv-refacciones-pendientes">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('Completado')">
+              <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle"></i></div>
+              <div>
+                <div class="stat-label">Completadas</div>
+                <div class="stat-value" id="stat-serv-completas">0</div>
+              </div>
+            </div>
+          </div>
+          <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+            <h2>Todas las Órdenes</h2>
+            <div style="display:flex; gap:0.5rem; flex-wrap:nowrap; align-items:center; flex:1; justify-content:flex-end;">
+              <div class="search-bar" style="width:100%; max-width:400px; margin:0;">
+                <input type="text" id="search-servicios" placeholder="Buscar por Folio, Ticket, Cliente, Ubicación..." oninput="filtrarOrdenes('servicios')" autocomplete="off" />
+              </div>
+              <button class="action-btn" onclick="regenerarOrdenesDesdeTickets()"
+                id="btn-regenerar-ordenes"
+                title="Regenerar Órdenes desde Tickets Cerrados"
+                style="height:38px; display:none; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--orange, #f59e0b); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
+                <i data-lucide="refresh-cw" class="btn-icon" style="width:14px;height:14px;"></i> Regenerar Órdenes
+              </button>
+              <button class="action-btn" onclick="window.abrirModalDepurarOrdenes()"
+                id="btn-depurar-ordenes-ref"
+                title="Depurar Órdenes de Refacciones y Garantías (Superadmin)"
+                style="height:38px; display:none; align-items:center; gap:0.4rem; padding:0 0.75rem; background:rgba(234, 88, 12, 0.1); border:1px solid rgba(234, 88, 12, 0.3); border-radius:var(--radius-sm); color:var(--accent, #ea580c); cursor:pointer; font-size:0.8rem; font-weight:600; white-space:nowrap;">
+                <i data-lucide="trash-2" class="btn-icon" style="width:14px;height:14px;"></i> Depurar Órdenes (<span id="badge-count-ordenes-ref">0</span>)
+              </button>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table class="orders-table" id="orders-table-servicios">
+              <thead>
+                <tr>
+                  <th style="width: 60px;">Acciones</th>
+                  <th id="th-ord-id">Folio </th>
+                  <th>Ticket</th>
+                  <th id="th-ord-cliente">Cliente </th>
+                  <th id="th-ord-ubicacion">Ubicación </th>
+                  <th id="th-ord-modelo">Modelo </th>
+
+                  <th id="th-ord-tipo">Tipo </th>
+                  <th id="th-ord-estado">Estado </th>
+                  <th id="th-ord-fecha">Fecha </th>
+                  <th style="width: 40px; text-align:center;"></th>
+                </tr>
+              </thead>
+              <tbody id="tabla-body-servicios">
+                <tr>
+                  <td colspan="10" class="empty-state">Sin órdenes aún.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ENVIOS VIEW -->
+        <!-- ENVIOS VIEW -->

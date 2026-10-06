@@ -1,0 +1,55 @@
+  <!-- MODAL: DESGLOSE ÓRDENES SAP -->
+  <div id="modal-desglose-sap" class="modal-overlay">
+    <div class="modal" style="max-width: 900px; width: 95%;">
+      <div class="modal-header">
+        <h3 id="desglose-sap-title">Saldo pedido cliente</h3>
+        <button class="modal-close" onclick="cerrarDesgloseSAP()">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 0;">
+        <div class="table-container" style="max-height: 60vh; overflow-y: auto;">
+          <table class="data-table" style="margin: 0; width: 100%;">
+            <thead style="position: sticky; top: 0; z-index: 10;">
+              <tr>
+                <th id="th-ord-fecha" onclick="toggleSortDesglose('fecha')"
+                  style="width: 120px; cursor:pointer; user-select:none;">Fecha <i data-lucide="arrow-up-down"
+                    style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                    id="sort-icon-desg-fecha"></i></th>
+                <th onclick="toggleSortDesglose('docNum')" style="width: 130px; cursor:pointer; user-select:none;">
+                  Número de doc. <i data-lucide="arrow-up-down"
+                    style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                    id="sort-icon-desg-docNum"></i></th>
+                <th onclick="toggleSortDesglose('comments')" style="cursor:pointer; user-select:none;">Comentarios <i
+                    data-lucide="arrow-up-down"
+                    style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                    id="sort-icon-desg-comments"></i></th>
+                <th onclick="toggleSortDesglose('importe')"
+                  style="width: 130px; text-align: right; cursor:pointer; user-select:none;">Importe <i
+                    data-lucide="arrow-up-down"
+                    style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                    id="sort-icon-desg-importe"></i></th>
+                <th onclick="toggleSortDesglose('openAmount')"
+                  style="width: 140px; text-align: right; cursor:pointer; user-select:none;">Saldo Pendiente <i
+                    data-lucide="arrow-up-down"
+                    style="width:14px;height:14px;vertical-align:middle;margin-left:4px;color:var(--text-muted);"
+                    id="sort-icon-desg-openAmount"></i></th>
+                <th style="width: 150px; text-align: right;">Saldo Acumulado</th>
+              </tr>
+            </thead>
+            <tbody id="desglose-sap-tbody">
+              <!-- Renderizado dinámico -->
+            </tbody>
+            <tfoot
+              style="position: sticky; bottom: 0; background: var(--bg-card); box-shadow: 0 -2px 10px rgba(0,0,0,0.2);">
+              <tr>
+                <td colspan="5" style="text-align: right; font-weight: bold; font-size: 1.1rem; padding: 1rem;">Total
+                  Abierto:</td>
+                <td id="desglose-sap-total"
+                  style="text-align: right; font-weight: bold; font-size: 1.1rem; color: var(--accent); padding: 1rem;">
+                  $0.00</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
