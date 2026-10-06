@@ -50,7 +50,7 @@ export function cleanMojibake(str) {
 
 // Normalize strings for search/filtering
 export function normStr(s) {
-  return (s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  return String(s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
 // Formatea fechas sin lanzar excepciones RangeError

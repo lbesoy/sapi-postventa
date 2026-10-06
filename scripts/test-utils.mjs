@@ -239,25 +239,39 @@ global.document = {
   getElementById: (id) => {
     if (id === 'tabla-body-refacciones') return mockBody;
     if (id === 'search-refacciones') return mockSearch;
-    if (id === 'refacciones-footer') return { innerHTML: '' };
+    if (id === 'refacciones-footer') return { innerHTML: '', style: {} };
     return null;
   },
   addEventListener: () => {}
 };
 if (!global.window) global.window = {};
 global.window.refaccionesDb = [
-  { id: '1', codigo: 'REF-01', descripcion: 'Manguera de Presión', marca: 'PUTZMEISTER', marcaCodigo: 'PTZ', grupo: 'Refacciones Bomba', precio: 1500, stock: 5 }
+  { id: '1', codigo: 'REF-01', descripcion: 'Manguera de Presión', marca: 'PUTZMEISTER', marcaCodigo: 'PTZ', grupo: 'Refacciones Bomba', precio: 1500, stock: 5 },
+  { id: '2', codigo: 'PTZ-101', descripcion: 'Codo 90 Putzmeister', marca: 'PTZ', marcaCodigo: 'PTZ', grupo: '', ItmsGrpCod: 101, precio: 2500, moneda: 'USD', stock: 10 },
+  { id: '3', codigo: 'SCH-102', descripcion: 'Válvula Schwing', marca: 'SCHWING', marcaCodigo: 'SCH', grupo: 102, ItmsGrpCod: 102, precio: 4500, stock: 0 }
 ];
 global.lucide = { createIcons: () => {} };
 
 renderRefacciones();
 assert.ok(mockBody.innerHTML.includes('Manguera de Presión'), 'renderRefacciones debe renderizar items desde window.refaccionesDb');
 assert.ok(mockBody.innerHTML.includes('PUTZMEISTER'), 'renderRefacciones debe mostrar la marca resuelta');
+assert.ok(mockBody.innerHTML.includes('Codo 90 Putzmeister'), 'renderRefacciones debe resolver refacción con ItmsGrpCod 101 sin errores');
+assert.ok(mockBody.innerHTML.includes('Refacciones'), 'renderRefacciones debe resolver nombre de grupo desde GRUPOS_RENDER');
+assert.ok(mockBody.innerHTML.includes('Refacciones Hidráulico'), 'renderRefacciones debe resolver grupo numérico 102');
+
+// Test E: Búsqueda reactiva en renderRefacciones
+mockSearch.value = 'valvula';
+renderRefacciones();
+assert.ok(mockBody.innerHTML.includes('Válvula Schwing'), 'renderRefacciones debe filtrar por término de búsqueda');
+assert.ok(!mockBody.innerHTML.includes('Codo 90 Putzmeister'), 'renderRefacciones debe excluir items que no coinciden');
+
+// Reset search
+mockSearch.value = '';
 
 // Restaurar mock
 global.document = prevDoc;
 
-console.log('  ✅ Catálogo de Maquinaria, Refacciones y Sitios (generarIdInternoMaquina, renderRefacciones y exports): OK');
+console.log('  ✅ Catálogo de Maquinaria, Refacciones y Sitios (generarIdInternoMaquina, renderRefacciones con GRUPOS_RENDER/filtros y exports): OK');
 
 // 16. Módulo de Calendario FullCalendar y Eventos
 const { renderCalendario, getFestivosMexico, getSemanaSanta, getNthDayOfMonth, actualizarFiltrosCalendario } = await import('../src/modules/calendario.js');

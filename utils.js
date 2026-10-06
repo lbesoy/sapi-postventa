@@ -47,7 +47,7 @@ window.cleanMojibake = function(str) {
 
 // Normalize strings for search/filtering
 window.normStr = function(s) {
-  return (s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  return String(s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 };
 
 // Helpers de fecha y hora local para México

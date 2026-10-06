@@ -553,6 +553,7 @@ function switchRefTab(tab) {
     }
     if (cat) cat.style.display = 'block';
     if (pen) pen.style.display = 'none';
+    if (typeof renderRefacciones === 'function') renderRefacciones();
   } else {
     if (btnCat) {
       btnCat.classList.remove('active');
@@ -771,12 +772,14 @@ function renderRefaccionesPendientes() {
   if (tableBody) tableBody.innerHTML = '';
   if (piecesBody) piecesBody.innerHTML = '';
   
-  const currentUser = usuarios.find(u => u && u.id === currentSession.userId);
-  const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+  const userList = (typeof usuarios !== 'undefined') ? usuarios : ((typeof window !== 'undefined' && window.usuarios) ? window.usuarios : []);
+  const sess = (typeof currentSession !== 'undefined') ? currentSession : ((typeof window !== 'undefined' && window.currentSession) ? window.currentSession : { viewMode: 'admin' });
+  const currentUser = userList.find(u => u && u.id === sess.userId);
+  const isEmpresa = ['empresa', 'cliente', 'cliente-consultor'].includes(String(sess.viewMode || '').toLowerCase().trim());
   
   window.obtenerOrdenAsociadaATicketRefacciones = window.obtenerOrdenAsociadaTicket;
 
-  const allTickets = (typeof getFilteredTickets === 'function' ? getFilteredTickets() : tickets) || [];
+  const allTickets = (typeof getFilteredTickets === 'function' ? getFilteredTickets() : ((typeof tickets !== 'undefined') ? tickets : ((typeof window !== 'undefined' && window.tickets) ? window.tickets : []))) || [];
   let refTickets = allTickets.filter(t => {
     if (!t || t.estado === 'Cerrado') return false;
     const cat = String(t.categoria || '').toLowerCase();
@@ -800,10 +803,10 @@ function renderRefaccionesPendientes() {
     }
   }
 
-  const userRole = currentSession.viewMode || '';
+  const userRole = sess.viewMode || '';
   if (userRole === 'tecnico') {
     const tecName = currentUser ? currentUser.nombre : '';
-    if (tecName && !isTestModeActive()) {
+    if (tecName && (typeof isTestModeActive === 'function' ? !isTestModeActive() : true)) {
       refTickets = refTickets.filter(t => {
         const assigned = (t.asignado || '').split(',').map(s => s.trim());
         return assigned.includes(tecName) || (t.tecnicosAsignados && t.tecnicosAsignados.includes(tecName));
@@ -1557,30 +1560,59 @@ async function cambiarEstatusEnLinea(ordenId, clave, descripcion, nuevoEstatus) 
 };
 
 let refaccionesCurrentPage = 1;
+if (typeof window !== 'undefined') {
+  window.refaccionesCurrentPage = window.refaccionesCurrentPage || 1;
+}
 const REFACCIONES_PAGE_SIZE = 50;
 
+const MARCAS_RENDER = {
+  'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM',
+  'MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS',
+  'TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM',
+  'POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG',
+  'HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
+};
+
+const GRUPOS_RENDER = {
+  101:'Refacciones', 102:'Refacciones Hidráulico', 103:'Refacciones Eléctrico',
+  104:'Refacciones Motor', 105:'Refacciones Transmisión', 106:'Refacciones Estructura',
+  107:'Gastos Operativos', 108:'Herramientas', 109:'Consumibles', 110:'Servicios',
+  111:'Anticipos'
+};
+
+if (typeof window !== 'undefined') {
+  window.MARCAS_RENDER = MARCAS_RENDER;
+  window.GRUPOS_RENDER = GRUPOS_RENDER;
+}
+
 function renderRefacciones(resetPage = false) {
-  if (resetPage) refaccionesCurrentPage = 1;
+  if (resetPage) {
+    refaccionesCurrentPage = 1;
+    if (typeof window !== 'undefined') window.refaccionesCurrentPage = 1;
+  }
   const body = document.getElementById('tabla-body-refacciones');
   if (!body) return;
 
-  const q = (document.getElementById('search-refacciones')?.value || '').toLowerCase();
+  const norm = s => (typeof normStr === 'function' ? normStr(String(s ?? '')) : String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim());
+  const qRaw = (document.getElementById('search-refacciones')?.value || '').trim();
+  const q = norm(qRaw);
 
   // Obtener catálogo desde window.refaccionesDb o refaccionesDb
   let catalogo = (typeof window !== 'undefined' && Array.isArray(window.refaccionesDb) && window.refaccionesDb.length > 0)
     ? window.refaccionesDb
     : ((typeof refaccionesDb !== 'undefined' && Array.isArray(refaccionesDb) && refaccionesDb.length > 0) ? refaccionesDb : []);
 
-  // Si aún está vacío en memoria, intentar cargar desde IndexedDB o Supabase reactivamente
-  if (catalogo.length === 0 && typeof window !== 'undefined' && !window._cargandoRefaccionesLocal) {
+  // Si aún está vacío en memoria, intentar cargar desde IndexedDB o Supabase reactivamente (solo 1 intento automático)
+  if (catalogo.length === 0 && typeof window !== 'undefined' && !window._cargandoRefaccionesLocal && !window._refaccionesCargaIntentada) {
     window._cargandoRefaccionesLocal = true;
+    window._refaccionesCargaIntentada = true;
     
     // Ocultar footer mientras carga
     const footerEl = document.getElementById('refacciones-footer');
     if (footerEl) footerEl.style.display = 'none';
 
     body.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--text-muted);"><i data-lucide="loader" class="spin"></i> Cargando catálogo de refacciones...</td></tr>';
-    if (typeof lucide !== 'undefined') lucide.createIcons();
+    if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') lucide.createIcons();
 
     const fetchDirectoSupabase = async () => {
       const sb = window.supabaseClient;
@@ -1644,32 +1676,37 @@ function renderRefacciones(resetPage = false) {
     const footerEl = document.getElementById('refacciones-footer');
     if (footerEl) footerEl.style.display = 'none';
     body.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--text-muted);"><i data-lucide="loader" class="spin"></i> Cargando catálogo de refacciones...</td></tr>';
-    if (typeof lucide !== 'undefined') lucide.createIcons();
+    if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') lucide.createIcons();
+    return;
+  }
+
+  if (catalogo.length === 0) {
+    const footerEl = document.getElementById('refacciones-footer');
+    if (footerEl) footerEl.style.display = 'none';
+    body.innerHTML = '<tr><td colspan="8" class="empty-state">No se encontraron refacciones en el catálogo. Usa el botón "Actualizar SAP" para sincronizar.</td></tr>';
     return;
   }
 
   console.log(`[renderRefacciones] refaccionesDb length: ${catalogo.length}`);
 
-  const MARCAS_RENDER = {
-    'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM',
-    'MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS',
-    'TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM',
-    'POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG',
-    'HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
-  };
-
-  // Filtrar: sin marca → excluir; busqueda
+  // Filtrar: sin marca → excluir en vista general; permitir búsqueda por código/descripción
   const filtered = catalogo.filter(r => {
-    // Resolve marca for filtering (may be code or full name in cache)
+    if (!r) return false;
     const marcaRaw = (r.marca || r.marcaCodigo || '').trim();
     const marcaCode = marcaRaw.toUpperCase();
-    const marcaFull = MARCAS_RENDER[marcaCode] || (marcaRaw.length > 4 ? marcaRaw : '');
-    if (!marcaFull) return false; // exclude items with no resolvable brand
-    if (!q) return true;
-    const itemId = (r.idInterno || r.codigo || r.id || '').toLowerCase();
-    const itemName = (r.nombre || r.descripcion || '').toLowerCase();
-    const itemGrupo = (r.grupo || '').toLowerCase();
-    return itemId.includes(q) || itemName.includes(q) || marcaFull.toLowerCase().includes(q) || itemGrupo.includes(q);
+    const marcaFull = MARCAS_RENDER[marcaCode] || ((marcaRaw && marcaRaw !== 'N/A' && marcaRaw.toLowerCase() !== 'sin marca') ? marcaRaw : '');
+    
+    // Si no hay búsqueda, excluir items sin marca resoluble
+    if (!q) {
+      return Boolean(marcaFull);
+    }
+    
+    // Si hay búsqueda activa, buscar en código, descripción, nombre, marca y grupo insensible a acentos
+    const itemId = norm(r.idInterno || r.codigo || r.id || '');
+    const itemName = norm(r.nombre || r.descripcion || '');
+    const itemGrupo = norm(r.grupo || '');
+    const brandMatch = marcaFull ? norm(marcaFull).includes(q) : false;
+    return itemId.includes(q) || itemName.includes(q) || brandMatch || itemGrupo.includes(q);
   });
 
   console.log(`[renderRefacciones] filtered length: ${filtered.length}, query: "${q}"`);
@@ -1679,58 +1716,68 @@ function renderRefacciones(resetPage = false) {
     debugEl.style.display = 'none';
   }
 
+  const curPage = (typeof window !== 'undefined' && window.refaccionesCurrentPage) ? window.refaccionesCurrentPage : refaccionesCurrentPage;
   const total = filtered.length;
   const totalPages = Math.ceil(total / REFACCIONES_PAGE_SIZE) || 1;
-  if (refaccionesCurrentPage > totalPages) refaccionesCurrentPage = totalPages;
-  const start = (refaccionesCurrentPage - 1) * REFACCIONES_PAGE_SIZE;
+  let page = curPage;
+  if (page > totalPages) page = totalPages;
+  if (page < 1) page = 1;
+  refaccionesCurrentPage = page;
+  if (typeof window !== 'undefined') window.refaccionesCurrentPage = page;
+
+  const start = (page - 1) * REFACCIONES_PAGE_SIZE;
   const pageItems = filtered.slice(start, start + REFACCIONES_PAGE_SIZE);
 
   let html = '';
   pageItems.forEach(r => {
-    const itemId = r.idInterno || r.codigo || r.id || 'N/A';
-    const itemName = r.nombre || r.descripcion || 'Sin Nombre';
+    try {
+      const itemId = r.idInterno || r.codigo || r.id || 'N/A';
+      const itemName = r.nombre || r.descripcion || 'Sin Nombre';
 
-    // Resolve marca code and full name from maps (handles both cached codes and fresh names)
-    const rawMarca = (r.marca || r.marcaCodigo || '').trim();
-    const isCode = rawMarca.length <= 4 && rawMarca === rawMarca.toUpperCase();
-    const itemMarcaCodigo = isCode ? rawMarca : (r.marcaCodigo || '');
-    const marcaKey = (itemMarcaCodigo || rawMarca).toUpperCase();
-    const itemMarcaNombre = MARCAS_RENDER[marcaKey] || rawMarca || 'N/A';
+      // Resolve marca code and full name from maps (handles both cached codes and fresh names)
+      const rawMarca = (r.marca || r.marcaCodigo || '').trim();
+      const isCode = rawMarca.length <= 4 && rawMarca === rawMarca.toUpperCase();
+      const itemMarcaCodigo = isCode ? rawMarca : (r.marcaCodigo || '');
+      const marcaKey = (itemMarcaCodigo || rawMarca).toUpperCase();
+      const itemMarcaNombre = MARCAS_RENDER[marcaKey] || rawMarca || 'N/A';
 
-    // Resolve group: could be a name string or numeric code
-    const grupoRaw = r.grupo || r.ItmsGrpNam || r.GrupoCode || r.ItmsGrpCod || '';
-    const itemGrupo = (typeof grupoRaw === 'number')
-      ? (GRUPOS_RENDER[grupoRaw] || `Grupo ${grupoRaw}`)
-      : (grupoRaw || GRUPOS_RENDER[r.ItmsGrpCod] || 'N/A');
+      // Resolve group: could be a name string or numeric code
+      const grupoRaw = r.grupo || r.ItmsGrpNam || r.GrupoCode || r.ItmsGrpCod || '';
+      const itemGrupo = (typeof grupoRaw === 'number' || (typeof grupoRaw === 'string' && /^\d+$/.test(grupoRaw.trim())))
+        ? (GRUPOS_RENDER[Number(grupoRaw)] || `Grupo ${grupoRaw}`)
+        : (grupoRaw || (r.ItmsGrpCod && GRUPOS_RENDER[r.ItmsGrpCod]) || 'N/A');
 
-    const itemStock = r.stock || 0;
-    let itemOrigen = r.origen || '';
-    if (!itemOrigen && itemId !== 'N/A') {
-      itemOrigen = itemId.toUpperCase().endsWith('N') ? 'Nacional' : 'Importado';
+      const itemStock = Number(r.stock || 0);
+      let itemOrigen = r.origen || '';
+      if (!itemOrigen && itemId !== 'N/A') {
+        itemOrigen = itemId.toUpperCase().endsWith('N') ? 'Nacional' : 'Importado';
+      }
+      itemOrigen = itemOrigen || 'N/A';
+
+      let customTds = '';
+      const cfgRef = (typeof configData !== 'undefined' ? configData : (typeof window !== 'undefined' && window.configData ? window.configData : null));
+      if (cfgRef?.mappings?.refacciones?.customCols) {
+        cfgRef.mappings.refacciones.customCols.forEach(col => {
+          customTds += `<td style="font-size:0.85rem; color:var(--text-secondary);">${r.customData && r.customData[col.label] ? r.customData[col.label] : 'N/A'}</td>`;
+        });
+      }
+      
+      html += `
+        <tr>
+          <td style="font-weight: 500; color: var(--text-primary); max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${itemName}">${itemName}</td>
+          <td><span style="font-family:monospace; font-size:0.82rem; font-weight:600; color:var(--accent); background:var(--bg-body); border:1px solid var(--border); padding:2px 6px; border-radius:4px;">${itemMarcaCodigo || marcaKey}</span></td>
+          <td style="font-weight: 500; color: var(--text-primary);">${itemMarcaNombre}</td>
+          <td><span class="status-badge status-open" style="background:var(--bg-secondary); color:var(--text-secondary);">${itemGrupo}</span></td>
+          <td style="font-family: monospace; font-weight: 500;">$${Number(r.precio||0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2})} ${r.moneda ? `<span style="font-size:0.75rem; color:var(--text-muted);">${r.moneda}</span>` : ''}</td>
+          <td style="font-weight: 500; color: ${itemStock > 0 ? 'var(--green)' : 'var(--red)'}">${itemStock}</td>
+          <td><span class="badge ${itemOrigen === 'Nacional' ? 'badge-completado' : (itemOrigen === 'Importado' ? 'badge-proceso' : 'badge-pendiente')}">${itemOrigen}</span></td>
+          ${customTds}
+          <td><button class="action-btn" onclick="mostrarNotificacion('Vista de detalle en construcción', 'info')" title="Ver detalles"><i data-lucide="eye"></i></button></td>
+        </tr>
+      `;
+    } catch (rowErr) {
+      console.warn('[renderRefacciones] Error al procesar fila de refacción:', rowErr, r);
     }
-    itemOrigen = itemOrigen || 'N/A';
-
-    let customTds = '';
-    const cfgRef = (typeof configData !== 'undefined' ? configData : (typeof window !== 'undefined' && window.configData ? window.configData : null));
-    if (cfgRef?.mappings?.refacciones?.customCols) {
-      cfgRef.mappings.refacciones.customCols.forEach(col => {
-        customTds += `<td style="font-size:0.85rem; color:var(--text-secondary);">${r.customData && r.customData[col.label] ? r.customData[col.label] : 'N/A'}</td>`;
-      });
-    }
-    
-    html += `
-      <tr>
-        <td style="font-weight: 500; color: var(--text-primary); max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${itemName}">${itemName}</td>
-        <td><span style="font-family:monospace; font-size:0.82rem; font-weight:600; color:var(--accent); background:var(--bg-body); border:1px solid var(--border); padding:2px 6px; border-radius:4px;">${itemMarcaCodigo || marcaKey}</span></td>
-        <td style="font-weight: 500; color: var(--text-primary);">${itemMarcaNombre}</td>
-        <td><span class="status-badge status-open" style="background:var(--bg-secondary); color:var(--text-secondary);">${itemGrupo}</span></td>
-        <td style="font-family: monospace; font-weight: 500;">$${Number(r.precio||0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2})}</td>
-        <td style="font-weight: 500; color: ${itemStock > 0 ? 'var(--green)' : 'var(--red)'}">${itemStock}</td>
-        <td><span class="badge ${itemOrigen === 'Nacional' ? 'badge-completado' : (itemOrigen === 'Importado' ? 'badge-proceso' : 'badge-pendiente')}">${itemOrigen}</span></td>
-        ${customTds}
-        <td><button class="action-btn" onclick="mostrarNotificacion('Vista de detalle en construcción', 'info')" title="Ver detalles"><i data-lucide="eye"></i></button></td>
-      </tr>
-    `;
   });
 
   body.innerHTML = html || '<tr><td colspan="8" class="empty-state">No se encontraron refacciones.</td></tr>';
@@ -1743,17 +1790,21 @@ function renderRefacciones(resetPage = false) {
     footer.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:0.75rem 1rem; font-size:0.82rem; color:var(--text-muted); border-top:1px solid var(--border); flex-wrap:wrap; gap:0.5rem;';
     body.closest('.table-wrapper')?.after(footer);
   }
-  footer.style.display = total > 0 ? 'flex' : 'none';
+  if (footer && footer.style) {
+    footer.style.display = total > 0 ? 'flex' : 'none';
+  }
   footer.innerHTML = `
-    <span>Mostrando <strong>${start + 1}–${Math.min(start + REFACCIONES_PAGE_SIZE, total)}</strong> de <strong>${total}</strong> refacciones</span>
+    <span>Mostrando <strong>${total > 0 ? start + 1 : 0}–${Math.min(start + REFACCIONES_PAGE_SIZE, total)}</strong> de <strong>${total}</strong> refacciones</span>
     <div style="display:flex; gap:0.5rem; align-items:center;">
-      <button onclick="refaccionesCurrentPage--; renderRefacciones()" ${refaccionesCurrentPage <= 1 ? 'disabled' : ''} style="padding:0.3rem 0.7rem; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-card); color:var(--text-primary); cursor:pointer; font-size:0.8rem;">← Anterior</button>
-      <span>Pág. ${refaccionesCurrentPage} / ${totalPages}</span>
-      <button onclick="refaccionesCurrentPage++; renderRefacciones()" ${refaccionesCurrentPage >= totalPages ? 'disabled' : ''} style="padding:0.3rem 0.7rem; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-card); color:var(--text-primary); cursor:pointer; font-size:0.8rem;">Siguiente →</button>
+      <button onclick="window.refaccionesCurrentPage = Math.max(1, (window.refaccionesCurrentPage || 1) - 1); if(typeof window.renderRefacciones === 'function') window.renderRefacciones(); else renderRefacciones();" ${(page <= 1) ? 'disabled' : ''} style="padding:0.3rem 0.7rem; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-card); color:var(--text-primary); cursor:pointer; font-size:0.8rem;">← Anterior</button>
+      <span>Pág. ${page} / ${totalPages}</span>
+      <button onclick="window.refaccionesCurrentPage = Math.min(${totalPages}, (window.refaccionesCurrentPage || 1) + 1); if(typeof window.renderRefacciones === 'function') window.renderRefacciones(); else renderRefacciones();" ${(page >= totalPages) ? 'disabled' : ''} style="padding:0.3rem 0.7rem; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-card); color:var(--text-primary); cursor:pointer; font-size:0.8rem;">Siguiente →</button>
     </div>
   `;
 
-  lucide.createIcons();
+  if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
 }
 
 function renderSitios() {
@@ -2120,6 +2171,9 @@ if (typeof window !== "undefined") {
   window.renombrarSitioEmpresa = renombrarSitioEmpresa;
   window.guardarRenombreSitio = guardarRenombreSitio;
   window.generarIdInternoMaquina = generarIdInternoMaquina;
+  window.refaccionesCurrentPage = refaccionesCurrentPage;
+  window.MARCAS_RENDER = MARCAS_RENDER;
+  window.GRUPOS_RENDER = GRUPOS_RENDER;
 }
 
 if (typeof document !== "undefined") {
