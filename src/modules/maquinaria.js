@@ -1619,6 +1619,9 @@ function renderRefacciones(resetPage = false) {
     if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') lucide.createIcons();
 
     const fetchDirectoSupabase = async () => {
+      if (typeof window.descargarRefaccionesSupabase === 'function') {
+        return window.descargarRefaccionesSupabase();
+      }
       const sb = window.supabaseClient;
       if (!sb) return [];
       try {
@@ -1626,7 +1629,7 @@ function renderRefacciones(resetPage = false) {
         let page = 0;
         let fetchMore = true;
         while (fetchMore) {
-          const { data: chunk, error } = await sb.from('refacciones').select('*').range(page * 1000, (page + 1) * 1000 - 1);
+          const { data: chunk, error } = await sb.from('refacciones').select('*').order('id', { ascending: true }).range(page * 1000, (page + 1) * 1000 - 1);
           if (!error && chunk && chunk.length > 0) {
             allRef = allRef.concat(chunk);
             if (chunk.length < 1000) fetchMore = false;
@@ -1656,8 +1659,8 @@ function renderRefacciones(resetPage = false) {
         if (typeof window.loadRefaccionesLocal === 'function') {
           data = await window.loadRefaccionesLocal().catch(() => []);
         }
-        if (!data || data.length === 0) {
-          console.log('[renderRefacciones] IndexedDB vacío. Consultando directamente a Supabase...');
+        if (!data || data.length <= 1000) {
+          console.log('[renderRefacciones] IndexedDB vacío o incompleto (<=1000 registros). Consultando catálogo completo a Supabase...');
           data = await fetchDirectoSupabase();
         }
         if (data && data.length > 0) {
@@ -1693,16 +1696,16 @@ function renderRefacciones(resetPage = false) {
 
   console.log(`[renderRefacciones] refaccionesDb length: ${catalogo.length}`);
 
-  // Filtrar: sin marca → excluir en vista general; permitir búsqueda por código/descripción
+  // Filtrar catálogo: si no hay búsqueda activa, mostrar todas las refacciones
   const filtered = catalogo.filter(r => {
     if (!r) return false;
     const marcaRaw = (r.marca || r.marcaCodigo || '').trim();
     const marcaCode = marcaRaw.toUpperCase();
     const marcaFull = MARCAS_RENDER[marcaCode] || ((marcaRaw && marcaRaw !== 'N/A' && marcaRaw.toLowerCase() !== 'sin marca') ? marcaRaw : '');
     
-    // Si no hay búsqueda, excluir items sin marca resoluble
+    // Si no hay búsqueda, incluir todos los registros del catálogo
     if (!q) {
-      return Boolean(marcaFull);
+      return true;
     }
     
     // Si hay búsqueda activa, buscar en código, descripción, nombre, marca y grupo insensible a acentos

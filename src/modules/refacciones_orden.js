@@ -109,21 +109,34 @@ function popularSelectMarcas(comboIdMarca, comboIdDesc) {
           console.log(`[popularSelectMarcas] Refacciones cargadas reactivamente desde IndexedDB (${data.length} registros).`);
         } else if (window.supabaseClient && !window._descargandoRefaccionesAuto) {
           window._descargandoRefaccionesAuto = true;
-          window.supabaseClient.from('refacciones').select('*').limit(3500).then(({ data: sbData }) => {
-            window._descargandoRefaccionesAuto = false;
-            if (sbData && sbData.length > 0) {
-              const mapped = sbData.map(r => ({
-                id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, 
-                marca: r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.custom_data?.marca || '', 
-                grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
-                ItmsGrpCod: r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
-              }));
-              window.refaccionesDb = mapped;
-              if (typeof refaccionesDb !== 'undefined') refaccionesDb = mapped;
-              if (typeof window.saveRefaccionesLocal === 'function') window.saveRefaccionesLocal(mapped);
-              console.log(`[popularSelectMarcas] ⚡ Refacciones descargadas automáticamente desde Supabase (${mapped.length} registros).`);
+          (async () => {
+            try {
+              let mapped = [];
+              if (typeof window.descargarRefaccionesSupabase === 'function') {
+                mapped = await window.descargarRefaccionesSupabase();
+              } else if (typeof window.fetchTablePaginated === 'function') {
+                const raw = await window.fetchTablePaginated('refacciones', '*', 'id', true);
+                if (raw && raw.length > 0) {
+                  mapped = raw.map(r => ({
+                    id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, 
+                    marca: r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.custom_data?.marca || '', 
+                    grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
+                    ItmsGrpCod: r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
+                  }));
+                  window.refaccionesDb = mapped;
+                  if (typeof refaccionesDb !== 'undefined') refaccionesDb = mapped;
+                  if (typeof window.saveRefaccionesLocal === 'function') await window.saveRefaccionesLocal(mapped);
+                }
+              }
+              if (mapped && mapped.length > 0) {
+                console.log(`[popularSelectMarcas] ⚡ Refacciones descargadas automáticamente desde Supabase (${mapped.length} registros).`);
+              }
+            } catch (err) {
+              console.warn('[popularSelectMarcas] Error descargando refacciones:', err);
+            } finally {
+              window._descargandoRefaccionesAuto = false;
             }
-          }).catch(() => { window._descargandoRefaccionesAuto = false; });
+          })();
         }
       }).catch(() => { window._cargandoRefaccionesLocal = false; });
     }
@@ -209,22 +222,37 @@ function actualizarDescripcionesCombo(comboIdMarca, comboIdDesc) {
   // Si el catálogo está vacío y se seleccionó una marca, intentar auto-recuperar y re-renderizar
   if (catalogo.length === 0 && marcaSel && typeof window !== 'undefined' && window.supabaseClient && !window._descargandoRefaccionesAuto) {
     window._descargandoRefaccionesAuto = true;
-    window.supabaseClient.from('refacciones').select('*').limit(3500).then(({ data: sbData }) => {
-      window._descargandoRefaccionesAuto = false;
-      if (sbData && sbData.length > 0) {
-        const mapped = sbData.map(r => ({
-          id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, 
-          marca: r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.custom_data?.marca || '', 
-          grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
-          ItmsGrpCod: r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
-        }));
-        window.refaccionesDb = mapped;
-        if (typeof refaccionesDb !== 'undefined') refaccionesDb = mapped;
-        if (typeof window.saveRefaccionesLocal === 'function') window.saveRefaccionesLocal(mapped);
-        console.log(`[actualizarDescripcionesCombo] ⚡ Refacciones descargadas automáticamente (${mapped.length} registros).`);
-        window.actualizarDescripcionesCombo(comboIdMarca, comboIdDesc);
+    (async () => {
+      try {
+        let mapped = [];
+        if (typeof window.descargarRefaccionesSupabase === 'function') {
+          mapped = await window.descargarRefaccionesSupabase();
+        } else if (typeof window.fetchTablePaginated === 'function') {
+          const raw = await window.fetchTablePaginated('refacciones', '*', 'id', true);
+          if (raw && raw.length > 0) {
+            mapped = raw.map(r => ({
+              id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, 
+              marca: r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.custom_data?.marca || '', 
+              grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
+              ItmsGrpCod: r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
+            }));
+            window.refaccionesDb = mapped;
+            if (typeof refaccionesDb !== 'undefined') refaccionesDb = mapped;
+            if (typeof window.saveRefaccionesLocal === 'function') await window.saveRefaccionesLocal(mapped);
+          }
+        }
+        if (mapped && mapped.length > 0) {
+          console.log(`[actualizarDescripcionesCombo] ⚡ Refacciones descargadas automáticamente (${mapped.length} registros).`);
+          if (typeof window.actualizarDescripcionesCombo === 'function') {
+            window.actualizarDescripcionesCombo(comboIdMarca, comboIdDesc);
+          }
+        }
+      } catch (err) {
+        console.warn('[actualizarDescripcionesCombo] Error descargando refacciones:', err);
+      } finally {
+        window._descargandoRefaccionesAuto = false;
       }
-    }).catch(() => { window._descargandoRefaccionesAuto = false; });
+    })();
   }
 };
 

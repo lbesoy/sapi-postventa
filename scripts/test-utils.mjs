@@ -248,7 +248,8 @@ if (!global.window) global.window = {};
 global.window.refaccionesDb = [
   { id: '1', codigo: 'REF-01', descripcion: 'Manguera de Presión', marca: 'PUTZMEISTER', marcaCodigo: 'PTZ', grupo: 'Refacciones Bomba', precio: 1500, stock: 5 },
   { id: '2', codigo: 'PTZ-101', descripcion: 'Codo 90 Putzmeister', marca: 'PTZ', marcaCodigo: 'PTZ', grupo: '', ItmsGrpCod: 101, precio: 2500, moneda: 'USD', stock: 10 },
-  { id: '3', codigo: 'SCH-102', descripcion: 'Válvula Schwing', marca: 'SCHWING', marcaCodigo: 'SCH', grupo: 102, ItmsGrpCod: 102, precio: 4500, stock: 0 }
+  { id: '3', codigo: 'SCH-102', descripcion: 'Válvula Schwing', marca: 'SCHWING', marcaCodigo: 'SCH', grupo: 102, ItmsGrpCod: 102, precio: 4500, stock: 0 },
+  { id: '4', codigo: 'GEN-01', descripcion: 'Tornillo Grado 8 Hexagonal', marca: 'N/A', marcaCodigo: '', grupo: 'Tornillería', precio: 25, stock: 100 }
 ];
 global.lucide = { createIcons: () => {} };
 
@@ -258,6 +259,7 @@ assert.ok(mockBody.innerHTML.includes('PUTZMEISTER'), 'renderRefacciones debe mo
 assert.ok(mockBody.innerHTML.includes('Codo 90 Putzmeister'), 'renderRefacciones debe resolver refacción con ItmsGrpCod 101 sin errores');
 assert.ok(mockBody.innerHTML.includes('Refacciones'), 'renderRefacciones debe resolver nombre de grupo desde GRUPOS_RENDER');
 assert.ok(mockBody.innerHTML.includes('Refacciones Hidráulico'), 'renderRefacciones debe resolver grupo numérico 102');
+assert.ok(mockBody.innerHTML.includes('Tornillo Grado 8 Hexagonal'), 'renderRefacciones debe renderizar piezas genéricas o sin marca sin excluirlas');
 
 // Test E: Búsqueda reactiva en renderRefacciones
 mockSearch.value = 'valvula';

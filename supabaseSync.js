@@ -166,6 +166,50 @@ window.loadRefaccionesLocal = async function() {
   return window.loadCatalogOffline('sapi_refacciones_db', []);
 };
 
+window.descargarRefaccionesSupabase = async function() {
+  const sb = window.supabaseClient;
+  if (!sb) return [];
+  try {
+    let allRefacciones = [];
+    if (typeof window.fetchTablePaginated === 'function') {
+      allRefacciones = await window.fetchTablePaginated('refacciones', '*', 'id', true);
+    } else {
+      let fetchMore = true;
+      let page = 0;
+      while (fetchMore) {
+        const { data: chunk, error } = await sb.from('refacciones').select('*').order('id', { ascending: true }).range(page * 1000, (page + 1) * 1000 - 1);
+        if (!error && chunk && chunk.length > 0) {
+          allRefacciones = allRefacciones.concat(chunk);
+          if (chunk.length < 1000) fetchMore = false;
+          else page++;
+        } else {
+          fetchMore = false;
+        }
+      }
+    }
+    if (allRefacciones && allRefacciones.length > 0) {
+      const mapped = allRefacciones.map(r => ({
+        id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, 
+        marca: r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.custom_data?.marca || '', 
+        grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
+        ItmsGrpCod: r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
+      }));
+      window.refaccionesDb = mapped;
+      if (typeof refaccionesDb !== 'undefined') {
+        refaccionesDb = mapped;
+      }
+      if (typeof window.saveRefaccionesLocal === 'function') {
+        await window.saveRefaccionesLocal(mapped);
+      }
+      console.log(`[Sync] Catálogo completo de refacciones descargado y almacenado (${mapped.length} registros).`);
+      return mapped;
+    }
+  } catch (err) {
+    console.error('[Sync] Error al descargar catálogo de refacciones:', err);
+  }
+  return [];
+};
+
 // Helpers de serialización de refacciones en el campo 'notas' del ticket
 window.extraerRefaccionesDeNotas = function(notasStr) {
   const str = notasStr || '';
@@ -4282,32 +4326,39 @@ window.cargarDatosDeSupabase = function() {
     }
 
     if (!isClientOrEmpresa) {
-      // Refacciones (con paginación para traer más de 1000 items)
-      let allRefacciones = [];
-      let fetchMore = true;
-      let page = 0;
-      while (fetchMore) {
-        const { data: refDbChunk } = await sb.from('refacciones').select('*').range(page * 1000, (page + 1) * 1000 - 1);
-        if (refDbChunk && refDbChunk.length > 0) {
-          allRefacciones = allRefacciones.concat(refDbChunk);
-          if (refDbChunk.length < 1000) fetchMore = false;
-          else page++;
-        } else {
-          fetchMore = false;
+      // Refacciones (con paginación para traer todo el catálogo desde Supabase)
+      let mapped = [];
+      if (typeof window.descargarRefaccionesSupabase === 'function') {
+        mapped = await window.descargarRefaccionesSupabase();
+      } else {
+        let allRefacciones = [];
+        let fetchMore = true;
+        let page = 0;
+        while (fetchMore) {
+          const { data: refDbChunk, error } = await sb.from('refacciones').select('*').order('id', { ascending: true }).range(page * 1000, (page + 1) * 1000 - 1);
+          if (!error && refDbChunk && refDbChunk.length > 0) {
+            allRefacciones = allRefacciones.concat(refDbChunk);
+            if (refDbChunk.length < 1000) fetchMore = false;
+            else page++;
+          } else {
+            fetchMore = false;
+          }
+        }
+        if (allRefacciones.length > 0) {
+          mapped = allRefacciones.map(r => ({
+            id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, 
+            marca: r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.custom_data?.marca || '', 
+            grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
+            ItmsGrpCod: r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
+          }));
+          await window.saveRefaccionesLocal(mapped);
+          window.refaccionesDb = mapped;
+          if (typeof refaccionesDb !== 'undefined') {
+            refaccionesDb = mapped;
+          }
         }
       }
-      if (allRefacciones.length > 0) {
-        const mapped = allRefacciones.map(r => ({
-          id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, 
-          marca: r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.custom_data?.marca || '', 
-          grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
-          ItmsGrpCod: r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
-        }));
-        await window.saveRefaccionesLocal(mapped);
-        window.refaccionesDb = mapped;
-        if (typeof refaccionesDb !== 'undefined') {
-          refaccionesDb = mapped;
-        }
+      if (mapped && mapped.length > 0) {
         console.log(`[Sync] Catálogo de refacciones cargado en memoria (${mapped.length} registros).`);
         if (typeof window.renderRefacciones === 'function' && document.getElementById('view-refacciones')?.classList.contains('active')) {
           try { window.renderRefacciones(); } catch (eR) {}

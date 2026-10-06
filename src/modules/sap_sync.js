@@ -748,6 +748,24 @@ async function sincronizarConGitHub(modulo = 'all', btnEl = null) {
     }
 
   } catch(e) {
+    if (modulo === 'refacciones' && typeof window !== 'undefined' && typeof window.descargarRefaccionesSupabase === 'function') {
+      _notify('Recargando catálogo directamente desde Supabase...', 'info');
+      try {
+        const data = await window.descargarRefaccionesSupabase();
+        if (data && data.length > 0) {
+          _notify(`✅ Catálogo actualizado desde Supabase (${data.length} refacciones).`, 'success');
+          if (typeof window.renderRefacciones === 'function') window.renderRefacciones();
+          if (btnEl) {
+            btnEl.innerHTML = origHTML;
+            btnEl.disabled = false;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+          }
+          return;
+        }
+      } catch (subErr) {
+        console.warn('[sincronizarConGitHub] Falló recarga directa de refacciones:', subErr);
+      }
+    }
     _notify(`❌ Error al disparar sync: ${e.message}`, 'error');
     if (btnEl) {
       btnEl.innerHTML = origHTML;
