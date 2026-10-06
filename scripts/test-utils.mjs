@@ -1914,7 +1914,17 @@ assert.equal(listenerCalled, 3, 'El suscriptor desuscrito no debe ejecutarse de 
 
 console.log('  ✅ Estado Reactivo Centralizado (Store, Pub/Sub y Entidades): OK');
 
+// 49. MÓDULO DE DEFINICIÓN DE MODELOS Y TIPADO JSDOC
+console.log('🧪 Verificando Definiciones de Tipos JSDoc y Modelos (src/types/models.js)...');
+const { TiposModelos } = await import('../src/types/models.js');
+
+assert.equal(typeof TiposModelos, 'object', 'TiposModelos debe ser un objeto');
+assert.equal(TiposModelos.version, '1.0.0', 'TiposModelos debe tener versión 1.0.0');
+
+console.log('  ✅ Definiciones de Tipos JSDoc y Modelos de Negocio: OK');
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
+
 
 
 
