@@ -348,13 +348,32 @@ function ticketToRow(t) {
   // Encontrar el ID del sitio por su nombre
   let sitioId = null;
   try {
-    const sitios = (typeof sitiosDb !== 'undefined' && Array.isArray(sitiosDb)) ? sitiosDb : JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
-    const match = sitios.find(s => (s.cliente === clienteId || s.cliente === t.cliente) && (s.nombre === t.sitio || s.direccion === t.sitio || s.id === t.sitio));
+    const sitios = (typeof sitiosDb !== 'undefined' && Array.isArray(sitiosDb) && sitiosDb.length > 0)
+      ? sitiosDb
+      : ((typeof window !== 'undefined' && Array.isArray(window.sitiosDb) && window.sitiosDb.length > 0)
+          ? window.sitiosDb
+          : JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]'));
+    const tSitioNorm = (t.sitio || '').trim().toLowerCase();
+    const match = sitios.find(s => {
+      if (!s) return false;
+      const isCliMatch = !clienteId || s.cliente === clienteId || s.cliente === t.cliente || (s.customData?.clienteNombre && t.cliente && s.customData.clienteNombre.toLowerCase() === t.cliente.toLowerCase());
+      const sNameNorm = (s.nombre || '').trim().toLowerCase();
+      const sDirNorm = (s.direccion || '').trim().toLowerCase();
+      const isSitioMatch = s.nombre === t.sitio || s.direccion === t.sitio || s.id === t.sitio || (tSitioNorm && (sNameNorm === tSitioNorm || sDirNorm === tSitioNorm));
+      return isCliMatch && isSitioMatch;
+    });
     if (match) {
       sitioId = match.id;
     } else if (t.sitio) {
       const existById = sitios.find(s => s.id === t.sitio);
       if (existById) sitioId = existById.id;
+    }
+    if (sitioId && isValidUUID(sitioId)) {
+      if (window._supaValidSitioIds && !window._supaValidSitioIds.has(sitioId)) {
+        if (sitios.some(s => s.id === sitioId)) {
+          window._supaValidSitioIds.add(sitioId);
+        }
+      }
     }
     // Validar formato UUID y existencia para evitar violación de FK tickets_sitio_fkey
     if (sitioId && (!isValidUUID(sitioId) || (window._supaValidSitioIds && window._supaValidSitioIds.size > 0 && !window._supaValidSitioIds.has(sitioId)))) {
@@ -3692,6 +3711,13 @@ window.cargarDatosDeSupabase = function() {
             cp: s.cp, ciudad: s.ciudad, estado: s.estado, customData: s.custom_data
           }));
           localStorage.setItem('sapi_sitios_db', JSON.stringify(mappedSitios));
+          if (typeof sitiosDb !== 'undefined' && Array.isArray(sitiosDb)) {
+            sitiosDb.length = 0;
+            sitiosDb.push(...mappedSitios);
+          }
+          if (typeof window !== 'undefined') {
+            window.sitiosDb = mappedSitios;
+          }
         }
 
         // Esperar a que config termine para aplicar saldosSap si llegaron
@@ -3817,6 +3843,13 @@ window.cargarDatosDeSupabase = function() {
             return row;
           });
           localStorage.setItem('sapi_clientes_db', JSON.stringify(mergedClientes));
+          if (typeof clientesDb !== 'undefined' && Array.isArray(clientesDb)) {
+            clientesDb.length = 0;
+            clientesDb.push(...mergedClientes);
+          }
+          if (typeof window !== 'undefined') {
+            window.clientesDb = mergedClientes;
+          }
         }
 
         // Maquinaria

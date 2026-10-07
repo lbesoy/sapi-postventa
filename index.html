@@ -5468,7 +5468,7 @@
                     <div class="combo-search">
                       <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted);"></i>
                       <input type="text" id="t-sitio-search" placeholder="Buscar o crear sitio..."
-                        onkeyup="filterCombo('t-sitio', this.value)" onclick="event.stopPropagation()" />
+                        oninput="filterCombo('t-sitio', this.value)" onkeyup="filterCombo('t-sitio', this.value)" onclick="event.stopPropagation()" />
                     </div>
                     <div class="combo-options" id="t-sitio-options">
                       <!-- Llenado dinámicamente -->
@@ -6366,6 +6366,37 @@
           </div>
         </div>
 
+        <!-- SECCIÓN 1.5: PENDIENTES SIN ASIGNAR -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+            <h4 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 0.5rem;">
+              <div style="width: 28px; height: 28px; border-radius: 8px; background: rgba(245, 158, 11, 0.12); color: #d97706; display: flex; align-items: center; justify-content: center;">
+                <i data-lucide="help-circle" style="width: 16px; height: 16px;"></i>
+              </div>
+              Pendientes y Tickets Sin Asignar
+            </h4>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Tickets y órdenes pendientes de asignar a un técnico</span>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="table-styled" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+              <thead>
+                <tr style="background: var(--bg-body, #f1f5f9); border-bottom: 2px solid var(--border); text-align: left;">
+                  <th style="padding: 0.65rem 0.85rem; font-weight: 700;">Concepto</th>
+                  <th style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 700;">Inicio Semana</th>
+                  <th style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 700; color: #3b82f6;">+ Entrantes</th>
+                  <th style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 700; color: #22c55e;">- Cerrados</th>
+                  <th id="th-resumen-semanal-sin-asignar-fin" style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 700;">Actualmente</th>
+                  <th style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 700;">Variación Net</th>
+                </tr>
+              </thead>
+              <tbody id="resumen-semanal-sin-asignar-tbody">
+                <tr><td colspan="6" style="text-align:center; padding: 1rem; color: var(--text-muted);">Sin elementos sin asignar</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- SECCIÓN 2: DETALLES DE ÓRDENES Y TICKETS -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1.25rem;">
           
@@ -6515,7 +6546,6 @@
         </form>
       </div>
     </div>
-  </div>
   </div>
 
   <!-- MODAL: DESGLOSE ÓRDENES SAP -->

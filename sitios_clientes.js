@@ -8,31 +8,95 @@
     else if (typeof window !== 'undefined' && typeof window.mostrarNotificacion === 'function') window.mostrarNotificacion(msg, tipo);
   }
 
+function safeNormStr(s) {
+  if (!s) return "";
+  if (typeof normStr === "function") return normStr(s);
+  if (typeof window !== "undefined" && typeof window.normStr === "function") return window.normStr(s);
+  return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
 function getSitioNombre(s) { return typeof s === 'string' ? s : (s?.nombre || ''); }
+
 function getNombresDeSitiosParaCliente(clienteObj) {
   if (!clienteObj) return [];
-  let cObj = typeof clienteObj === 'object' ? clienteObj : null;
+  let cObj = (typeof clienteObj === 'object' && clienteObj !== null) ? clienteObj : null;
   let rawVal = typeof clienteObj === 'string' ? clienteObj.trim() : '';
 
+  const allClients = (typeof clientesDb !== 'undefined' && Array.isArray(clientesDb))
+    ? clientesDb
+    : (typeof window !== 'undefined' && Array.isArray(window.clientesDb)
+        ? window.clientesDb
+        : (typeof safeGetJSON === 'function' ? safeGetJSON('sapi_clientes_db', []) : []));
+
+  const allSitios = (typeof sitiosDb !== 'undefined' && Array.isArray(sitiosDb))
+    ? sitiosDb
+    : (typeof window !== 'undefined' && Array.isArray(window.sitiosDb)
+        ? window.sitiosDb
+        : (typeof safeGetJSON === 'function' ? safeGetJSON('sapi_sitios_db', []) : []));
+
+  const allMaquinaria = (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb))
+    ? maquinariaDb
+    : (typeof window !== 'undefined' && Array.isArray(window.maquinariaDb)
+        ? window.maquinariaDb
+        : (typeof safeGetJSON === 'function' ? safeGetJSON('sapi_maquinaria_db', []) : []));
+
+  // Si cObj no se pasó directamente pero tenemos un string rawVal, buscar el cliente en allClients con coincidencia flexible
   if (!cObj && rawVal) {
-    cObj = (clientesDb || []).find(c => c.nombre === rawVal || c.id === rawVal || c.idInterno === rawVal || c.rfc === rawVal);
+    const normRaw = safeNormStr(rawVal);
+    cObj = allClients.find(c => {
+      if (!c) return false;
+      if (c.id === rawVal || c.nombre === rawVal || c.idInterno === rawVal || c.rfc === rawVal) return true;
+      const cNorm = safeNormStr(c.nombre);
+      if (cNorm && (cNorm === normRaw || cNorm.includes(normRaw) || normRaw.includes(cNorm))) return true;
+      return false;
+    });
   }
 
   const candidateKeys = new Set();
-  if (rawVal) candidateKeys.add(rawVal.toLowerCase());
+  const candidateNorms = new Set();
+
+  if (rawVal) {
+    candidateKeys.add(rawVal.toLowerCase());
+    candidateNorms.add(safeNormStr(rawVal));
+  }
   if (cObj) {
-    if (cObj.id) candidateKeys.add(String(cObj.id).toLowerCase());
-    if (cObj.idInterno) candidateKeys.add(String(cObj.idInterno).toLowerCase());
-    if (cObj.rfc) candidateKeys.add(String(cObj.rfc).toLowerCase());
-    if (cObj.nombre) candidateKeys.add(String(cObj.nombre).toLowerCase());
+    if (cObj.id) {
+      candidateKeys.add(String(cObj.id).toLowerCase());
+      candidateNorms.add(safeNormStr(cObj.id));
+    }
+    if (cObj.idInterno) {
+      candidateKeys.add(String(cObj.idInterno).toLowerCase());
+      candidateNorms.add(safeNormStr(cObj.idInterno));
+    }
+    if (cObj.rfc) {
+      candidateKeys.add(String(cObj.rfc).toLowerCase());
+      candidateNorms.add(safeNormStr(cObj.rfc));
+    }
+    if (cObj.nombre) {
+      candidateKeys.add(String(cObj.nombre).toLowerCase());
+      candidateNorms.add(safeNormStr(cObj.nombre));
+    }
   }
 
+  const matchesAnyCandidate = (val) => {
+    if (!val) return false;
+    const strVal = String(val).toLowerCase().trim();
+    if (candidateKeys.has(strVal)) return true;
+    const normVal = safeNormStr(val);
+    if (candidateNorms.has(normVal)) return true;
+    for (const cNorm of candidateNorms) {
+      if (cNorm && normVal && (cNorm.includes(normVal) || normVal.includes(cNorm))) return true;
+    }
+    return false;
+  };
+
   // 1. Buscar en sitiosDb
-  const sitiosFromDb = (sitiosDb || []).filter(s => {
+  const sitiosFromDb = (allSitios || []).filter(s => {
     if (!s) return false;
-    const sCli = String(s.cliente || '').toLowerCase();
-    const sCliCustom = String(s.customData?.clienteNombre || '').toLowerCase();
-    return candidateKeys.has(sCli) || (sCliCustom && candidateKeys.has(sCliCustom));
+    const sCli = s.cliente;
+    const sCliId = s.cliente_id;
+    const sCliCustom = s.customData?.clienteNombre;
+    return matchesAnyCandidate(sCli) || matchesAnyCandidate(sCliId) || matchesAnyCandidate(sCliCustom);
   }).map(s => s.nombre).filter(Boolean);
 
   // 2. Buscar en clienteObj.sitios
@@ -47,10 +111,9 @@ function getNombresDeSitiosParaCliente(clienteObj) {
   }
 
   // 3. Buscar en maquinariaDb
-  const sitiosFromMaq = (maquinariaDb || []).filter(m => {
+  const sitiosFromMaq = (allMaquinaria || []).filter(m => {
     if (!m) return false;
-    const mCli = String(m.cliente || '').toLowerCase();
-    return candidateKeys.has(mCli);
+    return matchesAnyCandidate(m.cliente);
   }).map(m => m.ubicacion || m.sitio).filter(Boolean);
 
   const merged = [...new Set([...sitiosFromDb, ...localSitios, ...sitiosFromMaq])];
@@ -189,7 +252,6 @@ function cerrarModalSitio(e) {
 
 async function guardarSitioCliente(e) {
   if (typeof document === "undefined") return;
-  if (typeof document === "undefined") return;
   e.preventDefault();
   let nombre = (document.getElementById('s-cliente-nombre')?.value || '').trim();
   const selectVal = (document.getElementById('s-cliente-select')?.value || '').trim();
@@ -202,7 +264,7 @@ async function guardarSitioCliente(e) {
   }
 
   if (!nombre) {
-    mostrarNotificacion('Por favor selecciona o especifica una Empresa / Cliente.', 'warning');
+    safeMostrarNotificacion('Por favor selecciona o especifica una Empresa / Cliente.', 'warning');
     return;
   }
 
@@ -213,20 +275,45 @@ async function guardarSitioCliente(e) {
   const direccion = document.getElementById('s-sitio-direccion')?.value.trim() || '';
   
   if (!nuevoSitio || nuevoSitio === '') {
-    mostrarNotificacion('El nombre del sitio es obligatorio.', 'warning');
+    safeMostrarNotificacion('El nombre del sitio es obligatorio.', 'warning');
     return;
   }
 
-  let clienteObj = clientesDb.find(c => c.nombre === nombre || c.id === nombre || c.idInterno === nombre || c.rfc === nombre);
+  const allClients = (typeof clientesDb !== 'undefined' && Array.isArray(clientesDb))
+    ? clientesDb
+    : (typeof window !== 'undefined' && Array.isArray(window.clientesDb)
+        ? window.clientesDb
+        : (typeof safeGetJSON === 'function' ? safeGetJSON('sapi_clientes_db', []) : []));
+
+  const allSitios = (typeof sitiosDb !== 'undefined' && Array.isArray(sitiosDb))
+    ? sitiosDb
+    : (typeof window !== 'undefined' && Array.isArray(window.sitiosDb)
+        ? window.sitiosDb
+        : (typeof safeGetJSON === 'function' ? safeGetJSON('sapi_sitios_db', []) : []));
+
+  const normTarget = safeNormStr(nombre);
+  let clienteObj = allClients.find(c => {
+    if (!c) return false;
+    if (c.nombre === nombre || c.id === nombre || c.idInterno === nombre || c.rfc === nombre) return true;
+    const cNorm = safeNormStr(c.nombre);
+    return cNorm && (cNorm === normTarget || cNorm.includes(normTarget) || normTarget.includes(cNorm));
+  });
+
   if (!clienteObj) {
     clienteObj = {
-      id: crypto.randomUUID(),
+      id: (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') ? crypto.randomUUID() : ('cli-' + Date.now()),
       createdAt: new Date().toISOString(),
       nombre: nombre,
       maquinas: [],
       sitios: []
     };
-    clientesDb.push(clienteObj);
+    allClients.push(clienteObj);
+    if (typeof clientesDb !== 'undefined' && Array.isArray(clientesDb) && clientesDb !== allClients) {
+      clientesDb.push(clienteObj);
+    }
+    if (typeof window !== 'undefined' && Array.isArray(window.clientesDb) && window.clientesDb !== allClients) {
+      window.clientesDb.push(clienteObj);
+    }
   }
 
   if (!clienteObj.sitios) clienteObj.sitios = [];
@@ -235,17 +322,18 @@ async function guardarSitioCliente(e) {
   const clientDbName = clienteObj.nombre || nombre;
 
   // 1. Guardar/Actualizar en sitiosDb
-  let existSitioDb = (sitiosDb || []).find(s => {
+  let existSitioDb = allSitios.find(s => {
     if (!s) return false;
-    const sameCli = s.cliente === clienteObj.id || s.cliente === clienteObj.idInterno || s.cliente === clienteObj.rfc || s.cliente === clienteObj.nombre || s.cliente === nombre || s.customData?.clienteNombre === clientDbName;
-    return sameCli && (s.nombre || '').toLowerCase() === nuevoSitio.toLowerCase();
+    const sameCli = s.cliente === clienteObj.id || s.cliente === clienteObj.idInterno || s.cliente === clienteObj.rfc || s.cliente === clienteObj.nombre || s.cliente === nombre || safeNormStr(s.customData?.clienteNombre) === safeNormStr(clientDbName);
+    return sameCli && safeNormStr(s.nombre) === safeNormStr(nuevoSitio);
   });
 
   if (!existSitioDb) {
     existSitioDb = {
-      id: crypto.randomUUID(),
+      id: (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') ? crypto.randomUUID() : ('sit-' + Date.now()),
       nombre: nuevoSitio,
       cliente: clientDbId,
+      cliente_id: clientDbId,
       direccion: direccion,
       cp: cp,
       ciudad: ciudad,
@@ -260,8 +348,16 @@ async function guardarSitioCliente(e) {
       },
       createdAt: new Date().toISOString()
     };
-    sitiosDb.push(existSitioDb);
+    allSitios.push(existSitioDb);
+    if (typeof sitiosDb !== 'undefined' && Array.isArray(sitiosDb) && sitiosDb !== allSitios) {
+      sitiosDb.push(existSitioDb);
+    }
+    if (typeof window !== 'undefined' && Array.isArray(window.sitiosDb) && window.sitiosDb !== allSitios) {
+      window.sitiosDb.push(existSitioDb);
+    }
   } else {
+    existSitioDb.cliente = clientDbId;
+    existSitioDb.cliente_id = clientDbId;
     existSitioDb.direccion = direccion || existSitioDb.direccion;
     existSitioDb.cp = cp || existSitioDb.cp;
     existSitioDb.ciudad = ciudad || existSitioDb.ciudad;
@@ -275,13 +371,24 @@ async function guardarSitioCliente(e) {
     if (direccion) existSitioDb.customData['Dirección'] = direccion;
   }
 
-  localStorage.setItem('sapi_sitios_db', JSON.stringify(sitiosDb));
-  if (window.pushToSupabase) {
-    await window.pushToSupabase('sitios', existSitioDb);
+  // Prevenir que Supabase descarte el sitio por no estar en el Set en memoria
+  if (typeof window !== 'undefined' && window._supaValidSitioIds && existSitioDb.id) {
+    window._supaValidSitioIds.add(existSitioDb.id);
+  }
+
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('sapi_sitios_db', JSON.stringify(allSitios));
+  }
+  if (typeof window !== 'undefined' && window.pushToSupabase) {
+    try {
+      await window.pushToSupabase('sitios', existSitioDb);
+    } catch (ePush) {
+      console.warn('[Sitios] Advertencia al sincronizar sitio en nube:', ePush);
+    }
   }
 
   // 2. Guardar en clienteObj.sitios para compatibilidad
-  const siteInLegacyIdx = clienteObj.sitios.findIndex(s => getSitioNombre(s).toLowerCase() === nuevoSitio.toLowerCase());
+  const siteInLegacyIdx = clienteObj.sitios.findIndex(s => safeNormStr(getSitioNombre(s)) === safeNormStr(nuevoSitio));
   const siteObjLegacy = {
     nombre: nuevoSitio,
     direccion, cp, ciudad, estado
@@ -291,27 +398,47 @@ async function guardarSitioCliente(e) {
   } else {
     clienteObj.sitios[siteInLegacyIdx] = Object.assign({}, clienteObj.sitios[siteInLegacyIdx], siteObjLegacy);
   }
-  localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
-  if (window.pushToSupabase) {
-    await window.pushToSupabase('clientes', clienteObj);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('sapi_clientes_db', JSON.stringify(allClients));
+  }
+  if (typeof window !== 'undefined' && window.pushToSupabase) {
+    try {
+      await window.pushToSupabase('clientes', clienteObj);
+    } catch (eCliPush) {
+      console.warn('[Sitios] Advertencia al sincronizar cliente en nube:', eCliPush);
+    }
   }
 
   cerrarModalSitio();
-  mostrarNotificacion(`Sitio "${nuevoSitio}" guardado correctamente.`, 'success');
+  safeMostrarNotificacion(`Sitio "${nuevoSitio}" guardado correctamente.`, 'success');
   
-  if (window._addingSiteFromTicket) {
-    const clientLabel = document.getElementById('t-cliente-display')?.textContent || clientDbName;
-    selectComboOption('t-cliente', clientDbName, clientLabel, true);
-    selectComboOption('t-sitio', nuevoSitio, nuevoSitio);
+  // Si venimos del formulario de ticket O el modal de ticket está abierto:
+  const isTicketModalOpen = typeof document !== 'undefined' && document.getElementById('modal-ticket-overlay')?.classList.contains('open');
+  if (typeof window !== 'undefined' && (window._addingSiteFromTicket || isTicketModalOpen)) {
+    const activeCliVal = document.getElementById('t-cliente')?.value || clientDbName;
+    const activeCliLabel = document.getElementById('t-cliente-display')?.textContent || clientDbName;
+    const fnSelect = (typeof selectComboOption === 'function')
+      ? selectComboOption
+      : (typeof window !== 'undefined' && typeof window.selectComboOption === 'function' ? window.selectComboOption : null);
+    
+    if (fnSelect) {
+      fnSelect('t-cliente', activeCliVal, activeCliLabel, true);
+      fnSelect('t-sitio', nuevoSitio, nuevoSitio);
+    }
     window._addingSiteFromTicket = false;
-  } else if (currentSession.viewMode === 'empresa') {
-    renderSitios();
+  }
+  
+  // Si el modal de detalle del cliente está abierto, refrescarlo de inmediato
+  const cliModalOverlay = typeof document !== 'undefined' && document.getElementById('modal-detalle-cliente-overlay');
+  const cliModalInner = typeof document !== 'undefined' && document.getElementById('modal-detalle-cliente');
+  if ((cliModalOverlay && cliModalOverlay.classList.contains('open')) || (cliModalInner && cliModalInner.classList.contains('open'))) {
+    if (typeof verDetalleCliente === 'function') verDetalleCliente(clientDbName);
+    else if (typeof window !== 'undefined' && typeof window.verDetalleCliente === 'function') window.verDetalleCliente(clientDbName);
+  } else if (typeof currentSession !== 'undefined' && currentSession.viewMode === 'empresa') {
+    if (typeof renderSitios === 'function') renderSitios();
   } else {
     if (document.getElementById('view-sitios')?.classList.contains('active')) {
-      renderSitios();
-    }
-    if (document.getElementById('detalle-cliente-modal')?.classList.contains('open') || document.getElementById('modal-detalle-cliente')?.classList.contains('open')) {
-      verDetalleCliente(clientDbName);
+      if (typeof renderSitios === 'function') renderSitios();
     }
   }
 }

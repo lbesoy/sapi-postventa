@@ -1102,6 +1102,27 @@ function toggleCombo(id) {
     document.querySelectorAll('.combo-menu').forEach(m => m.classList.remove('open'));
     document.querySelectorAll('.combo-box').forEach(c => c.classList.remove('focus'));
     
+    // Si estamos abriendo el combo de sitios, refrescar las opciones para el cliente seleccionado actualmente
+    if (id === 't-sitio') {
+      const cliVal = document.getElementById('t-cliente')?.value || '';
+      const sitOptions = document.getElementById('t-sitio-options');
+      if (sitOptions && cliVal && cliVal !== 'Ninguno' && cliVal !== 'Ninguno / Uso Interno') {
+        const fnGetSitios = (typeof getNombresDeSitiosParaCliente === 'function')
+          ? getNombresDeSitiosParaCliente
+          : (typeof window !== 'undefined' && typeof window.getNombresDeSitiosParaCliente === 'function' ? window.getNombresDeSitiosParaCliente : null);
+        if (fnGetSitios) {
+          const allClients = (typeof clientesDb !== 'undefined' && Array.isArray(clientesDb)) ? clientesDb : (typeof window !== 'undefined' && Array.isArray(window.clientesDb) ? window.clientesDb : []);
+          const c = allClients.find(x => x && (x.nombre === cliVal || x.id === cliVal || x.idInterno === cliVal || x.rfc === cliVal));
+          const sitios = fnGetSitios(c || cliVal);
+          sitOptions.innerHTML = '<div class="combo-option" onclick="selectComboOption(\'t-sitio\', \'\', \'Ninguno\')">Ninguno</div>';
+          sitios.forEach(sn => {
+            const escapedSn = String(sn).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            sitOptions.innerHTML += `<div class="combo-option" onclick="selectComboOption('t-sitio', '${escapedSn}', '${escapedSn}')">${sn}</div>`;
+          });
+        }
+      }
+    }
+
     menu.classList.add('open');
     combo.classList.add('focus');
     search.value = '';
@@ -1110,9 +1131,11 @@ function toggleCombo(id) {
   }
 }
 
-function filterCombo(id, query) {
+function filterCombo(id, query = '') {
   if (typeof document === 'undefined') return;
-  const q = query.toLowerCase().trim();
+  const searchInput = document.getElementById(id + '-search');
+  const rawQuery = (typeof query === 'string') ? query : (searchInput ? searchInput.value : '');
+  const q = (rawQuery || '').toLowerCase().trim();
   const options = document.querySelectorAll(`#${id}-options .combo-option`);
   let foundMatch = false;
   
@@ -1135,7 +1158,7 @@ function filterCombo(id, query) {
     const entityName = isSitio ? 'sitio' : 'empresa';
     
     if (q && !foundMatch) {
-      addTextSpan.textContent = `Crear ${entityName}: "${query}"`;
+      addTextSpan.textContent = `Crear ${entityName}: "${rawQuery}"`;
     } else {
       addTextSpan.textContent = `Crear nuev${isSitio ? 'o' : 'a'} ${entityName}`;
     }
@@ -1171,10 +1194,14 @@ function selectComboOption(id, value, label, isInitial = false) {
       
       if (sitOptions) {
         sitOptions.innerHTML = '<div class="combo-option" onclick="selectComboOption(\'t-sitio\', \'\', \'Ninguno\')">Ninguno</div>';
-        const c = (clientesDb || []).find(x => x.nombre === value || x.id === value || x.idInterno === value || x.rfc === value);
-        const sitios = getNombresDeSitiosParaCliente(c || value);
+        const fnGetSitios = (typeof getNombresDeSitiosParaCliente === 'function')
+          ? getNombresDeSitiosParaCliente
+          : (typeof window !== 'undefined' && typeof window.getNombresDeSitiosParaCliente === 'function' ? window.getNombresDeSitiosParaCliente : null);
+        const allClients = (typeof clientesDb !== 'undefined' && Array.isArray(clientesDb)) ? clientesDb : (typeof window !== 'undefined' && Array.isArray(window.clientesDb) ? window.clientesDb : []);
+        const c = allClients.find(x => x && (x.nombre === value || x.id === value || x.idInterno === value || x.rfc === value));
+        const sitios = fnGetSitios ? fnGetSitios(c || value) : [];
         sitios.forEach(sn => {
-          const escapedSn = sn.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          const escapedSn = String(sn).replace(/'/g, "\\'").replace(/"/g, '&quot;');
           sitOptions.innerHTML += `<div class="combo-option" onclick="selectComboOption('t-sitio', '${escapedSn}', '${escapedSn}')">${sn}</div>`;
         });
       }
@@ -1205,17 +1232,23 @@ function agregarSitioCombo(id) {
   if (typeof document === 'undefined') return;
   const cName = document.getElementById('t-cliente')?.value;
   if (!cName || cName === 'Ninguno' || cName === 'Ninguno / Uso Interno') {
-    mostrarNotificacion('Primero selecciona una Empresa (Cliente).', 'warning');
+    if (typeof mostrarNotificacion === 'function') mostrarNotificacion('Primero selecciona una Empresa (Cliente).', 'warning');
+    else if (typeof window !== 'undefined' && typeof window.mostrarNotificacion === 'function') window.mostrarNotificacion('Primero selecciona una Empresa (Cliente).', 'warning');
     return;
   }
   const q = document.getElementById('t-sitio-search')?.value.trim() || '';
-  agregarSitioCliente(cName);
-  if (q) {
-    document.getElementById('s-sitio-nombre').value = q;
-  }
-  document.getElementById('t-sitio-menu').classList.remove('open');
-  document.getElementById('t-sitio-combo').classList.remove('focus');
   window._addingSiteFromTicket = true;
+  if (typeof agregarSitioCliente === 'function') {
+    agregarSitioCliente(cName);
+  } else if (typeof window !== 'undefined' && typeof window.agregarSitioCliente === 'function') {
+    window.agregarSitioCliente(cName);
+  }
+  if (q) {
+    const sInput = document.getElementById('s-sitio-nombre');
+    if (sInput) sInput.value = q;
+  }
+  document.getElementById('t-sitio-menu')?.classList.remove('open');
+  document.getElementById('t-sitio-combo')?.classList.remove('focus');
 }
 
 function agregarEmpresaCombo(id) {

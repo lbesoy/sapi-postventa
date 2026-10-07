@@ -152,7 +152,7 @@
                     <div class="combo-search">
                       <i data-lucide="search" style="width:14px;height:14px;color:var(--text-muted);"></i>
                       <input type="text" id="t-sitio-search" placeholder="Buscar o crear sitio..."
-                        onkeyup="filterCombo('t-sitio', this.value)" onclick="event.stopPropagation()" />
+                        oninput="filterCombo('t-sitio', this.value)" onkeyup="filterCombo('t-sitio', this.value)" onclick="event.stopPropagation()" />
                     </div>
                     <div class="combo-options" id="t-sitio-options">
                       <!-- Llenado dinámicamente -->

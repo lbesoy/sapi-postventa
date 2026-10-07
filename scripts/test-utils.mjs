@@ -861,7 +861,8 @@ const {
   obtenerTodosLosElementosGlobales,
   cargarResumenSemanal,
   renderizarGraficasResumenSemanal,
-  setResumenTicketTab
+  setResumenTicketTab,
+  _extraerResponsablesIndividuales
 } = await import('../src/modules/resumen_semanal.js');
 
 // Test A: Funciones existen
@@ -873,6 +874,7 @@ assert.equal(typeof obtenerTodosLosElementosGlobales, 'function', 'obtenerTodosL
 assert.equal(typeof cargarResumenSemanal, 'function', 'cargarResumenSemanal debe ser función');
 assert.equal(typeof renderizarGraficasResumenSemanal, 'function', 'renderizarGraficasResumenSemanal debe ser función');
 assert.equal(typeof setResumenTicketTab, 'function', 'setResumenTicketTab debe ser función');
+assert.equal(typeof _extraerResponsablesIndividuales, 'function', '_extraerResponsablesIndividuales debe ser función');
 
 // Test B: obtenerRangoSemana
 const { monday: m0, sunday: s0 } = obtenerRangoSemana(0);
@@ -896,6 +898,69 @@ assert.equal(parseFechaResumenMs('invalid-date'), null, 'parseFechaResumenMs de 
 // Test D: obtenerTodosLosElementosGlobales
 const emptyItems = obtenerTodosLosElementosGlobales();
 assert.ok(Array.isArray(emptyItems), 'obtenerTodosLosElementosGlobales debe retornar array');
+
+// Test E: _extraerResponsablesIndividuales desglosa técnicos concatenados
+const combo1 = _extraerResponsablesIndividuales('Rodrigo Alonso Narvaez, Juan carlos Ramírez');
+assert.deepEqual(combo1, ['Rodrigo Alonso Narvaez', 'Juan carlos Ramírez'], 'Debe separar técnicos por coma');
+
+const combo2 = _extraerResponsablesIndividuales(['Ernesto Luciano, Luis Gress', 'Roberto Martinez de Jesus']);
+assert.deepEqual(combo2, ['Ernesto Luciano', 'Luis Gress', 'Roberto Martinez de Jesus'], 'Debe aplanar arrays y separar sub-cadenas');
+
+const comboSinAsignar = _extraerResponsablesIndividuales('Sin Asignar');
+assert.deepEqual(comboSinAsignar, [], 'Sin Asignar debe retornar array vacío para no considerarlo usuario');
+
+// Test F: obtenerTodosLosElementosGlobales desglosa tickets y órdenes con múltiples técnicos asignados
+const prevTickets = globalThis.tickets;
+const prevOrdenes = globalThis.ordenes;
+try {
+  globalThis.tickets = [
+    {
+      id: 'tkt-test-combo-1',
+      folio: 'TKT-9901',
+      titulo: 'Fuga hidráulica',
+      cliente: 'Minera Real',
+      estado: 'Abierto',
+      fechaCreacion: '2026-10-05T10:00:00Z',
+      asignado: 'Eduardo Jiménez Ortiz, Jesús Garduño gomez'
+    }
+  ];
+  globalThis.ordenes = [
+    {
+      id: 'os-test-combo-1',
+      folio: 'OS-9901',
+      trabajoSolicitado: 'Mantenimiento 500h',
+      cliente: 'Minera Real',
+      estado: 'Abierta',
+      fechaCreacion: '2026-10-05T11:00:00Z',
+      tecnicosAsignados: ['Juan carlos Ramírez, Sergio Soria Cervantes']
+    }
+  ];
+
+  const elementos = obtenerTodosLosElementosGlobales();
+  const tktElem = elementos.find(e => e.folio === 'TKT-9901');
+  assert.ok(tktElem, 'Debe encontrar ticket 9901');
+  assert.deepEqual(tktElem.responsables, ['Eduardo Jiménez Ortiz', 'Jesús Garduño gomez'], 'Ticket debe tener técnicos individuales');
+
+  const osElem = elementos.find(e => e.folio === 'OS-9901');
+  assert.ok(osElem, 'Debe encontrar orden 9901');
+  assert.deepEqual(osElem.responsables, ['Juan carlos Ramírez', 'Sergio Soria Cervantes'], 'Orden debe tener técnicos individuales');
+} finally {
+  globalThis.tickets = prevTickets;
+  globalThis.ordenes = prevOrdenes;
+}
+
+// Test G: Exclusión de usuarios de prueba (Test User, Usuario prueba, Prueba Tecnico)
+const testUser1 = _extraerResponsablesIndividuales('Test User');
+assert.deepEqual(testUser1, [], 'Test User debe ser ignorado y retornar []');
+
+const testUser2 = _extraerResponsablesIndividuales('Usuario prueba');
+assert.deepEqual(testUser2, [], 'Usuario prueba debe ser ignorado y retornar []');
+
+const testUser3 = _extraerResponsablesIndividuales('Prueba Tecnico');
+assert.deepEqual(testUser3, [], 'Prueba Tecnico debe ser ignorado y retornar []');
+
+const mixedCombo = _extraerResponsablesIndividuales('Luis Gress, Prueba Tecnico, Test User');
+assert.deepEqual(mixedCombo, ['Luis Gress'], 'Debe extraer solo al técnico real y descartar test users');
 
 console.log('  ✅ Resumen Semanal Operativo y Reportes Ejecutivos: OK');
 
@@ -1554,6 +1619,8 @@ assert.doesNotThrow(() => {
   onEquipoOrdenChangeMultiple();
   toggleCombo('combo-test');
   filterCombo('combo-test', 'query');
+  filterCombo('combo-test');
+  filterCombo('combo-test', undefined);
   selectComboOption('combo-test', 'val', 'Label');
   agregarSitioCombo('combo-test');
   agregarEmpresaCombo('combo-test');
@@ -2061,6 +2128,39 @@ assert.doesNotThrow(() => {
   setClientesSubView('portal');
   renderPortalUsuariosList();
 }, 'Las funciones de sitios_clientes no deben arrojar error en ausencia de DOM');
+const mockClient = {
+  id: 'cli-uuid-123',
+  idInterno: 'CLI001',
+  nombre: 'Constructora Monterrey S.A. de C.V.',
+  sitios: [{ nombre: 'Planta Monterrey' }, 'Obra Valle']
+};
+globalThis.window.clientesDb = [mockClient];
+globalThis.window.sitiosDb = [
+  { id: 'sit-1', nombre: 'Parque Industrial Apodaca', cliente: 'cli-uuid-123' },
+  { id: 'sit-2', nombre: 'Obra Guadalupe', customData: { clienteNombre: 'Constructora Monterrey' } }
+];
+globalThis.window.maquinariaDb = [
+  { id: 'maq-1', cliente: 'Constructora Monterrey S.A. de C.V.', ubicacion: 'Mina Saltillo' }
+];
+
+// Búsqueda pasando el objeto del cliente
+const sitiosObj = getNombresDeSitiosParaCliente(mockClient);
+assert.ok(sitiosObj.includes('Parque Industrial Apodaca'), 'Debe incluir sitio desde sitiosDb por cliente_id');
+assert.ok(sitiosObj.includes('Obra Guadalupe'), 'Debe incluir sitio desde sitiosDb por match flexible');
+assert.ok(sitiosObj.includes('Planta Monterrey'), 'Debe incluir sitio desde cliente.sitios');
+assert.ok(sitiosObj.includes('Obra Valle'), 'Debe incluir sitio string desde cliente.sitios');
+assert.ok(sitiosObj.includes('Mina Saltillo'), 'Debe incluir sitio desde maquinariaDb');
+
+// Búsqueda pasando únicamente el string del cliente (como viene en tickets legacy o no normalizados)
+const sitiosStr = getNombresDeSitiosParaCliente('constructora monterrey');
+assert.ok(sitiosStr.includes('Parque Industrial Apodaca'), 'Debe encontrar sitio buscando por nombre flexible del cliente');
+assert.ok(sitiosStr.includes('Obra Valle'), 'Debe encontrar sitio local buscando por nombre flexible del cliente');
+
+// Test E: Registro de IDs válidos en window._supaValidSitioIds
+globalThis.window._supaValidSitioIds = new Set();
+globalThis.window._supaValidSitioIds.add('sit-1');
+assert.ok(globalThis.window._supaValidSitioIds.has('sit-1'), '_supaValidSitioIds debe registrar IDs de sitios creados');
+
 
 // 47. MÓDULO DE MIGRACIONES DE DATOS Y CHIPS DE MÁQUINAS EN TICKETS
 console.log('🧪 Verificando Módulo de Migraciones y Tickets Form (app_migrations.js / tickets_form.js)...');

@@ -49,14 +49,115 @@
     return [];
   };
 
+  const _esUsuarioPrueba = (userOrName) => {
+    if (!userOrName) return false;
+    if (typeof isTestUser === 'function' && isTestUser(userOrName)) return true;
+    if (typeof global !== 'undefined' && typeof global.isTestUser === 'function' && global.isTestUser(userOrName)) return true;
+    const name = (typeof userOrName === 'string' ? userOrName : (userOrName.nombre || userOrName.name || '')).toLowerCase().trim();
+    const email = (typeof userOrName === 'object' ? (userOrName.email || userOrName.correo || '') : '').toLowerCase().trim();
+    return name.includes('prueba') || name.includes('test') || email.includes('prueba') || email.includes('test');
+  };
+
+  const _resolverNombreDeIdOUsuario = (val) => {
+    if (!val) return '';
+    if (typeof val === 'object') {
+      return val.nombre || val.name || val.usuario || val.tecnico || val.id || '';
+    }
+    const str = String(val).trim();
+    if (!str) return '';
+
+    const getArr = (key) => {
+      if (typeof window !== 'undefined' && Array.isArray(window[key])) return window[key];
+      if (typeof global !== 'undefined' && Array.isArray(global[key])) return global[key];
+      if (typeof globalThis !== 'undefined' && Array.isArray(globalThis[key])) return globalThis[key];
+      return [];
+    };
+
+    const uList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : getArr('usuarios');
+    const uFound = uList.find(u => u && (u.id === str || u.usuarioId === str));
+    if (uFound && uFound.nombre) return uFound.nombre;
+
+    const tList = (typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) ? tecnicosDb : getArr('tecnicosDb');
+    const tFound = tList.find(t => t && (t.id === str || t.idTecnico === str));
+    if (tFound && tFound.nombre) return tFound.nombre;
+
+    return str;
+  };
+
+  const _extraerResponsablesIndividuales = (input) => {
+    if (!input) return [];
+    const list = [];
+    const processStr = (rawStr) => {
+      if (!rawStr) return;
+      const str = _resolverNombreDeIdOUsuario(rawStr);
+      if (!str || typeof str !== 'string') return;
+      str.split(/[,;/]+/).forEach(part => {
+        const resolvedPart = _resolverNombreDeIdOUsuario(part.trim());
+        const u = _unify(resolvedPart);
+        if (u && u !== 'Sin Asignar' && u !== '-' && u !== 'sin_asignar' && u !== 'por definir' && !_esUsuarioPrueba(u) && !list.includes(u)) {
+          list.push(u);
+        }
+      });
+    };
+
+    if (Array.isArray(input)) {
+      input.forEach(item => {
+        if (typeof item === 'string' || typeof item === 'number') {
+          processStr(item);
+        } else if (item && typeof item === 'object') {
+          processStr(item.nombre || item.name || item.usuario || item.tecnico || item.id || '');
+        }
+      });
+    } else if (typeof input === 'string' || typeof input === 'number') {
+      processStr(input);
+    }
+    return list;
+  };
+
   const _getTecnicosJunta = () => {
-    if (typeof global !== "undefined" && typeof global.obtenerListaTecnicosJunta === "function") {
-      return global.obtenerListaTecnicosJunta();
+    const result = [];
+    const add = (arr) => {
+      if (!arr) return;
+      _extraerResponsablesIndividuales(arr).forEach(name => {
+        const u = _unify(name);
+        if (u && u !== 'Sin Asignar' && u !== 'todos' && !_esUsuarioPrueba(u) && !result.includes(u)) {
+          result.push(u);
+        }
+      });
+    };
+
+    const getTarget = (fnName) => {
+      if (typeof window !== "undefined" && typeof window[fnName] === "function") return window[fnName];
+      if (typeof global !== "undefined" && typeof global[fnName] === "function") return global[fnName];
+      if (typeof globalThis !== "undefined" && typeof globalThis[fnName] === "function") return globalThis[fnName];
+      return null;
+    };
+
+    const fnJunta = getTarget('obtenerListaTecnicosJunta');
+    if (fnJunta) {
+      try {
+        add(fnJunta());
+      } catch(e) {}
     }
-    if (typeof usuarios !== "undefined" && Array.isArray(usuarios)) {
-      return usuarios.filter(u => u && (u.rol === "tecnico" || u.rol === "supervisor")).map(u => _unify(u.nombre));
+
+    const getArr = (key) => {
+      if (typeof window !== 'undefined' && Array.isArray(window[key])) return window[key];
+      if (typeof global !== 'undefined' && Array.isArray(global[key])) return global[key];
+      if (typeof globalThis !== 'undefined' && Array.isArray(globalThis[key])) return globalThis[key];
+      return [];
+    };
+
+    const uList = (typeof usuarios !== "undefined" && Array.isArray(usuarios)) ? usuarios : getArr('usuarios');
+    if (uList.length > 0) {
+      add(uList.filter(u => u && (u.rol === "tecnico" || u.rol === "supervisor") && !_esUsuarioPrueba(u)).map(u => u.nombre));
     }
-    return [];
+
+    const tList = (typeof tecnicosDb !== "undefined" && Array.isArray(tecnicosDb)) ? tecnicosDb : getArr('tecnicosDb');
+    if (tList.length > 0) {
+      add(tList.filter(t => t && !_esUsuarioPrueba(t)).map(t => t.nombre).filter(Boolean));
+    }
+
+    return result;
   };
 
   /* ==========================================================================
@@ -142,10 +243,13 @@
   
       let resps = [];
       if (Array.isArray(t.responsablesList) && t.responsablesList.length > 0) {
-        resps = t.responsablesList.map(unificarNombreUsuario);
-      } else {
-        const single = _unify(t.asignado || t.asignadoA || t.responsable || t.tecnico || '');
-        if (single && single !== 'Sin Asignar') resps = [single];
+        resps = _extraerResponsablesIndividuales(t.responsablesList);
+      }
+      if (resps.length === 0 && Array.isArray(t.tecnicosAsignados) && t.tecnicosAsignados.length > 0) {
+        resps = _extraerResponsablesIndividuales(t.tecnicosAsignados);
+      }
+      if (resps.length === 0) {
+        resps = _extraerResponsablesIndividuales(t.asignado || t.asignadoA || t.responsable || t.tecnico || '');
       }
       if (resps.length === 0) resps = ['Sin Asignar'];
   
@@ -177,10 +281,13 @@
   
       let resps = [];
       if (Array.isArray(o.tecnicosAsignados) && o.tecnicosAsignados.length > 0) {
-        resps = o.tecnicosAsignados.map(unificarNombreUsuario);
-      } else {
-        const single = _unify(o.tecnicoAsignado || o.tecnico || o.responsable || '');
-        if (single && single !== 'Sin Asignar') resps = [single];
+        resps = _extraerResponsablesIndividuales(o.tecnicosAsignados);
+      }
+      if (resps.length === 0 && Array.isArray(o.responsablesList) && o.responsablesList.length > 0) {
+        resps = _extraerResponsablesIndividuales(o.responsablesList);
+      }
+      if (resps.length === 0) {
+        resps = _extraerResponsablesIndividuales(o.tecnicoAsignado || o.tecnico || o.responsable || '');
       }
       if (resps.length === 0) resps = ['Sin Asignar'];
   
@@ -211,8 +318,15 @@
       const fechaCierreMs = esCerrado ? parseFechaResumenMs(l.fechaCierre || l.fecha_cierre || l.closed_at || l.updated_at) : null;
   
       let resps = [];
-      const single = _unify(l.responsable || l.tecnico || l.asignado || '');
-      if (single && single !== 'Sin Asignar') resps = [single];
+      if (Array.isArray(l.responsablesList) && l.responsablesList.length > 0) {
+        resps = _extraerResponsablesIndividuales(l.responsablesList);
+      }
+      if (resps.length === 0 && Array.isArray(l.tecnicosAsignados) && l.tecnicosAsignados.length > 0) {
+        resps = _extraerResponsablesIndividuales(l.tecnicosAsignados);
+      }
+      if (resps.length === 0) {
+        resps = _extraerResponsablesIndividuales(l.responsable || l.tecnico || l.asignado || '');
+      }
       if (resps.length === 0) resps = ['Sin Asignar'];
   
       all.push({
@@ -269,63 +383,89 @@
   
     // 2. BALANCE POR USUARIO
     const usuariosMap = {};
+    const tecnicosSet = new Set();
     
-    if (typeof window.obtenerListaTecnicosJunta === 'function') {
-      const tecs = _getTecnicosJunta();
+    const tecs = _getTecnicosJunta();
+    if (Array.isArray(tecs)) {
       tecs.forEach(t => {
         const u = _unify(t);
-        if (u && u !== 'Sin Asignar' && u !== 'todos') {
+        if (u && u !== 'Sin Asignar' && u !== 'todos' && !u.includes(',') && !_esUsuarioPrueba(u)) {
+          tecnicosSet.add(u);
           if (!usuariosMap[u]) usuariosMap[u] = { nombre: u, inicio: 0, entrantes: 0, cerrados: 0, fin: 0 };
         }
       });
     }
+
+    function registrarActividadUsuario(uRaw, item) {
+      if (!uRaw || uRaw === 'todos') return;
+      const u = _unify(uRaw);
+      if (!u || u === 'todos' || _esUsuarioPrueba(u)) return;
+
+      if (u.includes(',')) {
+        _extraerResponsablesIndividuales(u).forEach(subU => registrarActividadUsuario(subU, item));
+        return;
+      }
+
+      if (!usuariosMap[u]) {
+        usuariosMap[u] = { nombre: u, inicio: 0, entrantes: 0, cerrados: 0, fin: 0 };
+      }
+
+      const fCreac = item.fechaCreacionMs || 0;
+      const fCierre = item.fechaCierreMs;
+
+      // PENDIENTES AL INICIO DE LA SEMANA: Creados antes de tInicio Y (no cerrados aún O cerrados a partir de tInicio)
+      const estabaAbiertoInicio = (fCreac < tInicio) && (!item.esCerrado || (fCierre && fCierre >= tInicio));
+      if (estabaAbiertoInicio) {
+        usuariosMap[u].inicio++;
+      }
+
+      // ENTRANTES EN LA SEMANA: Creados durante esta semana
+      const fueCreadoEnSemana = (fCreac >= tInicio && fCreac <= tFin);
+      if (fueCreadoEnSemana) {
+        usuariosMap[u].entrantes++;
+      }
+
+      // RESUELTOS EN LA SEMANA: Cerrados durante esta semana
+      const fueCerradoEnSemana = (item.esCerrado && fCierre && fCierre >= tInicio && fCierre <= tFin);
+      if (fueCerradoEnSemana) {
+        usuariosMap[u].cerrados++;
+      }
+
+      // PENDIENTES AL FINAL DE LA SEMANA: Creados antes o durante esta semana Y (no cerrados aún O cerrados después de tFin)
+      const estabaAbiertoFin = (fCreac <= tFin) && (!item.esCerrado || (fCierre && fCierre > tFin));
+      if (estabaAbiertoFin) {
+        usuariosMap[u].fin++;
+      }
+    }
   
     todos.forEach(item => {
-      item.responsables.forEach(uRaw => {
-        const u = _unify(uRaw);
-        if (!usuariosMap[u]) {
-          usuariosMap[u] = { nombre: u, inicio: 0, entrantes: 0, cerrados: 0, fin: 0 };
-        }
-  
-        const fCreac = item.fechaCreacionMs || 0;
-        const fCierre = item.fechaCierreMs;
-  
-        // PENDIENTES AL INICIO DE LA SEMANA: Creados antes de tInicio Y (no cerrados aún O cerrados a partir de tInicio)
-        const estabaAbiertoInicio = (fCreac < tInicio) && (!item.esCerrado || (fCierre && fCierre >= tInicio));
-        if (estabaAbiertoInicio) {
-          usuariosMap[u].inicio++;
-        }
-  
-        // ENTRANTES EN LA SEMANA: Creados durante esta semana
-        const fueCreadoEnSemana = (fCreac >= tInicio && fCreac <= tFin);
-        if (fueCreadoEnSemana) {
-          usuariosMap[u].entrantes++;
-        }
-  
-        // RESUELTOS EN LA SEMANA: Cerrados durante esta semana
-        const fueCerradoEnSemana = (item.esCerrado && fCierre && fCierre >= tInicio && fCierre <= tFin);
-        if (fueCerradoEnSemana) {
-          usuariosMap[u].cerrados++;
-        }
-  
-        // PENDIENTES AL FINAL DE LA SEMANA: Creados antes o durante esta semana Y (no cerrados aún O cerrados después de tFin)
-        const estabaAbiertoFin = (fCreac <= tFin) && (!item.esCerrado || (fCierre && fCierre > tFin));
-        if (estabaAbiertoFin) {
-          usuariosMap[u].fin++;
-        }
+      const rawResps = (Array.isArray(item.responsables) && item.responsables.length > 0)
+        ? item.responsables
+        : [item.responsables || 'Sin Asignar'];
+      const itemResps = _extraerResponsablesIndividuales(rawResps);
+      const effectiveResps = itemResps.length > 0 ? itemResps : ['Sin Asignar'];
+
+      effectiveResps.forEach(uRaw => {
+        registrarActividadUsuario(uRaw, item);
       });
     });
   
-    // Renderizar Tabla de Balance por Usuario
-    const listaUsuarios = Object.values(usuariosMap).filter(u => u.inicio > 0 || u.entrantes > 0 || u.cerrados > 0 || u.fin > 0 || u.nombre !== 'Sin Asignar');
+    // Renderizar Tabla de Balance por Usuario (Excluye 'Sin Asignar' y usuarios de prueba)
+    const listaUsuarios = Object.values(usuariosMap).filter(u => {
+      if (!u || !u.nombre || u.nombre.includes(',') || _esUsuarioPrueba(u.nombre)) return false;
+      if (u.nombre === 'Sin Asignar') return false;
+      const tieneActividad = (u.inicio > 0 || u.entrantes > 0 || u.cerrados > 0 || u.fin > 0);
+      if (tieneActividad) return true;
+      return tecnicosSet.has(u.nombre);
+    });
     listaUsuarios.sort((a, b) => b.fin - a.fin || b.inicio - a.inicio);
   
+    let totInicio = 0, totEntrantes = 0, totCerrados = 0, totFin = 0;
+
     const tbodyUsers = document.getElementById('resumen-semanal-usuarios-tbody');
     if (tbodyUsers) {
-      let totInicio = 0, totEntrantes = 0, totCerrados = 0, totFin = 0;
-  
       if (listaUsuarios.length === 0) {
-        tbodyUsers.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:1.25rem; color:var(--text-muted);">Sin actividad de usuarios en este período.</td></tr>';
+        tbodyUsers.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:1.25rem; color:var(--text-muted);">Sin actividad de personal técnico en este período.</td></tr>';
       } else {
         tbodyUsers.innerHTML = listaUsuarios.map(u => {
           totInicio += u.inicio;
@@ -360,7 +500,7 @@
   
         tbodyUsers.innerHTML += `
           <tr style="background: var(--bg-body, #f1f5f9); font-weight: 800; border-top: 2px solid var(--border);">
-            <td style="padding: 0.75rem 0.85rem;">TOTAL OPERATIVO</td>
+            <td style="padding: 0.75rem 0.85rem;">TOTAL EQUIPO TÉCNICO</td>
             <td style="padding: 0.75rem 0.85rem; text-align: center;">${totInicio}</td>
             <td style="padding: 0.75rem 0.85rem; text-align: center; color: #3b82f6;">+${totEntrantes}</td>
             <td style="padding: 0.75rem 0.85rem; text-align: center; color: #22c55e;">-${totCerrados}</td>
@@ -368,25 +508,64 @@
             <td style="padding: 0.75rem 0.85rem; text-align: center;">${deltaTotalHtml}</td>
           </tr>
         `;
-  
-        // KPI Balance Global Delta
-        const elDeltaKpi = document.getElementById('resumen-kpi-variacion-neto');
-        const elDeltaIconBg = document.getElementById('resumen-kpi-variacion-icon-bg');
-        if (elDeltaKpi) {
-          if (deltaTotal < 0) {
-            elDeltaKpi.textContent = `${deltaTotal} Reducción`;
-            elDeltaKpi.style.color = '#22c55e';
-            if (elDeltaIconBg) { elDeltaIconBg.style.background = 'rgba(34, 197, 94, 0.1)'; elDeltaIconBg.style.color = '#22c55e'; }
-          } else if (deltaTotal > 0) {
-            elDeltaKpi.textContent = `+${deltaTotal} Acumulados`;
-            elDeltaKpi.style.color = '#ef4444';
-            if (elDeltaIconBg) { elDeltaIconBg.style.background = 'rgba(239, 68, 68, 0.1)'; elDeltaIconBg.style.color = '#ef4444'; }
-          } else {
-            elDeltaKpi.textContent = `0 Sin cambio`;
-            elDeltaKpi.style.color = 'var(--text)';
-            if (elDeltaIconBg) { elDeltaIconBg.style.background = 'rgba(100, 116, 139, 0.1)'; elDeltaIconBg.style.color = 'var(--text-muted)'; }
-          }
-        }
+      }
+    }
+
+    // 2.1 TABLA DEDICADA DE PENDIENTES SIN ASIGNAR
+    const sinAsignarObj = usuariosMap['Sin Asignar'] || { nombre: 'Sin Asignar', inicio: 0, entrantes: 0, cerrados: 0, fin: 0 };
+    const tbodySinAsignar = document.getElementById('resumen-semanal-sin-asignar-tbody');
+    const elThSinAsignarFin = document.getElementById('th-resumen-semanal-sin-asignar-fin');
+    if (elThSinAsignarFin) {
+      elThSinAsignarFin.textContent = offsetSemanas === 0 ? 'Actualmente' : 'Fin Semana';
+    }
+
+    if (tbodySinAsignar) {
+      const deltaSA = sinAsignarObj.fin - sinAsignarObj.inicio;
+      let deltaHtmlSA = '<span style="color:var(--text-muted); font-weight:600;">0</span>';
+      if (deltaSA < 0) {
+        deltaHtmlSA = `<span style="color:#22c55e; font-weight:700;">${deltaSA}</span>`;
+      } else if (deltaSA > 0) {
+        deltaHtmlSA = `<span style="color:#ef4444; font-weight:700;">+${deltaSA}</span>`;
+      }
+
+      if (sinAsignarObj.inicio === 0 && sinAsignarObj.entrantes === 0 && sinAsignarObj.cerrados === 0 && sinAsignarObj.fin === 0) {
+        tbodySinAsignar.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:1.25rem; color:var(--text-muted);">Sin elementos sin asignar en este período (100% asignados al equipo técnico).</td></tr>';
+      } else {
+        tbodySinAsignar.innerHTML = `
+          <tr style="border-bottom: 1px solid var(--border); background: rgba(245, 158, 11, 0.04);">
+            <td style="padding: 0.65rem 0.85rem; font-weight: 700; color: #d97706; display: flex; align-items: center; gap: 0.5rem;">
+              <i data-lucide="help-circle" style="width: 16px; height: 16px;"></i> Tickets y Órdenes Sin Asignar
+            </td>
+            <td style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 600; background: rgba(0,0,0,0.02);">${sinAsignarObj.inicio}</td>
+            <td style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 600; color: #3b82f6;">+${sinAsignarObj.entrantes}</td>
+            <td style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 600; color: #22c55e;">-${sinAsignarObj.cerrados}</td>
+            <td style="padding: 0.65rem 0.85rem; text-align: center; font-weight: 700; background: rgba(0,0,0,0.02); color: #d97706;">${sinAsignarObj.fin}</td>
+            <td style="padding: 0.65rem 0.85rem; text-align: center;">${deltaHtmlSA}</td>
+          </tr>
+        `;
+      }
+    }
+
+    // KPI Balance Global Delta (Total sistema: equipo técnico + sin asignar)
+    const totGlobalFin = totFin + sinAsignarObj.fin;
+    const totGlobalInicio = totInicio + sinAsignarObj.inicio;
+    const deltaTotalGlobal = totGlobalFin - totGlobalInicio;
+
+    const elDeltaKpi = document.getElementById('resumen-kpi-variacion-neto');
+    const elDeltaIconBg = document.getElementById('resumen-kpi-variacion-icon-bg');
+    if (elDeltaKpi) {
+      if (deltaTotalGlobal < 0) {
+        elDeltaKpi.textContent = `${deltaTotalGlobal} Reducción`;
+        elDeltaKpi.style.color = '#22c55e';
+        if (elDeltaIconBg) { elDeltaIconBg.style.background = 'rgba(34, 197, 94, 0.1)'; elDeltaIconBg.style.color = '#22c55e'; }
+      } else if (deltaTotalGlobal > 0) {
+        elDeltaKpi.textContent = `+${deltaTotalGlobal} Acumulados`;
+        elDeltaKpi.style.color = '#ef4444';
+        if (elDeltaIconBg) { elDeltaIconBg.style.background = 'rgba(239, 68, 68, 0.1)'; elDeltaIconBg.style.color = '#ef4444'; }
+      } else {
+        elDeltaKpi.textContent = `0 Sin cambio`;
+        elDeltaKpi.style.color = 'var(--text)';
+        if (elDeltaIconBg) { elDeltaIconBg.style.background = 'rgba(100, 116, 139, 0.1)'; elDeltaIconBg.style.color = 'var(--text-muted)'; }
       }
     }
   
@@ -622,6 +801,7 @@
   global._resumenSemanalCacheData = _resumenSemanalCacheData;
   global._resumenChartBarras = _resumenChartBarras;
   global._resumenChartDonut = _resumenChartDonut;
+  global._extraerResponsablesIndividuales = _extraerResponsablesIndividuales;
   global.abrirModalResumenSemanal = abrirModalResumenSemanal;
   global.cerrarModalResumenSemanal = cerrarModalResumenSemanal;
   global.obtenerRangoSemana = obtenerRangoSemana;
