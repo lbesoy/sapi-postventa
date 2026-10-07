@@ -136,12 +136,15 @@ window.getTicketFechaModificacion = function(t) {
 window.getCurrentUserDisplayName = function() {
   try {
     if (typeof currentSession !== 'undefined' && currentSession) {
+      if (currentSession.nombre && String(currentSession.nombre).trim()) return String(currentSession.nombre).trim();
       if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
-        const u = usuarios.find(x => x && x.id === currentSession.userId);
-        if (u && u.nombre) return u.nombre;
+        const u = usuarios.find(x => x && (x.id === currentSession.userId || x.id === currentSession.realUserId));
+        if (u && u.nombre && String(u.nombre).trim()) return String(u.nombre).trim();
       }
-      if (currentSession.nombre) return currentSession.nombre;
-      if (currentSession.empresa) return currentSession.empresa;
+      if (currentSession.userId === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.viewMode === 'superadmin') {
+        return 'Super Administrador';
+      }
+      if (currentSession.empresa && String(currentSession.empresa).trim()) return String(currentSession.empresa).trim();
     }
     if (typeof currentClienteSession !== 'undefined' && currentClienteSession) {
       if (currentClienteSession.contacto) return currentClienteSession.contacto;
@@ -149,10 +152,63 @@ window.getCurrentUserDisplayName = function() {
       if (currentClienteSession.empresa) return currentClienteSession.empresa;
     }
     const sess = (typeof safeGetJSON === 'function') ? safeGetJSON('eurorep_session', null) : JSON.parse(localStorage.getItem('eurorep_session') || 'null');
-    if (sess && sess.nombre) return sess.nombre;
+    if (sess) {
+      if (sess.nombre && String(sess.nombre).trim()) return String(sess.nombre).trim();
+      if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
+        const u = usuarios.find(x => x && (x.id === sess.userId || x.id === sess.realUserId));
+        if (u && u.nombre && String(u.nombre).trim()) return String(u.nombre).trim();
+      }
+      if (sess.userId === 'superadmin') return 'Super Administrador';
+    }
   } catch (e) {}
   return 'Usuario';
 };
+
+// Determina con máxima certeza si el usuario activo es estrictamente Superadmin
+window.esUsuarioSuperadmin = function() {
+  try {
+    let sess = null;
+    if (typeof currentSession !== 'undefined' && currentSession) sess = currentSession;
+    else if (typeof window !== 'undefined' && window.currentSession) sess = window.currentSession;
+    else if (typeof safeGetJSON === 'function') sess = safeGetJSON('eurorep_session', null);
+    else if (typeof localStorage !== 'undefined') {
+      try { sess = JSON.parse(localStorage.getItem('eurorep_session') || 'null'); } catch (e) {}
+    }
+    if (!sess) return false;
+
+    const viewMode = String(sess.viewMode || '').toLowerCase().trim();
+    const realRol = String(sess.realRol || '').toLowerCase().trim();
+    const userId = String(sess.userId || '').toLowerCase().trim();
+
+    // 1. Si la vista activa actual NO es superadmin (o es admin, supervisor, tecnico, empresa, consulta), NUNCA autorizar
+    if (viewMode !== 'superadmin') return false;
+
+    // 2. Si el usuario existe en el catálogo de usuarios, verificar que su rol en base de datos sea superadmin
+    const usersList = (typeof window !== 'undefined' && Array.isArray(window.usuarios))
+      ? window.usuarios
+      : ((typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : (typeof safeGetJSON === 'function' ? safeGetJSON('eurorep_usuarios', []) : []));
+
+    if (Array.isArray(usersList) && userId) {
+      const userInDb = usersList.find(u => u && u.id === userId);
+      if (userInDb && userInDb.rol) {
+        const dbRol = String(userInDb.rol).toLowerCase().trim();
+        if (dbRol !== 'superadmin') return false;
+      }
+    }
+
+    // 3. Prohibición estricta si el rol real del usuario es cualquier rol operativo común
+    if (['admin', 'supervisor', 'tecnico', 'empresa', 'cliente', 'cliente-consultor', 'consulta'].includes(realRol)) {
+      return false;
+    }
+
+    // 4. Debe tener viewMode superadmin Y rol real o userId superadmin
+    return (viewMode === 'superadmin' && (realRol === 'superadmin' || userId === 'superadmin' || !realRol));
+  } catch (err) {
+    console.error('[Auth] Error verificando rol superadmin:', err);
+    return false;
+  }
+};
+
 
 // Obtiene el nombre del usuario que realizó la última modificación del ticket con fallbacks inteligentes
 window.getTicketModificadoPor = function(t) {
@@ -174,6 +230,84 @@ window.getTicketModificadoPor = function(t) {
   }
   
   return t.creadoPor || t.solicitante || t.usuario || '—';
+};
+
+// Resuelve el creador original de un ticket con máxima fidelidad y fallbacks relacionales
+window.resolverCreadorTicket = function(t) {
+  if (!t || typeof t !== 'object') return '';
+
+  // 1. Directo de creadoPor o creado_por
+  if (t.creadoPor && String(t.creadoPor).trim() !== '' && t.creadoPor !== '—' && t.creadoPor !== 'null') {
+    return String(t.creadoPor).trim();
+  }
+  if (t.creado_por && String(t.creado_por).trim() !== '' && t.creado_por !== '—' && t.creado_por !== 'null') {
+    return String(t.creado_por).trim();
+  }
+
+  // 2. Si proviene o está asociado a una Orden de Servicio
+  try {
+    const ordenesList = (typeof ordenes !== 'undefined' && Array.isArray(ordenes))
+      ? ordenes
+      : ((typeof safeGetJSON === 'function') ? safeGetJSON('sapi_ordenes', []) : JSON.parse(localStorage.getItem('sapi_ordenes') || '[]'));
+
+    if (Array.isArray(ordenesList) && ordenesList.length > 0) {
+      const matchOrden = ordenesList.find(o => {
+        if (!o) return false;
+        if (t.folio && (o.id === t.folio || o.folio === t.folio)) return true;
+        if (t.asunto && o.folio && t.asunto.includes(o.folio)) return true;
+        if (t.descripcion && o.folio && t.descripcion.includes(o.folio)) return true;
+        if (o.soporte && (o.soporte === t.id || o.soporte === t.folio)) return true;
+        return false;
+      });
+
+      if (matchOrden) {
+        if (matchOrden.creadoPor && String(matchOrden.creadoPor).trim() && matchOrden.creadoPor !== '—') {
+          return String(matchOrden.creadoPor).trim();
+        }
+        if (matchOrden.tecnico && String(matchOrden.tecnico).trim() && matchOrden.tecnico !== '—') {
+          return String(matchOrden.tecnico).trim();
+        }
+      }
+    }
+  } catch (e) {}
+
+  // 3. Revisar primer comentario interno cronológico (quien registró la primera acción)
+  try {
+    const coms = t.comentariosInternos || t.comentarios_internos || [];
+    if (Array.isArray(coms) && coms.length > 0) {
+      const first = coms[0];
+      if (first && (first.usuario || first.autor)) {
+        const autorCom = String(first.usuario || first.autor).trim();
+        if (autorCom && autorCom !== 'Sistema' && autorCom !== '—') {
+          return autorCom;
+        }
+      }
+    }
+  } catch (e) {}
+
+  // 4. Si el solicitante coincide con un usuario interno de la empresa (staff/técnico/admin)
+  try {
+    const usersList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios))
+      ? usuarios
+      : ((typeof safeGetJSON === 'function') ? safeGetJSON('sapi_usuarios', []) : JSON.parse(localStorage.getItem('sapi_usuarios') || '[]'));
+
+    if (t.solicitante && String(t.solicitante).trim()) {
+      const solNorm = String(t.solicitante).trim().toLowerCase();
+      const matchUser = usersList.find(u => u && u.nombre && u.nombre.toLowerCase().trim() === solNorm);
+      if (matchUser && matchUser.nombre) return matchUser.nombre;
+    }
+  } catch (e) {}
+
+  // 5. Fallback a modificadoPor si no tiene modificaciones posteriores
+  if (t.modificadoPor && String(t.modificadoPor).trim() && t.modificadoPor !== '—' && t.modificadoPor !== 'Usuario') {
+    const fc = t.fechaCreacion || t.fecha_creacion || t.fecha;
+    const fm = t.fechaModificacion || t.fecha_modificacion;
+    if (!fm || fc === fm) {
+      return String(t.modificadoPor).trim();
+    }
+  }
+
+  return '';
 };
 
 // Helper para convertir URLs de imágenes a Base64 Data URI con soporte Supabase Storage, Fetch Blob y Canvas
@@ -559,5 +693,162 @@ window.obtenerEstadoOffline = function() {
     backgroundSyncSupported: Boolean(bgSyncSupported)
   };
 };
+
+window.debounce = function(fn, delay) {
+  if (typeof delay === 'undefined') delay = 250;
+  var timer = null;
+  return function() {
+    var context = this;
+    var args = arguments;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(function() {
+      timer = null;
+      fn.apply(context, args);
+    }, delay);
+  };
+};
+
+window.debouncedCall = function(key, fn, delay) {
+  if (typeof delay === 'undefined') delay = 250;
+  var globalObj = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null);
+  if (!globalObj) {
+    fn();
+    return;
+  }
+  if (!globalObj._debouncedCallTimers) {
+    globalObj._debouncedCallTimers = new Map();
+  }
+  if (globalObj._debouncedCallTimers.has(key)) {
+    clearTimeout(globalObj._debouncedCallTimers.get(key));
+  }
+  var timer = setTimeout(function() {
+    globalObj._debouncedCallTimers.delete(key);
+    fn();
+  }, delay);
+  globalObj._debouncedCallTimers.set(key, timer);
+};
+
+window.compressImageFile = function(file, options) {
+  if (!options) options = {};
+  var maxWidth = options.maxWidth || 1600;
+  var maxHeight = options.maxHeight || 1600;
+  var quality = typeof options.quality === 'number' ? options.quality : 0.82;
+  var mimeType = options.mimeType || 'image/jpeg';
+
+  if (typeof FileReader === 'undefined') {
+    return Promise.resolve('');
+  }
+
+  var isImage = file && file.type && file.type.indexOf('image/') === 0 && file.type.indexOf('svg') === -1;
+  if (!isImage || typeof Image === 'undefined' || typeof document === 'undefined') {
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function() { resolve(reader.result); };
+      reader.onerror = function(err) { reject(err); };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onerror = function(err) { reject(err); };
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onerror = function() {
+        resolve(e.target.result);
+      };
+      img.onload = function() {
+        try {
+          var width = img.width || 1;
+          var height = img.height || 1;
+
+          if (width > maxWidth || height > maxHeight) {
+            if (width / maxWidth > height / maxHeight) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          var canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, width);
+          canvas.height = Math.max(1, height);
+          var ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(e.target.result);
+            return;
+          }
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          var compressedDataUrl = canvas.toDataURL(mimeType, quality);
+          if (compressedDataUrl && compressedDataUrl.length > 0) {
+            resolve(compressedDataUrl);
+          } else {
+            resolve(e.target.result);
+          }
+        } catch (canvasErr) {
+          console.warn('[compressImageFile] Fallback a original por error en Canvas:', canvasErr);
+          resolve(e.target.result);
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
+if (typeof window !== 'undefined') {
+  window.debouncedRenderRefacciones = window.debounce(function() {
+    if (typeof window.renderRefacciones === 'function') window.renderRefacciones();
+    else if (typeof renderRefacciones === 'function') renderRefacciones();
+  }, 250);
+
+  window.debouncedRenderTickets = window.debounce(function() {
+    if (typeof window.renderTickets === 'function') window.renderTickets();
+    else if (typeof renderTickets === 'function') renderTickets();
+  }, 250);
+
+  window.debouncedRenderOrdenes = window.debounce(function() {
+    if (typeof window.renderTabla === 'function') window.renderTabla();
+    else if (typeof renderTabla === 'function') renderTabla();
+  }, 250);
+
+  window.debouncedFiltrarOrdenes = window.debounce(function(view) {
+    if (typeof window.filtrarOrdenes === 'function') window.filtrarOrdenes(view);
+    else if (typeof filtrarOrdenes === 'function') filtrarOrdenes(view);
+  }, 250);
+
+  window.debouncedRenderMaquinaria = window.debounce(function() {
+    if (typeof window.renderMaquinaria === 'function') window.renderMaquinaria();
+    else if (typeof renderMaquinaria === 'function') renderMaquinaria();
+  }, 250);
+
+  window.debouncedRenderGastos = window.debounce(function() {
+    if (typeof window.renderGastos === 'function') window.renderGastos();
+    else if (typeof renderGastos === 'function') renderGastos();
+  }, 250);
+
+  window.debouncedRenderSitios = window.debounce(function() {
+    if (typeof window.renderSitios === 'function') window.renderSitios();
+    else if (typeof renderSitios === 'function') renderSitios();
+  }, 250);
+
+  window.debouncedRenderLevantamientos = window.debounce(function() {
+    if (typeof window.renderLevantamientos === 'function') window.renderLevantamientos();
+    else if (typeof renderLevantamientos === 'function') renderLevantamientos();
+  }, 250);
+
+  window.debouncedRenderRentas = window.debounce(function() {
+    if (typeof window.renderRentas === 'function') window.renderRentas();
+  }, 250);
+
+  window.debouncedRenderEnvios = window.debounce(function() {
+    if (typeof window.renderEnvios === 'function') window.renderEnvios();
+  }, 250);
+}
 
 

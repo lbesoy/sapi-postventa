@@ -171,6 +171,20 @@ function renderManualesPorRol() {
   // Catálogo completo global de manuales con permisos por rol y visores HTML interactivos
   window.CATALOGO_MANUALES = [
     {
+      id: 'diagrama_flujo',
+      titulo: 'Diagrama de Flujo del Proceso',
+      subtitulo: 'Mapa interactivo: Euro SAPI vs. Portal Clientes',
+      html: 'manuales/diagrama_flujo.html',
+      link: 'manuales/diagrama_flujo.html',
+      pdf: 'manuales/diagrama_flujo.html',
+      icono: 'network',
+      destacado: true,
+      customStyle: 'border-color: rgba(139, 92, 246, 0.4); background: rgba(139, 92, 246, 0.05);',
+      customIconStyle: 'background: rgba(139, 92, 246, 0.15); color: #8b5cf6;',
+      customTitleColor: '#a78bfa',
+      isExternal: true
+    },
+    {
       id: 'flujo_completo',
       titulo: 'Flujo Completo',
       subtitulo: 'Ciclo completo del sistema',
@@ -215,20 +229,6 @@ function renderManualesPorRol() {
       pdf: 'manuales/manual_gastos.pdf',
       icono: 'credit-card',
       destacado: false
-    },
-    {
-      id: 'diagrama_flujo',
-      titulo: 'Diagrama de Flujo del Proceso',
-      subtitulo: 'Mapa interactivo: Euro SAPI vs. Portal Clientes',
-      html: 'manuales/diagrama_flujo.html',
-      link: 'manuales/diagrama_flujo.html',
-      pdf: 'manuales/diagrama_flujo.html',
-      icono: 'network',
-      destacado: true,
-      customStyle: 'border-color: rgba(139, 92, 246, 0.4); background: rgba(139, 92, 246, 0.05);',
-      customIconStyle: 'background: rgba(139, 92, 246, 0.15); color: #8b5cf6;',
-      customTitleColor: '#a78bfa',
-      isExternal: true
     },
     {
       id: 'cliente',
@@ -278,19 +278,16 @@ function renderManualesPorRol() {
 
   let html = '';
   manualesPermitidos.forEach(m => {
-    const isLink = !!m.isExternal;
-    const urlPdf = m.pdf || m.link || m.html;
+    const urlViewer = m.html || m.link || m.pdf;
     const featuredClass = m.destacado ? ' featured' : '';
-    const styleAttr = m.customStyle ? ` style="${m.customStyle}; cursor:pointer;"` : ' style="cursor:pointer;"';
+    const styleAttr = m.customStyle ? ` style="${m.customStyle}"` : '';
     const iconStyleAttr = m.customIconStyle ? ` style="${m.customIconStyle}"` : '';
     const titleStyleAttr = m.customTitleColor ? ` style="color:${m.customTitleColor}; font-weight:700;"` : '';
-    const actionIcon = isLink ? 'external-link' : 'download';
-    const actionIconTitle = isLink ? 'Abrir en pestaña nueva' : 'Descargar PDF';
 
     html += `
-      <div class="manual-download-card${featuredClass}"${styleAttr} 
-           onclick="window.abrirVisorManualPorId('${m.id}')"
-           title="Haz clic para visualizar ${m.titulo} en pantalla">
+      <a href="${urlViewer}" target="_blank" 
+         class="manual-download-card${featuredClass}"${styleAttr} 
+         title="Ver en línea: ${m.titulo}">
         <div class="manual-card-icon"${iconStyleAttr}>
           <i data-lucide="${m.icono}" style="width:16px; height:16px;"></i>
         </div>
@@ -298,21 +295,8 @@ function renderManualesPorRol() {
           <div class="manual-card-title"${titleStyleAttr}>${m.titulo}</div>
           <div class="manual-card-sub">${m.subtitulo}</div>
         </div>
-        <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
-          <button type="button" 
-                  onclick="event.stopPropagation(); window.abrirVisorManualPorId('${m.id}');" 
-                  style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--primary, #2563eb); color:#ffffff; border:none; cursor:pointer;" 
-                  title="Visualizar en pantalla">
-            <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
-          </button>
-          <a href="${urlPdf}" ${isLink ? 'target="_blank"' : 'download'} 
-             onclick="event.stopPropagation();" 
-             style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--bg-hover); color:var(--text-muted); text-decoration:none; border: 1px solid var(--border);" 
-             title="${actionIconTitle}">
-            <i data-lucide="${actionIcon}" style="width:14px; height:14px; pointer-events:none;"></i>
-          </a>
-        </div>
-      </div>
+        <i data-lucide="external-link" class="manual-card-download-icon"${m.customIconStyle ? ` style="${m.customIconStyle}"` : ''}></i>
+      </a>
     `;
   });
 
@@ -329,38 +313,42 @@ function crearModalVisorManualSiNoExiste() {
     overlay = document.createElement('div');
     overlay.id = 'modal-visor-manual-overlay';
     overlay.className = 'modal-overlay';
+    overlay.style.cssText = 'z-index: 999999; display: none;';
     overlay.setAttribute('onclick', 'window.cerrarVisorManual(event)');
     overlay.innerHTML = `
-      <div class="modal" onclick="event.stopPropagation()" style="max-width:560px; width:92%; border-radius:16px; background:var(--bg-card, #1e293b); color:var(--text-primary, #f8fafc); box-shadow:var(--shadow-lg, 0 20px 25px -5px rgba(0,0,0,0.5)); border:1px solid var(--border, rgba(255,255,255,0.1));">
-        <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; padding:1.25rem 1.5rem; border-bottom:1px solid var(--border, rgba(255,255,255,0.1)); background:var(--bg-hover, rgba(255,255,255,0.03));">
-          <div style="display:flex; align-items:center; gap:0.75rem;">
-            <div style="width:40px; height:40px; border-radius:10px; background:rgba(37,99,235,0.12); color:var(--primary, #2563eb); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-              <i data-lucide="book-open" id="modal-visor-manual-icon" style="width:20px; height:20px;"></i>
+      <div class="modal" onclick="event.stopPropagation()" style="max-width: 1150px; width: 95vw; height: 90vh; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-card, #1e293b); color: var(--text-primary, #f8fafc); border: 1px solid var(--border, rgba(255,255,255,0.1)); border-radius: 14px; overflow: hidden; box-shadow: 0 20px 45px rgba(0,0,0,0.6);">
+        <div class="modal-header" style="padding: 0.85rem 1.25rem; background: var(--bg-secondary, #1a1d27); border-bottom: 1px solid var(--border, rgba(255,255,255,0.1)); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; gap: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0;">
+            <div id="modal-visor-manual-icon-container" style="width: 36px; height: 36px; border-radius: 8px; background: rgba(37,99,235,0.15); color: var(--primary, #2563eb); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <i data-lucide="book-open" id="modal-visor-manual-icon" style="width: 18px; height: 18px;"></i>
             </div>
-            <div>
-              <h2 id="modal-visor-manual-titulo" style="margin:0; font-size:1.15rem; font-weight:700; color:var(--text-primary, #f8fafc);">Manual del Sistema</h2>
-              <div id="modal-visor-manual-sub" style="font-size:0.8rem; color:var(--text-muted, #94a3b8); margin-top:2px;">Documentación y guías oficiales</div>
+            <div style="min-width: 0;">
+              <h2 id="modal-visor-manual-titulo" style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary, #f8fafc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Manual del Sistema</h2>
+              <div id="modal-visor-manual-sub" style="font-size: 0.75rem; color: var(--text-muted, #94a3b8); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Visor interactivo oficial</div>
             </div>
           </div>
-          <button class="modal-close" onclick="window.cerrarVisorManual()" style="background:transparent; border:none; color:var(--text-muted); font-size:1.25rem; cursor:pointer;">✕</button>
-        </div>
-        <div class="modal-body" style="padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem;">
-          <div id="modal-visor-manual-desc" style="font-size:0.92rem; line-height:1.5; color:var(--text-primary); background:var(--bg-body, #0f172a); padding:1rem; border-radius:8px; border:1px solid var(--border, rgba(255,255,255,0.1));">
-            Consulta la guía paso a paso o descarga el documento oficial en formato PDF.
-          </div>
-          <div style="display:flex; flex-direction:column; gap:0.75rem;">
-            <a id="modal-visor-manual-btn-tab" href="#" target="_blank" class="btn-primary" style="padding:0.75rem 1.25rem; font-size:0.95rem; font-weight:600; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.5rem; border-radius:10px; cursor:pointer;">
-              <i data-lucide="external-link" style="width:18px; height:18px;"></i>
-              <span>Abrir Manual Completo (Interactivo)</span>
+          <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+            <button type="button" class="btn-secondary" onclick="window.imprimirManualIframe()" title="Imprimir manual" style="padding: 0.4rem 0.75rem; font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem; border-radius: 8px; cursor: pointer; border: 1px solid var(--border, rgba(255,255,255,0.1)); background: var(--bg-card, #1e293b); color: var(--text-primary, #f8fafc);">
+              <i data-lucide="printer" style="width: 14px; height: 14px;"></i>
+              <span>Imprimir</span>
+            </button>
+            <a id="modal-visor-manual-btn-download" href="#" download class="btn-secondary" title="Descargar documento PDF" style="padding: 0.4rem 0.75rem; font-size: 0.8rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem; border-radius: 8px; cursor: pointer; border: 1px solid var(--border, rgba(255,255,255,0.1)); background: var(--bg-card, #1e293b); color: var(--text-primary, #f8fafc);">
+              <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+              <span>Descargar PDF</span>
             </a>
-            <a id="modal-visor-manual-btn-download" href="#" download class="btn-secondary" style="padding:0.75rem 1.25rem; font-size:0.95rem; font-weight:600; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.5rem; border-radius:10px; cursor:pointer;">
-              <i data-lucide="download" style="width:18px; height:18px;"></i>
-              <span>Descargar Documento PDF</span>
+            <a id="modal-visor-manual-btn-tab" href="#" target="_blank" class="btn-secondary" title="Abrir en pestaña nueva" style="padding: 0.4rem 0.75rem; font-size: 0.8rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem; border-radius: 8px; cursor: pointer; border: 1px solid var(--border, rgba(255,255,255,0.1)); background: var(--bg-card, #1e293b); color: var(--text-primary, #f8fafc);">
+              <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
+              <span>Pestaña Nueva</span>
             </a>
+            <button type="button" class="modal-close" onclick="window.cerrarVisorManual()" style="background: transparent; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer; padding: 0.2rem 0.4rem; line-height: 1; border-radius: 6px; margin-left: 0.25rem;" title="Cerrar visor">✕</button>
           </div>
         </div>
-        <div class="modal-footer" style="padding:1rem 1.5rem; border-top:1px solid var(--border, rgba(255,255,255,0.1)); display:flex; justify-content:flex-end; background:var(--bg-hover, rgba(255,255,255,0.03));">
-          <button type="button" class="btn-secondary" onclick="window.cerrarVisorManual()" style="padding:0.55rem 1.25rem; border-radius:8px; cursor:pointer;">Cerrar</button>
+        <div class="modal-body" style="flex: 1; padding: 0; overflow: hidden; background: #ffffff; position: relative; display: flex; flex-direction: column;">
+          <div id="modal-visor-manual-loading" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-card, #1e293b); color: var(--text-muted, #94a3b8); z-index: 2; transition: opacity 0.2s ease;">
+            <div class="spinner" style="width: 32px; height: 32px; border: 3px solid rgba(37,99,235,0.2); border-top-color: var(--primary, #2563eb); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 0.75rem;"></div>
+            <div style="font-size: 0.85rem; font-weight: 500;">Cargando documento en pantalla...</div>
+          </div>
+          <iframe id="modal-visor-manual-iframe" src="about:blank" style="width: 100%; height: 100%; border: none; flex: 1; background: #ffffff;" title="Visor de Manual Eurorep SAPI"></iframe>
         </div>
       </div>
     `;
@@ -374,24 +362,27 @@ function abrirVisorManualPorId(id) {
   const catalogo = window.CATALOGO_MANUALES || [];
   const m = catalogo.find(item => item.id === id || item.aliasId === id);
   if (m) {
-    abrirVisorManual(m.html || m.link || m.pdf, m.titulo, m.subtitulo, m.pdf || m.link);
+    abrirVisorManual(m.html || m.link || m.pdf, m.titulo, m.subtitulo, m.pdf || m.link, m.icono);
   } else {
-    abrirVisorManual(`manuales/manual_${id}.html`, 'Manual del Sistema', 'Visor interactivo oficial', `manuales/manual_${id}.pdf`);
+    abrirVisorManual(`manuales/manual_${id}.html`, 'Manual del Sistema', 'Visor interactivo oficial', `manuales/manual_${id}.pdf`, 'book-open');
   }
 };
 
-function abrirVisorManual(urlHtml, arg2, arg3, arg4) {
+function abrirVisorManual(urlHtml, arg2, arg3, arg4, arg5) {
   if (typeof document === 'undefined') return;
   const overlay = crearModalVisorManualSiNoExiste();
   const titleEl = document.getElementById('modal-visor-manual-titulo');
   const subEl = document.getElementById('modal-visor-manual-sub');
-  const descEl = document.getElementById('modal-visor-manual-desc');
+  const iconContainer = document.getElementById('modal-visor-manual-icon-container');
   const btnTab = document.getElementById('modal-visor-manual-btn-tab');
   const btnDownload = document.getElementById('modal-visor-manual-btn-download');
+  const iframe = document.getElementById('modal-visor-manual-iframe');
+  const loadingEl = document.getElementById('modal-visor-manual-loading');
 
   let titulo = 'Manual del Sistema';
   let subtitulo = 'Visor interactivo oficial';
   let urlPdf = '';
+  let icono = arg5 || 'book-open';
 
   if (typeof arg2 === 'string') {
     if (arg2.endsWith('.pdf') || (arg2.includes('/') && !arg2.includes(' '))) {
@@ -405,21 +396,55 @@ function abrirVisorManual(urlHtml, arg2, arg3, arg4) {
     }
   }
 
-  const targetViewerUrl = urlHtml || urlPdf || 'manuales/manual_flujo_completo.html';
+  const catalogo = window.CATALOGO_MANUALES || [];
+  const matched = catalogo.find(item => item.titulo === titulo || item.html === urlHtml || item.pdf === urlPdf);
+  if (matched && matched.icono) {
+    icono = matched.icono;
+  }
+
+  let targetViewerUrl = (urlHtml || urlPdf || 'manuales/manual_flujo_completo.html').replace(/^\.?\//, '');
   if (!urlPdf && urlHtml) {
     urlPdf = urlHtml.endsWith('.html') ? urlHtml.replace(/\.html$/, '.pdf') : urlHtml;
   }
+  if (urlPdf) urlPdf = urlPdf.replace(/^\.?\//, '');
+
+  console.log('[VisorManual] Abriendo visor interactivo:', { targetViewerUrl, titulo, subtitulo });
 
   if (titleEl) titleEl.textContent = titulo;
   if (subEl) subEl.textContent = subtitulo;
-  if (descEl) descEl.innerHTML = `<strong>${titulo}</strong><br><span style="color:var(--text-muted, #94a3b8); font-size:0.85rem;">${subtitulo}</span><div style="margin-top:0.5rem; font-size:0.85rem;">Selecciona una de las opciones para abrir la guía interactiva o descargarla en formato PDF.</div>`;
+
+  if (iconContainer) {
+    iconContainer.innerHTML = `<i data-lucide="${icono}" style="width: 18px; height: 18px;"></i>`;
+  }
 
   if (btnTab) {
     btnTab.href = targetViewerUrl;
   }
   if (btnDownload) {
     btnDownload.href = urlPdf || targetViewerUrl;
-    btnDownload.style.display = (targetViewerUrl && targetViewerUrl.includes('diagrama_flujo')) ? 'none' : 'flex';
+    btnDownload.style.display = (targetViewerUrl && targetViewerUrl.includes('diagrama_flujo')) ? 'none' : 'inline-flex';
+  }
+
+  // Cargar el documento en el iframe embebido
+  if (iframe) {
+    if (loadingEl) {
+      loadingEl.style.display = 'flex';
+      loadingEl.style.opacity = '1';
+    }
+    const hideLoading = function() {
+      if (loadingEl) {
+        loadingEl.style.opacity = '0';
+        setTimeout(() => { loadingEl.style.display = 'none'; }, 150);
+      }
+    };
+    iframe.onload = hideLoading;
+    setTimeout(hideLoading, 350);
+
+    if (!iframe.src.endsWith(targetViewerUrl)) {
+      iframe.src = targetViewerUrl;
+    } else {
+      hideLoading();
+    }
   }
 
   if (overlay) {
@@ -428,11 +453,12 @@ function abrirVisorManual(urlHtml, arg2, arg3, arg4) {
     overlay.style.visibility = 'visible';
     overlay.style.opacity = '1';
     overlay.style.pointerEvents = 'auto';
+    overlay.style.zIndex = '999999';
     document.body.style.overflow = 'hidden';
   }
 
   if (typeof lucide !== 'undefined' && lucide.createIcons) {
-    try { lucide.createIcons({ root: overlay }); } catch(e) {}
+    try { lucide.createIcons(); } catch(e) {}
   }
 };
 
@@ -452,10 +478,24 @@ function cerrarVisorManual(e) {
     overlay.style.pointerEvents = 'none';
     document.body.style.overflow = '';
   }
+  const iframe = document.getElementById('modal-visor-manual-iframe');
+  if (iframe) {
+    iframe.src = 'about:blank';
+  }
 };
 
 function imprimirManualIframe() {
   if (typeof document === 'undefined') return;
+  const iframe = document.getElementById('modal-visor-manual-iframe');
+  if (iframe && iframe.contentWindow) {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      return;
+    } catch (e) {
+      console.warn('[Visor Manual] Fallback de impresión:', e);
+    }
+  }
   window.print();
 };
 

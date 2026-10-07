@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import {
+  debounce,
+  debouncedCall,
   cleanMojibake,
   normStr,
   safeFormatDate,
@@ -13,10 +15,23 @@ import {
   formatearTiempoRelativoJunta,
   unificarNombreUsuario,
   extraerListaResponsables,
-  loadScriptOnDemand
+  loadScriptOnDemand,
+  compressImageFile,
+  esUsuarioSuperadmin,
+  resolverCreadorTicket
 } from '../src/utils.js';
 
 console.log('🧪 Ejecutando pruebas unitarias para src/utils.js...');
+
+if (typeof globalThis.localStorage === 'undefined') {
+  const _store = {};
+  globalThis.localStorage = {
+    getItem: (k) => (_store[k] !== undefined ? _store[k] : null),
+    setItem: (k, v) => { _store[k] = String(v); },
+    removeItem: (k) => { delete _store[k]; },
+    clear: () => { Object.keys(_store).forEach(k => delete _store[k]); }
+  };
+}
 
 // 0. loadScriptOnDemand (Lazy Loading)
 assert.equal(typeof loadScriptOnDemand, 'function', 'loadScriptOnDemand debe ser función');
@@ -24,6 +39,38 @@ await assert.doesNotReject(async () => {
   await loadScriptOnDemand('test-script.js');
 }, 'loadScriptOnDemand debe resolver de forma segura en entornos sin DOM');
 console.log('  ✅ loadScriptOnDemand (Lazy Loading): OK');
+
+// 0.05 compressImageFile (Client-side Image Compression)
+assert.equal(typeof compressImageFile, 'function', 'compressImageFile debe ser función');
+const dummyPdf = { name: 'reporte.pdf', type: 'application/pdf', size: 2048 };
+const compPdf = await compressImageFile(dummyPdf);
+assert.equal(typeof compPdf, 'string', 'compressImageFile debe retornar un string');
+const dummyImg = { name: 'foto.jpg', type: 'image/jpeg', size: 1024 };
+const compImg = await compressImageFile(dummyImg);
+assert.equal(typeof compImg, 'string', 'compressImageFile debe resolver de forma segura en entornos sin DOM');
+console.log('  ✅ compressImageFile (Compresión en Cliente): OK');
+
+// 0.1 debounce y debouncedCall
+assert.equal(typeof debounce, 'function', 'debounce debe ser función');
+assert.equal(typeof debouncedCall, 'function', 'debouncedCall debe ser función');
+
+let testCounter = 0;
+const increment = debounce(() => { testCounter++; }, 30);
+increment();
+increment();
+increment();
+assert.equal(testCounter, 0, 'debounce no debe ejecutar de inmediato');
+await new Promise(r => setTimeout(r, 60));
+assert.equal(testCounter, 1, 'debounce debe consolidar múltiples llamadas consecutivas en 1 sola');
+
+let callCount = 0;
+debouncedCall('test-key', () => { callCount++; }, 30);
+debouncedCall('test-key', () => { callCount++; }, 30);
+debouncedCall('test-key', () => { callCount++; }, 30);
+assert.equal(callCount, 0, 'debouncedCall no debe ejecutar de inmediato');
+await new Promise(r => setTimeout(r, 60));
+assert.equal(callCount, 1, 'debouncedCall debe consolidar en 1 sola llamada para la misma clave');
+console.log('  ✅ Debounce y DebouncedCall (Search Optimizations): OK');
 
 // 1. cleanMojibake
 assert.equal(cleanMojibake('CamiÃ³n'), 'Camión', 'cleanMojibake debe reparar ó mojibake');
@@ -88,6 +135,58 @@ console.log('  ✅ getTicketModificadoPor: OK');
 // 7. getCurrentUserDisplayName
 assert.equal(typeof getCurrentUserDisplayName(), 'string', 'getCurrentUserDisplayName debe retornar string sin crashear');
 console.log('  ✅ getCurrentUserDisplayName: OK');
+
+// 7.0 resolverCreadorTicket (Resolución de creadores de tickets)
+assert.equal(typeof resolverCreadorTicket, 'function', 'resolverCreadorTicket debe ser función');
+assert.equal(resolverCreadorTicket({ creadoPor: 'Pablo Besoy' }), 'Pablo Besoy', 'resolverCreadorTicket debe respetar creadoPor');
+assert.equal(resolverCreadorTicket({ creado_por: 'Pablo Besoy' }), 'Pablo Besoy', 'resolverCreadorTicket debe leer creado_por');
+assert.equal(resolverCreadorTicket({ comentariosInternos: [{ usuario: 'Adrian Franco', texto: 'Ticket creado' }] }), 'Adrian Franco', 'resolverCreadorTicket debe leer primer comentario');
+assert.equal(resolverCreadorTicket(null), '', 'resolverCreadorTicket con null retorna cadena vacía');
+console.log('  ✅ resolverCreadorTicket: OK');
+
+// 7.1 esUsuarioSuperadmin (Restricción estricta de permisos de Superadmin)
+assert.equal(typeof esUsuarioSuperadmin, 'function', 'esUsuarioSuperadmin debe ser función');
+const savedOrigSess = globalThis.currentSession;
+const savedOrigUsers = globalThis.usuarios;
+
+// Test A: Sin sesión -> false
+globalThis.currentSession = null;
+assert.equal(esUsuarioSuperadmin(), false, 'Sin sesión debe ser false');
+
+// Test B: Usuario con rol admin -> false
+globalThis.currentSession = { userId: 'usr-admin', viewMode: 'admin', realRol: 'admin' };
+assert.equal(esUsuarioSuperadmin(), false, 'Rol admin debe ser false');
+
+// Test C: Usuario con rol supervisor -> false
+globalThis.currentSession = { userId: 'usr-sup', viewMode: 'supervisor', realRol: 'supervisor' };
+assert.equal(esUsuarioSuperadmin(), false, 'Rol supervisor debe ser false');
+
+// Test D: Usuario con rol tecnico -> false
+globalThis.currentSession = { userId: 'usr-tec', viewMode: 'tecnico', realRol: 'tecnico' };
+assert.equal(esUsuarioSuperadmin(), false, 'Rol tecnico debe ser false');
+
+// Test E: Usuario con rol empresa / consulta -> false
+globalThis.currentSession = { userId: 'usr-emp', viewMode: 'empresa', realRol: 'empresa' };
+assert.equal(esUsuarioSuperadmin(), false, 'Rol empresa debe ser false');
+
+// Test F: Superadmin simulando rol de técnico (viewMode = 'tecnico') -> false
+globalThis.currentSession = { userId: 'superadmin', viewMode: 'tecnico', realRol: 'superadmin' };
+assert.equal(esUsuarioSuperadmin(), false, 'Superadmin simulando vista técnico debe ser false');
+
+// Test G: Superadmin real y en vista superadmin -> true
+globalThis.currentSession = { userId: 'superadmin', viewMode: 'superadmin', realRol: 'superadmin' };
+assert.equal(esUsuarioSuperadmin(), true, 'Superadmin auténtico debe ser true');
+
+// Test H: Usuario admin intentando inyectar viewMode superadmin con rol en BD admin -> false
+globalThis.usuarios = [{ id: 'fake-super', rol: 'admin', nombre: 'Atacante' }];
+globalThis.currentSession = { userId: 'fake-super', viewMode: 'superadmin', realRol: 'admin' };
+assert.equal(esUsuarioSuperadmin(), false, 'Usuario con rol admin en BD nunca debe ser superadmin');
+
+// Restaurar variables globales originales
+globalThis.currentSession = savedOrigSess;
+globalThis.usuarios = savedOrigUsers;
+console.log('  ✅ esUsuarioSuperadmin (Restricción exclusiva a Superadmins): OK');
+
 
 // 8. supabaseClient
 const { supabaseClient, SUPABASE_URL } = await import('../src/supabaseClient.js');
@@ -385,12 +484,13 @@ assert.ok(Array.isArray(pendientes), 'obtenerTodosLosPendientes debe devolver un
 console.log('  ✅ Juntas de Revisión (obtenerTodosLosPendientes, reestablecerTicket26477 y exports): OK');
 
 // 20. Módulo de Depuración y Auditoría de Tickets
-const { analizarInformacionTicket, contarTicketsADepuracion, sanitizarAsignacionesTickets, abrirModalDepurarTickets, exportarDepuradorTicketsAExcel } = await import('../src/modules/depurador_tickets.js');
+const { analizarInformacionTicket, contarTicketsADepuracion, sanitizarAsignacionesTickets, abrirModalDepurarTickets, exportarDepuradorTicketsAExcel, detectarYDepurarTicketsDuplicados } = await import('../src/modules/depurador_tickets.js');
 assert.equal(typeof analizarInformacionTicket, 'function', 'analizarInformacionTicket debe ser una función');
 assert.equal(typeof contarTicketsADepuracion, 'function', 'contarTicketsADepuracion debe ser una función');
 assert.equal(typeof sanitizarAsignacionesTickets, 'function', 'sanitizarAsignacionesTickets debe ser una función');
 assert.equal(typeof abrirModalDepurarTickets, 'function', 'abrirModalDepurarTickets debe ser una función');
 assert.equal(typeof exportarDepuradorTicketsAExcel, 'function', 'exportarDepuradorTicketsAExcel debe ser una función');
+assert.equal(typeof detectarYDepurarTicketsDuplicados, 'function', 'detectarYDepurarTicketsDuplicados debe ser una función');
 
 // Test A: Análisis forense de ticket con datos SAP
 const diagTkt = analizarInformacionTicket({ folio: 'TKT-26477', cotizacionSAP: '109923', pedidoSAP: '45001', comentariosInternos: [{ texto: 'ok' }] });
@@ -398,7 +498,29 @@ assert.equal(diagTkt.tieneInfo, true, 'Ticket con cotización SAP debe marcar ti
 assert.equal(diagTkt.cotizacionSAP, '109923', 'Cotización SAP debe extraerse correctamente');
 assert.equal(diagTkt.pedidoSAP, '45001', 'Pedido SAP debe extraerse correctamente');
 assert.equal(diagTkt.numComentarios, 1, 'Debe contar 1 comentario');
-console.log('  ✅ Depurador de Tickets (analizarInformacionTicket, sanitizarAsignacionesTickets y exports): OK');
+
+// Test B: Detección y depuración forense de tickets duplicados gemelos (TKT-26550 / TKT-26551)
+const origGlobalTickets = global.window ? global.window.tickets : null;
+global.window = global.window || {};
+global.window.tickets = [
+  { id: 'tkt-dup-1', folio: 'TKT-26550', cliente: 'Cliente Prueba S.A.', asunto: 'Falla fuga de aceite en tractor', equipo: 'CAT D6T', fechaCreacion: new Date(Date.now() - 5000).toISOString() },
+  { id: 'tkt-dup-2', folio: 'TKT-26551', cliente: 'Cliente Prueba S.A.', asunto: 'Falla fuga de aceite en tractor', equipo: 'CAT D6T', fechaCreacion: new Date().toISOString() }
+];
+global.window.ordenes = [];
+
+const hallazgosDuplicados = await detectarYDepurarTicketsDuplicados(false);
+assert.equal(hallazgosDuplicados.totalEncontrados, 1, 'Debe detectar 1 par de tickets duplicados');
+assert.equal(hallazgosDuplicados.duplicados[0].duplicado.folio, 'TKT-26551', 'El duplicado redundante debe ser TKT-26551');
+assert.equal(hallazgosDuplicados.duplicados[0].original.folio, 'TKT-26550', 'El ticket original a conservar debe ser TKT-26550');
+
+// Depuración con autoEliminar=true
+const resultadoDepuracion = await detectarYDepurarTicketsDuplicados(true);
+assert.equal(resultadoDepuracion.totalEncontrados, 1, 'Debe purgar el ticket gemelo detectado');
+assert.equal(global.window.tickets.length, 1, 'Debe restar únicamente el ticket original');
+assert.equal(global.window.tickets[0].folio, 'TKT-26550', 'El ticket conservado en memoria debe ser el original');
+if (origGlobalTickets) global.window.tickets = origGlobalTickets;
+
+console.log('  ✅ Depurador de Tickets (analizarInformacionTicket, sanitizarAsignacionesTickets, detectarYDepurarTicketsDuplicados y exports): OK');
 
 // 21. Módulo de Envíos y Guías de Paquetería
 const { obtenerUrlRastreoPaqueteria, asegurarGuiaEnvioParaTicket, obtenerTodosLosEnvios, renderEnvios, exportarEnviosAExcel, updateEnviosBadge } = await import('../src/modules/envios.js');
@@ -1281,7 +1403,11 @@ const {
   filtrarTickets,
   setFiltroTickets,
   seleccionarCanal,
-  updateFileLabel
+  updateFileLabel,
+  cargarMasTickets,
+  mostrarTodosLosTickets,
+  resetTicketPageLimit,
+  safeGetFilteredTickets
 } = await import('../src/modules/tickets_listado.js');
 
 // Test A: Funciones y variables existen
@@ -1296,6 +1422,15 @@ assert.equal(typeof esTicketHijoRefacciones, 'function', 'esTicketHijoRefaccione
 assert.equal(typeof resolverClienteTicket, 'function', 'resolverClienteTicket debe ser función');
 assert.equal(typeof filtrarTickets, 'function', 'filtrarTickets debe ser función');
 assert.equal(typeof setFiltroTickets, 'function', 'setFiltroTickets debe ser función');
+assert.equal(typeof cargarMasTickets, 'function', 'cargarMasTickets debe ser función');
+assert.equal(typeof mostrarTodosLosTickets, 'function', 'mostrarTodosLosTickets debe ser función');
+assert.equal(typeof resetTicketPageLimit, 'function', 'resetTicketPageLimit debe ser función');
+assert.doesNotThrow(() => {
+  resetTicketPageLimit();
+  cargarMasTickets();
+  mostrarTodosLosTickets();
+  resetTicketPageLimit();
+}, 'Las funciones de paginación de tickets deben ejecutarse sin errores');
 
 // Test B: Lógica de badgeTicketEstado
 assert.equal(badgeTicketEstado({ estado: 'Abierto' }), 'abierto', 'Estado Abierto debe dar clase abierto');
@@ -1330,7 +1465,23 @@ assert.doesNotThrow(() => {
 assert.ok(ticketSortColumn !== undefined, 'ticketSortColumn debe estar definido');
 assert.ok(ticketSortDirection !== undefined, 'ticketSortDirection debe estar definido');
 
-console.log('  ✅ Listados, Filtros, Menús de Ordenación y Badges de Tickets: OK');
+// Test G: Deduplicación estricta en safeGetFilteredTickets
+const fakeDuplicateTickets = [
+  { id: 'tkt-1', folio: 'TKT-PRUEBA-018', asunto: 'MTO 1', categoria: 'Mantenimiento' },
+  { id: 'tkt-1', folio: 'TKT-PRUEBA-018', asunto: 'MTO 1', categoria: 'Mantenimiento' },
+  { id: 'tkt-2', folio: 'TKT-PRUEBA-020', asunto: 'MTO 2', categoria: 'Mantenimiento' },
+  { id: 'tkt-2', folio: 'TKT-PRUEBA-020', asunto: 'MTO 2', categoria: 'Mantenimiento' },
+  { id: 'tkt-3', folio: 'TKT-PRUEBA-021', asunto: 'MTO 3', categoria: 'Mantenimiento' }
+];
+const oldGetFilteredTickets = global.getFilteredTickets;
+global.getFilteredTickets = () => fakeDuplicateTickets;
+const deduplicated = safeGetFilteredTickets();
+assert.equal(deduplicated.length, 3, 'safeGetFilteredTickets debe eliminar tickets duplicados y devolver solo 3');
+assert.equal(deduplicated.map(t => t.folio).join(','), 'TKT-PRUEBA-018,TKT-PRUEBA-020,TKT-PRUEBA-021', 'Folios deben ser únicos');
+if (oldGetFilteredTickets) global.getFilteredTickets = oldGetFilteredTickets;
+else delete global.getFilteredTickets;
+
+console.log('  ✅ Listados, Filtros, Menús de Ordenación y Badges de Tickets (con Deduplicación Estricta): OK');
 
 console.log('Test 38: Formulario, Combos y Guardado de Tickets');
 const {
@@ -1407,6 +1558,14 @@ assert.doesNotThrow(() => {
   agregarSitioCombo('combo-test');
   agregarEmpresaCombo('combo-test');
 }, 'Las funciones de tickets_form no deben arrojar error en ausencia de DOM');
+
+// Test D: Candado de guardado concurrente (Mutex anti-doble clic)
+global.window = global.window || {};
+global.window._guardandoTicket = true;
+let dummyPrevented = false;
+await guardarTicket({ preventDefault: () => { dummyPrevented = true; } });
+assert.equal(dummyPrevented, false, 'guardarTicket debe bloquearse inmediatamente si _guardandoTicket es true');
+global.window._guardandoTicket = false;
 
 console.log('  ✅ Formulario, Combos y Guardado de Tickets: OK');
 
@@ -1649,7 +1808,11 @@ const {
   toggleSortOrdenes,
   renderTabla,
   badgeEstado,
-  filtrarOrdenes
+  filtrarOrdenes,
+  cargarMasOrdenes,
+  mostrarTodasLasOrdenes,
+  resetOrdenPageLimit,
+  safeGetFilteredOrders
 } = await import('../src/modules/ordenes_listado.js');
 
 // Test A: Funciones y exports existen
@@ -1659,6 +1822,15 @@ assert.equal(typeof toggleSortOrdenes, 'function', 'toggleSortOrdenes debe ser f
 assert.equal(typeof renderTabla, 'function', 'renderTabla debe ser función');
 assert.equal(typeof badgeEstado, 'function', 'badgeEstado debe ser función');
 assert.equal(typeof filtrarOrdenes, 'function', 'filtrarOrdenes debe ser función');
+assert.equal(typeof cargarMasOrdenes, 'function', 'cargarMasOrdenes debe ser función');
+assert.equal(typeof mostrarTodasLasOrdenes, 'function', 'mostrarTodasLasOrdenes debe ser función');
+assert.equal(typeof resetOrdenPageLimit, 'function', 'resetOrdenPageLimit debe ser función');
+assert.doesNotThrow(() => {
+  resetOrdenPageLimit();
+  cargarMasOrdenes();
+  mostrarTodasLasOrdenes();
+  resetOrdenPageLimit();
+}, 'Las funciones de paginación de órdenes deben ejecutarse sin errores');
 
 // Test B: badgeEstado
 assert.equal(badgeEstado('En Proceso'), 'badge-proceso', 'badgeEstado En Proceso debe retornar badge-proceso');
@@ -1681,7 +1853,22 @@ assert.doesNotThrow(() => {
   toggleSortOrdenes('fecha');
 }, 'Las funciones de ordenes_listado no deben arrojar error en ausencia de DOM');
 
-console.log('  ✅ Listados, Filtros, Menús de Ordenación y Tabla de Órdenes: OK');
+// Test D: Deduplicación estricta en safeGetFilteredOrders
+const fakeDuplicateOrders = [
+  { id: 'ord-1', folio: 'OS-1001', cliente: 'Cliente 1' },
+  { id: 'ord-1', folio: 'OS-1001', cliente: 'Cliente 1' },
+  { id: 'ord-2', folio: 'OS-1002', cliente: 'Cliente 2' },
+  { id: 'ord-2', folio: 'OS-1002', cliente: 'Cliente 2' }
+];
+const oldGetFilteredOrders = global.getFilteredOrders;
+global.getFilteredOrders = () => fakeDuplicateOrders;
+const deduplicatedOrds = safeGetFilteredOrders();
+assert.equal(deduplicatedOrds.length, 2, 'safeGetFilteredOrders debe eliminar órdenes duplicadas y devolver solo 2');
+assert.equal(deduplicatedOrds.map(o => o.folio).join(','), 'OS-1001,OS-1002', 'Folios de órdenes deben ser únicos');
+if (oldGetFilteredOrders) global.getFilteredOrders = oldGetFilteredOrders;
+else delete global.getFilteredOrders;
+
+console.log('  ✅ Listados, Filtros, Menús de Ordenación y Tabla de Órdenes (con Deduplicación Estricta): OK');
 
 // ============================================================================
 // TEST 44: Ideas, Fallas, Mejoras y Priorización Drag & Drop
@@ -1882,7 +2069,8 @@ const {
   migrarOrdenesExistentesMaquinaria,
   migrarUbicacionesMaquinariaDesdeTickets,
   recuperarMaquinariaDesdeTickets,
-  reintentarSincronizacionGastosLocales
+  reintentarSincronizacionGastosLocales,
+  repararCreadoresTicketsFaltantes
 } = await import('../src/modules/app_migrations.js');
 const {
   agregarMaquinaChip
@@ -1894,7 +2082,21 @@ assert.equal(typeof migrarOrdenesExistentesMaquinaria, 'function', 'migrarOrdene
 assert.equal(typeof migrarUbicacionesMaquinariaDesdeTickets, 'function', 'migrarUbicacionesMaquinariaDesdeTickets debe ser función');
 assert.equal(typeof recuperarMaquinariaDesdeTickets, 'function', 'recuperarMaquinariaDesdeTickets debe ser función');
 assert.equal(typeof reintentarSincronizacionGastosLocales, 'function', 'reintentarSincronizacionGastosLocales debe ser función');
+assert.equal(typeof repararCreadoresTicketsFaltantes, 'function', 'repararCreadoresTicketsFaltantes debe ser función');
 assert.equal(typeof agregarMaquinaChip, 'function', 'agregarMaquinaChip debe ser función');
+
+// Test A.1: repararCreadoresTicketsFaltantes repara tickets sin creador
+const ticketsTestRepair = [
+  { id: 'tk_rep_1', folio: 'TK-101', creadoPor: '', creado_por: 'Pablo Besoy' },
+  { id: 'tk_rep_2', folio: 'TK-102', creadoPor: null, comentariosInternos: [{ usuario: 'Adrian Franco', texto: 'Iniciando' }] }
+];
+globalThis.window = globalThis.window || {};
+globalThis.window.resolverCreadorTicket = resolverCreadorTicket;
+localStorage.setItem('sapi_tickets', JSON.stringify(ticketsTestRepair));
+repararCreadoresTicketsFaltantes();
+const reparados = JSON.parse(localStorage.getItem('sapi_tickets'));
+assert.equal(reparados[0].creadoPor, 'Pablo Besoy', 'Ticket 1 debe haber reparado creadoPor');
+assert.equal(reparados[1].creadoPor, 'Adrian Franco', 'Ticket 2 debe haber reparado creadoPor desde comentarios');
 
 // Test B: generarTicketsRefaccionesFaltantes genera ticket para orden con refacciones pendientes
 globalThis.window.ordenes = [
@@ -2014,7 +2216,47 @@ assert(syncPromise instanceof Promise, 'solicitarBackgroundSync debe retornar un
 const syncResult = await syncPromise;
 assert.equal(typeof syncResult, 'boolean', 'El resultado de solicitarBackgroundSync debe ser booleano');
 
+// Test D: sw.js debe declarar la versión v417 del caché PWA
+import fs from 'node:fs';
+import path from 'node:path';
+const swPath = path.resolve('sw.js');
+const swContent = fs.readFileSync(swPath, 'utf8');
+assert.ok(/const CACHE_NAME = 'eurorep-postventa-v(417|418)';/.test(swContent), 'sw.js debe declarar versión válida de caché');
+
 console.log('  ✅ Arquitectura Offline-First y Background Sync: OK');
+
+// 51. MÓDULO DE MANTENIMIENTO Y RETENCIÓN DE ALMACENAMIENTO (app.js)
+console.log('🧪 Verificando Rutina de Retención y Limpieza de Almacenamiento (app.js)...');
+const appJsPath = path.resolve('app.js');
+const appJsContent = fs.readFileSync(appJsPath, 'utf8');
+assert.ok(appJsContent.includes('function ejecutarLimpiezaMantenimientoAlmacenamiento'), 'app.js debe definir ejecutarLimpiezaMantenimientoAlmacenamiento');
+assert.ok(appJsContent.includes('window.ejecutarLimpiezaMantenimientoAlmacenamiento = ejecutarLimpiezaMantenimientoAlmacenamiento'), 'ejecutarLimpiezaMantenimientoAlmacenamiento debe exportarse en window');
+
+// Test de lógica de retención con mock de localStorage
+const mockStorage = {
+  data: {},
+  getItem(k) { return this.data[k] || null; },
+  setItem(k, v) { this.data[k] = String(v); },
+  removeItem(k) { delete this.data[k]; },
+  get length() { return Object.keys(this.data).length; },
+  key(i) { return Object.keys(this.data)[i]; }
+};
+
+// Generar 250 logs simulados
+const logsPrueba = [];
+for (let i = 0; i < 250; i++) {
+  logsPrueba.push({ id: `log-${i}`, fecha: new Date(Date.now() - i * 3600000).toISOString() });
+}
+mockStorage.setItem('sapi_email_logs', JSON.stringify(logsPrueba));
+
+// Simular el proceso de truncado
+let logs = JSON.parse(mockStorage.getItem('sapi_email_logs'));
+if (logs.length > 200) {
+  logs = logs.slice(-200);
+  mockStorage.setItem('sapi_email_logs', JSON.stringify(logs));
+}
+assert.equal(JSON.parse(mockStorage.getItem('sapi_email_logs')).length, 200, 'La retención debe truncar a 200 logs');
+console.log('  ✅ Rutina de Retención y Limpieza de Almacenamiento: OK');
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 

@@ -46,7 +46,7 @@
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; flex: 1;">
               <div style="position: relative; min-width: 260px; max-width: 380px; flex: 1;">
                 <i data-lucide="search" style="position: absolute; left: 10px; top: 9px; width: 15px; height: 15px; color: var(--text-muted);"></i>
-                <input type="text" id="search-rentas" placeholder="Buscar folio, cliente, equipo, serie, asesor..." oninput="window.renderRentas()" style="width: 100%; padding: 0.45rem 0.75rem 0.45rem 2.1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+                <input type="text" id="search-rentas" placeholder="Buscar folio, cliente, equipo, serie, asesor..." oninput="debouncedRenderRentas()" style="width: 100%; padding: 0.45rem 0.75rem 0.45rem 2.1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
               </div>
               <div class="rentas-filter-pills-wrap" style="display: flex; gap: 0.35rem; background: var(--bg-hover); padding: 0.25rem; border-radius: 8px; border: 1px solid var(--border);">
                 <button type="button" class="btn-secondary rentas-filter-pill active" data-filtro="todas" onclick="window.setFiltroEstadoRentas('todas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: var(--accent, #E8820C); color: #fff;">Todas <span id="count-pill-rentas-todas" style="margin-left:3px; opacity:0.85;">0</span></button>

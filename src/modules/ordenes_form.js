@@ -808,6 +808,19 @@ async function guardarOrden(e) {
     maquinariaId = oVieja ? oVieja.maquinaria_id : null;
   }
 
+  const autorActual = (typeof window.getCurrentUserDisplayName === 'function')
+    ? window.getCurrentUserDisplayName()
+    : ((typeof getCurrentUserDisplayName === 'function') ? getCurrentUserDisplayName() : (currentSession?.nombre || 'Usuario'));
+
+  let autorCreador = autorActual;
+  if (oVieja) {
+    if (oVieja.creadoPor && String(oVieja.creadoPor).trim()) {
+      autorCreador = String(oVieja.creadoPor).trim();
+    } else if (oVieja.tecnico && String(oVieja.tecnico).trim()) {
+      autorCreador = String(oVieja.tecnico).trim();
+    }
+  }
+
   const orden = {
     id: editandoId || folioVal,
     fecha: oVieja ? oVieja.fecha : getLocalDateString(),
@@ -827,7 +840,7 @@ async function guardarOrden(e) {
     serie: document.getElementById('f-serie').value.trim(),
     tecnico: tecnicosSeleccionados.join(', '),
     tecnicosAsignados: tecnicosSeleccionados,
-    creadoPor: oVieja ? (oVieja.creadoPor || oVieja.tecnico) : (usuarios.find(u => u.id === currentSession.userId)?.nombre || ''),
+    creadoPor: autorCreador,
     soporte: document.getElementById('f-soporte').value.trim(),
     km_ida: document.getElementById('f-km-ida').value,
     km_vuelta: document.getElementById('f-km-vuelta').value,
@@ -924,8 +937,16 @@ async function guardarOrden(e) {
     ordenes = ordenes.map(o => o.id === editandoId ? orden : o);
     if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) window.ordenes = window.ordenes.map(o => o.id === editandoId ? orden : o);
   } else {
-    ordenes.unshift(orden);
-    if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) window.ordenes.unshift(orden);
+    const existeEnOrdenes = ordenes.some(o => o && (o.id === orden.id || (o.folio && orden.folio && o.folio === orden.folio)));
+    if (!existeEnOrdenes) {
+      ordenes.unshift(orden);
+    }
+    if (typeof window !== 'undefined' && Array.isArray(window.ordenes) && window.ordenes !== ordenes) {
+      const existeEnWin = window.ordenes.some(o => o && (o.id === orden.id || (o.folio && orden.folio && o.folio === orden.folio)));
+      if (!existeEnWin) {
+        window.ordenes.unshift(orden);
+      }
+    }
   }
   
   // Auto-cerrar el ticket relacionado

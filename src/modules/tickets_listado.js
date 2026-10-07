@@ -3,7 +3,39 @@
  * Diseñado como módulo ES con retrocompatibilidad global hacia window.
  */
 
-import { normStr, formatFechaHoraAmigable, escapeHTML } from "../utils.js";
+import { normStr, formatFechaHoraAmigable, escapeHTML, esUsuarioSuperadmin } from "../utils.js";
+
+function safeEsUsuarioSuperadmin() {
+  if (typeof esUsuarioSuperadmin === 'function') return esUsuarioSuperadmin();
+  if (typeof window !== 'undefined' && typeof window.esUsuarioSuperadmin === 'function') return window.esUsuarioSuperadmin();
+  let sess = null;
+  if (typeof currentSession !== 'undefined' && currentSession) sess = currentSession;
+  else if (typeof window !== 'undefined' && window.currentSession) sess = window.currentSession;
+  else if (typeof safeGetJSON === 'function') sess = safeGetJSON('eurorep_session', null);
+  else if (typeof localStorage !== 'undefined') {
+    try { sess = JSON.parse(localStorage.getItem('eurorep_session') || 'null'); } catch (e) {}
+  }
+  if (!sess) return false;
+  const viewMode = String(sess.viewMode || '').toLowerCase().trim();
+  const realRol = String(sess.realRol || '').toLowerCase().trim();
+  const userId = String(sess.userId || '').toLowerCase().trim();
+  if (viewMode !== 'superadmin') return false;
+  const usersList = (typeof window !== 'undefined' && Array.isArray(window.usuarios))
+    ? window.usuarios
+    : ((typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : (typeof safeGetJSON === 'function' ? safeGetJSON('eurorep_usuarios', []) : []));
+  if (Array.isArray(usersList) && userId) {
+    const userInDb = usersList.find(u => u && u.id === userId);
+    if (userInDb && userInDb.rol) {
+      const dbRol = String(userInDb.rol).toLowerCase().trim();
+      if (dbRol !== 'superadmin') return false;
+    }
+  }
+  if (['admin', 'supervisor', 'tecnico', 'empresa', 'cliente', 'cliente-consultor', 'consulta'].includes(realRol)) {
+    return false;
+  }
+  return (viewMode === 'superadmin' && (realRol === 'superadmin' || userId === 'superadmin' || !realRol));
+}
+
 
 function safeNorm(s) {
   if (!s) return "";
@@ -96,9 +128,23 @@ function safeGetCurrentSession() {
 }
 
 function safeGetFilteredTickets() {
-  if (typeof getFilteredTickets === "function") return getFilteredTickets();
-  if (typeof window !== "undefined" && typeof window.getFilteredTickets === "function") return window.getFilteredTickets();
-  return safeGetTickets();
+  let list = [];
+  if (typeof getFilteredTickets === "function") list = getFilteredTickets();
+  else if (typeof window !== "undefined" && typeof window.getFilteredTickets === "function") list = window.getFilteredTickets();
+  else list = safeGetTickets();
+  if (!Array.isArray(list)) return [];
+  const seenIds = new Set();
+  const seenFolios = new Set();
+  return list.filter(t => {
+    if (!t) return false;
+    const tid = t.id ? String(t.id).trim() : null;
+    const tfol = t.folio ? String(t.folio).trim() : null;
+    if (tid && seenIds.has(tid)) return false;
+    if (tfol && seenFolios.has(tfol)) return false;
+    if (tid) seenIds.add(tid);
+    if (tfol) seenFolios.add(tfol);
+    return true;
+  });
 }
 
 // ===== TICKETS DATA =====
@@ -157,6 +203,7 @@ function updateTicketBadge() {
       let passTec = true;
       let passSup = true;
       
+      const tCreador = t.creadoPor || (typeof window.resolverCreadorTicket === 'function' ? window.resolverCreadorTicket(t) : (t.creado_por || ''));
       if (tecFilter && tecNameLower) {
          let assigned = [];
          if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(safeResolveTecnicoNombre);
@@ -164,7 +211,7 @@ function updateTicketBadge() {
          const assignedLower = assigned.map(s => safeNorm(s));
          passTec = assignedLower.includes(tecNameLower) || 
                    (t.solicitante && safeNorm(t.solicitante) === tecNameLower) || 
-                   (t.creadoPor && safeNorm(t.creadoPor) === tecNameLower);
+                   (tCreador && safeNorm(tCreador) === tecNameLower);
       }
       
       if (supFilter && supNameLower) {
@@ -183,7 +230,7 @@ function updateTicketBadge() {
          
          let passSupTicket = assignedLower.includes(supNameLower) || 
                              (t.solicitante && safeNorm(t.solicitante) === supNameLower) || 
-                             (t.creadoPor && safeNorm(t.creadoPor) === supNameLower);
+                             (tCreador && safeNorm(tCreador) === supNameLower);
          
          passSup = passSupClient || passSupTicket;
       }
@@ -1513,8 +1560,19 @@ function renderTickets(ctx) {
       )
     );
     
-
-    
+    // Deduplicación estricta por ID y Folio para garantizar que ningún ticket se pinte dos veces
+    const seenTicketIds = new Set();
+    const seenTicketFolios = new Set();
+    filtered = filtered.filter(t => {
+      if (!t) return false;
+      const tid = t.id ? String(t.id).trim() : null;
+      const tfol = t.folio ? String(t.folio).trim() : null;
+      if (tid && seenTicketIds.has(tid)) return false;
+      if (tfol && seenTicketFolios.has(tfol)) return false;
+      if (tid) seenTicketIds.add(tid);
+      if (tfol) seenTicketFolios.add(tfol);
+      return true;
+    });
     // Ordenar dinámicamente según la columna seleccionada
     filtered.sort((a, b) => {
       if (!a || !b) return 0;
@@ -1692,6 +1750,7 @@ function renderTickets(ctx) {
         let passTec = true;
         let passSup = true;
         
+        const tCreador = t.creadoPor || (typeof window.resolverCreadorTicket === 'function' ? window.resolverCreadorTicket(t) : (t.creado_por || ''));
         if (tecFilter && tecNameLower) {
            let assigned = [];
            if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(safeResolveTecnicoNombre);
@@ -1699,7 +1758,7 @@ function renderTickets(ctx) {
            const assignedLower = assigned.map(s => safeNorm(s));
            passTec = assignedLower.includes(tecNameLower) || 
                      (t.solicitante && safeNorm(t.solicitante) === tecNameLower) || 
-                     (t.creadoPor && safeNorm(t.creadoPor) === tecNameLower);
+                     (tCreador && safeNorm(tCreador) === tecNameLower);
         }
         
         if (supFilter && supNameLower) {
@@ -1718,7 +1777,7 @@ function renderTickets(ctx) {
            
            let passSupTicket = assignedLower.includes(supNameLower) || 
                                (t.solicitante && safeNorm(t.solicitante) === supNameLower) || 
-                               (t.creadoPor && safeNorm(t.creadoPor) === supNameLower);
+                               (tCreador && safeNorm(tCreador) === supNameLower);
            
            passSup = passSupClient || passSupTicket;
         }
@@ -1763,9 +1822,29 @@ function renderTickets(ctx) {
     }
     const canEdit = currentSession.viewMode !== 'consulta';
     const canDelete = ['superadmin', 'admin'].includes(currentSession.viewMode);
-    const isSuperadmin = (typeof currentSession !== 'undefined' && currentSession && (currentSession.viewMode === 'superadmin' || currentSession.rol === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.userId === 'superadmin'));
+    const isSuperadmin = safeEsUsuarioSuperadmin();
 
-    body.innerHTML = filtered.map((t, i) => {
+    // Paginación progresiva para mantener el DOM ultra-rápido en listas extensas
+    const currentQ = q || '';
+    const currentF = ticketFiltroActivo || 'todos';
+    if (!isDashView && !isV2) {
+      if (currentQ !== window._lastRenderTicketsQuery || currentF !== window._lastRenderTicketsFilter) {
+        window.ticketPageLimit = 50;
+        window._lastRenderTicketsQuery = currentQ;
+        window._lastRenderTicketsFilter = currentF;
+      }
+    }
+    const currentLimit = (typeof window.ticketPageLimit === 'number') ? window.ticketPageLimit : 50;
+    const totalMatching = filtered.length;
+    let paginatedTickets = filtered;
+    let hasMoreTickets = false;
+
+    if (!isDashView && !isV2 && currentLimit > 0 && filtered.length > currentLimit) {
+      paginatedTickets = filtered.slice(0, currentLimit);
+      hasMoreTickets = true;
+    }
+
+    let htmlRows = paginatedTickets.map((t, i) => {
       if (!t) return '';
       const latestComment = (t.comentariosInternos && Array.isArray(t.comentariosInternos) && t.comentariosInternos.length > 0)
       let comentarioHtml = '<span style="color:var(--text-muted); font-size:0.75rem;">—</span>';
@@ -1865,6 +1944,26 @@ function renderTickets(ctx) {
       </tr>
       `;
     }).join('');
+
+    if (hasMoreTickets) {
+      htmlRows += `
+        <tr id="tickets-load-more-row">
+          <td colspan="15" style="text-align:center; padding:14px; background:var(--bg-subtle, rgba(0,0,0,0.02)); border-top:1px solid var(--border-color);">
+            <div style="display:flex; align-items:center; justify-content:center; gap:12px; font-size:0.85rem; color:var(--text-secondary); flex-wrap:wrap;">
+              <span>Mostrando <strong>${paginatedTickets.length}</strong> de <strong>${totalMatching}</strong> tickets</span>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="window.cargarMasTickets()" style="display:inline-flex; align-items:center; gap:5px; font-weight:600; padding:4px 12px; cursor:pointer;">
+                <i data-lucide="chevron-down" style="width:14px;height:14px;"></i> Cargar más (+50)
+              </button>
+              <button type="button" class="btn btn-sm btn-link" onclick="window.mostrarTodosLosTickets()" style="color:var(--accent); text-decoration:underline; font-weight:500; background:none; border:none; cursor:pointer;">
+                Mostrar todos
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    body.innerHTML = htmlRows;
     
     try { actualizarCabeceraOrdenacion(); } catch (e) {}
     try { if (typeof window.actualizarBadgeDepuradorTickets === 'function') window.actualizarBadgeDepuradorTickets(); } catch (e) {}
@@ -2045,10 +2144,37 @@ const allModuleExports = {
   filtrarTickets,
   setFiltroTickets,
   seleccionarCanal,
-  updateFileLabel
+  updateFileLabel,
+  cargarMasTickets,
+  mostrarTodosLosTickets,
+  resetTicketPageLimit,
+  safeGetFilteredTickets
 };
 
+function cargarMasTickets() {
+  if (typeof window !== 'undefined') {
+    window.ticketPageLimit = (window.ticketPageLimit || 50) + 50;
+  }
+  renderTickets();
+}
+
+function mostrarTodosLosTickets() {
+  if (typeof window !== 'undefined') {
+    window.ticketPageLimit = 999999;
+  }
+  renderTickets();
+}
+
+function resetTicketPageLimit() {
+  if (typeof window !== 'undefined') {
+    window.ticketPageLimit = 50;
+  }
+}
+
 if (typeof window !== "undefined") {
+  window.cargarMasTickets = cargarMasTickets;
+  window.mostrarTodosLosTickets = mostrarTodosLosTickets;
+  window.resetTicketPageLimit = resetTicketPageLimit;
   window.TicketsListado = allModuleExports;
   Object.assign(window, allModuleExports);
 }
@@ -2089,5 +2215,9 @@ export {
   filtrarTickets,
   setFiltroTickets,
   seleccionarCanal,
-  updateFileLabel
+  updateFileLabel,
+  cargarMasTickets,
+  mostrarTodosLosTickets,
+  resetTicketPageLimit,
+  safeGetFilteredTickets
 };

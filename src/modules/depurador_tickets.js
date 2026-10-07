@@ -1149,6 +1149,179 @@ function sanitizarAsignacionesTickets() {
   }
 };
 
+/**
+ * Detecta y opcionalmente purga tickets duplicados gemelos generados concurrentemente
+ * (mismo cliente, mismo asunto, mismos folios consecutivos o emitidos en un intervalo corto).
+ * @param {boolean} autoEliminar - Si es true, elimina de memoria, localStorage y Supabase el duplicado redundante.
+ * @returns {Promise<{totalEncontrados: number, duplicados: Array, eliminados: Array}>}
+ */
+async function detectarYDepurarTicketsDuplicados(autoEliminar = false) {
+  const listaTickets = (typeof tickets !== 'undefined' && Array.isArray(tickets))
+    ? tickets
+    : ((typeof window !== 'undefined' && Array.isArray(window.tickets)) ? window.tickets : []);
+
+  const ords = (typeof ordenes !== 'undefined' && Array.isArray(ordenes))
+    ? ordenes
+    : ((typeof window !== 'undefined' && Array.isArray(window.ordenes)) ? window.ordenes : []);
+
+  const duplicados = [];
+  const procesados = new Set();
+
+  for (let i = 0; i < listaTickets.length; i++) {
+    const t1 = listaTickets[i];
+    if (!t1 || !t1.id || procesados.has(t1.id)) continue;
+
+    for (let j = i + 1; j < listaTickets.length; j++) {
+      const t2 = listaTickets[j];
+      if (!t2 || !t2.id || procesados.has(t2.id)) continue;
+
+      let esDuplicado = false;
+      let motivo = '';
+
+      // Criterio 1: Exactamente el mismo folio
+      if (t1.folio && t2.folio && String(t1.folio).trim().toUpperCase() === String(t2.folio).trim().toUpperCase()) {
+        esDuplicado = true;
+        motivo = 'Mismo folio exacto';
+      }
+
+      // Criterio 2: Mismo cliente y asunto idéntico con folios consecutivos o creados con menos de 10 min de diferencia
+      if (!esDuplicado && t1.cliente && t2.cliente && t1.asunto && t2.asunto) {
+        const mismoCliente = String(t1.cliente).trim().toLowerCase() === String(t2.cliente).trim().toLowerCase();
+        const mismoAsunto = String(t1.asunto).trim().toLowerCase() === String(t2.asunto).trim().toLowerCase();
+
+        if (mismoCliente && mismoAsunto) {
+          // Revisar folios consecutivos
+          const m1 = String(t1.folio || '').match(/\d+/g);
+          const m2 = String(t2.folio || '').match(/\d+/g);
+          const num1 = m1 ? parseInt(m1[m1.length - 1], 10) : NaN;
+          const num2 = m2 ? parseInt(m2[m2.length - 1], 10) : NaN;
+          const consecutivos = (!isNaN(num1) && !isNaN(num2) && Math.abs(num1 - num2) <= 1);
+
+          // Revisar diferencia de tiempo de creación
+          let diffMinutos = Infinity;
+          if (t1.fechaCreacion && t2.fechaCreacion) {
+            const ms1 = new Date(t1.fechaCreacion).getTime();
+            const ms2 = new Date(t2.fechaCreacion).getTime();
+            if (!isNaN(ms1) && !isNaN(ms2)) {
+              diffMinutos = Math.abs(ms1 - ms2) / (1000 * 60);
+            }
+          }
+
+          if (consecutivos) {
+            esDuplicado = true;
+            motivo = `Mismo cliente y asunto con folios consecutivos (${t1.folio} / ${t2.folio})`;
+          } else if (diffMinutos <= 10) {
+            esDuplicado = true;
+            motivo = `Mismo cliente y asunto creado en un lapso de ${diffMinutos.toFixed(1)} min`;
+          }
+        }
+      }
+
+      if (esDuplicado) {
+        // Analizar cuál conservar
+        const info1 = (typeof analizarInformacionTicket === 'function') ? analizarInformacionTicket(t1) : { tieneInfo: false };
+        const info2 = (typeof analizarInformacionTicket === 'function') ? analizarInformacionTicket(t2) : { tieneInfo: false };
+
+        const linkedOrd1 = ords.some(o => o && (o.soporte === t1.id || o.soporte === t1.folio || o.id === t1.ordenId));
+        const linkedOrd2 = ords.some(o => o && (o.soporte === t2.id || o.soporte === t2.folio || o.id === t2.ordenId));
+
+        let original = t1;
+        let duplicadoItem = t2;
+
+        if (info2.tieneInfo && !info1.tieneInfo) {
+          original = t2;
+          duplicadoItem = t1;
+        } else if (linkedOrd2 && !linkedOrd1) {
+          original = t2;
+          duplicadoItem = t1;
+        } else if (!info2.tieneInfo && !info1.tieneInfo && !linkedOrd1 && !linkedOrd2) {
+          // Conservar el de folio menor / más antiguo
+          const m1 = String(t1.folio || '').match(/\d+/g);
+          const m2 = String(t2.folio || '').match(/\d+/g);
+          const n1 = m1 ? parseInt(m1[m1.length - 1], 10) : 0;
+          const n2 = m2 ? parseInt(m2[m2.length - 1], 10) : 0;
+          if (n2 < n1) {
+            original = t2;
+            duplicadoItem = t1;
+          }
+        }
+
+        procesados.add(duplicadoItem.id);
+        duplicados.push({
+          duplicado: { id: duplicadoItem.id, folio: duplicadoItem.folio, cliente: duplicadoItem.cliente, asunto: duplicadoItem.asunto, fechaCreacion: duplicadoItem.fechaCreacion },
+          original: { id: original.id, folio: original.folio, cliente: original.cliente, asunto: original.asunto, fechaCreacion: original.fechaCreacion },
+          motivo: motivo
+        });
+      }
+    }
+  }
+
+  const eliminados = [];
+  if (autoEliminar && duplicados.length > 0) {
+    const idsAEliminar = new Set(duplicados.map(d => d.duplicado.id));
+    
+    // Filtrar de memoria local
+    if (typeof tickets !== 'undefined' && Array.isArray(tickets)) {
+      tickets = tickets.filter(t => !idsAEliminar.has(t.id));
+    }
+    if (typeof window !== 'undefined' && Array.isArray(window.tickets)) {
+      window.tickets = window.tickets.filter(t => !idsAEliminar.has(t.id));
+    }
+
+    if (typeof safeSetJSON === 'function') {
+      const ts = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : (typeof window !== 'undefined' ? window.tickets : []);
+      safeSetJSON('sapi_tickets', ts);
+    }
+
+    // Purgar de Supabase
+    for (const d of duplicados) {
+      eliminados.push(d.duplicado.folio || d.duplicado.id);
+      try {
+        if (typeof window !== 'undefined' && window.deleteFromSupabase) {
+          await window.deleteFromSupabase('tickets', d.duplicado.id);
+        } else if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+          await supabaseClient.from('tickets').delete().eq('id', d.duplicado.id);
+        } else if (typeof window !== 'undefined' && window.supabaseClient) {
+          await window.supabaseClient.from('tickets').delete().eq('id', d.duplicado.id);
+        }
+      } catch (errDel) {
+        console.warn('[detectarYDepurarTicketsDuplicados] Error al eliminar de Supabase:', d.duplicado.id, errDel);
+      }
+    }
+
+    // Refrescar vistas
+    if (typeof renderTickets === 'function') renderTickets();
+    else if (typeof window !== 'undefined' && typeof window.renderTickets === 'function') window.renderTickets();
+
+    if (typeof renderStats === 'function') renderStats();
+    else if (typeof window !== 'undefined' && typeof window.renderStats === 'function') window.renderStats();
+
+    if (typeof updateTicketBadge === 'function') updateTicketBadge();
+    else if (typeof window !== 'undefined' && typeof window.updateTicketBadge === 'function') window.updateTicketBadge();
+
+    const msg = `Se depuraron y eliminaron ${duplicados.length} ticket(s) duplicado(s) exitosamente.`;
+    console.log(`[detectarYDepurarTicketsDuplicados] ${msg}`, eliminados);
+    if (typeof mostrarNotificacion === 'function') mostrarNotificacion(msg, 'success');
+    else if (typeof window !== 'undefined' && typeof window.mostrarNotificacion === 'function') window.mostrarNotificacion(msg, 'success');
+  } else {
+    console.log(`[detectarYDepurarTicketsDuplicados] Análisis concluido. ${duplicados.length} duplicado(s) detectado(s).`);
+    if (duplicados.length > 0) {
+      console.table(duplicados.map(d => ({
+        Duplicado: d.duplicado.folio,
+        Original: d.original.folio,
+        Cliente: d.duplicado.cliente,
+        Asunto: d.duplicado.asunto,
+        Motivo: d.motivo
+      })));
+    }
+  }
+
+  return {
+    totalEncontrados: duplicados.length,
+    duplicados,
+    eliminados
+  };
+}
 
 if (typeof window !== 'undefined') {
   window.analizarInformacionTicket = analizarInformacionTicket;
@@ -1169,6 +1342,7 @@ if (typeof window !== 'undefined') {
   window.depurarYRegenerarTicketsCompletos = depurarYRegenerarTicketsCompletos;
   window.exportarDepuradorTicketsAExcel = exportarDepuradorTicketsAExcel;
   window.sanitizarAsignacionesTickets = sanitizarAsignacionesTickets;
+  window.detectarYDepurarTicketsDuplicados = detectarYDepurarTicketsDuplicados;
   window._depurarTicketsCache = _depurarTicketsCache;
   window._depurarTicketsSeleccionadas = _depurarTicketsSeleccionadas;
   window._depurarTicketsFiltradasActuales = _depurarTicketsFiltradasActuales;
@@ -1193,6 +1367,7 @@ export {
   depurarYRegenerarTicketsCompletos,
   exportarDepuradorTicketsAExcel,
   sanitizarAsignacionesTickets,
+  detectarYDepurarTicketsDuplicados,
   _depurarTicketsCache,
   _depurarTicketsSeleccionadas,
   _depurarTicketsFiltradasActuales

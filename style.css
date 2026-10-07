@@ -678,8 +678,8 @@ body {
   z-index: 200; padding: 1rem;
 }
 .modal-overlay.open { display: flex; }
-.modal {
-  background: var(--bg-secondary); border: 1px solid var(--border);
+.modal, .modal-content {
+  background: var(--bg-card); border: 1px solid var(--border);
   border-radius: var(--radius); width: 100%; max-width: 860px;
   max-height: 92vh; display: flex; flex-direction: column;
   box-shadow: var(--shadow);
@@ -721,6 +721,10 @@ body {
   color: var(--text-primary); padding: 0.55rem 0.75rem;
   border-radius: var(--radius-sm); font-size: 0.875rem;
   font-family: inherit; transition: var(--transition); width: 100%;
+}
+.form-group input[type="checkbox"], .form-group input[type="radio"] {
+  width: 16px !important; height: 16px !important; min-width: 16px;
+  padding: 0 !important; margin: 0 !important; cursor: pointer; flex-shrink: 0;
 }
 .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
   outline: none; border-color: var(--accent);

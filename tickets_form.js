@@ -44,12 +44,15 @@ function abrirTicket(id) {
     mostrarNotificacion('El rol Consulta no puede generar tickets.', 'error');
     return;
   }
+  window._guardandoTicket = false;
   editandoTicketId = id || null;
   if (typeof window !== 'undefined') window.editandoTicketId = editandoTicketId;
   document.getElementById('ticket-modal-title').textContent = id ? 'Editar Ticket' : 'Nuevo Ticket';
   
   const btnSubmit = document.getElementById('btn-submit-ticket');
   if (btnSubmit) {
+    btnSubmit.disabled = false;
+    btnSubmit.style.pointerEvents = '';
     btnSubmit.innerHTML = id ? '<i data-lucide="save" class="btn-icon"></i> Guardar Cambios' : '<i data-lucide="save" class="btn-icon"></i> Emitir Ticket';
   }
 
@@ -693,6 +696,12 @@ function editarTicket(id) { abrirTicket(id); }
 function cerrarTicket(e) {
   if (typeof document === 'undefined') return;
   if (e && e.target !== document.getElementById('modal-ticket-overlay')) return;
+  window._guardandoTicket = false;
+  const btnSubmit = document.getElementById('btn-submit-ticket');
+  if (btnSubmit) {
+    btnSubmit.disabled = false;
+    btnSubmit.style.pointerEvents = '';
+  }
   document.getElementById('modal-ticket-overlay').classList.remove('open');
   document.getElementById('t-cliente-menu')?.classList.remove('open');
   document.getElementById('t-cliente-combo')?.classList.remove('focus');
@@ -1251,6 +1260,11 @@ function readFileAsBase64(file) {
   if (typeof FileReader === 'undefined') {
     return Promise.resolve('');
   }
+  if (file && file.type && file.type.startsWith('image/')) {
+    if (typeof window !== 'undefined' && typeof window.compressImageFile === 'function') {
+      return window.compressImageFile(file);
+    }
+  }
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
@@ -1262,6 +1276,34 @@ function readFileAsBase64(file) {
 async function guardarTicket(e) {
   if (typeof document === 'undefined') return;
   e.preventDefault();
+
+  // 1. Candado estricto contra doble clic y envíos concurrentes
+  if (window._guardandoTicket) {
+    console.warn('[guardarTicket] Intento de guardado concurrente bloqueado.');
+    return;
+  }
+  window._guardandoTicket = true;
+
+  const btnSubmit = document.getElementById('btn-submit-ticket');
+  const originalBtnHtml = btnSubmit ? btnSubmit.innerHTML : '';
+  if (btnSubmit) {
+    btnSubmit.disabled = true;
+    btnSubmit.style.pointerEvents = 'none';
+    btnSubmit.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;"><i data-lucide="loader-2" class="spin" style="width:14px;height:14px;"></i> Guardando...</span>`;
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+  }
+
+  const liberarBoton = () => {
+    window._guardandoTicket = false;
+    if (btnSubmit) {
+      btnSubmit.disabled = false;
+      btnSubmit.style.pointerEvents = '';
+      btnSubmit.innerHTML = originalBtnHtml;
+      if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+    }
+  };
+
+  try {
   const t_existente = editandoTicketId ? tickets.find(x=>x.id===editandoTicketId) : null;
   const isEmpresa = currentSession.viewMode === 'empresa';
   const estado = (isEmpresa || !editandoTicketId) ? 'Abierto' : (document.querySelector('input[name="t-estado"]:checked')?.value || 'Abierto');
@@ -1480,13 +1522,28 @@ async function guardarTicket(e) {
     }));
   }
 
+  const autorActual = (typeof window.getCurrentUserDisplayName === 'function')
+    ? window.getCurrentUserDisplayName()
+    : ((typeof getCurrentUserDisplayName === 'function') ? getCurrentUserDisplayName() : (currentSession?.nombre || 'Usuario'));
+
+  let autorCreador = autorActual;
+  if (t_existente) {
+    if (t_existente.creadoPor && String(t_existente.creadoPor).trim() && t_existente.creadoPor !== '—' && t_existente.creadoPor !== 'null') {
+      autorCreador = String(t_existente.creadoPor).trim();
+    } else if (t_existente.creado_por && String(t_existente.creado_por).trim() && t_existente.creado_por !== '—' && t_existente.creado_por !== 'null') {
+      autorCreador = String(t_existente.creado_por).trim();
+    } else if (typeof window.resolverCreadorTicket === 'function') {
+      autorCreador = window.resolverCreadorTicket(t_existente) || autorActual;
+    }
+  }
+
   const ticket = {
     id: editandoTicketId || crypto.randomUUID(),
     folio: editandoTicketId ? t_existente?.folio : newFolio,
     fecha: t_existente ? t_existente.fecha : new Date().toISOString(),
     fechaCreacion: t_existente ? t_existente.fechaCreacion : new Date().toISOString(),
     fechaModificacion: new Date().toISOString(),
-    modificadoPor: window.getCurrentUserDisplayName ? window.getCurrentUserDisplayName() : (usuarios.find(u => u.id === currentSession.userId)?.nombre || 'Usuario'),
+    modificadoPor: autorActual,
     fechaCierre: estado === 'Cerrado' ? (t_existente?.fechaCierre || new Date().toISOString()) : null,
     canal,
     contacto,
@@ -1494,7 +1551,7 @@ async function guardarTicket(e) {
     cliente: document.getElementById('t-cliente')?.value || '',
     sitio: document.getElementById('t-sitio')?.value || '',
     solicitante: document.getElementById('t-solicitante').value.trim(),
-    creadoPor: t_existente ? (t_existente.creadoPor || t_existente.solicitante) : (usuarios.find(u => u.id === currentSession.userId)?.nombre || ''),
+    creadoPor: autorCreador,
     area: document.getElementById('t-area').value,
     categoria: catSeleccionada,
     prioridad: document.getElementById('t-prioridad').value,
@@ -1640,8 +1697,35 @@ async function guardarTicket(e) {
     tickets = tickets.map(t => t.id === editandoTicketId ? ticket : t);
     if (typeof window !== 'undefined' && Array.isArray(window.tickets)) window.tickets = window.tickets.map(t => t.id === editandoTicketId ? ticket : t);
   } else {
-    tickets.unshift(ticket);
-    if (typeof window !== 'undefined' && Array.isArray(window.tickets)) window.tickets.unshift(ticket);
+    // Protección contra duplicados accidentales (doble clic o red intermitente en ventana de 12 segundos)
+    const ahora = Date.now();
+    const duplicadoReciente = tickets.find(t => {
+      if (!t || !t.fechaCreacion) return false;
+      const creadoMs = new Date(t.fechaCreacion).getTime();
+      if (isNaN(creadoMs)) return false;
+      const diffSegundos = (ahora - creadoMs) / 1000;
+      return diffSegundos < 12 &&
+             String(t.cliente || '').trim().toLowerCase() === String(ticket.cliente || '').trim().toLowerCase() &&
+             String(t.asunto || '').trim().toLowerCase() === String(ticket.asunto || '').trim().toLowerCase() &&
+             String(t.equipo || '').trim().toLowerCase() === String(ticket.equipo || '').trim().toLowerCase();
+    });
+    if (duplicadoReciente) {
+      console.warn('[guardarTicket] Intento de ticket duplicado detectado en ventana de 12s:', duplicadoReciente.folio);
+      mostrarNotificacion(`El ticket ${duplicadoReciente.folio} ya fue emitido hace un momento.`, 'info');
+      cerrarTicket();
+      return;
+    }
+
+    const existeEnTickets = tickets.some(t => t && (t.id === ticket.id || (t.folio && ticket.folio && t.folio === ticket.folio)));
+    if (!existeEnTickets) {
+      tickets.unshift(ticket);
+    }
+    if (typeof window !== 'undefined' && Array.isArray(window.tickets) && window.tickets !== tickets) {
+      const existeEnWin = window.tickets.some(t => t && (t.id === ticket.id || (t.folio && ticket.folio && t.folio === ticket.folio)));
+      if (!existeEnWin) {
+        window.tickets.unshift(ticket);
+      }
+    }
   }
   
   // Guardar SIEMPRE en local como respaldo (con try-catch para evitar que un PDF gigante rompa la subida a la nube)
@@ -1826,7 +1910,16 @@ async function guardarTicket(e) {
           esPrueba: isTest,
         };
 
-        ordenes.unshift(nuevaOrden);
+        const existeOrd = ordenes.some(o => o && (o.id === nuevaOrden.id || (o.folio && nuevaOrden.folio && o.folio === nuevaOrden.folio)));
+        if (!existeOrd) {
+          ordenes.unshift(nuevaOrden);
+        }
+        if (typeof window !== 'undefined' && Array.isArray(window.ordenes) && window.ordenes !== ordenes) {
+          const existeEnWin = window.ordenes.some(o => o && (o.id === nuevaOrden.id || (o.folio && nuevaOrden.folio && o.folio === nuevaOrden.folio)));
+          if (!existeEnWin) {
+            window.ordenes.unshift(nuevaOrden);
+          }
+        }
         safeSetJSON('sapi_ordenes', ordenes);
         if (window.supabaseClient) {
           await window.pushToSupabase('ordenes', nuevaOrden);
@@ -1876,6 +1969,14 @@ async function guardarTicket(e) {
   updateTicketBadge(); updateOrdenesBadge();
   if (typeof renderRefaccionesPendientes === 'function') {
     renderRefaccionesPendientes();
+  }
+  } catch (errGuardar) {
+    console.error('[guardarTicket] Error al guardar ticket:', errGuardar);
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion('Error al guardar el ticket: ' + (errGuardar.message || errGuardar), 'error');
+    }
+  } finally {
+    liberarBoton();
   }
 }
 

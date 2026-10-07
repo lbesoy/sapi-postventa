@@ -53,6 +53,134 @@ export function normStr(s) {
   return String(s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
+/**
+ * Crea una versión con debounce de una función para diferir su ejecución
+ * hasta que hayan transcurrido 'delay' milisegundos desde la última llamada.
+ * @param {Function} fn Función a ejecutar
+ * @param {number} delay Tiempo de espera en milisegundos (por defecto 250ms)
+ * @returns {Function} Función decorada con debounce
+ */
+export function debounce(fn, delay = 250) {
+  let timer = null;
+  return function(...args) {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      fn.apply(this, args);
+    }, delay);
+  };
+}
+
+/**
+ * Invoca una función de forma diferida identificada por una clave única.
+ * @param {string} key Identificador único del temporizador
+ * @param {Function} fn Función a ejecutar
+ * @param {number} delay Tiempo de espera en ms (por defecto 250ms)
+ */
+export function debouncedCall(key, fn, delay = 250) {
+  const globalObj = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null);
+  if (!globalObj) {
+    fn();
+    return;
+  }
+  if (!globalObj._debouncedCallTimers) {
+    globalObj._debouncedCallTimers = new Map();
+  }
+  if (globalObj._debouncedCallTimers.has(key)) {
+    clearTimeout(globalObj._debouncedCallTimers.get(key));
+  }
+  const timer = setTimeout(() => {
+    globalObj._debouncedCallTimers.delete(key);
+    fn();
+  }, delay);
+  globalObj._debouncedCallTimers.set(key, timer);
+}
+
+/**
+ * Comprime un archivo de imagen utilizando HTML5 Canvas para optimizar subidas y almacenamiento.
+ * Si el archivo no es una imagen o el entorno no soporta Canvas/DOM, realiza fallback a FileReader tradicional.
+ * @param {File|Blob} file Archivo a comprimir
+ * @param {Object} [options]
+ * @param {number} [options.maxWidth=1600] Ancho máximo en píxeles
+ * @param {number} [options.maxHeight=1600] Alto máximo en píxeles
+ * @param {number} [options.quality=0.82] Calidad JPEG/WebP (0.1 a 1.0)
+ * @param {string} [options.mimeType='image/jpeg'] Formato de salida
+ * @returns {Promise<string>} Promesa que resuelve a la Data URL comprimida
+ */
+export function compressImageFile(file, options = {}) {
+  const {
+    maxWidth = 1600,
+    maxHeight = 1600,
+    quality = 0.82,
+    mimeType = 'image/jpeg'
+  } = options;
+
+  if (typeof FileReader === 'undefined') {
+    return Promise.resolve('');
+  }
+
+  const isImage = file && file.type && file.type.startsWith('image/') && !file.type.includes('svg');
+  if (!isImage || typeof Image === 'undefined' || typeof document === 'undefined') {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = err => reject(err);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = err => reject(err);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = () => {
+        resolve(e.target.result);
+      };
+      img.onload = () => {
+        try {
+          let width = img.width || 1;
+          let height = img.height || 1;
+
+          if (width > maxWidth || height > maxHeight) {
+            if (width / maxWidth > height / maxHeight) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, width);
+          canvas.height = Math.max(1, height);
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(e.target.result);
+            return;
+          }
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          const compressedDataUrl = canvas.toDataURL(mimeType, quality);
+          if (compressedDataUrl && compressedDataUrl.length > 0) {
+            resolve(compressedDataUrl);
+          } else {
+            resolve(e.target.result);
+          }
+        } catch (canvasErr) {
+          console.warn('[compressImageFile] Fallback a original por error en Canvas:', canvasErr);
+          resolve(e.target.result);
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 // Formatea fechas sin lanzar excepciones RangeError
 export function safeFormatDate(fechaStr, options = { day:'numeric', month:'short' }, defaultVal = 'N/A') {
   if (!fechaStr) return defaultVal;
@@ -138,12 +266,15 @@ export function getTicketFechaModificacion(t) {
 export function getCurrentUserDisplayName() {
   try {
     if (typeof currentSession !== 'undefined' && currentSession) {
+      if (currentSession.nombre && String(currentSession.nombre).trim()) return String(currentSession.nombre).trim();
       if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
-        const u = usuarios.find(x => x && x.id === currentSession.userId);
-        if (u && u.nombre) return u.nombre;
+        const u = usuarios.find(x => x && (x.id === currentSession.userId || x.id === currentSession.realUserId));
+        if (u && u.nombre && String(u.nombre).trim()) return String(u.nombre).trim();
       }
-      if (currentSession.nombre) return currentSession.nombre;
-      if (currentSession.empresa) return currentSession.empresa;
+      if (currentSession.userId === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.viewMode === 'superadmin') {
+        return 'Super Administrador';
+      }
+      if (currentSession.empresa && String(currentSession.empresa).trim()) return String(currentSession.empresa).trim();
     }
     if (typeof currentClienteSession !== 'undefined' && currentClienteSession) {
       if (currentClienteSession.contacto) return currentClienteSession.contacto;
@@ -151,10 +282,63 @@ export function getCurrentUserDisplayName() {
       if (currentClienteSession.empresa) return currentClienteSession.empresa;
     }
     const sess = (typeof safeGetJSON === 'function') ? safeGetJSON('eurorep_session', null) : JSON.parse(localStorage.getItem('eurorep_session') || 'null');
-    if (sess && sess.nombre) return sess.nombre;
+    if (sess) {
+      if (sess.nombre && String(sess.nombre).trim()) return String(sess.nombre).trim();
+      if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
+        const u = usuarios.find(x => x && (x.id === sess.userId || x.id === sess.realUserId));
+        if (u && u.nombre && String(u.nombre).trim()) return String(u.nombre).trim();
+      }
+      if (sess.userId === 'superadmin') return 'Super Administrador';
+    }
   } catch (e) {}
   return 'Usuario';
 }
+
+// Determina con máxima certeza si el usuario activo es estrictamente Superadmin
+export function esUsuarioSuperadmin() {
+  try {
+    let sess = null;
+    if (typeof currentSession !== 'undefined' && currentSession) sess = currentSession;
+    else if (typeof window !== 'undefined' && window.currentSession) sess = window.currentSession;
+    else if (typeof safeGetJSON === 'function') sess = safeGetJSON('eurorep_session', null);
+    else if (typeof localStorage !== 'undefined') {
+      try { sess = JSON.parse(localStorage.getItem('eurorep_session') || 'null'); } catch (e) {}
+    }
+    if (!sess) return false;
+
+    const viewMode = String(sess.viewMode || '').toLowerCase().trim();
+    const realRol = String(sess.realRol || '').toLowerCase().trim();
+    const userId = String(sess.userId || '').toLowerCase().trim();
+
+    // 1. Si la vista activa actual NO es superadmin (o es admin, supervisor, tecnico, empresa, consulta), NUNCA autorizar
+    if (viewMode !== 'superadmin') return false;
+
+    // 2. Si el usuario existe en el catálogo de usuarios, verificar que su rol en base de datos sea superadmin
+    const usersList = (typeof window !== 'undefined' && Array.isArray(window.usuarios))
+      ? window.usuarios
+      : ((typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : (typeof safeGetJSON === 'function' ? safeGetJSON('eurorep_usuarios', []) : []));
+
+    if (Array.isArray(usersList) && userId) {
+      const userInDb = usersList.find(u => u && u.id === userId);
+      if (userInDb && userInDb.rol) {
+        const dbRol = String(userInDb.rol).toLowerCase().trim();
+        if (dbRol !== 'superadmin') return false;
+      }
+    }
+
+    // 3. Prohibición estricta si el rol real del usuario es cualquier rol operativo común
+    if (['admin', 'supervisor', 'tecnico', 'empresa', 'cliente', 'cliente-consultor', 'consulta'].includes(realRol)) {
+      return false;
+    }
+
+    // 4. Debe tener viewMode superadmin Y rol real o userId superadmin
+    return (viewMode === 'superadmin' && (realRol === 'superadmin' || userId === 'superadmin' || !realRol));
+  } catch (err) {
+    console.error('[Auth] Error verificando rol superadmin:', err);
+    return false;
+  }
+}
+
 
 // Obtiene el nombre del usuario que realizó la última modificación del ticket con fallbacks inteligentes
 export function getTicketModificadoPor(t) {
@@ -176,6 +360,84 @@ export function getTicketModificadoPor(t) {
   }
   
   return t.creadoPor || t.solicitante || t.usuario || '—';
+}
+
+// Resuelve el creador original de un ticket con máxima fidelidad y fallbacks relacionales
+export function resolverCreadorTicket(t) {
+  if (!t || typeof t !== 'object') return '';
+
+  // 1. Directo de creadoPor o creado_por
+  if (t.creadoPor && String(t.creadoPor).trim() !== '' && t.creadoPor !== '—' && t.creadoPor !== 'null') {
+    return String(t.creadoPor).trim();
+  }
+  if (t.creado_por && String(t.creado_por).trim() !== '' && t.creado_por !== '—' && t.creado_por !== 'null') {
+    return String(t.creado_por).trim();
+  }
+
+  // 2. Si proviene o está asociado a una Orden de Servicio
+  try {
+    const ordenesList = (typeof ordenes !== 'undefined' && Array.isArray(ordenes))
+      ? ordenes
+      : ((typeof safeGetJSON === 'function') ? safeGetJSON('sapi_ordenes', []) : JSON.parse(localStorage.getItem('sapi_ordenes') || '[]'));
+
+    if (Array.isArray(ordenesList) && ordenesList.length > 0) {
+      const matchOrden = ordenesList.find(o => {
+        if (!o) return false;
+        if (t.folio && (o.id === t.folio || o.folio === t.folio)) return true;
+        if (t.asunto && o.folio && t.asunto.includes(o.folio)) return true;
+        if (t.descripcion && o.folio && t.descripcion.includes(o.folio)) return true;
+        if (o.soporte && (o.soporte === t.id || o.soporte === t.folio)) return true;
+        return false;
+      });
+
+      if (matchOrden) {
+        if (matchOrden.creadoPor && String(matchOrden.creadoPor).trim() && matchOrden.creadoPor !== '—') {
+          return String(matchOrden.creadoPor).trim();
+        }
+        if (matchOrden.tecnico && String(matchOrden.tecnico).trim() && matchOrden.tecnico !== '—') {
+          return String(matchOrden.tecnico).trim();
+        }
+      }
+    }
+  } catch (e) {}
+
+  // 3. Revisar primer comentario interno cronológico (quien registró la primera acción)
+  try {
+    const coms = t.comentariosInternos || t.comentarios_internos || [];
+    if (Array.isArray(coms) && coms.length > 0) {
+      const first = coms[0];
+      if (first && (first.usuario || first.autor)) {
+        const autorCom = String(first.usuario || first.autor).trim();
+        if (autorCom && autorCom !== 'Sistema' && autorCom !== '—') {
+          return autorCom;
+        }
+      }
+    }
+  } catch (e) {}
+
+  // 4. Si el solicitante coincide con un usuario interno de la empresa (staff/técnico/admin)
+  try {
+    const usersList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios))
+      ? usuarios
+      : ((typeof safeGetJSON === 'function') ? safeGetJSON('sapi_usuarios', []) : JSON.parse(localStorage.getItem('sapi_usuarios') || '[]'));
+
+    if (t.solicitante && String(t.solicitante).trim()) {
+      const solNorm = String(t.solicitante).trim().toLowerCase();
+      const matchUser = usersList.find(u => u && u.nombre && u.nombre.toLowerCase().trim() === solNorm);
+      if (matchUser && matchUser.nombre) return matchUser.nombre;
+    }
+  } catch (e) {}
+
+  // 5. Fallback a modificadoPor si no tiene modificaciones posteriores
+  if (t.modificadoPor && String(t.modificadoPor).trim() && t.modificadoPor !== '—' && t.modificadoPor !== 'Usuario') {
+    const fc = t.fechaCreacion || t.fecha_creacion || t.fecha;
+    const fm = t.fechaModificacion || t.fecha_modificacion;
+    if (!fm || fc === fm) {
+      return String(t.modificadoPor).trim();
+    }
+  }
+
+  return '';
 }
 
 // Helper para convertir URLs de imágenes a Base64 Data URI con soporte Supabase Storage, Fetch Blob y Canvas
@@ -469,30 +731,32 @@ export function extraerListaResponsables(raw) {
   return validParts.length > 0 ? Array.from(new Set(validParts)) : ['Sin Asignar'];
 }
 
-// Vinculación automática a window para 100% retrocompatibilidad con código existente
-if (typeof window !== 'undefined') {
-  window.cleanMojibake = cleanMojibake;
-  window.getLocalDateString = getLocalDateString;
-  window.normStr = normStr;
-  window.safeFormatDate = safeFormatDate;
-  window.formatFechaHoraAmigable = formatFechaHoraAmigable;
-  window.isTestUser = isTestUser;
-  window.getTicketFechaModificacion = getTicketFechaModificacion;
-  window.getCurrentUserDisplayName = getCurrentUserDisplayName;
-  window.getTicketModificadoPor = getTicketModificadoPor;
-  window.urlToDataUri = urlToDataUri;
-  window.escapeHTML = escapeHTML;
-  window.calcularDiasJunta = calcularDiasJunta;
-  window.formatearTiempoRelativoJunta = formatearTiempoRelativoJunta;
-  window.normalizarTextoJunta = normalizarTextoJunta;
-  window.unificarNombreUsuario = unificarNombreUsuario;
-  window.obtenerInfoRolUsuario = obtenerInfoRolUsuario;
-  window.extraerListaResponsables = extraerListaResponsables;
-  window.loadScriptOnDemand = loadScriptOnDemand;
-  window.solicitarBackgroundSync = solicitarBackgroundSync;
-  window.registrarListenerBackgroundSync = registrarListenerBackgroundSync;
-  window.verificarConexionRed = verificarConexionRed;
-  window.obtenerEstadoOffline = obtenerEstadoOffline;
+// Vinculación automática a window y globalThis para 100% interoperabilidad
+const _targetGlobal = (typeof window !== 'undefined') ? window : ((typeof globalThis !== 'undefined') ? globalThis : null);
+if (_targetGlobal) {
+  _targetGlobal.cleanMojibake = cleanMojibake;
+  _targetGlobal.getLocalDateString = getLocalDateString;
+  _targetGlobal.normStr = normStr;
+  _targetGlobal.safeFormatDate = safeFormatDate;
+  _targetGlobal.formatFechaHoraAmigable = formatFechaHoraAmigable;
+  _targetGlobal.isTestUser = isTestUser;
+  _targetGlobal.getTicketFechaModificacion = getTicketFechaModificacion;
+  _targetGlobal.getCurrentUserDisplayName = getCurrentUserDisplayName;
+  _targetGlobal.getTicketModificadoPor = getTicketModificadoPor;
+  _targetGlobal.resolverCreadorTicket = resolverCreadorTicket;
+  _targetGlobal.urlToDataUri = urlToDataUri;
+  _targetGlobal.escapeHTML = escapeHTML;
+  _targetGlobal.calcularDiasJunta = calcularDiasJunta;
+  _targetGlobal.formatearTiempoRelativoJunta = formatearTiempoRelativoJunta;
+  _targetGlobal.normalizarTextoJunta = normalizarTextoJunta;
+  _targetGlobal.unificarNombreUsuario = unificarNombreUsuario;
+  _targetGlobal.obtenerInfoRolUsuario = obtenerInfoRolUsuario;
+  _targetGlobal.extraerListaResponsables = extraerListaResponsables;
+  _targetGlobal.loadScriptOnDemand = loadScriptOnDemand;
+  _targetGlobal.solicitarBackgroundSync = solicitarBackgroundSync;
+  _targetGlobal.registrarListenerBackgroundSync = registrarListenerBackgroundSync;
+  _targetGlobal.verificarConexionRed = verificarConexionRed;
+  _targetGlobal.obtenerEstadoOffline = obtenerEstadoOffline;
 }
 
 const _loadedScripts = new Set();
@@ -608,3 +872,60 @@ export function obtenerEstadoOffline() {
     backgroundSyncSupported: Boolean(bgSyncSupported)
   };
 }
+
+if (typeof window !== 'undefined') {
+  window.debounce = debounce;
+  window.debouncedCall = debouncedCall;
+  window.compressImageFile = compressImageFile;
+
+  window.debouncedRenderRefacciones = debounce(() => {
+    if (typeof window.renderRefacciones === 'function') window.renderRefacciones();
+    else if (typeof renderRefacciones === 'function') renderRefacciones();
+  }, 250);
+
+  window.debouncedRenderTickets = debounce(() => {
+    if (typeof window.renderTickets === 'function') window.renderTickets();
+    else if (typeof renderTickets === 'function') renderTickets();
+  }, 250);
+
+  window.debouncedRenderOrdenes = debounce(() => {
+    if (typeof window.renderTabla === 'function') window.renderTabla();
+    else if (typeof renderTabla === 'function') renderTabla();
+  }, 250);
+
+  window.debouncedFiltrarOrdenes = debounce((view) => {
+    if (typeof window.filtrarOrdenes === 'function') window.filtrarOrdenes(view);
+    else if (typeof filtrarOrdenes === 'function') filtrarOrdenes(view);
+  }, 250);
+
+  window.debouncedRenderMaquinaria = debounce(() => {
+    if (typeof window.renderMaquinaria === 'function') window.renderMaquinaria();
+    else if (typeof renderMaquinaria === 'function') renderMaquinaria();
+  }, 250);
+
+  window.debouncedRenderGastos = debounce(() => {
+    if (typeof window.renderGastos === 'function') window.renderGastos();
+    else if (typeof renderGastos === 'function') renderGastos();
+  }, 250);
+
+  window.debouncedRenderSitios = debounce(() => {
+    if (typeof window.renderSitios === 'function') window.renderSitios();
+    else if (typeof renderSitios === 'function') renderSitios();
+  }, 250);
+
+  window.debouncedRenderLevantamientos = debounce(() => {
+    if (typeof window.renderLevantamientos === 'function') window.renderLevantamientos();
+    else if (typeof renderLevantamientos === 'function') renderLevantamientos();
+  }, 250);
+
+  window.debouncedRenderRentas = debounce(() => {
+    if (typeof window.renderRentas === 'function') window.renderRentas();
+  }, 250);
+
+  window.debouncedRenderEnvios = debounce(() => {
+    if (typeof window.renderEnvios === 'function') window.renderEnvios();
+  }, 250);
+
+  window.esUsuarioSuperadmin = esUsuarioSuperadmin;
+}
+

@@ -105,14 +105,53 @@ if (typeof localStorage !== 'undefined') {
   }
 }
 
-// Proteger contra la ausencia de Lucide (por ejemplo, por fallas de carga de CDN)
+// Optimización de rendimiento para Lucide Icons (Batching y acotamiento de escaneo)
 if (typeof window !== 'undefined') {
-  if (typeof window.lucide === 'undefined' || typeof window.lucide.createIcons !== 'function') {
-    window.lucide = window.lucide || {};
-    window.lucide.createIcons = function() {
-      // Esperar a que la biblioteca Lucide termine de inicializarse
-    };
-  }
+  (function() {
+    let scheduledRaf = null;
+    function wrapLucide() {
+      if (!window.lucide || window.lucide._isOptimized) return;
+      const realCreateIcons = window.lucide.createIcons;
+      window.lucide.createIcons = function(options) {
+        // Si se pasa root acotado, ejecutar inmediatamente en ese subárbol
+        if (options && options.root) {
+          try {
+            return realCreateIcons.call(window.lucide, options);
+          } catch (e) {
+            return;
+          }
+        }
+        // Si es escaneo global, consolidar llamadas concurrentes en requestAnimationFrame
+        if (typeof requestAnimationFrame !== 'undefined') {
+          if (scheduledRaf) return;
+          scheduledRaf = requestAnimationFrame(() => {
+            scheduledRaf = null;
+            try { realCreateIcons.call(window.lucide); } catch (e) {}
+          });
+        } else {
+          try { realCreateIcons.call(window.lucide); } catch (e) {}
+        }
+      };
+      window.lucide._isOptimized = true;
+    }
+
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      wrapLucide();
+    } else {
+      let pendingGlobal = false;
+      window.lucide = window.lucide || {};
+      window.lucide.createIcons = function(opts) {
+        if (opts && opts.root) return;
+        pendingGlobal = true;
+      };
+      window.addEventListener('load', () => {
+        wrapLucide();
+        if (pendingGlobal && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      });
+    }
+  })();
 }
 
 // Función temporal activa por 48 horas (hasta el 8 de julio de 2026 a las 10:30 AM) para permitir pasar tickets sin cotización.
@@ -274,7 +313,37 @@ window.formatFechaAmigable = formatFechaAmigable;
 
 
 // ===== DATA =====
-let ordenes = safeGetJSON('sapi_ordenes', []);
+function sanitizarColeccionDeduplicada(arr, etiqueta = 'items') {
+  if (!Array.isArray(arr)) return [];
+  const seenIds = new Set();
+  const seenFolios = new Set();
+  let purgados = 0;
+  const limpio = arr.filter(item => {
+    if (!item || typeof item !== 'object') return false;
+    const id = item.id ? String(item.id).trim() : null;
+    const folio = (item.folio || item.numero_orden) ? String(item.folio || item.numero_orden).trim() : null;
+    if (id && seenIds.has(id)) {
+      purgados++;
+      return false;
+    }
+    if (folio && seenFolios.has(folio)) {
+      purgados++;
+      return false;
+    }
+    if (id) seenIds.add(id);
+    if (folio) seenFolios.add(folio);
+    return true;
+  });
+  if (purgados > 0) {
+    console.log(`[Deduplicar] Se purgaron ${purgados} registro(s) duplicados de ${etiqueta}.`);
+  }
+  return limpio;
+}
+if (typeof window !== 'undefined') window.sanitizarColeccionDeduplicada = sanitizarColeccionDeduplicada;
+
+let ordenes = sanitizarColeccionDeduplicada(safeGetJSON('sapi_ordenes', []), 'ordenes');
+try { safeSetJSON('sapi_ordenes', ordenes); } catch (e) {}
+
 setTimeout(() => {
   if (typeof window.deduplicarOrdenesLocales === 'function') {
     window.deduplicarOrdenesLocales();
@@ -286,7 +355,8 @@ if (typeof localStorage !== 'undefined' && !localStorage.getItem('eurorep_ticket
   localStorage.setItem('eurorep_tickets_cleaned_v2', 'true');
   console.log('[Deduplicar] Limpieza inicial única de tickets locales realizada para evitar fantasmas.');
 }
-let tickets = safeGetJSON('sapi_tickets', []);
+let tickets = sanitizarColeccionDeduplicada(safeGetJSON('sapi_tickets', []), 'tickets');
+try { safeSetJSON('sapi_tickets', tickets); } catch (e) {}
 let levantamientos = safeGetJSON('sapi_levantamientos', []);
 let ideasFallasDb = safeGetJSON('sapi_ideas_fallas', []);
 window.ideasFallasDb = ideasFallasDb;
@@ -472,15 +542,31 @@ if (typeof window !== 'undefined') {
       }
     };
   }
+  if (!window.repararCreadoresTicketsFaltantes) {
+    window.repararCreadoresTicketsFaltantes = function() {
+      if (window.AppMigrations && typeof window.AppMigrations.repararCreadoresTicketsFaltantes === 'function') {
+        return window.AppMigrations.repararCreadoresTicketsFaltantes();
+      }
+    };
+  }
 }
 
-// Sincronización con Supabase (escuchar cuando los datos bajen a localStorage)
-window.addEventListener('supabase_datos_cargados', async () => {
+// Sincronización con Supabase (consolidar ráfagas de eventos con debounce)
+let _supabaseSyncDebounceTimer = null;
+window.addEventListener('supabase_datos_cargados', () => {
+  if (_supabaseSyncDebounceTimer) clearTimeout(_supabaseSyncDebounceTimer);
+  _supabaseSyncDebounceTimer = setTimeout(async () => {
+    _supabaseSyncDebounceTimer = null;
+    await procesarActualizacionSupabaseUI();
+  }, 200);
+});
+
+async function procesarActualizacionSupabaseUI() {
   try {
     console.log('[App] Refrescando configuración, catálogos y re-renderizando UI desde Supabase...');
     
-    ordenes = safeGetJSON('sapi_ordenes', []);
-    tickets = safeGetJSON('sapi_tickets', []);
+    ordenes = sanitizarColeccionDeduplicada(safeGetJSON('sapi_ordenes', []), 'ordenes');
+    tickets = sanitizarColeccionDeduplicada(safeGetJSON('sapi_tickets', []), 'tickets');
     clientesDb = safeGetJSON('sapi_clientes_db', []);
     refaccionesDb = await window.loadRefaccionesLocal();
     window.refaccionesDb = refaccionesDb;
@@ -506,6 +592,11 @@ window.addEventListener('supabase_datos_cargados', async () => {
     // Reparar y preservar de inmediato asignaciones, clientes y equipos
     if (typeof window.sanitizarAsignacionesTickets === 'function') {
       try { window.sanitizarAsignacionesTickets(); } catch (eSan) { console.warn('[App] Error al sanitizar tickets:', eSan); }
+    }
+
+    // Reparar y asegurar creadores faltantes de tickets
+    if (typeof window.repararCreadoresTicketsFaltantes === 'function') {
+      try { window.repararCreadoresTicketsFaltantes(); } catch (eRep) { console.warn('[App] Error al reparar creadores de tickets:', eRep); }
     }
 
     // Ejecutar migraciones heredadas solo una vez por sesión y solo para administradores
@@ -593,18 +684,27 @@ window.addEventListener('supabase_datos_cargados', async () => {
       if (typeof cargarConfig === 'function') cargarConfig();
     }
     
-    // Re-render UI
+    // RE-RENDER SELECTIVO DE UI: Solo redibujar la vista visible activa para evitar bloqueos del hilo principal
     actualizarFiltrosPersonal();
-    renderTabla();
-    renderTabla('servicios');
     
-    if (typeof renderClientes === 'function') renderClientes();
-    if (typeof renderUsuariosList === 'function') renderUsuariosList();
-    if (typeof renderStats === 'function') renderStats();
-    
-    if (typeof renderTickets === 'function') {
-      renderTickets();
-      renderTickets('dash-tickets');
+    if (document.getElementById('view-ordenes')?.classList.contains('active')) {
+      renderTabla();
+    }
+    if (document.getElementById('view-servicios')?.classList.contains('active')) {
+      renderTabla('servicios');
+    }
+    if (document.getElementById('view-clientes')?.classList.contains('active')) {
+      if (typeof renderClientes === 'function') renderClientes();
+    }
+    if (document.getElementById('view-usuarios')?.classList.contains('active')) {
+      if (typeof renderUsuariosList === 'function') renderUsuariosList();
+    }
+    if (document.getElementById('view-dashboard')?.classList.contains('active')) {
+      if (typeof renderStats === 'function') renderStats();
+      if (typeof renderTickets === 'function') renderTickets('dash-tickets');
+    }
+    if (document.getElementById('view-tickets')?.classList.contains('active')) {
+      if (typeof renderTickets === 'function') renderTickets();
     }
     if (typeof updateTicketBadge === 'function') updateTicketBadge(); updateOrdenesBadge();
     if (typeof window.sincronizarNotificacionesInternas === 'function') window.sincronizarNotificacionesInternas();
@@ -653,30 +753,6 @@ window.addEventListener('supabase_datos_cargados', async () => {
     if (typeof window.actualizarTodosLosBadges === 'function') {
       window.actualizarTodosLosBadges();
     }
-
-    // Calcular y reportar uso de almacenamiento local en megabytes
-    try {
-      let lsBytes = 0;
-      for (let i = 0; i < localStorage.length; i++) {
-        let key = localStorage.key(i);
-        let val = localStorage.getItem(key) || '';
-        lsBytes += (key.length + val.length) * 2; // UTF-16
-      }
-      let idbBytes = 0;
-      if (window.localStorageCache) {
-        for (let key in window.localStorageCache) {
-          if (window.localStorageCache.hasOwnProperty(key)) {
-            let val = window.localStorageCache[key] || '';
-            idbBytes += (key.length + val.length) * 2;
-          }
-        }
-      }
-      console.log(`[Storage] LocalStorage real: ${(lsBytes / 1024 / 1024).toFixed(3)} MB`);
-      console.log(`[Storage] IndexedDB (Puente): ${(idbBytes / 1024 / 1024).toFixed(3)} MB`);
-      console.log(`[Storage] Total ocupado: ${((lsBytes + idbBytes) / 1024 / 1024).toFixed(3)} MB`);
-    } catch (eStorage) {
-      console.warn('[Storage] Error al calcular espacio ocupado:', eStorage);
-    }
   } catch (err) {
     console.error('[App] Error en listener supabase_datos_cargados:', err);
     if (window.trackTelemetryEvent) {
@@ -688,7 +764,7 @@ window.addEventListener('supabase_datos_cargados', async () => {
       } catch (e) {}
     }
   }
-});
+}
 let editandoId = null;
 let editandoTicketId = null;
 let ticketFiltroActivo = 'todos';
@@ -1629,12 +1705,38 @@ function resolveTecnicoNombre(idOrName) {
 
 function getFilteredOrders() {
   const active = isTestModeActive();
-  return ordenes.filter(o => isTestData(o) === active);
+  const seenIds = new Set();
+  const seenFolios = new Set();
+  return ordenes.filter(o => {
+    if (!o || isTestData(o) !== active) return false;
+    if (o.id) {
+      if (seenIds.has(o.id)) return false;
+      seenIds.add(o.id);
+    }
+    if (o.folio) {
+      if (seenFolios.has(o.folio)) return false;
+      seenFolios.add(o.folio);
+    }
+    return true;
+  });
 }
 
 function getFilteredTickets() {
   const active = isTestModeActive();
-  return tickets.filter(t => isTestData(t) === active && t.categoria !== 'Soporte General');
+  const seenIds = new Set();
+  const seenFolios = new Set();
+  return tickets.filter(t => {
+    if (!t || isTestData(t) !== active || t.categoria === 'Soporte General') return false;
+    if (t.id) {
+      if (seenIds.has(t.id)) return false;
+      seenIds.add(t.id);
+    }
+    if (t.folio) {
+      if (seenFolios.has(t.folio)) return false;
+      seenFolios.add(t.folio);
+    }
+    return true;
+  });
 }
 
 function isTestGasto(g) {
@@ -3636,6 +3738,82 @@ function dispararInicializacionGlobal() {
       }
     }
   } catch(e) {}
+
+  // Mantenimiento y política de retención de almacenamiento local (Telemetry, Email Logs, Sync)
+  try {
+    ejecutarLimpiezaMantenimientoAlmacenamiento();
+  } catch (errMaint) {
+    console.warn('[Storage Maintenance] Error en ejecución de mantenimiento:', errMaint);
+  }
+}
+
+/**
+ * Rutina de saneamiento periódico de almacenamiento local
+ * - Limita sapi_email_logs a 200 ítems recientes o < 30 días
+ * - Trunca sapi_telemetry_events si sobrepasa 150 ítems
+ * - Descarta colas de sincronización corruptas o huérfanas
+ */
+function ejecutarLimpiezaMantenimientoAlmacenamiento() {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const ahora = Date.now();
+    const LIMITE_30_DIAS_MS = 30 * 24 * 60 * 60 * 1000;
+
+    // 1. Limpieza y retención de sapi_email_logs
+    try {
+      const rawEmailLogs = localStorage.getItem('sapi_email_logs');
+      if (rawEmailLogs) {
+        let logs = JSON.parse(rawEmailLogs);
+        if (Array.isArray(logs) && logs.length > 0) {
+          const antes = logs.length;
+          logs = logs.filter(item => {
+            if (!item) return false;
+            const fechaItem = item.fecha || item.created_at || item.timestamp;
+            if (!fechaItem) return true;
+            const ms = new Date(fechaItem).getTime();
+            if (isNaN(ms)) return true;
+            return (ahora - ms) < LIMITE_30_DIAS_MS;
+          });
+          if (logs.length > 200) {
+            logs = logs.slice(-200);
+          }
+          if (logs.length !== antes) {
+            localStorage.setItem('sapi_email_logs', JSON.stringify(logs));
+          }
+        }
+      }
+    } catch (eEmail) {}
+
+    // 2. Limpieza de telemetría sapi_telemetry_events
+    try {
+      const rawTelem = localStorage.getItem('sapi_telemetry_events');
+      if (rawTelem) {
+        let events = JSON.parse(rawTelem);
+        if (Array.isArray(events) && events.length > 150) {
+          events = events.slice(-100);
+          localStorage.setItem('sapi_telemetry_events', JSON.stringify(events));
+        }
+      }
+    } catch (eTelem) {}
+
+    // 3. Limpieza de claves temporales obsoletas en localStorage
+    try {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('sapi_temp_sync_') || k.startsWith('sapi_cache_tmp_'))) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+    } catch (eKeys) {}
+  } catch (err) {
+    console.warn('[Storage Cleanup] Fallo general en rutina de mantenimiento:', err);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.ejecutarLimpiezaMantenimientoAlmacenamiento = ejecutarLimpiezaMantenimientoAlmacenamiento;
 }
 
 // ============================================================

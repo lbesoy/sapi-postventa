@@ -7,7 +7,7 @@
 
   if (typeof global.usuarios === "undefined") global.usuarios = [];
   if (typeof global.clientesDb === "undefined") global.clientesDb = [];
-  if (typeof global.currentSession === "undefined") global.currentSession = { userId: "admin", viewMode: "admin", realRol: "superadmin" };
+  if (typeof global.currentSession === "undefined") global.currentSession = { userId: "admin", viewMode: "admin", realRol: "admin" };
   if (typeof global.ROLES === "undefined") {
     global.ROLES = {
       superadmin: { label: "SuperAdmin", views: [] },

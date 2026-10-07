@@ -74,8 +74,8 @@ async function generarTicketsRefaccionesFaltantes() {
     
     const targetFolio = cleanFolio.endsWith('-A') ? `${prefix}${cleanFolio}` : `${prefix}${cleanFolio}-A`;
     
-    // Verificar si ya existe un ticket local con este folio
-    let ticketExistente = tickets.find(t => t.folio === targetFolio);
+    // Verificar si ya existe un ticket local con este folio o vinculado a esta orden
+    let ticketExistente = tickets.find(t => t && (t.folio === targetFolio || (t.ordenId && t.ordenId === o.id) || (t.ordenFolio && t.ordenFolio === o.folio)));
     if (ticketExistente) continue; // Ya existe, no hacemos nada
     
     // Crear el ticket autogenerado desde la orden
@@ -528,6 +528,72 @@ function reintentarSincronizacionGastosLocales() {
   }
 };
 
+// Rutina de auto-reparación para asegurar que todos los tickets locales y en nube tengan su creador asignado
+function repararCreadoresTicketsFaltantes() {
+  try {
+    const rawTickets = (typeof localStorage !== 'undefined') ? localStorage.getItem('sapi_tickets') : JSON.stringify(safeGetJSON('sapi_tickets', []));
+    if (!rawTickets) return;
+    let ticketsList = JSON.parse(rawTickets);
+    if (!Array.isArray(ticketsList) || ticketsList.length === 0) return;
+
+    let repairedCount = 0;
+    const ticketsToPush = [];
+
+    ticketsList.forEach(t => {
+      if (!t) return;
+      const tieneCreador = t.creadoPor && String(t.creadoPor).trim() !== '' && t.creadoPor !== '—' && t.creadoPor !== 'null';
+      if (!tieneCreador) {
+        const resCreador = (typeof window !== 'undefined' && typeof window.resolverCreadorTicket === 'function')
+          ? window.resolverCreadorTicket(t)
+          : ((typeof resolverCreadorTicket === 'function') ? resolverCreadorTicket(t) : (t.creado_por || null));
+
+        if (resCreador && String(resCreador).trim()) {
+          t.creadoPor = String(resCreador).trim();
+          repairedCount++;
+          if (t.id) {
+            ticketsToPush.push({ id: t.id, creado_por: t.creadoPor });
+          }
+        }
+      }
+    });
+
+    if (repairedCount > 0) {
+      console.log(`[Auto-Repair] Se repararon ${repairedCount} tickets con creador faltante.`);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('sapi_tickets', JSON.stringify(ticketsList));
+      }
+      if (typeof safeSetJSON === 'function') {
+        safeSetJSON('sapi_tickets', ticketsList);
+      }
+      if (typeof window !== 'undefined' && window._supaTickets && Array.isArray(window._supaTickets)) {
+        window._supaTickets = ticketsList;
+      }
+      if (typeof tickets !== 'undefined' && Array.isArray(tickets)) {
+        ticketsList.forEach(rep => {
+          const idx = tickets.findIndex(x => x.id === rep.id);
+          if (idx !== -1) tickets[idx].creadoPor = rep.creadoPor;
+        });
+      }
+
+      // Sincronizar actualización puntual a Supabase en segundo plano
+      if (ticketsToPush.length > 0) {
+        const sbClient = (typeof window !== 'undefined' && window.supabaseClient) ? window.supabaseClient : null;
+        if (sbClient) {
+          Promise.allSettled(ticketsToPush.map(p =>
+            sbClient.from('tickets').update({ creado_por: p.creado_por }).eq('id', p.id)
+          )).then(results => {
+            console.log(`[Auto-Repair] Creadores sincronizados a Supabase: ${results.filter(r => r.status === 'fulfilled').length}/${ticketsToPush.length}`);
+          }).catch(err => {
+            console.warn('[Auto-Repair] Error al sincronizar creadores reparados con Supabase:', err);
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Auto-Repair] Error en repararCreadoresTicketsFaltantes:', err);
+  }
+}
+
 // Interoperabilidad con window
 if (typeof window !== 'undefined') {
   window.generarTicketsRefaccionesFaltantes = generarTicketsRefaccionesFaltantes;
@@ -535,6 +601,7 @@ if (typeof window !== 'undefined') {
   window.migrarUbicacionesMaquinariaDesdeTickets = migrarUbicacionesMaquinariaDesdeTickets;
   window.recuperarMaquinariaDesdeTickets = recuperarMaquinariaDesdeTickets;
   window.reintentarSincronizacionGastosLocales = reintentarSincronizacionGastosLocales;
+  window.repararCreadoresTicketsFaltantes = repararCreadoresTicketsFaltantes;
 }
 
 export {
@@ -542,5 +609,6 @@ export {
   migrarOrdenesExistentesMaquinaria,
   migrarUbicacionesMaquinariaDesdeTickets,
   recuperarMaquinariaDesdeTickets,
-  reintentarSincronizacionGastosLocales
+  reintentarSincronizacionGastosLocales,
+  repararCreadoresTicketsFaltantes
 };

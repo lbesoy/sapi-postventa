@@ -7,7 +7,7 @@ import { supabaseClient } from "../supabaseClient.js";
 // Fallbacks y polyfills defensivos para Node.js y ambientes desacoplados
 if (typeof globalThis.usuarios === "undefined") globalThis.usuarios = [];
 if (typeof globalThis.clientesDb === "undefined") globalThis.clientesDb = [];
-if (typeof globalThis.currentSession === "undefined") globalThis.currentSession = { userId: "admin", viewMode: "admin", realRol: "superadmin" };
+if (typeof globalThis.currentSession === "undefined") globalThis.currentSession = { userId: "admin", viewMode: "admin", realRol: "admin" };
 if (typeof globalThis.ROLES === "undefined") {
   globalThis.ROLES = {
     superadmin: { label: "SuperAdmin", views: [] },

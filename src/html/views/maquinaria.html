@@ -17,7 +17,7 @@
               </div>
               <div class="search-bar" style="width:100%; max-width:400px; margin:0;">
                 <input type="text" id="search-maquinaria" placeholder="Buscar máquina, serie o cliente..."
-                  oninput="renderMaquinaria()" />
+                  oninput="debouncedRenderMaquinaria()" />
               </div>
               <div style="position:relative;" id="maq-filters-container">
                 <button class="action-btn"

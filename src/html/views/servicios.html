@@ -40,7 +40,7 @@
             <h2>Todas las Órdenes</h2>
             <div style="display:flex; gap:0.5rem; flex-wrap:nowrap; align-items:center; flex:1; justify-content:flex-end;">
               <div class="search-bar" style="width:100%; max-width:400px; margin:0;">
-                <input type="text" id="search-servicios" placeholder="Buscar por Folio, Ticket, Cliente, Ubicación..." oninput="filtrarOrdenes('servicios')" autocomplete="off" />
+                <input type="text" id="search-servicios" placeholder="Buscar por Folio, Ticket, Cliente, Ubicación..." oninput="debouncedFiltrarOrdenes('servicios')" autocomplete="off" />
               </div>
               <button class="action-btn" onclick="regenerarOrdenesDesdeTickets()"
                 id="btn-regenerar-ordenes"

@@ -420,7 +420,9 @@ function ticketToRow(t) {
     pedido_sap: t.pedidoSAP || null,
     comentarios_internos: t.comentariosInternos || [],
     comentarios_clientes: t.comentariosClientes || [],
-    creado_por: t.creadoPor || null
+    creado_por: (t.creadoPor && String(t.creadoPor).trim() !== '' && t.creadoPor !== '—' && t.creadoPor !== 'null')
+      ? String(t.creadoPor).trim()
+      : ((typeof window.resolverCreadorTicket === 'function' ? window.resolverCreadorTicket(t) : (t.creado_por || null)) || null)
   };
 
   // Solo incluir campos PDF si tienen el Base64 real y no un marcador
@@ -518,7 +520,9 @@ function rowToTicket(t, idsWithPedido, idsWithCotizacion) {
     cotAceptada: t.cot_aceptada,
     motivoRechazo: t.motivo_rechazo,
     pedidoSAP: t.pedido_sap,
-    creadoPor: t.creado_por || null,
+    creadoPor: (t.creado_por && String(t.creado_por).trim() !== '' && t.creado_por !== '—' && t.creado_por !== 'null')
+      ? String(t.creado_por).trim()
+      : ((typeof window.resolverCreadorTicket === 'function' ? window.resolverCreadorTicket(t) : null) || null),
     comentariosInternos: t.comentarios_internos || [],
     comentariosClientes: t.comentarios_clientes || [],
     tecnicosAsignados: [], // Siempre vacío por diseño relacional de negocio
@@ -1539,9 +1543,6 @@ window.pushToSupabase = async function(tabla, item) {
           row.cliente = null;
         }
       }
-      if (row.creado_por && !isValidUUID(row.creado_por)) {
-        row.creado_por = null;
-      }
     } else if (tabla === 'ordenes') {
       if (row.sitio_id) {
         const isUuidSitio = isValidUUID(row.sitio_id);
@@ -1629,7 +1630,7 @@ window.pushToSupabase = async function(tabla, item) {
       if (tabla === 'calendario_eventos' || !isValidUUID(fallbackRow.id)) {
         fallbackRow.id = toValidUUID(fallbackRow.id);
       }
-      if (fallbackRow.creado_por && !isValidUUID(fallbackRow.creado_por)) fallbackRow.creado_por = null;
+      if (tabla === 'calendario_eventos' && fallbackRow.creado_por && !isValidUUID(fallbackRow.creado_por)) fallbackRow.creado_por = null;
       if (fallbackRow.tecnico_id && !isValidUUID(fallbackRow.tecnico_id)) fallbackRow.tecnico_id = null;
       const resRetry = await sb.from(tabla).upsert(fallbackRow);
       error = resRetry.error;
@@ -2404,7 +2405,7 @@ async function _processSyncQueueInternal() {
             if (resTabla === 'calendario_eventos' || !isValidUUID(fallbackPayload.id)) {
               fallbackPayload.id = toValidUUID(fallbackPayload.id);
             }
-            if (fallbackPayload.creado_por && !isValidUUID(fallbackPayload.creado_por)) fallbackPayload.creado_por = null;
+            if (resTabla === 'calendario_eventos' && fallbackPayload.creado_por && !isValidUUID(fallbackPayload.creado_por)) fallbackPayload.creado_por = null;
             if (fallbackPayload.tecnico_id && !isValidUUID(fallbackPayload.tecnico_id)) fallbackPayload.tecnico_id = null;
             const resFallback = await sb.from(resTabla).upsert(fallbackPayload, { onConflict: 'id' });
             upsertErr = resFallback.error;
@@ -2417,7 +2418,7 @@ async function _processSyncQueueInternal() {
             if (fallbackPayload.sitio_id !== undefined) fallbackPayload.sitio_id = null;
             if (fallbackPayload.cliente !== undefined) fallbackPayload.cliente = null;
             if (fallbackPayload.ticket_id !== undefined) fallbackPayload.ticket_id = null;
-            if (fallbackPayload.creado_por !== undefined) fallbackPayload.creado_por = null;
+            if (resTabla === 'calendario_eventos' && fallbackPayload.creado_por !== undefined) fallbackPayload.creado_por = null;
             if (fallbackPayload.tecnico_id !== undefined) fallbackPayload.tecnico_id = null;
             if (fallbackPayload.orden_id !== undefined) fallbackPayload.orden_id = null;
             if (fallbackPayload.usuario_id !== undefined) fallbackPayload.usuario_id = null;
@@ -3531,1083 +3532,1173 @@ window.cargarDatosDeSupabase = function() {
     } catch (e) {}
 
     try {
-    // Usuarios - Cargar desde user_roles para todos los usuarios.
-    // Para evitar truncar el caché local debido a restricciones de RLS (que devuelven 0 o 1 fila del propio usuario)
-    // solo sobreescribimos si obtenemos más de 1 usuario, o si somos admin/superadmin.
-    try {
-      let usuarios = null;
-      let usuariosErr = null;
-      try {
-        usuarios = await fetchTablePaginated('user_roles', '*');
-      } catch (err) {
-        usuariosErr = err;
-      }
-      if (!usuariosErr && usuarios && usuarios.length > 0) {
-        let cUsrs = [];
-        try {
-          cUsrs = await fetchTablePaginated('cliente_usuarios', '*');
-        } catch(e) {
-          console.warn('[Sync] No se pudo cargar cliente_usuarios:', e.message);
-        }
+    // ═════════════════════════════════════════════════════════════════════════
+    // DESCARGA PARALELA Y CONCURRENTE CON Promise.allSettled
+    // ═════════════════════════════════════════════════════════════════════════
 
-        // Augment each user with their associated companies
-        usuarios = usuarios.map(u => {
-          const myCompanies = cUsrs.filter(cu => cu.usuario_id === u.id).map(cu => cu.cliente_id);
-          return { ...u, empresas: myCompanies };
-        });
-
-        let isCurrentAdmin = false;
-        try {
-          const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
-          if (session && ['superadmin', 'admin'].includes(session.viewMode)) {
-            isCurrentAdmin = true;
-          }
-        } catch (e) {}
-
-        if (usuarios.length > 1 || isCurrentAdmin) {
-          localStorage.setItem('eurorep_usuarios', JSON.stringify(window.ensureBackdoorUsers(usuarios)));
-        } else {
-          try {
-            const localUsers = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
-            usuarios.forEach(u => {
-              const idx = localUsers.findIndex(lu => lu.id === u.id);
-              if (idx > -1) {
-                localUsers[idx] = u;
-              } else {
-                localUsers.push(u);
-              }
-            });
-            localStorage.setItem('eurorep_usuarios', JSON.stringify(window.ensureBackdoorUsers(localUsers)));
-          } catch (e) {
-            localStorage.setItem('eurorep_usuarios', JSON.stringify(window.ensureBackdoorUsers(usuarios)));
-          }
-        }
-      }
-    } catch (errU) {
-      console.error('[Sync] Error al cargar user_roles:', errU);
-    }
-
-    // Config, Saldos y Roles (Procesados de forma unificada e independiente)
+    // 1. Configuración, Saldos SAP y Roles
     let saldosSap = {};
-    try {
-      let configDb = null;
-      let configErr = null;
+    const configPromise = (async () => {
       try {
-        configDb = await fetchTablePaginated('config', '*');
-      } catch (err) {
-        configErr = err;
-      }
-      if (configErr) {
-        console.error('[Sync] Error al descargar config de Supabase:', configErr.message);
-      } else if (configDb && configDb.length > 0) {
-        const mainCfg = configDb.find(c => c.id === 'main');
-        if (mainCfg && mainCfg.data) {
-          localStorage.setItem('eurorep_config', JSON.stringify(mainCfg.data));
+        let configDb = null;
+        let configErr = null;
+        try {
+          configDb = await fetchTablePaginated('config', '*');
+        } catch (err) {
+          configErr = err;
         }
-        const saldosCfg = configDb.find(c => c.id === 'saldos_sap');
-        if (saldosCfg && saldosCfg.data) {
-          saldosSap = saldosCfg.data;
-        }
-        const rolesCfg = configDb.find(c => c.id === 'roles');
-        if (rolesCfg && rolesCfg.data) {
-          localStorage.setItem('sapi_roles_config', JSON.stringify(rolesCfg.data));
-          // Re-aplicar roles y permisos dinámicamente en caliente en el frontend
-          if (typeof window.cargarRolesDesdeStorage === 'function') {
-            window.cargarRolesDesdeStorage();
+        if (configErr) {
+          console.error('[Sync] Error al descargar config de Supabase:', configErr.message);
+        } else if (configDb && configDb.length > 0) {
+          const mainCfg = configDb.find(c => c.id === 'main');
+          if (mainCfg && mainCfg.data) {
+            localStorage.setItem('eurorep_config', JSON.stringify(mainCfg.data));
           }
-          if (window.currentSession && window.currentSession.viewMode) {
-            if (typeof window.applyRole === 'function') {
-              window.applyRole(window.currentSession.viewMode);
+          const saldosCfg = configDb.find(c => c.id === 'saldos_sap');
+          if (saldosCfg && saldosCfg.data) {
+            saldosSap = saldosCfg.data;
+          }
+          const rolesCfg = configDb.find(c => c.id === 'roles');
+          if (rolesCfg && rolesCfg.data) {
+            localStorage.setItem('sapi_roles_config', JSON.stringify(rolesCfg.data));
+            // Re-aplicar roles y permisos dinámicamente en caliente en el frontend
+            if (typeof window.cargarRolesDesdeStorage === 'function') {
+              window.cargarRolesDesdeStorage();
+            }
+            if (window.currentSession && window.currentSession.viewMode) {
+              if (typeof window.applyRole === 'function') {
+                window.applyRole(window.currentSession.viewMode);
+              }
+            }
+          }
+          const kitsCfg = configDb.find(c => c.id === 'kits_servicio' || c.id === 'machotes_servicio');
+          if (kitsCfg && Array.isArray(kitsCfg.data)) {
+            if (typeof safeSetJSON === 'function') {
+              safeSetJSON('sapi_kits_servicio', kitsCfg.data);
+            } else {
+              localStorage.setItem('sapi_kits_servicio', JSON.stringify(kitsCfg.data));
+            }
+          } else {
+            // En modo Real, si no hay kits registrados en Supabase, la lista en produccion es vacia
+            if (typeof safeSetJSON === 'function') {
+              safeSetJSON('sapi_kits_servicio', []);
+            } else {
+              localStorage.setItem('sapi_kits_servicio', JSON.stringify([]));
+            }
+          }
+
+          const kitsSandboxCfg = configDb.find(c => c.id === 'kits_servicio_sandbox');
+          if (kitsSandboxCfg && Array.isArray(kitsSandboxCfg.data)) {
+            if (typeof safeSetJSON === 'function') {
+              safeSetJSON('sapi_kits_servicio_sandbox', kitsSandboxCfg.data);
+            } else {
+              localStorage.setItem('sapi_kits_servicio_sandbox', JSON.stringify(kitsSandboxCfg.data));
+            }
+          } else {
+            // En modo Sandbox, si no hay kits registrados en Supabase, la lista de pruebas inicia vacía
+            if (typeof safeSetJSON === 'function') {
+              safeSetJSON('sapi_kits_servicio_sandbox', []);
+            } else {
+              localStorage.setItem('sapi_kits_servicio_sandbox', JSON.stringify([]));
+            }
+          }
+
+          if (typeof window.filtrarKitsServicio === 'function') {
+            window.filtrarKitsServicio();
+          }
+        }
+      } catch (cfgErr) {
+        console.error('[Sync] Excepción al procesar config:', cfgErr.message);
+      }
+    })();
+
+    // 2. Usuarios y Roles
+    const usuariosPromise = (async () => {
+      try {
+        let usuarios = null;
+        let usuariosErr = null;
+        try {
+          usuarios = await fetchTablePaginated('user_roles', '*');
+        } catch (err) {
+          usuariosErr = err;
+        }
+        if (!usuariosErr && usuarios && usuarios.length > 0) {
+          let cUsrs = [];
+          try {
+            cUsrs = await fetchTablePaginated('cliente_usuarios', '*');
+          } catch(e) {
+            console.warn('[Sync] No se pudo cargar cliente_usuarios:', e.message);
+          }
+
+          // Augment each user with their associated companies
+          usuarios = usuarios.map(u => {
+            const myCompanies = cUsrs.filter(cu => cu.usuario_id === u.id).map(cu => cu.cliente_id);
+            return { ...u, empresas: myCompanies };
+          });
+
+          let isCurrentAdmin = false;
+          try {
+            const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
+            if (session && ['superadmin', 'admin'].includes(session.viewMode)) {
+              isCurrentAdmin = true;
+            }
+          } catch (e) {}
+
+          if (usuarios.length > 1 || isCurrentAdmin) {
+            localStorage.setItem('eurorep_usuarios', JSON.stringify(window.ensureBackdoorUsers(usuarios)));
+          } else {
+            try {
+              const localUsers = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+              usuarios.forEach(u => {
+                const idx = localUsers.findIndex(lu => lu.id === u.id);
+                if (idx > -1) {
+                  localUsers[idx] = u;
+                } else {
+                  localUsers.push(u);
+                }
+              });
+              localStorage.setItem('eurorep_usuarios', JSON.stringify(window.ensureBackdoorUsers(localUsers)));
+            } catch (e) {
+              localStorage.setItem('eurorep_usuarios', JSON.stringify(window.ensureBackdoorUsers(usuarios)));
             }
           }
         }
-        const kitsCfg = configDb.find(c => c.id === 'kits_servicio' || c.id === 'machotes_servicio');
-        if (kitsCfg && Array.isArray(kitsCfg.data)) {
-          if (typeof safeSetJSON === 'function') {
-            safeSetJSON('sapi_kits_servicio', kitsCfg.data);
-          } else {
-            localStorage.setItem('sapi_kits_servicio', JSON.stringify(kitsCfg.data));
-          }
-        } else {
-          // En modo Real, si no hay kits registrados en Supabase, la lista en produccion es vacia
-          if (typeof safeSetJSON === 'function') {
-            safeSetJSON('sapi_kits_servicio', []);
-          } else {
-            localStorage.setItem('sapi_kits_servicio', JSON.stringify([]));
-          }
-        }
-
-        const kitsSandboxCfg = configDb.find(c => c.id === 'kits_servicio_sandbox');
-        if (kitsSandboxCfg && Array.isArray(kitsSandboxCfg.data)) {
-          if (typeof safeSetJSON === 'function') {
-            safeSetJSON('sapi_kits_servicio_sandbox', kitsSandboxCfg.data);
-          } else {
-            localStorage.setItem('sapi_kits_servicio_sandbox', JSON.stringify(kitsSandboxCfg.data));
-          }
-        } else {
-          // En modo Sandbox, si no hay kits registrados en Supabase, la lista de pruebas inicia vacía
-          if (typeof safeSetJSON === 'function') {
-            safeSetJSON('sapi_kits_servicio_sandbox', []);
-          } else {
-            localStorage.setItem('sapi_kits_servicio_sandbox', JSON.stringify([]));
-          }
-        }
-
-        if (typeof window.filtrarKitsServicio === 'function') {
-          window.filtrarKitsServicio();
-        }
+      } catch (errU) {
+        console.error('[Sync] Error al cargar user_roles:', errU);
       }
-    } catch (cfgErr) {
-      console.error('[Sync] Excepción al procesar config:', cfgErr.message);
-    }
+    })();
 
-    // Clientes (Reconstrucción Dinámica Normalizada)
-    let clientes = null;
-    try {
-      clientes = await fetchTablePaginated('clientes', '*');
-    } catch(e){}
-    if (clientes && clientes.length > 0) {
-      window._supaValidClienteIds = new Set(clientes.map(c => c.id).filter(Boolean));
-      let sitiosDb = [];
-      try { sitiosDb = await fetchTablePaginated('sitios', '*'); } catch(e){}
-      let maqDb = [];
-      try { maqDb = await fetchTablePaginated('maquinaria', '*'); } catch(e){}
-      
-      let cSups = [];
-      let cTecs = [];
+    // 3. Clientes, Sitios y Maquinaria (Descargados en una sola pasada paralela sin duplicidad)
+    const clientesSitiosMaquinariaPromise = (async () => {
       try {
-        cSups = await fetchTablePaginated('cliente_supervisores', '*');
-      } catch(e){}
-      try {
-        cTecs = await fetchTablePaginated('cliente_tecnicos', '*');
-      } catch(e){}
+        const [clientesRes, sitiosRes, maqRes, supsRes, tecsRes] = await Promise.allSettled([
+          fetchTablePaginated('clientes', '*'),
+          fetchTablePaginated('sitios', '*'),
+          fetchTablePaginated('maquinaria', '*'),
+          fetchTablePaginated('cliente_supervisores', '*'),
+          fetchTablePaginated('cliente_tecnicos', '*')
+        ]);
 
-      const localClientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
-      const userList = window.usuarios || (typeof usuarios !== 'undefined' ? usuarios : []);
+        const sitiosDb = (sitiosRes.status === 'fulfilled' && sitiosRes.value) ? sitiosRes.value : [];
+        const maqDb = (maqRes.status === 'fulfilled' && maqRes.value) ? maqRes.value : [];
+        const cSups = (supsRes.status === 'fulfilled' && supsRes.value) ? supsRes.value : [];
+        const cTecs = (tecsRes.status === 'fulfilled' && tecsRes.value) ? tecsRes.value : [];
+        const clientes = (clientesRes.status === 'fulfilled' && clientesRes.value) ? clientesRes.value : null;
 
-      const mergedClientes = clientes.map(c => {
-        const row = rowToCliente(c);
-        const local = localClientes.find(lc => lc.id === row.id);
-        
-        // 1. Reconstrucción Dinámica de Sitios (Fuente de verdad: tabla sitios)
-        const matchSitios = (sitiosDb || []).filter(s => s.cliente === row.id);
-        row.sitios = matchSitios.map(s => ({
-          id: s.id,
-          nombre: s.nombre,
-          cliente: s.cliente,
-          direccion: s.direccion,
-          cp: s.cp,
-          ciudad: s.ciudad,
-          estado: s.estado,
-          customData: s.custom_data
-        }));
-        
-        // 2. Reconstrucción Dinámica de Maquinarias (Fuente de verdad: tabla maquinaria)
-        const matchMaq = (maqDb || []).filter(m => {
-          if (m.cliente === row.id) return true;
-          if (m.cliente === row.nombre) return true;
-          const cData = m.custom_data || {};
-          const addClients = cData.clientesAdicionales || cData.empresasVinculadas || [];
-          if (Array.isArray(addClients) && (addClients.includes(row.id) || addClients.includes(row.nombre))) return true;
-          return false;
-        });
-        row.maquinas = matchMaq.map(m => {
-          const cData = m.custom_data || {};
-          
-          // ESTRATEGIA DE AUTOLIMPIEZA: Si la máquina está ligada por nombre en vez de ID, la corregimos en la nube
-          if (m.cliente === row.nombre && row.id !== row.nombre) {
-            console.log(`[Sync] Corrigiendo vinculación por nombre de máquina ${m.id} al ID ${row.id}`);
-            if (window.pushToSupabase) {
-              window.pushToSupabase('maquinaria', {
-                idInterno: m.id,
+        if (sitiosDb && sitiosDb.length > 0) {
+          window._supaValidSitioIds = new Set(sitiosDb.map(s => s.id).filter(Boolean));
+          const mappedSitios = sitiosDb.map(s => ({
+            id: s.id, nombre: s.nombre, cliente: s.cliente, direccion: s.direccion,
+            cp: s.cp, ciudad: s.ciudad, estado: s.estado, customData: s.custom_data
+          }));
+          localStorage.setItem('sapi_sitios_db', JSON.stringify(mappedSitios));
+        }
+
+        // Esperar a que config termine para aplicar saldosSap si llegaron
+        await configPromise;
+
+        if (clientes && clientes.length > 0) {
+          window._supaValidClienteIds = new Set(clientes.map(c => c.id).filter(Boolean));
+          const localClientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+
+          const mergedClientes = clientes.map(c => {
+            const row = rowToCliente(c);
+            const local = localClientes.find(lc => lc.id === row.id);
+            
+            // 1. Reconstrucción Dinámica de Sitios (Fuente de verdad: tabla sitios)
+            const matchSitios = (sitiosDb || []).filter(s => s.cliente === row.id);
+            row.sitios = matchSitios.map(s => ({
+              id: s.id,
+              nombre: s.nombre,
+              cliente: s.cliente,
+              direccion: s.direccion,
+              cp: s.cp,
+              ciudad: s.ciudad,
+              estado: s.estado,
+              customData: s.custom_data
+            }));
+            
+            // 2. Reconstrucción Dinámica de Maquinarias (Fuente de verdad: tabla maquinaria)
+            const matchMaq = (maqDb || []).filter(m => {
+              if (m.cliente === row.id) return true;
+              if (m.cliente === row.nombre) return true;
+              const cData = m.custom_data || {};
+              const addClients = cData.clientesAdicionales || cData.empresasVinculadas || [];
+              if (Array.isArray(addClients) && (addClients.includes(row.id) || addClients.includes(row.nombre))) return true;
+              return false;
+            });
+            row.maquinas = matchMaq.map(m => {
+              const cData = m.custom_data || {};
+              
+              // ESTRATEGIA DE AUTOLIMPIEZA: Si la máquina está ligada por nombre en vez de ID, la corregimos en la nube
+              if (m.cliente === row.nombre && row.id !== row.nombre) {
+                console.log(`[Sync] Corrigiendo vinculación por nombre de máquina ${m.id} al ID ${row.id}`);
+                if (window.pushToSupabase) {
+                  window.pushToSupabase('maquinaria', {
+                    idInterno: m.id,
+                    id: m.id,
+                    serie: m.serie,
+                    marca: m.marca,
+                    modelo: m.modelo,
+                    anio: m.anio,
+                    cliente: row.id,
+                    descripcion: m.descripcion,
+                    customData: cData,
+                    sitio_id: m.sitio_id
+                  });
+                }
+              }
+
+              // Resolver nombre del sitio a partir del sitio_id
+              let ubiName = m.ubicacion || cData.ubicacion || 'N/A';
+              if (m.sitio_id) {
+                const sMatch = (sitiosDb || []).find(s => s.id === m.sitio_id);
+                if (sMatch) ubiName = sMatch.nombre;
+              }
+
+              return {
                 id: m.id,
                 serie: m.serie,
                 marca: m.marca,
                 modelo: m.modelo,
                 anio: m.anio,
-                cliente: row.id,
+                cliente: row.nombre,
+                idInterno: m.id_interno || m.id,
                 descripcion: m.descripcion,
-                customData: cData,
-                sitio_id: m.sitio_id
+                tipo: m.tipo || cData.tipo || 'N/A',
+                numeroEconomico: m.numero_economico || cData.numeroEconomico || 'N/A',
+                numeroMotor: m.numero_motor || cData.numeroMotor || 'N/A',
+                venta: m.venta || cData.venta || '',
+                ubicacion: ubiName,
+                sitio_id: m.sitio_id || null,
+                latitud: (m.latitud !== null && m.latitud !== undefined) ? m.latitud : cData.latitud,
+                longitud: (m.longitud !== null && m.longitud !== undefined) ? m.longitud : cData.longitud,
+                customData: cData
+              };
+            });
+
+            // ESTRATEGIA ANTI-PÉRDIDA: Preservar y subir máquinas manuales locales pendientes
+            if (local && local.maquinas) {
+              local.maquinas.forEach(lm => {
+                const lmId = lm.idInterno || lm.id || lm.serie;
+                const existsInCloud = (maqDb || []).some(m => {
+                  if (lmId && (m.id === lmId || m.id_interno === lmId)) return true;
+                  if (lm.serie && m.serie === lm.serie) return true;
+                  return false;
+                });
+                if (!existsInCloud) {
+                  row.maquinas.push(lm);
+                  if (window.pushToSupabase) {
+                    window.pushToSupabase('maquinaria', { ...lm, cliente: row.id });
+                  }
+                }
               });
             }
-          }
+            
+            // 3. Reconstrucción Dinámica de Supervisores Asignados (Junction Table)
+            const supsLink = cSups.filter(l => l.cliente_id === row.id);
+            row.supervisoresAsignados = supsLink.map(link => link.usuario_id);
+            
+            // 4. Reconstrucción Dinámica de Técnicos Asignados (Junction Table)
+            const tecsLink = cTecs.filter(l => l.cliente_id === row.id);
+            row.tecnicosAsignados = tecsLink.map(link => link.usuario_id);
 
-          // Resolver nombre del sitio a partir del sitio_id
-          let ubiName = m.ubicacion || cData.ubicacion || 'N/A';
-          if (m.sitio_id) {
-            const sMatch = (sitiosDb || []).find(s => s.id === m.sitio_id);
-            if (sMatch) ubiName = sMatch.nombre;
-          }
-
-          return {
-            id: m.id,
-            serie: m.serie,
-            marca: m.marca,
-            modelo: m.modelo,
-            anio: m.anio,
-            cliente: row.nombre,
-            idInterno: m.id_interno || m.id,
-            descripcion: m.descripcion,
-            tipo: m.tipo || cData.tipo || 'N/A',
-            numeroEconomico: m.numero_economico || cData.numeroEconomico || 'N/A',
-            numeroMotor: m.numero_motor || cData.numeroMotor || 'N/A',
-            venta: m.venta || cData.venta || '',
-            ubicacion: ubiName,
-            sitio_id: m.sitio_id || null,
-            latitud: (m.latitud !== null && m.latitud !== undefined) ? m.latitud : cData.latitud,
-            longitud: (m.longitud !== null && m.longitud !== undefined) ? m.longitud : cData.longitud,
-            customData: cData
-          };
-        });
-
-        // ESTRATEGIA ANTI-PÉRDIDA: Preservar y subir máquinas manuales locales pendientes
-        if (local && local.maquinas) {
-          local.maquinas.forEach(lm => {
-            const lmId = lm.idInterno || lm.id || lm.serie;
-            const existsInCloud = (maqDb || []).some(m => {
-              if (lmId && (m.id === lmId || m.id_interno === lmId)) return true;
-              if (lm.serie && m.serie === lm.serie) return true;
-              return false;
-            });
-            if (!existsInCloud) {
-              row.maquinas.push(lm);
-              if (window.pushToSupabase) {
-                window.pushToSupabase('maquinaria', { ...lm, cliente: row.id });
-              }
+            // Priorizar saldos
+            if (saldosSap[row.id]) {
+              row.saldoCuenta = saldosSap[row.id].saldoCuenta || 0;
+              row.saldoOrdenes = saldosSap[row.id].saldoOrdenes || 0;
+            } else if (local) {
+              row.saldoCuenta = local.saldoCuenta || 0;
+              row.saldoOrdenes = local.saldoOrdenes || 0;
+            } else {
+              row.saldoCuenta = 0;
+              row.saldoOrdenes = 0;
             }
+            return row;
           });
+          localStorage.setItem('sapi_clientes_db', JSON.stringify(mergedClientes));
         }
-        
-        // 3. Reconstrucción Dinámica de Supervisores Asignados (Junction Table)
-        const supsLink = cSups.filter(l => l.cliente_id === row.id);
-        row.supervisoresAsignados = supsLink.map(link => link.usuario_id);
-        
-        // 4. Reconstrucción Dinámica de Técnicos Asignados (Junction Table)
-        const tecsLink = cTecs.filter(l => l.cliente_id === row.id);
-        row.tecnicosAsignados = tecsLink.map(link => link.usuario_id);
 
-        // Priorizar saldos
-        if (saldosSap[row.id]) {
-          row.saldoCuenta = saldosSap[row.id].saldoCuenta || 0;
-          row.saldoOrdenes = saldosSap[row.id].saldoOrdenes || 0;
-        } else if (local) {
-          row.saldoCuenta = local.saldoCuenta || 0;
-          row.saldoOrdenes = local.saldoOrdenes || 0;
-        } else {
-          row.saldoCuenta = 0;
-          row.saldoOrdenes = 0;
+        // Maquinaria
+        if (maqDb && maqDb.length > 0) {
+          window._supaValidMaquinariaIds = new Set(maqDb.map(m => m.id).filter(Boolean));
+          const mappedMaq = maqDb.map(m => {
+            let clienteNombre = m.cliente;
+            try {
+              const clientesDbList = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+              const matchByName = clientesDbList.find(c => c.nombre === m.cliente && c.id !== m.cliente);
+              if (matchByName) {
+                console.log(`[Sync] Corrigiendo ID de cliente para máquina ${m.id}: de '${m.cliente}' a '${matchByName.id}'`);
+                if (window.pushToSupabase) {
+                  window.pushToSupabase('maquinaria', {
+                    idInterno: m.id,
+                    id: m.id,
+                    serie: m.serie,
+                    marca: m.marca,
+                    modelo: m.modelo,
+                    anio: m.anio,
+                    cliente: matchByName.id,
+                    descripcion: m.descripcion,
+                    customData: m.custom_data,
+                    sitio_id: m.sitio_id
+                  });
+                }
+                clienteNombre = matchByName.nombre;
+              } else {
+                const match = clientesDbList.find(c => c.id === m.cliente);
+                if (match) clienteNombre = match.nombre;
+              }
+            } catch(e) {}
+            const cData = m.custom_data || {};
+
+            let ubiName = m.ubicacion || cData.ubicacion || 'N/A';
+            if (m.sitio_id) {
+              const sMatch = (sitiosDb || []).find(s => s.id === m.sitio_id);
+              if (sMatch) ubiName = sMatch.nombre;
+            }
+
+            return {
+              id: m.id,
+              serie: m.serie,
+              marca: m.marca,
+              modelo: m.modelo,
+              anio: m.anio,
+              cliente: clienteNombre,
+              idInterno: m.id_interno || m.id,
+              descripcion: m.descripcion,
+              tipo: m.tipo || cData.tipo || 'N/A',
+              numeroEconomico: m.numero_economico || cData.numeroEconomico || 'N/A',
+              numeroMotor: m.numero_motor || cData.numeroMotor || 'N/A',
+              venta: m.venta || cData.venta || '',
+              ubicacion: ubiName,
+              sitio_id: m.sitio_id || null,
+              latitud: (m.latitud !== null && m.latitud !== undefined) ? m.latitud : cData.latitud,
+              longitud: (m.longitud !== null && m.longitud !== undefined) ? m.longitud : cData.longitud,
+              customData: cData
+            };
+          });
+          localStorage.setItem('sapi_maquinaria_db', JSON.stringify(mappedMaq));
         }
-        return row;
-      });
-      localStorage.setItem('sapi_clientes_db', JSON.stringify(mergedClientes));
-    }
+      } catch (errCSM) {
+        console.error('[Sync] Error al cargar clientes/sitios/maquinaria:', errCSM);
+      }
+    })();
 
-    // Tickets — SOLO sobreescribir local si la consulta fue exitosa
-    let ticketsDb = null;
-    let ticketsError = null;
-    let idsWithPedido = new Set();
-    let idsWithCotizacion = new Set();
-    try {
-      // Descargar columnas principales del ticket con orden indexado en created_at para prevenir timeouts en Postgres
-      let columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, notas, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion, creado_por, fecha_modificacion, updated_at, modificado_por, comentarios_internos, comentarios_clientes';
+    // 4. Tickets (Descarga indexada y fusionada con cambios locales; sin re-render prematuro)
+    const ticketsPromise = (async () => {
+      let ticketsDb = null;
+      let ticketsError = null;
+      let idsWithPedido = new Set();
+      let idsWithCotizacion = new Set();
       try {
-        ticketsDb = await fetchTablePaginated('tickets', columns, 'created_at', false, null, 50, 20000);
-      } catch (colErr) {
-        console.warn('[Sync] Reintentando carga de tickets con columnas ultraligeras...', colErr?.message);
+        let columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, notas, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion, creado_por, fecha_modificacion, updated_at, modificado_por, comentarios_internos, comentarios_clientes';
         try {
-          columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion, creado_por, comentarios_internos, comentarios_clientes';
-          ticketsDb = await fetchTablePaginated('tickets', columns, 'created_at', false, null, 40, 20000);
-        } catch (colErr2) {
-          console.warn('[Sync] Reintentando consulta directa indexada de tickets...', colErr2?.message);
-          const sb = window.supabaseClient;
-          if (sb) {
-            const { data: directData, error: directErr } = await sb.from('tickets').select(columns).order('created_at', { ascending: false }).limit(250);
-            if (!directErr && directData) {
-              ticketsDb = directData;
+          ticketsDb = await fetchTablePaginated('tickets', columns, 'created_at', false, null, 50, 20000);
+        } catch (colErr) {
+          console.warn('[Sync] Reintentando carga de tickets con columnas ultraligeras...', colErr?.message);
+          try {
+            columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion, creado_por, comentarios_internos, comentarios_clientes';
+            ticketsDb = await fetchTablePaginated('tickets', columns, 'created_at', false, null, 40, 20000);
+          } catch (colErr2) {
+            console.warn('[Sync] Reintentando consulta directa indexada de tickets...', colErr2?.message);
+            const sb = window.supabaseClient;
+            if (sb) {
+              const { data: directData, error: directErr } = await sb.from('tickets').select(columns).order('created_at', { ascending: false }).limit(250);
+              if (!directErr && directData) {
+                ticketsDb = directData;
+              } else {
+                throw colErr2;
+              }
             } else {
               throw colErr2;
             }
-          } else {
-            throw colErr2;
           }
         }
+      } catch (e) {
+        console.warn('[Sync] Error al descargar tickets principales de Supabase:', e.message);
+        ticketsError = e;
       }
-    } catch (e) {
-      console.warn('[Sync] Error al descargar tickets principales de Supabase:', e.message);
-      ticketsError = e;
-    }
 
-
-
-    if (ticketsDb) {
-      let mapped = [];
-      let mapErrors = [];
-      ticketsDb.forEach(t => {
-        try {
-          mapped.push(rowToTicket(t, idsWithPedido, idsWithCotizacion));
-        } catch (e) {
-          mapErrors.push({ folio: t.folio, error: e.message });
-        }
-      });
-      
-      if (mapErrors.length > 0 && window.trackTelemetryEvent) {
-        window.trackTelemetryEvent('Diag: Mapping Errors', { errors: mapErrors });
-      }
-      
-      // FUSIONAR CON CAMBIOS LOCALES PENDIENTES DE SINCRONIZAR
-      const queue = getSyncQueue();
-      const pendingTickets = queue.filter(item => item.table === 'tickets');
-      pendingTickets.forEach(item => {
-        if (item.action === 'upsert') {
-          const idx = mapped.findIndex(t => t.id === item.data.id);
-          if (idx > -1) {
-            mapped[idx] = item.data;
-          } else {
-            mapped.unshift(item.data);
-          }
-        } else if (item.action === 'delete') {
-          mapped = mapped.filter(t => t.id !== item.data.id);
-        }
-      });
-
-      // ESTRATEGIA ANTI-PÉRDIDA: Preservar tickets que solo existen localmente y nunca se han sincronizado
-      try {
-        const localTickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
-        const unsyncedLocal = localTickets.filter(t => t && t._synced !== true);
-        unsyncedLocal.forEach(lt => {
-          const exists = mapped.some(m => m.id === lt.id);
-          if (!exists) {
-            console.log(`[Sync] Preservando ticket local no sincronizado: ${lt.id} (Folio: ${lt.folio})`);
-            mapped.push(lt);
+      if (ticketsDb) {
+        let mapped = [];
+        let mapErrors = [];
+        ticketsDb.forEach(t => {
+          try {
+            mapped.push(rowToTicket(t, idsWithPedido, idsWithCotizacion));
+          } catch (e) {
+            mapErrors.push({ folio: t.folio, error: e.message });
           }
         });
-      } catch (e) {
-        console.error('[Sync] Error al preservar tickets locales no sincronizados:', e);
-      }
-
-      window._supaTickets = mapped;
-      localStorage.setItem('sapi_tickets', JSON.stringify(mapped));
-      
-      // Emitir evento inmediato para que la UI renderice los tickets descargados sin esperar el resto del sync
-      console.log('[Sync] Tickets guardados. Despachando evento de renderizado inmediato.');
-      window.dispatchEvent(new Event('supabase_datos_cargados'));
-    } else {
-      // Si la nube falló o está vacía, respetamos el local (no borramos nada) y notificamos a la UI para renderizar datos locales
-      console.log('[Sync] No se recibieron tickets nuevos de la nube. Manteniendo datos locales.');
-      window._supaTickets = null;
-      window.dispatchEvent(new Event('supabase_datos_cargados'));
-    }
-
-    // Sitios
-    let sitiosDb = [];
-    try {
-      sitiosDb = await fetchTablePaginated('sitios', '*');
-    } catch (e) {}
-    if (sitiosDb && sitiosDb.length > 0) {
-      window._supaValidSitioIds = new Set(sitiosDb.map(s => s.id).filter(Boolean));
-      const mapped = sitiosDb.map(s => ({ id: s.id, nombre: s.nombre, cliente: s.cliente, direccion: s.direccion, cp: s.cp, ciudad: s.ciudad, estado: s.estado, customData: s.custom_data }));
-      localStorage.setItem('sapi_sitios_db', JSON.stringify(mapped));
-    }
-
-    // Maquinaria
-    let maqDb = [];
-    try {
-      maqDb = await fetchTablePaginated('maquinaria', '*');
-    } catch (e) {}
-    if (maqDb && maqDb.length > 0) {
-      window._supaValidMaquinariaIds = new Set(maqDb.map(m => m.id).filter(Boolean));
-      const mapped = maqDb.map(m => {
-        let clienteNombre = m.cliente;
-        try {
-          const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
-          
-          // ESTRATEGIA DE AUTOLIMPIEZA: Si la máquina está ligada por nombre en vez de ID, la corregimos en la nube
-          const matchByName = clientes.find(c => c.nombre === m.cliente && c.id !== m.cliente);
-          if (matchByName) {
-            console.log(`[Sync] Corrigiendo ID de cliente para máquina ${m.id}: de '${m.cliente}' a '${matchByName.id}'`);
-            if (window.pushToSupabase) {
-              window.pushToSupabase('maquinaria', {
-                idInterno: m.id,
-                id: m.id,
-                serie: m.serie,
-                marca: m.marca,
-                modelo: m.modelo,
-                anio: m.anio,
-                cliente: matchByName.id,
-                descripcion: m.descripcion,
-                customData: m.custom_data,
-                sitio_id: m.sitio_id
-              });
+        
+        if (mapErrors.length > 0 && window.trackTelemetryEvent) {
+          window.trackTelemetryEvent('Diag: Mapping Errors', { errors: mapErrors });
+        }
+        
+        // FUSIONAR CON CAMBIOS LOCALES PENDIENTES DE SINCRONIZAR
+        const queue = getSyncQueue();
+        const pendingTickets = queue.filter(item => item.table === 'tickets');
+        pendingTickets.forEach(item => {
+          if (item.action === 'upsert') {
+            const idx = mapped.findIndex(t => t.id === item.data.id);
+            if (idx > -1) {
+              mapped[idx] = item.data;
+            } else {
+              mapped.unshift(item.data);
             }
-            clienteNombre = matchByName.nombre;
-          } else {
-            const match = clientes.find(c => c.id === m.cliente);
-            if (match) clienteNombre = match.nombre;
+          } else if (item.action === 'delete') {
+            mapped = mapped.filter(t => t.id !== item.data.id);
           }
-        } catch(e) {}
-        const cData = m.custom_data || {};
+        });
 
-        // Resolver nombre del sitio a partir del sitio_id
-        let ubiName = m.ubicacion || cData.ubicacion || 'N/A';
-        if (m.sitio_id) {
-          try {
-            const sitios = JSON.parse(localStorage.getItem('sapi_sitios_db') || '[]');
-            const sMatch = sitios.find(s => s.id === m.sitio_id);
-            if (sMatch) ubiName = sMatch.nombre;
-          } catch(e) {}
-        }
-
-        return {
-          id: m.id,
-          serie: m.serie,
-          marca: m.marca,
-          modelo: m.modelo,
-          anio: m.anio,
-          cliente: clienteNombre,
-          idInterno: m.id_interno || m.id,
-          descripcion: m.descripcion,
-          tipo: m.tipo || cData.tipo || 'N/A',
-          numeroEconomico: m.numero_economico || cData.numeroEconomico || 'N/A',
-          numeroMotor: m.numero_motor || cData.numeroMotor || 'N/A',
-          venta: m.venta || cData.venta || '',
-          ubicacion: ubiName,
-          sitio_id: m.sitio_id || null,
-          latitud: (m.latitud !== null && m.latitud !== undefined) ? m.latitud : cData.latitud,
-          longitud: (m.longitud !== null && m.longitud !== undefined) ? m.longitud : cData.longitud,
-          customData: cData
-        };
-      });
-      localStorage.setItem('sapi_maquinaria_db', JSON.stringify(mapped));
-    }
-
-    // Levantamientos
-    try {
-      let levantamientosDb = null;
-      let levErr = null;
-      try {
-        levantamientosDb = await fetchTablePaginated('levantamientos', '*');
-      } catch (err) {
-        levErr = err;
-      }
-      if (levantamientosDb && !levErr) {
-        const mapped = levantamientosDb.map(rowToLevantamiento);
-        localStorage.setItem('sapi_levantamientos', JSON.stringify(mapped));
-        if (typeof window.levantamientos !== 'undefined') {
-          window.levantamientos = mapped;
-        }
-      } else if (levErr) {
-        console.error('[Sync] Error loading levantamientos:', levErr);
-      }
-    } catch (e) {
-      console.error('[Sync] Exception loading levantamientos:', e);
-    }
-
-    // Rentas de Maquinaria
-    try {
-      let rentasDb = null;
-      let renErr = null;
-      try {
-        rentasDb = await fetchTablePaginated('rentas', '*');
-      } catch (err) {
-        renErr = err;
-      }
-      if (rentasDb && !renErr) {
-        let localRentas = [];
-        try { localRentas = JSON.parse(localStorage.getItem('sapi_rentas') || '[]'); } catch(e){}
-        const mapped = rentasDb.map(rowToRenta);
-        if (mapped.length === 0 && localRentas.length > 0) {
-          console.log(`[Sync] Migrando ${localRentas.length} rentas locales a Supabase...`);
-          for (const lr of localRentas) {
-            if (window.pushToSupabase) window.pushToSupabase('rentas', lr);
-          }
-        } else {
-          localStorage.setItem('sapi_rentas', JSON.stringify(mapped));
-          window.rentas = mapped;
-          if (typeof window.renderRentas === 'function') {
-            window.renderRentas();
-          }
-          if (typeof window.doRender === 'function') {
-            window.doRender();
-          }
-        }
-      } else if (renErr) {
-        console.warn('[Sync] Aviso cargando tabla rentas (usando datos locales):', renErr.message);
-      }
-    } catch (e) {
-      console.warn('[Sync] Excepción al sincronizar rentas:', e);
-    }
-
-    // Envíos y Guías de Paquetería
-    try {
-      let enviosDb = null;
-      let envErr = null;
-      try {
-        enviosDb = await fetchTablePaginated('envios', '*');
-      } catch (err) {
-        envErr = err;
-      }
-      if (enviosDb && !envErr) {
-        const mapped = enviosDb.map(rowToEnvio);
-        localStorage.setItem('sapi_envios_db', JSON.stringify(mapped));
-        if (typeof window.sapiEnviosDb !== 'undefined') {
-          window.sapiEnviosDb = mapped;
-        }
-        // Sincronizar hacia los tickets locales si existen
+        // ESTRATEGIA ANTI-PÉRDIDA: Preservar tickets que solo existen localmente y nunca se han sincronizado
         try {
           const localTickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
-          let tktChanged = false;
-          mapped.forEach(env => {
-            if (env.ticketId) {
-              const t = localTickets.find(x => x.id === env.ticketId || x.folio === env.ticketId);
-              if (t) {
-                if (!t.envios) t.envios = [];
-                const existIdx = t.envios.findIndex(x => x.id === env.id);
-                if (existIdx >= 0) {
-                  t.envios[existIdx] = env;
-                } else {
-                  t.envios.push(env);
-                }
-                tktChanged = true;
+          const unsyncedLocal = localTickets.filter(t => t && t._synced !== true);
+          unsyncedLocal.forEach(lt => {
+            const exists = mapped.some(m => m.id === lt.id);
+            if (!exists) {
+              console.log(`[Sync] Preservando ticket local no sincronizado: ${lt.id} (Folio: ${lt.folio})`);
+              mapped.push(lt);
+            }
+          });
+        } catch (e) {
+          console.error('[Sync] Error al preservar tickets locales no sincronizados:', e);
+        }
+
+        // ESTRATEGIA ANTI-PÉRDIDA DE CREADOR: Preservar creador local si la nube viene vacía
+        try {
+          const localTickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+          const localMap = new Map(localTickets.map(lt => [lt.id, lt]));
+          mapped.forEach(t => {
+            const hasRemoteCreator = t.creadoPor && String(t.creadoPor).trim() !== '' && t.creadoPor !== '—' && t.creadoPor !== 'null';
+            if (!hasRemoteCreator) {
+              const loc = localMap.get(t.id);
+              if (loc && loc.creadoPor && String(loc.creadoPor).trim() !== '' && loc.creadoPor !== '—' && loc.creadoPor !== 'null') {
+                t.creadoPor = String(loc.creadoPor).trim();
+              } else if (typeof window.resolverCreadorTicket === 'function') {
+                const resolved = window.resolverCreadorTicket(t);
+                if (resolved) t.creadoPor = resolved;
               }
             }
           });
-          if (tktChanged) {
-            localStorage.setItem('sapi_tickets', JSON.stringify(localTickets));
-            if (typeof tickets !== 'undefined') window.tickets = localTickets;
-          }
-        } catch(e) {}
-
-        if (typeof window.renderEnvios === 'function') {
-          window.renderEnvios();
+        } catch (e) {
+          console.error('[Sync] Error al preservar creadores locales de tickets:', e);
         }
+        // Deduplicación estricta por ID y Folio antes de persistir
+        const seenSupaTktIds = new Set();
+        const seenSupaTktFolios = new Set();
+        mapped = mapped.filter(t => {
+          if (!t) return false;
+          const tid = t.id ? String(t.id).trim() : null;
+          const tfol = t.folio ? String(t.folio).trim() : null;
+          if (tid && seenSupaTktIds.has(tid)) return false;
+          if (tfol && seenSupaTktFolios.has(tfol)) return false;
+          if (tid) seenSupaTktIds.add(tid);
+          if (tfol) seenSupaTktFolios.add(tfol);
+          return true;
+        });
+
+        window._supaTickets = mapped;
+        localStorage.setItem('sapi_tickets', JSON.stringify(mapped));
+      } else {
+        console.log('[Sync] No se recibieron tickets nuevos de la nube. Manteniendo datos locales.');
+        window._supaTickets = null;
       }
-    } catch (e) {
-      console.warn('[Sync] Tabla envios no disponible o en migración:', e.message);
-    }
+    })();
 
-    // Órdenes y subtablas asociadas descargadas de forma estable y secuencial
-    let ordenes = null;
-    let ordenesError = null;
-    let bitacorasDb = [];
-    let refsDb = [];
-    let firmasDb = [];
+    // 5. Órdenes y subtablas asociadas (bitácora, refacciones, firmas) en paralelo concurrente
+    const ordenesPromise = (async () => {
+      let ordenes = null;
+      let ordenesError = null;
+      let bitacorasDb = [];
+      let refsDb = [];
+      let firmasDb = [];
 
-    try {
-      ordenes = await fetchTablePaginated('ordenes', '*');
-      try { bitacorasDb = await fetchTablePaginated('orden_bitacora', '*'); } catch(e) {}
-      try { refsDb = await fetchTablePaginated('orden_refacciones', '*, refacciones(codigo, descripcion)'); } catch(e) {}
-      try { firmasDb = await fetchTablePaginated('orden_firmas', '*'); } catch(e) {}
-    } catch (err) {
-      ordenesError = err;
-    }
+      try {
+        const [ordRes, bitRes, refRes, firRes] = await Promise.allSettled([
+          fetchTablePaginated('ordenes', '*'),
+          fetchTablePaginated('orden_bitacora', '*'),
+          fetchTablePaginated('orden_refacciones', '*, refacciones(codigo, descripcion)'),
+          fetchTablePaginated('orden_firmas', '*')
+        ]);
+        if (ordRes.status === 'fulfilled') {
+          ordenes = ordRes.value;
+        } else {
+          ordenesError = ordRes.reason;
+        }
+        if (bitRes.status === 'fulfilled') bitacorasDb = bitRes.value || [];
+        if (refRes.status === 'fulfilled') refsDb = refRes.value || [];
+        if (firRes.status === 'fulfilled') firmasDb = firRes.value || [];
+      } catch (err) {
+        ordenesError = err;
+      }
 
-    window.lastSyncOrdsLength = ordenes ? ordenes.length : -1;
-    window.lastSyncOrdsError = ordenesError ? ordenesError.message : null;
-    window.lastSyncTimestamp = new Date().toISOString();
-    localStorage.setItem('sapi_last_sync_timestamp', window.lastSyncTimestamp);
-    if (ordenes) {
-      let bitacorasMap = {};
-      if (bitacorasDb && bitacorasDb.length > 0) {
-        const seenBitacoraIds = new Set();
+      window.lastSyncOrdsLength = ordenes ? ordenes.length : -1;
+      window.lastSyncOrdsError = ordenesError ? ordenesError.message : null;
+      window.lastSyncTimestamp = new Date().toISOString();
+      localStorage.setItem('sapi_last_sync_timestamp', window.lastSyncTimestamp);
 
-        bitacorasDb.forEach(b => {
-          if (!b || !b.id) return;
-          if (seenBitacoraIds.has(b.id)) return;
-          seenBitacoraIds.add(b.id);
+      if (ordenes) {
+        let bitacorasMap = {};
+        if (bitacorasDb && bitacorasDb.length > 0) {
+          const seenBitacoraIds = new Set();
 
-          if (!bitacorasMap[b.orden_id]) bitacorasMap[b.orden_id] = [];
-          
-          // Formatear fecha a YYYY-MM-DD para la app
-          const datePortion = b.fecha ? b.fecha.substring(0, 10) : '';
-          
-          let tecnico = b.tecnico;
-          let nota = b.nota || '';
-          let realizado = true;
-          let programadoEntrada = null;
-          let programadoSalida = null;
-          let desviacion = null;
+          bitacorasDb.forEach(b => {
+            if (!b || !b.id) return;
+            if (seenBitacoraIds.has(b.id)) return;
+            seenBitacoraIds.add(b.id);
 
-          if (nota.includes('[Realizado: ')) {
-            const match = nota.match(/(?:\r?\n|^)\[Realizado: (.*?)\]/);
-            if (match) {
-              realizado = match[1] === 'true';
-              nota = nota.replace(/(?:\r?\n|^)\[Realizado: (.*?)\]/g, '');
+            if (!bitacorasMap[b.orden_id]) bitacorasMap[b.orden_id] = [];
+            
+            const datePortion = b.fecha ? b.fecha.substring(0, 10) : '';
+            
+            let tecnico = b.tecnico;
+            let nota = b.nota || '';
+            let realizado = true;
+            let programadoEntrada = null;
+            let programadoSalida = null;
+            let desviacion = null;
+
+            if (nota.includes('[Realizado: ')) {
+              const match = nota.match(/(?:\r?\n|^)\[Realizado: (.*?)\]/);
+              if (match) {
+                realizado = match[1] === 'true';
+                nota = nota.replace(/(?:\r?\n|^)\[Realizado: (.*?)\]/g, '');
+              }
+            } else {
+              const esPendiente = nota.includes('Programado por supervisor') || nota.includes('Pendiente de llenado');
+              realizado = !esPendiente;
             }
-          } else {
-            // Retrocompatibilidad
-            const esPendiente = nota.includes('Programado por supervisor') || nota.includes('Pendiente de llenado');
-            realizado = !esPendiente;
-          }
 
-          if (nota.includes('[Prog: ')) {
-            const match = nota.match(/(?:\r?\n|^)\[Prog: (.*?)-(.*?)\]/);
-            if (match) {
-              programadoEntrada = match[1];
-              programadoSalida = match[2];
-              nota = nota.replace(/(?:\r?\n|^)\[Prog: (.*?)-(.*?)\]/g, '');
+            if (nota.includes('[Prog: ')) {
+              const match = nota.match(/(?:\r?\n|^)\[Prog: (.*?)-(.*?)\]/);
+              if (match) {
+                programadoEntrada = match[1];
+                programadoSalida = match[2];
+                nota = nota.replace(/(?:\r?\n|^)\[Prog: (.*?)-(.*?)\]/g, '');
+              }
             }
-          }
 
-          if (nota.includes('[Desv: ')) {
-            const match = nota.match(/(?:\r?\n|^)\[Desv: (.*?)\]/);
-            if (match) {
-              desviacion = match[1];
-              nota = nota.replace(/(?:\r?\n|^)\[Desv: (.*?)\]/g, '');
+            if (nota.includes('[Desv: ')) {
+              const match = nota.match(/(?:\r?\n|^)\[Desv: (.*?)\]/);
+              if (match) {
+                desviacion = match[1];
+                nota = nota.replace(/(?:\r?\n|^)\[Desv: (.*?)\]/g, '');
+              }
             }
-          }
 
-          if (!tecnico && nota.includes('[Técnico: ')) {
-            const match = nota.match(/\n\[Técnico: (.*?)\]$/);
-            if (match) {
-              tecnico = match[1];
-              nota = nota.replace(/\n\[Técnico: (.*?)\]$/, '');
+            if (!tecnico && nota.includes('[Técnico: ')) {
+              const match = nota.match(/\n\[Técnico: (.*?)\]$/);
+              if (match) {
+                tecnico = match[1];
+                nota = nota.replace(/\n\[Técnico: (.*?)\]$/, '');
+              }
             }
-          }
 
-          let asignadoPorName = null;
-          if (nota.includes('[AsignadoPor: ')) {
-            const match = nota.match(/(?:\r?\n|^)\[AsignadoPor: (.*?)\]/);
-            if (match) {
-              asignadoPorName = match[1];
-              nota = nota.replace(/(?:\r?\n|^)\[AsignadoPor: (.*?)\]/g, '');
+            let asignadoPorName = null;
+            if (nota.includes('[AsignadoPor: ')) {
+              const match = nota.match(/(?:\r?\n|^)\[AsignadoPor: (.*?)\]/);
+              if (match) {
+                asignadoPorName = match[1];
+                nota = nota.replace(/(?:\r?\n|^)\[AsignadoPor: (.*?)\]/g, '');
+              }
             }
-          }
 
-          bitacorasMap[b.orden_id].push({
-            id: b.id,
-            fecha: datePortion,
-            tecnico: tecnico,
-            nota: nota,
-            entrada: b.entrada,
-            salida: b.salida,
-            hora_inicio: b.hora_inicio,
-            horas_traslado: b.horas_traslado,
-            programadoHorasTraslado: b.programado_horas_traslado,
-            hora_fin_regreso: b.hora_fin_regreso,
-            horas_regreso: b.horas_regreso,
-            programadoHorasRegreso: b.programado_horas_regreso,
-            tipo: b.tipo || 'Servicio',
-            realizado: realizado,
-            programadoEntrada: programadoEntrada,
-            programadoSalida: programadoSalida,
-            desviacion: desviacion,
-            asignadoPorName: asignadoPorName
+            bitacorasMap[b.orden_id].push({
+              id: b.id,
+              fecha: datePortion,
+              tecnico: tecnico,
+              nota: nota,
+              entrada: b.entrada,
+              salida: b.salida,
+              hora_inicio: b.hora_inicio,
+              horas_traslado: b.horas_traslado,
+              programadoHorasTraslado: b.programado_horas_traslado,
+              hora_fin_regreso: b.hora_fin_regreso,
+              horas_regreso: b.horas_regreso,
+              programadoHorasRegreso: b.programado_horas_regreso,
+              tipo: b.tipo || 'Servicio',
+              realizado: realizado,
+              programadoEntrada: programadoEntrada,
+              programadoSalida: programadoSalida,
+              desviacion: desviacion,
+              asignadoPorName: asignadoPorName
+            });
           });
-        });
-      }
+        }
 
-      // Procesar Refacciones Asociadas
-      let refaccionesMap = {};
-      if (refsDb && refsDb.length > 0) {
-        refsDb.forEach(r => {
-          if (!refaccionesMap[r.orden_id]) refaccionesMap[r.orden_id] = { necesarias: [], utilizadas: [] };
-          
-          const refMeta = r.refacciones || {};
-          const refObj = {
-            clave: refMeta.codigo || null,
-            descripcion: refMeta.descripcion || 'Refacción',
-            cantidad: r.cantidad || 1,
-            precio: r.precio_unitario || 0,
-            estatusPedido: r.estatus_pedido || (r.estado === 'Necesaria' || r.estado === 'Solicitado' ? 'Por Pedir' : null),
-            estado: r.estado || null
-          };
-          
-          if (r.estado === 'Necesaria' || r.estado === 'Solicitado') {
-            refaccionesMap[r.orden_id].necesarias.push(refObj);
-          } else {
-            refaccionesMap[r.orden_id].utilizadas.push(refObj);
-          }
-        });
-      }
-
-      // Procesar Firmas Asociadas
-      let firmasMap = {};
-      if (firmasDb && firmasDb.length > 0) {
-        firmasDb.forEach(f => {
-          firmasMap[f.orden_id] = {
-            firma_tecnico_base64: f.firma_tecnico_url || null,
-            firma_tecnico_fecha: f.fecha_firma || null,
-            firma_cliente_base64: f.firma_cliente_url || null,
-            firma_cliente_nombre: f.nombre_firmante || null,
-            firma_cliente_fecha: f.fecha_firma || null
-          };
-        });
-      }
-
-      let mapped = ordenes.map(o => {
-        const ord = rowToOrden(o);
-        ord.bitacora = bitacorasMap[ord.id] || [];
-        
-        // Re-inyectar y fusionar refacciones
-        const refLink = refaccionesMap[ord.id] || { necesarias: [], utilizadas: [] };
-        
-        // Fusionar necesarias
-        refLink.necesarias.forEach(rl => {
-          const match = ord.ref_necesarias.find(ex => ex.descripcion === rl.descripcion);
-          if (match) {
-            match.estatusPedido = rl.estatusPedido;
-            match.estado = rl.estado;
-            match.clave = match.clave || rl.clave;
-          } else {
-            ord.ref_necesarias.push(rl);
-          }
-        });
-        
-        // Fusionar utilizadas
-        refLink.utilizadas.forEach(rl => {
-          const match = ord.ref_utilizadas.find(ex => ex.descripcion === rl.descripcion);
-          if (match) {
-            match.estatusPedido = rl.estatusPedido;
-            match.estado = rl.estado;
-            match.clave = match.clave || rl.clave;
-          } else {
-            ord.ref_utilizadas.push(rl);
-          }
-        });
-        
-        // Mantener las banderas de pdf
-        if (ord.pdfRefFlags) {
-          ord.ref_utilizadas.forEach(r => {
-            if (ord.pdfRefFlags[r.descripcion]) {
-              r.isFromPdf = true;
+        let refaccionesMap = {};
+        if (refsDb && refsDb.length > 0) {
+          refsDb.forEach(r => {
+            if (!refaccionesMap[r.orden_id]) refaccionesMap[r.orden_id] = { necesarias: [], utilizadas: [] };
+            
+            const refMeta = r.refacciones || {};
+            const refObj = {
+              clave: refMeta.codigo || null,
+              descripcion: refMeta.descripcion || 'Refacción',
+              cantidad: r.cantidad || 1,
+              precio: r.precio_unitario || 0,
+              estatusPedido: r.estatus_pedido || (r.estado === 'Necesaria' || r.estado === 'Solicitado' ? 'Por Pedir' : null),
+              estado: r.estado || null
+            };
+            
+            if (r.estado === 'Necesaria' || r.estado === 'Solicitado') {
+              refaccionesMap[r.orden_id].necesarias.push(refObj);
+            } else {
+              refaccionesMap[r.orden_id].utilizadas.push(refObj);
             }
           });
         }
+
+        let firmasMap = {};
+        if (firmasDb && firmasDb.length > 0) {
+          firmasDb.forEach(f => {
+            firmasMap[f.orden_id] = {
+              firma_tecnico_base64: f.firma_tecnico_url || null,
+              firma_tecnico_fecha: f.fecha_firma || null,
+              firma_cliente_base64: f.firma_cliente_url || null,
+              firma_cliente_nombre: f.nombre_firmante || null,
+              firma_cliente_fecha: f.fecha_firma || null
+            };
+          });
+        }
+
+        let mapped = ordenes.map(o => {
+          const ord = rowToOrden(o);
+          ord.bitacora = bitacorasMap[ord.id] || [];
+          
+          const refLink = refaccionesMap[ord.id] || { necesarias: [], utilizadas: [] };
+          
+          refLink.necesarias.forEach(rl => {
+            const match = ord.ref_necesarias.find(ex => ex.descripcion === rl.descripcion);
+            if (match) {
+              match.estatusPedido = rl.estatusPedido;
+              match.estado = rl.estado;
+              match.clave = match.clave || rl.clave;
+            } else {
+              ord.ref_necesarias.push(rl);
+            }
+          });
+          
+          refLink.utilizadas.forEach(rl => {
+            const match = ord.ref_utilizadas.find(ex => ex.descripcion === rl.descripcion);
+            if (match) {
+              match.estatusPedido = rl.estatusPedido;
+              match.estado = rl.estado;
+              match.clave = match.clave || rl.clave;
+            } else {
+              ord.ref_utilizadas.push(rl);
+            }
+          });
+          
+          if (ord.pdfRefFlags) {
+            ord.ref_utilizadas.forEach(r => {
+              if (ord.pdfRefFlags[r.descripcion]) {
+                r.isFromPdf = true;
+              }
+            });
+          }
+          
+          const firmLink = firmasMap[ord.id] || {};
+          ord.firma_tecnico_base64 = firmLink.firma_tecnico_base64 || null;
+          ord.firma_tecnico_fecha = firmLink.firma_tecnico_fecha || null;
+          ord.firma_cliente_base64 = firmLink.firma_cliente_base64 || null;
+          ord.firma_cliente_nombre = firmLink.firma_cliente_nombre || null;
+          ord.firma_cliente_fecha = firmLink.firma_cliente_fecha || null;
+          
+          return ord;
+        });
+        window.lastSyncMappedLength = mapped ? mapped.length : -1;
         
-        // Re-inyectar firmas
-        const firmLink = firmasMap[ord.id] || {};
-        ord.firma_tecnico_base64 = firmLink.firma_tecnico_base64 || null;
-        ord.firma_tecnico_fecha = firmLink.firma_tecnico_fecha || null;
-        ord.firma_cliente_base64 = firmLink.firma_cliente_base64 || null;
-        ord.firma_cliente_nombre = firmLink.firma_cliente_nombre || null;
-        ord.firma_cliente_fecha = firmLink.firma_cliente_fecha || null;
-        
-        return ord;
-      });
-      window.lastSyncMappedLength = mapped ? mapped.length : -1;
+        const queue = getSyncQueue();
+        const pendingOrdenes = queue.filter(item => item.table === 'ordenes');
+        pendingOrdenes.forEach(item => {
+          if (item.action === 'upsert') {
+            const idx = mapped.findIndex(o => o.id === item.data.id);
+            if (idx > -1) {
+              mapped[idx] = item.data;
+            } else {
+              mapped.unshift(item.data);
+            }
+          } else if (item.action === 'delete') {
+            mapped = mapped.filter(o => o.id !== item.data.id);
+          }
+        });
+
+        try {
+          const localOrdenes = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+          const unsyncedLocal = localOrdenes.filter(o => o && o._synced !== true);
+          unsyncedLocal.forEach(lo => {
+            const exists = mapped.some(m => m.id === lo.id);
+            if (!exists) {
+              console.log(`[Sync] Preservando orden local no sincronizada: ${lo.id} (Folio: ${lo.folio})`);
+              mapped.push(lo);
+            }
+          });
+        } catch (e) {
+          console.error('[Sync] Error al preservar órdenes locales no sincronizadas:', e);
+        }
+
+        // Deduplicación estricta por ID y Folio antes de persistir
+        const seenSupaOrdIds = new Set();
+        const seenSupaOrdFolios = new Set();
+        mapped = mapped.filter(o => {
+          if (!o) return false;
+          const oid = o.id ? String(o.id).trim() : null;
+          const ofol = (o.folio || o.numero_orden) ? String(o.folio || o.numero_orden).trim() : null;
+          if (oid && seenSupaOrdIds.has(oid)) return false;
+          if (ofol && seenSupaOrdFolios.has(ofol)) return false;
+          if (oid) seenSupaOrdIds.add(oid);
+          if (ofol) seenSupaOrdFolios.add(ofol);
+          return true;
+        });
+
+        window._supaOrdenes = mapped;
+        localStorage.setItem('sapi_ordenes', JSON.stringify(window._supaOrdenes));
+      } else {
+        window._supaOrdenes = null;
+      }
+    })();
+
+    // 6. Refacciones (Catálogo con paginación)
+    const refaccionesPromise = (async () => {
+      if (!isClientOrEmpresa) {
+        let mapped = [];
+        if (typeof window.descargarRefaccionesSupabase === 'function') {
+          mapped = await window.descargarRefaccionesSupabase();
+        } else {
+          let allRefacciones = [];
+          let fetchMore = true;
+          let page = 0;
+          while (fetchMore) {
+            const { data: refDbChunk, error } = await sb.from('refacciones').select('*').order('id', { ascending: true }).range(page * 1000, (page + 1) * 1000 - 1);
+            if (!error && refDbChunk && refDbChunk.length > 0) {
+              allRefacciones = allRefacciones.concat(refDbChunk);
+              if (refDbChunk.length < 1000) fetchMore = false;
+              else page++;
+            } else {
+              fetchMore = false;
+            }
+          }
+          if (allRefacciones.length > 0) {
+            mapped = allRefacciones.map(r => ({
+              id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, 
+              marca: r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.custom_data?.marca || '', 
+              grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
+              ItmsGrpCod: r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
+            }));
+            await window.saveRefaccionesLocal(mapped);
+            window.refaccionesDb = mapped;
+            if (typeof refaccionesDb !== 'undefined') {
+              refaccionesDb = mapped;
+            }
+          }
+        }
+        if (mapped && mapped.length > 0) {
+          console.log(`[Sync] Catálogo de refacciones cargado en memoria (${mapped.length} registros).`);
+          if (typeof window.renderRefacciones === 'function' && document.getElementById('view-refacciones')?.classList.contains('active')) {
+            try { window.renderRefacciones(); } catch (eR) {}
+          }
+          if (typeof window.renderRefaccionesPendientes === 'function' && document.getElementById('view-refacciones')?.classList.contains('active')) {
+            try { window.renderRefaccionesPendientes(); } catch (eR) {}
+          }
+        }
+      } else {
+        console.log('[Sync] Omitiendo descarga del catálogo de refacciones para rol cliente/empresa.');
+      }
+    })();
+
+    // 7. Clara Transactions & Clara Cards en paralelo
+    const claraPromise = (async () => {
+      try {
+        const [claraRes, cardsRes] = await Promise.allSettled([
+          fetchTablePaginated('clara_transactions', '*'),
+          fetchTablePaginated('clara_cards', '*')
+        ]);
+
+        if (claraRes.status === 'fulfilled' && claraRes.value) {
+          const claraDb = claraRes.value;
+          const mappedClara = claraDb.map(row => ({
+            id: row.id,
+            fecha: row.fecha ? row.fecha.split('T')[0] : '',
+            merchant: row.merchant,
+            monto: Number(row.monto),
+            cardLast4: padCard(row.card_last_4),
+            usuario: row.usuario || 'Técnico Asignado',
+            categoria: row.categoria || 'Otros',
+            fechaTransaccion: row.fecha_transaccion,
+            estadoCuenta: row.estado_cuenta,
+            transaccion: row.transaccion,
+            montoOriginal: Number(row.monto_original || 0),
+            monedaOriginal: row.moneda_original,
+            montoMxn: Number(row.monto_mxn || 0),
+            tarjeta: padCard(row.tarjeta),
+            aliasTarjeta: row.alias_tarjeta,
+            estado: row.estado,
+            estadoAprobacion: row.estado_aprobacion,
+            nombreAprobador: row.nombre_aprobador,
+            notaAprobacion: row.nota_aprobacion,
+            codigoAutorizacion: row.codigo_autorizacion,
+            categoriaClara: row.categoria_clara,
+            facturaElectronica: row.factura_electronica,
+            facturaAutovinculada: row.factura_autovinculada,
+            archivosFactura: row.archivos_factura,
+            anexos: row.anexos,
+            archivosAnexo: row.archivos_anexo,
+            folioFiscal: row.folio_fiscal,
+            titular: row.titular,
+            grupos: row.grupos,
+            ubicacion: row.ubicacion,
+            etiquetas: row.etiquetas,
+            descripcion: row.descripcion
+          }));
+
+          let localTxs = [];
+          try {
+            localTxs = JSON.parse(localStorage.getItem('sapi_clara_mock_txs') || '[]');
+          } catch(e) {}
+          
+          const dbIds = new Set(mappedClara.map(t => t.id));
+          const pendingUploads = localTxs.filter(t => t && t.id && !dbIds.has(t.id));
+          
+          if (pendingUploads.length > 0) {
+            console.log(`[Sync] Detectadas ${pendingUploads.length} transacciones Clara locales no sincronizadas. Conservando y re-intentando subir.`);
+            pendingUploads.forEach(t => {
+              mappedClara.push(t);
+              if (window.pushToSupabase) {
+                window.pushToSupabase('clara_transactions', t);
+              }
+            });
+          }
+
+          window._supaClaraTxs = mappedClara;
+          localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(mappedClara));
+        }
+
+        if (cardsRes.status === 'fulfilled' && cardsRes.value) {
+          const cardsDb = cardsRes.value;
+          const mappedCards = cardsDb.map(row => ({
+            id: row.id,
+            alias: row.alias,
+            usuario: row.usuario,
+            correo: row.correo,
+            estado: row.estado,
+            tipo: row.tipo,
+            tarjeta: padCard(row.tarjeta),
+            limite: Number(row.limite || 0),
+            saldoUtilizado: Number(row.saldo_utilizado || 0),
+            ultimaActualizacion: row.ultima_actualizacion,
+            dondeComprar: row.donde_comprar,
+            usuarioVinculadoId: row.usuario_vinculado_id || null
+          }));
+
+          let localCards = [];
+          try {
+            localCards = JSON.parse(localStorage.getItem('sapi_clara_cards') || '[]');
+          } catch(e) {}
+
+          const dbCardIds = new Set(mappedCards.map(c => c.id));
+          const pendingCards = localCards.filter(c => c && c.id && !dbCardIds.has(c.id));
+
+          if (pendingCards.length > 0) {
+            console.log(`[Sync] Detectadas ${pendingCards.length} tarjetas Clara locales no sincronizadas. Conservando y re-intentando subir.`);
+            pendingCards.forEach(c => {
+              mappedCards.push(c);
+              if (window.pushToSupabase) {
+                window.pushToSupabase('clara_cards', c);
+              }
+            });
+          }
+
+          window._supaClaraCards = mappedCards;
+          localStorage.setItem('sapi_clara_cards', JSON.stringify(mappedCards));
+        }
+      } catch (errCards) {
+        console.warn('[Sync] Excepción al procesar datos de Clara:', errCards.message);
+      }
+    })();
+
+    // 8. Gastos
+    const gastosPromise = (async () => {
+      let mappedGastos = [];
+      try {
+        let gastosDb = null;
+        let gastosErr = null;
+        try {
+          gastosDb = await fetchTablePaginated('gastos', '*');
+        } catch (err) {
+          gastosErr = err;
+        }
+        if (!gastosErr && gastosDb && gastosDb.length > 0) {
+          mappedGastos = gastosDb.map(rowToGasto);
+        }
+      } catch (errG) {
+        console.warn('[Sync] Tabla de gastos no disponible en Supabase (o RLS activa). Cargando local.', errG.message);
+      }
       
-      // FUSIONAR CON CAMBIOS LOCALES PENDIENTES DE SINCRONIZAR
-      const queue = getSyncQueue();
-      const pendingOrdenes = queue.filter(item => item.table === 'ordenes');
-      pendingOrdenes.forEach(item => {
+      const localGastos = JSON.parse(localStorage.getItem('sapi_gastos') || '[]');
+      let mergedGastos = mappedGastos.length > 0 ? mappedGastos : localGastos;
+      
+      const queueForGastos = getSyncQueue();
+      const pendingGastos = queueForGastos.filter(item => item.table === 'gastos');
+      pendingGastos.forEach(item => {
         if (item.action === 'upsert') {
-          const idx = mapped.findIndex(o => o.id === item.data.id);
+          const idx = mergedGastos.findIndex(g => g.id === item.data.id);
           if (idx > -1) {
-            mapped[idx] = item.data;
+            mergedGastos[idx] = item.data;
           } else {
-            mapped.unshift(item.data);
+            mergedGastos.unshift(item.data);
           }
         } else if (item.action === 'delete') {
-          mapped = mapped.filter(o => o.id !== item.data.id);
+          mergedGastos = mergedGastos.filter(g => g.id !== item.data.id);
         }
       });
 
-      // ESTRATEGIA ANTI-PÉRDIDA: Preservar órdenes que solo existen localmente y nunca se han sincronizado
-      try {
-        const localOrdenes = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
-        const unsyncedLocal = localOrdenes.filter(o => o && o._synced !== true);
-        unsyncedLocal.forEach(lo => {
-          const exists = mapped.some(m => m.id === lo.id);
-          if (!exists) {
-            console.log(`[Sync] Preservando orden local no sincronizada: ${lo.id} (Folio: ${lo.folio})`);
-            mapped.push(lo);
-          }
-        });
-      } catch (e) {
-        console.error('[Sync] Error al preservar órdenes locales no sincronizadas:', e);
+      if (mappedGastos.length > 0) {
+        try {
+          const unsyncedLocal = localGastos.filter(g => g && g._synced !== true);
+          unsyncedLocal.forEach(lg => {
+            const exists = mergedGastos.some(m => m.id === lg.id);
+            if (!exists) {
+              console.log(`[Sync] Preservando gasto local no sincronizado: ${lg.id}`);
+              mergedGastos.push(lg);
+            }
+          });
+        } catch (e) {
+          console.error('[Sync] Error al preservar gastos locales no sincronizados:', e);
+        }
       }
 
-      window._supaOrdenes = mapped;
-      localStorage.setItem('sapi_ordenes', JSON.stringify(window._supaOrdenes));
-      
-      // Emitir evento inmediato para que la UI renderice las órdenes descargadas sin esperar el resto del sync
-      console.log('[Sync] Órdenes guardadas. Despachando evento de renderizado inmediato.');
-      window.dispatchEvent(new Event('supabase_datos_cargados'));
-    } else {
-      window._supaOrdenes = null;
-    }
+      window._supaGastos = mergedGastos;
+      localStorage.setItem('sapi_gastos', JSON.stringify(mergedGastos));
+    })();
 
-    if (!isClientOrEmpresa) {
-      // Refacciones (con paginación para traer todo el catálogo desde Supabase)
-      let mapped = [];
-      if (typeof window.descargarRefaccionesSupabase === 'function') {
-        mapped = await window.descargarRefaccionesSupabase();
-      } else {
-        let allRefacciones = [];
-        let fetchMore = true;
-        let page = 0;
-        while (fetchMore) {
-          const { data: refDbChunk, error } = await sb.from('refacciones').select('*').order('id', { ascending: true }).range(page * 1000, (page + 1) * 1000 - 1);
-          if (!error && refDbChunk && refDbChunk.length > 0) {
-            allRefacciones = allRefacciones.concat(refDbChunk);
-            if (refDbChunk.length < 1000) fetchMore = false;
-            else page++;
+    // 9. Levantamientos
+    const levantamientosPromise = (async () => {
+      try {
+        let levantamientosDb = null;
+        let levErr = null;
+        try {
+          levantamientosDb = await fetchTablePaginated('levantamientos', '*');
+        } catch (err) {
+          levErr = err;
+        }
+        if (levantamientosDb && !levErr) {
+          const mapped = levantamientosDb.map(rowToLevantamiento);
+          localStorage.setItem('sapi_levantamientos', JSON.stringify(mapped));
+          if (typeof window.levantamientos !== 'undefined') {
+            window.levantamientos = mapped;
+          }
+        } else if (levErr) {
+          console.error('[Sync] Error loading levantamientos:', levErr);
+        }
+      } catch (e) {
+        console.error('[Sync] Exception loading levantamientos:', e);
+      }
+    })();
+
+    // 10. Rentas de Maquinaria
+    const rentasPromise = (async () => {
+      try {
+        let rentasDb = null;
+        let renErr = null;
+        try {
+          rentasDb = await fetchTablePaginated('rentas', '*');
+        } catch (err) {
+          renErr = err;
+        }
+        if (rentasDb && !renErr) {
+          let localRentas = [];
+          try { localRentas = JSON.parse(localStorage.getItem('sapi_rentas') || '[]'); } catch(e){}
+          const mapped = rentasDb.map(rowToRenta);
+          if (mapped.length === 0 && localRentas.length > 0) {
+            console.log(`[Sync] Migrando ${localRentas.length} rentas locales a Supabase...`);
+            for (const lr of localRentas) {
+              if (window.pushToSupabase) window.pushToSupabase('rentas', lr);
+            }
           } else {
-            fetchMore = false;
+            localStorage.setItem('sapi_rentas', JSON.stringify(mapped));
+            window.rentas = mapped;
+            if (typeof window.renderRentas === 'function' && document.getElementById('view-rentas')?.classList.contains('active')) {
+              window.renderRentas();
+            }
           }
+        } else if (renErr) {
+          console.warn('[Sync] Aviso cargando tabla rentas (usando datos locales):', renErr.message);
         }
-        if (allRefacciones.length > 0) {
-          mapped = allRefacciones.map(r => ({
-            id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, 
-            marca: r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.custom_data?.marca || '', 
-            grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
-            ItmsGrpCod: r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
-          }));
-          await window.saveRefaccionesLocal(mapped);
-          window.refaccionesDb = mapped;
-          if (typeof refaccionesDb !== 'undefined') {
-            refaccionesDb = mapped;
-          }
-        }
+      } catch (e) {
+        console.warn('[Sync] Excepción al sincronizar rentas:', e);
       }
-      if (mapped && mapped.length > 0) {
-        console.log(`[Sync] Catálogo de refacciones cargado en memoria (${mapped.length} registros).`);
-        if (typeof window.renderRefacciones === 'function' && document.getElementById('view-refacciones')?.classList.contains('active')) {
-          try { window.renderRefacciones(); } catch (eR) {}
-        }
-        if (typeof window.renderRefaccionesPendientes === 'function' && document.getElementById('view-refacciones')?.classList.contains('active')) {
-          try { window.renderRefaccionesPendientes(); } catch (eR) {}
-        }
-      }
-    } else {
-      console.log('[Sync] Omitiendo descarga del catálogo de refacciones para rol cliente/empresa.');
-    }
+    })();
 
-    // La tabla config y roles ya se procesan arriba de forma segura al inicio de la sincronización.
-    // Clara Transactions
-    try {
-      let claraDb = null;
-      let claraErr = null;
+    // 11. Envíos y Guías de Paquetería
+    const enviosPromise = (async () => {
       try {
-        claraDb = await fetchTablePaginated('clara_transactions', '*');
-      } catch (err) {
-        claraErr = err;
-      }
-      if (!claraErr && claraDb) {
-        const mappedClara = claraDb.map(row => ({
-          id: row.id,
-          fecha: row.fecha ? row.fecha.split('T')[0] : '',
-          merchant: row.merchant,
-          monto: Number(row.monto),
-          cardLast4: padCard(row.card_last_4),
-          usuario: row.usuario || 'Técnico Asignado',
-          categoria: row.categoria || 'Otros',
-          fechaTransaccion: row.fecha_transaccion,
-          estadoCuenta: row.estado_cuenta,
-          transaccion: row.transaccion,
-          montoOriginal: Number(row.monto_original || 0),
-          monedaOriginal: row.moneda_original,
-          montoMxn: Number(row.monto_mxn || 0),
-          tarjeta: padCard(row.tarjeta),
-          aliasTarjeta: row.alias_tarjeta,
-          estado: row.estado,
-          estadoAprobacion: row.estado_aprobacion,
-          nombreAprobador: row.nombre_aprobador,
-          notaAprobacion: row.nota_aprobacion,
-          codigoAutorizacion: row.codigo_autorizacion,
-          categoriaClara: row.categoria_clara,
-          facturaElectronica: row.factura_electronica,
-          facturaAutovinculada: row.factura_autovinculada,
-          archivosFactura: row.archivos_factura,
-          anexos: row.anexos,
-          archivosAnexo: row.archivos_anexo,
-          folioFiscal: row.folio_fiscal,
-          titular: row.titular,
-          grupos: row.grupos,
-          ubicacion: row.ubicacion,
-          etiquetas: row.etiquetas,
-          descripcion: row.descripcion
-        }));
-        // Recuperar y fusionar transacciones locales pendientes de subir
-        let localTxs = [];
+        let enviosDb = null;
+        let envErr = null;
         try {
-          localTxs = JSON.parse(localStorage.getItem('sapi_clara_mock_txs') || '[]');
-        } catch(e) {}
-        
-        const dbIds = new Set(mappedClara.map(t => t.id));
-        const pendingUploads = localTxs.filter(t => t && t.id && !dbIds.has(t.id));
-        
-        if (pendingUploads.length > 0) {
-          console.log(`[Sync] Detectadas ${pendingUploads.length} transacciones Clara locales no sincronizadas. Conservando y re-intentando subir.`);
-          pendingUploads.forEach(t => {
-            mappedClara.push(t);
-            if (window.pushToSupabase) {
-              window.pushToSupabase('clara_transactions', t);
+          enviosDb = await fetchTablePaginated('envios', '*');
+        } catch (err) {
+          envErr = err;
+        }
+        if (enviosDb && !envErr) {
+          const mapped = enviosDb.map(rowToEnvio);
+          localStorage.setItem('sapi_envios_db', JSON.stringify(mapped));
+          if (typeof window.sapiEnviosDb !== 'undefined') {
+            window.sapiEnviosDb = mapped;
+          }
+          // Esperar a que tickets terminen de mapear
+          await ticketsPromise;
+          try {
+            const localTickets = JSON.parse(localStorage.getItem('sapi_tickets') || '[]');
+            let tktChanged = false;
+            mapped.forEach(env => {
+              if (env.ticketId) {
+                const t = localTickets.find(x => x.id === env.ticketId || x.folio === env.ticketId);
+                if (t) {
+                  if (!t.envios) t.envios = [];
+                  const existIdx = t.envios.findIndex(x => x.id === env.id);
+                  if (existIdx >= 0) {
+                    t.envios[existIdx] = env;
+                  } else {
+                    t.envios.push(env);
+                  }
+                  tktChanged = true;
+                }
+              }
+            });
+            if (tktChanged) {
+              localStorage.setItem('sapi_tickets', JSON.stringify(localTickets));
+              if (typeof tickets !== 'undefined') window.tickets = localTickets;
+              if (window._supaTickets) window._supaTickets = localTickets;
+            }
+          } catch(e) {}
+
+          if (typeof window.renderEnvios === 'function' && document.getElementById('view-envios')?.classList.contains('active')) {
+            window.renderEnvios();
+          }
+        }
+      } catch (e) {
+        console.warn('[Sync] Tabla envios no disponible o en migración:', e.message);
+      }
+    })();
+
+    // 12. Eventos de Calendario Administrativos
+    const eventosPromise = (async () => {
+      let mappedEventos = [];
+      try {
+        let eventosDb = null;
+        let eventosErr = null;
+        try {
+          eventosDb = await fetchTablePaginated('calendario_eventos', '*');
+        } catch (err) {
+          eventosErr = err;
+        }
+        if (!eventosErr && eventosDb && eventosDb.length > 0) {
+          mappedEventos = eventosDb.map(rowToEvento);
+        }
+      } catch (errEv) {
+        console.warn('[Sync] Tabla de calendario_eventos no disponible en Supabase (o RLS activa). Cargando local.', errEv.message);
+      }
+
+      const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+      let mergedEventos = mappedEventos.length > 0 ? mappedEventos : localEventos;
+
+      const queueForEventos = getSyncQueue();
+      const pendingEventos = queueForEventos.filter(item => item.table === 'calendario_eventos');
+      pendingEventos.forEach(item => {
+        if (item.action === 'upsert') {
+          const idx = mergedEventos.findIndex(e => e.id === item.data.id);
+          if (idx > -1) {
+            mergedEventos[idx] = item.data;
+          } else {
+            mergedEventos.unshift(item.data);
+          }
+        } else if (item.action === 'delete') {
+          mergedEventos = mergedEventos.filter(e => e.id !== item.data.id);
+        }
+      });
+
+      if (mappedEventos.length > 0) {
+        try {
+          const unsyncedLocal = localEventos.filter(e => e && e._synced !== true);
+          unsyncedLocal.forEach(le => {
+            const exists = mergedEventos.some(m => m.id === le.id);
+            if (!exists) {
+              console.log(`[Sync] Preservando evento local no sincronizado: ${le.id}`);
+              mergedEventos.push(le);
             }
           });
+        } catch (e) {
+          console.error('[Sync] Error al preservar eventos locales no sincronizados:', e);
         }
-
-        window._supaClaraTxs = mappedClara;
-        localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(mappedClara));
       }
-    } catch (errC) {
-      console.warn('[Sync] Tabla clara_transactions no disponible en Supabase. Se usarán datos locales/mock.', errC.message);
-    }
 
-    // Clara Cards
-    try {
-      let cardsDb = null;
-      let cardsErr = null;
+      window._supaCalendarioEventos = mergedEventos;
+      localStorage.setItem('sapi_calendario_eventos', JSON.stringify(mergedEventos));
+    })();
+
+    // 13. Catálogos SAP (Cotizaciones y Pedidos)
+    const sapCatalogsPromise = (async () => {
       try {
-        cardsDb = await fetchTablePaginated('clara_cards', '*');
-      } catch (err) {
-        cardsErr = err;
-      }
-      if (!cardsErr && cardsDb) {
-        const mappedCards = cardsDb.map(row => ({
-          id: row.id,
-          alias: row.alias,
-          usuario: row.usuario,
-          correo: row.correo,
-          estado: row.estado,
-          tipo: row.tipo,
-          tarjeta: padCard(row.tarjeta),
-          limite: Number(row.limite || 0),
-          saldoUtilizado: Number(row.saldo_utilizado || 0),
-          ultimaActualizacion: row.ultima_actualizacion,
-          dondeComprar: row.donde_comprar,
-          usuarioVinculadoId: row.usuario_vinculado_id || null
-        }));
-        // Recuperar y fusionar tarjetas locales pendientes de subir
-        let localCards = [];
+        let cotizaciones = null;
+        let cotizacionesErr = null;
         try {
-          localCards = JSON.parse(localStorage.getItem('sapi_clara_cards') || '[]');
-        } catch(e) {}
+          cotizaciones = await fetchTablePaginated('cotizaciones_sap', '*', null, false);
+        } catch (err) {
+          cotizacionesErr = err;
+        }
+        if (!cotizacionesErr && cotizaciones) {
+          window._cacheCotizacionesSap = cotizaciones;
+          await window.saveCatalogOffline('eurorep_cotizaciones_sap', cotizaciones);
+        }
+      } catch (errCot) {
+        console.warn('[Sync] Error al cargar cotizaciones_sap:', errCot);
+      }
 
-        const dbCardIds = new Set(mappedCards.map(c => c.id));
-        const pendingCards = localCards.filter(c => c && c.id && !dbCardIds.has(c.id));
+      try {
+        let pedidos = null;
+        let pedidosErr = null;
+        try {
+          pedidos = await fetchTablePaginated('pedidos_sap', '*', null, false);
+        } catch (err) {
+          pedidosErr = err;
+        }
+        if (!pedidosErr && pedidos) {
+          window._cachePedidosSap = pedidos;
+          await window.saveCatalogOffline('eurorep_pedidos_sap', pedidos);
+        }
+      } catch (errPed) {
+        console.warn('[Sync] Error al cargar pedidos_sap:', errPed);
+      }
+    })();
 
-        if (pendingCards.length > 0) {
-          console.log(`[Sync] Detectadas ${pendingCards.length} tarjetas Clara locales no sincronizadas. Conservando y re-intentando subir.`);
-          pendingCards.forEach(c => {
-            mappedCards.push(c);
-            if (window.pushToSupabase) {
-              window.pushToSupabase('clara_cards', c);
+    // 14. Ideas y Fallas (Solo Superadmins)
+    const ideasFallasPromise = (async () => {
+      try {
+        const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
+        const isSuper = session && (session.realRol === 'superadmin' || session.viewMode === 'superadmin');
+        if (isSuper) {
+          let ideasFallas = null;
+          let ideasFallasErr = null;
+          try {
+            ideasFallas = await fetchTablePaginated('ideas_fallas', '*');
+          } catch (err) {
+            ideasFallasErr = err;
+          }
+          if (!ideasFallasErr && ideasFallas) {
+            localStorage.setItem('sapi_ideas_fallas', JSON.stringify(ideasFallas));
+            if (typeof window.ideasFallasDb !== 'undefined') {
+              window.ideasFallasDb = ideasFallas;
             }
-          });
-        }
-
-        window._supaClaraCards = mappedCards;
-        localStorage.setItem('sapi_clara_cards', JSON.stringify(mappedCards));
-      }
-    } catch (errCards) {
-      console.warn('[Sync] Tabla clara_cards no disponible en Supabase. Se usarán datos locales/mock.', errCards.message);
-    }
-
-    // Gastos
-    let mappedGastos = [];
-
-    try {
-      let gastosDb = null;
-      let gastosErr = null;
-      try {
-        gastosDb = await fetchTablePaginated('gastos', '*');
-      } catch (err) {
-        gastosErr = err;
-      }
-      if (!gastosErr && gastosDb && gastosDb.length > 0) {
-        mappedGastos = gastosDb.map(rowToGasto);
-      }
-    } catch (errG) {
-      console.warn('[Sync] Tabla de gastos no disponible en Supabase (o RLS activa). Cargando local.', errG.message);
-    }
-    
-    // FUSIONAR CON CAMBIOS LOCALES PENDIENTES DE SINCRONIZAR
-    const localGastos = JSON.parse(localStorage.getItem('sapi_gastos') || '[]');
-    let mergedGastos = mappedGastos.length > 0 ? mappedGastos : localGastos;
-    
-    const queueForGastos = getSyncQueue();
-    const pendingGastos = queueForGastos.filter(item => item.table === 'gastos');
-    pendingGastos.forEach(item => {
-      if (item.action === 'upsert') {
-        const idx = mergedGastos.findIndex(g => g.id === item.data.id);
-        if (idx > -1) {
-          mergedGastos[idx] = item.data;
-        } else {
-          mergedGastos.unshift(item.data);
-        }
-      } else if (item.action === 'delete') {
-        mergedGastos = mergedGastos.filter(g => g.id !== item.data.id);
-      }
-    });
-
-    // ESTRATEGIA ANTI-PÉRDIDA: Preservar gastos locales no sincronizados
-    if (mappedGastos.length > 0) {
-      try {
-        const unsyncedLocal = localGastos.filter(g => g && g._synced !== true);
-        unsyncedLocal.forEach(lg => {
-          const exists = mergedGastos.some(m => m.id === lg.id);
-          if (!exists) {
-            console.log(`[Sync] Preservando gasto local no sincronizado: ${lg.id}`);
-            mergedGastos.push(lg);
           }
-        });
-      } catch (e) {
-        console.error('[Sync] Error al preservar gastos locales no sincronizados:', e);
-      }
-    }
-
-    window._supaGastos = mergedGastos;
-    localStorage.setItem('sapi_gastos', JSON.stringify(mergedGastos));
-
-    // Eventos de Calendario Administrativos (Fase 9)
-    let mappedEventos = [];
-    try {
-      let eventosDb = null;
-      let eventosErr = null;
-      try {
-        eventosDb = await fetchTablePaginated('calendario_eventos', '*');
-      } catch (err) {
-        eventosErr = err;
-      }
-      if (!eventosErr && eventosDb && eventosDb.length > 0) {
-        mappedEventos = eventosDb.map(rowToEvento);
-      }
-    } catch (errEv) {
-      console.warn('[Sync] Tabla de calendario_eventos no disponible en Supabase (o RLS activa). Cargando local.', errEv.message);
-    }
-
-    // FUSIONAR CON CAMBIOS LOCALES PENDIENTES DE SINCRONIZAR
-    const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
-    let mergedEventos = mappedEventos.length > 0 ? mappedEventos : localEventos;
-
-    const queueForEventos = getSyncQueue();
-    const pendingEventos = queueForEventos.filter(item => item.table === 'calendario_eventos');
-    pendingEventos.forEach(item => {
-      if (item.action === 'upsert') {
-        const idx = mergedEventos.findIndex(e => e.id === item.data.id);
-        if (idx > -1) {
-          mergedEventos[idx] = item.data;
-        } else {
-          mergedEventos.unshift(item.data);
         }
-      } else if (item.action === 'delete') {
-        mergedEventos = mergedEventos.filter(e => e.id !== item.data.id);
+      } catch (errIf) {
+        console.warn('[Sync] Error al cargar ideas_fallas:', errIf);
       }
-    });
-
-    // ESTRATEGIA ANTI-PÉRDIDA: Preservar eventos locales no sincronizados
-    if (mappedEventos.length > 0) {
-      try {
-        const unsyncedLocal = localEventos.filter(e => e && e._synced !== true);
-        unsyncedLocal.forEach(le => {
-          const exists = mergedEventos.some(m => m.id === le.id);
-          if (!exists) {
-            console.log(`[Sync] Preservando evento local no sincronizado: ${le.id}`);
-            mergedEventos.push(le);
-          }
-        });
-      } catch (e) {
-        console.error('[Sync] Error al preservar eventos locales no sincronizados:', e);
-      }
-    }
-
-    window._supaCalendarioEventos = mergedEventos;
-    localStorage.setItem('sapi_calendario_eventos', JSON.stringify(mergedEventos));
+    })();
 
     // Telemetry events: Ahora se consultan bajo demanda cuando el admin abre el módulo de telemetría
-    // evitando saturar conexiones y memoria en el inicio de sesión.
     window.fetchTelemetryFromSupabase = async function(limitCount = 200) {
       const client = window.supabaseClient;
       if (!client) return;
@@ -4639,62 +4730,23 @@ window.cargarDatosDeSupabase = function() {
       }
     };
 
-    // Cotizaciones SAP (Caché en memoria y localStorage para autocompletar)
-    try {
-      let cotizaciones = null;
-      let cotizacionesErr = null;
-      try {
-        cotizaciones = await fetchTablePaginated('cotizaciones_sap', '*', null, false);
-      } catch (err) {
-        cotizacionesErr = err;
-      }
-      if (!cotizacionesErr && cotizaciones) {
-        window._cacheCotizacionesSap = cotizaciones;
-        await window.saveCatalogOffline('eurorep_cotizaciones_sap', cotizaciones);
-      }
-    } catch (errCot) {
-      console.warn('[Sync] Error al cargar cotizaciones_sap:', errCot);
-    }
-
-    // Pedidos SAP (Caché en memoria y localStorage para autocompletar)
-    try {
-      let pedidos = null;
-      let pedidosErr = null;
-      try {
-        pedidos = await fetchTablePaginated('pedidos_sap', '*', null, false);
-      } catch (err) {
-        pedidosErr = err;
-      }
-      if (!pedidosErr && pedidos) {
-        window._cachePedidosSap = pedidos;
-        await window.saveCatalogOffline('eurorep_pedidos_sap', pedidos);
-      }
-    } catch (errPed) {
-      console.warn('[Sync] Error al cargar pedidos_sap:', errPed);
-    }
-
-    // Ideas y Fallas (Solo Superadmins)
-    try {
-      const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
-      const isSuper = session && (session.realRol === 'superadmin' || session.viewMode === 'superadmin');
-      if (isSuper) {
-        let ideasFallas = null;
-        let ideasFallasErr = null;
-        try {
-          ideasFallas = await fetchTablePaginated('ideas_fallas', '*');
-        } catch (err) {
-          ideasFallasErr = err;
-        }
-        if (!ideasFallasErr && ideasFallas) {
-          localStorage.setItem('sapi_ideas_fallas', JSON.stringify(ideasFallas));
-          if (typeof window.ideasFallasDb !== 'undefined') {
-            window.ideasFallasDb = ideasFallas;
-          }
-        }
-      }
-    } catch (errIf) {
-      console.warn('[Sync] Error al cargar ideas_fallas:', errIf);
-    }
+    // DISPARAR TODAS LAS TAREAS CONCURRENTES EN PARALELO
+    await Promise.allSettled([
+      configPromise,
+      usuariosPromise,
+      clientesSitiosMaquinariaPromise,
+      ticketsPromise,
+      ordenesPromise,
+      refaccionesPromise,
+      claraPromise,
+      gastosPromise,
+      levantamientosPromise,
+      rentasPromise,
+      enviosPromise,
+      eventosPromise,
+      sapCatalogsPromise,
+      ideasFallasPromise
+    ]);
 
     // Historial de Correos (Bandeja de Correo y Notificaciones - gestionado localmente)
     try {
@@ -4758,6 +4810,10 @@ function setupRealtime() {
             const idx = current.findIndex(t => t.id === ticket.id);
             if (idx > -1) {
               const oldTicket = current[idx];
+              // Preservar creador si payload remoto viene nulo o vacío
+              if ((!ticket.creadoPor || ticket.creadoPor === '—') && oldTicket.creadoPor && oldTicket.creadoPor !== '—') {
+                ticket.creadoPor = oldTicket.creadoPor;
+              }
               // Comparar comentarios internos nuevos para notificaciones
               if (ticket.comentariosInternos && ticket.comentariosInternos.length > 0) {
                 const oldComments = oldTicket.comentariosInternos || [];

@@ -5,7 +5,7 @@
             <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; flex:1; justify-content:flex-end;">
               <div class="search-bar" style="width:100%; max-width:280px; margin:0; position:relative; display:flex; align-items:center;">
                 <i data-lucide="search" style="position:absolute; left:0.75rem; width:1rem; height:1rem; color:var(--text-muted);"></i>
-                <input type="text" id="search-sitios" placeholder="Buscar sitio, cliente, CP..." oninput="renderSitios()" style="padding-left:2.25rem; width:100%;">
+                <input type="text" id="search-sitios" placeholder="Buscar sitio, cliente, CP..." oninput="debouncedRenderSitios()" style="padding-left:2.25rem; width:100%;">
               </div>
               <div style="display:flex; align-items:center; gap:0.3rem;">
                 <span style="font-size:0.8rem; color:var(--text-muted); font-weight:500; white-space:nowrap;">Ordenar por:</span>

@@ -38,12 +38,27 @@ function safeResolveTecnicoNombre(tecId) {
 }
 
 function safeGetFilteredOrders() {
+  let list = [];
   if (typeof window !== 'undefined' && typeof window.getFilteredOrders === 'function') {
-    return window.getFilteredOrders();
+    list = window.getFilteredOrders();
+  } else if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
+    list = ordenes;
+  } else if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) {
+    list = window.ordenes;
   }
-  if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) return ordenes;
-  if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) return window.ordenes;
-  return [];
+  if (!Array.isArray(list)) return [];
+  const seenIds = new Set();
+  const seenFolios = new Set();
+  return list.filter(o => {
+    if (!o) return false;
+    const oid = o.id ? String(o.id).trim() : null;
+    const ofol = (o.folio || o.numero_orden) ? String(o.folio || o.numero_orden).trim() : null;
+    if (oid && seenIds.has(oid)) return false;
+    if (ofol && seenFolios.has(ofol)) return false;
+    if (oid) seenIds.add(oid);
+    if (ofol) seenFolios.add(ofol);
+    return true;
+  });
 }
 
 function setFiltroEstadoServicios(estado) {
@@ -276,6 +291,20 @@ function renderTabla(ctx) {
     });
   }
 
+  // Deduplicación estricta por ID y Folio
+  const seenOrdIds = new Set();
+  const seenOrdFolios = new Set();
+  filtradas = filtradas.filter(o => {
+    if (!o) return false;
+    const oid = o.id ? String(o.id).trim() : null;
+    const ofol = (o.folio || o.numero_orden) ? String(o.folio || o.numero_orden).trim() : null;
+    if (oid && seenOrdIds.has(oid)) return false;
+    if (ofol && seenOrdFolios.has(ofol)) return false;
+    if (oid) seenOrdIds.add(oid);
+    if (ofol) seenOrdFolios.add(ofol);
+    return true;
+  });
+
   // ORDENAMIENTO
   if (currentOrdSortCol !== 'reciente') {
     filtradas.sort((a, b) => {
@@ -325,7 +354,27 @@ function renderTabla(ctx) {
   const canEdit = !isConsulta && !isTecnico && !isEmpresa;
   const canDelete = currentSession && ['superadmin', 'admin'].includes(currentSession.viewMode);
 
-  body.innerHTML = filtradas.map(o => {
+  // Paginación progresiva para mantener el DOM ultra-rápido en listas extensas
+  const currentQ = qClean || '';
+  const currentCtx = ctx || 'default';
+  if (typeof window !== 'undefined') {
+    if (currentQ !== window._lastRenderOrdenesQuery || currentCtx !== window._lastRenderOrdenesCtx) {
+      window.ordenPageLimit = 50;
+      window._lastRenderOrdenesQuery = currentQ;
+      window._lastRenderOrdenesCtx = currentCtx;
+    }
+  }
+  const currentLimit = (typeof window !== 'undefined' && typeof window.ordenPageLimit === 'number') ? window.ordenPageLimit : 50;
+  const totalMatching = filtradas.length;
+  let paginatedOrdenes = filtradas;
+  let hasMoreOrdenes = false;
+
+  if (currentLimit > 0 && filtradas.length > currentLimit) {
+    paginatedOrdenes = filtradas.slice(0, currentLimit);
+    hasMoreOrdenes = true;
+  }
+
+  let htmlRows = paginatedOrdenes.map(o => {
     let orderCanEdit = canEdit;
     if (((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__') || o.cierre_papel_pdf) && (!currentSession || !['superadmin', 'admin'].includes(currentSession.viewMode))) {
       orderCanEdit = false;
@@ -360,12 +409,54 @@ function renderTabla(ctx) {
     </tr>
     `;
   }).join('');
+
+  if (hasMoreOrdenes) {
+    const escapedCtx = String(ctx || '').replace(/'/g, "\\'");
+    htmlRows += `
+      <tr id="ordenes-load-more-row">
+        <td colspan="10" style="text-align:center; padding:14px; background:var(--bg-subtle, rgba(0,0,0,0.02)); border-top:1px solid var(--border-color);">
+          <div style="display:flex; align-items:center; justify-content:center; gap:12px; font-size:0.85rem; color:var(--text-secondary); flex-wrap:wrap;">
+            <span>Mostrando <strong>${paginatedOrdenes.length}</strong> de <strong>${totalMatching}</strong> órdenes</span>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="window.cargarMasOrdenes('${escapedCtx}')" style="display:inline-flex; align-items:center; gap:5px; font-weight:600; padding:4px 12px; cursor:pointer;">
+              <i data-lucide="chevron-down" style="width:14px;height:14px;"></i> Cargar más (+50)
+            </button>
+            <button type="button" class="btn btn-sm btn-link" onclick="window.mostrarTodasLasOrdenes('${escapedCtx}')" style="color:var(--accent); text-decoration:underline; font-weight:500; background:none; border:none; cursor:pointer;">
+              Mostrar todas
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+
+  body.innerHTML = htmlRows;
+
   if (!ctx) {
     if (typeof renderStats === 'function') renderStats();
     else if (typeof window !== 'undefined' && typeof window.renderStats === 'function') window.renderStats();
   }
   if (typeof lucide !== 'undefined' && lucide.createIcons) {
     lucide.createIcons();
+  }
+}
+
+function cargarMasOrdenes(ctx) {
+  if (typeof window !== 'undefined') {
+    window.ordenPageLimit = (window.ordenPageLimit || 50) + 50;
+  }
+  renderTabla(ctx);
+}
+
+function mostrarTodasLasOrdenes(ctx) {
+  if (typeof window !== 'undefined') {
+    window.ordenPageLimit = 999999;
+  }
+  renderTabla(ctx);
+}
+
+function resetOrdenPageLimit() {
+  if (typeof window !== 'undefined') {
+    window.ordenPageLimit = 50;
   }
 }
 
@@ -381,7 +472,10 @@ if (typeof window !== 'undefined') {
     toggleSortOrdenes,
     renderTabla,
     badgeEstado,
-    filtrarOrdenes
+    filtrarOrdenes,
+    cargarMasOrdenes,
+    mostrarTodasLasOrdenes,
+    resetOrdenPageLimit
   };
   window.filtroEstadoServicios = filtroEstadoServicios;
   window.filtroTicketsV2 = filtroTicketsV2;
@@ -393,6 +487,10 @@ if (typeof window !== 'undefined') {
   window.renderTabla = renderTabla;
   window.badgeEstado = badgeEstado;
   window.filtrarOrdenes = filtrarOrdenes;
+  window.cargarMasOrdenes = cargarMasOrdenes;
+  window.mostrarTodasLasOrdenes = mostrarTodasLasOrdenes;
+  window.resetOrdenPageLimit = resetOrdenPageLimit;
+  window.safeGetFilteredOrders = safeGetFilteredOrders;
 }
 
 export {
@@ -405,5 +503,9 @@ export {
   toggleSortOrdenes,
   renderTabla,
   badgeEstado,
-  filtrarOrdenes
+  filtrarOrdenes,
+  cargarMasOrdenes,
+  mostrarTodasLasOrdenes,
+  resetOrdenPageLimit,
+  safeGetFilteredOrders
 };

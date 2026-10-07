@@ -4298,55 +4298,35 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
   lucide.createIcons();
 };
 
-window.procesarEvidenciaGasto = function(e) {
+window.procesarEvidenciaGasto = async function(e) {
   const file = e.target.files[0];
   if (!file) return;
 
-  const reader = new FileReader();
+  try {
+    const compressedDataUrl = (typeof window.compressImageFile === 'function')
+      ? await window.compressImageFile(file, { maxWidth: 1200, maxHeight: 1200, quality: 0.75 })
+      : await new Promise((resolve) => {
+          const r = new FileReader();
+          r.onload = ev => resolve(ev.target.result);
+          r.readAsDataURL(file);
+        });
 
-  reader.onload = function(event) {
-    const img = new Image();
-    img.onload = function() {
-      let width = img.width;
-      let height = img.height;
-      const MAX_WIDTH = 800;
-      const MAX_HEIGHT = 800;
+    window._gastoEvidenciaBase64 = compressedDataUrl;
 
-      if (width > height) {
-        if (width > MAX_WIDTH) {
-          height *= MAX_WIDTH / width;
-          width = MAX_WIDTH;
-        }
-      } else {
-        if (height > MAX_HEIGHT) {
-          width *= MAX_HEIGHT / height;
-          height = MAX_HEIGHT;
-        }
-      }
+    // Add to sidebar files list
+    if (!window._gastoUploadedFiles) window._gastoUploadedFiles = [];
+    window._gastoUploadedFiles = window._gastoUploadedFiles.filter(x => x.type !== 'ticket');
+    window._gastoUploadedFiles.push({
+      type: 'ticket',
+      base64: compressedDataUrl
+    });
 
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
-
-      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-      window._gastoEvidenciaBase64 = compressedDataUrl;
-
-      // Add to sidebar files list
-      if (!window._gastoUploadedFiles) window._gastoUploadedFiles = [];
-      window._gastoUploadedFiles = window._gastoUploadedFiles.filter(x => x.type !== 'ticket');
-      window._gastoUploadedFiles.push({
-        type: 'ticket',
-        base64: compressedDataUrl
-      });
-
-      window.renderUploaderSidebar();
-      mostrarNotificacion('Ticket cargado como evidencia', 'success');
-    };
-    img.src = event.target.result;
-  };
-  reader.readAsDataURL(file);
+    window.renderUploaderSidebar();
+    mostrarNotificacion('Ticket cargado como evidencia', 'success');
+  } catch (err) {
+    console.error('[Gastos] Error al procesar evidencia:', err);
+    mostrarNotificacion('Error al procesar la imagen del ticket', 'error');
+  }
 };
 
 window.eliminarEvidenciaGasto = function() {

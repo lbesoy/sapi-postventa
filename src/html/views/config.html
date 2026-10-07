@@ -360,115 +360,10 @@
                 </div>
                 <div class="toggle-row" style="border-top: 1px dashed var(--border); padding-top: 0.85rem; margin-top: 0.25rem; flex-direction: column; align-items: stretch; gap: 0.4rem;">
                   <div class="toggle-label">Manuales de Ayuda y Uso</div>
-                  <div class="toggle-sub">Descarga las guías de uso oficiales en formato PDF:</div>
+                  <div class="toggle-sub">Consulta las guías de uso oficiales interactivas en pantalla (sin necesidad de descarga):</div>
                   <div class="manuals-grid" id="manuals-grid-container">
                     
-                    <div class="manual-download-card featured" style="cursor:pointer;" onclick="window.abrirVisorManualPorId('flujo_completo')" title="Haz clic para visualizar Flujo Completo en pantalla">
-                      <div class="manual-card-icon">
-                        <i data-lucide="git-branch" style="width:16px; height:16px;"></i>
-                      </div>
-                      <div class="manual-card-info">
-                        <div class="manual-card-title">Flujo Completo</div>
-                        <div class="manual-card-sub">Ciclo completo del sistema</div>
-                      </div>
-                      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
-                        <button type="button" 
-                                onclick="event.stopPropagation(); window.abrirVisorManualPorId('flujo_completo');" 
-                                style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--primary, #2563eb); color:#ffffff; border:none; cursor:pointer;" 
-                                title="Visualizar en pantalla">
-                          <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
-                        </button>
-                        <a href="manuales/manual_flujo_completo.pdf" download onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--bg-hover); color:var(--text-muted); text-decoration:none; border: 1px solid var(--border);" title="Descargar PDF">
-                          <i data-lucide="download" style="width:14px; height:14px; pointer-events:none;"></i>
-                        </a>
-                      </div>
-                    </div>
-                    
-                    <div class="manual-download-card" style="cursor:pointer;" onclick="window.abrirVisorManualPorId('admin')" title="Haz clic para visualizar Administrador en pantalla">
-                      <div class="manual-card-icon">
-                        <i data-lucide="user-cog" style="width:16px; height:16px;"></i>
-                      </div>
-                      <div class="manual-card-info">
-                        <div class="manual-card-title">Administrador</div>
-                        <div class="manual-card-sub">Gestión, calendario y roles</div>
-                      </div>
-                      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
-                        <button type="button" 
-                                onclick="event.stopPropagation(); window.abrirVisorManualPorId('admin');" 
-                                style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--primary, #2563eb); color:#ffffff; border:none; cursor:pointer;" 
-                                title="Visualizar en pantalla">
-                          <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
-                        </button>
-                        <a href="manuales/manual_administrador.pdf" download onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--bg-hover); color:var(--text-muted); text-decoration:none; border: 1px solid var(--border);" title="Descargar PDF">
-                          <i data-lucide="download" style="width:14px; height:14px; pointer-events:none;"></i>
-                        </a>
-                      </div>
-                    </div>
-                    
-                    <div class="manual-download-card" style="cursor:pointer;" onclick="window.abrirVisorManualPorId('tecnico')" title="Haz clic para visualizar Técnico de Campo en pantalla">
-                      <div class="manual-card-icon">
-                        <i data-lucide="wrench" style="width:16px; height:16px;"></i>
-                      </div>
-                      <div class="manual-card-info">
-                        <div class="manual-card-title">Técnico de Campo</div>
-                        <div class="manual-card-sub">Órdenes, bitácoras y offline</div>
-                      </div>
-                      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
-                        <button type="button" 
-                                onclick="event.stopPropagation(); window.abrirVisorManualPorId('tecnico');" 
-                                style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--primary, #2563eb); color:#ffffff; border:none; cursor:pointer;" 
-                                title="Visualizar en pantalla">
-                          <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
-                        </button>
-                        <a href="manuales/manual_tecnico.pdf" download onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--bg-hover); color:var(--text-muted); text-decoration:none; border: 1px solid var(--border);" title="Descargar PDF">
-                          <i data-lucide="download" style="width:14px; height:14px; pointer-events:none;"></i>
-                        </a>
-                      </div>
-                    </div>
-
-                    <div class="manual-download-card" style="cursor:pointer;" onclick="window.abrirVisorManualPorId('tickets')" title="Haz clic para visualizar Gestión de Tickets en pantalla">
-                      <div class="manual-card-icon">
-                        <i data-lucide="ticket" style="width:16px; height:16px;"></i>
-                      </div>
-                      <div class="manual-card-info">
-                        <div class="manual-card-title">Gestión de Tickets</div>
-                        <div class="manual-card-sub">Ciclo, cotizaciones SAP y chat</div>
-                      </div>
-                      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
-                        <button type="button" 
-                                onclick="event.stopPropagation(); window.abrirVisorManualPorId('tickets');" 
-                                style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--primary, #2563eb); color:#ffffff; border:none; cursor:pointer;" 
-                                title="Visualizar en pantalla">
-                          <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
-                        </button>
-                        <a href="manuales/manual_tickets.pdf" download onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--bg-hover); color:var(--text-muted); text-decoration:none; border: 1px solid var(--border);" title="Descargar PDF">
-                          <i data-lucide="download" style="width:14px; height:14px; pointer-events:none;"></i>
-                        </a>
-                      </div>
-                    </div>
-                    
-                    <div class="manual-download-card" style="cursor:pointer;" onclick="window.abrirVisorManualPorId('gastos')" title="Haz clic para visualizar Control de Gastos en pantalla">
-                      <div class="manual-card-icon">
-                        <i data-lucide="credit-card" style="width:16px; height:16px;"></i>
-                      </div>
-                      <div class="manual-card-info">
-                        <div class="manual-card-title">Control de Gastos</div>
-                        <div class="manual-card-sub">Viáticos y conciliación Clara</div>
-                      </div>
-                      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
-                        <button type="button" 
-                                onclick="event.stopPropagation(); window.abrirVisorManualPorId('gastos');" 
-                                style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--primary, #2563eb); color:#ffffff; border:none; cursor:pointer;" 
-                                title="Visualizar en pantalla">
-                          <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
-                        </button>
-                        <a href="manuales/manual_gastos.pdf" download onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--bg-hover); color:var(--text-muted); text-decoration:none; border: 1px solid var(--border);" title="Descargar PDF">
-                          <i data-lucide="download" style="width:14px; height:14px; pointer-events:none;"></i>
-                        </a>
-                      </div>
-                    </div>
-                    
-                    <div class="manual-download-card featured" style="border-color: rgba(139, 92, 246, 0.4); background: rgba(139, 92, 246, 0.05); cursor:pointer;" onclick="window.abrirVisorManualPorId('diagrama_flujo')" title="Haz clic para visualizar Diagrama de Flujo en pantalla">
+                    <a href="manuales/diagrama_flujo.html" target="_blank" class="manual-download-card featured" style="border-color: rgba(139, 92, 246, 0.4); background: rgba(139, 92, 246, 0.05);" title="Ver en línea: Diagrama de Flujo del Proceso">
                       <div class="manual-card-icon" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6;">
                         <i data-lucide="network" style="width:16px; height:16px;"></i>
                       </div>
@@ -476,20 +371,65 @@
                         <div class="manual-card-title" style="color:#a78bfa; font-weight:700;">Diagrama de Flujo del Proceso</div>
                         <div class="manual-card-sub">Mapa interactivo: Euro SAPI vs. Portal Clientes</div>
                       </div>
-                      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
-                        <button type="button" 
-                                onclick="event.stopPropagation(); window.abrirVisorManualPorId('diagrama_flujo');" 
-                                style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:#8b5cf6; color:#ffffff; border:none; cursor:pointer;" 
-                                title="Visualizar en pantalla">
-                          <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
-                        </button>
-                        <a href="manuales/diagrama_flujo.html" target="_blank" onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:rgba(139, 92, 246, 0.15); color:#8b5cf6; text-decoration:none; border: 1px solid rgba(139, 92, 246, 0.3);" title="Abrir en pestaña nueva">
-                          <i data-lucide="external-link" style="width:14px; height:14px; pointer-events:none;"></i>
-                        </a>
+                      <i data-lucide="external-link" class="manual-card-download-icon" style="color: #8b5cf6;"></i>
+                    </a>
+                    
+                    <a href="manuales/manual_flujo_completo.html" target="_blank" class="manual-download-card featured" title="Ver en línea: Flujo Completo">
+                      <div class="manual-card-icon">
+                        <i data-lucide="git-branch" style="width:16px; height:16px;"></i>
                       </div>
-                    </div>
+                      <div class="manual-card-info">
+                        <div class="manual-card-title">Flujo Completo</div>
+                        <div class="manual-card-sub">Ciclo completo del sistema</div>
+                      </div>
+                      <i data-lucide="external-link" class="manual-card-download-icon"></i>
+                    </a>
+                    
+                    <a href="manuales/manual_administrador.html" target="_blank" class="manual-download-card" title="Ver en línea: Administrador">
+                      <div class="manual-card-icon">
+                        <i data-lucide="user-cog" style="width:16px; height:16px;"></i>
+                      </div>
+                      <div class="manual-card-info">
+                        <div class="manual-card-title">Administrador</div>
+                        <div class="manual-card-sub">Gestión, calendario y roles</div>
+                      </div>
+                      <i data-lucide="external-link" class="manual-card-download-icon"></i>
+                    </a>
+                    
+                    <a href="manuales/manual_tecnico.html" target="_blank" class="manual-download-card" title="Ver en línea: Técnico de Campo">
+                      <div class="manual-card-icon">
+                        <i data-lucide="wrench" style="width:16px; height:16px;"></i>
+                      </div>
+                      <div class="manual-card-info">
+                        <div class="manual-card-title">Técnico de Campo</div>
+                        <div class="manual-card-sub">Órdenes, bitácoras y offline</div>
+                      </div>
+                      <i data-lucide="external-link" class="manual-card-download-icon"></i>
+                    </a>
 
-                    <div class="manual-download-card" style="cursor:pointer;" onclick="window.abrirVisorManualPorId('cliente')" title="Haz clic para visualizar Manual del Cliente en pantalla">
+                    <a href="manuales/manual_tickets.html" target="_blank" class="manual-download-card" title="Ver en línea: Gestión de Tickets">
+                      <div class="manual-card-icon">
+                        <i data-lucide="ticket" style="width:16px; height:16px;"></i>
+                      </div>
+                      <div class="manual-card-info">
+                        <div class="manual-card-title">Gestión de Tickets</div>
+                        <div class="manual-card-sub">Ciclo, cotizaciones SAP y chat</div>
+                      </div>
+                      <i data-lucide="external-link" class="manual-card-download-icon"></i>
+                    </a>
+                    
+                    <a href="manuales/manual_gastos.html" target="_blank" class="manual-download-card" title="Ver en línea: Control de Gastos">
+                      <div class="manual-card-icon">
+                        <i data-lucide="credit-card" style="width:16px; height:16px;"></i>
+                      </div>
+                      <div class="manual-card-info">
+                        <div class="manual-card-title">Control de Gastos</div>
+                        <div class="manual-card-sub">Viáticos y conciliación Clara</div>
+                      </div>
+                      <i data-lucide="external-link" class="manual-card-download-icon"></i>
+                    </a>
+
+                    <a href="manuales/manual_cliente.html" target="_blank" class="manual-download-card" title="Ver en línea: Manual del Cliente">
                       <div class="manual-card-icon">
                         <i data-lucide="building" style="width:16px; height:16px;"></i>
                       </div>
@@ -497,20 +437,10 @@
                         <div class="manual-card-title">Manual del Cliente</div>
                         <div class="manual-card-sub">Portal, rentas y solicitudes</div>
                       </div>
-                      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
-                        <button type="button" 
-                                onclick="event.stopPropagation(); window.abrirVisorManualPorId('cliente');" 
-                                style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--primary, #2563eb); color:#ffffff; border:none; cursor:pointer;" 
-                                title="Visualizar en pantalla">
-                          <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
-                        </button>
-                        <a href="manuales/manual_cliente.pdf" download onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--bg-hover); color:var(--text-muted); text-decoration:none; border: 1px solid var(--border);" title="Descargar PDF">
-                          <i data-lucide="download" style="width:14px; height:14px; pointer-events:none;"></i>
-                        </a>
-                      </div>
-                    </div>
+                      <i data-lucide="external-link" class="manual-card-download-icon"></i>
+                    </a>
                     
-                    <div class="manual-download-card" style="cursor:pointer;" onclick="window.abrirVisorManualPorId('desarrollador')" title="Haz clic para visualizar Sistemas y Desarrollador en pantalla">
+                    <a href="manuales/manual_tecnico_desarrollador.html" target="_blank" class="manual-download-card" title="Ver en línea: Sistemas y Desarrollador">
                       <div class="manual-card-icon">
                         <i data-lucide="code-2" style="width:16px; height:16px;"></i>
                       </div>
@@ -518,18 +448,8 @@
                         <div class="manual-card-title">Sistemas y Desarrollador</div>
                         <div class="manual-card-sub">Estructura técnica, base de datos y APIs</div>
                       </div>
-                      <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
-                        <button type="button" 
-                                onclick="event.stopPropagation(); window.abrirVisorManualPorId('desarrollador');" 
-                                style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--primary, #2563eb); color:#ffffff; border:none; cursor:pointer;" 
-                                title="Visualizar en pantalla">
-                          <i data-lucide="eye" style="width:14px; height:14px; pointer-events:none;"></i>
-                        </button>
-                        <a href="manuales/manual_tecnico_desarrollador.pdf" download onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:var(--bg-hover); color:var(--text-muted); text-decoration:none; border: 1px solid var(--border);" title="Descargar PDF">
-                          <i data-lucide="download" style="width:14px; height:14px; pointer-events:none;"></i>
-                        </a>
-                      </div>
-                    </div>
+                      <i data-lucide="external-link" class="manual-card-download-icon"></i>
+                    </a>
                     
                   </div>
                 </div>

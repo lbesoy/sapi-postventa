@@ -3,7 +3,39 @@
  * Diseñado como módulo ES con retrocompatibilidad global hacia window.
  */
 
-import { normStr, formatFechaHoraAmigable, escapeHTML } from "../utils.js";
+import { normStr, formatFechaHoraAmigable, escapeHTML, esUsuarioSuperadmin } from "../utils.js";
+
+function safeEsUsuarioSuperadmin() {
+  if (typeof esUsuarioSuperadmin === 'function') return esUsuarioSuperadmin();
+  if (typeof window !== 'undefined' && typeof window.esUsuarioSuperadmin === 'function') return window.esUsuarioSuperadmin();
+  let sess = null;
+  if (typeof currentSession !== 'undefined' && currentSession) sess = currentSession;
+  else if (typeof window !== 'undefined' && window.currentSession) sess = window.currentSession;
+  else if (typeof safeGetJSON === 'function') sess = safeGetJSON('eurorep_session', null);
+  else if (typeof localStorage !== 'undefined') {
+    try { sess = JSON.parse(localStorage.getItem('eurorep_session') || 'null'); } catch (e) {}
+  }
+  if (!sess) return false;
+  const viewMode = String(sess.viewMode || '').toLowerCase().trim();
+  const realRol = String(sess.realRol || '').toLowerCase().trim();
+  const userId = String(sess.userId || '').toLowerCase().trim();
+  if (viewMode !== 'superadmin') return false;
+  const usersList = (typeof window !== 'undefined' && Array.isArray(window.usuarios))
+    ? window.usuarios
+    : ((typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : (typeof safeGetJSON === 'function' ? safeGetJSON('eurorep_usuarios', []) : []));
+  if (Array.isArray(usersList) && userId) {
+    const userInDb = usersList.find(u => u && u.id === userId);
+    if (userInDb && userInDb.rol) {
+      const dbRol = String(userInDb.rol).toLowerCase().trim();
+      if (dbRol !== 'superadmin') return false;
+    }
+  }
+  if (['admin', 'supervisor', 'tecnico', 'empresa', 'cliente', 'cliente-consultor', 'consulta'].includes(realRol)) {
+    return false;
+  }
+  return (viewMode === 'superadmin' && (realRol === 'superadmin' || userId === 'superadmin' || !realRol));
+}
+
 
 function safeNorm(s) {
   if (!s) return "";
@@ -443,7 +475,7 @@ function verDetalleTicket(id) {
 
   const assocOrder = window.obtenerOrdenAsociadaTicket(t);
   const parentTicket = !assocOrder ? (typeof window.obtenerTicketPadre === 'function' ? window.obtenerTicketPadre(t) : null) : null;
-  const isSuperadmin = (typeof currentSession !== 'undefined' && currentSession && (currentSession.viewMode === 'superadmin' || currentSession.rol === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.userId === 'superadmin'));
+  const isSuperadmin = safeEsUsuarioSuperadmin();
   const isDecisionLocked = ['si', 'aprobada', 'no', 'rechazada'].includes(String(t.cotAceptada || '').toLowerCase().trim());
   document.getElementById('ticket-detalle-title').textContent = `Ticket ${t.folio}`;
 
@@ -540,7 +572,7 @@ function verDetalleTicket(id) {
         ${field('Estado', `<span class="badge badge-${badgeTicketEstado(t)}">${getTicketEstadoLabel(t)}</span>`)}
         ${!['empresa', 'cliente', 'cliente-consultor'].includes(currentSession.viewMode) ? field('Prioridad', `<span class="badge badge-${(t.prioridad||'media').toLowerCase()}">${t.prioridad}</span>`) : ''}
         ${field('Solicitante', t.solicitante)}
-        ${field('Creado por', t.creadoPor)}
+        ${field('Creado por', (typeof window.resolverCreadorTicket === 'function' ? window.resolverCreadorTicket(t) : (t.creadoPor || t.creado_por)) || '—')}
         ${field('Área', t.area)}
         ${field('Categoría', t.categoria)}
         ${field('Asignado a', t.asignado)}
@@ -1621,6 +1653,11 @@ function cerrarDetalleTicket(e) {
 
 async function forzarEstadoTicket(id) {
   if (typeof document === 'undefined') return;
+  const isSuperadmin = safeEsUsuarioSuperadmin();
+  if (!isSuperadmin) {
+    mostrarNotificacion('Acción restringida: Solo los usuarios con rol Superadmin pueden forzar estados de tickets.', 'error');
+    return;
+  }
   const t = tickets.find(x => x.id === id);
   if (!t) return;
   const overlay = document.createElement('div');
@@ -1628,33 +1665,35 @@ async function forzarEstadoTicket(id) {
   overlay.style.zIndex = '99999';
   
   overlay.innerHTML = `
-    <div class="modal-content" style="max-width:400px; padding:1.5rem;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--border); padding-bottom:0.5rem;">
-        <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
-          <i data-lucide="zap" style="color:var(--accent);"></i> Forzar Estado (Superadmin)
+    <div class="modal" style="max-width: 440px; width: 100%; background: var(--bg-card, #1e2130); border: 1px solid var(--border, #2e3248); border-radius: var(--radius, 12px); box-shadow: 0 20px 40px rgba(0,0,0,0.5); display: flex; flex-direction: column; overflow: hidden; animation: slideUp 0.2s ease;">
+      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--border); background: var(--bg-secondary); flex-shrink: 0;">
+        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="zap" style="color: var(--accent); width: 18px; height: 18px;"></i> Forzar Estado (Superadmin)
         </h3>
-        <button class="close-btn" onclick="this.closest('.modal-overlay').remove()" style="background:none; border:none; cursor:pointer; color:var(--text-muted);">
-          <i data-lucide="x"></i>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()" style="background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-sm); transition: var(--transition);">
+          <i data-lucide="x" style="width: 18px; height: 18px;"></i>
         </button>
       </div>
       
-      <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
-        Cambiarás el estado del ticket <strong>${t.folio}</strong> saltando todas las validaciones.
-      </p>
+      <div class="modal-body" style="padding: 1.25rem 1.4rem;">
+        <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.4;">
+          Cambiarás el estado del ticket <strong style="color: var(--text-primary);">${t.folio}</strong> saltando todas las validaciones.
+        </p>
 
-      <div class="form-group" style="margin-bottom:1.5rem;">
-        <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; margin-bottom:0.4rem; display:block;">Nuevo Estado:</label>
-        <select id="forzar-estado-select" style="width:100%; padding:0.6rem; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-secondary); color:var(--text-primary);">
-          <option value="Abierto" ${t.estado === 'Abierto' ? 'selected' : ''}>Abierto</option>
-          <option value="Refacciones" ${t.estado === 'Refacciones' ? 'selected' : ''}>Refacciones</option>
-          <option value="Cotización" ${t.estado === 'Cotización' ? 'selected' : ''}>Cotización</option>
-          <option value="Cerrado" ${t.estado === 'Cerrado' ? 'selected' : ''}>Cerrado</option>
-        </select>
-      </div>
-      
-      <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
-        <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
-        <button class="btn-primary" style="background:var(--accent); border-color:var(--accent);" id="btn-forzar-confirmar">Confirmar Cambio</button>
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label style="font-weight: 600; color: var(--text-primary); font-size: 0.85rem; margin-bottom: 0.4rem; display: block;">Nuevo Estado:</label>
+          <select id="forzar-estado-select" style="width: 100%; padding: 0.65rem 0.8rem; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-size: 0.88rem;">
+            <option value="Abierto" ${t.estado === 'Abierto' ? 'selected' : ''}>Abierto</option>
+            <option value="Refacciones" ${t.estado === 'Refacciones' ? 'selected' : ''}>Refacciones</option>
+            <option value="Cotización" ${t.estado === 'Cotización' ? 'selected' : ''}>Cotización</option>
+            <option value="Cerrado" ${t.estado === 'Cerrado' ? 'selected' : ''}>Cerrado</option>
+          </select>
+        </div>
+        
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+          <button type="button" class="btn-secondary" onclick="this.closest('.modal-overlay').remove()" style="padding: 0.6rem 1.25rem; font-weight: 500; cursor: pointer; background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-primary); border-radius: var(--radius-sm); transition: var(--transition);">Cancelar</button>
+          <button type="button" class="btn-primary" style="padding: 0.6rem 1.35rem; font-weight: 600; cursor: pointer; background: var(--accent); border: 1px solid var(--accent); color: #ffffff; border-radius: var(--radius-sm);" id="btn-forzar-confirmar">Confirmar Cambio</button>
+        </div>
       </div>
     </div>
   `;
@@ -1685,11 +1724,10 @@ async function forzarEstadoTicket(id) {
 
 async function forzarCrearOrdenServicio(id) {
   if (typeof document === 'undefined') return;
-  const isSuperadmin = (typeof currentSession !== 'undefined' && currentSession && 
-    (currentSession.viewMode === 'superadmin' || currentSession.rol === 'superadmin' || currentSession.realRol === 'superadmin' || currentSession.userId === 'superadmin'));
+  const isSuperadmin = safeEsUsuarioSuperadmin();
   
   if (!isSuperadmin) {
-    mostrarNotificacion('Solo los usuarios con rol Superadmin pueden forzar la creación de órdenes de servicio.', 'error');
+    mostrarNotificacion('Acción restringida: Solo los usuarios con rol Superadmin pueden forzar órdenes de servicio.', 'error');
     return;
   }
 
@@ -1758,97 +1796,99 @@ async function forzarCrearOrdenServicio(id) {
   overlay.style.zIndex = '99999';
   
   overlay.innerHTML = `
-    <div class="modal-content" style="max-width:560px; padding:1.5rem; max-height:90vh; overflow-y:auto;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--border); padding-bottom:0.6rem;">
-        <h3 style="margin:0; font-size:1.15rem; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
-          <i data-lucide="file-plus" style="color:#2563eb;"></i> Forzar Orden de Servicio (Superadmin)
+    <div class="modal" style="max-width: 580px; width: 100%; max-height: 92vh; background: var(--bg-card, #1e2130); border: 1px solid var(--border, #2e3248); border-radius: var(--radius, 12px); box-shadow: 0 20px 40px rgba(0,0,0,0.5); display: flex; flex-direction: column; overflow: hidden; animation: slideUp 0.2s ease;">
+      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--border); background: var(--bg-secondary); flex-shrink: 0;">
+        <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="file-plus" style="color: #2563eb; width: 20px; height: 20px;"></i> Forzar Orden de Servicio (Superadmin)
         </h3>
-        <button class="close-btn" onclick="this.closest('.modal-overlay').remove()" style="background:none; border:none; cursor:pointer; color:var(--text-muted);">
-          <i data-lucide="x"></i>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()" style="background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-sm); transition: var(--transition);">
+          <i data-lucide="x" style="width: 18px; height: 18px;"></i>
         </button>
       </div>
 
-      <div style="background: rgba(37, 99, 235, 0.06); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 8px; padding: 0.8rem 1rem; margin-bottom: 1.2rem;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.82rem;">
-          <div><span style="color:var(--text-muted);">Ticket:</span> <strong style="color:var(--text-primary);">${t.folio || t.id}</strong></div>
-          <div><span style="color:var(--text-muted);">Estado:</span> <span class="badge badge-${typeof badgeTicketEstado === 'function' ? badgeTicketEstado(t) : 'abierto'}">${typeof getTicketEstadoLabel === 'function' ? getTicketEstadoLabel(t) : (t.estado || 'Abierto')}</span></div>
-          <div style="grid-column: 1 / -1;"><span style="color:var(--text-muted);">Cliente:</span> <strong style="color:var(--text-primary);">${t.cliente || 'Sin cliente especificado'}</strong> ${t.sitio ? `(Sitio: ${t.sitio})` : ''}</div>
-          <div style="grid-column: 1 / -1;"><span style="color:var(--text-muted);">Asunto:</span> <span style="color:var(--text-secondary);">${t.asunto || '—'}</span></div>
-        </div>
-      </div>
-
-      <form id="form-forzar-orden" onsubmit="event.preventDefault();">
-        <div class="form-group" style="margin-bottom:1rem;">
-          <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; margin-bottom:0.35rem; display:block;">Tipo de Visita / Servicio *</label>
-          <select id="forzar-tipo-servicio" style="width:100%; padding:0.6rem; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-secondary); color:var(--text-primary);">
-            <option value="Servicio" ${(!t.tipo || t.tipo === 'Servicio') ? 'selected' : ''}>Servicio</option>
-            <option value="Servicio preventivo" ${(t.tipo === 'Servicio preventivo' || (t.categoria && t.categoria.includes('Preventivo'))) ? 'selected' : ''}>Servicio preventivo</option>
-            <option value="Servicio correctivo" ${(t.tipo === 'Servicio correctivo' || (t.categoria && t.categoria.includes('Correctivo'))) ? 'selected' : ''}>Servicio correctivo</option>
-            <option value="Inspección" ${t.tipo === 'Inspección' ? 'selected' : ''}>Inspección</option>
-            <option value="Entrega y puesta en marcha" ${(t.tipo === 'Entrega y puesta en marcha' || (t.categoria && t.categoria.includes('Puesta en Marcha'))) ? 'selected' : ''}>Entrega y puesta en marcha</option>
-            <option value="Pre-entrega" ${(t.tipo === 'Pre-entrega' || (t.categoria && t.categoria.includes('Pre-Entrega'))) ? 'selected' : ''}>Pre-entrega</option>
-            <option value="Garantía" ${(t.tipo === 'Garantía' || (t.categoria && t.categoria.includes('Garantía'))) ? 'selected' : ''}>Garantía</option>
-          </select>
+      <div class="modal-body" style="padding: 1.25rem 1.4rem; overflow-y: auto; flex: 1;">
+        <div style="background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.25); border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1.25rem;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;">
+            <div><span style="color: var(--text-secondary); font-weight: 500;">Ticket:</span> <strong style="color: var(--text-primary); font-weight: 700;">${t.folio || t.id}</strong></div>
+            <div><span style="color: var(--text-secondary); font-weight: 500;">Estado:</span> <span class="badge badge-${typeof badgeTicketEstado === 'function' ? badgeTicketEstado(t) : 'abierto'}">${typeof getTicketEstadoLabel === 'function' ? getTicketEstadoLabel(t) : (t.estado || 'Abierto')}</span></div>
+            <div style="grid-column: 1 / -1;"><span style="color: var(--text-secondary); font-weight: 500;">Cliente:</span> <strong style="color: var(--text-primary);">${t.cliente || 'Sin cliente especificado'}</strong> ${t.sitio ? `<span style="color: var(--text-muted); font-size: 0.8rem;">(Sitio: ${t.sitio})</span>` : ''}</div>
+            <div style="grid-column: 1 / -1;"><span style="color: var(--text-secondary); font-weight: 500;">Asunto:</span> <span style="color: var(--text-primary); font-weight: 500;">${t.asunto || '—'}</span></div>
+          </div>
         </div>
 
-        <div class="form-group" style="margin-bottom:1rem;">
-          <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; margin-bottom:0.35rem; display:block;">Equipo / Maquinaria</label>
-          <input type="text" id="forzar-equipo" value="${(t.equipo && t.equipo !== 'Otra / No registrada') ? t.equipo.replace(/"/g, '&quot;') : ''}" placeholder="Ej. [1234] CIFA K40H (SN: 9876)" style="width:100%; padding:0.6rem; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-secondary); color:var(--text-primary);" />
-          ${maquinasOptions.length > 0 ? `
-            <div style="margin-top: 0.35rem; font-size: 0.75rem; color: var(--text-muted);">
-              Sugerencias del cliente: 
-              <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
-                ${maquinasOptions.slice(0, 6).map(m => {
-                  const label = `${m.idInterno ? `[${m.idInterno}] ` : ''}${m.marca || ''} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
-                  const safeLabel = label.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                  return `<button type="button" class="badge" style="cursor:pointer; background:var(--bg-card); border:1px solid var(--border); font-size:0.72rem; padding:2px 6px;" onclick="document.getElementById('forzar-equipo').value='${safeLabel}'">${label}</button>`;
-                }).join('')}
+        <form id="form-forzar-orden" onsubmit="event.preventDefault();">
+          <div class="form-group" style="margin-bottom: 1.1rem;">
+            <label style="font-weight: 600; color: var(--text-primary); font-size: 0.85rem; margin-bottom: 0.35rem; display: block;">Tipo de Visita / Servicio <span style="color: var(--red, #ef4444);">*</span></label>
+            <select id="forzar-tipo-servicio" style="width: 100%; padding: 0.65rem 0.8rem; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.88rem;">
+              <option value="Servicio" ${(!t.tipo || t.tipo === 'Servicio') ? 'selected' : ''}>Servicio</option>
+              <option value="Servicio preventivo" ${(t.tipo === 'Servicio preventivo' || (t.categoria && t.categoria.includes('Preventivo'))) ? 'selected' : ''}>Servicio preventivo</option>
+              <option value="Servicio correctivo" ${(t.tipo === 'Servicio correctivo' || (t.categoria && t.categoria.includes('Correctivo'))) ? 'selected' : ''}>Servicio correctivo</option>
+              <option value="Inspección" ${t.tipo === 'Inspección' ? 'selected' : ''}>Inspección</option>
+              <option value="Entrega y puesta en marcha" ${(t.tipo === 'Entrega y puesta en marcha' || (t.categoria && t.categoria.includes('Puesta en Marcha'))) ? 'selected' : ''}>Entrega y puesta en marcha</option>
+              <option value="Pre-entrega" ${(t.tipo === 'Pre-entrega' || (t.categoria && t.categoria.includes('Pre-Entrega'))) ? 'selected' : ''}>Pre-entrega</option>
+              <option value="Garantía" ${(t.tipo === 'Garantía' || (t.categoria && t.categoria.includes('Garantía'))) ? 'selected' : ''}>Garantía</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1.1rem;">
+            <label style="font-weight: 600; color: var(--text-primary); font-size: 0.85rem; margin-bottom: 0.35rem; display: block;">Equipo / Maquinaria</label>
+            <input type="text" id="forzar-equipo" value="${(t.equipo && t.equipo !== 'Otra / No registrada') ? t.equipo.replace(/"/g, '&quot;') : ''}" placeholder="Ej. [1234] CIFA K40H (SN: 9876)" style="width: 100%; padding: 0.65rem 0.8rem; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.88rem;" />
+            ${maquinasOptions.length > 0 ? `
+              <div style="margin-top: 0.45rem; font-size: 0.78rem; color: var(--text-secondary);">
+                <span style="font-weight: 500;">Sugerencias del cliente:</span> 
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
+                  ${maquinasOptions.slice(0, 6).map(m => {
+                    const label = `${m.idInterno ? `[${m.idInterno}] ` : ''}${m.marca || ''} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+                    const safeLabel = label.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    return `<button type="button" style="cursor: pointer; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); font-size: 0.74rem; padding: 4px 8px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'" onclick="document.getElementById('forzar-equipo').value='${safeLabel}'">${label}</button>`;
+                  }).join('')}
+                </div>
               </div>
+            ` : ''}
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1.1rem;">
+            <label style="font-weight: 600; color: var(--text-primary); font-size: 0.85rem; margin-bottom: 0.35rem; display: block;">Técnicos Asignados</label>
+            <div style="max-height: 140px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.4rem; background: var(--bg-secondary); display: flex; flex-direction: column; gap: 2px;">
+              ${listaTecnicos.length > 0 ? listaTecnicos.map(tec => {
+                const checked = tecsAsignadosTicket.some(st => String(st).toLowerCase().trim() === String(tec).toLowerCase().trim() || String(st).includes(tec));
+                return `
+                  <label style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; color: var(--text-primary); transition: background 0.15s ease;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+                    <input type="checkbox" name="forzar-tecnicos" value="${tec.replace(/"/g, '&quot;')}" ${checked ? 'checked' : ''} style="width: 16px !important; height: 16px !important; min-width: 16px; margin: 0 !important; cursor: pointer; accent-color: #2563eb; flex-shrink: 0;" />
+                    <span style="font-weight: 500;">${tec}</span>
+                  </label>
+                `;
+              }).join('') : '<span style="font-size: 0.82rem; color: var(--text-muted); padding: 0.5rem;">No hay técnicos disponibles en la base de datos</span>'}
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1.1rem;">
+            <label style="font-weight: 600; color: var(--text-primary); font-size: 0.85rem; margin-bottom: 0.35rem; display: block;">No. Pedido SAP <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(Opcional)</span></label>
+            <input type="text" id="forzar-pedido-sap" value="${(t.pedidoSAP || '').replace(/"/g, '&quot;')}" placeholder="Ej. 10245" style="width: 100%; padding: 0.65rem 0.8rem; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.88rem;" />
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1.1rem;">
+            <label style="font-weight: 600; color: var(--text-primary); font-size: 0.85rem; margin-bottom: 0.35rem; display: block;">Falla / Descripción del Servicio</label>
+            <textarea id="forzar-falla" rows="3" style="width: 100%; padding: 0.65rem 0.8rem; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.88rem; resize: vertical;">${((t.asunto ? t.asunto + '\n' : '') + (t.descripcion || '')).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+          </div>
+
+          ${tieneRefacciones ? `
+            <div class="form-group" style="margin-bottom: 1.2rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem 1rem;">
+              <label style="display: flex; align-items: center; gap: 10px; font-size: 0.85rem; font-weight: 600; color: var(--text-primary); cursor: pointer;">
+                <input type="checkbox" id="forzar-incluir-refacciones" checked style="width: 16px !important; height: 16px !important; min-width: 16px; margin: 0 !important; cursor: pointer; accent-color: #2563eb; flex-shrink: 0;" />
+                <span>Copiar ${t.refaccionesSeleccionadas.length} refacción(es) del ticket a la Orden de Servicio</span>
+              </label>
             </div>
           ` : ''}
-        </div>
 
-        <div class="form-group" style="margin-bottom:1rem;">
-          <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; margin-bottom:0.35rem; display:block;">Técnicos Asignados</label>
-          <div style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem; background: var(--bg-secondary);">
-            ${listaTecnicos.length > 0 ? listaTecnicos.map(tec => {
-              const checked = tecsAsignadosTicket.some(st => String(st).toLowerCase().trim() === String(tec).toLowerCase().trim() || String(st).includes(tec));
-              return `
-                <label style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; margin-bottom: 4px; cursor: pointer; color: var(--text-primary);">
-                  <input type="checkbox" name="forzar-tecnicos" value="${tec.replace(/"/g, '&quot;')}" ${checked ? 'checked' : ''} />
-                  <span>${tec}</span>
-                </label>
-              `;
-            }).join('') : '<span style="font-size:0.8rem; color:var(--text-muted);">No hay técnicos disponibles en la base de datos</span>'}
+          <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+            <button type="button" class="btn-secondary" onclick="this.closest('.modal-overlay').remove()" style="padding: 0.6rem 1.25rem; font-weight: 500; cursor: pointer; background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-primary); border-radius: var(--radius-sm); transition: var(--transition);">Cancelar</button>
+            <button type="button" class="btn-primary" style="padding: 0.6rem 1.35rem; display: inline-flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; background: #2563eb; border: 1px solid #1d4ed8; color: #ffffff; border-radius: var(--radius-sm); box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);" id="btn-forzar-orden-confirmar">
+              <i data-lucide="file-plus" style="width: 16px; height: 16px;"></i> Crear y Vincular Orden
+            </button>
           </div>
-        </div>
-
-        <div class="form-group" style="margin-bottom:1rem;">
-          <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; margin-bottom:0.35rem; display:block;">No. Pedido SAP <span style="font-size:0.72rem; color:var(--text-muted); font-weight:normal;">(Opcional)</span></label>
-          <input type="text" id="forzar-pedido-sap" value="${(t.pedidoSAP || '').replace(/"/g, '&quot;')}" placeholder="Ej. 10245" style="width:100%; padding:0.6rem; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-secondary); color:var(--text-primary);" />
-        </div>
-
-        <div class="form-group" style="margin-bottom:1rem;">
-          <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem; margin-bottom:0.35rem; display:block;">Falla / Descripción del Servicio</label>
-          <textarea id="forzar-falla" rows="3" style="width:100%; padding:0.6rem; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-secondary); color:var(--text-primary); resize:vertical;">${((t.asunto ? t.asunto + '\n' : '') + (t.descripcion || '')).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
-        </div>
-
-        ${tieneRefacciones ? `
-          <div class="form-group" style="margin-bottom:1.2rem; background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:0.65rem 0.85rem;">
-            <label style="display:flex; align-items:center; gap:8px; font-size:0.82rem; font-weight:600; color:var(--text-primary); cursor:pointer;">
-              <input type="checkbox" id="forzar-incluir-refacciones" checked />
-              <span>Copiar ${t.refaccionesSeleccionadas.length} refacción(es) del ticket a la Orden de Servicio</span>
-            </label>
-          </div>
-        ` : ''}
-
-        <div style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:1.5rem; border-top:1px solid var(--border); padding-top:1rem;">
-          <button type="button" class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
-          <button type="button" class="btn-primary" style="background:#2563eb; border-color:#2563eb;" id="btn-forzar-orden-confirmar">
-            <i data-lucide="file-plus" style="width:16px;height:16px;"></i> Crear y Vincular Orden
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   `;
 
@@ -1982,6 +2022,7 @@ async function forzarCrearOrdenServicio(id) {
         tecnico: checkedTecs.join(', '),
         tecnicosAsignados: checkedTecs,
         soporte: t.id,
+        creadoPor: (typeof window.getCurrentUserDisplayName === 'function') ? window.getCurrentUserDisplayName() : (currentSession?.nombre || 'Usuario'),
         km_ida: '', km_vuelta: '', km_total: '',
         tipo: tipoVal || 'Servicio',
         estado: 'Pendiente',

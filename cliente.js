@@ -5598,38 +5598,42 @@ window.crearModalVisorManualClienteSiNoExiste = function() {
     overlay = document.createElement('div');
     overlay.id = 'modal-visor-manual-cliente-overlay';
     overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '999999';
     overlay.setAttribute('onclick', 'window.cerrarVisorManualCliente(event)');
     overlay.innerHTML = `
-      <div class="modal" onclick="event.stopPropagation()" style="max-width:560px; width:92%; border-radius:16px; background:var(--bg-card, #1e293b); color:var(--text-primary, #f8fafc); box-shadow:var(--shadow-lg, 0 20px 25px -5px rgba(0,0,0,0.5)); border:1px solid var(--border, rgba(255,255,255,0.1));">
-        <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; padding:1.25rem 1.5rem; border-bottom:1px solid var(--border, rgba(255,255,255,0.1)); background:var(--bg-hover, rgba(255,255,255,0.03));">
-          <div style="display:flex; align-items:center; gap:0.75rem;">
-            <div style="width:40px; height:40px; border-radius:10px; background:rgba(37,99,235,0.12); color:var(--primary, #2563eb); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-              <i data-lucide="book-open" style="width:20px; height:20px;"></i>
+      <div class="modal" onclick="event.stopPropagation()" style="max-width: 1150px; width: 95vw; height: 90vh; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-card, #1e293b); color: var(--text-primary, #f8fafc); border: 1px solid var(--border, rgba(255,255,255,0.1)); border-radius: 14px; overflow: hidden; box-shadow: 0 20px 45px rgba(0,0,0,0.6);">
+        <div class="modal-header" style="padding: 0.85rem 1.25rem; background: var(--bg-secondary, #1a1d27); border-bottom: 1px solid var(--border, rgba(255,255,255,0.1)); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; gap: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0;">
+            <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(37,99,235,0.15); color: var(--primary, #2563eb); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <i data-lucide="book-open" style="width: 18px; height: 18px;"></i>
             </div>
-            <div>
-              <h2 style="margin:0; font-size:1.15rem; font-weight:700; color:var(--text-primary, #f8fafc);">Manual del Cliente (SAPI)</h2>
-              <div style="font-size:0.8rem; color:var(--text-muted, #94a3b8); margin-top:2px;">Guía oficial del portal para clientes</div>
+            <div style="min-width: 0;">
+              <h2 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary, #f8fafc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Manual del Cliente (SAPI)</h2>
+              <div style="font-size: 0.75rem; color: var(--text-muted, #94a3b8); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Visor interactivo oficial para clientes</div>
             </div>
           </div>
-          <button class="modal-close" onclick="window.cerrarVisorManualCliente()" style="background:transparent; border:none; color:var(--text-muted); font-size:1.25rem; cursor:pointer;">✕</button>
-        </div>
-        <div class="modal-body" style="padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem;">
-          <div style="font-size:0.92rem; line-height:1.5; color:var(--text-primary); background:var(--bg-body, #0f172a); padding:1rem; border-radius:8px; border:1px solid var(--border, rgba(255,255,255,0.1));">
-            Consulta la guía paso a paso para solicitar servicios técnicos, consultar maquinaria en renta y cotizaciones, o descarga el manual oficial en PDF.
-          </div>
-          <div style="display:flex; flex-direction:column; gap:0.75rem;">
-            <a href="manuales/manual_cliente.html" target="_blank" class="btn-primary" style="padding:0.75rem 1.25rem; font-size:0.95rem; font-weight:600; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.5rem; border-radius:10px; cursor:pointer;">
-              <i data-lucide="external-link" style="width:18px; height:18px;"></i>
-              <span>Abrir Manual Completo (Interactivo)</span>
+          <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+            <button type="button" class="btn-secondary" onclick="window.imprimirManualClienteIframe()" title="Imprimir manual" style="padding: 0.4rem 0.75rem; font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem; border-radius: 8px; cursor: pointer; border: 1px solid var(--border, rgba(255,255,255,0.1)); background: var(--bg-card, #1e293b); color: var(--text-primary, #f8fafc);">
+              <i data-lucide="printer" style="width: 14px; height: 14px;"></i>
+              <span>Imprimir</span>
+            </button>
+            <a href="manuales/manual_cliente.pdf" download class="btn-secondary" title="Descargar documento PDF" style="padding: 0.4rem 0.75rem; font-size: 0.8rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem; border-radius: 8px; cursor: pointer; border: 1px solid var(--border, rgba(255,255,255,0.1)); background: var(--bg-card, #1e293b); color: var(--text-primary, #f8fafc);">
+              <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+              <span>Descargar PDF</span>
             </a>
-            <a href="manuales/manual_cliente.pdf" download class="btn-secondary" style="padding:0.75rem 1.25rem; font-size:0.95rem; font-weight:600; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:0.5rem; border-radius:10px; cursor:pointer;">
-              <i data-lucide="download" style="width:18px; height:18px;"></i>
-              <span>Descargar Documento PDF</span>
+            <a href="manuales/manual_cliente.html" target="_blank" class="btn-secondary" title="Abrir en pestaña nueva" style="padding: 0.4rem 0.75rem; font-size: 0.8rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem; border-radius: 8px; cursor: pointer; border: 1px solid var(--border, rgba(255,255,255,0.1)); background: var(--bg-card, #1e293b); color: var(--text-primary, #f8fafc);">
+              <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
+              <span>Pestaña Nueva</span>
             </a>
+            <button type="button" class="modal-close" onclick="window.cerrarVisorManualCliente()" style="background: transparent; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer; padding: 0.2rem 0.4rem; line-height: 1; border-radius: 6px; margin-left: 0.25rem;" title="Cerrar visor">✕</button>
           </div>
         </div>
-        <div class="modal-footer" style="padding:1rem 1.5rem; border-top:1px solid var(--border, rgba(255,255,255,0.1)); display:flex; justify-content:flex-end; background:var(--bg-hover, rgba(255,255,255,0.03));">
-          <button type="button" class="btn-secondary" onclick="window.cerrarVisorManualCliente()" style="padding:0.55rem 1.25rem; border-radius:8px; cursor:pointer;">Cerrar</button>
+        <div class="modal-body" style="flex: 1; padding: 0; overflow: hidden; background: #ffffff; position: relative; display: flex; flex-direction: column;">
+          <div id="modal-visor-manual-cliente-loading" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-card, #1e293b); color: var(--text-muted, #94a3b8); z-index: 2; transition: opacity 0.2s ease;">
+            <div class="spinner" style="width: 32px; height: 32px; border: 3px solid rgba(37,99,235,0.2); border-top-color: var(--primary, #2563eb); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 0.75rem;"></div>
+            <div style="font-size: 0.85rem; font-weight: 500;">Cargando documento en pantalla...</div>
+          </div>
+          <iframe id="modal-visor-manual-cliente-iframe" src="about:blank" style="width: 100%; height: 100%; border: none; flex: 1; background: #ffffff;" title="Manual del Cliente SAPI"></iframe>
         </div>
       </div>
     `;
@@ -5640,14 +5644,36 @@ window.crearModalVisorManualClienteSiNoExiste = function() {
 
 window.abrirVisorManualCliente = function() {
   const overlay = window.crearModalVisorManualClienteSiNoExiste();
-  if (overlay) {
-    overlay.classList.add('open');
-    overlay.style.display = 'flex';
-    overlay.style.visibility = 'visible';
-    overlay.style.opacity = '1';
-    overlay.style.pointerEvents = 'auto';
-    document.body.style.overflow = 'hidden';
+  if (!overlay) return;
+
+  const iframe = document.getElementById('modal-visor-manual-cliente-iframe');
+  const loading = document.getElementById('modal-visor-manual-cliente-loading');
+
+  if (loading) {
+    loading.style.display = 'flex';
+    loading.style.opacity = '1';
   }
+
+  if (iframe) {
+    iframe.onload = function() {
+      if (loading) {
+        loading.style.opacity = '0';
+        setTimeout(function() {
+          loading.style.display = 'none';
+        }, 200);
+      }
+    };
+    iframe.src = 'manuales/manual_cliente.html';
+  }
+
+  overlay.classList.add('open');
+  overlay.style.display = 'flex';
+  overlay.style.visibility = 'visible';
+  overlay.style.opacity = '1';
+  overlay.style.pointerEvents = 'auto';
+  overlay.style.zIndex = '999999';
+  document.body.style.overflow = 'hidden';
+
   if (typeof lucide !== 'undefined' && lucide.createIcons) {
     try { lucide.createIcons({ root: overlay }); } catch(e) {}
   }
@@ -5668,9 +5694,23 @@ window.cerrarVisorManualCliente = function(e) {
     overlay.style.pointerEvents = 'none';
     document.body.style.overflow = '';
   }
+  const iframe = document.getElementById('modal-visor-manual-cliente-iframe');
+  if (iframe) {
+    iframe.src = 'about:blank';
+  }
 };
 
 window.imprimirManualClienteIframe = function() {
+  const iframe = document.getElementById('modal-visor-manual-cliente-iframe');
+  if (iframe && iframe.contentWindow) {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      return;
+    } catch(err) {
+      console.warn('Error al imprimir iframe cliente:', err);
+    }
+  }
   window.print();
 };
 
