@@ -321,7 +321,9 @@ function sanitizarColeccionDeduplicada(arr, etiqueta = 'items') {
   const limpio = arr.filter(item => {
     if (!item || typeof item !== 'object') return false;
     const id = item.id ? String(item.id).trim() : null;
-    const folio = (item.folio || item.numero_orden) ? String(item.folio || item.numero_orden).trim() : null;
+    const rawFolio = (item.folio || item.numero_orden) ? String(item.folio || item.numero_orden).trim() : null;
+    const isGeneric = !rawFolio || ['-', 'n/a', 's/n', 'sin folio', 'null', 'undefined', 'por asignar'].includes(rawFolio.toLowerCase());
+    const folio = isGeneric ? null : rawFolio.toLowerCase();
     if (id && seenIds.has(id)) {
       purgados++;
       return false;
@@ -479,25 +481,45 @@ function unificarNombreUsuario(rawNombre) {
   }
   return String(rawNombre || 'Sin Asignar').trim();
 }
-if (typeof window !== 'undefined') window.unificarNombreUsuario = unificarNombreUsuario;
+if (typeof window !== 'undefined' && (!window.unificarNombreUsuario || !window._unificarNombreUsuarioBase)) {
+  window.unificarNombreUsuario = unificarNombreUsuario;
+}
 
 function obtenerInfoRolUsuario(nombre) {
   if (typeof window !== 'undefined' && typeof window._obtenerInfoRolUsuarioBase === 'function') {
     return window._obtenerInfoRolUsuarioBase(nombre);
   }
+  if (!nombre) return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
+  const norm = (typeof normalizarTextoJunta === 'function') ? normalizarTextoJunta(nombre) : String(nombre || '').toLowerCase().trim();
+  if (norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === '' || norm === 'sin_asignar') {
+    return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
+  }
+  if (norm === 'pablo besoy' || norm === 'pablo besoy trigueros' || norm === 'besoy' || norm.startsWith('pablo besoy')) {
+    return { rol: 'superadmin', label: 'Super Admin', color: '#E8820C', icon: 'shield-alert' };
+  }
   return { rol: 'tecnico', label: 'Técnico', color: '#10b981', icon: 'wrench' };
 }
-if (typeof window !== 'undefined') window.obtenerInfoRolUsuario = obtenerInfoRolUsuario;
+if (typeof window !== 'undefined' && (!window.obtenerInfoRolUsuario || !window._obtenerInfoRolUsuarioBase)) {
+  window.obtenerInfoRolUsuario = obtenerInfoRolUsuario;
+}
 
 function extraerListaResponsables(raw) {
+  if (typeof window !== 'undefined' && typeof window._extraerListaResponsablesBase === 'function') {
+    return window._extraerListaResponsablesBase(raw);
+  }
   if (!raw) return ['Sin Asignar'];
+  const isPaqFn = (typeof esNombrePaqueteria === 'function') ? esNombrePaqueteria : (typeof window !== 'undefined' && window.esNombrePaqueteria ? window.esNombrePaqueteria : () => false);
+  const isExclFn = (typeof esResponsableExcluidoOperativo === 'function') ? esResponsableExcluidoOperativo : (typeof window !== 'undefined' && window.esResponsableExcluidoOperativo ? window.esResponsableExcluidoOperativo : () => false);
   const parts = String(raw).trim().split(/[,;/]+/).map(s => s.trim()).filter(Boolean);
-  return parts.length > 0 ? parts : ['Sin Asignar'];
+  const valid = parts.filter(s => s !== '-' && s.toLowerCase() !== 'sin asignar' && s.toLowerCase() !== 'sin_asignar' && !isPaqFn(s) && !isExclFn(s));
+  return valid.length > 0 ? Array.from(new Set(valid)) : ['Sin Asignar'];
 }
-if (typeof window !== 'undefined') window.extraerListaResponsables = extraerListaResponsables;
+if (typeof window !== 'undefined' && (!window.extraerListaResponsables || !window._extraerListaResponsablesBase)) {
+  window.extraerListaResponsables = extraerListaResponsables;
+}
 
 // Clara Mock Transactions
-let defaultClaraMockTxs = [
+var defaultClaraMockTxs = [
   { id: 'tx_clara_1', fecha: '2026-05-22', merchant: 'GASOLINERIA ES 08996', monto: 1174.79, cardLast4: '9112', usuario: 'Victor Gonzalez Zamora', categoria: 'Combustibles' },
   { id: 'tx_clara_2', fecha: '2026-05-22', merchant: 'GALERIAS IXTAPALUCA', monto: 95.01, cardLast4: '5513', usuario: 'Roque Falcon Chavez', categoria: 'Venta Minorista' },
   { id: 'tx_clara_3', fecha: '2026-05-22', merchant: 'UBER RIDE', monto: 68.95, cardLast4: '1130', usuario: 'Octavio Rivero', categoria: 'Transporte' },
@@ -506,10 +528,13 @@ let defaultClaraMockTxs = [
   { id: 'tx_clara_6', fecha: '2026-05-21', merchant: 'OFFICE DEPOT MIYANA', monto: 280.00, cardLast4: '9112', usuario: 'Victor Gonzalez Zamora', categoria: 'Venta Minorista' }
 ];
 
-let claraMockTxs = safeGetJSON('sapi_clara_mock_txs', defaultClaraMockTxs);
+var claraMockTxs = safeGetJSON('sapi_clara_mock_txs', defaultClaraMockTxs);
 if (claraMockTxs.length < 6 || !localStorage.getItem('sapi_clara_mock_txs')) {
   claraMockTxs = defaultClaraMockTxs;
   localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(claraMockTxs));
+}
+if (typeof window !== 'undefined') {
+  window.claraMockTxs = claraMockTxs;
 }
 
 // Shims for data migration and sync routines (implemented in app_migrations.js)
@@ -1698,24 +1723,42 @@ function isTestModeActive() {
 
 function resolveTecnicoNombre(idOrName) {
   if (!idOrName) return '';
-  const user = (typeof usuarios !== 'undefined' ? usuarios : []).find(u => u.id === idOrName) || 
-               (typeof tecnicosDb !== 'undefined' ? tecnicosDb : []).find(t => t.id === idOrName);
+  const users = (typeof window !== 'undefined' && Array.isArray(window.usuarios))
+    ? window.usuarios
+    : ((typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : []);
+  const tecs = (typeof window !== 'undefined' && Array.isArray(window.tecnicosDb))
+    ? window.tecnicosDb
+    : ((typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) ? tecnicosDb : []);
+  const user = users.find(u => u && u.id === idOrName) || tecs.find(t => t && t.id === idOrName);
   return user ? user.nombre : idOrName;
+}
+if (typeof window !== 'undefined') {
+  window.resolveTecnicoNombre = resolveTecnicoNombre;
 }
 
 function getFilteredOrders() {
   const active = isTestModeActive();
   const seenIds = new Set();
   const seenFolios = new Set();
-  return ordenes.filter(o => {
+  const source = (typeof window !== 'undefined' && Array.isArray(window.ordenes) && window.ordenes.length > 0)
+    ? window.ordenes
+    : ((typeof ordenes !== 'undefined' && Array.isArray(ordenes) && ordenes.length > 0)
+        ? ordenes
+        : safeGetJSON('sapi_ordenes', []));
+
+  return source.filter(o => {
     if (!o || isTestData(o) !== active) return false;
     if (o.id) {
-      if (seenIds.has(o.id)) return false;
-      seenIds.add(o.id);
+      const oid = String(o.id).trim();
+      if (seenIds.has(oid)) return false;
+      seenIds.add(oid);
     }
-    if (o.folio) {
-      if (seenFolios.has(o.folio)) return false;
-      seenFolios.add(o.folio);
+    const rawFolio = (o.folio || o.numero_orden) ? String(o.folio || o.numero_orden).trim() : '';
+    const isGeneric = !rawFolio || ['-', 'n/a', 's/n', 'sin folio', 'null', 'undefined', 'por asignar'].includes(rawFolio.toLowerCase());
+    if (!isGeneric) {
+      const fNorm = rawFolio.toLowerCase();
+      if (seenFolios.has(fNorm)) return false;
+      seenFolios.add(fNorm);
     }
     return true;
   });
@@ -1725,15 +1768,25 @@ function getFilteredTickets() {
   const active = isTestModeActive();
   const seenIds = new Set();
   const seenFolios = new Set();
-  return tickets.filter(t => {
+  const source = (typeof window !== 'undefined' && Array.isArray(window.tickets) && window.tickets.length > 0)
+    ? window.tickets
+    : ((typeof tickets !== 'undefined' && Array.isArray(tickets) && tickets.length > 0)
+        ? tickets
+        : safeGetJSON('sapi_tickets', []));
+
+  return source.filter(t => {
     if (!t || isTestData(t) !== active || t.categoria === 'Soporte General') return false;
     if (t.id) {
-      if (seenIds.has(t.id)) return false;
-      seenIds.add(t.id);
+      const tid = String(t.id).trim();
+      if (seenIds.has(tid)) return false;
+      seenIds.add(tid);
     }
-    if (t.folio) {
-      if (seenFolios.has(t.folio)) return false;
-      seenFolios.add(t.folio);
+    const rawFolio = (t.folio || t.numero_ticket) ? String(t.folio || t.numero_ticket).trim() : '';
+    const isGeneric = !rawFolio || ['-', 'n/a', 's/n', 'sin folio', 'null', 'undefined', 'por asignar'].includes(rawFolio.toLowerCase());
+    if (!isGeneric) {
+      const fNorm = rawFolio.toLowerCase();
+      if (seenFolios.has(fNorm)) return false;
+      seenFolios.add(fNorm);
     }
     return true;
   });

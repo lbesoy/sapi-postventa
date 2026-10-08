@@ -633,12 +633,29 @@ function getValidDbTecnico(tecnicoStr) {
   
   let localUsers = [];
   try {
-    localUsers = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+    localUsers = JSON.parse(localStorage.getItem('eurorep_usuarios') || localStorage.getItem('sapi_usuarios') || '[]');
   } catch (e) {}
+  if (!localUsers.length && typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
+    localUsers = usuarios;
+  }
   
   for (const name of names) {
-    const match = localUsers.find(u => u.nombre && u.nombre.trim().toLowerCase() === name.toLowerCase());
-    if (match) {
+    const nameNorm = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    // 1. Coincidencia exacta
+    let match = localUsers.find(u => u && u.nombre && u.nombre.trim().toLowerCase() === name.toLowerCase());
+    // 2. Coincidencia normalizada / subcadena (ej. "Sergio Soria Cervantes" -> "Sergio Soria")
+    if (!match) {
+      match = localUsers.find(u => {
+        if (!u || !u.nombre) return false;
+        const uNorm = u.nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        return uNorm === nameNorm || uNorm.includes(nameNorm) || nameNorm.includes(uNorm);
+      });
+    }
+    // 3. Coincidencia por ID de usuario
+    if (!match) {
+      match = localUsers.find(u => u && u.id === name);
+    }
+    if (match && match.nombre) {
       return match.nombre;
     }
   }
@@ -1523,7 +1540,16 @@ window.pushToSupabase = async function(tabla, item) {
 
   if (isOnlineOnly) {
     const sb = window.supabaseClient;
-    if (!sb) {
+    const isOffline = (typeof navigator !== 'undefined' && !navigator.onLine) || !sb;
+    if (isOffline) {
+      if (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos') {
+        console.warn(`[Direct Push] Sin conexión con la base de datos para guardar en ${tabla}. Encolando en sync queue local.`);
+        addToSyncQueue(tabla, 'upsert', item);
+        if (typeof window.mostrarNotificacion === 'function') {
+          window.mostrarNotificacion(`Guardado localmente. Se sincronizará al recuperar conexión.`, 'info');
+        }
+        return { offlineQueued: true };
+      }
       if (typeof window.mostrarNotificacion === 'function') {
         window.mostrarNotificacion(`No hay conexión con la base de datos para guardar en ${tabla}.`, 'error');
       }
@@ -1700,6 +1726,21 @@ window.pushToSupabase = async function(tabla, item) {
     }
 
     if (error) {
+      const isNetworkErr = error.message && (
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('NetworkError') ||
+        error.message.includes('network') ||
+        error.message.includes('timeout') ||
+        error.message.includes('offline')
+      );
+      if (isNetworkErr && (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos')) {
+        console.warn(`[Direct Push] Error de red al guardar en ${tabla}: ${error.message}. Encolando en sync queue local...`);
+        addToSyncQueue(tabla, 'upsert', item);
+        if (typeof window.mostrarNotificacion === 'function') {
+          window.mostrarNotificacion(`Guardado en el dispositivo. Pendiente de sincronización.`, 'info');
+        }
+        return { offlineQueued: true };
+      }
       console.error(`[Direct Push] Error al guardar en ${tabla}:`, error.message);
       if (typeof window.mostrarNotificacion === 'function') {
         window.mostrarNotificacion(`Error al guardar en ${tabla}: ${error.message}`, 'error');
@@ -1717,7 +1758,7 @@ window.pushToSupabase = async function(tabla, item) {
         };
 
         const filasBitacora = (item.bitacora || []).map(b => {
-          const dbTecnico = getValidDbTecnico(b.tecnico) || b.tecnico;
+          const dbTecnico = getValidDbTecnico(b.tecnico);
           let dbNota = b.nota || '';
           if (b.tecnico && !dbNota.includes('[Técnico: ')) {
             dbNota += `\n[Técnico: ${b.tecnico}]`;
@@ -1735,7 +1776,7 @@ window.pushToSupabase = async function(tabla, item) {
             dbNota += `\n[AsignadoPor: ${b.asignadoPorName}]`;
           }
           return {
-            id: b.id || toValidUUID(),
+            id: toValidUUID(b.id),
             orden_id: item.id,
             fecha: cleanFecha(b.fecha),
             tecnico: dbTecnico || null,
@@ -1759,6 +1800,58 @@ window.pushToSupabase = async function(tabla, item) {
         }
       } catch (errBit) {
         console.warn('[Direct Push] Error sincronizando orden_bitacora directa:', errBit);
+      }
+    }
+
+    // Si la tabla es ordenes y tiene firmas, sincronizar orden_firmas directamente
+    if (tabla === 'ordenes' && item) {
+      try {
+        const ordId = item.id;
+        let firmaTecUrl = item.firma_tecnico_base64 || null;
+        let firmaCliUrl = item.firma_cliente_base64 || null;
+
+        // Subir a Storage si son base64 (data:image/...)
+        if (firmaTecUrl && typeof firmaTecUrl === 'string' && firmaTecUrl.startsWith('data:')) {
+          try {
+            if (typeof window !== 'undefined' && typeof window.uploadBase64ToStorage === 'function') {
+              const url = await window.uploadBase64ToStorage(firmaTecUrl, 'evidencias', `firmas/firma_tec_${ordId}.png`);
+              if (url) {
+                firmaTecUrl = url;
+                item.firma_tecnico_base64 = url;
+              }
+            }
+          } catch (eStorage) {
+            console.warn('[Direct Push] Error subiendo firma técnico a Storage:', eStorage);
+          }
+        }
+        if (firmaCliUrl && typeof firmaCliUrl === 'string' && firmaCliUrl.startsWith('data:')) {
+          try {
+            if (typeof window !== 'undefined' && typeof window.uploadBase64ToStorage === 'function') {
+              const url = await window.uploadBase64ToStorage(firmaCliUrl, 'evidencias', `firmas/firma_cli_${ordId}.png`);
+              if (url) {
+                firmaCliUrl = url;
+                item.firma_cliente_base64 = url;
+              }
+            }
+          } catch (eStorage) {
+            console.warn('[Direct Push] Error subiendo firma cliente a Storage:', eStorage);
+          }
+        }
+
+        if (firmaTecUrl || firmaCliUrl || firmaTecUrl === '__DELETED__' || firmaCliUrl === '__DELETED__') {
+          const firmaPayload = {
+            orden_id: ordId,
+            firma_cliente_url: firmaCliUrl === '__DELETED__' ? null : (firmaCliUrl || null),
+            nombre_firmante: item.firma_cliente_nombre || null,
+            puesto_firmante: null,
+            firma_tecnico_url: firmaTecUrl === '__DELETED__' ? null : (firmaTecUrl || null),
+            fecha_firma: item.firma_cliente_fecha || item.firma_tecnico_fecha || new Date().toISOString()
+          };
+          const { error: upsertFirmErr } = await sb.from('orden_firmas').upsert(firmaPayload, { onConflict: 'orden_id' });
+          if (upsertFirmErr) console.warn('[Direct Push] Error al guardar orden_firmas en Supabase:', upsertFirmErr.message);
+        }
+      } catch (errFirm) {
+        console.warn('[Direct Push] Error sincronizando orden_firmas directa:', errFirm);
       }
     }
     
@@ -2494,7 +2587,7 @@ async function _processSyncQueueInternal() {
                   dbNota += `\n[AsignadoPor: ${b.asignadoPorName}]`;
                 }
                 return {
-                  id: b.id,
+                  id: toValidUUID(b.id),
                   orden_id: ordId,
                   fecha: cleanFecha(b.fecha),
                   tecnico: dbTecnico || null,
@@ -4120,11 +4213,11 @@ window.cargarDatosDeSupabase = function() {
               }
             }
 
-            if (!tecnico && nota.includes('[Técnico: ')) {
-              const match = nota.match(/\n\[Técnico: (.*?)\]$/);
+            if (nota.includes('[Técnico: ')) {
+              const match = nota.match(/(?:\r?\n|^)\[Técnico: (.*?)\]/);
               if (match) {
-                tecnico = match[1];
-                nota = nota.replace(/\n\[Técnico: (.*?)\]$/, '');
+                if (!tecnico) tecnico = match[1];
+                nota = nota.replace(/(?:\r?\n|^)\[Técnico: (.*?)\]/g, '');
               }
             }
 
@@ -4260,34 +4353,146 @@ window.cargarDatosDeSupabase = function() {
 
         try {
           const localOrdenes = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+          
+          // 1. Fusionar bitácoras y técnicos locales en las órdenes remotas para nunca perder avances locales
+          mapped.forEach(ord => {
+            const localOrd = localOrdenes.find(lo => lo && (lo.id === ord.id || (lo.folio && ord.folio && String(lo.folio).trim().toLowerCase() === String(ord.folio).trim().toLowerCase())));
+            if (localOrd) {
+              if (Array.isArray(localOrd.bitacora) && localOrd.bitacora.length > 0) {
+                if (!Array.isArray(ord.bitacora)) ord.bitacora = [];
+                localOrd.bitacora.forEach(lb => {
+                  if (!lb) return;
+                  const lbId = lb.id;
+                  const lbDate = lb.fecha ? lb.fecha.substring(0, 10) : '';
+                  const lbTec = (lb.tecnico || '').trim().toLowerCase();
+                  const exists = ord.bitacora.some(rb => {
+                    if (lbId && rb.id && (rb.id === lbId || rb.id === toValidUUID(lbId) || toValidUUID(rb.id) === toValidUUID(lbId))) return true;
+                    const rbDate = rb.fecha ? rb.fecha.substring(0, 10) : '';
+                    const rbTec = (rb.tecnico || '').trim().toLowerCase();
+                    return lbDate && rbDate && lbDate === rbDate && lbTec && rbTec && (lbTec === rbTec || lbTec.includes(rbTec) || rbTec.includes(lbTec));
+                  });
+                  if (!exists) {
+                    ord.bitacora.push(lb);
+                  }
+                });
+              }
+              // Preservar técnicos asignados locales
+              if (Array.isArray(localOrd.tecnicosAsignados) && localOrd.tecnicosAsignados.length > 0) {
+                if (!Array.isArray(ord.tecnicosAsignados)) ord.tecnicosAsignados = [];
+                localOrd.tecnicosAsignados.forEach(ta => {
+                  if (ta && !ord.tecnicosAsignados.includes(ta)) ord.tecnicosAsignados.push(ta);
+                });
+              }
+              if (localOrd.tecnico && ord.tecnico) {
+                const localTecs = String(localOrd.tecnico).split(',').map(s => s.trim());
+                localTecs.forEach(lt => {
+                  if (!lt) return;
+                  const ordTecs = String(ord.tecnico).split(',').map(s => s.trim().toLowerCase());
+                  if (!ordTecs.some(ot => ot === lt.toLowerCase() || ot.includes(lt.toLowerCase()) || lt.toLowerCase().includes(ot))) {
+                    ord.tecnico = `${ord.tecnico}, ${lt}`;
+                  }
+                });
+              } else if (localOrd.tecnico && !ord.tecnico) {
+                ord.tecnico = localOrd.tecnico;
+              }
+
+              // Preservar firmas locales si en remoto están vacías
+              if (!ord.firma_tecnico_base64 && localOrd.firma_tecnico_base64 && localOrd.firma_tecnico_base64 !== '__DELETED__') {
+                ord.firma_tecnico_base64 = localOrd.firma_tecnico_base64;
+                ord.firma_tecnico_nombre = localOrd.firma_tecnico_nombre || ord.firma_tecnico_nombre;
+                ord.firma_tecnico_fecha = localOrd.firma_tecnico_fecha || ord.firma_tecnico_fecha;
+              }
+              if (!ord.firma_cliente_base64 && localOrd.firma_cliente_base64 && localOrd.firma_cliente_base64 !== '__DELETED__') {
+                ord.firma_cliente_base64 = localOrd.firma_cliente_base64;
+                ord.firma_cliente_nombre = localOrd.firma_cliente_nombre || ord.firma_cliente_nombre;
+                ord.firma_cliente_fecha = localOrd.firma_cliente_fecha || ord.firma_cliente_fecha;
+              }
+              if (!ord.cierre_papel_pdf && localOrd.cierre_papel_pdf) {
+                ord.cierre_papel_pdf = localOrd.cierre_papel_pdf;
+                ord.cierre_papel_motivo = localOrd.cierre_papel_motivo || ord.cierre_papel_motivo;
+                ord.cierre_papel_usuario = localOrd.cierre_papel_usuario || ord.cierre_papel_usuario;
+                ord.cierre_papel_fecha = localOrd.cierre_papel_fecha || ord.cierre_papel_fecha;
+              }
+
+              // Preservar jornadas de trabajo locales (dias de lunes a domingo) si en remoto están vacías
+              if (localOrd.dias && typeof localOrd.dias === 'object') {
+                if (!ord.dias || typeof ord.dias !== 'object') {
+                  ord.dias = { ...localOrd.dias };
+                } else {
+                  Object.keys(localOrd.dias).forEach(dKey => {
+                    const lDia = localOrd.dias[dKey];
+                    const rDia = ord.dias[dKey];
+                    const lHasData = lDia && (lDia.fecha || lDia.entrada || lDia.salida || lDia.normales || lDia.trasladoIda);
+                    const rHasData = rDia && (rDia.fecha || rDia.entrada || rDia.salida || rDia.normales || rDia.trasladoIda);
+                    if (lHasData && !rHasData) {
+                      ord.dias[dKey] = { ...lDia };
+                    }
+                  });
+                }
+              }
+            }
+          });
+
           const unsyncedLocal = localOrdenes.filter(o => o && o._synced !== true);
           unsyncedLocal.forEach(lo => {
-            const exists = mapped.some(m => m.id === lo.id);
-            if (!exists) {
-              console.log(`[Sync] Preservando orden local no sincronizada: ${lo.id} (Folio: ${lo.folio})`);
-              mapped.push(lo);
+            const idx = mapped.findIndex(m => m && (m.id === lo.id || (m.folio && lo.folio && String(m.folio).trim().toLowerCase() === String(lo.folio).trim().toLowerCase())));
+            if (idx > -1) {
+              console.log(`[Sync] Mezclando orden local no sincronizada sobre datos remotos: ${lo.id} (Folio: ${lo.folio})`);
+              const mergedBitacora = [...(mapped[idx].bitacora || [])];
+              if (Array.isArray(lo.bitacora)) {
+                lo.bitacora.forEach(lb => {
+                  if (!lb) return;
+                  const lbId = lb.id;
+                  const lbDate = lb.fecha ? lb.fecha.substring(0, 10) : '';
+                  const lbTec = (lb.tecnico || '').trim().toLowerCase();
+                  const exists = mergedBitacora.some(rb => {
+                    if (lbId && rb.id && (rb.id === lbId || rb.id === toValidUUID(lbId) || toValidUUID(rb.id) === toValidUUID(lbId))) return true;
+                    const rbDate = rb.fecha ? rb.fecha.substring(0, 10) : '';
+                    const rbTec = (rb.tecnico || '').trim().toLowerCase();
+                    return lbDate && rbDate && lbDate === rbDate && lbTec && rbTec && (lbTec === rbTec || lbTec.includes(rbTec) || rbTec.includes(lbTec));
+                  });
+                  if (!exists) {
+                    mergedBitacora.push(lb);
+                  }
+                });
+              }
+              mapped[idx] = { 
+                ...mapped[idx], 
+                ...lo, 
+                bitacora: mergedBitacora, 
+                dias: (lo.dias && typeof lo.dias === 'object') ? { ...(mapped[idx].dias || {}), ...lo.dias } : mapped[idx].dias,
+                firma_tecnico_base64: lo.firma_tecnico_base64 || mapped[idx].firma_tecnico_base64,
+                firma_cliente_base64: lo.firma_cliente_base64 || mapped[idx].firma_cliente_base64,
+                _synced: false 
+              };
+            } else {
+              console.log(`[Sync] Preservando orden local no sincronizada nueva: ${lo.id} (Folio: ${lo.folio})`);
+              mapped.unshift(lo);
             }
           });
         } catch (e) {
           console.error('[Sync] Error al preservar órdenes locales no sincronizadas:', e);
         }
 
-        // Deduplicación estricta por ID y Folio antes de persistir
+        // Deduplicación estricta por ID y Folio no genérico antes de persistir
         const seenSupaOrdIds = new Set();
         const seenSupaOrdFolios = new Set();
         mapped = mapped.filter(o => {
           if (!o) return false;
           const oid = o.id ? String(o.id).trim() : null;
-          const ofol = (o.folio || o.numero_orden) ? String(o.folio || o.numero_orden).trim() : null;
+          const rawFolio = (o.folio || o.numero_orden) ? String(o.folio || o.numero_orden).trim() : '';
+          const isGeneric = !rawFolio || ['-', 'n/a', 's/n', 'sin folio', 'null', 'undefined', 'por asignar'].includes(rawFolio.toLowerCase());
           if (oid && seenSupaOrdIds.has(oid)) return false;
-          if (ofol && seenSupaOrdFolios.has(ofol)) return false;
+          if (!isGeneric && seenSupaOrdFolios.has(rawFolio.toLowerCase())) return false;
           if (oid) seenSupaOrdIds.add(oid);
-          if (ofol) seenSupaOrdFolios.add(ofol);
+          if (!isGeneric) seenSupaOrdFolios.add(rawFolio.toLowerCase());
           return true;
         });
 
         window._supaOrdenes = mapped;
         localStorage.setItem('sapi_ordenes', JSON.stringify(window._supaOrdenes));
+        if (typeof ordenes !== 'undefined') ordenes = mapped;
+        if (typeof window !== 'undefined') window.ordenes = mapped;
       } else {
         window._supaOrdenes = null;
       }

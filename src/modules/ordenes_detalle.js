@@ -1913,6 +1913,13 @@ function guardarFirmaCanvas(ordenId, tipo) {
     }
     
     ordenes[idx].estado = calcularEstadoOrden(ordenes[idx]);
+    ordenes[idx]._synced = false;
+
+    if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) {
+      const wIdx = window.ordenes.findIndex(x => x.id === ordenes[idx].id);
+      if (wIdx >= 0) window.ordenes[wIdx] = ordenes[idx];
+      else window.ordenes.push(ordenes[idx]);
+    }
     
     try {
       safeSetJSON('sapi_ordenes', ordenes);

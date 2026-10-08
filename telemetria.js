@@ -1162,14 +1162,21 @@ async function confirmarFusionClientes() {
   }
 }function deduplicarOrdenesLocales() {
   if (typeof localStorage === 'undefined') return;
-  const localOrds = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
-  if (localOrds.length === 0) return;
+  let localOrds = [];
+  try {
+    localOrds = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+  } catch (e) {
+    localOrds = [];
+  }
+  if (!Array.isArray(localOrds) || localOrds.length === 0) return;
 
-  const seen = new Map();
+  const seenIds = new Set();
+  const seenFolios = new Map();
   const keep = [];
   const removedIds = new Set();
 
   localOrds.forEach(o => {
+    if (!o) return;
     // Limpiar entradas duplicadas dentro de la propia bitácora de la orden
     if (o.bitacora && Array.isArray(o.bitacora) && o.bitacora.length > 0) {
       const seenB = new Set();
@@ -1181,32 +1188,42 @@ async function confirmarFusionClientes() {
       });
     }
 
-    // Generar una clave única basada en el contenido de la orden (excluyendo id y folio)
-    const key = [
-      o.cliente || '',
-      o.tecnico || '',
-      o.tipo || '',
-      o.fecha || '',
-      o.maquinaria_id || '',
-      o.sitio_id || '',
-      o.notas || '',
-      o.evidencia_url || o.evidenciaBase64 || ''
-    ].join('|');
+    const oid = o.id ? String(o.id).trim() : null;
+    const rawFolio = (o.folio || o.numero_orden) ? String(o.folio || o.numero_orden).trim() : '';
+    const isGeneric = !rawFolio || ['-', 'n/a', 's/n', 'sin folio', 'null', 'undefined', 'por asignar'].includes(rawFolio.toLowerCase());
 
-    if (!seen.has(key)) {
-      seen.set(key, true);
-      keep.push(o);
-    } else {
-      removedIds.add(o.id);
+    if (oid && seenIds.has(oid)) {
+      removedIds.add(oid);
+      return;
     }
+
+    if (!isGeneric) {
+      const folKey = rawFolio.toLowerCase();
+      if (seenFolios.has(folKey)) {
+        const prevIdx = seenFolios.get(folKey);
+        const prevOrd = keep[prevIdx];
+        if (o._synced === false && prevOrd._synced !== false) {
+          if (prevOrd.id) removedIds.add(prevOrd.id);
+          keep[prevIdx] = o;
+          if (oid) seenIds.add(oid);
+        } else {
+          if (oid) removedIds.add(oid);
+        }
+        return;
+      }
+      seenFolios.set(folKey, keep.length);
+    }
+
+    if (oid) seenIds.add(oid);
+    keep.push(o);
   });
 
   if (removedIds.size > 0) {
-    console.log(`[Deduplicar] Eliminadas ${removedIds.size} órdenes duplicadas locales.`);
+    console.log(`[Deduplicar] Eliminadas ${removedIds.size} órdenes con ID o Folio estrictamente duplicado.`);
     localStorage.setItem('sapi_ordenes', JSON.stringify(keep));
-    ordenes = keep; // actualizar la variable global en memoria
+    if (typeof ordenes !== 'undefined') ordenes = keep;
+    if (typeof window !== 'undefined') window.ordenes = keep;
     
-    // Limpiar cola de sincronización de las órdenes eliminadas
     try {
       const queue = JSON.parse(localStorage.getItem('sapi_sync_queue') || '[]');
       const newQueue = queue.filter(item => {
@@ -1217,71 +1234,10 @@ async function confirmarFusionClientes() {
         return true;
       });
       localStorage.setItem('sapi_sync_queue', JSON.stringify(newQueue));
-      if (window.updateSyncStatusUI) window.updateSyncStatusUI();
+      if (typeof window !== 'undefined' && window.updateSyncStatusUI) window.updateSyncStatusUI();
     } catch (e) {
       console.error('Error limpiando cola de sync en deduplicación:', e);
     }
-  }
-
-  // Deduplicar en Supabase usando la sesión actual del usuario
-  const sb = window.supabaseClient;
-  if (sb) {
-    (async () => {
-      try {
-        let supaOrds = [];
-        let fetchErr = null;
-        try {
-          supaOrds = await window.fetchTablePaginated('ordenes', '*');
-        } catch (err) {
-          fetchErr = err;
-        }
-        if (!fetchErr && supaOrds && supaOrds.length > 0) {
-          const sSeen = new Map();
-          const sDupIds = [];
-
-          // Ordenar para mantener el primer folio creado
-          supaOrds.sort((a, b) => String(a.folio || a.id).localeCompare(String(b.folio || b.id)));
-
-          supaOrds.forEach(o => {
-            let cName = o.cliente || '';
-            try {
-              const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
-              const match = clientes.find(c => c.id === o.cliente);
-              if (match) cName = match.nombre;
-            } catch (e) {}
-
-            const key = [
-              cName || '',
-              o.tecnico || '',
-              o.tipo || '',
-              o.fecha || '',
-              o.maquinaria_id || '',
-              o.sitio_id || '',
-              o.notas || '',
-              o.evidencia_url || ''
-            ].join('|');
-
-            if (!sSeen.has(key)) {
-              sSeen.set(key, o.id);
-            } else {
-              sDupIds.push(o.id);
-            }
-          });
-
-          if (sDupIds.length > 0) {
-            console.log(`[Deduplicar Supabase] Eliminando ${sDupIds.length} duplicados en Supabase...`);
-            for (let i = 0; i < sDupIds.length; i += 50) {
-              const batch = sDupIds.slice(i, i + 50);
-              await sb.from('ordenes').delete().in('id', batch);
-            }
-            console.log('[Deduplicar Supabase] Devolviendo ordenes deduplicadas.');
-            mostrarNotificacion(`Se han eliminado ${sDupIds.length} órdenes duplicadas en la base de datos.`, 'info');
-          }
-        }
-      } catch (e) {
-        console.warn('Bypassing Supabase deduplication due to session/auth:', e);
-      }
-    })();
   }
 }
 

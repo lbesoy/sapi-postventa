@@ -42,6 +42,14 @@
       return;
     }
 
+    const matchMyTec = (nameOrId) => {
+      if (!nameOrId) return false;
+      const str = String(nameOrId).trim().toLowerCase();
+      if (!str) return false;
+      if (currentUser && (str === currentUser.id || nameOrId === currentUser.id)) return true;
+      return str === miNombreClean || str.includes(miNombreClean) || miNombreClean.includes(str);
+    };
+
     const getOrders = typeof getFilteredOrders === 'function' ? getFilteredOrders : (typeof window !== 'undefined' && typeof window.getFilteredOrders === 'function' ? window.getFilteredOrders : () => (typeof ordenes !== 'undefined' ? ordenes : (typeof window !== 'undefined' ? window.ordenes : [])) || []);
 
     // Filtrar órdenes que no estén resueltas / finalizadas
@@ -50,21 +58,22 @@
       const estadoClean = String(o.estado || '').trim().toLowerCase();
       if (estadoClean === 'finalizado' || estadoClean === 'cerrada' || estadoClean === 'completada') return false;
 
-      const orderTecnicoClean = String(o.tecnico || '').trim().toLowerCase();
-      const isAssignedToOrder = orderTecnicoClean === miNombreClean ||
-        (Array.isArray(o.tecnicosAsignados) && o.tecnicosAsignados.some(t => String(t).trim().toLowerCase() === miNombreClean)) ||
-        orderTecnicoClean.split(',').map(s => s.trim()).includes(miNombreClean);
+      const isAssignedToOrder = matchMyTec(o.tecnico) ||
+        (Array.isArray(o.tecnicosAsignados) && o.tecnicosAsignados.some(matchMyTec)) ||
+        String(o.tecnico || '').split(',').map(s => s.trim()).some(matchMyTec);
 
       let hasPendingBitacora = false;
+      let hasMyBitacora = false;
       if (o.bitacora && Array.isArray(o.bitacora)) {
+        hasMyBitacora = o.bitacora.some(b => b && (matchMyTec(b.tecnico) || matchMyTec(b.tecnicoId)));
         hasPendingBitacora = o.bitacora.some(b => {
-          const bTecnicoClean = String(b.tecnico || '').trim().toLowerCase();
+          if (!b) return false;
           const esAsignacionPendiente = b.realizado === false || (b.nota && b.nota.includes('Programado por supervisor') && b.realizado !== true);
-          return bTecnicoClean === miNombreClean && esAsignacionPendiente;
+          return (matchMyTec(b.tecnico) || matchMyTec(b.tecnicoId)) && esAsignacionPendiente;
         });
       }
 
-      return isAssignedToOrder || hasPendingBitacora;
+      return isAssignedToOrder || hasPendingBitacora || hasMyBitacora;
     });
 
     let html = '';
@@ -76,10 +85,13 @@
         let scheduledDateText = o.fecha ? new Date(o.fecha).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : 'Sin fecha';
 
         if (o.bitacora && Array.isArray(o.bitacora)) {
-          const myBitacora = o.bitacora.find(b => String(b.tecnico || '').trim().toLowerCase() === miNombreClean);
-          if (myBitacora) {
+          const myBitacoras = o.bitacora.filter(b => b && (matchMyTec(b.tecnico) || matchMyTec(b.tecnicoId)));
+          if (myBitacoras.length > 0) {
+            const pendingOne = myBitacoras.find(b => b.realizado === false || (b.nota && b.nota.includes('Programado por supervisor') && b.realizado !== true));
+            const myBitacora = pendingOne || myBitacoras[myBitacoras.length - 1];
             if (myBitacora.fecha) {
-              scheduledDateText = new Date(myBitacora.fecha + 'T00:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+              const fStr = myBitacora.fecha.includes('T') ? myBitacora.fecha : myBitacora.fecha + 'T00:00:00';
+              scheduledDateText = new Date(fStr).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
             }
             if (myBitacora.entrada) {
               scheduledTimeText = `${myBitacora.entrada} hs`;
@@ -92,7 +104,7 @@
         if (scheduledTimeText === 'No especificada') {
           try {
             const localEvents = JSON.parse((typeof localStorage !== 'undefined' ? localStorage.getItem('sapi_calendario_eventos') : null) || '[]');
-            const myEv = localEvents.find(e => (e.ordenId === o.id || e.orden_id === o.id) && String(e.tecnicoNombre || e.tecnico_nombre || '').trim().toLowerCase() === miNombreClean);
+            const myEv = localEvents.find(e => (e.ordenId === o.id || e.orden_id === o.id) && (matchMyTec(e.tecnicoNombre || e.tecnico_nombre) || matchMyTec(e.tecnicoId || e.tecnico_id)));
             if (myEv) {
               const startVal = myEv.fechaInicio || myEv.fecha_inicio || myEv.start;
               if (startVal) {

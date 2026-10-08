@@ -51,11 +51,19 @@
 
   const _esUsuarioPrueba = (userOrName) => {
     if (!userOrName) return false;
+    if (typeof esResponsableExcluidoOperativo === 'function' && esResponsableExcluidoOperativo(userOrName)) return true;
+    if (typeof window !== 'undefined' && typeof window.esResponsableExcluidoOperativo === 'function' && window.esResponsableExcluidoOperativo(userOrName)) return true;
     if (typeof isTestUser === 'function' && isTestUser(userOrName)) return true;
     if (typeof global !== 'undefined' && typeof global.isTestUser === 'function' && global.isTestUser(userOrName)) return true;
+    if (typeof window !== 'undefined' && typeof window.isTestUser === 'function' && window.isTestUser(userOrName)) return true;
+    if (typeof esNombrePaqueteria === 'function' && esNombrePaqueteria(userOrName)) return true;
+    if (typeof window !== 'undefined' && typeof window.esNombrePaqueteria === 'function' && window.esNombrePaqueteria(userOrName)) return true;
     const name = (typeof userOrName === 'string' ? userOrName : (userOrName.nombre || userOrName.name || '')).toLowerCase().trim();
     const email = (typeof userOrName === 'object' ? (userOrName.email || userOrName.correo || '') : '').toLowerCase().trim();
-    return name.includes('prueba') || name.includes('test') || email.includes('prueba') || email.includes('test');
+    if (name === 'pablo besoy' || name === 'pablo besoy trigueros' || name === 'besoy' || name.startsWith('pablo besoy')) return true;
+    if (name.includes('prueba') || name.includes('test') || email.includes('prueba') || email.includes('test')) return true;
+    const paqs = ['dhl', 'fedex', 'estafeta', 'paquetexpress', 'redpack', 'castores', 'tres guerras', 'tresguerras', 'ups', 'paqueteria', 'por definir'];
+    return paqs.some(p => name === p || name.startsWith(p + ' ') || name.startsWith(p + ' express'));
   };
 
   const _resolverNombreDeIdOUsuario = (val) => {

@@ -56,17 +56,52 @@ function unificarNombreUsuario(rawNombre) {
   return String(rawNombre || 'Sin Asignar').trim();
 }
 
+function esResponsableExcluidoOperativo(nombre) {
+  if (!nombre) return false;
+  const str = typeof nombre === 'object' ? (nombre.nombre || nombre.name || nombre.usuario || '') : String(nombre);
+  const n = (typeof normalizarTextoJunta === 'function') ? normalizarTextoJunta(str) : (typeof window !== 'undefined' && window.normalizarTextoJunta ? window.normalizarTextoJunta(str) : String(str).toLowerCase().trim());
+  if (!n) return false;
+  if (n === 'pablo besoy' || n === 'pablo besoy trigueros' || n === 'besoy') {
+    return true;
+  }
+  const isPaqFn = (typeof esNombrePaqueteria === 'function') ? esNombrePaqueteria : (typeof window !== 'undefined' && window.esNombrePaqueteria ? window.esNombrePaqueteria : () => false);
+  if (isPaqFn(str)) return true;
+  if (typeof isTestUser === 'function' && isTestUser({ nombre: str })) return true;
+  return false;
+}
+
+if (typeof window !== 'undefined') {
+  window.esResponsableExcluidoOperativo = esResponsableExcluidoOperativo;
+}
+
 function obtenerInfoRolUsuario(nombre) {
   if (typeof window !== 'undefined' && typeof window._obtenerInfoRolUsuarioBase === 'function') {
     return window._obtenerInfoRolUsuarioBase(nombre);
+  }
+  if (typeof window !== 'undefined' && typeof window.obtenerInfoRolUsuario === 'function' && window.obtenerInfoRolUsuario !== obtenerInfoRolUsuario) {
+    return window.obtenerInfoRolUsuario(nombre);
+  }
+  if (!nombre) return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
+  const norm = (typeof normalizarTextoJunta === 'function') ? normalizarTextoJunta(nombre) : (typeof window !== 'undefined' && window.normalizarTextoJunta ? window.normalizarTextoJunta(nombre) : String(nombre || '').toLowerCase().trim());
+  if (norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === '' || norm === 'sin_asignar') {
+    return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
+  }
+  if (norm === 'pablo besoy' || norm === 'pablo besoy trigueros' || norm === 'besoy') {
+    return { rol: 'superadmin', label: 'Super Admin', color: '#E8820C', icon: 'shield-alert' };
   }
   return { rol: 'tecnico', label: 'Técnico', color: '#10b981', icon: 'wrench' };
 }
 
 function extraerListaResponsables(raw) {
+  if (typeof window !== 'undefined' && typeof window._extraerListaResponsablesBase === 'function') {
+    return window._extraerListaResponsablesBase(raw);
+  }
   if (!raw) return ['Sin Asignar'];
   const parts = String(raw).trim().split(/[,;/]+/).map(s => s.trim()).filter(Boolean);
-  return parts.length > 0 ? parts : ['Sin Asignar'];
+  const isPaqFn = (typeof esNombrePaqueteria === 'function') ? esNombrePaqueteria : (typeof window !== 'undefined' && window.esNombrePaqueteria ? window.esNombrePaqueteria : () => false);
+  const isExclFn = esResponsableExcluidoOperativo;
+  const valid = parts.filter(s => s !== '-' && s.toLowerCase() !== 'sin asignar' && s.toLowerCase() !== 'sin_asignar' && !isPaqFn(s) && !isExclFn(s));
+  return valid.length > 0 ? Array.from(new Set(valid)) : ['Sin Asignar'];
 }
 
 window.reestablecerTicket26477 = async function() {
@@ -226,9 +261,10 @@ window.obtenerListaTecnicosJunta = function() {
       } else if (typeof isTestUser === 'function' && isTestUser(u)) {
         return;
       }
+      if (typeof esResponsableExcluidoOperativo === 'function' && esResponsableExcluidoOperativo(u)) return;
       u.nombre.split(/[,;/]+/).forEach(part => {
         const n = (typeof formatNombreCorto === 'function') ? formatNombreCorto(part.trim()) : part.trim();
-        if (n && n !== '-' && n.toLowerCase() !== 'sin asignar' && !nombresSet.has(n)) {
+        if (n && n !== '-' && n.toLowerCase() !== 'sin asignar' && !esResponsableExcluidoOperativo(n) && !nombresSet.has(n)) {
           nombresSet.add(n);
           lista.push(n);
         }
@@ -543,7 +579,22 @@ window.obtenerTodosLosPendientes = function() {
         ? e.parts.map(p => `${p.cantidad || 1}x ${p.descripcion || p.codigo || 'Pieza'}`).join(', ')
         : 'Refacciones varias';
 
-      const responsableRaw = e.paqueteria || 'Logística';
+      // El responsable debe ser un técnico o supervisor operativo asignado al ticket/orden asociado, NUNCA paqueterías ni directivos excluidos
+      const isPaqFn = (typeof esNombrePaqueteria === 'function') ? esNombrePaqueteria : (typeof window !== 'undefined' && window.esNombrePaqueteria ? window.esNombrePaqueteria : () => false);
+      const isExclFn = (typeof esResponsableExcluidoOperativo === 'function') ? esResponsableExcluidoOperativo : (typeof window !== 'undefined' && window.esResponsableExcluidoOperativo ? window.esResponsableExcluidoOperativo : () => false);
+      let responsableRaw = (e.responsable && !isPaqFn(e.responsable) && !isExclFn(e.responsable)) ? e.responsable : '';
+      if (!responsableRaw && e.ticketId) {
+        const tPadre = tkts.find(t => t && (t.id === e.ticketId || t.folio === e.ticketId || t.folio === e.ticketFolio));
+        if (tPadre) {
+          const tResp = tPadre.asignado || tPadre.supervisor || tPadre.tecnico || '';
+          if (!isExclFn(tResp)) {
+            responsableRaw = tResp;
+          }
+        }
+      }
+      if (!responsableRaw || isPaqFn(responsableRaw) || isExclFn(responsableRaw)) {
+        responsableRaw = 'Sin Asignar';
+      }
       const listaResp = extraerListaResponsables(responsableRaw);
 
       lista.push({
@@ -833,7 +884,9 @@ window.poblarFiltrosJuntaSelectores = function() {
     todos.forEach(item => {
       (item.responsablesList || []).forEach(r => {
         const rTrim = String(r).trim();
-        if (rTrim && rTrim !== 'Sin Asignar' && rTrim !== '-' && rTrim.toLowerCase() !== 'sin asignar' && rTrim.toLowerCase() !== 'sin_asignar') {
+        const isPaqFn = (typeof esNombrePaqueteria === 'function') ? esNombrePaqueteria : (typeof window !== 'undefined' && window.esNombrePaqueteria ? window.esNombrePaqueteria : () => false);
+        const isExclFn = (typeof esResponsableExcluidoOperativo === 'function') ? esResponsableExcluidoOperativo : (typeof window !== 'undefined' && window.esResponsableExcluidoOperativo ? window.esResponsableExcluidoOperativo : () => false);
+        if (rTrim && rTrim !== 'Sin Asignar' && rTrim !== '-' && rTrim.toLowerCase() !== 'sin asignar' && rTrim.toLowerCase() !== 'sin_asignar' && !isPaqFn(rTrim) && !isExclFn(rTrim)) {
           respSet.add(rTrim);
         }
       });
@@ -900,6 +953,382 @@ window.renderJuntaBottleneckAnalytics = function(todos) {
   container.innerHTML = html || '<div style="font-size:0.8rem; color:var(--text-muted);">Sin cuellos de botella detectados.</div>';
 };
 
+// ==========================================
+// TOOLTIP DE DESGLOSE DE PENDIENTES POR RESPONSABLE
+// ==========================================
+let _juntaRespArrayCache = [];
+let _gruposJuntaCache = {};
+let _juntaTooltipEl = null;
+
+function obtenerCrearJuntaTooltip() {
+  if (typeof document === 'undefined') return null;
+  let el = document.getElementById('junta-floating-tooltip');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'junta-floating-tooltip';
+    el.setAttribute('role', 'tooltip');
+    el.style.cssText = 'position:fixed; z-index:999999; pointer-events:none; display:none; max-width:320px; min-width:240px; background:var(--bg-card, #1e293b); color:var(--text-primary, #f8fafc); border:1px solid var(--border, #334155); border-radius:8px; padding:0.7rem 0.85rem; font-size:0.75rem; box-shadow:0 12px 28px rgba(0,0,0,0.45), 0 4px 10px rgba(0,0,0,0.25); font-family:inherit; line-height:1.4; transition:opacity 0.08s ease; opacity:0;';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+function posicionarJuntaTooltip(e, el) {
+  if (!e || !el) return;
+  const paddingX = 16;
+  const paddingY = 14;
+  const tooltipWidth = el.offsetWidth || 260;
+  const tooltipHeight = el.offsetHeight || 160;
+  
+  let left = (e.clientX || 0) + paddingX;
+  let top = (e.clientY || 0) + paddingY;
+
+  if (typeof window !== 'undefined') {
+    if (left + tooltipWidth > window.innerWidth - 12) {
+      left = (e.clientX || 0) - tooltipWidth - 12;
+    }
+    if (top + tooltipHeight > window.innerHeight - 12) {
+      top = (e.clientY || 0) - tooltipHeight - 12;
+    }
+    left = Math.max(10, left);
+    top = Math.max(10, top);
+  }
+
+  el.style.left = `${left}px`;
+  el.style.top = `${top}px`;
+}
+
+function generarContenidoTooltipDesglose(r, columna) {
+  if (!r) return '';
+  const safeNombre = (typeof escapeHTML === 'function') ? escapeHTML(r.nombre || 'Responsable') : (r.nombre || 'Responsable');
+  const items = Array.isArray(r.items) ? r.items : [];
+
+  const obtenerTopCasos = (tipoFiltro, limite = 3) => {
+    let filtrados = items;
+    if (tipoFiltro) {
+      filtrados = items.filter(x => x.tipo === tipoFiltro);
+    }
+    return filtrados
+      .slice()
+      .sort((a, b) => (b.diasAntiguedad || 0) - (a.diasAntiguedad || 0))
+      .slice(0, limite);
+  };
+
+  const renderFilaTopCaso = (c) => {
+    const rawFolio = c.folio || (c.tipo === 'ticket' ? `TK-${c.id}` : (c.tipo === 'orden' ? `OS-${c.id}` : String(c.id || '')));
+    const folio = (typeof escapeHTML === 'function') ? escapeHTML(rawFolio) : rawFolio;
+    const rawCliente = c.cliente || 'Sin cliente';
+    const truncCliente = rawCliente.length > 22 ? rawCliente.substring(0, 20) + '…' : rawCliente;
+    const cliente = (typeof escapeHTML === 'function') ? escapeHTML(truncCliente) : truncCliente;
+    const dias = c.diasAntiguedad || 0;
+    const badgeColor = dias > 14 ? '#ef4444' : (dias > 7 ? '#f59e0b' : '#10b981');
+    const badgeBg = dias > 14 ? 'rgba(239,68,68,0.15)' : (dias > 7 ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)');
+    return `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; font-size:0.7rem; margin-top:3px; padding:2px 0;">
+        <span style="font-weight:700; color:var(--text-primary); white-space:nowrap;">${folio}</span>
+        <span style="color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:140px;">${cliente}</span>
+        <span style="background:${badgeBg}; color:${badgeColor}; font-weight:700; font-size:0.65rem; padding:1px 5px; border-radius:4px; white-space:nowrap;">${dias}d</span>
+      </div>
+    `;
+  };
+
+  let icon = '📊';
+  let title = 'Total Pendientes';
+  let bodyHtml = '';
+
+  if (columna === 'tickets') {
+    icon = '🎫';
+    title = 'Desglose de Tickets';
+    const urgs = items.filter(x => x.tipo === 'ticket' && (x.prioridad === 'Urgente' || x.cuelloNivel === 'danger')).length;
+    const normales = Math.max(0, (r.ticketsCount || 0) - (r.ticketsMas15 || 0));
+    const topCasos = obtenerTopCasos('ticket', 3);
+
+    bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-muted);">Total Tickets:</span>
+          <span style="font-weight:700; color:#8b5cf6;">${r.ticketsCount || 0}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-muted);">• Antigüedad &gt; 15 días:</span>
+          <span style="font-weight:700; color:#ef4444;">${r.ticketsMas15 || 0}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-muted);">• Antigüedad ≤ 15 días:</span>
+          <span style="font-weight:600; color:#10b981;">${normales}</span>
+        </div>
+        ${urgs > 0 ? `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:var(--text-muted);">• Críticos / Urgentes:</span>
+            <span style="font-weight:700; color:#ef4444;">🔥 ${urgs}</span>
+          </div>
+        ` : ''}
+      </div>
+      ${topCasos.length > 0 ? `
+        <div style="margin-top:0.5rem; padding-top:0.4rem; border-top:1px dashed var(--border);">
+          <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:2px;">Casos más antiguos:</div>
+          ${topCasos.map(renderFilaTopCaso).join('')}
+        </div>
+      ` : ''}
+    `;
+  } else if (columna === 'ordenes') {
+    icon = '📋';
+    title = 'Desglose de Órdenes';
+    const urgs = items.filter(x => x.tipo === 'orden' && (x.prioridad === 'Urgente' || x.cuelloNivel === 'danger')).length;
+    const firmadas = Math.max(0, (r.ordenesCount || 0) - (r.ordenesSinFirma || 0));
+    const topCasos = obtenerTopCasos('orden', 3);
+
+    bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-muted);">Total Órdenes:</span>
+          <span style="font-weight:700; color:#10b981;">${r.ordenesCount || 0}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-muted);">• Pendiente de firmas:</span>
+          <span style="font-weight:700; color:#f59e0b;">${r.ordenesSinFirma || 0}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-muted);">• Con firmas completas:</span>
+          <span style="font-weight:600; color:#10b981;">${firmadas}</span>
+        </div>
+        ${urgs > 0 ? `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:var(--text-muted);">• Críticas / Urgentes:</span>
+            <span style="font-weight:700; color:#ef4444;">🔥 ${urgs}</span>
+          </div>
+        ` : ''}
+      </div>
+      ${topCasos.length > 0 ? `
+        <div style="margin-top:0.5rem; padding-top:0.4rem; border-top:1px dashed var(--border);">
+          <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:2px;">Casos más antiguos:</div>
+          ${topCasos.map(renderFilaTopCaso).join('')}
+        </div>
+      ` : ''}
+    `;
+  } else if (columna === 'levantamientos') {
+    icon = '📝';
+    title = 'Desglose de Levantamientos';
+    const topCasos = obtenerTopCasos('levantamiento', 3);
+    const rezagados = items.filter(x => x.tipo === 'levantamiento' && x.diasAntiguedad > 7).length;
+
+    bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-muted);">Total Levantamientos:</span>
+          <span style="font-weight:700; color:#06b6d4;">${r.levantamientosCount || 0}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-muted);">• En proceso / captura:</span>
+          <span style="font-weight:600; color:var(--text-primary);">${r.levantamientosCount || 0}</span>
+        </div>
+        ${rezagados > 0 ? `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:var(--text-muted);">• Rezagados (&gt; 7 días):</span>
+            <span style="font-weight:700; color:#ef4444;">${rezagados}</span>
+          </div>
+        ` : ''}
+      </div>
+      ${topCasos.length > 0 ? `
+        <div style="margin-top:0.5rem; padding-top:0.4rem; border-top:1px dashed var(--border);">
+          <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:2px;">Casos activos:</div>
+          ${topCasos.map(renderFilaTopCaso).join('')}
+        </div>
+      ` : ''}
+    `;
+  } else if (columna === 'envios') {
+    icon = '🚚';
+    title = 'Desglose de Envíos';
+    const enviosItems = items.filter(x => x.tipo === 'envio');
+    const conGuia = enviosItems.filter(x => x.rawItem && x.rawItem.guiaPedido).length;
+    const sinGuia = Math.max(0, (r.enviosCount || 0) - conGuia);
+    const rezagados = enviosItems.filter(x => x.diasAntiguedad > 7).length;
+    const topCasos = obtenerTopCasos('envio', 3);
+
+    bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-muted);">Total Envíos:</span>
+          <span style="font-weight:700; color:#f59e0b;">${r.enviosCount || 0}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-muted);">• Con guía asignada:</span>
+          <span style="font-weight:600; color:#10b981;">${conGuia}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-muted);">• Pendiente de guía:</span>
+          <span style="font-weight:600; color:${sinGuia > 0 ? '#f59e0b' : 'var(--text-muted)'};">${sinGuia}</span>
+        </div>
+        ${rezagados > 0 ? `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:var(--text-muted);">• Rezagados (&gt; 7 días):</span>
+            <span style="font-weight:700; color:#ef4444;">${rezagados}</span>
+          </div>
+        ` : ''}
+      </div>
+      ${topCasos.length > 0 ? `
+        <div style="margin-top:0.5rem; padding-top:0.4rem; border-top:1px dashed var(--border);">
+          <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:2px;">Envíos en tránsito:</div>
+          ${topCasos.map(renderFilaTopCaso).join('')}
+        </div>
+      ` : ''}
+    `;
+  } else if (columna === 'rezago') {
+    icon = '⏳';
+    title = 'Análisis de Rezago';
+    const sumDias = items.reduce((acc, x) => acc + (x.diasAntiguedad || 0), 0);
+    const promDias = items.length > 0 ? Math.round(sumDias / items.length) : 0;
+    const topCasos = obtenerTopCasos(null, 1);
+    const peorCaso = topCasos[0];
+
+    bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-muted);">Mayor Rezago:</span>
+          <span style="font-weight:700; color:${(r.maxDias || 0) > 14 ? '#ef4444' : ((r.maxDias || 0) > 7 ? '#f59e0b' : '#10b981')};">${r.maxDias || 0} días</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-muted);">Promedio de Rezago:</span>
+          <span style="font-weight:600; color:var(--text-primary);">${promDias} días</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-muted);">Total Casos Evaluados:</span>
+          <span style="font-weight:600; color:var(--text-primary);">${items.length}</span>
+        </div>
+      </div>
+      ${peorCaso ? `
+        <div style="margin-top:0.5rem; padding-top:0.4rem; border-top:1px dashed var(--border);">
+          <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:2px;">Caso más crítico:</div>
+          <div style="font-size:0.72rem; font-weight:700; color:var(--text-primary); display:flex; justify-content:space-between;">
+            <span>${(typeof escapeHTML === 'function') ? escapeHTML(peorCaso.folio || peorCaso.id) : (peorCaso.folio || peorCaso.id)} (${peorCaso.tipo})</span>
+            <span style="color:#ef4444;">${peorCaso.diasAntiguedad}d</span>
+          </div>
+          <div style="font-size:0.68rem; color:var(--text-muted); margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            ${(typeof escapeHTML === 'function') ? escapeHTML(peorCaso.cliente || 'Sin cliente') : (peorCaso.cliente || 'Sin cliente')}
+          </div>
+          ${peorCaso.cuelloDeBotella ? `
+            <div style="font-size:0.65rem; color:#f59e0b; margin-top:2px; line-height:1.2;">
+              ⚠️ ${(typeof escapeHTML === 'function') ? escapeHTML(peorCaso.cuelloDeBotella) : peorCaso.cuelloDeBotella}
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
+    `;
+  } else {
+    // Default: Total Pendientes
+    icon = '📊';
+    title = 'Total Pendientes';
+    const topCasos = obtenerTopCasos(null, 3);
+
+    bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-muted);">Total Pendientes:</span>
+          <span style="font-weight:700; color:var(--text-primary); font-size:0.85rem;">${r.total}</span>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-top:2px; font-size:0.72rem;">
+          <div style="display:flex; justify-content:space-between; padding:2px 4px; background:var(--bg-hover); border-radius:4px;">
+            <span style="color:#8b5cf6; font-weight:600;">🎫 Tickets:</span>
+            <span style="font-weight:700;">${r.ticketsCount || 0}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding:2px 4px; background:var(--bg-hover); border-radius:4px;">
+            <span style="color:#10b981; font-weight:600;">📋 Órdenes:</span>
+            <span style="font-weight:700;">${r.ordenesCount || 0}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding:2px 4px; background:var(--bg-hover); border-radius:4px;">
+            <span style="color:#06b6d4; font-weight:600;">📝 Lev.:</span>
+            <span style="font-weight:700;">${r.levantamientosCount || 0}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding:2px 4px; background:var(--bg-hover); border-radius:4px;">
+            <span style="color:#f59e0b; font-weight:600;">🚚 Envíos:</span>
+            <span style="font-weight:700;">${r.enviosCount || 0}</span>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
+          <span style="color:var(--text-muted);">Urgentes / Críticos:</span>
+          <span style="font-weight:700; color:${(r.urgentesCount || 0) > 0 ? '#ef4444' : 'var(--text-muted)'};">${(r.urgentesCount || 0) > 0 ? '🔥 ' + r.urgentesCount : '0'}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:var(--text-muted);">Mayor Rezago:</span>
+          <span style="font-weight:700; color:${(r.maxDias || 0) > 14 ? '#ef4444' : ((r.maxDias || 0) > 7 ? '#f59e0b' : '#10b981')};">${r.maxDias || 0} días</span>
+        </div>
+      </div>
+      ${topCasos.length > 0 ? `
+        <div style="margin-top:0.5rem; padding-top:0.4rem; border-top:1px dashed var(--border);">
+          <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:2px;">Top Casos Más Antiguos:</div>
+          ${topCasos.map(renderFilaTopCaso).join('')}
+        </div>
+      ` : ''}
+    `;
+  }
+
+  return `
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:0.45rem; padding-bottom:0.35rem; border-bottom:1px solid var(--border);">
+      <div style="display:flex; align-items:center; gap:4px; font-weight:700; color:var(--text-primary); font-size:0.78rem;">
+        <span>${icon}</span>
+        <span>${title}</span>
+      </div>
+      <span style="font-size:0.7rem; font-weight:700; color:var(--text-muted); background:var(--bg-hover); padding:1px 6px; border-radius:4px; max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+        ${safeNombre}
+      </span>
+    </div>
+    ${bodyHtml}
+    <div style="margin-top:0.45rem; font-size:0.65rem; color:var(--text-muted); text-align:right; font-style:italic;">
+      Clic en la fila para filtrar
+    </div>
+  `;
+}
+
+function mostrarTooltipDesglose(e, target, columna) {
+  const el = obtenerCrearJuntaTooltip();
+  if (!el) return;
+
+  let r = null;
+  if (typeof target === 'number') {
+    r = _juntaRespArrayCache[target] || (typeof window !== 'undefined' && window._juntaRespArrayCache && window._juntaRespArrayCache[target]);
+  } else if (typeof target === 'string') {
+    r = _gruposJuntaCache[target] || (typeof window !== 'undefined' && window._gruposJuntaCache && window._gruposJuntaCache[target]);
+  } else if (target && typeof target === 'object') {
+    r = target;
+  }
+  if (!r) return;
+
+  const content = generarContenidoTooltipDesglose(r, columna);
+  if (!content) return;
+
+  el.innerHTML = content;
+  el.style.display = 'block';
+  posicionarJuntaTooltip(e, el);
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => {
+      el.style.opacity = '1';
+    });
+  } else {
+    el.style.opacity = '1';
+  }
+}
+
+function moverTooltipDesglose(e) {
+  const el = (typeof document !== 'undefined') ? document.getElementById('junta-floating-tooltip') : null;
+  if (!el || el.style.display === 'none') return;
+  posicionarJuntaTooltip(e, el);
+}
+
+function ocultarTooltipDesglose() {
+  const el = (typeof document !== 'undefined') ? document.getElementById('junta-floating-tooltip') : null;
+  if (!el) return;
+  el.style.opacity = '0';
+  el.style.display = 'none';
+}
+
+if (typeof window !== 'undefined') {
+  window.mostrarTooltipDesglose = mostrarTooltipDesglose;
+  window.moverTooltipDesglose = moverTooltipDesglose;
+  window.ocultarTooltipDesglose = ocultarTooltipDesglose;
+  window.generarContenidoTooltipDesglose = generarContenidoTooltipDesglose;
+  window.obtenerCrearJuntaTooltip = obtenerCrearJuntaTooltip;
+}
+
 // Renderizado de la tabla analítica de responsables con más pendientes
 window.renderJuntaResponsablesTable = function(todos) {
   const container = document.getElementById('junta-responsables-table-container');
@@ -916,7 +1345,15 @@ window.renderJuntaResponsablesTable = function(todos) {
   todos.forEach(item => {
     const rList = (item.responsablesList && item.responsablesList.length > 0) ? item.responsablesList : ['Sin Asignar'];
     rList.forEach(respKey => {
-      const rName = (typeof unificarNombreUsuario === 'function') ? unificarNombreUsuario(respKey) : (String(respKey || '').trim() || 'Sin Asignar');
+      const isPaqFn = (typeof esNombrePaqueteria === 'function') ? esNombrePaqueteria : (typeof window !== 'undefined' && window.esNombrePaqueteria ? window.esNombrePaqueteria : () => false);
+      const isExclFn = (typeof esResponsableExcluidoOperativo === 'function') ? esResponsableExcluidoOperativo : (typeof window !== 'undefined' && window.esResponsableExcluidoOperativo ? window.esResponsableExcluidoOperativo : () => false);
+      const isPaq = isPaqFn(respKey);
+      const isExcl = isExclFn(respKey);
+      const rKeyClean = (isPaq || isExcl) ? 'Sin Asignar' : respKey;
+      const rName = (typeof unificarNombreUsuario === 'function') ? unificarNombreUsuario(rKeyClean) : (String(rKeyClean || '').trim() || 'Sin Asignar');
+      if (rName !== 'Sin Asignar' && isExclFn(rName)) {
+        return;
+      }
       if (!grupos[rName]) {
         grupos[rName] = {
           nombre: rName,
@@ -958,11 +1395,20 @@ window.renderJuntaResponsablesTable = function(todos) {
     });
   });
 
-  const respArray = Object.values(grupos).sort((a, b) => {
+  const isExclFn = (typeof esResponsableExcluidoOperativo === 'function') ? esResponsableExcluidoOperativo : (typeof window !== 'undefined' && window.esResponsableExcluidoOperativo ? window.esResponsableExcluidoOperativo : () => false);
+  const respArray = Object.values(grupos).filter(r => r.nombre === 'Sin Asignar' || !isExclFn(r.nombre)).sort((a, b) => {
     if (a.nombre === 'Sin Asignar') return 1;
     if (b.nombre === 'Sin Asignar') return -1;
     return b.total - a.total;
   });
+
+  // Guardar en caché para acceso rápido desde tooltips interactivos
+  _gruposJuntaCache = grupos;
+  _juntaRespArrayCache = respArray;
+  if (typeof window !== 'undefined') {
+    window._gruposJuntaCache = grupos;
+    window._juntaRespArrayCache = respArray;
+  }
 
   const maxTotal = respArray.length > 0 ? Math.max(...respArray.map(r => r.total), 1) : 1;
 
@@ -1029,7 +1475,10 @@ window.renderJuntaResponsablesTable = function(todos) {
             <span>${escapeHTML(rolInfo.label)}</span>
           </span>
         </td>
-        <td style="padding:0.55rem 0.75rem;">
+        <td style="padding:0.55rem 0.75rem; cursor:pointer;" 
+            onmouseenter="window.mostrarTooltipDesglose(event, ${idx}, 'total')" 
+            onmousemove="window.moverTooltipDesglose(event)" 
+            onmouseleave="window.ocultarTooltipDesglose()">
           <div style="display:flex; flex-direction:column; gap:0.2rem;">
             <div style="display:flex; justify-content:space-between; font-size:0.78rem; font-weight:700; color:var(--text-primary);">
               <span>${r.total} pendientes</span>
@@ -1040,21 +1489,36 @@ window.renderJuntaResponsablesTable = function(todos) {
             </div>
           </div>
         </td>
-        <td style="padding:0.55rem 0.75rem; text-align:center;">
+        <td style="padding:0.55rem 0.75rem; text-align:center; cursor:pointer;" 
+            onmouseenter="window.mostrarTooltipDesglose(event, ${idx}, 'tickets')" 
+            onmousemove="window.moverTooltipDesglose(event)" 
+            onmouseleave="window.ocultarTooltipDesglose()">
           <span style="font-weight:700; color:#8b5cf6;">${r.ticketsCount}</span>
           ${r.ticketsMas15 > 0 ? `<div style="font-size:0.68rem; color:#ef4444; font-weight:600;">+${r.ticketsMas15} (+15d)</div>` : ''}
         </td>
-        <td style="padding:0.55rem 0.75rem; text-align:center;">
+        <td style="padding:0.55rem 0.75rem; text-align:center; cursor:pointer;" 
+            onmouseenter="window.mostrarTooltipDesglose(event, ${idx}, 'ordenes')" 
+            onmousemove="window.moverTooltipDesglose(event)" 
+            onmouseleave="window.ocultarTooltipDesglose()">
           <span style="font-weight:700; color:#10b981;">${r.ordenesCount}</span>
           ${r.ordenesSinFirma > 0 ? `<div style="font-size:0.68rem; color:#f59e0b; font-weight:600;">${r.ordenesSinFirma} s/firma</div>` : ''}
         </td>
-        <td style="padding:0.55rem 0.75rem; text-align:center;">
-          <span style="font-weight:700; color:#6366f1;">${r.levantamientosCount}</span>
+        <td style="padding:0.55rem 0.75rem; text-align:center; cursor:pointer;" 
+            onmouseenter="window.mostrarTooltipDesglose(event, ${idx}, 'levantamientos')" 
+            onmousemove="window.moverTooltipDesglose(event)" 
+            onmouseleave="window.ocultarTooltipDesglose()">
+          <span style="font-weight:700; color:#06b6d4;">${r.levantamientosCount}</span>
         </td>
-        <td style="padding:0.55rem 0.75rem; text-align:center;">
+        <td style="padding:0.55rem 0.75rem; text-align:center; cursor:pointer;" 
+            onmouseenter="window.mostrarTooltipDesglose(event, ${idx}, 'envios')" 
+            onmousemove="window.moverTooltipDesglose(event)" 
+            onmouseleave="window.ocultarTooltipDesglose()">
           <span style="font-weight:700; color:#f59e0b;">${r.enviosCount}</span>
         </td>
-        <td style="padding:0.55rem 0.75rem; text-align:center;">
+        <td style="padding:0.55rem 0.75rem; text-align:center; cursor:pointer;" 
+            onmouseenter="window.mostrarTooltipDesglose(event, ${idx}, 'rezago')" 
+            onmousemove="window.moverTooltipDesglose(event)" 
+            onmouseleave="window.ocultarTooltipDesglose()">
           <span class="badge" style="background:${r.maxDias > 14 ? 'rgba(239,68,68,0.15)' : (r.maxDias > 7 ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)')}; color:${r.maxDias > 14 ? '#ef4444' : (r.maxDias > 7 ? '#f59e0b' : '#10b981')}; font-weight:700; padding:0.15rem 0.45rem; border-radius:6px; font-size:0.72rem;">
             ${r.maxDias} días
           </span>

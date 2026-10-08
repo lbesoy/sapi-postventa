@@ -246,10 +246,15 @@ function actualizarEventoCalendarioDesdeBitacora(orden, bitacoraEntry) {
     // Si no existe por ID, buscamos si hay algún evento de esta orden en el mismo día y técnico
     if (idx === -1 && bitacoraEntry.fecha) {
       const bitDate = bitacoraEntry.fecha.substring(0, 10);
+      const bTecLower = (bitacoraEntry.tecnico || '').toLowerCase().trim();
       idx = localEventos.findIndex(x => 
         x.ordenId === orden.id && 
         (x.start && x.start.substring(0, 10) === bitDate) &&
-        (x.tecnicoNombre === bitacoraEntry.tecnico)
+        (x.tecnicoNombre === bitacoraEntry.tecnico || 
+         (x.tecnicoNombre && bTecLower && (
+           x.tecnicoNombre.toLowerCase().includes(bTecLower) ||
+           bTecLower.includes(x.tecnicoNombre.toLowerCase())
+         )))
       );
     }
 
@@ -278,8 +283,14 @@ function actualizarEventoCalendarioDesdeBitacora(orden, bitacoraEntry) {
     }
     const endISO = `${endDateStr}T${salidaHora}:00`;
 
-    const usr = usuarios.find(u => u.nombre === bitacoraEntry.tecnico);
-    const tecnicoId = usr ? usr.id : null;
+    const bTecNorm = (bitacoraEntry.tecnico || '').toLowerCase().trim();
+    const usr = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios.find(u => {
+      if (!u) return false;
+      const uNorm = (u.nombre || '').toLowerCase().trim();
+      if (!uNorm) return false;
+      return uNorm === bTecNorm || uNorm.includes(bTecNorm) || bTecNorm.includes(uNorm) || (u.id === bitacoraEntry.tecnicoId);
+    }) : null;
+    const tecnicoId = usr ? usr.id : (bitacoraEntry.tecnicoId || null);
 
     const eventTitle = `${(bitacoraEntry.tecnico || 'Téc').split(' ')[0]} | ${orden.cliente}`;
 
@@ -306,7 +317,12 @@ function actualizarEventoCalendarioDesdeBitacora(orden, bitacoraEntry) {
 
     localStorage.setItem('sapi_calendario_eventos', JSON.stringify(localEventos));
     if (window.pushToSupabase) {
-      window.pushToSupabase('calendario_eventos', eventoObj);
+      try {
+        const p = window.pushToSupabase('calendario_eventos', eventoObj);
+        if (p && typeof p.catch === 'function') p.catch(e => console.warn('[Calendario] Push error:', e?.message || e));
+      } catch (errP) {
+        console.warn('[Calendario] Push error:', errP?.message || errP);
+      }
     }
   } catch(e) {
     console.error('Error al sincronizar evento en calendario_eventos:', e);
@@ -529,11 +545,42 @@ function guardarNotaBitacora() {
     actualizarEventoCalendarioDesdeBitacora(o, nuevaEntrada);
   }
   
+  // Asegurar que el técnico que llena o reporta la bitácora quede vinculado a la orden
+  if (!o.tecnicosAsignados || !Array.isArray(o.tecnicosAsignados)) {
+    o.tecnicosAsignados = [];
+  }
+  const myUserId = (typeof currentSession !== 'undefined' && currentSession) ? currentSession.userId : null;
+  if (myUserId && !o.tecnicosAsignados.includes(myUserId)) {
+    o.tecnicosAsignados.push(myUserId);
+  }
+  if (tecnicoDestino) {
+    if (!o.tecnico) {
+      o.tecnico = tecnicoDestino;
+    } else {
+      const tecs = String(o.tecnico).split(',').map(s => s.trim().toLowerCase());
+      if (!tecs.some(t => t === tecnicoDestino.toLowerCase() || t.includes(tecnicoDestino.toLowerCase()) || tecnicoDestino.toLowerCase().includes(t))) {
+        o.tecnico = (o.tecnico + ', ' + tecnicoDestino).trim();
+      }
+    }
+  }
+
   o.estado = calcularEstadoOrden(o);
+  o._synced = false;
   
+  if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) {
+    const wIdx = window.ordenes.findIndex(x => x.id === o.id);
+    if (wIdx >= 0) window.ordenes[wIdx] = o;
+    else window.ordenes.push(o);
+  }
+
   safeSetJSON('sapi_ordenes', ordenes);
   if (window.pushToSupabase) {
-    window.pushToSupabase('ordenes', o);
+    try {
+      const p = window.pushToSupabase('ordenes', o);
+      if (p && typeof p.catch === 'function') p.catch(e => console.warn('[Bitácora] Push error:', e?.message || e));
+    } catch (errP) {
+      console.warn('[Bitácora] Push error:', errP?.message || errP);
+    }
   }
 
   if (window.trackTelemetryEvent) {

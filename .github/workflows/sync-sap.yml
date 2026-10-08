@@ -28,6 +28,8 @@ jobs:
         run: cd backend && npm install
 
       - name: Ejecutar sincronización SAP → Supabase
+        id: sap_sync
+        continue-on-error: true
         env:
           SAP_SL_URL: ${{ secrets.SAP_SL_URL }}
           SAP_COMPANY_DB: ${{ secrets.SAP_COMPANY_DB }}
@@ -39,3 +41,12 @@ jobs:
           SAP_REJECT_UNAUTHORIZED: 'false'
         run: |
           cd backend && node sync-sap-supabase.js
+
+      - name: Verificar resultado de la sincronización
+        if: always()
+        run: |
+          if [ "${{ steps.sap_sync.outcome }}" = "failure" ]; then
+            echo "::warning title=Conexión SAP no disponible::El script de sincronización no pudo conectarse con SAP Service Layer o finalizó con errores de red."
+          else
+            echo "::notice title=Sincronización Exitosa::Sincronización SAP → Supabase completada exitosamente."
+          fi

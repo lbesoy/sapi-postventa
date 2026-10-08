@@ -18,7 +18,10 @@ import {
   loadScriptOnDemand,
   compressImageFile,
   esUsuarioSuperadmin,
-  resolverCreadorTicket
+  resolverCreadorTicket,
+  esNombrePaqueteria,
+  esResponsableExcluidoOperativo,
+  obtenerInfoRolUsuario
 } from '../src/utils.js';
 
 console.log('🧪 Ejecutando pruebas unitarias para src/utils.js...');
@@ -97,7 +100,24 @@ console.log('  ✅ calcularDiasJunta y formatearTiempoRelativoJunta: OK');
 assert.deepEqual(extraerListaResponsables('Juan Pérez, Carlos Gómez'), ['Juan Pérez', 'Carlos Gómez'], 'extraerListaResponsables desglosa responsables');
 assert.deepEqual(extraerListaResponsables(''), ['Sin Asignar'], 'extraerListaResponsables vacío retorna Sin Asignar');
 assert.deepEqual(extraerListaResponsables('Sin Asignar'), ['Sin Asignar'], 'extraerListaResponsables Sin Asignar');
-console.log('  ✅ extraerListaResponsables: OK');
+assert.deepEqual(extraerListaResponsables('DHL'), ['Sin Asignar'], 'extraerListaResponsables con DHL debe excluirse y retornar Sin Asignar');
+assert.deepEqual(extraerListaResponsables('DHL Express, FedEx'), ['Sin Asignar'], 'extraerListaResponsables con paqueterías debe retornar Sin Asignar');
+assert.deepEqual(extraerListaResponsables('Juan Pérez, DHL'), ['Juan Pérez'], 'extraerListaResponsables debe conservar técnico y excluir DHL');
+assert.deepEqual(extraerListaResponsables('Pablo Besoy'), ['Sin Asignar'], 'extraerListaResponsables con Pablo Besoy debe retornar Sin Asignar para operación de técnicos');
+assert.deepEqual(extraerListaResponsables('Pablo Besoy, Carlos Gómez'), ['Carlos Gómez'], 'extraerListaResponsables debe conservar técnico operativo y excluir directivo');
+assert.equal(esNombrePaqueteria('DHL'), true, 'esNombrePaqueteria detecta DHL');
+assert.equal(esNombrePaqueteria('DHL Express'), true, 'esNombrePaqueteria detecta DHL Express');
+assert.equal(esNombrePaqueteria('FedEx'), true, 'esNombrePaqueteria detecta FedEx');
+assert.equal(esNombrePaqueteria('Juan Pérez'), false, 'esNombrePaqueteria no debe marcar a técnico real');
+assert.equal(esResponsableExcluidoOperativo('Pablo Besoy'), true, 'esResponsableExcluidoOperativo detecta Pablo Besoy');
+assert.equal(esResponsableExcluidoOperativo('pablo besoy'), true, 'esResponsableExcluidoOperativo en minúsculas');
+assert.equal(esResponsableExcluidoOperativo('Pablo Besoy Trigueros'), true, 'esResponsableExcluidoOperativo con segundo apellido');
+assert.equal(esResponsableExcluidoOperativo('DHL'), true, 'esResponsableExcluidoOperativo detecta DHL');
+assert.equal(esResponsableExcluidoOperativo('Usuario prueba'), true, 'esResponsableExcluidoOperativo detecta usuario de prueba');
+assert.equal(esResponsableExcluidoOperativo('Juan Pérez'), false, 'esResponsableExcluidoOperativo permite técnico operativo');
+assert.equal(obtenerInfoRolUsuario('Pablo Besoy').rol, 'superadmin', 'obtenerInfoRolUsuario identifica a Pablo Besoy como superadmin');
+assert.equal(obtenerInfoRolUsuario('Sin Asignar').rol, 'sin_asignar', 'obtenerInfoRolUsuario identifica Sin Asignar correctamente');
+console.log('  ✅ extraerListaResponsables, esNombrePaqueteria y esResponsableExcluidoOperativo: OK');
 
 // 2. normStr
 assert.equal(normStr('  TÉCNICO Especial  '), 'tecnico especial', 'normStr debe normalizar acentos y espacios');
@@ -470,18 +490,83 @@ assert.ok(kitRubble.piezas.length >= 3, 'El kit 250h debe contener al menos 3 re
 console.log('  ✅ Kits de Servicio y Machotes (detectarSistemaRefaccion, catálogo 36 kits y exports): OK');
 
 // 19. Módulo de Juntas de Revisión y Rescate Histórico
-const { reestablecerTicket26477, obtenerTodosLosPendientes, renderJuntaRevision, copiarMinutaJunta, toggleFullscreenJunta, toggleJuntaAnalytics } = await import('../src/modules/juntas.js');
+const { 
+  reestablecerTicket26477, 
+  obtenerTodosLosPendientes, 
+  renderJuntaRevision, 
+  copiarMinutaJunta, 
+  toggleFullscreenJunta, 
+  toggleJuntaAnalytics,
+  generarContenidoTooltipDesglose,
+  mostrarTooltipDesglose,
+  ocultarTooltipDesglose
+} = await import('../src/modules/juntas.js');
 assert.equal(typeof reestablecerTicket26477, 'function', 'reestablecerTicket26477 debe ser una función');
 assert.equal(typeof obtenerTodosLosPendientes, 'function', 'obtenerTodosLosPendientes debe ser una función');
 assert.equal(typeof renderJuntaRevision, 'function', 'renderJuntaRevision debe ser una función');
 assert.equal(typeof copiarMinutaJunta, 'function', 'copiarMinutaJunta debe ser una función');
 assert.equal(typeof toggleFullscreenJunta, 'function', 'toggleFullscreenJunta debe ser una función');
 assert.equal(typeof toggleJuntaAnalytics, 'function', 'toggleJuntaAnalytics debe ser una función');
+assert.equal(typeof generarContenidoTooltipDesglose, 'function', 'generarContenidoTooltipDesglose debe ser función');
+assert.equal(typeof mostrarTooltipDesglose, 'function', 'mostrarTooltipDesglose debe ser función');
+assert.equal(typeof ocultarTooltipDesglose, 'function', 'ocultarTooltipDesglose debe ser función');
 
 // Test A: Ejecución segura de obtenerTodosLosPendientes sin fallar ante entorno vacío
 const pendientes = obtenerTodosLosPendientes();
 assert.ok(Array.isArray(pendientes), 'obtenerTodosLosPendientes debe devolver un array');
-console.log('  ✅ Juntas de Revisión (obtenerTodosLosPendientes, reestablecerTicket26477 y exports): OK');
+
+// Test B: Generación de tooltip de desglose interactivo para cada columna analítica
+const mockRespTooltip = {
+  nombre: 'Técnico Especialista',
+  total: 6,
+  ticketsCount: 2,
+  ticketsMas15: 1,
+  ordenesCount: 2,
+  ordenesSinFirma: 1,
+  levantamientosCount: 1,
+  enviosCount: 1,
+  urgentesCount: 2,
+  maxDias: 20,
+  items: [
+    { tipo: 'ticket', id: 101, folio: 'TK-101', cliente: 'Cliente Alfa', diasAntiguedad: 20, prioridad: 'Urgente' },
+    { tipo: 'ticket', id: 102, folio: 'TK-102', cliente: 'Cliente Beta', diasAntiguedad: 5, prioridad: 'Media' },
+    { tipo: 'orden', id: 201, folio: 'OS-201', cliente: 'Cliente Alfa', diasAntiguedad: 12, prioridad: 'Urgente' },
+    { tipo: 'orden', id: 202, folio: 'OS-202', cliente: 'Cliente Gamma', diasAntiguedad: 2, prioridad: 'Baja' },
+    { tipo: 'levantamiento', id: 301, folio: 'LEV-301', cliente: 'Cliente Delta', diasAntiguedad: 9, prioridad: 'Alta' },
+    { tipo: 'envio', id: 401, folio: 'GUIA-888', cliente: 'Cliente Alfa', diasAntiguedad: 8, rawItem: { guiaPedido: '888' } }
+  ]
+};
+
+const htmlTotal = generarContenidoTooltipDesglose(mockRespTooltip, 'total');
+assert.ok(htmlTotal.includes('Total Pendientes'), 'Tooltip total debe incluir Total Pendientes');
+assert.ok(htmlTotal.includes('Técnico Especialista'), 'Tooltip total debe incluir nombre del técnico');
+assert.ok(htmlTotal.includes('Tickets'), 'Tooltip total debe desglosar Tickets');
+assert.ok(htmlTotal.includes('Órdenes'), 'Tooltip total debe desglosar Órdenes');
+
+const htmlTickets = generarContenidoTooltipDesglose(mockRespTooltip, 'tickets');
+assert.ok(htmlTickets.includes('Desglose de Tickets'), 'Tooltip tickets debe incluir título de desglose');
+assert.ok(htmlTickets.includes('TK-101'), 'Tooltip tickets debe listar top caso TK-101');
+assert.ok(htmlTickets.includes('&gt; 15 días'), 'Tooltip tickets debe detallar tickets > 15 días');
+
+const htmlOrdenes = generarContenidoTooltipDesglose(mockRespTooltip, 'ordenes');
+assert.ok(htmlOrdenes.includes('Desglose de Órdenes'), 'Tooltip ordenes debe incluir título');
+assert.ok(htmlOrdenes.includes('Pendiente de firmas'), 'Tooltip ordenes debe indicar órdenes sin firma');
+assert.ok(htmlOrdenes.includes('OS-201'), 'Tooltip ordenes debe listar OS-201');
+
+const htmlLev = generarContenidoTooltipDesglose(mockRespTooltip, 'levantamientos');
+assert.ok(htmlLev.includes('Desglose de Levantamientos'), 'Tooltip levantamientos debe incluir título');
+assert.ok(htmlLev.includes('LEV-301'), 'Tooltip levantamientos debe listar LEV-301');
+
+const htmlEnv = generarContenidoTooltipDesglose(mockRespTooltip, 'envios');
+assert.ok(htmlEnv.includes('Desglose de Envíos'), 'Tooltip envios debe incluir título');
+assert.ok(htmlEnv.includes('Con guía asignada'), 'Tooltip envios debe desglosar guía');
+
+const htmlRezago = generarContenidoTooltipDesglose(mockRespTooltip, 'rezago');
+assert.ok(htmlRezago.includes('Análisis de Rezago'), 'Tooltip rezago debe incluir título');
+assert.ok(htmlRezago.includes('20 días'), 'Tooltip rezago debe incluir max días');
+assert.ok(htmlRezago.includes('Promedio de Rezago'), 'Tooltip rezago debe calcular promedio');
+
+console.log('  ✅ Juntas de Revisión (obtenerTodosLosPendientes, desgloses interactivos en hover y exports): OK');
 
 // 20. Módulo de Depuración y Auditoría de Tickets
 const { analizarInformacionTicket, contarTicketsADepuracion, sanitizarAsignacionesTickets, abrirModalDepurarTickets, exportarDepuradorTicketsAExcel, detectarYDepurarTicketsDuplicados } = await import('../src/modules/depurador_tickets.js');

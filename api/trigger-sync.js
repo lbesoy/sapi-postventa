@@ -80,6 +80,36 @@ export default async function handler(req, res) {
   const GH_WORKFLOW = 'sync-sap.yml';
 
   try {
+    // 2. Prevenir ejecuciones concurrentes o spam de workflows si ya hay uno activo o recién disparado
+    try {
+      const checkResp = await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/runs?per_page=1`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${ghToken}`,
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'SAPI-Postventa-Serverless-Function'
+        }
+      });
+      if (checkResp.ok) {
+        const checkData = await checkResp.json();
+        const latestRun = checkData.workflow_runs?.[0];
+        if (latestRun) {
+          const isRunning = latestRun.status === 'queued' || latestRun.status === 'in_progress';
+          const ageMs = Date.now() - new Date(latestRun.created_at).getTime();
+          // Si está en ejecución o se lanzó hace menos de 90 segundos, no duplicar el workflow
+          if (isRunning || ageMs < 90000) {
+            return res.status(200).json({
+              success: true,
+              alreadyRunning: true,
+              message: 'Ya hay una sincronización en proceso o solicitada recientemente. Por favor espera un momento.'
+            });
+          }
+        }
+      }
+    } catch (checkErr) {
+      console.warn('[Sync API] No se pudo verificar estado previo, procediendo con precaución:', checkErr.message);
+    }
+
     const resp = await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/dispatches`, {
       method: 'POST',
       headers: {

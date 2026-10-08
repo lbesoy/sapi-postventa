@@ -8,6 +8,35 @@ import { supabaseClient } from "../supabaseClient.js";
 
 // ─── CALENDARIO ────────────────────────────────────────────────────────────────
 let calendarInstance = null;
+function matchTecnico(tA, tB) {
+  if (!tB) return true;
+  if (!tA) return false;
+  const normA = (typeof normStr === 'function' ? normStr(tA) : String(tA).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim());
+  const normB = (typeof normStr === 'function' ? normStr(tB) : String(tB).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim());
+  if (normA === normB) return true;
+  if (normA.includes(normB) || normB.includes(normA)) return true;
+  
+  const wordsA = normA.split(/\s+/).filter(Boolean);
+  const wordsB = normB.split(/\s+/).filter(Boolean);
+  if (wordsA.length >= 2 && wordsB.length >= 2) {
+    if (wordsA[0] === wordsB[0] && wordsA[1] === wordsB[1]) return true;
+  }
+  
+  const userList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : ((typeof window !== 'undefined' && Array.isArray(window.usuarios)) ? window.usuarios : []);
+  const uA = userList.find(u => u && (u.id === tA || (typeof normStr === 'function' ? normStr(u.nombre) : String(u.nombre).toLowerCase().trim()) === normA));
+  const uB = userList.find(u => u && (u.id === tB || (typeof normStr === 'function' ? normStr(u.nombre) : String(u.nombre).toLowerCase().trim()) === normB));
+  if (uA && uB && uA.id === uB.id) return true;
+  if (uA && uA.nombre && (uA.nombre !== tA) && matchTecnico(uA.nombre, tB)) return true;
+  if (uB && uB.nombre && (uB.nombre !== tB) && matchTecnico(tA, uB.nombre)) return true;
+
+  const fnResolve = (typeof window !== 'undefined' && typeof window.resolveTecnicoNombre === 'function') ? window.resolveTecnicoNombre : (typeof resolveTecnicoNombre === 'function' ? resolveTecnicoNombre : null);
+  if (fnResolve) {
+    const resA = (typeof normStr === 'function' ? normStr(fnResolve(tA)) : String(fnResolve(tA)).toLowerCase().trim());
+    const resB = (typeof normStr === 'function' ? normStr(fnResolve(tB)) : String(fnResolve(tB)).toLowerCase().trim());
+    if (resA === resB || resA.includes(resB) || resB.includes(resA)) return true;
+  }
+  return false;
+}
 
 function actualizarFiltrosCalendario() {
   const selCli = document.getElementById('filter-cal-cliente');
@@ -34,12 +63,13 @@ function actualizarFiltrosCalendario() {
     selTec.style.display = '';
   }
 
-  let clientesDisponibles = ordenes;
+  let clientesDisponibles = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes : ((typeof window !== 'undefined' && Array.isArray(window.ordenes)) ? window.ordenes : []);
   if (isEmpresa) clientesDisponibles = clientesDisponibles.filter(o => o.cliente === miEmpresa);
   if (isTecnico && miTecnicoNombre) {
     clientesDisponibles = clientesDisponibles.filter(o => {
-      const tieneBitacora = o.bitacora && o.bitacora.some(b => b.tecnico === miTecnicoNombre);
-      const estaAsignado = o.tecnicosAsignados && o.tecnicosAsignados.includes(miTecnicoNombre);
+      const tieneBitacora = o.bitacora && o.bitacora.some(b => matchTecnico(b.tecnico, miTecnicoNombre));
+      const estaAsignado = (o.tecnicosAsignados && o.tecnicosAsignados.some(t => matchTecnico(t, miTecnicoNombre))) ||
+                           matchTecnico(o.tecnico, miTecnicoNombre);
       return tieneBitacora || estaAsignado;
     });
   }
@@ -208,7 +238,7 @@ function renderCalendario() {
     if (o.bitacora && o.bitacora.length > 0) {
       o.bitacora.forEach(b => {
         if (!b) return;
-        if (filtroTecnico && b.tecnico !== filtroTecnico) return;
+        if (filtroTecnico && !matchTecnico(b.tecnico, filtroTecnico)) return;
 
         // Filtrar estrictamente según el modo Sandbox activo
         if (typeof isTestData === 'function') {
@@ -462,7 +492,7 @@ function renderCalendario() {
       
       // Filtrar por técnico si hay un filtro activo (y si está asignado)
       const asignadoVal = lev.tecnico_asignado || lev.asignado_a || null;
-      if (filtroTecnico && asignadoVal !== filtroTecnico) return;
+      if (filtroTecnico && !matchTecnico(asignadoVal, filtroTecnico)) return;
       
       // Filtrar por empresa si el usuario es empresa
       if (isEmpresa && lev.cliente !== miEmpresa) return;
@@ -510,11 +540,7 @@ function renderCalendario() {
       }
 
       // Filtrar por técnico si hay filtro activo
-      if (filtroTecnico) {
-        const u = usuarios.find(usr => usr.nombre === filtroTecnico || usr.id === filtroTecnico);
-        const uId = u ? u.id : filtroTecnico;
-        if (e.tecnicoId !== uId && e.tecnicoNombre !== filtroTecnico) return;
-      }
+      if (filtroTecnico && !matchTecnico(e.tecnicoNombre || e.tecnicoId, filtroTecnico)) return;
 
       let eventColor = '#3b82f6'; // Azul por defecto
       if (e.tipo === 'Junta' || e.tipo === 'Capacitación') eventColor = '#8b5cf6'; // Morado: Asignación Programada

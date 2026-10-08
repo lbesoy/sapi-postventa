@@ -1071,6 +1071,28 @@ window.sanitizarAsignacionesTickets = function() {
       if (!t) return;
       let tMod = false;
 
+      // 0. Limpiar asignaciones erróneas que apunten a empresas de paquetería (ej. DHL, FedEx, etc.)
+      const isPaqFn = (typeof esNombrePaqueteria === 'function') ? esNombrePaqueteria : (typeof window !== 'undefined' && window.esNombrePaqueteria ? window.esNombrePaqueteria : (str) => {
+        if (!str) return false;
+        const s = String(str).toLowerCase().trim();
+        return ['dhl', 'fedex', 'estafeta', 'paquetexpress', 'redpack', 'castores', 'tres guerras', 'tresguerras', 'ups', 'paqueteria', 'por definir'].some(p => s === p || s.startsWith(p + ' '));
+      });
+      if (t.asignado && isPaqFn(t.asignado)) {
+        t.asignado = '';
+        tMod = true;
+      }
+      if (t.tecnico && isPaqFn(t.tecnico)) {
+        t.tecnico = '';
+        tMod = true;
+      }
+      if (Array.isArray(t.tecnicosAsignados)) {
+        const tecsLimpios = t.tecnicosAsignados.filter(x => !isPaqFn(x));
+        if (tecsLimpios.length !== t.tecnicosAsignados.length) {
+          t.tecnicosAsignados = tecsLimpios;
+          tMod = true;
+        }
+      }
+
       // 1. Preservar asignación si venía en t.tecnico o t.tecnicosAsignados y t.asignado está vacío
       if ((!t.asignado || t.asignado === '-' || t.asignado === 'Sin Asignar' || t.asignado === 'sin_asignar') && t.tecnico) {
         t.asignado = t.tecnico;

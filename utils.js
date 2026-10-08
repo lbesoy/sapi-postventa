@@ -499,12 +499,40 @@ window.unificarNombreUsuario = function(rawNombre) {
   return String(rawNombre).trim();
 };
 
+window.PAQUETERIAS_CONOCIDAS = [
+  'dhl', 'fedex', 'estafeta', 'paquetexpress', 'redpack', 'castores', 'tres guerras', 'tresguerras', 'ups', 'paqueteria', 'por definir'
+];
+
+window.esNombrePaqueteria = function(nombre) {
+  if (!nombre) return false;
+  const n = String(typeof nombre === 'object' ? (nombre.nombre || nombre.name || '') : nombre).toLowerCase().trim();
+  if (!n) return false;
+  return window.PAQUETERIAS_CONOCIDAS.some(p => n === p || n.startsWith(p + ' ') || n.startsWith(p + ' express'));
+};
+
+window.esResponsableExcluidoOperativo = function(nombre) {
+  if (!nombre) return false;
+  const str = typeof nombre === 'object' ? (nombre.nombre || nombre.name || nombre.usuario || '') : String(nombre);
+  const n = window.normalizarTextoJunta(str);
+  if (!n) return false;
+  if (n === 'pablo besoy' || n === 'pablo besoy trigueros' || n === 'besoy') {
+    return true;
+  }
+  if (window.esNombrePaqueteria(str)) return true;
+  if (typeof isTestUser === 'function' && isTestUser({ nombre: str })) return true;
+  return false;
+};
+
 window.obtenerInfoRolUsuario = function(nombre) {
   if (!nombre) return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
   
   const norm = window.normalizarTextoJunta(nombre);
-  if (norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === '' || norm === 'sin_asignar') {
+  if (norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === '' || norm === 'sin_asignar' || window.esNombrePaqueteria(nombre)) {
     return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
+  }
+
+  if (norm === 'pablo besoy' || norm === 'pablo besoy trigueros' || norm === 'besoy') {
+    return { rol: 'superadmin', label: 'Super Admin', color: '#E8820C', icon: 'shield-alert' };
   }
 
   let user = null;
@@ -595,9 +623,13 @@ window.extraerListaResponsables = function(raw) {
     return ['Sin Asignar'];
   }
   const parts = rawStr.split(/[,;/]+/).map(s => s.trim()).filter(Boolean);
-  const validParts = parts.filter(s => s !== '-' && s.toLowerCase() !== 'sin asignar' && s.toLowerCase() !== 'sin_asignar');
+  const validParts = parts.filter(s => s !== '-' && s.toLowerCase() !== 'sin asignar' && s.toLowerCase() !== 'sin_asignar' && !window.esNombrePaqueteria(s) && !window.esResponsableExcluidoOperativo(s));
   return validParts.length > 0 ? Array.from(new Set(validParts)) : ['Sin Asignar'];
 };
+
+window._unificarNombreUsuarioBase = window.unificarNombreUsuario;
+window._obtenerInfoRolUsuarioBase = window.obtenerInfoRolUsuario;
+window._extraerListaResponsablesBase = window.extraerListaResponsables;
 
 const _loadedScripts = new Set();
 window.loadScriptOnDemand = function(src) {

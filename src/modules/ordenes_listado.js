@@ -31,20 +31,32 @@ function safeIsTestModeActive() {
 }
 
 function safeResolveTecnicoNombre(tecId) {
+  if (!tecId) return '';
   if (typeof window !== 'undefined' && typeof window.resolveTecnicoNombre === 'function') {
     return window.resolveTecnicoNombre(tecId);
   }
-  return tecId;
+  const users = (typeof window !== 'undefined' && Array.isArray(window.usuarios))
+    ? window.usuarios
+    : ((typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : []);
+  const tecs = (typeof window !== 'undefined' && Array.isArray(window.tecnicosDb))
+    ? window.tecnicosDb
+    : ((typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) ? tecnicosDb : []);
+  const match = users.find(u => u && (u.id === tecId || u.nombre === tecId)) || tecs.find(t => t && (t.id === tecId || t.nombre === tecId));
+  return match ? match.nombre : tecId;
 }
 
 function safeGetFilteredOrders() {
   let list = [];
   if (typeof window !== 'undefined' && typeof window.getFilteredOrders === 'function') {
     list = window.getFilteredOrders();
-  } else if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
-    list = ordenes;
-  } else if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) {
+  } else if (typeof window !== 'undefined' && Array.isArray(window.ordenes) && window.ordenes.length > 0) {
     list = window.ordenes;
+  } else if (typeof ordenes !== 'undefined' && Array.isArray(ordenes) && ordenes.length > 0) {
+    list = ordenes;
+  } else if (typeof safeGetJSON === 'function') {
+    list = safeGetJSON('sapi_ordenes', []);
+  } else if (typeof localStorage !== 'undefined') {
+    try { list = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]'); } catch(e) { list = []; }
   }
   if (!Array.isArray(list)) return [];
   const seenIds = new Set();
@@ -52,11 +64,12 @@ function safeGetFilteredOrders() {
   return list.filter(o => {
     if (!o) return false;
     const oid = o.id ? String(o.id).trim() : null;
-    const ofol = (o.folio || o.numero_orden) ? String(o.folio || o.numero_orden).trim() : null;
+    const rawFolio = (o.folio || o.numero_orden) ? String(o.folio || o.numero_orden).trim() : '';
+    const isGeneric = !rawFolio || ['-', 'n/a', 's/n', 'sin folio', 'null', 'undefined', 'por asignar'].includes(rawFolio.toLowerCase());
     if (oid && seenIds.has(oid)) return false;
-    if (ofol && seenFolios.has(ofol)) return false;
+    if (!isGeneric && seenFolios.has(rawFolio.toLowerCase())) return false;
     if (oid) seenIds.add(oid);
-    if (ofol) seenFolios.add(ofol);
+    if (!isGeneric) seenFolios.add(rawFolio.toLowerCase());
     return true;
   });
 }
@@ -185,125 +198,170 @@ function renderTabla(ctx) {
     filtradas = filtradas.filter(o => (o.estado || '').toLowerCase() === filtroEstadoServicios.toLowerCase());
   }
 
-  let tecFilter = document.getElementById('filter-ord-tecnico')?.value;
-  let supFilter = document.getElementById('filter-ord-supervisor')?.value;
-  
-  const currentUser = currentSession ? usuarios.find(u => u.id === currentSession.userId) : null;
-  const isEmpresa = currentSession && ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
-  
-  if (isEmpresa) {
-    let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
-    if (nombreEmpresaLogged) {
-      nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
-      filtradas = filtradas.filter(o => {
-        const ocli = String(o.cliente || '').toLowerCase().trim();
-        let fromTicket = false;
-        if (o.soporte) {
-          const tick = tickets.find(t => t.id === o.soporte);
-          if (tick) {
-            const tcli = String(tick.cliente || '').toLowerCase().trim();
-            const tsol = String(tick.solicitante || '').toLowerCase().trim();
-            if (tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged) fromTicket = true;
-          }
-        }
-        return ocli === nombreEmpresaLogged || fromTicket;
-      });
-    } else {
-      filtradas = [];
-    }
-  }
-
-  const userRole = currentSession ? (currentSession.viewMode || '') : '';
-  if (userRole === 'tecnico') {
-    if (safeIsTestModeActive()) {
-      tecFilter = '';
-    } else {
-      tecFilter = currentUser ? currentUser.nombre : '';
-    }
-  }
-  if (userRole === 'supervisor') {
-    supFilter = document.getElementById('filter-ord-supervisor')?.value || '';
-  }
-  
-  if (tecFilter || supFilter) {
-    const tecNameLower = tecFilter ? safeNormStr(tecFilter) : '';
-    const supNameLower = supFilter ? safeNormStr(supFilter) : '';
+    let tecFilter = document.getElementById('filter-ord-tecnico')?.value;
+    let supFilter = document.getElementById('filter-ord-supervisor')?.value;
     
-    filtradas = filtradas.filter(o => {
-      let passTec = true;
-      let passSup = true;
-      
-      if (tecFilter && tecNameLower) {
-         let assigned = [];
-         if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(safeResolveTecnicoNombre);
-         else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
-         const assignedLower = assigned.map(s => safeNormStr(s));
-         let isCreator = false;
-         let isTkAssigned = false;
-         if (o.creadoPor && safeNormStr(o.creadoPor) === tecNameLower) isCreator = true;
-         if (o.soporte) {
-            const tk = tickets.find(x => x.id === o.soporte);
-            if (tk) {
-               if ((tk.solicitante && safeNormStr(tk.solicitante) === tecNameLower) || 
-                   (tk.creadoPor && safeNormStr(tk.creadoPor) === tecNameLower)) isCreator = true;
-               let tkAssigned = [];
-               if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(safeResolveTecnicoNombre);
-               else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
-               const tkAssignedLower = tkAssigned.map(s => safeNormStr(s));
-               if (tkAssignedLower.includes(tecNameLower)) isTkAssigned = true;
-            }
-         }
-         passTec = assignedLower.includes(tecNameLower) || isCreator || isTkAssigned;
-      }
-      
-      if (supFilter && supNameLower) {
-         let passSupClient = false;
-         const cli = clientesDb.find(c => c.nombre === o.cliente);
-         if (cli) {
-            const supUser = usuarios.find(u => u && ((u.nombre && safeNormStr(u.nombre) === supNameLower) || u.id === supFilter));
-            const supId = supUser ? supUser.id : supFilter;
-            passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (safeNormStr(cli.supervisorAsignado) === supNameLower) || (cli.supervisorAsignado === supFilter);
-         }
-         
-         let assigned = [];
-         if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) assigned = o.tecnicosAsignados.map(safeResolveTecnicoNombre);
-         else if (o.tecnico) assigned = o.tecnico.split(',').map(s=>s.trim());
-         const assignedLower = assigned.map(s => safeNormStr(s));
-         
-         let passSupTicket = assignedLower.includes(supNameLower);
-         let isCreator = false;
-         if (o.soporte) {
-            const tk = tickets.find(x => x.id === o.soporte);
-            if (tk) {
-               if ((tk.solicitante && safeNormStr(tk.solicitante) === supNameLower) || 
-                   (tk.creadoPor && safeNormStr(tk.creadoPor) === supNameLower)) isCreator = true;
-               let tkAssigned = [];
-               if (tk.tecnicosAsignados && tk.tecnicosAsignados.length > 0) tkAssigned = tk.tecnicosAsignados.map(safeResolveTecnicoNombre);
-               else if (tk.asignado && tk.asignado !== 'Sin asignar') tkAssigned = String(tk.asignado).split(',').map(s=>s.trim());
-               const tkAssignedLower = tkAssigned.map(s => safeNormStr(s));
-               if (tkAssignedLower.includes(supNameLower)) passSupTicket = true;
-            }
-         }
-         passSup = passSupClient || passSupTicket || isCreator;
-      }
-      
-      return passTec && passSup;
-    });
-  }
+    const activeSession = (typeof currentSession !== 'undefined' && currentSession) ? currentSession : ((typeof window !== 'undefined' && window.currentSession) ? window.currentSession : null);
+    const usersList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : ((typeof window !== 'undefined' && Array.isArray(window.usuarios)) ? window.usuarios : []);
+    const ticketsList = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : ((typeof window !== 'undefined' && Array.isArray(window.tickets)) ? window.tickets : []);
+    const clientesList = (typeof clientesDb !== 'undefined' && Array.isArray(clientesDb)) ? clientesDb : ((typeof window !== 'undefined' && Array.isArray(window.clientesDb)) ? window.clientesDb : []);
 
-  // Deduplicación estricta por ID y Folio
-  const seenOrdIds = new Set();
-  const seenOrdFolios = new Set();
-  filtradas = filtradas.filter(o => {
-    if (!o) return false;
-    const oid = o.id ? String(o.id).trim() : null;
-    const ofol = (o.folio || o.numero_orden) ? String(o.folio || o.numero_orden).trim() : null;
-    if (oid && seenOrdIds.has(oid)) return false;
-    if (ofol && seenOrdFolios.has(ofol)) return false;
-    if (oid) seenOrdIds.add(oid);
-    if (ofol) seenOrdFolios.add(ofol);
-    return true;
-  });
+    const currentUser = activeSession ? usersList.find(u => u && u.id === activeSession.userId) : null;
+    const isEmpresa = activeSession && ['empresa', 'cliente', 'cliente-consultor'].includes(String(activeSession.viewMode || '').toLowerCase().trim());
+    
+    if (isEmpresa) {
+      let nombreEmpresaLogged = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
+      if (nombreEmpresaLogged) {
+        nombreEmpresaLogged = String(nombreEmpresaLogged).toLowerCase().trim();
+        filtradas = filtradas.filter(o => {
+          const ocli = String(o.cliente || '').toLowerCase().trim();
+          let fromTicket = false;
+          if (o.soporte || o.ticket_id) {
+            const targetTkId = o.soporte || o.ticket_id;
+            const tick = ticketsList.find(t => t && (t.id === targetTkId || t.folio === targetTkId));
+            if (tick) {
+              const tcli = String(tick.cliente || '').toLowerCase().trim();
+              const tsol = String(tick.solicitante || '').toLowerCase().trim();
+              if (tcli === nombreEmpresaLogged || tsol === nombreEmpresaLogged) fromTicket = true;
+            }
+          }
+          return ocli === nombreEmpresaLogged || fromTicket;
+        });
+      } else {
+        filtradas = [];
+      }
+    }
+
+    const userRole = activeSession ? (activeSession.viewMode || '') : '';
+    if (userRole === 'tecnico') {
+      if (safeIsTestModeActive()) {
+        tecFilter = '';
+      } else {
+        tecFilter = currentUser ? currentUser.nombre : (activeSession.nombre || '');
+      }
+    }
+    if (userRole === 'supervisor') {
+      supFilter = document.getElementById('filter-ord-supervisor')?.value || '';
+    }
+    
+    if (tecFilter || supFilter) {
+      const tecNameLower = tecFilter ? safeNormStr(tecFilter) : '';
+      const supNameLower = supFilter ? safeNormStr(supFilter) : '';
+      const myUserId = activeSession ? activeSession.userId : null;
+      
+      filtradas = filtradas.filter(o => {
+        let passTec = true;
+        let passSup = true;
+        
+        if (tecFilter && tecNameLower) {
+           let assigned = [];
+           if (o.tecnicosAsignados && Array.isArray(o.tecnicosAsignados) && o.tecnicosAsignados.length > 0) {
+             assigned = o.tecnicosAsignados.map(safeResolveTecnicoNombre);
+           }
+           if (o.tecnico) {
+             assigned = assigned.concat(String(o.tecnico).split(',').map(s=>s.trim()));
+           }
+           const assignedLower = assigned.map(s => safeNormStr(s));
+           const isDirectIdMatch = Boolean(myUserId && Array.isArray(o.tecnicosAsignados) && o.tecnicosAsignados.includes(myUserId));
+           const isDirectNameMatch = assignedLower.some(a => a === tecNameLower || a.includes(tecNameLower) || tecNameLower.includes(a));
+           let isCreator = false;
+           let isTkAssigned = false;
+           let isBitacoraAssigned = false;
+           if (o.bitacora && Array.isArray(o.bitacora)) {
+             isBitacoraAssigned = o.bitacora.some(b => {
+               if (!b || !b.tecnico) return false;
+               const bNorm = safeNormStr(b.tecnico);
+               return bNorm === tecNameLower || 
+                      bNorm.includes(tecNameLower) || 
+                      tecNameLower.includes(bNorm) || 
+                      (myUserId && (b.tecnico === myUserId || b.tecnicoId === myUserId));
+             });
+           }
+           if (o.creadoPor && (safeNormStr(o.creadoPor) === tecNameLower || (myUserId && o.creadoPor === myUserId))) {
+             isCreator = true;
+           }
+           if (o.soporte || o.ticket_id) {
+              const targetTkId = o.soporte || o.ticket_id;
+              const tk = ticketsList.find(x => x && (x.id === targetTkId || x.folio === targetTkId));
+              if (tk) {
+                 if ((tk.solicitante && safeNormStr(tk.solicitante) === tecNameLower) || 
+                     (tk.creadoPor && (safeNormStr(tk.creadoPor) === tecNameLower || (myUserId && tk.creadoPor === myUserId)))) {
+                   isCreator = true;
+                 }
+                 let tkAssigned = [];
+                 if (tk.tecnicosAsignados && Array.isArray(tk.tecnicosAsignados) && tk.tecnicosAsignados.length > 0) {
+                   tkAssigned = tk.tecnicosAsignados.map(safeResolveTecnicoNombre);
+                 }
+                 if (tk.asignado && tk.asignado !== 'Sin asignar') {
+                   tkAssigned = tkAssigned.concat(String(tk.asignado).split(',').map(s=>s.trim()));
+                 }
+                 const tkAssignedLower = tkAssigned.map(s => safeNormStr(s));
+                 if (tkAssignedLower.some(a => a === tecNameLower || a.includes(tecNameLower) || tecNameLower.includes(a)) || (myUserId && Array.isArray(tk.tecnicosAsignados) && tk.tecnicosAsignados.includes(myUserId))) {
+                   isTkAssigned = true;
+                 }
+              }
+           }
+           passTec = isDirectIdMatch || isDirectNameMatch || isCreator || isTkAssigned || isBitacoraAssigned;
+        }
+        
+        if (supFilter && supNameLower) {
+           let passSupClient = false;
+           const cli = clientesList.find(c => c && c.nombre === o.cliente);
+           if (cli) {
+              const supUser = usersList.find(u => u && ((u.nombre && safeNormStr(u.nombre) === supNameLower) || u.id === supFilter));
+              const supId = supUser ? supUser.id : supFilter;
+              passSupClient = (cli.supervisoresAsignados && cli.supervisoresAsignados.includes(supId)) || (cli.supervisorAsignado === supId) || (safeNormStr(cli.supervisorAsignado) === supNameLower) || (cli.supervisorAsignado === supFilter);
+           }
+           
+           let assigned = [];
+           if (o.tecnicosAsignados && Array.isArray(o.tecnicosAsignados) && o.tecnicosAsignados.length > 0) {
+             assigned = o.tecnicosAsignados.map(safeResolveTecnicoNombre);
+           }
+           if (o.tecnico) {
+             assigned = assigned.concat(String(o.tecnico).split(',').map(s=>s.trim()));
+           }
+           const assignedLower = assigned.map(s => safeNormStr(s));
+           
+           let passSupTicket = assignedLower.includes(supNameLower);
+           let isCreator = false;
+           if (o.soporte || o.ticket_id) {
+              const targetTkId = o.soporte || o.ticket_id;
+              const tk = ticketsList.find(x => x && (x.id === targetTkId || x.folio === targetTkId));
+              if (tk) {
+                 if ((tk.solicitante && safeNormStr(tk.solicitante) === supNameLower) || 
+                     (tk.creadoPor && safeNormStr(tk.creadoPor) === supNameLower)) isCreator = true;
+                 let tkAssigned = [];
+                 if (tk.tecnicosAsignados && Array.isArray(tk.tecnicosAsignados) && tk.tecnicosAsignados.length > 0) {
+                   tkAssigned = tk.tecnicosAsignados.map(safeResolveTecnicoNombre);
+                 }
+                 if (tk.asignado && tk.asignado !== 'Sin asignar') {
+                   tkAssigned = tkAssigned.concat(String(tk.asignado).split(',').map(s=>s.trim()));
+                 }
+                 const tkAssignedLower = tkAssigned.map(s => safeNormStr(s));
+                 if (tkAssignedLower.includes(supNameLower)) passSupTicket = true;
+              }
+           }
+           passSup = passSupClient || passSupTicket || isCreator;
+        }
+        
+        return passTec && passSup;
+      });
+    }
+
+    // Deduplicación estricta por ID y Folio no genérico
+    const seenOrdIds = new Set();
+    const seenOrdFolios = new Set();
+    filtradas = filtradas.filter(o => {
+      if (!o) return false;
+      const oid = o.id ? String(o.id).trim() : null;
+      const rawFolio = (o.folio || o.numero_orden) ? String(o.folio || o.numero_orden).trim() : '';
+      const isGeneric = !rawFolio || ['-', 'n/a', 's/n', 'sin folio', 'null', 'undefined', 'por asignar'].includes(rawFolio.toLowerCase());
+      if (oid && seenOrdIds.has(oid)) return false;
+      if (!isGeneric && seenOrdFolios.has(rawFolio.toLowerCase())) return false;
+      if (oid) seenOrdIds.add(oid);
+      if (!isGeneric) seenOrdFolios.add(rawFolio.toLowerCase());
+      return true;
+    });
 
   // ORDENAMIENTO
   if (currentOrdSortCol !== 'reciente') {

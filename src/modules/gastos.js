@@ -8,6 +8,12 @@ import { supabaseClient } from "../supabaseClient.js";
 // ==========================================
 // MÓDULO CONTROL DE GASTOS Y CONCILIACIÓN CLARA
 // ==========================================
+// Transacciones Clara corporativas (gestionadas en app.js y window.claraMockTxs)
+var getClaraMockTxs = function() {
+  if (typeof window !== 'undefined' && Array.isArray(window.claraMockTxs)) return window.claraMockTxs;
+  if (typeof claraMockTxs !== 'undefined' && Array.isArray(claraMockTxs)) return claraMockTxs;
+  return [];
+};
 
 window.switchGastosTab = function(tabName) {
   const btnHistorial = document.getElementById('btn-tab-gastos-historial');
@@ -1631,7 +1637,7 @@ window.procesarArchivoMovimientos = function(event) {
       window._pendingImportedTxs = parsedTxs;
 
       // Calcular cuántos ya existen
-      const localTxs = safeGetJSON('sapi_clara_mock_txs', claraMockTxs);
+      const localTxs = safeGetJSON('sapi_clara_mock_txs', getClaraMockTxs());
       const existingIds = new Set(localTxs.map(t => t.id));
       const duplicatesCount = parsedTxs.filter(t => existingIds.has(t.id)).length;
       const newCount = parsedTxs.length - duplicatesCount;
@@ -1677,7 +1683,7 @@ window.confirmarImportacion = function() {
   }
 
   // Cargar existentes
-  let currentTxs = safeGetJSON('sapi_clara_mock_txs', claraMockTxs);
+  let currentTxs = safeGetJSON('sapi_clara_mock_txs', getClaraMockTxs());
   const existingIds = new Set(currentTxs.map(t => t.id));
 
   let newTxsCount = 0;
@@ -1694,7 +1700,10 @@ window.confirmarImportacion = function() {
   });
 
   // Guardar local
-  claraMockTxs = currentTxs;
+  if (typeof window !== 'undefined') window.claraMockTxs = currentTxs;
+  if (typeof claraMockTxs !== 'undefined') {
+    try { claraMockTxs = currentTxs; } catch (_) {}
+  }
   localStorage.setItem('sapi_clara_mock_txs', JSON.stringify(currentTxs));
 
   // Re-render
@@ -1944,7 +1953,7 @@ window.renderGastos = function() {
       .filter(g => g.claraTxId && g.estado !== 'Rechazado')
       .map(g => g.claraTxId)
   );
-  const pendingTxsCount = claraMockTxs.filter(tx => !associatedTxIds.has(tx.id)).length;
+  const pendingTxsCount = getClaraMockTxs().filter(tx => !associatedTxIds.has(tx.id)).length;
   const badgeClara = document.getElementById('badge-clara-txs');
   if (badgeClara) {
     badgeClara.textContent = pendingTxsCount;
@@ -1963,7 +1972,7 @@ window.onMetodoPagoChange = function() {
   if (headerMeta) {
     const claraId = document.getElementById('gasto-clara-tx-id').value;
     if (claraId) {
-      const tx = claraMockTxs.find(x => x.id === claraId);
+      const tx = getClaraMockTxs().find(x => x.id === claraId);
       headerMeta.textContent = `${document.getElementById('gasto-fecha').value || ''} • Tarjeta Clara • •••• ${tx ? tx.cardLast4 : '4321'}`;
     } else {
       headerMeta.textContent = `${document.getElementById('gasto-fecha').value || ''} • ${metodo}`;
@@ -2099,7 +2108,7 @@ window.generarTimelineActividad = function() {
   // Agregar evento de creación
   const claraId = document.getElementById('gasto-clara-tx-id').value;
   if (claraId) {
-    const tx = claraMockTxs.find(x => x.id === claraId);
+    const tx = getClaraMockTxs().find(x => x.id === claraId);
     items.push({
       date: dateInput,
       title: 'Transacción Clara Detectada',
@@ -4232,7 +4241,7 @@ window.abrirModalGasto = function(gastoId = null, mockClaraId = null) {
     }
 
   } else if (mockClaraId) {
-    const tx = claraMockTxs.find(x => x.id === mockClaraId);
+    const tx = getClaraMockTxs().find(x => x.id === mockClaraId);
     if (!tx) return;
 
     titleEl.innerHTML = `Conciliar Transacción <img src="Logo_de_Clara.svg" alt="Clara" style="height: 14px; width: auto; vertical-align: middle; margin-left: 0.5rem; display: inline-block; filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.15));" />`;
@@ -4464,7 +4473,7 @@ window.guardarGasto = function(e) {
   let claraCardLast4 = null;
 
   if (claraTxId) {
-    const tx = claraMockTxs.find(x => x.id === claraTxId);
+    const tx = getClaraMockTxs().find(x => x.id === claraTxId);
     if (tx) {
       claraMerchant = tx.merchant;
       claraCardLast4 = tx.cardLast4;

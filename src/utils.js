@@ -631,12 +631,40 @@ export function unificarNombreUsuario(rawNombre) {
   return String(rawNombre).trim();
 }
 
+export const PAQUETERIAS_CONOCIDAS = [
+  'dhl', 'fedex', 'estafeta', 'paquetexpress', 'redpack', 'castores', 'tres guerras', 'tresguerras', 'ups', 'paqueteria', 'por definir'
+];
+
+export function esNombrePaqueteria(nombre) {
+  if (!nombre) return false;
+  const n = String(typeof nombre === 'object' ? (nombre.nombre || nombre.name || '') : nombre).toLowerCase().trim();
+  if (!n) return false;
+  return PAQUETERIAS_CONOCIDAS.some(p => n === p || n.startsWith(p + ' ') || n.startsWith(p + ' express'));
+}
+
+export function esResponsableExcluidoOperativo(nombre) {
+  if (!nombre) return false;
+  const str = typeof nombre === 'object' ? (nombre.nombre || nombre.name || nombre.usuario || '') : String(nombre);
+  const n = normalizarTextoJunta(str);
+  if (!n) return false;
+  if (n === 'pablo besoy' || n === 'pablo besoy trigueros' || n === 'besoy') {
+    return true;
+  }
+  if (esNombrePaqueteria(str)) return true;
+  if (typeof isTestUser === 'function' && isTestUser({ nombre: str })) return true;
+  return false;
+}
+
 export function obtenerInfoRolUsuario(nombre) {
   if (!nombre) return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
   
   const norm = normalizarTextoJunta(nombre);
-  if (norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === '' || norm === 'sin_asignar') {
+  if (norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === '' || norm === 'sin_asignar' || esNombrePaqueteria(nombre)) {
     return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
+  }
+
+  if (norm === 'pablo besoy' || norm === 'pablo besoy trigueros' || norm === 'besoy') {
+    return { rol: 'superadmin', label: 'Super Admin', color: '#E8820C', icon: 'shield-alert' };
   }
 
   let user = null;
@@ -727,7 +755,7 @@ export function extraerListaResponsables(raw) {
     return ['Sin Asignar'];
   }
   const parts = rawStr.split(/[,;/]+/).map(s => s.trim()).filter(Boolean);
-  const validParts = parts.filter(s => s !== '-' && s.toLowerCase() !== 'sin asignar' && s.toLowerCase() !== 'sin_asignar');
+  const validParts = parts.filter(s => s !== '-' && s.toLowerCase() !== 'sin asignar' && s.toLowerCase() !== 'sin_asignar' && !esNombrePaqueteria(s) && !esResponsableExcluidoOperativo(s));
   return validParts.length > 0 ? Array.from(new Set(validParts)) : ['Sin Asignar'];
 }
 
@@ -750,8 +778,14 @@ if (_targetGlobal) {
   _targetGlobal.formatearTiempoRelativoJunta = formatearTiempoRelativoJunta;
   _targetGlobal.normalizarTextoJunta = normalizarTextoJunta;
   _targetGlobal.unificarNombreUsuario = unificarNombreUsuario;
+  _targetGlobal._unificarNombreUsuarioBase = unificarNombreUsuario;
   _targetGlobal.obtenerInfoRolUsuario = obtenerInfoRolUsuario;
+  _targetGlobal._obtenerInfoRolUsuarioBase = obtenerInfoRolUsuario;
   _targetGlobal.extraerListaResponsables = extraerListaResponsables;
+  _targetGlobal._extraerListaResponsablesBase = extraerListaResponsables;
+  _targetGlobal.esResponsableExcluidoOperativo = esResponsableExcluidoOperativo;
+  _targetGlobal.esNombrePaqueteria = esNombrePaqueteria;
+  _targetGlobal.PAQUETERIAS_CONOCIDAS = PAQUETERIAS_CONOCIDAS;
   _targetGlobal.loadScriptOnDemand = loadScriptOnDemand;
   _targetGlobal.solicitarBackgroundSync = solicitarBackgroundSync;
   _targetGlobal.registrarListenerBackgroundSync = registrarListenerBackgroundSync;

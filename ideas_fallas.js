@@ -862,6 +862,12 @@ const GH_WORKFLOW = 'sync-sap.yml';
 
 async function sincronizarConGitHub(modulo = 'all', btnEl = null) {
   if (typeof document === "undefined") return;
+  if (typeof window !== 'undefined' && window._sapSyncRunning) {
+    if (typeof mostrarNotificacion === 'function') mostrarNotificacion('⏳ Ya hay una sincronización en curso. Por favor espera un momento.', 'info');
+    return;
+  }
+  if (typeof window !== 'undefined') window._sapSyncRunning = true;
+
   const origHTML = btnEl ? btnEl.innerHTML : '';
   if (btnEl) { 
     btnEl.innerHTML = '<i data-lucide="loader" class="btn-icon rotating"></i> Conectando SAP...'; 
@@ -982,6 +988,7 @@ async function sincronizarConGitHub(modulo = 'all', btnEl = null) {
     }, 5000);
 
     function finishSync() {
+      if (typeof window !== 'undefined') window._sapSyncRunning = false;
       if (btnEl) {
         btnEl.innerHTML = origHTML;
         btnEl.disabled = false;
@@ -990,6 +997,7 @@ async function sincronizarConGitHub(modulo = 'all', btnEl = null) {
     }
 
   } catch(e) {
+    if (typeof window !== 'undefined') window._sapSyncRunning = false;
     mostrarNotificacion(`❌ Error al disparar sync: ${e.message}`, 'error');
     if (btnEl) {
       btnEl.innerHTML = origHTML;

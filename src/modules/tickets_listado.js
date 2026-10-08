@@ -3,7 +3,7 @@
  * Diseñado como módulo ES con retrocompatibilidad global hacia window.
  */
 
-import { normStr, formatFechaHoraAmigable, escapeHTML, esUsuarioSuperadmin } from "../utils.js";
+import { normStr, formatFechaHoraAmigable, escapeHTML, esUsuarioSuperadmin, esNombrePaqueteria } from "../utils.js";
 
 function safeEsUsuarioSuperadmin() {
   if (typeof esUsuarioSuperadmin === 'function') return esUsuarioSuperadmin();
@@ -447,7 +447,22 @@ function actualizarFiltrosPersonal() {
       });
     }
 
-    const uniqueStaff = Array.from(allStaff).filter(Boolean).sort((a,b) => a.localeCompare(b));
+    const esValidoStaff = (n) => {
+      if (!n || typeof n !== 'string') return false;
+      const clean = n.trim();
+      if (!clean || clean === '-' || clean.toLowerCase() === 'sin asignar' || clean.toLowerCase() === 'sin_asignar') return false;
+      const isPaqFn = (typeof esNombrePaqueteria === 'function') ? esNombrePaqueteria : (typeof window !== 'undefined' && window.esNombrePaqueteria ? window.esNombrePaqueteria : () => false);
+      if (isPaqFn(clean)) return false;
+      const nLow = clean.toLowerCase();
+      const paqs = ['dhl', 'fedex', 'estafeta', 'paquetexpress', 'redpack', 'castores', 'tres guerras', 'tresguerras', 'ups', 'paqueteria', 'por definir'];
+      if (paqs.some(p => nLow === p || nLow.startsWith(p + ' '))) return false;
+      if (typeof isTestUser === 'function' && isTestUser({ nombre: clean })) return false;
+      if (typeof window !== 'undefined' && typeof window.isTestUser === 'function' && window.isTestUser({ nombre: clean })) return false;
+      if (nLow.includes('test') || nLow.includes('prueba')) return false;
+      return true;
+    };
+
+    const uniqueStaff = Array.from(allStaff).filter(esValidoStaff).sort((a,b) => a.localeCompare(b));
     
     // Crear lista separada exclusiva para supervisores
     let allSupervisores = new Set();
@@ -478,7 +493,7 @@ function actualizarFiltrosPersonal() {
         }
       });
     }
-    const uniqueSupervisores = Array.from(allSupervisores).filter(Boolean).sort((a,b) => a.localeCompare(b));
+    const uniqueSupervisores = Array.from(allSupervisores).filter(esValidoStaff).sort((a,b) => a.localeCompare(b));
 
     const tecOptionsHtml = '<option value="">Cualquier Técnico</option>' + uniqueStaff.map(n => `<option value="${n}">${n}</option>`).join('');
     const supOptionsHtml = '<option value="">Cualquier Supervisor</option>' + uniqueSupervisores.map(n => `<option value="${n}">${n}</option>`).join('');

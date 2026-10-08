@@ -768,10 +768,15 @@ async function guardarOrden(e) {
     equipoVal = document.getElementById('f-equipo')?.value || '';
   }
 
+  if (!equipoVal && oVieja && oVieja.equipo) {
+    equipoVal = oVieja.equipo;
+  }
+  if (!equipoVal && soporteIdGuardar) {
+    const t = tickets.find(x => x.id === soporteIdGuardar);
+    if (t && (t.maquinaria || t.equipo)) equipoVal = t.maquinaria || t.equipo;
+  }
   if (!equipoVal) {
-    mostrarNotificacion('Debe seleccionar al menos una máquina.', 'error');
-    restoreBtn();
-    return;
+    equipoVal = 'General / No especificada';
   }
 
   let marcasVal = '';
@@ -933,21 +938,29 @@ async function guardarOrden(e) {
     document.getElementById('f-estado').value = orden.estado; // update UI state
   }
 
+  orden._synced = false;
   if (oVieja) {
     ordenes = ordenes.map(o => o.id === editandoId ? orden : o);
-    if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) window.ordenes = window.ordenes.map(o => o.id === editandoId ? orden : o);
+    if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) {
+      window.ordenes = window.ordenes.map(o => o.id === editandoId ? orden : o);
+    }
   } else {
-    const existeEnOrdenes = ordenes.some(o => o && (o.id === orden.id || (o.folio && orden.folio && o.folio === orden.folio)));
-    if (!existeEnOrdenes) {
+    const idx = ordenes.findIndex(o => o && (o.id === orden.id || (o.folio && orden.folio && o.folio === orden.folio)));
+    if (idx >= 0) {
+      ordenes[idx] = orden;
+    } else {
       ordenes.unshift(orden);
     }
-    if (typeof window !== 'undefined' && Array.isArray(window.ordenes) && window.ordenes !== ordenes) {
-      const existeEnWin = window.ordenes.some(o => o && (o.id === orden.id || (o.folio && orden.folio && o.folio === orden.folio)));
-      if (!existeEnWin) {
+    if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) {
+      const winIdx = window.ordenes.findIndex(o => o && (o.id === orden.id || (o.folio && orden.folio && o.folio === orden.folio)));
+      if (winIdx >= 0) {
+        window.ordenes[winIdx] = orden;
+      } else {
         window.ordenes.unshift(orden);
       }
     }
   }
+  if (typeof window !== 'undefined') window.ordenes = ordenes;
   
   // Auto-cerrar el ticket relacionado
   if (orden.soporte) {

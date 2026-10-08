@@ -69,13 +69,53 @@ const err = (msg) => console.error(`[${new Date().toLocaleTimeString('es-MX')}] 
 
 // ── 1. Login a SAP ────────────────────────────────────────────────
 async function loginSAP() {
-  log('Iniciando sesión en SAP B1...');
-  const res = await axios.post(`${SAP_URL}/Login`, {
-    CompanyDB: SAP_DB, UserName: SAP_USER, Password: SAP_PASS
-  }, { httpsAgent: agent, timeout: 30000 });
-  sessionId = res.data.SessionId;
-  sapApi.defaults.headers.common['Cookie'] = `B1SESSION=${sessionId}`;
-  log(`✅ Login SAP exitoso.`);
+  log(`Iniciando sesión en SAP B1 (${SAP_URL}) para CompanyDB "${SAP_DB}", usuario "${SAP_USER}"...`);
+  
+  const attemptLogin = async (user) => {
+    return await axios.post(`${SAP_URL}/Login`, {
+      CompanyDB: SAP_DB,
+      UserName: user,
+      Password: SAP_PASS
+    }, { httpsAgent: agent, timeout: 30000 });
+  };
+
+  try {
+    let res;
+    try {
+      res = await attemptLogin(SAP_USER);
+    } catch (firstErr) {
+      // Si el usuario tiene prefijo de dominio tipo "sinergia\usuario", intentar sin el prefijo si el primero dio 401
+      if (firstErr.response?.status === 401 && SAP_USER && SAP_USER.includes('\\')) {
+        const cleanUser = SAP_USER.split('\\').pop();
+        log(`Intento con "${SAP_USER}" rechazado (401). Probando sin dominio: "${cleanUser}"...`);
+        res = await attemptLogin(cleanUser);
+      } else {
+        throw firstErr;
+      }
+    }
+
+    sessionId = res.data.SessionId;
+    sapApi.defaults.headers.common['Cookie'] = `B1SESSION=${sessionId}`;
+    log(`✅ Login SAP exitoso. SessionId obtenido.`);
+  } catch (loginErr) {
+    const status = loginErr.response?.status;
+    const sapErr = loginErr.response?.data?.error;
+    const msg = sapErr?.message?.value || loginErr.response?.data || loginErr.message;
+    const code = sapErr?.code || status;
+
+    err(`Fallo de conexión/autenticación con SAP:`);
+    err(`   - Status HTTP: ${status || 'Sin respuesta'}`);
+    err(`   - Código SAP: ${code || 'N/A'}`);
+    err(`   - Mensaje: ${typeof msg === 'object' ? JSON.stringify(msg) : String(msg).trim()}`);
+    
+    if (status === 401 || code === -334) {
+      err(`⚠️ Las credenciales de SAP (SAP_USER o SAP_PASSWORD) fueron rechazadas por SAP Business One.`);
+      err(`   Por favor verifica que la contraseña en GitHub Secrets y en backend/.env esté vigente y el usuario no esté bloqueado en SAP.`);
+    } else if (loginErr.code === 'ETIMEDOUT' || loginErr.code === 'ECONNREFUSED' || loginErr.code === 'ENOTFOUND') {
+      err(`⚠️ Error de red hacia SAP: No se pudo alcanzar el host "${SAP_URL}".`);
+    }
+    throw loginErr;
+  }
 }
 
 // ── 2. Obtener datos de un query SAP ─────────────────────────────

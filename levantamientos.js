@@ -13,7 +13,11 @@ function renderLevantamientos() {
   
   const searchTerm = (document.getElementById('search-levantamientos')?.value || '').toLowerCase();
   
-  let list = levantamientos || [];
+  let list = (typeof window !== 'undefined' && Array.isArray(window.levantamientos) && window.levantamientos.length > 0)
+    ? window.levantamientos
+    : ((typeof levantamientos !== 'undefined' && Array.isArray(levantamientos) && levantamientos.length > 0)
+      ? levantamientos
+      : (typeof safeGetJSON === 'function' ? safeGetJSON('sapi_levantamientos', []) : []));
   
   // Filter by Sandbox mode
   if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
@@ -22,22 +26,35 @@ function renderLevantamientos() {
   }
 
   // Filtrar por rol de técnico (solo ver levantamientos asignados a sí mismo)
-  const isTecnico = (typeof currentSession !== 'undefined' && currentSession.viewMode === 'tecnico');
-  let miNombreLower = '';
-  if (isTecnico && typeof currentSession !== 'undefined') {
-    let miNombre = currentSession.nombre || '';
-    if (!miNombre && typeof usuarios !== 'undefined') {
-      const u = usuarios.find(usr => usr.id === currentSession.userId);
-      if (u) miNombre = u.nombre || '';
-    }
-    miNombreLower = miNombre.trim().toLowerCase();
-  }
+  const activeSess = (typeof currentSession !== 'undefined' && currentSession) ? currentSession : ((typeof window !== 'undefined' && window.currentSession) ? window.currentSession : null);
+  const isTecnico = activeSess && activeSess.viewMode === 'tecnico';
+  const testMode = (typeof isTestModeActive === 'function' && isTestModeActive()) || (typeof window !== 'undefined' && typeof window.isTestModeActive === 'function' && window.isTestModeActive());
+  
+  if (isTecnico && !testMode && activeSess) {
+    const myId = activeSess.userId;
+    const usersArr = (typeof window !== 'undefined' && Array.isArray(window.usuarios)) ? window.usuarios : ((typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : []);
+    const usr = usersArr.find(u => u && u.id === myId);
+    const myName = (usr ? usr.nombre : activeSess.nombre) || '';
+    const myNameLower = myName.trim().toLowerCase();
 
-  if (isTecnico && miNombreLower) {
     list = list.filter(l => {
-      if (!l.tecnico_asignado) return false;
-      const asignados = l.tecnico_asignado.split(',').map(s => s.trim().toLowerCase());
-      return asignados.includes(miNombreLower);
+      if (!l) return false;
+      if (myId && l.creado_por === myId) return true;
+      if (myNameLower && l.creado_por && String(l.creado_por).trim().toLowerCase() === myNameLower) return true;
+      
+      let asignados = [];
+      if (l.tecnicosAsignados && Array.isArray(l.tecnicosAsignados)) {
+        if (myId && l.tecnicosAsignados.includes(myId)) return true;
+        asignados = asignados.concat(l.tecnicosAsignados.map(t => {
+          if (typeof window !== 'undefined' && typeof window.resolveTecnicoNombre === 'function') return window.resolveTecnicoNombre(t);
+          return t;
+        }));
+      }
+      if (l.tecnico_asignado) {
+        asignados = asignados.concat(String(l.tecnico_asignado).split(',').map(s => s.trim()));
+      }
+      const asignadosLower = asignados.map(s => String(s || '').trim().toLowerCase());
+      return myNameLower ? asignadosLower.includes(myNameLower) : false;
     });
   }
   
