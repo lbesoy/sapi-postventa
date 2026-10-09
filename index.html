@@ -54,7 +54,7 @@
       }
     } else if (typeof window !== 'undefined') {
       // Control de versión automático para invalidar Service Workers y caché en Vercel/Producción
-      const currentAppVer = '1.3.338';
+      const currentAppVer = '1.3.339';
       const lastAppVer = localStorage.getItem('sapi_app_version');
       if (lastAppVer !== currentAppVer) {
         localStorage.setItem('sapi_app_version', currentAppVer);
@@ -9171,17 +9171,17 @@
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=327",
+        "supabaseSync.js?v=328",
         "store.js?v=1",
-        "utils.js?v=8",
+        "utils.js?v=9",
         "sap_sync.js?v=1",
         "sap_mapper.js?v=1",
         "notificaciones.js?v=1",
         "config_tecnicos.js?v=1",
         "ordenes_estados.js?v=1",
         "ordenes_listado.js?v=1",
-        "ordenes_form.js?v=1",
-        "ordenes_detalle.js?v=1",
+        "ordenes_form.js?v=2",
+        "ordenes_detalle.js?v=2",
         "ordenes_bitacora.js?v=1",
         "servicios_programados.js?v=1",
         "tickets_listado.js?v=1",

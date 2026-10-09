@@ -871,6 +871,28 @@ async function guardarOrden(e) {
     evidencias: oVieja ? (oVieja.evidencias || { fotoInicio: null, fotoFin: null, adicionales: [] }) : { fotoInicio: null, fotoFin: null, adicionales: [] }
   };
   
+  // Consolidar evidencias con la copia más reciente de memoria y localStorage para no sobreescribir fotos subidas en paralelo
+  try {
+    let freshEvidencias = orden.evidencias;
+    const localList = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+    const targetId = (typeof editandoId !== 'undefined' && editandoId) ? editandoId : ((typeof currentId !== 'undefined' && currentId) ? currentId : null);
+    const freshOrd = localList.find(x => x && ((targetId && x.id === targetId) || (x.folio && orden.folio && x.folio === orden.folio)));
+    if (freshOrd && freshOrd.evidencias) {
+      if (typeof window.mergeEvidencias === 'function') {
+        freshEvidencias = window.mergeEvidencias(freshEvidencias, freshOrd.evidencias);
+      } else {
+        freshEvidencias = {
+          fotoInicio: freshEvidencias.fotoInicio || freshOrd.evidencias.fotoInicio || null,
+          fotoFin: freshEvidencias.fotoFin || freshOrd.evidencias.fotoFin || null,
+          adicionales: Array.from(new Set([...(freshEvidencias.adicionales || []), ...(freshOrd.evidencias.adicionales || [])]))
+        };
+      }
+    }
+    orden.evidencias = freshEvidencias;
+  } catch (eEv) {
+    console.warn('[ordenes_form] Error consolidando evidencias frescas:', eEv);
+  }
+  
   // VALIDACIÓN: Refacciones utilizadas obligatorias con foto (omitir si cantidad es 0)
   const refSinFoto = orden.ref_utilizadas.find(ref => !ref.fotoUrl && ref.descripcion && parseFloat(ref.cantidad || 0) > 0);
   if (refSinFoto) {

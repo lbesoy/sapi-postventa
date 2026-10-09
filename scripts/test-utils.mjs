@@ -21,7 +21,8 @@ import {
   resolverCreadorTicket,
   esNombrePaqueteria,
   esResponsableExcluidoOperativo,
-  obtenerInfoRolUsuario
+  obtenerInfoRolUsuario,
+  mergeEvidencias
 } from '../src/utils.js';
 
 console.log('🧪 Ejecutando pruebas unitarias para src/utils.js...');
@@ -1842,6 +1843,24 @@ assert.doesNotThrow(() => {
   borrarCanvasFirma('cliente');
   guardarFirmaCanvas('ord-1', 'cliente');
 }, 'Las funciones de ordenes_detalle no deben arrojar error en ausencia de DOM');
+
+// Test D: Validación exhaustiva de mergeEvidencias (cero pérdida de evidencias)
+assert.equal(typeof mergeEvidencias, 'function', 'mergeEvidencias debe ser función');
+const evMerged = mergeEvidencias(
+  { fotoInicio: 'https://ex.com/ini.jpg', adicionales: ['https://ex.com/a.jpg', 'https://ex.com/b.jpg'] },
+  { fotoFin: 'https://ex.com/fin.jpg', adicionales: ['https://ex.com/b.jpg', 'https://ex.com/c.jpg'] }
+);
+assert.equal(evMerged.fotoInicio, 'https://ex.com/ini.jpg', 'fotoInicio debe preservarse');
+assert.equal(evMerged.fotoFin, 'https://ex.com/fin.jpg', 'fotoFin debe integrarse');
+assert.deepEqual(evMerged.adicionales, ['https://ex.com/a.jpg', 'https://ex.com/b.jpg', 'https://ex.com/c.jpg'], 'adicionales debe ser la unión sin duplicados');
+
+// Exclusión explícita de fotos eliminadas
+const evWithExclusion = mergeEvidencias(
+  { adicionales: ['https://ex.com/a.jpg', 'https://ex.com/b.jpg'] },
+  { adicionales: ['https://ex.com/b.jpg'] },
+  ['https://ex.com/a.jpg']
+);
+assert.deepEqual(evWithExclusion.adicionales, ['https://ex.com/b.jpg'], 'foto eliminada no debe reaparecer');
 
 console.log('  ✅ Detalle, Evidencias Fotográficas y Canvas de Firmas de Órdenes: OK');
 

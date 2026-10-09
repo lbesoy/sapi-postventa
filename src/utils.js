@@ -961,5 +961,51 @@ if (typeof window !== 'undefined') {
   }, 250);
 
   window.esUsuarioSuperadmin = esUsuarioSuperadmin;
+  window.mergeEvidencias = mergeEvidencias;
+}
+
+export function mergeEvidencias(target, source, excludedUrls = []) {
+  const excludeSet = new Set(Array.isArray(excludedUrls) ? excludedUrls.map(u => String(u).trim()) : []);
+  
+  const parseEv = (ev) => {
+    if (!ev) return null;
+    if (typeof ev === 'string') {
+      try { return JSON.parse(ev); } catch (e) { return null; }
+    }
+    return (typeof ev === 'object') ? ev : null;
+  };
+
+  const t = parseEv(target) || {};
+  const s = parseEv(source) || {};
+
+  const cleanUrl = (u) => {
+    if (!u || typeof u !== 'string') return null;
+    const str = u.trim();
+    if (!str || str === 'null' || str === 'undefined' || excludeSet.has(str)) return null;
+    return str;
+  };
+
+  const fotoInicio = cleanUrl(t.fotoInicio) || cleanUrl(s.fotoInicio) || null;
+  const fotoFin = cleanUrl(t.fotoFin) || cleanUrl(s.fotoFin) || null;
+
+  const adicionalesSet = new Set();
+  const adicionalesList = [];
+
+  const addAdicional = (url) => {
+    const cleaned = cleanUrl(url);
+    if (cleaned && !adicionalesSet.has(cleaned)) {
+      adicionalesSet.add(cleaned);
+      adicionalesList.push(cleaned);
+    }
+  };
+
+  if (Array.isArray(t.adicionales)) t.adicionales.forEach(addAdicional);
+  if (Array.isArray(s.adicionales)) s.adicionales.forEach(addAdicional);
+
+  return {
+    fotoInicio,
+    fotoFin,
+    adicionales: adicionalesList
+  };
 }
 

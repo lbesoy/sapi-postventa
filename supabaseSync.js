@@ -193,9 +193,9 @@ window.descargarRefaccionesSupabase = async function() {
     if (allRefacciones && allRefacciones.length > 0) {
       const mapped = allRefacciones.map(r => ({
         id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, 
-        marca: r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.custom_data?.marca || '', 
-        grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
-        ItmsGrpCod: r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
+        marca: r.marca || r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.marca || r.custom_data?.marca || '', 
+        grupo: r.grupo || r.custom_data?.grupo || '', origen: r.origen || r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
+        ItmsGrpCod: r.itms_grp_cod || r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
       }));
       window.refaccionesDb = mapped;
       if (typeof refaccionesDb !== 'undefined') {
@@ -262,7 +262,13 @@ window.inyectarCotizacionesEnNotas = function(rawOrCleanNotasStr, cotizaciones) 
   const extracted = window.extraerCotizacionesDeNotas(rawOrCleanNotasStr);
   const clean = (extracted.notasLimpias || '').trim();
   if (!cotizaciones || cotizaciones.length === 0) return clean;
-  return `${clean}\n\n=== COTIZACIONES ===\n${JSON.stringify(cotizaciones)}`;
+  // Nunca almacenar blobs Base64 de PDFs dentro de las notas de texto
+  const sanitized = cotizaciones.map(c => {
+    if (!c || typeof c !== 'object') return c;
+    const { pdf, ...rest } = c;
+    return { ...rest, tienePdf: !!pdf };
+  });
+  return `${clean}\n\n=== COTIZACIONES ===\n${JSON.stringify(sanitized)}`;
 };
 
 // ============================================================
@@ -441,7 +447,18 @@ function ticketToRow(t) {
     comentarios_clientes: t.comentariosClientes || [],
     creado_por: (t.creadoPor && String(t.creadoPor).trim() !== '' && t.creadoPor !== '—' && t.creadoPor !== 'null')
       ? String(t.creadoPor).trim()
-      : ((typeof window.resolverCreadorTicket === 'function' ? window.resolverCreadorTicket(t) : (t.creado_por || null)) || null)
+      : ((typeof window.resolverCreadorTicket === 'function' ? window.resolverCreadorTicket(t) : (t.creado_por || null)) || null),
+    horometro: (t.horometro !== undefined && t.horometro !== null && String(t.horometro).trim() !== '')
+      ? (parseFloat(String(t.horometro).replace(/[^0-9.]/g, '')) || null)
+      : null,
+    envios: Array.isArray(t.envios) ? t.envios : [],
+    refacciones: Array.isArray(t.refaccionesSeleccionadas) ? t.refaccionesSeleccionadas : [],
+    cotizaciones_adicionales: (t.cotizacionesAdicionales || []).map(c => {
+      if (!c || typeof c !== 'object') return c;
+      const { pdf, pdfGuia, ...rest } = c;
+      return { ...rest, tienePdf: !!pdf || !!pdfGuia || !!c.tienePdf };
+    }),
+    es_prueba: !!(t.esPrueba || (t.folio && t.folio.includes('PRUEBA')) || (t.asunto && t.asunto.startsWith('[PRUEBA]')))
   };
 
   // Solo incluir campos PDF si tienen el Base64 real y no un marcador
@@ -509,6 +526,14 @@ function rowToTicket(t, idsWithPedido, idsWithCotizacion) {
   const extracted = window.extraerRefaccionesDeNotas(t.notas);
   const extractedCot = window.extraerCotizacionesDeNotas(extracted.notasLimpias);
 
+  const refaccionesVal = (t.refacciones && Array.isArray(t.refacciones) && t.refacciones.length > 0)
+    ? t.refacciones
+    : extracted.refacciones;
+
+  const cotizacionesVal = (t.cotizaciones_adicionales && Array.isArray(t.cotizaciones_adicionales) && t.cotizaciones_adicionales.length > 0)
+    ? t.cotizaciones_adicionales
+    : extractedCot.cotizaciones;
+
   const obj = {
     id: t.id,
     _synced: true,
@@ -531,8 +556,8 @@ function rowToTicket(t, idsWithPedido, idsWithCotizacion) {
     descripcion: t.descripcion,
     equipo: t.equipo,
     notas: extractedCot.notasLimpias,
-    refaccionesSeleccionadas: extracted.refacciones,
-    cotizacionesAdicionales: extractedCot.cotizaciones,
+    refaccionesSeleccionadas: refaccionesVal,
+    cotizacionesAdicionales: cotizacionesVal,
     estado: t.estado,
     cotizacionSAP: t.cotizacion_sap,
     montoCotizacion: (t.monto_cotizacion !== undefined && t.monto_cotizacion !== null) ? Number(t.monto_cotizacion) : null,
@@ -547,10 +572,10 @@ function rowToTicket(t, idsWithPedido, idsWithCotizacion) {
     tecnicosAsignados: [], // Siempre vacío por diseño relacional de negocio
     pdfPedido: pdfPedidoVal,
     pdfCotizacion: pdfCotizacionVal,
-    esPrueba: t.es_prueba || (t.folio && t.folio.includes('PRUEBA')) || (t.asunto && t.asunto.startsWith('[PRUEBA]')) || false
+    esPrueba: (t.es_prueba !== undefined && t.es_prueba !== null) ? t.es_prueba : ((t.folio && t.folio.includes('PRUEBA')) || (t.asunto && t.asunto.startsWith('[PRUEBA]')) || false)
   };
   
-  obj.horometro = '';
+  obj.horometro = (t.horometro !== undefined && t.horometro !== null) ? String(t.horometro) : '';
   obj.guiaPedido = '';
   obj.paqueteria = '';
   obj.fechaPedido = '';
@@ -558,7 +583,7 @@ function rowToTicket(t, idsWithPedido, idsWithCotizacion) {
   obj.destinoPiezas = '';
   obj.destinoPrecio = '';
   obj.destinoPdfUrl = '';
-  obj.envios = [];
+  obj.envios = (t.envios && Array.isArray(t.envios) && t.envios.length > 0) ? t.envios : [];
   
   if (obj.notas) {
     let remainingNotes = obj.notas;
@@ -569,7 +594,7 @@ function rowToTicket(t, idsWithPedido, idsWithCotizacion) {
       const tag = remainingNotes.substring(1, 3);
       const val = remainingNotes.substring(3, endIdx);
       if (tag === 'H:') {
-        obj.horometro = val;
+        if (!obj.horometro) obj.horometro = val;
       } else if (tag === 'U:') {
         obj.destinoPiezas = val;
       } else if (tag === 'Y:') {
@@ -586,9 +611,9 @@ function rowToTicket(t, idsWithPedido, idsWithCotizacion) {
         obj.fechaEntrega = val;
       } else if (tag === 'S:') {
         try {
-          obj.envios = JSON.parse(val);
+          if (!obj.envios || obj.envios.length === 0) obj.envios = JSON.parse(val);
         } catch (e) {
-          obj.envios = [];
+          if (!obj.envios) obj.envios = [];
         }
       } else {
         break;
@@ -776,6 +801,23 @@ function ordenToRow(o) {
     fecha_fin: o.fechaFin || null,
     duracion_minutos: o.duracion || null,
     notas: notasJSON,
+    horometro: (o.horometro && !isNaN(parseFloat(String(o.horometro).replace(/[^0-9.]/g, '')))) ? parseFloat(String(o.horometro).replace(/[^0-9.]/g, '')) : null,
+    horometro_real: (o.horometro_real && !isNaN(parseFloat(String(o.horometro_real).replace(/[^0-9.]/g, '')))) ? parseFloat(String(o.horometro_real).replace(/[^0-9.]/g, '')) : null,
+    pedido: o.pedido ? String(o.pedido).trim() : null,
+    eco: o.eco ? String(o.eco).trim() : null,
+    falla: o.falla || null,
+    trabajos: o.trabajos || null,
+    dictamen: o.dictamen || null,
+    condiciones: o.condiciones || null,
+    pendientes: o.pendientes || null,
+    observaciones: o.observaciones || null,
+    soporte: o.soporte || null,
+    tecnicos_asignados: Array.isArray(o.tecnicosAsignados) ? o.tecnicosAsignados : (Array.isArray(o.tecnicos_asignados) ? o.tecnicos_asignados : (o.tecnico ? [o.tecnico] : [])),
+    ref_necesarias: Array.isArray(o.ref_necesarias) ? o.ref_necesarias : [],
+    ref_utilizadas: Array.isArray(o.ref_utilizadas) ? o.ref_utilizadas : [],
+    dias: Array.isArray(o.dias) ? o.dias : (o.dias && typeof o.dias === 'object' ? [o.dias] : []),
+    km_total: (o.km_total && !isNaN(parseFloat(String(o.km_total).replace(/[^0-9.]/g, '')))) ? parseFloat(String(o.km_total).replace(/[^0-9.]/g, '')) : null,
+    es_prueba: !!(o.esPrueba || o.es_prueba || (o.folio && o.folio.includes('PRUEBA'))),
     evidencia_url: evUrl,
     evidencias: sanitizedEvidencias,
     ubicacion_sitio: o.ubicacion_sitio || null,
@@ -876,6 +918,7 @@ function rowToOrden(o) {
   res.bitacora = [];
   res.ref_necesarias = extraData.ref_necesarias || [];
   res.ref_utilizadas = extraData.ref_utilizadas || [];
+  res.evidencias = mergeEvidencias(evidenciasObj, extraData.evidencias);
 
   if (!res.ubicacion_sitio && extraData.ubicacion_sitio) res.ubicacion_sitio = extraData.ubicacion_sitio;
   if (!res.operador && extraData.operador) res.operador = extraData.operador;
@@ -885,6 +928,25 @@ function rowToOrden(o) {
   res.serie = serie || res.serie || null;
   res.marca = marca || res.marca || null;
   res.eco = eco || res.eco || null;
+
+  // Priorizar columnas dedicadas de la base de datos si existen
+  if (o.pedido !== undefined && o.pedido !== null) res.pedido = o.pedido;
+  if (o.horometro !== undefined && o.horometro !== null) res.horometro = o.horometro;
+  if (o.horometro_real !== undefined && o.horometro_real !== null) res.horometro_real = o.horometro_real;
+  if (o.eco !== undefined && o.eco !== null) res.eco = o.eco;
+  if (o.falla !== undefined && o.falla !== null) res.falla = o.falla;
+  if (o.trabajos !== undefined && o.trabajos !== null) res.trabajos = o.trabajos;
+  if (o.dictamen !== undefined && o.dictamen !== null) res.dictamen = o.dictamen;
+  if (o.condiciones !== undefined && o.condiciones !== null) res.condiciones = o.condiciones;
+  if (o.pendientes !== undefined && o.pendientes !== null) res.pendientes = o.pendientes;
+  if (o.observaciones !== undefined && o.observaciones !== null) res.observaciones = o.observaciones;
+  if (o.soporte !== undefined && o.soporte !== null) res.soporte = o.soporte;
+  if (o.tecnicos_asignados && Array.isArray(o.tecnicos_asignados) && o.tecnicos_asignados.length > 0) res.tecnicosAsignados = o.tecnicos_asignados;
+  if (o.ref_necesarias && Array.isArray(o.ref_necesarias) && o.ref_necesarias.length > 0) res.ref_necesarias = o.ref_necesarias;
+  if (o.ref_utilizadas && Array.isArray(o.ref_utilizadas) && o.ref_utilizadas.length > 0) res.ref_utilizadas = o.ref_utilizadas;
+  if (o.dias && Array.isArray(o.dias) && o.dias.length > 0) res.dias = o.dias;
+  if (o.km_total !== undefined && o.km_total !== null) res.km_total = o.km_total;
+  if (o.es_prueba !== undefined && o.es_prueba !== null) res.esPrueba = o.es_prueba;
   
   return res;
 }
@@ -946,6 +1008,8 @@ function levantamientoToRow(l) {
     estado: l.estado || 'Pendiente',
     tecnico_asignado: l.tecnico_asignado || null,
     notas_tecnico: finalNotas,
+    refacciones: Array.isArray(l.refacciones) ? l.refacciones : [],
+    es_prueba: !!(l.esPrueba || l.es_prueba || (l.folio && l.folio.includes('PRUEBA')) || (l.descripcion && l.descripcion.includes('PRUEBA'))),
     evidencias: l.evidencias || {},
     ticket_generado_id: l.ticket_generado_id || null,
     created_at: l.created_at || new Date().toISOString(),
@@ -972,6 +1036,9 @@ function rowToLevantamiento(r) {
   } catch (e) {}
 
   const extracted = window.extraerRefaccionesDeNotas(r.notas_tecnico);
+  const refaccionesVal = (r.refacciones && Array.isArray(r.refacciones) && r.refacciones.length > 0)
+    ? r.refacciones
+    : extracted.refacciones;
 
   return {
     id: r.id,
@@ -985,9 +1052,10 @@ function rowToLevantamiento(r) {
     estado: r.estado || 'Pendiente',
     tecnico_asignado: r.tecnico_asignado || null,
     notas_tecnico: extracted.notasLimpias,
-    refacciones: extracted.refacciones,
+    refacciones: refaccionesVal,
     evidencias: r.evidencias || {},
     ticket_generado_id: r.ticket_generado_id || null,
+    esPrueba: (r.es_prueba !== undefined && r.es_prueba !== null) ? r.es_prueba : ((r.folio && r.folio.includes('PRUEBA')) || false),
     created_at: r.created_at || null,
     updated_at: r.updated_at || null
   };
@@ -1087,6 +1155,52 @@ function toValidUUID(str) {
 }
 window.toValidUUID = toValidUUID;
 window.isValidUUID = isValidUUID;
+
+function mergeEvidencias(target, source, excludedUrls = []) {
+  const excludeSet = new Set(Array.isArray(excludedUrls) ? excludedUrls.map(u => String(u).trim()) : []);
+  
+  const parseEv = (ev) => {
+    if (!ev) return null;
+    if (typeof ev === 'string') {
+      try { return JSON.parse(ev); } catch (e) { return null; }
+    }
+    return (typeof ev === 'object') ? ev : null;
+  };
+
+  const t = parseEv(target) || {};
+  const s = parseEv(source) || {};
+
+  const cleanUrl = (u) => {
+    if (!u || typeof u !== 'string') return null;
+    const str = u.trim();
+    if (!str || str === 'null' || str === 'undefined' || excludeSet.has(str)) return null;
+    return str;
+  };
+
+  const fotoInicio = cleanUrl(t.fotoInicio) || cleanUrl(s.fotoInicio) || null;
+  const fotoFin = cleanUrl(t.fotoFin) || cleanUrl(s.fotoFin) || null;
+
+  const adicionalesSet = new Set();
+  const adicionalesList = [];
+
+  const addAdicional = (url) => {
+    const cleaned = cleanUrl(url);
+    if (cleaned && !adicionalesSet.has(cleaned)) {
+      adicionalesSet.add(cleaned);
+      adicionalesList.push(cleaned);
+    }
+  };
+
+  if (Array.isArray(t.adicionales)) t.adicionales.forEach(addAdicional);
+  if (Array.isArray(s.adicionales)) s.adicionales.forEach(addAdicional);
+
+  return {
+    fotoInicio,
+    fotoFin,
+    adicionales: adicionalesList
+  };
+}
+window.mergeEvidencias = mergeEvidencias;
 
 function gastoToRow(g) {
   let ordenId = null;
@@ -1507,7 +1621,23 @@ window.obtenerSiguienteFolioTicket = async function(esPrueba = false) {
   return `${prefix}${(maxConsecutivo + 1).toString().padStart(3, '0')}`;
 };
 
+const _ordenPushQueues = new Map();
+
 window.pushToSupabase = async function(tabla, item) {
+  if (tabla === 'ordenes' && item && item.id) {
+    const key = String(item.id);
+    const lastOp = _ordenPushQueues.get(key) || Promise.resolve();
+    const currentOp = (async () => {
+      await lastOp.catch(() => {});
+      return _executePushToSupabase(tabla, item);
+    })();
+    _ordenPushQueues.set(key, currentOp);
+    return currentOp;
+  }
+  return _executePushToSupabase(tabla, item);
+};
+
+async function _executePushToSupabase(tabla, item) {
   // La telemetría es no-crítica: se envía directo sin cola para evitar
   // acumulación de errores "Failed to fetch" en la UI.
   if (tabla === 'sapi_telemetry') {
@@ -1611,9 +1741,48 @@ window.pushToSupabase = async function(tabla, item) {
       }
     }
     
+    // Consolidación de evidencias fotográficas para órdenes (prevenir pérdida por sobreescritura concurrente)
+    if (tabla === 'ordenes' && row.id) {
+      try {
+        const { data: dbCurrent } = await sb
+          .from('ordenes')
+          .select('evidencias')
+          .eq('id', row.id)
+          .maybeSingle();
+
+        if (dbCurrent && dbCurrent.evidencias) {
+          const excluded = item._evidenciasEliminadas || [];
+          const mergedEv = mergeEvidencias(dbCurrent.evidencias, row.evidencias, excluded);
+          row.evidencias = mergedEv;
+          if (item && item.evidencias) {
+            item.evidencias = { ...mergedEv };
+          }
+          if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
+            const oMem = ordenes.find(x => x && x.id === row.id);
+            if (oMem) oMem.evidencias = { ...mergedEv };
+          }
+          try {
+            const localList = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+            const idx = localList.findIndex(x => x && x.id === row.id);
+            if (idx > -1) {
+              localList[idx].evidencias = { ...mergedEv };
+              localStorage.setItem('sapi_ordenes', JSON.stringify(localList));
+            }
+          } catch (eLocal) {}
+        }
+      } catch (eEv) {
+        console.warn('[pushToSupabase] Error unificando evidencias con la base de datos:', eEv);
+      }
+    }
+
     // Upsert directo en la nube por clave primaria ID para evitar sobreescrituras accidentales de folios
     const upsertOptions = (row.id) ? { onConflict: 'id' } : undefined;
     let { error } = await sb.from(tabla).upsert(row, upsertOptions);
+
+    if (!error && tabla === 'ordenes') {
+      delete item._evidenciasEliminadas;
+      delete row._evidenciasEliminadas;
+    }
 
     // Si hay error de colisión de unicidad de folio (23505) en tickets
     if (error && (error.code === '23505' || String(error.message || '').toLowerCase().includes('duplicate') || String(error.message || '').toLowerCase().includes('folio')) && tabla === 'tickets') {
@@ -1781,6 +1950,11 @@ window.pushToSupabase = async function(tabla, item) {
             fecha: cleanFecha(b.fecha),
             tecnico: dbTecnico || null,
             nota: dbNota,
+            realizado: typeof b.realizado !== 'undefined' ? !!b.realizado : false,
+            asignado_por: b.asignadoPorName || b.asignado_por || null,
+            programado_entrada: b.programadoEntrada || b.programado_entrada || null,
+            programado_salida: b.programadoSalida || b.programado_salida || null,
+            desviacion: b.desviacion || null,
             entrada: b.entrada || null,
             salida: b.salida || null,
             hora_inicio: b.hora_inicio || null,
@@ -2296,7 +2470,20 @@ async function _processSyncQueueInternal() {
               empresa: item.data.empresa || null
             };
           } else if (item.table === 'sitios') {
-            payload = { id: item.data.id, nombre: item.data.nombre, cliente: item.data.cliente, direccion: item.data.direccion, cp: item.data.cp, ciudad: item.data.ciudad, estado: item.data.estado, custom_data: item.data.customData || {} };
+            const lat = (item.data.latitud !== undefined && item.data.latitud !== null && item.data.latitud !== '') ? (parseFloat(item.data.latitud) || null) : ((item.data.customData?.latitud !== undefined && item.data.customData?.latitud !== null && item.data.customData?.latitud !== '') ? (parseFloat(item.data.customData.latitud) || null) : null);
+            const lng = (item.data.longitud !== undefined && item.data.longitud !== null && item.data.longitud !== '') ? (parseFloat(item.data.longitud) || null) : ((item.data.customData?.longitud !== undefined && item.data.customData?.longitud !== null && item.data.customData?.longitud !== '') ? (parseFloat(item.data.customData.longitud) || null) : null);
+            payload = { 
+              id: item.data.id, 
+              nombre: item.data.nombre, 
+              cliente: item.data.cliente, 
+              direccion: item.data.direccion, 
+              cp: item.data.cp, 
+              ciudad: item.data.ciudad, 
+              estado: item.data.estado, 
+              latitud: lat,
+              longitud: lng,
+              custom_data: item.data.customData || { latitud: item.data.latitud || '', longitud: item.data.longitud || '' } 
+            };
           } else if (item.table === 'maquinaria') {
             const cleanId = item.data.idInterno || item.data.id || item.data.serie;
             let clienteId = item.data.cliente || null;
@@ -2343,10 +2530,24 @@ async function _processSyncQueueInternal() {
               venta: item.data.venta || item.data.customData?.venta || null,
               ubicacion: item.data.ubicacion || item.data.customData?.ubicacion || null,
               latitud: (item.data.latitud !== undefined && item.data.latitud !== null) ? (parseFloat(item.data.latitud) || null) : ((item.data.customData?.latitud !== undefined && item.data.customData?.latitud !== null) ? (parseFloat(item.data.customData.latitud) || null) : null),
-              longitud: (item.data.longitud !== undefined && item.data.longitud !== null) ? (parseFloat(item.data.longitud) || null) : ((item.data.customData?.longitud !== undefined && item.data.customData?.longitud !== null) ? (parseFloat(item.data.customData.longitud) || null) : null)
+              longitud: (item.data.longitud !== undefined && item.data.longitud !== null) ? (parseFloat(item.data.longitud) || null) : ((item.data.customData?.longitud !== undefined && item.data.customData?.longitud !== null) ? (parseFloat(item.data.customData.longitud) || null) : null),
+              empresas_vinculadas: Array.isArray(item.data.empresas_vinculadas) ? item.data.empresas_vinculadas : (Array.isArray(item.data.empresasVinculadas) ? item.data.empresasVinculadas : (Array.isArray(customData.empresasVinculadas) ? customData.empresasVinculadas : [])),
+              clientes_adicionales: Array.isArray(item.data.clientes_adicionales) ? item.data.clientes_adicionales : (Array.isArray(item.data.clientesAdicionales) ? item.data.clientesAdicionales : (Array.isArray(customData.clientesAdicionales) ? customData.clientesAdicionales : []))
             };
           } else if (item.table === 'refacciones') {
-            payload = { id: item.data.id, codigo: item.data.codigo, descripcion: item.data.descripcion, precio: item.data.precio, moneda: item.data.moneda, stock: item.data.stock, custom_data: { ...(item.data.customData || {}), marca: item.data.marca, grupo: item.data.grupo, origen: item.data.origen, nombre: item.data.nombre } };
+            payload = { 
+              id: item.data.id, 
+              codigo: item.data.codigo, 
+              descripcion: item.data.descripcion, 
+              precio: item.data.precio, 
+              moneda: item.data.moneda, 
+              stock: item.data.stock, 
+              marca: item.data.marca || item.data.customData?.marca || null,
+              origen: item.data.origen || item.data.customData?.origen || null,
+              itms_grp_cod: item.data.itms_grp_cod || item.data.ItmsGrpCod || (item.data.customData?.ItmsGrpCod ? parseInt(item.data.customData.ItmsGrpCod, 10) : null),
+              grupo: item.data.grupo || item.data.customData?.grupo || null,
+              custom_data: { ...(item.data.customData || {}), marca: item.data.marca, grupo: item.data.grupo, origen: item.data.origen, nombre: item.data.nombre } 
+            };
           } else if (item.table === 'gastos') {
             payload = gastoToRow(item.data);
           } else if (item.table === 'sapi_telemetry') {
@@ -2592,6 +2793,11 @@ async function _processSyncQueueInternal() {
                   fecha: cleanFecha(b.fecha),
                   tecnico: dbTecnico || null,
                   nota: dbNota,
+                  realizado: typeof b.realizado !== 'undefined' ? !!b.realizado : false,
+                  asignado_por: b.asignadoPorName || b.asignado_por || null,
+                  programado_entrada: b.programadoEntrada || b.programado_entrada || null,
+                  programado_salida: b.programadoSalida || b.programado_salida || null,
+                  desviacion: b.desviacion || null,
                   entrada: b.entrada || null,
                   salida: b.salida || null,
                   hora_inicio: b.hora_inicio || null,
@@ -3801,7 +4007,10 @@ window.cargarDatosDeSupabase = function() {
           window._supaValidSitioIds = new Set(sitiosDb.map(s => s.id).filter(Boolean));
           const mappedSitios = sitiosDb.map(s => ({
             id: s.id, nombre: s.nombre, cliente: s.cliente, direccion: s.direccion,
-            cp: s.cp, ciudad: s.ciudad, estado: s.estado, customData: s.custom_data
+            cp: s.cp, ciudad: s.ciudad, estado: s.estado,
+            latitud: (s.latitud !== null && s.latitud !== undefined) ? s.latitud : (s.custom_data?.latitud ? (parseFloat(s.custom_data.latitud) || null) : null),
+            longitud: (s.longitud !== null && s.longitud !== undefined) ? s.longitud : (s.custom_data?.longitud ? (parseFloat(s.custom_data.longitud) || null) : null),
+            customData: s.custom_data
           }));
           localStorage.setItem('sapi_sitios_db', JSON.stringify(mappedSitios));
           if (typeof sitiosDb !== 'undefined' && Array.isArray(sitiosDb)) {
@@ -3834,6 +4043,8 @@ window.cargarDatosDeSupabase = function() {
               cp: s.cp,
               ciudad: s.ciudad,
               estado: s.estado,
+              latitud: (s.latitud !== null && s.latitud !== undefined) ? s.latitud : (s.custom_data?.latitud ? (parseFloat(s.custom_data.latitud) || null) : null),
+              longitud: (s.longitud !== null && s.longitud !== undefined) ? s.longitud : (s.custom_data?.longitud ? (parseFloat(s.custom_data.longitud) || null) : null),
               customData: s.custom_data
             }));
             
@@ -3842,7 +4053,11 @@ window.cargarDatosDeSupabase = function() {
               if (m.cliente === row.id) return true;
               if (m.cliente === row.nombre) return true;
               const cData = m.custom_data || {};
-              const addClients = cData.clientesAdicionales || cData.empresasVinculadas || [];
+              const addClients = (Array.isArray(m.clientes_adicionales) && m.clientes_adicionales.length > 0)
+                ? m.clientes_adicionales
+                : ((Array.isArray(m.empresas_vinculadas) && m.empresas_vinculadas.length > 0)
+                  ? m.empresas_vinculadas
+                  : (cData.clientesAdicionales || cData.empresasVinculadas || []));
               if (Array.isArray(addClients) && (addClients.includes(row.id) || addClients.includes(row.nombre))) return true;
               return false;
             });
@@ -4000,7 +4215,21 @@ window.cargarDatosDeSupabase = function() {
               sitio_id: m.sitio_id || null,
               latitud: (m.latitud !== null && m.latitud !== undefined) ? m.latitud : cData.latitud,
               longitud: (m.longitud !== null && m.longitud !== undefined) ? m.longitud : cData.longitud,
-              customData: cData
+              empresas_vinculadas: (Array.isArray(m.empresas_vinculadas) && m.empresas_vinculadas.length > 0)
+                ? m.empresas_vinculadas
+                : (Array.isArray(cData.empresasVinculadas) ? cData.empresasVinculadas : []),
+              clientes_adicionales: (Array.isArray(m.clientes_adicionales) && m.clientes_adicionales.length > 0)
+                ? m.clientes_adicionales
+                : (Array.isArray(cData.clientesAdicionales) ? cData.clientesAdicionales : []),
+              customData: {
+                ...cData,
+                empresasVinculadas: (Array.isArray(m.empresas_vinculadas) && m.empresas_vinculadas.length > 0)
+                  ? m.empresas_vinculadas
+                  : (Array.isArray(cData.empresasVinculadas) ? cData.empresasVinculadas : []),
+                clientesAdicionales: (Array.isArray(m.clientes_adicionales) && m.clientes_adicionales.length > 0)
+                  ? m.clientes_adicionales
+                  : (Array.isArray(cData.clientesAdicionales) ? cData.clientesAdicionales : [])
+              }
             };
           });
           localStorage.setItem('sapi_maquinaria_db', JSON.stringify(mappedMaq));
@@ -4180,18 +4409,19 @@ window.cargarDatosDeSupabase = function() {
             
             let tecnico = b.tecnico;
             let nota = b.nota || '';
-            let realizado = true;
-            let programadoEntrada = null;
-            let programadoSalida = null;
-            let desviacion = null;
+            let realizado = (b.realizado !== undefined && b.realizado !== null) ? b.realizado : true;
+            let programadoEntrada = b.programado_entrada || null;
+            let programadoSalida = b.programado_salida || null;
+            let desviacion = b.desviacion || null;
+            let asignadoPorName = b.asignado_por || null;
 
             if (nota.includes('[Realizado: ')) {
               const match = nota.match(/(?:\r?\n|^)\[Realizado: (.*?)\]/);
               if (match) {
-                realizado = match[1] === 'true';
+                if (b.realizado === undefined || b.realizado === null) realizado = match[1] === 'true';
                 nota = nota.replace(/(?:\r?\n|^)\[Realizado: (.*?)\]/g, '');
               }
-            } else {
+            } else if (b.realizado === undefined || b.realizado === null) {
               const esPendiente = nota.includes('Programado por supervisor') || nota.includes('Pendiente de llenado');
               realizado = !esPendiente;
             }
@@ -4221,11 +4451,10 @@ window.cargarDatosDeSupabase = function() {
               }
             }
 
-            let asignadoPorName = null;
             if (nota.includes('[AsignadoPor: ')) {
               const match = nota.match(/(?:\r?\n|^)\[AsignadoPor: (.*?)\]/);
               if (match) {
-                asignadoPorName = match[1];
+                if (!asignadoPorName) asignadoPorName = match[1];
                 nota = nota.replace(/(?:\r?\n|^)\[AsignadoPor: (.*?)\]/g, '');
               }
             }
@@ -4430,6 +4659,23 @@ window.cargarDatosDeSupabase = function() {
                   });
                 }
               }
+
+              // Preservar y fusionar evidencias fotográficas locales (evitar pérdida en descargas de background sync)
+              if (localOrd.evidencias) {
+                ord.evidencias = mergeEvidencias(ord.evidencias, localOrd.evidencias);
+              }
+
+              // Preservar fotos de refacciones utilizadas si en remoto vienen sin foto
+              if (Array.isArray(localOrd.ref_utilizadas) && Array.isArray(ord.ref_utilizadas)) {
+                ord.ref_utilizadas.forEach(r => {
+                  if (!r.fotoUrl) {
+                    const lr = localOrd.ref_utilizadas.find(x => x && (x.id === r.id || x.descripcion === r.descripcion));
+                    if (lr && lr.fotoUrl) {
+                      r.fotoUrl = lr.fotoUrl;
+                    }
+                  }
+                });
+              }
             }
           });
 
@@ -4460,6 +4706,7 @@ window.cargarDatosDeSupabase = function() {
                 ...mapped[idx], 
                 ...lo, 
                 bitacora: mergedBitacora, 
+                evidencias: mergeEvidencias(mapped[idx].evidencias, lo.evidencias),
                 dias: (lo.dias && typeof lo.dias === 'object') ? { ...(mapped[idx].dias || {}), ...lo.dias } : mapped[idx].dias,
                 firma_tecnico_base64: lo.firma_tecnico_base64 || mapped[idx].firma_tecnico_base64,
                 firma_cliente_base64: lo.firma_cliente_base64 || mapped[idx].firma_cliente_base64,
@@ -4521,9 +4768,9 @@ window.cargarDatosDeSupabase = function() {
           if (allRefacciones.length > 0) {
             mapped = allRefacciones.map(r => ({
               id: r.id, codigo: r.codigo, descripcion: r.descripcion, precio: r.precio, moneda: r.moneda, stock: r.stock, 
-              marca: r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.custom_data?.marca || '', 
-              grupo: r.custom_data?.grupo || '', origen: r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
-              ItmsGrpCod: r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
+              marca: r.marca || r.custom_data?.marca || 'N/A', marcaCodigo: r.custom_data?.marcaCodigo || r.marca || r.custom_data?.marca || '', 
+              grupo: r.grupo || r.custom_data?.grupo || '', origen: r.origen || r.custom_data?.origen || 'N/A', nombre: r.custom_data?.nombre || r.descripcion,
+              ItmsGrpCod: r.itms_grp_cod || r.custom_data?.ItmsGrpCod || r.custom_data?.grupoCode || null
             }));
             await window.saveRefaccionesLocal(mapped);
             window.refaccionesDb = mapped;

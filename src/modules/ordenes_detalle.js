@@ -383,20 +383,34 @@ async function subirEvidenciaFoto(ordenId, tipo, inputEl) {
       }
     }
 
-    if (!o.evidencias) o.evidencias = { fotoInicio: null, fotoFin: null, adicionales: [] };
+    // Re-obtener la orden fresca de memoria y de localStorage para evitar condiciones de carrera
+    let freshOrd = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes.find(x => x && x.id === ordenId) : null;
+    if (!freshOrd) {
+      try {
+        const localList = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+        freshOrd = localList.find(x => x && x.id === ordenId);
+      } catch (e) {}
+    }
+    if (!freshOrd) freshOrd = o;
+
+    if (!freshOrd.evidencias) freshOrd.evidencias = { fotoInicio: null, fotoFin: null, adicionales: [] };
     
     if (tipo === 'fotoInicio') {
-      o.evidencias.fotoInicio = publicUrl;
+      freshOrd.evidencias.fotoInicio = publicUrl;
     } else if (tipo === 'fotoFin') {
-      o.evidencias.fotoFin = publicUrl;
+      freshOrd.evidencias.fotoFin = publicUrl;
     } else if (tipo === 'adicional') {
-      if (!o.evidencias.adicionales) o.evidencias.adicionales = [];
-      o.evidencias.adicionales.push(publicUrl);
+      if (!Array.isArray(freshOrd.evidencias.adicionales)) freshOrd.evidencias.adicionales = [];
+      if (!freshOrd.evidencias.adicionales.includes(publicUrl)) {
+        freshOrd.evidencias.adicionales.push(publicUrl);
+      }
     }
 
-    safeSetJSON('sapi_ordenes', ordenes);
+    o.evidencias = freshOrd.evidencias;
+
+    safeSetJSON('sapi_ordenes', (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes : [freshOrd]);
     if (window.pushToSupabase) {
-      await window.pushToSupabase('ordenes', o);
+      await window.pushToSupabase('ordenes', freshOrd);
     }
 
     if (window.trackTelemetryEvent) {
@@ -553,6 +567,10 @@ async function eliminarEvidenciaFoto(ordenId, tipo, url) {
   } else if (tipo === 'adicional') {
     o.evidencias.adicionales = (o.evidencias.adicionales || []).filter(x => x !== url);
   }
+
+  // Registrar URL eliminada explícitamente para evitar resurrección durante reconciliación
+  if (!o._evidenciasEliminadas) o._evidenciasEliminadas = [];
+  if (url) o._evidenciasEliminadas.push(url);
 
   safeSetJSON('sapi_ordenes', ordenes);
   if (window.pushToSupabase) {
