@@ -1394,10 +1394,6 @@ function abrirModalPiezaPendienteTicket(ticketId, clave, descripcion, estatusAct
   overlay.id = 'dynamic-modal-pieza';
   overlay.className = 'modal-overlay open';
   overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: flex !important; align-items: center; justify-content: center; z-index: 9999999 !important; padding: 1rem; box-sizing: border-box;';
-  
-  overlay.onclick = (e) => {
-    if (e.target === overlay) overlay.remove();
-  };
 
   const modal = document.createElement('div');
   modal.className = 'modal';
@@ -2055,7 +2051,7 @@ function renderSitios() {
 }
 
 function cerrarModalRenombrarSitio(e) {
-  if (e && e.target !== document.getElementById('modal-renombrar-sitio-overlay')) return;
+  if (e && (e.target === document.getElementById('modal-renombrar-sitio-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   document.getElementById('modal-renombrar-sitio-overlay').classList.remove('open');
 }
 

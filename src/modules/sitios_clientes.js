@@ -248,7 +248,7 @@ function agregarSitioCliente(nombre) {
 
 function cerrarModalSitio(e) {
   if (typeof document === "undefined") return;
-  if (e && e.target !== document.getElementById('modal-agregar-sitio-overlay')) return;
+  if (e && (e.target === document.getElementById('modal-agregar-sitio-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   document.getElementById('modal-agregar-sitio-overlay').classList.remove('open');
 }
 

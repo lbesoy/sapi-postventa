@@ -646,7 +646,7 @@ function editarOrden(id) {
 
 function cerrarFormulario(e) {
   if (typeof document === 'undefined') return;
-  if (e && e.target !== document.getElementById('modal-overlay')) return;
+  if (e && (e.target === document.getElementById('modal-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   document.getElementById('modal-overlay').classList.remove('open');
   document.body.style.overflow = '';
   editandoId = null;

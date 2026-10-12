@@ -354,7 +354,7 @@ function toggleEmpresaField(radio) {
 function cerrarModalUsuario(e) {
   if (typeof document === "undefined") return;
   const uModalOverlay = document.getElementById('modal-usuario-overlay');
-  if (e && e.target !== uModalOverlay) return;
+  if (e && (e.target === uModalOverlay || e.target?.classList?.contains('modal-overlay'))) return;
   if (uModalOverlay) uModalOverlay.classList.remove('open');
   document.body.style.overflow = '';
   editandoUserId = null;
@@ -870,7 +870,7 @@ function abrirSesionModal() {
 
 function cerrarSesionModal(e) {
   if (typeof document === "undefined") return;
-  if (e && e.target !== document.getElementById('modal-sesion-overlay')) return;
+  if (e && (e.target === document.getElementById('modal-sesion-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   document.getElementById('modal-sesion-overlay').classList.remove('open');
   document.body.style.overflow = '';
 }

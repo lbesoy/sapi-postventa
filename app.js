@@ -1723,14 +1723,26 @@ function isTestModeActive() {
 
 function resolveTecnicoNombre(idOrName) {
   if (!idOrName) return '';
-  const users = (typeof window !== 'undefined' && Array.isArray(window.usuarios))
+  let users = (typeof window !== 'undefined' && Array.isArray(window.usuarios) && window.usuarios.length > 0)
     ? window.usuarios
-    : ((typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : []);
+    : ((typeof usuarios !== 'undefined' && Array.isArray(usuarios) && usuarios.length > 0) ? usuarios : []);
+  if (!users || users.length === 0) {
+    try {
+      if (typeof safeGetJSON === 'function') {
+        users = safeGetJSON('eurorep_usuarios', []);
+      } else if (typeof localStorage !== 'undefined') {
+        users = JSON.parse(localStorage.getItem('eurorep_usuarios') || '[]');
+      }
+    } catch (e) {
+      users = [];
+    }
+  }
   const tecs = (typeof window !== 'undefined' && Array.isArray(window.tecnicosDb))
     ? window.tecnicosDb
     : ((typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) ? tecnicosDb : []);
-  const user = users.find(u => u && u.id === idOrName) || tecs.find(t => t && t.id === idOrName);
-  return user ? user.nombre : idOrName;
+  const user = (Array.isArray(users) ? users.find(u => u && (u.id === idOrName || u.user_id === idOrName || u.nombre === idOrName)) : null) ||
+               (Array.isArray(tecs) ? tecs.find(t => t && (t.id === idOrName || t.user_id === idOrName || t.nombre === idOrName)) : null);
+  return (user && user.nombre) ? user.nombre : idOrName;
 }
 if (typeof window !== 'undefined') {
   window.resolveTecnicoNombre = resolveTecnicoNombre;
@@ -3719,6 +3731,13 @@ function dispararInicializacionGlobal() {
     inicializarPasswordRecovery();
   } catch (err) {
     console.error('Error al inicializar recuperación de contraseña:', err);
+  }
+  try {
+    if (typeof window.inicializarDragAndDropTickets === 'function') {
+      window.inicializarDragAndDropTickets();
+    }
+  } catch (err) {
+    console.error('Error al inicializar drag and drop de tickets:', err);
   }
   try {
     if (typeof window.actualizarTodosLosBadges === 'function') {

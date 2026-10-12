@@ -78,7 +78,7 @@ function calcularEstadoOrden(o) {
 
 function cerrarDetalle(e) {
   if (typeof document === "undefined") return;
-  if (e && e.target !== document.getElementById('modal-detalle-overlay')) return;
+  if (e && (e.target === document.getElementById('modal-detalle-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   document.getElementById('modal-detalle-overlay').classList.remove('open');
   document.body.style.overflow = '';
 }

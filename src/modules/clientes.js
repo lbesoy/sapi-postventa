@@ -945,7 +945,7 @@ function verDetalleCliente(nombre) {
 }
 
 function cerrarDetalleMaquina(e) {
-  if (e && e.target !== document.getElementById('modal-detalle-maquina-overlay')) return;
+  if (e && (e.target === document.getElementById('modal-detalle-maquina-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   document.getElementById('modal-detalle-maquina-overlay').classList.remove('open');
 }
 
@@ -1099,7 +1099,7 @@ function abrirDetalleSitio(sitioNombre) {
 }
 
 function cerrarDetalleSitio(e) {
-  if (e && e.target !== document.getElementById('modal-detalle-sitio-overlay')) return;
+  if (e && (e.target === document.getElementById('modal-detalle-sitio-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   document.getElementById('modal-detalle-sitio-overlay').classList.remove('open');
 }
 
@@ -1522,7 +1522,7 @@ function eliminarSitioDeClienteAdmin(clienteNombre, sitioNombre) {
 }
 
 function cerrarDetalleCliente(e) {
-  if (e && e.target !== document.getElementById('modal-detalle-cliente-overlay')) return;
+  if (e && (e.target === document.getElementById('modal-detalle-cliente-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   document.getElementById('modal-detalle-cliente-overlay').classList.remove('open');
 }
 
@@ -1549,7 +1549,7 @@ function abrirModalCliente() {
 }
 
 function cerrarCliente(e) {
-  if (e && e.target !== document.getElementById('modal-cliente-overlay')) return;
+  if (e && (e.target === document.getElementById('modal-cliente-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   document.getElementById('modal-cliente-overlay').classList.remove('open');
 }
 
@@ -1824,7 +1824,7 @@ function abrirModalAgregarMaquina() {
 }
 
 function cerrarModalAgregarMaquina(e) {
-  if (e && e.target !== document.getElementById('modal-agregar-maquina-overlay')) return;
+  if (e && (e.target === document.getElementById('modal-agregar-maquina-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   document.getElementById('modal-agregar-maquina-overlay').classList.remove('open');
   editandoMaquinaId = null;
   editandoMaquinaCliente = null;
@@ -1881,7 +1881,7 @@ function abrirModalFusionarMaquinas() {
 
 function cerrarModalFusionarMaquinas(e) {
   const modalOverlay = document.getElementById('modal-fusionar-maquinas-overlay');
-  if (e && e.target !== modalOverlay) return;
+  if (e && (e.target === modalOverlay || e.target?.classList?.contains('modal-overlay'))) return;
   if (modalOverlay) modalOverlay.classList.remove('open');
   document.body.style.overflow = '';
 };
@@ -2648,7 +2648,7 @@ function abrirModalMoverMaquina(clienteNombre, idInterno) {
 }
 
 function cerrarModalMoverMaquina(e) {
-  if (e && e.target !== document.getElementById('modal-mover-maquina-overlay')) return;
+  if (e && (e.target === document.getElementById('modal-mover-maquina-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   document.getElementById('modal-mover-maquina-overlay').classList.remove('open');
 }
 
@@ -2787,7 +2787,7 @@ function abrirModalTraspasarMaquina(clienteNombre, idInterno) {
 };
 
 function cerrarModalTraspasarMaquina(e) {
-  if (e && e.target !== document.getElementById('modal-traspasar-maquina-overlay')) return;
+  if (e && (e.target === document.getElementById('modal-traspasar-maquina-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   document.getElementById('modal-traspasar-maquina-overlay').classList.remove('open');
 };
 

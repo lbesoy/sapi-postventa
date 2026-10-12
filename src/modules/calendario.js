@@ -22,10 +22,23 @@ function matchTecnico(tA, tB) {
     if (wordsA[0] === wordsB[0] && wordsA[1] === wordsB[1]) return true;
   }
   
-  const userList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : ((typeof window !== 'undefined' && Array.isArray(window.usuarios)) ? window.usuarios : []);
-  const uA = userList.find(u => u && (u.id === tA || (typeof normStr === 'function' ? normStr(u.nombre) : String(u.nombre).toLowerCase().trim()) === normA));
-  const uB = userList.find(u => u && (u.id === tB || (typeof normStr === 'function' ? normStr(u.nombre) : String(u.nombre).toLowerCase().trim()) === normB));
-  if (uA && uB && uA.id === uB.id) return true;
+  const userList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios) && usuarios.length > 0)
+    ? usuarios
+    : ((typeof window !== 'undefined' && Array.isArray(window.usuarios) && window.usuarios.length > 0)
+        ? window.usuarios
+        : (typeof safeGetJSON === 'function' ? safeGetJSON('eurorep_usuarios', []) : []));
+
+  const tecsList = (typeof window !== 'undefined' && Array.isArray(window.tecnicosDb))
+    ? window.tecnicosDb
+    : ((typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) ? tecnicosDb : []);
+
+  const uA = userList.find(u => u && (u.id === tA || u.user_id === tA || (typeof normStr === 'function' ? normStr(u.nombre) : String(u.nombre).toLowerCase().trim()) === normA)) ||
+             tecsList.find(t => t && (t.id === tA || t.user_id === tA || (typeof normStr === 'function' ? normStr(t.nombre) : String(t.nombre).toLowerCase().trim()) === normA));
+
+  const uB = userList.find(u => u && (u.id === tB || u.user_id === tB || (typeof normStr === 'function' ? normStr(u.nombre) : String(u.nombre).toLowerCase().trim()) === normB)) ||
+             tecsList.find(t => t && (t.id === tB || t.user_id === tB || (typeof normStr === 'function' ? normStr(t.nombre) : String(t.nombre).toLowerCase().trim()) === normB));
+
+  if (uA && uB && ((uA.id && uB.id && uA.id === uB.id) || (uA.user_id && uB.user_id && uA.user_id === uB.user_id))) return true;
   if (uA && uA.nombre && (uA.nombre !== tA) && matchTecnico(uA.nombre, tB)) return true;
   if (uB && uB.nombre && (uB.nombre !== tB) && matchTecnico(tA, uB.nombre)) return true;
 
@@ -46,11 +59,20 @@ function actualizarFiltrosCalendario() {
   const currentCli = selCli.value;
   const currentTec = selTec.value;
 
-  const isEmpresa = currentSession.viewMode === 'empresa';
-  const isTecnico = currentSession.viewMode === 'tecnico';
-  const currentUser = usuarios.find(u => u.id === currentSession.userId);
+  const currentSess = (typeof currentSession !== 'undefined' && currentSession) ? currentSession : ((typeof window !== 'undefined' && window.currentSession) ? window.currentSession : null);
+  const isEmpresa = currentSess ? currentSess.viewMode === 'empresa' : false;
+  const isTecnico = currentSess ? currentSess.viewMode === 'tecnico' : false;
+
+  const userList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios) && usuarios.length > 0)
+    ? usuarios
+    : ((typeof window !== 'undefined' && Array.isArray(window.usuarios) && window.usuarios.length > 0)
+        ? window.usuarios
+        : (typeof safeGetJSON === 'function' ? safeGetJSON('eurorep_usuarios', []) : []));
+
+  const sessUserId = currentSess ? currentSess.userId : null;
+  const currentUser = sessUserId ? userList.find(u => u && (u.id === sessUserId || u.user_id === sessUserId)) : null;
   const miEmpresa = currentUser ? (currentUser.empresa || currentUser.nombre) : null;
-  const miTecnicoNombre = isTecnico ? (currentSession.nombre || (currentUser ? currentUser.nombre : '')) : null;
+  const miTecnicoNombre = isTecnico ? ((currentSess && currentSess.nombre) || (currentUser ? currentUser.nombre : '')) : null;
 
   if (isTecnico) {
     selTec.style.display = 'none';
@@ -86,20 +108,119 @@ function actualizarFiltrosCalendario() {
 
   if (!isTecnico) {
     const tecnicosUnicos = new Set();
-    clientesDisponibles.forEach(o => {
-      if (o.tecnico) o.tecnico.split(',').forEach(t => tecnicosUnicos.add(t.trim()));
-      if (o.tecnicosAsignados) o.tecnicosAsignados.forEach(t => tecnicosUnicos.add(t));
-      if (o.bitacora) o.bitacora.forEach(b => { if(b.tecnico) tecnicosUnicos.add(b.tecnico) });
+    const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(str || '').trim());
+
+    const resolverNombreTecnico = (raw) => {
+      if (!raw) return null;
+      let clean = String(raw).trim();
+      if (!clean || clean === '-' || clean.toLowerCase() === 'sin asignar' || clean.toLowerCase() === 'desconocido') return null;
+
+      let res = clean;
+      if (typeof resolveTecnicoNombre === 'function') {
+        res = resolveTecnicoNombre(clean);
+      } else if (typeof window !== 'undefined' && typeof window.resolveTecnicoNombre === 'function') {
+        res = window.resolveTecnicoNombre(clean);
+      }
+
+      if (isUUID(res)) {
+        const u = userList.find(usr => usr && (usr.id === res || usr.user_id === res));
+        if (u && u.nombre) {
+          res = u.nombre.trim();
+        }
+      }
+
+      // Si tras todos los intentos sigue siendo un UUID sin resolver, descartarlo
+      if (isUUID(res)) {
+        return null;
+      }
+
+      return res;
+    };
+
+    // 1. Agregar de usuarios activos (técnicos, supervisores, administradores)
+    const activeSandbox = typeof isTestModeActive === 'function' ? isTestModeActive() : false;
+    userList.forEach(u => {
+      if (u && ['tecnico', 'supervisor', 'admin', 'superadmin'].includes(u.rol) && u.activo !== false && u.nombre) {
+        const isTest = typeof isTestUser === 'function' ? isTestUser(u) : false;
+        if (activeSandbox || !isTest) {
+          const resolved = resolverNombreTecnico(u.nombre);
+          if (resolved) tecnicosUnicos.add(resolved);
+        }
+      }
     });
-    
-    const tArr = [...tecnicosUnicos].filter(Boolean).sort((a,b) => a.localeCompare(b));
+
+    // 2. Agregar de tecnicosDb
+    const tecsList = (typeof window !== 'undefined' && Array.isArray(window.tecnicosDb))
+      ? window.tecnicosDb
+      : ((typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) ? tecnicosDb : []);
+    tecsList.forEach(t => {
+      if (t && t.nombre) {
+        const resolved = resolverNombreTecnico(t.nombre);
+        if (resolved) tecnicosUnicos.add(resolved);
+      }
+    });
+
+    // 3. Agregar de órdenes (clientesDisponibles)
+    clientesDisponibles.forEach(o => {
+      if (!o) return;
+      if (typeof o.tecnico === 'string') {
+        o.tecnico.split(',').forEach(t => {
+          const resolved = resolverNombreTecnico(t);
+          if (resolved) tecnicosUnicos.add(resolved);
+        });
+      }
+      if (Array.isArray(o.tecnicosAsignados)) {
+        o.tecnicosAsignados.forEach(t => {
+          const resolved = resolverNombreTecnico(t);
+          if (resolved) tecnicosUnicos.add(resolved);
+        });
+      }
+      if (Array.isArray(o.bitacora)) {
+        o.bitacora.forEach(b => {
+          if (b && b.tecnico) {
+            const resolved = resolverNombreTecnico(b.tecnico);
+            if (resolved) tecnicosUnicos.add(resolved);
+          }
+        });
+      }
+    });
+
+    // 4. Agregar de eventos administrativos (sapi_calendario_eventos)
+    try {
+      const adminEvents = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
+      adminEvents.forEach(e => {
+        if (!e) return;
+        if (e.tecnicoNombre) {
+          const resolved = resolverNombreTecnico(e.tecnicoNombre);
+          if (resolved) tecnicosUnicos.add(resolved);
+        } else if (e.tecnicoId) {
+          const resolved = resolverNombreTecnico(e.tecnicoId);
+          if (resolved) tecnicosUnicos.add(resolved);
+        }
+      });
+    } catch(e) {}
+
+    // 5. Agregar de levantamientos
+    if (typeof levantamientos !== 'undefined' && Array.isArray(levantamientos)) {
+      levantamientos.forEach(lev => {
+        if (!lev) return;
+        const asig = lev.tecnico_asignado || lev.asignado_a;
+        if (asig) {
+          const resolved = resolverNombreTecnico(asig);
+          if (resolved) tecnicosUnicos.add(resolved);
+        }
+      });
+    }
+
+    const tArr = [...tecnicosUnicos].filter(Boolean).sort((a,b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
     let htmlTec = '<option value="">Todos los Técnicos</option>';
     tArr.forEach(t => htmlTec += `<option value="${t}">${t}</option>`);
-    
+
     if (selTec.innerHTML !== htmlTec) {
       selTec.innerHTML = htmlTec;
-      selTec.value = currentTec;
-      if (!selTec.value && currentTec) selTec.value = ''; 
+      const targetVal = isUUID(currentTec) ? (resolverNombreTecnico(currentTec) || '') : currentTec;
+      selTec.value = targetVal;
+      if (!selTec.value && targetVal) selTec.value = ''; 
     }
   }
 }
@@ -320,9 +441,10 @@ function renderCalendario() {
         }
 
         const tipoPrefix = isTrasladoEvent ? (b.nota && b.nota.toLowerCase().includes('regreso') ? '🚗 Regreso - ' : '🚗 Ida - ') : (b.tipo && b.tipo !== 'Servicio' ? `${b.tipo.substring(0,3)} | ` : '');
+        const tecNombre = (typeof resolveTecnicoNombre === 'function' ? resolveTecnicoNombre(b.tecnico) : (window.resolveTecnicoNombre ? window.resolveTecnicoNombre(b.tecnico) : b.tecnico)) || b.tecnico || 'Téc';
         const ev = {
           id: `bit-${b.id || Math.random()}`,
-          title: `${tipoPrefix}${(b.tecnico || 'Téc').split(' ')[0]} | ${o.cliente}${maqSuffix}`,
+          title: `${tipoPrefix}${tecNombre.split(' ')[0]} | ${o.cliente}${maqSuffix}`,
           start: startVal,
           allDay: isAllDay,
           backgroundColor: eventColor,
@@ -330,7 +452,7 @@ function renderCalendario() {
           extendedProps: {
             isBitacora: true,
             ordenId: o.id,
-            tecnico: b.tecnico || 'Desconocido',
+            tecnico: tecNombre !== 'Téc' ? tecNombre : (b.tecnico || 'Desconocido'),
             cliente: o.cliente,
             ubicacion: o.ubicacion || 'Sin ubicación',
             equipo: o.equipo || o.modelo || 'N/A',
@@ -373,9 +495,10 @@ function renderCalendario() {
 
               if (startLlegada && endLlegada && !isNaN(startLlegada.getTime())) {
                 pushedTraslados.add(keyIda);
+                const tecNombreIda = (typeof resolveTecnicoNombre === 'function' ? resolveTecnicoNombre(b.tecnico) : (window.resolveTecnicoNombre ? window.resolveTecnicoNombre(b.tecnico) : b.tecnico)) || b.tecnico || 'Téc';
                 eventos.push({
                   id: `bit-traslado-ida-${b.id || Math.random()}`,
-                  title: `🚗 Ida - ${(b.tecnico || 'Téc').split(' ')[0]} | ${o.folio || o.id.substring(0,8)}`,
+                  title: `🚗 Ida - ${tecNombreIda.split(' ')[0]} | ${o.folio || o.id.substring(0,8)}`,
                   start: toLocalISO(startLlegada),
                   end: toLocalISO(endLlegada),
                   allDay: false,
@@ -400,7 +523,7 @@ function renderCalendario() {
                     tipoTraslado: 'Ida',
                     duracion: b.horas_traslado,
                     ordenId: o.id,
-                    tecnico: b.tecnico,
+                    tecnico: tecNombreIda !== 'Téc' ? tecNombreIda : (b.tecnico || 'Desconocido'),
                     cliente: o.cliente,
                     ubicacion: o.ubicacion || 'Sin ubicación',
                     equipo: o.equipo || o.modelo || 'N/A'
@@ -435,9 +558,10 @@ function renderCalendario() {
 
               if (startRegreso && endRegreso && !isNaN(startRegreso.getTime())) {
                 pushedTraslados.add(keyRegreso);
+                const tecNombreReg = (typeof resolveTecnicoNombre === 'function' ? resolveTecnicoNombre(b.tecnico) : (window.resolveTecnicoNombre ? window.resolveTecnicoNombre(b.tecnico) : b.tecnico)) || b.tecnico || 'Téc';
                 eventos.push({
                   id: `bit-traslado-regreso-${b.id || Math.random()}`,
-                  title: `🚗 Regreso - ${(b.tecnico || 'Téc').split(' ')[0]} | ${o.folio || o.id.substring(0,8)}`,
+                  title: `🚗 Regreso - ${tecNombreReg.split(' ')[0]} | ${o.folio || o.id.substring(0,8)}`,
                   start: toLocalISO(startRegreso),
                   end: toLocalISO(endRegreso),
                   allDay: false,
@@ -462,7 +586,7 @@ function renderCalendario() {
                     tipoTraslado: 'Regreso',
                     duracion: b.horas_regreso,
                     ordenId: o.id,
-                    tecnico: b.tecnico,
+                    tecnico: tecNombreReg !== 'Téc' ? tecNombreReg : (b.tecnico || 'Desconocido'),
                     cliente: o.cliente,
                     ubicacion: o.ubicacion || 'Sin ubicación',
                     equipo: o.equipo || o.modelo || 'N/A'
@@ -491,8 +615,9 @@ function renderCalendario() {
       if (typeof isTestData === 'function' && isTestData(lev) !== activeSandbox) return;
       
       // Filtrar por técnico si hay un filtro activo (y si está asignado)
-      const asignadoVal = lev.tecnico_asignado || lev.asignado_a || null;
-      if (filtroTecnico && !matchTecnico(asignadoVal, filtroTecnico)) return;
+      const asignadoValRaw = lev.tecnico_asignado || lev.asignado_a || null;
+      const asignadoVal = asignadoValRaw ? ((typeof resolveTecnicoNombre === 'function' ? resolveTecnicoNombre(asignadoValRaw) : (window.resolveTecnicoNombre ? window.resolveTecnicoNombre(asignadoValRaw) : asignadoValRaw)) || asignadoValRaw) : null;
+      if (filtroTecnico && !matchTecnico(asignadoVal || asignadoValRaw, filtroTecnico)) return;
       
       // Filtrar por empresa si el usuario es empresa
       if (isEmpresa && lev.cliente !== miEmpresa) return;
@@ -540,7 +665,14 @@ function renderCalendario() {
       }
 
       // Filtrar por técnico si hay filtro activo
-      if (filtroTecnico && !matchTecnico(e.tecnicoNombre || e.tecnicoId, filtroTecnico)) return;
+      let tecNom = e.tecnicoNombre;
+      if (!tecNom && e.tecnicoId) {
+        tecNom = typeof resolveTecnicoNombre === 'function' ? resolveTecnicoNombre(e.tecnicoId) : (window.resolveTecnicoNombre ? window.resolveTecnicoNombre(e.tecnicoId) : e.tecnicoId);
+      }
+      if (tecNom) {
+        tecNom = typeof resolveTecnicoNombre === 'function' ? resolveTecnicoNombre(tecNom) : (window.resolveTecnicoNombre ? window.resolveTecnicoNombre(tecNom) : tecNom);
+      }
+      if (filtroTecnico && !matchTecnico(tecNom || e.tecnicoNombre || e.tecnicoId, filtroTecnico)) return;
 
       let eventColor = '#3b82f6'; // Azul por defecto
       if (e.tipo === 'Junta' || e.tipo === 'Capacitación') eventColor = '#8b5cf6'; // Morado: Asignación Programada
@@ -558,7 +690,7 @@ function renderCalendario() {
         if (endVal) endVal = endVal.substring(0, 10);
       }
 
-      const tecPrefix = e.tecnicoNombre ? `${e.tecnicoNombre.split(' ')[0]} | ` : '';
+      const tecPrefix = tecNom ? `${tecNom.split(' ')[0]} | ` : '';
       eventos.push({
         id: e.id,
         title: `${tecPrefix}${e.tipo} | ${e.titulo || ''}`,
@@ -575,8 +707,8 @@ function renderCalendario() {
           descripcion: e.descripcion,
           tipo: e.tipo,
           tecnicoId: e.tecnicoId,
-          tecnicoNombre: e.tecnicoNombre,
-          tecnico: e.tecnicoNombre || 'Sin asignar',
+          tecnicoNombre: tecNom,
+          tecnico: tecNom || 'Sin asignar',
           creadoPor: e.creadoPor,
           ordenId: e.ordenId,
           entrada: e.entrada || '',
@@ -957,8 +1089,17 @@ async function guardarActividadCalendario() {
 
   let tecnicoNombre = null;
   if (tecnicoId) {
-    const u = usuarios.find(usr => usr.id === tecnicoId);
-    if (u) tecnicoNombre = u.nombre;
+    tecnicoNombre = typeof resolveTecnicoNombre === 'function' ? resolveTecnicoNombre(tecnicoId) : (window.resolveTecnicoNombre ? window.resolveTecnicoNombre(tecnicoId) : tecnicoId);
+    if (tecnicoNombre === tecnicoId) {
+      const uList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios) && usuarios.length > 0)
+        ? usuarios
+        : ((typeof window !== 'undefined' && Array.isArray(window.usuarios) && window.usuarios.length > 0)
+            ? window.usuarios
+            : (typeof safeGetJSON === 'function' ? safeGetJSON('eurorep_usuarios', []) : []));
+      const u = uList.find(usr => usr && (usr.id === tecnicoId || usr.user_id === tecnicoId));
+      if (u && u.nombre) tecnicoNombre = u.nombre;
+      else tecnicoNombre = null;
+    }
   }
 
   const activeUserId = currentSession.userId || null;
@@ -1208,6 +1349,8 @@ function mostrarPopupBitacora(info) {
     `;
   }
 
+  const displayTec = (typeof resolveTecnicoNombre === 'function' ? resolveTecnicoNombre(p.tecnico) : (window.resolveTecnicoNombre ? window.resolveTecnicoNombre(p.tecnico) : p.tecnico)) || p.tecnico || 'Sin asignar';
+
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.style.zIndex = '9999';
@@ -1220,7 +1363,7 @@ function mostrarPopupBitacora(info) {
       <div class="modal-body" style="padding:1.5rem;">
         <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:1rem; text-transform:capitalize; font-weight:500;">${fechaStr}</div>
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Orden de Servicio:</strong> ${folio}</p>
-        <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Técnico:</strong> ${p.tecnico}</p>
+        <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Técnico:</strong> ${displayTec}</p>
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Asignado por:</strong> ${asignador}</p>
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Cliente:</strong> ${p.cliente}</p>
         <p style="margin:0 0 0.5rem 0; font-size:0.85rem;"><strong style="color:var(--text-primary);">Maquinaria:</strong> ${p.equipo || 'N/A'}</p>

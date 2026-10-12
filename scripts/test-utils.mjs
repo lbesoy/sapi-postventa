@@ -444,7 +444,44 @@ assert.equal(ss2026.viernes, '2026-04-03', 'Viernes Santo 2026 debe ser 2026-04-
 // Test C: Encontrar N-ésimo día de la semana en un mes (ej. tercer lunes de marzo = Natalicio de Benito Juárez)
 const natalicioJuarez2026 = getNthDayOfMonth(2026, 2, 1, 3); // mes 2 es marzo, día 1 es lunes, el 3er lunes
 assert.equal(natalicioJuarez2026, '2026-03-16', 'Tercer lunes de marzo 2026 debe ser 16 de marzo');
-console.log('  ✅ Calendario FullCalendar (getFestivosMexico, getSemanaSanta, getNthDayOfMonth): OK');
+
+// Test D: Filtrado de técnicos en el calendario con resolución de UUIDs a nombres legibles
+const prevDocCal = global.document;
+const prevUsersCal = global.usuarios;
+const prevOrdersCal = global.ordenes;
+const prevSessCal = global.currentSession;
+const mockSelCli = { value: '', innerHTML: '', style: {} };
+const mockSelTec = { value: '', innerHTML: '', style: {} };
+global.document = {
+  getElementById: (id) => {
+    if (id === 'filter-cal-cliente') return mockSelCli;
+    if (id === 'filter-cal-tecnico') return mockSelTec;
+    return null;
+  }
+};
+global.usuarios = [
+  { id: '0fa8950b-480b-40f1-a01c-320a57bb94fa', nombre: 'Sergio Soria Cervantes', rol: 'tecnico', activo: true },
+  { id: 'be40ea0f-0eca-4c56-8392-3e00125c32b4', nombre: 'Eduardo Jiménez Ortiz', rol: 'tecnico', activo: true }
+];
+global.ordenes = [
+  { id: 'ord-1', cliente: 'Cliente A', tecnico: 'Eduardo Jiménez Ortiz', tecnicosAsignados: ['0fa8950b-480b-40f1-a01c-320a57bb94fa'] },
+  { id: 'ord-2', cliente: 'Cliente B', bitacora: [{ tecnico: 'be40ea0f-0eca-4c56-8392-3e00125c32b4' }, { tecnico: '77777777-8888-9999-aaaa-bbbbbbbbbbbb' }] }
+];
+global.currentSession = { viewMode: 'admin', userId: 'admin-1', nombre: 'Admin' };
+
+actualizarFiltrosCalendario();
+
+assert.ok(mockSelTec.innerHTML.includes('Eduardo Jiménez Ortiz'), 'El selector debe contener "Eduardo Jiménez Ortiz"');
+assert.ok(mockSelTec.innerHTML.includes('Sergio Soria Cervantes'), 'El selector debe contener "Sergio Soria Cervantes"');
+const calUuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+assert.ok(!calUuidRegex.test(mockSelTec.innerHTML), 'El selector de técnicos del calendario NO debe contener ningún UUID sin resolver');
+
+global.document = prevDocCal;
+global.usuarios = prevUsersCal;
+global.ordenes = prevOrdersCal;
+global.currentSession = prevSessCal;
+
+console.log('  ✅ Calendario FullCalendar (getFestivosMexico, getSemanaSanta, getNthDayOfMonth, actualizarFiltrosCalendario sin UUIDs): OK');
 
 // 17. Módulo de Chat de Soporte y Bandeja de Correo
 const { formatMontoConComas, switchSoporteTab, setMailFilter, renderBandejaCorreoEmpresa, renderChatSoporteEmpresa } = await import('../src/modules/soporte.js');
@@ -1657,7 +1694,9 @@ const {
   agregarEmpresaCombo,
   readFileAsBase64,
   guardarTicket,
-  eliminarTicket
+  eliminarTicket,
+  procesarArchivosArrastrados,
+  inicializarDragAndDropTickets
 } = await import('../src/modules/tickets_form.js');
 
 // Test A: Existencia y tipo de las funciones exportadas
@@ -2461,6 +2500,204 @@ if (logs.length > 200) {
 }
 assert.equal(JSON.parse(mockStorage.getItem('sapi_email_logs')).length, 200, 'La retención debe truncar a 200 logs');
 console.log('  ✅ Rutina de Retención y Limpieza de Almacenamiento: OK');
+
+// 54. BLINDAJE DE VENTANAS MODALES (PREVENCIÓN DE CIERRE EN BACKDROP Y GESTOS HORIZONTALES)
+console.log('🧪 Verificando Blindaje de Ventanas Modales y Prevención de Cierre Accidental...');
+
+// Test A: CSS overscroll-behavior en style.css y cliente.css
+const cssStyle = fs.readFileSync(path.resolve('style.css'), 'utf8');
+const cssCliente = fs.readFileSync(path.resolve('cliente.css'), 'utf8');
+assert.ok(cssStyle.includes('overscroll-behavior-x: none;'), 'style.css debe contener overscroll-behavior-x: none');
+assert.ok(cssCliente.includes('overscroll-behavior-x: none;'), 'cliente.css debe contener overscroll-behavior-x: none');
+
+// Test B: Plantillas modales en src/html/modals no deben tener onclick en modal-overlay
+const modalDir = path.resolve('src/html/modals');
+const modalFiles = fs.readdirSync(modalDir).filter(f => f.endsWith('.html'));
+for (const mf of modalFiles) {
+  const content = fs.readFileSync(path.join(modalDir, mf), 'utf8');
+  const lines = content.split('\n');
+  lines.forEach((l, idx) => {
+    if (l.includes('modal-overlay') && l.includes('onclick')) {
+      assert.fail(`El archivo ${mf}:${idx+1} aún tiene onclick en el overlay: ${l.trim()}`);
+    }
+  });
+}
+
+// Test C: Funciones de cierre deben ignorar eventos con target en el overlay
+function createMockElement(id, classes = ['open', 'modal-overlay']) {
+  const classListSet = new Set(classes);
+  return {
+    id,
+    classList: {
+      contains: (c) => classListSet.has(c),
+      add: (c) => classListSet.add(c),
+      remove: (c) => classListSet.delete(c)
+    },
+    style: {},
+    remove: () => {}
+  };
+}
+
+const mockDoc = {
+  elements: {},
+  getElementById(id) {
+    if (!this.elements[id]) {
+      this.elements[id] = createMockElement(id);
+    }
+    return this.elements[id];
+  },
+  body: { style: {} }
+};
+
+const originalDoc = globalThis.document;
+globalThis.document = mockDoc;
+
+try {
+  // 1. cerrarFormulario
+  const ordOverlay = mockDoc.getElementById('modal-overlay');
+  ordOverlay.classList.add('open');
+  cerrarFormulario({ target: ordOverlay });
+  assert.ok(ordOverlay.classList.contains('open'), 'cerrarFormulario NO debe cerrar el modal al hacer clic en el overlay');
+  cerrarFormulario();
+  assert.ok(!ordOverlay.classList.contains('open'), 'cerrarFormulario debe cerrar al invocarse sin evento o desde botón');
+
+  // 2. cerrarTicket
+  const tktOverlay = mockDoc.getElementById('modal-ticket-overlay');
+  tktOverlay.classList.add('open');
+  cerrarTicket({ target: tktOverlay });
+  assert.ok(tktOverlay.classList.contains('open'), 'cerrarTicket NO debe cerrar el modal al hacer clic en el overlay');
+  cerrarTicket();
+  assert.ok(!tktOverlay.classList.contains('open'), 'cerrarTicket debe cerrar al invocarse sin evento o desde botón');
+
+  // 3. cerrarDetalle
+  const detOverlay = mockDoc.getElementById('modal-detalle-overlay');
+  detOverlay.classList.add('open');
+  cerrarDetalle({ target: detOverlay });
+  assert.ok(detOverlay.classList.contains('open'), 'cerrarDetalle NO debe cerrar el modal al hacer clic en el overlay');
+  cerrarDetalle();
+  assert.ok(!detOverlay.classList.contains('open'), 'cerrarDetalle debe cerrar al invocarse sin evento o desde botón');
+
+  // 4. cerrarDetalleTicket
+  const tktDetOverlay = mockDoc.getElementById('modal-ticket-detalle-overlay');
+  tktDetOverlay.classList.add('open');
+  cerrarDetalleTicket({ target: tktDetOverlay });
+  assert.ok(tktDetOverlay.classList.contains('open'), 'cerrarDetalleTicket NO debe cerrar el modal al hacer clic en el overlay');
+  cerrarDetalleTicket();
+  assert.ok(!tktDetOverlay.classList.contains('open'), 'cerrarDetalleTicket debe cerrar al invocarse sin evento o desde botón');
+
+  // 5. cerrarBitacora
+  const bitOverlay = mockDoc.getElementById('modal-bitacora-overlay');
+  bitOverlay.classList.add('open');
+  cerrarBitacora({ target: bitOverlay });
+  assert.ok(bitOverlay.classList.contains('open'), 'cerrarBitacora NO debe cerrar el modal al hacer clic en el overlay');
+  cerrarBitacora();
+  assert.ok(!bitOverlay.classList.contains('open'), 'cerrarBitacora debe cerrar al invocarse sin evento o desde botón');
+
+  // 6. cerrarCierrePapel
+  const cpOverlay = mockDoc.getElementById('modal-cierre-papel-overlay');
+  cpOverlay.classList.add('open');
+  cerrarCierrePapel({ target: cpOverlay });
+  assert.ok(cpOverlay.classList.contains('open'), 'cerrarCierrePapel NO debe cerrar el modal al hacer clic en el overlay');
+  cerrarCierrePapel();
+  assert.ok(!cpOverlay.classList.contains('open'), 'cerrarCierrePapel debe cerrar al invocarse sin evento o desde botón');
+} finally {
+  globalThis.document = originalDoc;
+}
+
+console.log('  ✅ Blindaje de Ventanas Modales (Prevención Clic Exterior, Arrastre y Gestos Horizontales): OK');
+
+// 55. SOPORTE DE ARRASTRAR Y SOLTAR (DRAG & DROP) PARA COTIZACIONES Y PEDIDOS EN TICKETS
+console.log('🧪 Verificando Soporte de Drag & Drop para PDFs en Tickets...');
+
+// Test A: Existencia de estilos en style.css
+assert.ok(cssStyle.includes('.custom-file-upload.dragover'), 'style.css debe contener regla .custom-file-upload.dragover');
+assert.ok(cssStyle.includes('.custom-file-upload.drag-hint'), 'style.css debe contener regla .custom-file-upload.drag-hint');
+assert.ok(cssStyle.includes('.file-sublabel-text'), 'style.css debe contener regla .file-sublabel-text');
+
+// Test B: data-drop-zone y sublabels en plantillas HTML y módulos de detalle
+const modalTicketFormHtml = fs.readFileSync(path.join(modalDir, 'modal_ticket_form.html'), 'utf8');
+assert.ok(modalTicketFormHtml.includes('data-drop-zone="cotizacion"'), 'modal_ticket_form.html debe incluir data-drop-zone="cotizacion"');
+assert.ok(modalTicketFormHtml.includes('data-drop-zone="pedido"'), 'modal_ticket_form.html debe incluir data-drop-zone="pedido"');
+assert.ok(modalTicketFormHtml.includes('file-sublabel-text'), 'modal_ticket_form.html debe incluir file-sublabel-text');
+
+const ticketsDetalleCode = fs.readFileSync(path.resolve('tickets_detalle.js'), 'utf8');
+assert.ok(ticketsDetalleCode.includes('data-drop-zone="cotizacion"'), 'tickets_detalle.js debe incluir data-drop-zone="cotizacion"');
+assert.ok(ticketsDetalleCode.includes('data-drop-zone="pedido"'), 'tickets_detalle.js debe incluir data-drop-zone="pedido"');
+
+// Test C: Funciones exportadas
+assert.equal(typeof inicializarDragAndDropTickets, 'function', 'inicializarDragAndDropTickets debe ser una función');
+assert.equal(typeof procesarArchivosArrastrados, 'function', 'procesarArchivosArrastrados debe ser una función');
+
+// Test D: Simulación de arrastrar y soltar archivo PDF vs no-PDF
+{
+  const originalDoc = globalThis.document;
+  const originalWindow = globalThis.window;
+  try {
+    const { JSDOM } = await import('jsdom');
+    const dom = new JSDOM(`
+      <div id="modal-ticket-overlay">
+        <label class="custom-file-upload" data-drop-zone="cotizacion">
+          <input type="file" id="t-cotizacion-pdf" accept="application/pdf" />
+          <i data-lucide="upload-cloud"></i>
+          <span class="file-label-text">Arrastra aquí o selecciona tu cotización (PDF)</span>
+          <span class="file-sublabel-text">Haz clic o suelta el archivo PDF aquí</span>
+        </label>
+        <button type="button" id="btn-clear-pdf-modal" style="display:none;"></button>
+        <div id="pdf-extraction-table-container" style="display:none;"></div>
+
+        <label class="custom-file-upload" data-drop-zone="pedido">
+          <input type="file" id="t-pedido-pdf" accept="application/pdf" />
+          <i data-lucide="upload-cloud"></i>
+          <span class="file-label-text">Arrastra aquí o selecciona tu pedido (PDF)</span>
+          <span class="file-sublabel-text">Haz clic o suelta el archivo PDF aquí</span>
+        </label>
+        <button type="button" id="btn-clear-pdf-pedido-modal" style="display:none;"></button>
+      </div>
+    `);
+
+    globalThis.document = dom.window.document;
+    globalThis.window = dom.window;
+    dom.window.updateFileLabel = updateFileLabel;
+
+    const cotZone = dom.window.document.querySelector('[data-drop-zone="cotizacion"]');
+    const cotInput = dom.window.document.getElementById('t-cotizacion-pdf');
+    const clearCotBtn = dom.window.document.getElementById('btn-clear-pdf-modal');
+
+    // 1. Archivo inválido (imagen o ejecutable) debe ser rechazado
+    const archivoInvalido = [{ name: 'foto.png', type: 'image/png', size: 1024 }];
+    const resInvalido = procesarArchivosArrastrados(cotZone, archivoInvalido);
+    assert.strictEqual(resInvalido, false, 'procesarArchivosArrastrados debe rechazar archivos que no sean PDF');
+
+    // 2. Archivo PDF válido debe ser aceptado y actualizar etiquetas
+    const pdfCotValido = [{ name: 'Cotizacion_Prueba.pdf', type: 'application/pdf', size: 524288 }]; // 512 KB
+    const resValido = procesarArchivosArrastrados(cotZone, pdfCotValido);
+    assert.strictEqual(resValido, true, 'procesarArchivosArrastrados debe aceptar archivos PDF válidos');
+    
+    assert.equal(cotZone.querySelector('.file-label-text').textContent, 'Cotizacion_Prueba.pdf', 'Debe actualizar el nombre del archivo');
+    assert.ok(cotZone.querySelector('.file-sublabel-text').textContent.includes('512.0 KB'), 'Debe mostrar el tamaño en KB');
+    assert.equal(clearCotBtn.style.display, 'inline-flex', 'Debe mostrar el botón de eliminar cotización');
+
+    // 3. Prueba en Pedido PDF
+    const pedZone = dom.window.document.querySelector('[data-drop-zone="pedido"]');
+    const clearPedBtn = dom.window.document.getElementById('btn-clear-pdf-pedido-modal');
+    const pdfPedValido = [{ name: 'Pedido_12345.pdf', type: 'application/pdf', size: 262144 }]; // 256 KB
+    const resPed = procesarArchivosArrastrados(pedZone, pdfPedValido);
+    assert.strictEqual(resPed, true, 'procesarArchivosArrastrados debe aceptar pedido PDF');
+    assert.equal(pedZone.querySelector('.file-label-text').textContent, 'Pedido_12345.pdf');
+    assert.ok(pedZone.querySelector('.file-sublabel-text').textContent.includes('256.0 KB'));
+    assert.equal(clearPedBtn.style.display, 'inline-flex', 'Debe mostrar el botón de eliminar pedido');
+
+    // 4. Limpieza con updateFileLabel / clear
+    cotInput.files = [];
+    updateFileLabel(cotInput);
+    assert.equal(cotZone.querySelector('.file-label-text').textContent, 'Arrastra aquí o selecciona tu cotización (PDF)');
+    assert.equal(clearCotBtn.style.display, 'none', 'Debe ocultar el botón de eliminar tras limpiar');
+  } finally {
+    globalThis.document = originalDoc;
+    globalThis.window = originalWindow;
+  }
+}
+console.log('  ✅ Soporte de Drag & Drop para PDFs en Tickets (Cotizaciones y Pedidos): OK');
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 

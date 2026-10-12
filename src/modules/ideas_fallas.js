@@ -114,7 +114,7 @@ function abrirModalResolucionIdeaFalla(id) {
 function cerrarModalResolucionIdeaFalla(e) {
   if (typeof document === "undefined") return;
   const modalOverlay = document.getElementById('modal-resolucion-idea-falla-overlay');
-  if (e && e.target !== modalOverlay) return;
+  if (e && (e.target === modalOverlay || e.target?.classList?.contains('modal-overlay'))) return;
   if (modalOverlay) modalOverlay.classList.remove('open');
   document.body.style.overflow = '';
   renderIdeasFallas();
@@ -264,7 +264,7 @@ function abrirModalIdeaFalla(id = null) {
 function cerrarModalIdeaFalla(e) {
   if (typeof document === "undefined") return;
   const modalOverlay = document.getElementById('modal-idea-falla-overlay');
-  if (e && e.target !== modalOverlay) return;
+  if (e && (e.target === modalOverlay || e.target?.classList?.contains('modal-overlay'))) return;
   if (modalOverlay) modalOverlay.classList.remove('open');
   document.body.style.overflow = '';
   editandoIdeaFallaId = null;

@@ -634,9 +634,7 @@ function abrirModalNuevoEnvio(ticketId, envioId) {
 };
 
 function cerrarModalEnvio(e) {
-  if (e && e.target && e.target !== document.getElementById('modal-envio-overlay') && !e.target.classList.contains('modal-close') && !e.target.closest('.modal-close') && !e.target.closest('button[onclick*="cerrarModalEnvio"]')) {
-    return;
-  }
+  if (e && (e.target === document.getElementById('modal-envio-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   const modal = document.getElementById('modal-envio-overlay');
   if (modal) {
     modal.style.display = 'none';
@@ -1051,9 +1049,7 @@ function toggleLlegoDesdeDetalle(envioId, ticketId, checked) {
 };
 
 function cerrarDetalleEnvio(e) {
-  if (e && e.target && e.target !== document.getElementById('modal-detalle-envio-overlay') && !e.target.classList.contains('modal-close') && !e.target.closest('.modal-close')) {
-    return;
-  }
+  if (e && (e.target === document.getElementById('modal-detalle-envio-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   const modal = document.getElementById('modal-detalle-envio-overlay');
   if (modal) {
     modal.style.display = 'none';

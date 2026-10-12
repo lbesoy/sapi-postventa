@@ -3801,7 +3801,7 @@
     </div>
 
     <!-- MODAL FORMULARIO -->
-    <div class="modal-overlay" id="modal-overlay" onclick="cerrarFormulario(event)">
+    <div class="modal-overlay" id="modal-overlay" >
       <div class="modal" id="modal-form">
         <div class="modal-header">
           <h2 id="modal-title">Nueva Orden de Servicio</h2>
@@ -4045,7 +4045,7 @@
     </div>
 
     <!-- MODAL DETALLE -->
-    <div class="modal-overlay" id="modal-detalle-overlay" onclick="cerrarDetalle(event)" style="z-index: 500;">
+    <div class="modal-overlay" id="modal-detalle-overlay"  style="z-index: 500;">
       <div class="modal" id="modal-detalle">
         <div class="modal-header">
           <h2 id="detalle-title">Orden de Servicio</h2>
@@ -4074,7 +4074,7 @@
     </div>
 
     <!-- MODAL CIERRE EN PAPEL -->
-    <div class="modal-overlay" id="modal-cierre-papel-overlay" onclick="cerrarCierrePapel(event)" style="z-index: 600;">
+    <div class="modal-overlay" id="modal-cierre-papel-overlay"  style="z-index: 600;">
       <div class="modal" id="modal-cierre-papel" style="max-width: 780px;">
         <div class="modal-header">
           <h2>Cierre de Orden en Papel</h2>
@@ -4120,7 +4120,7 @@
     </div>
 
     <!-- MODAL PROGRAMAR TECNICO (CALENDARIO) -->
-    <div class="modal-overlay" id="modal-programar-tecnico-overlay" onclick="if(event.target===this) this.classList.remove('open')">
+    <div class="modal-overlay" id="modal-programar-tecnico-overlay" >
       <div class="modal" id="modal-programar-tecnico" style="max-width:500px;">
         <div class="modal-header">
           <h2>Programar Asignación</h2>
@@ -4327,7 +4327,7 @@
     </div>
 
     <!-- MODAL REGISTRAR ACTIVIDAD (CALENDARIO FASE 9) -->
-    <div class="modal-overlay" id="modal-registrar-actividad-overlay" onclick="if(event.target===this) this.classList.remove('open')" style="z-index:999999; backdrop-filter:blur(6px); transition:opacity 0.25s ease-in-out;">
+    <div class="modal-overlay" id="modal-registrar-actividad-overlay"  style="z-index:999999; backdrop-filter:blur(6px); transition:opacity 0.25s ease-in-out;">
       <style>
         #modal-registrar-actividad {
           max-width: 550px;
@@ -4556,7 +4556,7 @@
     </div>
 
     <!-- MODAL ASIGNAR TECNICOS (CALENDARIO) -->
-    <div class="modal-overlay" id="modal-asignar-tecnicos-overlay" onclick="cerrarAsignarTecnicos(event)"
+    <div class="modal-overlay" id="modal-asignar-tecnicos-overlay" 
       style="z-index: 500;">
       <div class="modal" id="modal-asignar-tecnicos" style="max-width:400px;">
         <div class="modal-header">
@@ -4579,7 +4579,7 @@
     </div>
 
     <!-- MODAL BITÁCORA -->
-    <div class="modal-overlay" id="modal-bitacora-overlay" onclick="cerrarBitacora(event)" style="z-index: 500;">
+    <div class="modal-overlay" id="modal-bitacora-overlay"  style="z-index: 500;">
       <div class="modal" id="modal-bitacora" style="max-width:500px;">
         <div class="modal-header">
           <h2>Agregar Nota a Bitácora</h2>
@@ -4623,7 +4623,7 @@
     </div>
 
     <!-- MODAL CLIENTE -->
-    <div class="modal-overlay" id="modal-cliente-overlay" onclick="cerrarCliente(event)">
+    <div class="modal-overlay" id="modal-cliente-overlay" >
       <div class="modal" id="modal-cliente" style="max-width:700px;">
         <div class="modal-header">
           <h2 id="cliente-modal-title">Nuevo Cliente</h2>
@@ -4753,7 +4753,7 @@
     </div>
 
     <!-- MODAL AGREGAR MÁQUINA A CLIENTE EXISTENTE -->
-    <div class="modal-overlay" id="modal-agregar-maquina-overlay" onclick="cerrarModalAgregarMaquina(event)"
+    <div class="modal-overlay" id="modal-agregar-maquina-overlay" 
       style="z-index: 300;">
       <div class="modal" id="modal-agregar-maquina" style="max-width:500px;">
         <div class="modal-header">
@@ -4907,7 +4907,7 @@
     </div>
 
     <!-- MODAL MOVER MÁQUINA DE SITIO -->
-    <div class="modal-overlay" id="modal-mover-maquina-overlay" onclick="cerrarModalMoverMaquina(event)"
+    <div class="modal-overlay" id="modal-mover-maquina-overlay" 
       style="z-index: 300;">
       <div class="modal" id="modal-mover-maquina" style="max-width:400px;">
         <div class="modal-header">
@@ -4933,7 +4933,7 @@
       </div>
     </div>
     <!-- MODAL TRASPASAR MÁQUINA DE CLIENTE -->
-    <div class="modal-overlay" id="modal-traspasar-maquina-overlay" onclick="window.cerrarModalTraspasarMaquina(event)"
+    <div class="modal-overlay" id="modal-traspasar-maquina-overlay" 
       style="z-index: 300;">
       <div class="modal" id="modal-traspasar-maquina" style="max-width:450px;">
         <div class="modal-header">
@@ -4982,7 +4982,7 @@
     </div>
 
     <!-- MODAL PLANTILLA DE AUTOMATIZACIÓN (MACHOTE) -->
-    <div class="modal-overlay" id="modal-auto-plantilla-overlay" onclick="if(event.target===this) cerrarModalAutoPlantilla()" style="z-index: 500; display:none; opacity:0; transition: opacity 0.2s;">
+    <div class="modal-overlay" id="modal-auto-plantilla-overlay"  style="z-index: 500; display:none; opacity:0; transition: opacity 0.2s;">
       <div class="modal" style="max-width:1000px; width:90%; transition: transform 0.2s, opacity 0.2s; transform: translateY(20px); opacity:0;" id="modal-auto-plantilla-inner">
         <div class="modal-header">
           <h2 id="auto-plantilla-modal-title">Editar Plantilla de Correo</h2>
@@ -5088,7 +5088,7 @@
     </div>
 
     <!-- MODAL REGLA DE AUTOMATIZACIÓN -->
-    <div class="modal-overlay" id="modal-auto-regla-overlay" onclick="if(event.target===this) cerrarModalAutoRegla()" style="z-index: 500; display:none; opacity:0; transition: opacity 0.2s;">
+    <div class="modal-overlay" id="modal-auto-regla-overlay"  style="z-index: 500; display:none; opacity:0; transition: opacity 0.2s;">
       <div class="modal" style="max-width:500px; transition: transform 0.2s, opacity 0.2s; transform: translateY(20px); opacity:0;" id="modal-auto-regla-inner">
         <div class="modal-header">
           <h2 id="auto-regla-modal-title">Editar Regla de Automatización</h2>
@@ -5155,7 +5155,7 @@
     </div>
 
     <!-- MODAL DETALLE DE CLIENTE -->
-    <div class="modal-overlay" id="modal-detalle-cliente-overlay" onclick="cerrarDetalleCliente(event)" style="z-index: 400;">
+    <div class="modal-overlay" id="modal-detalle-cliente-overlay"  style="z-index: 400;">
       <div class="modal" id="modal-detalle-cliente" style="max-width:800px;">
         <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
           <h2 id="detalle-cliente-title">Perfil del Cliente</h2>
@@ -5176,7 +5176,7 @@
     </div>
 
     <!-- MODAL FUSIONAR CLIENTES DUPLICADOS -->
-    <div class="modal-overlay" id="modal-fusionar-clientes-overlay" onclick="if(event.target===this) cerrarModalFusionarClientes()" style="display:none; opacity:0; transition: opacity 0.2s;">
+    <div class="modal-overlay" id="modal-fusionar-clientes-overlay"  style="display:none; opacity:0; transition: opacity 0.2s;">
       <div class="modal" style="max-width:620px; transition: transform 0.2s, opacity 0.2s; transform: translateY(20px); opacity:0;" id="modal-fusionar-clientes-inner">
         <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
           <div style="display:flex; align-items:center; gap:0.75rem;">
@@ -5263,7 +5263,7 @@
     </div>
 
     <!-- MODAL DETALLE DE MÁQUINA (SERVICIOS) -->
-    <div class="modal-overlay" id="modal-detalle-maquina-overlay" onclick="cerrarDetalleMaquina(event)" style="z-index: 400;">
+    <div class="modal-overlay" id="modal-detalle-maquina-overlay"  style="z-index: 400;">
       <div class="modal" id="modal-detalle-maquina" style="max-width:600px;">
         <div class="modal-header">
           <div id="detalle-maquina-title" style="flex:1;">Historial de Máquina</div>
@@ -5277,7 +5277,7 @@
     </div>
 
     <!-- MODAL RENOMBRAR SITIO EMPRESA -->
-    <div class="modal-overlay" id="modal-renombrar-sitio-overlay" onclick="cerrarModalRenombrarSitio(event)" style="z-index: 400;">
+    <div class="modal-overlay" id="modal-renombrar-sitio-overlay"  style="z-index: 400;">
       <div class="modal" id="modal-renombrar-sitio" style="max-width:400px;">
         <div class="modal-header">
           <div>Renombrar Sitio</div>
@@ -5300,7 +5300,7 @@
     </div>
 
     <!-- MODAL DETALLE DE SITIO -->
-    <div class="modal-overlay" id="modal-detalle-sitio-overlay" onclick="cerrarDetalleSitio(event)"
+    <div class="modal-overlay" id="modal-detalle-sitio-overlay" 
       style="z-index: 400;">
       <div class="modal" id="modal-detalle-sitio" style="max-width:500px;">
         <div class="modal-header">
@@ -5315,7 +5315,7 @@
     </div>
 
     <!-- MODAL TICKET -->
-    <div class="modal-overlay" id="modal-ticket-overlay" onclick="cerrarTicket(event)">
+    <div class="modal-overlay" id="modal-ticket-overlay" >
       <div class="modal ticket-receipt" id="modal-ticket"
         style="max-width:540px; border-radius: 0; background: var(--bg-card); position: relative; border: 1px solid var(--border); box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
         <div class="receipt-edge-top"></div>
@@ -5679,10 +5679,11 @@
                   <label>Archivo Cotización (PDF) *</label>
                   <div style="display:flex; flex-direction:column; gap:0.5rem; width:100%;">
                     <div style="display:flex; gap:0.5rem; align-items:center; width:100%;">
-                      <label class="custom-file-upload" style="flex:1; margin:0;">
+                      <label class="custom-file-upload" style="flex:1; margin:0;" data-drop-zone="cotizacion" title="Arrastra tu PDF aquí o haz clic para seleccionarlo">
                         <input type="file" id="t-cotizacion-pdf" accept="application/pdf" onchange="updateFileLabel(this); if(this.files[0]) window.autoExtraerDesdePdfCotizacion(this.files[0], true, window.soporteActual);" />
-                        <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
-                        <span class="file-label-text">Subir cotización en PDF</span>
+                        <i data-lucide="upload-cloud" style="width:24px; height:24px; margin-bottom:0.3rem;"></i>
+                        <span class="file-label-text">Arrastra aquí o selecciona tu cotización (PDF)</span>
+                        <span class="file-sublabel-text">Haz clic o suelta el archivo PDF aquí</span>
                       </label>
                       <button type="button" id="btn-clear-pdf-modal" onclick="window.clearPdfInput(true)" class="btn-icon" style="display:none; background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); border-radius:6px; padding:0.6rem; cursor:pointer; height:45px; width:45px; align-items:center; justify-content:center;" title="Eliminar archivo"><i data-lucide="trash-2" style="width:16px; height:16px;"></i></button>
                     </div>
@@ -5731,10 +5732,11 @@
                     <label>Archivo Pedido (PDF) *</label>
                     <div style="display:flex; flex-direction:column; gap:0.5rem; width:100%;">
                       <div style="display:flex; gap:0.5rem; align-items:center; width:100%;">
-                        <label class="custom-file-upload" style="flex:1; margin:0;">
+                        <label class="custom-file-upload" style="flex:1; margin:0;" data-drop-zone="pedido" title="Arrastra tu PDF aquí o haz clic para seleccionarlo">
                           <input type="file" id="t-pedido-pdf" accept="application/pdf" onchange="updateFileLabel(this); if(this.files[0]) window.autoExtraerDesdePdfPedido(this.files[0], true, window.soporteActual);" />
-                          <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
-                          <span class="file-label-text">Subir pedido en PDF</span>
+                          <i data-lucide="upload-cloud" style="width:24px; height:24px; margin-bottom:0.3rem;"></i>
+                          <span class="file-label-text">Arrastra aquí o selecciona tu pedido (PDF)</span>
+                          <span class="file-sublabel-text">Haz clic o suelta el archivo PDF aquí</span>
                         </label>
                         <button type="button" id="btn-clear-pdf-pedido-modal" onclick="window.clearPdfPedidoInput(true)" class="btn-icon" style="display:none; background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); border-radius:6px; padding:0.6rem; cursor:pointer; height:45px; width:45px; align-items:center; justify-content:center;" title="Eliminar archivo"><i data-lucide="trash-2" style="width:16px; height:16px;"></i></button>
                       </div>
@@ -5842,7 +5844,7 @@
     </div>
 
     <!-- MODAL DETALLE TICKET -->
-    <div class="modal-overlay" id="modal-ticket-detalle-overlay" onclick="cerrarDetalleTicket(event)" style="z-index: 500;">
+    <div class="modal-overlay" id="modal-ticket-detalle-overlay"  style="z-index: 500;">
       <div class="modal modal-receipt" id="modal-ticket-detalle" style="max-width:640px; padding-bottom: 3rem;">
         <div class="receipt-edge-top"></div>
         <div class="modal-header">
@@ -5855,7 +5857,7 @@
     </div>
 
     <!-- MODAL IDEAS Y FALLAS -->
-    <div class="modal-overlay" id="modal-idea-falla-overlay" onclick="cerrarModalIdeaFalla(event)">
+    <div class="modal-overlay" id="modal-idea-falla-overlay" >
       <div class="modal" style="max-width:500px;">
         <div class="modal-header">
           <h2 id="idea-falla-modal-title">Reportar Idea / Falla</h2>
@@ -5964,7 +5966,7 @@
     </div>
 
     <!-- MODAL CONCLUSIÓN / RESOLUCIÓN IDEAS Y FALLAS -->
-    <div class="modal-overlay" id="modal-resolucion-idea-falla-overlay" onclick="window.cerrarModalResolucionIdeaFalla(event)">
+    <div class="modal-overlay" id="modal-resolucion-idea-falla-overlay" >
       <div class="modal" style="max-width:500px;">
         <div class="modal-header" style="background: rgba(16, 185, 129, 0.08); border-bottom: 1px solid rgba(16, 185, 129, 0.2);">
           <h2 style="display:flex; align-items:center; gap:0.5rem; color:#10b981; margin:0; font-size:1.1rem;">
@@ -5998,7 +6000,7 @@
     </div>
 
     <!-- MODAL FUSIONAR MAQUINAS -->
-    <div class="modal-overlay" id="modal-fusionar-maquinas-overlay" onclick="cerrarModalFusionarMaquinas(event)" style="z-index: 500;">
+    <div class="modal-overlay" id="modal-fusionar-maquinas-overlay"  style="z-index: 500;">
       <div class="modal" style="max-width:500px;">
         <div class="modal-header">
           <h2><i data-lucide="git-merge" style="vertical-align:middle; margin-right:6px; color:var(--accent);"></i> Fusionar Maquinarias</h2>
@@ -6042,7 +6044,7 @@
     </div>
 
     <!-- MODAL USUARIO -->
-    <div class="modal-overlay" id="modal-usuario-overlay" onclick="cerrarModalUsuario(event)">
+    <div class="modal-overlay" id="modal-usuario-overlay" >
       <div class="modal" style="max-width:520px;">
         <div class="modal-header">
           <h2 id="usuario-modal-title">Nuevo Usuario</h2>
@@ -6202,7 +6204,7 @@
     </div>
 
     <!-- MODAL SESIÓN (cambiar usuario) -->
-    <div class="modal-overlay" id="modal-sesion-overlay" onclick="cerrarSesionModal(event)">
+    <div class="modal-overlay" id="modal-sesion-overlay" >
       <div class="modal" style="max-width:420px;">
         <div class="modal-header">
           <h2>Cambiar Usuario</h2>
@@ -6217,7 +6219,7 @@
   </div><!-- /app-wrapper -->
 
   <!-- MODAL DETALLE TÉCNICO -->
-  <div class="modal-overlay" id="modal-detalle-tecnico-overlay" onclick="cerrarDetalleTecnico(event)" style="z-index: 400;">
+  <div class="modal-overlay" id="modal-detalle-tecnico-overlay"  style="z-index: 400;">
     <div class="modal" id="modal-detalle-tecnico" style="max-width: 700px; padding:0;">
       <div class="modal-header" style="border-bottom: 1px solid var(--border); padding: 1.25rem 1.5rem;">
         <h2 id="tecnico-detalle-title" style="display:flex; align-items:center; gap:0.5rem;"><i data-lucide="user"
@@ -6231,7 +6233,7 @@
   </div>
 
   <!-- MODAL RESUMEN SEMANAL OPERATIVO -->
-  <div class="modal-overlay" id="modal-resumen-semanal-overlay" onclick="if(event.target===this) window.cerrarModalResumenSemanal()" style="z-index: 1200; backdrop-filter: blur(4px);">
+  <div class="modal-overlay" id="modal-resumen-semanal-overlay"  style="z-index: 1200; backdrop-filter: blur(4px);">
     <div class="modal" id="modal-resumen-semanal" style="max-width: 1050px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; padding: 0; border-radius: 16px; overflow: hidden; background: var(--bg-card); border: 1px solid var(--border);">
       
       <!-- HEADER -->
@@ -6468,7 +6470,7 @@
   </div>
 
   <!-- MODAL AGREGAR SITIO -->
-  <div class="modal-overlay" id="modal-agregar-sitio-overlay" onclick="cerrarModalSitio(event)" style="z-index: 300;">
+  <div class="modal-overlay" id="modal-agregar-sitio-overlay"  style="z-index: 300;">
     <div class="modal" style="max-width:400px;">
       <div class="modal-header">
         <h2 id="modal-sitio-title">Nuevo Sitio</h2>
@@ -6605,7 +6607,7 @@
   </div>
 
   <!-- MODAL: DIAGRAMA DE FLUJO INTERACTIVO (PANTALLA COMPLETA) -->
-  <div id="modal-diagrama-flujo-overlay" class="modal-overlay" style="z-index: 999999; display: none;" onclick="window.cerrarModalDiagramaFlujo(event)">
+  <div id="modal-diagrama-flujo-overlay" class="modal-overlay" style="z-index: 999999; display: none;" >
     <div class="modal" style="max-width: 1200px; width: 95vw; height: 90vh; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
       <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
         <div style="display:flex; align-items:center; gap:0.6rem;">
@@ -6640,7 +6642,7 @@
   </div>
 
   <!-- MODAL: DEPURADOR DE ÓRDENES DE REFACCIONES Y GARANTÍAS (SUPERADMIN) -->
-  <div id="modal-depurar-ordenes-overlay" class="modal-overlay" style="z-index: 999999; display: none;" onclick="window.cerrarModalDepurarOrdenes(event)">
+  <div id="modal-depurar-ordenes-overlay" class="modal-overlay" style="z-index: 999999; display: none;" >
     <div class="modal" style="max-width: 1250px; width: 95vw; height: 90vh; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
       
       <!-- Modal Header -->
@@ -6764,7 +6766,7 @@
   </div>
 
   <!-- MODAL: KITS DE SERVICIO PREVENTIVO POR MAQUINARIA (250h, 500h, 1000h) -->
-  <div id="modal-kits-servicio-overlay" class="modal-overlay" style="z-index: 999999; display: none;" onclick="window.cerrarModalKitsServicio(event)">
+  <div id="modal-kits-servicio-overlay" class="modal-overlay" style="z-index: 999999; display: none;" >
     <div class="modal" onclick="event.stopPropagation()" style="max-width: 1280px; width: 95vw; height: 90vh; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 12px 48px rgba(0,0,0,0.45);">
       
       <!-- Modal Header -->
@@ -6945,7 +6947,7 @@
   </div>
 
   <!-- SUBMODAL: FORMULARIO CREAR / EDITAR KIT DE SERVICIO -->
-  <div id="modal-editar-kit-overlay" class="modal-overlay" style="z-index: 1000000; display: none;" onclick="window.cerrarModalFormularioKit(event)">
+  <div id="modal-editar-kit-overlay" class="modal-overlay" style="z-index: 1000000; display: none;" >
     <div class="modal" onclick="event.stopPropagation()" style="max-width: 840px; width: 95vw; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
       
       <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
@@ -7042,7 +7044,7 @@
   </div>
 
   <!-- MODAL: CREAR / EDITAR GUÍA DE ENVÍO Y PAQUETERÍA -->
-  <div id="modal-envio-overlay" class="modal-overlay" style="z-index: 99999; display: none;" onclick="window.cerrarModalEnvio(event)">
+  <div id="modal-envio-overlay" class="modal-overlay" style="z-index: 99999; display: none;" >
     <div class="modal" style="max-width: 680px; width: 95vw; max-height: 90vh; overflow-y: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
       <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
         <div style="display:flex; align-items:center; gap:0.6rem;">
@@ -7162,7 +7164,7 @@
   </div>
 
   <!-- MODAL: DETALLE VISUAL DE GUÍA DE ENVÍO -->
-  <div id="modal-detalle-envio-overlay" class="modal-overlay" style="z-index: 99999; display: none;" onclick="window.cerrarDetalleEnvio(event)">
+  <div id="modal-detalle-envio-overlay" class="modal-overlay" style="z-index: 99999; display: none;" >
     <div class="modal" style="max-width: 620px; width: 95vw; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
       <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
         <div style="display:flex; align-items:center; gap:0.6rem;">
@@ -7922,7 +7924,7 @@
   </div>
 
   <!-- MODAL DESGLOSE DASHBOARD -->
-  <div class="modal-overlay" id="modal-dashboard-desglose" onclick="if(event.target===this) this.classList.remove('open')">
+  <div class="modal-overlay" id="modal-dashboard-desglose" >
     <div class="modal" style="max-width: 900px;">
       <div class="modal-header">
         <h2 id="modal-dashboard-desglose-title">Desglose</h2>
@@ -7944,7 +7946,7 @@
   </div>
 
   <!-- MODAL REGISTRAR/EDITAR GASTO -->
-  <div class="modal-overlay" id="modal-gasto-overlay" onclick="if(event.target===this) cerrarModalGasto()">
+  <div class="modal-overlay" id="modal-gasto-overlay" >
     <div class="modal" style="max-width: 1000px; width: 95%; overflow:hidden;">
       <div class="modal-header" style="border-bottom:1px solid var(--border); padding: 1.25rem 1.5rem; display:flex; align-items:center; justify-content:space-between;">
         <h2 id="modal-gasto-titulo" style="font-size:1.05rem; display:flex; align-items:center; gap:0.5rem; margin:0;"><i data-lucide="receipt-text" style="color:var(--accent);"></i> Detalle de la transacción</h2>
@@ -8159,7 +8161,7 @@
 
 
   <!-- MODAL ONEDRIVE FILE EXPLORER PICKER -->
-  <div class="modal-overlay" id="modal-onedrive-picker-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:2100; align-items:center; justify-content:center; padding:1rem; box-sizing:border-box;" onclick="if(event.target===this) cerrarOneDrivePicker()">
+  <div class="modal-overlay" id="modal-onedrive-picker-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:2100; align-items:center; justify-content:center; padding:1rem; box-sizing:border-box;" >
     <div class="modal" style="max-width:800px; width:100%; max-height:85vh; padding:0; border-radius:12px; overflow:hidden; background:#f3f3f3; color:#242424; box-shadow:0 8px 32px rgba(0,0,0,0.3); display:flex; flex-direction:column; border:1px solid #d2d2d2; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
       
       <!-- HEADER ESTILO OFFICE 365 -->
@@ -8242,7 +8244,7 @@
 
 
   <!-- MODAL DETALLE / APROBACIÓN GASTO -->
-  <div class="modal-overlay" id="modal-gasto-detalle-overlay" onclick="if(event.target===this) cerrarDetalleGasto()">
+  <div class="modal-overlay" id="modal-gasto-detalle-overlay" >
     <div class="modal" style="max-width: 700px; padding:0;">
       <div class="modal-header" style="padding:1.25rem 1.5rem; border-bottom:1px solid var(--border);">
         <h2>Detalle del Gasto</h2>
@@ -8644,7 +8646,7 @@
     </div>
   </div>
   <!-- MODAL DETALLES DE SINCRONIZACIÓN -->
-  <div id="modal-sync-detalles" class="modal-overlay" onclick="if(event.target === this) window.cerrarModalSyncDetalles()" style="z-index:99999;">
+  <div id="modal-sync-detalles" class="modal-overlay"  style="z-index:99999;">
     <div class="modal" style="max-width:550px; width:90%; border-radius:16px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); box-shadow:var(--shadow-lg);">
       <div class="modal-header">
         <h2 style="margin:0; font-size:1.2rem; font-weight:700;">Cambios Pendientes de Sincronizar</h2>
@@ -8668,7 +8670,7 @@
   </div>
 
   <!-- MODAL GASTOS RECHAZADOS -->
-  <div id="modal-gastos-rechazados" class="modal-overlay" onclick="if(event.target === this) window.cerrarModalRechazados()" style="z-index:99999;">
+  <div id="modal-gastos-rechazados" class="modal-overlay"  style="z-index:99999;">
     <div class="modal" style="max-width:650px; width:90%; border-radius:16px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); box-shadow:var(--shadow-lg);">
       <div class="modal-header">
         <div style="display:flex; align-items:center; gap:0.5rem;">
@@ -8712,7 +8714,7 @@
     </div>
   </div>
   <!-- MODAL PIEZA PENDIENTE -->
-  <div id="modal-pieza-pendiente" class="modal-overlay" style="z-index:99999;" onclick="if(event.target === this) window.cerrarModalPiezaPendiente()">
+  <div id="modal-pieza-pendiente" class="modal-overlay" style="z-index:99999;" >
     <div class="modal" style="max-width:500px; width:90%; border-radius:16px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); box-shadow:var(--shadow-lg);">
       <div class="modal-header">
         <h2 style="margin:0; font-size:1.2rem; font-weight:700;">Detalle de Refacción</h2>
@@ -8737,7 +8739,7 @@
   </div>
 
   <!-- MODAL VISOR DE MANUALES Y DOCUMENTOS (VISOR INTERACTIVO EN PANTALLA) -->
-  <div id="modal-visor-manual-overlay" class="modal-overlay" style="z-index: 999999; display: none;" onclick="window.cerrarVisorManual(event)">
+  <div id="modal-visor-manual-overlay" class="modal-overlay" style="z-index: 999999; display: none;" >
     <div class="modal" onclick="event.stopPropagation()" style="max-width: 1150px; width: 95vw; height: 90vh; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-card, #1e293b); color: var(--text-primary, #f8fafc); border: 1px solid var(--border, rgba(255,255,255,0.1)); border-radius: 14px; overflow: hidden; box-shadow: 0 20px 45px rgba(0,0,0,0.6);">
       
       <!-- HEADER -->

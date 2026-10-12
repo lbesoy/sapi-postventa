@@ -695,7 +695,7 @@ function editarTicket(id) { abrirTicket(id); }
 
 function cerrarTicket(e) {
   if (typeof document === 'undefined') return;
-  if (e && e.target !== document.getElementById('modal-ticket-overlay')) return;
+  if (e && (e.target === document.getElementById('modal-ticket-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   window._guardandoTicket = false;
   const btnSubmit = document.getElementById('btn-submit-ticket');
   if (btnSubmit) {
@@ -1287,6 +1287,181 @@ if (typeof document !== 'undefined') {
     document.querySelectorAll('.combo-box').forEach(c => c.classList.remove('focus'));
   }
 });
+}
+
+function procesarArchivosArrastrados(dropzone, files) {
+  if (!dropzone) return false;
+  const input = dropzone.querySelector('input[type="file"]') || (dropzone.tagName === 'INPUT' ? dropzone : null);
+  if (!input) return false;
+
+  const fileArray = Array.from(files || []);
+  if (fileArray.length === 0) return false;
+
+  // Validar formato si es PDF
+  const accept = (input.getAttribute('accept') || '').toLowerCase();
+  if (accept.includes('application/pdf') || accept.includes('.pdf')) {
+    const invalidFiles = fileArray.filter(f => {
+      const name = (f.name || '').toLowerCase();
+      const type = (f.type || '').toLowerCase();
+      return !name.endsWith('.pdf') && type !== 'application/pdf';
+    });
+    if (invalidFiles.length > 0) {
+      const msg = 'Solo se admiten archivos en formato PDF.';
+      if (typeof window !== 'undefined' && typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion(msg, 'error');
+      } else if (typeof window !== 'undefined' && typeof window._notify === 'function') {
+        window._notify(msg, 'error');
+      } else if (typeof alert === 'function') {
+        alert(msg);
+      }
+      return false;
+    }
+  }
+
+  // Asignar archivos al input
+  let filesToAssign = fileArray;
+  if (!input.multiple && fileArray.length > 1) {
+    filesToAssign = [fileArray[0]];
+  }
+
+  let assigned = false;
+  if (typeof DataTransfer !== 'undefined') {
+    try {
+      const dt = new DataTransfer();
+      filesToAssign.forEach(f => dt.items.add(f));
+      input.files = dt.files;
+      assigned = true;
+    } catch (_) {}
+  }
+  if (!assigned) {
+    try {
+      Object.defineProperty(input, 'files', {
+        value: filesToAssign,
+        writable: true,
+        configurable: true
+      });
+      assigned = true;
+    } catch (_) {
+      input._droppedFiles = filesToAssign;
+    }
+  }
+
+  // Disparar evento change
+  let changeFired = false;
+  const changeTracker = () => { changeFired = true; };
+  input.addEventListener('change', changeTracker, { once: true });
+  const win = (input.ownerDocument && input.ownerDocument.defaultView) || (typeof window !== 'undefined' ? window : null);
+  const EventCtor = (win && win.Event) || (typeof Event !== 'undefined' ? Event : null);
+  if (EventCtor) {
+    try {
+      input.dispatchEvent(new EventCtor('change', { bubbles: true, cancelable: true }));
+    } catch (_) {}
+  }
+  input.removeEventListener('change', changeTracker);
+
+  // Si change no fue manejado por inline onchange (ej. jsdom)
+  if (!changeFired && typeof input.onchange === 'function') {
+    try {
+      input.onchange.call(input, { target: input });
+    } catch (e) {
+      console.error('Error al ejecutar onchange:', e);
+    }
+  } else if (!changeFired) {
+    const onchangeAttr = input.getAttribute('onchange');
+    if (onchangeAttr && typeof window !== 'undefined') {
+      try {
+        const fn = new Function('event', onchangeAttr);
+        fn.call(input, { target: input });
+      } catch (e) {}
+    }
+  }
+
+  // Sincronizar etiqueta
+  if (typeof updateFileLabel === 'function') {
+    updateFileLabel(input);
+  } else if (typeof window !== 'undefined' && typeof window.updateFileLabel === 'function') {
+    window.updateFileLabel(input);
+  }
+
+  // Notificación amigable
+  const nombreArchivo = (filesToAssign[0] && filesToAssign[0].name) ? filesToAssign[0].name : 'Documento PDF';
+  const msgExito = filesToAssign.length === 1
+    ? `Archivo "${nombreArchivo}" cargado exitosamente.`
+    : `${filesToAssign.length} archivos cargados exitosamente.`;
+  if (typeof window !== 'undefined' && typeof window.mostrarNotificacion === 'function') {
+    window.mostrarNotificacion(msgExito, 'success');
+  } else if (typeof window !== 'undefined' && typeof window._notify === 'function') {
+    window._notify(msgExito, 'success');
+  }
+
+  return true;
+}
+
+function inicializarDragAndDropTickets() {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return;
+  if (window.__ticketDragAndDropIniciado) return;
+  window.__ticketDragAndDropIniciado = true;
+
+  // Prevenir que el navegador abra el archivo en una nueva pestaña si se suelta fuera de dropzone
+  window.addEventListener('dragover', function(e) {
+    e.preventDefault();
+  }, false);
+
+  window.addEventListener('drop', function(e) {
+    const isDropZone = e.target && e.target.closest && (e.target.closest('.custom-file-upload') || e.target.closest('[ondrop]'));
+    if (!isDropZone) {
+      e.preventDefault();
+    }
+  }, false);
+
+  document.addEventListener('dragenter', function(e) {
+    const zone = e.target && e.target.closest ? e.target.closest('.custom-file-upload') : null;
+    if (zone) {
+      e.preventDefault();
+      zone.classList.add('dragover');
+    }
+  }, false);
+
+  document.addEventListener('dragover', function(e) {
+    const zone = e.target && e.target.closest ? e.target.closest('.custom-file-upload') : null;
+    if (zone) {
+      e.preventDefault();
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'copy';
+      }
+      if (!zone.classList.contains('dragover')) {
+        zone.classList.add('dragover');
+      }
+    }
+  }, false);
+
+  document.addEventListener('dragleave', function(e) {
+    const zone = e.target && e.target.closest ? e.target.closest('.custom-file-upload') : null;
+    if (zone && (!e.relatedTarget || !zone.contains(e.relatedTarget))) {
+      zone.classList.remove('dragover');
+    }
+  }, false);
+
+  document.addEventListener('drop', function(e) {
+    const zone = e.target && e.target.closest ? e.target.closest('.custom-file-upload') : null;
+    if (zone) {
+      e.preventDefault();
+      e.stopPropagation();
+      zone.classList.remove('dragover');
+      const files = e.dataTransfer ? e.dataTransfer.files : null;
+      if (files && files.length > 0) {
+        procesarArchivosArrastrados(zone, files);
+      }
+    }
+  }, false);
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inicializarDragAndDropTickets);
+  } else {
+    inicializarDragAndDropTickets();
+  }
 }
 
 function readFileAsBase64(file) {
@@ -2065,7 +2240,9 @@ async function eliminarTicket(id) {
     agregarEmpresaCombo: agregarEmpresaCombo,
     readFileAsBase64: readFileAsBase64,
     guardarTicket: guardarTicket,
-    eliminarTicket: eliminarTicket
+    eliminarTicket: eliminarTicket,
+    procesarArchivosArrastrados: procesarArchivosArrastrados,
+    inicializarDragAndDropTickets: inicializarDragAndDropTickets
   };
 
   if (typeof root !== "undefined") {
@@ -2096,6 +2273,8 @@ async function eliminarTicket(id) {
     window.readFileAsBase64 = readFileAsBase64;
     window.guardarTicket = guardarTicket;
     window.eliminarTicket = eliminarTicket;
+    window.procesarArchivosArrastrados = procesarArchivosArrastrados;
+    window.inicializarDragAndDropTickets = inicializarDragAndDropTickets;
   }
 
   return exports;

@@ -110,7 +110,7 @@ function abrirAsignarTecnicos() {
 }
 
 function cerrarAsignarTecnicos(e) {
-  if (e && e.target !== document.getElementById('modal-asignar-tecnicos-overlay')) return;
+  if (e && (e.target === document.getElementById('modal-asignar-tecnicos-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   const modal = document.getElementById('modal-asignar-tecnicos-overlay');
   if (modal) modal.classList.remove('open');
 }

@@ -1,5 +1,5 @@
   <!-- MODAL REGISTRAR/EDITAR GASTO -->
-  <div class="modal-overlay" id="modal-gasto-overlay" onclick="if(event.target===this) cerrarModalGasto()">
+  <div class="modal-overlay" id="modal-gasto-overlay" >
     <div class="modal" style="max-width: 1000px; width: 95%; overflow:hidden;">
       <div class="modal-header" style="border-bottom:1px solid var(--border); padding: 1.25rem 1.5rem; display:flex; align-items:center; justify-content:space-between;">
         <h2 id="modal-gasto-titulo" style="font-size:1.05rem; display:flex; align-items:center; gap:0.5rem; margin:0;"><i data-lucide="receipt-text" style="color:var(--accent);"></i> Detalle de la transacción</h2>
@@ -214,7 +214,7 @@
 
 
   <!-- MODAL ONEDRIVE FILE EXPLORER PICKER -->
-  <div class="modal-overlay" id="modal-onedrive-picker-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:2100; align-items:center; justify-content:center; padding:1rem; box-sizing:border-box;" onclick="if(event.target===this) cerrarOneDrivePicker()">
+  <div class="modal-overlay" id="modal-onedrive-picker-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:2100; align-items:center; justify-content:center; padding:1rem; box-sizing:border-box;" >
     <div class="modal" style="max-width:800px; width:100%; max-height:85vh; padding:0; border-radius:12px; overflow:hidden; background:#f3f3f3; color:#242424; box-shadow:0 8px 32px rgba(0,0,0,0.3); display:flex; flex-direction:column; border:1px solid #d2d2d2; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
       
       <!-- HEADER ESTILO OFFICE 365 -->
@@ -297,7 +297,7 @@
 
 
   <!-- MODAL DETALLE / APROBACIÓN GASTO -->
-  <div class="modal-overlay" id="modal-gasto-detalle-overlay" onclick="if(event.target===this) cerrarDetalleGasto()">
+  <div class="modal-overlay" id="modal-gasto-detalle-overlay" >
     <div class="modal" style="max-width: 700px; padding:0;">
       <div class="modal-header" style="padding:1.25rem 1.5rem; border-bottom:1px solid var(--border);">
         <h2>Detalle del Gasto</h2>

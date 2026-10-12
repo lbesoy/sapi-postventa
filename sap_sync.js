@@ -1819,11 +1819,18 @@
     const fileInput = document.getElementById(fileInputId);
     if (fileInput) {
       fileInput.value = '';
-      const textSpan = fileInput.parentElement.querySelector('.file-label-text');
-      if (textSpan) textSpan.textContent = 'Subir pedido en PDF';
-      fileInput.parentElement.style.borderColor = 'var(--border)';
-      fileInput.parentElement.style.color = 'var(--text-muted)';
-      fileInput.parentElement.style.background = 'rgba(255,255,255,0.02)';
+      if (typeof updateFileLabel === 'function') updateFileLabel(fileInput);
+      else if (typeof global !== 'undefined' && typeof global.updateFileLabel === 'function') global.updateFileLabel(fileInput);
+      else if (typeof window !== 'undefined' && typeof window.updateFileLabel === 'function') window.updateFileLabel(fileInput);
+      else {
+        const textSpan = fileInput.parentElement.querySelector('.file-label-text');
+        if (textSpan) textSpan.textContent = 'Arrastra aquí o selecciona tu pedido (PDF)';
+        const subSpan = fileInput.parentElement.querySelector('.file-sublabel-text');
+        if (subSpan) subSpan.textContent = 'Haz clic o suelta el archivo PDF aquí';
+        fileInput.parentElement.style.borderColor = 'var(--border)';
+        fileInput.parentElement.style.color = 'var(--text-muted)';
+        fileInput.parentElement.style.background = 'rgba(255,255,255,0.02)';
+      }
     }
 
     const tableContainerId = isModal ? 'pdf-pedido-extraction-table-container' : `quick-pdf-pedido-extraction-table-container-${ticketId}`;

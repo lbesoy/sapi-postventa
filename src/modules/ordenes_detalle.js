@@ -1460,9 +1460,7 @@ function abrirCierrePapel(ordenId) {
 
 function cerrarCierrePapel(e) {
   if (typeof document === 'undefined') return;
-  if (e && e.target !== document.getElementById('modal-cierre-papel-overlay') && e.target !== document.querySelector('#modal-cierre-papel .modal-close') && e.target.tagName !== 'BUTTON') {
-    if (e.target.closest('#modal-cierre-papel')) return;
-  }
+  if (e && (e.target === document.getElementById('modal-cierre-papel-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   document.getElementById('modal-cierre-papel-overlay').classList.remove('open');
   if (!document.getElementById('modal-detalle-overlay').classList.contains('open')) {
     document.body.style.overflow = '';

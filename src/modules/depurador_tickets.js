@@ -255,9 +255,7 @@ function abrirModalDepurarTickets() {
 };
 
 function cerrarModalDepurarTickets(e) {
-  if (e && e.target && e.target !== document.getElementById('modal-depurar-tickets-overlay') && !e.target.classList.contains('modal-close') && !e.target.closest('.modal-close') && !e.target.closest('button')) {
-    return;
-  }
+  if (e && (e.target === document.getElementById('modal-depurar-tickets-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   const modal = document.getElementById('modal-depurar-tickets-overlay');
   if (modal) {
     modal.style.display = 'none';

@@ -904,9 +904,7 @@ window.abrirModalKitsServicio = function(modeloPreseleccionado) {
 };
 
 window.cerrarModalKitsServicio = function(e) {
-  if (e && e.target && e.target !== document.getElementById('modal-kits-servicio-overlay') && !e.target.classList.contains('modal-close') && !e.target.closest('.modal-close') && !e.target.closest('button')) {
-    return;
-  }
+  if (e && (e.target === document.getElementById('modal-kits-servicio-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   const modal = document.getElementById('modal-kits-servicio-overlay');
   if (modal) {
     modal.style.display = 'none';
@@ -2287,17 +2285,8 @@ window.abrirModalFormularioKit = function(kitId) {
 };
 
 window.cerrarModalFormularioKit = function(e) {
-  if (e && e.target) {
-    const overlay = document.getElementById('modal-editar-kit-overlay');
-    const isOverlay = (e.target === overlay);
-    const isCloseBtn = (e.target.classList && e.target.classList.contains('modal-close')) || 
-                       (e.target.closest && e.target.closest('.modal-close')) ||
-                       (e.target.classList && e.target.classList.contains('btn-cancelar-modal')) ||
-                       (e.target.closest && e.target.closest('.btn-cancelar-modal'));
-    if (!isOverlay && !isCloseBtn) {
-      return;
-    }
-  }
+  const overlay = document.getElementById('modal-editar-kit-overlay');
+  if (e && (e.target === overlay || e.target?.classList?.contains('modal-overlay'))) return;
   const modal = document.getElementById('modal-editar-kit-overlay');
   if (modal) {
     modal.style.display = 'none';

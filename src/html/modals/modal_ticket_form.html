@@ -1,5 +1,5 @@
     <!-- MODAL TICKET -->
-    <div class="modal-overlay" id="modal-ticket-overlay" onclick="cerrarTicket(event)">
+    <div class="modal-overlay" id="modal-ticket-overlay" >
       <div class="modal ticket-receipt" id="modal-ticket"
         style="max-width:540px; border-radius: 0; background: var(--bg-card); position: relative; border: 1px solid var(--border); box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
         <div class="receipt-edge-top"></div>
@@ -363,10 +363,11 @@
                   <label>Archivo Cotización (PDF) *</label>
                   <div style="display:flex; flex-direction:column; gap:0.5rem; width:100%;">
                     <div style="display:flex; gap:0.5rem; align-items:center; width:100%;">
-                      <label class="custom-file-upload" style="flex:1; margin:0;">
+                      <label class="custom-file-upload" style="flex:1; margin:0;" data-drop-zone="cotizacion" title="Arrastra tu PDF aquí o haz clic para seleccionarlo">
                         <input type="file" id="t-cotizacion-pdf" accept="application/pdf" onchange="updateFileLabel(this); if(this.files[0]) window.autoExtraerDesdePdfCotizacion(this.files[0], true, window.soporteActual);" />
-                        <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
-                        <span class="file-label-text">Subir cotización en PDF</span>
+                        <i data-lucide="upload-cloud" style="width:24px; height:24px; margin-bottom:0.3rem;"></i>
+                        <span class="file-label-text">Arrastra aquí o selecciona tu cotización (PDF)</span>
+                        <span class="file-sublabel-text">Haz clic o suelta el archivo PDF aquí</span>
                       </label>
                       <button type="button" id="btn-clear-pdf-modal" onclick="window.clearPdfInput(true)" class="btn-icon" style="display:none; background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); border-radius:6px; padding:0.6rem; cursor:pointer; height:45px; width:45px; align-items:center; justify-content:center;" title="Eliminar archivo"><i data-lucide="trash-2" style="width:16px; height:16px;"></i></button>
                     </div>
@@ -415,10 +416,11 @@
                     <label>Archivo Pedido (PDF) *</label>
                     <div style="display:flex; flex-direction:column; gap:0.5rem; width:100%;">
                       <div style="display:flex; gap:0.5rem; align-items:center; width:100%;">
-                        <label class="custom-file-upload" style="flex:1; margin:0;">
+                        <label class="custom-file-upload" style="flex:1; margin:0;" data-drop-zone="pedido" title="Arrastra tu PDF aquí o haz clic para seleccionarlo">
                           <input type="file" id="t-pedido-pdf" accept="application/pdf" onchange="updateFileLabel(this); if(this.files[0]) window.autoExtraerDesdePdfPedido(this.files[0], true, window.soporteActual);" />
-                          <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
-                          <span class="file-label-text">Subir pedido en PDF</span>
+                          <i data-lucide="upload-cloud" style="width:24px; height:24px; margin-bottom:0.3rem;"></i>
+                          <span class="file-label-text">Arrastra aquí o selecciona tu pedido (PDF)</span>
+                          <span class="file-sublabel-text">Haz clic o suelta el archivo PDF aquí</span>
                         </label>
                         <button type="button" id="btn-clear-pdf-pedido-modal" onclick="window.clearPdfPedidoInput(true)" class="btn-icon" style="display:none; background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); border-radius:6px; padding:0.6rem; cursor:pointer; height:45px; width:45px; align-items:center; justify-content:center;" title="Eliminar archivo"><i data-lucide="trash-2" style="width:16px; height:16px;"></i></button>
                       </div>

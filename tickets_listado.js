@@ -31,8 +31,22 @@
   }
 
   function safeResolveTecnicoNombre(id) {
-    if (typeof resolveTecnicoNombre === "function") return resolveTecnicoNombre(id);
-    if (typeof window !== "undefined" && typeof window.resolveTecnicoNombre === "function") return window.resolveTecnicoNombre(id);
+    if (!id) return '';
+    if (typeof resolveTecnicoNombre === "function") {
+      const res = resolveTecnicoNombre(id);
+      if (res && res !== id) return res;
+    }
+    if (typeof window !== "undefined" && typeof window.resolveTecnicoNombre === "function") {
+      const res = window.resolveTecnicoNombre(id);
+      if (res && res !== id) return res;
+    }
+    const uList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios) && usuarios.length > 0)
+      ? usuarios
+      : ((typeof window !== 'undefined' && Array.isArray(window.usuarios) && window.usuarios.length > 0)
+          ? window.usuarios
+          : (typeof safeGetJSON === 'function' ? safeGetJSON('eurorep_usuarios', []) : []));
+    const match = uList.find(u => u && (u.id === id || u.user_id === id));
+    if (match && match.nombre) return match.nombre;
     return id;
   }
 
@@ -415,10 +429,18 @@ function actualizarFiltrosPersonal() {
       tickets.forEach(t => {
         if (!t) return;
         if (typeof t.asignado === 'string' && t.asignado !== 'Sin asignar') {
-          t.asignado.split(',').forEach(n => allStaff.add(n.trim()));
+          t.asignado.split(',').forEach(n => {
+            const resolved = safeResolveTecnicoNombre(n.trim());
+            allStaff.add(resolved || n.trim());
+          });
         }
         if (Array.isArray(t.tecnicosAsignados)) {
-          t.tecnicosAsignados.forEach(n => { if (typeof n === 'string') allStaff.add(n.trim()); });
+          t.tecnicosAsignados.forEach(n => {
+            if (typeof n === 'string') {
+              const resolved = safeResolveTecnicoNombre(n.trim());
+              allStaff.add(resolved || n.trim());
+            }
+          });
         }
       });
     }
@@ -427,10 +449,18 @@ function actualizarFiltrosPersonal() {
       ordenes.forEach(o => {
         if (!o) return;
         if (typeof o.tecnico === 'string') {
-          o.tecnico.split(',').forEach(n => allStaff.add(n.trim()));
+          o.tecnico.split(',').forEach(n => {
+            const resolved = safeResolveTecnicoNombre(n.trim());
+            allStaff.add(resolved || n.trim());
+          });
         }
         if (Array.isArray(o.tecnicosAsignados)) {
-          o.tecnicosAsignados.forEach(n => { if (typeof n === 'string') allStaff.add(n.trim()); });
+          o.tecnicosAsignados.forEach(n => {
+            if (typeof n === 'string') {
+              const resolved = safeResolveTecnicoNombre(n.trim());
+              allStaff.add(resolved || n.trim());
+            }
+          });
         }
       });
     }
@@ -449,6 +479,8 @@ function actualizarFiltrosPersonal() {
       if (!n || typeof n !== 'string') return false;
       const clean = n.trim();
       if (!clean || clean === '-' || clean.toLowerCase() === 'sin asignar' || clean.toLowerCase() === 'sin_asignar') return false;
+      // Descartar UUIDs puros sin resolver
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean)) return false;
       const isPaqFn = (typeof esNombrePaqueteria === 'function') ? esNombrePaqueteria : (typeof window !== 'undefined' && window.esNombrePaqueteria ? window.esNombrePaqueteria : () => false);
       if (isPaqFn(clean)) return false;
       const nLow = clean.toLowerCase();
@@ -2073,27 +2105,41 @@ function seleccionarCanal(canal) {
 }
 
 function updateFileLabel(input) {
+  if (!input || !input.parentElement) return;
   const textSpan = input.parentElement.querySelector('.file-label-text');
+  const subSpan = input.parentElement.querySelector('.file-sublabel-text');
   const isSelected = input.files && input.files.length > 0;
   
   if (isSelected) {
-    if (input.files.length === 1) {
-      textSpan.textContent = input.files[0].name;
-    } else {
-      textSpan.textContent = `${input.files.length} archivo(s) listo(s)`;
+    if (textSpan) {
+      if (input.files.length === 1) {
+        textSpan.textContent = input.files[0].name;
+      } else {
+        textSpan.textContent = `${input.files.length} archivo(s) listo(s)`;
+      }
+    }
+    if (subSpan) {
+      if (input.files[0] && input.files[0].size) {
+        const kb = (input.files[0].size / 1024).toFixed(1);
+        subSpan.textContent = `${kb} KB • Clic o arrastra para cambiar`;
+      } else {
+        subSpan.textContent = 'Clic o arrastra para cambiar';
+      }
     }
     input.parentElement.style.borderColor = 'var(--accent)';
     input.parentElement.style.color = 'var(--accent)';
     input.parentElement.style.background = 'var(--accent-light)';
   } else {
     // Si es cotización, pedido o destino en PDF, poner el texto por defecto correcto
-    let defaultText = 'Subir PDF';
+    let defaultText = 'Arrastrar o subir PDF';
+    let defaultSub = 'Haz clic o suelta el archivo PDF aquí';
     if (input.id.includes('cotizacion')) {
-      defaultText = 'Subir cotización en PDF';
+      defaultText = 'Arrastra aquí o selecciona tu cotización (PDF)';
     } else if (input.id.includes('pedido')) {
-      defaultText = 'Subir pedido en PDF';
+      defaultText = 'Arrastra aquí o selecciona tu pedido (PDF)';
     }
-    textSpan.textContent = defaultText;
+    if (textSpan) textSpan.textContent = defaultText;
+    if (subSpan) subSpan.textContent = defaultSub;
     input.parentElement.style.borderColor = 'var(--border)';
     input.parentElement.style.color = 'var(--text-secondary)';
     input.parentElement.style.background = 'var(--bg-primary)';
@@ -2113,6 +2159,18 @@ function updateFileLabel(input) {
     const isModal = input.id === 't-cotizacion-pdf';
     const ticketId = isModal ? null : input.id.replace('quick-cot-pdf-', '');
     const clearBtnId = isModal ? 'btn-clear-pdf-modal' : `btn-clear-pdf-quick-${ticketId}`;
+    const clearBtn = document.getElementById(clearBtnId);
+    if (clearBtn) {
+      clearBtn.style.display = isSelected ? 'inline-flex' : 'none';
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+  }
+
+  const isPedidoPdf = input.id === 't-pedido-pdf' || input.id.startsWith('quick-ped-pdf-');
+  if (isPedidoPdf) {
+    const isModal = input.id === 't-pedido-pdf';
+    const ticketId = isModal ? null : input.id.replace('quick-ped-pdf-', '');
+    const clearBtnId = isModal ? 'btn-clear-pdf-pedido-modal' : `btn-clear-pdf-pedido-quick-${ticketId}`;
     const clearBtn = document.getElementById(clearBtnId);
     if (clearBtn) {
       clearBtn.style.display = isSelected ? 'inline-flex' : 'none';

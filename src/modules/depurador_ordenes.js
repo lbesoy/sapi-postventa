@@ -571,9 +571,7 @@ function abrirModalDepurarOrdenes() {
 
 function cerrarModalDepurarOrdenes(e) {
   if (typeof document === 'undefined') return;
-  if (e && e.target && e.target !== document.getElementById('modal-depurar-ordenes-overlay') && !e.target.classList.contains('modal-close') && !e.target.closest('.modal-close')) {
-    return;
-  }
+  if (e && (e.target === document.getElementById('modal-depurar-ordenes-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   const modal = document.getElementById('modal-depurar-ordenes-overlay');
   if (modal) {
     modal.style.display = 'none';

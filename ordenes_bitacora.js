@@ -230,7 +230,7 @@ function editarBitacora(ordenId, bitacoraId) {
 
 function cerrarBitacora(e) {
   if (typeof document === 'undefined') return;
-  if (e && e.target !== document.getElementById('modal-bitacora-overlay')) return;
+  if (e && (e.target === document.getElementById('modal-bitacora-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   document.getElementById('modal-bitacora-overlay').classList.remove('open');
 }
 

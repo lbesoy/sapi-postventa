@@ -749,10 +749,11 @@ function verDetalleTicket(id) {
           <label style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:0.4rem; color:var(--text-secondary);">Archivo Cotización (PDF) *</label>
           <div style="display:flex; flex-direction:column; gap:0.5rem; width:100%;">
             <div style="display:flex; gap:0.5rem; align-items:center; width:100%;">
-              <label class="custom-file-upload" style="flex:1; margin:0;">
+              <label class="custom-file-upload" style="flex:1; margin:0;" data-drop-zone="cotizacion" title="Arrastra tu PDF aquí o haz clic para seleccionarlo">
                 <input type="file" id="quick-cot-pdf-${t.id}" accept="application/pdf" onchange="updateFileLabel(this); if(this.files[0]) window.autoExtraerDesdePdfCotizacion(this.files[0], false, '${t.id}');"/>
-                <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
-                <span class="file-label-text">Subir cotización en PDF</span>
+                <i data-lucide="upload-cloud" style="width:24px; height:24px; margin-bottom:0.3rem;"></i>
+                <span class="file-label-text">Arrastra aquí o selecciona tu cotización (PDF)</span>
+                <span class="file-sublabel-text">Haz clic o suelta el archivo PDF aquí</span>
               </label>
               <button type="button" id="btn-clear-pdf-quick-${t.id}" onclick="window.clearPdfInput(false, '${t.id}')" class="btn-icon" style="display:none; background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); border-radius:6px; padding:0.6rem; cursor:pointer; height:45px; width:45px; align-items:center; justify-content:center;" title="Eliminar archivo"><i data-lucide="trash-2" style="width:16px; height:16px;"></i></button>
             </div>
@@ -894,10 +895,11 @@ function verDetalleTicket(id) {
             <label style="font-weight:600; color:var(--text-secondary); font-size:0.85rem;">Archivo Pedido (PDF) *</label>
             <div style="display:flex; flex-direction:column; gap:0.5rem; width:100%;">
               <div style="display:flex; gap:0.5rem; align-items:center; width:100%;">
-                <label class="custom-file-upload" style="flex:1; margin:0;">
+                <label class="custom-file-upload" style="flex:1; margin:0;" data-drop-zone="pedido" title="Arrastra tu PDF aquí o haz clic para seleccionarlo">
                   <input type="file" id="quick-ped-pdf-${t.id}" accept="application/pdf" onchange="updateFileLabel(this); if(this.files[0]) window.autoExtraerDesdePdfPedido(this.files[0], false, '${t.id}');" />
-                  <i data-lucide="upload" style="width:24px; height:24px; margin-bottom:0.4rem;"></i>
-                  <span class="file-label-text">Subir pedido en PDF</span>
+                  <i data-lucide="upload-cloud" style="width:24px; height:24px; margin-bottom:0.3rem;"></i>
+                  <span class="file-label-text">Arrastra aquí o selecciona tu pedido (PDF)</span>
+                  <span class="file-sublabel-text">Haz clic o suelta el archivo PDF aquí</span>
                 </label>
                 <button type="button" id="btn-clear-pdf-pedido-quick-${t.id}" onclick="window.clearPdfPedidoInput(false, '${t.id}')" class="btn-icon" style="display:none; background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); border-radius:6px; padding:0.6rem; cursor:pointer; height:45px; width:45px; align-items:center; justify-content:center;" title="Eliminar archivo"><i data-lucide="trash-2" style="width:16px; height:16px;"></i></button>
               </div>
@@ -1645,7 +1647,7 @@ async function cerrarCotizacionTicket(id) {
 
 function cerrarDetalleTicket(e) {
   if (typeof document === 'undefined') return;
-  if (e && e.target !== document.getElementById('modal-ticket-detalle-overlay')) return;
+  if (e && (e.target === document.getElementById('modal-ticket-detalle-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
   document.getElementById('modal-ticket-detalle-overlay').classList.remove('open');
   document.body.style.overflow = '';
 }
