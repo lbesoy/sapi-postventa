@@ -1984,6 +1984,23 @@ async function _executePushToSupabase(tabla, item) {
 
         const currentBitIds = filasBitacora.map(f => f.id).filter(Boolean);
         if (currentBitIds.length > 0) {
+          // Proteger contra sobreescritura accidental: si en Supabase ya está como realizado=true, no degradar a false
+          try {
+            const { data: existingBits } = await sb.from('orden_bitacora').select('id, realizado, nota').in('id', currentBitIds);
+            if (existingBits && Array.isArray(existingBits) && existingBits.length > 0) {
+              const exMap = new Map(existingBits.map(eb => [eb.id, eb]));
+              filasBitacora.forEach(f => {
+                const ex = exMap.get(f.id);
+                if (ex && ex.realizado === true && f.realizado !== true) {
+                  f.realizado = true;
+                  f.nota = ex.nota;
+                }
+              });
+            }
+          } catch (eProt) {
+            console.warn('[Direct Push] No se pudo verificar estado previo de bitacoras:', eProt);
+          }
+
           const { error: upsertBitErr } = await sb.from('orden_bitacora').upsert(filasBitacora, { onConflict: 'id' });
           if (upsertBitErr) console.warn('[Direct Push] Error al guardar orden_bitacora en Supabase:', upsertBitErr.message);
         }
@@ -2827,6 +2844,20 @@ async function _processSyncQueueInternal() {
 
               const currentBitIds = filasBitacora.map(f => f.id).filter(Boolean);
               if (currentBitIds.length > 0) {
+                try {
+                  const { data: existingBits } = await sb.from('orden_bitacora').select('id, realizado, nota').in('id', currentBitIds);
+                  if (existingBits && Array.isArray(existingBits) && existingBits.length > 0) {
+                    const exMap = new Map(existingBits.map(eb => [eb.id, eb]));
+                    filasBitacora.forEach(f => {
+                      const ex = exMap.get(f.id);
+                      if (ex && ex.realizado === true && f.realizado !== true) {
+                        f.realizado = true;
+                        f.nota = ex.nota;
+                      }
+                    });
+                  }
+                } catch (eProt) {}
+
                 const { error: upsertBitErr } = await sb.from('orden_bitacora').upsert(filasBitacora, { onConflict: 'id' });
                 if (upsertBitErr) throw upsertBitErr;
               }
@@ -4456,6 +4487,14 @@ window.cargarDatosDeSupabase = function() {
             } else if (b.realizado === undefined || b.realizado === null) {
               const esPendiente = nota.includes('Programado por supervisor') || nota.includes('Pendiente de llenado');
               realizado = !esPendiente;
+            }
+
+            // Detección inteligente de avance real reportado si por error de asignación venía en false
+            if (realizado === false && nota) {
+              const notaLimpia = nota.replace(/(?:\r?\n|^)\[.*?\]/g, '').trim();
+              if (notaLimpia && !notaLimpia.includes('Programado por supervisor') && !notaLimpia.includes('Pendiente de llenado') && notaLimpia.length > 15) {
+                realizado = true;
+              }
             }
 
             if (nota.includes('[Prog: ')) {

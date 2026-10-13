@@ -736,6 +736,8 @@ function verDetalle(id) {
           const existe = items.some(b => b.id === ev.id || (b.fecha === fISO && b.tecnico === ev.tecnicoNombre && b.entrada === ent));
           
           if (!existe) {
+            const evDesc = (ev.descripcion || '').trim();
+            const esAvanceReal = evDesc && !evDesc.includes('Programado por supervisor') && !evDesc.includes('Pendiente de llenado') && evDesc.length > 15;
             items.push({
               id: ev.id,
               fecha: fISO,
@@ -743,7 +745,7 @@ function verDetalle(id) {
               nota: ev.descripcion || "Programado por supervisor. Pendiente de llenado por el técnico.",
               entrada: ent,
               salida: sal,
-              realizado: false,
+              realizado: esAvanceReal ? true : false,
               asignadoPorName: ev.creadoPorNombre || 'Supervisor'
             });
           }
@@ -751,9 +753,15 @@ function verDetalle(id) {
       });
     } catch(e){}
 
-    // Separar pendientes de realizados
-    const pendientes = items.filter(b => b.realizado === false || (b.nota && b.nota.includes('Programado por supervisor') && b.realizado !== true));
-    const realizados = items.filter(b => b.realizado === true || (!pendientes.some(p => p.id === b.id)));
+    // Separar pendientes de realizados (protección: si contiene un avance real de trabajo, es realizado)
+    const pendientes = items.filter(b => {
+      if (b.realizado === true) return false;
+      const cleanNota = (b.nota || '').replace(/(?:\r?\n|^)\[.*?\]/g, '').trim();
+      const esAvanceReal = cleanNota && !cleanNota.includes('Programado por supervisor') && !cleanNota.includes('Pendiente de llenado') && cleanNota.length > 15;
+      if (esAvanceReal) return false;
+      return b.realizado === false || cleanNota.includes('Programado por supervisor');
+    });
+    const realizados = items.filter(b => !pendientes.some(p => p.id === b.id));
 
     // 1. Renderizar Asignaciones Programadas (Pendientes)
     if (pendientes.length > 0) {

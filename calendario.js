@@ -1167,13 +1167,16 @@ async function guardarActividadCalendario() {
         
         const existIdx = o.bitacora.findIndex(b => b.id === eventoObj.id);
         const fechaISO = inicio.substring(0, 10);
+        const yaReportado = existIdx > -1 ? o.bitacora[existIdx].realizado === true : false;
+        const notaExistente = existIdx > -1 ? (o.bitacora[existIdx].nota || '') : '';
+        const esNotaDeCampo = notaExistente && !notaExistente.includes('Programado por supervisor') && !notaExistente.includes('Pendiente de llenado') && notaExistente.length > 15;
 
         const nuevaEntrada = {
           id: eventoObj.id,
           fecha: fechaISO,
           tecnico: tecnicoNombre || 'Sin Asignar',
           tipo: tipo,
-          nota: isSandbox ? (descripcion ? (descripcion.includes('[PRUEBA]') ? descripcion : `[PRUEBA] ${descripcion}`) : "[PRUEBA] Programado por supervisor.") : (descripcion || "Programado por supervisor. Pendiente de llenado por el técnico."),
+          nota: (yaReportado || esNotaDeCampo) ? notaExistente : (isSandbox ? (descripcion ? (descripcion.includes('[PRUEBA]') ? descripcion : `[PRUEBA] ${descripcion}`) : "[PRUEBA] Programado por supervisor.") : (descripcion || "Programado por supervisor. Pendiente de llenado por el técnico.")),
           entrada: entrada,
           salida: salida,
           esPrueba: isSandbox,
@@ -1184,13 +1187,13 @@ async function guardarActividadCalendario() {
           fecha_fin_regreso: mraFechaFinRegresoDate || null,
           hora_fin_regreso: mraHoraFinRegreso || null,
           horas_regreso: mraHorasRegreso ? parseFloat(mraHorasRegreso) : null,
-          realizado: false,
+          realizado: yaReportado || esNotaDeCampo,
           asignadoPorName: activeUserName,
           asignadoPorId: activeUserId
         };
 
         if (existIdx > -1) {
-          if (o.bitacora[existIdx].realizado !== true) {
+          if (o.bitacora[existIdx].realizado !== true && !esNotaDeCampo) {
             const origAsignado = o.bitacora[existIdx].asignadoPorName || activeUserName;
             const origAsignadoId = o.bitacora[existIdx].asignadoPorId || activeUserId;
             o.bitacora[existIdx] = { 
@@ -1199,6 +1202,12 @@ async function guardarActividadCalendario() {
               asignadoPorName: origAsignado,
               asignadoPorId: origAsignadoId
             };
+          } else {
+            // Si ya es un reporte real del técnico, no degradar a pendiente ni sobreescribir su nota
+            o.bitacora[existIdx].tipo = tipo;
+            if (entrada) o.bitacora[existIdx].entrada = entrada;
+            if (salida) o.bitacora[existIdx].salida = salida;
+            o.bitacora[existIdx].realizado = true;
           }
         } else {
           o.bitacora.push(nuevaEntrada);
