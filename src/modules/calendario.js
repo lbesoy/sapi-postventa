@@ -371,7 +371,9 @@ function renderCalendario() {
         if (dateStr.includes('T')) dateStr = dateStr.split('T')[0];
         
         const notaClean = (b.nota || '').trim();
-        const notaLower = notaClean.toLowerCase();
+        const cleanNotaSinTags = notaClean.replace(/(?:\r?\n|^)\[.*?\]/g, '').trim();
+        const cleanNotaLower = cleanNotaSinTags.toLowerCase();
+
         const hasRealContent = Boolean(
           (b.firma_tecnico_url && b.firma_tecnico_url !== '__DELETED__') ||
           (b.firma_tecnico_base64 && b.firma_tecnico_base64 !== '__DELETED__') ||
@@ -382,7 +384,15 @@ function renderCalendario() {
           b.cierre_papel_pdf
         );
 
-        const esAsignacionPendiente = !hasRealContent || b.realizado === false || (notaLower.includes('programado') || notaLower.includes('pendiente de llenado'));
+        const isSupervisorTemplate = !cleanNotaSinTags ||
+          cleanNotaLower.includes('programado por supervisor') ||
+          cleanNotaLower.includes('pendiente de llenado') ||
+          cleanNotaLower.includes('pendiente de reporte');
+        const hasTechnicianReport = !isSupervisorTemplate && cleanNotaSinTags.length > 15;
+
+        // Es realizado si el flag está en true, o si contiene un reporte real de campo del técnico o evidencias/firmas
+        const isRealizado = b.realizado === true || (b.realizado !== false && (hasTechnicianReport || hasRealContent)) || (hasTechnicianReport && !isSupervisorTemplate);
+        const esAsignacionPendiente = !isRealizado;
 
         let eventColor = '#ef4444'; // Rojo: Trabajo realizado sin asignación por defecto
 

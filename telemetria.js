@@ -1608,9 +1608,15 @@ window.eliminarTodasAsignacionesOrden = async function(ordenId) {
 
   const pendientes = (o.bitacora || []).filter(b => {
     if (!b) return false;
-    const notaLower = (b.nota || '').toLowerCase();
-    const hasReal = Boolean(b.firma_tecnico_url || b.firma_tecnico_base64 || (b.fotos && b.fotos.length > 0) || (b.evidencias && Object.keys(b.evidencias).length > 0));
-    return !hasReal && (b.realizado === false || notaLower.includes('programado') || notaLower.includes('pendiente de llenado') || !b.nota);
+    if (b.realizado === true) return false;
+    const cleanNota = (b.nota || '').replace(/(?:\r?\n|^)\[.*?\]/g, '').trim();
+    const cleanNotaLower = cleanNota.toLowerCase();
+    const isSupervisorTemplate = !cleanNota ||
+      cleanNotaLower.includes('programado por supervisor') ||
+      cleanNotaLower.includes('pendiente de llenado') ||
+      cleanNotaLower.includes('pendiente de reporte');
+    const hasReal = Boolean(b.firma_tecnico_url || b.firma_tecnico_base64 || (b.fotos && b.fotos.length > 0) || (b.evidencias && Object.keys(b.evidencias).length > 0) || b.cierre_papel_pdf);
+    return !hasReal && (b.realizado === false || isSupervisorTemplate);
   });
 
   if (pendientes.length === 0) {

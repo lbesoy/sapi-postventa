@@ -2966,6 +2966,107 @@ console.log('Test 56: Exportación a Excel (.xlsx) de Tickets y Órdenes de Serv
 }
 console.log('  ✅ Exportación a Excel (.xlsx) de Tickets y Órdenes de Servicio: OK');
 
+// Test 57: Colorimetría de bitácoras y asignaciones en Calendario
+console.log('🧪 Verificando Colorimetría de Bitácoras y Asignaciones en Calendario...');
+{
+  function calcularColorEventoCalendario(b) {
+    const notaClean = (b.nota || '').trim();
+    const cleanNotaSinTags = notaClean.replace(/(?:\r?\n|^)\[.*?\]/g, '').trim();
+    const cleanNotaLower = cleanNotaSinTags.toLowerCase();
+
+    const hasRealContent = Boolean(
+      (b.firma_tecnico_url && b.firma_tecnico_url !== '__DELETED__') ||
+      (b.firma_tecnico_base64 && b.firma_tecnico_base64 !== '__DELETED__') ||
+      (b.firma_cliente_url && b.firma_cliente_url !== '__DELETED__') ||
+      (b.firma_cliente_base64 && b.firma_cliente_base64 !== '__DELETED__') ||
+      (b.fotos && b.fotos.length > 0) ||
+      (b.evidencias && Object.keys(b.evidencias).length > 0) ||
+      b.cierre_papel_pdf
+    );
+
+    const isSupervisorTemplate = !cleanNotaSinTags ||
+      cleanNotaLower.includes('programado por supervisor') ||
+      cleanNotaLower.includes('pendiente de llenado') ||
+      cleanNotaLower.includes('pendiente de reporte');
+    const hasTechnicianReport = !isSupervisorTemplate && cleanNotaSinTags.length > 15;
+
+    const isRealizado = b.realizado === true || (b.realizado !== false && (hasTechnicianReport || hasRealContent)) || (hasTechnicianReport && !isSupervisorTemplate);
+    const esAsignacionPendiente = !isRealizado;
+
+    let eventColor = '#ef4444'; // Rojo por defecto
+
+    if (esAsignacionPendiente) {
+      eventColor = '#8b5cf6'; // Morado
+    } else {
+      if (b.programadoEntrada) {
+        const isAligned = !b.desviacion || b.desviacion === 'Alineado' || b.desviacion === '0m';
+        if (isAligned) {
+          eventColor = '#10b981'; // Verde
+        } else {
+          eventColor = '#3b82f6'; // Azul
+        }
+      } else {
+        eventColor = '#ef4444'; // Rojo
+      }
+    }
+
+    const isTrasladoEvent = b.tipo === 'Traslado' || (b.nota && b.nota.toLowerCase().includes('traslado'));
+    if (isTrasladoEvent && b.realizado) {
+      eventColor = '#475569';
+    }
+
+    return eventColor;
+  }
+
+  // 1. Asignación programada pendiente (plantilla de supervisor) -> Morado (#8b5cf6)
+  const bPendiente = {
+    realizado: false,
+    programadoEntrada: '09:00',
+    programadoSalida: '18:00',
+    nota: 'Programado por supervisor. Pendiente de llenado por el técnico.'
+  };
+  assert.strictEqual(calcularColorEventoCalendario(bPendiente), '#8b5cf6', 'Asignación pendiente debe ser morada (#8b5cf6)');
+
+  // 2. Reporte completado y alineado SIN firmas ni fotos (caso Eduardo Jiménez) -> Verde (#10b981)
+  const bCompletadoAlineado = {
+    realizado: true,
+    programadoEntrada: '09:00',
+    programadoSalida: '18:00',
+    entrada: '09:00',
+    salida: '18:00',
+    desviacion: 'Alineado',
+    nota: 'Se pasa a hotel por técnico Andrea. Se llega a sitio y se inician pruebas de tableros.'
+  };
+  assert.strictEqual(calcularColorEventoCalendario(bCompletadoAlineado), '#10b981', 'Reporte completado alineado sin firmas debe ser verde (#10b981)');
+
+  // 3. Reporte con la palabra "programado" en la redacción ("mantenimiento preventivo programado") -> Verde (#10b981)
+  const bNotaConPalabraProgramado = {
+    realizado: true,
+    programadoEntrada: '09:00',
+    desviacion: 'Alineado',
+    nota: 'Se realizó el mantenimiento preventivo programado de 500 horas satisfactoriamente.'
+  };
+  assert.strictEqual(calcularColorEventoCalendario(bNotaConPalabraProgramado), '#10b981', 'Reporte con texto "programado" pero realizado debe ser verde (#10b981)');
+
+  // 4. Reporte completado con desviación de horas -> Azul (#3b82f6)
+  const bDesviado = {
+    realizado: true,
+    programadoEntrada: '09:00',
+    desviacion: '+2h 30m',
+    nota: 'Se concluyó cambio de sellos hidráulicos.'
+  };
+  assert.strictEqual(calcularColorEventoCalendario(bDesviado), '#3b82f6', 'Reporte con desviación de horas debe ser azul (#3b82f6)');
+
+  // 5. Trabajo completado sin asignación previa -> Rojo (#ef4444)
+  const bSinAsignar = {
+    realizado: true,
+    nota: 'Atención de emergencia en planta.'
+  };
+  assert.strictEqual(calcularColorEventoCalendario(bSinAsignar), '#ef4444', 'Trabajo no programado debe ser rojo (#ef4444)');
+
+  console.log('  ✅ Colorimetría de Bitácoras y Asignaciones en Calendario: OK');
+}
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 
