@@ -347,7 +347,11 @@ function ticketToRow(t) {
   // Encontrar el ID del cliente por su nombre o preservar el nombre directo
   let clienteId = t.cliente || null;
   try {
-    const clientes = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+    const clientes = (typeof clientesDb !== 'undefined' && Array.isArray(clientesDb) && clientesDb.length > 0)
+      ? clientesDb
+      : ((typeof window !== 'undefined' && Array.isArray(window.clientesDb) && window.clientesDb.length > 0)
+          ? window.clientesDb
+          : JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]'));
     const tCliNorm = t.cliente ? String(t.cliente).toLowerCase().trim() : '';
     if (tCliNorm) {
       const match = clientes.find(c => 
@@ -359,6 +363,9 @@ function ticketToRow(t) {
       );
       if (match) {
         clienteId = match.id;
+        if (window._supaValidClienteIds && !window._supaValidClienteIds.has(match.id)) {
+          window._supaValidClienteIds.add(match.id);
+        }
       }
     }
   } catch (e) {}

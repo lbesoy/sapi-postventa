@@ -85,6 +85,9 @@ function abrirTicket(id) {
   if (t) {
     if (Array.isArray(t.cotizacionesAdicionales) && t.cotizacionesAdicionales.length > 0) {
       window.editandoCotizaciones = JSON.parse(JSON.stringify(t.cotizacionesAdicionales));
+      if (window.editandoCotizaciones[0] && !window.editandoCotizaciones[0].pdf && t.pdfCotizacion) {
+        window.editandoCotizaciones[0].pdf = t.pdfCotizacion;
+      }
     } else if (t.cotizacionSAP) {
       window.editandoCotizaciones = [{
         sap: t.cotizacionSAP,
@@ -759,27 +762,76 @@ function poblarMaquinasCliente(selectId, selectedValue = '', clienteNombre = nul
   select.innerHTML = '<option value="">Seleccione una máquina registrada...</option><option value="Otra / No registrada">Otra / Captura manual</option>';
   
   if (clienteNombre && clienteNombre !== 'Ninguno / Uso Interno' && clienteNombre !== 'Ninguno') {
-    const c = clientesDb.find(x => x.nombre === clienteNombre);
-    if (c && c.maquinas) {
-      c.maquinas.forEach(m => {
-        const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
-        const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
-        const cleanId = m.idInterno || m.id || '';
-        const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
-        const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
-        const mName = `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
-        const opt = document.createElement('option');
-        opt.value = mName;
-        opt.textContent = mName;
-        if (mName === selectedValue) opt.selected = true;
-        opt.setAttribute('data-marca', mFullName);
-        opt.setAttribute('data-modelo', m.modelo || '');
-        opt.setAttribute('data-serie', m.serie || '');
-        opt.setAttribute('data-eco', m.no_economico || '');
-        opt.setAttribute('data-ubicacion', m.ubicacion || m.sitio || '');
-        select.appendChild(opt);
-      });
+    const allClients = (typeof clientesDb !== 'undefined' && Array.isArray(clientesDb)) ? clientesDb : (typeof window !== 'undefined' && Array.isArray(window.clientesDb) ? window.clientesDb : []);
+    const c = allClients.find(x => x && (x.nombre === clienteNombre || x.id === clienteNombre || x.idInterno === clienteNombre || x.rfc === clienteNombre));
+    const allMaqs = (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb)) ? maquinariaDb : (typeof window !== 'undefined' && Array.isArray(window.maquinariaDb) ? window.maquinariaDb : []);
+    
+    const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
+    
+    const formatMaquina = (m) => {
+      const cleanId = m.idInterno || m.id || '';
+      const isUUID = cleanId && cleanId.length > 30 && cleanId.includes('-');
+      const idDisplay = (cleanId && !isUUID) ? `[${cleanId}] ` : '';
+      const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+      return `${idDisplay}${mFullName} ${m.modelo || ''} (SN: ${m.serie || ''})`.trim();
+    };
+
+    const addedKeys = new Set();
+    const addOption = (m) => {
+      if (!m) return;
+      const mName = formatMaquina(m);
+      const key = `${m.idInterno || m.id || ''}_${m.serie || ''}`.toLowerCase();
+      if (addedKeys.has(key) || addedKeys.has(mName.toLowerCase())) return;
+      addedKeys.add(key);
+      addedKeys.add(mName.toLowerCase());
+
+      const mFullName = MARCAS_RENDER[(m.marca || '').toUpperCase()] || m.marca || '';
+      const opt = document.createElement('option');
+      opt.value = mName;
+      opt.textContent = mName;
+      if (mName === selectedValue) opt.selected = true;
+      opt.setAttribute('data-marca', mFullName);
+      opt.setAttribute('data-modelo', m.modelo || '');
+      opt.setAttribute('data-serie', m.serie || '');
+      opt.setAttribute('data-eco', m.no_economico || m.numeroEconomico || '');
+      opt.setAttribute('data-ubicacion', m.ubicacion || m.sitio || '');
+      select.appendChild(opt);
+    };
+
+    // 1. Máquinas de c.maquinas (manuales)
+    if (c && Array.isArray(c.maquinas)) {
+      c.maquinas.forEach(addOption);
     }
+
+    // 2. Máquinas de maquinariaDb (SAP / catálogo central)
+    const normName = String(clienteNombre).toLowerCase().trim();
+    const cId = c?.id?.toLowerCase().trim();
+    const cRfc = c?.rfc?.toLowerCase().trim();
+
+    allMaqs.forEach(m => {
+      if (!m) return;
+      const mCli = String(m.cliente || '').toLowerCase().trim();
+      const linked = [
+        ...(Array.isArray(m.empresas_vinculadas) ? m.empresas_vinculadas : []),
+        ...(Array.isArray(m.empresasVinculadas) ? m.empresasVinculadas : []),
+        ...(Array.isArray(m.clientes_adicionales) ? m.clientes_adicionales : []),
+        ...(Array.isArray(m.clientesAdicionales) ? m.clientesAdicionales : []),
+        ...(Array.isArray(m.custom_data?.empresasVinculadas) ? m.custom_data.empresasVinculadas : []),
+        ...(Array.isArray(m.customData?.empresasVinculadas) ? m.customData.empresasVinculadas : [])
+      ].map(x => String(x).toLowerCase().trim());
+
+      const isMatch = mCli === normName ||
+        (cId && mCli === cId) ||
+        (cRfc && mCli === cRfc) ||
+        (c && c.nombre && mCli === c.nombre.toLowerCase().trim()) ||
+        linked.includes(normName) ||
+        (cId && linked.includes(cId)) ||
+        (c && c.nombre && linked.includes(c.nombre.toLowerCase().trim()));
+
+      if (isMatch) {
+        addOption(m);
+      }
+    });
   }
   
   if (selectedValue && !Array.from(select.options).some(o => o.value === selectedValue) && selectedValue !== 'Otra / No registrada') {
@@ -1190,8 +1242,8 @@ function selectComboOption(id, value, label, isInitial = false) {
     
     if (!isInitial) {
       poblarMaquinasCliente('t-equipo', '', value);
-      const selectedEquiposContainer = document.getElementById('t-equipos-seleccionados');
-      if (selectedEquiposContainer) selectedEquiposContainer.innerHTML = '';
+      // Preservar máquinas ya agregadas en chips si existen (en edición o captura)
+      // para evitar que se pierdan las máquinas afectadas y se bloquee el guardado del ticket.
     }
     
     if (value && value !== 'Ninguno' && value !== 'Ninguno / Uso Interno') {
@@ -1222,7 +1274,10 @@ function selectComboOption(id, value, label, isInitial = false) {
       poblarMaquinasCliente('f-equipo', '', value);
       poblarSoportesPorCliente(value, '');
       const ordSelectedEquiposContainer = document.getElementById('f-equipos-seleccionados');
-      if (ordSelectedEquiposContainer) ordSelectedEquiposContainer.innerHTML = '';
+      const isEditingOrder = typeof editandoOrdenId !== 'undefined' && editandoOrdenId;
+      if (ordSelectedEquiposContainer && !isEditingOrder && !ordSelectedEquiposContainer.querySelector('.maquina-chip')) {
+        ordSelectedEquiposContainer.innerHTML = '';
+      }
     }
   } else if (id === 'pt-orden') {
     for (let i = 0; i <= 6; i++) {
@@ -1785,7 +1840,7 @@ async function guardarTicket(e) {
     pedidoSAP: document.getElementById('t-pedido-sap')?.value.trim() || '',
     tecnicosAsignados: [],
     pdfPedido: pdfPedidoBase64,
-    pdfCotizacion: (window.editandoCotizaciones && window.editandoCotizaciones.length > 0) ? window.editandoCotizaciones[0].pdf : null,
+    pdfCotizacion: ((window.editandoCotizaciones && window.editandoCotizaciones.length > 0) ? window.editandoCotizaciones[0].pdf : null) || pdfCotizacionBase64 || (t_existente ? t_existente.pdfCotizacion : null),
     cotizacionesAdicionales: window.editandoCotizaciones || [],
     comentariosInternos: t_existente ? (t_existente.comentariosInternos || []) : [],
     esPrueba: t_existente ? (t_existente.esPrueba || false) : isTestModeActive(),
