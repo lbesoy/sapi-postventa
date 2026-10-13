@@ -2095,6 +2095,55 @@ async function guardarTicket(e) {
           orderTecnicos = ticket.asignado.split(',').map(s => s.trim()).filter(Boolean);
         }
 
+        let autoReembolsoKm = false;
+        let autoNoches = '';
+        let autoAlimentacion = '';
+        let autoTrasladoCosto = '';
+
+        if (window.supabaseClient) {
+          try {
+            const orFilters = [`ticket_id.eq.${ticket.id}`];
+            if (ticket.folio) orFilters.push(`ticket_id.eq.${ticket.folio}`);
+            if (ticket.pedidoSAP) orFilters.push(`folio_sap.eq.${ticket.pedidoSAP}`);
+
+            const { data: dbEx } = await window.supabaseClient
+              .from('pdf_extracciones_ai')
+              .select('conceptos, extras, ruta_servicio, folio_sap')
+              .or(orFilters.join(','))
+              .order('fecha_extraccion', { ascending: false })
+              .limit(1);
+
+            if (dbEx && dbEx.length > 0) {
+              const exRow = dbEx[0];
+              const ext = exRow.extras || [];
+              const allItems = [...(exRow.conceptos || []), ...ext];
+              const rawTxt = (exRow.ruta_servicio || '').toLowerCase();
+              autoReembolsoKm = allItems.some(x => !x.isViajeData && x.descripcion && ((x.descripcion.toLowerCase().includes('reembolso') && (x.descripcion.toLowerCase().includes('km') || x.descripcion.toLowerCase().includes('casetas') || x.descripcion.toLowerCase().includes('kilometraje'))) || x.descripcion.toLowerCase().includes('reembolso km') || x.descripcion.toLowerCase().includes('km de traslado'))) ||
+                (rawTxt.includes('reembolso') && (rawTxt.includes('km') || rawTxt.includes('casetas') || rawTxt.includes('kilometraje'))) || rawTxt.includes('reembolso km');
+
+              const viajeData = ext.find(x => x && x.isViajeData);
+              if (viajeData) {
+                if (viajeData.num_hospedaje) autoNoches = viajeData.num_hospedaje;
+                if (viajeData.num_alimento) autoAlimentacion = viajeData.num_alimento;
+                if (viajeData.num_traslado) autoTrasladoCosto = viajeData.num_traslado;
+              }
+            }
+          } catch (exErr) {}
+        }
+
+        if (!autoReembolsoKm && window._lastPdfPedidoExtracted) {
+          const lpe = window._lastPdfPedidoExtracted;
+          const allLpeItems = [...(lpe.articulos || []), ...(lpe.mainArticulos || [])];
+          const rawLpe = (lpe.cleanText || '').toLowerCase();
+          autoReembolsoKm = allLpeItems.some(x => x.descripcion && ((x.descripcion.toLowerCase().includes('reembolso') && (x.descripcion.toLowerCase().includes('km') || x.descripcion.toLowerCase().includes('casetas') || x.descripcion.toLowerCase().includes('kilometraje'))) || x.descripcion.toLowerCase().includes('reembolso km'))) ||
+            (rawLpe.includes('reembolso') && (rawLpe.includes('km') || rawLpe.includes('casetas') || rawLpe.includes('kilometraje'))) || rawLpe.includes('reembolso km');
+          if (lpe.detallesViaje) {
+            if (!autoNoches && lpe.detallesViaje.num_hospedaje) autoNoches = lpe.detallesViaje.num_hospedaje;
+            if (!autoAlimentacion && lpe.detallesViaje.num_alimento) autoAlimentacion = lpe.detallesViaje.num_alimento;
+            if (!autoTrasladoCosto && lpe.detallesViaje.num_traslado) autoTrasladoCosto = lpe.detallesViaje.num_traslado;
+          }
+        }
+
         const nuevaOrden = {
           id: newFolio,
           fecha: getLocalDateString(),
@@ -2124,7 +2173,10 @@ async function guardarTicket(e) {
           observaciones: '', pendientes: '',
           ref_utilizadas: [], ref_necesarias: [],
           factura_ref: '', factura_mo: '',
-          noches: '', alimentacion: '', traslado_costo: '',
+          noches: autoNoches,
+          alimentacion: autoAlimentacion,
+          traslado_costo: autoTrasladoCosto,
+          reembolso_km: !!autoReembolsoKm,
           dias: [],
           esPrueba: isTest,
         };

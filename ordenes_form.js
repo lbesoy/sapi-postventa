@@ -520,60 +520,111 @@ function abrirFormulario(id, modoReporte = false) {
 
 function autoFillFromPdfExtraction(ticketId, force = false) {
   if (typeof document === 'undefined') return;
-  if (!window.supabaseClient || !ticketId) return;
+  if (!ticketId) return;
 
   const elNoches = document.getElementById('f-noches');
   const elAlimento = document.getElementById('f-alimentacion');
+  const elReembolso = document.getElementById('f-reembolso-km');
   
   const nocVal = elNoches ? elNoches.value : '';
-  const isNewOrEmpty = force || (nocVal === '' || nocVal === '0');
-  console.log('[Auto-fill PDF] Evaluando ticket_id:', ticketId, 'isNewOrEmpty:', isNewOrEmpty);
+  const needsCheck = force || (nocVal === '' || nocVal === '0') || (elReembolso && !elReembolso.checked);
+  console.log('[Auto-fill PDF] Evaluando ticket_id/soporte:', ticketId, 'needsCheck:', needsCheck);
+  if (!needsCheck) return;
+
+  const allTickets = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : ((typeof window !== 'undefined' && Array.isArray(window.tickets)) ? window.tickets : []);
+  const foundTicket = allTickets.find(x => x && (x.id === ticketId || x.folio === ticketId));
   
-  if (isNewOrEmpty) {
-    window.supabaseClient
+  let ticketUuid = foundTicket ? foundTicket.id : ticketId;
+  let ticketFolio = foundTicket ? foundTicket.folio : (String(ticketId).startsWith('TKT-') ? ticketId : null);
+  let pedidoSap = foundTicket ? (foundTicket.pedidoSAP || foundTicket.pedido) : null;
+  
+  const elPedido = document.getElementById('f-pedido');
+  if (elPedido && elPedido.value) {
+    pedidoSap = pedidoSap || elPedido.value.trim();
+  }
+
+  const procesarExtraccion = (extRow) => {
+    if (!extRow) return;
+    const ext = extRow.extras || [];
+    const conceptos = extRow.conceptos || [];
+    const viajeData = ext.find(x => x && x.isViajeData);
+    if (viajeData) {
+      if (elNoches && (force || elNoches.value === '' || elNoches.value === '0')) {
+        elNoches.value = viajeData.num_hospedaje || 0;
+      }
+      if (elAlimento && (force || elAlimento.value === '' || elAlimento.value === '0')) {
+        elAlimento.value = viajeData.num_alimento || 0;
+      }
+      const elTraslado = document.getElementById('f-traslado-costo');
+      if (elTraslado && (force || elTraslado.value === '' || elTraslado.value === '0')) {
+        elTraslado.value = viajeData.num_traslado || 0;
+      }
+    }
+
+    if (elReembolso && (!elReembolso.checked || force)) {
+      const allItems = [...ext, ...conceptos];
+      const hasReembolsoInItems = allItems.some(x => {
+        if (!x || x.isViajeData) return false;
+        const desc = (x.descripcion || '').toLowerCase();
+        return (desc.includes('reembolso') && (desc.includes('km') || desc.includes('casetas') || desc.includes('kilometraje'))) ||
+               desc.includes('reembolso km') ||
+               desc.includes('km de traslado') ||
+               desc.includes('kilometraje');
+      });
+      const rawText = (extRow.ruta_servicio || '').toLowerCase();
+      const hasReembolsoInText = (rawText.includes('reembolso') && (rawText.includes('km') || rawText.includes('casetas') || rawText.includes('kilometraje'))) ||
+                                 rawText.includes('reembolso km');
+
+      if (hasReembolsoInItems || hasReembolsoInText) {
+        elReembolso.checked = true;
+        console.log('[Auto-fill PDF] Reembolso KM detectado y marcado.');
+      }
+    }
+  };
+
+  if (window.supabaseClient) {
+    let query = window.supabaseClient
       .from('pdf_extracciones_ai')
-      .select('extras, conceptos')
-      .eq('ticket_id', ticketId)
-      .order('fecha_extraccion', { ascending: false })
-      .limit(1)
+      .select('extras, conceptos, ruta_servicio, folio_sap, ticket_id')
+      .order('fecha_extraccion', { ascending: false });
+
+    const orFilters = [];
+    if (ticketUuid) orFilters.push(`ticket_id.eq.${ticketUuid}`);
+    if (ticketFolio && ticketFolio !== ticketUuid) orFilters.push(`ticket_id.eq.${ticketFolio}`);
+    if (pedidoSap) orFilters.push(`folio_sap.eq.${pedidoSap}`);
+
+    if (orFilters.length > 1) {
+      query = query.or(orFilters.join(','));
+    } else if (orFilters.length === 1) {
+      const [col, val] = orFilters[0].split('.eq.');
+      query = query.eq(col, val);
+    } else {
+      query = query.eq('ticket_id', ticketId);
+    }
+
+    query.limit(1)
       .then(({ data, error }) => {
         if (!error && data && data.length > 0) {
-          const ext = data[0].extras || [];
-          const viajeData = ext.find(x => x.isViajeData);
-          console.log('[Auto-fill PDF] Datos de logística encontrados:', viajeData);
-          if (viajeData) {
-            if (elNoches && (elNoches.value === '' || elNoches.value === '0')) {
-               elNoches.value = viajeData.num_hospedaje || 0;
-               console.log('[Auto-fill PDF] Llenado f-noches con:', viajeData.num_hospedaje);
-            }
-            if (elAlimento && (elAlimento.value === '' || elAlimento.value === '0')) {
-               elAlimento.value = viajeData.num_alimento || 0;
-               console.log('[Auto-fill PDF] Llenado f-alimentacion con:', viajeData.num_alimento);
-            }
-            const elTraslado = document.getElementById('f-traslado-costo');
-            if (elTraslado && (elTraslado.value === '' || elTraslado.value === '0')) {
-               elTraslado.value = viajeData.num_traslado || 0;
-               console.log('[Auto-fill PDF] Llenado f-traslado-costo con:', viajeData.num_traslado);
-            }
-          }
-          
-          // Auto-check Reembolso KM
-          const elReembolso = document.getElementById('f-reembolso-km');
-          if (elReembolso) {
-            const allItems = [...ext, ...(data[0].conceptos || [])];
-            const hasReembolso = allItems.some(x => !x.isViajeData && x.descripcion && x.descripcion.toLowerCase().includes('reembolso') && x.descripcion.toLowerCase().includes('km'));
-            if (hasReembolso) {
-              elReembolso.checked = true;
-              console.log('[Auto-fill PDF] Reembolso KM detectado y marcado.');
-            }
-          }
-        } else {
-           console.log('[Auto-fill PDF] No se encontró extracción en BD o hubo error', error);
+          procesarExtraccion(data[0]);
+        } else if (typeof window !== 'undefined' && window._lastPdfPedidoExtracted) {
+          const lpe = window._lastPdfPedidoExtracted;
+          procesarExtraccion({
+            extras: lpe.detallesViaje ? [{ isViajeData: true, ...lpe.detallesViaje }] : [],
+            conceptos: [...(lpe.articulos || []), ...(lpe.mainArticulos || [])],
+            ruta_servicio: lpe.cleanText || ''
+          });
         }
       })
-      .catch(err => console.warn('[Auto-fill PDF] Error:', err));
+      .catch(err => console.warn('[Auto-fill PDF] Error en consulta Supabase:', err));
+  } else if (typeof window !== 'undefined' && window._lastPdfPedidoExtracted) {
+    const lpe = window._lastPdfPedidoExtracted;
+    procesarExtraccion({
+      extras: lpe.detallesViaje ? [{ isViajeData: true, ...lpe.detallesViaje }] : [],
+      conceptos: [...(lpe.articulos || []), ...(lpe.mainArticulos || [])],
+      ruta_servicio: lpe.cleanText || ''
+    });
   }
-};
+}
 
 function onSoporteChange() {
   if (typeof document === 'undefined') return;

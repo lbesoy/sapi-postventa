@@ -3277,6 +3277,86 @@ console.log('🧪 Verificando resolución de UUIDs a nombres humanos en Juntas..
   console.log('  ✅ Resolución de UUIDs a Nombres Humanos en Juntas: OK');
 }
 
+// 62. Verificación de Extracción y Auto-Marcado de Reembolso KM desde SAP PEDIDO / PED_TRI
+{
+  console.log('🧪 Verificando Extracción y Detección de Reembolso KM...');
+
+  // Mock texto típico extraído de SAP PEDIDO CLIENTE PED_TRI
+  const sapCleanText = `
+    PEDIDO CLIENTE PED_TRI 2200611
+    Cliente: CL002 CONSTRUCTORA EJEMPLO S.A.
+    1 15,000.00 16.00 15,000.00 001 1 MET Servicio de Mantenimiento Preventivo E48 ZFAC10
+    1 8,800.00 16.00 8,800.00 002 1 MET Reembolso KM/Casetas E48 CDMX - Cardel,Veracruz - 800 - KM - Ida y vuelta - Precio del KM - 11 ZFAC10
+    1 1,500.00 16.00 1,500.00 003 1 MET Viaticos Operaciones HOSPEDAJE E48
+    1 800.00 16.00 800.00 004 1 MET Viaticos Operaciones ALIMENTOS E48
+    Subtotal: 26,100.00
+    Importe total: 30,276.00
+  `;
+
+  // Test regex SAP PED_TRI
+  const itemRegexSap = /(?:(\d+(?:\.\d+)?)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+)?(\d{3})\s+(\d+(?:\.\d+)?)\s+([A-Za-z0-9]{1,5})\s+(.*?)(?=\s+(?:ZFAC\d+|Item Code:|\d+(?:\.\d+)?\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+\d{3}|\d{3}\s+\d+|\bSubtotal:|\bImporte total:|$))/gi;
+  const items = [];
+  let m;
+  while ((m = itemRegexSap.exec(sapCleanText)) !== null) {
+    const desc = (m[8] || '').trim();
+    if (desc && desc.length > 2) {
+      items.push({
+        partida: m[5],
+        cantidad: parseFloat(m[6] || m[1] || '1'),
+        descripcion: desc,
+        total: m[4] ? parseFloat(m[4].replace(/,/g, '')) : 0
+      });
+    }
+  }
+
+  assert.ok(items.length >= 3, `Debe extraer al menos 3 partidas de SAP PED_TRI (se extrajeron ${items.length})`);
+  const kmItem = items.find(it => it.descripcion.toLowerCase().includes('reembolso') && it.descripcion.toLowerCase().includes('km'));
+  assert.ok(kmItem, 'Debe haber extraído la partida de Reembolso KM/Casetas');
+  assert.strictEqual(kmItem.partida, '002', 'La partida de Reembolso KM debe ser 002');
+
+  // Test detección en texto directo como salvaguarda
+  const cleanLower = sapCleanText.toLowerCase();
+  const hasKmText = (cleanLower.includes('reembolso') && (cleanLower.includes('km') || cleanLower.includes('casetas') || cleanLower.includes('kilometraje'))) || cleanLower.includes('reembolso km');
+  assert.strictEqual(hasKmText, true, 'Debe detectar Reembolso KM en texto crudo');
+
+  // Test autoFillFromPdfExtraction evaluando el checkbox
+  const { JSDOM } = await import('jsdom');
+  const dom = new JSDOM(`<!DOCTYPE html><html><body>
+    <input type="number" id="f-noches" value="" />
+    <input type="number" id="f-alimentacion" value="" />
+    <input type="number" id="f-traslado-costo" value="" />
+    <input type="checkbox" id="f-reembolso-km" />
+    <input type="text" id="f-pedido" value="2200611" />
+  </body></html>`);
+
+  global.document = dom.window.document;
+  global.window = dom.window;
+
+  // Mock _lastPdfPedidoExtracted
+  window._lastPdfPedidoExtracted = {
+    doc: '2200611',
+    cleanText: sapCleanText,
+    articulos: items,
+    mainArticulos: items.filter(x => !x.descripcion.toLowerCase().includes('reembolso') && !x.descripcion.toLowerCase().includes('viaticos')),
+    detallesViaje: {
+      num_hospedaje: 1,
+      num_alimento: 1,
+      num_traslado: 800
+    }
+  };
+
+  const { autoFillFromPdfExtraction } = await import('../src/modules/ordenes_form.js');
+  autoFillFromPdfExtraction('TKT-TEST-KM', true);
+
+  const elReembolso = dom.window.document.getElementById('f-reembolso-km');
+  assert.strictEqual(elReembolso.checked, true, 'El checkbox f-reembolso-km debe marcarse como true al procesar extracción');
+
+  const elNoches = dom.window.document.getElementById('f-noches');
+  assert.strictEqual(elNoches.value, '1', 'f-noches debe auto-llenarse');
+
+  console.log('  ✅ Extracción y Detección de Reembolso KM: OK');
+}
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 

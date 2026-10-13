@@ -1594,10 +1594,12 @@ async function autoExtraerDesdePdfPedido(file, isModal = true, ticketId = null) 
       }
 
       if (!extractedArticulos || extractedArticulos.length === 0) {
+        // Intento 1: Formato estándar partida descripcion cant um x_surtir almacen precio imp total
         const itemRegex = /\b(\d{3})\s+(.*?)\s+(\d+(?:\.\d+)?)\s+([A-Za-z0-9]{1,5})\s+(\d+(?:\.\d+)?)\s+([A-Za-z0-9]{1,5})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\b/g;
         let itemMatch;
         while ((itemMatch = itemRegex.exec(cleanText)) !== null) {
           extractedArticulos.push({
+            partida: itemMatch[1],
             descripcion: itemMatch[2].trim(),
             cantidad: parseFloat(itemMatch[3]),
             unidad_medida: itemMatch[4],
@@ -1608,9 +1610,86 @@ async function autoExtraerDesdePdfPedido(file, isModal = true, ticketId = null) 
             total: parseFloat(itemMatch[9].replace(/,/g, ''))
           });
         }
+
+        // Intento 2: Formato SAP PEDIDO CLIENTE / PED_TRI
+        // Ej: 1 8,800.00 16.00 8,800.00 002 1 MET Reembolso KM/Casetas E48 CDMX - Cardel,Veracruz - 800 - KM...
+        if (extractedArticulos.length === 0) {
+          const itemRegexSap = /(?:(\d+(?:\.\d+)?)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+)?(\d{3})\s+(\d+(?:\.\d+)?)\s+([A-Za-z0-9]{1,5})\s+(.*?)(?=\s+(?:ZFAC\d+|Item Code:|\d+(?:\.\d+)?\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+\d{3}|\d{3}\s+\d+|\bSubtotal:|\bImporte total:|$))/gi;
+          let sapMatch;
+          while ((sapMatch = itemRegexSap.exec(cleanText)) !== null) {
+            const desc = (sapMatch[8] || '').trim();
+            if (desc && desc.length > 2) {
+              extractedArticulos.push({
+                partida: sapMatch[5],
+                cantidad: parseFloat(sapMatch[6] || sapMatch[1] || '1'),
+                unidad_medida: sapMatch[7] || 'MET',
+                descripcion: desc,
+                precio: sapMatch[2] ? parseFloat(sapMatch[2].replace(/,/g, '')) : 0,
+                impuesto_porcentaje: sapMatch[3] ? parseFloat(sapMatch[3].replace(/,/g, '')) : 16,
+                total: sapMatch[4] ? parseFloat(sapMatch[4].replace(/,/g, '')) : 0
+              });
+            }
+          }
+        }
+
+        // Intento 3: Salvaguarda directa para Reembolso KM si existe en texto pero no fue capturado por tablas
+        const cleanLower = cleanText.toLowerCase();
+        const hasKmInText = (cleanLower.includes('reembolso') && (cleanLower.includes('km') || cleanLower.includes('casetas') || cleanLower.includes('kilometraje'))) || cleanLower.includes('reembolso km');
+        const alreadyHasKm = extractedArticulos.some(a => {
+          const d = (a.descripcion || '').toLowerCase();
+          return (d.includes('reembolso') && (d.includes('km') || d.includes('casetas') || d.includes('kilometraje'))) || d.includes('reembolso km');
+        });
+        if (hasKmInText && !alreadyHasKm) {
+          const kmSnippetMatch = cleanText.match(/(?:reembolso\s+(?:de\s+)?(?:km|kilometraje|casetas)[^\n\r]*|.*?(?:reembolso\s+km[^\n\r]*))/i);
+          const kmSnippet = kmSnippetMatch ? kmSnippetMatch[0].trim() : 'Reembolso KM / Casetas';
+          extractedArticulos.push({
+            partida: 'KM',
+            descripcion: kmSnippet,
+            cantidad: 1,
+            unidad_medida: 'MET',
+            precio: 0,
+            impuesto_porcentaje: 16,
+            total: 0
+          });
+        }
+
         if (extractedArticulos.length > 0) {
           console.log('[PDF Auto-Extract Pedido] Extraídos articulos con Regex fallback:', extractedArticulos);
         }
+      }
+    }
+
+    // Extracción fallback de logística si no vino de la AI
+    if (!detallesViaje && cleanText) {
+      let nHospedaje = 0;
+      let nAlimento = 0;
+      let nTraslado = 0;
+      const hospMatches = cleanText.matchAll(/(?:hospedaje|noches?)[^\d]*(\d+)/gi);
+      for (const hm of hospMatches) {
+        const val = parseInt(hm[1], 10);
+        if (val > 0 && val < 50) nHospedaje = Math.max(nHospedaje, val);
+      }
+      const alimMatches = cleanText.matchAll(/(?:alimentos?|comidas?)[^\d]*(\d+)/gi);
+      for (const am of alimMatches) {
+        const val = parseInt(am[1], 10);
+        if (val > 0 && val < 50) nAlimento = Math.max(nAlimento, val);
+      }
+      const rutaMatch = cleanText.match(/([A-Za-zÁÉÍÓÚáéíóúñÑ\s]+)\s*-\s*([A-Za-zÁÉÍÓÚáéíóúñÑ\s,]+)\s*-\s*(\d+)\s*-\s*KM/i);
+      let origen = '';
+      let destino = '';
+      if (rutaMatch) {
+        origen = rutaMatch[1].trim();
+        destino = rutaMatch[2].trim();
+        nTraslado = parseInt(rutaMatch[3], 10) || 0;
+      }
+      if (nHospedaje > 0 || nAlimento > 0 || nTraslado > 0 || origen || destino) {
+        detallesViaje = {
+          origen: origen || 'CDMX',
+          destino: destino || '',
+          num_hospedaje: nHospedaje,
+          num_alimento: nAlimento,
+          num_traslado: nTraslado
+        };
       }
     }
 
@@ -1623,7 +1702,7 @@ async function autoExtraerDesdePdfPedido(file, isModal = true, ticketId = null) 
       }
     }
 
-    const extraKeywords = ['consumibles', 'asistencia', 'casetas', 'viaticos', 'viáticos', 'reembolso', 'km'];
+    const extraKeywords = ['consumibles', 'asistencia', 'casetas', 'viaticos', 'viáticos', 'reembolso', 'km', 'kilometraje', 'hospedaje', 'alimentos', 'traslado'];
     if (extractedArticulos && extractedArticulos.length > 0) {
       extractedArticulos.forEach(art => {
         const desc = (art.descripcion || '').toLowerCase();

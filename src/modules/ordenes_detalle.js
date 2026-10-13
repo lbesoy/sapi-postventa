@@ -602,6 +602,57 @@ function verDetalle(id) {
   }
   if (!o) return;
   const actualId = o.id || id;
+
+  // Auto-detección asíncrona para órdenes históricas que no tengan la bandera reembolso_km guardada
+  if (!o.reembolso_km && !o._reconciledKm && window.supabaseClient && (o.soporte || o.pedido || o.ticket_id)) {
+    const ordenTarget = o;
+    const allTkts = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : ((typeof window !== 'undefined' && Array.isArray(window.tickets)) ? window.tickets : []);
+    const refTkt = allTkts.find(t => t && (t.id === ordenTarget.soporte || t.folio === ordenTarget.soporte || t.id === ordenTarget.ticket_id || t.folio === ordenTarget.ticket_folio));
+    const targetUuid = refTkt ? refTkt.id : ordenTarget.ticket_id;
+    const targetFolio = refTkt ? refTkt.folio : (String(ordenTarget.soporte || '').startsWith('TKT-') ? ordenTarget.soporte : null);
+    const targetPedido = ordenTarget.pedido || (refTkt ? refTkt.pedidoSAP : null);
+
+    const orFilters = [];
+    if (targetUuid) orFilters.push(`ticket_id.eq.${targetUuid}`);
+    if (targetFolio && targetFolio !== targetUuid) orFilters.push(`ticket_id.eq.${targetFolio}`);
+    if (targetPedido) orFilters.push(`folio_sap.eq.${targetPedido}`);
+
+    if (orFilters.length > 0) {
+      window.supabaseClient
+        .from('pdf_extracciones_ai')
+        .select('extras, conceptos, ruta_servicio')
+        .or(orFilters.join(','))
+        .order('fecha_extraccion', { ascending: false })
+        .limit(1)
+        .then(({ data, error }) => {
+          if (!error && data && data.length > 0) {
+            const row = data[0];
+            const allItems = [...(row.extras || []), ...(row.conceptos || [])];
+            const rawTxt = (row.ruta_servicio || '').toLowerCase();
+            const hasReembolso = allItems.some(x => !x.isViajeData && x.descripcion && ((x.descripcion.toLowerCase().includes('reembolso') && (x.descripcion.toLowerCase().includes('km') || x.descripcion.toLowerCase().includes('casetas') || x.descripcion.toLowerCase().includes('kilometraje'))) || x.descripcion.toLowerCase().includes('reembolso km') || x.descripcion.toLowerCase().includes('km de traslado'))) ||
+              (rawTxt.includes('reembolso') && (rawTxt.includes('km') || rawTxt.includes('casetas') || rawTxt.includes('kilometraje'))) || rawTxt.includes('reembolso km');
+
+            if (hasReembolso && !ordenTarget.reembolso_km) {
+              console.log('[verDetalle] Reconciliando reembolso_km automáticamente para orden:', ordenTarget.folio || ordenTarget.id);
+              ordenTarget.reembolso_km = true;
+              ordenTarget._reconciledKm = true;
+              if (typeof safeSetJSON === 'function' && typeof ordenes !== 'undefined') {
+                safeSetJSON('sapi_ordenes', ordenes);
+              }
+              if (window.pushToSupabase) {
+                window.pushToSupabase('ordenes', { id: ordenTarget.id, reembolso_km: true });
+              }
+              const currentTitle = document.getElementById('detalle-title')?.textContent || '';
+              if (currentTitle.includes(ordenTarget.folio || String(ordenTarget.id).slice(0,8))) {
+                verDetalle(ordenTarget.id);
+              }
+            }
+          }
+        })
+        .catch(err => console.warn('[verDetalle] Error verificando extracción:', err));
+    }
+  }
+
   document.getElementById('detalle-title').textContent = `Orden ${o.folio || o.id.slice(0,8)}`;
   
   const btnCerrarAdmin = document.getElementById('btn-cerrar-orden-admin');

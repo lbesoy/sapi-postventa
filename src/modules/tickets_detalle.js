@@ -1124,7 +1124,9 @@ function verDetalleTicket(id) {
           };
 
           const allExtractedItems = [...mainArticulos, ...extrasArticulos];
-          const hasReembolsoKm = allExtractedItems.some(x => !x.isViajeData && x.descripcion && x.descripcion.toLowerCase().includes('reembolso') && x.descripcion.toLowerCase().includes('km'));
+          const rawTextLower = (ex.ruta_servicio || '').toLowerCase();
+          const hasReembolsoInText = (rawTextLower.includes('reembolso') && (rawTextLower.includes('km') || rawTextLower.includes('casetas') || rawTextLower.includes('kilometraje'))) || rawTextLower.includes('reembolso km');
+          const hasReembolsoKm = allExtractedItems.some(x => !x.isViajeData && x.descripcion && ((x.descripcion.toLowerCase().includes('reembolso') && (x.descripcion.toLowerCase().includes('km') || x.descripcion.toLowerCase().includes('casetas') || x.descripcion.toLowerCase().includes('kilometraje'))) || x.descripcion.toLowerCase().includes('reembolso km') || x.descripcion.toLowerCase().includes('km de traslado'))) || hasReembolsoInText;
 
           container.innerHTML = `
             <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:0.75rem; font-size:0.8rem;">
@@ -1564,29 +1566,55 @@ async function cerrarCotizacionTicket(id) {
         }
 
         let refUtilizadasExtraidas = [];
+        let autoReembolsoKm = false;
+        let autoNoches = '';
+        let autoAlimentacion = '';
+        let autoTrasladoCosto = '';
+
         if (window.supabaseClient) {
           try {
+            const orFilters = [`ticket_id.eq.${id}`];
+            if (t.folio) orFilters.push(`ticket_id.eq.${t.folio}`);
+            if (pedidoSAP) orFilters.push(`folio_sap.eq.${pedidoSAP}`);
+
             const { data: dbEx } = await window.supabaseClient
               .from('pdf_extracciones_ai')
-              .select('conceptos')
-              .eq('ticket_id', id)
+              .select('conceptos, extras, ruta_servicio, folio_sap')
+              .or(orFilters.join(','))
               .order('fecha_extraccion', { ascending: false })
               .limit(1);
-            if (dbEx && dbEx.length > 0 && dbEx[0].conceptos) {
-              refUtilizadasExtraidas = dbEx[0].conceptos.map(c => {
-                let matchedClave = '';
-                const descUpper = (c.descripcion || '').trim().toUpperCase();
-                if (descUpper && typeof refaccionesDb !== 'undefined') {
-                  const match = refaccionesDb.find(r => (r.descripcion || '').toUpperCase().trim() === descUpper);
-                  if (match) matchedClave = match.codigo || match.id || '';
-                }
-                return {
-                  descripcion: c.descripcion || '',
-                  cantidad: (c.cantidad || 1).toString(),
-                  clave: matchedClave,
-                  isFromPdf: true
-                };
-              });
+
+            if (dbEx && dbEx.length > 0) {
+              const exRow = dbEx[0];
+              if (exRow.conceptos && Array.isArray(exRow.conceptos)) {
+                refUtilizadasExtraidas = exRow.conceptos.map(c => {
+                  let matchedClave = '';
+                  const descUpper = (c.descripcion || '').trim().toUpperCase();
+                  if (descUpper && typeof refaccionesDb !== 'undefined') {
+                    const match = refaccionesDb.find(r => (r.descripcion || '').toUpperCase().trim() === descUpper);
+                    if (match) matchedClave = match.codigo || match.id || '';
+                  }
+                  return {
+                    descripcion: c.descripcion || '',
+                    cantidad: (c.cantidad || 1).toString(),
+                    clave: matchedClave,
+                    isFromPdf: true
+                  };
+                });
+              }
+
+              const ext = exRow.extras || [];
+              const allItems = [...(exRow.conceptos || []), ...ext];
+              const rawTxt = (exRow.ruta_servicio || '').toLowerCase();
+              autoReembolsoKm = allItems.some(x => !x.isViajeData && x.descripcion && ((x.descripcion.toLowerCase().includes('reembolso') && (x.descripcion.toLowerCase().includes('km') || x.descripcion.toLowerCase().includes('casetas') || x.descripcion.toLowerCase().includes('kilometraje'))) || x.descripcion.toLowerCase().includes('reembolso km') || x.descripcion.toLowerCase().includes('km de traslado'))) ||
+                (rawTxt.includes('reembolso') && (rawTxt.includes('km') || rawTxt.includes('casetas') || rawTxt.includes('kilometraje'))) || rawTxt.includes('reembolso km');
+
+              const viajeData = ext.find(x => x && x.isViajeData);
+              if (viajeData) {
+                if (viajeData.num_hospedaje) autoNoches = viajeData.num_hospedaje;
+                if (viajeData.num_alimento) autoAlimentacion = viajeData.num_alimento;
+                if (viajeData.num_traslado) autoTrasladoCosto = viajeData.num_traslado;
+              }
             }
           } catch(err) {}
         }
@@ -1605,6 +1633,18 @@ async function cerrarCotizacionTicket(id) {
               isFromPdf: true
             };
           });
+        }
+        if (!autoReembolsoKm && window._lastPdfPedidoExtracted) {
+          const lpe = window._lastPdfPedidoExtracted;
+          const allLpeItems = [...(lpe.articulos || []), ...(lpe.mainArticulos || [])];
+          const rawLpe = (lpe.cleanText || '').toLowerCase();
+          autoReembolsoKm = allLpeItems.some(x => x.descripcion && ((x.descripcion.toLowerCase().includes('reembolso') && (x.descripcion.toLowerCase().includes('km') || x.descripcion.toLowerCase().includes('casetas') || x.descripcion.toLowerCase().includes('kilometraje'))) || x.descripcion.toLowerCase().includes('reembolso km'))) ||
+            (rawLpe.includes('reembolso') && (rawLpe.includes('km') || rawLpe.includes('casetas') || rawLpe.includes('kilometraje'))) || rawLpe.includes('reembolso km');
+          if (lpe.detallesViaje) {
+            if (!autoNoches && lpe.detallesViaje.num_hospedaje) autoNoches = lpe.detallesViaje.num_hospedaje;
+            if (!autoAlimentacion && lpe.detallesViaje.num_alimento) autoAlimentacion = lpe.detallesViaje.num_alimento;
+            if (!autoTrasladoCosto && lpe.detallesViaje.num_traslado) autoTrasladoCosto = lpe.detallesViaje.num_traslado;
+          }
         }
 
         let refNecesariasManuales = [];
@@ -1645,7 +1685,10 @@ async function cerrarCotizacionTicket(id) {
           observaciones: '', pendientes: '',
           ref_utilizadas: refUtilizadasExtraidas, ref_necesarias: refNecesariasManuales,
           factura_ref: '', factura_mo: '',
-          noches: '', alimentacion: '', traslado_costo: '',
+          noches: autoNoches,
+          alimentacion: autoAlimentacion,
+          traslado_costo: autoTrasladoCosto,
+          reembolso_km: !!autoReembolsoKm,
           dias: [],
           esPrueba: isTest,
         };
