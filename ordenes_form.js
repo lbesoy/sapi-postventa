@@ -513,6 +513,9 @@ function abrirFormulario(id, modoReporte = false) {
 
   document.getElementById('modal-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
+  if (typeof window.sincronizarAsteriscosCamposObligatorios === 'function') {
+    window.sincronizarAsteriscosCamposObligatorios('modal-form');
+  }
 }
 
 function autoFillFromPdfExtraction(ticketId, force = false) {

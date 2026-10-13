@@ -9,12 +9,12 @@
           <form id="form-cierre-papel" onsubmit="confirmarCierrePapel(event)">
             <input type="hidden" id="cp-orden-id" />
             <div class="form-group" style="margin-bottom: 1rem;">
-              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Archivo PDF Escaneado *</label>
+              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Archivo PDF Escaneado <span class="required-asterisk">*</span></label>
               <input type="file" id="cp-pdf-file" accept="application/pdf" required style="width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary);" />
               <small style="color:var(--text-muted); font-size:0.75rem; display:block; margin-top:0.25rem;">Suba el reporte en formato PDF firmado físicamente en campo.</small>
             </div>
             <div class="form-group" style="margin-bottom: 1rem;">
-              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Estado de la Orden *</label>
+              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Estado de la Orden <span class="required-asterisk">*</span></label>
               <select id="cp-estado" required style="width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary);">
                 <option value="Completado">Completado</option>
                 <option value="Refacciones pendientes">Refacciones pendientes</option>
@@ -32,7 +32,7 @@
               </div>
             </div>
             <div class="form-group" style="margin-bottom: 1.5rem;">
-              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Motivo de Cierre en Papel (¿Por qué no es digital?) *</label>
+              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Motivo de Cierre en Papel (¿Por qué no es digital?) <span class="required-asterisk">*</span></label>
               <textarea id="cp-motivo" placeholder="Ej. El cliente no cuenta con firma digital / Error de red en zona de trabajo / Orden antigua cerrada físicamente..." required rows="4" style="width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary); resize:vertical; box-sizing:border-box; font-family:inherit;"></textarea>
             </div>
             <div class="form-actions" style="display:flex; justify-content:flex-end; gap:0.5rem;">

@@ -1098,3 +1098,23 @@ export function mergeEvidencias(target, source, excludedUrls = []) {
   };
 }
 
+export function sincronizarAsteriscosCamposObligatorios(container) {
+  const root = typeof container === 'string' ? document.getElementById(container) : (container || document);
+  if (!root || !root.querySelectorAll) return;
+  const requiredInputs = root.querySelectorAll('input[required], select[required], textarea[required]');
+  requiredInputs.forEach(input => {
+    const parent = input.closest('.form-group') || input.parentElement;
+    if (!parent) return;
+    const label = parent.querySelector('label');
+    if (!label) return;
+    if (label.querySelector('.required-asterisk')) return;
+    if (label.textContent.includes('*')) {
+      label.innerHTML = label.innerHTML.replace(/\s*\*\s*/g, ' <span class="required-asterisk">*</span>');
+    } else {
+      label.insertAdjacentHTML('beforeend', ' <span class="required-asterisk">*</span>');
+    }
+  });
+}
+if (typeof window !== 'undefined') {
+  window.sincronizarAsteriscosCamposObligatorios = sincronizarAsteriscosCamposObligatorios;
+}

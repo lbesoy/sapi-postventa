@@ -3824,11 +3824,11 @@
               </div>
               <div class="form-grid">
                 <div class="form-group">
-                  <label>Folio (Bitácora No.)</label>
+                  <label>Folio (Bitácora No.) <span class="required-asterisk">*</span></label>
                   <input type="text" id="f-folio" placeholder="Ej. 1570-C" required />
                 </div>
                 <div class="form-group" style="position:relative;" id="group-f-cliente">
-                  <label>Cliente *</label>
+                  <label>Cliente <span class="required-asterisk">*</span></label>
                   <div class="combo-box" tabindex="0" id="f-cliente-combo" onclick="toggleCombo('f-cliente')">
                     <span id="f-cliente-display">Seleccionar cliente...</span>
                     <i data-lucide="chevron-down" style="width:16px;height:16px;"></i>
@@ -3848,7 +3848,7 @@
                   <input type="hidden" id="f-cliente" required>
                 </div>
                 <div class="form-group">
-                  <label>Ticket (Soporte) *</label>
+                  <label>Ticket (Soporte) <span class="required-asterisk">*</span></label>
                   <select id="f-soporte" onchange="onSoporteChange()" required>
                     <option value="">Ninguno</option>
                   </select>
@@ -3885,7 +3885,7 @@
                   <input type="text" id="f-horometro" placeholder="Ej. 1304" />
                 </div>
                 <div class="form-group">
-                  <label>Horómetro Real <span style="color:var(--red)">*</span></label>
+                  <label>Horómetro Real <span class="required-asterisk">*</span></label>
                   <input type="text" id="f-horometro-real" placeholder="Lectura en campo" required />
                 </div>
                 <div class="form-group">
@@ -4098,12 +4098,12 @@
           <form id="form-cierre-papel" onsubmit="confirmarCierrePapel(event)">
             <input type="hidden" id="cp-orden-id" />
             <div class="form-group" style="margin-bottom: 1rem;">
-              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Archivo PDF Escaneado *</label>
+              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Archivo PDF Escaneado <span class="required-asterisk">*</span></label>
               <input type="file" id="cp-pdf-file" accept="application/pdf" required style="width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary);" />
               <small style="color:var(--text-muted); font-size:0.75rem; display:block; margin-top:0.25rem;">Suba el reporte en formato PDF firmado físicamente en campo.</small>
             </div>
             <div class="form-group" style="margin-bottom: 1rem;">
-              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Estado de la Orden *</label>
+              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Estado de la Orden <span class="required-asterisk">*</span></label>
               <select id="cp-estado" required style="width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary);">
                 <option value="Completado">Completado</option>
                 <option value="Refacciones pendientes">Refacciones pendientes</option>
@@ -4121,7 +4121,7 @@
               </div>
             </div>
             <div class="form-group" style="margin-bottom: 1.5rem;">
-              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Motivo de Cierre en Papel (¿Por qué no es digital?) *</label>
+              <label style="display:block; margin-bottom:0.4rem; font-weight:600; font-size:0.9rem;">Motivo de Cierre en Papel (¿Por qué no es digital?) <span class="required-asterisk">*</span></label>
               <textarea id="cp-motivo" placeholder="Ej. El cliente no cuenta con firma digital / Error de red en zona de trabajo / Orden antigua cerrada físicamente..." required rows="4" style="width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary); resize:vertical; box-sizing:border-box; font-family:inherit;"></textarea>
             </div>
             <div class="form-actions" style="display:flex; justify-content:flex-end; gap:0.5rem;">
@@ -4601,20 +4601,20 @@
         </div>
         <div class="modal-body">
           <div class="form-group full-width" style="margin-top:0.75rem;">
-            <label>Fecha *</label>
+            <label>Fecha <span class="required-asterisk">*</span></label>
             <input type="date" id="bitacora-fecha" required />
           </div>
           <div class="form-group full-width" style="margin-top:0.75rem;">
-            <label>Nota / Avance del día *</label>
+            <label>Nota / Avance del día <span class="required-asterisk">*</span></label>
             <textarea id="bitacora-nota" rows="4" placeholder="Describe el trabajo realizado..." required></textarea>
           </div>
           <div class="form-group full-width" id="grupo-bitacora-horas" style="margin-top:0.75rem; display:flex; gap:1rem;">
             <div style="flex:1;">
-              <label id="lbl-bitacora-entrada">Hora de Entrada *</label>
+              <label id="lbl-bitacora-entrada">Hora de Entrada <span class="required-asterisk">*</span></label>
               <input type="time" id="bitacora-entrada" required />
             </div>
             <div style="flex:1;">
-              <label id="lbl-bitacora-salida">Hora de Salida *</label>
+              <label id="lbl-bitacora-salida">Hora de Salida <span class="required-asterisk">*</span></label>
               <input type="time" id="bitacora-salida" required />
             </div>
           </div>

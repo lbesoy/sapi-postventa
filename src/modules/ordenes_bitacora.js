@@ -90,8 +90,8 @@ function abrirBitacora(id, defaultNote = '', isOnlyTraslado = false) {
     if (grupoHoras) grupoHoras.style.display = 'flex';
     const lblEntrada = document.getElementById('lbl-bitacora-entrada');
     const lblSalida = document.getElementById('lbl-bitacora-salida');
-    if (lblEntrada) lblEntrada.textContent = 'Hora de Salida *';
-    if (lblSalida) lblSalida.textContent = 'Hora de Llegada *';
+    if (lblEntrada) lblEntrada.innerHTML = 'Hora de Salida <span class="required-asterisk">*</span>';
+    if (lblSalida) lblSalida.innerHTML = 'Hora de Llegada <span class="required-asterisk">*</span>';
     
     // Asegurar que sean requeridos
     if (inputEntrada) inputEntrada.setAttribute('required', 'true');
@@ -107,8 +107,8 @@ function abrirBitacora(id, defaultNote = '', isOnlyTraslado = false) {
     // Restaurar etiquetas originales
     const lblEntrada = document.getElementById('lbl-bitacora-entrada');
     const lblSalida = document.getElementById('lbl-bitacora-salida');
-    if (lblEntrada) lblEntrada.textContent = 'Hora de Entrada *';
-    if (lblSalida) lblSalida.textContent = 'Hora de Salida *';
+    if (lblEntrada) lblEntrada.innerHTML = 'Hora de Entrada <span class="required-asterisk">*</span>';
+    if (lblSalida) lblSalida.innerHTML = 'Hora de Salida <span class="required-asterisk">*</span>';
     
     // Asegurar que sean requeridos
     if (inputEntrada) inputEntrada.setAttribute('required', 'true');

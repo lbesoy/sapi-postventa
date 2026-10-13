@@ -1024,4 +1024,23 @@ function mergeEvidencias(target, source, excludedUrls) {
 }
 if (typeof window !== 'undefined') window.mergeEvidencias = mergeEvidencias;
 
+function sincronizarAsteriscosCamposObligatorios(container) {
+  var root = typeof container === 'string' ? document.getElementById(container) : (container || document);
+  if (!root || !root.querySelectorAll) return;
+  var requiredInputs = root.querySelectorAll('input[required], select[required], textarea[required]');
+  requiredInputs.forEach(function(input) {
+    var parent = input.closest('.form-group') || input.parentElement;
+    if (!parent) return;
+    var label = parent.querySelector('label');
+    if (!label) return;
+    if (label.querySelector('.required-asterisk')) return;
+    if (label.textContent.indexOf('*') !== -1) {
+      label.innerHTML = label.innerHTML.replace(/\s*\*\s*/g, ' <span class="required-asterisk">*</span>');
+    } else {
+      label.insertAdjacentHTML('beforeend', ' <span class="required-asterisk">*</span>');
+    }
+  });
+}
+if (typeof window !== 'undefined') window.sincronizarAsteriscosCamposObligatorios = sincronizarAsteriscosCamposObligatorios;
+
 

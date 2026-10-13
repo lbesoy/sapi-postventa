@@ -14,11 +14,11 @@
               </div>
               <div class="form-grid">
                 <div class="form-group">
-                  <label>Folio (Bitácora No.)</label>
+                  <label>Folio (Bitácora No.) <span class="required-asterisk">*</span></label>
                   <input type="text" id="f-folio" placeholder="Ej. 1570-C" required />
                 </div>
                 <div class="form-group" style="position:relative;" id="group-f-cliente">
-                  <label>Cliente *</label>
+                  <label>Cliente <span class="required-asterisk">*</span></label>
                   <div class="combo-box" tabindex="0" id="f-cliente-combo" onclick="toggleCombo('f-cliente')">
                     <span id="f-cliente-display">Seleccionar cliente...</span>
                     <i data-lucide="chevron-down" style="width:16px;height:16px;"></i>
@@ -38,7 +38,7 @@
                   <input type="hidden" id="f-cliente" required>
                 </div>
                 <div class="form-group">
-                  <label>Ticket (Soporte) *</label>
+                  <label>Ticket (Soporte) <span class="required-asterisk">*</span></label>
                   <select id="f-soporte" onchange="onSoporteChange()" required>
                     <option value="">Ninguno</option>
                   </select>
@@ -75,7 +75,7 @@
                   <input type="text" id="f-horometro" placeholder="Ej. 1304" />
                 </div>
                 <div class="form-group">
-                  <label>Horómetro Real <span style="color:var(--red)">*</span></label>
+                  <label>Horómetro Real <span class="required-asterisk">*</span></label>
                   <input type="text" id="f-horometro-real" placeholder="Lectura en campo" required />
                 </div>
                 <div class="form-group">
