@@ -1,4 +1,4 @@
-const CACHE_NAME = 'eurorep-postventa-v418';
+const CACHE_NAME = 'eurorep-postventa-v419';
 const ASSETS = [
   '/',
   '/index.html',
@@ -53,6 +53,7 @@ const ASSETS = [
   '/tecnicos_reporte.js',
   '/logo_transparent.png',
   '/Logo_de_Clara.svg',
+  '/horometro_ejemplo.jpg',
   '/manuales/manual_flujo_completo.html',
   '/manuales/manual_administrador.html',
   '/manuales/manual_tecnico.html',
@@ -69,7 +70,9 @@ const ASSETS = [
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+  'https://js.live.net/v7.2/OneDrive.js',
+  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'
 ];
 
 // Instalación del Service Worker
@@ -114,8 +117,8 @@ self.addEventListener('fetch', e => {
   e.respondWith(
     fetch(e.request)
       .then(response => {
-        // Clonar e insertar en caché si la respuesta es válida (incluyendo CORS de CDNs)
-        if (response && response.status === 200 && (response.type === 'basic' || response.type === 'cors')) {
+        // Clonar e insertar en caché si la respuesta es válida (incluyendo CORS y opacas de CDNs confiables)
+        if (response && (response.status === 200 || response.type === 'opaque') && (response.type === 'basic' || response.type === 'cors' || response.type === 'opaque')) {
           const responseToCache = response.clone();
           caches.open(CACHE_NAME).then(cache => {
             cache.put(e.request, responseToCache);
