@@ -15,10 +15,10 @@ CREATE INDEX IF NOT EXISTS idx_tickets_created_at_desc ON public.tickets (create
 CREATE INDEX IF NOT EXISTS idx_tickets_folio ON public.tickets (folio);
 
 -- Índice para conteos rápidos de estado (KPIs de abiertos, refacciones, etc.)
-CREATE INDEX IF NOT EXISTS idx_tickets_estatus ON public.tickets (estatus);
+CREATE INDEX IF NOT EXISTS idx_tickets_estado ON public.tickets (estado);
 
--- Índice compuesto para consultas filtradas por estatus y ordenadas por fecha
-CREATE INDEX IF NOT EXISTS idx_tickets_estatus_created ON public.tickets (estatus, created_at DESC);
+-- Índice compuesto para consultas filtradas por estado y ordenadas por fecha
+CREATE INDEX IF NOT EXISTS idx_tickets_estado_created ON public.tickets (estado, created_at DESC);
 
 -- Índice para filtrado de tickets por cliente
 CREATE INDEX IF NOT EXISTS idx_tickets_cliente ON public.tickets (cliente);
