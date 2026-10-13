@@ -220,8 +220,17 @@ function updateTicketBadge() {
       const tCreador = t.creadoPor || (typeof window.resolverCreadorTicket === 'function' ? window.resolverCreadorTicket(t) : (t.creado_por || ''));
       if (tecFilter && tecNameLower) {
          let assigned = [];
-         if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(safeResolveTecnicoNombre);
-         else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+         if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) {
+           assigned = t.tecnicosAsignados.flatMap(raw => {
+             const res = safeResolveTecnicoNombre(raw) || raw;
+             return typeof res === 'string' ? res.split(',').map(s => s.trim()) : [];
+           });
+         } else if (t.asignado && t.asignado !== 'Sin asignar') {
+           assigned = String(t.asignado).split(',').flatMap(s => {
+             const res = safeResolveTecnicoNombre(s.trim()) || s.trim();
+             return typeof res === 'string' ? res.split(',').map(x => x.trim()) : [];
+           });
+         }
          const assignedLower = assigned.map(s => safeNorm(s));
          passTec = assignedLower.includes(tecNameLower) || 
                    (t.solicitante && safeNorm(t.solicitante) === tecNameLower) || 
@@ -238,8 +247,17 @@ function updateTicketBadge() {
          }
          
          let assigned = [];
-         if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(safeResolveTecnicoNombre);
-         else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+         if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) {
+           assigned = t.tecnicosAsignados.flatMap(raw => {
+             const res = safeResolveTecnicoNombre(raw) || raw;
+             return typeof res === 'string' ? res.split(',').map(s => s.trim()) : [];
+           });
+         } else if (t.asignado && t.asignado !== 'Sin asignar') {
+           assigned = String(t.asignado).split(',').flatMap(s => {
+             const res = safeResolveTecnicoNombre(s.trim()) || s.trim();
+             return typeof res === 'string' ? res.split(',').map(x => x.trim()) : [];
+           });
+         }
          const assignedLower = assigned.map(s => safeNorm(s));
          
          let passSupTicket = assignedLower.includes(supNameLower) || 
@@ -410,11 +428,36 @@ function actualizarFiltrosPersonal() {
     // Combinar todos los roles operativos para que salgan en ambos filtros
     let allStaff = new Set();
     
+    const agregarStaff = (raw) => {
+      if (!raw) return;
+      if (Array.isArray(raw)) {
+        raw.forEach(item => agregarStaff(item));
+        return;
+      }
+      const rawStr = String(raw).trim();
+      if (!rawStr) return;
+      const parts = rawStr.split(',');
+      for (let part of parts) {
+        part = part.trim();
+        if (!part) continue;
+        const resolved = safeResolveTecnicoNombre(part);
+        const finalName = resolved || part;
+        if (typeof finalName === 'string' && finalName.includes(',')) {
+          finalName.split(',').forEach(sub => {
+            const subClean = sub.trim();
+            if (subClean) allStaff.add(subClean);
+          });
+        } else if (typeof finalName === 'string') {
+          allStaff.add(finalName.trim());
+        }
+      }
+    };
+
     // Agregar de usuarios (tecnicos, supervisores, admins)
     if (Array.isArray(usuarios)) {
       usuarios.forEach(u => { 
         if (u && ['tecnico', 'supervisor', 'admin', 'superadmin'].includes(u.rol) && u.activo !== false && typeof u.nombre === 'string') {
-          allStaff.add(u.nombre.trim()); 
+          agregarStaff(u.nombre); 
         }
       });
     }
@@ -422,7 +465,7 @@ function actualizarFiltrosPersonal() {
     // Agregar de tecnicosDb
     if (Array.isArray(tecnicosDb)) {
       tecnicosDb.forEach(t => { 
-        if (t && typeof t.nombre === 'string') allStaff.add(t.nombre.trim()); 
+        if (t && typeof t.nombre === 'string') agregarStaff(t.nombre); 
       });
     }
     
@@ -430,19 +473,11 @@ function actualizarFiltrosPersonal() {
     if (Array.isArray(tickets)) {
       tickets.forEach(t => {
         if (!t) return;
-        if (typeof t.asignado === 'string' && t.asignado !== 'Sin asignar') {
-          t.asignado.split(',').forEach(n => {
-            const resolved = safeResolveTecnicoNombre(n.trim());
-            allStaff.add(resolved || n.trim());
-          });
+        if (t.asignado && t.asignado !== 'Sin asignar') {
+          agregarStaff(t.asignado);
         }
         if (Array.isArray(t.tecnicosAsignados)) {
-          t.tecnicosAsignados.forEach(n => {
-            if (typeof n === 'string') {
-              const resolved = safeResolveTecnicoNombre(n.trim());
-              allStaff.add(resolved || n.trim());
-            }
-          });
+          agregarStaff(t.tecnicosAsignados);
         }
       });
     }
@@ -450,19 +485,11 @@ function actualizarFiltrosPersonal() {
     if (Array.isArray(ordenes)) {
       ordenes.forEach(o => {
         if (!o) return;
-        if (typeof o.tecnico === 'string') {
-          o.tecnico.split(',').forEach(n => {
-            const resolved = safeResolveTecnicoNombre(n.trim());
-            allStaff.add(resolved || n.trim());
-          });
+        if (o.tecnico) {
+          agregarStaff(o.tecnico);
         }
         if (Array.isArray(o.tecnicosAsignados)) {
-          o.tecnicosAsignados.forEach(n => {
-            if (typeof n === 'string') {
-              const resolved = safeResolveTecnicoNombre(n.trim());
-              allStaff.add(resolved || n.trim());
-            }
-          });
+          agregarStaff(o.tecnicosAsignados);
         }
       });
     }
@@ -470,9 +497,9 @@ function actualizarFiltrosPersonal() {
     if (Array.isArray(clientesDb)) {
       clientesDb.forEach(c => {
         if (!c) return;
-        if (typeof c.supervisorAsignado === 'string') allStaff.add(c.supervisorAsignado.trim());
+        if (c.supervisorAsignado) agregarStaff(c.supervisorAsignado);
         if (Array.isArray(c.supervisoresAsignados)) {
-          c.supervisoresAsignados.forEach(s => { if (typeof s === 'string') allStaff.add(s.trim()); });
+          agregarStaff(c.supervisoresAsignados);
         }
       });
     }
@@ -481,6 +508,7 @@ function actualizarFiltrosPersonal() {
       if (!n || typeof n !== 'string') return false;
       const clean = n.trim();
       if (!clean || clean === '-' || clean.toLowerCase() === 'sin asignar' || clean.toLowerCase() === 'sin_asignar') return false;
+      if (clean.includes(',')) return false;
       // Descartar UUIDs puros sin resolver
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean)) return false;
       const isPaqFn = (typeof esNombrePaqueteria === 'function') ? esNombrePaqueteria : (typeof window !== 'undefined' && window.esNombrePaqueteria ? window.esNombrePaqueteria : () => false);
@@ -498,30 +526,39 @@ function actualizarFiltrosPersonal() {
     
     // Crear lista separada exclusiva para supervisores
     let allSupervisores = new Set();
+    const agregarSupervisor = (raw) => {
+      if (!raw) return;
+      if (Array.isArray(raw)) {
+        raw.forEach(item => agregarSupervisor(item));
+        return;
+      }
+      const rawStr = String(raw).trim();
+      if (!rawStr) return;
+      rawStr.split(',').forEach(s => {
+        const sClean = s.trim();
+        if (!sClean) return;
+        if (sClean.includes('-')) {
+          const u = usuarios.find(usr => usr && (usr.id === sClean || usr.user_id === sClean));
+          if (u && typeof u.nombre === 'string') allSupervisores.add(u.nombre.trim());
+        } else {
+          allSupervisores.add(sClean);
+        }
+      });
+    };
+
     if (Array.isArray(usuarios)) {
       usuarios.forEach(u => {
         if (u && u.rol === 'supervisor' && u.activo !== false && typeof u.nombre === 'string') {
-          allSupervisores.add(u.nombre.trim());
+          agregarSupervisor(u.nombre);
         }
       });
     }
     if (Array.isArray(clientesDb)) {
       clientesDb.forEach(c => {
         if (!c) return;
-        if (typeof c.supervisorAsignado === 'string' && c.supervisorAsignado.trim()) {
-          allSupervisores.add(c.supervisorAsignado.trim());
-        }
+        if (c.supervisorAsignado) agregarSupervisor(c.supervisorAsignado);
         if (Array.isArray(c.supervisoresAsignados)) {
-          c.supervisoresAsignados.forEach(s => {
-            if (typeof s === 'string') {
-              if (s.includes('-')) { // Es un UUID de usuario, buscamos su nombre
-                const u = usuarios.find(usr => usr.id === s);
-                if (u && typeof u.nombre === 'string') allSupervisores.add(u.nombre.trim());
-              } else {
-                allSupervisores.add(s.trim());
-              }
-            }
-          });
+          agregarSupervisor(c.supervisoresAsignados);
         }
       });
     }
@@ -1800,8 +1837,17 @@ function renderTickets(ctx) {
         const tCreador = t.creadoPor || (typeof window.resolverCreadorTicket === 'function' ? window.resolverCreadorTicket(t) : (t.creado_por || ''));
         if (tecFilter && tecNameLower) {
            let assigned = [];
-           if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(safeResolveTecnicoNombre);
-           else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+           if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) {
+             assigned = t.tecnicosAsignados.flatMap(raw => {
+               const res = safeResolveTecnicoNombre(raw) || raw;
+               return typeof res === 'string' ? res.split(',').map(s => s.trim()) : [];
+             });
+           } else if (t.asignado && t.asignado !== 'Sin asignar') {
+             assigned = String(t.asignado).split(',').flatMap(s => {
+               const res = safeResolveTecnicoNombre(s.trim()) || s.trim();
+               return typeof res === 'string' ? res.split(',').map(x => x.trim()) : [];
+             });
+           }
            const assignedLower = assigned.map(s => safeNorm(s));
            passTec = assignedLower.includes(tecNameLower) || 
                      (t.solicitante && safeNorm(t.solicitante) === tecNameLower) || 
@@ -1818,8 +1864,17 @@ function renderTickets(ctx) {
            }
            
            let assigned = [];
-           if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) assigned = t.tecnicosAsignados.map(safeResolveTecnicoNombre);
-           else if (t.asignado && t.asignado !== 'Sin asignar') assigned = String(t.asignado).split(',').map(s=>s.trim());
+           if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) {
+             assigned = t.tecnicosAsignados.flatMap(raw => {
+               const res = safeResolveTecnicoNombre(raw) || raw;
+               return typeof res === 'string' ? res.split(',').map(s => s.trim()) : [];
+             });
+           } else if (t.asignado && t.asignado !== 'Sin asignar') {
+             assigned = String(t.asignado).split(',').flatMap(s => {
+               const res = safeResolveTecnicoNombre(s.trim()) || s.trim();
+               return typeof res === 'string' ? res.split(',').map(x => x.trim()) : [];
+             });
+           }
            const assignedLower = assigned.map(s => safeNorm(s));
            
            let passSupTicket = assignedLower.includes(supNameLower) || 

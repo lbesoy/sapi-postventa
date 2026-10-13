@@ -261,10 +261,17 @@ function renderTabla(ctx) {
         if (tecFilter && tecNameLower) {
            let assigned = [];
            if (o.tecnicosAsignados && Array.isArray(o.tecnicosAsignados) && o.tecnicosAsignados.length > 0) {
-             assigned = o.tecnicosAsignados.map(safeResolveTecnicoNombre);
+             assigned = o.tecnicosAsignados.flatMap(raw => {
+               const res = safeResolveTecnicoNombre(raw) || raw;
+               return typeof res === 'string' ? res.split(',').map(s => s.trim()) : [];
+             });
            }
            if (o.tecnico) {
-             assigned = assigned.concat(String(o.tecnico).split(',').map(s=>s.trim()));
+             const oTecs = String(o.tecnico).split(',').flatMap(s => {
+               const res = safeResolveTecnicoNombre(s.trim()) || s.trim();
+               return typeof res === 'string' ? res.split(',').map(x => x.trim()) : [];
+             });
+             assigned = assigned.concat(oTecs);
            }
            const assignedLower = assigned.map(s => safeNormStr(s));
            const isDirectIdMatch = Boolean(myUserId && Array.isArray(o.tecnicosAsignados) && o.tecnicosAsignados.includes(myUserId));

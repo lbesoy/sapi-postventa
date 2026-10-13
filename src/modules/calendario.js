@@ -11,6 +11,21 @@ let calendarInstance = null;
 function matchTecnico(tA, tB) {
   if (!tB) return true;
   if (!tA) return false;
+
+  // Manejar listas de técnicos como array o separados por comas
+  if (Array.isArray(tA)) {
+    return tA.some(sub => matchTecnico(sub, tB));
+  }
+  if (Array.isArray(tB)) {
+    return tB.some(sub => matchTecnico(tA, sub));
+  }
+  if (typeof tA === 'string' && tA.includes(',')) {
+    return tA.split(',').some(part => matchTecnico(part.trim(), tB));
+  }
+  if (typeof tB === 'string' && tB.includes(',')) {
+    return tB.split(',').some(part => matchTecnico(tA, part.trim()));
+  }
+
   const normA = (typeof normStr === 'function' ? normStr(tA) : String(tA).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim());
   const normB = (typeof normStr === 'function' ? normStr(tB) : String(tB).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim());
   if (normA === normB) return true;
@@ -137,14 +152,39 @@ function actualizarFiltrosCalendario() {
       return res;
     };
 
+    const agregarTecnico = (raw) => {
+      if (!raw) return;
+      if (Array.isArray(raw)) {
+        raw.forEach(item => agregarTecnico(item));
+        return;
+      }
+      const rawStr = String(raw).trim();
+      if (!rawStr) return;
+      const parts = rawStr.split(',');
+      for (let part of parts) {
+        part = part.trim();
+        if (!part) continue;
+        const resolved = resolverNombreTecnico(part);
+        if (resolved) {
+          if (resolved.includes(',')) {
+            resolved.split(',').forEach(sub => {
+              const subClean = sub.trim();
+              if (subClean && !isUUID(subClean)) tecnicosUnicos.add(subClean);
+            });
+          } else if (!isUUID(resolved)) {
+            tecnicosUnicos.add(resolved);
+          }
+        }
+      }
+    };
+
     // 1. Agregar de usuarios activos (técnicos, supervisores, administradores)
     const activeSandbox = typeof isTestModeActive === 'function' ? isTestModeActive() : false;
     userList.forEach(u => {
       if (u && ['tecnico', 'supervisor', 'admin', 'superadmin'].includes(u.rol) && u.activo !== false && u.nombre) {
         const isTest = typeof isTestUser === 'function' ? isTestUser(u) : false;
         if (activeSandbox || !isTest) {
-          const resolved = resolverNombreTecnico(u.nombre);
-          if (resolved) tecnicosUnicos.add(resolved);
+          agregarTecnico(u.nombre);
         }
       }
     });
@@ -155,31 +195,23 @@ function actualizarFiltrosCalendario() {
       : ((typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) ? tecnicosDb : []);
     tecsList.forEach(t => {
       if (t && t.nombre) {
-        const resolved = resolverNombreTecnico(t.nombre);
-        if (resolved) tecnicosUnicos.add(resolved);
+        agregarTecnico(t.nombre);
       }
     });
 
     // 3. Agregar de órdenes (clientesDisponibles)
     clientesDisponibles.forEach(o => {
       if (!o) return;
-      if (typeof o.tecnico === 'string') {
-        o.tecnico.split(',').forEach(t => {
-          const resolved = resolverNombreTecnico(t);
-          if (resolved) tecnicosUnicos.add(resolved);
-        });
+      if (o.tecnico) {
+        agregarTecnico(o.tecnico);
       }
       if (Array.isArray(o.tecnicosAsignados)) {
-        o.tecnicosAsignados.forEach(t => {
-          const resolved = resolverNombreTecnico(t);
-          if (resolved) tecnicosUnicos.add(resolved);
-        });
+        agregarTecnico(o.tecnicosAsignados);
       }
       if (Array.isArray(o.bitacora)) {
         o.bitacora.forEach(b => {
           if (b && b.tecnico) {
-            const resolved = resolverNombreTecnico(b.tecnico);
-            if (resolved) tecnicosUnicos.add(resolved);
+            agregarTecnico(b.tecnico);
           }
         });
       }
@@ -191,11 +223,12 @@ function actualizarFiltrosCalendario() {
       adminEvents.forEach(e => {
         if (!e) return;
         if (e.tecnicoNombre) {
-          const resolved = resolverNombreTecnico(e.tecnicoNombre);
-          if (resolved) tecnicosUnicos.add(resolved);
+          agregarTecnico(e.tecnicoNombre);
         } else if (e.tecnicoId) {
-          const resolved = resolverNombreTecnico(e.tecnicoId);
-          if (resolved) tecnicosUnicos.add(resolved);
+          agregarTecnico(e.tecnicoId);
+        }
+        if (e.tecnicosAsignados) {
+          agregarTecnico(e.tecnicosAsignados);
         }
       });
     } catch(e) {}
@@ -206,13 +239,12 @@ function actualizarFiltrosCalendario() {
         if (!lev) return;
         const asig = lev.tecnico_asignado || lev.asignado_a;
         if (asig) {
-          const resolved = resolverNombreTecnico(asig);
-          if (resolved) tecnicosUnicos.add(resolved);
+          agregarTecnico(asig);
         }
       });
     }
 
-    const tArr = [...tecnicosUnicos].filter(Boolean).sort((a,b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+    const tArr = [...tecnicosUnicos].filter(t => t && !t.includes(',') && !isUUID(t)).sort((a,b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
     let htmlTec = '<option value="">Todos los Técnicos</option>';
     tArr.forEach(t => htmlTec += `<option value="${t}">${t}</option>`);
 
@@ -682,7 +714,8 @@ function renderCalendario() {
       if (tecNom) {
         tecNom = typeof resolveTecnicoNombre === 'function' ? resolveTecnicoNombre(tecNom) : (window.resolveTecnicoNombre ? window.resolveTecnicoNombre(tecNom) : tecNom);
       }
-      if (filtroTecnico && !matchTecnico(tecNom || e.tecnicoNombre || e.tecnicoId, filtroTecnico)) return;
+      const tecCandidates = [tecNom, e.tecnicoNombre, e.tecnicoId, e.tecnicosAsignados].filter(Boolean);
+      if (filtroTecnico && !tecCandidates.some(c => matchTecnico(c, filtroTecnico))) return;
 
       let eventColor = '#3b82f6'; // Azul por defecto
       if (e.tipo === 'Junta' || e.tipo === 'Capacitación') eventColor = '#8b5cf6'; // Morado: Asignación Programada
@@ -1413,11 +1446,13 @@ if (typeof window !== "undefined") {
   window.guardarActividadCalendario = guardarActividadCalendario;
   window.eliminarActividadCalendario = eliminarActividadCalendario;
   window.mostrarPopupBitacora = mostrarPopupBitacora;
+  window.matchTecnico = matchTecnico;
 }
 
 
 // Exportar funciones del módulo de Calendario para ES modules
 export {
+  matchTecnico,
   actualizarFiltrosCalendario,
   getNthDayOfMonth,
   getSemanaSanta,

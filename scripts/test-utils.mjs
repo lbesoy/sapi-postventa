@@ -3357,6 +3357,81 @@ console.log('🧪 Verificando resolución de UUIDs a nombres humanos en Juntas..
   console.log('  ✅ Extracción y Detección de Reembolso KM: OK');
 }
 
+// 63. MÓDULO DE SEPARACIÓN DE TÉCNICOS COMBINADOS POR COMAS (CALENDARIO Y TICKETS)
+console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...');
+{
+  const { matchTecnico, actualizarFiltrosCalendario } = await import('../src/modules/calendario.js');
+  
+  // 1. matchTecnico con combinaciones separadas por coma
+  const multiTec = 'Eduardo Jiménez Ortiz, José Antonio Miranda Romero, Abraham reyes';
+  assert.strictEqual(matchTecnico(multiTec, 'Eduardo Jiménez Ortiz'), true, 'Debe coincidir con el primer técnico');
+  assert.strictEqual(matchTecnico(multiTec, 'José Antonio Miranda Romero'), true, 'Debe coincidir con el segundo técnico');
+  assert.strictEqual(matchTecnico(multiTec, 'Abraham reyes'), true, 'Debe coincidir con el tercer técnico');
+  assert.strictEqual(matchTecnico(multiTec, 'eduardo jimenez'), true, 'Debe coincidir con nombre normalizado');
+  assert.strictEqual(matchTecnico(multiTec, 'Carlos Santana'), false, 'No debe coincidir con técnico no presente');
+  
+  // 2. matchTecnico con arrays
+  assert.strictEqual(matchTecnico(['Eduardo Jiménez Ortiz', 'José Antonio'], 'Eduardo Jiménez Ortiz'), true, 'Array debe coincidir');
+  
+  // 3. actualizarFiltrosCalendario debe desglosar técnicos combinados y no incluir comas en las opciones
+  const { JSDOM } = await import('jsdom');
+  const dom = new JSDOM(`<!DOCTYPE html><html><body>
+    <select id="filter-cal-cliente"></select>
+    <select id="filter-cal-tecnico"></select>
+  </body></html>`, { url: 'http://localhost' });
+
+  global.document = dom.window.document;
+  global.window = dom.window;
+
+  const prevUsers = global.usuarios;
+  const prevTecs = global.tecnicosDb;
+  const prevSess = global.currentSession;
+  const prevOrds = global.ordenes;
+
+  global.usuarios = [
+    { id: 'u1', nombre: 'Pablo Besoy', rol: 'admin', activo: true },
+    { id: 'u2', nombre: 'Eduardo Jiménez Ortiz, José Antonio Miranda Romero', rol: 'tecnico', activo: true }
+  ];
+  global.tecnicosDb = [
+    { id: 't1', nombre: 'Ignacio Silvestre alba, Juan carlos Ramírez' }
+  ];
+  global.currentSession = { userId: 'u1', viewMode: 'admin', nombre: 'Pablo Besoy' };
+  global.ordenes = [
+    { id: 'o1', cliente: 'Cliente A', tecnico: 'Luis Gress, Rodrigo Alonso Narváez', bitacora: [] }
+  ];
+  dom.window.usuarios = global.usuarios;
+  dom.window.tecnicosDb = global.tecnicosDb;
+  dom.window.currentSession = global.currentSession;
+  dom.window.ordenes = global.ordenes;
+  dom.window.localStorage.setItem('sapi_calendario_eventos', JSON.stringify([
+    { id: 'ev1', tipo: 'Junta', titulo: 'Junta Staff', tecnicoNombre: 'Jesús Garduño gomez, José Antonio Miranda Romero' }
+  ]));
+
+  actualizarFiltrosCalendario();
+
+  const selectTec = dom.window.document.getElementById('filter-cal-tecnico');
+  const options = Array.from(selectTec.options).map(o => o.value).filter(Boolean);
+
+  global.usuarios = prevUsers;
+  global.tecnicosDb = prevTecs;
+  global.currentSession = prevSess;
+  global.ordenes = prevOrds;
+
+  assert.ok(options.length > 0, 'Debe poblar opciones de técnicos');
+  options.forEach(opt => {
+    assert.strictEqual(opt.includes(','), false, `La opción "${opt}" no debe contener comas`);
+  });
+
+  assert.ok(options.includes('Eduardo Jiménez Ortiz'), 'Debe incluir a Eduardo Jiménez Ortiz individualmente');
+  assert.ok(options.includes('José Antonio Miranda Romero'), 'Debe incluir a José Antonio Miranda Romero individualmente');
+  assert.ok(options.includes('Ignacio Silvestre alba'), 'Debe incluir a Ignacio Silvestre alba individualmente');
+  assert.ok(options.includes('Juan carlos Ramírez'), 'Debe incluir a Juan carlos Ramírez individualmente');
+  assert.ok(options.includes('Luis Gress'), 'Debe incluir a Luis Gress individualmente');
+  assert.ok(options.includes('Rodrigo Alonso Narváez'), 'Debe incluir a Rodrigo Alonso Narváez individualmente');
+
+  console.log('  ✅ Separación de Técnicos Combinados por Comas en Filtros y Búsqueda: OK');
+}
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 
