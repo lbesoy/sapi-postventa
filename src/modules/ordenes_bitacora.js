@@ -155,10 +155,15 @@ function iniciarReporteDesdeAsignacion(ordenId, bitacoraId) {
   if (!b) return;
 
   if (currentSession.viewMode === 'tecnico') {
-    const currentUser = usuarios.find(u => u.id === currentSession.userId);
-    const miTecnicoNombre = currentUser ? currentUser.nombre : '';
+    const currentUser = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios.find(u => u && u.id === currentSession.userId) : null;
+    const miTecnicoNombre = currentUser ? currentUser.nombre : (currentSession.nombre || '');
     const normStr = s => (s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-    if (normStr(b.tecnico) !== normStr(miTecnicoNombre)) {
+    const bTecNorm = normStr(b.tecnico);
+    const miNorm = normStr(miTecnicoNombre);
+    const myId = currentSession.userId;
+    const isIdMatch = Boolean(myId && (b.tecnicoId === myId || b.tecnico === myId));
+    const isNameMatch = bTecNorm && miNorm && (bTecNorm === miNorm || bTecNorm.includes(miNorm) || miNorm.includes(bTecNorm));
+    if (!isIdMatch && !isNameMatch) {
       mostrarNotificacion('Solo puedes reportar tus propias asignaciones programadas.', 'error');
       return;
     }
@@ -394,22 +399,53 @@ function guardarNotaBitacora() {
         }
       }
     } else {
-      // Validar que esté dentro del rango hábil permitido (que ahora permite fines de semana si caen en el rango)
-      const rango = calcularRangoFechasLaboral(10);
-      if (fecha < rango.min || fecha > rango.max) {
-        mostrarNotificacion('La fecha seleccionada está fuera del rango permitido.', 'error');
-        return;
+      // Validar que esté dentro del rango hábil permitido (solo para creaciones libres no asignadas)
+      if (!window.currentBitacoraEntryId) {
+        const rango = calcularRangoFechasLaboral(10);
+        if (fecha < rango.min || fecha > rango.max) {
+          mostrarNotificacion('La fecha seleccionada está fuera del rango permitido.', 'error');
+          return;
+        }
       }
     }
   }
   
-  const currentUser = usuarios.find(u => u.id === currentSession.userId);
-  const nombreTecnico = currentUser ? currentUser.nombre : 'Usuario';
+  const currentUser = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios.find(u => u && u.id === currentSession.userId) : null;
+  const nombreTecnico = currentUser ? currentUser.nombre : (currentSession.nombre || 'Usuario');
   const tecnicoDestino = window.currentBitacoraEntryId && o.bitacora ? 
       (o.bitacora.find(x => x.id === window.currentBitacoraEntryId)?.tecnico || nombreTecnico) : 
       nombreTecnico;
 
-  // Validación de empalme de horarios (no permitir que el técnico repita horario)
+  if (!o.bitacora) o.bitacora = [];
+
+  let esAsignacionPendiente = false;
+  if (window.currentBitacoraEntryId) {
+    const bIndex = o.bitacora.findIndex(x => x.id === window.currentBitacoraEntryId);
+    if (bIndex >= 0) {
+      const bObj = o.bitacora[bIndex];
+      if (bObj.realizado === false || (bObj.nota && bObj.nota.includes('Programado por supervisor') && bObj.realizado !== true)) {
+        esAsignacionPendiente = true;
+      }
+    }
+  } else if (fecha && o.bitacora) {
+    // Si el técnico no abrió desde la tarjeta sino desde el botón "Agregar Avance",
+    // vincular automáticamente la asignación pendiente si existe para esta misma fecha y técnico.
+    const bitDate = fecha.substring(0, 10);
+    const pendIdx = o.bitacora.findIndex(x => {
+      if (x.realizado === true) return false;
+      const xDate = x.fecha ? x.fecha.substring(0, 10) : '';
+      if (xDate !== bitDate) return false;
+      const xTec = (x.tecnico || '').toLowerCase().trim();
+      const tDest = (tecnicoDestino || '').toLowerCase().trim();
+      return xTec === tDest || xTec.includes(tDest) || tDest.includes(xTec);
+    });
+    if (pendIdx >= 0) {
+      window.currentBitacoraEntryId = o.bitacora[pendIdx].id;
+      esAsignacionPendiente = true;
+    }
+  }
+
+  // Validación de empalme de horarios (no permitir que el técnico repita horario con trabajos ya realizados)
   if (entrada && salida) {
     const doOverlap = (e1, s1, e2, s2) => {
       if (!e1 || !s1 || !e2 || !s2) return false;
@@ -426,6 +462,7 @@ function guardarNotaBitacora() {
       if (!ord.bitacora) continue;
       for (const bit of ord.bitacora) {
         if (bit.id === window.currentBitacoraEntryId) continue; // Ignorar el mismo registro si estamos editando
+        if (bit.realizado === false) continue; // Ignorar asignaciones pendientes no realizadas de supervisor
         if (bit.tecnico !== tecnicoDestino) continue; // Solo validar registros del mismo técnico
         
         try {
@@ -447,19 +484,6 @@ function guardarNotaBitacora() {
     if (empalme) {
       mostrarNotificacion(`Horario empalmado con otro registro tuyo de ${empalme.entrada} a ${empalme.salida} (Orden: ${empalme.ordenFolio}).`, 'error');
       return;
-    }
-  }
-  
-  if (!o.bitacora) o.bitacora = [];
-
-  let esAsignacionPendiente = false;
-  if (window.currentBitacoraEntryId) {
-    const bIndex = o.bitacora.findIndex(x => x.id === window.currentBitacoraEntryId);
-    if (bIndex >= 0) {
-      const bObj = o.bitacora[bIndex];
-      if (bObj.realizado === false || (bObj.nota && bObj.nota.includes('Programado por supervisor') && bObj.realizado !== true)) {
-        esAsignacionPendiente = true;
-      }
     }
   }
 

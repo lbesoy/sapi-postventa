@@ -6,7 +6,7 @@
   const originalSetItem = Storage.prototype.setItem;
   const originalRemoveItem = Storage.prototype.removeItem;
   const originalClear = Storage.prototype.clear;
-  const redirectedKeys = ['sapi_refacciones_db', 'eurorep_pedidos_sap', 'eurorep_cotizaciones_sap', 'sapi_tickets', 'sapi_ordenes', 'sapi_levantamientos', 'sapi_sync_queue'];
+  const redirectedKeys = ['sapi_refacciones_db', 'eurorep_pedidos_sap', 'eurorep_cotizaciones_sap', 'sapi_tickets', 'sapi_ordenes', 'sapi_levantamientos', 'sapi_sync_queue', 'sapi_calendario_eventos'];
   let sharedDb = null;
   const pendingWrites = new Map();
 

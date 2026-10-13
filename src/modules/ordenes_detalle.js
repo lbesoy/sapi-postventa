@@ -684,8 +684,8 @@ function verDetalle(id) {
     let html = '';
     const isClosed = (['completado', 'cerrada', 'cerrado', 'finalizado'].includes(String(o.estado || '').toLowerCase())) && ((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__') || o.cierre_papel_pdf);
     const isTecnico = currentSession.viewMode === 'tecnico';
-    const currentUser = usuarios.find(u => u.id === currentSession.userId);
-    const miTecnicoNombre = currentUser ? currentUser.nombre : '';
+    const currentUser = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios.find(u => u && u.id === currentSession.userId) : null;
+    const miTecnicoNombre = currentUser ? currentUser.nombre : (currentSession.nombre || '');
 
     let items = [...(o.bitacora || [])];
     // Mostrar todo el historial de la orden sin ocultar las bitácoras registradas por otros compañeros de equipo
@@ -696,8 +696,15 @@ function verDetalle(id) {
       const normStr = s => (s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
       localEventos.forEach(ev => {
         if (ev.ordenId === o.id) {
-          if (isTecnico && miTecnicoNombre && normStr(ev.tecnicoNombre) !== normStr(miTecnicoNombre)) {
-            return;
+          if (isTecnico) {
+            const evTecNorm = normStr(ev.tecnicoNombre);
+            const miNorm = normStr(miTecnicoNombre);
+            const myId = currentSession.userId;
+            const isIdMatch = Boolean(myId && (ev.tecnicoId === myId || ev.tecnico === myId));
+            const isNameMatch = evTecNorm && miNorm && (evTecNorm === miNorm || evTecNorm.includes(miNorm) || miNorm.includes(evTecNorm));
+            if (!isIdMatch && !isNameMatch) {
+              return;
+            }
           }
           // Extraer fecha local simple (YYYY-MM-DD)
           let fISO = '';

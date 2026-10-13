@@ -11,7 +11,8 @@ export const redirectedKeys = [
   'sapi_tickets',
   'sapi_ordenes',
   'sapi_levantamientos',
-  'sapi_sync_queue'
+  'sapi_sync_queue',
+  'sapi_calendario_eventos'
 ];
 
 let sharedDb = null;

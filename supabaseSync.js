@@ -1687,10 +1687,10 @@ async function _executePushToSupabase(tabla, item) {
     const sb = window.supabaseClient;
     const isOffline = (typeof navigator !== 'undefined' && !navigator.onLine) || !sb;
     if (isOffline) {
-      if (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos') {
+      if (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora' || tabla === 'rentas' || tabla === 'envios' || tabla === 'ideas_fallas') {
         console.warn(`[Direct Push] Sin conexión con la base de datos para guardar en ${tabla}. Encolando en sync queue local.`);
         addToSyncQueue(tabla, 'upsert', item);
-        if (typeof window.mostrarNotificacion === 'function') {
+        if (typeof window.mostrarNotificacion === 'function' && tabla !== 'calendario_eventos' && tabla !== 'orden_bitacora') {
           window.mostrarNotificacion(`Guardado localmente. Se sincronizará al recuperar conexión.`, 'info');
         }
         return { offlineQueued: true };
@@ -1792,7 +1792,13 @@ async function _executePushToSupabase(tabla, item) {
 
     // Upsert directo en la nube por clave primaria ID para evitar sobreescrituras accidentales de folios
     const upsertOptions = (row.id) ? { onConflict: 'id' } : undefined;
-    let { error } = await sb.from(tabla).upsert(row, upsertOptions);
+    let error = null;
+    try {
+      const resUpsert = await sb.from(tabla).upsert(row, upsertOptions);
+      error = resUpsert.error;
+    } catch (netErr) {
+      error = { message: netErr?.message || 'Failed to fetch', isException: true };
+    }
 
     if (!error && tabla === 'ordenes') {
       delete item._evidenciasEliminadas;
@@ -1910,17 +1916,19 @@ async function _executePushToSupabase(tabla, item) {
     }
 
     if (error) {
-      const isNetworkErr = error.message && (
+      const isNetworkErr = error.isException || (error.message && (
         error.message.includes('Failed to fetch') ||
         error.message.includes('NetworkError') ||
         error.message.includes('network') ||
         error.message.includes('timeout') ||
-        error.message.includes('offline')
-      );
-      if (isNetworkErr && (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos')) {
+        error.message.includes('offline') ||
+        error.message.includes('fetch failed') ||
+        error.message.includes('AbortError')
+      ));
+      if (isNetworkErr && (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora' || tabla === 'rentas' || tabla === 'envios' || tabla === 'ideas_fallas')) {
         console.warn(`[Direct Push] Error de red al guardar en ${tabla}: ${error.message}. Encolando en sync queue local...`);
         addToSyncQueue(tabla, 'upsert', item);
-        if (typeof window.mostrarNotificacion === 'function') {
+        if (typeof window.mostrarNotificacion === 'function' && tabla !== 'calendario_eventos' && tabla !== 'orden_bitacora') {
           window.mostrarNotificacion(`Guardado en el dispositivo. Pendiente de sincronización.`, 'info');
         }
         return { offlineQueued: true };
@@ -4665,14 +4673,23 @@ window.cargarDatosDeSupabase = function() {
                   const lbId = lb.id;
                   const lbDate = lb.fecha ? lb.fecha.substring(0, 10) : '';
                   const lbTec = (lb.tecnico || '').trim().toLowerCase();
-                  const exists = ord.bitacora.some(rb => {
+                  const matchIdx = ord.bitacora.findIndex(rb => {
                     if (lbId && rb.id && (rb.id === lbId || rb.id === toValidUUID(lbId) || toValidUUID(rb.id) === toValidUUID(lbId))) return true;
                     const rbDate = rb.fecha ? rb.fecha.substring(0, 10) : '';
                     const rbTec = (rb.tecnico || '').trim().toLowerCase();
                     return lbDate && rbDate && lbDate === rbDate && lbTec && rbTec && (lbTec === rbTec || lbTec.includes(rbTec) || rbTec.includes(lbTec));
                   });
-                  if (!exists) {
+                  if (matchIdx === -1) {
                     ord.bitacora.push(lb);
+                  } else {
+                    const rb = ord.bitacora[matchIdx];
+                    const localHasReport = lb.realizado === true || (lb.nota && lb.nota.length > 15 && !lb.nota.includes('Programado por supervisor') && !lb.nota.includes('Pendiente de llenado'));
+                    const remoteIsTemplate = rb.realizado === false || !rb.nota || rb.nota.includes('Programado por supervisor') || rb.nota.includes('Pendiente de llenado');
+                    if (localHasReport && (remoteIsTemplate || !rb.realizado)) {
+                      ord.bitacora[matchIdx] = { ...rb, ...lb, realizado: true };
+                    } else if (lb.realizado && !rb.realizado) {
+                      ord.bitacora[matchIdx] = { ...rb, ...lb, realizado: true };
+                    }
                   }
                 });
               }
@@ -4762,14 +4779,23 @@ window.cargarDatosDeSupabase = function() {
                   const lbId = lb.id;
                   const lbDate = lb.fecha ? lb.fecha.substring(0, 10) : '';
                   const lbTec = (lb.tecnico || '').trim().toLowerCase();
-                  const exists = mergedBitacora.some(rb => {
+                  const matchIdx = mergedBitacora.findIndex(rb => {
                     if (lbId && rb.id && (rb.id === lbId || rb.id === toValidUUID(lbId) || toValidUUID(rb.id) === toValidUUID(lbId))) return true;
                     const rbDate = rb.fecha ? rb.fecha.substring(0, 10) : '';
                     const rbTec = (rb.tecnico || '').trim().toLowerCase();
                     return lbDate && rbDate && lbDate === rbDate && lbTec && rbTec && (lbTec === rbTec || lbTec.includes(rbTec) || rbTec.includes(lbTec));
                   });
-                  if (!exists) {
+                  if (matchIdx === -1) {
                     mergedBitacora.push(lb);
+                  } else {
+                    const rb = mergedBitacora[matchIdx];
+                    const localHasReport = lb.realizado === true || (lb.nota && lb.nota.length > 15 && !lb.nota.includes('Programado por supervisor') && !lb.nota.includes('Pendiente de llenado'));
+                    const remoteIsTemplate = rb.realizado === false || !rb.nota || rb.nota.includes('Programado por supervisor') || rb.nota.includes('Pendiente de llenado');
+                    if (localHasReport && (remoteIsTemplate || !rb.realizado)) {
+                      mergedBitacora[matchIdx] = { ...rb, ...lb, realizado: true };
+                    } else if (lb.realizado && !rb.realizado) {
+                      mergedBitacora[matchIdx] = { ...rb, ...lb, realizado: true };
+                    }
                   }
                 });
               }

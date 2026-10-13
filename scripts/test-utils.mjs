@@ -3067,6 +3067,181 @@ console.log('🧪 Verificando Colorimetría de Bitácoras y Asignaciones en Cale
   console.log('  ✅ Colorimetría de Bitácoras y Asignaciones en Calendario: OK');
 }
 
+// Test 58: Validación de solapamiento de horarios (ignorar asignaciones pendientes)
+console.log('🧪 Verificando que asignaciones pendientes no generen falso empalme de horarios...');
+{
+  function doOverlap(e1, s1, e2, s2) {
+    return (e1 < s2) && (s1 > e2);
+  }
+
+  function verificarEmpalme(nuevaEntrada, nuevaSalida, tecnico, fecha, ordenesExistentes, ordenActualIdx = 0, editIdx = null) {
+    for (let oIdx = 0; oIdx < ordenesExistentes.length; oIdx++) {
+      const ordBit = ordenesExistentes[oIdx].bitacora || [];
+      for (let bIdx = 0; bIdx < ordBit.length; bIdx++) {
+        const bit = ordBit[bIdx];
+        if (editIdx !== null && oIdx === ordenActualIdx && bIdx === editIdx) continue;
+        if (bit.realizado === false) continue; // CRUCIAL: Ignorar plantillas o asignaciones pendientes
+        if (bit.fecha !== fecha) continue;
+        if (bit.tecnico && bit.tecnico.toLowerCase() === tecnico.toLowerCase()) {
+          const bitEntrada = bit.entrada || bit.programadoEntrada;
+          const bitSalida = bit.salida || bit.programadoSalida;
+          if (bitEntrada && bitSalida && nuevaEntrada && nuevaSalida) {
+            if (doOverlap(nuevaEntrada, nuevaSalida, bitEntrada, bitSalida)) {
+              return { empalme: true, conflicto: bit };
+            }
+          }
+        }
+      }
+    }
+    return { empalme: false };
+  }
+
+  const ordenesMock = [
+    {
+      id: 'ord-1',
+      bitacora: [
+        // Asignación programada por supervisor (pendiente de llenar por técnico)
+        {
+          id: 'asig-1',
+          tecnico: 'Eduardo Jiménez',
+          fecha: '2026-10-13',
+          programadoEntrada: '09:00',
+          programadoSalida: '18:00',
+          realizado: false,
+          nota: 'Programado por supervisor'
+        }
+      ]
+    }
+  ];
+
+  // Caso 1: El técnico guarda su reporte de 09:00 a 18:00 en la misma fecha
+  // NO debe causar error de empalme con la asignación previa realizada: false
+  const resSinEmpalme = verificarEmpalme('09:00', '18:00', 'Eduardo Jiménez', '2026-10-13', ordenesMock, 0, null);
+  assert.strictEqual(resSinEmpalme.empalme, false, 'Una asignación pendiente no debe bloquear el reporte por falso empalme');
+
+  // Caso 2: Si ya existe un reporte REALIZADO en ese horario, SÍ debe alertar empalme
+  ordenesMock[0].bitacora.push({
+    id: 'rep-previo',
+    tecnico: 'Eduardo Jiménez',
+    fecha: '2026-10-13',
+    entrada: '09:00',
+    salida: '14:00',
+    realizado: true,
+    nota: 'Trabajo real ya completado'
+  });
+  const resConEmpalme = verificarEmpalme('10:00', '12:00', 'Eduardo Jiménez', '2026-10-13', ordenesMock, 0, null);
+  assert.strictEqual(resConEmpalme.empalme, true, 'Debe alertar empalme si ya hay un reporte realizado por el mismo técnico en el mismo horario');
+
+  console.log('  ✅ Validación de Empalmes (ignora realizado: false): OK');
+}
+
+// Test 59: Reconciliador bidireccional de bitácoras (preserva reportes técnicos locales)
+console.log('🧪 Verificando que el reconciliador de Supabase preserve reportes técnicos locales...');
+{
+  function reconciliarBitacoras(ordenLocal, bitacorasRemotas) {
+    const ord = { ...ordenLocal, bitacora: [...(ordenLocal.bitacora || [])] };
+    const localMap = new Map();
+    ord.bitacora.forEach((b, idx) => {
+      const k = b.id ? `id:${b.id}` : `legacy:${b.fecha || ''}|${b.tecnico || ''}|${b.entrada || ''}`;
+      localMap.set(k, { b, idx });
+    });
+
+    bitacorasRemotas.forEach(b => {
+      const k = b.id ? `id:${b.id}` : `legacy:${b.fecha || ''}|${b.tecnico || ''}|${b.entrada || ''}`;
+      if (localMap.has(k)) {
+        const { b: lb, idx } = localMap.get(k);
+        const isLocalReal = lb.realizado === true || (lb.realizado !== false && ((lb.nota && lb.nota.length > 20) || lb.firma_tecnico_url || lb.firma_tecnico_base64 || (lb.fotos && lb.fotos.length > 0)));
+        const isRemotePending = b.realizado === false || !b.realizado;
+        if (isLocalReal && isRemotePending) {
+          ord.bitacora[idx] = { ...b, ...lb, realizado: true };
+        } else {
+          ord.bitacora[idx] = b;
+        }
+      } else {
+        ord.bitacora.push(b);
+      }
+    });
+
+    return ord.bitacora;
+  }
+
+  const ordenLocal = {
+    id: 'ord-100',
+    bitacora: [
+      {
+        id: 'bit-001',
+        tecnico: 'Eduardo Jiménez',
+        fecha: '2026-10-13',
+        entrada: '09:00',
+        salida: '18:00',
+        realizado: true,
+        nota: 'Se revisó tablero de control, se cambiaron filtros y se firmó de recibido con el cliente.',
+        firma_tecnico_base64: 'data:image/png;base64,mock'
+      }
+    ]
+  };
+
+  // La base de datos remota todavía tiene la plantilla con realizado: false porque el técnico estaba offline
+  const bitacorasRemotas = [
+    {
+      id: 'bit-001',
+      tecnico: 'Eduardo Jiménez',
+      fecha: '2026-10-13',
+      programadoEntrada: '09:00',
+      programadoSalida: '18:00',
+      realizado: false,
+      nota: 'Programado por supervisor'
+    }
+  ];
+
+  const resultado = reconciliarBitacoras(ordenLocal, bitacorasRemotas);
+  assert.strictEqual(resultado.length, 1);
+  assert.strictEqual(resultado[0].realizado, true, 'El reporte local realizado no debe sobrescribirse a realizado: false');
+  assert.ok(resultado[0].nota.includes('tablero de control'), 'La nota del técnico debe ser preservada');
+  assert.ok(resultado[0].firma_tecnico_base64, 'La firma del técnico debe ser preservada');
+
+  console.log('  ✅ Reconciliador de Bitácoras (preservación de avances locales): OK');
+}
+
+// Test 60: Validación flexible de identidad de técnicos (UUID y coincidencias de nombre)
+console.log('🧪 Verificando validación flexible de identidad de técnicos...');
+{
+  function normStr(s) {
+    return (s || '').toString().toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function esMiAsignacion(session, asignacion) {
+    const miNorm = normStr(session?.name || '');
+    const bTecNorm = normStr(asignacion.tecnico || '');
+    return Boolean(
+      (session?.userId && asignacion.tecnicoId && String(asignacion.tecnicoId) === String(session.userId)) ||
+      (miNorm && bTecNorm && (bTecNorm.includes(miNorm) || miNorm.includes(bTecNorm)))
+    );
+  }
+
+  // 1. Coincidencia por UUID
+  const session1 = { userId: 'usr-12345', name: 'Eduardo J.' };
+  const asig1 = { tecnicoId: 'usr-12345', tecnico: 'Eduardo Jiménez Ortiz' };
+  assert.strictEqual(esMiAsignacion(session1, asig1), true, 'Debe coincidir por UUID de usuario');
+
+  // 2. Coincidencia por inclusión de nombre (apellidos compuestos)
+  const session2 = { userId: 'usr-999', name: 'Eduardo Jiménez' };
+  const asig2 = { tecnicoId: null, tecnico: 'Eduardo Jiménez Ortiz' };
+  assert.strictEqual(esMiAsignacion(session2, asig2), true, 'Debe coincidir aunque la asignación tenga segundo apellido');
+
+  // 3. Coincidencia inversa con acentos
+  const session3 = { userId: 'usr-888', name: 'Ángel Gómez Martínez' };
+  const asig3 = { tecnicoId: null, tecnico: 'Angel Gomez' };
+  assert.strictEqual(esMiAsignacion(session3, asig3), true, 'Debe coincidir normalizando acentos e inclusión inversa');
+
+  // 4. No debe coincidir con un técnico distinto
+  const session4 = { userId: 'usr-111', name: 'Carlos Mendoza' };
+  const asig4 = { tecnicoId: 'usr-222', tecnico: 'Eduardo Jiménez' };
+  assert.strictEqual(esMiAsignacion(session4, asig4), false, 'No debe coincidir con un técnico completamente diferente');
+
+  console.log('  ✅ Validación Flexible de Identidad de Técnicos: OK');
+}
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 
