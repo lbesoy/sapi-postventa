@@ -5248,7 +5248,7 @@ window.cargarDatosDeSupabase = function() {
         let cotizaciones = null;
         let cotizacionesErr = null;
         try {
-          cotizaciones = await fetchTablePaginated('cotizaciones_sap', '*', null, false);
+          cotizaciones = await fetchTablePaginated('cotizaciones_sap', '*', 'numero_cotizacion', false);
         } catch (err) {
           cotizacionesErr = err;
         }
@@ -5264,7 +5264,7 @@ window.cargarDatosDeSupabase = function() {
         let pedidos = null;
         let pedidosErr = null;
         try {
-          pedidos = await fetchTablePaginated('pedidos_sap', '*', null, false);
+          pedidos = await fetchTablePaginated('pedidos_sap', '*', 'numero_pedido', false);
         } catch (err) {
           pedidosErr = err;
         }

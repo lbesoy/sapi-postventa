@@ -84,8 +84,10 @@
   }
 
   function _getTickets() {
+    if (typeof window !== 'undefined' && Array.isArray(window.tickets) && window.tickets.length > 0) return window.tickets;
     if (typeof tickets !== 'undefined' && Array.isArray(tickets)) return tickets;
     if (typeof global !== 'undefined' && Array.isArray(global.tickets)) return global.tickets;
+    if (typeof window !== 'undefined' && Array.isArray(window.tickets)) return window.tickets;
     return [];
   }
 
@@ -1101,6 +1103,7 @@
       optionsContainer.innerHTML = '';
       const query = filterText.toLowerCase().trim();
       let count = 0;
+      let lastGroupLabel = null;
 
       Array.from(originalSelect.options).forEach(opt => {
         const text = opt.textContent;
@@ -1110,6 +1113,16 @@
         
         if (query && !text.toLowerCase().includes(query) && !val.toLowerCase().includes(query)) {
           return;
+        }
+
+        const parentOptGroup = opt.parentElement && opt.parentElement.tagName === 'OPTGROUP' ? opt.parentElement.label : null;
+        if (parentOptGroup && parentOptGroup !== lastGroupLabel) {
+          lastGroupLabel = parentOptGroup;
+          const groupHeader = document.createElement('div');
+          groupHeader.className = 'custom-select-group-header';
+          groupHeader.textContent = parentOptGroup;
+          groupHeader.style.cssText = 'padding: 6px 12px; font-size: 0.72rem; font-weight: 700; color: var(--text-muted); background: var(--bg-hover, rgba(0,0,0,0.04)); text-transform: uppercase; letter-spacing: 0.5px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin: 4px 0 2px 0; pointer-events: none;';
+          optionsContainer.appendChild(groupHeader);
         }
 
         count++;
@@ -1138,7 +1151,7 @@
           addOptionEl.className = 'custom-select-search-option';
           addOptionEl.style.fontWeight = 'bold';
           addOptionEl.style.color = 'var(--primary)';
-          addOptionEl.innerHTML = `+ Agregar y usar "${query}"`;
+          addOptionEl.innerHTML = `+ Usar "${query}"`;
           addOptionEl.onclick = (e) => {
             e.stopPropagation();
             
@@ -1165,7 +1178,9 @@
           hintEl.style.color = 'var(--text-muted)';
           hintEl.style.cursor = 'default';
           hintEl.style.background = 'transparent';
-          hintEl.textContent = 'Escriba arriba para agregar un sitio nuevo...';
+          const pLower = (placeholder || '').toLowerCase();
+          const entityName = pLower.includes('sitio') ? 'un sitio nuevo' : (pLower.includes('pedido') ? 'un número de pedido' : (pLower.includes('cotizaci') ? 'un número de cotización' : 'un valor personalizado'));
+          hintEl.textContent = `Escriba arriba para ingresar ${entityName}...`;
           optionsContainer.appendChild(hintEl);
           count++;
         }
@@ -1220,7 +1235,6 @@
   async function poblarCotizacionesDropdown(isModal = true, ticketId = null, selectedValue = '') {
     if (typeof document === 'undefined') return;
     const sb = _getSb();
-    if (!sb) return;
 
     const selectId = isModal ? 't-cotizacion-sap' : `quick-cot-sap-${ticketId}`;
     const selectEl = document.getElementById(selectId);
@@ -1234,8 +1248,8 @@
         try {
           if (typeof global !== 'undefined' && typeof global.fetchTablePaginated === 'function') {
             data = await global.fetchTablePaginated('cotizaciones_sap', '*', 'numero_cotizacion', false);
-          } else {
-            const res = await sb.from('cotizaciones_sap').select('*').order('numero_cotizacion', { ascending: false }).limit(200);
+          } else if (sb) {
+            const res = await sb.from('cotizaciones_sap').select('*').order('numero_cotizacion', { ascending: false }).limit(2000);
             data = res.data || [];
             error = res.error;
           }
@@ -1254,25 +1268,36 @@
         }
       }
 
-      let quotes = cache || [];
+      const quotes = cache || [];
       
-      const tId = isModal ? (typeof editandoTicketId !== 'undefined' ? editandoTicketId : null) : ticketId;
+      const tId = ticketId || (typeof editandoTicketId !== 'undefined' ? editandoTicketId : (typeof global !== 'undefined' ? global.editandoTicketId : null));
       const tkts = _getTickets();
       const ticketObj = tkts.find(x => x.id === tId);
+      const clienteFiltro = (ticketObj && ticketObj.cliente) || (isModal && typeof document !== 'undefined' ? document.getElementById('t-cliente')?.value : '') || '';
       
-      if (ticketObj && ticketObj.cliente) {
-        const tClientClean = String(ticketObj.cliente).toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+      const clientQuotes = [];
+      const otherQuotes = [];
+
+      if (clienteFiltro) {
+        const tClientClean = String(clienteFiltro).toLowerCase().replace(/[^a-z0-9]/g, '').trim();
         if (tClientClean) {
-          const filtered = quotes.filter(q => {
-            if (!q.cliente) return false;
+          quotes.forEach(q => {
+            if (!q.cliente) {
+              otherQuotes.push(q);
+              return;
+            }
             const sClientClean = String(q.cliente).toLowerCase().replace(/[^a-z0-9]/g, '').trim();
-            return tClientClean.includes(sClientClean) || sClientClean.includes(tClientClean);
+            if (tClientClean.includes(sClientClean) || sClientClean.includes(tClientClean)) {
+              clientQuotes.push(q);
+            } else {
+              otherQuotes.push(q);
+            }
           });
-          
-          if (filtered.length > 0) {
-            quotes = filtered;
-          }
+        } else {
+          quotes.forEach(q => otherQuotes.push(q));
         }
+      } else {
+        quotes.forEach(q => otherQuotes.push(q));
       }
 
       selectEl.innerHTML = '<option value="">— Seleccione una cotización —</option>';
@@ -1284,19 +1309,34 @@
         selectEl.appendChild(tempOpt);
       }
 
-      quotes.forEach(q => {
+      const appendQuoteOption = (q, parent, isClientMatch = false) => {
         const option = document.createElement('option');
         option.value = q.numero_cotizacion;
         const montoFormateado = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(q.monto || 0);
         const fechaFormateada = q.fecha ? new Date(q.fecha).toLocaleDateString('es-MX') : '—';
-        option.textContent = `${q.numero_cotizacion} - ${q.cliente || 'Sin cliente'} (${montoFormateado} | ${fechaFormateada})`;
-        selectEl.appendChild(option);
-      });
+        const prefix = isClientMatch ? '★ ' : '';
+        option.textContent = `${prefix}${q.numero_cotizacion} - ${q.cliente || 'Sin cliente'} (${montoFormateado} | ${fechaFormateada})`;
+        parent.appendChild(option);
+      };
+
+      if (clientQuotes.length > 0) {
+        const clientGroup = document.createElement('optgroup');
+        clientGroup.label = `── Cotizaciones de este Cliente (${clientQuotes.length}) ──`;
+        clientQuotes.forEach(q => appendQuoteOption(q, clientGroup, true));
+        selectEl.appendChild(clientGroup);
+
+        const otherGroup = document.createElement('optgroup');
+        otherGroup.label = `── Todas las demás Cotizaciones SAP (${otherQuotes.length}) ──`;
+        otherQuotes.forEach(q => appendQuoteOption(q, otherGroup, false));
+        selectEl.appendChild(otherGroup);
+      } else {
+        otherQuotes.forEach(q => appendQuoteOption(q, selectEl, false));
+      }
 
       if (selectedValue) {
         selectEl.value = selectedValue;
       }
-      initSearchableSelect(selectId, 'Buscar cotización SAP...');
+      initSearchableSelect(selectId, 'Buscar cotización SAP...', true);
     } catch (err) {
       console.error('[SAP Autocomplete] Error populating select dropdown:', err);
     }
@@ -1305,7 +1345,6 @@
   async function poblarPedidosDropdown(isModal = true, ticketId = null, selectedValue = '') {
     if (typeof document === 'undefined') return;
     const sb = _getSb();
-    if (!sb) return;
 
     const selectId = isModal ? 't-pedido-sap' : `quick-ped-sap-${ticketId}`;
     const selectEl = document.getElementById(selectId);
@@ -1319,8 +1358,8 @@
         try {
           if (typeof global !== 'undefined' && typeof global.fetchTablePaginated === 'function') {
             data = await global.fetchTablePaginated('pedidos_sap', '*', 'numero_pedido', false);
-          } else {
-            const res = await sb.from('pedidos_sap').select('*').order('numero_pedido', { ascending: false }).limit(200);
+          } else if (sb) {
+            const res = await sb.from('pedidos_sap').select('*').order('numero_pedido', { ascending: false }).limit(2000);
             data = res.data || [];
             error = res.error;
           }
@@ -1339,24 +1378,36 @@
         }
       }
 
-      let orders = cache || [];
+      const orders = cache || [];
       
-      const tId = isModal ? (typeof editandoTicketId !== 'undefined' ? editandoTicketId : null) : ticketId;
+      const tId = ticketId || (typeof editandoTicketId !== 'undefined' ? editandoTicketId : (typeof global !== 'undefined' ? global.editandoTicketId : null));
       const tkts = _getTickets();
       const ticketObj = tkts.find(x => x.id === tId);
+      const clienteFiltro = (ticketObj && ticketObj.cliente) || (isModal && typeof document !== 'undefined' ? document.getElementById('t-cliente')?.value : '') || '';
       
-      if (ticketObj && ticketObj.cliente) {
-        const tClientClean = String(ticketObj.cliente).toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+      const clientOrders = [];
+      const otherOrders = [];
+
+      if (clienteFiltro) {
+        const tClientClean = String(clienteFiltro).toLowerCase().replace(/[^a-z0-9]/g, '').trim();
         if (tClientClean) {
-          const filtered = orders.filter(o => {
-            if (!o.cliente_nombre) return false;
+          orders.forEach(o => {
+            if (!o.cliente_nombre) {
+              otherOrders.push(o);
+              return;
+            }
             const sClientClean = String(o.cliente_nombre).toLowerCase().replace(/[^a-z0-9]/g, '').trim();
-            return tClientClean.includes(sClientClean) || sClientClean.includes(tClientClean);
+            if (tClientClean.includes(sClientClean) || sClientClean.includes(tClientClean)) {
+              clientOrders.push(o);
+            } else {
+              otherOrders.push(o);
+            }
           });
-          if (filtered.length > 0) {
-            orders = filtered;
-          }
+        } else {
+          orders.forEach(o => otherOrders.push(o));
         }
+      } else {
+        orders.forEach(o => otherOrders.push(o));
       }
 
       selectEl.innerHTML = '<option value="">— Seleccione un pedido —</option>';
@@ -1368,19 +1419,34 @@
         selectEl.appendChild(tempOpt);
       }
 
-      orders.forEach(o => {
+      const appendOrderOption = (o, parent, isClientMatch = false) => {
         const option = document.createElement('option');
         option.value = o.numero_pedido;
         const montoFormateado = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(o.monto || 0);
         const fechaFormateada = o.fecha ? new Date(o.fecha).toLocaleDateString('es-MX') : '—';
-        option.textContent = `${o.numero_pedido} - ${o.cliente_nombre || 'Sin cliente'} (${montoFormateado} | ${fechaFormateada})`;
-        selectEl.appendChild(option);
-      });
+        const prefix = isClientMatch ? '★ ' : '';
+        option.textContent = `${prefix}${o.numero_pedido} - ${o.cliente_nombre || 'Sin cliente'} (${montoFormateado} | ${fechaFormateada})`;
+        parent.appendChild(option);
+      };
+
+      if (clientOrders.length > 0) {
+        const clientGroup = document.createElement('optgroup');
+        clientGroup.label = `── Pedidos de este Cliente (${clientOrders.length}) ──`;
+        clientOrders.forEach(o => appendOrderOption(o, clientGroup, true));
+        selectEl.appendChild(clientGroup);
+
+        const otherGroup = document.createElement('optgroup');
+        otherGroup.label = `── Todos los demás Pedidos SAP (${otherOrders.length}) ──`;
+        otherOrders.forEach(o => appendOrderOption(o, otherGroup, false));
+        selectEl.appendChild(otherGroup);
+      } else {
+        otherOrders.forEach(o => appendOrderOption(o, selectEl, false));
+      }
 
       if (selectedValue) {
         selectEl.value = selectedValue;
       }
-      initSearchableSelect(selectId, 'Buscar pedido SAP...');
+      initSearchableSelect(selectId, 'Buscar pedido SAP...', true);
     } catch (err) {
       console.error('[SAP Autocomplete Pedidos] Error populating select dropdown:', err);
     }

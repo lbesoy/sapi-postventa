@@ -866,7 +866,96 @@ assert.equal(API_CONFIG.USE_SAP_BACKEND, true, 'USE_SAP_BACKEND debe estar activ
 // Test B: checkPdfSapMatchCount con bypass cuando no hay PDF cargado
 assert.equal(checkPdfSapMatchCount('1101234', 1500, 'Cliente Test'), 3, 'Sin PDF en cache debe retornar 3 (bypass)');
 
-console.log('  ✅ Integración y Sincronización SAP (API_CONFIG, checkPdfSapMatchCount, catálogos y exports): OK');
+// Test C: poblarPedidosDropdown conserva pedidos de todos los clientes y divide en grupos
+{
+  const prevDoc = globalThis.document;
+  const prevWin = globalThis.window;
+  const prevEvent = globalThis.Event;
+  const prevTickets = globalThis.tickets;
+  const prevEditandoTicketId = globalThis.editandoTicketId;
+
+  const { JSDOM } = await import('jsdom');
+  const dom = new JSDOM(`<!DOCTYPE html><html><body>
+    <div>
+      <select id="t-pedido-sap"></select>
+    </div>
+  </body></html>`);
+  globalThis.document = dom.window.document;
+  globalThis.window = dom.window;
+  globalThis.Event = dom.window.Event;
+
+  window._cachePedidosSap = [
+    { numero_pedido: '2200100', cliente_nombre: 'Minera San Julián', monto: 12500, fecha: '2026-08-01' },
+    { numero_pedido: '2200200', cliente_nombre: 'Euro Representaciones', monto: 5400, fecha: '2026-08-02' }
+  ];
+  window.tickets = [
+    { id: 'TKT-TEST', cliente: 'Minera San Julián' }
+  ];
+  globalThis.tickets = window.tickets;
+  globalThis.editandoTicketId = 'TKT-TEST';
+
+  await poblarPedidosDropdown(true, 'TKT-TEST');
+
+  const selectEl = dom.window.document.getElementById('t-pedido-sap');
+  const allOptions = Array.from(selectEl.options);
+  assert.equal(allOptions.length, 3, 'Debe haber 3 opciones (placeholder + 2 pedidos)');
+  assert.ok(allOptions.some(o => o.value === '2200100'), 'El pedido de Minera San Julián debe estar presente');
+  assert.ok(allOptions.some(o => o.value === '2200200'), 'El pedido de Euro Representaciones NO debe ser descartado');
+
+  const optgroups = selectEl.querySelectorAll('optgroup');
+  assert.equal(optgroups.length, 2, 'Deben existir 2 grupos: Pedidos de este cliente y Todos los demás');
+
+  globalThis.document = prevDoc;
+  globalThis.window = prevWin;
+  globalThis.Event = prevEvent;
+  globalThis.tickets = prevTickets;
+  globalThis.editandoTicketId = prevEditandoTicketId;
+}
+
+// Test D: poblarCotizacionesDropdown conserva cotizaciones de todos los clientes
+{
+  const prevDoc = globalThis.document;
+  const prevWin = globalThis.window;
+  const prevEvent = globalThis.Event;
+  const prevTickets = globalThis.tickets;
+  const prevEditandoTicketId = globalThis.editandoTicketId;
+
+  const { JSDOM } = await import('jsdom');
+  const dom = new JSDOM(`<!DOCTYPE html><html><body>
+    <div>
+      <select id="t-cotizacion-sap"></select>
+    </div>
+  </body></html>`);
+  globalThis.document = dom.window.document;
+  globalThis.window = dom.window;
+  globalThis.Event = dom.window.Event;
+
+  window._cacheCotizacionesSap = [
+    { numero_cotizacion: '1100100', cliente: 'Minera San Julián', monto: 15000, fecha: '2026-07-01' },
+    { numero_cotizacion: '1100200', cliente: 'Euro Representaciones', monto: 8200, fecha: '2026-07-02' }
+  ];
+  window.tickets = [
+    { id: 'TKT-TEST', cliente: 'Minera San Julián' }
+  ];
+  globalThis.tickets = window.tickets;
+  globalThis.editandoTicketId = 'TKT-TEST';
+
+  await poblarCotizacionesDropdown(true, 'TKT-TEST');
+
+  const selectEl = dom.window.document.getElementById('t-cotizacion-sap');
+  const allOptions = Array.from(selectEl.options);
+  assert.equal(allOptions.length, 3, 'Debe haber 3 opciones (placeholder + 2 cotizaciones)');
+  assert.ok(allOptions.some(o => o.value === '1100100'), 'La cotización de Minera San Julián debe estar presente');
+  assert.ok(allOptions.some(o => o.value === '1100200'), 'La cotización de Euro Representaciones NO debe ser descartada');
+
+  globalThis.document = prevDoc;
+  globalThis.window = prevWin;
+  globalThis.Event = prevEvent;
+  globalThis.tickets = prevTickets;
+  globalThis.editandoTicketId = prevEditandoTicketId;
+}
+
+console.log('  ✅ Integración y Sincronización SAP (API_CONFIG, checkPdfSapMatchCount, poblarPedidosDropdown preservando pedidos, catálogos y exports): OK');
 
 // =========================================================================
 // PRUEBAS DE MÓDULO: OneDrive, Extracción SAT 26 Campos y Visor PDF
