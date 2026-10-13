@@ -173,8 +173,15 @@ try {
     .toString()
     .trim();
   if (trackedEnv) {
-    const trackedList = trackedEnv.split('\n').filter(Boolean);
-    error(`Se detectaron archivos de entorno/secretos seguidos en Git:\n   - ${trackedList.join('\n   - ')}\n   Usa "git rm --cached <archivo>" y agrégalos a .gitignore.`);
+    const trackedList = trackedEnv
+      .split('\n')
+      .map(s => s.trim())
+      .filter(s => s && !s.endsWith('.example') && !s.endsWith('.sample'));
+    if (trackedList.length > 0) {
+      error(`Se detectaron archivos de entorno/secretos seguidos en Git:\n   - ${trackedList.join('\n   - ')}\n   Usa "git rm --cached <archivo>" y agrégalos a .gitignore.`);
+    } else {
+      success('Ningún archivo de variables de entorno (.env) está expuesto en Git (.env.example permitido).');
+    }
   } else {
     success('Ningún archivo de variables de entorno (.env) está expuesto en Git.');
   }
