@@ -403,6 +403,9 @@ function ticketToRow(t) {
   let finalNotas = baseNotas;
   finalNotas = window.inyectarCotizacionesEnNotas(finalNotas, t.cotizacionesAdicionales || []);
   finalNotas = window.inyectarRefaccionesEnNotas(finalNotas, t.refaccionesSeleccionadas || []);
+  if (typeof finalNotas === 'string' && finalNotas.includes('data:application/pdf;base64')) {
+    finalNotas = finalNotas.replace(/data:application\/pdf;base64,[A-Za-z0-9+/=]+/g, '');
+  }
 
   let prefix = '';
   if (t.horometro) prefix += `[H:${t.horometro}]\n`;
@@ -4263,13 +4266,13 @@ window.cargarDatosDeSupabase = function() {
         if (!sb) throw new Error('Supabase client no disponible');
 
         try {
-          // Descarga ultrarrápida paralela en dos canales: atributos ligeros + comentarios JSONB (1.3s total)
-          const [tktRes, comsRes] = await Promise.all([
-            sb.from('tickets').select(lightCols).limit(1500),
-            sb.from('tickets').select('id, comentarios_internos, comentarios_clientes').limit(1500)
-          ]);
-
+          // Descarga secuencial indexada: atributos ligeros (1.1s) + comentarios JSONB (0.4s)
+          const tktRes = await sb.from('tickets').select(lightCols).order('created_at', { ascending: false }).limit(1500);
           if (tktRes.error) throw tktRes.error;
+
+          const comsRes = await sb.from('tickets').select('id, comentarios_internos, comentarios_clientes').limit(1500);
+          if (comsRes.error) throw comsRes.error;
+
           if (tktRes.data && Array.isArray(tktRes.data)) {
             const comsMap = new Map();
             if (comsRes.data && Array.isArray(comsRes.data)) {
@@ -4287,7 +4290,7 @@ window.cargarDatosDeSupabase = function() {
         } catch (fastErr) {
           console.warn('[Sync] Reintentando carga de tickets por canal primario indexado...', fastErr?.message);
           try {
-            const { data: directLight, error: directErr } = await sb.from('tickets').select(lightCols).limit(1500);
+            const { data: directLight, error: directErr } = await sb.from('tickets').select(lightCols).order('created_at', { ascending: false }).limit(1500);
             if (!directErr && directLight) {
               ticketsDb = directLight;
             } else {
