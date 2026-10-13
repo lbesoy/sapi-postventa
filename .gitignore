@@ -24,6 +24,15 @@ backend/pdf_extractor
 # Exclusión de perfil local de Chrome para generación de capturas
 manuales/chrome_profile/
 .claude/
+.gemini/
+.vite/
 
+# Archivos de conflicto de sincronización (Dropbox / OneDrive)
+*copia en conflicto*
+*Conflicted Copy*
 
-
+# Archivos de sistema operativo
+Thumbs.db
+ehthumbs.db
+.Spotlight-V100
+.Trashes
