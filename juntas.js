@@ -53,7 +53,24 @@ function unificarNombreUsuario(rawNombre) {
   if (typeof window !== 'undefined' && typeof window._unificarNombreUsuarioBase === 'function') {
     return window._unificarNombreUsuarioBase(rawNombre);
   }
-  return String(rawNombre || 'Sin Asignar').trim();
+  if (typeof window !== 'undefined' && typeof window.unificarNombreUsuario === 'function' && window.unificarNombreUsuario !== unificarNombreUsuario) {
+    return window.unificarNombreUsuario(rawNombre);
+  }
+  const trimmed = String(rawNombre || 'Sin Asignar').trim();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed);
+  if (isUuid || (typeof resolveTecnicoNombre === 'function')) {
+    let res = null;
+    if (typeof resolveTecnicoNombre === 'function') res = resolveTecnicoNombre(trimmed);
+    else if (typeof window !== 'undefined' && typeof window.resolveTecnicoNombre === 'function') res = window.resolveTecnicoNombre(trimmed);
+    if (res && res !== trimmed) return res.trim();
+  }
+  let allUsers = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : (typeof window !== 'undefined' && Array.isArray(window.usuarios) ? window.usuarios : []);
+  if (!allUsers.length && typeof localStorage !== 'undefined') {
+    try { allUsers = JSON.parse(localStorage.getItem('eurorep_usuarios') || localStorage.getItem('sapi_usuarios') || '[]'); } catch(e) {}
+  }
+  const match = allUsers.find(u => u && (u.id === trimmed || u.user_id === trimmed));
+  if (match && match.nombre) return match.nombre.trim();
+  return trimmed;
 }
 
 function esResponsableExcluidoOperativo(nombre) {
@@ -82,7 +99,9 @@ function obtenerInfoRolUsuario(nombre) {
     return window.obtenerInfoRolUsuario(nombre);
   }
   if (!nombre) return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
-  const norm = (typeof normalizarTextoJunta === 'function') ? normalizarTextoJunta(nombre) : (typeof window !== 'undefined' && window.normalizarTextoJunta ? window.normalizarTextoJunta(nombre) : String(nombre || '').toLowerCase().trim());
+  const rawStr = String(nombre).trim();
+  const nombreLimpio = (typeof unificarNombreUsuario === 'function') ? unificarNombreUsuario(rawStr) : rawStr;
+  const norm = (typeof normalizarTextoJunta === 'function') ? normalizarTextoJunta(nombreLimpio) : (typeof window !== 'undefined' && window.normalizarTextoJunta ? window.normalizarTextoJunta(nombreLimpio) : String(nombreLimpio || '').toLowerCase().trim());
   if (norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === '' || norm === 'sin_asignar') {
     return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
   }
@@ -92,6 +111,20 @@ function obtenerInfoRolUsuario(nombre) {
   if (norm.includes('almacen') || norm.includes('compras') || norm.includes('logistica')) {
     return { rol: 'almacen', label: 'Almacén y Compras', color: '#0284c7', icon: 'package' };
   }
+
+  let allUsers = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : (typeof window !== 'undefined' && Array.isArray(window.usuarios) ? window.usuarios : []);
+  if (!allUsers.length && typeof localStorage !== 'undefined') {
+    try { allUsers = JSON.parse(localStorage.getItem('eurorep_usuarios') || localStorage.getItem('sapi_usuarios') || '[]'); } catch(e) {}
+  }
+  const uMatch = allUsers.find(u => u && ((u.nombre && (typeof normalizarTextoJunta === 'function' ? normalizarTextoJunta(u.nombre) : u.nombre.toLowerCase().trim()) === norm) || u.id === rawStr || u.user_id === rawStr));
+  if (uMatch && uMatch.rol) {
+    const rolKey = String(uMatch.rol).toLowerCase();
+    if (rolKey === 'supervisor') return { rol: 'supervisor', label: 'Supervisor', color: '#ca8a04', icon: 'user-check' };
+    if (rolKey === 'admin') return { rol: 'admin', label: 'Administrador', color: '#4f8ef7', icon: 'shield' };
+    if (rolKey === 'superadmin') return { rol: 'superadmin', label: 'Super Admin', color: '#E8820C', icon: 'shield-alert' };
+    if (rolKey === 'tecnico') return { rol: 'tecnico', label: 'Técnico', color: '#10b981', icon: 'wrench' };
+  }
+
   return { rol: 'tecnico', label: 'Técnico', color: '#10b981', icon: 'wrench' };
 }
 
@@ -101,9 +134,10 @@ function extraerListaResponsables(raw) {
   }
   if (!raw) return ['Sin Asignar'];
   const parts = String(raw).trim().split(/[,;/]+/).map(s => s.trim()).filter(Boolean);
+  const resolved = parts.map(p => (typeof unificarNombreUsuario === 'function' ? unificarNombreUsuario(p) : p));
   const isPaqFn = (typeof esNombrePaqueteria === 'function') ? esNombrePaqueteria : (typeof window !== 'undefined' && window.esNombrePaqueteria ? window.esNombrePaqueteria : () => false);
   const isExclFn = esResponsableExcluidoOperativo;
-  const valid = parts.filter(s => s !== '-' && s.toLowerCase() !== 'sin asignar' && s.toLowerCase() !== 'sin_asignar' && !isPaqFn(s) && !isExclFn(s));
+  const valid = resolved.filter(s => s !== '-' && s.toLowerCase() !== 'sin asignar' && s.toLowerCase() !== 'sin_asignar' && !isPaqFn(s) && !isExclFn(s));
   return valid.length > 0 ? Array.from(new Set(valid)) : ['Sin Asignar'];
 }
 

@@ -575,8 +575,15 @@ function guardarNotaBitacora() {
     o.tecnicosAsignados = [];
   }
   const myUserId = (typeof currentSession !== 'undefined' && currentSession) ? currentSession.userId : null;
-  if (myUserId && !o.tecnicosAsignados.includes(myUserId)) {
-    o.tecnicosAsignados.push(myUserId);
+  const myTecName = (typeof currentSession !== 'undefined' && currentSession && currentSession.name) ||
+                    (typeof resolveTecnicoNombre === 'function' && myUserId ? resolveTecnicoNombre(myUserId) : null) ||
+                    (typeof window !== 'undefined' && typeof window.resolveTecnicoNombre === 'function' && myUserId ? window.resolveTecnicoNombre(myUserId) : null) ||
+                    tecnicoDestino;
+  if (myTecName && myTecName !== myUserId) {
+    const normMyName = myTecName.toLowerCase().trim();
+    if (!o.tecnicosAsignados.some(t => (t || '').toLowerCase().trim() === normMyName)) {
+      o.tecnicosAsignados.push(myTecName);
+    }
   }
   if (tecnicoDestino) {
     if (!o.tecnico) {

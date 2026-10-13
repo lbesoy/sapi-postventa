@@ -955,8 +955,19 @@ function rowToOrden(o) {
   if (o.condiciones !== undefined && o.condiciones !== null) res.condiciones = o.condiciones;
   if (o.pendientes !== undefined && o.pendientes !== null) res.pendientes = o.pendientes;
   if (o.observaciones !== undefined && o.observaciones !== null) res.observaciones = o.observaciones;
-  if (o.soporte !== undefined && o.soporte !== null) res.soporte = o.soporte;
-  if (o.tecnicos_asignados && Array.isArray(o.tecnicos_asignados) && o.tecnicos_asignados.length > 0) res.tecnicosAsignados = o.tecnicos_asignados;
+  if (o.tecnicos_asignados && Array.isArray(o.tecnicos_asignados) && o.tecnicos_asignados.length > 0) {
+    const resolver = (typeof resolveTecnicoNombre === 'function') ? resolveTecnicoNombre : (typeof window !== 'undefined' && typeof window.resolveTecnicoNombre === 'function' ? window.resolveTecnicoNombre : (typeof getValidDbTecnico === 'function' ? getValidDbTecnico : s => s));
+    const seen = new Set();
+    res.tecnicosAsignados = [];
+    o.tecnicos_asignados.forEach(t => {
+      const resolved = resolver(t) || t;
+      const norm = (resolved || '').toLowerCase().trim();
+      if (norm && !seen.has(norm)) {
+        seen.add(norm);
+        res.tecnicosAsignados.push(resolved);
+      }
+    });
+  }
   if (o.ref_necesarias && Array.isArray(o.ref_necesarias) && o.ref_necesarias.length > 0) res.ref_necesarias = o.ref_necesarias;
   if (o.ref_utilizadas && Array.isArray(o.ref_utilizadas) && o.ref_utilizadas.length > 0) res.ref_utilizadas = o.ref_utilizadas;
   if (o.dias && Array.isArray(o.dias) && o.dias.length > 0) res.dias = o.dias;
@@ -4696,8 +4707,19 @@ window.cargarDatosDeSupabase = function() {
               // Preservar técnicos asignados locales
               if (Array.isArray(localOrd.tecnicosAsignados) && localOrd.tecnicosAsignados.length > 0) {
                 if (!Array.isArray(ord.tecnicosAsignados)) ord.tecnicosAsignados = [];
+                const resolver = (typeof resolveTecnicoNombre === 'function') ? resolveTecnicoNombre : (typeof window !== 'undefined' && typeof window.resolveTecnicoNombre === 'function' ? window.resolveTecnicoNombre : (typeof getValidDbTecnico === 'function' ? getValidDbTecnico : s => s));
                 localOrd.tecnicosAsignados.forEach(ta => {
-                  if (ta && !ord.tecnicosAsignados.includes(ta)) ord.tecnicosAsignados.push(ta);
+                  const resolvedTa = resolver(ta) || ta;
+                  if (resolvedTa && !ord.tecnicosAsignados.some(x => (x || '').toLowerCase().trim() === resolvedTa.toLowerCase().trim())) {
+                    ord.tecnicosAsignados.push(resolvedTa);
+                  }
+                });
+                const seenAsig = new Set();
+                ord.tecnicosAsignados = ord.tecnicosAsignados.map(x => resolver(x) || x).filter(x => {
+                  const norm = (x || '').toLowerCase().trim();
+                  if (!norm || seenAsig.has(norm)) return false;
+                  seenAsig.add(norm);
+                  return true;
                 });
               }
               if (localOrd.tecnico && ord.tecnico) {

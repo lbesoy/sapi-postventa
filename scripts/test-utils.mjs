@@ -3242,6 +3242,41 @@ console.log('🧪 Verificando validación flexible de identidad de técnicos...'
   console.log('  ✅ Validación Flexible de Identidad de Técnicos: OK');
 }
 
+// Test 61: Resolución de UUIDs a nombres humanos en Juntas de Revisión y deduplicación
+console.log('🧪 Verificando resolución de UUIDs a nombres humanos en Juntas...');
+{
+  const mockUsuarios = [
+    { id: '70759c7c-9c4f-4521-80f6-e48994f4deb2', nombre: 'Victor Edmundo Santelis Flores', rol: 'supervisor' },
+    { id: 'd775fdce-07fe-48e9-8518-24415aa50195', nombre: 'Abraham reyes', rol: 'tecnico' },
+    { id: 'be40ea0f-0eca-4c56-8392-3e00125c32b4', nombre: 'Eduardo Jiménez Ortiz', rol: 'tecnico' },
+    { id: 'a956eb23-46f3-4a9d-b36f-db47446b2746', nombre: 'Ernesto Luciano', rol: 'tecnico' }
+  ];
+
+  const prevGlobalUsers = global.usuarios;
+  global.usuarios = mockUsuarios;
+
+  const { unificarNombreUsuario, extraerListaResponsables, obtenerInfoRolUsuario } = await import('../src/utils.js');
+
+  // 1. unificarNombreUsuario con UUID directo
+  const nombreResuelto = unificarNombreUsuario('70759c7c-9c4f-4521-80f6-e48994f4deb2');
+  assert.strictEqual(nombreResuelto, 'Victor Edmundo Santelis Flores', 'Debe resolver el UUID de Victor Santelis a su nombre real');
+
+  // 2. extraerListaResponsables con lista mixta (nombre + UUID)
+  const listaMixta = extraerListaResponsables('Juan carlos Ramírez, d775fdce-07fe-48e9-8518-24415aa50195');
+  assert.deepStrictEqual(listaMixta, ['Juan carlos Ramírez', 'Abraham reyes'], 'Debe transformar el UUID en nombre dentro de la lista');
+
+  // 3. Deduplicación estricta cuando viene el nombre Y el UUID de la misma persona
+  const listaDuplicadaConUuid = extraerListaResponsables('Abraham reyes, d775fdce-07fe-48e9-8518-24415aa50195');
+  assert.deepStrictEqual(listaDuplicadaConUuid, ['Abraham reyes'], 'Debe deduplicar a una sola persona y no generar fila con UUID');
+
+  // 4. obtenerInfoRolUsuario resolviendo rol correcto a partir de UUID
+  const rolVictor = obtenerInfoRolUsuario('70759c7c-9c4f-4521-80f6-e48994f4deb2');
+  assert.strictEqual(rolVictor.rol, 'supervisor', 'Debe detectar el rol real del usuario a partir del UUID');
+
+  global.usuarios = prevGlobalUsers;
+  console.log('  ✅ Resolución de UUIDs a Nombres Humanos en Juntas: OK');
+}
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 
 

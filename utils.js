@@ -452,6 +452,33 @@ window.normalizarTextoJunta = function(str) {
 
 window.unificarNombreUsuario = function(rawNombre) {
   if (!rawNombre) return 'Sin Asignar';
+  const trimmedRaw = String(rawNombre).trim();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmedRaw);
+
+  // 0. Si es un UUID o ID, resolverlo inmediatamente
+  if (isUuid || (typeof window !== 'undefined' && typeof window.resolveTecnicoNombre === 'function')) {
+    let resolved = null;
+    if (typeof window !== 'undefined' && typeof window.resolveTecnicoNombre === 'function') {
+      resolved = window.resolveTecnicoNombre(trimmedRaw);
+    } else if (typeof resolveTecnicoNombre === 'function') {
+      resolved = resolveTecnicoNombre(trimmedRaw);
+    }
+    if (resolved && resolved !== trimmedRaw) return String(resolved).trim();
+  }
+
+  let allUsers = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : (typeof window !== 'undefined' && Array.isArray(window.usuarios) ? window.usuarios : []);
+  if (!allUsers.length && typeof localStorage !== 'undefined') {
+    try {
+      allUsers = JSON.parse(localStorage.getItem('eurorep_usuarios') || localStorage.getItem('sapi_usuarios') || '[]');
+    } catch(e) {}
+  }
+  const idMatch = allUsers.find(u => u && (u.id === trimmedRaw || u.user_id === trimmedRaw));
+  if (idMatch && idMatch.nombre) return idMatch.nombre.trim();
+
+  let allTecs = (typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) ? tecnicosDb : (typeof window !== 'undefined' && Array.isArray(window.tecnicosDb) ? window.tecnicosDb : []);
+  const tecIdMatch = allTecs.find(t => t && (t.id === trimmedRaw || t.user_id === trimmedRaw));
+  if (tecIdMatch && tecIdMatch.nombre) return tecIdMatch.nombre.trim();
+
   const norm = String(rawNombre)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -525,9 +552,11 @@ window.esResponsableExcluidoOperativo = function(nombre) {
 
 window.obtenerInfoRolUsuario = function(nombre) {
   if (!nombre) return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
+  const rawStr = String(nombre).trim();
+  const nombreLimpio = (typeof window.unificarNombreUsuario === 'function') ? window.unificarNombreUsuario(rawStr) : rawStr;
   
-  const norm = window.normalizarTextoJunta(nombre);
-  if (norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === '' || norm === 'sin_asignar' || window.esNombrePaqueteria(nombre)) {
+  const norm = window.normalizarTextoJunta(nombreLimpio);
+  if (norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === '' || norm === 'sin_asignar' || window.esNombrePaqueteria(nombreLimpio)) {
     return { rol: 'sin_asignar', label: 'Sin Asignar', color: '#ef4444', icon: 'user-x' };
   }
 
@@ -541,7 +570,7 @@ window.obtenerInfoRolUsuario = function(nombre) {
 
   let user = null;
   if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
-    user = usuarios.find(u => u && u.nombre && window.normalizarTextoJunta(u.nombre) === norm);
+    user = usuarios.find(u => u && ((u.nombre && window.normalizarTextoJunta(u.nombre) === norm) || u.id === rawStr || u.user_id === rawStr));
     if (!user) {
       const normWords = norm.split(/\s+/).filter(w => w.length > 2);
       if (normWords.length > 0) {
@@ -595,12 +624,12 @@ window.obtenerInfoRolUsuario = function(nombre) {
   }
 
   if (typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) {
-    let isTec = tecnicosDb.some(t => t && t.nombre && (
+    let isTec = tecnicosDb.some(t => t && ((t.nombre && (
       window.normalizarTextoJunta(t.nombre) === norm || 
       window.normalizarTextoJunta(t.nombre).includes(norm) || 
       norm.includes(window.normalizarTextoJunta(t.nombre)) ||
       (typeof formatNombreCorto === 'function' && window.normalizarTextoJunta(formatNombreCorto(t.nombre)) === norm)
-    ));
+    )) || t.id === rawStr || t.user_id === rawStr));
     if (!isTec) {
       const normWords = norm.split(/\s+/).filter(w => w.length > 2);
       if (normWords.length > 0) {
@@ -627,7 +656,8 @@ window.extraerListaResponsables = function(raw) {
     return ['Sin Asignar'];
   }
   const parts = rawStr.split(/[,;/]+/).map(s => s.trim()).filter(Boolean);
-  const validParts = parts.filter(s => s !== '-' && s.toLowerCase() !== 'sin asignar' && s.toLowerCase() !== 'sin_asignar' && !window.esNombrePaqueteria(s) && !window.esResponsableExcluidoOperativo(s));
+  const resolvedParts = parts.map(p => (typeof window.unificarNombreUsuario === 'function' ? window.unificarNombreUsuario(p) : p));
+  const validParts = resolvedParts.filter(s => s !== '-' && s.toLowerCase() !== 'sin asignar' && s.toLowerCase() !== 'sin_asignar' && !window.esNombrePaqueteria(s) && !window.esResponsableExcluidoOperativo(s));
   return validParts.length > 0 ? Array.from(new Set(validParts)) : ['Sin Asignar'];
 };
 
