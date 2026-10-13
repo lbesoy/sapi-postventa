@@ -42,6 +42,9 @@
               <div class="search-bar" style="width:100%; max-width:400px; margin:0;">
                 <input type="text" id="search-servicios" placeholder="Buscar por Folio, Ticket, Cliente, Ubicación..." oninput="debouncedFiltrarOrdenes('servicios')" autocomplete="off" />
               </div>
+              <button type="button" id="btn-exportar-ordenes-excel" class="btn-secondary" onclick="window.exportarOrdenesAExcel()" style="height:38px; display:inline-flex; align-items:center; gap:0.4rem; padding:0 0.85rem; font-size:0.85rem; white-space:nowrap; background:#10b981; color:#ffffff; border-color:#10b981; font-weight:600; cursor:pointer; border-radius:8px;" title="Exportar lista actual de órdenes de servicio a Excel (.xlsx)">
+                <i data-lucide="download" style="width:14px; height:14px;"></i> Exportar Excel
+              </button>
               <button class="action-btn" onclick="regenerarOrdenesDesdeTickets()"
                 id="btn-regenerar-ordenes"
                 title="Regenerar Órdenes desde Tickets Cerrados"

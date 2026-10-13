@@ -321,7 +321,11 @@ window.renderTelemetryEventsFeed = function() {
     filtered = filtered.filter(e => [
       'Conexión OneDrive', 'Importación OneDrive', 'Vinculación de Factura', 'Guardado de Gasto', 'Visor PDF SAT',
       'Creación de Gasto', 'Edición de Gasto', 'Eliminación de Gasto',
-      'Creación de Ticket', 'Edición de Ticket', 'Eliminación de Ticket'
+      'Creación de Ticket', 'Edición de Ticket', 'Eliminación de Ticket', 'Eliminación Masiva de Tickets'
+    ].includes(e.action));
+  } else if (filter === 'tickets') {
+    filtered = filtered.filter(e => [
+      'Creación de Ticket', 'Edición de Ticket', 'Eliminación de Ticket', 'Eliminación Masiva de Tickets'
     ].includes(e.action));
   } else if (filter === 'orders') {
     filtered = filtered.filter(e => [
@@ -329,6 +333,10 @@ window.renderTelemetryEventsFeed = function() {
       'Creación de Asignación', 'Edición de Asignación', 'Eliminación de Asignación',
       'Firma de Técnico (Orden Completada)', 'Firma de Cliente (Orden Firmada)',
       'Vinculación Orden en Detalle'
+    ].includes(e.action));
+  } else if (filter === 'deletions') {
+    filtered = filtered.filter(e => [
+      'Eliminación de Ticket', 'Eliminación Masiva de Tickets', 'Eliminación de Orden', 'Eliminación de Gasto', 'Eliminación de Asignación'
     ].includes(e.action));
   }
 
@@ -400,7 +408,16 @@ window.renderTelemetryEventsFeed = function() {
       icon = 'trash-2';
       iconColor = 'var(--red)';
       iconBg = 'rgba(239,68,68,0.12)';
-      desc = `Eliminó el Ticket folio <strong>${e.details?.folio || '-'}</strong>.`;
+      const cliTxt = e.details?.cliente ? ` (Cliente: <strong>${e.details.cliente}</strong>)` : '';
+      const asuTxt = e.details?.asunto ? ` - "${e.details.asunto}"` : '';
+      const motTxt = e.details?.motivo ? ` <span style="font-size:0.68rem; opacity:0.8; font-style:italic;">[${e.details.motivo}]</span>` : '';
+      desc = `Eliminó el Ticket folio <strong>${e.details?.folio || '-'}</strong>${cliTxt}${asuTxt}.${motTxt}`;
+    } else if (e.action === 'Eliminación Masiva de Tickets') {
+      icon = 'trash-2';
+      iconColor = 'var(--red)';
+      iconBg = 'rgba(239,68,68,0.12)';
+      const motTxt = e.details?.motivo ? ` <span style="font-size:0.68rem; opacity:0.8; font-style:italic;">[${e.details.motivo}]</span>` : '';
+      desc = `Eliminó en lote <strong>${e.details?.cantidad || 0} tickets</strong>.${motTxt}`;
     } else if (e.action === 'Creación de Orden') {
       icon = 'plus-circle';
       iconColor = 'var(--green)';
@@ -415,7 +432,10 @@ window.renderTelemetryEventsFeed = function() {
       icon = 'trash-2';
       iconColor = 'var(--red)';
       iconBg = 'rgba(239,68,68,0.12)';
-      desc = `Eliminó la Orden de Servicio folio <strong>${e.details?.folio || '-'}</strong>.`;
+      const cliTxt = e.details?.cliente ? ` (Cliente: <strong>${e.details.cliente}</strong>)` : '';
+      const modTxt = e.details?.modelo ? ` [${e.details.modelo}]` : '';
+      const motTxt = e.details?.motivo ? ` <span style="font-size:0.68rem; opacity:0.8; font-style:italic;">[${e.details.motivo}]</span>` : '';
+      desc = `Eliminó la Orden de Servicio folio <strong>${e.details?.folio || '-'}</strong>${cliTxt}${modTxt}.${motTxt}`;
     } else if (e.action === 'Creación de Gasto') {
       icon = 'plus-circle';
       iconColor = 'var(--green)';
@@ -491,7 +511,7 @@ window.renderTelemetryEventsFeed = function() {
               <span style="font-weight:700; font-size:0.75rem; color:var(--text-primary);">${e.userName}</span>
               <span style="font-size:0.55rem; font-weight:700; color:${rColor}; background:rgba(255,255,255,0.03); border:1px solid ${rColor}30; padding:0 0.25rem; border-radius:3px; letter-spacing:0.02em;">${rLabel}</span>
             </div>
-            <span style="font-size:0.65rem; color:var(--text-muted); font-weight:500;">${window.getRelativeTime(e.timestamp)}</span>
+            <span style="font-size:0.65rem; color:var(--text-muted); font-weight:500;" title="${new Date(e.timestamp).toLocaleString('es-MX', { dateStyle: 'full', timeStyle: 'medium' })}">${window.getRelativeTime(e.timestamp)}</span>
           </div>
           <div style="font-size:0.72rem; color:var(--text-secondary); line-height:1.3; word-break:break-word;">${desc}</div>
         </div>
@@ -1368,7 +1388,9 @@ window.regenerarOrdenesDesdeTickets = async function() {
       equipo: t.equipo || '',
       tecnico: (t.tecnicosAsignados || []).join(', '),
       tecnicosAsignados: t.tecnicosAsignados || [],
-      soporte: t.id,
+      soporte: t.folio || t.id,
+      ticket_id: t.id,
+      ticket_folio: t.folio,
       km_ida: '', km_vuelta: '', km_total: '',
       tipo: 'Servicio',
       estado: 'Pendiente',

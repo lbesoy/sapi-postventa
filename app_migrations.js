@@ -588,6 +588,51 @@ function repararCreadoresTicketsFaltantes() {
   }
 }
 
+function autoCorregirUuidsSoporteEnOrdenes() {
+  try {
+    const rawOrds = safeGetJSON('sapi_ordenes', []);
+    if (!Array.isArray(rawOrds) || rawOrds.length === 0) return;
+    const rawTkts = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : safeGetJSON('sapi_tickets', []);
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let modified = false;
+
+    rawOrds.forEach(o => {
+      if (o && o.soporte && isUuid.test(o.soporte)) {
+        const t = (rawTkts || []).find(x => x && (x.id === o.soporte || x.folio === o.soporte));
+        if (t && t.folio) {
+          if (!o.ticket_id) o.ticket_id = o.soporte;
+          o.ticket_folio = t.folio;
+          o.soporte = t.folio;
+          modified = true;
+        } else if (o.ticket_folio) {
+          if (!o.ticket_id) o.ticket_id = o.soporte;
+          o.soporte = o.ticket_folio;
+          modified = true;
+        }
+      }
+    });
+
+    if (modified) {
+      safeSetJSON('sapi_ordenes', rawOrds);
+      if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
+        ordenes.forEach(o => {
+          const fresh = rawOrds.find(r => r && r.id === o.id);
+          if (fresh && fresh.soporte) o.soporte = fresh.soporte;
+        });
+      }
+      if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) {
+        window.ordenes.forEach(o => {
+          const fresh = rawOrds.find(r => r && r.id === o.id);
+          if (fresh && fresh.soporte) o.soporte = fresh.soporte;
+        });
+      }
+      console.log('[Auto-Repair] Se auto-repararon soportes con UUID a Folio de Ticket en caché local.');
+    }
+  } catch (e) {
+    console.warn('[Auto-Repair] Error en autoCorregirUuidsSoporteEnOrdenes:', e);
+  }
+}
+
   if (typeof window !== 'undefined') {
     window.AppMigrations = {
       generarTicketsRefaccionesFaltantes,
@@ -595,7 +640,8 @@ function repararCreadoresTicketsFaltantes() {
       migrarUbicacionesMaquinariaDesdeTickets,
       recuperarMaquinariaDesdeTickets,
       reintentarSincronizacionGastosLocales,
-      repararCreadoresTicketsFaltantes
+      repararCreadoresTicketsFaltantes,
+      autoCorregirUuidsSoporteEnOrdenes
     };
     window.generarTicketsRefaccionesFaltantes = generarTicketsRefaccionesFaltantes;
     window.migrarOrdenesExistentesMaquinaria = migrarOrdenesExistentesMaquinaria;
@@ -603,6 +649,7 @@ function repararCreadoresTicketsFaltantes() {
     window.recuperarMaquinariaDesdeTickets = recuperarMaquinariaDesdeTickets;
     window.reintentarSincronizacionGastosLocales = reintentarSincronizacionGastosLocales;
     window.repararCreadoresTicketsFaltantes = repararCreadoresTicketsFaltantes;
+    window.autoCorregirUuidsSoporteEnOrdenes = autoCorregirUuidsSoporteEnOrdenes;
   }
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
@@ -611,7 +658,8 @@ function repararCreadoresTicketsFaltantes() {
       migrarUbicacionesMaquinariaDesdeTickets,
       recuperarMaquinariaDesdeTickets,
       reintentarSincronizacionGastosLocales,
-      repararCreadoresTicketsFaltantes
+      repararCreadoresTicketsFaltantes,
+      autoCorregirUuidsSoporteEnOrdenes
     };
   }
 })();

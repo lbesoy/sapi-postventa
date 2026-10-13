@@ -667,6 +667,10 @@ export function obtenerInfoRolUsuario(nombre) {
     return { rol: 'superadmin', label: 'Super Admin', color: '#E8820C', icon: 'shield-alert' };
   }
 
+  if (norm.includes('almacen') || norm.includes('compras') || norm.includes('logistica')) {
+    return { rol: 'almacen', label: 'Almacén y Compras', color: '#0284c7', icon: 'package' };
+  }
+
   let user = null;
   if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
     user = usuarios.find(u => u && u.nombre && normalizarTextoJunta(u.nombre) === norm);
@@ -759,6 +763,59 @@ export function extraerListaResponsables(raw) {
   return validParts.length > 0 ? Array.from(new Set(validParts)) : ['Sin Asignar'];
 }
 
+export function esSupervisorOAdmin(nombre) {
+  if (!nombre) return false;
+  const isPaq = (typeof esNombrePaqueteria === 'function') ? esNombrePaqueteria(nombre) : false;
+  const isExcl = (typeof esResponsableExcluidoOperativo === 'function') ? esResponsableExcluidoOperativo(nombre) : false;
+  if (isPaq || isExcl) return false;
+
+  const norm = normalizarTextoJunta(nombre);
+  if (!norm || norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === 'sin_asignar' || norm.includes('almacen') || norm.includes('compras') || norm.includes('logistica')) {
+    return false;
+  }
+
+  const info = obtenerInfoRolUsuario(nombre);
+  if (info && (info.rol === 'supervisor' || info.rol === 'admin' || info.rol === 'superadmin')) {
+    return true;
+  }
+
+  if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
+    const user = usuarios.find(u => u && u.nombre && normalizarTextoJunta(u.nombre) === norm);
+    if (user && user.rol && ['supervisor', 'admin', 'superadmin'].includes(String(user.rol).toLowerCase())) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function esTecnicoCampo(nombre) {
+  if (!nombre) return false;
+  if (esSupervisorOAdmin(nombre)) return false;
+
+  const isPaq = (typeof esNombrePaqueteria === 'function') ? esNombrePaqueteria(nombre) : false;
+  const isExcl = (typeof esResponsableExcluidoOperativo === 'function') ? esResponsableExcluidoOperativo(nombre) : false;
+  if (isPaq || isExcl) return false;
+
+  const norm = normalizarTextoJunta(nombre);
+  if (!norm || norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === 'sin_asignar' || norm.includes('almacen') || norm.includes('compras') || norm.includes('logistica')) {
+    return false;
+  }
+
+  const info = obtenerInfoRolUsuario(nombre);
+  if (info && info.rol === 'tecnico') {
+    return true;
+  }
+
+  if (typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) {
+    if (tecnicosDb.some(t => t && t.nombre && normalizarTextoJunta(t.nombre) === norm)) {
+      return true;
+    }
+  }
+
+  return true;
+}
+
 // Vinculación automática a window y globalThis para 100% interoperabilidad
 const _targetGlobal = (typeof window !== 'undefined') ? window : ((typeof globalThis !== 'undefined') ? globalThis : null);
 if (_targetGlobal) {
@@ -783,6 +840,8 @@ if (_targetGlobal) {
   _targetGlobal._obtenerInfoRolUsuarioBase = obtenerInfoRolUsuario;
   _targetGlobal.extraerListaResponsables = extraerListaResponsables;
   _targetGlobal._extraerListaResponsablesBase = extraerListaResponsables;
+  _targetGlobal.esSupervisorOAdmin = esSupervisorOAdmin;
+  _targetGlobal.esTecnicoCampo = esTecnicoCampo;
   _targetGlobal.esResponsableExcluidoOperativo = esResponsableExcluidoOperativo;
   _targetGlobal.esNombrePaqueteria = esNombrePaqueteria;
   _targetGlobal.PAQUETERIAS_CONOCIDAS = PAQUETERIAS_CONOCIDAS;

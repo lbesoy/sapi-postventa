@@ -497,6 +497,9 @@ function obtenerInfoRolUsuario(nombre) {
   if (norm === 'pablo besoy' || norm === 'pablo besoy trigueros' || norm === 'besoy' || norm.startsWith('pablo besoy')) {
     return { rol: 'superadmin', label: 'Super Admin', color: '#E8820C', icon: 'shield-alert' };
   }
+  if (norm.includes('almacen') || norm.includes('compras') || norm.includes('logistica')) {
+    return { rol: 'almacen', label: 'Almacén y Compras', color: '#0284c7', icon: 'package' };
+  }
   return { rol: 'tecnico', label: 'Técnico', color: '#10b981', icon: 'wrench' };
 }
 if (typeof window !== 'undefined' && (!window.obtenerInfoRolUsuario || !window._obtenerInfoRolUsuarioBase)) {
@@ -516,6 +519,39 @@ function extraerListaResponsables(raw) {
 }
 if (typeof window !== 'undefined' && (!window.extraerListaResponsables || !window._extraerListaResponsablesBase)) {
   window.extraerListaResponsables = extraerListaResponsables;
+}
+
+function esSupervisorOAdmin(nombre) {
+  if (typeof window !== 'undefined' && typeof window._esSupervisorOAdminBase === 'function') {
+    return window._esSupervisorOAdminBase(nombre);
+  }
+  if (!nombre) return false;
+  const isPaq = (typeof esNombrePaqueteria === 'function') ? esNombrePaqueteria(nombre) : false;
+  const isExcl = (typeof esResponsableExcluidoOperativo === 'function') ? esResponsableExcluidoOperativo(nombre) : false;
+  if (isPaq || isExcl) return false;
+  const info = (typeof obtenerInfoRolUsuario === 'function') ? obtenerInfoRolUsuario(nombre) : null;
+  return info ? (info.rol === 'supervisor' || info.rol === 'admin' || info.rol === 'superadmin') : false;
+}
+if (typeof window !== 'undefined' && (!window.esSupervisorOAdmin || !window._esSupervisorOAdminBase)) {
+  window.esSupervisorOAdmin = esSupervisorOAdmin;
+}
+
+function esTecnicoCampo(nombre) {
+  if (typeof window !== 'undefined' && typeof window._esTecnicoCampoBase === 'function') {
+    return window._esTecnicoCampoBase(nombre);
+  }
+  if (!nombre) return false;
+  if (esSupervisorOAdmin(nombre)) return false;
+  const isPaq = (typeof esNombrePaqueteria === 'function') ? esNombrePaqueteria(nombre) : false;
+  const isExcl = (typeof esResponsableExcluidoOperativo === 'function') ? esResponsableExcluidoOperativo(nombre) : false;
+  if (isPaq || isExcl) return false;
+  const norm = String(nombre).toLowerCase().trim();
+  if (norm.includes('almacen') || norm.includes('compras') || norm.includes('logistica')) return false;
+  const info = (typeof obtenerInfoRolUsuario === 'function') ? obtenerInfoRolUsuario(nombre) : null;
+  return info ? info.rol === 'tecnico' : true;
+}
+if (typeof window !== 'undefined' && (!window.esTecnicoCampo || !window._esTecnicoCampoBase)) {
+  window.esTecnicoCampo = esTecnicoCampo;
 }
 
 // Clara Mock Transactions
@@ -574,6 +610,13 @@ if (typeof window !== 'undefined') {
       }
     };
   }
+  if (!window.autoCorregirUuidsSoporteEnOrdenes) {
+    window.autoCorregirUuidsSoporteEnOrdenes = function() {
+      if (window.AppMigrations && typeof window.AppMigrations.autoCorregirUuidsSoporteEnOrdenes === 'function') {
+        return window.AppMigrations.autoCorregirUuidsSoporteEnOrdenes();
+      }
+    };
+  }
 }
 
 // Sincronización con Supabase (consolidar ráfagas de eventos con debounce)
@@ -624,6 +667,11 @@ async function procesarActualizacionSupabaseUI() {
       try { window.repararCreadoresTicketsFaltantes(); } catch (eRep) { console.warn('[App] Error al reparar creadores de tickets:', eRep); }
     }
 
+    // Auto-corregir soportes con UUIDs en órdenes al folio real del ticket
+    if (typeof window.autoCorregirUuidsSoporteEnOrdenes === 'function') {
+      try { window.autoCorregirUuidsSoporteEnOrdenes(); } catch (eSop) { console.warn('[App] Error al auto-corregir soportes de órdenes:', eSop); }
+    }
+
     // Ejecutar migraciones heredadas solo una vez por sesión y solo para administradores
     // Esto previene bucles infinitos de escritura y consultas redundantes en clientes no-admin
     const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
@@ -643,8 +691,8 @@ async function procesarActualizacionSupabaseUI() {
         }
       }
       
-      if (!hasSessionStorage || !sessionStorage.getItem('eurorep_ref_tickets_migrated_v9')) {
-        if (hasSessionStorage) sessionStorage.setItem('eurorep_ref_tickets_migrated_v9', 'true');
+      if (!localStorage.getItem('eurorep_ref_tickets_migrated_v9')) {
+        localStorage.setItem('eurorep_ref_tickets_migrated_v9', 'true');
         
         let modifiedAny = false;
         tickets = tickets.map(t => {
@@ -717,6 +765,7 @@ async function procesarActualizacionSupabaseUI() {
     }
     if (document.getElementById('view-servicios')?.classList.contains('active')) {
       renderTabla('servicios');
+      if (typeof renderStats === 'function') renderStats();
     }
     if (document.getElementById('view-clientes')?.classList.contains('active')) {
       if (typeof renderClientes === 'function') renderClientes();
@@ -730,6 +779,7 @@ async function procesarActualizacionSupabaseUI() {
     }
     if (document.getElementById('view-tickets')?.classList.contains('active')) {
       if (typeof renderTickets === 'function') renderTickets();
+      if (typeof renderStats === 'function') renderStats();
     }
     if (typeof updateTicketBadge === 'function') updateTicketBadge(); updateOrdenesBadge();
     if (typeof window.sincronizarNotificacionesInternas === 'function') window.sincronizarNotificacionesInternas();

@@ -253,6 +253,9 @@
               <div class="search-bar" style="margin:0;">
                 <input type="text" id="search-tickets" placeholder="Buscar ticket..." oninput="debouncedRenderTickets()" style="width: 180px; height: 38px; padding: 0.4rem 0.75rem; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary);" />
               </div>
+              <button type="button" id="btn-exportar-tickets-excel" class="btn-secondary" onclick="window.exportarTicketsAExcel()" style="height:38px; display:none; align-items:center; gap:0.4rem; padding:0 0.85rem; font-size:0.85rem; white-space:nowrap; background:#10b981; color:#ffffff; border-color:#10b981; font-weight:600; cursor:pointer; border-radius:8px;" title="Exportar lista actual de tickets a Excel (.xlsx)">
+                <i data-lucide="download" style="width:14px; height:14px;"></i> Exportar Excel
+              </button>
             </div>
           </div>
           <div class="table-wrapper" style="margin-top:1rem;">

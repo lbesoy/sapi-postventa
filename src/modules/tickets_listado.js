@@ -1835,9 +1835,9 @@ function renderTickets(ctx) {
     
     if (!isDashView && !isV2 && ticketFiltroActivo !== 'todos') {
       if (ticketFiltroActivo === 'Cerrado - Aprobado') {
-        filtered = filtered.filter(t => t && t.estado === 'Cerrado' && t.cotAceptada === 'si');
+        filtered = filtered.filter(t => t && t.estado === 'Cerrado' && (t.cotAceptada === 'si' || t.cotAceptada === 'aprobada' || (!t.cotAceptada && !t.motivoRechazo && !t.motivo_rechazo)));
       } else if (ticketFiltroActivo === 'Cerrado - Rechazado') {
-        filtered = filtered.filter(t => t && t.estado === 'Cerrado' && t.cotAceptada === 'no');
+        filtered = filtered.filter(t => t && t.estado === 'Cerrado' && (t.cotAceptada === 'no' || t.cotAceptada === 'rechazada' || t.motivoRechazo === 'Rechazado' || t.motivo_rechazo));
       } else {
         filtered = filtered.filter(t => t && t.estado === ticketFiltroActivo);
       }
@@ -1860,6 +1860,18 @@ function renderTickets(ctx) {
       const pageTitleEl = document.getElementById('page-title');
       if (pageTitleEl) {
         pageTitleEl.textContent = `Tickets (${filtered.length})`;
+      }
+      if (typeof renderStats === 'function') renderStats();
+      else if (typeof window !== 'undefined' && typeof window.renderStats === 'function') window.renderStats();
+    }
+
+    if (!isDashView && !isV2) {
+      if (typeof window !== 'undefined') {
+        window._currentTicketsFiltrados = filtered;
+      }
+      const btnExportTickets = document.getElementById('btn-exportar-tickets-excel');
+      if (btnExportTickets) {
+        btnExportTickets.style.display = safeEsUsuarioSuperadmin() ? 'inline-flex' : 'none';
       }
     }
     
@@ -2211,6 +2223,7 @@ const allModuleExports = {
   obtenerTicketPadre,
   resolverClienteTicket,
   renderTickets,
+  exportarTicketsAExcel,
   esTicketEnTransito,
   badgeTicketEstado,
   getTicketEstadoLabel,
@@ -2223,6 +2236,144 @@ const allModuleExports = {
   resetTicketPageLimit,
   safeGetFilteredTickets
 };
+
+// Exportar tickets filtrados a archivo Excel (.xlsx) para Superadmin
+function exportarTicketsAExcel() {
+  if (!safeEsUsuarioSuperadmin()) {
+    if (typeof window !== 'undefined' && typeof window.mostrarNotificacion === 'function') {
+      window.mostrarNotificacion('Solo los Super Administradores pueden exportar tickets a Excel.', 'error');
+    } else if (typeof alert === 'function') {
+      alert('Solo los Super Administradores pueden exportar tickets a Excel.');
+    }
+    return null;
+  }
+
+  let lista = (typeof window !== 'undefined' && Array.isArray(window._currentTicketsFiltrados)) ? window._currentTicketsFiltrados : null;
+  if (!lista || lista.length === 0) {
+    if (typeof safeGetFilteredTickets === 'function') {
+      lista = safeGetFilteredTickets();
+    } else if (typeof window !== 'undefined' && Array.isArray(window.tickets)) {
+      lista = window.tickets;
+    } else {
+      lista = [];
+    }
+  }
+
+  lista = (lista || []).filter(t => t && t.categoria !== 'Soporte General');
+
+  if (lista.length === 0) {
+    if (typeof window !== 'undefined' && typeof window.mostrarNotificacion === 'function') {
+      window.mostrarNotificacion('No hay tickets en la lista actual para exportar.', 'warning');
+    } else if (typeof alert === 'function') {
+      alert('No hay tickets en la lista actual para exportar.');
+    }
+    return [];
+  }
+
+  const dataExport = lista.map((t, idx) => {
+    let ultimoComentarioTexto = '';
+    let ultimoComentarioAutor = '';
+    let ultimoComentarioFecha = '';
+    if (t.comentariosInternos && Array.isArray(t.comentariosInternos) && t.comentariosInternos.length > 0) {
+      const ult = t.comentariosInternos[t.comentariosInternos.length - 1];
+      ultimoComentarioTexto = String(ult.texto || '').replace(/\s+/g, ' ').trim();
+      ultimoComentarioAutor = ult.usuario || '';
+      ultimoComentarioFecha = ult.fecha ? safeFormatFechaHoraAmigable(ult.fecha) : '';
+    }
+
+    const clienteResuelto = (typeof window !== 'undefined' && typeof window.resolverClienteTicket === 'function' ? window.resolverClienteTicket(t) : '') || t.cliente || '';
+    const estadoLabel = (typeof getTicketEstadoLabel === 'function' ? getTicketEstadoLabel(t) : t.estado) || '';
+    const fechaCreacionStr = safeFormatFechaHoraAmigable(t.fechaCreacion || t.fecha);
+    const fechaModifStr = safeFormatFechaHoraAmigable(typeof window !== 'undefined' && window.getTicketFechaModificacion ? window.getTicketFechaModificacion(t) : (t.fechaModificacion || t.fechaCreacion || t.fecha));
+
+    return {
+      '#': idx + 1,
+      'Folio': t.folio || ('#' + (idx + 1)),
+      'Asunto': t.asunto || '',
+      'Categoría': t.categoria || t.tipo || '',
+      'Solicitante': t.solicitante || '',
+      'Cliente': clienteResuelto,
+      'Sitio / Ubicación': t.sitio || '',
+      'Área': t.area || '',
+      'Prioridad': t.prioridad || '',
+      'Estado': estadoLabel,
+      'Último Comentario': ultimoComentarioTexto,
+      'Autor Comentario': ultimoComentarioAutor,
+      'Fecha Comentario': ultimoComentarioFecha,
+      'Cotización SAP': t.cotizacionSAP || '',
+      'Monto Cotización ($)': (t.montoCotizacion !== undefined && t.montoCotizacion !== null && !isNaN(Number(t.montoCotizacion))) ? Number(t.montoCotizacion) : '',
+      'Pedido SAP': t.pedidoSAP || '',
+      'Técnico Asignado': t.asignado || '',
+      'Fecha Creación': fechaCreacionStr,
+      'Última Modificación': fechaModifStr,
+      'Modificado Por': t.modificadoPor || ''
+    };
+  });
+
+  const fechaHoy = new Date().toISOString().split('T')[0];
+  const filename = `Tickets_Eurorep_${fechaHoy}.xlsx`;
+
+  if (typeof XLSX !== 'undefined') {
+    const ws = XLSX.utils.json_to_sheet(dataExport);
+
+    ws['!cols'] = [
+      { wch: 6 },   // #
+      { wch: 14 },  // Folio
+      { wch: 32 },  // Asunto
+      { wch: 18 },  // Categoría
+      { wch: 24 },  // Solicitante
+      { wch: 28 },  // Cliente
+      { wch: 22 },  // Sitio / Ubicación
+      { wch: 14 },  // Área
+      { wch: 12 },  // Prioridad
+      { wch: 14 },  // Estado
+      { wch: 40 },  // Último Comentario
+      { wch: 18 },  // Autor Comentario
+      { wch: 18 },  // Fecha Comentario
+      { wch: 16 },  // Cotización SAP
+      { wch: 20 },  // Monto Cotización ($)
+      { wch: 16 },  // Pedido SAP
+      { wch: 22 },  // Técnico Asignado
+      { wch: 18 },  // Fecha Creación
+      { wch: 18 },  // Última Modificación
+      { wch: 18 }   // Modificado Por
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Tickets');
+    XLSX.writeFile(wb, filename);
+
+    if (typeof window !== 'undefined' && typeof window.mostrarNotificacion === 'function') {
+      window.mostrarNotificacion(`Se exportaron ${lista.length} tickets a Excel (${filename}).`, 'success');
+    }
+  } else {
+    // Fallback a CSV UTF-8 con BOM
+    const headers = Object.keys(dataExport[0]);
+    let csv = '\uFEFF' + headers.join(',') + '\n';
+    dataExport.forEach(row => {
+      const line = headers.map(h => `"${String(row[h] !== undefined && row[h] !== null ? row[h] : '').replace(/"/g, '""')}"`).join(',');
+      csv += line + '\n';
+    });
+
+    if (typeof Blob !== 'undefined' && typeof document !== 'undefined') {
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Tickets_Eurorep_${fechaHoy}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    if (typeof window !== 'undefined' && typeof window.mostrarNotificacion === 'function') {
+      window.mostrarNotificacion(`Se exportaron ${lista.length} tickets a CSV.`, 'success');
+    }
+  }
+
+  return dataExport;
+}
 
 function cargarMasTickets() {
   if (typeof window !== 'undefined') {
@@ -2245,6 +2396,7 @@ function resetTicketPageLimit() {
 }
 
 if (typeof window !== "undefined") {
+  window.exportarTicketsAExcel = exportarTicketsAExcel;
   window.cargarMasTickets = cargarMasTickets;
   window.mostrarTodosLosTickets = mostrarTodosLosTickets;
   window.resetTicketPageLimit = resetTicketPageLimit;
@@ -2282,6 +2434,7 @@ export {
   obtenerTicketPadre,
   resolverClienteTicket,
   renderTickets,
+  exportarTicketsAExcel,
   esTicketEnTransito,
   badgeTicketEstado,
   getTicketEstadoLabel,

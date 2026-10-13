@@ -427,6 +427,35 @@ function verDetalleTicket(id) {
     t = pool.find(x => x && (x.id === id || x.folio === id || norm(x.folio || x.id) === targetNorm || (targetNum.length >= 4 && String(x.folio || '').replace(/[^0-9]/g, '') === targetNum)));
   }
   if (!t) {
+    if (typeof window !== 'undefined' && window.supabaseClient && id) {
+      window.supabaseClient.from('tickets').select('*').or(`id.eq.${id},folio.eq.${id}`).maybeSingle().then(({ data: remoteTicket, error }) => {
+        if (!error && remoteTicket) {
+          const loadedTkt = (typeof window.rowToTicket === 'function') ? window.rowToTicket(remoteTicket) : remoteTicket;
+          if (typeof tickets !== 'undefined' && Array.isArray(tickets) && !tickets.some(x => x.id === loadedTkt.id)) {
+            tickets.push(loadedTkt);
+          }
+          if (typeof window !== 'undefined' && Array.isArray(window.tickets) && !window.tickets.some(x => x.id === loadedTkt.id)) {
+            window.tickets.push(loadedTkt);
+          }
+          verDetalleTicket(loadedTkt.id);
+          return;
+        }
+        const navTickets = document.querySelector('.nav-item[data-view="tickets"]');
+        if (navTickets) navTickets.click();
+        setTimeout(() => {
+          const searchInput = document.getElementById('search-tickets');
+          if (searchInput) {
+            searchInput.value = id;
+            if (typeof renderTickets === 'function') renderTickets();
+          }
+        }, 150);
+      }).catch(() => {
+        const navTickets = document.querySelector('.nav-item[data-view="tickets"]');
+        if (navTickets) navTickets.click();
+      });
+      return;
+    }
+
     const navTickets = document.querySelector('.nav-item[data-view="tickets"]');
     if (navTickets) navTickets.click();
     setTimeout(() => {
@@ -1604,7 +1633,9 @@ async function cerrarCotizacionTicket(id) {
           equipo: t.equipo || '',
           tecnico: tecnicosAsignados.join(', '),
           tecnicosAsignados: tecnicosAsignados,
-          soporte: t.id,
+          soporte: t.folio || t.id,
+          ticket_id: t.id,
+          ticket_folio: t.folio,
           km_ida: '', km_vuelta: '', km_total: '',
           tipo: tipoVisitaSeleccionado,
           estado: 'Pendiente',
@@ -2022,7 +2053,9 @@ async function forzarCrearOrdenServicio(id) {
         equipo: equipoVal || t.equipo || '',
         tecnico: checkedTecs.join(', '),
         tecnicosAsignados: checkedTecs,
-        soporte: t.id,
+        soporte: t.folio || t.id,
+        ticket_id: t.id,
+        ticket_folio: t.folio,
         creadoPor: (typeof window.getCurrentUserDisplayName === 'function') ? window.getCurrentUserDisplayName() : (currentSession?.nombre || 'Usuario'),
         km_ida: '', km_vuelta: '', km_total: '',
         tipo: tipoVal || 'Servicio',

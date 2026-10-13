@@ -604,6 +604,29 @@ function verDetalle(id) {
   const actualId = o.id || id;
   document.getElementById('detalle-title').textContent = `Orden ${o.folio || o.id.slice(0,8)}`;
   
+  const btnCerrarAdmin = document.getElementById('btn-cerrar-orden-admin');
+  const btnReabrirAdmin = document.getElementById('btn-reabrir-orden-admin');
+  const isAllowedCloseRole = currentSession && ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
+  const esCerrada = String(o.estado || '').toLowerCase() === 'cerrada';
+
+  if (btnCerrarAdmin) {
+    if (isAllowedCloseRole && !esCerrada) {
+      btnCerrarAdmin.style.display = 'inline-flex';
+      btnCerrarAdmin.setAttribute('onclick', `confirmarCierreOrdenAdmin('${actualId}')`);
+    } else {
+      btnCerrarAdmin.style.display = 'none';
+    }
+  }
+
+  if (btnReabrirAdmin) {
+    if (isAllowedCloseRole && esCerrada) {
+      btnReabrirAdmin.style.display = 'inline-flex';
+      btnReabrirAdmin.setAttribute('onclick', `confirmarReaperturaOrdenAdmin('${actualId}')`);
+    } else {
+      btnReabrirAdmin.style.display = 'none';
+    }
+  }
+
   const btnCierrePapel = document.getElementById('btn-cierre-papel');
   if (btnCierrePapel) {
     const isAllowedRole = ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
@@ -1125,7 +1148,22 @@ function verDetalle(id) {
           }
           return maq && (maq.idInterno || maq.id) ? `<span style="font-family:monospace; font-weight:600; color:var(--accent); background:var(--blue-light); padding:0.15rem 0.4rem; border-radius:4px; border:1px solid rgba(232, 133, 10, 0.3);">${maq.idInterno || maq.id}</span>` : '—';
         })())}
-        ${field('Técnico', o.tecnico)} ${field('Ticket Soporte', (() => { const t = tickets.find(x => x.id === o.soporte); return t ? (t.folio || t.id.slice(0,8)) : o.soporte || null; })())}
+        ${field('Técnico', o.tecnico)} ${field('Ticket Soporte', (() => { 
+          const t = tickets.find(x => x.id === o.soporte || x.folio === o.soporte || (o.ticket_id && x.id === o.ticket_id) || (o.ticket_folio && x.folio === o.ticket_folio)); 
+          if (t) {
+            return `<a href="#" onclick="verDetalleTicket('${t.id}'); return false;" style="color:var(--accent); font-weight:600; text-decoration:underline;" title="${t.asunto || ''}">${t.folio}</a>`;
+          }
+          const displayFolio = o.ticket_folio || (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(o.soporte) ? o.soporte : null);
+          if (displayFolio) {
+            return `<a href="#" onclick="verDetalleTicket('${o.ticket_id || displayFolio}'); return false;" style="color:var(--accent); font-weight:600; text-decoration:underline;">${displayFolio}</a>`;
+          }
+          if (o.soporte) {
+            const known = (typeof window !== 'undefined' && window._ticketFolioMap) ? window._ticketFolioMap[o.soporte] : null;
+            if (known) return `<a href="#" onclick="verDetalleTicket('${o.soporte}'); return false;" style="color:var(--accent); font-weight:600; text-decoration:underline;">${known}</a>`;
+            return `<span class="async-ticket-cell" data-tkt-id="${o.soporte}" style="color:var(--accent); font-weight:600;"><i data-lucide="loader" style="width:12px;height:12px;display:inline-block;animation:spin 1s linear infinite;vertical-align:middle;"></i> Ticket...</span>`;
+          }
+          return '—';
+        })())}
       </div>`)}
     ${seccion('Kilómetros / Tipo', `
       <div class="detalle-grid">
@@ -1134,6 +1172,7 @@ function verDetalle(id) {
         ${field('Total Km', (o.km_total != null && o.km_total !== '') ? o.km_total + ' km' : null)}
         ${field('Tipo de Visita', `<span class="badge badge-${(o.tipo||'otro').toLowerCase().replace(/ /g, '-').replace('é','e').replace('í','i')}">${o.tipo}</span>`)}
         ${field('Estado', `<span class="badge ${badgeEstado(o.estado)}">${o.estado}</span>`)}
+        ${(o.estado === 'Cerrada' && o.cerrado_por_admin) ? field('Finiquito Formal', `<span style="font-weight:600; color:var(--text-primary);"><i data-lucide="check-check" style="width:13px;height:13px;color:#10b981;vertical-align:middle;margin-right:2px;"></i> ${o.cerrado_por_admin}</span> <small style="color:var(--text-muted);">(${formatFecha(o.fecha_cierre_admin)})</small>`) : ''}
       </div>
       ${o.reembolso_km ? `
         <div style="margin-top:1rem; display:flex; flex-direction:row; align-items:center; gap:1rem; flex-wrap:wrap;">
@@ -1791,6 +1830,180 @@ async function confirmarCierrePapel(e) {
   }
 };
 
+// ===== CIERRE Y REAPERTURA ADMINISTRATIVA FORMAL =====
+async function confirmarCierreOrdenAdmin(ordenId) {
+  if (typeof document === 'undefined') return;
+  const currentSession = (typeof window !== 'undefined' && window.currentSession) ? window.currentSession : null;
+  const isAllowedCloseRole = currentSession && ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
+  if (!isAllowedCloseRole) {
+    if (typeof mostrarNotificacion === 'function') mostrarNotificacion('Solo los administradores y supervisores pueden realizar el cierre formal de la orden.', 'warning');
+    else if (window.mostrarNotificacion) window.mostrarNotificacion('Solo los administradores y supervisores pueden realizar el cierre formal de la orden.', 'warning');
+    return;
+  }
+
+  const idTarget = ordenId || window.currentDetalleOrdenId;
+  const o = ordenes.find(x => x && (x.id === idTarget || x.folio === idTarget));
+  if (!o) {
+    if (typeof mostrarNotificacion === 'function') mostrarNotificacion('Orden no encontrada.', 'error');
+    else if (window.mostrarNotificacion) window.mostrarNotificacion('Orden no encontrada.', 'error');
+    return;
+  }
+
+  const folioText = o.folio || o.id;
+  const sinFirmas = (!o.firma_cliente_base64 || o.firma_cliente_base64 === '__DELETED__') && !o.cierre_papel_pdf;
+  const advertenciaFirmas = sinFirmas ? '<br><br><span style="color:#d97706;font-size:0.85rem;">⚠️ <strong>Nota:</strong> Esta orden aún no cuenta con firma de cliente ni cierre en papel registrado.</span>' : '';
+
+  const confirmado = (typeof window.confirmarAccion === 'function')
+    ? await window.confirmarAccion({
+        titulo: 'Cierre Administrativo Formal',
+        mensaje: `¿Deseas cerrar formalmente la orden <strong>${safeEscapeHTML(folioText)}</strong>?${advertenciaFirmas}<br><br>La orden pasará a estado <strong>Cerrada</strong> y saldrá de la Junta de Revisión de Pendientes.`,
+        icono: 'check-circle-2',
+        esPeligroso: false
+      })
+    : confirm(`¿Deseas cerrar formalmente la orden ${folioText}? Pasará a estado "Cerrada" y saldrá de la Junta.`);
+
+  if (!confirmado) return;
+
+  const idx = ordenes.findIndex(x => x && (x.id === o.id || (x.folio && x.folio === o.folio)));
+  if (idx === -1) return;
+
+  const currentUser = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios.find(u => u.id === currentSession.userId) : null;
+  const usuarioNombre = currentUser ? currentUser.nombre : (currentSession.nombre || 'Administrador');
+
+  ordenes[idx].estado = 'Cerrada';
+  ordenes[idx].fecha_cierre_admin = new Date().toISOString();
+  ordenes[idx].cerrado_por_admin = usuarioNombre;
+  ordenes[idx]._synced = false;
+
+  if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) {
+    const wIdx = window.ordenes.findIndex(x => x.id === ordenes[idx].id);
+    if (wIdx >= 0) window.ordenes[wIdx] = ordenes[idx];
+    else window.ordenes.push(ordenes[idx]);
+  }
+
+  try {
+    if (typeof safeSetJSON === 'function') {
+      safeSetJSON('sapi_ordenes', ordenes);
+    } else {
+      localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+    }
+  } catch (err) {
+    console.error('[confirmarCierreOrdenAdmin] Error guardando local:', err);
+  }
+
+  if (window.pushToSupabase) {
+    window.pushToSupabase('ordenes', ordenes[idx]).catch(err => {
+      console.error('[confirmarCierreOrdenAdmin] Error supabase:', err);
+    });
+  }
+
+  if (window.trackTelemetryEvent) {
+    window.trackTelemetryEvent('Cierre Formal de Orden (Admin)', { id: o.id, folio: o.folio, usuario: usuarioNombre });
+  }
+
+  if (typeof mostrarNotificacion === 'function') mostrarNotificacion(`Orden ${folioText} cerrada formalmente con éxito.`, 'success');
+  else if (window.mostrarNotificacion) window.mostrarNotificacion(`Orden ${folioText} cerrada formalmente con éxito.`, 'success');
+
+  verDetalle(o.id);
+
+  try {
+    if (typeof renderTabla === 'function') {
+      renderTabla();
+      renderTabla('servicios');
+    }
+    if (typeof renderStats === 'function') renderStats();
+    if (typeof window.renderJuntaRevision === 'function' && document.getElementById('view-junta')?.classList.contains('active')) {
+      window.renderJuntaRevision();
+    }
+  } catch (e) {
+    console.error('[confirmarCierreOrdenAdmin] Error refrescando vistas:', e);
+  }
+}
+
+async function confirmarReaperturaOrdenAdmin(ordenId) {
+  if (typeof document === 'undefined') return;
+  const currentSession = (typeof window !== 'undefined' && window.currentSession) ? window.currentSession : null;
+  const isAllowedCloseRole = currentSession && ['superadmin', 'admin', 'supervisor'].includes(currentSession.viewMode);
+  if (!isAllowedCloseRole) {
+    if (typeof mostrarNotificacion === 'function') mostrarNotificacion('Solo los administradores y supervisores pueden reabrir una orden cerrada.', 'warning');
+    else if (window.mostrarNotificacion) window.mostrarNotificacion('Solo los administradores y supervisores pueden reabrir una orden cerrada.', 'warning');
+    return;
+  }
+
+  const idTarget = ordenId || window.currentDetalleOrdenId;
+  const o = ordenes.find(x => x && (x.id === idTarget || x.folio === idTarget));
+  if (!o) {
+    if (typeof mostrarNotificacion === 'function') mostrarNotificacion('Orden no encontrada.', 'error');
+    else if (window.mostrarNotificacion) window.mostrarNotificacion('Orden no encontrada.', 'error');
+    return;
+  }
+
+  const folioText = o.folio || o.id;
+
+  const confirmado = (typeof window.confirmarAccion === 'function')
+    ? await window.confirmarAccion({
+        titulo: 'Reabrir Orden de Servicio',
+        mensaje: `¿Deseas reabrir la orden <strong>${safeEscapeHTML(folioText)}</strong>?<br><br>La orden volverá al estado <strong>Completado</strong> y volverá a mostrarse en la Junta de Revisión si tiene trámites pendientes.`,
+        icono: 'rotate-ccw',
+        esPeligroso: true
+      })
+    : confirm(`¿Deseas reabrir la orden ${folioText}? Volverá a estado "Completado".`);
+
+  if (!confirmado) return;
+
+  const idx = ordenes.findIndex(x => x && (x.id === o.id || (x.folio && x.folio === o.folio)));
+  if (idx === -1) return;
+
+  ordenes[idx].estado = 'Completado';
+  ordenes[idx].reabierto_por_admin = currentSession.nombre || 'Administrador';
+  ordenes[idx].fecha_reapertura_admin = new Date().toISOString();
+  ordenes[idx]._synced = false;
+
+  if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) {
+    const wIdx = window.ordenes.findIndex(x => x.id === ordenes[idx].id);
+    if (wIdx >= 0) window.ordenes[wIdx] = ordenes[idx];
+    else window.ordenes.push(ordenes[idx]);
+  }
+
+  try {
+    if (typeof safeSetJSON === 'function') {
+      safeSetJSON('sapi_ordenes', ordenes);
+    } else {
+      localStorage.setItem('sapi_ordenes', JSON.stringify(ordenes));
+    }
+  } catch (err) {
+    console.error('[confirmarReaperturaOrdenAdmin] Error guardando local:', err);
+  }
+
+  if (window.pushToSupabase) {
+    window.pushToSupabase('ordenes', ordenes[idx]).catch(err => {
+      console.error('[confirmarReaperturaOrdenAdmin] Error supabase:', err);
+    });
+  }
+
+  if (window.trackTelemetryEvent) {
+    window.trackTelemetryEvent('Reapertura de Orden (Admin)', { id: o.id, folio: o.folio });
+  }
+
+  if (typeof mostrarNotificacion === 'function') mostrarNotificacion(`Orden ${folioText} reabierta al estado Completado.`, 'info');
+  else if (window.mostrarNotificacion) window.mostrarNotificacion(`Orden ${folioText} reabierta al estado Completado.`, 'info');
+
+  verDetalle(o.id);
+
+  try {
+    if (typeof renderTabla === 'function') {
+      renderTabla();
+      renderTabla('servicios');
+    }
+    if (typeof renderStats === 'function') renderStats();
+    if (typeof window.renderJuntaRevision === 'function' && document.getElementById('view-junta')?.classList.contains('active')) {
+      window.renderJuntaRevision();
+    }
+  } catch (e) {
+    console.error('[confirmarReaperturaOrdenAdmin] Error refrescando vistas:', e);
+  }
+}
+
 // ===== LOGICA DEL CANVAS DE FIRMA =====
 let canvasesFirma = {
   tecnico: { canvas: null, ctx: null, dibujando: false },
@@ -2010,6 +2223,8 @@ export {
   abrirCierrePapel,
   cerrarCierrePapel,
   confirmarCierrePapel,
+  confirmarCierreOrdenAdmin,
+  confirmarReaperturaOrdenAdmin,
   inicializarCanvasFirma,
   borrarCanvasFirma,
   guardarFirmaCanvas,
@@ -2028,6 +2243,8 @@ if (typeof window !== "undefined") {
   window.abrirCierrePapel = abrirCierrePapel;
   window.cerrarCierrePapel = cerrarCierrePapel;
   window.confirmarCierrePapel = confirmarCierrePapel;
+  window.confirmarCierreOrdenAdmin = confirmarCierreOrdenAdmin;
+  window.confirmarReaperturaOrdenAdmin = confirmarReaperturaOrdenAdmin;
   window.inicializarCanvasFirma = inicializarCanvasFirma;
   window.borrarCanvasFirma = borrarCanvasFirma;
   window.guardarFirmaCanvas = guardarFirmaCanvas;
@@ -2044,6 +2261,8 @@ if (typeof window !== "undefined") {
     abrirCierrePapel,
     cerrarCierrePapel,
     confirmarCierrePapel,
+    confirmarCierreOrdenAdmin,
+    confirmarReaperturaOrdenAdmin,
     inicializarCanvasFirma,
     borrarCanvasFirma,
     guardarFirmaCanvas,

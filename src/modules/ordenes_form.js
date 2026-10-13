@@ -348,11 +348,12 @@ function abrirFormulario(id, modoReporte = false) {
     
     // Poblar tickets para la edición
     if (elSoporte && o.soporte) {
-      const t = tickets.find(x => x.id === o.soporte);
-      if (t && !Array.from(elSoporte.options).some(opt => opt.value === t.id)) {
-        elSoporte.innerHTML += `<option value="${t.id}">${t.folio || t.id} - Pedido: ${t.pedidoSAP || 'S/N'}</option>`;
+      const t = tickets.find(x => x.id === o.soporte || x.folio === o.soporte);
+      const targetVal = t ? (t.folio || t.id) : o.soporte;
+      if (!Array.from(elSoporte.options).some(opt => opt.value === targetVal || (t && opt.value === t.id) || (t && opt.value === t.folio))) {
+        elSoporte.innerHTML += `<option value="${targetVal}">${t ? (t.folio || t.id) : targetVal} - Pedido: ${t ? (t.pedidoSAP || 'S/N') : 'S/N'}</option>`;
       }
-      elSoporte.value = o.soporte;
+      elSoporte.value = targetVal;
     }
     
     // refacciones
@@ -425,7 +426,7 @@ function abrirFormulario(id, modoReporte = false) {
     let isCerrado = false;
 
     if (soporteActual) {
-      const t = tickets.find(x => x.id === soporteActual);
+      const t = tickets.find(x => x.id === soporteActual || x.folio === soporteActual);
       if (t && t.estado === 'Cerrado') isCerrado = true;
     }
 
@@ -579,7 +580,7 @@ function onSoporteChange() {
   const inTecnico = document.getElementById('f-tecnico');
   
   if (soporteId) {
-    const t = tickets.find(x => x.id === soporteId);
+    const t = tickets.find(x => x.id === soporteId || x.folio === soporteId);
     if (t) {
       if (t.pedidoSAP) {
         inPedido.value = t.pedidoSAP;
@@ -681,6 +682,9 @@ async function guardarOrden(e) {
   const tipo = document.querySelector('input[name="tipo"]:checked')?.value || 'Servicio';
   let tecnicosSeleccionados = [];
   const soporteIdGuardar = document.getElementById('f-soporte').value.trim();
+  const matchedTicketGuardar = soporteIdGuardar ? tickets.find(x => x.id === soporteIdGuardar || x.folio === soporteIdGuardar) : null;
+  const targetTicketId = matchedTicketGuardar ? matchedTicketGuardar.id : (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(soporteIdGuardar) ? soporteIdGuardar : null);
+  const targetTicketFolio = matchedTicketGuardar ? matchedTicketGuardar.folio : (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(soporteIdGuardar) ? soporteIdGuardar : null);
   const oVieja = editandoId ? (ordenes.find(x => x.id === editandoId) || {}) : null;
 
   // VALIDACIÓN: Avisar si cambiaron los días de hospedaje/alimentos vs ticket extraído
@@ -689,12 +693,13 @@ async function guardarOrden(e) {
   
   if (soporteIdGuardar && window.supabaseClient) {
     try {
-      const { data, error } = await window.supabaseClient
-        .from('pdf_extracciones_ai')
-        .select('extras')
-        .eq('ticket_id', soporteIdGuardar)
-        .order('fecha_extraccion', { ascending: false })
-        .limit(1);
+      let queryExt = window.supabaseClient.from('pdf_extracciones_ai').select('extras');
+      if (targetTicketId && targetTicketFolio) {
+        queryExt = queryExt.or(`ticket_id.eq.${targetTicketId},ticket_id.eq.${targetTicketFolio}`);
+      } else {
+        queryExt = queryExt.eq('ticket_id', soporteIdGuardar);
+      }
+      const { data, error } = await queryExt.order('fecha_extraccion', { ascending: false }).limit(1);
 
       if (!error && data && data.length > 0) {
         const ext = data[0].extras || [];
@@ -734,7 +739,7 @@ async function guardarOrden(e) {
   if (oVieja && (oVieja.tecnicosAsignados?.length > 0 || oVieja.tecnico)) {
     tecnicosSeleccionados = oVieja.tecnicosAsignados || oVieja.tecnico.split(',').map(s => s.trim());
   } else if (soporteIdGuardar) {
-    const t = tickets.find(x => x.id === soporteIdGuardar);
+    const t = matchedTicketGuardar || tickets.find(x => x.id === soporteIdGuardar || x.folio === soporteIdGuardar);
     if (t) {
       if (t.tecnicosAsignados && t.tecnicosAsignados.length > 0) {
         tecnicosSeleccionados = t.tecnicosAsignados;
@@ -772,7 +777,7 @@ async function guardarOrden(e) {
     equipoVal = oVieja.equipo;
   }
   if (!equipoVal && soporteIdGuardar) {
-    const t = tickets.find(x => x.id === soporteIdGuardar);
+    const t = matchedTicketGuardar || tickets.find(x => x.id === soporteIdGuardar || x.folio === soporteIdGuardar);
     if (t && (t.maquinaria || t.equipo)) equipoVal = t.maquinaria || t.equipo;
   }
   if (!equipoVal) {
@@ -846,7 +851,9 @@ async function guardarOrden(e) {
     tecnico: tecnicosSeleccionados.join(', '),
     tecnicosAsignados: tecnicosSeleccionados,
     creadoPor: autorCreador,
-    soporte: document.getElementById('f-soporte').value.trim(),
+    soporte: targetTicketFolio || soporteIdGuardar,
+    ticket_id: targetTicketId || null,
+    ticket_folio: targetTicketFolio || null,
     km_ida: document.getElementById('f-km-ida').value,
     km_vuelta: document.getElementById('f-km-vuelta').value,
     km_total: document.getElementById('f-km-total').value,
@@ -986,7 +993,7 @@ async function guardarOrden(e) {
   
   // Auto-cerrar el ticket relacionado
   if (orden.soporte) {
-    const tIndex = tickets.findIndex(t => t.id === orden.soporte);
+    const tIndex = tickets.findIndex(t => t.id === orden.soporte || t.folio === orden.soporte || (orden.ticket_id && t.id === orden.ticket_id));
     if (tIndex >= 0 && tickets[tIndex].estado !== 'Cerrado') {
       tickets[tIndex].estado = 'Cerrado';
       safeSetJSON('sapi_tickets', tickets);
@@ -1052,7 +1059,13 @@ async function eliminarOrden(id) {
     window.deleteFromSupabase('ordenes', id);
   }
   if (window.trackTelemetryEvent) {
-    window.trackTelemetryEvent('Eliminación de Orden', { id, folio });
+    window.trackTelemetryEvent('Eliminación de Orden', {
+      id,
+      folio,
+      cliente: o ? (o.cliente || '') : '',
+      modelo: o ? (o.modelo || '') : '',
+      motivo: 'Eliminación manual desde listado'
+    });
   }
   renderTabla();
   renderTabla('servicios');

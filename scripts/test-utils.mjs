@@ -22,6 +22,8 @@ import {
   esNombrePaqueteria,
   esResponsableExcluidoOperativo,
   obtenerInfoRolUsuario,
+  esSupervisorOAdmin,
+  esTecnicoCampo,
   mergeEvidencias
 } from '../src/utils.js';
 
@@ -118,7 +120,26 @@ assert.equal(esResponsableExcluidoOperativo('Usuario prueba'), true, 'esResponsa
 assert.equal(esResponsableExcluidoOperativo('Juan Pérez'), false, 'esResponsableExcluidoOperativo permite técnico operativo');
 assert.equal(obtenerInfoRolUsuario('Pablo Besoy').rol, 'superadmin', 'obtenerInfoRolUsuario identifica a Pablo Besoy como superadmin');
 assert.equal(obtenerInfoRolUsuario('Sin Asignar').rol, 'sin_asignar', 'obtenerInfoRolUsuario identifica Sin Asignar correctamente');
-console.log('  ✅ extraerListaResponsables, esNombrePaqueteria y esResponsableExcluidoOperativo: OK');
+assert.equal(obtenerInfoRolUsuario('Almacén y Compras').rol, 'almacen', 'obtenerInfoRolUsuario identifica a Almacén y Compras');
+assert.equal(obtenerInfoRolUsuario('Almacén y Compras').label, 'Almacén y Compras');
+assert.equal(obtenerInfoRolUsuario('Almacén y Compras').icon, 'package');
+assert.equal(obtenerInfoRolUsuario('Compras y Logística').rol, 'almacen', 'obtenerInfoRolUsuario detecta compras/logistica');
+
+const backupUsuariosRoles = globalThis.usuarios;
+try {
+  globalThis.usuarios = [
+    { id: 'u-sup-1', nombre: 'Victor Edmundo Santelis Flores', rol: 'supervisor', activo: true },
+    { id: 'u-tec-1', nombre: 'Sergio Soria', rol: 'tecnico', activo: true }
+  ];
+  assert.equal(esSupervisorOAdmin('Victor Edmundo Santelis Flores'), true, 'esSupervisorOAdmin identifica a Victor Santelis');
+  assert.equal(esSupervisorOAdmin('Sergio Soria'), false, 'esSupervisorOAdmin no incluye a Sergio Soria');
+  assert.equal(esTecnicoCampo('Sergio Soria'), true, 'esTecnicoCampo identifica a Sergio Soria');
+  assert.equal(esTecnicoCampo('Victor Edmundo Santelis Flores'), false, 'esTecnicoCampo no incluye a Victor Santelis');
+  assert.equal(esTecnicoCampo('Almacén y Compras'), false, 'esTecnicoCampo no incluye a Almacén y Compras');
+} finally {
+  globalThis.usuarios = backupUsuariosRoles;
+}
+console.log('  ✅ extraerListaResponsables, esNombrePaqueteria, esResponsableExcluidoOperativo, esSupervisorOAdmin y esTecnicoCampo: OK');
 
 // 2. normStr
 assert.equal(normStr('  TÉCNICO Especial  '), 'tecnico especial', 'normStr debe normalizar acentos y espacios');
@@ -603,6 +624,72 @@ const htmlRezago = generarContenidoTooltipDesglose(mockRespTooltip, 'rezago');
 assert.ok(htmlRezago.includes('Análisis de Rezago'), 'Tooltip rezago debe incluir título');
 assert.ok(htmlRezago.includes('20 días'), 'Tooltip rezago debe incluir max días');
 assert.ok(htmlRezago.includes('Promedio de Rezago'), 'Tooltip rezago debe calcular promedio');
+
+// Test C: Asignación de envíos a Supervisores y a 'Almacén y Compras', NUNCA a técnicos de campo
+const backupTktsJunta = globalThis.tickets;
+const backupEnviosJunta = globalThis.window.obtenerTodosLosEnvios;
+const backupUsuariosJunta = globalThis.usuarios;
+try {
+  globalThis.usuarios = [
+    { id: 'u-sup-1', nombre: 'Victor Edmundo Santelis Flores', rol: 'supervisor', activo: true },
+    { id: 'u-tec-1', nombre: 'Sergio Soria', rol: 'tecnico', activo: true },
+    { id: 'u-tec-2', nombre: 'Jesús Garduño', rol: 'tecnico', activo: true }
+  ];
+  globalThis.tickets = [
+    // Ticket 1: Con supervisor explícito y técnico asignado
+    { id: 'tkt-test-1', folio: 'TKT-1001', supervisor: 'Victor Edmundo Santelis Flores', asignado: 'Sergio Soria', estado: 'Abierto', cliente: 'Cliente Alfa' },
+    // Ticket 2: Solo con técnico asignado, sin supervisor
+    { id: 'tkt-test-2', folio: 'TKT-1002', asignado: 'Jesús Garduño', estado: 'Abierto', cliente: 'Cliente Beta' }
+  ];
+  globalThis.window.obtenerTodosLosEnvios = () => [
+    {
+      id: 'env-1001',
+      ticketId: 'tkt-test-1',
+      ticketFolio: 'TKT-1001',
+      guiaPedido: 'DHL-1111',
+      paqueteria: 'DHL',
+      parts: [{ descripcion: 'Bomba hidráulica', cantidad: 1 }],
+      estatus: 'En Tránsito',
+      fechaEnvio: '2026-10-10'
+    },
+    {
+      id: 'env-1002',
+      ticketId: 'tkt-test-2',
+      ticketFolio: 'TKT-1002',
+      guiaPedido: 'FEDEX-2222',
+      paqueteria: 'FedEx',
+      parts: [{ descripcion: 'Filtro de aire', cantidad: 2 }],
+      estatus: 'En Tránsito',
+      fechaEnvio: '2026-10-11'
+    }
+  ];
+  const itemsPendientes = obtenerTodosLosPendientes();
+
+  // 1. Envío de ticket con supervisor: Asignado al supervisor (Victor Santelis)
+  const envio1 = itemsPendientes.find(i => i.id === 'env-1001');
+  assert.ok(envio1, 'El envío 1 debe estar en la lista de pendientes');
+  assert.equal(envio1.responsable, 'Victor Edmundo Santelis Flores', 'El envío 1 debe estar a cargo del supervisor');
+  assert.equal(envio1.tecnicoDestino, 'Sergio Soria', 'El técnico de destino debe ser Sergio Soria');
+  assert.ok(envio1.titulo.includes('(Para técnico: Sergio Soria)'), 'El título debe clarificar para qué técnico es la refacción');
+
+  // 2. Envío de ticket sin supervisor: Asignado a Almacén y Compras
+  const envio2 = itemsPendientes.find(i => i.id === 'env-1002');
+  assert.ok(envio2, 'El envío 2 debe estar en la lista de pendientes');
+  assert.equal(envio2.responsable, 'Almacén y Compras', 'El envío 2 sin supervisor debe estar a cargo de Almacén y Compras');
+  assert.equal(envio2.tecnicoDestino, 'Jesús Garduño', 'El técnico de destino debe ser Jesús Garduño');
+
+  // 3. Verificar que NINGÚN técnico de campo tenga envíos a su cargo ("solo técnicos no")
+  const enviosDeSergio = itemsPendientes.filter(i => i.tipo === 'envio' && i.responsablesList.includes('Sergio Soria'));
+  assert.equal(enviosDeSergio.length, 0, 'Sergio Soria no debe tener envíos asignados');
+  const enviosDeJesus = itemsPendientes.filter(i => i.tipo === 'envio' && i.responsablesList.includes('Jesús Garduño'));
+  assert.equal(enviosDeJesus.length, 0, 'Jesús Garduño no debe tener envíos asignados');
+} finally {
+  globalThis.tickets = backupTktsJunta;
+  if (backupEnviosJunta) {
+    globalThis.window.obtenerTodosLosEnvios = backupEnviosJunta;
+  }
+  globalThis.usuarios = backupUsuariosJunta;
+}
 
 console.log('  ✅ Juntas de Revisión (obtenerTodosLosPendientes, desgloses interactivos en hover y exports): OK');
 
@@ -1585,6 +1672,7 @@ const {
   obtenerTicketPadre,
   resolverClienteTicket,
   renderTickets,
+  exportarTicketsAExcel,
   esTicketEnTransito,
   badgeTicketEstado,
   getTicketEstadoLabel,
@@ -1604,6 +1692,7 @@ assert.equal(typeof updateOrdenesBadge, 'function', 'updateOrdenesBadge debe ser
 assert.equal(typeof actualizarFiltrosPersonal, 'function', 'actualizarFiltrosPersonal debe ser función');
 assert.equal(typeof ordenarTicketsPor, 'function', 'ordenarTicketsPor debe ser función');
 assert.equal(typeof renderTickets, 'function', 'renderTickets debe ser función');
+assert.equal(typeof exportarTicketsAExcel, 'function', 'exportarTicketsAExcel debe ser función');
 assert.equal(typeof badgeTicketEstado, 'function', 'badgeTicketEstado debe ser función');
 assert.equal(typeof getTicketEstadoLabel, 'function', 'getTicketEstadoLabel debe ser función');
 assert.equal(typeof esTicketHijoRefacciones, 'function', 'esTicketHijoRefacciones debe ser función');
@@ -1834,6 +1923,8 @@ const {
   abrirCierrePapel,
   cerrarCierrePapel,
   confirmarCierrePapel,
+  confirmarCierreOrdenAdmin,
+  confirmarReaperturaOrdenAdmin,
   inicializarCanvasFirma,
   borrarCanvasFirma,
   guardarFirmaCanvas,
@@ -1852,6 +1943,8 @@ assert.equal(typeof agregarRenglonTecnicoCierre, 'function', 'agregarRenglonTecn
 assert.equal(typeof abrirCierrePapel, 'function', 'abrirCierrePapel debe ser función');
 assert.equal(typeof cerrarCierrePapel, 'function', 'cerrarCierrePapel debe ser función');
 assert.equal(typeof confirmarCierrePapel, 'function', 'confirmarCierrePapel debe ser función');
+assert.equal(typeof confirmarCierreOrdenAdmin, 'function', 'confirmarCierreOrdenAdmin debe ser función');
+assert.equal(typeof confirmarReaperturaOrdenAdmin, 'function', 'confirmarReaperturaOrdenAdmin debe ser función');
 assert.equal(typeof inicializarCanvasFirma, 'function', 'inicializarCanvasFirma debe ser función');
 assert.equal(typeof borrarCanvasFirma, 'function', 'borrarCanvasFirma debe ser función');
 assert.equal(typeof guardarFirmaCanvas, 'function', 'guardarFirmaCanvas debe ser función');
@@ -1881,6 +1974,8 @@ assert.doesNotThrow(() => {
   inicializarCanvasFirma('cliente');
   borrarCanvasFirma('cliente');
   guardarFirmaCanvas('ord-1', 'cliente');
+  confirmarCierreOrdenAdmin('ord-1');
+  confirmarReaperturaOrdenAdmin('ord-1');
 }, 'Las funciones de ordenes_detalle no deben arrojar error en ausencia de DOM');
 
 // Test D: Validación exhaustiva de mergeEvidencias (cero pérdida de evidencias)
@@ -2019,6 +2114,7 @@ const {
   renderTabla,
   badgeEstado,
   filtrarOrdenes,
+  exportarOrdenesAExcel,
   cargarMasOrdenes,
   mostrarTodasLasOrdenes,
   resetOrdenPageLimit,
@@ -2032,6 +2128,7 @@ assert.equal(typeof toggleSortOrdenes, 'function', 'toggleSortOrdenes debe ser f
 assert.equal(typeof renderTabla, 'function', 'renderTabla debe ser función');
 assert.equal(typeof badgeEstado, 'function', 'badgeEstado debe ser función');
 assert.equal(typeof filtrarOrdenes, 'function', 'filtrarOrdenes debe ser función');
+assert.equal(typeof exportarOrdenesAExcel, 'function', 'exportarOrdenesAExcel debe ser función');
 assert.equal(typeof cargarMasOrdenes, 'function', 'cargarMasOrdenes debe ser función');
 assert.equal(typeof mostrarTodasLasOrdenes, 'function', 'mostrarTodasLasOrdenes debe ser función');
 assert.equal(typeof resetOrdenPageLimit, 'function', 'resetOrdenPageLimit debe ser función');
@@ -2698,6 +2795,176 @@ assert.equal(typeof procesarArchivosArrastrados, 'function', 'procesarArchivosAr
   }
 }
 console.log('  ✅ Soporte de Drag & Drop para PDFs en Tickets (Cotizaciones y Pedidos): OK');
+
+console.log('Test 56: Exportación a Excel (.xlsx) de Tickets y Órdenes de Servicio');
+{
+  const originalDoc = globalThis.document;
+  const originalWindow = globalThis.window;
+  const originalXlsx = globalThis.XLSX;
+
+  try {
+    const fs = await import('fs');
+    const { JSDOM } = await import('jsdom');
+    const indexHtmlContent = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf-8');
+
+    // 1. Verificar existencia de botones en index.html
+    assert.ok(indexHtmlContent.includes('id="btn-exportar-tickets-excel"'), 'El botón de exportar tickets debe estar presente en index.html');
+    assert.ok(indexHtmlContent.includes('id="btn-exportar-ordenes-excel"'), 'El botón de exportar órdenes debe estar presente en index.html');
+
+    // 2. Simular entorno DOM y XLSX mockeado para pruebas
+    const dom = new JSDOM(`
+      <!DOCTYPE html>
+      <html>
+      <body>
+        <div id="view-tickets" class="active"></div>
+        <div id="page-title"></div>
+        <div id="tkt-filtered-count"></div>
+        <input id="search-tickets" value="" />
+        <button id="btn-exportar-tickets-excel" style="display:none;"></button>
+        <div id="tickets-body"></div>
+
+        <input id="search-servicios" value="" />
+        <button id="btn-exportar-ordenes-excel" style="display:inline-flex;"></button>
+        <button id="btn-regenerar-ordenes" style="display:none;"></button>
+        <tbody id="tabla-body-servicios"></tbody>
+      </body>
+      </html>
+    `, { url: 'http://localhost:3005' });
+
+    globalThis.document = dom.window.document;
+    globalThis.window = dom.window;
+
+    let excelExportedSheets = [];
+    let excelExportedFiles = [];
+    globalThis.XLSX = {
+      utils: {
+        json_to_sheet: (data) => {
+          excelExportedSheets.push(data);
+          return { '!cols': [] };
+        },
+        book_new: () => ({ Sheets: {}, SheetNames: [] }),
+        book_append_sheet: (wb, ws, name) => {
+          wb.Sheets[name] = ws;
+          wb.SheetNames.push(name);
+        }
+      },
+      writeFile: (wb, filename) => {
+        excelExportedFiles.push(filename);
+      }
+    };
+    dom.window.XLSX = globalThis.XLSX;
+
+    const savedGlobalSession = globalThis.currentSession;
+    const savedGlobalTickets = globalThis._currentTicketsFiltrados;
+    const savedGlobalOrdenes = globalThis._currentOrdenesFiltradas;
+
+    // 3. Prueba de Seguridad: Usuario NO superadmin intenta exportar tickets
+    dom.window.currentSession = { userId: 'tec-1', viewMode: 'tecnico', nombre: 'Juan Técnico' };
+    globalThis.currentSession = dom.window.currentSession;
+    const ticketsPrueba = [
+      {
+        id: 'tkt-1',
+        folio: 'TKT-1001',
+        asunto: 'Falla bomba hidráulica',
+        categoria: 'Mantenimiento Correctivo',
+        solicitante: 'Pedro Supervisor',
+        cliente: 'Constructora Alfa',
+        sitio: 'Planta Norte',
+        area: 'Taller',
+        prioridad: 'Alta',
+        estado: 'Abierto',
+        comentariosInternos: [
+          { usuario: 'Carlos Ing', texto: 'Se requiere cambio de empaque', fecha: '2026-10-12T10:00:00Z' }
+        ],
+        cotizacionSAP: 'COT-8877',
+        montoCotizacion: 12500,
+        pedidoSAP: 'PED-4433',
+        asignado: 'Juan Técnico',
+        fechaCreacion: '2026-10-12T08:00:00Z',
+        fechaModificacion: '2026-10-12T10:30:00Z',
+        modificadoPor: 'Carlos Ing'
+      }
+    ];
+
+    dom.window._currentTicketsFiltrados = ticketsPrueba;
+    dom.window.tickets = ticketsPrueba;
+    globalThis._currentTicketsFiltrados = ticketsPrueba;
+
+    const resBloqueado = exportarTicketsAExcel();
+    assert.strictEqual(resBloqueado, null, 'exportarTicketsAExcel debe retornar null y rechazar la exportación si el usuario no es superadmin');
+    assert.strictEqual(excelExportedFiles.length, 0, 'No debe haberse generado ningún archivo Excel');
+
+    // 4. Prueba con Super Administrador: exportación exitosa de tickets
+    dom.window.currentSession = { userId: 'admin-root', viewMode: 'superadmin', realRol: 'superadmin', nombre: 'Super Administrador' };
+    globalThis.currentSession = dom.window.currentSession;
+
+    const resExitoTickets = exportarTicketsAExcel();
+    assert.ok(Array.isArray(resExitoTickets), 'exportarTicketsAExcel debe retornar el arreglo de datos mapeados');
+    assert.strictEqual(resExitoTickets.length, 1, 'Debe exportar el ticket de prueba');
+    assert.strictEqual(resExitoTickets[0]['Folio'], 'TKT-1001');
+    assert.strictEqual(resExitoTickets[0]['Asunto'], 'Falla bomba hidráulica');
+    assert.strictEqual(resExitoTickets[0]['Cliente'], 'Constructora Alfa');
+    assert.strictEqual(resExitoTickets[0]['Último Comentario'], 'Se requiere cambio de empaque');
+    assert.strictEqual(resExitoTickets[0]['Autor Comentario'], 'Carlos Ing');
+    assert.strictEqual(resExitoTickets[0]['Cotización SAP'], 'COT-8877');
+    assert.strictEqual(resExitoTickets[0]['Monto Cotización ($)'], 12500);
+    assert.strictEqual(resExitoTickets[0]['Pedido SAP'], 'PED-4433');
+    assert.strictEqual(resExitoTickets[0]['Técnico Asignado'], 'Juan Técnico');
+    assert.ok(excelExportedFiles.some(f => f.startsWith('Tickets_Eurorep_')), 'Debe haberse generado el archivo Excel de tickets');
+
+    // 5. Prueba de Órdenes de Servicio: Bloqueo para perfiles Empresa
+    dom.window.currentSession = { userId: 'cli-1', viewMode: 'empresa', nombre: 'Cliente Portal' };
+    globalThis.currentSession = dom.window.currentSession;
+    const ordenesPrueba = [
+      {
+        id: 'ord-1',
+        folio: 'OS-2001',
+        soporte: 'tkt-1',
+        cliente: 'Constructora Alfa',
+        ubicacion: 'Planta Norte',
+        modelo: 'Montacargas Yale ERP-030',
+        serie: 'YAL-998877',
+        tipo: 'Correctivo',
+        estado: 'En Proceso',
+        tecnico: 'Juan Técnico',
+        fecha: '2026-10-12',
+        created_at: '2026-10-12T09:00:00Z',
+        descripcion: 'Fuga de aceite en pistón principal',
+        trabajo_realizado: 'Diagnóstico preliminar',
+        horometro: 1420
+      }
+    ];
+    dom.window._currentOrdenesFiltradas = ordenesPrueba;
+    dom.window.ordenes = ordenesPrueba;
+    globalThis._currentOrdenesFiltradas = ordenesPrueba;
+
+    const resBloqueadoOrdenes = exportarOrdenesAExcel();
+    assert.strictEqual(resBloqueadoOrdenes, null, 'exportarOrdenesAExcel debe retornar null y rechazar para rol empresa');
+
+    // 6. Prueba de Órdenes de Servicio: Exportación exitosa para personal operativo (admin/supervisor/superadmin)
+    dom.window.currentSession = { userId: 'sup-1', viewMode: 'supervisor', nombre: 'Supervisor General' };
+    globalThis.currentSession = dom.window.currentSession;
+    const resExitoOrdenes = exportarOrdenesAExcel();
+    assert.ok(Array.isArray(resExitoOrdenes), 'exportarOrdenesAExcel debe retornar el arreglo de datos mapeados');
+    assert.strictEqual(resExitoOrdenes.length, 1, 'Debe exportar la orden de prueba');
+    assert.strictEqual(resExitoOrdenes[0]['Folio'], 'OS-2001');
+    assert.strictEqual(resExitoOrdenes[0]['Ticket Asociado'], 'TKT-1001');
+    assert.strictEqual(resExitoOrdenes[0]['Cliente'], 'Constructora Alfa');
+    assert.strictEqual(resExitoOrdenes[0]['Modelo'], 'Montacargas Yale ERP-030');
+    assert.strictEqual(resExitoOrdenes[0]['No. Serie'], 'YAL-998877');
+    assert.strictEqual(resExitoOrdenes[0]['Horómetro'], 1420);
+    assert.strictEqual(resExitoOrdenes[0]['Descripción / Falla'], 'Fuga de aceite en pistón principal');
+    assert.ok(excelExportedFiles.some(f => f.startsWith('Ordenes_Servicio_Eurorep_')), 'Debe haberse generado el archivo Excel de órdenes');
+  } finally {
+    globalThis.document = originalDoc;
+    globalThis.window = originalWindow;
+    globalThis.XLSX = originalXlsx;
+    if (typeof savedGlobalSession !== 'undefined') globalThis.currentSession = savedGlobalSession;
+    if (typeof savedGlobalTickets !== 'undefined') globalThis._currentTicketsFiltrados = savedGlobalTickets;
+    if (typeof savedGlobalOrdenes !== 'undefined') globalThis._currentOrdenesFiltradas = savedGlobalOrdenes;
+  }
+}
+console.log('  ✅ Exportación a Excel (.xlsx) de Tickets y Órdenes de Servicio: OK');
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
 

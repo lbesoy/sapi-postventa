@@ -20,12 +20,12 @@ window.fetchTablePaginated = async (tableName, selectQuery = '*', orderColumn = 
     return [];
   }
   
-  // Tablas con campos JSONB pesados o RLS compleja (tickets) se descargan en lotes seguros de 50 y orden indexado
+  // Tablas con campos JSONB pesados o RLS compleja (tickets) se descargan con orden indexado por clave primaria
   if (tableName === 'tickets') {
-    if (pageLimit > 50) pageLimit = 50;
+    if (pageLimit > 100) pageLimit = 100;
     if (!orderColumn) {
-      orderColumn = 'created_at';
-      orderAscending = false;
+      orderColumn = 'id';
+      orderAscending = true;
     }
   }
 
@@ -33,21 +33,33 @@ window.fetchTablePaginated = async (tableName, selectQuery = '*', orderColumn = 
   let fetchMore = true;
   let page = 0;
   while (fetchMore) {
-    let query = sb.from(tableName).select(selectQuery);
-    if (queryModifier) {
-      query = queryModifier(query);
+    // Timeout protector por página con reintento automático y nueva instancia de query
+    let data = null;
+    let error = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        let query = sb.from(tableName).select(selectQuery);
+        if (queryModifier) {
+          query = queryModifier(query);
+        }
+        if (orderColumn) {
+          query = query.order(orderColumn, { ascending: orderAscending });
+        }
+        const fetchPromise = query.range(page * pageLimit, (page + 1) * pageLimit - 1);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error(`Timeout (${timeoutMs/1000}s) en tabla ${tableName}`)), timeoutMs)
+        );
+        const res = await Promise.race([fetchPromise, timeoutPromise]);
+        data = res.data;
+        error = res.error;
+        if (!error && data) break;
+      } catch (err) {
+        error = err;
+      }
+      if (attempt === 0) {
+        await new Promise(r => setTimeout(r, 400));
+      }
     }
-    if (orderColumn) {
-      query = query.order(orderColumn, { ascending: orderAscending });
-    }
-    
-    // Timeout protector de 30s para evitar cuelgues indefinidos
-    const fetchPromise = query.range(page * pageLimit, (page + 1) * pageLimit - 1);
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error(`Timeout (${timeoutMs/1000}s) en tabla ${tableName}`)), timeoutMs)
-    );
-
-    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
     if (error) {
       if (tableName === 'sapi_email_logs' && (error.message?.includes('schema cache') || error.code === '42P01' || error.message?.includes('404') || error.message?.includes('does not exist'))) {
@@ -4246,27 +4258,44 @@ window.cargarDatosDeSupabase = function() {
       let idsWithPedido = new Set();
       let idsWithCotizacion = new Set();
       try {
-        let columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, notas, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion, creado_por, fecha_modificacion, updated_at, modificado_por, comentarios_internos, comentarios_clientes';
+        const lightCols = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, notas, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion, creado_por, fecha_modificacion, updated_at, modificado_por';
+        const sb = window.supabaseClient;
+        if (!sb) throw new Error('Supabase client no disponible');
+
         try {
-          ticketsDb = await fetchTablePaginated('tickets', columns, 'created_at', false, null, 50, 20000);
-        } catch (colErr) {
-          console.warn('[Sync] Reintentando carga de tickets con columnas ultraligeras...', colErr?.message);
-          try {
-            columns = 'id, folio, fecha, fecha_creacion, canal, contacto, asunto, cliente, sitio, solicitante, area, categoria, prioridad, asignado, descripcion, equipo, estado, cotizacion_sap, cot_aceptada, motivo_rechazo, pedido_sap, created_at, fecha_cierre, monto_cotizacion, creado_por, comentarios_internos, comentarios_clientes';
-            ticketsDb = await fetchTablePaginated('tickets', columns, 'created_at', false, null, 40, 20000);
-          } catch (colErr2) {
-            console.warn('[Sync] Reintentando consulta directa indexada de tickets...', colErr2?.message);
-            const sb = window.supabaseClient;
-            if (sb) {
-              const { data: directData, error: directErr } = await sb.from('tickets').select(columns).order('created_at', { ascending: false }).limit(250);
-              if (!directErr && directData) {
-                ticketsDb = directData;
-              } else {
-                throw colErr2;
-              }
-            } else {
-              throw colErr2;
+          // Descarga ultrarrápida paralela en dos canales: atributos ligeros + comentarios JSONB (1.3s total)
+          const [tktRes, comsRes] = await Promise.all([
+            sb.from('tickets').select(lightCols).limit(1500),
+            sb.from('tickets').select('id, comentarios_internos, comentarios_clientes').limit(1500)
+          ]);
+
+          if (tktRes.error) throw tktRes.error;
+          if (tktRes.data && Array.isArray(tktRes.data)) {
+            const comsMap = new Map();
+            if (comsRes.data && Array.isArray(comsRes.data)) {
+              comsRes.data.forEach(c => comsMap.set(c.id, c));
             }
+            ticketsDb = tktRes.data.map(t => {
+              const c = comsMap.get(t.id);
+              return {
+                ...t,
+                comentarios_internos: c?.comentarios_internos || [],
+                comentarios_clientes: c?.comentarios_clientes || []
+              };
+            });
+          }
+        } catch (fastErr) {
+          console.warn('[Sync] Reintentando carga de tickets por canal primario indexado...', fastErr?.message);
+          try {
+            const { data: directLight, error: directErr } = await sb.from('tickets').select(lightCols).limit(1500);
+            if (!directErr && directLight) {
+              ticketsDb = directLight;
+            } else {
+              throw directErr || fastErr;
+            }
+          } catch (colErr2) {
+            console.warn('[Sync] Reintentando paginado seguro con orden indexado por ID...', colErr2?.message);
+            ticketsDb = await fetchTablePaginated('tickets', lightCols, 'id', true, null, 100, 30000);
           }
         }
       } catch (e) {

@@ -15,7 +15,7 @@ function _safeGet(key, fallback) {
   }
   return fallback;
 }
-import { cleanMojibake, normStr, safeFormatDate, formatFechaHoraAmigable, urlToDataUri, escapeHTML, calcularDiasJunta, formatearTiempoRelativoJunta, normalizarTextoJunta, unificarNombreUsuario, obtenerInfoRolUsuario, extraerListaResponsables, esNombrePaqueteria, esResponsableExcluidoOperativo } from "../utils.js";
+import { cleanMojibake, normStr, safeFormatDate, formatFechaHoraAmigable, urlToDataUri, escapeHTML, calcularDiasJunta, formatearTiempoRelativoJunta, normalizarTextoJunta, unificarNombreUsuario, obtenerInfoRolUsuario, extraerListaResponsables, esNombrePaqueteria, esResponsableExcluidoOperativo, esSupervisorOAdmin, esTecnicoCampo } from "../utils.js";
 import { supabaseClient } from "../supabaseClient.js";
 
 /**
@@ -499,21 +499,82 @@ function obtenerTodosLosPendientes() {
         ? e.parts.map(p => `${p.cantidad || 1}x ${p.descripcion || p.codigo || 'Pieza'}`).join(', ')
         : 'Refacciones varias';
 
-      // El responsable debe ser un técnico o supervisor operativo asignado al ticket/orden asociado, NUNCA paqueterías ni directivos excluidos
-      let responsableRaw = (e.responsable && !esNombrePaqueteria(e.responsable) && !esResponsableExcluidoOperativo(e.responsable)) ? e.responsable : '';
-      if (!responsableRaw && e.ticketId) {
-        const tPadre = tkts.find(t => t && (t.id === e.ticketId || t.folio === e.ticketId || t.folio === e.ticketFolio));
-        if (tPadre) {
-          const tResp = tPadre.asignado || tPadre.supervisor || tPadre.tecnico || '';
-          if (!esResponsableExcluidoOperativo(tResp)) {
-            responsableRaw = tResp;
+      // Envíos: Los supervisores SÍ pueden estar encargados de envíos de refacciones.
+      // Los técnicos de campo NUNCA deben tener envíos asignados a su cargo ("solo técnicos no").
+      // Si no hay un supervisor asignado, el envío se agrupa bajo "Almacén y Compras".
+      const isPaqFn = (typeof esNombrePaqueteria === 'function') ? esNombrePaqueteria : (typeof window !== 'undefined' && window.esNombrePaqueteria ? window.esNombrePaqueteria : () => false);
+      const isExclFn = (typeof esResponsableExcluidoOperativo === 'function') ? esResponsableExcluidoOperativo : (typeof window !== 'undefined' && window.esResponsableExcluidoOperativo ? window.esResponsableExcluidoOperativo : () => false);
+      const isSupFn = (typeof esSupervisorOAdmin === 'function') ? esSupervisorOAdmin : (typeof window !== 'undefined' && window.esSupervisorOAdmin ? window.esSupervisorOAdmin : () => false);
+      const isTecFn = (typeof esTecnicoCampo === 'function') ? esTecnicoCampo : (typeof window !== 'undefined' && window.esTecnicoCampo ? window.esTecnicoCampo : () => false);
+
+      let tPadre = null;
+      if (e.ticketId) {
+        tPadre = tkts.find(t => t && (t.id === e.ticketId || t.folio === e.ticketId || t.folio === e.ticketFolio));
+      }
+
+      let tecnicoAsoc = '';
+      let responsableElegido = '';
+
+      // 1. Evaluar si el envío trae responsable explícito
+      if (e.responsable && !isPaqFn(e.responsable) && !isExclFn(e.responsable)) {
+        if (isSupFn(e.responsable)) {
+          responsableElegido = e.responsable;
+        } else if (isTecFn(e.responsable)) {
+          tecnicoAsoc = e.responsable;
+        } else if (String(e.responsable).toLowerCase().includes('almacen') || String(e.responsable).toLowerCase().includes('compras') || String(e.responsable).toLowerCase().includes('logistica')) {
+          responsableElegido = 'Almacén y Compras';
+        }
+      }
+
+      // 2. Si no hay responsable supervisor asignado aún, buscar en el ticket padre
+      if (tPadre) {
+        // Identificar técnico asociado para trazabilidad en el título
+        if (!tecnicoAsoc) {
+          const tTec = tPadre.asignado || tPadre.tecnico || '';
+          if (tTec && isTecFn(tTec)) {
+            tecnicoAsoc = tTec;
+          } else if (Array.isArray(tPadre.tecnicosAsignados) && tPadre.tecnicosAsignados.length > 0) {
+            tecnicoAsoc = tPadre.tecnicosAsignados.join(', ');
+          }
+        }
+
+        // Buscar supervisor asignado al ticket
+        if (!responsableElegido || !isSupFn(responsableElegido)) {
+          if (tPadre.supervisor && isSupFn(tPadre.supervisor)) {
+            responsableElegido = tPadre.supervisor;
+          } else if (tPadre.asignado && isSupFn(tPadre.asignado)) {
+            responsableElegido = tPadre.asignado;
+          } else if (tPadre.cliente && typeof clientesDb !== 'undefined' && Array.isArray(clientesDb)) {
+            const cli = clientesDb.find(c => c && c.nombre && (
+              (typeof normalizarTextoJunta === 'function' ? normalizarTextoJunta(c.nombre) : String(c.nombre).toLowerCase().trim()) === 
+              (typeof normalizarTextoJunta === 'function' ? normalizarTextoJunta(tPadre.cliente) : String(tPadre.cliente).toLowerCase().trim())
+            ));
+            if (cli) {
+              if (cli.supervisorAsignado && isSupFn(cli.supervisorAsignado)) {
+                responsableElegido = cli.supervisorAsignado;
+              } else if (Array.isArray(cli.supervisoresAsignados) && cli.supervisoresAsignados.length > 0) {
+                const supName = cli.supervisoresAsignados.map(idOrName => {
+                  if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
+                    const u = usuarios.find(usr => usr.id === idOrName || usr.nombre === idOrName);
+                    if (u && u.nombre) return u.nombre;
+                  }
+                  return idOrName;
+                }).find(n => isSupFn(n));
+                if (supName) responsableElegido = supName;
+              }
+            }
           }
         }
       }
-      if (!responsableRaw || esNombrePaqueteria(responsableRaw) || esResponsableExcluidoOperativo(responsableRaw)) {
-        responsableRaw = 'Sin Asignar';
+
+      // 3. Si no hay supervisor asignado, o el responsable detectado es un técnico de campo:
+      // Se agrupa bajo "Almacén y Compras" (los técnicos NUNCA deben tener envíos)
+      if (!responsableElegido || isTecFn(responsableElegido) || isPaqFn(responsableElegido) || isExclFn(responsableElegido)) {
+        responsableElegido = 'Almacén y Compras';
       }
-      const listaResp = extraerListaResponsables(responsableRaw);
+
+      const listaResp = extraerListaResponsables(responsableElegido);
+      const tecnicoInfoStr = (tecnicoAsoc && !isExclFn(tecnicoAsoc) && tecnicoAsoc !== responsableElegido) ? ` (Para técnico: ${tecnicoAsoc})` : '';
 
       lista.push({
         id: e.id,
@@ -523,13 +584,14 @@ function obtenerTodosLosPendientes() {
         tipoIcon: 'truck',
         tipoColor: '#f59e0b',
         folio: e.guiaPedido ? `GUÍA: ${e.guiaPedido}` : `ENV-${String(e.id).substring(0,8)}`,
-        titulo: `Refacciones para ${e.ticketFolio || 'Ticket'}: ${partesTexto}`,
+        titulo: `Refacciones para ${e.ticketFolio || 'Ticket'}${tecnicoInfoStr}: ${partesTexto}`,
         cliente: e.cliente || 'Sin Cliente',
         sitio: e.sitio || 'General',
         equipo: e.equipo || '',
         serie: e.serie || '',
         responsable: listaResp.join(', '),
         responsablesList: listaResp,
+        tecnicoDestino: tecnicoAsoc,
         prioridad: dias > 5 ? 'Alta' : 'Media',
         estado: e.estatus || 'En Tránsito',
         fecha: fechaEnvio,
@@ -1276,6 +1338,12 @@ function renderJuntaResponsablesTable(todos) {
         };
       }
       if (!grupos[rName].items.some(x => x.tipo === item.tipo && x.id === item.id)) {
+        if (item.tipo === 'envio') {
+          const isTecCheck = (typeof esTecnicoCampo === 'function') ? esTecnicoCampo : (typeof window !== 'undefined' && window.esTecnicoCampo ? window.esTecnicoCampo : () => false);
+          if (isTecCheck(rName)) {
+            return; // Blindaje: los técnicos de campo nunca reciben envíos a su cargo
+          }
+        }
         grupos[rName].items.push(item);
         grupos[rName].total++;
         if (item.tipo === 'ticket') {
@@ -1494,15 +1562,23 @@ function generarHtmlTarjetaJunta(item, tecnicosDisponibles) {
     `;
   }
 
-  // Selector de reasignación rápida (Supervisores para tickets, Técnicos para órdenes/levantamientos/envíos)
-  const listaDisponibles = (item.tipo === 'ticket') 
-    ? (typeof window.obtenerListaSupervisoresJunta === 'function' ? window.obtenerListaSupervisoresJunta() : [])
+  // Selector de reasignación rápida:
+  // - Tickets y Envíos: Supervisores (y Almacén y Compras para envíos)
+  // - Órdenes y Levantamientos: Técnicos operativos
+  const listaDisponibles = (item.tipo === 'ticket' || item.tipo === 'envio') 
+    ? (() => {
+        const sups = typeof window.obtenerListaSupervisoresJunta === 'function' ? window.obtenerListaSupervisoresJunta() : [];
+        if (item.tipo === 'envio') {
+          return ['Almacén y Compras', ...sups.filter(s => s !== 'Almacén y Compras')];
+        }
+        return sups;
+      })()
     : (tecnicosDisponibles && tecnicosDisponibles.length > 0 ? tecnicosDisponibles : (typeof window.obtenerListaTecnicosJunta === 'function' ? window.obtenerListaTecnicosJunta() : []));
 
   let primerResp = (item.responsablesList && item.responsablesList[0]) ? item.responsablesList[0] : 'Sin Asignar';
-  if (item.tipo === 'ticket' && primerResp !== 'Sin Asignar') {
+  if ((item.tipo === 'ticket' || item.tipo === 'envio') && primerResp !== 'Sin Asignar') {
     const isSup = listaDisponibles.some(s => normalizarTextoJunta(s) === normalizarTextoJunta(primerResp));
-    if (!isSup) primerResp = 'Sin Asignar';
+    if (!isSup) primerResp = item.tipo === 'envio' ? 'Almacén y Compras' : 'Sin Asignar';
   }
 
   let tecOptionsHtml = `<option value="${escapeHTML(primerResp)}" selected>${escapeHTML(primerResp)}</option>`;
@@ -1627,8 +1703,8 @@ function generarHtmlTarjetaJunta(item, tecnicosDisponibles) {
           })()}
           
           <!-- Reasignación rápida de responsable/técnico en 1 clic -->
-          <div style="display: inline-flex; align-items: center; gap: 3px; background: var(--bg-hover); padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border);" title="${item.tipo === 'ticket' ? 'Reasignar supervisor' : 'Reasignar técnico'}" onclick="event.stopPropagation();">
-            <i data-lucide="${item.tipo === 'ticket' ? 'user-check' : 'user'}" style="width: 12px; height: 12px; color: var(--accent);"></i>
+          <div style="display: inline-flex; align-items: center; gap: 3px; background: var(--bg-hover); padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border);" title="${(item.tipo === 'ticket' || item.tipo === 'envio') ? 'Reasignar supervisor' : 'Reasignar técnico'}" onclick="event.stopPropagation();">
+            <i data-lucide="${(item.tipo === 'ticket' || item.tipo === 'envio') ? 'user-check' : 'user'}" style="width: 12px; height: 12px; color: var(--accent);"></i>
             <select onclick="event.stopPropagation();" onchange="event.stopPropagation(); window.juntaReasignarTecnico('${item.tipo}', '${item.id}', this.value)" style="border: none; background: transparent; color: var(--text-primary); font-size: 0.74rem; font-weight: 600; cursor: pointer; outline: none; max-width: 150px;">
               ${tecOptionsHtml}
             </select>

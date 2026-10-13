@@ -123,6 +123,11 @@
     const clientesDb = (typeof window !== 'undefined' && Array.isArray(window.clientesDb)) ? window.clientesDb : [];
 
     if (isServiciosView) {
+      const btnExportOrd = document.getElementById('btn-exportar-ordenes-excel');
+      if (btnExportOrd) {
+        const isEmpresaUser = currentSession && ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+        btnExportOrd.style.display = isEmpresaUser ? 'none' : 'inline-flex';
+      }
       const btnRegen = document.getElementById('btn-regenerar-ordenes');
       if (btnRegen) {
         const isAdmin = currentSession && ['superadmin', 'admin'].includes(currentSession.viewMode);
@@ -393,6 +398,10 @@
       }
     });
 
+    if (isServiciosView && typeof window !== 'undefined') {
+      window._currentOrdenesFiltradas = filtradas;
+    }
+
     const body = document.getElementById(bodyId);
     if (!body) return;
     if (!filtradas.length) {
@@ -429,12 +438,26 @@
       if (((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__') || o.cierre_papel_pdf) && (!currentSession || !['superadmin', 'admin'].includes(currentSession.viewMode))) {
         orderCanEdit = false;
       }
-      const ticketAsoc = (o.soporte || o.ticket_id || o.ticket_folio)
-        ? tickets.find(x => x.id === o.soporte || x.folio === o.soporte || (o.ticket_id && x.id === o.ticket_id) || (o.ticket_folio && x.folio === o.ticket_folio))
+      const targetVal = o.soporte || o.ticket_id || o.ticket_folio;
+      const isUuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const ticketAsoc = targetVal
+        ? tickets.find(x => x.id === targetVal || x.folio === targetVal || (o.ticket_id && x.id === o.ticket_id) || (o.ticket_folio && x.folio === o.ticket_folio) || (o.soporte && (x.id === o.soporte || x.folio === o.soporte)))
         : null;
-      const ticketHtml = ticketAsoc
-        ? `<a href="#" onclick="verDetalleTicket('${ticketAsoc.id}'); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;" title="${ticketAsoc.asunto || ''}">${ticketAsoc.folio}</a>`
-        : (o.soporte ? `<span style="font-family:monospace; font-size:0.8rem; color:var(--text-muted);">${o.soporte}</span>` : '-');
+      let ticketHtml = '-';
+      if (ticketAsoc) {
+        ticketHtml = `<a href="#" onclick="verDetalleTicket('${ticketAsoc.id || ticketAsoc.folio}'); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;" title="${ticketAsoc.asunto || ''}">${ticketAsoc.folio || ticketAsoc.id}</a>`;
+      } else if (o.ticket_folio || (o.soporte && !isUuidRegex.test(o.soporte))) {
+        const displayFolio = o.ticket_folio || o.soporte;
+        const callId = o.ticket_id || o.soporte;
+        ticketHtml = `<a href="#" onclick="verDetalleTicket('${callId}'); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;" title="Ticket ${displayFolio}">${displayFolio}</a>`;
+      } else if (o.soporte) {
+        const knownFolio = (typeof window !== 'undefined' && window._ticketFolioMap) ? window._ticketFolioMap[o.soporte] : null;
+        if (knownFolio) {
+          ticketHtml = `<a href="#" onclick="verDetalleTicket('${o.soporte}'); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;" title="Ticket ${knownFolio}">${knownFolio}</a>`;
+        } else {
+          ticketHtml = `<span class="async-ticket-cell" data-tkt-id="${o.soporte}" style="color: var(--accent); font-weight: 600; font-size: 0.85rem;"><i data-lucide="loader" style="width:12px;height:12px;display:inline-block;animation:spin 1s linear infinite;vertical-align:middle;"></i> Ticket...</span>`;
+        }
+      }
       
       return `
       <tr>
@@ -488,6 +511,28 @@
     if (typeof lucide !== 'undefined' && lucide.createIcons) {
       lucide.createIcons();
     }
+    resolvePendingAsyncTickets();
+  }
+
+  function resolvePendingAsyncTickets() {
+    if (typeof document === 'undefined') return;
+    const pending = document.querySelectorAll('.async-ticket-cell[data-tkt-id]');
+    if (!pending || pending.length === 0) return;
+    const ids = Array.from(new Set(Array.from(pending).map(el => el.getAttribute('data-tkt-id')).filter(Boolean)));
+    if (ids.length === 0 || typeof window === 'undefined' || !window.supabaseClient) return;
+
+    window.supabaseClient.from('tickets').select('id, folio').in('id', ids.slice(0, 50)).then(({ data, error }) => {
+      if (error || !data) return;
+      if (!window._ticketFolioMap) window._ticketFolioMap = {};
+      data.forEach(t => {
+        if (!t || !t.id || !t.folio) return;
+        window._ticketFolioMap[t.id] = t.folio;
+        const cells = document.querySelectorAll(`.async-ticket-cell[data-tkt-id="${t.id}"]`);
+        cells.forEach(c => {
+          c.outerHTML = `<a href="#" onclick="verDetalleTicket('${t.id}'); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;" title="Ticket ${t.folio}">${t.folio}</a>`;
+        });
+      });
+    }).catch(() => {});
   }
 
   function cargarMasOrdenes(ctx) {
@@ -510,6 +555,137 @@
     }
   }
 
+  // Exportar órdenes de servicio a archivo Excel (.xlsx)
+  function exportarOrdenesAExcel() {
+    const currentSession = (typeof window !== 'undefined' && window.currentSession) ? window.currentSession : null;
+    const isEmpresa = currentSession && ['empresa', 'cliente', 'cliente-consultor'].includes(String(currentSession.viewMode || '').toLowerCase().trim());
+    if (isEmpresa) {
+      if (typeof window !== 'undefined' && typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion('No tienes permisos para exportar la lista de órdenes.', 'error');
+      } else if (typeof alert === 'function') {
+        alert('No tienes permisos para exportar la lista de órdenes.');
+      }
+      return null;
+    }
+
+    let lista = (typeof window !== 'undefined' && Array.isArray(window._currentOrdenesFiltradas)) ? window._currentOrdenesFiltradas : null;
+    if (!lista || lista.length === 0) {
+      if (typeof safeGetFilteredOrders === 'function') {
+        lista = safeGetFilteredOrders();
+      } else if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) {
+        lista = window.ordenes;
+      } else {
+        lista = [];
+      }
+    }
+
+    if (!lista || lista.length === 0) {
+      if (typeof window !== 'undefined' && typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion('No hay órdenes de servicio en la lista para exportar.', 'warning');
+      } else if (typeof alert === 'function') {
+        alert('No hay órdenes de servicio en la lista para exportar.');
+      }
+      return [];
+    }
+
+    const ticketsList = (typeof window !== 'undefined' && Array.isArray(window.tickets)) ? window.tickets : [];
+
+    const dataExport = lista.map((o, idx) => {
+      const ticketAsoc = (o.soporte || o.ticket_id || o.ticket_folio)
+        ? ticketsList.find(x => x && (x.id === o.soporte || x.folio === o.soporte || (o.ticket_id && x.id === o.ticket_id) || (o.ticket_folio && x.folio === o.ticket_folio)))
+        : null;
+
+      let tecnicoStr = '';
+      if (o.tecnicosAsignados && Array.isArray(o.tecnicosAsignados) && o.tecnicosAsignados.length > 0) {
+        tecnicoStr = o.tecnicosAsignados.map(safeResolveTecnicoNombre).filter(Boolean).join(', ');
+      }
+      if (!tecnicoStr && o.tecnico) {
+        tecnicoStr = String(o.tecnico);
+      }
+
+      const folioTicket = ticketAsoc ? (ticketAsoc.folio || '') : (o.soporte || o.ticket_id || o.ticket_folio || '');
+      const fechaOrdStr = safeFormatFechaAmigable(o.fecha);
+      const fechaCreacionStr = safeFormatFechaAmigable(o.created_at || o.fechaCreacion || o.fecha);
+
+      return {
+        '#': idx + 1,
+        'Folio': o.folio || o.numero_orden || o.id || ('OS-' + (idx + 1)),
+        'Ticket Asociado': folioTicket,
+        'Cliente': o.cliente || '',
+        'Ubicación / Sitio': o.ubicacion || o.ubicacion_sitio || o.sitio || '',
+        'Modelo': o.modelo || '',
+        'No. Serie': o.serie || o.numero_serie || o.no_serie || '',
+        'Tipo de Servicio': o.tipo || '',
+        'Estado': o.estado || '',
+        'Técnico Asignado': tecnicoStr,
+        'Fecha de Orden': fechaOrdStr,
+        'Fecha Creación': fechaCreacionStr,
+        'Descripción / Falla': o.descripcion || o.falla_reportada || o.trabajo_solicitado || '',
+        'Trabajos Realizados': o.trabajo_realizado || o.observaciones || '',
+        'Horómetro': (o.horometro !== undefined && o.horometro !== null && o.horometro !== '') ? o.horometro : ''
+      };
+    });
+
+    const fechaHoy = new Date().toISOString().split('T')[0];
+    const filename = `Ordenes_Servicio_Eurorep_${fechaHoy}.xlsx`;
+
+    if (typeof XLSX !== 'undefined') {
+      const ws = XLSX.utils.json_to_sheet(dataExport);
+
+      ws['!cols'] = [
+        { wch: 6 },   // #
+        { wch: 14 },  // Folio
+        { wch: 16 },  // Ticket Asociado
+        { wch: 28 },  // Cliente
+        { wch: 22 },  // Ubicación / Sitio
+        { wch: 18 },  // Modelo
+        { wch: 18 },  // No. Serie
+        { wch: 18 },  // Tipo de Servicio
+        { wch: 16 },  // Estado
+        { wch: 24 },  // Técnico Asignado
+        { wch: 16 },  // Fecha de Orden
+        { wch: 16 },  // Fecha Creación
+        { wch: 35 },  // Descripción / Falla
+        { wch: 35 },  // Trabajos Realizados
+        { wch: 14 }   // Horómetro
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Órdenes de Servicio');
+      XLSX.writeFile(wb, filename);
+
+      if (typeof window !== 'undefined' && typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion(`Se exportaron ${lista.length} órdenes de servicio a Excel (${filename}).`, 'success');
+      }
+    } else {
+      // Fallback a CSV UTF-8 con BOM
+      const headers = Object.keys(dataExport[0]);
+      let csv = '\uFEFF' + headers.join(',') + '\n';
+      dataExport.forEach(row => {
+        const line = headers.map(h => `"${String(row[h] !== undefined && row[h] !== null ? row[h] : '').replace(/"/g, '""')}"`).join(',');
+        csv += line + '\n';
+      });
+
+      if (typeof Blob !== 'undefined' && typeof document !== 'undefined') {
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Ordenes_Servicio_Eurorep_${fechaHoy}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      if (typeof window !== 'undefined' && typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion(`Se exportaron ${lista.length} órdenes de servicio a CSV.`, 'success');
+      }
+    }
+
+    return dataExport;
+  }
+
   // Exponer a window
   const allModuleExports = {
     filtroEstadoServicios: filtroEstadoServicios,
@@ -522,6 +698,7 @@
     renderTabla: renderTabla,
     badgeEstado: badgeEstado,
     filtrarOrdenes: filtrarOrdenes,
+    exportarOrdenesAExcel: exportarOrdenesAExcel,
     cargarMasOrdenes: cargarMasOrdenes,
     mostrarTodasLasOrdenes: mostrarTodasLasOrdenes,
     resetOrdenPageLimit: resetOrdenPageLimit
@@ -537,6 +714,7 @@
   window.renderTabla = renderTabla;
   window.badgeEstado = badgeEstado;
   window.filtrarOrdenes = filtrarOrdenes;
+  window.exportarOrdenesAExcel = exportarOrdenesAExcel;
   window.cargarMasOrdenes = cargarMasOrdenes;
   window.mostrarTodasLasOrdenes = mostrarTodasLasOrdenes;
   window.resetOrdenPageLimit = resetOrdenPageLimit;

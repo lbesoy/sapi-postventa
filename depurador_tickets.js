@@ -450,6 +450,16 @@ window.eliminarTicketIndividualDepurador = async function(id) {
     await window.deleteFromSupabase('tickets', id).catch(() => {});
   }
 
+  if (typeof window !== 'undefined' && typeof window.trackTelemetryEvent === 'function') {
+    window.trackTelemetryEvent('Eliminación de Ticket', {
+      id,
+      folio,
+      cliente: item ? (item.cliente || '') : '',
+      asunto: item ? (item.asunto || '') : '',
+      motivo: 'Depurador de Tickets'
+    });
+  }
+
   window._depurarTicketsSeleccionadas.delete(id);
   window._depurarTicketsCache = window._depurarTicketsCache.filter(x => x.id !== id);
 
@@ -479,6 +489,14 @@ window.eliminarSeleccionadosDepuradorTickets = async function() {
   safeSetJSON('sapi_tickets', tickets);
   if (window.deleteFromSupabase) {
     await Promise.all(ids.map(id => window.deleteFromSupabase('tickets', id).catch(() => {})));
+  }
+
+  if (typeof window !== 'undefined' && typeof window.trackTelemetryEvent === 'function') {
+    window.trackTelemetryEvent('Eliminación Masiva de Tickets', {
+      cantidad: ids.length,
+      ids: ids.slice(0, 10),
+      motivo: 'Depurador de Tickets'
+    });
   }
 
   window._depurarTicketsSeleccionadas.clear();

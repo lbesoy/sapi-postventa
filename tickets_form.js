@@ -724,21 +724,27 @@ function poblarSoportesPorCliente(clienteNombre, selectedSoporte = '') {
   let validTickets = [];
   
   if (clienteNombre && clienteNombre !== 'Ninguno / Uso Interno') {
-    validTickets = tickets.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'si' && !usedSoportes.includes(t.id) && !usedPedidos.includes(t.pedidoSAP) && t.cliente === clienteNombre);
+    validTickets = tickets.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'si' && !usedSoportes.includes(t.id) && !usedSoportes.includes(t.folio) && !usedPedidos.includes(t.pedidoSAP) && t.cliente === clienteNombre);
   }
   
   validTickets.forEach(t => {
     const opt = document.createElement('option');
-    opt.value = t.id;
+    opt.value = t.folio || t.id;
+    opt.dataset.ticketId = t.id;
+    opt.dataset.ticketFolio = t.folio;
     opt.textContent = `${t.folio || t.id} - Pedido: ${t.pedidoSAP || 'S/N'}`;
-    if (t.id === selectedSoporte) opt.selected = true;
+    if (t.id === selectedSoporte || t.folio === selectedSoporte) opt.selected = true;
     elSoporte.appendChild(opt);
   });
   
   if (selectedSoporte && !Array.from(elSoporte.options).some(o => o.value === selectedSoporte)) {
     const opt = document.createElement('option');
-    opt.value = selectedSoporte;
-    const t = tickets.find(x => x.id === selectedSoporte);
+    const t = tickets.find(x => x.id === selectedSoporte || x.folio === selectedSoporte);
+    opt.value = t ? (t.folio || t.id) : selectedSoporte;
+    if (t) {
+      opt.dataset.ticketId = t.id;
+      opt.dataset.ticketFolio = t.folio;
+    }
     opt.textContent = t ? `${t.folio || t.id} - Pedido: ${t.pedidoSAP || 'S/N'}` : selectedSoporte;
     opt.selected = true;
     elSoporte.appendChild(opt);
@@ -1985,7 +1991,9 @@ async function guardarTicket(e) {
         ordMod = true;
       }
       if (!assocOrd.soporte) {
-        assocOrd.soporte = ticket.id || ticket.folio;
+        assocOrd.soporte = ticket.folio || ticket.id;
+        assocOrd.ticket_id = ticket.id;
+        assocOrd.ticket_folio = ticket.folio;
         ordMod = true;
       }
       if (ordMod) {
@@ -2004,7 +2012,7 @@ async function guardarTicket(e) {
   // Generar Orden de Servicio automáticamente solo si es de Servicio en campo (NO para Garantías ni Refacciones)
   if (estado === 'Cerrado' && ticket.cotAceptada === 'si') {
     if (window.esTicketDeServicioEnCampo(ticket)) {
-      const ordenExistente = ordenes.find(o => o.soporte === ticket.id);
+      const ordenExistente = ordenes.find(o => o.soporte === ticket.id || o.soporte === ticket.folio || o.ticket_id === ticket.id);
       if (!ordenExistente) {
         let modeloStr = '';
         let serieStr = '';
@@ -2104,7 +2112,9 @@ async function guardarTicket(e) {
           equipo: ticket.equipo || '',
           tecnico: orderTecnicos.join(', '),
           tecnicosAsignados: orderTecnicos,
-          soporte: ticket.id,
+          soporte: ticket.folio || ticket.id,
+          ticket_id: ticket.id,
+          ticket_folio: ticket.folio,
           km_ida: '', km_vuelta: '', km_total: '',
           tipo: 'Servicio',
           estado: 'Pendiente',
@@ -2208,7 +2218,13 @@ async function eliminarTicket(id) {
     window.deleteFromSupabase('tickets', id);
   }
   if (window.trackTelemetryEvent) {
-    window.trackTelemetryEvent('Eliminación de Ticket', { id, folio });
+    window.trackTelemetryEvent('Eliminación de Ticket', {
+      id,
+      folio,
+      cliente: t ? (t.cliente || t.empresa || '') : '',
+      asunto: t ? (t.asunto || '') : '',
+      motivo: 'Eliminación manual desde listado'
+    });
   }
   renderTickets();
   renderStats();

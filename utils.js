@@ -535,6 +535,10 @@ window.obtenerInfoRolUsuario = function(nombre) {
     return { rol: 'superadmin', label: 'Super Admin', color: '#E8820C', icon: 'shield-alert' };
   }
 
+  if (norm.includes('almacen') || norm.includes('compras') || norm.includes('logistica')) {
+    return { rol: 'almacen', label: 'Almacén y Compras', color: '#0284c7', icon: 'package' };
+  }
+
   let user = null;
   if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
     user = usuarios.find(u => u && u.nombre && window.normalizarTextoJunta(u.nombre) === norm);
@@ -627,9 +631,68 @@ window.extraerListaResponsables = function(raw) {
   return validParts.length > 0 ? Array.from(new Set(validParts)) : ['Sin Asignar'];
 };
 
+window.esSupervisorOAdmin = function(nombre) {
+  if (!nombre) return false;
+  const isPaq = (typeof window.esNombrePaqueteria === 'function') ? window.esNombrePaqueteria(nombre) : false;
+  const isExcl = (typeof window.esResponsableExcluidoOperativo === 'function') ? window.esResponsableExcluidoOperativo(nombre) : false;
+  if (isPaq || isExcl) return false;
+
+  const norm = (typeof window.normalizarTextoJunta === 'function') ? window.normalizarTextoJunta(nombre) : String(nombre || '').toLowerCase().trim();
+  if (!norm || norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === 'sin_asignar' || norm.includes('almacen') || norm.includes('compras') || norm.includes('logistica')) {
+    return false;
+  }
+
+  const info = (typeof window.obtenerInfoRolUsuario === 'function') ? window.obtenerInfoRolUsuario(nombre) : null;
+  if (info && (info.rol === 'supervisor' || info.rol === 'admin' || info.rol === 'superadmin')) {
+    return true;
+  }
+
+  if (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) {
+    const user = usuarios.find(u => u && u.nombre && (
+      (typeof window.normalizarTextoJunta === 'function' ? window.normalizarTextoJunta(u.nombre) : String(u.nombre).toLowerCase().trim()) === norm
+    ));
+    if (user && user.rol && ['supervisor', 'admin', 'superadmin'].includes(String(user.rol).toLowerCase())) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+window.esTecnicoCampo = function(nombre) {
+  if (!nombre) return false;
+  if (window.esSupervisorOAdmin && window.esSupervisorOAdmin(nombre)) return false;
+
+  const isPaq = (typeof window.esNombrePaqueteria === 'function') ? window.esNombrePaqueteria(nombre) : false;
+  const isExcl = (typeof window.esResponsableExcluidoOperativo === 'function') ? window.esResponsableExcluidoOperativo(nombre) : false;
+  if (isPaq || isExcl) return false;
+
+  const norm = (typeof window.normalizarTextoJunta === 'function') ? window.normalizarTextoJunta(nombre) : String(nombre || '').toLowerCase().trim();
+  if (!norm || norm === 'sin asignar' || norm === 'por definir' || norm === '-' || norm === 'sin_asignar' || norm.includes('almacen') || norm.includes('compras') || norm.includes('logistica')) {
+    return false;
+  }
+
+  const info = (typeof window.obtenerInfoRolUsuario === 'function') ? window.obtenerInfoRolUsuario(nombre) : null;
+  if (info && info.rol === 'tecnico') {
+    return true;
+  }
+
+  if (typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) {
+    if (tecnicosDb.some(t => t && t.nombre && (
+      (typeof window.normalizarTextoJunta === 'function' ? window.normalizarTextoJunta(t.nombre) : String(t.nombre).toLowerCase().trim()) === norm
+    ))) {
+      return true;
+    }
+  }
+
+  return true;
+};
+
 window._unificarNombreUsuarioBase = window.unificarNombreUsuario;
 window._obtenerInfoRolUsuarioBase = window.obtenerInfoRolUsuario;
 window._extraerListaResponsablesBase = window.extraerListaResponsables;
+window._esSupervisorOAdminBase = window.esSupervisorOAdmin;
+window._esTecnicoCampoBase = window.esTecnicoCampo;
 
 const _loadedScripts = new Set();
 window.loadScriptOnDemand = function(src) {

@@ -121,7 +121,7 @@ function abrirDesgloseDashboard(tipo, filtro) {
         const ocli = String(o.cliente || '').toLowerCase().trim();
         let fromTicket = false;
         if (!hasEmpresa && o.soporte) {
-          const tick = tickets.find(t => t.id === o.soporte);
+          const tick = tickets.find(t => t.id === o.soporte || t.folio === o.soporte);
           if (tick) {
             const tcli = String(tick.cliente || '').toLowerCase().trim();
             const tsol = String(tick.solicitante || '').toLowerCase().trim();
@@ -269,7 +269,7 @@ function _renderStatsInternal() {
         const ocli = String(o.cliente || '').toLowerCase().trim();
         let fromTicket = false;
         if (!hasEmpresa && o.soporte) {
-          const tick = tickets.find(t => t.id === o.soporte);
+          const tick = tickets.find(t => t.id === o.soporte || t.folio === o.soporte);
           if (tick) {
             const tcli = String(tick.cliente || '').toLowerCase().trim();
             const tsol = String(tick.solicitante || '').toLowerCase().trim();
@@ -340,7 +340,7 @@ function _renderStatsInternal() {
           let isTkAssigned = false;
           if (o.creadoPor && window.normStr(o.creadoPor) === tecNameLower) isCreator = true;
           if (o.soporte) {
-            const tk = tickets.find(x => x.id === o.soporte);
+            const tk = tickets.find(x => x.id === o.soporte || x.folio === o.soporte);
             if (tk) {
               if ((tk.solicitante && window.normStr(tk.solicitante) === tecNameLower) || 
                   (tk.creadoPor && window.normStr(tk.creadoPor) === tecNameLower)) isCreator = true;
@@ -384,7 +384,7 @@ function _renderStatsInternal() {
           let isCreator = false;
           if (o.creadoPor && window.normStr(o.creadoPor) === supNameLower) isCreator = true;
           if (o.soporte) {
-            const tk = tickets.find(x => x.id === o.soporte);
+            const tk = tickets.find(x => x.id === o.soporte || x.folio === o.soporte);
             if (tk) {
               if ((tk.solicitante && window.normStr(tk.solicitante) === supNameLower) || 
                   (tk.creadoPor && window.normStr(tk.creadoPor) === supNameLower)) isCreator = true;
@@ -452,12 +452,12 @@ function _renderStatsInternal() {
   const t_abiertos = ticketsFilter.filter(t => t.estado === 'Abierto').length;
   const t_refacciones = ticketsFilter.filter(t => t.estado === 'Refacciones').length;
   const t_cotizacion = ticketsFilter.filter(t => t.estado === 'Cotización').length;
-  const t_cerrados_aprobados = ticketsFilter.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'si').length;
-  const t_cerrados_rechazados = ticketsFilter.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'no').length;
+  const t_cerrados_aprobados = ticketsFilter.filter(t => t.estado === 'Cerrado' && (t.cotAceptada === 'si' || t.cotAceptada === 'aprobada' || (!t.cotAceptada && !t.motivoRechazo && !t.motivo_rechazo))).length;
+  const t_cerrados_rechazados = ticketsFilter.filter(t => t.estado === 'Cerrado' && (t.cotAceptada === 'no' || t.cotAceptada === 'rechazada' || t.motivoRechazo === 'Rechazado' || t.motivo_rechazo)).length;
   const t_cerrados = t_cerrados_aprobados + t_cerrados_rechazados;
 
   const sum_cotizacion = ticketsFilter.filter(t => t.estado === 'Cotización').reduce((sum, t) => sum + (Number(t.montoCotizacion) || 0), 0);
-  const sum_cerrados_aprobados = ticketsFilter.filter(t => t.estado === 'Cerrado' && t.cotAceptada === 'si').reduce((sum, t) => sum + (Number(t.montoCotizacion) || 0), 0);
+  const sum_cerrados_aprobados = ticketsFilter.filter(t => t.estado === 'Cerrado' && (t.cotAceptada === 'si' || t.cotAceptada === 'aprobada')).reduce((sum, t) => sum + (Number(t.montoCotizacion) || 0), 0);
   const formatMontoShort = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
 
   const elTotalT = document.getElementById('stat-t-total');
@@ -591,7 +591,7 @@ function renderDashboardV2() {
       const ocli = String(o.cliente || '').toLowerCase().trim();
       let fromTicket = false;
       if (o.soporte) {
-        const tick = tickets.find(t => t.id === o.soporte);
+        const tick = tickets.find(t => t.id === o.soporte || t.folio === o.soporte);
         if (tick) {
           const tcli = String(tick.cliente || '').toLowerCase().trim();
           const tsol = String(tick.solicitante || '').toLowerCase().trim();
@@ -623,7 +623,7 @@ function renderDashboardV2() {
       let isTkAssigned = false;
       if (o.creadoPor && String(o.creadoPor).toLowerCase().trim() === tecNameLower) isCreator = true;
       if (o.soporte) {
-        const tk = tickets.find(x => x.id === o.soporte);
+        const tk = tickets.find(x => x.id === o.soporte || x.folio === o.soporte);
         if (tk) {
           if ((tk.solicitante && String(tk.solicitante).toLowerCase().trim() === tecNameLower) || 
               (tk.creadoPor && String(tk.creadoPor).toLowerCase().trim() === tecNameLower)) isCreator = true;
@@ -670,7 +670,7 @@ function renderDashboardV2() {
       let isCreator = false;
       if (o.creadoPor === supFilter) isCreator = true;
       if (o.soporte) {
-        const tk = tickets.find(x => x.id === o.soporte);
+        const tk = tickets.find(x => x.id === o.soporte || x.folio === o.soporte);
         if (tk) {
           if (tk.solicitante === supFilter || tk.creadoPor === supFilter) isCreator = true;
           let tkAssigned = [];
