@@ -1,0 +1,65 @@
+<!-- MODAL CONFIGURACIÓN Y RENOVACIÓN DE BOLSA DE HORAS -->
+<div class="modal-overlay" id="modal-configurar-bolsa-horas-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 99999; overflow-y: auto; align-items: flex-start; justify-content: center; padding: 2rem 1rem;">
+  <div class="modal-card" style="background: var(--bg-card, #1e293b); border: 1px solid var(--border, #334155); border-radius: 16px; width: 100%; max-width: 540px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); margin: auto; overflow: hidden; display: flex; flex-direction: column;">
+    
+    <!-- Modal Header -->
+    <div style="padding: 1.25rem 1.5rem; background: var(--bg-secondary, #0f172a); border-bottom: 1px solid var(--border, #334155); display: flex; justify-content: space-between; align-items: center;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(59,130,246,0.15); color: #3b82f6; display: flex; align-items: center; justify-content: center;">
+          <i data-lucide="pie-chart" style="width: 20px; height: 20px;"></i>
+        </div>
+        <div>
+          <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-primary);">
+            Bolsa de Horas de Servicio Técnico
+          </h3>
+          <span style="font-size: 0.74rem; color: var(--text-muted);">
+            Configuración del paquete contratado por el cliente
+          </span>
+        </div>
+      </div>
+      <button type="button" onclick="window.cerrarModalConfigurarBolsaHoras()" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 0.25rem;">
+        <i data-lucide="x" style="width: 18px; height: 18px;"></i>
+      </button>
+    </div>
+
+    <!-- Form Body -->
+    <form id="form-configurar-bolsa-horas" onsubmit="event.preventDefault(); window.guardarConfiguracionBolsaHoras();" style="margin: 0; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+      <div class="form-group">
+        <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem; display: block;">Contrato de Renta / Arrendatario <span style="color:#ef4444;">*</span></label>
+        <select id="cfg-bolsa-renta-id" required onchange="window.alSeleccionarRentaEnConfigBolsa()" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
+          <!-- Se puebla con rentas -->
+        </select>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem;">
+        <div class="form-group">
+          <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem; display: block;">Horas Contratadas (Bolsa) <span style="color:#ef4444;">*</span></label>
+          <input type="number" id="cfg-bolsa-horas-total" min="1" step="0.5" placeholder="Ej. 50, 100 o 200" required style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.95rem; font-weight: 800;" />
+        </div>
+        <div class="form-group">
+          <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem; display: block;">Tarifa Hora Excedente ($)</label>
+          <input type="number" id="cfg-bolsa-tarifa-excedente" min="0" step="50" placeholder="Ej. 650" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.95rem; font-weight: 700;" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem; display: block;">Vigencia / Fecha de Inicio de la Bolsa</label>
+        <input type="date" id="cfg-bolsa-fecha-inicio" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;" />
+      </div>
+
+      <div class="form-group">
+        <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem; display: block;">Notas o Condiciones del Paquete</label>
+        <textarea id="cfg-bolsa-notas" rows="2" placeholder="Ej. Incluye soporte técnico en campo para planta de trituración y criba; no incluye refacciones mayores." style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.82rem; box-sizing: border-box;"></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem;">
+        <button type="button" class="btn-secondary" onclick="window.cerrarModalConfigurarBolsaHoras()">
+          Cancelar
+        </button>
+        <button type="submit" class="btn-primary" style="background: #2563eb; border-color: #2563eb;">
+          Guardar Bolsa
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

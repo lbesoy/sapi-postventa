@@ -3791,6 +3791,236 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
   assert.equal(bannerInfo.style.display, 'none', 'Banner informativo debe ocultarse al limpiar');
 
   console.log('  ✅ Módulo de Servicios Preventivos en Rentas (Horarios, Badges, Refacciones, Kits por Horas, Offline Sync & Sandbox Isolation): OK');
+
+  // =========================================================================
+  // 8. MÓDULO DE SERVICIOS NO PREVENTIVOS EN RENTAS (BOLSA DE HORAS, BITÁCORA Y MULTIMÁQUINA)
+  // =========================================================================
+  // Cargar servicios_no_preventivos.js en el entorno DOM
+  const snpCode = fs.readFileSync(path.resolve('./servicios_no_preventivos.js'), 'utf-8');
+  dom.window.eval(snpCode);
+
+  // Inyectar elementos DOM de Servicios No Preventivos si no existen
+  const snpContainer = dom.window.document.createElement('div');
+  snpContainer.innerHTML = `
+    <div id="rentas-subtab-no-preventivos">
+      <div id="stat-bolsa-contratada"></div>
+      <div id="stat-bolsa-consumida"></div>
+      <div id="stat-bolsa-saldo"></div>
+      <div id="stat-bolsa-status-label"></div>
+      <div id="stat-bolsa-porcentaje"></div>
+      <div id="stat-bolsa-progress-bar"></div>
+      <div id="snp-bolsa-maquinas-chips"></div>
+
+      <div id="stat-snp-total">0</div>
+      <div id="stat-snp-horas">0.0 hrs</div>
+      <div id="stat-snp-maquinas">0</div>
+      <div id="stat-snp-bolsa-horas">0.0 hrs</div>
+      <div id="stat-snp-refacciones">$0.00</div>
+
+      <span id="badge-count-no-preventivos">0</span>
+      <span id="count-pill-snp-todos">0</span>
+      <span id="count-pill-snp-correctivo">0</span>
+      <span id="count-pill-snp-electrico">0</span>
+      <span id="count-pill-snp-hidraulico">0</span>
+      <span id="count-pill-snp-calibracion">0</span>
+
+      <select id="snp-filtro-semana"></select>
+      <select id="snp-filtro-renta-bolsa"></select>
+      <input id="search-no-preventivos" />
+
+      <table id="no-preventivos-table-body"></table>
+      <div id="no-preventivos-cards-mobile"></div>
+    </div>
+
+    <!-- Modal Form Elements -->
+    <div id="modal-servicio-no-preventivo-overlay" style="display:none;">
+      <h3 id="modal-snp-title"></h3>
+      <span id="modal-snp-folio-badge"></span>
+      <input id="snp-id" />
+      <select id="snp-renta-id"></select>
+      <input id="snp-cliente" />
+      <input id="snp-sitio" />
+      <input id="snp-equipo" />
+      <input id="snp-serie" />
+      <input id="snp-horometro" />
+      <span id="snp-horas-calculadas-badge"></span>
+      <input id="snp-tecnico-nombre" />
+      <input id="snp-fecha" />
+      <input id="snp-hora-inicio" />
+      <input id="snp-hora-fin" />
+      <input id="snp-aplica-bolsa" type="checkbox" checked />
+      <select id="snp-tipo-trabajo"></select>
+      <select id="snp-sistema"></select>
+      <select id="snp-estado-equipo"></select>
+      <input id="snp-descripcion-falla" />
+      <textarea id="snp-solucion-aplicada"></textarea>
+      <tbody id="snp-refacciones-tbody"></tbody>
+      <span id="snp-refacciones-total-label"></span>
+      <div id="snp-galeria-fotos"></div>
+      <canvas id="snp-canvas-firma-tecnico" width="320" height="110"></canvas>
+      <canvas id="snp-canvas-firma-cliente" width="320" height="110"></canvas>
+      <input id="snp-nombre-recibe" />
+    </div>
+
+    <!-- Modal Reporte Semanal -->
+    <div id="modal-reporte-semanal-snp-overlay" style="display:none;">
+      <select id="snp-reporte-filtro-renta"></select>
+      <select id="snp-reporte-filtro-semana"></select>
+      <select id="snp-reporte-filtro-maquina"></select>
+      <div id="snp-reporte-semanal-documento"></div>
+    </div>
+
+    <!-- Modal Config Bolsa -->
+    <div id="modal-configurar-bolsa-horas-overlay" style="display:none;">
+      <select id="cfg-bolsa-renta-id"></select>
+      <input id="cfg-bolsa-horas-total" />
+      <input id="cfg-bolsa-tarifa-excedente" />
+      <input id="cfg-bolsa-fecha-inicio" />
+      <textarea id="cfg-bolsa-notas"></textarea>
+    </div>
+  `;
+  dom.window.document.body.appendChild(snpContainer);
+
+  // 8.1 Cálculo de horas diurnas y nocturnas
+  dom.window.document.getElementById('snp-hora-inicio').value = '08:00';
+  dom.window.document.getElementById('snp-hora-fin').value = '11:30';
+  const horasSNP1 = dom.window.recalcularHorasTrabajadasSNP();
+  assert.equal(horasSNP1, 3.5, '08:00 a 11:30 deben ser 3.5 horas de trabajo técnico');
+
+  dom.window.document.getElementById('snp-hora-inicio').value = '21:00';
+  dom.window.document.getElementById('snp-hora-fin').value = '01:30';
+  const horasSNPNocturnas = dom.window.recalcularHorasTrabajadasSNP();
+  assert.equal(horasSNPNocturnas, 4.5, '21:00 a 01:30 deben ser 4.5 horas cruzando medianoche');
+
+  // 8.2 Generación de Folios en Producción vs Sandbox
+  testModeActive = false;
+  const folioSNPProd = dom.window.generarSiguienteFolioSNP();
+  assert.ok(folioSNPProd.startsWith(`SNP-${new Date().getFullYear()}-`), `Folio producción debe ser SNP-${new Date().getFullYear()}-...: ${folioSNPProd}`);
+
+  testModeActive = true;
+  const folioSNPSandbox = dom.window.generarSiguienteFolioSNP();
+  assert.ok(folioSNPSandbox.startsWith(`SNP-PRUEBA-${new Date().getFullYear()}-`), `Folio sandbox debe ser SNP-PRUEBA-${new Date().getFullYear()}-...: ${folioSNPSandbox}`);
+
+  // 8.3 Supabase Converters: rowToServicioNoPreventivo & servicioNoPreventivoToRow
+  assert.equal(typeof dom.window.servicioNoPreventivoToRow, 'function', 'servicioNoPreventivoToRow debe existir en supabaseSync');
+  assert.equal(typeof dom.window.rowToServicioNoPreventivo, 'function', 'rowToServicioNoPreventivo debe existir en supabaseSync');
+
+  const mockSNPApp = {
+    id: 'snp-mock-uuid-001',
+    folio: 'SNP-2026-0001',
+    renta_id: 'ren-001',
+    renta_folio: 'REN-2026-0010',
+    cliente: 'Minera del Norte S.A.',
+    sitio: 'Tajo Norte',
+    equipo: 'Trituradora RM120X',
+    serie: 'RM120X-5510',
+    horometro_servicio: 1845.5,
+    tecnico_nombre: 'Adrian Franco',
+    fecha_servicio: '2026-10-14',
+    semana_ano: '2026-W42',
+    hora_inicio: '08:00',
+    hora_fin: '11:30',
+    horas_trabajadas: 3.5,
+    aplica_bolsa_horas: true,
+    tipo_trabajo: 'Correctivo Mecanico',
+    sistema_afectado: 'Trituracion / Cribado',
+    estado_equipo: 'Operativo',
+    descripcion_falla: 'Banda transportadora principal descentrada y con roce',
+    solucion_aplicada: 'Alineación de polea de cola, ajuste de tensores y prueba con 40m3 de balasto.',
+    monto_refacciones: 850,
+    refacciones: [
+      { clave: 'ROD-6205', descripcion: 'Rodamiento de rodillo guía', cantidad: 2, unidad: 'PZA', costo_unitario: 425, subtotal: 850, pagado_por: 'cliente' }
+    ]
+  };
+
+  const snpRow = dom.window.servicioNoPreventivoToRow(mockSNPApp);
+  assert.equal(snpRow.folio, 'SNP-2026-0001');
+  assert.equal(snpRow.equipo, 'Trituradora RM120X');
+  assert.equal(snpRow.horas_trabajadas, 3.5);
+  assert.equal(snpRow.aplica_bolsa_horas, true);
+  assert.equal(snpRow.semana_ano, '2026-W42');
+
+  const snpRestored = dom.window.rowToServicioNoPreventivo(snpRow);
+  assert.equal(snpRestored.folio, mockSNPApp.folio);
+  assert.equal(snpRestored.descripcion_falla, mockSNPApp.descripcion_falla);
+  assert.equal(snpRestored.horas_trabajadas, 3.5);
+  assert.equal(snpRestored.refacciones.length, 1);
+  assert.equal(snpRestored.esPrueba, false);
+
+  // 8.4 Bolsa de Horas Dashboard y Balance
+  dom.window.rentas = [
+    {
+      id: 'ren-001',
+      folio: 'REN-2026-0010',
+      cliente: 'Minera del Norte S.A.',
+      sitio: 'Tajo Norte',
+      equipo: 'Trituradora RM120X',
+      bolsa_horas_total: 50.0,
+      bolsa_tarifa_excedente: 650
+    }
+  ];
+
+  dom.window.serviciosNoPreventivos = [
+    {
+      id: 'snp-1',
+      folio: 'SNP-2026-0001',
+      renta_id: 'ren-001',
+      equipo: 'Trituradora RM120X',
+      horas_trabajadas: 4.0,
+      aplica_bolsa_horas: true,
+      fecha_servicio: '2026-10-14',
+      semana_ano: '2026-W42'
+    },
+    {
+      id: 'snp-2',
+      folio: 'SNP-2026-0002',
+      renta_id: 'ren-001',
+      equipo: 'Excavadora HX220',
+      horas_trabajadas: 6.0,
+      aplica_bolsa_horas: true,
+      fecha_servicio: '2026-10-14',
+      semana_ano: '2026-W42'
+    },
+    {
+      id: 'snp-3',
+      folio: 'SNP-2026-0003',
+      renta_id: 'ren-001',
+      equipo: 'Criba Móvil MSC8500',
+      horas_trabajadas: 2.5,
+      aplica_bolsa_horas: false, // Extraordinario, no descuenta bolsa
+      fecha_servicio: '2026-10-14',
+      semana_ano: '2026-W42'
+    }
+  ];
+
+  dom.window.actualizarBolsaHorasDashboard('ren-001');
+
+  const statContratada = dom.window.document.getElementById('stat-bolsa-contratada')?.textContent;
+  const statConsumida = dom.window.document.getElementById('stat-bolsa-consumida')?.textContent;
+  const statSaldo = dom.window.document.getElementById('stat-bolsa-saldo')?.textContent;
+
+  assert.equal(statContratada, '50.0 hrs', 'Horas contratadas deben ser 50.0 hrs');
+  assert.equal(statConsumida, '10.0 hrs', 'Horas consumidas de bolsa deben ser 4.0 + 6.0 = 10.0 hrs (excluyendo no-bolsa)');
+  assert.equal(statSaldo, '40.0 hrs', 'Saldo disponible debe ser 50 - 10 = 40.0 hrs');
+
+  // Verificar desglose por máquina en chips
+  const chipsHtml = dom.window.document.getElementById('snp-bolsa-maquinas-chips')?.innerHTML;
+  assert.ok(chipsHtml.includes('Trituradora RM120X') && chipsHtml.includes('4.0 hrs'), 'Debe incluir chip de Trituradora con 4.0 hrs');
+  assert.ok(chipsHtml.includes('Excavadora HX220') && chipsHtml.includes('6.0 hrs'), 'Debe incluir chip de Excavadora con 6.0 hrs');
+
+  // 8.5 Bitácora Semanal y Generación de Documento
+  dom.window.abrirModalReporteSemanalSNP();
+  dom.window.document.getElementById('snp-reporte-filtro-renta').value = 'ren-001';
+  dom.window.actualizarReporteSemanalSNP();
+
+  const docHtml = dom.window.document.getElementById('snp-reporte-semanal-documento')?.innerHTML;
+  assert.ok(docHtml.includes('EUROREP S.A. DE C.V.'), 'Documento semanal debe incluir membrete oficial Eurorep');
+  assert.ok(docHtml.includes('Bitácora Semanal de Servicio'), 'Documento debe tener título formal de Bitácora');
+  assert.ok(docHtml.includes('Minera del Norte S.A.'), 'Documento debe incluir cliente del proyecto');
+  assert.ok(docHtml.includes('Trituradora RM120X'), 'Documento debe incluir intervención de trituradora');
+  assert.ok(docHtml.includes('Excavadora HX220'), 'Documento debe incluir intervención de excavadora');
+
+  console.log('  ✅ Módulo de Servicios NO Preventivos en Rentas (Bolsa de Horas, Captura Multimáquina, Bitácora Semanal, Supabase & Sandbox): OK');
 }
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');

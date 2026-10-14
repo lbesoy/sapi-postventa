@@ -1,0 +1,284 @@
+<!-- MODAL CAPTURA / EDICIÓN DE SERVICIO NO PREVENTIVO (EN SITIO / BOLSA DE HORAS) -->
+<div class="modal-overlay" id="modal-servicio-no-preventivo-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 99999; overflow-y: auto; align-items: flex-start; justify-content: center; padding: 1.5rem 1rem;">
+  <div class="modal-card" style="background: var(--bg-card, #1e293b); border: 1px solid var(--border, #334155); border-radius: 16px; width: 100%; max-width: 920px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); margin: auto; overflow: hidden; display: flex; flex-direction: column;">
+    
+    <!-- Modal Header -->
+    <div style="padding: 1.25rem 1.5rem; background: var(--bg-secondary, #0f172a); border-bottom: 1px solid var(--border, #334155); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(59,130,246,0.15); color: #3b82f6; display: flex; align-items: center; justify-content: center;">
+          <i data-lucide="wrench" style="width: 22px; height: 22px;"></i>
+        </div>
+        <div>
+          <h3 id="modal-snp-title" style="margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); letter-spacing: -0.3px;">
+            Servicio NO Preventivo / Soporte en Sitio
+          </h3>
+          <span style="font-size: 0.78rem; color: var(--text-muted);">
+            Registro diario de trabajo técnico por maquinaria en proyecto • Bolsa de Horas
+          </span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <span id="modal-snp-folio-badge" class="badge" style="background: rgba(59,130,246,0.12); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 800; font-size: 0.82rem; padding: 0.25rem 0.75rem; border-radius: 8px;">
+          SNP-AUTO
+        </span>
+        <button type="button" onclick="window.cerrarModalServicioNoPreventivo()" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 0.35rem; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+          <i data-lucide="x" style="width: 20px; height: 20px;"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal Form Body -->
+    <form id="form-servicio-no-preventivo" onsubmit="event.preventDefault(); window.guardarServicioNoPreventivo();" style="margin: 0; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; max-height: calc(88vh - 130px); overflow-y: auto;">
+      <input type="hidden" id="snp-id" />
+
+      <!-- SECCIÓN 1: PROYECTO, CONTRATO Y MAQUINARIA -->
+      <div style="background: var(--bg-primary, #0f172a); border: 1px solid var(--border, #334155); border-radius: 12px; padding: 1rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; color: #3b82f6; font-weight: 700; font-size: 0.9rem;">
+            <i data-lucide="key-round" style="width: 16px; height: 16px;"></i> Contrato de Renta y Maquinaria Intervenida
+          </div>
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">
+            Un técnico puede registrar 3 a 4 máquinas distintas por día
+          </span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.85rem;">
+          <div class="form-group">
+            <label style="font-size: 0.8rem; font-weight: 600;">Contrato de Renta / Proyecto <span style="color:#ef4444;">*</span></label>
+            <select id="snp-renta-id" onchange="window.alCambiarRentaEnServicioNoPreventivo()" required style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;">
+              <option value="">-- Seleccionar Renta Activa --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label style="font-size: 0.8rem; font-weight: 600;">Cliente</label>
+            <input type="text" id="snp-cliente" placeholder="Cliente del proyecto" readonly style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-hover); color: var(--text-primary); font-size: 0.85rem;" />
+          </div>
+          <div class="form-group">
+            <label style="font-size: 0.8rem; font-weight: 600;">Sitio / Ubicación de Obra</label>
+            <input type="text" id="snp-sitio" placeholder="Ubicación o frente de trabajo" readonly style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-hover); color: var(--text-primary); font-size: 0.85rem;" />
+          </div>
+          <div class="form-group">
+            <label style="font-size: 0.8rem; font-weight: 600;">Maquinaria Intervenida <span style="color:#ef4444;">*</span></label>
+            <input type="text" id="snp-equipo" list="snp-lista-maquinas-proyecto" placeholder="Ej. Trituradora RM120X / Excavadora HX220" required onchange="window.alCambiarMaquinaSNP()" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem; font-weight: 600;" />
+            <datalist id="snp-lista-maquinas-proyecto"></datalist>
+          </div>
+          <div class="form-group">
+            <label style="font-size: 0.8rem; font-weight: 600;">No. de Serie / Código</label>
+            <input type="text" id="snp-serie" placeholder="Número de serie" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem; font-family: var(--font-mono, monospace);" />
+          </div>
+          <div class="form-group">
+            <label style="font-size: 0.8rem; font-weight: 600;">Horómetro del Equipo (hrs)</label>
+            <input type="number" id="snp-horometro" min="0" step="0.5" placeholder="Ej. 1420.5" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem; font-weight: 700;" />
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 2: TÉCNICO, HORARIO DE TRABAJO Y CÁLCULO DE HORAS -->
+      <div style="background: var(--bg-primary, #0f172a); border: 1px solid var(--border, #334155); border-radius: 12px; padding: 1rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; color: #3b82f6; font-weight: 700; font-size: 0.9rem;">
+            <i data-lucide="clock" style="width: 16px; height: 16px;"></i> Horario Técnico y Registro de Jornada
+          </div>
+          <div id="snp-horas-calculadas-badge" style="background: rgba(16,185,129,0.15); color: #10b981; font-weight: 800; padding: 0.25rem 0.75rem; border-radius: 8px; font-size: 0.84rem; border: 1px solid rgba(16,185,129,0.3);">
+            Horas Trabajadas: 0.0 hrs
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.85rem; align-items: flex-end;">
+          <div class="form-group">
+            <label style="font-size: 0.8rem; font-weight: 600;">Técnico Asignado <span style="color:#ef4444;">*</span></label>
+            <input type="text" id="snp-tecnico-nombre" list="snp-tecnicos-datalist" placeholder="Nombre del técnico" required style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+            <datalist id="snp-tecnicos-datalist"></datalist>
+          </div>
+
+          <div class="form-group">
+            <label style="font-size: 0.8rem; font-weight: 600;">Fecha de la Intervención <span style="color:#ef4444;">*</span></label>
+            <input type="date" id="snp-fecha" required onchange="window.alCambiarFechaSNP()" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+          </div>
+
+          <!-- Hora Inicio con botón "Ahora" -->
+          <div class="form-group">
+            <label style="font-size: 0.8rem; font-weight: 600; display: flex; justify-content: space-between;">
+              <span>Hora Inicio <span style="color:#ef4444;">*</span></span>
+              <a href="javascript:void(0)" onclick="window.fijarHoraActualSNP('snp-hora-inicio')" style="color: #3b82f6; text-decoration: none; font-size: 0.74rem; font-weight: 700;">Ahora</a>
+            </label>
+            <input type="time" id="snp-hora-inicio" required onchange="window.recalcularHorasTrabajadasSNP()" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+          </div>
+
+          <!-- Hora Fin con botón "Ahora" -->
+          <div class="form-group">
+            <label style="font-size: 0.8rem; font-weight: 600; display: flex; justify-content: space-between;">
+              <span>Hora Fin <span style="color:#ef4444;">*</span></span>
+              <a href="javascript:void(0)" onclick="window.fijarHoraActualSNP('snp-hora-fin')" style="color: #3b82f6; text-decoration: none; font-size: 0.74rem; font-weight: 700;">Ahora</a>
+            </label>
+            <input type="time" id="snp-hora-fin" required onchange="window.recalcularHorasTrabajadasSNP()" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+          </div>
+
+          <!-- Bolsa de Horas Switch -->
+          <div class="form-group" style="padding-bottom: 4px;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; user-select: none; font-size: 0.82rem; font-weight: 600; color: var(--text-primary);">
+              <input type="checkbox" id="snp-aplica-bolsa" checked style="accent-color: #3b82f6; transform: scale(1.15);" />
+              <span>Descontar de Bolsa de Horas</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 3: TIPO DE TRABAJO, DIAGNÓSTICO Y SOLUCIÓN -->
+      <div style="background: var(--bg-primary, #0f172a); border: 1px solid var(--border, #334155); border-radius: 12px; padding: 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; color: #3b82f6; font-weight: 700; font-size: 0.9rem;">
+          <i data-lucide="activity" style="width: 16px; height: 16px;"></i> Clasificación del Trabajo y Bitácora de Campo
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.85rem; margin-bottom: 0.85rem;">
+          <div class="form-group">
+            <label style="font-size: 0.8rem; font-weight: 600;">Tipo de Intervención <span style="color:#ef4444;">*</span></label>
+            <select id="snp-tipo-trabajo" required style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem; font-weight: 600;">
+              <option value="Correctivo Mecanico">Correctivo / Falla Mecánica</option>
+              <option value="Falla Electrica">Falla Eléctrica / Electrónica</option>
+              <option value="Falla Hidraulica">Falla Hidráulica / Fuga de Presión</option>
+              <option value="Calibracion Ajuste">Calibración / Ajuste Operativo</option>
+              <option value="Capacitacion Operadores">Capacitación a Operadores en Obra</option>
+              <option value="Inspeccion Extraordinaria">Inspección Extraordinaria / Diagnóstico</option>
+              <option value="Auxilio Rescate">Auxilio / Desatorón en Campo</option>
+              <option value="Otro">Otro Soporte Técnico</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label style="font-size: 0.8rem; font-weight: 600;">Sistema Afectado</label>
+            <select id="snp-sistema" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;">
+              <option value="General">General / Múltiple</option>
+              <option value="Motor">Motor Diesel / Combustible</option>
+              <option value="Hidraulico">Sistema Hidráulico / Bombas / Válvulas</option>
+              <option value="Electrico">Sistema Eléctrico / Sensores / PLC</option>
+              <option value="Transmision">Transmisión / Bandas / Reductores</option>
+              <option value="Trituracion / Cribado">Cámara de Trituración / Mallas</option>
+              <option value="Chasis / Rodaje">Orugas / Chasis / Estructura</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label style="font-size: 0.8rem; font-weight: 600;">Estado Final de la Máquina <span style="color:#ef4444;">*</span></label>
+            <select id="snp-estado-equipo" required style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem; font-weight: 700;">
+              <option value="Operativo" style="color:#10b981;">Operativo 100% (Listo para producción)</option>
+              <option value="Operativo con Observaciones" style="color:#f59e0b;">Operativo con Observaciones (Monitorear)</option>
+              <option value="Fuera de Servicio" style="color:#ef4444;">Fuera de Servicio (Requiere refacción/reparación)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0.85rem;">
+          <label style="font-size: 0.8rem; font-weight: 600;">Falla Reportada / Síntomas en Obra <span style="color:#ef4444;">*</span></label>
+          <input type="text" id="snp-descripcion-falla" placeholder="Ej. Máquina se apaga bajo carga / Manguera de presión rota en cilindro / Banda descentrada" required style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+        </div>
+
+        <div class="form-group">
+          <label style="font-size: 0.8rem; font-weight: 600;">Trabajos Realizados, Pruebas y Recomendaciones Técnicas <span style="color:#ef4444;">*</span></label>
+          <textarea id="snp-solucion-aplicada" rows="3" placeholder="Describe detalladamente los trabajos ejecutados, ajustes, reemplazos, pruebas con material y recomendaciones operativas..." required style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem; box-sizing: border-box;"></textarea>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 4: REFACCIONES E INSUMOS UTILIZADOS EN EL CORRECTIVO -->
+      <div style="background: var(--bg-primary, #0f172a); border: 1px solid var(--border, #334155); border-radius: 12px; padding: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; color: #3b82f6; font-weight: 700; font-size: 0.9rem;">
+            <i data-lucide="package" style="width: 16px; height: 16px;"></i> Refacciones e Insumos Utilizados en el Servicio (Opcional)
+          </div>
+          <button type="button" class="btn-secondary" onclick="window.agregarFilaRefaccionSNP()" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; display: flex; align-items: center; gap: 0.35rem; background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.4); color: #3b82f6; border-radius: 8px;">
+            <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Agregar Refacción
+          </button>
+        </div>
+
+        <div style="overflow-x: auto; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
+            <thead>
+              <tr style="background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border); color: var(--text-secondary);">
+                <th style="padding: 0.5rem 0.65rem; width: 130px;">Clave / Código</th>
+                <th style="padding: 0.5rem 0.65rem;">Descripción</th>
+                <th style="padding: 0.5rem 0.65rem; width: 75px;">Cant.</th>
+                <th style="padding: 0.5rem 0.65rem; width: 80px;">Unidad</th>
+                <th style="padding: 0.5rem 0.65rem; width: 95px;">Costo U.</th>
+                <th style="padding: 0.5rem 0.65rem; width: 95px;">Subtotal</th>
+                <th style="padding: 0.5rem 0.65rem; width: 120px;">Pagador</th>
+                <th style="padding: 0.5rem 0.65rem; width: 40px;"></th>
+              </tr>
+            </thead>
+            <tbody id="snp-refacciones-tbody">
+              <!-- Se puebla con JS -->
+            </tbody>
+            <tfoot>
+              <tr style="border-top: 2px solid var(--border); font-weight: 700;">
+                <td colspan="5" style="padding: 0.6rem; text-align: right; color: var(--text-secondary);">Total Refacciones:</td>
+                <td id="snp-refacciones-total-label" style="padding: 0.6rem; color: #10b981;">$0.00</td>
+                <td colspan="2"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 5: EVIDENCIAS FOTOGRÁFICAS Y FIRMAS DIGITALES -->
+      <div style="background: var(--bg-primary, #0f172a); border: 1px solid var(--border, #334155); border-radius: 12px; padding: 1rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; color: #3b82f6; font-weight: 700; font-size: 0.9rem;">
+            <i data-lucide="camera" style="width: 16px; height: 16px;"></i> Evidencias Fotográficas y Conformidad en Obra
+          </div>
+          <label class="btn-secondary" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; border-radius: 8px;">
+            <i data-lucide="camera" style="width: 14px; height: 14px;"></i> Tomar / Subir Foto
+            <input type="file" id="snp-foto-input" accept="image/*" multiple onchange="window.manejarSubidaFotosSNP(event)" style="display: none;" />
+          </label>
+        </div>
+
+        <div id="snp-galeria-fotos" style="display: flex; flex-wrap: wrap; gap: 0.65rem; min-height: 50px; background: var(--bg-card); border-radius: 8px; border: 1px dashed var(--border); padding: 0.65rem; align-items: center; margin-bottom: 1rem;">
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">Sin fotos adjuntas aún.</span>
+        </div>
+
+        <!-- Canvas de Firmas Táctiles -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem;">
+          <!-- Firma Técnico -->
+          <div style="background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); padding: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+              <label style="font-size: 0.8rem; font-weight: 700;">Firma del Técnico Especialista</label>
+              <a href="javascript:void(0)" onclick="window.limpiarFirmaTecnicoSNP()" style="font-size: 0.72rem; color: #ef4444; text-decoration: none;">Limpiar</a>
+            </div>
+            <canvas id="snp-canvas-firma-tecnico" width="320" height="110" style="width: 100%; height: 110px; background: #ffffff; border-radius: 6px; cursor: crosshair; touch-action: none; border: 1px solid #cbd5e1;"></canvas>
+          </div>
+
+          <!-- Firma y Nombre Cliente / Encargado de Obra -->
+          <div style="background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); padding: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+              <label style="font-size: 0.8rem; font-weight: 700;">Firma Vo.Bo. Residente / Encargado de Obra</label>
+              <a href="javascript:void(0)" onclick="window.limpiarFirmaClienteSNP()" style="font-size: 0.72rem; color: #ef4444; text-decoration: none;">Limpiar</a>
+            </div>
+            <canvas id="snp-canvas-firma-cliente" width="320" height="110" style="width: 100%; height: 110px; background: #ffffff; border-radius: 6px; cursor: crosshair; touch-action: none; border: 1px solid #cbd5e1;"></canvas>
+            <div style="margin-top: 0.45rem;">
+              <input type="text" id="snp-nombre-recibe" placeholder="Nombre completo de quien firma de conformidad" style="width: 100%; padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.78rem;" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer con Acción Rápida Multimáquina -->
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+        <button type="button" class="btn-secondary" onclick="window.cerrarModalServicioNoPreventivo()" style="font-size: 0.85rem;">
+          Cancelar
+        </button>
+
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <!-- Botón de Captura Rápida Multimáquina -->
+          <button type="button" class="btn-secondary" onclick="window.guardarYCapturarOtraMaquinaSNP()" title="Guarda este registro y deja listos los datos para capturar la siguiente máquina de la jornada" style="font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem; background: rgba(59,130,246,0.12); border-color: rgba(59,130,246,0.4); color: #3b82f6; font-weight: 600;">
+            <i data-lucide="layers" style="width: 15px; height: 15px;"></i>
+            Guardar y Registrar Otra Máquina Hoy
+          </button>
+
+          <!-- Guardar Estándar -->
+          <button type="submit" class="btn-primary" style="font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem; background: #2563eb; border-color: #2563eb;">
+            <i data-lucide="save" style="width: 15px; height: 15px;"></i>
+            Guardar Servicio
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>

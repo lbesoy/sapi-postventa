@@ -1260,6 +1260,93 @@ function servicioPreventivoToRow(s) {
 }
 window.servicioPreventivoToRow = servicioPreventivoToRow;
 
+function rowToServicioNoPreventivo(r) {
+  if (!r) return null;
+  const descFalla = r.descripcion_falla || r.descripcion_trabajo || '';
+  const horo = (r.horometro_servicio != null) ? Number(r.horometro_servicio) : ((r.horometro != null) ? Number(r.horometro) : 0);
+  return {
+    id: r.id,
+    folio: r.folio || 'SNP-AUTO',
+    renta_id: r.renta_id || null,
+    renta_folio: r.renta_folio || null,
+    cliente: r.cliente || 'Sin Cliente',
+    sitio: r.sitio || 'Sin Ubicación',
+    equipo: r.equipo || 'Sin Equipo',
+    serie: r.serie || 'S/N',
+    maquina_id: r.maquina_id || null,
+    horometro: horo,
+    horometro_servicio: horo,
+    fecha_servicio: r.fecha_servicio || new Date().toISOString().substring(0, 10),
+    hora_inicio: r.hora_inicio || '',
+    hora_fin: r.hora_fin || '',
+    horas_trabajadas: (r.horas_trabajadas != null) ? Number(r.horas_trabajadas) : 0,
+    tecnico_nombre: r.tecnico_nombre || 'Técnico General',
+    tecnico_id: r.tecnico_id || null,
+    tipo_trabajo: r.tipo_trabajo || 'Correctivo Mecanico',
+    sistema_afectado: r.sistema_afectado || 'General',
+    descripcion_falla: descFalla,
+    descripcion_trabajo: descFalla,
+    solucion_aplicada: r.solucion_aplicada || '',
+    estado_equipo: r.estado_equipo || 'Operativo',
+    refacciones: Array.isArray(r.refacciones) ? r.refacciones : [],
+    monto_refacciones: (r.monto_refacciones != null) ? Number(r.monto_refacciones) : 0,
+    evidencias: Array.isArray(r.evidencias) ? r.evidencias : [],
+    firma_tecnico: r.firma_tecnico || null,
+    firma_cliente: r.firma_cliente || null,
+    nombre_recibe: r.nombre_recibe || null,
+    semana_ano: r.semana_ano || null,
+    facturado_semanal: Boolean(r.facturado_semanal),
+    aplica_bolsa_horas: (r.aplica_bolsa_horas !== false),
+    es_prueba: (r.es_prueba === true || (typeof r.folio === 'string' && r.folio.startsWith('SNP-PRUEBA')) || false),
+    esPrueba: (r.es_prueba === true || (typeof r.folio === 'string' && r.folio.startsWith('SNP-PRUEBA')) || false),
+    created_at: r.created_at || null,
+    updated_at: r.updated_at || null
+  };
+}
+window.rowToServicioNoPreventivo = rowToServicioNoPreventivo;
+
+function servicioNoPreventivoToRow(s) {
+  if (!s) return null;
+  const descFalla = s.descripcion_falla || s.descripcion_trabajo || s.descripcionTrabajo || s.descripcionFalla || null;
+  const horo = parseFloat(s.horometro_servicio != null ? s.horometro_servicio : (s.horometro != null ? s.horometro : 0)) || 0;
+  return {
+    id: (s.id && isValidUUID(s.id)) ? s.id : (s.id ? toValidUUID(s.id) : undefined),
+    folio: s.folio || null,
+    renta_id: s.renta_id || s.rentaId || null,
+    renta_folio: s.renta_folio || s.rentaFolio || null,
+    cliente: s.cliente || null,
+    sitio: s.sitio || null,
+    equipo: s.equipo || null,
+    serie: s.serie || null,
+    maquina_id: s.maquina_id || s.maquinaId || null,
+    horometro: horo,
+    fecha_servicio: s.fecha_servicio || s.fechaServicio || null,
+    hora_inicio: s.hora_inicio || s.horaInicio || null,
+    hora_fin: s.hora_fin || s.horaFin || null,
+    horas_trabajadas: parseFloat(s.horas_trabajadas || s.horasTrabajadas) || 0,
+    tecnico_nombre: s.tecnico_nombre || s.tecnicoNombre || null,
+    tecnico_id: s.tecnico_id || s.tecnicoId || null,
+    tipo_trabajo: s.tipo_trabajo || s.tipoTrabajo || 'Correctivo Mecanico',
+    sistema_afectado: s.sistema_afectado || s.sistemaAfectado || 'General',
+    descripcion_trabajo: descFalla,
+    solucion_aplicada: s.solucion_aplicada || s.solucionAplicada || null,
+    estado_equipo: s.estado_equipo || s.estadoEquipo || 'Operativo',
+    refacciones: Array.isArray(s.refacciones) ? s.refacciones : [],
+    monto_refacciones: parseFloat(s.monto_refacciones || s.montoRefacciones) || 0,
+    evidencias: Array.isArray(s.evidencias) ? s.evidencias : [],
+    firma_tecnico: s.firma_tecnico || s.firmaTecnico || null,
+    firma_cliente: s.firma_cliente || s.firmaCliente || null,
+    nombre_recibe: s.nombre_recibe || s.nombreRecibe || null,
+    semana_ano: s.semana_ano || s.semanaAno || null,
+    facturado_semanal: Boolean(s.facturado_semanal || s.facturadoSemanal),
+    aplica_bolsa_horas: (s.aplica_bolsa_horas !== false && s.aplicaBolsaHoras !== false),
+    es_prueba: (s.es_prueba === true || s.esPrueba === true || (typeof s.folio === 'string' && s.folio.startsWith('SNP-PRUEBA')) || false),
+    created_at: s.created_at || s.createdAt || new Date().toISOString(),
+    updated_at: s.updated_at || new Date().toISOString()
+  };
+}
+window.servicioNoPreventivoToRow = servicioNoPreventivoToRow;
+
 function isValidUUID(uuid) {
   if (typeof uuid !== 'string') return false;
   const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -1833,6 +1920,8 @@ async function _executePushToSupabase(tabla, item) {
       row = window.rentaToRow(item);
     } else if (tabla === 'servicios_preventivos' && typeof window.servicioPreventivoToRow === 'function') {
       row = window.servicioPreventivoToRow(item);
+    } else if (tabla === 'servicios_no_preventivos' && typeof window.servicioNoPreventivoToRow === 'function') {
+      row = window.servicioNoPreventivoToRow(item);
     } else if (tabla === 'envios' && typeof window.envioToRow === 'function') {
       row = window.envioToRow(item);
     } else if (tabla === 'calendario_eventos' && typeof eventoToRow === 'function') {
@@ -2752,6 +2841,8 @@ async function _processSyncQueueInternal() {
             payload = (typeof window.rentaToRow === 'function') ? window.rentaToRow(item.data) : item.data;
           } else if (item.table === 'servicios_preventivos') {
             payload = (typeof window.servicioPreventivoToRow === 'function') ? window.servicioPreventivoToRow(item.data) : item.data;
+          } else if (item.table === 'servicios_no_preventivos') {
+            payload = (typeof window.servicioNoPreventivoToRow === 'function') ? window.servicioNoPreventivoToRow(item.data) : item.data;
           } else if (item.table === 'clara_transactions') {
             payload = {
               id: item.data.id,

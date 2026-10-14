@@ -14,7 +14,9 @@ export const redirectedKeys = [
   'sapi_sync_queue',
   'sapi_calendario_eventos',
   'sapi_rentas',
-  'sapi_servicios_preventivos'
+  'sapi_servicios_preventivos',
+  'sapi_servicios_no_preventivos',
+  'sapi_servicios_no_preventivos_sandbox'
 ];
 
 let sharedDb = null;

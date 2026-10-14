@@ -10,6 +10,10 @@
               <i data-lucide="shield-check" style="width: 16px; height: 16px;"></i> Servicios Preventivos
               <span id="badge-count-preventivos" class="badge" style="background: rgba(232,130,12,0.15); color: var(--accent, #E8820C); font-size: 0.72rem; padding: 0.1rem 0.5rem; border-radius: 999px; margin-left: 4px; font-weight: 700;">0</span>
             </button>
+            <button type="button" id="tab-rentas-no-preventivos-btn" class="tab-btn" onclick="window.cambiarSubTabRentas('no_preventivos')" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.25rem; font-weight: 600; font-size: 0.92rem; border: none; background: transparent; border-bottom: 3px solid transparent; color: var(--text-secondary); cursor: pointer; transition: all 0.2s ease;">
+              <i data-lucide="wrench" style="width: 16px; height: 16px;"></i> Servicios NO Preventivos (Bolsa de Horas)
+              <span id="badge-count-no-preventivos" class="badge" style="background: rgba(59,130,246,0.15); color: #3b82f6; font-size: 0.72rem; padding: 0.1rem 0.5rem; border-radius: 999px; margin-left: 4px; font-weight: 700;">0</span>
+            </button>
           </div>
 
           <!-- SUBTAB 1: CONTRATOS DE RENTA -->
@@ -200,5 +204,205 @@
             <div id="preventivos-cards-mobile" class="sp-mobile-cards" style="display: none; flex-direction: column; gap: 0.85rem; margin-top: 0.5rem;">
               <!-- Llenado con JS para vistas touch/mobile -->
             </div>
+          </div>
+
+          <!-- SUBTAB 3: SERVICIOS NO PREVENTIVOS (EN SITIO / BOLSA DE HORAS) -->
+          <div id="rentas-subtab-no-preventivos" style="display: none;">
+            
+            <!-- PANEL DESTACADO: BOLSA DE HORAS TÉCNICAS DEL PROYECTO -->
+            <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+                <div style="display: flex; align-items: center; gap: 0.65rem;">
+                  <div style="width: 36px; height: 36px; border-radius: 9px; background: rgba(59,130,246,0.12); color: #3b82f6; display: flex; align-items: center; justify-content: center;">
+                    <i data-lucide="pie-chart" style="width: 20px; height: 20px;"></i>
+                  </div>
+                  <div>
+                    <h4 style="margin: 0; font-size: 1rem; font-weight: 800; color: var(--text-primary); letter-spacing: -0.2px;">
+                      Control y Monitoreo de Bolsa de Horas Técnicas
+                    </h4>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">
+                      Saldo de horas contratadas para soporte en campo en este proyecto
+                    </span>
+                  </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                  <!-- Selector de Contrato para Bolsa de Horas -->
+                  <div style="display: flex; align-items: center; gap: 0.35rem; background: var(--bg-hover); padding: 0.2rem 0.5rem; border-radius: 8px; border: 1px solid var(--border);">
+                    <i data-lucide="key-round" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                    <select id="snp-filtro-renta-bolsa" onchange="window.alCambiarRentaBolsaHorasSNP()" style="border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 700; outline: none; cursor: pointer; max-width: 260px;">
+                      <!-- Se puebla con rentas activas -->
+                    </select>
+                  </div>
+
+                  <button type="button" class="btn-secondary" onclick="window.abrirModalConfigurarBolsaHoras()" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; display: flex; align-items: center; gap: 0.35rem;">
+                    <i data-lucide="sliders" style="width: 13px; height: 13px;"></i> Configurar Bolsa
+                  </button>
+                </div>
+              </div>
+
+              <!-- Indicadores y Barra de Progreso de la Bolsa -->
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 1rem;">
+                  <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Horas Contratadas</span>
+                  <div id="stat-bolsa-contratada" style="font-size: 1.45rem; font-weight: 800; color: var(--text-primary); margin-top: 2px;">0.0 hrs</div>
+                </div>
+                <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 1rem;">
+                  <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Horas Consumidas</span>
+                  <div id="stat-bolsa-consumida" style="font-size: 1.45rem; font-weight: 800; color: #3b82f6; margin-top: 2px;">0.0 hrs</div>
+                </div>
+                <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 1rem;">
+                  <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Saldo Disponible</span>
+                  <div id="stat-bolsa-saldo" style="font-size: 1.45rem; font-weight: 800; color: #10b981; margin-top: 2px;">0.0 hrs</div>
+                </div>
+                <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 1rem;">
+                  <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Estatus del Consumo</span>
+                  <div id="stat-bolsa-status-label" style="font-size: 0.85rem; font-weight: 700; color: #10b981; margin-top: 6px; display: flex; align-items: center; gap: 4px;">
+                    Dentro de la bolsa (0%)
+                  </div>
+                </div>
+              </div>
+
+              <!-- Termómetro / Medidor Visual de Horas -->
+              <div style="margin-bottom: 0.85rem;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.35rem; font-weight: 600;">
+                  <span>Consumo acumulado</span>
+                  <span id="stat-bolsa-porcentaje">0%</span>
+                </div>
+                <div style="width: 100%; height: 10px; background: var(--bg-primary); border-radius: 999px; overflow: hidden; border: 1px solid var(--border);">
+                  <div id="stat-bolsa-progress-bar" style="height: 100%; width: 0%; background: #10b981; border-radius: 999px; transition: width 0.4s ease, background 0.4s ease;"></div>
+                </div>
+              </div>
+
+              <!-- Desglose de Horas por Maquinaria en este Proyecto -->
+              <div>
+                <span style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; display: block; margin-bottom: 0.45rem;">
+                  Horas Técnicas por Maquinaria Intervenida:
+                </span>
+                <div id="snp-bolsa-maquinas-chips" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+                  <span style="font-size: 0.78rem; color: var(--text-muted); font-style: italic;">Sin horas registradas en este contrato aún.</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- KPI Cards Grid No Preventivos -->
+            <div class="stats-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem;">
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroTipoServiciosSNP('todos')">
+                <div class="stat-icon" style="background:rgba(59,130,246,0.12);color:#3b82f6;"><i data-lucide="wrench"></i></div>
+                <div>
+                  <div class="stat-label">Total Servicios SNP</div>
+                  <div class="stat-value" id="stat-snp-total">0</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="clock"></i></div>
+                <div>
+                  <div class="stat-label">Horas Totales Obra</div>
+                  <div class="stat-value" id="stat-snp-horas">0.0 hrs</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:var(--accent);"><i data-lucide="truck"></i></div>
+                <div>
+                  <div class="stat-label">Máquinas Atendidas</div>
+                  <div class="stat-value" id="stat-snp-maquinas">0</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(139,92,246,0.12);color:#8b5cf6;"><i data-lucide="pie-chart"></i></div>
+                <div>
+                  <div class="stat-label">Horas Bolsa Aplicadas</div>
+                  <div class="stat-value" id="stat-snp-bolsa-horas">0.0 hrs</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:#f59e0b;"><i data-lucide="package"></i></div>
+                <div>
+                  <div class="stat-label">Refacciones Correctivos</div>
+                  <div class="stat-value" id="stat-snp-refacciones" style="font-size:1.15rem;">$0.00</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Controls Toolbar: Search, Filter Pills & Export -->
+            <div style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+              <!-- Left: Search, Filter Pills & Week Filter -->
+              <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; flex: 1;">
+                <div style="position: relative; min-width: 250px; max-width: 360px; flex: 1;">
+                  <i data-lucide="search" style="position: absolute; left: 10px; top: 9px; width: 15px; height: 15px; color: var(--text-muted);"></i>
+                  <input type="text" id="search-no-preventivos" placeholder="Buscar por folio, máquina, técnico, falla..." oninput="debouncedRenderServiciosNoPreventivos()" style="width: 100%; padding: 0.45rem 0.75rem 0.45rem 2.1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+                </div>
+
+                <div class="snp-filter-pills-wrap" style="display: flex; gap: 0.35rem; background: var(--bg-hover); padding: 0.25rem; border-radius: 8px; border: 1px solid var(--border); flex-wrap: wrap;">
+                  <button type="button" class="btn-secondary snp-filter-pill active" data-filtro="todos" onclick="window.setFiltroTipoServiciosSNP('todos')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: var(--accent, #E8820C); color: #fff;">Todos <span id="count-pill-snp-todos" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary snp-filter-pill" data-filtro="correctivo" onclick="window.setFiltroTipoServiciosSNP('correctivo')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Correctivos <span id="count-pill-snp-correctivo" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary snp-filter-pill" data-filtro="electrico" onclick="window.setFiltroTipoServiciosSNP('electrico')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Eléctricos <span id="count-pill-snp-electrico" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary snp-filter-pill" data-filtro="hidraulico" onclick="window.setFiltroTipoServiciosSNP('hidraulico')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Hidráulicos <span id="count-pill-snp-hidraulico" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary snp-filter-pill" data-filtro="calibracion" onclick="window.setFiltroTipoServiciosSNP('calibracion')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Ajustes <span id="count-pill-snp-calibracion" style="margin-left:3px; opacity:0.85;">0</span></button>
+                </div>
+
+                <!-- Selector de Semana -->
+                <div style="display: flex; align-items: center; gap: 0.35rem; background: var(--bg-hover); padding: 0.2rem 0.5rem; border-radius: 8px; border: 1px solid var(--border);">
+                  <i data-lucide="calendar" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                  <select id="snp-filtro-semana" onchange="window.alCambiarFiltroSemanaSNP(this.value)" style="border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 600; outline: none; cursor: pointer;">
+                    <option value="todas">Todas las Semanas</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Right: Action buttons -->
+              <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                <!-- Botón Bitácora / Reporte Semanal -->
+                <button type="button" class="btn-secondary" onclick="window.abrirModalReporteSemanalSNP()" title="Generar documento semanal para bitácora del equipo y facturación" style="font-size: 0.82rem; display: flex; align-items: center; gap: 0.4rem; background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.4); color: #10b981; font-weight: 600;">
+                  <i data-lucide="file-text" style="width:14px;height:14px;"></i> Bitácora Semanal
+                </button>
+
+                <!-- Exportar Excel -->
+                <button type="button" class="btn-secondary" onclick="window.exportarServiciosNoPreventivosExcel()" style="font-size: 0.82rem;">
+                  <i data-lucide="download" style="width:14px;height:14px;"></i> Exportar Excel
+                </button>
+
+                <!-- Captura Multimáquina de la Jornada -->
+                <button type="button" class="btn-secondary" onclick="window.abrirCapturaMultimaquinaSNP()" title="Capturar en un solo paso las 3 o 4 máquinas que el técnico atendió hoy" style="font-size: 0.82rem; display: flex; align-items: center; gap: 0.4rem; background: rgba(59,130,246,0.12); border-color: rgba(59,130,246,0.4); color: #3b82f6; font-weight: 600;">
+                  <i data-lucide="layers" style="width:14px;height:14px;"></i> Jornada Multimáquina
+                </button>
+
+                <!-- Nuevo Servicio Individual -->
+                <button type="button" class="btn-primary" onclick="window.abrirModalServicioNoPreventivo()" style="font-size: 0.82rem; background: #2563eb; border-color: #2563eb; display: flex; align-items: center; gap: 0.4rem;">
+                  <i data-lucide="plus" style="width:14px;height:14px;"></i> Registrar Servicio
+                </button>
+              </div>
+            </div>
+
+            <!-- Responsive Desktop Table -->
+            <div class="table-container snp-desktop-table" style="background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border); overflow-x: auto; box-shadow: var(--shadow-sm);">
+              <table class="orders-table" style="width:100%; border-collapse:collapse; text-align:left;">
+                <thead>
+                  <tr>
+                    <th style="width: 105px;">Acciones</th>
+                    <th>Folio</th>
+                    <th>Fecha</th>
+                    <th>Técnico</th>
+                    <th>Renta / Cliente</th>
+                    <th>Maquinaria / Equipo</th>
+                    <th>Horario</th>
+                    <th>Horas</th>
+                    <th>Tipo de Trabajo</th>
+                    <th>Falla / Actividades</th>
+                    <th>Refacciones</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="no-preventivos-table-body">
+                  <!-- Llenado con JS -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Responsive View: Mobile & Tablet Cards -->
+            <div id="no-preventivos-cards-mobile" class="snp-mobile-cards" style="display: none; flex-direction: column; gap: 0.85rem; margin-top: 0.5rem;">
+              <!-- Llenado con JS para vistas touch/mobile -->
+            </div>
+
           </div>
         </div>

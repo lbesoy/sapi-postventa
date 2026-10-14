@@ -32,41 +32,58 @@
   }
 
   /**
-   * Cambiar entre subpestañas de Rentas: Contratos vs Servicios Preventivos
+   * Cambiar entre subpestañas de Rentas: Contratos, Servicios Preventivos y Servicios NO Preventivos
    */
   window.cambiarSubTabRentas = function(subtab) {
     const btnContratos = document.getElementById('tab-rentas-contratos-btn');
     const btnPreventivos = document.getElementById('tab-rentas-preventivos-btn');
+    const btnNoPreventivos = document.getElementById('tab-rentas-no-preventivos-btn');
     const contContratos = document.getElementById('rentas-subtab-contratos');
     const contPreventivos = document.getElementById('rentas-subtab-preventivos');
+    const contNoPreventivos = document.getElementById('rentas-subtab-no-preventivos');
+
+    // Desactivar todos los botones
+    [btnContratos, btnPreventivos, btnNoPreventivos].forEach(btn => {
+      if (btn) {
+        btn.classList.remove('active');
+        btn.style.borderBottomColor = 'transparent';
+        btn.style.color = 'var(--text-secondary)';
+      }
+    });
+
+    // Ocultar todos los contenedores
+    if (contContratos) contContratos.style.display = 'none';
+    if (contPreventivos) contPreventivos.style.display = 'none';
+    if (contNoPreventivos) contNoPreventivos.style.display = 'none';
 
     if (subtab === 'preventivos') {
-      if (btnContratos) {
-        btnContratos.classList.remove('active');
-        btnContratos.style.borderBottomColor = 'transparent';
-        btnContratos.style.color = 'var(--text-secondary)';
-      }
       if (btnPreventivos) {
         btnPreventivos.classList.add('active');
         btnPreventivos.style.borderBottomColor = 'var(--accent, #E8820C)';
         btnPreventivos.style.color = 'var(--accent, #E8820C)';
       }
-      if (contContratos) contContratos.style.display = 'none';
       if (contPreventivos) contPreventivos.style.display = 'block';
 
-      window.renderServiciosPreventivos();
-    } else {
-      if (btnPreventivos) {
-        btnPreventivos.classList.remove('active');
-        btnPreventivos.style.borderBottomColor = 'transparent';
-        btnPreventivos.style.color = 'var(--text-secondary)';
+      if (typeof window.renderServiciosPreventivos === 'function') {
+        window.renderServiciosPreventivos();
       }
+    } else if (subtab === 'no_preventivos') {
+      if (btnNoPreventivos) {
+        btnNoPreventivos.classList.add('active');
+        btnNoPreventivos.style.borderBottomColor = '#2563eb';
+        btnNoPreventivos.style.color = '#2563eb';
+      }
+      if (contNoPreventivos) contNoPreventivos.style.display = 'block';
+
+      if (typeof window.renderServiciosNoPreventivos === 'function') {
+        window.renderServiciosNoPreventivos();
+      }
+    } else {
       if (btnContratos) {
         btnContratos.classList.add('active');
         btnContratos.style.borderBottomColor = 'var(--accent, #E8820C)';
         btnContratos.style.color = 'var(--accent, #E8820C)';
       }
-      if (contPreventivos) contPreventivos.style.display = 'none';
       if (contContratos) contContratos.style.display = 'block';
 
       if (typeof window.renderRentas === 'function') {
