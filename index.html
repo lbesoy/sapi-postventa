@@ -3374,99 +3374,209 @@
 
         <!-- RENTAS VIEW -->
         <div id="view-rentas" class="view">
-          <div style="height: 1.5rem; width: 100%; flex-shrink: 0;"></div>
+          <div style="height: 1.25rem; width: 100%; flex-shrink: 0;"></div>
 
-          <!-- KPI Cards Grid -->
-          <div class="stats-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
-            <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('todas')">
-              <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:var(--accent);"><i data-lucide="key-round"></i></div>
-              <div>
-                <div class="stat-label">Total Contratos</div>
-                <div class="stat-value" id="stat-rentas-total">0</div>
+          <!-- Subtabs Header: Contratos vs Servicios Preventivos -->
+          <div class="rentas-subtabs-nav" style="display: flex; gap: 0.5rem; border-bottom: 2px solid var(--border); margin-bottom: 1.5rem; padding-bottom: 0;">
+            <button type="button" id="tab-rentas-contratos-btn" class="tab-btn active" onclick="window.cambiarSubTabRentas('contratos')" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.25rem; font-weight: 700; font-size: 0.92rem; border: none; background: transparent; border-bottom: 3px solid var(--accent, #E8820C); color: var(--accent, #E8820C); cursor: pointer; transition: all 0.2s ease;">
+              <i data-lucide="key-round" style="width: 16px; height: 16px;"></i> Contratos de Renta
+            </button>
+            <button type="button" id="tab-rentas-preventivos-btn" class="tab-btn" onclick="window.cambiarSubTabRentas('preventivos')" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.25rem; font-weight: 600; font-size: 0.92rem; border: none; background: transparent; border-bottom: 3px solid transparent; color: var(--text-secondary); cursor: pointer; transition: all 0.2s ease;">
+              <i data-lucide="shield-check" style="width: 16px; height: 16px;"></i> Servicios Preventivos
+              <span id="badge-count-preventivos" class="badge" style="background: rgba(232,130,12,0.15); color: var(--accent, #E8820C); font-size: 0.72rem; padding: 0.1rem 0.5rem; border-radius: 999px; margin-left: 4px; font-weight: 700;">0</span>
+            </button>
+          </div>
+
+          <!-- SUBTAB 1: CONTRATOS DE RENTA -->
+          <div id="rentas-subtab-contratos">
+            <!-- KPI Cards Grid -->
+            <div class="stats-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('todas')">
+                <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:var(--accent);"><i data-lucide="key-round"></i></div>
+                <div>
+                  <div class="stat-label">Total Contratos</div>
+                  <div class="stat-value" id="stat-rentas-total">0</div>
+                </div>
+              </div>
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('activas')">
+                <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle-2"></i></div>
+                <div>
+                  <div class="stat-label">Activas en Campo</div>
+                  <div class="stat-value" id="stat-rentas-activas">0</div>
+                </div>
+              </div>
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('por_vencer')">
+                <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:#f59e0b;"><i data-lucide="alert-triangle"></i></div>
+                <div>
+                  <div class="stat-label">Por Vencer (&le; 7d)</div>
+                  <div class="stat-value" id="stat-rentas-por-vencer">0</div>
+                </div>
+              </div>
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('vencidas')">
+                <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-octagon"></i></div>
+                <div>
+                  <div class="stat-label">Vencidas</div>
+                  <div class="stat-value" id="stat-rentas-vencidas">0</div>
+                </div>
+              </div>
+              <div class="stat-card" style="cursor: pointer;">
+                <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="dollar-sign"></i></div>
+                <div>
+                  <div class="stat-label">Ingresos Est. / Mes</div>
+                  <div class="stat-value" id="stat-rentas-ingresos" style="font-size:1.15rem;">$0.00</div>
+                </div>
               </div>
             </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('activas')">
-              <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle-2"></i></div>
-              <div>
-                <div class="stat-label">Activas en Campo</div>
-                <div class="stat-value" id="stat-rentas-activas">0</div>
+
+            <!-- Controls Toolbar: Search, Filter Pills & Export -->
+            <div style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+              <!-- Left: Search & Filter Pills -->
+              <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; flex: 1;">
+                <div style="position: relative; min-width: 260px; max-width: 380px; flex: 1;">
+                  <i data-lucide="search" style="position: absolute; left: 10px; top: 9px; width: 15px; height: 15px; color: var(--text-muted);"></i>
+                  <input type="text" id="search-rentas" placeholder="Buscar folio, cliente, equipo, serie, asesor..." oninput="debouncedRenderRentas()" style="width: 100%; padding: 0.45rem 0.75rem 0.45rem 2.1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+                </div>
+                <div class="rentas-filter-pills-wrap" style="display: flex; gap: 0.35rem; background: var(--bg-hover); padding: 0.25rem; border-radius: 8px; border: 1px solid var(--border);">
+                  <button type="button" class="btn-secondary rentas-filter-pill active" data-filtro="todas" onclick="window.setFiltroEstadoRentas('todas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: var(--accent, #E8820C); color: #fff;">Todas <span id="count-pill-rentas-todas" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="activas" onclick="window.setFiltroEstadoRentas('activas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Activas <span id="count-pill-rentas-activas" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="reservadas" onclick="window.setFiltroEstadoRentas('reservadas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Reservadas <span id="count-pill-rentas-reservadas" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="por_vencer" onclick="window.setFiltroEstadoRentas('por_vencer')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Por Vencer <span id="count-pill-rentas-por-vencer" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="vencidas" onclick="window.setFiltroEstadoRentas('vencidas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Vencidas <span id="count-pill-rentas-vencidas" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="finalizadas" onclick="window.setFiltroEstadoRentas('finalizadas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Finalizadas <span id="count-pill-rentas-finalizadas" style="margin-left:3px; opacity:0.85;">0</span></button>
+                </div>
+              </div>
+
+              <!-- Right: Action buttons -->
+              <div style="display: flex; gap: 0.5rem;">
+                <button type="button" class="btn-secondary" onclick="window.exportarRentasExcel()" style="font-size: 0.85rem;">
+                  <i data-lucide="download" style="width:14px;height:14px;"></i> Exportar Excel
+                </button>
+                <button type="button" class="btn-primary" onclick="window.abrirModalNuevaRenta()" style="font-size: 0.85rem;">
+                  <i data-lucide="plus" style="width:14px;height:14px;"></i> Nueva Renta
+                </button>
               </div>
             </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('por_vencer')">
-              <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:#f59e0b;"><i data-lucide="alert-triangle"></i></div>
-              <div>
-                <div class="stat-label">Por Vencer (&le; 7d)</div>
-                <div class="stat-value" id="stat-rentas-por-vencer">0</div>
-              </div>
-            </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('vencidas')">
-              <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-octagon"></i></div>
-              <div>
-                <div class="stat-label">Vencidas</div>
-                <div class="stat-value" id="stat-rentas-vencidas">0</div>
-              </div>
-            </div>
-            <div class="stat-card" style="cursor: pointer;">
-              <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="dollar-sign"></i></div>
-              <div>
-                <div class="stat-label">Ingresos Est. / Mes</div>
-                <div class="stat-value" id="stat-rentas-ingresos" style="font-size:1.15rem;">$0.00</div>
-              </div>
+
+            <!-- Rentas Table -->
+            <div class="table-container" style="background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow-sm);">
+              <table class="orders-table" style="width:100%; border-collapse:collapse; text-align:left;">
+                <thead>
+                  <tr>
+                    <th style="width: 100px;">Acciones</th>
+                    <th>Folio</th>
+                    <th>Cliente y Sitio</th>
+                    <th>Maquinaria / Equipo</th>
+                    <th>Periodo Vigencia</th>
+                    <th>Horómetro</th>
+                    <th>Tarifa y Depósito</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="rentas-table-body">
+                  <!-- Se llena con JS -->
+                </tbody>
+              </table>
             </div>
           </div>
 
-          <!-- Controls Toolbar: Search, Filter Pills & Export -->
-          <div style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
-            <!-- Left: Search & Filter Pills -->
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; flex: 1;">
-              <div style="position: relative; min-width: 260px; max-width: 380px; flex: 1;">
-                <i data-lucide="search" style="position: absolute; left: 10px; top: 9px; width: 15px; height: 15px; color: var(--text-muted);"></i>
-                <input type="text" id="search-rentas" placeholder="Buscar folio, cliente, equipo, serie, asesor..." oninput="debouncedRenderRentas()" style="width: 100%; padding: 0.45rem 0.75rem 0.45rem 2.1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+          <!-- SUBTAB 2: SERVICIOS PREVENTIVOS -->
+          <div id="rentas-subtab-preventivos" style="display: none;">
+            <!-- KPI Cards Grid Preventivos -->
+            <div class="stats-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroServiciosPreventivos('todos')">
+                <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:var(--accent);"><i data-lucide="shield-check"></i></div>
+                <div>
+                  <div class="stat-label">Total Servicios</div>
+                  <div class="stat-value" id="stat-sp-total">0</div>
+                </div>
               </div>
-              <div class="rentas-filter-pills-wrap" style="display: flex; gap: 0.35rem; background: var(--bg-hover); padding: 0.25rem; border-radius: 8px; border: 1px solid var(--border);">
-                <button type="button" class="btn-secondary rentas-filter-pill active" data-filtro="todas" onclick="window.setFiltroEstadoRentas('todas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: var(--accent, #E8820C); color: #fff;">Todas <span id="count-pill-rentas-todas" style="margin-left:3px; opacity:0.85;">0</span></button>
-                <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="activas" onclick="window.setFiltroEstadoRentas('activas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Activas <span id="count-pill-rentas-activas" style="margin-left:3px; opacity:0.85;">0</span></button>
-                <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="reservadas" onclick="window.setFiltroEstadoRentas('reservadas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Reservadas <span id="count-pill-rentas-reservadas" style="margin-left:3px; opacity:0.85;">0</span></button>
-                <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="por_vencer" onclick="window.setFiltroEstadoRentas('por_vencer')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Por Vencer <span id="count-pill-rentas-por-vencer" style="margin-left:3px; opacity:0.85;">0</span></button>
-                <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="vencidas" onclick="window.setFiltroEstadoRentas('vencidas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Vencidas <span id="count-pill-rentas-vencidas" style="margin-left:3px; opacity:0.85;">0</span></button>
-                <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="finalizadas" onclick="window.setFiltroEstadoRentas('finalizadas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Finalizadas <span id="count-pill-rentas-finalizadas" style="margin-left:3px; opacity:0.85;">0</span></button>
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroServiciosPreventivos('cliente')">
+                <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="file-text"></i></div>
+                <div>
+                  <div class="stat-label">Facturable Cliente</div>
+                  <div class="stat-value" id="stat-sp-cliente">0</div>
+                </div>
+              </div>
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroServiciosPreventivos('eurorep')">
+                <div class="stat-icon" style="background:rgba(59,130,246,0.12);color:#3b82f6;"><i data-lucide="wrench"></i></div>
+                <div>
+                  <div class="stat-label">Cubierto Eurorep</div>
+                  <div class="stat-value" id="stat-sp-eurorep">0</div>
+                </div>
+              </div>
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroServiciosPreventivos('garantia')">
+                <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:#f59e0b;"><i data-lucide="award"></i></div>
+                <div>
+                  <div class="stat-label">Garantía / Otros</div>
+                  <div class="stat-value" id="stat-sp-garantia">0</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(139,92,246,0.12);color:#8b5cf6;"><i data-lucide="package"></i></div>
+                <div>
+                  <div class="stat-label">Refacciones Invertidas</div>
+                  <div class="stat-value" id="stat-sp-refacciones" style="font-size:1.15rem;">$0.00</div>
+                </div>
               </div>
             </div>
 
-            <!-- Right: Action buttons -->
-            <div style="display: flex; gap: 0.5rem;">
-              <button type="button" class="btn-secondary" onclick="window.exportarRentasExcel()" style="font-size: 0.85rem;">
-                <i data-lucide="download" style="width:14px;height:14px;"></i> Exportar Excel
-              </button>
-              <button type="button" class="btn-primary" onclick="window.abrirModalNuevaRenta()" style="font-size: 0.85rem;">
-                <i data-lucide="plus" style="width:14px;height:14px;"></i> Nueva Renta
-              </button>
-            </div>
-          </div>
+            <!-- Controls Toolbar: Search, Filter Pills & Export -->
+            <div style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+              <!-- Left: Search & Filter Pills -->
+              <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; flex: 1;">
+                <div style="position: relative; min-width: 260px; max-width: 380px; flex: 1;">
+                  <i data-lucide="search" style="position: absolute; left: 10px; top: 9px; width: 15px; height: 15px; color: var(--text-muted);"></i>
+                  <input type="text" id="search-preventivos" placeholder="Buscar por folio, cliente, equipo, serie, operador..." oninput="debouncedRenderServiciosPreventivos()" style="width: 100%; padding: 0.45rem 0.75rem 0.45rem 2.1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+                </div>
+                <div class="sp-filter-pills-wrap" style="display: flex; gap: 0.35rem; background: var(--bg-hover); padding: 0.25rem; border-radius: 8px; border: 1px solid var(--border); flex-wrap: wrap;">
+                  <button type="button" class="btn-secondary sp-filter-pill active" data-filtro="todos" onclick="window.setFiltroServiciosPreventivos('todos')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: var(--accent, #E8820C); color: #fff;">Todos <span id="count-pill-sp-todos" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary sp-filter-pill" data-filtro="cliente" onclick="window.setFiltroServiciosPreventivos('cliente')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Facturable Cliente <span id="count-pill-sp-cliente" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary sp-filter-pill" data-filtro="eurorep" onclick="window.setFiltroServiciosPreventivos('eurorep')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Cubierto Eurorep <span id="count-pill-sp-eurorep" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary sp-filter-pill" data-filtro="garantia" onclick="window.setFiltroServiciosPreventivos('garantia')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Garantía <span id="count-pill-sp-garantia" style="margin-left:3px; opacity:0.85;">0</span></button>
+                </div>
+              </div>
 
-          <!-- Rentas Table -->
-          <div class="table-container" style="background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow-sm);">
-            <table class="orders-table" style="width:100%; border-collapse:collapse; text-align:left;">
-              <thead>
-                <tr>
-                  <th style="width: 100px;">Acciones</th>
-                  <th>Folio</th>
-                  <th>Cliente y Sitio</th>
-                  <th>Maquinaria / Equipo</th>
-                  <th>Periodo Vigencia</th>
-                  <th>Horómetro</th>
-                  <th>Tarifa y Depósito</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody id="rentas-table-body">
-                <!-- Se llena con JS -->
-              </tbody>
-            </table>
+              <!-- Right: Action buttons -->
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button type="button" class="btn-secondary" onclick="window.exportarServiciosPreventivosExcel()" style="font-size: 0.85rem;">
+                  <i data-lucide="download" style="width:14px;height:14px;"></i> Exportar Excel
+                </button>
+                <button type="button" class="btn-primary" onclick="window.abrirModalServicioPreventivo()" style="font-size: 0.85rem; background: var(--accent, #E8820C); border-color: var(--accent, #E8820C); display: flex; align-items: center; gap: 0.4rem;">
+                  <i data-lucide="plus" style="width:14px;height:14px;"></i> Nuevo Servicio Preventivo
+                </button>
+              </div>
+            </div>
+
+            <!-- Responsive View: Desktop Table -->
+            <div class="table-container sp-desktop-table" style="background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border); overflow-x: auto; box-shadow: var(--shadow-sm);">
+              <table class="orders-table" style="width:100%; border-collapse:collapse; text-align:left;">
+                <thead>
+                  <tr>
+                    <th style="width: 105px;">Acciones</th>
+                    <th>Folio</th>
+                    <th>Renta / Cliente</th>
+                    <th>Maquinaria / Equipo</th>
+                    <th>Horario (In / Out)</th>
+                    <th>Horas</th>
+                    <th>Horómetro</th>
+                    <th>¿Quién Paga?</th>
+                    <th>Operador</th>
+                    <th>Refacciones</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="preventivos-table-body">
+                  <!-- Llenado con JS -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Responsive View: Mobile & Tablet Cards -->
+            <div id="preventivos-cards-mobile" class="sp-mobile-cards" style="display: none; flex-direction: column; gap: 0.85rem; margin-top: 0.5rem;">
+              <!-- Llenado con JS para vistas touch/mobile -->
+            </div>
           </div>
         </div>
-
-        <!-- LEVANTAMIENTOS VIEW -->
         <div id="view-levantamientos" class="view">
           <div style="height: 3rem; width: 100%; flex-shrink: 0;"></div>
           <div class="stats-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
@@ -8797,6 +8907,346 @@
 
     </div>
   </div>
+    <!-- MODAL SERVICIO PREVENTIVO EN RENTAS (TOUCH & MOBILE READY) -->
+    <div class="modal-overlay" id="modal-servicio-preventivo-overlay" style="z-index: 600; display: none;">
+      <div class="modal" id="modal-servicio-preventivo" style="max-width: 900px; width: 95vw; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; padding: 0; background: var(--bg-card, #1e293b); color: var(--text-primary, #f8fafc); border-radius: 16px; border: 1px solid var(--border, #334155); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6);">
+        
+        <!-- Header -->
+        <div class="modal-header" style="padding: 1rem 1.5rem; background: var(--bg-secondary, #0f172a); border-bottom: 1px solid var(--border, #334155); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(232,130,12,0.15); color: var(--accent, #E8820C); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <i data-lucide="shield-check" style="width: 20px; height: 20px;"></i>
+            </div>
+            <div>
+              <h2 id="modal-sp-title" style="margin: 0; font-size: 1.15rem; font-weight: 700;">Nuevo Servicio Preventivo</h2>
+              <div style="font-size: 0.75rem; color: var(--text-muted, #94a3b8); margin-top: 2px; display: flex; align-items: center; gap: 0.5rem;">
+                <span id="modal-sp-folio-badge" style="font-family: var(--font-mono, monospace); font-weight: 700; color: var(--accent, #E8820C);">SP-AUTO</span>
+                <span>•</span>
+                <span id="modal-sp-offline-badge" style="display: inline-flex; align-items: center; gap: 3px; color: #10b981; font-weight: 600;">
+                  <i data-lucide="hard-drive" style="width: 12px; height: 12px;"></i> Offline Ready
+                </span>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="modal-close" onclick="window.cerrarModalServicioPreventivo()" style="background: transparent; border: none; color: var(--text-muted); font-size: 1.4rem; cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 6px;">✕</button>
+        </div>
+
+        <!-- Body con scroll para pantallas táctiles -->
+        <div class="modal-body" style="flex: 1; overflow-y: auto; padding: 1.25rem 1.5rem; box-sizing: border-box; display: flex; flex-direction: column; gap: 1.25rem;">
+          <input type="hidden" id="sp-id" value="" />
+
+          <!-- SECCIÓN 1: CONTRATO DE RENTA Y EQUIPO -->
+          <div style="background: var(--bg-primary, #0f172a); border: 1px solid var(--border, #334155); border-radius: 12px; padding: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; color: var(--accent, #E8820C); font-weight: 700; font-size: 0.9rem;">
+              <i data-lucide="key-round" style="width: 16px; height: 16px;"></i> Contrato de Renta y Maquinaria
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.85rem;">
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600;">Contrato de Renta <span class="required-asterisk" style="color:#ef4444;">*</span></label>
+                <select id="sp-renta-id" onchange="window.alCambiarRentaEnServicioPreventivo()" required style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;">
+                  <option value="">-- Seleccionar Renta Activa --</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600;">Cliente</label>
+                <input type="text" id="sp-cliente" placeholder="Cliente de la renta" readonly style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-hover); color: var(--text-primary); font-size: 0.85rem;" />
+              </div>
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600;">Sitio / Ubicación</label>
+                <input type="text" id="sp-sitio" placeholder="Sitio del equipo" readonly style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-hover); color: var(--text-primary); font-size: 0.85rem;" />
+              </div>
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600;">Maquinaria / Equipo</label>
+                <input type="text" id="sp-equipo" placeholder="Equipo asignado" readonly style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-hover); color: var(--text-primary); font-size: 0.85rem;" />
+              </div>
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600;">No. de Serie</label>
+                <input type="text" id="sp-serie" placeholder="Número de serie" readonly style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-hover); color: var(--text-primary); font-size: 0.85rem; font-family: var(--font-mono, monospace);" />
+              </div>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 2: ¿QUIÉN PAGA POR EL SERVICIO? (REQUISITO PRIMORDIAL) -->
+          <div style="background: rgba(232,130,12,0.06); border: 2px solid var(--accent, #E8820C); border-radius: 12px; padding: 1.15rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--accent, #E8820C); font-weight: 800; font-size: 0.95rem;">
+                <i data-lucide="dollar-sign" style="width: 18px; height: 18px;"></i> ¿QUIÉN PAGA POR ESTE SERVICIO PREVENTIVO? <span class="required-asterisk" style="color:#ef4444;">*</span>
+              </div>
+              <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">Indicar responsabilidad comercial</span>
+            </div>
+
+            <!-- Botones táctiles de selección rápida de Pagador -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.65rem; margin-bottom: 0.85rem;">
+              <label class="sp-pago-option" style="cursor: pointer; display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 0.85rem; border-radius: 10px; border: 1.5px solid var(--border); background: var(--bg-card); transition: all 0.2s;">
+                <input type="radio" name="sp_pagado_por" value="cliente" checked onchange="window.alCambiarPagadorServicioPreventivo()" style="accent-color: var(--accent); transform: scale(1.15);" />
+                <div>
+                  <strong style="display: block; font-size: 0.85rem; color: #10b981;">Facturable Cliente</strong>
+                  <span style="font-size: 0.7rem; color: var(--text-muted);">Cargo al arrendatario</span>
+                </div>
+              </label>
+
+              <label class="sp-pago-option" style="cursor: pointer; display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 0.85rem; border-radius: 10px; border: 1.5px solid var(--border); background: var(--bg-card); transition: all 0.2s;">
+                <input type="radio" name="sp_pagado_por" value="eurorep" onchange="window.alCambiarPagadorServicioPreventivo()" style="accent-color: var(--accent); transform: scale(1.15);" />
+                <div>
+                  <strong style="display: block; font-size: 0.85rem; color: #3b82f6;">Incluido Eurorep</strong>
+                  <span style="font-size: 0.7rem; color: var(--text-muted);">Incluido en contrato</span>
+                </div>
+              </label>
+
+              <label class="sp-pago-option" style="cursor: pointer; display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 0.85rem; border-radius: 10px; border: 1.5px solid var(--border); background: var(--bg-card); transition: all 0.2s;">
+                <input type="radio" name="sp_pagado_por" value="garantia" onchange="window.alCambiarPagadorServicioPreventivo()" style="accent-color: var(--accent); transform: scale(1.15);" />
+                <div>
+                  <strong style="display: block; font-size: 0.85rem; color: #f59e0b;">Garantía Fabricante</strong>
+                  <span style="font-size: 0.7rem; color: var(--text-muted);">Reclamo a planta</span>
+                </div>
+              </label>
+
+              <label class="sp-pago-option" style="cursor: pointer; display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 0.85rem; border-radius: 10px; border: 1.5px solid var(--border); background: var(--bg-card); transition: all 0.2s;">
+                <input type="radio" name="sp_pagado_por" value="compartido" onchange="window.alCambiarPagadorServicioPreventivo()" style="accent-color: var(--accent); transform: scale(1.15);" />
+                <div>
+                  <strong style="display: block; font-size: 0.85rem; color: #8b5cf6;">Compartido / Otro</strong>
+                  <span style="font-size: 0.7rem; color: var(--text-muted);">Acuerdo especial</span>
+                </div>
+              </label>
+            </div>
+
+            <!-- Justificación y montos -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.85rem; align-items: flex-end;">
+              <div class="form-group" style="grid-column: span 2;">
+                <label style="font-size: 0.8rem; font-weight: 600;">Motivo / Justificación de Cobro</label>
+                <input type="text" id="sp-justificacion-pago" placeholder="Ej. Preventivo programado por contrato / Mal uso de filtros / Servicio ordinario 250h" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+              </div>
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600;">Mano de Obra ($ MXN)</label>
+                <input type="number" id="sp-monto-mano-obra" min="0" step="50" value="0" oninput="window.recalcularTotalesServicioPreventivo()" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+              </div>
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600;">Factura / Pedido SAP (Opcional)</label>
+                <input type="text" id="sp-numero-factura-sap" placeholder="Ej. F-10492 / PED-4820" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+              </div>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 3: HORARIOS DE ENTRADA Y SALIDA + HORÓMETRO (REQUISITO ESENCIAL) -->
+          <div style="background: var(--bg-primary, #0f172a); border: 1px solid var(--border, #334155); border-radius: 12px; padding: 1rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--accent, #E8820C); font-weight: 700; font-size: 0.9rem;">
+                <i data-lucide="clock" style="width: 16px; height: 16px;"></i> Registro de Horario de Entrada, Salida y Horómetro
+              </div>
+              <div id="sp-horas-calculadas-badge" style="background: rgba(16,185,129,0.15); color: #10b981; font-weight: 700; padding: 0.2rem 0.65rem; border-radius: 8px; font-size: 0.8rem;">
+                Horas Servicio: 0.0 hrs
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.85rem; align-items: flex-end;">
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600;">Fecha del Servicio <span class="required-asterisk" style="color:#ef4444;">*</span></label>
+                <input type="date" id="sp-fecha" required style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+              </div>
+
+              <!-- Hora Entrada con Botón Táctil "Ahora" -->
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600; display: flex; justify-content: space-between;">
+                  <span>Hora Entrada <span class="required-asterisk" style="color:#ef4444;">*</span></span>
+                  <a href="javascript:void(0)" onclick="window.fijarHoraActualSP('sp-hora-entrada')" style="color: var(--accent); text-decoration: none; font-size: 0.75rem; font-weight: 700;">⏱️ Ahora</a>
+                </label>
+                <input type="time" id="sp-hora-entrada" onchange="window.recalcularHorasTrabajadasSP()" required style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+              </div>
+
+              <!-- Hora Salida con Botón Táctil "Ahora" -->
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600; display: flex; justify-content: space-between;">
+                  <span>Hora Salida <span class="required-asterisk" style="color:#ef4444;">*</span></span>
+                  <a href="javascript:void(0)" onclick="window.fijarHoraActualSP('sp-hora-salida')" style="color: var(--accent); text-decoration: none; font-size: 0.75rem; font-weight: 700;">⏱️ Ahora</a>
+                </label>
+                <input type="time" id="sp-hora-salida" onchange="window.recalcularHorasTrabajadasSP()" required style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+              </div>
+
+              <!-- Horómetro Actual -->
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600;">Horómetro del Equipo (hrs) <span class="required-asterisk" style="color:#ef4444;">*</span></label>
+                <input type="number" id="sp-horometro" min="0" step="0.5" placeholder="Ej. 1250.5" oninput="window.calcularProximoHorometroSP()" required style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem; font-weight: 700;" />
+              </div>
+
+              <!-- Próximo Horómetro Sugerido -->
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600;">Próximo Servicio (hrs)</label>
+                <input type="number" id="sp-proximo-horometro" min="0" step="0.5" placeholder="Ej. 1500.5" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+              </div>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 4: QUIÉN REALIZÓ EL SERVICIO (OPERADOR / TÉCNICO) -->
+          <div style="background: var(--bg-primary, #0f172a); border: 1px solid var(--border, #334155); border-radius: 12px; padding: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; color: var(--accent, #E8820C); font-weight: 700; font-size: 0.9rem;">
+              <i data-lucide="user-check" style="width: 16px; height: 16px;"></i> ¿Quién Realizó el Servicio?
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.85rem;">
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600;">Nombre del Operador / Técnico <span class="required-asterisk" style="color:#ef4444;">*</span></label>
+                <input type="text" id="sp-operador-nombre" placeholder="Nombre completo" required list="sp-lista-tecnicos-datalist" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+                <datalist id="sp-lista-tecnicos-datalist"></datalist>
+              </div>
+
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600;">Tipo de Operador</label>
+                <select id="sp-tipo-operador" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;">
+                  <option value="eurorep">Operador / Técnico Eurorep</option>
+                  <option value="cliente">Operador del Cliente</option>
+                  <option value="externo">Técnico Tercerizado / Externo</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600;">Supervisor Responsable</label>
+                <input type="text" id="sp-supervisor" placeholder="Supervisor asignado" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+              </div>
+
+              <div class="form-group">
+                <label style="font-size: 0.8rem; font-weight: 600;">Estado Final del Equipo</label>
+                <select id="sp-estado-equipo" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem; font-weight: 600;">
+                  <option value="Operativo" style="color:#10b981;">🟢 Operativo 100%</option>
+                  <option value="Operativo con Observaciones" style="color:#f59e0b;">🟡 Operativo con Observaciones</option>
+                  <option value="Fuera de Servicio" style="color:#ef4444;">🔴 Fuera de Servicio / Requiere Reparación</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 5: BITÁCORA DIARIA Y CHECKLIST DE MANTENIMIENTO -->
+          <div style="background: var(--bg-primary, #0f172a); border: 1px solid var(--border, #334155); border-radius: 12px; padding: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--accent, #E8820C); font-weight: 700; font-size: 0.9rem;">
+                <i data-lucide="clipboard-list" style="width: 16px; height: 16px;"></i> Bitácora Diaria y Checklist de Mantenimiento
+              </div>
+              <div class="form-group" style="margin: 0; min-width: 180px;">
+                <select id="sp-tipo-mantenimiento" onchange="window.generarChecklistActividadesSP()" style="padding: 0.35rem 0.65rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.82rem; font-weight: 600;">
+                  <option value="250h">Preventivo 250 Horas</option>
+                  <option value="500h">Preventivo 500 Horas</option>
+                  <option value="1000h">Preventivo 1,000 Horas</option>
+                  <option value="2000h">Preventivo Mayor 2,000 Horas</option>
+                  <option value="inspeccion">Inspección Periódica en Obra</option>
+                  <option value="otro">Mantenimiento Personalizado</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Checklist Interactivo (Touch Grid) -->
+            <div id="sp-checklist-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.5rem; margin-bottom: 0.85rem; padding: 0.5rem; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);">
+              <!-- Se puebla dinámicamente con JS -->
+            </div>
+
+            <div class="form-group">
+              <label style="font-size: 0.8rem; font-weight: 600;">Bitácora Narrativa / Observaciones del Operador</label>
+              <textarea id="sp-bitacora-notas" rows="3" placeholder="Describe detalladamente los hallazgos, pruebas de funcionamiento realizadas, estado general de componentes y recomendaciones..." style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem; box-sizing: border-box;"></textarea>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 6: CONTROL DE REFACCIONES E INSUMOS (REQUISITO CLAVE) -->
+          <div style="background: var(--bg-primary, #0f172a); border: 1px solid var(--border, #334155); border-radius: 12px; padding: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--accent, #E8820C); font-weight: 700; font-size: 0.9rem;">
+                <i data-lucide="package" style="width: 16px; height: 16px;"></i> Control de Refacciones e Insumos Utilizados
+              </div>
+              <button type="button" class="btn-secondary" onclick="window.agregarFilaRefaccionSP()" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; display: flex; align-items: center; gap: 0.35rem; background: rgba(232,130,12,0.1); border-color: var(--accent); color: var(--accent);">
+                <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Agregar Refacción
+              </button>
+            </div>
+
+            <!-- Tabla de refacciones optimizada para pantallas táctiles -->
+            <div style="overflow-x: auto; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);">
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
+                <thead>
+                  <tr style="background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border); color: var(--text-secondary);">
+                    <th style="padding: 0.5rem 0.65rem; width: 130px;">Clave / Código</th>
+                    <th style="padding: 0.5rem 0.65rem;">Descripción</th>
+                    <th style="padding: 0.5rem 0.65rem; width: 75px;">Cant.</th>
+                    <th style="padding: 0.5rem 0.65rem; width: 80px;">Unidad</th>
+                    <th style="padding: 0.5rem 0.65rem; width: 95px;">Costo U.</th>
+                    <th style="padding: 0.5rem 0.65rem; width: 95px;">Subtotal</th>
+                    <th style="padding: 0.5rem 0.65rem; width: 120px;">Pagador</th>
+                    <th style="padding: 0.5rem 0.65rem; width: 40px;"></th>
+                  </tr>
+                </thead>
+                <tbody id="sp-refacciones-tbody">
+                  <!-- Llenado con JS -->
+                </tbody>
+                <tfoot>
+                  <tr style="border-top: 2px solid var(--border); font-weight: 700;">
+                    <td colspan="5" style="padding: 0.6rem; text-align: right; color: var(--text-secondary);">Total Refacciones:</td>
+                    <td id="sp-refacciones-total-label" style="padding: 0.6rem; color: #10b981;">$0.00</td>
+                    <td colspan="2"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 7: EVIDENCIAS FOTOGRÁFICAS Y FIRMAS DIGITALES TOUCH -->
+          <div style="background: var(--bg-primary, #0f172a); border: 1px solid var(--border, #334155); border-radius: 12px; padding: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; color: var(--accent, #E8820C); font-weight: 700; font-size: 0.9rem;">
+              <i data-lucide="camera" style="width: 16px; height: 16px;"></i> Evidencias Fotográficas y Firmas de Conformidad
+            </div>
+
+            <!-- Fotos / Evidencias -->
+            <div style="margin-bottom: 1rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <label style="font-size: 0.8rem; font-weight: 600;">Fotos del Servicio / Componentes</label>
+                <label class="btn-secondary" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
+                  <i data-lucide="camera" style="width: 14px; height: 14px;"></i> Tomar / Subir Foto
+                  <input type="file" id="sp-foto-input" accept="image/*" multiple onchange="window.manejarSubidaFotosSP(event)" style="display: none;" />
+                </label>
+              </div>
+              <div id="sp-galeria-fotos" style="display: flex; flex-wrap: wrap; gap: 0.65rem; min-height: 50px; background: var(--bg-card); border-radius: 8px; border: 1px dashed var(--border); padding: 0.65rem; align-items: center;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">Sin fotos adjuntas aún.</span>
+              </div>
+            </div>
+
+            <!-- Canvas de Firmas Táctiles -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem;">
+              <!-- Firma Operador -->
+              <div style="background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); padding: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                  <label style="font-size: 0.8rem; font-weight: 700;">Firma del Operador</label>
+                  <a href="javascript:void(0)" onclick="window.limpiarFirmaOperadorSP()" style="font-size: 0.72rem; color: #ef4444; text-decoration: none;">Limpiar</a>
+                </div>
+                <canvas id="sp-canvas-firma-operador" width="320" height="110" style="width: 100%; height: 110px; background: #ffffff; border-radius: 6px; cursor: crosshair; touch-action: none; border: 1px solid #cbd5e1;"></canvas>
+              </div>
+
+              <!-- Firma y Nombre Cliente -->
+              <div style="background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); padding: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                  <label style="font-size: 0.8rem; font-weight: 700;">Firma de Conformidad (Cliente)</label>
+                  <a href="javascript:void(0)" onclick="window.limpiarFirmaClienteSP()" style="font-size: 0.72rem; color: #ef4444; text-decoration: none;">Limpiar</a>
+                </div>
+                <canvas id="sp-canvas-firma-cliente" width="320" height="110" style="width: 100%; height: 110px; background: #ffffff; border-radius: 6px; cursor: crosshair; touch-action: none; border: 1px solid #cbd5e1;"></canvas>
+                <div style="margin-top: 0.5rem;">
+                  <input type="text" id="sp-nombre-recibe" placeholder="Nombre de quien recibe en sitio" style="width: 100%; padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.78rem;" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer con Resumen y Acciones Táctiles -->
+        <div class="modal-footer" style="padding: 1rem 1.5rem; background: var(--bg-secondary, #0f172a); border-top: 1px solid var(--border, #334155); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Total Inversión Servicio:</div>
+            <div id="sp-gran-total-label" style="font-size: 1.25rem; font-weight: 800; color: var(--accent, #E8820C); font-family: var(--font-mono, monospace);">$0.00</div>
+          </div>
+
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button type="button" class="btn-secondary" onclick="window.cerrarModalServicioPreventivo()" style="font-size: 0.85rem; padding: 0.55rem 1rem;">
+              Cancelar
+            </button>
+            <button type="button" class="btn-primary" onclick="window.guardarServicioPreventivo()" style="font-size: 0.88rem; padding: 0.55rem 1.35rem; background: var(--accent, #E8820C); border-color: var(--accent, #E8820C); font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+              <i data-lucide="save" style="width: 16px; height: 16px;"></i> Guardar Servicio
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
 
   <script>
     // ============================================================
@@ -9227,6 +9677,7 @@
         "envios.js?v=1",
         "asignacion_tecnicos.js?v=1",
         "rentas.js?v=12",
+        "servicios_preventivos.js?v=1",
         "levantamientos.js?v=306",
         "tecnicos_reporte.js?v=303"
       ];

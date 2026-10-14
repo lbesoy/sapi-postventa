@@ -3521,7 +3521,145 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
   console.log('  ✅ Separación de Técnicos Combinados por Comas en Filtros y Búsqueda: OK');
 }
 
+// ============================================================
+// TEST: Módulo de Servicios Preventivos en Rentas (servicios_preventivos.js)
+// ============================================================
+{
+  console.log('🧪 Verificando Módulo de Servicios Preventivos en Rentas (servicios_preventivos.js)...');
+  const { JSDOM } = await import('jsdom');
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+
+  const dom = new JSDOM(`<!DOCTYPE html><html><body>
+    <input id="sp-hora-entrada" value="08:30" />
+    <input id="sp-hora-salida" value="14:00" />
+    <div id="sp-horas-calculadas-badge"></div>
+    <div id="sp-checklist-container"></div>
+    <select id="sp-tipo-mantenimiento"><option value="250h">250h</option></select>
+    <input id="sp-horometro" value="1000" />
+    <input id="sp-proximo-horometro" value="" />
+    <table id="sp-refacciones-table">
+      <tbody id="sp-refacciones-tbody"></tbody>
+    </table>
+    <div id="sp-refacciones-total-label"></div>
+    <input id="sp-monto-mano-obra" value="500" />
+    <div id="sp-gran-total-label"></div>
+  </body></html>`, { url: 'http://localhost', runScripts: 'dangerously' });
+
+  global.window = dom.window;
+  global.document = dom.window.document;
+  global.localStorage = dom.window.localStorage;
+
+  // Cargar supabaseSync.js para verificar row converters
+  const supaSyncCode = fs.readFileSync(path.resolve('./supabaseSync.js'), 'utf-8');
+  dom.window.eval(supaSyncCode);
+
+  // Cargar servicios_preventivos.js
+  const spCode = fs.readFileSync(path.resolve('./servicios_preventivos.js'), 'utf-8');
+  dom.window.eval(spCode);
+
+  // 1. Horas trabajadas (cálculo diurno y nocturno)
+  const horasDiurnas = dom.window.recalcularHorasTrabajadasSP();
+  assert.equal(horasDiurnas, 5.5, '08:30 a 14:00 deben ser 5.5 horas');
+
+  dom.window.document.getElementById('sp-hora-entrada').value = '22:00';
+  dom.window.document.getElementById('sp-hora-salida').value = '02:00';
+  const horasNocturnas = dom.window.recalcularHorasTrabajadasSP();
+  assert.equal(horasNocturnas, 4.0, '22:00 a 02:00 deben ser 4.0 horas cruzando medianoche');
+
+  // 2. Badges de responsabilidad de pago (Cliente, Eurorep, Garantía, Compartido)
+  const bCli = dom.window.obtenerBadgePagadorSP('cliente');
+  assert.ok(bCli.includes('Facturable Cliente'), 'Badge cliente debe indicar Facturable');
+
+  const bEur = dom.window.obtenerBadgePagadorSP('eurorep');
+  assert.ok(bEur.includes('Cubierto Eurorep'), 'Badge eurorep debe indicar Cubierto');
+
+  const bGar = dom.window.obtenerBadgePagadorSP('garantia');
+  assert.ok(bGar.includes('Garantía Fabricante'), 'Badge garantia debe indicar Garantía');
+
+  const bComp = dom.window.obtenerBadgePagadorSP('compartido');
+  assert.ok(bComp.includes('Compartido'), 'Badge compartido debe indicar Compartido');
+
+  // 3. Checklist y sugerencia de próximo horómetro
+  dom.window.generarChecklistActividadesSP();
+  const checkboxes = dom.window.document.querySelectorAll('.sp-checklist-input');
+  assert.ok(checkboxes.length >= 5, 'Debe generar items de checklist para mantenimiento preventivo 250h');
+
+  dom.window.calcularProximoHorometroSP();
+  const proxHoro = dom.window.document.getElementById('sp-proximo-horometro').value;
+  assert.equal(proxHoro, '1250.0', '1000 + 250h debe sugerir próximo servicio en 1250.0 hrs');
+
+  // 4. Tabla dinámica de refacciones y totales de inversión
+  dom.window.agregarFilaRefaccionSP({
+    clave: 'FIL-01',
+    descripcion: 'Filtro aceite motor',
+    cantidad: 2,
+    unidad: 'Pza',
+    costo_unitario: 450,
+    pagado_por: 'cliente'
+  });
+  dom.window.agregarFilaRefaccionSP({
+    clave: 'ACE-15W40',
+    descripcion: 'Aceite multigrado 15W40',
+    cantidad: 10,
+    unidad: 'Lts',
+    costo_unitario: 120,
+    pagado_por: 'eurorep'
+  });
+
+  const totales = dom.window.recalcularTotalesServicioPreventivo();
+  assert.equal(totales.totalRef, 2100, '2x450 + 10x120 = 2100 en refacciones');
+  assert.equal(totales.manoObra, 500, 'Mano de obra debe ser 500');
+  assert.equal(totales.granTotal, 2600, 'Gran total debe ser 2600');
+
+  // 5. Supabase sync converters: rowToServicioPreventivo & servicioPreventivoToRow
+  assert.equal(typeof dom.window.servicioPreventivoToRow, 'function', 'servicioPreventivoToRow debe existir');
+  assert.equal(typeof dom.window.rowToServicioPreventivo, 'function', 'rowToServicioPreventivo debe existir');
+
+  const mockAppSP = {
+    id: 'b1234567-89ab-4cde-0123-456789abcdef',
+    folio: 'SP-2026-0042',
+    renta_id: 'ren-001',
+    renta_folio: 'REN-2026-0010',
+    cliente: 'Constructora S.A.',
+    sitio: 'Obra Autopista',
+    equipo: 'Retroexcavadora Cat 416',
+    serie: 'CAT416E-1029',
+    pagado_por: 'cliente',
+    justificacion_pago: 'Servicio programado en contrato',
+    monto_mano_obra: 500,
+    monto_refacciones: 2100,
+    monto_total_servicio: 2600,
+    fecha_servicio: '2026-10-13',
+    hora_entrada: '08:00',
+    hora_salida: '12:00',
+    horas_trabajadas: 4.0,
+    horometro_servicio: 1500,
+    operador_nombre: 'Adrian Franco',
+    tipo_operador: 'eurorep',
+    estado_equipo: 'Operativo',
+    refacciones: [
+      { clave: 'FIL-01', descripcion: 'Filtro', cantidad: 2, unidad: 'Pza', costo_unitario: 450, subtotal: 900, pagado_por: 'cliente' }
+    ]
+  };
+
+  const dbRow = dom.window.servicioPreventivoToRow(mockAppSP);
+  assert.equal(dbRow.folio, 'SP-2026-0042');
+  assert.equal(dbRow.pagado_por, 'cliente');
+  assert.equal(dbRow.monto_total_servicio, 2600);
+  assert.equal(dbRow.horas_trabajadas, 4.0);
+
+  const restored = dom.window.rowToServicioPreventivo(dbRow);
+  assert.equal(restored.folio, mockAppSP.folio);
+  assert.equal(restored.cliente, mockAppSP.cliente);
+  assert.equal(restored.monto_total_servicio, mockAppSP.monto_total_servicio);
+  assert.equal(restored.refacciones.length, 1);
+
+  console.log('  ✅ Módulo de Servicios Preventivos en Rentas (Horarios, Badges, Refacciones, Offline Sync): OK');
+}
+
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
+process.exit(0);
 
 
 

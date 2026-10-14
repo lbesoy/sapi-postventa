@@ -1158,6 +1158,95 @@ function rentaToRow(r) {
 }
 window.rentaToRow = rentaToRow;
 
+function rowToServicioPreventivo(r) {
+  if (!r) return null;
+  return {
+    id: r.id,
+    _synced: true,
+    folio: r.folio,
+    renta_id: r.renta_id || null,
+    renta_folio: r.renta_folio || null,
+    cliente: r.cliente || null,
+    sitio: r.sitio || null,
+    equipo: r.equipo || null,
+    serie: r.serie || null,
+    maquina_id: r.maquina_id || null,
+    pagado_por: r.pagado_por || 'cliente',
+    justificacion_pago: r.justificacion_pago || null,
+    monto_mano_obra: parseFloat(r.monto_mano_obra) || 0,
+    monto_refacciones: parseFloat(r.monto_refacciones) || 0,
+    monto_total_servicio: parseFloat(r.monto_total_servicio) || 0,
+    numero_factura_sap: r.numero_factura_sap || null,
+    fecha_servicio: r.fecha_servicio || null,
+    hora_entrada: r.hora_entrada || null,
+    hora_salida: r.hora_salida || null,
+    horas_trabajadas: parseFloat(r.horas_trabajadas) || 0,
+    horometro_servicio: parseFloat(r.horometro_servicio) || 0,
+    proximo_servicio_horometro: (r.proximo_servicio_horometro != null) ? parseFloat(r.proximo_servicio_horometro) : null,
+    operador_nombre: r.operador_nombre || null,
+    operador_id: r.operador_id || null,
+    tipo_operador: r.tipo_operador || 'eurorep',
+    supervisor_responsable: r.supervisor_responsable || null,
+    tipo_mantenimiento: r.tipo_mantenimiento || '250h',
+    checklist_actividades: Array.isArray(r.checklist_actividades) ? r.checklist_actividades : [],
+    bitacora_notas: r.bitacora_notas || null,
+    estado_equipo: r.estado_equipo || 'Operativo',
+    refacciones: Array.isArray(r.refacciones) ? r.refacciones : [],
+    evidencias: Array.isArray(r.evidencias) ? r.evidencias : [],
+    firma_operador: r.firma_operador || null,
+    firma_cliente: r.firma_cliente || null,
+    nombre_recibe: r.nombre_recibe || null,
+    es_prueba: (r.es_prueba === true || (typeof r.folio === 'string' && r.folio.startsWith('SP-PRUEBA')) || false),
+    created_at: r.created_at || null,
+    updated_at: r.updated_at || null
+  };
+}
+window.rowToServicioPreventivo = rowToServicioPreventivo;
+
+function servicioPreventivoToRow(s) {
+  if (!s) return null;
+  return {
+    id: (s.id && isValidUUID(s.id)) ? s.id : (s.id ? toValidUUID(s.id) : undefined),
+    folio: s.folio || null,
+    renta_id: s.renta_id || s.rentaId || null,
+    renta_folio: s.renta_folio || s.rentaFolio || null,
+    cliente: s.cliente || null,
+    sitio: s.sitio || null,
+    equipo: s.equipo || null,
+    serie: s.serie || null,
+    maquina_id: s.maquina_id || s.maquinaId || null,
+    pagado_por: s.pagado_por || s.pagadoPor || 'cliente',
+    justificacion_pago: s.justificacion_pago || s.justificacionPago || null,
+    monto_mano_obra: parseFloat(s.monto_mano_obra || s.montoManoObra) || 0,
+    monto_refacciones: parseFloat(s.monto_refacciones || s.montoRefacciones) || 0,
+    monto_total_servicio: parseFloat(s.monto_total_servicio || s.montoTotalServicio) || 0,
+    numero_factura_sap: s.numero_factura_sap || s.numeroFacturaSap || null,
+    fecha_servicio: s.fecha_servicio || s.fechaServicio || null,
+    hora_entrada: s.hora_entrada || s.horaEntrada || null,
+    hora_salida: s.hora_salida || s.horaSalida || null,
+    horas_trabajadas: parseFloat(s.horas_trabajadas || s.horasTrabajadas) || 0,
+    horometro_servicio: parseFloat(s.horometro_servicio || s.horometroServicio) || 0,
+    proximo_servicio_horometro: (s.proximo_servicio_horometro != null) ? parseFloat(s.proximo_servicio_horometro) : ((s.proximoServicioHorometro != null) ? parseFloat(s.proximoServicioHorometro) : null),
+    operador_nombre: s.operador_nombre || s.operadorNombre || null,
+    operador_id: s.operador_id || s.operadorId || null,
+    tipo_operador: s.tipo_operador || s.tipoOperador || 'eurorep',
+    supervisor_responsable: s.supervisor_responsable || s.supervisorResponsable || null,
+    tipo_mantenimiento: s.tipo_mantenimiento || s.tipoMantenimiento || '250h',
+    checklist_actividades: Array.isArray(s.checklist_actividades || s.checklistActividades) ? (s.checklist_actividades || s.checklistActividades) : [],
+    bitacora_notas: s.bitacora_notas || s.bitacoraNotas || null,
+    estado_equipo: s.estado_equipo || s.estadoEquipo || 'Operativo',
+    refacciones: Array.isArray(s.refacciones) ? s.refacciones : [],
+    evidencias: Array.isArray(s.evidencias) ? s.evidencias : [],
+    firma_operador: s.firma_operador || s.firmaOperador || null,
+    firma_cliente: s.firma_cliente || s.firmaCliente || null,
+    nombre_recibe: s.nombre_recibe || s.nombreRecibe || null,
+    es_prueba: (s.es_prueba === true || s.esPrueba === true || (typeof s.folio === 'string' && s.folio.startsWith('SP-PRUEBA')) || false),
+    created_at: s.created_at || s.createdAt || new Date().toISOString(),
+    updated_at: s.updated_at || new Date().toISOString()
+  };
+}
+window.servicioPreventivoToRow = servicioPreventivoToRow;
+
 function isValidUUID(uuid) {
   if (typeof uuid !== 'string') return false;
   const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -1697,7 +1786,7 @@ async function _executePushToSupabase(tabla, item) {
   // Determinar si la operación debe ser ONLINE-ONLY (directa a Supabase sin encolar offline)
   let isOnlineOnly = false;
   
-  if (tabla === 'tickets' || tabla === 'ordenes' || tabla === 'ideas_fallas' || tabla === 'envios' || tabla === 'rentas' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora') {
+  if (tabla === 'tickets' || tabla === 'ordenes' || tabla === 'ideas_fallas' || tabla === 'envios' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora') {
     isOnlineOnly = true;
   }
 
@@ -1705,7 +1794,7 @@ async function _executePushToSupabase(tabla, item) {
     const sb = window.supabaseClient;
     const isOffline = (typeof navigator !== 'undefined' && !navigator.onLine) || !sb;
     if (isOffline) {
-      if (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora' || tabla === 'rentas' || tabla === 'envios' || tabla === 'ideas_fallas') {
+      if (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'envios' || tabla === 'ideas_fallas') {
         console.warn(`[Direct Push] Sin conexión con la base de datos para guardar en ${tabla}. Encolando en sync queue local.`);
         addToSyncQueue(tabla, 'upsert', item);
         if (typeof window.mostrarNotificacion === 'function' && tabla !== 'calendario_eventos' && tabla !== 'orden_bitacora') {
@@ -1729,6 +1818,8 @@ async function _executePushToSupabase(tabla, item) {
       row = window.levantamientoToRow(item);
     } else if (tabla === 'rentas' && typeof window.rentaToRow === 'function') {
       row = window.rentaToRow(item);
+    } else if (tabla === 'servicios_preventivos' && typeof window.servicioPreventivoToRow === 'function') {
+      row = window.servicioPreventivoToRow(item);
     } else if (tabla === 'envios' && typeof window.envioToRow === 'function') {
       row = window.envioToRow(item);
     } else if (tabla === 'calendario_eventos' && typeof eventoToRow === 'function') {
@@ -1943,7 +2034,7 @@ async function _executePushToSupabase(tabla, item) {
         error.message.includes('fetch failed') ||
         error.message.includes('AbortError')
       ));
-      if (isNetworkErr && (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora' || tabla === 'rentas' || tabla === 'envios' || tabla === 'ideas_fallas')) {
+      if (isNetworkErr && (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'envios' || tabla === 'ideas_fallas')) {
         console.warn(`[Direct Push] Error de red al guardar en ${tabla}: ${error.message}. Encolando en sync queue local...`);
         addToSyncQueue(tabla, 'upsert', item);
         if (typeof window.mostrarNotificacion === 'function' && tabla !== 'calendario_eventos' && tabla !== 'orden_bitacora') {
@@ -2115,7 +2206,7 @@ window.deleteFromSupabase = async function(tabla, id) {
   // Determinar si la operación debe ser ONLINE-ONLY
   let isOnlineOnly = false;
   
-  if (tabla === 'tickets' || tabla === 'ordenes' || tabla === 'ideas_fallas' || tabla === 'envios' || tabla === 'rentas' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora') {
+  if (tabla === 'tickets' || tabla === 'ordenes' || tabla === 'ideas_fallas' || tabla === 'envios' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora') {
     isOnlineOnly = true;
   }
 
@@ -2638,6 +2729,8 @@ async function _processSyncQueueInternal() {
             payload = eventoToRow(item.data);
           } else if (item.table === 'rentas') {
             payload = (typeof window.rentaToRow === 'function') ? window.rentaToRow(item.data) : item.data;
+          } else if (item.table === 'servicios_preventivos') {
+            payload = (typeof window.servicioPreventivoToRow === 'function') ? window.servicioPreventivoToRow(item.data) : item.data;
           } else if (item.table === 'clara_transactions') {
             payload = {
               id: item.data.id,
@@ -5142,6 +5235,40 @@ window.cargarDatosDeSupabase = function() {
       }
     })();
 
+    // 10.1. Servicios Preventivos en Rentas
+    const serviciosPreventivosPromise = (async () => {
+      try {
+        let spDb = null;
+        let spErr = null;
+        try {
+          spDb = await fetchTablePaginated('servicios_preventivos', '*');
+        } catch (err) {
+          spErr = err;
+        }
+        if (spDb && !spErr) {
+          let localSP = [];
+          try { localSP = JSON.parse(localStorage.getItem('sapi_servicios_preventivos') || '[]'); } catch(e){}
+          const mapped = spDb.map(rowToServicioPreventivo);
+          if (mapped.length === 0 && localSP.length > 0) {
+            console.log(`[Sync] Migrando ${localSP.length} servicios preventivos locales a Supabase...`);
+            for (const lsp of localSP) {
+              if (window.pushToSupabase) window.pushToSupabase('servicios_preventivos', lsp);
+            }
+          } else {
+            localStorage.setItem('sapi_servicios_preventivos', JSON.stringify(mapped));
+            window.serviciosPreventivos = mapped;
+            if (typeof window.renderServiciosPreventivos === 'function' && document.getElementById('view-rentas')?.classList.contains('active')) {
+              window.renderServiciosPreventivos();
+            }
+          }
+        } else if (spErr) {
+          console.warn('[Sync] Aviso cargando tabla servicios_preventivos (usando datos locales):', spErr.message);
+        }
+      } catch (e) {
+        console.warn('[Sync] Excepción al sincronizar servicios preventivos:', e);
+      }
+    })();
+
     // 11. Envíos y Guías de Paquetería
     const enviosPromise = (async () => {
       try {
@@ -5353,6 +5480,7 @@ window.cargarDatosDeSupabase = function() {
       gastosPromise,
       levantamientosPromise,
       rentasPromise,
+      serviciosPreventivosPromise,
       enviosPromise,
       eventosPromise,
       sapCatalogsPromise,
@@ -5743,6 +5871,34 @@ function setupRealtime() {
           window.doRender();
         }
       }
+
+      if (tableName === 'servicios_preventivos') {
+        let spArr = [];
+        try {
+          spArr = JSON.parse(localStorage.getItem('sapi_servicios_preventivos') || '[]');
+        } catch(e) { spArr = []; }
+
+        if (!isFallback && payload) {
+          if (payload.eventType === 'DELETE' && payload.old) {
+            spArr = spArr.filter(s => s.id !== payload.old.id);
+          } else if ((payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') && payload.new) {
+            const mapped = rowToServicioPreventivo(payload.new);
+            const idx = spArr.findIndex(s => s.id === mapped.id);
+            if (idx >= 0) spArr[idx] = mapped;
+            else spArr.unshift(mapped);
+          }
+        } else if (data) {
+          spArr = data.map(rowToServicioPreventivo);
+        }
+        localStorage.setItem('sapi_servicios_preventivos', JSON.stringify(spArr));
+        window.serviciosPreventivos = spArr;
+        if (typeof window.renderServiciosPreventivos === 'function') {
+          window.renderServiciosPreventivos();
+        }
+        if (typeof window.actualizarBadgesServiciosPreventivos === 'function') {
+          window.actualizarBadgesServiciosPreventivos();
+        }
+      }
       
       window.dispatchEvent(new Event('supabase_datos_cargados'));
     } catch (e) {
@@ -5764,6 +5920,7 @@ function setupRealtime() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, (payload) => handleUpdate('tickets', payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes' }, (payload) => handleUpdate('ordenes', payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rentas' }, (payload) => handleUpdate('rentas', payload))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'servicios_preventivos' }, (payload) => handleUpdate('servicios_preventivos', payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'envios' }, (payload) => handleUpdate('envios', payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'calendario_eventos' }, (payload) => handleUpdate('calendario_eventos', payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ideas_fallas' }, (payload) => handleUpdate('ideas_fallas', payload))

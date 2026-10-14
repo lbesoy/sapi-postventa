@@ -12,7 +12,9 @@ export const redirectedKeys = [
   'sapi_ordenes',
   'sapi_levantamientos',
   'sapi_sync_queue',
-  'sapi_calendario_eventos'
+  'sapi_calendario_eventos',
+  'sapi_rentas',
+  'sapi_servicios_preventivos'
 ];
 
 let sharedDb = null;

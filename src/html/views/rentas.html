@@ -1,94 +1,204 @@
         <div id="view-rentas" class="view">
-          <div style="height: 1.5rem; width: 100%; flex-shrink: 0;"></div>
+          <div style="height: 1.25rem; width: 100%; flex-shrink: 0;"></div>
 
-          <!-- KPI Cards Grid -->
-          <div class="stats-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
-            <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('todas')">
-              <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:var(--accent);"><i data-lucide="key-round"></i></div>
-              <div>
-                <div class="stat-label">Total Contratos</div>
-                <div class="stat-value" id="stat-rentas-total">0</div>
+          <!-- Subtabs Header: Contratos vs Servicios Preventivos -->
+          <div class="rentas-subtabs-nav" style="display: flex; gap: 0.5rem; border-bottom: 2px solid var(--border); margin-bottom: 1.5rem; padding-bottom: 0;">
+            <button type="button" id="tab-rentas-contratos-btn" class="tab-btn active" onclick="window.cambiarSubTabRentas('contratos')" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.25rem; font-weight: 700; font-size: 0.92rem; border: none; background: transparent; border-bottom: 3px solid var(--accent, #E8820C); color: var(--accent, #E8820C); cursor: pointer; transition: all 0.2s ease;">
+              <i data-lucide="key-round" style="width: 16px; height: 16px;"></i> Contratos de Renta
+            </button>
+            <button type="button" id="tab-rentas-preventivos-btn" class="tab-btn" onclick="window.cambiarSubTabRentas('preventivos')" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.25rem; font-weight: 600; font-size: 0.92rem; border: none; background: transparent; border-bottom: 3px solid transparent; color: var(--text-secondary); cursor: pointer; transition: all 0.2s ease;">
+              <i data-lucide="shield-check" style="width: 16px; height: 16px;"></i> Servicios Preventivos
+              <span id="badge-count-preventivos" class="badge" style="background: rgba(232,130,12,0.15); color: var(--accent, #E8820C); font-size: 0.72rem; padding: 0.1rem 0.5rem; border-radius: 999px; margin-left: 4px; font-weight: 700;">0</span>
+            </button>
+          </div>
+
+          <!-- SUBTAB 1: CONTRATOS DE RENTA -->
+          <div id="rentas-subtab-contratos">
+            <!-- KPI Cards Grid -->
+            <div class="stats-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('todas')">
+                <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:var(--accent);"><i data-lucide="key-round"></i></div>
+                <div>
+                  <div class="stat-label">Total Contratos</div>
+                  <div class="stat-value" id="stat-rentas-total">0</div>
+                </div>
+              </div>
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('activas')">
+                <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle-2"></i></div>
+                <div>
+                  <div class="stat-label">Activas en Campo</div>
+                  <div class="stat-value" id="stat-rentas-activas">0</div>
+                </div>
+              </div>
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('por_vencer')">
+                <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:#f59e0b;"><i data-lucide="alert-triangle"></i></div>
+                <div>
+                  <div class="stat-label">Por Vencer (&le; 7d)</div>
+                  <div class="stat-value" id="stat-rentas-por-vencer">0</div>
+                </div>
+              </div>
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('vencidas')">
+                <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-octagon"></i></div>
+                <div>
+                  <div class="stat-label">Vencidas</div>
+                  <div class="stat-value" id="stat-rentas-vencidas">0</div>
+                </div>
+              </div>
+              <div class="stat-card" style="cursor: pointer;">
+                <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="dollar-sign"></i></div>
+                <div>
+                  <div class="stat-label">Ingresos Est. / Mes</div>
+                  <div class="stat-value" id="stat-rentas-ingresos" style="font-size:1.15rem;">$0.00</div>
+                </div>
               </div>
             </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('activas')">
-              <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="check-circle-2"></i></div>
-              <div>
-                <div class="stat-label">Activas en Campo</div>
-                <div class="stat-value" id="stat-rentas-activas">0</div>
+
+            <!-- Controls Toolbar: Search, Filter Pills & Export -->
+            <div style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+              <!-- Left: Search & Filter Pills -->
+              <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; flex: 1;">
+                <div style="position: relative; min-width: 260px; max-width: 380px; flex: 1;">
+                  <i data-lucide="search" style="position: absolute; left: 10px; top: 9px; width: 15px; height: 15px; color: var(--text-muted);"></i>
+                  <input type="text" id="search-rentas" placeholder="Buscar folio, cliente, equipo, serie, asesor..." oninput="debouncedRenderRentas()" style="width: 100%; padding: 0.45rem 0.75rem 0.45rem 2.1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+                </div>
+                <div class="rentas-filter-pills-wrap" style="display: flex; gap: 0.35rem; background: var(--bg-hover); padding: 0.25rem; border-radius: 8px; border: 1px solid var(--border);">
+                  <button type="button" class="btn-secondary rentas-filter-pill active" data-filtro="todas" onclick="window.setFiltroEstadoRentas('todas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: var(--accent, #E8820C); color: #fff;">Todas <span id="count-pill-rentas-todas" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="activas" onclick="window.setFiltroEstadoRentas('activas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Activas <span id="count-pill-rentas-activas" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="reservadas" onclick="window.setFiltroEstadoRentas('reservadas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Reservadas <span id="count-pill-rentas-reservadas" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="por_vencer" onclick="window.setFiltroEstadoRentas('por_vencer')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Por Vencer <span id="count-pill-rentas-por-vencer" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="vencidas" onclick="window.setFiltroEstadoRentas('vencidas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Vencidas <span id="count-pill-rentas-vencidas" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="finalizadas" onclick="window.setFiltroEstadoRentas('finalizadas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Finalizadas <span id="count-pill-rentas-finalizadas" style="margin-left:3px; opacity:0.85;">0</span></button>
+                </div>
+              </div>
+
+              <!-- Right: Action buttons -->
+              <div style="display: flex; gap: 0.5rem;">
+                <button type="button" class="btn-secondary" onclick="window.exportarRentasExcel()" style="font-size: 0.85rem;">
+                  <i data-lucide="download" style="width:14px;height:14px;"></i> Exportar Excel
+                </button>
+                <button type="button" class="btn-primary" onclick="window.abrirModalNuevaRenta()" style="font-size: 0.85rem;">
+                  <i data-lucide="plus" style="width:14px;height:14px;"></i> Nueva Renta
+                </button>
               </div>
             </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('por_vencer')">
-              <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:#f59e0b;"><i data-lucide="alert-triangle"></i></div>
-              <div>
-                <div class="stat-label">Por Vencer (&le; 7d)</div>
-                <div class="stat-value" id="stat-rentas-por-vencer">0</div>
-              </div>
-            </div>
-            <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoRentas('vencidas')">
-              <div class="stat-icon" style="background:rgba(239,68,68,0.12);color:#ef4444;"><i data-lucide="alert-octagon"></i></div>
-              <div>
-                <div class="stat-label">Vencidas</div>
-                <div class="stat-value" id="stat-rentas-vencidas">0</div>
-              </div>
-            </div>
-            <div class="stat-card" style="cursor: pointer;">
-              <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="dollar-sign"></i></div>
-              <div>
-                <div class="stat-label">Ingresos Est. / Mes</div>
-                <div class="stat-value" id="stat-rentas-ingresos" style="font-size:1.15rem;">$0.00</div>
-              </div>
+
+            <!-- Rentas Table -->
+            <div class="table-container" style="background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow-sm);">
+              <table class="orders-table" style="width:100%; border-collapse:collapse; text-align:left;">
+                <thead>
+                  <tr>
+                    <th style="width: 100px;">Acciones</th>
+                    <th>Folio</th>
+                    <th>Cliente y Sitio</th>
+                    <th>Maquinaria / Equipo</th>
+                    <th>Periodo Vigencia</th>
+                    <th>Horómetro</th>
+                    <th>Tarifa y Depósito</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="rentas-table-body">
+                  <!-- Se llena con JS -->
+                </tbody>
+              </table>
             </div>
           </div>
 
-          <!-- Controls Toolbar: Search, Filter Pills & Export -->
-          <div style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
-            <!-- Left: Search & Filter Pills -->
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; flex: 1;">
-              <div style="position: relative; min-width: 260px; max-width: 380px; flex: 1;">
-                <i data-lucide="search" style="position: absolute; left: 10px; top: 9px; width: 15px; height: 15px; color: var(--text-muted);"></i>
-                <input type="text" id="search-rentas" placeholder="Buscar folio, cliente, equipo, serie, asesor..." oninput="debouncedRenderRentas()" style="width: 100%; padding: 0.45rem 0.75rem 0.45rem 2.1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+          <!-- SUBTAB 2: SERVICIOS PREVENTIVOS -->
+          <div id="rentas-subtab-preventivos" style="display: none;">
+            <!-- KPI Cards Grid Preventivos -->
+            <div class="stats-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroServiciosPreventivos('todos')">
+                <div class="stat-icon" style="background:rgba(232,130,12,0.12);color:var(--accent);"><i data-lucide="shield-check"></i></div>
+                <div>
+                  <div class="stat-label">Total Servicios</div>
+                  <div class="stat-value" id="stat-sp-total">0</div>
+                </div>
               </div>
-              <div class="rentas-filter-pills-wrap" style="display: flex; gap: 0.35rem; background: var(--bg-hover); padding: 0.25rem; border-radius: 8px; border: 1px solid var(--border);">
-                <button type="button" class="btn-secondary rentas-filter-pill active" data-filtro="todas" onclick="window.setFiltroEstadoRentas('todas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: var(--accent, #E8820C); color: #fff;">Todas <span id="count-pill-rentas-todas" style="margin-left:3px; opacity:0.85;">0</span></button>
-                <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="activas" onclick="window.setFiltroEstadoRentas('activas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Activas <span id="count-pill-rentas-activas" style="margin-left:3px; opacity:0.85;">0</span></button>
-                <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="reservadas" onclick="window.setFiltroEstadoRentas('reservadas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Reservadas <span id="count-pill-rentas-reservadas" style="margin-left:3px; opacity:0.85;">0</span></button>
-                <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="por_vencer" onclick="window.setFiltroEstadoRentas('por_vencer')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Por Vencer <span id="count-pill-rentas-por-vencer" style="margin-left:3px; opacity:0.85;">0</span></button>
-                <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="vencidas" onclick="window.setFiltroEstadoRentas('vencidas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Vencidas <span id="count-pill-rentas-vencidas" style="margin-left:3px; opacity:0.85;">0</span></button>
-                <button type="button" class="btn-secondary rentas-filter-pill" data-filtro="finalizadas" onclick="window.setFiltroEstadoRentas('finalizadas')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Finalizadas <span id="count-pill-rentas-finalizadas" style="margin-left:3px; opacity:0.85;">0</span></button>
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroServiciosPreventivos('cliente')">
+                <div class="stat-icon" style="background:rgba(16,185,129,0.12);color:#10b981;"><i data-lucide="file-text"></i></div>
+                <div>
+                  <div class="stat-label">Facturable Cliente</div>
+                  <div class="stat-value" id="stat-sp-cliente">0</div>
+                </div>
+              </div>
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroServiciosPreventivos('eurorep')">
+                <div class="stat-icon" style="background:rgba(59,130,246,0.12);color:#3b82f6;"><i data-lucide="wrench"></i></div>
+                <div>
+                  <div class="stat-label">Cubierto Eurorep</div>
+                  <div class="stat-value" id="stat-sp-eurorep">0</div>
+                </div>
+              </div>
+              <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroServiciosPreventivos('garantia')">
+                <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:#f59e0b;"><i data-lucide="award"></i></div>
+                <div>
+                  <div class="stat-label">Garantía / Otros</div>
+                  <div class="stat-value" id="stat-sp-garantia">0</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon" style="background:rgba(139,92,246,0.12);color:#8b5cf6;"><i data-lucide="package"></i></div>
+                <div>
+                  <div class="stat-label">Refacciones Invertidas</div>
+                  <div class="stat-value" id="stat-sp-refacciones" style="font-size:1.15rem;">$0.00</div>
+                </div>
               </div>
             </div>
 
-            <!-- Right: Action buttons -->
-            <div style="display: flex; gap: 0.5rem;">
-              <button type="button" class="btn-secondary" onclick="window.exportarRentasExcel()" style="font-size: 0.85rem;">
-                <i data-lucide="download" style="width:14px;height:14px;"></i> Exportar Excel
-              </button>
-              <button type="button" class="btn-primary" onclick="window.abrirModalNuevaRenta()" style="font-size: 0.85rem;">
-                <i data-lucide="plus" style="width:14px;height:14px;"></i> Nueva Renta
-              </button>
-            </div>
-          </div>
+            <!-- Controls Toolbar: Search, Filter Pills & Export -->
+            <div style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+              <!-- Left: Search & Filter Pills -->
+              <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; flex: 1;">
+                <div style="position: relative; min-width: 260px; max-width: 380px; flex: 1;">
+                  <i data-lucide="search" style="position: absolute; left: 10px; top: 9px; width: 15px; height: 15px; color: var(--text-muted);"></i>
+                  <input type="text" id="search-preventivos" placeholder="Buscar por folio, cliente, equipo, serie, operador..." oninput="debouncedRenderServiciosPreventivos()" style="width: 100%; padding: 0.45rem 0.75rem 0.45rem 2.1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
+                </div>
+                <div class="sp-filter-pills-wrap" style="display: flex; gap: 0.35rem; background: var(--bg-hover); padding: 0.25rem; border-radius: 8px; border: 1px solid var(--border); flex-wrap: wrap;">
+                  <button type="button" class="btn-secondary sp-filter-pill active" data-filtro="todos" onclick="window.setFiltroServiciosPreventivos('todos')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: var(--accent, #E8820C); color: #fff;">Todos <span id="count-pill-sp-todos" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary sp-filter-pill" data-filtro="cliente" onclick="window.setFiltroServiciosPreventivos('cliente')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Facturable Cliente <span id="count-pill-sp-cliente" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary sp-filter-pill" data-filtro="eurorep" onclick="window.setFiltroServiciosPreventivos('eurorep')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Cubierto Eurorep <span id="count-pill-sp-eurorep" style="margin-left:3px; opacity:0.85;">0</span></button>
+                  <button type="button" class="btn-secondary sp-filter-pill" data-filtro="garantia" onclick="window.setFiltroServiciosPreventivos('garantia')" style="padding: 0.3rem 0.75rem; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary);">Garantía <span id="count-pill-sp-garantia" style="margin-left:3px; opacity:0.85;">0</span></button>
+                </div>
+              </div>
 
-          <!-- Rentas Table -->
-          <div class="table-container" style="background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow-sm);">
-            <table class="orders-table" style="width:100%; border-collapse:collapse; text-align:left;">
-              <thead>
-                <tr>
-                  <th style="width: 100px;">Acciones</th>
-                  <th>Folio</th>
-                  <th>Cliente y Sitio</th>
-                  <th>Maquinaria / Equipo</th>
-                  <th>Periodo Vigencia</th>
-                  <th>Horómetro</th>
-                  <th>Tarifa y Depósito</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody id="rentas-table-body">
-                <!-- Se llena con JS -->
-              </tbody>
-            </table>
+              <!-- Right: Action buttons -->
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button type="button" class="btn-secondary" onclick="window.exportarServiciosPreventivosExcel()" style="font-size: 0.85rem;">
+                  <i data-lucide="download" style="width:14px;height:14px;"></i> Exportar Excel
+                </button>
+                <button type="button" class="btn-primary" onclick="window.abrirModalServicioPreventivo()" style="font-size: 0.85rem; background: var(--accent, #E8820C); border-color: var(--accent, #E8820C); display: flex; align-items: center; gap: 0.4rem;">
+                  <i data-lucide="plus" style="width:14px;height:14px;"></i> Nuevo Servicio Preventivo
+                </button>
+              </div>
+            </div>
+
+            <!-- Responsive View: Desktop Table -->
+            <div class="table-container sp-desktop-table" style="background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border); overflow-x: auto; box-shadow: var(--shadow-sm);">
+              <table class="orders-table" style="width:100%; border-collapse:collapse; text-align:left;">
+                <thead>
+                  <tr>
+                    <th style="width: 105px;">Acciones</th>
+                    <th>Folio</th>
+                    <th>Renta / Cliente</th>
+                    <th>Maquinaria / Equipo</th>
+                    <th>Horario (In / Out)</th>
+                    <th>Horas</th>
+                    <th>Horómetro</th>
+                    <th>¿Quién Paga?</th>
+                    <th>Operador</th>
+                    <th>Refacciones</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="preventivos-table-body">
+                  <!-- Llenado con JS -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Responsive View: Mobile & Tablet Cards -->
+            <div id="preventivos-cards-mobile" class="sp-mobile-cards" style="display: none; flex-direction: column; gap: 0.85rem; margin-top: 0.5rem;">
+              <!-- Llenado con JS para vistas touch/mobile -->
+            </div>
           </div>
         </div>
-
-        <!-- LEVANTAMIENTOS VIEW -->

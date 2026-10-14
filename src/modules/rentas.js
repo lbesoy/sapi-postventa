@@ -167,6 +167,10 @@ if (typeof window !== 'undefined') {
     if (document.getElementById('count-pill-rentas-vencidas')) document.getElementById('count-pill-rentas-vencidas').textContent = vencidas;
     if (document.getElementById('count-pill-rentas-finalizadas')) document.getElementById('count-pill-rentas-finalizadas').textContent = finalizadas;
 
+    if (typeof window.actualizarBadgesServiciosPreventivos === 'function') {
+      try { window.actualizarBadgesServiciosPreventivos(); } catch(eBP) {}
+    }
+
     // Aplicar filtro de estado seleccionado
     if (currentRentasFilter === 'activas') {
       list = list.filter(r => r._estadoCalculado === 'Activa');
@@ -1720,6 +1724,45 @@ if (typeof window !== 'undefined') {
             </div>
           ` : ''}
 
+          <!-- Historial de Servicios Preventivos de la Renta -->
+          <div style="background:var(--bg-primary, #0f172a); border:1px solid var(--border, #334155); border-radius:10px; padding:1rem; margin-bottom:1.25rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem; flex-wrap:wrap; gap:0.5rem;">
+              <h4 style="margin:0; font-size:0.88rem; color:var(--accent, #E8820C); display:flex; align-items:center; gap:0.35rem;">
+                <i data-lucide="shield-check" style="width:15px;height:15px;"></i> Servicios Preventivos Realizados (${(window.serviciosPreventivos || []).filter(x => x && (x.renta_id === r.id || x.renta_folio === r.folio)).length})
+              </h4>
+              ${!isEmpresa ? `
+                <button type="button" class="btn-secondary" onclick="window.cerrarModalDetalleRenta(); window.abrirModalServicioPreventivo({ rentaId: '${r.id}' });" style="font-size:0.78rem; padding:0.3rem 0.65rem; display:flex; align-items:center; gap:0.3rem; background:rgba(232,130,12,0.1); border-color:var(--accent); color:var(--accent); cursor:pointer;">
+                  <i data-lucide="plus" style="width:13px; height:13px;"></i> Registrar Preventivo
+                </button>
+              ` : ''}
+            </div>
+            ${(() => {
+              const sps = (window.serviciosPreventivos || []).filter(x => x && (x.renta_id === r.id || x.renta_folio === r.folio));
+              if (!sps.length) {
+                return '<div style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">No se han registrado servicios preventivos aún para este contrato.</div>';
+              }
+              return `
+                <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                  ${sps.map(sp => `
+                    <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:0.6rem 0.8rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; font-size:0.8rem;">
+                      <div>
+                        <strong style="color:var(--accent); font-family:var(--font-mono, monospace);">${sp.folio}</strong>
+                        <span style="color:var(--text-muted); margin-left:0.4rem;">${sp.fecha_servicio || ''}</span>
+                        <div style="color:var(--text-secondary); margin-top:2px;">Operador: <strong>${sp.operador_nombre || 'N/A'}</strong> | Horómetro: <strong>${sp.horometro_servicio || 0} hrs</strong></div>
+                      </div>
+                      <div style="display:flex; align-items:center; gap:0.5rem;">
+                        ${(typeof window.obtenerBadgePagadorSP === 'function') ? window.obtenerBadgePagadorSP(sp.pagado_por) : `<span class="badge">${sp.pagado_por}</span>`}
+                        <button type="button" class="action-btn" onclick="window.cerrarModalDetalleRenta(); window.verDetalleServicioPreventivo('${sp.id}');" title="Ver Detalle" style="padding:0.25rem 0.4rem; border-radius:6px; border:1px solid var(--border); background:var(--bg-hover); cursor:pointer; color:var(--text-primary);">
+                          <i data-lucide="eye" style="width:13px;height:13px;"></i>
+                        </button>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              `;
+            })()}
+          </div>
+
           <!-- Botones de Acción -->
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; border-top:1px solid var(--border, #334155); padding-top:1rem;">
             <div style="display:flex; gap:0.5rem;">
@@ -1727,6 +1770,9 @@ if (typeof window !== 'undefined') {
                 <i data-lucide="printer" style="width:15px; height:15px;"></i> Imprimir Contrato PDF
               </button>
               ${!isEmpresa ? `
+                <button class="btn-secondary" onclick="window.cerrarModalDetalleRenta(); window.cambiarSubTabRentas('preventivos');" title="Ir a Servicios Preventivos" style="font-size:0.85rem; display:flex; align-items:center; gap:0.4rem;">
+                  <i data-lucide="shield-check" style="width:15px; height:15px;"></i> Ver Preventivos
+                </button>
                 <button class="btn-secondary" onclick="window.crearServicioDesdeRenta('${r.id}')" title="Crear orden de servicio para este equipo" style="font-size:0.85rem; display:flex; align-items:center; gap:0.4rem;">
                   <i data-lucide="wrench" style="width:15px; height:15px;"></i> Generar Orden de Servicio
                 </button>
