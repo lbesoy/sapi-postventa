@@ -229,7 +229,7 @@ if (typeof window !== 'undefined') {
       // Formatear periodo
       const fIni = r.fecha_inicio ? r.fecha_inicio.substring(0, 10).split('-').reverse().join('/') : '-';
       const fFin = r.fecha_fin_estimada ? r.fecha_fin_estimada.substring(0, 10).split('-').reverse().join('/') : 'Indefinido';
-      const periodoTexto = `<div style="font-weight:600; font-size:0.84rem;">${fIni} ➔ ${fFin}</div>`;
+      const periodoTexto = `<div style="font-weight:600; font-size:0.84rem;">${fIni} &rarr; ${fFin}</div>`;
 
       // Tarifa
       const tarifaMonto = Number(r.monto_renta || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -886,7 +886,7 @@ if (typeof window !== 'undefined') {
     window.selectRentaComboOption('renta-sitio', nombre, nombre);
 
     if (typeof mostrarNotificacion === 'function') {
-      mostrarNotificacion(`✅ Sitio "${nombre}" registrado y seleccionado con éxito.`, 'success');
+      mostrarNotificacion(`Sitio "${nombre}" registrado y seleccionado con éxito.`, 'success');
     }
   };
 
@@ -1053,7 +1053,7 @@ if (typeof window !== 'undefined') {
     if (!clienteNombre || !String(clienteNombre).trim()) {
       selectMaq.innerHTML = `
         <option value="">-- Selecciona primero un Cliente para ver su maquinaria --</option>
-        <option value="__REGISTRAR__">➕ Registrar nueva maquinaria en catálogo...</option>
+        <option value="__REGISTRAR__">+ Registrar nueva maquinaria en catálogo...</option>
       `;
       if (customDiv) customDiv.style.display = 'none';
       return;
@@ -1070,7 +1070,7 @@ if (typeof window !== 'undefined') {
 
     if (maquinas.length === 0) {
       html += `<option value="">(Este cliente no tiene maquinaria registrada en catálogo)</option>`;
-      html += `<option value="__REGISTRAR__" selected>➕ Registrar nueva maquinaria para este cliente...</option>`;
+      html += `<option value="__REGISTRAR__" selected>+ Registrar nueva maquinaria para este cliente...</option>`;
       selectMaq.innerHTML = html;
       selectMaq.value = '__REGISTRAR__';
       if (customDiv) customDiv.style.display = 'grid';
@@ -1094,7 +1094,7 @@ if (typeof window !== 'undefined') {
 
       const desc = `${idDisplay}${tipo} ${mFullName} ${modelo} (SN: ${serie || 'S/N'})`.trim();
       const estaEnRenta = rentasActivasMaqIds.includes(cleanId) || (serie && rentasActivasMaqIds.includes(serie));
-      const estadoTag = estaEnRenta ? ' [⚠️ EN RENTA ACTIVA]' : ' [Disponible]';
+      const estadoTag = estaEnRenta ? ' [EN RENTA ACTIVA]' : ' [Disponible]';
 
       const horoVal = (m.horometro != null ? m.horometro : (m.customData && m.customData.horometro != null ? m.customData.horometro : (m.horometro_actual != null ? m.horometro_actual : 0)));
 
@@ -1114,7 +1114,7 @@ if (typeof window !== 'undefined') {
     });
 
     const isManualSelected = maquinaSeleccionadaId === '__REGISTRAR__' || maquinaSeleccionadaId === '__MANUAL__' || (!matchFound && Boolean(maquinaSeleccionadaId));
-    html += `<option value="__REGISTRAR__" ${isManualSelected ? 'selected' : ''}>➕ Registrar nueva maquinaria / Otro equipo...</option>`;
+    html += `<option value="__REGISTRAR__" ${isManualSelected ? 'selected' : ''}>+ Registrar nueva maquinaria / Otro equipo...</option>`;
 
     selectMaq.innerHTML = html;
 
@@ -1503,7 +1503,7 @@ if (typeof window !== 'undefined') {
 
       if (maquinaId && maquinaId !== '__MANUAL__' && maquinaId !== '__REGISTRAR__') {
         const opt = selectMaq.options[selectMaq.selectedIndex];
-        equipoDesc = opt ? (opt.dataset.nombre || (opt.textContent || '').replace(/ \[(Disponible|⚠️ EN RENTA ACTIVA)\]/g, '').trim()) : maquinaId;
+        equipoDesc = opt ? (opt.dataset.nombre || (opt.textContent || '').replace(/ \[(Disponible|EN RENTA ACTIVA)\]/g, '').trim()) : maquinaId;
         if (!serieVal && opt && opt.dataset.serie) serieVal = opt.dataset.serie;
       } else {
         equipoDesc = inputEquipoManual?.value?.trim() || 'Equipo de Renta';
@@ -1586,7 +1586,7 @@ if (typeof window !== 'undefined') {
 
       cerrarModalNuevaRenta();
       renderRentas();
-      mostrarNotificacion(`✅ Contrato de Renta ${folio} guardado con éxito`, 'success');
+      mostrarNotificacion(`Contrato de Renta ${folio} guardado con éxito`, 'success');
     } catch (err) {
       console.error('[Rentas] Error guardando renta:', err);
       mostrarNotificacion('Error al guardar contrato de renta', 'error');
@@ -1699,14 +1699,14 @@ if (typeof window !== 'undefined') {
             </h4>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem; font-size:0.85rem;">
               <div style="border-right:1px solid var(--border, #334155); padding-right:0.5rem;">
-                <strong style="color:var(--text-primary, #f8fafc); display:block; margin-bottom:0.25rem;">🚀 Entrega al Cliente (Check-in):</strong>
+                <strong style="color:var(--text-primary, #f8fafc); display:block; margin-bottom:0.25rem;">Entrega al Cliente (Check-in):</strong>
                 <div><strong>Condición:</strong> ${r.checklist_entrega?.condicion || 'Excelente'}</div>
                 <div><strong>Combustible:</strong> ${r.checklist_entrega?.combustible || '100%'}</div>
                 <div><strong>Accesorios:</strong> ${r.checklist_entrega?.accesorios || 'Ninguno especificado'}</div>
                 <div><strong>Responsable:</strong> ${r.checklist_entrega?.responsable || 'Eurorep'}</div>
               </div>
               <div>
-                <strong style="color:var(--text-primary, #f8fafc); display:block; margin-bottom:0.25rem;">🏁 Recepción / Retorno (Check-out):</strong>
+                <strong style="color:var(--text-primary, #f8fafc); display:block; margin-bottom:0.25rem;">Recepción / Retorno (Check-out):</strong>
                 ${r.checklist_devolucion ? `
                   <div><strong>Condición:</strong> ${r.checklist_devolucion.condicion || 'Buen estado'}</div>
                   <div><strong>Combustible:</strong> ${r.checklist_devolucion.combustible || 'N/A'}</div>
@@ -2055,7 +2055,7 @@ if (typeof window !== 'undefined') {
 
       cerrarModalDevolucionRenta();
       renderRentas();
-      mostrarNotificacion(`✅ Renta ${r.folio} finalizada exitosamente. Maquinaria liberada.`, 'success');
+      mostrarNotificacion(`Renta ${r.folio} finalizada exitosamente. Maquinaria liberada.`, 'success');
     } catch (err) {
       console.error('[Rentas] Error confirmando devolución:', err);
       mostrarNotificacion('Error al registrar devolución de maquinaria', 'error');
@@ -2291,7 +2291,7 @@ if (typeof window !== 'undefined') {
     XLSX.utils.book_append_sheet(wb, ws, 'Rentas_Eurorep');
     const fechaStr = new Date().toISOString().substring(0, 10);
     XLSX.writeFile(wb, `Rentas_Maquinaria_Eurorep_${fechaStr}.xlsx`);
-    mostrarNotificacion('✅ Exportación a Excel completada con éxito', 'success');
+    mostrarNotificacion('Exportación a Excel completada con éxito', 'success');
   };
 
   // Inicializar al cargar el script en el navegador

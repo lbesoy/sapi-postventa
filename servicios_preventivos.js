@@ -109,11 +109,11 @@
   window.obtenerBadgeEstadoEquipoSP = function(estado) {
     switch (estado) {
       case 'Operativo':
-        return '<span class="badge" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);font-weight:600;">🟢 Operativo</span>';
+        return '<span class="badge" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);font-weight:600;display:inline-flex;align-items:center;gap:5px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;"></span>Operativo</span>';
       case 'Operativo con Observaciones':
-        return '<span class="badge" style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);font-weight:600;">🟡 Con Obs.</span>';
+        return '<span class="badge" style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);font-weight:600;display:inline-flex;align-items:center;gap:5px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#f59e0b;"></span>Con Obs.</span>';
       case 'Fuera de Servicio':
-        return '<span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-weight:600;">🔴 Fuera de Servicio</span>';
+        return '<span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-weight:600;display:inline-flex;align-items:center;gap:5px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ef4444;"></span>Fuera de Servicio</span>';
       default:
         return `<span class="badge badge-secondary">${estado || 'Operativo'}</span>`;
     }
@@ -356,7 +356,7 @@
         </select>
       </td>
       <td style="padding: 0.4rem 0.5rem; text-align: center;">
-        <button type="button" onclick="document.getElementById('${rowId}')?.remove(); window.recalcularTotalesServicioPreventivo();" title="Eliminar fila" style="background: transparent; border: none; color: #ef4444; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 1rem;">✕</button>
+        <button type="button" onclick="document.getElementById('${rowId}')?.remove(); window.recalcularTotalesServicioPreventivo();" title="Eliminar fila" style="background: transparent; border: none; color: #ef4444; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 1.1rem; line-height: 1;">&times;</button>
       </td>
     `;
 
@@ -568,7 +568,7 @@
     container.innerHTML = spFotosAdjuntas.map((f, i) => `
       <div style="position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border);">
         <img src="${f.url}" style="width: 100%; height: 100%; object-fit: cover;" alt="Foto ${i+1}" />
-        <button type="button" onclick="window.eliminarFotoSP(${i})" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.7); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center;">✕</button>
+        <button type="button" onclick="window.eliminarFotoSP(${i})" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.7); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 12px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center;">&times;</button>
       </div>
     `).join('');
   }
@@ -1162,7 +1162,7 @@
       }).join('');
     }
 
-    // Render Mobile & Tablet Cards (Grandes botones táctiles, diseño vertical espacioso)
+    // Render Mobile & Tablet Cards
     if (mobileContainer) {
       mobileContainer.innerHTML = items.map(sp => {
         const pagadorBadge = window.obtenerBadgePagadorSP(sp.pagado_por);
@@ -1177,7 +1177,7 @@
             <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--border); padding-bottom: 0.65rem;">
               <div>
                 <span style="font-family: var(--font-mono, monospace); font-weight: 800; font-size: 1rem; color: var(--accent, #E8820C);">${sp.folio || 'SP-0000'}</span>
-                <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">📅 ${fechaStr}</span>
+                <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem; display: inline-flex; align-items: center; gap: 4px;"><i data-lucide="calendar" style="width: 12px; height: 12px;"></i> ${fechaStr}</span>
                 <div style="font-size: 0.88rem; font-weight: 700; margin-top: 2px;">${sp.cliente || 'Sin Cliente'}</div>
               </div>
               <div>${pagadorBadge}</div>
@@ -1200,9 +1200,10 @@
             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; flex-wrap: wrap; gap: 0.5rem;">
               <div>
                 <span style="color: var(--text-muted); font-size: 0.72rem;">HORARIO DE TRABAJO:</span>
-                <div>
-                  <strong style="color: #10b981;">⏱️ ${sp.hora_entrada || '--:--'}</strong> &rarr; <strong style="color: #ef4444;">${sp.hora_salida || '--:--'}</strong>
-                  <span style="background: rgba(59,130,246,0.15); color: #3b82f6; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 6px; margin-left: 4px; font-size: 0.75rem;">${(parseFloat(sp.horas_trabajadas) || 0).toFixed(1)} hrs</span>
+                <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
+                  <i data-lucide="clock" style="width: 13px; height: 13px; color: #10b981;"></i>
+                  <strong style="color: #10b981;">${sp.hora_entrada || '--:--'}</strong> &rarr; <strong style="color: #ef4444;">${sp.hora_salida || '--:--'}</strong>
+                  <span style="background: rgba(59,130,246,0.15); color: #3b82f6; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 6px; font-size: 0.75rem;">${(parseFloat(sp.horas_trabajadas) || 0).toFixed(1)} hrs</span>
                 </div>
               </div>
               <div style="text-align: right;">
@@ -1215,7 +1216,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--border); padding-top: 0.65rem; font-size: 0.82rem;">
               <div>
                 <span style="color: var(--text-muted); font-size: 0.72rem;">OPERADOR / TÉCNICO:</span>
-                <div><strong>👤 ${sp.operador_nombre || 'No asignado'}</strong></div>
+                <div style="display: flex; align-items: center; gap: 4px; margin-top: 2px;"><i data-lucide="user" style="width: 13px; height: 13px; color: var(--text-muted);"></i> <strong>${sp.operador_nombre || 'No asignado'}</strong></div>
               </div>
               <div style="text-align: right;">
                 <span style="color: var(--text-muted); font-size: 0.72rem;">REFACCIONES (${refCount}):</span>
@@ -1240,7 +1241,6 @@
       }).join('');
     }
 
-    // Adaptar vista según ancho de pantalla
     ajustarVisibilidadResponsiveSP();
 
     if (window.lucide) window.lucide.createIcons();
@@ -1384,7 +1384,7 @@
                     <th style="padding:0.4rem;">Descripción</th>
                     <th style="padding:0.4rem; width:60px;">Cant.</th>
                     <th style="padding:0.4rem; width:80px;">Costo U.</th>
-                    <th style="padding:0.4rem; width:90px;">Subtotal</th>
+                    <th style="padding:0.4rem; font-weight:700; color:#10b981;">Subtotal</th>
                     <th style="padding:0.4rem; width:90px;">Pagador</th>
                   </tr>
                 </thead>
@@ -1660,21 +1660,32 @@
   };
 
   // Inicializar al cargar el DOM o si ya está listo
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      window.actualizarBadgesServiciosPreventivos();
-    });
-  } else {
-    window.actualizarBadgesServiciosPreventivos();
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        if (typeof window.actualizarBadgesServiciosPreventivos === 'function') {
+          window.actualizarBadgesServiciosPreventivos();
+        }
+      });
+    } else {
+      if (typeof window.actualizarBadgesServiciosPreventivos === 'function') {
+        window.actualizarBadgesServiciosPreventivos();
+      }
+    }
   }
 
 })();
 
-// Exportaciones para entorno de pruebas / ESM
-if (typeof exports !== 'undefined') {
+// Exportar funciones para Node / CommonJS si está disponible
+if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
+    cambiarSubTabRentas: (typeof window !== 'undefined') ? window.cambiarSubTabRentas : undefined,
     recalcularHorasTrabajadasSP: (typeof window !== 'undefined') ? window.recalcularHorasTrabajadasSP : undefined,
     obtenerBadgePagadorSP: (typeof window !== 'undefined') ? window.obtenerBadgePagadorSP : undefined,
-    guardarServicioPreventivo: (typeof window !== 'undefined') ? window.guardarServicioPreventivo : undefined
+    obtenerBadgeEstadoEquipoSP: (typeof window !== 'undefined') ? window.obtenerBadgeEstadoEquipoSP : undefined,
+    abrirModalServicioPreventivo: (typeof window !== 'undefined') ? window.abrirModalServicioPreventivo : undefined,
+    guardarServicioPreventivo: (typeof window !== 'undefined') ? window.guardarServicioPreventivo : undefined,
+    renderServiciosPreventivos: (typeof window !== 'undefined') ? window.renderServiciosPreventivos : undefined,
+    exportarServiciosPreventivosExcel: (typeof window !== 'undefined') ? window.exportarServiciosPreventivosExcel : undefined
   };
 }

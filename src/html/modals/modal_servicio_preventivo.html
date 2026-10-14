@@ -19,7 +19,7 @@
               </div>
             </div>
           </div>
-          <button type="button" class="modal-close" onclick="window.cerrarModalServicioPreventivo()" style="background: transparent; border: none; color: var(--text-muted); font-size: 1.4rem; cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 6px;">✕</button>
+          <button type="button" class="modal-close" onclick="window.cerrarModalServicioPreventivo()" style="background: transparent; border: none; color: var(--text-muted); font-size: 1.4rem; cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 6px;">&times;</button>
         </div>
 
         <!-- Body con scroll para pantallas táctiles -->
@@ -139,7 +139,7 @@
               <div class="form-group">
                 <label style="font-size: 0.8rem; font-weight: 600; display: flex; justify-content: space-between;">
                   <span>Hora Entrada <span class="required-asterisk" style="color:#ef4444;">*</span></span>
-                  <a href="javascript:void(0)" onclick="window.fijarHoraActualSP('sp-hora-entrada')" style="color: var(--accent); text-decoration: none; font-size: 0.75rem; font-weight: 700;">⏱️ Ahora</a>
+                  <a href="javascript:void(0)" onclick="window.fijarHoraActualSP('sp-hora-entrada')" style="color: var(--accent); text-decoration: none; font-size: 0.75rem; font-weight: 700;">Ahora</a>
                 </label>
                 <input type="time" id="sp-hora-entrada" onchange="window.recalcularHorasTrabajadasSP()" required style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
               </div>
@@ -148,7 +148,7 @@
               <div class="form-group">
                 <label style="font-size: 0.8rem; font-weight: 600; display: flex; justify-content: space-between;">
                   <span>Hora Salida <span class="required-asterisk" style="color:#ef4444;">*</span></span>
-                  <a href="javascript:void(0)" onclick="window.fijarHoraActualSP('sp-hora-salida')" style="color: var(--accent); text-decoration: none; font-size: 0.75rem; font-weight: 700;">⏱️ Ahora</a>
+                  <a href="javascript:void(0)" onclick="window.fijarHoraActualSP('sp-hora-salida')" style="color: var(--accent); text-decoration: none; font-size: 0.75rem; font-weight: 700;">Ahora</a>
                 </label>
                 <input type="time" id="sp-hora-salida" onchange="window.recalcularHorasTrabajadasSP()" required style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;" />
               </div>
@@ -196,9 +196,9 @@
               <div class="form-group">
                 <label style="font-size: 0.8rem; font-weight: 600;">Estado Final del Equipo</label>
                 <select id="sp-estado-equipo" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem; font-weight: 600;">
-                  <option value="Operativo" style="color:#10b981;">🟢 Operativo 100%</option>
-                  <option value="Operativo con Observaciones" style="color:#f59e0b;">🟡 Operativo con Observaciones</option>
-                  <option value="Fuera de Servicio" style="color:#ef4444;">🔴 Fuera de Servicio / Requiere Reparación</option>
+                  <option value="Operativo" style="color:#10b981;">Operativo 100%</option>
+                  <option value="Operativo con Observaciones" style="color:#f59e0b;">Operativo con Observaciones</option>
+                  <option value="Fuera de Servicio" style="color:#ef4444;">Fuera de Servicio / Requiere Reparación</option>
                 </select>
               </div>
             </div>
