@@ -3825,6 +3825,7 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
       <span id="count-pill-snp-calibracion">0</span>
 
       <select id="snp-filtro-semana"></select>
+      <select id="snp-filtro-cliente-bolsa"></select>
       <select id="snp-filtro-renta-bolsa"></select>
       <input id="search-no-preventivos" />
 
@@ -3864,6 +3865,7 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
 
     <!-- Modal Reporte Semanal -->
     <div id="modal-reporte-semanal-snp-overlay" style="display:none;">
+      <select id="snp-reporte-filtro-cliente"></select>
       <select id="snp-reporte-filtro-renta"></select>
       <select id="snp-reporte-filtro-semana"></select>
       <select id="snp-reporte-filtro-maquina"></select>
@@ -3872,6 +3874,7 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
 
     <!-- Modal Config Bolsa -->
     <div id="modal-configurar-bolsa-horas-overlay" style="display:none;">
+      <select id="cfg-bolsa-cliente"></select>
       <select id="cfg-bolsa-renta-id"></select>
       <input id="cfg-bolsa-horas-total" />
       <input id="cfg-bolsa-tarifa-excedente" />
@@ -3947,7 +3950,8 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
   assert.equal(snpRestored.refacciones.length, 1);
   assert.equal(snpRestored.esPrueba, false);
 
-  // 8.4 Bolsa de Horas Dashboard y Balance
+  // 8.4 Bolsa de Horas Dashboard y Balance Por Cliente (Multi-Proyecto)
+  // Caso de uso: Un mismo cliente ("Minera del Norte S.A.") tiene dos contratos/obras distintas (ren-001 y ren-002)
   dom.window.rentas = [
     {
       id: 'ren-001',
@@ -3957,14 +3961,37 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
       equipo: 'Trituradora RM120X',
       bolsa_horas_total: 50.0,
       bolsa_tarifa_excedente: 650
+    },
+    {
+      id: 'ren-002',
+      folio: 'REN-2026-0011',
+      cliente: 'Minera del Norte S.A.',
+      sitio: 'Planta Peñasquito',
+      equipo: 'Excavadora HX220',
+      bolsa_horas_total: 30.0,
+      bolsa_tarifa_excedente: 650
     }
   ];
+
+  // Configurar bolsa global del cliente en 80 hrs
+  const bolsasClientesTest = {
+    'minera del norte s.a.': {
+      cliente: 'Minera del Norte S.A.',
+      horas_contratadas: 80.0,
+      tarifa_excedente: 650,
+      fecha_inicio: '2026-10-01',
+      notas: 'Bolsa acordada para ambos frentes de trabajo'
+    }
+  };
+  dom.window.localStorage.setItem('sapi_bolsas_clientes', JSON.stringify(bolsasClientesTest));
 
   dom.window.serviciosNoPreventivos = [
     {
       id: 'snp-1',
       folio: 'SNP-2026-0001',
       renta_id: 'ren-001',
+      cliente: 'Minera del Norte S.A.',
+      sitio: 'Tajo Norte',
       equipo: 'Trituradora RM120X',
       horas_trabajadas: 4.0,
       aplica_bolsa_horas: true,
@@ -3974,7 +4001,9 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
     {
       id: 'snp-2',
       folio: 'SNP-2026-0002',
-      renta_id: 'ren-001',
+      renta_id: 'ren-002',
+      cliente: 'Minera del Norte S.A.',
+      sitio: 'Planta Peñasquito',
       equipo: 'Excavadora HX220',
       horas_trabajadas: 6.0,
       aplica_bolsa_horas: true,
@@ -3985,6 +4014,8 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
       id: 'snp-3',
       folio: 'SNP-2026-0003',
       renta_id: 'ren-001',
+      cliente: 'Minera del Norte S.A.',
+      sitio: 'Tajo Norte',
       equipo: 'Criba Móvil MSC8500',
       horas_trabajadas: 2.5,
       aplica_bolsa_horas: false, // Extraordinario, no descuenta bolsa
@@ -3993,34 +4024,37 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
     }
   ];
 
-  dom.window.actualizarBolsaHorasDashboard('ren-001');
+  // Actualizar dashboard filtrando por el cliente
+  dom.window.actualizarBolsaHorasDashboard('Minera del Norte S.A.');
 
   const statContratada = dom.window.document.getElementById('stat-bolsa-contratada')?.textContent;
   const statConsumida = dom.window.document.getElementById('stat-bolsa-consumida')?.textContent;
   const statSaldo = dom.window.document.getElementById('stat-bolsa-saldo')?.textContent;
 
-  assert.equal(statContratada, '50.0 hrs', 'Horas contratadas deben ser 50.0 hrs');
-  assert.equal(statConsumida, '10.0 hrs', 'Horas consumidas de bolsa deben ser 4.0 + 6.0 = 10.0 hrs (excluyendo no-bolsa)');
-  assert.equal(statSaldo, '40.0 hrs', 'Saldo disponible debe ser 50 - 10 = 40.0 hrs');
+  assert.equal(statContratada, '80.0 hrs', 'Horas contratadas de la bolsa del cliente deben ser 80.0 hrs');
+  assert.equal(statConsumida, '10.0 hrs', 'Horas consumidas de bolsa del cliente deben ser 4.0 + 6.0 = 10.0 hrs (agrupando múltiples obras y excluyendo horas extraordinarias)');
+  assert.equal(statSaldo, '70.0 hrs', 'Saldo disponible de la bolsa del cliente debe ser 80 - 10 = 70.0 hrs');
 
-  // Verificar desglose por máquina en chips
+  // Verificar desglose por maquinaria y sitio para el cliente seleccionado
   const chipsHtml = dom.window.document.getElementById('snp-bolsa-maquinas-chips')?.innerHTML;
-  assert.ok(chipsHtml.includes('Trituradora RM120X') && chipsHtml.includes('4.0 hrs'), 'Debe incluir chip de Trituradora con 4.0 hrs');
-  assert.ok(chipsHtml.includes('Excavadora HX220') && chipsHtml.includes('6.0 hrs'), 'Debe incluir chip de Excavadora con 6.0 hrs');
+  assert.ok(chipsHtml.includes('Trituradora RM120X') && chipsHtml.includes('4.0 hrs'), 'Debe incluir chip de Trituradora en Tajo Norte con 4.0 hrs');
+  assert.ok(chipsHtml.includes('Excavadora HX220') && chipsHtml.includes('6.0 hrs'), 'Debe incluir chip de Excavadora en Planta Peñasquito con 6.0 hrs');
 
-  // 8.5 Bitácora Semanal y Generación de Documento
+  // 8.5 Bitácora Semanal y Generación de Documento por Cliente
   dom.window.abrirModalReporteSemanalSNP();
-  dom.window.document.getElementById('snp-reporte-filtro-renta').value = 'ren-001';
-  dom.window.actualizarReporteSemanalSNP();
+  dom.window.document.getElementById('snp-reporte-filtro-cliente').value = 'Minera del Norte S.A.';
+  dom.window.alCambiarClienteEnReporteSNP();
 
   const docHtml = dom.window.document.getElementById('snp-reporte-semanal-documento')?.innerHTML;
   assert.ok(docHtml.includes('EUROREP S.A. DE C.V.'), 'Documento semanal debe incluir membrete oficial Eurorep');
   assert.ok(docHtml.includes('Bitácora Semanal de Servicio'), 'Documento debe tener título formal de Bitácora');
-  assert.ok(docHtml.includes('Minera del Norte S.A.'), 'Documento debe incluir cliente del proyecto');
+  assert.ok(docHtml.includes('Minera del Norte S.A.'), 'Documento debe incluir cliente arrendatario');
+  assert.ok(docHtml.includes('80.0 hrs'), 'Documento debe reflejar bolsa contratada por el cliente de 80.0 hrs');
+  assert.ok(docHtml.includes('70.0 hrs'), 'Documento debe reflejar saldo restante de bolsa de 70.0 hrs');
   assert.ok(docHtml.includes('Trituradora RM120X'), 'Documento debe incluir intervención de trituradora');
   assert.ok(docHtml.includes('Excavadora HX220'), 'Documento debe incluir intervención de excavadora');
 
-  console.log('  ✅ Módulo de Servicios NO Preventivos en Rentas (Bolsa de Horas, Captura Multimáquina, Bitácora Semanal, Supabase & Sandbox): OK');
+  console.log('  ✅ Módulo de Servicios NO Preventivos en Rentas (Bolsa de Horas por Cliente, Multi-Proyecto, Bitácora Semanal, Supabase & Sandbox): OK');
 }
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');

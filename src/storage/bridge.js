@@ -16,7 +16,9 @@ export const redirectedKeys = [
   'sapi_rentas',
   'sapi_servicios_preventivos',
   'sapi_servicios_no_preventivos',
-  'sapi_servicios_no_preventivos_sandbox'
+  'sapi_servicios_no_preventivos_sandbox',
+  'sapi_bolsas_clientes',
+  'sapi_bolsas_clientes_sandbox'
 ];
 
 let sharedDb = null;

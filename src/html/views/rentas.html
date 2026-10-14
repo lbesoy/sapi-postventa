@@ -218,20 +218,20 @@
                   </div>
                   <div>
                     <h4 style="margin: 0; font-size: 1rem; font-weight: 800; color: var(--text-primary); letter-spacing: -0.2px;">
-                      Control y Monitoreo de Bolsa de Horas Técnicas
+                      Control y Monitoreo de Bolsa de Horas Técnicas por Cliente
                     </h4>
                     <span style="font-size: 0.75rem; color: var(--text-muted);">
-                      Saldo de horas contratadas para soporte en campo en este proyecto
+                      Saldo de horas contratadas para soporte técnico en sitio por empresa / cliente
                     </span>
                   </div>
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                  <!-- Selector de Contrato para Bolsa de Horas -->
+                  <!-- Selector de Cliente para Bolsa de Horas -->
                   <div style="display: flex; align-items: center; gap: 0.35rem; background: var(--bg-hover); padding: 0.2rem 0.5rem; border-radius: 8px; border: 1px solid var(--border);">
-                    <i data-lucide="key-round" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
-                    <select id="snp-filtro-renta-bolsa" onchange="window.alCambiarRentaBolsaHorasSNP()" style="border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 700; outline: none; cursor: pointer; max-width: 260px;">
-                      <!-- Se puebla con rentas activas -->
+                    <i data-lucide="building-2" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                    <select id="snp-filtro-cliente-bolsa" onchange="window.alCambiarClienteBolsaHorasSNP()" style="border: none; background: transparent; color: var(--text-primary); font-size: 0.8rem; font-weight: 700; outline: none; cursor: pointer; max-width: 280px;">
+                      <!-- Se puebla con clientes -->
                     </select>
                   </div>
 
@@ -274,13 +274,13 @@
                 </div>
               </div>
 
-              <!-- Desglose de Horas por Maquinaria en este Proyecto -->
+              <!-- Desglose de Horas por Maquinaria en este Cliente -->
               <div>
                 <span style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; display: block; margin-bottom: 0.45rem;">
-                  Horas Técnicas por Maquinaria Intervenida:
+                  Horas Técnicas por Maquinaria y Proyecto de este Cliente:
                 </span>
                 <div id="snp-bolsa-maquinas-chips" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
-                  <span style="font-size: 0.78rem; color: var(--text-muted); font-style: italic;">Sin horas registradas en este contrato aún.</span>
+                  <span style="font-size: 0.78rem; color: var(--text-muted); font-style: italic;">Sin horas registradas para este cliente aún.</span>
                 </div>
               </div>
             </div>

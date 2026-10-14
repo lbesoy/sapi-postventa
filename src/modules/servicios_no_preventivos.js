@@ -993,41 +993,114 @@
     }
   };
 
+  // Clave de almacenamiento dinámico para Bolsas por Cliente
+  function getBolsasStorageKey() {
+    const isSandbox = typeof isTestModeActive === 'function' ? isTestModeActive() : (window.modoPruebas === true);
+    return isSandbox ? 'sapi_bolsas_clientes_sandbox' : 'sapi_bolsas_clientes';
+  }
+
+  function obtenerBolsasClientes() {
+    try {
+      const key = getBolsasStorageKey();
+      const stored = localStorage.getItem(key);
+      if (stored) return JSON.parse(stored);
+      return {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function guardarBolsasClientes(bolsas) {
+    try {
+      const key = getBolsasStorageKey();
+      localStorage.setItem(key, JSON.stringify(bolsas));
+    } catch (e) {
+      console.warn('[BolsasClientes] Error al persistir:', e);
+    }
+  }
+
   /**
-   * Actualizar el Dashboard y Termómetro de Bolsa de Horas
+   * Obtener lista unificada y normalizada de clientes/empresas
    */
-  window.actualizarBolsaHorasDashboard = function(rentaIdFiltro = null) {
-    const selRenta = document.getElementById('snp-filtro-renta-bolsa');
-    const rentaId = rentaIdFiltro || (selRenta ? selRenta.value : '');
-
-    const rentas = Array.isArray(window.rentas) ? window.rentas : [];
-    const todosServicios = Array.isArray(window.serviciosNoPreventivos) ? window.serviciosNoPreventivos : [];
-
-    // Poblar selector de rentas si está vacío
-    if (selRenta && selRenta.options.length <= 1) {
-      selRenta.innerHTML = '<option value="todas">-- Todos los Proyectos / Global --</option>';
-      rentas.forEach(r => {
-        selRenta.innerHTML += `<option value="${r.id}">${r.folio || 'REN'} - ${r.cliente || 'Cliente'} (${r.equipo || 'Equipo'})</option>`;
+  window.obtenerListaClientesDisponiblesSNP = function() {
+    const clientesSet = new Set();
+    // 1. De los servicios no preventivos
+    (window.serviciosNoPreventivos || []).forEach(s => {
+      if (s.cliente && s.cliente.trim()) clientesSet.add(s.cliente.trim());
+    });
+    // 2. De las rentas
+    (window.rentas || []).forEach(r => {
+      if (r.cliente && r.cliente.trim()) clientesSet.add(r.cliente.trim());
+    });
+    // 3. De la base de clientes del sistema
+    try {
+      const cDb = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+      cDb.forEach(c => {
+        const nom = c.nombre || c.razonSocial || c.empresa;
+        if (nom && nom.trim()) clientesSet.add(nom.trim());
       });
-      if (rentaId) selRenta.value = rentaId;
+    } catch (e) {}
+
+    // 4. De las bolsas configuradas
+    const bolsas = obtenerBolsasClientes();
+    Object.values(bolsas).forEach(b => {
+      if (b.cliente && b.cliente.trim()) clientesSet.add(b.cliente.trim());
+    });
+
+    return Array.from(clientesSet).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  };
+
+  /**
+   * Actualizar el Dashboard y Termómetro de Bolsa de Horas por CLIENTE
+   */
+  window.actualizarBolsaHorasDashboard = function(clienteFiltroParam = null) {
+    const selCliente = document.getElementById('snp-filtro-cliente-bolsa') || document.getElementById('snp-filtro-renta-bolsa');
+    const clienteSeleccionado = clienteFiltroParam || (selCliente ? selCliente.value : '');
+
+    const todosServicios = Array.isArray(window.serviciosNoPreventivos) ? window.serviciosNoPreventivos : [];
+    const bolsasClientes = obtenerBolsasClientes();
+    const clientesLista = window.obtenerListaClientesDisponiblesSNP();
+
+    // Poblar selector de clientes si está disponible
+    if (selCliente) {
+      const valorActual = clienteSeleccionado || selCliente.value || 'todos';
+      selCliente.innerHTML = '<option value="todos">-- Todos los Clientes (Consolidado) --</option>';
+      clientesLista.forEach(c => {
+        selCliente.innerHTML += `<option value="${c}">${c}</option>`;
+      });
+      if (valorActual && (valorActual === 'todos' || clientesLista.includes(valorActual))) {
+        selCliente.value = valorActual;
+      }
     }
 
-    let rentaActiva = null;
+    const clienteActivo = (selCliente?.value && selCliente.value !== 'todos') ? selCliente.value : (clienteFiltroParam && clienteFiltroParam !== 'todos' ? clienteFiltroParam : null);
+
+    let bolsaContratada = 0;
     let serviciosFiltrados = todosServicios;
 
-    if (rentaId && rentaId !== 'todas') {
-      rentaActiva = rentas.find(x => String(x.id) === String(rentaId));
-      serviciosFiltrados = todosServicios.filter(s => String(s.renta_id) === String(rentaId));
-    }
+    if (clienteActivo) {
+      // Filtrar por el cliente específico (en todos los frentes / proyectos donde esté trabajando)
+      serviciosFiltrados = todosServicios.filter(s => (s.cliente || '').trim().toLowerCase() === clienteActivo.trim().toLowerCase());
 
-    // Calcular bolsa contratada
-    let bolsaContratada = 0;
-    if (rentaActiva) {
-      bolsaContratada = parseFloat(rentaActiva.bolsa_horas_total) || 50.0;
+      const configBolsa = bolsasClientes[clienteActivo.trim().toLowerCase()];
+      if (configBolsa && configBolsa.horas_contratadas != null) {
+        bolsaContratada = parseFloat(configBolsa.horas_contratadas) || 50.0;
+      } else {
+        // Fallback: buscar si alguna renta de este cliente tiene bolsa_horas_total
+        const rentasCli = (window.rentas || []).filter(r => (r.cliente || '').trim().toLowerCase() === clienteActivo.trim().toLowerCase());
+        const totalEnRentas = rentasCli.reduce((acc, r) => acc + (parseFloat(r.bolsa_horas_total) || 0), 0);
+        bolsaContratada = totalEnRentas > 0 ? totalEnRentas : 50.0;
+      }
     } else {
-      // Suma global de todas las bolsas de contratos activos
-      bolsaContratada = rentas.reduce((acc, r) => acc + (parseFloat(r.bolsa_horas_total) || 50.0), 0);
-      if (bolsaContratada === 0) bolsaContratada = 100.0;
+      // Consolidado Global de todos los clientes
+      const keys = Object.keys(bolsasClientes);
+      if (keys.length > 0) {
+        bolsaContratada = Object.values(bolsasClientes).reduce((acc, b) => acc + (parseFloat(b.horas_contratadas) || 50.0), 0);
+      } else {
+        const rentas = Array.isArray(window.rentas) ? window.rentas : [];
+        bolsaContratada = rentas.reduce((acc, r) => acc + (parseFloat(r.bolsa_horas_total) || 50.0), 0);
+        if (bolsaContratada === 0) bolsaContratada = 100.0;
+      }
     }
 
     // Horas consumidas (solo las que aplican para bolsa de horas)
@@ -1082,40 +1155,85 @@
       elProgressBar.style.background = barColor;
     }
 
-    // Desglose de horas por maquinaria intervenida (Chips)
+    // Desglose de horas: Si hay un cliente seleccionado, desglosar por Maquinaria y Sitio de ese cliente.
+    // Si es consolidado global, desglosar por Cliente.
     const chipsCont = document.getElementById('snp-bolsa-maquinas-chips');
     if (chipsCont) {
-      const horasPorMaquina = {};
-      serviciosFiltrados.forEach(s => {
-        const maq = (s.equipo || 'Sin Equipo').trim();
-        horasPorMaquina[maq] = (horasPorMaquina[maq] || 0) + (parseFloat(s.horas_trabajadas) || 0);
-      });
+      if (clienteActivo) {
+        const horasPorMaquina = {};
+        serviciosFiltrados.forEach(s => {
+          const maq = (s.equipo || 'Sin Equipo').trim();
+          const sitio = s.sitio ? ` (${s.sitio})` : '';
+          const key = `${maq}${sitio}`;
+          horasPorMaquina[key] = (horasPorMaquina[key] || 0) + (parseFloat(s.horas_trabajadas) || 0);
+        });
 
-      const maquinasKeys = Object.keys(horasPorMaquina);
-      if (maquinasKeys.length === 0) {
-        chipsCont.innerHTML = '<span style="font-size: 0.78rem; color: var(--text-muted); font-style: italic;">Sin horas registradas en este contrato aún.</span>';
+        const maquinasKeys = Object.keys(horasPorMaquina);
+        if (maquinasKeys.length === 0) {
+          chipsCont.innerHTML = `<span style="font-size: 0.78rem; color: var(--text-muted); font-style: italic;">Sin horas registradas para ${clienteActivo} aún.</span>`;
+        } else {
+          chipsCont.innerHTML = maquinasKeys.map(key => {
+            const hrs = horasPorMaquina[key];
+            return `
+              <div style="background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); border-radius: 20px; padding: 0.25rem 0.65rem; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 0.4rem; color: var(--text-primary);">
+                <i data-lucide="truck" style="width: 12px; height: 12px; color: #3b82f6;"></i>
+                <span style="font-weight: 600;">${key}:</span>
+                <strong style="color: #3b82f6;">${hrs.toFixed(1)} hrs</strong>
+              </div>
+            `;
+          }).join('');
+        }
       } else {
-        chipsCont.innerHTML = maquinasKeys.map(maq => {
-          const hrs = horasPorMaquina[maq];
-          return `
-            <div style="background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); border-radius: 20px; padding: 0.25rem 0.65rem; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 0.4rem; color: var(--text-primary);">
-              <i data-lucide="truck" style="width: 12px; height: 12px; color: #3b82f6;"></i>
-              <span style="font-weight: 600;">${maq}:</span>
-              <strong style="color: #3b82f6;">${hrs.toFixed(1)} hrs</strong>
-            </div>
-          `;
-        }).join('');
+        // Desglose consolidado por cliente
+        const horasPorCliente = {};
+        todosServicios.forEach(s => {
+          const cli = (s.cliente || 'Sin Cliente').trim();
+          horasPorCliente[cli] = (horasPorCliente[cli] || 0) + (parseFloat(s.horas_trabajadas) || 0);
+        });
+
+        const clientesKeys = Object.keys(horasPorCliente);
+        if (clientesKeys.length === 0) {
+          chipsCont.innerHTML = '<span style="font-size: 0.78rem; color: var(--text-muted); font-style: italic;">Sin horas registradas aún.</span>';
+        } else {
+          chipsCont.innerHTML = clientesKeys.map(cli => {
+            const hrs = horasPorCliente[cli];
+            return `
+              <div onclick="window.seleccionarClienteEnBolsaSNP('${cli}')" style="cursor: pointer; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); border-radius: 20px; padding: 0.25rem 0.65rem; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 0.4rem; color: var(--text-primary);" title="Clic para filtrar por este cliente">
+                <i data-lucide="building-2" style="width: 12px; height: 12px; color: #3b82f6;"></i>
+                <span style="font-weight: 600;">${cli}:</span>
+                <strong style="color: #3b82f6;">${hrs.toFixed(1)} hrs</strong>
+              </div>
+            `;
+          }).join('');
+        }
       }
+    }
+
+    if (window.lucide) window.lucide.createIcons();
+  };
+
+  /**
+   * Clic rápido en chip de cliente para filtrar
+   */
+  window.seleccionarClienteEnBolsaSNP = function(cliente) {
+    const sel = document.getElementById('snp-filtro-cliente-bolsa');
+    if (sel) {
+      sel.value = cliente;
+      window.actualizarBolsaHorasDashboard(cliente);
+      window.renderServiciosNoPreventivos();
     }
   };
 
   /**
-   * Al cambiar la renta en el selector de la Bolsa de Horas
+   * Al cambiar el cliente en el selector de la Bolsa de Horas
    */
-  window.alCambiarRentaBolsaHorasSNP = function() {
+  window.alCambiarClienteBolsaHorasSNP = function() {
     window.actualizarBolsaHorasDashboard();
     window.renderServiciosNoPreventivos();
   };
+
+  // Compatibilidad hacia atrás
+  window.alCambiarRentaBolsaHorasSNP = window.alCambiarClienteBolsaHorasSNP;
 
   /**
    * Renderizar la lista principal de Servicios No Preventivos (Desktop y Móvil)
@@ -1364,35 +1482,35 @@
   };
 
   /**
-   * Modal de Configuración de Bolsa de Horas
+   * Modal de Configuración de Bolsa de Horas (Por Cliente)
    */
-  window.abrirModalConfigurarBolsaHoras = function(rentaIdParam = null) {
+  window.abrirModalConfigurarBolsaHoras = function(clienteParam = null) {
     const overlay = document.getElementById('modal-configurar-bolsa-horas-overlay');
     if (!overlay) return;
 
     overlay.style.display = 'flex';
 
-    // Poblar contratos de renta
-    const selRenta = document.getElementById('cfg-bolsa-renta-id');
-    const rentas = Array.isArray(window.rentas) ? window.rentas : [];
+    // Poblar clientes disponibles
+    const selCliente = document.getElementById('cfg-bolsa-cliente') || document.getElementById('cfg-bolsa-renta-id');
+    const clientes = window.obtenerListaClientesDisponiblesSNP();
 
-    if (selRenta) {
-      selRenta.innerHTML = '';
-      rentas.forEach(r => {
-        selRenta.innerHTML += `<option value="${r.id}">${r.folio || 'REN'} - ${r.cliente || 'Sin Cliente'} (${r.equipo || 'Equipo'})</option>`;
+    if (selCliente) {
+      selCliente.innerHTML = '';
+      clientes.forEach(c => {
+        selCliente.innerHTML += `<option value="${c}">${c}</option>`;
       });
 
-      if (rentaIdParam) {
-        selRenta.value = rentaIdParam;
+      if (clienteParam && clientes.includes(clienteParam)) {
+        selCliente.value = clienteParam;
       } else {
-        const selFiltro = document.getElementById('snp-filtro-renta-bolsa');
-        if (selFiltro && selFiltro.value && selFiltro.value !== 'todas') {
-          selRenta.value = selFiltro.value;
+        const selFiltro = document.getElementById('snp-filtro-cliente-bolsa') || document.getElementById('snp-filtro-renta-bolsa');
+        if (selFiltro && selFiltro.value && selFiltro.value !== 'todos' && clientes.includes(selFiltro.value)) {
+          selCliente.value = selFiltro.value;
         }
       }
     }
 
-    window.alSeleccionarRentaEnConfigBolsa();
+    window.alSeleccionarClienteEnConfigBolsa();
     if (window.lucide) window.lucide.createIcons();
   };
 
@@ -1401,60 +1519,90 @@
     if (overlay) overlay.style.display = 'none';
   };
 
-  window.alSeleccionarRentaEnConfigBolsa = function() {
-    const rentaId = document.getElementById('cfg-bolsa-renta-id')?.value;
-    const rentas = Array.isArray(window.rentas) ? window.rentas : [];
-    const r = rentas.find(x => String(x.id) === String(rentaId));
+  window.alSeleccionarClienteEnConfigBolsa = function() {
+    const selCliente = document.getElementById('cfg-bolsa-cliente') || document.getElementById('cfg-bolsa-renta-id');
+    const clienteNombre = selCliente?.value?.trim();
+    if (!clienteNombre) return;
 
-    if (r) {
-      document.getElementById('cfg-bolsa-horas-total').value = r.bolsa_horas_total != null ? r.bolsa_horas_total : 50;
-      document.getElementById('cfg-bolsa-tarifa-excedente').value = r.bolsa_tarifa_excedente != null ? r.bolsa_tarifa_excedente : 650;
-      document.getElementById('cfg-bolsa-fecha-inicio').value = r.bolsa_fecha_inicio || r.fecha_inicio || new Date().toISOString().substring(0, 10);
-      document.getElementById('cfg-bolsa-notas').value = r.bolsa_notas || '';
+    const bolsas = obtenerBolsasClientes();
+    const config = bolsas[clienteNombre.toLowerCase()];
+
+    if (config) {
+      document.getElementById('cfg-bolsa-horas-total').value = config.horas_contratadas != null ? config.horas_contratadas : 50;
+      document.getElementById('cfg-bolsa-tarifa-excedente').value = config.tarifa_excedente != null ? config.tarifa_excedente : 650;
+      document.getElementById('cfg-bolsa-fecha-inicio').value = config.fecha_inicio || new Date().toISOString().substring(0, 10);
+      document.getElementById('cfg-bolsa-notas').value = config.notas || '';
+    } else {
+      // Valores por defecto para cliente nuevo
+      document.getElementById('cfg-bolsa-horas-total').value = 50;
+      document.getElementById('cfg-bolsa-tarifa-excedente').value = 650;
+      document.getElementById('cfg-bolsa-fecha-inicio').value = new Date().toISOString().substring(0, 10);
+      document.getElementById('cfg-bolsa-notas').value = '';
     }
   };
 
+  // Compatibilidad hacia atrás
+  window.alSeleccionarRentaEnConfigBolsa = window.alSeleccionarClienteEnConfigBolsa;
+
   window.guardarConfiguracionBolsaHoras = function() {
-    const rentaId = document.getElementById('cfg-bolsa-renta-id')?.value;
+    const selCliente = document.getElementById('cfg-bolsa-cliente') || document.getElementById('cfg-bolsa-renta-id');
+    const clienteNombre = selCliente?.value?.trim();
     const horasTotal = parseFloat(document.getElementById('cfg-bolsa-horas-total')?.value);
     const tarifa = parseFloat(document.getElementById('cfg-bolsa-tarifa-excedente')?.value) || 0;
     const fechaIni = document.getElementById('cfg-bolsa-fecha-inicio')?.value;
     const notas = document.getElementById('cfg-bolsa-notas')?.value?.trim();
 
-    if (!rentaId || isNaN(horasTotal) || horasTotal <= 0) {
-      alert('Por favor especifica un número válido de horas contratadas.');
+    if (!clienteNombre || isNaN(horasTotal) || horasTotal <= 0) {
+      alert('Por favor selecciona un cliente y especifica un número válido de horas contratadas.');
       return;
     }
 
-    const rentas = Array.isArray(window.rentas) ? window.rentas : [];
-    const r = rentas.find(x => String(x.id) === String(rentaId));
+    const bolsas = obtenerBolsasClientes();
+    const isSandbox = (typeof isTestModeActive === 'function' && isTestModeActive());
 
-    if (r) {
-      r.bolsa_horas_total = horasTotal;
-      r.bolsa_tarifa_excedente = tarifa;
-      r.bolsa_fecha_inicio = fechaIni;
-      r.bolsa_notas = notas;
+    const nuevaBolsa = {
+      cliente: clienteNombre,
+      cliente_id: null,
+      horas_contratadas: horasTotal,
+      tarifa_excedente: tarifa,
+      fecha_inicio: fechaIni || new Date().toISOString().substring(0, 10),
+      notas: notas || '',
+      es_prueba: isSandbox,
+      updated_at: new Date().toISOString()
+    };
 
-      // Guardar en Storage
+    bolsas[clienteNombre.toLowerCase()] = nuevaBolsa;
+    guardarBolsasClientes(bolsas);
+
+    // Actualizar también en sapi_clientes_db si existe el cliente
+    try {
+      const cDb = JSON.parse(localStorage.getItem('sapi_clientes_db') || '[]');
+      const match = cDb.find(c => (c.nombre || c.razonSocial || c.empresa || '').toLowerCase() === clienteNombre.toLowerCase());
+      if (match) {
+        match.bolsa_horas_total = horasTotal;
+        match.bolsa_tarifa_excedente = tarifa;
+        match.bolsa_fecha_inicio = fechaIni;
+        match.bolsa_notas = notas;
+        localStorage.setItem('sapi_clientes_db', JSON.stringify(cDb));
+      }
+    } catch (eCli) {}
+
+    // Sincronizar con Supabase si está disponible
+    if (typeof window.pushToSupabase === 'function') {
       try {
-        const isSandbox = (typeof isTestModeActive === 'function' && isTestModeActive());
-        const rKey = isSandbox ? 'sapi_rentas_sandbox' : 'sapi_rentas';
-        localStorage.setItem(rKey, JSON.stringify(window.rentas));
-        if (typeof window.pushToSupabase === 'function') {
-          window.pushToSupabase('rentas', r);
-        }
-      } catch (e) {
-        console.error('[ServiciosNoPreventivos] Error guardando config de bolsa:', e);
+        window.pushToSupabase('bolsas_horas_clientes', nuevaBolsa);
+      } catch (eSync) {
+        console.warn('[BolsasClientes] Pendiente de sincronizar a Supabase:', eSync);
       }
-
-      if (typeof window.showToast === 'function') {
-        window.showToast(`Bolsa de ${horasTotal} horas guardada para ${r.cliente || 'el contrato'}.`, 'success');
-      }
-
-      window.cerrarModalConfigurarBolsaHoras();
-      window.actualizarBolsaHorasDashboard(rentaId);
-      window.renderServiciosNoPreventivos();
     }
+
+    if (typeof window.showToast === 'function') {
+      window.showToast(`Bolsa de ${horasTotal} horas guardada para el cliente ${clienteNombre}.`, 'success');
+    }
+
+    window.cerrarModalConfigurarBolsaHoras();
+    window.actualizarBolsaHorasDashboard(clienteNombre);
+    window.renderServiciosNoPreventivos();
   };
 
   /**
@@ -1466,21 +1614,24 @@
 
     overlay.style.display = 'flex';
 
-    // Poblar selector de rentas en el reporte
-    const selRenta = document.getElementById('snp-reporte-filtro-renta');
-    const rentas = Array.isArray(window.rentas) ? window.rentas : [];
-    if (selRenta) {
-      selRenta.innerHTML = '<option value="">-- Todos los Contratos / Proyectos --</option>';
-      rentas.forEach(r => {
-        selRenta.innerHTML += `<option value="${r.id}">${r.folio || 'REN'} - ${r.cliente || 'Sin Cliente'} (${r.equipo || 'Equipo'})</option>`;
+    // Poblar selector de clientes en el reporte
+    const selCliente = document.getElementById('snp-reporte-filtro-cliente');
+    const clientes = window.obtenerListaClientesDisponiblesSNP();
+    if (selCliente) {
+      selCliente.innerHTML = '<option value="">-- Todos los Clientes --</option>';
+      clientes.forEach(c => {
+        selCliente.innerHTML += `<option value="${c}">${c}</option>`;
       });
 
-      // Preseleccionar renta activa si la hay
-      const selBolsa = document.getElementById('snp-filtro-renta-bolsa');
-      if (selBolsa && selBolsa.value && selBolsa.value !== 'todas') {
-        selRenta.value = selBolsa.value;
+      // Preseleccionar cliente si hay uno filtrado en la barra superior o en bolsa
+      const selBolsa = document.getElementById('snp-filtro-cliente-bolsa') || document.getElementById('snp-filtro-renta-bolsa');
+      if (selBolsa && selBolsa.value && selBolsa.value !== 'todos' && clientes.includes(selBolsa.value)) {
+        selCliente.value = selBolsa.value;
       }
     }
+
+    // Poblar selector de rentas y contratos
+    window.actualizarSelectorRentasReporteSNP();
 
     // Poblar selector de semanas del año
     const selSemana = document.getElementById('snp-reporte-filtro-semana');
@@ -1518,15 +1669,57 @@
 
   window.cerrarModalReporteSemanalSNP = function() {
     const overlay = document.getElementById('modal-reporte-semanal-snp-overlay');
-    if (overlay) overlay.style.display = 'none';
+    if (!overlay) return;
+    overlay.style.display = 'none';
+  };
+
+  window.alCambiarClienteEnReporteSNP = function() {
+    window.actualizarSelectorRentasReporteSNP();
+    window.actualizarSelectorMaquinasReporteSNP();
+    window.actualizarReporteSemanalSNP();
+  };
+
+  window.alCambiarRentaEnReporteSNP = function() {
+    window.actualizarSelectorMaquinasReporteSNP();
+    window.actualizarReporteSemanalSNP();
+  };
+
+  window.actualizarSelectorRentasReporteSNP = function() {
+    const selRenta = document.getElementById('snp-reporte-filtro-renta');
+    if (!selRenta) return;
+
+    const clienteFiltro = document.getElementById('snp-reporte-filtro-cliente')?.value?.trim();
+    const rentas = Array.isArray(window.rentas) ? window.rentas : [];
+
+    let rentasFiltradas = rentas;
+    if (clienteFiltro) {
+      rentasFiltradas = rentas.filter(r => (r.cliente || '').trim().toLowerCase() === clienteFiltro.toLowerCase());
+    }
+
+    const prevVal = selRenta.value;
+    selRenta.innerHTML = '<option value="">-- Todos los Contratos / Proyectos --</option>';
+    rentasFiltradas.forEach(r => {
+      selRenta.innerHTML += `<option value="${r.id}">${r.folio || 'REN'} - ${r.cliente || 'Sin Cliente'} (${r.equipo || 'Equipo'})</option>`;
+    });
+
+    if (prevVal && rentasFiltradas.some(r => String(r.id) === String(prevVal))) {
+      selRenta.value = prevVal;
+    } else {
+      selRenta.value = '';
+    }
   };
 
   window.actualizarSelectorMaquinasReporteSNP = function() {
     const selMaq = document.getElementById('snp-reporte-filtro-maquina');
-    const rentaId = document.getElementById('snp-reporte-filtro-renta')?.value;
     if (!selMaq) return;
 
+    const clienteFiltro = document.getElementById('snp-reporte-filtro-cliente')?.value?.trim();
+    const rentaId = document.getElementById('snp-reporte-filtro-renta')?.value;
+
     let lista = Array.isArray(window.serviciosNoPreventivos) ? window.serviciosNoPreventivos : [];
+    if (clienteFiltro) {
+      lista = lista.filter(s => (s.cliente || '').trim().toLowerCase() === clienteFiltro.toLowerCase());
+    }
     if (rentaId) {
       lista = lista.filter(s => String(s.renta_id) === String(rentaId));
     }
@@ -1536,10 +1729,17 @@
       if (s.equipo) maquinas.add(s.equipo);
     });
 
+    const prevVal = selMaq.value;
     selMaq.innerHTML = '<option value="">-- Todas las Máquinas --</option>';
     Array.from(maquinas).forEach(m => {
       selMaq.innerHTML += `<option value="${m}">${m}</option>`;
     });
+
+    if (prevVal && maquinas.has(prevVal)) {
+      selMaq.value = prevVal;
+    } else {
+      selMaq.value = '';
+    }
   };
 
   /**
@@ -1549,15 +1749,19 @@
     const docCont = document.getElementById('snp-reporte-semanal-documento');
     if (!docCont) return;
 
-    const rentaId = document.getElementById('snp-reporte-filtro-renta')?.value;
-    const semanaClave = document.getElementById('snp-reporte-filtro-semana')?.value;
-    const maquinaFiltro = document.getElementById('snp-reporte-filtro-maquina')?.value;
+    const clienteFiltro = document.getElementById('snp-reporte-filtro-cliente')?.value?.trim() || '';
+    const rentaId = document.getElementById('snp-reporte-filtro-renta')?.value || '';
+    const semanaClave = document.getElementById('snp-reporte-filtro-semana')?.value || '';
+    const maquinaFiltro = document.getElementById('snp-reporte-filtro-maquina')?.value || '';
 
     const rentas = Array.isArray(window.rentas) ? window.rentas : [];
     const renta = rentas.find(x => String(x.id) === String(rentaId));
 
     let lista = Array.isArray(window.serviciosNoPreventivos) ? [...window.serviciosNoPreventivos] : [];
 
+    if (clienteFiltro) {
+      lista = lista.filter(s => (s.cliente || '').trim().toLowerCase() === clienteFiltro.toLowerCase());
+    }
     if (rentaId) {
       lista = lista.filter(s => String(s.renta_id) === String(rentaId));
     }
@@ -1586,15 +1790,45 @@
     const horasBolsaSemana = lista.filter(s => s.aplica_bolsa_horas !== false).reduce((acc, s) => acc + (parseFloat(s.horas_trabajadas) || 0), 0);
     const totalRefacciones = lista.reduce((acc, s) => acc + (parseFloat(s.monto_refacciones) || 0), 0);
 
-    // Bolsa de Horas Balance antes y después
-    const bolsaTotal = renta ? (parseFloat(renta.bolsa_horas_total) || 50.0) : 50.0;
-    
-    // Horas consumidas acumuladas en total para este contrato
-    const horasConsumidasTotal = (window.serviciosNoPreventivos || [])
-      .filter(s => String(s.renta_id) === String(rentaId) && s.aplica_bolsa_horas !== false)
-      .reduce((acc, s) => acc + (parseFloat(s.horas_trabajadas) || 0), 0);
+    // Bolsa de Horas Balance (Calculada a nivel CLIENTE)
+    const bolsas = obtenerBolsasClientes();
+    let bolsaTotal = 0;
+    let horasConsumidasHistoricas = 0;
 
-    const saldoRestante = bolsaTotal - horasConsumidasTotal;
+    if (clienteFiltro) {
+      const cfg = bolsas[clienteFiltro.toLowerCase()];
+      if (cfg && cfg.horas_contratadas != null) {
+        bolsaTotal = parseFloat(cfg.horas_contratadas) || 0;
+      } else {
+        const rentasCliente = rentas.filter(r => (r.cliente || '').trim().toLowerCase() === clienteFiltro.toLowerCase());
+        bolsaTotal = rentasCliente.reduce((acc, r) => acc + (parseFloat(r.bolsa_horas_total) || 50.0), 0);
+        if (bolsaTotal === 0) bolsaTotal = 50.0;
+      }
+
+      horasConsumidasHistoricas = (window.serviciosNoPreventivos || [])
+        .filter(s => (s.cliente || '').trim().toLowerCase() === clienteFiltro.toLowerCase() && s.aplica_bolsa_horas !== false)
+        .reduce((acc, s) => acc + (parseFloat(s.horas_trabajadas) || 0), 0);
+    } else {
+      const clientesUnicos = window.obtenerListaClientesDisponiblesSNP();
+      clientesUnicos.forEach(c => {
+        const cfg = bolsas[c.toLowerCase()];
+        if (cfg && cfg.horas_contratadas != null) {
+          bolsaTotal += parseFloat(cfg.horas_contratadas) || 0;
+        } else {
+          bolsaTotal += 50.0;
+        }
+      });
+      horasConsumidasHistoricas = (window.serviciosNoPreventivos || [])
+        .filter(s => s.aplica_bolsa_horas !== false)
+        .reduce((acc, s) => acc + (parseFloat(s.horas_trabajadas) || 0), 0);
+    }
+
+    const saldoRestante = bolsaTotal - horasConsumidasHistoricas;
+    const saldoPrevioSemana = saldoRestante + horasBolsaSemana;
+
+    const clienteDisplay = clienteFiltro || (renta?.cliente || (lista[0]?.cliente || 'Todos los Clientes'));
+    const obraDisplay = renta?.sitio || (clienteFiltro ? 'Múltiples Obras / Frentes del Cliente' : (lista[0]?.sitio || 'Obra en Campo'));
+    const contratoDisplay = renta?.folio ? `Folio Renta: ${renta.folio}` : (clienteFiltro ? `Bolsa de Horas Cliente (${clienteFiltro})` : 'Consolidado General');
 
     docCont.innerHTML = `
       <!-- Encabezado Oficial Eurorep -->
@@ -1611,23 +1845,26 @@
         </div>
       </div>
 
-      <!-- Resumen del Proyecto y Arrendatario -->
+      <!-- Resumen del Proyecto y Arrendatario (Bolsa por Cliente) -->
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; font-size: 0.84rem;">
         <div>
           <span style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; display: block;">Cliente / Arrendatario:</span>
-          <strong style="color: #0f172a; font-size: 0.95rem;">${renta?.cliente || (lista[0]?.cliente || 'Varios Clientes')}</strong>
-          <div style="color: #475569; font-size: 0.8rem; margin-top: 2px;">Obra / Frente: ${renta?.sitio || (lista[0]?.sitio || 'Obra en Campo')}</div>
+          <strong style="color: #0f172a; font-size: 0.95rem;">${clienteDisplay}</strong>
+          <div style="color: #475569; font-size: 0.8rem; margin-top: 2px;">Obra / Frente: ${obraDisplay}</div>
         </div>
         <div>
-          <span style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; display: block;">Contrato / Semana:</span>
-          <strong style="color: #0f172a;">Folio Renta: ${renta?.folio || 'GENERAL'}</strong>
+          <span style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; display: block;">Periodo / Contrato:</span>
+          <strong style="color: #0f172a;">${contratoDisplay}</strong>
           <div style="color: #2563eb; font-weight: 700; font-size: 0.82rem; margin-top: 2px;">${rangoStr}</div>
         </div>
         <div>
-          <span style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; display: block;">Estado de Bolsa de Horas:</span>
+          <span style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; display: block;">Balance de Bolsa del Cliente:</span>
           <div>Bolsa Contratada: <strong>${bolsaTotal.toFixed(1)} hrs</strong></div>
+          <div>Saldo Previo a la Semana: <strong>${saldoPrevioSemana.toFixed(1)} hrs</strong></div>
           <div>Horas en esta Semana: <strong style="color: #2563eb;">${horasBolsaSemana.toFixed(1)} hrs</strong></div>
-          <div>Saldo Restante: <strong style="color: ${saldoRestante >= 0 ? '#10b981' : '#ef4444'};">${saldoRestante.toFixed(1)} hrs</strong></div>
+          <div style="border-top: 1px dashed #cbd5e1; margin-top: 3px; padding-top: 3px;">
+            Saldo Restante: <strong style="color: ${saldoRestante >= 0 ? '#10b981' : '#ef4444'}; font-size: 0.9rem;">${saldoRestante >= 0 ? `${saldoRestante.toFixed(1)} hrs` : `-${Math.abs(saldoRestante).toFixed(1)} hrs (Excedente)`}</strong>
+          </div>
         </div>
       </div>
 
@@ -1716,7 +1953,7 @@
           </div>
         </div>
         <div style="text-align: center; margin-top: 1.5rem; font-size: 0.7rem; color: #94a3b8;">
-          Este documento avala las intervenciones técnicas realizadas en el proyecto y forma parte de la bitácora física de los equipos para efectos de conciliación y facturación de la Bolsa de Horas contratada.
+          Este documento avala las intervenciones técnicas realizadas en el proyecto y forma parte de la bitácora física de los equipos para efectos de conciliación y facturación de la Bolsa de Horas contratada por el cliente.
         </div>
       </div>
     `;
@@ -1760,11 +1997,13 @@
    * Exportar Reporte Semanal a Excel (CSV)
    */
   window.exportarReporteSemanalExcelSNP = function() {
+    const clienteFiltro = document.getElementById('snp-reporte-filtro-cliente')?.value?.trim();
     const semanaClave = document.getElementById('snp-reporte-filtro-semana')?.value || 'Semana';
     const rentaId = document.getElementById('snp-reporte-filtro-renta')?.value;
     const maquinaFiltro = document.getElementById('snp-reporte-filtro-maquina')?.value;
 
     let lista = Array.isArray(window.serviciosNoPreventivos) ? [...window.serviciosNoPreventivos] : [];
+    if (clienteFiltro) lista = lista.filter(s => (s.cliente || '').trim().toLowerCase() === clienteFiltro.toLowerCase());
     if (rentaId) lista = lista.filter(s => String(s.renta_id) === String(rentaId));
     if (semanaClave) lista = lista.filter(s => s.semana_ano === semanaClave || getNumeroSemanaISO(s.fecha_servicio).clave === semanaClave);
     if (maquinaFiltro) lista = lista.filter(s => s.equipo === maquinaFiltro);
@@ -1801,7 +2040,7 @@
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Bitacora_Semanal_SNP_${semanaClave}_${new Date().toISOString().substring(0, 10)}.csv`;
+    link.download = `Bitacora_Semanal_SNP_${clienteFiltro ? clienteFiltro.replace(/\s+/g, '_') + '_' : ''}${semanaClave}_${new Date().toISOString().substring(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };

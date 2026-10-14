@@ -25,9 +25,9 @@
     <!-- Form Body -->
     <form id="form-configurar-bolsa-horas" onsubmit="event.preventDefault(); window.guardarConfiguracionBolsaHoras();" style="margin: 0; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
       <div class="form-group">
-        <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem; display: block;">Contrato de Renta / Arrendatario <span style="color:#ef4444;">*</span></label>
-        <select id="cfg-bolsa-renta-id" required onchange="window.alSeleccionarRentaEnConfigBolsa()" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
-          <!-- Se puebla con rentas -->
+        <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem; display: block;">Cliente / Empresa Arrendataria <span style="color:#ef4444;">*</span></label>
+        <select id="cfg-bolsa-cliente" required onchange="window.alSeleccionarClienteEnConfigBolsa()" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem; font-weight: 600;">
+          <!-- Se puebla con clientes -->
         </select>
       </div>
 

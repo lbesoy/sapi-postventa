@@ -32,10 +32,17 @@
 
     <!-- Filter Bar for Report Generator -->
     <div style="padding: 1rem 1.5rem; background: var(--bg-hover); border-bottom: 1px solid var(--border); display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
-      <div class="form-group" style="min-width: 220px; flex: 1;">
-        <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem; display: block;">Contrato de Renta / Proyecto</label>
-        <select id="snp-reporte-filtro-renta" onchange="window.actualizarReporteSemanalSNP()" style="width: 100%; padding: 0.45rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;">
-          <option value="">-- Todos los Contratos / Proyectos --</option>
+      <div class="form-group" style="min-width: 200px; flex: 1;">
+        <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem; display: block;">Cliente / Empresa Arrendataria</label>
+        <select id="snp-reporte-filtro-cliente" onchange="window.alCambiarClienteEnReporteSNP()" style="width: 100%; padding: 0.45rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem; font-weight: 700;">
+          <option value="">-- Todos los Clientes --</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="min-width: 180px;">
+        <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem; display: block;">Contrato / Proyecto (Opcional)</label>
+        <select id="snp-reporte-filtro-renta" onchange="window.alCambiarRentaEnReporteSNP()" style="width: 100%; padding: 0.45rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem;">
+          <option value="">-- Todos los Contratos --</option>
         </select>
       </div>
 
