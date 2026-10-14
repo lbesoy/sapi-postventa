@@ -301,6 +301,9 @@
     }).join('');
 
     window.calcularProximoHorometroSP();
+    if (typeof window.actualizarSelectorKitsSP === 'function') {
+      window.actualizarSelectorKitsSP();
+    }
   };
 
   /**
@@ -425,6 +428,299 @@
     });
   };
 
+  // Variables de control de kit activo y sugerido en el formulario
+  window._kitActivoEnSP = null;
+  window._kitSugeridoActualSP = null;
+
+  /**
+   * Vaciar lista de refacciones del servicio preventivo
+   */
+  window.limpiarRefaccionesSP = function(confirmar = true) {
+    const tbody = document.getElementById('sp-refacciones-tbody');
+    if (!tbody) return;
+
+    const vaciar = () => {
+      tbody.innerHTML = '';
+      window._kitActivoEnSP = null;
+      const banner = document.getElementById('sp-kit-banner-info');
+      if (banner) banner.style.display = 'none';
+      window.recalcularTotalesServicioPreventivo();
+      if (typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion('Lista de refacciones vaciada.', 'info');
+      }
+    };
+
+    if (confirmar && tbody.children.length > 0) {
+      if (typeof window.confirmarAccion === 'function') {
+        window.confirmarAccion({
+          titulo: '¿Limpiar refacciones?',
+          mensaje: 'Se eliminarán todas las refacciones cargadas en este servicio preventivo.',
+          tipo: 'peligro',
+          textoConfirmar: 'Sí, limpiar'
+        }).then(ok => {
+          if (ok) vaciar();
+        });
+        return;
+      } else if (!confirm('¿Deseas eliminar todas las refacciones de este servicio preventivo?')) {
+        return;
+      }
+    }
+    vaciar();
+  };
+
+  /**
+   * Obtener lista de kits de servicio precargados / configurados
+   */
+  window.obtenerKitsDisponiblesSP = function() {
+    let kits = [];
+    if (typeof window.loadKitsServicio === 'function') {
+      try {
+        kits = window.loadKitsServicio();
+      } catch (e) {
+        console.warn('[SP] Error leyendo loadKitsServicio:', e);
+      }
+    }
+    if (!Array.isArray(kits) || kits.length === 0) {
+      if (typeof window.KITS_PRECARGADOS_DEFAULT !== 'undefined' && Array.isArray(window.KITS_PRECARGADOS_DEFAULT)) {
+        kits = window.KITS_PRECARGADOS_DEFAULT;
+      } else if (typeof KITS_PRECARGADOS_DEFAULT !== 'undefined' && Array.isArray(KITS_PRECARGADOS_DEFAULT)) {
+        kits = KITS_PRECARGADOS_DEFAULT;
+      }
+    }
+    return Array.isArray(kits) ? kits : [];
+  };
+
+  /**
+   * Actualizar selector de kits y botón inteligente de sugerencia por horómetro
+   */
+  window.actualizarSelectorKitsSP = function() {
+    const selectEl = document.getElementById('sp-select-kit-horas');
+    const btnSugerido = document.getElementById('sp-btn-cargar-kit-sugerido');
+    const btnTexto = document.getElementById('sp-btn-cargar-kit-texto');
+    const eqInput = document.getElementById('sp-equipo');
+    const tipoMantInput = document.getElementById('sp-tipo-mantenimiento');
+
+    const eqText = eqInput?.value?.trim() || '';
+    const tipoMant = tipoMantInput?.value || '250h';
+    const horasNum = (tipoMant || '').replace(/\D/g, '') || '250';
+
+    const allKits = window.obtenerKitsDisponiblesSP();
+
+    // Detección de kits para el equipo vinculado
+    let sugeridos = [];
+    let nombreLimpio = eqText;
+
+    if (eqText && allKits.length > 0) {
+      if (typeof window.detectarMachotesParaMaquina === 'function') {
+        const res = window.detectarMachotesParaMaquina(eqText, allKits);
+        sugeridos = res?.sugeridos || [];
+        nombreLimpio = res?.nombreLimpio || eqText;
+      } else {
+        const cleanLower = eqText.toLowerCase().replace(/\[.*?\]|\(.*?\)/g, '').trim();
+        const tokens = cleanLower.split(/[\s\-_/]+/).filter(t => t.length >= 2);
+        sugeridos = allKits.filter(k => {
+          const mod = (k.modelo || '').toLowerCase();
+          const mar = (k.marca || '').toLowerCase();
+          return (mod && cleanLower.includes(mod)) || (mar && cleanLower.includes(mar)) || tokens.some(t => mod && mod.includes(t));
+        });
+      }
+    }
+
+    // Coincidencia exacta de horas con los machotes del equipo
+    const matchExactoHoras = (sugeridos || []).find(k => String(k.intervalo || '').replace(/\D/g, '') === String(horasNum));
+    const kitSugerido = matchExactoHoras || (sugeridos && sugeridos[0]) || null;
+
+    // Coincidencia global por horas si la máquina no tiene machote específico
+    const matchHorasGlobal = allKits.find(k => String(k.intervalo || '').replace(/\D/g, '') === String(horasNum));
+
+    window._kitSugeridoActualSP = kitSugerido || matchHorasGlobal || null;
+
+    // Actualizar botón sugerido
+    if (btnTexto) {
+      if (kitSugerido) {
+        const interLabel = kitSugerido.intervalo ? `${kitSugerido.intervalo}h` : `${horasNum}h`;
+        const modLabel = kitSugerido.modelo ? ` (${kitSugerido.modelo})` : '';
+        btnTexto.textContent = `Cargar Kit ${interLabel}${modLabel}`;
+        if (btnSugerido) {
+          btnSugerido.title = `Cargar refacciones del kit sugerido: ${kitSugerido.nombre}`;
+        }
+      } else if (matchHorasGlobal) {
+        btnTexto.textContent = `Cargar Kit ${horasNum}h`;
+        if (btnSugerido) {
+          btnSugerido.title = `Cargar refacciones del kit de ${horasNum} horas`;
+        }
+      } else {
+        btnTexto.textContent = `Cargar Kit ${horasNum}h`;
+        if (btnSugerido) {
+          btnSugerido.title = 'No hay kit registrado para este intervalo u horas.';
+        }
+      }
+    }
+
+    // Actualizar menú desplegable
+    if (selectEl) {
+      let html = '<option value="">-- Cargar Kit por Horas --</option>';
+
+      if (sugeridos && sugeridos.length > 0) {
+        html += `<optgroup label="Kits para ${nombreLimpio || 'este equipo'}">`;
+        sugeridos.forEach(k => {
+          const pzasCount = Array.isArray(k.piezas) ? k.piezas.length : 0;
+          html += `<option value="${k.id}">Kit ${k.intervalo || '0'}h - ${k.modelo || ''} (${pzasCount} refacciones)</option>`;
+        });
+        html += '</optgroup>';
+
+        const otros = allKits.filter(k => !sugeridos.some(s => s.id === k.id));
+        if (otros.length > 0) {
+          html += '<optgroup label="Otros Kits en Catálogo">';
+          otros.forEach(k => {
+            const pzasCount = Array.isArray(k.piezas) ? k.piezas.length : 0;
+            html += `<option value="${k.id}">Kit ${k.intervalo || '0'}h - ${k.modelo || ''} - ${k.nombre || ''}</option>`;
+          });
+          html += '</optgroup>';
+        }
+      } else if (allKits.length > 0) {
+        html += '<optgroup label="Todos los Kits de Catálogo">';
+        allKits.forEach(k => {
+          const pzasCount = Array.isArray(k.piezas) ? k.piezas.length : 0;
+          html += `<option value="${k.id}">Kit ${k.intervalo || '0'}h - ${k.modelo || ''} - ${k.nombre || ''}</option>`;
+        });
+        html += '</optgroup>';
+      } else {
+        html += '<option value="" disabled>No hay kits configurados</option>';
+      }
+
+      selectEl.innerHTML = html;
+      selectEl.value = '';
+    }
+
+    if (window.lucide) window.lucide.createIcons();
+  };
+
+  /**
+   * Cargar el kit sugerido actualmente para el equipo y horas
+   */
+  window.cargarKitSugeridoSP = function() {
+    if (window._kitSugeridoActualSP) {
+      window.aplicarKitRefaccionesSP(window._kitSugeridoActualSP, 'preguntar');
+    } else {
+      const allKits = window.obtenerKitsDisponiblesSP();
+      if (allKits.length > 0) {
+        const selectEl = document.getElementById('sp-select-kit-horas');
+        if (selectEl) selectEl.focus();
+        if (typeof window.mostrarNotificacion === 'function') {
+          window.mostrarNotificacion('Selecciona un kit específico del menú desplegable.', 'info');
+        }
+      } else {
+        if (typeof window.mostrarNotificacion === 'function') {
+          window.mostrarNotificacion('No se encontraron kits de refacciones disponibles.', 'warning');
+        }
+      }
+    }
+  };
+
+  /**
+   * Manejar selección de kit desde el dropdown
+   */
+  window.alSeleccionarKitDesdeSelectSP = function(kitId) {
+    if (!kitId) return;
+    const allKits = window.obtenerKitsDisponiblesSP();
+    const kit = allKits.find(k => k.id === kitId);
+    if (kit) {
+      window.aplicarKitRefaccionesSP(kit, 'preguntar');
+    }
+    const selectEl = document.getElementById('sp-select-kit-horas');
+    if (selectEl) selectEl.value = '';
+  };
+
+  /**
+   * Aplicar las piezas de un kit a la tabla de refacciones del servicio preventivo
+   */
+  window.aplicarKitRefaccionesSP = function(kit, accionDuplicados = 'preguntar') {
+    if (!kit || !Array.isArray(kit.piezas) || kit.piezas.length === 0) {
+      if (typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion('El kit seleccionado no contiene piezas registradas.', 'warning');
+      }
+      return;
+    }
+
+    const tbody = document.getElementById('sp-refacciones-tbody');
+    const filasActuales = tbody ? tbody.children.length : 0;
+
+    const ejecutarCarga = (reemplazar) => {
+      if (reemplazar && tbody) {
+        tbody.innerHTML = '';
+      }
+
+      const pagadoPor = document.querySelector('input[name="sp_pagado_por"]:checked')?.value || 'cliente';
+      const catalogoRef = (typeof window.refaccionesDb !== 'undefined' && Array.isArray(window.refaccionesDb))
+        ? window.refaccionesDb
+        : ((typeof window.refaccionesGlobales !== 'undefined' && Array.isArray(window.refaccionesGlobales))
+            ? window.refaccionesGlobales
+            : []);
+
+      kit.piezas.forEach(p => {
+        const clave = (p.codigo || p.clave || '').trim();
+        const desc = (p.descripcion || p.nombre || '').trim();
+        const cant = parseFloat(p.cantidad) || 1;
+        let unid = p.unidad || 'Pza';
+        if (!p.unidad && /aceite|refrigerante|hidraulico|grasa|fluido|anticongelante|litro/i.test(desc)) {
+          unid = 'Lts';
+        }
+        let costo = parseFloat(p.costo_unitario || p.costo || p.precio) || 0;
+        if (!costo && catalogoRef.length > 0) {
+          const match = catalogoRef.find(r => r && (
+            (clave && (r.codigo === clave || r.clave === clave)) ||
+            (desc && (r.nombre === desc || r.descripcion === desc))
+          ));
+          if (match) {
+            costo = parseFloat(match.precio || match.costo || match.costo_unitario) || 0;
+          }
+        }
+        window.agregarFilaRefaccionSP({
+          clave: clave,
+          descripcion: desc,
+          cantidad: cant,
+          unidad: unid,
+          costo_unitario: costo,
+          pagado_por: pagadoPor
+        });
+      });
+
+      window._kitActivoEnSP = {
+        id: kit.id || null,
+        nombre: kit.nombre || 'Kit de Mantenimiento',
+        intervalo: kit.intervalo || null,
+        modelo: kit.modelo || null
+      };
+
+      const banner = document.getElementById('sp-kit-banner-info');
+      const bannerTxt = document.getElementById('sp-kit-banner-texto');
+      if (banner && bannerTxt) {
+        bannerTxt.textContent = `Kit aplicado: ${kit.nombre} (${kit.piezas.length} refacciones cargadas)`;
+        banner.style.display = 'flex';
+      }
+
+      window.recalcularTotalesServicioPreventivo();
+
+      if (typeof window.mostrarNotificacion === 'function') {
+        window.mostrarNotificacion(`Se cargaron ${kit.piezas.length} refacciones del ${kit.nombre}`, 'success');
+      }
+
+      if (window.lucide) window.lucide.createIcons();
+    };
+
+    if (filasActuales > 0 && accionDuplicados === 'preguntar') {
+      const msg = `La tabla ya contiene ${filasActuales} refacción(es).\n\n` +
+                  `¿Deseas REEMPLAZAR la lista actual con las refacciones de "${kit.nombre}"?\n\n` +
+                  `• Presiona [Aceptar] para REEMPLAZAR todo\n` +
+                  `• Presiona [Cancelar] para AGREGAR las piezas al final`;
+      const reemplazar = confirm(msg);
+      ejecutarCarga(reemplazar);
+    } else {
+      ejecutarCarga(accionDuplicados === 'reemplazar');
+    }
+  };
+
   /**
    * Manejar cambio de renta seleccionada en el combo
    */
@@ -447,6 +743,10 @@
     if (horoInput && (!horoInput.value || Number(horoInput.value) === 0)) {
       horoInput.value = (renta.horometro_final != null) ? renta.horometro_final : (renta.horometro_inicial || 0);
       window.calcularProximoHorometroSP();
+    }
+
+    if (typeof window.actualizarSelectorKitsSP === 'function') {
+      window.actualizarSelectorKitsSP();
     }
   };
 
@@ -747,12 +1047,31 @@
             spFotosAdjuntas = [...sp.evidencias];
           }
 
+          // Kit registrado previamente
+          if (sp.kit_nombre) {
+            window._kitActivoEnSP = { id: sp.kit_id || null, nombre: sp.kit_nombre, intervalo: sp.tipo_mantenimiento || null };
+            const banner = document.getElementById('sp-kit-banner-info');
+            const bannerTxt = document.getElementById('sp-kit-banner-texto');
+            if (banner && bannerTxt) {
+              bannerTxt.textContent = `Kit registrado: ${sp.kit_nombre}`;
+              banner.style.display = 'flex';
+            }
+          } else {
+            window._kitActivoEnSP = null;
+            const banner = document.getElementById('sp-kit-banner-info');
+            if (banner) banner.style.display = 'none';
+          }
+
           window.generarChecklistActividadesSP(sp.checklist_actividades);
         }
       } else {
         setText('modal-sp-folio-badge', window.generarSiguienteFolioSP ? window.generarSiguienteFolioSP() : 'SP-AUTO');
         const radioCliente = document.querySelector('input[name="sp_pagado_por"][value="cliente"]');
         if (radioCliente) radioCliente.checked = true;
+
+        window._kitActivoEnSP = null;
+        const banner = document.getElementById('sp-kit-banner-info');
+        if (banner) banner.style.display = 'none';
 
         // Si viene con renta preseleccionada
         if (options.rentaId) {
@@ -766,6 +1085,10 @@
       renderGaleriaFotosSP();
       window.recalcularHorasTrabajadasSP();
       window.recalcularTotalesServicioPreventivo();
+
+      if (typeof window.actualizarSelectorKitsSP === 'function') {
+        window.actualizarSelectorKitsSP();
+      }
     } catch (errSetup) {
       console.warn('[SP] Advertencia preparando modal:', errSetup);
     }
@@ -944,6 +1267,8 @@
       firma_operador: firmaOpBase64,
       firma_cliente: firmaCliBase64,
       nombre_recibe: document.getElementById('sp-nombre-recibe')?.value || '',
+      kit_id: window._kitActivoEnSP?.id || spExistente?.kit_id || null,
+      kit_nombre: window._kitActivoEnSP?.nombre || spExistente?.kit_nombre || null,
       es_prueba: finalEsPrueba,
       esPrueba: finalEsPrueba,
       created_at: spExistente?.created_at || new Date().toISOString(),
@@ -1669,7 +1994,7 @@
       'Renta Folio', 'Cliente', 'Sitio', 'Equipo', 'Serie', 'Horometro',
       'Proximo Horometro', 'Quien Paga', 'Justificacion Pago', 'Mano de Obra',
       'Refacciones Total', 'Total Servicio', 'Operador', 'Tipo Operador',
-      'Supervisor', 'Estado Equipo', 'Factura SAP', 'Refacciones Detalle'
+      'Supervisor', 'Estado Equipo', 'Factura SAP', 'Kit Horas Utilizado', 'Refacciones Detalle'
     ];
 
     const rows = items.map(sp => {
@@ -1700,6 +2025,7 @@
         sp.supervisor_responsable || '',
         sp.estado_equipo || '',
         sp.numero_factura_sap || '',
+        sp.kit_nombre || 'N/A',
         refDetalle
       ].map(val => `"${String(val).replace(/"/g, '""')}"`);
     });
@@ -1741,6 +2067,12 @@ if (typeof module !== 'undefined' && module.exports) {
     abrirModalServicioPreventivo: (typeof window !== 'undefined') ? window.abrirModalServicioPreventivo : undefined,
     guardarServicioPreventivo: (typeof window !== 'undefined') ? window.guardarServicioPreventivo : undefined,
     renderServiciosPreventivos: (typeof window !== 'undefined') ? window.renderServiciosPreventivos : undefined,
-    exportarServiciosPreventivosExcel: (typeof window !== 'undefined') ? window.exportarServiciosPreventivosExcel : undefined
+    exportarServiciosPreventivosExcel: (typeof window !== 'undefined') ? window.exportarServiciosPreventivosExcel : undefined,
+    obtenerKitsDisponiblesSP: (typeof window !== 'undefined') ? window.obtenerKitsDisponiblesSP : undefined,
+    actualizarSelectorKitsSP: (typeof window !== 'undefined') ? window.actualizarSelectorKitsSP : undefined,
+    cargarKitSugeridoSP: (typeof window !== 'undefined') ? window.cargarKitSugeridoSP : undefined,
+    alSeleccionarKitDesdeSelectSP: (typeof window !== 'undefined') ? window.alSeleccionarKitDesdeSelectSP : undefined,
+    aplicarKitRefaccionesSP: (typeof window !== 'undefined') ? window.aplicarKitRefaccionesSP : undefined,
+    limpiarRefaccionesSP: (typeof window !== 'undefined') ? window.limpiarRefaccionesSP : undefined
   };
 }

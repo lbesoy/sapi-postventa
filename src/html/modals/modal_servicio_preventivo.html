@@ -239,8 +239,38 @@
               <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--accent, #E8820C); font-weight: 700; font-size: 0.9rem;">
                 <i data-lucide="package" style="width: 16px; height: 16px;"></i> Control de Refacciones e Insumos Utilizados
               </div>
-              <button type="button" class="btn-secondary" onclick="window.agregarFilaRefaccionSP()" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; display: flex; align-items: center; gap: 0.35rem; background: rgba(232,130,12,0.1); border-color: var(--accent); color: var(--accent);">
-                <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Agregar Refacción
+
+              <!-- Herramientas de Kits por Horas de Maquinaria y Alta de Refacciones -->
+              <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <!-- Selector rápido de Kits por Horas -->
+                <div style="display: flex; align-items: center; gap: 0.35rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 0.2rem 0.5rem;">
+                  <i data-lucide="layers" style="width: 13px; height: 13px; color: var(--text-muted);"></i>
+                  <select id="sp-select-kit-horas" onchange="window.alSeleccionarKitDesdeSelectSP(this.value)" style="border: none; background: transparent; color: var(--text-primary); font-size: 0.78rem; font-weight: 600; outline: none; cursor: pointer; max-width: 220px;">
+                    <option value="">-- Cargar Kit por Horas --</option>
+                  </select>
+                </div>
+
+                <!-- Botón de Carga Rápida de Kit Sugerido -->
+                <button type="button" class="btn-secondary" id="sp-btn-cargar-kit-sugerido" onclick="window.cargarKitSugeridoSP()" title="Cargar automáticamente el kit de refacciones por horas para este equipo" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; display: flex; align-items: center; gap: 0.35rem; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.4); color: #10b981; font-weight: 600; border-radius: 8px; cursor: pointer;">
+                  <i data-lucide="package-check" style="width: 14px; height: 14px;"></i>
+                  <span id="sp-btn-cargar-kit-texto">Cargar Kit Sugerido</span>
+                </button>
+
+                <!-- Botón Manual Agregar Refacción -->
+                <button type="button" class="btn-secondary" onclick="window.agregarFilaRefaccionSP()" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; display: flex; align-items: center; gap: 0.35rem; background: rgba(232,130,12,0.1); border-color: var(--accent); color: var(--accent); border-radius: 8px;">
+                  <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Agregar Refacción
+                </button>
+              </div>
+            </div>
+
+            <!-- Banner informativo del Kit Aplicado -->
+            <div id="sp-kit-banner-info" style="display: none; margin-bottom: 0.75rem; padding: 0.45rem 0.75rem; background: rgba(37,99,235,0.08); border: 1px solid rgba(37,99,235,0.25); border-radius: 8px; font-size: 0.78rem; color: var(--text-secondary); align-items: center; justify-content: space-between; gap: 0.5rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 0;">
+                <i data-lucide="check-circle-2" style="width: 15px; height: 15px; color: #3b82f6; flex-shrink: 0;"></i>
+                <span id="sp-kit-banner-texto" style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Kit cargado</span>
+              </div>
+              <button type="button" onclick="window.limpiarRefaccionesSP()" style="background: transparent; border: none; color: #ef4444; font-size: 0.74rem; cursor: pointer; display: flex; align-items: center; gap: 0.25rem; font-weight: 600;">
+                <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i> Limpiar lista
               </button>
             </div>
 

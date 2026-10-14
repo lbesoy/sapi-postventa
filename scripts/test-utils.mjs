@@ -3569,6 +3569,9 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
       <input id="sp-justificacion-pago" />
       <select id="sp-tipo-operador"></select>
       <select id="sp-estado-equipo"></select>
+      <select id="sp-select-kit-horas"></select>
+      <button id="sp-btn-cargar-kit-sugerido"><span id="sp-btn-cargar-kit-texto"></span></button>
+      <div id="sp-kit-banner-info" style="display: none;"><span id="sp-kit-banner-texto"></span></div>
       <input type="radio" name="sp_pagado_por" value="cliente" />
       <input type="radio" name="sp_pagado_por" value="eurorep" />
     </div>
@@ -3581,6 +3584,10 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
   // Cargar supabaseSync.js para verificar row converters
   const supaSyncCode = fs.readFileSync(path.resolve('./supabaseSync.js'), 'utf-8');
   dom.window.eval(supaSyncCode);
+
+  // Cargar kits.js
+  const kitsCode = fs.readFileSync(path.resolve('./kits.js'), 'utf-8');
+  dom.window.eval(kitsCode);
 
   // Cargar servicios_preventivos.js
   const spCode = fs.readFileSync(path.resolve('./servicios_preventivos.js'), 'utf-8');
@@ -3754,7 +3761,36 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
   assert.ok(optionsSandbox.includes('ren-test-1'), 'Modal de sandbox debe incluir renta de prueba');
   assert.ok(!optionsSandbox.includes('ren-real-1'), 'Modal de sandbox NO debe incluir renta real');
 
-  console.log('  ✅ Módulo de Servicios Preventivos en Rentas (Horarios, Badges, Refacciones, Offline Sync & Sandbox Isolation): OK');
+  // 7. Kits de refacciones por horas de uso de maquinaria
+  const kitsDisponibles = dom.window.obtenerKitsDisponiblesSP();
+  assert.ok(kitsDisponibles.length >= 3, 'Debe disponer de kits precargados u oficiales de maquinaria');
+
+  // Asignar maquinaria RM120X y verificar detección de kit 250h sugerido
+  dom.window.document.getElementById('sp-equipo').value = 'Rubble Master RM120X';
+  dom.window.document.getElementById('sp-tipo-mantenimiento').value = '250h';
+  dom.window.actualizarSelectorKitsSP();
+
+  const textoBoton = dom.window.document.getElementById('sp-btn-cargar-kit-texto').textContent;
+  assert.ok(textoBoton.includes('250h') && textoBoton.includes('RM120X'), 'Botón sugerido debe mostrar Kit 250h (RM120X)');
+
+  const selectKit = dom.window.document.getElementById('sp-select-kit-horas');
+  assert.ok(selectKit.children.length >= 2, 'Select de kits debe tener optgroups con machotes recomendados y catálogo');
+
+  // Cargar kit sugerido (250h)
+  dom.window.cargarKitSugeridoSP();
+  const filasRef = dom.window.document.querySelectorAll('#sp-refacciones-tbody tr');
+  assert.equal(filasRef.length, 3, 'Kit 250h de RM120X debe cargar exactamente 3 refacciones');
+
+  const bannerInfo = dom.window.document.getElementById('sp-kit-banner-info');
+  assert.equal(bannerInfo.style.display, 'flex', 'Banner informativo debe mostrarse al aplicar kit');
+
+  // Limpiar refacciones
+  dom.window.limpiarRefaccionesSP(false);
+  const filasDespuesLimpiar = dom.window.document.querySelectorAll('#sp-refacciones-tbody tr');
+  assert.equal(filasDespuesLimpiar.length, 0, 'Limpiar refacciones debe vaciar la tabla');
+  assert.equal(bannerInfo.style.display, 'none', 'Banner informativo debe ocultarse al limpiar');
+
+  console.log('  ✅ Módulo de Servicios Preventivos en Rentas (Horarios, Badges, Refacciones, Kits por Horas, Offline Sync & Sandbox Isolation): OK');
 }
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
