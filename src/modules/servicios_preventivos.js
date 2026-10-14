@@ -620,14 +620,26 @@
    */
   window.abrirModalServicioPreventivo = function(options = {}) {
     const overlay = document.getElementById('modal-servicio-preventivo-overlay');
-    if (!overlay) return;
+    if (!overlay) {
+      console.warn('[SP] Overlay #modal-servicio-preventivo-overlay not found in DOM');
+      return;
+    }
 
     servicioEnEdicionId = options.id || null;
     spFotosAdjuntas = [];
 
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = (val !== undefined && val !== null) ? val : '';
+    };
+    const setText = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = (val !== undefined && val !== null) ? val : '';
+    };
+
     // Limpiar campos
-    document.getElementById('sp-id').value = servicioEnEdicionId || '';
-    document.getElementById('modal-sp-title').textContent = servicioEnEdicionId ? 'Editar Servicio Preventivo' : 'Nuevo Servicio Preventivo';
+    setVal('sp-id', servicioEnEdicionId || '');
+    setText('modal-sp-title', servicioEnEdicionId ? 'Editar Servicio Preventivo' : 'Nuevo Servicio Preventivo');
     
     // Poblar combos
     poblarRentasDropdownSP(options.rentaId || null);
@@ -639,21 +651,21 @@
     const hh = String(now.getHours()).padStart(2, '0');
     const mm = String(now.getMinutes()).padStart(2, '0');
 
-    document.getElementById('sp-fecha').value = hoy;
-    document.getElementById('sp-hora-entrada').value = `${hh}:${mm}`;
-    document.getElementById('sp-hora-salida').value = '';
-    document.getElementById('sp-monto-mano-obra').value = '0';
-    document.getElementById('sp-justificacion-pago').value = '';
-    document.getElementById('sp-numero-factura-sap').value = '';
-    document.getElementById('sp-horometro').value = '';
-    document.getElementById('sp-proximo-horometro').value = '';
-    document.getElementById('sp-operador-nombre').value = '';
-    document.getElementById('sp-supervisor').value = '';
-    document.getElementById('sp-bitacora-notas').value = '';
-    document.getElementById('sp-nombre-recibe').value = '';
-    document.getElementById('sp-estado-equipo').value = 'Operativo';
-    document.getElementById('sp-tipo-operador').value = 'eurorep';
-    document.getElementById('sp-tipo-mantenimiento').value = '250h';
+    setVal('sp-fecha', hoy);
+    setVal('sp-hora-entrada', `${hh}:${mm}`);
+    setVal('sp-hora-salida', '');
+    setVal('sp-monto-mano-obra', '0');
+    setVal('sp-justificacion-pago', '');
+    setVal('sp-numero-factura-sap', '');
+    setVal('sp-horometro', '');
+    setVal('sp-proximo-horometro', '');
+    setVal('sp-operador-nombre', '');
+    setVal('sp-supervisor', '');
+    setVal('sp-bitacora-notas', '');
+    setVal('sp-nombre-recibe', '');
+    setVal('sp-estado-equipo', 'Operativo');
+    setVal('sp-tipo-operador', 'eurorep');
+    setVal('sp-tipo-mantenimiento', '250h');
 
     // Limpiar tabla refacciones
     const tbody = document.getElementById('sp-refacciones-tbody');
@@ -663,27 +675,27 @@
     if (servicioEnEdicionId) {
       const sp = (window.serviciosPreventivos || []).find(x => x.id === servicioEnEdicionId);
       if (sp) {
-        document.getElementById('modal-sp-folio-badge').textContent = sp.folio || 'SP-EDIT';
-        document.getElementById('sp-renta-id').value = sp.renta_id || '';
-        document.getElementById('sp-cliente').value = sp.cliente || '';
-        document.getElementById('sp-sitio').value = sp.sitio || '';
-        document.getElementById('sp-equipo').value = sp.equipo || '';
-        document.getElementById('sp-serie').value = sp.serie || '';
-        document.getElementById('sp-fecha').value = sp.fecha_servicio || hoy;
-        document.getElementById('sp-hora-entrada').value = sp.hora_entrada || '';
-        document.getElementById('sp-hora-salida').value = sp.hora_salida || '';
-        document.getElementById('sp-monto-mano-obra').value = sp.monto_mano_obra || 0;
-        document.getElementById('sp-justificacion-pago').value = sp.justificacion_pago || '';
-        document.getElementById('sp-numero-factura-sap').value = sp.numero_factura_sap || '';
-        document.getElementById('sp-horometro').value = sp.horometro_servicio || '';
-        document.getElementById('sp-proximo-horometro').value = sp.proximo_servicio_horometro || '';
-        document.getElementById('sp-operador-nombre').value = sp.operador_nombre || '';
-        document.getElementById('sp-supervisor').value = sp.supervisor_responsable || '';
-        document.getElementById('sp-bitacora-notas').value = sp.bitacora_notas || '';
-        document.getElementById('sp-nombre-recibe').value = sp.nombre_recibe || '';
-        document.getElementById('sp-estado-equipo').value = sp.estado_equipo || 'Operativo';
-        document.getElementById('sp-tipo-operador').value = sp.tipo_operador || 'eurorep';
-        document.getElementById('sp-tipo-mantenimiento').value = sp.tipo_mantenimiento || '250h';
+        setText('modal-sp-folio-badge', sp.folio || 'SP-EDIT');
+        setVal('sp-renta-id', sp.renta_id || '');
+        setVal('sp-cliente', sp.cliente || '');
+        setVal('sp-sitio', sp.sitio || '');
+        setVal('sp-equipo', sp.equipo || '');
+        setVal('sp-serie', sp.serie || '');
+        setVal('sp-fecha', sp.fecha_servicio || hoy);
+        setVal('sp-hora-entrada', sp.hora_entrada || '');
+        setVal('sp-hora-salida', sp.hora_salida || '');
+        setVal('sp-monto-mano-obra', sp.monto_mano_obra || 0);
+        setVal('sp-justificacion-pago', sp.justificacion_pago || '');
+        setVal('sp-numero-factura-sap', sp.numero_factura_sap || '');
+        setVal('sp-horometro', sp.horometro_servicio || '');
+        setVal('sp-proximo-horometro', sp.proximo_servicio_horometro || '');
+        setVal('sp-operador-nombre', sp.operador_nombre || '');
+        setVal('sp-supervisor', sp.supervisor_responsable || '');
+        setVal('sp-bitacora-notas', sp.bitacora_notas || '');
+        setVal('sp-nombre-recibe', sp.nombre_recibe || '');
+        setVal('sp-estado-equipo', sp.estado_equipo || 'Operativo');
+        setVal('sp-tipo-operador', sp.tipo_operador || 'eurorep');
+        setVal('sp-tipo-mantenimiento', sp.tipo_mantenimiento || '250h');
 
         // Radio pagador
         const pagadorVal = sp.pagado_por || 'cliente';
@@ -703,13 +715,13 @@
         window.generarChecklistActividadesSP(sp.checklist_actividades);
       }
     } else {
-      document.getElementById('modal-sp-folio-badge').textContent = 'SP-AUTO';
+      setText('modal-sp-folio-badge', 'SP-AUTO');
       const radioCliente = document.querySelector('input[name="sp_pagado_por"][value="cliente"]');
       if (radioCliente) radioCliente.checked = true;
 
       // Si viene con renta preseleccionada
       if (options.rentaId) {
-        document.getElementById('sp-renta-id').value = options.rentaId;
+        setVal('sp-renta-id', options.rentaId);
         window.alCambiarRentaEnServicioPreventivo();
       }
 
@@ -720,6 +732,7 @@
     window.recalcularHorasTrabajadasSP();
     window.recalcularTotalesServicioPreventivo();
 
+    overlay.classList.add('open');
     overlay.style.display = 'flex';
     document.body.style.overflow = 'hidden';
 
@@ -755,7 +768,10 @@
    */
   window.cerrarModalServicioPreventivo = function() {
     const overlay = document.getElementById('modal-servicio-preventivo-overlay');
-    if (overlay) overlay.style.display = 'none';
+    if (overlay) {
+      overlay.classList.remove('open');
+      overlay.style.display = 'none';
+    }
     document.body.style.overflow = 'auto';
   };
 

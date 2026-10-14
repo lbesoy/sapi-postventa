@@ -62,7 +62,15 @@ window.fetchTablePaginated = async (tableName, selectQuery = '*', orderColumn = 
     }
 
     if (error) {
-      if (tableName === 'sapi_email_logs' && (error.message?.includes('schema cache') || error.code === '42P01' || error.message?.includes('404') || error.message?.includes('does not exist'))) {
+      if ((tableName === 'sapi_email_logs' || tableName === 'servicios_preventivos') && (
+        error.message?.includes('schema cache') ||
+        error.message?.includes('Could not find the table') ||
+        error.message?.includes('does not exist') ||
+        error.message?.includes('404') ||
+        error.code === '42P01' ||
+        error.code === 'PGRST204'
+      )) {
+        console.warn(`[Sync] Tabla '${tableName}' no disponible aún en el backend remoto. Operando offline con datos locales.`);
         return [];
       }
       console.error(`[Sync] Error cargando ${tableName} página ${page}:`, error.message);
@@ -2034,11 +2042,19 @@ async function _executePushToSupabase(tabla, item) {
         error.message.includes('fetch failed') ||
         error.message.includes('AbortError')
       ));
-      if (isNetworkErr && (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'envios' || tabla === 'ideas_fallas')) {
-        console.warn(`[Direct Push] Error de red al guardar en ${tabla}: ${error.message}. Encolando en sync queue local...`);
+      const isMissingTable = error.message && (
+        error.message.includes('schema cache') ||
+        error.message.includes('Could not find the table') ||
+        error.message.includes('does not exist') ||
+        error.message.includes('404') ||
+        error.code === '42P01' ||
+        error.code === 'PGRST204'
+      );
+      if ((isNetworkErr || (isMissingTable && (tabla === 'servicios_preventivos' || tabla === 'sapi_email_logs'))) && (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'envios' || tabla === 'ideas_fallas')) {
+        console.warn(`[Direct Push] Error al guardar en ${tabla}: ${error.message}. Encolando en sync queue local...`);
         addToSyncQueue(tabla, 'upsert', item);
         if (typeof window.mostrarNotificacion === 'function' && tabla !== 'calendario_eventos' && tabla !== 'orden_bitacora') {
-          window.mostrarNotificacion(`Guardado en el dispositivo. Pendiente de sincronización.`, 'info');
+          window.mostrarNotificacion(`Guardado en el dispositivo (modo offline). Pendiente de sincronización.`, 'info');
         }
         return { offlineQueued: true };
       }
