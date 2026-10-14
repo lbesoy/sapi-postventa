@@ -1131,6 +1131,7 @@ function rowToRenta(r) {
     checklist_entrega: r.checklist_entrega || null,
     checklist_devolucion: r.checklist_devolucion || null,
     esPrueba: (r.es_prueba === true || (typeof r.folio === 'string' && r.folio.startsWith('REN-PRUEBA')) || false),
+    es_prueba: (r.es_prueba === true || (typeof r.folio === 'string' && r.folio.startsWith('REN-PRUEBA')) || false),
     created_at: r.created_at || null,
     updated_at: r.updated_at || null
   };

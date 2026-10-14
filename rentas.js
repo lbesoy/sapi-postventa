@@ -1058,7 +1058,11 @@
 
     // Máquinas en renta activa para señalizarlas
     const currentEdicionId = rentaEnEdicionId;
-    const rentasActivas = (window.rentas || []).filter(x => x && x.id !== currentEdicionId && (x.estado === 'Activa' || x.estado === 'Por Vencer' || x.estado === 'Reservada'));
+    let rentasActivas = (window.rentas || []).filter(x => x && x.id !== currentEdicionId && (x.estado === 'Activa' || x.estado === 'Por Vencer' || x.estado === 'Reservada'));
+    if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+      const activeSandbox = isTestModeActive();
+      rentasActivas = rentasActivas.filter(x => isTestData(x) === activeSandbox);
+    }
     const rentasActivasMaqIds = rentasActivas.map(x => x.maquina_id || x.serie).filter(Boolean);
 
     let html = '';
@@ -1723,7 +1727,7 @@
           <div style="background:var(--bg-primary, #0f172a); border:1px solid var(--border, #334155); border-radius:10px; padding:1rem; margin-bottom:1.25rem;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem; flex-wrap:wrap; gap:0.5rem;">
               <h4 style="margin:0; font-size:0.88rem; color:var(--accent, #E8820C); display:flex; align-items:center; gap:0.35rem;">
-                <i data-lucide="shield-check" style="width:15px;height:15px;"></i> Servicios Preventivos Realizados (${(window.serviciosPreventivos || []).filter(x => x && (x.renta_id === r.id || x.renta_folio === r.folio)).length})
+                <i data-lucide="shield-check" style="width:15px;height:15px;"></i> Servicios Preventivos Realizados (${(window.serviciosPreventivos || []).filter(x => x && (x.renta_id === r.id || x.renta_folio === r.folio) && (typeof isTestData === 'function' ? isTestData(x) === (typeof isTestData === 'function' && isTestData(r)) : true)).length})
               </h4>
               ${!isEmpresa ? `
                 <button type="button" class="btn-secondary" onclick="window.cerrarModalDetalleRenta(); window.abrirModalServicioPreventivo({ rentaId: '${r.id}' });" style="font-size:0.78rem; padding:0.3rem 0.65rem; display:flex; align-items:center; gap:0.3rem; background:rgba(232,130,12,0.1); border-color:var(--accent); color:var(--accent); cursor:pointer;">
@@ -1732,7 +1736,8 @@
               ` : ''}
             </div>
             ${(() => {
-              const sps = (window.serviciosPreventivos || []).filter(x => x && (x.renta_id === r.id || x.renta_folio === r.folio));
+              const isRTest = typeof isTestData === 'function' ? isTestData(r) : false;
+              const sps = (window.serviciosPreventivos || []).filter(x => x && (x.renta_id === r.id || x.renta_folio === r.folio) && (typeof isTestData === 'function' ? isTestData(x) === isRTest : true));
               if (!sps.length) {
                 return '<div style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">No se han registrado servicios preventivos aún para este contrato.</div>';
               }
@@ -2252,9 +2257,14 @@
       return;
     }
 
-    const list = Array.isArray(window.rentas) ? window.rentas : [];
+    let list = Array.isArray(window.rentas) ? [...window.rentas] : [];
+    const isTest = (typeof isTestModeActive === 'function' && isTestModeActive());
+    if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+      list = list.filter(r => isTestData(r) === isTest);
+    }
+
     if (list.length === 0) {
-      mostrarNotificacion('No hay contratos de renta para exportar', 'warning');
+      mostrarNotificacion('No hay contratos de renta para exportar en este modo', 'warning');
       return;
     }
 
@@ -2285,7 +2295,7 @@
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Rentas_Eurorep');
     const fechaStr = new Date().toISOString().substring(0, 10);
-    XLSX.writeFile(wb, `Rentas_Maquinaria_Eurorep_${fechaStr}.xlsx`);
+    XLSX.writeFile(wb, `Rentas_Maquinaria_Eurorep_${isTest ? 'SANDBOX_' : ''}${fechaStr}.xlsx`);
     mostrarNotificacion('Exportación a Excel completada con éxito', 'success');
   };
 
