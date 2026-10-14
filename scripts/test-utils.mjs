@@ -3544,6 +3544,34 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
     <div id="sp-refacciones-total-label"></div>
     <input id="sp-monto-mano-obra" value="500" />
     <div id="sp-gran-total-label"></div>
+    <div id="badge-count-preventivos"></div>
+    <div id="count-pill-sp-todos"></div>
+    <div id="count-pill-sp-cliente"></div>
+    <div id="count-pill-sp-eurorep"></div>
+    <div id="count-pill-sp-garantia"></div>
+    <div id="stat-sp-total"></div>
+    <div id="stat-sp-cliente"></div>
+    <div id="stat-sp-eurorep"></div>
+    <div id="stat-sp-garantia"></div>
+    <div id="stat-sp-refacciones"></div>
+    <div class="modal-overlay" id="modal-servicio-preventivo-overlay">
+      <div id="modal-sp-title"></div>
+      <div id="modal-sp-folio-badge"></div>
+      <select id="sp-renta-id"></select>
+      <input id="sp-id" />
+      <input id="sp-cliente" />
+      <input id="sp-sitio" />
+      <input id="sp-equipo" />
+      <input id="sp-serie" />
+      <input id="sp-fecha" />
+      <input id="sp-operador-nombre" />
+      <input id="sp-supervisor" />
+      <input id="sp-justificacion-pago" />
+      <select id="sp-tipo-operador"></select>
+      <select id="sp-estado-equipo"></select>
+      <input type="radio" name="sp_pagado_por" value="cliente" />
+      <input type="radio" name="sp_pagado_por" value="eurorep" />
+    </div>
   </body></html>`, { url: 'http://localhost', runScripts: 'dangerously' });
 
   global.window = dom.window;
@@ -3654,8 +3682,79 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
   assert.equal(restored.cliente, mockAppSP.cliente);
   assert.equal(restored.monto_total_servicio, mockAppSP.monto_total_servicio);
   assert.equal(restored.refacciones.length, 1);
+  assert.equal(restored.esPrueba, false);
 
-  console.log('  ✅ Módulo de Servicios Preventivos en Rentas (Horarios, Badges, Refacciones, Offline Sync): OK');
+  // 6. Blindaje y Aislamiento de Sandbox / Modo Pruebas
+  let testModeActive = false;
+  dom.window.isTestModeActive = () => testModeActive;
+  dom.window.isTestData = (item) => {
+    if (!item) return false;
+    if (item.esPrueba === true || item.es_prueba === true) return true;
+    const f = String(item.folio || '').toUpperCase();
+    return f.startsWith('SP-PRUEBA') || f.startsWith('REN-PRUEBA');
+  };
+
+  // 6.1 Generación de folio en Producción vs Sandbox
+  testModeActive = false;
+  const folioProd = dom.window.generarSiguienteFolioSP();
+  assert.ok(folioProd.startsWith(`SP-${new Date().getFullYear()}-`), `Folio producción debe ser SP-${new Date().getFullYear()}-...: ${folioProd}`);
+
+  testModeActive = true;
+  const folioSandbox = dom.window.generarSiguienteFolioSP();
+  assert.ok(folioSandbox.startsWith(`SP-PRUEBA-${new Date().getFullYear()}-`), `Folio sandbox debe ser SP-PRUEBA-${new Date().getFullYear()}-...: ${folioSandbox}`);
+
+  // 6.2 Aislamiento de datos en Listado y KPIs
+  const spProd = {
+    id: 'sp-prod-1',
+    folio: 'SP-2026-0001',
+    cliente: 'Cliente Real S.A.',
+    pagado_por: 'cliente',
+    es_prueba: false,
+    esPrueba: false
+  };
+  const spTest = {
+    id: 'sp-test-1',
+    folio: 'SP-PRUEBA-2026-0001',
+    cliente: 'Cliente Prueba Demo',
+    pagado_por: 'cliente',
+    es_prueba: true,
+    esPrueba: true
+  };
+  dom.window.serviciosPreventivos = [spProd, spTest];
+
+  // En Producción
+  testModeActive = false;
+  dom.window.actualizarBadgesServiciosPreventivos();
+  const countProd = dom.window.document.getElementById('stat-sp-total')?.textContent;
+  assert.equal(countProd, '1', 'En producción solo debe contabilizar 1 servicio preventivo real');
+
+  // En Sandbox
+  testModeActive = true;
+  dom.window.actualizarBadgesServiciosPreventivos();
+  const countSandbox = dom.window.document.getElementById('stat-sp-total')?.textContent;
+  assert.equal(countSandbox, '1', 'En sandbox solo debe contabilizar 1 servicio preventivo de prueba');
+
+  // 6.3 Aislamiento en selector de Rentas del Modal
+  dom.window.rentas = [
+    { id: 'ren-real-1', folio: 'REN-0001', cliente: 'Cliente Real', estado: 'Activa', esPrueba: false },
+    { id: 'ren-test-1', folio: 'REN-PRUEBA-0001', cliente: 'Cliente Demo', estado: 'Activa', esPrueba: true }
+  ];
+
+  // Abrir modal en Producción
+  testModeActive = false;
+  dom.window.abrirModalServicioPreventivo();
+  const optionsProd = Array.from(dom.window.document.getElementById('sp-renta-id')?.options || []).map(o => o.value);
+  assert.ok(optionsProd.includes('ren-real-1'), 'Modal de producción debe incluir renta real');
+  assert.ok(!optionsProd.includes('ren-test-1'), 'Modal de producción NO debe incluir renta de prueba');
+
+  // Abrir modal en Sandbox
+  testModeActive = true;
+  dom.window.abrirModalServicioPreventivo();
+  const optionsSandbox = Array.from(dom.window.document.getElementById('sp-renta-id')?.options || []).map(o => o.value);
+  assert.ok(optionsSandbox.includes('ren-test-1'), 'Modal de sandbox debe incluir renta de prueba');
+  assert.ok(!optionsSandbox.includes('ren-real-1'), 'Modal de sandbox NO debe incluir renta real');
+
+  console.log('  ✅ Módulo de Servicios Preventivos en Rentas (Horarios, Badges, Refacciones, Offline Sync & Sandbox Isolation): OK');
 }
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');

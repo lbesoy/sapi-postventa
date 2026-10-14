@@ -1208,6 +1208,7 @@ function rowToServicioPreventivo(r) {
     firma_cliente: r.firma_cliente || null,
     nombre_recibe: r.nombre_recibe || null,
     es_prueba: (r.es_prueba === true || (typeof r.folio === 'string' && r.folio.startsWith('SP-PRUEBA')) || false),
+    esPrueba: (r.es_prueba === true || (typeof r.folio === 'string' && r.folio.startsWith('SP-PRUEBA')) || false),
     created_at: r.created_at || null,
     updated_at: r.updated_at || null
   };

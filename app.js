@@ -1659,6 +1659,7 @@ function isTestData(item) {
         upper.startsWith('TKT-PRUEBA') || 
         upper.startsWith('LEV-PRUEBA') ||
         upper.startsWith('REN-PRUEBA') ||
+        upper.startsWith('SP-PRUEBA') ||
         upper.startsWith('TEST-') ||
         upper.startsWith('PRUEBA-') ||
         /^TKT-OS00\d+/i.test(upper) ||
@@ -2064,6 +2065,12 @@ window.actualizarTodosLosBadges = function() {
   } catch (e) { console.warn('[Badges] Error en actualizarBadgeRentasSidebar:', e); }
 
   try {
+    if (typeof window.actualizarBadgesServiciosPreventivos === 'function') {
+      window.actualizarBadgesServiciosPreventivos();
+    }
+  } catch (e) { console.warn('[Badges] Error en actualizarBadgesServiciosPreventivos:', e); }
+
+  try {
     if (typeof window.actualizarBadgeJuntaRevision === 'function') {
       window.actualizarBadgeJuntaRevision();
     }
@@ -2130,6 +2137,9 @@ function actualizarVistaActual() {
   }
   if (typeof window.renderRentas === 'function') {
     try { window.renderRentas(); } catch(e){}
+  }
+  if (typeof window.renderServiciosPreventivos === 'function') {
+    try { window.renderServiciosPreventivos(); } catch(e){}
   }
 }
 

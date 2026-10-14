@@ -579,19 +579,47 @@
   };
 
   /**
-   * Poblar selector de rentas en el modal
+   * Poblar selector de rentas en el modal respetando el modo Sandbox activo
    */
   function poblarRentasDropdownSP(selectedRentaId = null) {
     const select = document.getElementById('sp-renta-id');
     if (!select) return;
 
-    const rentas = (window.rentas || []).filter(r => r && r.estado !== 'Cancelada');
+    let rentas = (window.rentas || []).filter(r => r && r.estado !== 'Cancelada');
+    if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+      const activeSandbox = isTestModeActive();
+      rentas = rentas.filter(r => isTestData(r) === activeSandbox);
+    }
+
     select.innerHTML = '<option value="">-- Seleccionar Renta Activa --</option>' +
       rentas.map(r => {
         const sel = (r.id === selectedRentaId || r.folio === selectedRentaId) ? 'selected' : '';
         return `<option value="${r.id}" ${sel}>${r.folio || 'REN'} - ${r.cliente || 'Sin Cliente'} (${r.equipo || 'Maquinaria'})</option>`;
       }).join('');
   }
+
+  /**
+   * Generar siguiente folio respetando el modo Sandbox / Producción
+   */
+  window.generarSiguienteFolioSP = function() {
+    const isTest = (typeof isTestModeActive === 'function' && isTestModeActive());
+    const year = new Date().getFullYear();
+    const prefix = isTest ? `SP-PRUEBA-${year}-` : `SP-${year}-`;
+    const list = Array.isArray(window.serviciosPreventivos) ? window.serviciosPreventivos : [];
+    let maxNum = 0;
+    list.forEach(sp => {
+      if (sp && sp.folio && typeof sp.folio === 'string') {
+        const fUpper = sp.folio.trim().toUpperCase();
+        if (fUpper.startsWith(prefix.toUpperCase())) {
+          const numStr = fUpper.substring(prefix.length);
+          const num = parseInt(numStr, 10);
+          if (!isNaN(num) && num > maxNum) maxNum = num;
+        }
+      }
+    });
+    const nextNum = maxNum + 1;
+    return `${prefix}${String(nextNum).padStart(4, '0')}`;
+  };
 
   /**
    * Poblar datalist de técnicos
@@ -722,7 +750,7 @@
           window.generarChecklistActividadesSP(sp.checklist_actividades);
         }
       } else {
-        setText('modal-sp-folio-badge', 'SP-AUTO');
+        setText('modal-sp-folio-badge', window.generarSiguienteFolioSP ? window.generarSiguienteFolioSP() : 'SP-AUTO');
         const radioCliente = document.querySelector('input[name="sp_pagado_por"][value="cliente"]');
         if (radioCliente) radioCliente.checked = true;
 
@@ -866,13 +894,20 @@
     // Generar UUID si es nuevo
     const id = servicioEnEdicionId || (crypto.randomUUID ? crypto.randomUUID() : 'sp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9));
 
-    // Generar Folio si es nuevo (SP-2026-0001)
+    // Determinar si es registro de prueba según el entorno activo o el contrato de renta vinculado
+    const activeSandbox = (typeof isTestModeActive === 'function' && isTestModeActive());
+    const rentaEsPrueba = Boolean(renta && typeof isTestData === 'function' && isTestData(renta));
+    const isTest = activeSandbox || rentaEsPrueba;
+
+    // Generar Folio si es nuevo respetando Sandbox
     let folio = document.getElementById('modal-sp-folio-badge')?.textContent;
     if (!folio || folio === 'SP-AUTO') {
-      const year = new Date().getFullYear();
-      const nextNum = (window.serviciosPreventivos || []).length + 1;
-      folio = `SP-${year}-${String(nextNum).padStart(4, '0')}`;
+      folio = window.generarSiguienteFolioSP ? window.generarSiguienteFolioSP() : `SP-${new Date().getFullYear()}-0001`;
     }
+
+    // Preservar estado de prueba previo si se está editando
+    const spExistente = servicioEnEdicionId ? (window.serviciosPreventivos || []).find(x => x.id === servicioEnEdicionId) : null;
+    const finalEsPrueba = spExistente ? (spExistente.esPrueba === true || spExistente.es_prueba === true || isTest) : isTest;
 
     const nuevoSP = {
       id: id,
@@ -909,8 +944,9 @@
       firma_operador: firmaOpBase64,
       firma_cliente: firmaCliBase64,
       nombre_recibe: document.getElementById('sp-nombre-recibe')?.value || '',
-      es_prueba: false,
-      created_at: new Date().toISOString(),
+      es_prueba: finalEsPrueba,
+      esPrueba: finalEsPrueba,
+      created_at: spExistente?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
 
@@ -989,7 +1025,14 @@
    * Actualizar contadores y badges de servicios preventivos
    */
   window.actualizarBadgesServiciosPreventivos = function() {
-    const items = window.serviciosPreventivos || [];
+    let items = window.serviciosPreventivos || [];
+
+    // Filtrar por Sandbox / Modo Pruebas
+    if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+      const activeSandbox = isTestModeActive();
+      items = items.filter(x => isTestData(x) === activeSandbox);
+    }
+
     const badgeCount = document.getElementById('badge-count-preventivos');
     if (badgeCount) badgeCount.textContent = items.length;
 
@@ -1036,6 +1079,12 @@
     if (!tbody && !mobileContainer) return;
 
     let items = [...(window.serviciosPreventivos || [])];
+
+    // Filtrar por Sandbox / Modo Pruebas
+    if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+      const activeSandbox = isTestModeActive();
+      items = items.filter(x => isTestData(x) === activeSandbox);
+    }
 
     // Filtro rápido de pagador
     if (currentSPFilter !== 'todos') {
@@ -1604,9 +1653,14 @@
    * Exportar servicios preventivos a archivo Excel (CSV compatible)
    */
   window.exportarServiciosPreventivosExcel = function() {
-    const items = window.serviciosPreventivos || [];
+    let items = [...(window.serviciosPreventivos || [])];
+    const isTest = (typeof isTestModeActive === 'function' && isTestModeActive());
+    if (typeof isTestModeActive === 'function' && typeof isTestData === 'function') {
+      items = items.filter(x => isTestData(x) === isTest);
+    }
+
     if (!items.length) {
-      alert('No hay servicios preventivos registrados para exportar.');
+      alert('No hay servicios preventivos registrados para exportar en este modo.');
       return;
     }
 
@@ -1654,7 +1708,7 @@
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `servicios_preventivos_rentas_${new Date().toISOString().substring(0, 10)}.csv`;
+    link.download = `servicios_preventivos_rentas_${isTest ? 'SANDBOX_' : ''}${new Date().toISOString().substring(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
   };
@@ -1680,6 +1734,7 @@
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     cambiarSubTabRentas: (typeof window !== 'undefined') ? window.cambiarSubTabRentas : undefined,
+    generarSiguienteFolioSP: (typeof window !== 'undefined') ? window.generarSiguienteFolioSP : undefined,
     recalcularHorasTrabajadasSP: (typeof window !== 'undefined') ? window.recalcularHorasTrabajadasSP : undefined,
     obtenerBadgePagadorSP: (typeof window !== 'undefined') ? window.obtenerBadgePagadorSP : undefined,
     obtenerBadgeEstadoEquipoSP: (typeof window !== 'undefined') ? window.obtenerBadgeEstadoEquipoSP : undefined,

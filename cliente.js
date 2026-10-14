@@ -84,6 +84,7 @@ function isTestData(item) {
         upper.includes('OS-PRUEBA') || 
         upper.includes('TKT-PRUEBA') || 
         upper.includes('REN-PRUEBA') || 
+        upper.includes('SP-PRUEBA') || 
         upper.includes('LEV-PRUEBA') ||
         upper.startsWith('TEST-') ||
         upper.startsWith('PRUEBA-') ||
@@ -97,7 +98,7 @@ function isTestData(item) {
   }
 
   const folioUpper = String(item.folio || '').trim().toUpperCase();
-  if (/^TKT-OS00\d+/i.test(folioUpper) || /^OS-PRUEBA/i.test(folioUpper) || /^TKT-PRUEBA/i.test(folioUpper) || /^REN-PRUEBA/i.test(folioUpper)) {
+  if (/^TKT-OS00\d+/i.test(folioUpper) || /^OS-PRUEBA/i.test(folioUpper) || /^TKT-PRUEBA/i.test(folioUpper) || /^REN-PRUEBA/i.test(folioUpper) || /^SP-PRUEBA/i.test(folioUpper)) {
     return true;
   }
 
