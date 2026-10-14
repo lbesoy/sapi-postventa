@@ -149,9 +149,9 @@
     }
   ];
   
-  // Inicializar memoria intermedia con valores por defecto
-  let emailTemplates = [...defaultTemplates];
-  let automationRules = [...defaultRules];
+  // Inicializar memoria intermedia con datos guardados localmente o valores por defecto
+  let emailTemplates = _safeGetJSON('sapi_email_templates', defaultTemplates);
+  let automationRules = _safeGetJSON('sapi_automation_rules', defaultRules);
   
   // Guardar copia local en localStorage como respaldo/fallback
   function saveTemplatesToLocal() {
@@ -163,7 +163,7 @@
   
   // Saber si la base de datos de Supabase tiene activada la sincronización
   function isCloudSyncActive() {
-    return window.supabaseClient && !document.getElementById('supa-table-warning');
+    return Boolean(window.supabaseClient && !document.getElementById('supa-table-warning'));
   };
   
   // Mostrar alerta visual con SQL si faltan tablas
@@ -191,7 +191,7 @@
     nombre TEXT NOT NULL,
     asunto TEXT NOT NULL,
     cuerpo TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
   );
   
   -- 2. Crear tabla de reglas de automatización
@@ -199,19 +199,24 @@
     id TEXT PRIMARY KEY,
     nombre TEXT NOT NULL,
     evento TEXT NOT NULL,
-    "plantillaId" TEXT REFERENCES sapi_email_templates(id) ON DELETE CASCADE,
+    "plantillaId" TEXT,
     destinatario TEXT NOT NULL,
     activo BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
   );
   
   -- 3. Habilitar seguridad de fila (RLS)
   ALTER TABLE sapi_email_templates ENABLE ROW LEVEL SECURITY;
   ALTER TABLE sapi_automation_rules ENABLE ROW LEVEL SECURITY;
   
-  -- 4. Crear políticas públicas/autenticadas
-  CREATE POLICY "Acceso total a autenticados" ON sapi_email_templates FOR ALL TO authenticated USING (true) WITH CHECK (true);
-  CREATE POLICY "Acceso total a autenticados" ON sapi_automation_rules FOR ALL TO authenticated USING (true) WITH CHECK (true);
+  -- 4. Crear políticas de acceso total (tanto autenticados como anon)
+  DROP POLICY IF EXISTS "Acceso total a autenticados" ON sapi_email_templates;
+  DROP POLICY IF EXISTS "Acceso total a sapi_email_templates" ON sapi_email_templates;
+  CREATE POLICY "Acceso total a sapi_email_templates" ON sapi_email_templates FOR ALL USING (true) WITH CHECK (true);
+
+  DROP POLICY IF EXISTS "Acceso total a autenticados" ON sapi_automation_rules;
+  DROP POLICY IF EXISTS "Acceso total a sapi_automation_rules" ON sapi_automation_rules;
+  CREATE POLICY "Acceso total a sapi_automation_rules" ON sapi_automation_rules FOR ALL USING (true) WITH CHECK (true);
       </pre>
     `;
     
@@ -226,26 +231,14 @@
       if (typeof window.renderEmailTemplates === 'function') window.renderEmailTemplates();
       else if (typeof renderEmailTemplates === 'function') renderEmailTemplates();
     };
+
+    // 1. Cargar estado local previo para no arrancar vacíos
+    const localTemplates = _safeGetJSON('sapi_email_templates', defaultTemplates);
+    const localRules = _safeGetJSON('sapi_automation_rules', defaultRules);
+    emailTemplates = localTemplates;
+    automationRules = localRules;
   
     if (!window.supabaseClient) {
-      emailTemplates = _safeGetJSON('sapi_email_templates', defaultTemplates);
-      automationRules = _safeGetJSON('sapi_automation_rules', defaultRules);
-      safeRender();
-      return;
-    }
-    
-    // Si no hay sesión autenticada activa en Supabase, usar persistencia local sin disparar errores 401
-    try {
-      const sessionRes = await window.supabaseClient.auth.getSession().catch(() => null);
-      if (!sessionRes || !sessionRes.data || !sessionRes.data.session) {
-        emailTemplates = _safeGetJSON('sapi_email_templates', defaultTemplates);
-        automationRules = _safeGetJSON('sapi_automation_rules', defaultRules);
-        safeRender();
-        return;
-      }
-    } catch (eSes) {
-      emailTemplates = _safeGetJSON('sapi_email_templates', defaultTemplates);
-      automationRules = _safeGetJSON('sapi_automation_rules', defaultRules);
       safeRender();
       return;
     }
@@ -257,7 +250,7 @@
         .select('*');
         
       if (tErr) {
-        if (tErr.code === 'P0001' || tErr.message.includes('relation') || tErr.message.includes('does not exist')) {
+        if (tErr.code === 'P0001' || tErr.code === '42P01' || tErr.message.includes('relation') || tErr.message.includes('does not exist')) {
           throw new Error('TABLES_NOT_CREATED');
         }
         throw tErr;
@@ -270,43 +263,49 @@
         
       if (rErr) throw rErr;
       
-      // Si la base de datos está vacía, inicializarla con los valores por defecto
+      // Quitar banner de advertencia si las tablas ya existen
+      const warnEl = document.getElementById('supa-table-warning');
+      if (warnEl) warnEl.remove();
+
+      // Si la base de datos está vacía, inicializarla respetando las reglas y plantillas locales actuales
       if (!templatesData || templatesData.length === 0) {
-        console.log('[Automation] Inicializando Supabase con plantillas por defecto...');
-        await window.supabaseClient.from('sapi_email_templates').insert(defaultTemplates);
-        emailTemplates = [...defaultTemplates];
+        console.log('[Automation] Inicializando Supabase con plantillas locales...');
+        await window.supabaseClient.from('sapi_email_templates').upsert(localTemplates);
+        emailTemplates = localTemplates;
       } else {
         emailTemplates = templatesData;
+        saveTemplatesToLocal();
       }
       
       if (!rulesData || rulesData.length === 0) {
-        console.log('[Automation] Inicializando Supabase con reglas por defecto...');
-        await window.supabaseClient.from('sapi_automation_rules').insert(defaultRules);
-        automationRules = [...defaultRules];
+        console.log('[Automation] Inicializando Supabase con reglas locales actuales...');
+        await window.supabaseClient.from('sapi_automation_rules').upsert(localRules);
+        automationRules = localRules;
       } else {
-        automationRules = rulesData;
+        // Normalizar reglas desde Supabase preservando estados booleanos y campos
+        automationRules = rulesData.map(r => ({
+          ...r,
+          plantillaId: r.plantillaId || r.plantilla_id || '',
+          activo: Boolean(r.activo === true || r.activo === 'true' || r.activo === 1)
+        }));
+        saveRulesToLocal();
       }
   
-      console.log('[Automation] Datos cargados correctamente desde Supabase');
+      console.log('[Automation] Datos cargados y sincronizados correctamente con Supabase');
       
     } catch (err) {
       if (err.message === 'TABLES_NOT_CREATED') {
         console.warn('[Automation] Faltan tablas en la nube. Usando persistencia local (localStorage).');
-        emailTemplates = _safeGetJSON('sapi_email_templates', defaultTemplates);
-        automationRules = _safeGetJSON('sapi_automation_rules', defaultRules);
         mostrarAdvertenciaTablasNube();
       } else {
-        console.error('[Automation] Error al sincronizar con la nube:', err);
-        emailTemplates = _safeGetJSON('sapi_email_templates', defaultTemplates);
-        automationRules = _safeGetJSON('sapi_automation_rules', defaultRules);
+        console.warn('[Automation] Error al sincronizar con la nube (usando persistencia local):', err);
       }
+      // Mantener siempre los valores locales del usuario
+      emailTemplates = _safeGetJSON('sapi_email_templates', defaultTemplates);
+      automationRules = _safeGetJSON('sapi_automation_rules', defaultRules);
     }
     
-    if (typeof renderAutomationRules === 'function') renderAutomationRules();
-    else if (typeof window.renderAutomationRules === 'function') window.renderAutomationRules();
-  
-    if (typeof renderEmailTemplates === 'function') renderEmailTemplates();
-    else if (typeof window.renderEmailTemplates === 'function') window.renderEmailTemplates();
+    safeRender();
   };
   
   // Navegación de Sub-Vistas del Portal
@@ -365,6 +364,7 @@
   
   // Renderizar Reglas
   function renderAutomationRules() {
+    if (typeof document === 'undefined') return;
     const list = document.getElementById('automation-rules-list');
     if (!list) return;
     
@@ -411,6 +411,7 @@
   
   // Renderizar Plantillas (Machotes)
   function renderEmailTemplates() {
+    if (typeof document === 'undefined') return;
     const list = document.getElementById('email-templates-list');
     if (!list) return;
     
@@ -444,14 +445,36 @@
   };
   
   // Toggle Regla Activa
-  function toggleReglaActiva(id) {
+  async function toggleReglaActiva(id) {
     const match = automationRules.find(r => r.id === id);
-    if (match) {
-      match.activo = !match.activo;
-      saveRulesToLocal();
-      renderAutomationRules();
-      if (typeof mostrarNotificacion === 'function') {
-        mostrarNotificacion('Regla de automatización actualizada', 'success');
+    if (!match) return;
+
+    match.activo = !match.activo;
+    saveRulesToLocal();
+    renderAutomationRules();
+
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion(`Regla "${match.nombre}" ${match.activo ? 'activada' : 'desactivada'}`, 'success');
+    }
+
+    // Sincronizar de inmediato a Supabase si está disponible
+    if (window.supabaseClient && isCloudSyncActive()) {
+      try {
+        const { error } = await window.supabaseClient
+          .from('sapi_automation_rules')
+          .upsert({
+            id: match.id,
+            nombre: match.nombre,
+            evento: match.evento,
+            plantillaId: match.plantillaId || match.plantilla_id || '',
+            destinatario: match.destinatario,
+            activo: match.activo
+          });
+        if (error) {
+          console.warn('[Automation] Error al actualizar estado de regla en Supabase:', error);
+        }
+      } catch (err) {
+        console.warn('[Automation] Fallo de conexión al actualizar regla:', err);
       }
     }
   };

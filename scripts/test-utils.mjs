@@ -1148,6 +1148,18 @@ assert.ok(htmlMail.includes('Eurorep'), 'HTML de correo debe contener branding d
 assert.ok(htmlMail.includes('Su cotización está lista'), 'HTML de correo debe contener el cuerpo transformado');
 assert.ok(htmlMail.includes('<div') && htmlMail.includes('max-width: 600px'), 'HTML debe generar estructura de maquetado profesional');
 
+// Test D: Persistencia de estado activo/inactivo de reglas al actualizar
+const { cargarConfiguracionesNube, automationRules } = await import('../src/modules/automatizaciones.js');
+const testRule = automationRules[0];
+const estadoInicial = testRule.activo;
+await toggleReglaActiva(testRule.id);
+assert.equal(testRule.activo, !estadoInicial, 'La regla debe alternar su estado activo');
+// Simular recarga/actualización de la app
+await cargarConfiguracionesNube();
+assert.equal(testRule.activo, !estadoInicial, 'La regla desactivada debe conservar su estado y NO reactivarse al actualizar');
+// Restaurar
+await toggleReglaActiva(testRule.id);
+
 console.log('  ✅ Automatizaciones, Reglas de Eventos y Plantillas de Correo: OK');
 
 // 27. MÓDULO DE RESUMEN SEMANAL OPERATIVO Y REPORTES EJECUTIVOS
