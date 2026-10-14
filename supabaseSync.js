@@ -70,6 +70,9 @@ window.fetchTablePaginated = async (tableName, selectQuery = '*', orderColumn = 
         error.code === '42P01' ||
         error.code === 'PGRST204'
       )) {
+        if (tableName === 'servicios_preventivos') {
+          window.__serviciosPreventivosTableMissing = true;
+        }
         console.warn(`[Sync] Tabla '${tableName}' no disponible aún en el backend remoto. Operando offline con datos locales.`);
         return [];
       }
@@ -5254,6 +5257,9 @@ window.cargarDatosDeSupabase = function() {
     // 10.1. Servicios Preventivos en Rentas
     const serviciosPreventivosPromise = (async () => {
       try {
+        let localSP = [];
+        try { localSP = JSON.parse(localStorage.getItem('sapi_servicios_preventivos') || '[]'); } catch(e){}
+
         let spDb = null;
         let spErr = null;
         try {
@@ -5261,9 +5267,16 @@ window.cargarDatosDeSupabase = function() {
         } catch (err) {
           spErr = err;
         }
+
+        if (window.__serviciosPreventivosTableMissing) {
+          window.serviciosPreventivos = localSP;
+          if (typeof window.renderServiciosPreventivos === 'function' && document.getElementById('view-rentas')?.classList.contains('active')) {
+            window.renderServiciosPreventivos();
+          }
+          return;
+        }
+
         if (spDb && !spErr) {
-          let localSP = [];
-          try { localSP = JSON.parse(localStorage.getItem('sapi_servicios_preventivos') || '[]'); } catch(e){}
           const mapped = spDb.map(rowToServicioPreventivo);
           if (mapped.length === 0 && localSP.length > 0) {
             console.log(`[Sync] Migrando ${localSP.length} servicios preventivos locales a Supabase...`);
@@ -5279,6 +5292,7 @@ window.cargarDatosDeSupabase = function() {
           }
         } else if (spErr) {
           console.warn('[Sync] Aviso cargando tabla servicios_preventivos (usando datos locales):', spErr.message);
+          window.serviciosPreventivos = localSP;
         }
       } catch (e) {
         console.warn('[Sync] Excepción al sincronizar servicios preventivos:', e);
