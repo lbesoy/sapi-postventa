@@ -62,7 +62,7 @@ window.fetchTablePaginated = async (tableName, selectQuery = '*', orderColumn = 
     }
 
     if (error) {
-      if ((tableName === 'sapi_email_logs' || tableName === 'servicios_preventivos') && (
+      if ((tableName === 'sapi_email_logs' || tableName === 'servicios_preventivos' || tableName === 'servicios_no_preventivos') && (
         error.message?.includes('schema cache') ||
         error.message?.includes('Could not find the table') ||
         error.message?.includes('does not exist') ||
@@ -72,6 +72,9 @@ window.fetchTablePaginated = async (tableName, selectQuery = '*', orderColumn = 
       )) {
         if (tableName === 'servicios_preventivos') {
           window.__serviciosPreventivosTableMissing = true;
+        }
+        if (tableName === 'servicios_no_preventivos') {
+          window.__serviciosNoPreventivosTableMissing = true;
         }
         console.warn(`[Sync] Tabla '${tableName}' no disponible aún en el backend remoto. Operando offline con datos locales.`);
         return [];
@@ -1886,7 +1889,7 @@ async function _executePushToSupabase(tabla, item) {
   // Determinar si la operación debe ser ONLINE-ONLY (directa a Supabase sin encolar offline)
   let isOnlineOnly = false;
   
-  if (tabla === 'tickets' || tabla === 'ordenes' || tabla === 'ideas_fallas' || tabla === 'envios' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora') {
+  if (tabla === 'tickets' || tabla === 'ordenes' || tabla === 'ideas_fallas' || tabla === 'envios' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'servicios_no_preventivos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora') {
     isOnlineOnly = true;
   }
 
@@ -1894,7 +1897,7 @@ async function _executePushToSupabase(tabla, item) {
     const sb = window.supabaseClient;
     const isOffline = (typeof navigator !== 'undefined' && !navigator.onLine) || !sb;
     if (isOffline) {
-      if (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'envios' || tabla === 'ideas_fallas') {
+      if (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'servicios_no_preventivos' || tabla === 'envios' || tabla === 'ideas_fallas') {
         console.warn(`[Direct Push] Sin conexión con la base de datos para guardar en ${tabla}. Encolando en sync queue local.`);
         addToSyncQueue(tabla, 'upsert', item);
         if (typeof window.mostrarNotificacion === 'function' && tabla !== 'calendario_eventos' && tabla !== 'orden_bitacora') {
@@ -2144,7 +2147,7 @@ async function _executePushToSupabase(tabla, item) {
         error.code === '42P01' ||
         error.code === 'PGRST204'
       );
-      if ((isNetworkErr || (isMissingTable && (tabla === 'servicios_preventivos' || tabla === 'sapi_email_logs'))) && (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'envios' || tabla === 'ideas_fallas')) {
+      if ((isNetworkErr || (isMissingTable && (tabla === 'servicios_preventivos' || tabla === 'servicios_no_preventivos' || tabla === 'sapi_email_logs'))) && (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'servicios_no_preventivos' || tabla === 'envios' || tabla === 'ideas_fallas')) {
         console.warn(`[Direct Push] Error al guardar en ${tabla}: ${error.message}. Encolando en sync queue local...`);
         addToSyncQueue(tabla, 'upsert', item);
         if (typeof window.mostrarNotificacion === 'function' && tabla !== 'calendario_eventos' && tabla !== 'orden_bitacora') {
@@ -2316,7 +2319,7 @@ window.deleteFromSupabase = async function(tabla, id) {
   // Determinar si la operación debe ser ONLINE-ONLY
   let isOnlineOnly = false;
   
-  if (tabla === 'tickets' || tabla === 'ordenes' || tabla === 'ideas_fallas' || tabla === 'envios' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora') {
+  if (tabla === 'tickets' || tabla === 'ordenes' || tabla === 'ideas_fallas' || tabla === 'envios' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'servicios_no_preventivos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora') {
     isOnlineOnly = true;
   }
 
@@ -5392,6 +5395,51 @@ window.cargarDatosDeSupabase = function() {
       }
     })();
 
+    // 10.2. Servicios NO Preventivos en Rentas (Bolsa de Horas y Bitácora)
+    const serviciosNoPreventivosPromise = (async () => {
+      try {
+        let localSNP = [];
+        try { localSNP = JSON.parse(localStorage.getItem('sapi_servicios_no_preventivos') || '[]'); } catch(e){}
+
+        let snpDb = null;
+        let snpErr = null;
+        try {
+          snpDb = await fetchTablePaginated('servicios_no_preventivos', '*');
+        } catch (err) {
+          snpErr = err;
+        }
+
+        if (window.__serviciosNoPreventivosTableMissing) {
+          window.serviciosNoPreventivos = localSNP;
+          if (typeof window.renderServiciosNoPreventivos === 'function' && document.getElementById('view-rentas')?.classList.contains('active')) {
+            window.renderServiciosNoPreventivos();
+          }
+          return;
+        }
+
+        if (snpDb && !snpErr) {
+          const mapped = snpDb.map(rowToServicioNoPreventivo);
+          if (mapped.length === 0 && localSNP.length > 0) {
+            console.log(`[Sync] Migrando ${localSNP.length} servicios no preventivos locales a Supabase...`);
+            for (const lsnp of localSNP) {
+              if (window.pushToSupabase) window.pushToSupabase('servicios_no_preventivos', lsnp);
+            }
+          } else {
+            localStorage.setItem('sapi_servicios_no_preventivos', JSON.stringify(mapped));
+            window.serviciosNoPreventivos = mapped;
+            if (typeof window.renderServiciosNoPreventivos === 'function' && document.getElementById('view-rentas')?.classList.contains('active')) {
+              window.renderServiciosNoPreventivos();
+            }
+          }
+        } else if (snpErr) {
+          console.warn('[Sync] Aviso cargando tabla servicios_no_preventivos (usando datos locales):', snpErr.message);
+          window.serviciosNoPreventivos = localSNP;
+        }
+      } catch (e) {
+        console.warn('[Sync] Excepción al sincronizar servicios no preventivos:', e);
+      }
+    })();
+
     // 11. Envíos y Guías de Paquetería
     const enviosPromise = (async () => {
       try {
@@ -5604,6 +5652,7 @@ window.cargarDatosDeSupabase = function() {
       levantamientosPromise,
       rentasPromise,
       serviciosPreventivosPromise,
+      serviciosNoPreventivosPromise,
       enviosPromise,
       eventosPromise,
       sapCatalogsPromise,
@@ -6022,6 +6071,31 @@ function setupRealtime() {
           window.actualizarBadgesServiciosPreventivos();
         }
       }
+
+      if (tableName === 'servicios_no_preventivos') {
+        let snpArr = [];
+        try {
+          snpArr = JSON.parse(localStorage.getItem('sapi_servicios_no_preventivos') || '[]');
+        } catch(e) { snpArr = []; }
+
+        if (!isFallback && payload) {
+          if (payload.eventType === 'DELETE' && payload.old) {
+            snpArr = snpArr.filter(s => s.id !== payload.old.id);
+          } else if ((payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') && payload.new) {
+            const mapped = rowToServicioNoPreventivo(payload.new);
+            const idx = snpArr.findIndex(s => s.id === mapped.id);
+            if (idx >= 0) snpArr[idx] = mapped;
+            else snpArr.unshift(mapped);
+          }
+        } else if (data) {
+          snpArr = data.map(rowToServicioNoPreventivo);
+        }
+        localStorage.setItem('sapi_servicios_no_preventivos', JSON.stringify(snpArr));
+        window.serviciosNoPreventivos = snpArr;
+        if (typeof window.renderServiciosNoPreventivos === 'function') {
+          window.renderServiciosNoPreventivos();
+        }
+      }
       
       window.dispatchEvent(new Event('supabase_datos_cargados'));
     } catch (e) {
@@ -6044,6 +6118,7 @@ function setupRealtime() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes' }, (payload) => handleUpdate('ordenes', payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rentas' }, (payload) => handleUpdate('rentas', payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'servicios_preventivos' }, (payload) => handleUpdate('servicios_preventivos', payload))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'servicios_no_preventivos' }, (payload) => handleUpdate('servicios_no_preventivos', payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'envios' }, (payload) => handleUpdate('envios', payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'calendario_eventos' }, (payload) => handleUpdate('calendario_eventos', payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ideas_fallas' }, (payload) => handleUpdate('ideas_fallas', payload))
