@@ -1483,7 +1483,8 @@ function agregarRenglonTecnicoCierre(tecnicoNombre = '', horas = '', fecha_inici
   if (typeof document === 'undefined') return;
   const container = document.getElementById('cp-tecnicos-lista');
   if (!container) return;
-  const rowId = existingId || ('cp-' + crypto.randomUUID());
+  const safeGenId = () => 'cp-' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).substring(2, 7)));
+  const rowId = existingId || safeGenId();
   const div = document.createElement('div');
   div.id = rowId;
   div.style.display = 'flex';
@@ -1492,7 +1493,8 @@ function agregarRenglonTecnicoCierre(tecnicoNombre = '', horas = '', fecha_inici
   div.style.marginBottom = '0.25rem';
   
   let options = '<option value="">-- Seleccionar Técnico --</option>';
-  const sortedUsers = [...usuarios].sort((a,b) => a.nombre.localeCompare(b.nombre));
+  const userList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : ((typeof window !== 'undefined' && Array.isArray(window.usuarios)) ? window.usuarios : []);
+  const sortedUsers = [...userList].sort((a,b) => (a.nombre || '').localeCompare(b.nombre || ''));
   sortedUsers.forEach(u => {
     const selected = u.nombre === tecnicoNombre ? 'selected' : '';
     options += `<option value="${u.nombre}" ${selected}>${u.nombre}</option>`;
@@ -1514,30 +1516,39 @@ function agregarRenglonTecnicoCierre(tecnicoNombre = '', horas = '', fecha_inici
     </div>
   `;
   container.appendChild(div);
-  if (typeof lucide !== 'undefined') {
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
     lucide.createIcons();
   }
 };
 
 function abrirCierrePapel(ordenId) {
   if (typeof document === 'undefined') return;
-  const o = ordenes.find(x => x.id === ordenId);
-  if (!o) return;
+  const list = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes : ((typeof window !== 'undefined' && Array.isArray(window.ordenes)) ? window.ordenes : []);
+  const o = list.find(x => x && (String(x.id) === String(ordenId) || (x.folio && String(x.folio) === String(ordenId))));
+  if (!o) {
+    if (typeof mostrarNotificacion === 'function') mostrarNotificacion('Orden no encontrada.', 'error');
+    else if (typeof window !== 'undefined' && window.mostrarNotificacion) window.mostrarNotificacion('Orden no encontrada.', 'error');
+    return;
+  }
   
   // Guardar ID
-  document.getElementById('cp-orden-id').value = ordenId;
+  const cpIdInput = document.getElementById('cp-orden-id');
+  if (cpIdInput) cpIdInput.value = o.id;
   
   // Resetear el formulario
-  document.getElementById('form-cierre-papel').reset();
+  const form = document.getElementById('form-cierre-papel');
+  if (form) form.reset();
   
   // Limpiar lista de técnicos y pre-poblar
   const container = document.getElementById('cp-tecnicos-lista');
   if (container) container.innerHTML = '';
   
+  const safeGenId = () => 'cp-' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).substring(2, 7)));
+
   let tecnicosLista = [];
   if (o.cierre_papel_tecnicos_horas && o.cierre_papel_tecnicos_horas.length > 0) {
     tecnicosLista = o.cierre_papel_tecnicos_horas.map(item => ({
-      id: item.id || ('cp-' + crypto.randomUUID()),
+      id: item.id || safeGenId(),
       tecnico: item.tecnico,
       horas: item.horas,
       fecha_inicio: item.fecha_inicio || item.fecha || item.dias || '',
@@ -1547,26 +1558,33 @@ function abrirCierrePapel(ordenId) {
       regreso: item.regreso !== undefined ? item.regreso : ''
     }));
   } else if (o.tecnicosAsignados && o.tecnicosAsignados.length > 0) {
-    tecnicosLista = o.tecnicosAsignados.map(t => ({ id: 'cp-' + crypto.randomUUID(), tecnico: t, horas: '', fecha_inicio: '', fecha_fin: '', trayectos: '', ida: '', regreso: '' }));
+    tecnicosLista = o.tecnicosAsignados.map(t => ({ id: safeGenId(), tecnico: t, horas: '', fecha_inicio: '', fecha_fin: '', trayectos: '', ida: '', regreso: '' }));
   } else if (o.tecnico) {
-    tecnicosLista = o.tecnico.split(',').map(t => t.trim()).filter(Boolean).map(t => ({ id: 'cp-' + crypto.randomUUID(), tecnico: t, horas: '', fecha_inicio: '', fecha_fin: '', trayectos: '', ida: '', regreso: '' }));
+    tecnicosLista = o.tecnico.split(',').map(t => t.trim()).filter(Boolean).map(t => ({ id: safeGenId(), tecnico: t, horas: '', fecha_inicio: '', fecha_fin: '', trayectos: '', ida: '', regreso: '' }));
   }
   
   tecnicosLista.forEach(item => {
-    window.agregarRenglonTecnicoCierre(item.tecnico, item.horas, item.fecha_inicio, item.fecha_fin, item.trayectos, item.ida, item.regreso, item.id);
+    if (typeof window.agregarRenglonTecnicoCierre === 'function') {
+      window.agregarRenglonTecnicoCierre(item.tecnico, item.horas, item.fecha_inicio, item.fecha_fin, item.trayectos, item.ida, item.regreso, item.id);
+    } else if (typeof agregarRenglonTecnicoCierre === 'function') {
+      agregarRenglonTecnicoCierre(item.tecnico, item.horas, item.fecha_inicio, item.fecha_fin, item.trayectos, item.ida, item.regreso, item.id);
+    }
   });
   
   // Abrir modal
-  document.getElementById('modal-cierre-papel-overlay').classList.add('open');
+  const overlay = document.getElementById('modal-cierre-papel-overlay');
+  if (overlay) overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
-  lucide.createIcons();
+  if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
 };
 
 function cerrarCierrePapel(e) {
   if (typeof document === 'undefined') return;
   if (e && (e.target === document.getElementById('modal-cierre-papel-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
-  document.getElementById('modal-cierre-papel-overlay').classList.remove('open');
-  if (!document.getElementById('modal-detalle-overlay').classList.contains('open')) {
+  const overlay = document.getElementById('modal-cierre-papel-overlay');
+  if (overlay) overlay.classList.remove('open');
+  const modalDetalle = document.getElementById('modal-detalle-overlay');
+  if (!modalDetalle || !modalDetalle.classList.contains('open')) {
     document.body.style.overflow = '';
   }
 };
@@ -1575,19 +1593,24 @@ async function confirmarCierrePapel(e) {
   if (typeof document === 'undefined') return;
   e.preventDefault();
   
-  const ordenId = document.getElementById('cp-orden-id').value;
-  const o = ordenes.find(x => x.id === ordenId);
-  if (!o) return;
+  const ordenId = document.getElementById('cp-orden-id')?.value;
+  const list = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes : ((typeof window !== 'undefined' && Array.isArray(window.ordenes)) ? window.ordenes : []);
+  const o = list.find(x => x && (String(x.id) === String(ordenId) || (x.folio && String(x.folio) === String(ordenId))));
+  if (!o) {
+    if (typeof mostrarNotificacion === 'function') mostrarNotificacion('No se encontró la orden especificada.', 'error');
+    else if (typeof window !== 'undefined' && window.mostrarNotificacion) window.mostrarNotificacion('No se encontró la orden especificada.', 'error');
+    return;
+  }
   
   const fileInput = document.getElementById('cp-pdf-file');
-  const file = fileInput.files[0];
+  const file = fileInput?.files?.[0];
   if (!file) {
     mostrarNotificacion('Por favor, seleccione un archivo PDF.', 'warning');
     return;
   }
   
-  const nuevoEstado = document.getElementById('cp-estado').value;
-  const motivo = document.getElementById('cp-motivo').value.trim();
+  const nuevoEstado = document.getElementById('cp-estado')?.value || 'Completado';
+  const motivo = (document.getElementById('cp-motivo')?.value || '').trim();
   if (motivo.length < 5) {
     mostrarNotificacion('Por favor, ingrese un motivo de al menos 5 caracteres.', 'warning');
     return;
@@ -1667,90 +1690,80 @@ async function confirmarCierrePapel(e) {
     originalBtnText = btnSubmit.innerHTML;
     btnSubmit.disabled = true;
     btnSubmit.innerHTML = '<i class="rotating" data-lucide="loader-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i> Guardando...';
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
   }
   
-  let publicUrl = null;
-  const timestamp = Date.now();
-  const uniqueName = `cierre_papel_${timestamp}_${Math.random().toString(36).substring(2,7)}.pdf`;
-  const filePath = `ordenes/${ordenId}/${uniqueName}`;
-  
-  if (!navigator.onLine || !window.supabaseClient) {
-    try {
-      mostrarNotificacion('Guardando archivo localmente (Modo Offline)...', 'info');
-      const blobToBase64 = (blob) => {
-        return new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.readAsDataURL(blob);
-        });
-      };
-      publicUrl = await blobToBase64(file);
-    } catch (err) {
-      console.error(err);
-      mostrarNotificacion('Fallo al procesar el archivo en modo offline.', 'error');
-      if (btnSubmit) {
-        btnSubmit.disabled = false;
-        btnSubmit.innerHTML = originalBtnText;
-        lucide.createIcons();
-      }
-      return;
-    }
-  } else {
-    try {
-      mostrarNotificacion('Subiendo PDF a Supabase Storage...', 'info');
-      const { data: uploadData, error: uploadErr } = await window.supabaseClient.storage
-        .from('evidencias')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true
-        });
-        
-      if (uploadErr) throw uploadErr;
-      
-      const { data: urlData } = window.supabaseClient.storage
-        .from('evidencias')
-        .getPublicUrl(filePath);
-        
-      publicUrl = urlData.publicUrl;
-    } catch (err) {
-      console.warn("Fallo la subida directa a Supabase. Guardando offline:", err);
-      try {
-        const blobToBase64 = (blob) => {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(blob);
-          });
-        };
-        publicUrl = await blobToBase64(file);
-      } catch (baseErr) {
-        console.error(baseErr);
-        mostrarNotificacion('Error al guardar el archivo localmente.', 'error');
-        if (btnSubmit) {
-          btnSubmit.disabled = false;
-          btnSubmit.innerHTML = originalBtnText;
-          lucide.createIcons();
-        }
-        return;
-      }
-    }
-  }
-  
-  const idx = ordenes.findIndex(x => x.id === ordenId);
-  if (idx !== -1) {
-    const currentUser = usuarios.find(u => u.id === currentSession.userId);
-    const usuarioNombre = currentUser ? currentUser.nombre : (currentSession.nombre || 'Supervisor');
+  try {
+    let publicUrl = null;
+    const timestamp = Date.now();
+    const safeRand = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).substring(2, 7);
+    const uniqueName = `cierre_papel_${timestamp}_${safeRand}.pdf`;
+    const filePath = `ordenes/${o.id || ordenId}/${uniqueName}`;
     
-    ordenes[idx].cierre_papel_pdf = publicUrl;
-    ordenes[idx].cierre_papel_motivo = motivo;
-    ordenes[idx].cierre_papel_usuario = usuarioNombre;
-    ordenes[idx].cierre_papel_fecha = new Date().toISOString();
-    ordenes[idx].cierre_papel_tecnicos_horas = tecnicosHoras;
-    ordenes[idx].estado = nuevoEstado;
+    const fileToDataUrl = (blob) => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Error al procesar el archivo localmente.'));
+        reader.readAsDataURL(blob);
+      });
+    };
+
+    const isOnline = (typeof navigator !== 'undefined' ? navigator.onLine : true) && !!(typeof window !== 'undefined' && window.supabaseClient && window.supabaseClient.storage);
+
+    if (!isOnline) {
+      mostrarNotificacion('Guardando archivo localmente (Modo Offline)...', 'info');
+      publicUrl = await fileToDataUrl(file);
+    } else {
+      try {
+        mostrarNotificacion('Subiendo PDF a Supabase Storage...', 'info');
+        const uploadPromise = window.supabaseClient.storage
+          .from('evidencias')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: true
+          });
+
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Tiempo de espera agotado al subir el PDF (15s)')), 15000)
+        );
+
+        const { data: uploadData, error: uploadErr } = await Promise.race([uploadPromise, timeoutPromise]);
+        if (uploadErr) throw uploadErr;
+
+        const { data: urlData } = window.supabaseClient.storage
+          .from('evidencias')
+          .getPublicUrl(filePath);
+
+        publicUrl = urlData ? urlData.publicUrl : null;
+      } catch (uploadErr) {
+        console.warn('Fallo la subida a Supabase Storage. Guardando localmente:', uploadErr);
+        mostrarNotificacion('No se pudo subir a la nube (' + (uploadErr.message || 'Error de red') + '). Guardando copia local...', 'warning');
+        publicUrl = await fileToDataUrl(file);
+      }
+    }
+
+    // Ubicar orden en los arreglos
+    let targetList = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes : ((typeof window !== 'undefined' && Array.isArray(window.ordenes)) ? window.ordenes : []);
+    const idx = targetList.findIndex(x => x && (String(x.id) === String(o.id) || (x.folio && String(x.folio) === String(o.folio))));
+    if (idx === -1) {
+      throw new Error('No se encontró la orden en memoria para registrar el cierre.');
+    }
+
+    const userList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : ((typeof window !== 'undefined' && Array.isArray(window.usuarios)) ? window.usuarios : []);
+    const sess = (typeof currentSession !== 'undefined' && currentSession) ? currentSession : ((typeof window !== 'undefined' && window.currentSession) ? window.currentSession : {});
+    const currentUser = userList.find(u => u && u.id === sess.userId);
+    const usuarioNombre = currentUser ? currentUser.nombre : (sess.nombre || 'Supervisor');
+
+    targetList[idx].cierre_papel_pdf = publicUrl;
+    targetList[idx].cierre_papel_motivo = motivo;
+    targetList[idx].cierre_papel_usuario = usuarioNombre;
+    targetList[idx].cierre_papel_fecha = new Date().toISOString();
+    targetList[idx].cierre_papel_tecnicos_horas = tecnicosHoras;
+    targetList[idx].estado = nuevoEstado;
 
     // Sincronizar con la bitácora para reflejar en el calendario
-    if (!ordenes[idx].bitacora) ordenes[idx].bitacora = [];
+    if (!targetList[idx].bitacora) targetList[idx].bitacora = [];
 
     // Expandir cada rango en entradas de un día individuales
     const obtenerFechasEnRango = (inicio, fin) => {
@@ -1784,7 +1797,7 @@ async function confirmarCierrePapel(e) {
     });
 
     // Filtrar entradas obsoletas de cierre en papel en o.bitacora
-    ordenes[idx].bitacora = ordenes[idx].bitacora.filter(b => {
+    targetList[idx].bitacora = targetList[idx].bitacora.filter(b => {
       if (b.cierre_papel) {
         return expandedEntries.some(ee => ee.id === b.id);
       }
@@ -1796,16 +1809,14 @@ async function confirmarCierrePapel(e) {
       const localEventos = JSON.parse(localStorage.getItem('sapi_calendario_eventos') || '[]');
       const updatedEventos = [];
       for (const ev of localEventos) {
-        if (ev.ordenId === ordenId && ev.id) {
+        if (ev && (String(ev.ordenId) === String(o.id) || (o.folio && String(ev.ordenId) === String(o.folio))) && ev.id) {
           const cleanEvId = String(ev.id).replace('bit-', '');
           const isPaperClosureEvent = cleanEvId.startsWith('cp-');
           if (isPaperClosureEvent) {
-            const stillExists = ordenes[idx].bitacora.some(b => b.id === cleanEvId || b.id === ev.id || `bit-${b.id}` === ev.id);
+            const stillExists = targetList[idx].bitacora.some(b => b.id === cleanEvId || b.id === ev.id || `bit-${b.id}` === ev.id);
             if (!stillExists) {
               if (window.deleteFromSupabase) {
                 window.deleteFromSupabase('calendario_eventos', ev.id);
-              }
-              if (window.deleteFromSupabase) {
                 window.deleteFromSupabase('calendario_eventos', `bit-traslado-ida-${cleanEvId}`);
                 window.deleteFromSupabase('calendario_eventos', `bit-traslado-regreso-${cleanEvId}`);
               }
@@ -1817,12 +1828,12 @@ async function confirmarCierrePapel(e) {
       }
       localStorage.setItem('sapi_calendario_eventos', JSON.stringify(updatedEventos));
     } catch (e) {
-      console.error('Error al limpiar eventos del calendario:', e);
+      console.warn('Error al limpiar eventos del calendario:', e);
     }
 
     // Crear/actualizar entradas y actualizar calendario
     expandedEntries.forEach(ee => {
-      let bEntry = ordenes[idx].bitacora.find(b => b.id === ee.id);
+      let bEntry = targetList[idx].bitacora.find(b => b.id === ee.id);
       
       const entrada = '08:00';
       const baseHour = 8;
@@ -1858,25 +1869,40 @@ async function confirmarCierrePapel(e) {
           realizado: true,
           cierre_papel: true,
           asignadoPorName: usuarioNombre,
-          asignadoPorId: currentSession.userId || null
+          asignadoPorId: sess.userId || null
         };
-        ordenes[idx].bitacora.push(bEntry);
+        targetList[idx].bitacora.push(bEntry);
       }
       
       if (typeof actualizarEventoCalendarioDesdeBitacora === 'function') {
-        actualizarEventoCalendarioDesdeBitacora(ordenes[idx], bEntry);
+        try {
+          actualizarEventoCalendarioDesdeBitacora(targetList[idx], bEntry);
+        } catch (calErr) {
+          console.warn('Error al actualizar evento de calendario:', calErr);
+        }
       }
     });
 
+    // Sincronizar en window.ordenes si difiere de targetList
+    if (typeof window !== 'undefined' && Array.isArray(window.ordenes) && window.ordenes !== targetList) {
+      const wIdx = window.ordenes.findIndex(x => x && (String(x.id) === String(o.id) || (x.folio && String(x.folio) === String(o.folio))));
+      if (wIdx !== -1) window.ordenes[wIdx] = targetList[idx];
+      else window.ordenes.push(targetList[idx]);
+    }
+    if (typeof ordenes !== 'undefined' && Array.isArray(ordenes) && ordenes !== targetList) {
+      const oIdx = ordenes.findIndex(x => x && (String(x.id) === String(o.id) || (x.folio && String(x.folio) === String(o.folio))));
+      if (oIdx !== -1) ordenes[oIdx] = targetList[idx];
+      else ordenes.push(targetList[idx]);
+    }
+
     try {
-      safeSetJSON('sapi_ordenes', ordenes);
+      safeSetJSON('sapi_ordenes', targetList);
     } catch (err) {
-      console.error(err);
-      mostrarNotificacion('Error al guardar en almacenamiento local.', 'error');
+      console.warn('Error al guardar en almacenamiento local:', err);
     }
     
     if (window.pushToSupabase) {
-      window.pushToSupabase('ordenes', ordenes[idx]).catch(err => {
+      window.pushToSupabase('ordenes', targetList[idx]).catch(err => {
         console.error('Error al sincronizar con la nube:', err);
       });
     }
@@ -1884,13 +1910,33 @@ async function confirmarCierrePapel(e) {
     mostrarNotificacion('Orden cerrada correctamente.', 'success');
     
     cerrarCierrePapel();
-    verDetalle(ordenId);
+
+    try {
+      if (typeof verDetalle === 'function') verDetalle(o.id || ordenId);
+      else if (typeof window !== 'undefined' && typeof window.verDetalle === 'function') window.verDetalle(o.id || ordenId);
+    } catch (vdErr) {
+      console.warn('Error al refrescar detalle:', vdErr);
+    }
     
     try {
-      renderTabla();
-      renderTabla('servicios');
+      if (typeof renderTabla === 'function') {
+        renderTabla();
+        renderTabla('servicios');
+      } else if (typeof window !== 'undefined' && typeof window.renderTabla === 'function') {
+        window.renderTabla();
+        window.renderTabla('servicios');
+      }
     } catch (e) {
-      console.error('Error al refrescar tablas:', e);
+      console.warn('Error al refrescar tablas:', e);
+    }
+  } catch (globalErr) {
+    console.error('Error durante el cierre en papel:', globalErr);
+    mostrarNotificacion('Error al procesar el cierre: ' + (globalErr.message || globalErr), 'error');
+  } finally {
+    if (btnSubmit) {
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = originalBtnText;
+      if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
     }
   }
 };

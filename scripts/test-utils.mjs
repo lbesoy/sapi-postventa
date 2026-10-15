@@ -2077,6 +2077,7 @@ assert.doesNotThrow(() => {
   guardarFirmaCanvas('ord-1', 'cliente');
   confirmarCierreOrdenAdmin('ord-1');
   confirmarReaperturaOrdenAdmin('ord-1');
+  confirmarCierrePapel({ preventDefault: () => {} });
 }, 'Las funciones de ordenes_detalle no deben arrojar error en ausencia de DOM');
 
 // Test D: Validación exhaustiva de mergeEvidencias (cero pérdida de evidencias)
