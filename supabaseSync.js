@@ -4531,12 +4531,22 @@ window.cargarDatosDeSupabase = function() {
         if (!sb) throw new Error('Supabase client no disponible');
 
         try {
-          // Descarga secuencial indexada: atributos ligeros (1.1s) + comentarios JSONB (0.4s)
-          const tktRes = await sb.from('tickets').select(lightCols).order('created_at', { ascending: false }).limit(1500);
+          // Descarga paralela indexada: atributos ligeros, comentarios JSONB y flags de existencia de PDFs
+          const [tktRes, comsRes, cotsRes, pedsRes] = await Promise.all([
+            sb.from('tickets').select(lightCols).order('created_at', { ascending: false }).limit(1500),
+            sb.from('tickets').select('id, comentarios_internos, comentarios_clientes').limit(1500),
+            sb.from('tickets').select('id').not('pdf_cotizacion', 'is', null).limit(1500),
+            sb.from('tickets').select('id').not('pdf_pedido', 'is', null).limit(1500)
+          ]);
           if (tktRes.error) throw tktRes.error;
-
-          const comsRes = await sb.from('tickets').select('id, comentarios_internos, comentarios_clientes').limit(1500);
           if (comsRes.error) throw comsRes.error;
+
+          if (cotsRes && cotsRes.data) {
+            idsWithCotizacion = new Set(cotsRes.data.map(x => x.id));
+          }
+          if (pedsRes && pedsRes.data) {
+            idsWithPedido = new Set(pedsRes.data.map(x => x.id));
+          }
 
           if (tktRes.data && Array.isArray(tktRes.data)) {
             const comsMap = new Map();

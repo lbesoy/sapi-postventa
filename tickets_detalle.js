@@ -654,11 +654,11 @@ function verDetalleTicket(id) {
       </div>
 
       <div class="detalle-grid">
-        ${t.pdfCotizacion ? field('PDF Cotización', `<div style="display:inline-flex; gap:0.25rem;"><button type="button" onclick="window.visualizarPdfOnDemand('${t.id}', 'cotizacion')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="eye" style="width:14px;height:14px;"></i> Ver</button><button type="button" onclick="window.descargarPdfOnDemand('${t.id}', 'cotizacion')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</button></div>`) : ''}
+        ${t.pdfCotizacion ? field('PDF Cotización', `<div style="display:inline-flex; gap:0.25rem;"><button type="button" onclick="window.visualizarPdfOnDemand('${t.id}', 'cotizacion')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="eye" style="width:14px;height:14px;"></i> Ver</button><button type="button" onclick="window.descargarPdfOnDemand('${t.id}', 'cotizacion')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</button></div>`) : (t.cotizacionSAP ? field('PDF Cotización', `<div style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="color:var(--text-muted); font-size:0.78rem;">Sin adjunto</span><input type="file" id="input-grid-pdf-cot-${t.id}" accept=".pdf" style="display:none;" onchange="window.adjuntarDocumentoTicketDirecto('${t.id}', 'cotizacion', this)" /><button type="button" onclick="document.getElementById('input-grid-pdf-cot-${t.id}').click()" class="btn-secondary" style="padding:0.15rem 0.45rem; font-size:0.72rem; cursor:pointer; display:inline-flex; align-items:center; gap:0.2rem;"><i data-lucide="upload" style="width:12px;height:12px;"></i> Adjuntar</button></div>`) : '')}
         ${t.cotAceptada ? field('Resultado', t.cotAceptada === 'si' ? '<span style="color:var(--green); display:inline-flex; align-items:center; gap:4px;"><i data-lucide="check-circle" style="width:14px;height:14px;"></i> Aprobada</span>' : '<span style="color:var(--red); display:inline-flex; align-items:center; gap:4px;"><i data-lucide="x-circle" style="width:14px;height:14px;"></i> Rechazada</span>') : ''}
         ${t.motivoRechazo ? field('Motivo Rechazo', t.motivoRechazo) : ''}
         ${t.pedidoSAP ? field('Pedido SAP', t.pedidoSAP) : ''}
-        ${t.pdfPedido ? field('PDF Pedido', `<div style="display:inline-flex; gap:0.25rem;"><button type="button" onclick="window.visualizarPdfOnDemand('${t.id}', 'pedido')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="eye" style="width:14px;height:14px;"></i> Ver</button><button type="button" onclick="window.descargarPdfOnDemand('${t.id}', 'pedido')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</button></div>`) : ''}
+        ${t.pdfPedido ? field('PDF Pedido', `<div style="display:inline-flex; gap:0.25rem;"><button type="button" onclick="window.visualizarPdfOnDemand('${t.id}', 'pedido')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="eye" style="width:14px;height:14px;"></i> Ver</button><button type="button" onclick="window.descargarPdfOnDemand('${t.id}', 'pedido')" class="btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</button></div>`) : (t.pedidoSAP ? field('PDF Pedido', `<div style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="color:var(--text-muted); font-size:0.78rem;">Sin adjunto</span><input type="file" id="input-grid-pdf-ped-${t.id}" accept=".pdf" style="display:none;" onchange="window.adjuntarDocumentoTicketDirecto('${t.id}', 'pedido', this)" /><button type="button" onclick="document.getElementById('input-grid-pdf-ped-${t.id}').click()" class="btn-secondary" style="padding:0.15rem 0.45rem; font-size:0.72rem; cursor:pointer; display:inline-flex; align-items:center; gap:0.2rem;"><i data-lucide="upload" style="width:12px;height:12px;"></i> Adjuntar</button></div>`) : '')}
         ${t.tecnicosAsignados && t.tecnicosAsignados.length > 0 ? field('Técnicos Asignados', t.tecnicosAsignados.join(', ')) : ''}
       </div>
       <div id="closed-pdf-extraction-${t.id}" style="margin-top: 1rem;"></div>
@@ -818,16 +818,31 @@ function verDetalleTicket(id) {
       </div>
       
       ${t.pdfCotizacion ? `
-      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:1rem; display:flex; align-items:center; justify-content:space-between; box-shadow: var(--shadow-sm);">
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:1rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; box-shadow: var(--shadow-sm);">
         <div style="display:flex; align-items:center; gap:0.5rem; font-weight:600; font-size:0.85rem; color:var(--text-secondary);">
           <i data-lucide="file-text" style="width:16px;height:16px;color:var(--accent);"></i> Archivo de Cotización
         </div>
-        <div style="display:flex; gap:0.25rem;">
+        <div style="display:flex; gap:0.25rem; align-items:center;">
           <button type="button" onclick="window.visualizarPdfOnDemand('${t.id}', 'cotizacion')" class="btn-secondary" style="padding:0.25rem 0.6rem; font-size:0.78rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="eye" style="width:14px;height:14px;"></i> Ver</button>
           <button type="button" onclick="window.descargarPdfOnDemand('${t.id}', 'cotizacion')" class="btn-secondary" style="padding:0.25rem 0.6rem; font-size:0.78rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="download" style="width:14px;height:14px;"></i> Descargar</button>
+          <input type="file" id="input-replace-pdf-cot-${t.id}" accept=".pdf" style="display:none;" onchange="window.adjuntarDocumentoTicketDirecto('${t.id}', 'cotizacion', this)" />
+          <button type="button" onclick="document.getElementById('input-replace-pdf-cot-${t.id}').click()" class="btn-secondary" title="Reemplazar archivo PDF" style="padding:0.25rem 0.5rem; font-size:0.78rem; border:1px solid var(--border); background:var(--bg-card); cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="upload" style="width:14px;height:14px;"></i></button>
         </div>
       </div>
-      ` : ''}
+      ` : `
+      <div style="background:var(--bg-card); border:1px dashed var(--border); border-radius:8px; padding:0.85rem 1rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; box-shadow: var(--shadow-sm);">
+        <div style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; color:var(--text-muted);">
+          <i data-lucide="file-question" style="width:16px;height:16px;color:#f59e0b;"></i>
+          <span>Sin archivo PDF de cotización adjunto</span>
+        </div>
+        <div>
+          <input type="file" id="input-adjuntar-pdf-cot-${t.id}" accept=".pdf" style="display:none;" onchange="window.adjuntarDocumentoTicketDirecto('${t.id}', 'cotizacion', this)" />
+          <button type="button" onclick="document.getElementById('input-adjuntar-pdf-cot-${t.id}').click()" class="btn-secondary" style="padding:0.3rem 0.75rem; font-size:0.8rem; border:1px solid var(--accent); color:var(--accent); background:rgba(232, 130, 12, 0.06); cursor:pointer; display:inline-flex; align-items:center; gap:0.35rem; font-weight:600; border-radius:6px;">
+            <i data-lucide="upload" style="width:14px;height:14px;"></i> Adjuntar PDF
+          </button>
+        </div>
+      </div>
+      `}
       
       <!-- Refacciones Solicitadas (Bloqueado / Lectura) -->
       <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:1rem; display:flex; flex-direction:column; gap:0.75rem; box-shadow: var(--shadow-sm);">
@@ -1359,6 +1374,73 @@ async function descargarPdfOnDemand(ticketId, tipo) {
     mostrarNotificacion('Error al descargar el archivo: ' + err.message, 'error');
   }
 };
+
+async function adjuntarDocumentoTicketDirecto(ticketId, tipo, fileInput) {
+  if (typeof document === 'undefined') return;
+  if (!fileInput || !fileInput.files || !fileInput.files[0]) return;
+  const file = fileInput.files[0];
+  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+    if (typeof mostrarNotificacion === 'function') mostrarNotificacion('Por favor, selecciona un archivo en formato PDF.', 'warning');
+    return;
+  }
+
+  const list = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : ((typeof window !== 'undefined' && Array.isArray(window.tickets)) ? window.tickets : []);
+  const t = list.find(x => x && (x.id === ticketId || x.folio === ticketId));
+  if (!t) {
+    if (typeof mostrarNotificacion === 'function') mostrarNotificacion('Ticket no encontrado.', 'error');
+    return;
+  }
+
+  const isPedido = tipo === 'pedido';
+  const label = isPedido ? 'pdfPedido' : 'pdfCotizacion';
+  const colName = isPedido ? 'pdf_pedido' : 'pdf_cotizacion';
+  const docName = isPedido ? 'pedido' : 'cotización';
+
+  if (typeof mostrarNotificacion === 'function') {
+    mostrarNotificacion(`Procesando y guardando PDF de ${docName}...`, 'info');
+  }
+
+  try {
+    const reader = new FileReader();
+    const base64 = await new Promise((resolve, reject) => {
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = (e) => reject(e);
+      reader.readAsDataURL(file);
+    });
+
+    t[label] = base64;
+
+    if (typeof safeSetJSON === 'function') {
+      safeSetJSON('sapi_tickets', list);
+    }
+
+    if (window.supabaseClient) {
+      const updatePayload = {};
+      updatePayload[colName] = base64;
+      const { error } = await window.supabaseClient
+        .from('tickets')
+        .update(updatePayload)
+        .eq('id', t.id);
+
+      if (error) {
+        console.warn(`Error al actualizar ${colName} en Supabase:`, error);
+      }
+    }
+
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion(`PDF de ${docName} adjuntado correctamente.`, 'success');
+    }
+
+    if (typeof verDetalleTicket === 'function') {
+      verDetalleTicket(t.id);
+    }
+  } catch (err) {
+    console.error(`Error al adjuntar PDF de ${docName}:`, err);
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion('Error al adjuntar archivo: ' + (err.message || err), 'error');
+    }
+  }
+}
 
 async function avanzarCotizacionTicket(id) {
   if (typeof document === 'undefined') return;
@@ -2184,7 +2266,8 @@ async function forzarCrearOrdenServicio(id) {
     cerrarCotizacionTicket: cerrarCotizacionTicket,
     cerrarDetalleTicket: cerrarDetalleTicket,
     forzarEstadoTicket: forzarEstadoTicket,
-    forzarCrearOrdenServicio: forzarCrearOrdenServicio
+    forzarCrearOrdenServicio: forzarCrearOrdenServicio,
+    adjuntarDocumentoTicketDirecto: adjuntarDocumentoTicketDirecto
   };
 
   if (typeof root !== "undefined") {
@@ -2205,6 +2288,7 @@ async function forzarCrearOrdenServicio(id) {
     window.cerrarDetalleTicket = cerrarDetalleTicket;
     window.forzarEstadoTicket = forzarEstadoTicket;
     window.forzarCrearOrdenServicio = forzarCrearOrdenServicio;
+    window.adjuntarDocumentoTicketDirecto = adjuntarDocumentoTicketDirecto;
   }
 
   return exports;
