@@ -690,54 +690,26 @@ function loadKitsServicio() {
   const isTest = typeof isTestModeActive === 'function' && isTestModeActive();
   const storageKey = isTest ? 'sapi_kits_servicio_sandbox' : 'sapi_kits_servicio';
 
-  // Configuración de entorno:
-  // - Sandbox: Contiene los 36 machotes de ejemplo / prueba para referencia del equipo
-  // - Producción (Real): Inicia en 0 ([]) para que el equipo cree los machotes oficiales desde cero
-  if (!localStorage.getItem('sapi_kits_env_swap_sandbox_v4')) {
-    localStorage.setItem('sapi_kits_env_swap_sandbox_v4', 'true');
-    try {
-      // 1. Limpiar producción a lista vacía []
-      if (typeof safeSetJSON === 'function') {
-        safeSetJSON('sapi_kits_servicio', []);
-      } else {
-        localStorage.setItem('sapi_kits_servicio', JSON.stringify([]));
-      }
-      if (typeof window.pushToSupabase === 'function') {
-        window.pushToSupabase('kits_servicio', []);
-      }
-
-      // 2. Cargar los 36 machotes en Sandbox
-      if (typeof safeSetJSON === 'function') {
-        safeSetJSON('sapi_kits_servicio_sandbox', KITS_PRECARGADOS_DEFAULT);
-      } else {
-        localStorage.setItem('sapi_kits_servicio_sandbox', JSON.stringify(KITS_PRECARGADOS_DEFAULT));
-      }
-      if (typeof window.pushToSupabase === 'function') {
-        window.pushToSupabase('kits_servicio_sandbox', KITS_PRECARGADOS_DEFAULT);
-      }
-    } catch(e) {
-      console.warn('[Kits] Error al inicializar partición sandbox/producción:', e);
-    }
-  }
-
   try {
     const raw = (typeof safeGetJSON === 'function') 
       ? safeGetJSON(storageKey, null) 
       : JSON.parse(localStorage.getItem(storageKey) || 'null');
-    if (Array.isArray(raw)) {
+    if (Array.isArray(raw) && raw.length > 0) {
       return raw;
     }
   } catch (e) {
     console.warn('[Kits] Error leyendo kits locales:', e);
   }
 
-  // En Sandbox, si aún no hay datos inicializamos con los 36 machotes de prueba
-  if (isTest) {
-    window.saveKitsServicio(KITS_PRECARGADOS_DEFAULT);
-    return [...KITS_PRECARGADOS_DEFAULT];
+  // Si no hay datos registrados aún, inicializar con el catálogo de machotes oficiales precargados
+  const defaults = (typeof KITS_PRECARGADOS_DEFAULT !== 'undefined' && Array.isArray(KITS_PRECARGADOS_DEFAULT))
+    ? KITS_PRECARGADOS_DEFAULT
+    : [];
+  if (defaults.length > 0) {
+    saveKitsServicio(defaults);
+    return [...defaults];
   }
 
-  // En Modo Real (Producción), si no hay datos se mantiene limpio en 0 ([])
   return [];
 };
 
@@ -749,8 +721,10 @@ function saveKitsServicio(kits) {
   try {
     if (typeof safeSetJSON === 'function') {
       safeSetJSON(storageKey, kits);
+      safeSetJSON(storageKey + '_backup', kits);
     } else {
       localStorage.setItem(storageKey, JSON.stringify(kits));
+      localStorage.setItem(storageKey + '_backup', JSON.stringify(kits));
     }
     // Sincronizar con Supabase en la tabla config
     if (typeof window.pushToSupabase === 'function') {

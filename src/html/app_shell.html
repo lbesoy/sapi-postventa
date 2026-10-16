@@ -282,8 +282,9 @@
         <a href="#" class="nav-item" data-view="gastos" data-title="Control de Gastos" id="nav-gastos">
           <span class="nav-icon"><i data-lucide="receipt"></i></span><span>Control de Gastos</span>
         </a>
-        <a href="#" class="nav-item" data-view="rentas" data-title="Rentas" id="nav-rentas">
+        <a href="#" class="nav-item" data-view="rentas" data-title="Rentas (En Desarrollo)" id="nav-rentas">
           <span class="nav-icon"><i data-lucide="key-round"></i></span><span>Rentas</span>
+          <span style="font-size: 0.65rem; background: rgba(232, 130, 12, 0.15); color: var(--accent); padding: 1px 5px; border-radius: 4px; font-weight: 700; margin-left: auto;">DEV</span>
           <span class="nav-badge" id="nav-badge-rentas" style="display:none;"></span>
         </a>
         <a href="#" class="nav-item" data-view="clientes" data-title="Clientes" id="nav-clientes">
@@ -396,6 +397,11 @@
               </div>
             </div>
           </div>
+
+          <!-- Theme Toggle (Modo Oscuro / Claro) -->
+          <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="window.toggleTheme()" title="Cambiar modo oscuro / claro" aria-label="Cambiar tema">
+            <i data-lucide="sun" id="theme-toggle-icon" style="width:16px; height:16px;"></i>
+          </button>
 
           <div class="session-badge" id="session-badge" onclick="abrirSesionModal()">
             <div class="session-avatar" id="session-avatar">S</div>

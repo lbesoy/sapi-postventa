@@ -497,12 +497,16 @@ function ticketToRow(t) {
     es_prueba: !!(t.esPrueba || (t.folio && t.folio.includes('PRUEBA')) || (t.asunto && t.asunto.startsWith('[PRUEBA]')))
   };
 
-  // Solo incluir campos PDF si tienen el Base64 real y no un marcador
-  if (t.pdfPedido !== undefined && t.pdfPedido !== '__HAS_PDF__' && t.pdfPedido !== true) {
+  // Solo incluir campos PDF si tienen el Base64/URL real y no un marcador ni null para evitar borrar PDFs existentes en la nube
+  if (t.pdfPedido && typeof t.pdfPedido === 'string' && t.pdfPedido !== '__HAS_PDF__' && t.pdfPedido !== 'true') {
     row.pdf_pedido = t.pdfPedido;
+  } else if (t._borrarPdfPedido) {
+    row.pdf_pedido = null;
   }
-  if (t.pdfCotizacion !== undefined && t.pdfCotizacion !== '__HAS_PDF__' && t.pdfCotizacion !== true) {
+  if (t.pdfCotizacion && typeof t.pdfCotizacion === 'string' && t.pdfCotizacion !== '__HAS_PDF__' && t.pdfCotizacion !== 'true') {
     row.pdf_cotizacion = t.pdfCotizacion;
+  } else if (t._borrarPdfCotizacion) {
+    row.pdf_cotizacion = null;
   }
 
   return row;
@@ -1889,7 +1893,7 @@ async function _executePushToSupabase(tabla, item) {
   // Determinar si la operación debe ser ONLINE-ONLY (directa a Supabase sin encolar offline)
   let isOnlineOnly = false;
   
-  if (tabla === 'tickets' || tabla === 'ordenes' || tabla === 'ideas_fallas' || tabla === 'envios' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'servicios_no_preventivos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora') {
+  if (tabla === 'tickets' || tabla === 'ordenes' || tabla === 'ideas_fallas' || tabla === 'envios' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'servicios_no_preventivos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora' || tabla === 'kits_servicio' || tabla === 'kits_servicio_sandbox' || tabla === 'machotes_servicio') {
     isOnlineOnly = true;
   }
 
@@ -1897,7 +1901,7 @@ async function _executePushToSupabase(tabla, item) {
     const sb = window.supabaseClient;
     const isOffline = (typeof navigator !== 'undefined' && !navigator.onLine) || !sb;
     if (isOffline) {
-      if (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'servicios_no_preventivos' || tabla === 'envios' || tabla === 'ideas_fallas') {
+      if (tabla === 'ordenes' || tabla === 'tickets' || tabla === 'levantamientos' || tabla === 'calendario_eventos' || tabla === 'orden_bitacora' || tabla === 'rentas' || tabla === 'servicios_preventivos' || tabla === 'servicios_no_preventivos' || tabla === 'envios' || tabla === 'ideas_fallas' || tabla === 'kits_servicio' || tabla === 'kits_servicio_sandbox' || tabla === 'machotes_servicio') {
         console.warn(`[Direct Push] Sin conexión con la base de datos para guardar en ${tabla}. Encolando en sync queue local.`);
         addToSyncQueue(tabla, 'upsert', item);
         if (typeof window.mostrarNotificacion === 'function' && tabla !== 'calendario_eventos' && tabla !== 'orden_bitacora') {
@@ -1912,8 +1916,15 @@ async function _executePushToSupabase(tabla, item) {
     }
     
     // Mapear el objeto de negocio a fila de Supabase si aplica
+    let targetTabla = tabla;
     let row = item;
-    if (tabla === 'ordenes' && typeof window.ordenToRow === 'function') {
+    if (tabla === 'kits_servicio' || tabla === 'machotes_servicio') {
+      targetTabla = 'config';
+      row = { id: 'kits_servicio', data: item, updated_at: new Date().toISOString() };
+    } else if (tabla === 'kits_servicio_sandbox') {
+      targetTabla = 'config';
+      row = { id: 'kits_servicio_sandbox', data: item, updated_at: new Date().toISOString() };
+    } else if (tabla === 'ordenes' && typeof window.ordenToRow === 'function') {
       row = window.ordenToRow(item);
     } else if (tabla === 'tickets' && typeof window.ticketToRow === 'function') {
       row = window.ticketToRow(item);
@@ -2008,7 +2019,7 @@ async function _executePushToSupabase(tabla, item) {
     const upsertOptions = (row.id) ? { onConflict: 'id' } : undefined;
     let error = null;
     try {
-      const resUpsert = await sb.from(tabla).upsert(row, upsertOptions);
+      const resUpsert = await sb.from(targetTabla).upsert(row, upsertOptions);
       error = resUpsert.error;
     } catch (netErr) {
       error = { message: netErr?.message || 'Failed to fetch', isException: true };
@@ -4170,34 +4181,39 @@ window.cargarDatosDeSupabase = function() {
             }
           }
           const kitsCfg = configDb.find(c => c.id === 'kits_servicio' || c.id === 'machotes_servicio');
-          if (kitsCfg && Array.isArray(kitsCfg.data)) {
+          if (kitsCfg && Array.isArray(kitsCfg.data) && kitsCfg.data.length > 0) {
             if (typeof safeSetJSON === 'function') {
               safeSetJSON('sapi_kits_servicio', kitsCfg.data);
             } else {
               localStorage.setItem('sapi_kits_servicio', JSON.stringify(kitsCfg.data));
             }
           } else {
-            // En modo Real, si no hay kits registrados en Supabase, la lista en produccion es vacia
-            if (typeof safeSetJSON === 'function') {
-              safeSetJSON('sapi_kits_servicio', []);
-            } else {
-              localStorage.setItem('sapi_kits_servicio', JSON.stringify([]));
+            // Preservar kits existentes locales o recuperar desde precargados si no hay nada
+            const curLocal = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_kits_servicio', null) : JSON.parse(localStorage.getItem('sapi_kits_servicio') || 'null');
+            if (!Array.isArray(curLocal) || curLocal.length === 0) {
+              const defKits = (typeof KITS_PRECARGADOS_DEFAULT !== 'undefined' && Array.isArray(KITS_PRECARGADOS_DEFAULT)) ? KITS_PRECARGADOS_DEFAULT : [];
+              if (defKits.length > 0) {
+                if (typeof safeSetJSON === 'function') safeSetJSON('sapi_kits_servicio', defKits);
+                else localStorage.setItem('sapi_kits_servicio', JSON.stringify(defKits));
+              }
             }
           }
 
           const kitsSandboxCfg = configDb.find(c => c.id === 'kits_servicio_sandbox');
-          if (kitsSandboxCfg && Array.isArray(kitsSandboxCfg.data)) {
+          if (kitsSandboxCfg && Array.isArray(kitsSandboxCfg.data) && kitsSandboxCfg.data.length > 0) {
             if (typeof safeSetJSON === 'function') {
               safeSetJSON('sapi_kits_servicio_sandbox', kitsSandboxCfg.data);
             } else {
               localStorage.setItem('sapi_kits_servicio_sandbox', JSON.stringify(kitsSandboxCfg.data));
             }
           } else {
-            // En modo Sandbox, si no hay kits registrados en Supabase, la lista de pruebas inicia vacía
-            if (typeof safeSetJSON === 'function') {
-              safeSetJSON('sapi_kits_servicio_sandbox', []);
-            } else {
-              localStorage.setItem('sapi_kits_servicio_sandbox', JSON.stringify([]));
+            const curSbox = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_kits_servicio_sandbox', null) : JSON.parse(localStorage.getItem('sapi_kits_servicio_sandbox') || 'null');
+            if (!Array.isArray(curSbox) || curSbox.length === 0) {
+              const defKits = (typeof KITS_PRECARGADOS_DEFAULT !== 'undefined' && Array.isArray(KITS_PRECARGADOS_DEFAULT)) ? KITS_PRECARGADOS_DEFAULT : [];
+              if (defKits.length > 0) {
+                if (typeof safeSetJSON === 'function') safeSetJSON('sapi_kits_servicio_sandbox', defKits);
+                else localStorage.setItem('sapi_kits_servicio_sandbox', JSON.stringify(defKits));
+              }
             }
           }
 

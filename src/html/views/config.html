@@ -332,11 +332,11 @@
                 </div>
                 <div class="toggle-row">
                   <div>
-                    <div class="toggle-label">Modo Oscuro</div>
-                    <div class="toggle-sub">Apágalo para activar el modo claro</div>
+                    <div class="toggle-label">Modo Oscuro / Claro</div>
+                    <div class="toggle-sub">Alterna entre el modo oscuro y modo claro</div>
                   </div>
                   <label class="toggle-switch">
-                    <input type="checkbox" id="cfg-darkmode" checked />
+                    <input type="checkbox" id="cfg-darkmode" checked onchange="window.toggleTheme(this.checked)" />
                     <span class="toggle-track"></span>
                   </label>
                 </div>

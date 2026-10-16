@@ -237,11 +237,15 @@ const MARCAS_RENDER = {
 // Inicialización del Portal
 async function inicializarPortal() {
   // Inicializar Tema (Oscuro por defecto)
-  const savedTheme = localStorage.getItem('theme_mode') || 'dark';
-  if (savedTheme === 'light') {
+  const isLight = localStorage.getItem('theme_mode') === 'light' || localStorage.getItem('eurorep_darkmode') === 'false';
+  if (isLight) {
     document.body.classList.add('light-mode');
     const icon = document.getElementById('theme-icon');
     if (icon) icon.setAttribute('data-lucide', 'moon');
+  } else {
+    document.body.classList.remove('light-mode');
+    const icon = document.getElementById('theme-icon');
+    if (icon) icon.setAttribute('data-lucide', 'sun');
   }
   
   // Lucide Icons
@@ -4924,19 +4928,34 @@ function getLogoByBrand(brand) {
 }
 
 // Tema Oscuro / Claro
-function toggleTheme() {
-  const isLight = document.body.classList.toggle('light-mode');
-  const icon = document.getElementById('theme-icon');
-  
-  if (isLight) {
-    localStorage.setItem('theme_mode', 'light');
-    if (icon) icon.setAttribute('data-lucide', 'moon');
+function toggleTheme(forceDark) {
+  let isLight;
+  if (typeof forceDark === 'boolean') {
+    isLight = !forceDark;
+    if (isLight) {
+      document.body.classList.add('light-mode');
+    } else {
+      document.body.classList.remove('light-mode');
+    }
   } else {
-    localStorage.setItem('theme_mode', 'dark');
-    if (icon) icon.setAttribute('data-lucide', 'sun');
+    isLight = document.body.classList.toggle('light-mode');
   }
-  lucide.createIcons();
+
+  localStorage.setItem('theme_mode', isLight ? 'light' : 'dark');
+  localStorage.setItem('eurorep_darkmode', isLight ? 'false' : 'true');
+
+  const icon = document.getElementById('theme-icon');
+  if (icon && icon.parentElement) {
+    icon.parentElement.innerHTML = '<i data-lucide="' + (isLight ? 'moon' : 'sun') + '" id="theme-icon"></i>';
+  }
+  if (typeof window.safeCreateIcons === 'function') {
+    window.safeCreateIcons();
+  } else if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    try { lucide.createIcons(); } catch (e) {}
+  }
+  return !isLight;
 }
+window.toggleTheme = toggleTheme;
 
 // Toast Notifications
 function showToast(message, type = 'info') {

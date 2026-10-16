@@ -1431,8 +1431,20 @@ function inicializarApp() {
   
   // Theme check
   try {
-    if (localStorage.getItem('eurorep_darkmode') === 'false') {
-      document.body.classList.add('light-mode');
+    if (typeof window.initTheme === 'function') {
+      window.initTheme();
+    } else {
+      const isDark = localStorage.getItem('eurorep_darkmode') !== 'false' && localStorage.getItem('theme_mode') !== 'light';
+      if (!isDark) {
+        document.body.classList.add('light-mode');
+      } else {
+        document.body.classList.remove('light-mode');
+      }
+      const isLight = document.body.classList.contains('light-mode');
+      const topbarBtn = document.getElementById('theme-toggle-btn');
+      if (topbarBtn) {
+        topbarBtn.innerHTML = '<i data-lucide="' + (isLight ? 'moon' : 'sun') + '" id="theme-toggle-icon" style="width:16px;height:16px;"></i>';
+      }
     }
   } catch (err) {
     console.error('Error applying theme:', err);
@@ -2149,6 +2161,19 @@ window.isTestUser = isTestUser;
 window.getFilteredOrders = getFilteredOrders;
 window.getFilteredTickets = getFilteredTickets;
 
+function isEntornoDesarrolloRentas() {
+  if (typeof window === 'undefined') return true;
+  const host = window.location.hostname || '';
+  const port = window.location.port || '';
+  if (!host || host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local') || ['3005', '5173', '5000', '8080'].includes(port)) {
+    return true;
+  }
+  if (window.location.search && window.location.search.includes('dev=rentas')) return true;
+  if (typeof localStorage !== 'undefined' && localStorage.getItem('eurorep_rentas_dev_enabled') === 'true') return true;
+  return false;
+}
+window.isEntornoDesarrolloRentas = isEntornoDesarrolloRentas;
+
 function applyRole(rolKey) {
   try {
     const user = usuarios.find(u => u.id === currentSession.userId);
@@ -2158,6 +2183,11 @@ function applyRole(rolKey) {
     // Show/hide nav items
     document.querySelectorAll('.nav-item[data-view]').forEach(item => {
       const v = item.dataset.view;
+      if (v === 'rentas') {
+        const canSeeRentas = isEntornoDesarrolloRentas();
+        item.style.display = (navViews.includes(v) && canSeeRentas) ? '' : 'none';
+        return;
+      }
       item.style.display = navViews.includes(v) ? '' : 'none';
     });
 
@@ -2366,7 +2396,7 @@ function updateTopbarButtons(view, role) {
   } else if (view === 'levantamientos') {
     if (btnLevantamiento && ['superadmin', 'admin', 'supervisor', 'tecnico'].includes(role)) btnLevantamiento.style.display = '';
   } else if (view === 'rentas') {
-    if (btnRenta && ['superadmin', 'admin', 'supervisor', 'tecnico'].includes(role)) btnRenta.style.display = '';
+    if (btnRenta && ['superadmin', 'admin', 'supervisor', 'tecnico'].includes(role) && isEntornoDesarrolloRentas()) btnRenta.style.display = '';
   }
 }
 
@@ -2766,6 +2796,7 @@ function setupNav() {
           renderTecnicosConfig();
           renderPermisosRoles();
           cargarListaQueriesSAP();
+          if (typeof cargarConfig === 'function') cargarConfig();
         }
         if (view === 'servicios') { renderTabla('servicios'); renderStats(); }
         if (view === 'rentas' && typeof renderRentas === 'function') renderRentas();
@@ -2792,6 +2823,7 @@ function setupNav() {
           // renderStats() ya invoca internamente a renderDashboardV2() si existe
         }
         if (view === 'preferencias') {
+          if (typeof cargarConfig === 'function') cargarConfig();
           if (typeof renderServiciosProgramadosTecnico === 'function') {
             renderServiciosProgramadosTecnico();
           }

@@ -57,18 +57,16 @@ function cargarConfig() {
   if (configData.queryOrdenes && document.getElementById('cfg-query-ordenes')) document.getElementById('cfg-query-ordenes').value = configData.queryOrdenes;
   if (configData.queryRefacciones && document.getElementById('cfg-query-refacciones')) document.getElementById('cfg-query-refacciones').value = configData.queryRefacciones;
 
+  initTheme();
   const dmToggle = document.getElementById('cfg-darkmode');
   if (dmToggle) {
-    dmToggle.checked = localStorage.getItem('eurorep_darkmode') !== 'false';
-    dmToggle.addEventListener('change', (e) => {
-      if (e.target.checked) {
-        document.body.classList.remove('light-mode');
-        localStorage.setItem('eurorep_darkmode', 'true');
-      } else {
-        document.body.classList.add('light-mode');
-        localStorage.setItem('eurorep_darkmode', 'false');
-      }
-    });
+    dmToggle.checked = !document.body.classList.contains('light-mode');
+    if (!dmToggle._hasThemeListener) {
+      dmToggle._hasThemeListener = true;
+      dmToggle.addEventListener('change', (e) => {
+        toggleTheme(e.target.checked);
+      });
+    }
   }
 
   // Cargar configuración de OneDrive
@@ -519,10 +517,78 @@ function filtrarRutaDiagrama(ruta, btn) {
   });
 }
 
+function toggleTheme(forceDark) {
+  if (typeof document === 'undefined') return;
+  let isLight;
+  if (typeof forceDark === 'boolean') {
+    isLight = !forceDark;
+    if (isLight) {
+      document.body.classList.add('light-mode');
+    } else {
+      document.body.classList.remove('light-mode');
+    }
+  } else {
+    isLight = document.body.classList.toggle('light-mode');
+  }
+
+  try {
+    localStorage.setItem('eurorep_darkmode', isLight ? 'false' : 'true');
+    localStorage.setItem('theme_mode', isLight ? 'light' : 'dark');
+  } catch (e) {}
+
+  const dmToggle = document.getElementById('cfg-darkmode');
+  if (dmToggle) {
+    dmToggle.checked = !isLight;
+  }
+
+  const topbarBtn = document.getElementById('theme-toggle-btn');
+  if (topbarBtn) {
+    topbarBtn.innerHTML = '<i data-lucide="' + (isLight ? 'moon' : 'sun') + '" id="theme-toggle-icon" style="width:16px;height:16px;"></i>';
+  }
+  const clienteIcon = document.getElementById('theme-icon');
+  if (clienteIcon && clienteIcon.parentElement) {
+    clienteIcon.parentElement.innerHTML = '<i data-lucide="' + (isLight ? 'moon' : 'sun') + '" id="theme-icon"></i>';
+  }
+
+  if (typeof window !== 'undefined' && typeof window.safeCreateIcons === 'function') {
+    window.safeCreateIcons();
+  } else if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    try { lucide.createIcons(); } catch (e) {}
+  }
+  return !isLight;
+}
+
+function initTheme() {
+  if (typeof document === 'undefined') return;
+  let isDark = true;
+  try {
+    isDark = localStorage.getItem('eurorep_darkmode') !== 'false' && localStorage.getItem('theme_mode') !== 'light';
+  } catch (e) {}
+  if (!isDark) {
+    document.body.classList.add('light-mode');
+  } else {
+    document.body.classList.remove('light-mode');
+  }
+  const isLight = document.body.classList.contains('light-mode');
+  const dmToggle = document.getElementById('cfg-darkmode');
+  if (dmToggle) dmToggle.checked = !isLight;
+  const topbarBtn = document.getElementById('theme-toggle-btn');
+  if (topbarBtn) {
+    topbarBtn.innerHTML = '<i data-lucide="' + (isLight ? 'moon' : 'sun') + '" id="theme-toggle-icon" style="width:16px;height:16px;"></i>';
+  }
+  if (typeof window !== 'undefined' && typeof window.safeCreateIcons === 'function') {
+    window.safeCreateIcons();
+  } else if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    try { lucide.createIcons(); } catch (e) {}
+  }
+}
+
 // Interoperabilidad en navegador clásico
 if (typeof window !== 'undefined') {
   window.cargarConfig = cargarConfig;
   window.guardarConfig = guardarConfig;
+  window.toggleTheme = toggleTheme;
+  window.initTheme = initTheme;
   window.toggleOneDriveDemoMode = toggleOneDriveDemoMode;
   window.guardarOneDriveConfig = guardarOneDriveConfig;
   window.initTableResizers = initTableResizers;
@@ -543,6 +609,8 @@ if (typeof window !== 'undefined') {
 export {
   cargarConfig,
   guardarConfig,
+  toggleTheme,
+  initTheme,
   toggleOneDriveDemoMode,
   guardarOneDriveConfig,
   initTableResizers,

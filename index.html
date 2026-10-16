@@ -282,8 +282,9 @@
         <a href="#" class="nav-item" data-view="gastos" data-title="Control de Gastos" id="nav-gastos">
           <span class="nav-icon"><i data-lucide="receipt"></i></span><span>Control de Gastos</span>
         </a>
-        <a href="#" class="nav-item" data-view="rentas" data-title="Rentas" id="nav-rentas">
+        <a href="#" class="nav-item" data-view="rentas" data-title="Rentas (En Desarrollo)" id="nav-rentas">
           <span class="nav-icon"><i data-lucide="key-round"></i></span><span>Rentas</span>
+          <span style="font-size: 0.65rem; background: rgba(232, 130, 12, 0.15); color: var(--accent); padding: 1px 5px; border-radius: 4px; font-weight: 700; margin-left: auto;">DEV</span>
           <span class="nav-badge" id="nav-badge-rentas" style="display:none;"></span>
         </a>
         <a href="#" class="nav-item" data-view="clientes" data-title="Clientes" id="nav-clientes">
@@ -396,6 +397,11 @@
               </div>
             </div>
           </div>
+
+          <!-- Theme Toggle (Modo Oscuro / Claro) -->
+          <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="window.toggleTheme()" title="Cambiar modo oscuro / claro" aria-label="Cambiar tema">
+            <i data-lucide="sun" id="theme-toggle-icon" style="width:16px; height:16px;"></i>
+          </button>
 
           <div class="session-badge" id="session-badge" onclick="abrirSesionModal()">
             <div class="session-avatar" id="session-avatar">S</div>
@@ -2590,11 +2596,11 @@
                 </div>
                 <div class="toggle-row">
                   <div>
-                    <div class="toggle-label">Modo Oscuro</div>
-                    <div class="toggle-sub">Apágalo para activar el modo claro</div>
+                    <div class="toggle-label">Modo Oscuro / Claro</div>
+                    <div class="toggle-sub">Alterna entre el modo oscuro y modo claro</div>
                   </div>
                   <label class="toggle-switch">
-                    <input type="checkbox" id="cfg-darkmode" checked />
+                    <input type="checkbox" id="cfg-darkmode" checked onchange="window.toggleTheme(this.checked)" />
                     <span class="toggle-track"></span>
                   </label>
                 </div>
@@ -3374,7 +3380,15 @@
 
         <!-- RENTAS VIEW -->
         <div id="view-rentas" class="view">
-          <div style="height: 1.25rem; width: 100%; flex-shrink: 0;"></div>
+          <div style="height: 0.75rem; width: 100%; flex-shrink: 0;"></div>
+
+          <!-- Banner de Entorno de Desarrollo -->
+          <div id="rentas-dev-banner" style="background: rgba(232, 130, 12, 0.1); border: 1px solid rgba(232, 130, 12, 0.3); border-radius: 8px; padding: 0.6rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; color: var(--text-primary);">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem;">EN DESARROLLO</span>
+              <span>Módulo de Rentas activo en entorno local de pruebas (oculto al público en producción).</span>
+            </div>
+          </div>
 
           <!-- Subtabs Header: Contratos vs Servicios Preventivos -->
           <div class="rentas-subtabs-nav" style="display: flex; gap: 0.5rem; border-bottom: 2px solid var(--border); margin-bottom: 1.5rem; padding-bottom: 0;">
