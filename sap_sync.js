@@ -2511,6 +2511,23 @@
       const sapCliente = data.cliente || '';
       const sapFecha = data.fecha ? new Date(data.fecha).toLocaleDateString('es-MX') : '—';
       
+      // Auto-completar monto si estaba vacío o en 0 pero en Supabase ya tiene un valor válido
+      if ((!montoVal || montoVal === 0) && sapMonto > 0 && montoInput) {
+        montoInput.value = sapMonto.toFixed(2);
+        montoVal = sapMonto;
+      }
+
+      // Actualizar cache local si la cotización tenía monto desactualizado
+      if (typeof global !== 'undefined' && global._cacheCotizacionesSap) {
+        const cached = global._cacheCotizacionesSap.find(q => String(q.numero_cotizacion) === String(sapVal));
+        if (cached && Number(cached.monto) !== sapMonto) {
+          cached.monto = sapMonto;
+          if (typeof global.saveCatalogOffline === 'function') {
+            global.saveCatalogOffline('eurorep_cotizaciones_sap', global._cacheCotizacionesSap);
+          }
+        }
+      }
+      
       let isMontoMatch = Math.abs(montoVal - sapMonto) < 0.05;
       
       const tClientName = isModal

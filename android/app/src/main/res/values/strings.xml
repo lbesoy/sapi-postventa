@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SAPI Postventa</string>
+    <string name="title_activity_main">SAPI Postventa</string>
+    <string name="package_name">com.eurorep.sapi</string>
+    <string name="custom_url_scheme">com.eurorep.sapi</string>
+</resources>

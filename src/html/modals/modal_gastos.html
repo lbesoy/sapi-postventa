@@ -161,9 +161,12 @@
               <div style="font-size:0.82rem; font-weight:600; color:var(--text-primary); display:flex; align-items:center; gap:0.4rem;">
                 <i data-lucide="upload-cloud" style="color:var(--accent); width:16px; height:16px;"></i> Sube tu evidencia
               </div>
-              <div>
-                <button type="button" onclick="document.getElementById('gasto-evidencia-file').click()" class="btn-secondary" style="display:flex; align-items:center; justify-content:center; gap:0.5rem; padding:0.65rem; font-size:0.75rem; font-weight:600; min-height:auto; border-style:dashed; border-radius:6px; width:100%; border-color:var(--border);">
-                  <i data-lucide="camera" style="width:16px;height:16px;color:var(--text-muted);"></i> Cargar Ticket / Recibo
+              <div style="display:flex; gap:0.5rem;">
+                <button type="button" onclick="window.tomarFotoNativaGasto()" class="btn-secondary" style="flex:1; display:flex; align-items:center; justify-content:center; gap:0.35rem; padding:0.65rem; font-size:0.75rem; font-weight:600; min-height:auto; border-style:dashed; border-radius:6px; border-color:var(--accent); color:var(--accent);">
+                  <i data-lucide="camera" style="width:16px;height:16px;"></i> Tomar Foto
+                </button>
+                <button type="button" onclick="document.getElementById('gasto-evidencia-file').click()" class="btn-secondary" style="flex:1; display:flex; align-items:center; justify-content:center; gap:0.35rem; padding:0.65rem; font-size:0.75rem; font-weight:600; min-height:auto; border-style:dashed; border-radius:6px; border-color:var(--border);">
+                  <i data-lucide="image" style="width:16px;height:16px;color:var(--text-muted);"></i> Galería
                 </button>
               </div>
               <button type="button" onclick="abrirOneDrivePicker()" class="btn-secondary" style="display:flex; align-items:center; justify-content:center; gap:0.5rem; padding:0.5rem 0.75rem; font-size:0.75rem; font-weight:600; min-height:auto; border-radius:6px; width:100%; margin-top:0.4rem; background:rgba(0,120,212,0.06); border:1px solid rgba(0,120,212,0.25); color:#0078d4; transition:var(--transition); font-family:inherit;" onmouseover="this.style.background='rgba(0,120,212,0.12)'" onmouseout="this.style.background='rgba(0,120,212,0.06)'">

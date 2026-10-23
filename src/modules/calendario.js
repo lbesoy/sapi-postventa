@@ -324,6 +324,17 @@ function getFestivosMexico(year) {
   return festivos;
 }
 
+function toggleCalendarLegend() {
+  if (typeof document === 'undefined') return;
+  const card = document.getElementById('cal-legend-card');
+  if (!card) return;
+  card.classList.toggle('open');
+  const btn = card.querySelector('.calendar-legend-header');
+  if (btn) {
+    btn.setAttribute('aria-expanded', card.classList.contains('open') ? 'true' : 'false');
+  }
+}
+
 function renderCalendario() {
   const container = document.getElementById('calendar-container');
   if (!container) return;
@@ -839,30 +850,31 @@ function renderCalendario() {
     }
   });
 
+
   const isMobileCalendar = window.innerWidth <= 768;
   const initialViewType = prevView || (isMobileCalendar ? 'listWeek' : 'dayGridMonth');
   calendarInstance = new FullCalendar.Calendar(container, {
     locale: 'es',
     allDayText: 'Todo el día',
-    noEventsText: 'No hay eventos para mostrar',
+    noEventsText: 'No hay actividades para mostrar',
     initialView: initialViewType,
     initialDate: prevDate || undefined,
     firstDay: 1, // Start on Monday
     headerToolbar: isMobileCalendar ? {
-      left: 'prev,next',
+      left: 'prev,next today',
       center: 'title',
-      right: 'listWeek,timeGridDay'
+      right: 'listWeek,dayGridMonth,timeGridDay'
     } : {
       left: 'prev,next today',
       center: 'title',
-      right: 'dayGridMonth,timeGridWeek,timeGridDay'
+      right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
     },
     buttonText: {
       today: 'Hoy',
       month: 'Mes',
       week: 'Semana',
       day: 'Día',
-      list: 'Lista'
+      list: 'Agenda'
     },
     events: eventosUnicos,
     eventClick: function(info) {
@@ -883,14 +895,14 @@ function renderCalendario() {
       if (arg.event.extendedProps.isFestivo) {
         const iconName = arg.event.extendedProps.icon || 'calendar';
         return {
-          html: `<div style="background-color:${bgColor}; border:1px solid ${arg.event.borderColor}; border-radius:3px; font-size:0.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:2px 4px; color:${arg.event.textColor}; width:100%; box-sizing:border-box; display:flex; align-items:center; gap:0.25rem;" title="${arg.event.title}">
-                   <i data-lucide="${iconName}" style="width:12px; height:12px;"></i>
-                   <b>${arg.event.title}</b>
+          html: `<div class="fc-holiday-pill" style="background-color:${bgColor}; border:1px solid ${arg.event.borderColor}; color:${arg.event.textColor}; padding:2px 6px; border-radius:4px; font-size:0.72rem; display:flex; align-items:center; gap:4px; overflow:hidden;" title="${arg.event.title}">
+                   <i data-lucide="${iconName}" style="width:12px; height:12px; flex-shrink:0;"></i>
+                   <b style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${arg.event.title}</b>
                  </div>`
         };
       }
 
-      let timeText = arg.timeText || '';
+      // VISTA MES (dayGridMonth)
       if (arg.view.type === 'dayGridMonth') {
         const p = arg.event.extendedProps || {};
         let startHour = '';
@@ -908,25 +920,69 @@ function renderCalendario() {
         }
         const timeHtml = startHour ? `<b>${startHour}</b> ` : '';
         return {
-          html: `<div style="background-color:${bgColor}; border-radius:3px; font-size:0.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:2px 4px; color:white; width:100%; box-sizing:border-box; box-shadow: 0 1px 2px rgba(0,0,0,0.15);" title="${arg.event.title}">
+          html: `<div class="fc-month-event-pill" style="background-color:${bgColor}; border-radius:4px; font-size:0.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:2px 5px; color:#ffffff; width:100%; box-sizing:border-box; box-shadow: 0 1px 2px rgba(0,0,0,0.15); font-weight:500;" title="${arg.event.title}">
                    ${timeHtml}${arg.event.title}
                  </div>`
         };
       }
 
+      // VISTA AGENDA / LISTA (listWeek, listDay, listMonth)
+      if (arg.view.type.startsWith('list')) {
+        const p = arg.event.extendedProps || {};
+        const tecNombre = p.tecnico || 'Técnico';
+        const rawTitle = arg.event.title || '';
+        
+        let displayTitle = rawTitle;
+        let badgeText = '';
+
+        if (p.isTraslado || rawTitle.includes('🚗')) {
+          badgeText = 'Traslado';
+        } else if (p.isLevantamiento) {
+          badgeText = 'Levantamiento';
+        } else if (p.isAdminEvent) {
+          badgeText = p.tipo || 'Actividad';
+        } else if (p.isBitacora) {
+          badgeText = p.equipo || 'Servicio';
+        }
+
+        let ordenFolio = '';
+        if (p.ordenId) {
+          ordenFolio = String(p.ordenId).startsWith('OS-') ? p.ordenId : '';
+        }
+        if (!ordenFolio) {
+          const match = rawTitle.match(/OS-\d+/i);
+          if (match) ordenFolio = match[0];
+        }
+
+        return {
+          html: `<div class="fc-custom-agenda-card" style="border-left-color:${bgColor};">
+                   <div class="fc-agenda-header-row">
+                     <span class="fc-agenda-title">${displayTitle}</span>
+                     ${ordenFolio ? `<span class="fc-agenda-folio-badge">${ordenFolio}</span>` : ''}
+                   </div>
+                   <div class="fc-agenda-meta-row">
+                     <span class="fc-agenda-tech"><i data-lucide="user"></i> ${tecNombre}</span>
+                     ${p.cliente && !displayTitle.includes(p.cliente) ? `<span class="fc-agenda-client"><i data-lucide="building-2"></i> ${p.cliente}</span>` : ''}
+                     ${badgeText && !displayTitle.includes(badgeText) ? `<span class="fc-agenda-tag">${badgeText}</span>` : ''}
+                   </div>
+                 </div>`
+        };
+      }
+
+      // VISTA HORAS (timeGridWeek, timeGridDay)
+      let timeText = arg.timeText || '';
       if (!arg.event.allDay && arg.event.extendedProps.entrada) {
         timeText = arg.event.extendedProps.entrada;
         if (arg.event.extendedProps.salida) {
           timeText += ` a ${arg.event.extendedProps.salida}`;
         }
       }
-
-      const timeHtml = timeText ? `<div style="font-weight:700; margin-bottom:1px; font-size:0.7rem; color:rgba(255,255,255,0.9);">${timeText}</div>` : '';
+      const timeHtml = timeText ? `<div style="font-weight:700; margin-bottom:2px; font-size:0.7rem; color:rgba(255,255,255,0.95);">${timeText}</div>` : '';
       
       return {
-        html: `<div style="background-color:${bgColor}; border-radius:3px; font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:3px 4px; color:white; width:100%; box-sizing:border-box; box-shadow: 0 1px 2px rgba(0,0,0,0.2);" title="${arg.event.title}">
+        html: `<div class="fc-timegrid-event-box" style="background-color:${bgColor}; border-radius:4px; font-size:0.75rem; overflow:hidden; text-overflow:ellipsis; padding:4px 6px; color:#ffffff; width:100%; box-sizing:border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.25);" title="${arg.event.title}">
                  ${timeHtml}<b>${arg.event.title}</b><br/>
-                 <span style="font-size:0.65rem; opacity:0.85;">${arg.event.extendedProps.tecnico || 'Sin asignar'}</span>
+                 <span style="font-size:0.68rem; opacity:0.9;">${arg.event.extendedProps.tecnico || 'Sin asignar'}</span>
                </div>`
       };
     },
@@ -1447,6 +1503,7 @@ if (typeof window !== "undefined") {
   window.eliminarActividadCalendario = eliminarActividadCalendario;
   window.mostrarPopupBitacora = mostrarPopupBitacora;
   window.matchTecnico = matchTecnico;
+  window.toggleCalendarLegend = toggleCalendarLegend;
 }
 
 
@@ -1462,5 +1519,6 @@ export {
   mostrarDetalleEventoAdministrativo,
   guardarActividadCalendario,
   eliminarActividadCalendario,
-  mostrarPopupBitacora
+  mostrarPopupBitacora,
+  toggleCalendarLegend
 };

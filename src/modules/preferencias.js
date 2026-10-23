@@ -10,7 +10,7 @@
  */
 
 function safeGetJSON(key, defaultVal) {
-  if (typeof window !== 'undefined' && typeof window.safeGetJSON === 'function') {
+  if (typeof window !== 'undefined' && typeof window.safeGetJSON === 'function' && window.safeGetJSON !== safeGetJSON) {
     return window.safeGetJSON(key, defaultVal);
   }
   try {
@@ -524,17 +524,24 @@ function toggleTheme(forceDark) {
     isLight = !forceDark;
     if (isLight) {
       document.body.classList.add('light-mode');
+      document.documentElement.classList.add('light-mode');
     } else {
       document.body.classList.remove('light-mode');
+      document.documentElement.classList.remove('light-mode');
     }
   } else {
     isLight = document.body.classList.toggle('light-mode');
+    document.documentElement.classList.toggle('light-mode', isLight);
   }
 
   try {
     localStorage.setItem('eurorep_darkmode', isLight ? 'false' : 'true');
     localStorage.setItem('theme_mode', isLight ? 'light' : 'dark');
   } catch (e) {}
+
+  if (typeof window !== 'undefined' && typeof window.syncCapacitorStatusBar === 'function') {
+    window.syncCapacitorStatusBar(isLight);
+  }
 
   const dmToggle = document.getElementById('cfg-darkmode');
   if (dmToggle) {
@@ -566,10 +573,15 @@ function initTheme() {
   } catch (e) {}
   if (!isDark) {
     document.body.classList.add('light-mode');
+    document.documentElement.classList.add('light-mode');
   } else {
     document.body.classList.remove('light-mode');
+    document.documentElement.classList.remove('light-mode');
   }
   const isLight = document.body.classList.contains('light-mode');
+  if (typeof window !== 'undefined' && typeof window.syncCapacitorStatusBar === 'function') {
+    window.syncCapacitorStatusBar(isLight);
+  }
   const dmToggle = document.getElementById('cfg-darkmode');
   if (dmToggle) dmToggle.checked = !isLight;
   const topbarBtn = document.getElementById('theme-toggle-btn');

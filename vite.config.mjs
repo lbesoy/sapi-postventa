@@ -7,6 +7,9 @@ export default defineConfig({
     port: 3000,
     open: false,
     cors: true,
+    watch: {
+      ignored: ['**/android/**', '**/dist/**', '**/.temp_icons/**', '**/.git/**']
+    }
   },
   // Configuración de compilación multi-página
   build: {

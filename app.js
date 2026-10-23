@@ -448,6 +448,118 @@ function escapeHTML(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
+function showView(viewName) {
+  if (typeof document === 'undefined') return;
+  const navItem = document.querySelector(`.nav-item[data-view="${viewName}"]`);
+  if (navItem) {
+    navItem.click();
+    return;
+  }
+  const viewEl = document.getElementById('view-' + viewName);
+  if (!viewEl) return;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  viewEl.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.dataset.view === viewName) n.classList.add('active');
+    else n.classList.remove('active');
+  });
+  const MORE_VIEWS = ['gastos', 'preferencias', 'levantamientos', 'envios'];
+  const masNavItem = document.getElementById('nav-mobile-mas');
+  if (masNavItem) {
+    if (MORE_VIEWS.includes(viewName)) {
+      masNavItem.classList.add('active');
+    } else {
+      masNavItem.classList.remove('active');
+    }
+  }
+  if (typeof window !== 'undefined') {
+    window.currentView = viewName;
+    if (typeof window.updateMobileFabVisibility === 'function') {
+      window.updateMobileFabVisibility(viewName);
+    }
+  }
+}
+if (typeof window !== 'undefined') {
+  window.showView = showView;
+}
+
+// ===== MOBILE "MÁS" BOTTOM SHEET CONTROLS =====
+function isMobileMoreSheetOpen() {
+  const sheet = document.getElementById('mobile-more-sheet');
+  return !!(sheet && sheet.classList.contains('open'));
+}
+
+function openMobileMoreSheet() {
+  const sheet = document.getElementById('mobile-more-sheet');
+  const backdrop = document.getElementById('mobile-more-backdrop');
+  if (sheet) sheet.classList.add('open');
+  if (backdrop) backdrop.classList.add('open');
+  document.body.classList.add('sheet-open');
+
+  // Populate user info dynamically in header
+  try {
+    if (typeof currentSession !== 'undefined' && currentSession) {
+      const nameEl = document.getElementById('mobile-sheet-user-name');
+      const roleEl = document.getElementById('mobile-sheet-user-role');
+      const avEl = document.getElementById('mobile-sheet-avatar');
+      const uName = currentSession.nombre || currentSession.usuario || 'Técnico Eurorep';
+      if (nameEl) nameEl.textContent = uName;
+      if (roleEl) {
+        const rLabel = (window.ROLES && window.ROLES[currentSession.rol]?.label) || currentSession.rol || 'Técnico de Campo';
+        roleEl.textContent = rLabel;
+      }
+      if (avEl) avEl.textContent = (uName.trim()[0] || 'T').toUpperCase();
+    }
+  } catch (err) {
+    console.warn('[MobileSheet] Error al actualizar cabecera:', err);
+  }
+
+  if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
+}
+
+function closeMobileMoreSheet() {
+  const sheet = document.getElementById('mobile-more-sheet');
+  const backdrop = document.getElementById('mobile-more-backdrop');
+  if (sheet) sheet.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('open');
+  document.body.classList.remove('sheet-open');
+}
+
+function toggleMobileMoreSheet(e) {
+  if (e) {
+    if (typeof e.preventDefault === 'function') e.preventDefault();
+    if (typeof e.stopPropagation === 'function') e.stopPropagation();
+  }
+  if (isMobileMoreSheetOpen()) {
+    closeMobileMoreSheet();
+  } else {
+    openMobileMoreSheet();
+  }
+}
+
+function selectMobileMoreView(viewName) {
+  closeMobileMoreSheet();
+  if (typeof showView === 'function') {
+    showView(viewName);
+  }
+  const MORE_VIEWS = ['gastos', 'preferencias', 'levantamientos', 'envios'];
+  const masNavItem = document.getElementById('nav-mobile-mas');
+  if (masNavItem && MORE_VIEWS.includes(viewName)) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    masNavItem.classList.add('active');
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.isMobileMoreSheetOpen = isMobileMoreSheetOpen;
+  window.openMobileMoreSheet = openMobileMoreSheet;
+  window.closeMobileMoreSheet = closeMobileMoreSheet;
+  window.toggleMobileMoreSheet = toggleMobileMoreSheet;
+  window.selectMobileMoreView = selectMobileMoreView;
+}
 if (typeof window !== 'undefined') window.escapeHTML = escapeHTML;
 
 function calcularDiasJunta(fechaStr) {
@@ -776,6 +888,7 @@ async function procesarActualizacionSupabaseUI() {
     if (document.getElementById('view-dashboard')?.classList.contains('active')) {
       if (typeof renderStats === 'function') renderStats();
       if (typeof renderTickets === 'function') renderTickets('dash-tickets');
+      if (typeof renderMobileHomeDashboard === 'function') renderMobileHomeDashboard();
     }
     if (document.getElementById('view-tickets')?.classList.contains('active')) {
       if (typeof renderTickets === 'function') renderTickets();
@@ -2118,6 +2231,7 @@ function actualizarVistaActual() {
   try { renderStats(); } catch(e){}
   try { renderDashboardV2(); } catch(e){}
   try { renderDashboardTecnicos(); } catch(e){}
+  try { if (typeof renderMobileHomeDashboard === 'function') renderMobileHomeDashboard(); } catch(e){}
   try { renderTecnicos(); } catch(e){}
   try { 
     if (typeof window.actualizarTodosLosBadges === 'function') {
@@ -2178,7 +2292,21 @@ function applyRole(rolKey) {
   try {
     const user = usuarios.find(u => u.id === currentSession.userId);
     const rol = ROLES[rolKey] || ROLES.superadmin;
-    const navViews = rol.views;
+    let navViews = Array.isArray(rol.views) ? [...rol.views] : [];
+
+    const isMobileApp = !!(
+      (typeof window !== 'undefined' && window.IS_MOBILE_APP) ||
+      (typeof window !== 'undefined' && window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) ||
+      (typeof document !== 'undefined' && (document.body.classList.contains('is-native-app') || document.body.classList.contains('is-android')))
+    );
+
+    if (isMobileApp) {
+      const MOBILE_ALLOWED_VIEWS = ['dashboard', 'servicios', 'tickets', 'calendario', 'gastos', 'preferencias', 'levantamientos', 'envios'];
+      navViews = navViews.filter(v => MOBILE_ALLOWED_VIEWS.includes(v));
+      if (navViews.length === 0) {
+        navViews = MOBILE_ALLOWED_VIEWS;
+      }
+    }
 
     // Show/hide nav items
     document.querySelectorAll('.nav-item[data-view]').forEach(item => {
@@ -2391,7 +2519,21 @@ function updateTopbarButtons(view, role) {
       btnMaquina.style.display = 'none';
     }
   } else if (view === 'servicios') {
-    if (btnOrden && ['superadmin', 'admin', 'supervisor'].includes(role)) btnOrden.style.display = '';
+    const isMobileAppEnv = (typeof window !== 'undefined' && (
+      window.IS_MOBILE_APP ||
+      (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) ||
+      (typeof document !== 'undefined' && document.body && (
+        document.body.classList.contains('is-android') ||
+        document.body.classList.contains('is-native-app') ||
+        document.body.classList.contains('is-mobile-app')
+      )) ||
+      (typeof window !== 'undefined' && window.innerWidth <= 768)
+    ));
+    if (btnOrden && ['superadmin', 'admin', 'supervisor'].includes(role) && !isMobileAppEnv) {
+      btnOrden.style.display = '';
+    } else if (btnOrden) {
+      btnOrden.style.display = 'none';
+    }
     if (typeof window.actualizarBadgeDepuradorOrdenes === 'function') window.actualizarBadgeDepuradorOrdenes();
   } else if (view === 'levantamientos') {
     if (btnLevantamiento && ['superadmin', 'admin', 'supervisor', 'tecnico'].includes(role)) btnLevantamiento.style.display = '';
@@ -2743,10 +2885,36 @@ function agregarUsuario(...args) {
 function setupNav() {
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', (e) => {
-      e.preventDefault();
+      if (item.id === 'nav-mobile-mas') return;
+      const view = item.dataset.view;
+      if (typeof window !== 'undefined') {
+        window.currentView = view;
+        if (typeof window.updateMobileFabVisibility === 'function') {
+          window.updateMobileFabVisibility(view);
+        }
+      }
+      const isMobileApp = !!(
+        (typeof window !== 'undefined' && window.IS_MOBILE_APP) ||
+        (typeof window !== 'undefined' && window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) ||
+        (typeof document !== 'undefined' && (document.body.classList.contains('is-native-app') || document.body.classList.contains('is-android')))
+      );
+      if (isMobileApp) {
+        const MOBILE_ALLOWED_VIEWS = ['dashboard', 'servicios', 'tickets', 'calendario', 'gastos', 'preferencias', 'levantamientos', 'envios'];
+        if (!MOBILE_ALLOWED_VIEWS.includes(view)) return;
+      }
+
       document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
       item.classList.add('active');
-      const view = item.dataset.view;
+
+      const MORE_VIEWS = ['gastos', 'preferencias', 'levantamientos', 'envios'];
+      const masNavItem = document.getElementById('nav-mobile-mas');
+      if (masNavItem) {
+        if (MORE_VIEWS.includes(view)) {
+          masNavItem.classList.add('active');
+        } else {
+          masNavItem.classList.remove('active');
+        }
+      }
       const viewEl = document.getElementById('view-' + view);
       
       // Cerrar sidebar en móvil
@@ -2820,7 +2988,9 @@ function setupNav() {
         }
         if (view === 'dashboard') {
           renderStats();
-          // renderStats() ya invoca internamente a renderDashboardV2() si existe
+          if (typeof renderMobileHomeDashboard === 'function') {
+            renderMobileHomeDashboard();
+          }
         }
         if (view === 'preferencias') {
           if (typeof cargarConfig === 'function') cargarConfig();

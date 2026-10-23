@@ -4338,6 +4338,38 @@ window.procesarEvidenciaGasto = async function(e) {
   }
 };
 
+window.tomarFotoNativaGasto = async function() {
+  if (typeof window.capturarFotoNativa !== 'function') {
+    const fallbackInput = document.getElementById('gasto-evidencia-file');
+    if (fallbackInput) fallbackInput.click();
+    return;
+  }
+  try {
+    const dataUrl = await window.capturarFotoNativa({ quality: 75, maxWidth: 1200, sourceType: 'camera' });
+    if (!dataUrl) return;
+
+    window._gastoEvidenciaBase64 = dataUrl;
+
+    if (!window._gastoUploadedFiles) window._gastoUploadedFiles = [];
+    window._gastoUploadedFiles = window._gastoUploadedFiles.filter(x => x.type !== 'ticket');
+    window._gastoUploadedFiles.push({
+      type: 'ticket',
+      base64: dataUrl
+    });
+
+    if (typeof window.renderUploaderSidebar === 'function') {
+      window.renderUploaderSidebar();
+    }
+    if (window.mostrarNotificacion) {
+      mostrarNotificacion('Ticket capturado con cámara y comprimido.', 'success');
+    }
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+  } catch (err) {
+    console.error('[Gastos] Error al capturar foto de ticket:', err);
+    if (window.mostrarNotificacion) mostrarNotificacion('Error al capturar foto del ticket', 'error');
+  }
+};
+
 window.eliminarEvidenciaGasto = function() {
   window.quitarSidebarFile('ticket');
 };

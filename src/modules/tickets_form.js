@@ -2258,10 +2258,11 @@ async function guardarTicket(e) {
     }
   }
 
-  // Asegurar generación automática de Guía de Envío si el ticket tiene refacciones
+  // Asegurar generación automática de Guía de Envío SOLO si el ticket tiene pedido confirmado
   if (typeof window.asegurarGuiaEnvioParaTicket === 'function') {
     const isRefCat = String(ticket.categoria || '').toLowerCase().includes('refacci') || String(ticket.categoria || '').toLowerCase().includes('garant') || (ticket.folio && ticket.folio.endsWith('-A'));
-    if (isRefCat || (ticket.refaccionesSeleccionadas && ticket.refaccionesSeleccionadas.length > 0)) {
+    const hasOrder = (typeof window.ticketTienePedidoOEnvioValido === 'function') ? window.ticketTienePedidoOEnvioValido(ticket) : (ticket.pedidoSAP || ticket.pdfPedido || ticket.guiaPedido);
+    if ((isRefCat || (ticket.refaccionesSeleccionadas && ticket.refaccionesSeleccionadas.length > 0)) && hasOrder) {
       window.asegurarGuiaEnvioParaTicket(ticket);
     }
   }

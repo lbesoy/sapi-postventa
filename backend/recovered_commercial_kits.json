@@ -1,0 +1,510 @@
+[
+  {
+    "id": "kit-custom-1791907148319",
+    "marca": "RUBBLE MASTER",
+    "modelo": "RM120X",
+    "nombre": "ST100h - RM120X",
+    "piezas": [
+      {
+        "marca": "RBM",
+        "codigo": "360140N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE ACEITE PARA RM 100, Y 120 GO"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "360141N",
+        "sistema": "Combustible",
+        "cantidad": 1,
+        "descripcion": "KIT DE FILTROS  COMBUSTIBLE RM 100 Y RM 120 GO"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "360142N",
+        "sistema": "Aire / Admisión",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE AIRE PRIMARIO PARA RM 80,100,120 Y J110X"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "361007N",
+        "sistema": "Aire / Admisión",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE AIRE SECUNDARIO RM 80.100,120 Y J110X"
+      },
+      {
+        "marca": "OTM",
+        "codigo": "AP31624N",
+        "sistema": "Motor",
+        "cantidad": 2,
+        "descripcion": "CUBETA 19 LTS  ACEITE MULTIGRADO 15 W 40 JHON DEERE"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "REP2N",
+        "sistema": "General",
+        "cantidad": 1,
+        "descripcion": "GRASA BASE LITIO RALOY E-P2"
+      }
+    ],
+    "esOficial": false,
+    "intervalo": "100",
+    "descripcion": "Primer mantenimiento, servicio a motor, engrasado, revisión de puntos de seguridad, llenado de hoja de servicio RM para confirmacion de la garantia"
+  },
+  {
+    "id": "kit-custom-1791923256116",
+    "marca": "RUBBLE MASTER",
+    "modelo": "HS7500M",
+    "nombre": "ST250h - HS7500M",
+    "piezas": [
+      {
+        "marca": "RBM",
+        "codigo": "7W2326N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE ACEITE MOTOR P/CRIBA  RM MSC5700 Y MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "3608960N",
+        "sistema": "Combustible",
+        "cantidad": 2,
+        "descripcion": "FILTRO DE COMBUSTIBLE CRIBA RM MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "4395037N",
+        "sistema": "Combustible",
+        "cantidad": 1,
+        "descripcion": "FILTRO SEPARADOR DE AGUA CRIBA RM MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "3212412N",
+        "sistema": "Aire / Admisión",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE AIRE SECUNDARIO CRIBA RM MSC5700 Y MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "3212411N",
+        "sistema": "Aire / Admisión",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE AIRE PRIMARIO CRIBA RM MSC5700 Y MSC10500"
+      },
+      {
+        "marca": "OTM",
+        "codigo": "AP31624N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "CUBETA 19 LTS  ACEITE MULTIGRADO 15 W 40 JHON DEERE"
+      }
+    ],
+    "esOficial": false,
+    "intervalo": "250",
+    "descripcion": ""
+  },
+  {
+    "id": "kit-custom-1791937459156",
+    "marca": "RUBBLE MASTER",
+    "modelo": "RM120X",
+    "nombre": "ST250H - RM120X",
+    "piezas": [
+      {
+        "marca": "RBM",
+        "codigo": "360140N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE ACEITE PARA RM 100, Y 120 GO"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "360141N",
+        "sistema": "Combustible",
+        "cantidad": 1,
+        "descripcion": "KIT DE FILTROS  COMBUSTIBLE RM 100 Y RM 120 GO"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "360142N",
+        "sistema": "Aire / Admisión",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE AIRE PRIMARIO PARA RM 80,100,120 Y J110X"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "361007N",
+        "sistema": "Aire / Admisión",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE AIRE SECUNDARIO RM 80.100,120 Y J110X"
+      },
+      {
+        "marca": "OTM",
+        "codigo": "AP31624N",
+        "sistema": "Motor",
+        "cantidad": 2,
+        "descripcion": "CUBETA 19 LTS  ACEITE MULTIGRADO 15 W 40 JHON DEERE"
+      }
+    ],
+    "esOficial": false,
+    "intervalo": "250",
+    "descripcion": "Reemplazo de filtros de motor e inspección de puntos de seguridad, desgaste de cámara de trituración, bandas de trasporte y transmisión"
+  },
+  {
+    "id": "kit-custom-1791937536016",
+    "marca": "RUBBLE MASTER",
+    "modelo": "RM120X",
+    "nombre": "ST2000H - RM120X",
+    "piezas": [
+      {
+        "marca": "RBM",
+        "codigo": "360140N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE ACEITE PARA RM 100, Y 120 GO"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "360141N",
+        "sistema": "Combustible",
+        "cantidad": 1,
+        "descripcion": "KIT DE FILTROS  COMBUSTIBLE RM 100 Y RM 120 GO"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "360142N",
+        "sistema": "Aire / Admisión",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE AIRE PRIMARIO PARA RM 80,100,120 Y J110X"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "361007N",
+        "sistema": "Aire / Admisión",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE AIRE SECUNDARIO RM 80.100,120 Y J110X"
+      },
+      {
+        "marca": "OTM",
+        "codigo": "AP31624N",
+        "sistema": "Motor",
+        "cantidad": 2,
+        "descripcion": "CUBETA 19 LTS  ACEITE MULTIGRADO 15 W 40 JHON DEERE"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "50046319",
+        "sistema": "Hidráulico",
+        "cantidad": 1,
+        "descripcion": "Filtro hidraulico RM120X - Retorno"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "50013044",
+        "sistema": "Hidráulico",
+        "cantidad": 1,
+        "descripcion": "FILTRO HIDRAULICO RM120GO! - RM120X - Respiradero"
+      },
+      {
+        "marca": "OTM",
+        "codigo": "HT300N",
+        "sistema": "Motor",
+        "cantidad": 4,
+        "descripcion": "CUBETA DE ACEITE HIDRAULICO HT300 ROSHFRANS"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "REP2N",
+        "sistema": "General",
+        "cantidad": 1,
+        "descripcion": "GRASA BASE LITIO RALOY E-P2"
+      },
+      {
+        "marca": "OTM",
+        "codigo": "80W90N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "ACEITE DE TRANSMISION MULTIGRADO 80W90"
+      },
+      {
+        "marca": "OTM",
+        "codigo": "COOLANT",
+        "sistema": "General",
+        "cantidad": 3,
+        "descripcion": "ANTICONGELANTE HEAVY DUTY 19 LTS"
+      }
+    ],
+    "esOficial": false,
+    "intervalo": "2000",
+    "descripcion": "Reemplazo de filtros de motor e inspección de puntos de seguridad, desgaste de cámara de trituración, bandas de trasporte y transmisión, cambio de filtros hidráulicos y aceite. Limpieza de tableros electricos, purga de tanque de combustible"
+  },
+  {
+    "id": "kit-custom-1791938132564",
+    "marca": "RUBBLE MASTER",
+    "modelo": "MSC10500M-3D",
+    "nombre": "ST100H - MSC10500M-3D",
+    "piezas": [
+      {
+        "marca": "RBM",
+        "codigo": "7W2326N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE ACEITE MOTOR P/CRIBA  RM MSC5700 Y MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "3608960N",
+        "sistema": "Combustible",
+        "cantidad": 2,
+        "descripcion": "FILTRO DE COMBUSTIBLE CRIBA RM MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "4395037N",
+        "sistema": "Combustible",
+        "cantidad": 1,
+        "descripcion": "FILTRO SEPARADOR DE AGUA CRIBA RM MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "3212412N",
+        "sistema": "Aire / Admisión",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE AIRE SECUNDARIO CRIBA RM MSC5700 Y MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "3212411N",
+        "sistema": "Aire / Admisión",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE AIRE PRIMARIO CRIBA RM MSC5700 Y MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "359028",
+        "sistema": "Hidráulico",
+        "cantidad": 2,
+        "descripcion": "FILTRO HIDRAULICO DE MSC1500M, MSC8500M, HS7000, HS5500, MXJ1100"
+      },
+      {
+        "marca": "OTM",
+        "codigo": "AP31624N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "CUBETA 19 LTS  ACEITE MULTIGRADO 15 W 40 JHON DEERE"
+      },
+      {
+        "marca": "OTM",
+        "codigo": "80W90N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "ACEITE DE TRANSMISION MULTIGRADO 80W90"
+      }
+    ],
+    "esOficial": false,
+    "intervalo": "100",
+    "descripcion": "Primer servicio a criba, cambio de aceites y filtros de motor, cambio de filtro hidráulico de retorno, cambio de aceite de reductor de alimentador y mandos finales. Llenado de formato de garantía. Revision de puntos de seguridad"
+  },
+  {
+    "id": "kit-custom-1791938214990",
+    "marca": "RUBBLE MASTER",
+    "modelo": "MSC10500M-3D",
+    "nombre": "ST250H - MSC10500M-3D",
+    "piezas": [
+      {
+        "marca": "RBM",
+        "codigo": "7W2326N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE ACEITE MOTOR P/CRIBA  RM MSC5700 Y MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "3608960N",
+        "sistema": "Combustible",
+        "cantidad": 2,
+        "descripcion": "FILTRO DE COMBUSTIBLE CRIBA RM MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "4395037N",
+        "sistema": "Combustible",
+        "cantidad": 1,
+        "descripcion": "FILTRO SEPARADOR DE AGUA CRIBA RM MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "3212412N",
+        "sistema": "Aire / Admisión",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE AIRE SECUNDARIO CRIBA RM MSC5700 Y MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "3212411N",
+        "sistema": "Aire / Admisión",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE AIRE PRIMARIO CRIBA RM MSC5700 Y MSC10500"
+      },
+      {
+        "marca": "OTM",
+        "codigo": "AP31624N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "CUBETA 19 LTS  ACEITE MULTIGRADO 15 W 40 JHON DEERE"
+      }
+    ],
+    "esOficial": false,
+    "intervalo": "250",
+    "descripcion": "Primer servicio a criba, cambio de aceites y filtros de motor. Revisión de puntos de seguridad"
+  },
+  {
+    "id": "kit-custom-1791938704597",
+    "marca": "RUBBLE MASTER",
+    "modelo": "MSC10500M-3D",
+    "nombre": "ST500h - MSC10500M-3D",
+    "piezas": [
+      {
+        "marca": "RBM",
+        "codigo": "7W2326N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE ACEITE MOTOR P/CRIBA  RM MSC5700 Y MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "3608960N",
+        "sistema": "Combustible",
+        "cantidad": 2,
+        "descripcion": "FILTRO DE COMBUSTIBLE CRIBA RM MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "4395037N",
+        "sistema": "Combustible",
+        "cantidad": 1,
+        "descripcion": "FILTRO SEPARADOR DE AGUA CRIBA RM MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "3212412N",
+        "sistema": "Aire / Admisión",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE AIRE SECUNDARIO CRIBA RM MSC5700 Y MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "3212411N",
+        "sistema": "Aire / Admisión",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE AIRE PRIMARIO CRIBA RM MSC5700 Y MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "359028",
+        "sistema": "Hidráulico",
+        "cantidad": 2,
+        "descripcion": "FILTRO HIDRAULICO DE MSC1500M, MSC8500M, HS7000, HS5500, MXJ1100"
+      },
+      {
+        "marca": "OTM",
+        "codigo": "AP31624N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "CUBETA 19 LTS  ACEITE MULTIGRADO 15 W 40 JHON DEERE"
+      },
+      {
+        "marca": "OTM",
+        "codigo": "80W90N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "ACEITE DE TRANSMISION MULTIGRADO 80W90"
+      }
+    ],
+    "esOficial": false,
+    "intervalo": "500",
+    "descripcion": "Primer servicio a criba, cambio de aceites y filtros de motor, cambio de filtro hidráulico de retorno, cambio de aceite de reductor de alimentador y mandos finales. Llenado de formato de garantía. Revisión de puntos de seguridad"
+  },
+  {
+    "id": "kit-custom-1791938845853",
+    "marca": "RUBBLE MASTER",
+    "modelo": "MSC10500M-3D",
+    "nombre": "ST2000H - MSC10500M-3D",
+    "piezas": [
+      {
+        "marca": "RBM",
+        "codigo": "7W2326N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE ACEITE MOTOR P/CRIBA  RM MSC5700 Y MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "3608960N",
+        "sistema": "Combustible",
+        "cantidad": 2,
+        "descripcion": "FILTRO DE COMBUSTIBLE CRIBA RM MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "4395037N",
+        "sistema": "Combustible",
+        "cantidad": 1,
+        "descripcion": "FILTRO SEPARADOR DE AGUA CRIBA RM MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "3212412N",
+        "sistema": "Aire / Admisión",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE AIRE SECUNDARIO CRIBA RM MSC5700 Y MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "3212411N",
+        "sistema": "Aire / Admisión",
+        "cantidad": 1,
+        "descripcion": "FILTRO DE AIRE PRIMARIO CRIBA RM MSC5700 Y MSC10500"
+      },
+      {
+        "marca": "RBM",
+        "codigo": "359028",
+        "sistema": "Hidráulico",
+        "cantidad": 2,
+        "descripcion": "FILTRO HIDRAULICO DE MSC1500M, MSC8500M, HS7000, HS5500, MXJ1100"
+      },
+      {
+        "marca": "OTM",
+        "codigo": "AP31624N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "CUBETA 19 LTS  ACEITE MULTIGRADO 15 W 40 JHON DEERE"
+      },
+      {
+        "marca": "OTM",
+        "codigo": "80W90N",
+        "sistema": "Motor",
+        "cantidad": 1,
+        "descripcion": "ACEITE DE TRANSMISION MULTIGRADO 80W90"
+      },
+      {
+        "marca": "OTM",
+        "codigo": "HT300N",
+        "sistema": "Motor",
+        "cantidad": 18,
+        "descripcion": "CUBETA DE ACEITE HIDRAULICO HT300 ROSHFRANS"
+      },
+      {
+        "marca": "OTM",
+        "codigo": "COOLANT",
+        "sistema": "General",
+        "cantidad": 2,
+        "descripcion": "ANTICONGELANTE HEAVY DUTY 19 LTS"
+      }
+    ],
+    "esOficial": false,
+    "intervalo": "2000",
+    "descripcion": "Primer servicio a criba, cambio de aceites y filtros de motor, cambio de filtros hidráulicos y aceite cambio de aceite de reductor de alimentador y mandos finales. Cambio de anticongelante. Llenado de formato de garantía. Revisión de puntos de seguridad"
+  }
+]

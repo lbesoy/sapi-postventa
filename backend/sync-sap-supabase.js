@@ -462,18 +462,21 @@ async function fetchCotizacionesFromSAP() {
   // Fallback a OData estándar de SAP (Quotations)
   try {
     log('Consultando cotizaciones de SAP (OData)...');
-    let url = `${SAP_URL}/Quotations?$select=DocNum,DocDate,DocTotal,CardName,Cancelled&$filter=Cancelled eq 'tNO'`;
+    let url = `${SAP_URL}/Quotations?$select=DocNum,DocDate,DocTotal,CardName,Cancelled&$filter=Cancelled eq 'tNO'&$orderby=DocEntry desc`;
     let allQuotes = [];
     let page = 1;
 
     while (url) {
       log(`- Obteniendo página ${page} de cotizaciones...`);
-      const qRes = await sapApi.get(url, { timeout: 15000 });
+      const qRes = await sapApi.get(url, {
+        headers: { 'Prefer': 'odata.maxpagesize=100' },
+        timeout: 15000
+      });
       const items = qRes.data.value || [];
       allQuotes = allQuotes.concat(items);
       url = qRes.data['odata.nextLink'] ? `${SAP_URL}/${qRes.data['odata.nextLink']}` : null;
       page++;
-      if (page > 100) break;
+      if (page > 30) break;
     }
 
     log(`✅ Cotizaciones obtenidas de SAP (${allQuotes.length} registros).`);

@@ -159,7 +159,7 @@ if (typeof window !== 'undefined' && typeof Storage !== 'undefined') {
         let parsedData = JSON.parse(value);
         scheduleDbWrite(key, parsedData);
       } catch (e) {
-        console.error('[IndexedDB Bridge] Error al parsear para guardar:', key, e);
+        scheduleDbWrite(key, value);
       }
       return;
     }

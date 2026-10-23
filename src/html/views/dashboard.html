@@ -1,5 +1,99 @@
         <div id="view-dashboard" class="view active">
 
+          <!-- ===== DASHBOARD MÓVIL (NATIVO PARA TÉCNICOS / APP) ===== -->
+          <div id="dash-mobile-home" class="mobile-only-home">
+            <!-- 1. Header Saludo y Perfil -->
+            <div class="mobile-app-hero">
+              <div class="mobile-hero-info">
+                <span class="mobile-hero-badge"><i data-lucide="shield-check" style="width:12px;height:12px;"></i> Eurorep SAPI</span>
+                <h2 class="mobile-hero-name" id="mob-user-greeting">Hola, Técnico 👋</h2>
+                <p class="mobile-hero-date" id="mob-date-display">Cargando fecha...</p>
+              </div>
+              <div class="mobile-hero-logo-box" onclick="abrirSesionModal()" id="mob-avatar-btn" title="Eurorep SAPI">
+                <img src="logo_transparent.png" alt="Eurorep" class="mobile-hero-logo-img" />
+                <span id="mob-avatar-char" style="display:none;">T</span>
+              </div>
+            </div>
+
+            <!-- 2. Módulos Principales (Órdenes, Tickets, Levantamientos, Envíos) -->
+            <div class="mobile-section-header" style="margin-top: 1.25rem;">
+              <span class="mobile-section-title">Módulos de Trabajo</span>
+              <button type="button" class="mobile-refresh-btn" onclick="renderMobileHomeDashboard()" title="Actualizar">
+                <i data-lucide="refresh-cw"></i>
+              </button>
+            </div>
+
+            <div class="mobile-modules-list">
+              <!-- Módulo 1: Órdenes de Servicio -->
+              <div class="mobile-module-card card-blue" onclick="showView('servicios')">
+                <div class="mobile-module-icon">
+                  <i data-lucide="wrench"></i>
+                </div>
+                <div class="mobile-module-content">
+                  <div class="mobile-module-title-row">
+                    <span class="mobile-module-title">Órdenes de Servicio</span>
+                    <span class="mobile-module-badge badge-blue" id="mob-stat-ordenes">0</span>
+                  </div>
+                  <span class="mobile-module-desc" id="mob-sub-ordenes">Órdenes activas en seguimiento</span>
+                </div>
+                <div class="mobile-module-arrow">
+                  <i data-lucide="chevron-right"></i>
+                </div>
+              </div>
+
+              <!-- Módulo 3: Calendario de Servicios -->
+              <div class="mobile-module-card card-purple" onclick="showView('calendario')">
+                <div class="mobile-module-icon">
+                  <i data-lucide="calendar"></i>
+                </div>
+                <div class="mobile-module-content">
+                  <div class="mobile-module-title-row">
+                    <span class="mobile-module-title">Calendario</span>
+                    <span class="mobile-module-badge badge-purple" id="mob-stat-cal">Agenda</span>
+                  </div>
+                  <span class="mobile-module-desc" id="mob-sub-cal">Servicios programados y citas</span>
+                </div>
+                <div class="mobile-module-arrow">
+                  <i data-lucide="chevron-right"></i>
+                </div>
+              </div>
+
+              <!-- Módulo 4: Levantamientos -->
+              <div class="mobile-module-card card-emerald" onclick="showView('levantamientos')">
+                <div class="mobile-module-icon">
+                  <i data-lucide="clipboard-check"></i>
+                </div>
+                <div class="mobile-module-content">
+                  <div class="mobile-module-title-row">
+                    <span class="mobile-module-title">Levantamientos</span>
+                    <span class="mobile-module-badge badge-emerald" id="mob-stat-levs">0</span>
+                  </div>
+                  <span class="mobile-module-desc" id="mob-sub-levs">Inspecciones de maquinaria en campo</span>
+                </div>
+                <div class="mobile-module-arrow">
+                  <i data-lucide="chevron-right"></i>
+                </div>
+              </div>
+
+              <!-- Módulo 4: Envíos -->
+              <div class="mobile-module-card card-indigo" onclick="showView('envios')">
+                <div class="mobile-module-icon">
+                  <i data-lucide="truck"></i>
+                </div>
+                <div class="mobile-module-content">
+                  <div class="mobile-module-title-row">
+                    <span class="mobile-module-title">Envíos de Guías</span>
+                    <span class="mobile-module-badge badge-indigo" id="mob-stat-envios">0</span>
+                  </div>
+                  <span class="mobile-module-desc" id="mob-sub-envios">Paquetería y refacciones en tránsito</span>
+                </div>
+                <div class="mobile-module-arrow">
+                  <i data-lucide="chevron-right"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- ===== DASHBOARD V1 (todos los roles excepto superadmin) ===== -->
           <div id="dash-v1">
           <div class="section-header"

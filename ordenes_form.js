@@ -213,16 +213,46 @@ function generarFolioConsecutivo() {
   return `${prefix}${padded}`;
 }
 
-function abrirFormulario(id, modoReporte = false) {
+function abrirFormulario(id = null, modoReporte = false) {
   if (typeof document === 'undefined') return;
-  if (!id && currentSession.viewMode === 'consulta') {
+  const targetId = id || (modoReporte ? window.currentDetalleOrdenId : null);
+  if (!targetId && currentSession && currentSession.viewMode === 'consulta') {
     mostrarNotificacion('El rol Consulta no puede generar órdenes.', 'error');
     return;
   }
-  editandoId = id || null;
+
+  let o = null;
+  if (targetId) {
+    const norm = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const targetNorm = norm(targetId);
+    const targetNum = String(targetId).replace(/[^0-9]/g, '');
+    let pool = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? [...ordenes] : [];
+    if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) pool = pool.concat(window.ordenes);
+    try {
+      const local = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_ordenes', []) : JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+      if (Array.isArray(local)) pool = pool.concat(local);
+    } catch (e) {}
+    o = pool.find(x => x && (x.id === targetId || x.folio === targetId || norm(x.folio || x.id) === targetNorm || (targetNum.length >= 4 && String(x.folio || '').replace(/[^0-9]/g, '') === targetNum)));
+    if (!o) {
+      console.warn('[abrirFormulario] No se encontró la orden para targetId:', targetId);
+      if (typeof mostrarNotificacion === 'function') {
+        mostrarNotificacion('No se encontró la orden especificada.', 'error');
+      }
+      if (typeof verDetalle === 'function' && window.currentDetalleOrdenId) {
+        verDetalle(window.currentDetalleOrdenId);
+      }
+      return;
+    }
+  }
+
+  editandoId = o ? (o.id || targetId) : null;
   if (typeof window !== 'undefined') window.editandoId = editandoId;
-  document.getElementById('modal-title').textContent = modoReporte ? 'Llenar Reporte Técnico' : (id ? 'Editar Orden' : 'Nueva Orden de Servicio');
-  document.getElementById('form-orden').reset();
+  const modalTitleEl = document.getElementById('modal-title');
+  if (modalTitleEl) {
+    modalTitleEl.textContent = modoReporte ? 'Llenar Reporte Técnico' : (o ? 'Editar Orden' : 'Nueva Orden de Servicio');
+  }
+  const formOrdenEl = document.getElementById('form-orden');
+  if (formOrdenEl) formOrdenEl.reset();
 
   // Restaurar estilos y propiedades habilitadas por defecto (evita que se queden bloqueadas de sesiones anteriores)
   const todosCamposTexto = [
@@ -314,9 +344,7 @@ function abrirFormulario(id, modoReporte = false) {
     });
   }
 
-  if (id) {
-    const o = ordenes.find(x => x.id === id);
-    if (!o) return;
+  if (o) {
     const fields = ['folio','pedido','ubicacion','ubicacion-sitio','operador','eco','horometro','horometro-real',
       'modelo','serie','soporte','km-ida','km-vuelta','km-total',
       'falla','trabajos','dictamen','condiciones','observaciones','pendientes',
@@ -340,8 +368,10 @@ function abrirFormulario(id, modoReporte = false) {
     }
     poblarSoportesPorCliente(o.cliente, o.soporte);
     // tipo radio
-    const radio = document.querySelector(`input[name="tipo"][value="${o.tipo}"]`);
-    if (radio) radio.checked = true;
+    if (o.tipo) {
+      const radio = document.querySelector(`input[name="tipo"][value="${o.tipo}"]`);
+      if (radio) radio.checked = true;
+    }
     // estado
     const sel = document.getElementById('f-estado');
     if (sel && o.estado) sel.value = o.estado;
@@ -369,26 +399,22 @@ function abrirFormulario(id, modoReporte = false) {
   }
   
   // Los técnicos se extraen automáticamente del ticket al guardar
-  const oSel = id ? ordenes.find(x => x.id === id) : null;
-  poblarMaquinasCliente('f-equipo', '', oSel ? oSel.cliente : '');
+  poblarMaquinasCliente('f-equipo', '', o ? o.cliente : '');
   
   const ordSelectedEquiposContainer = document.getElementById('f-equipos-seleccionados');
   if (ordSelectedEquiposContainer) ordSelectedEquiposContainer.innerHTML = '';
   
-  if (oSel && oSel.equipo) {
-    oSel.equipo.split(', ').forEach(eqName => {
+  if (o && o.equipo) {
+    o.equipo.split(', ').forEach(eqName => {
       if (eqName.trim() && window.agregarMaquinaChipOrden) {
         window.agregarMaquinaChipOrden(eqName.trim());
       }
     });
   }
   
-  if (id) {
-    const o = ordenes.find(x => x.id === id);
-    if (o && o.soporte) {
-      const elSoporte = document.getElementById('f-soporte');
-      if (elSoporte) elSoporte.value = o.soporte;
-    }
+  if (o && o.soporte) {
+    const elSoporte = document.getElementById('f-soporte');
+    if (elSoporte) elSoporte.value = o.soporte;
   }
 
   onSoporteChange(); // Sincroniza el pedido y metadata
@@ -511,8 +537,11 @@ function abrirFormulario(id, modoReporte = false) {
     window.autoFillFromPdfExtraction(soporteActual, !id);
   }
 
-  document.getElementById('modal-overlay').classList.add('open');
+  const modalFormOverlay = document.getElementById('modal-overlay');
+  if (modalFormOverlay) modalFormOverlay.classList.add('open');
   document.body.style.overflow = 'hidden';
+  const fab = document.getElementById('mobile-fab-container');
+  if (fab) fab.classList.add('hidden');
   if (typeof window.sincronizarAsteriscosCamposObligatorios === 'function') {
     window.sincronizarAsteriscosCamposObligatorios('modal-form');
   }
@@ -691,23 +720,43 @@ function onSoporteChange() {
 
 function editarOrden(id) {
   if (typeof document === 'undefined') return;
-  const o = ordenes.find(x => x.id === id);
-  if (o && (((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__') || o.cierre_papel_pdf)) && !['superadmin', 'admin'].includes(currentSession.viewMode)) {
+  let o = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes.find(x => x && x.id === id) : null;
+  if (!o) {
+    const norm = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const targetNorm = norm(id);
+    const targetNum = String(id).replace(/[^0-9]/g, '');
+    let pool = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? [...ordenes] : [];
+    if (typeof window !== 'undefined' && Array.isArray(window.ordenes)) pool = pool.concat(window.ordenes);
+    try {
+      const local = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_ordenes', []) : JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+      if (Array.isArray(local)) pool = pool.concat(local);
+    } catch (e) {}
+    o = pool.find(x => x && (x.id === id || x.folio === id || norm(x.folio || x.id) === targetNorm || (targetNum.length >= 4 && String(x.folio || '').replace(/[^0-9]/g, '') === targetNum)));
+  }
+  if (o && (((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__')) || o.cierre_papel_pdf) && !['superadmin', 'admin'].includes(currentSession.viewMode)) {
     mostrarNotificacion('Esta orden ya fue firmada o cerrada en papel. Solo administradores pueden editarla.', 'error');
     return;
   }
-  abrirFormulario(id);
+  abrirFormulario(o ? (o.id || id) : id);
 }
 
 function cerrarFormulario(e) {
   if (typeof document === 'undefined') return;
   if (e && (e.target === document.getElementById('modal-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
-  document.getElementById('modal-overlay').classList.remove('open');
+  const modalOverlay = document.getElementById('modal-overlay');
+  if (modalOverlay) modalOverlay.classList.remove('open');
   document.body.style.overflow = '';
+  const fab = document.getElementById('mobile-fab-container');
+  if (fab) fab.classList.remove('hidden');
   editandoId = null;
-  // Limpiar banner de modo reporte si existe
   const banner = document.getElementById('reporte-modo-banner');
   if (banner) banner.remove();
+
+  const returnDetailId = window._origenDetalleOrdenId;
+  window._origenDetalleOrdenId = null;
+  if (returnDetailId && typeof verDetalle === 'function') {
+    verDetalle(returnDetailId);
+  }
 }
 
 function guardarOrdenes() {
@@ -1081,6 +1130,8 @@ async function guardarOrden(e) {
     window.trackTelemetryEvent(act, { folio: orden.folio, cliente: orden.cliente });
   }
   
+  const returnDetailId = window._origenDetalleOrdenId || orden.id || orden.folio;
+  window._origenDetalleOrdenId = null;
   restoreBtn();
   cerrarFormulario();
   renderTabla();
@@ -1088,6 +1139,11 @@ async function guardarOrden(e) {
   renderStats();
   if (typeof renderCalendario === 'function') {
     renderCalendario();
+  }
+  if (returnDetailId && typeof verDetalle === 'function') {
+    setTimeout(() => {
+      verDetalle(returnDetailId);
+    }, 150);
   }
 }
 
@@ -1131,9 +1187,11 @@ async function eliminarOrden(id) {
 
 function completarReporteDesdeDetalle(id) {
   if (typeof document === 'undefined') return;
+  const targetId = id || window.currentDetalleOrdenId;
+  window._origenDetalleOrdenId = targetId;
   cerrarDetalle();
   setTimeout(() => {
-    abrirFormulario(id, true); // true = modoReporte: solo permite editar el reporte técnico
+    abrirFormulario(targetId, true); // true = modoReporte: solo permite editar el reporte técnico
   }, 100);
 }
 

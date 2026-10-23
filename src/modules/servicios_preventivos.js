@@ -497,7 +497,8 @@
         console.warn('[SP] Error leyendo loadKitsServicio:', e);
       }
     }
-    if (!Array.isArray(kits) || kits.length === 0) {
+    const isTest = typeof isTestModeActive === 'function' && isTestModeActive();
+    if (isTest && (!Array.isArray(kits) || kits.length === 0)) {
       if (typeof window.KITS_PRECARGADOS_DEFAULT !== 'undefined' && Array.isArray(window.KITS_PRECARGADOS_DEFAULT)) {
         kits = window.KITS_PRECARGADOS_DEFAULT;
       } else if (typeof KITS_PRECARGADOS_DEFAULT !== 'undefined' && Array.isArray(KITS_PRECARGADOS_DEFAULT)) {

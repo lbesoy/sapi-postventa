@@ -1567,6 +1567,9 @@ async function cerrarCotizacionTicket(id) {
   safeSetJSON('sapi_tickets', tickets);
   
   if (aceptada === 'si') {
+    if (typeof window.asegurarGuiaEnvioParaTicket === 'function') {
+      window.asegurarGuiaEnvioParaTicket(t);
+    }
     if (typeof window.ejecutarAutomatizacion === 'function') {
       window.ejecutarAutomatizacion('Cotización SAP aceptada por el cliente', {
         email: t.contacto || '',
@@ -1788,10 +1791,11 @@ async function cerrarCotizacionTicket(id) {
     }
   }
 
-  // Asegurar generación automática de Guía de Envío si el ticket tiene refacciones
+  // Asegurar generación automática de Guía de Envío SOLO si el ticket tiene refacciones y pedido confirmado
   if (typeof window.asegurarGuiaEnvioParaTicket === 'function') {
     const isRefCat = String(t.categoria || '').toLowerCase().includes('refacci') || String(t.categoria || '').toLowerCase().includes('garant') || (t.folio && t.folio.endsWith('-A'));
-    if (isRefCat || (t.refaccionesSeleccionadas && t.refaccionesSeleccionadas.length > 0)) {
+    const hasOrder = (typeof window.ticketTienePedidoOEnvioValido === 'function') ? window.ticketTienePedidoOEnvioValido(t) : (t.pedidoSAP || t.pdfPedido || t.guiaPedido);
+    if ((isRefCat || (t.refaccionesSeleccionadas && t.refaccionesSeleccionadas.length > 0)) && hasOrder) {
       window.asegurarGuiaEnvioParaTicket(t);
     }
   }
@@ -1805,8 +1809,11 @@ async function cerrarCotizacionTicket(id) {
 function cerrarDetalleTicket(e) {
   if (typeof document === 'undefined') return;
   if (e && (e.target === document.getElementById('modal-ticket-detalle-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
-  document.getElementById('modal-ticket-detalle-overlay').classList.remove('open');
+  const overlay = document.getElementById('modal-ticket-detalle-overlay');
+  if (overlay) overlay.classList.remove('open');
   document.body.style.overflow = '';
+  const fab = document.getElementById('mobile-fab-container');
+  if (fab) fab.classList.remove('hidden');
 }
 
 async function forzarEstadoTicket(id) {

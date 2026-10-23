@@ -26,6 +26,16 @@ function safeFormatFechaAmigable(f) {
   return f || '';
 }
 
+function safeEscape(str) {
+  if (!str && str !== 0) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function safeIsTestModeActive() {
   return typeof window !== 'undefined' && typeof window.isTestModeActive === 'function' ? window.isTestModeActive() : false;
 }
@@ -74,11 +84,24 @@ function safeGetFilteredOrders() {
   });
 }
 
+function setFiltroEstadoServiciosChip(estado, btn) {
+  if (typeof document !== 'undefined') {
+    document.querySelectorAll('.mobile-status-chips-scroll .status-chip').forEach(c => c.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+  }
+  setFiltroEstadoServicios(estado);
+}
+
 function setFiltroEstadoServicios(estado) {
   filtroEstadoServicios = estado;
   if (typeof window !== 'undefined') window.filtroEstadoServicios = estado;
+  if (typeof document !== 'undefined') {
+    document.querySelectorAll('.mobile-status-chips-scroll .status-chip').forEach(c => {
+      const chipEstado = c.getAttribute('data-estado') || '';
+      c.classList.toggle('active', chipEstado === (estado || ''));
+    });
+  }
   filtrarOrdenes('servicios');
-  renderTabla('v2');
 }
 
 function setFiltroTicketsV2(estado) {
@@ -389,6 +412,18 @@ function renderTabla(ctx) {
         const dateA = new Date(valA).getTime() || 0;
         const dateB = new Date(valB).getTime() || 0;
         return currentOrdSortDir === 'asc' ? dateA - dateB : dateB - dateA;
+      } else if (currentOrdSortCol === 'tecnico') {
+        let tecA = '';
+        if (a.tecnicosAsignados && Array.isArray(a.tecnicosAsignados) && a.tecnicosAsignados.length > 0) tecA = a.tecnicosAsignados.map(safeResolveTecnicoNombre).filter(Boolean).join(', ');
+        else if (a.tecnico) tecA = safeResolveTecnicoNombre(a.tecnico);
+        let tecB = '';
+        if (b.tecnicosAsignados && Array.isArray(b.tecnicosAsignados) && b.tecnicosAsignados.length > 0) tecB = b.tecnicosAsignados.map(safeResolveTecnicoNombre).filter(Boolean).join(', ');
+        else if (b.tecnico) tecB = safeResolveTecnicoNombre(b.tecnico);
+        valA = tecA.toLowerCase();
+        valB = tecB.toLowerCase();
+        if (valA < valB) return currentOrdSortDir === 'asc' ? -1 : 1;
+        if (valA > valB) return currentOrdSortDir === 'asc' ? 1 : -1;
+        return 0;
       } else {
         valA = valA.toString().toLowerCase();
         valB = valB.toString().toLowerCase();
@@ -419,8 +454,12 @@ function renderTabla(ctx) {
 
   const body = document.getElementById(bodyId);
   if (!body) return;
+  const mobileContainer = document.getElementById('mobile-orders-cards-container');
   if (!filtradas.length) {
-    body.innerHTML = `<tr><td colspan="10" class="empty-state">No hay órdenes${q ? ' que coincidan' : ' registradas'}.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="11" class="empty-state">No hay órdenes${q ? ' que coincidan' : ' registradas'}.</td></tr>`;
+    if (mobileContainer && (isServiciosView || bodyId === 'tabla-body-servicios')) {
+      mobileContainer.innerHTML = `<div class="empty-state" style="text-align:center; padding:2rem; color:var(--text-muted);">No hay órdenes${q ? ' que coincidan' : ' registradas'}.</div>`;
+    }
     return;
   }
   const isConsulta = currentSession && currentSession.viewMode === 'consulta';
@@ -448,76 +487,162 @@ function renderTabla(ctx) {
     hasMoreOrdenes = true;
   }
 
-  let htmlRows = paginatedOrdenes.map(o => {
-    let orderCanEdit = canEdit;
-    if (((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__') || o.cierre_papel_pdf) && (!currentSession || !['superadmin', 'admin'].includes(currentSession.viewMode))) {
-      orderCanEdit = false;
-    }
-    const targetVal = o.soporte || o.ticket_id || o.ticket_folio;
-    const isUuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const ticketAsoc = targetVal
-      ? tickets.find(x => x.id === targetVal || x.folio === targetVal || (o.ticket_id && x.id === o.ticket_id) || (o.ticket_folio && x.folio === o.ticket_folio) || (o.soporte && (x.id === o.soporte || x.folio === o.soporte)))
-      : null;
-    let ticketHtml = '-';
-    if (ticketAsoc) {
-      ticketHtml = `<a href="#" onclick="verDetalleTicket('${ticketAsoc.id || ticketAsoc.folio}'); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;" title="${ticketAsoc.asunto || ''}">${ticketAsoc.folio || ticketAsoc.id}</a>`;
-    } else if (o.ticket_folio || (o.soporte && !isUuidRegex.test(o.soporte))) {
-      const displayFolio = o.ticket_folio || o.soporte;
-      const callId = o.ticket_id || o.soporte;
-      ticketHtml = `<a href="#" onclick="verDetalleTicket('${callId}'); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;" title="Ticket ${displayFolio}">${displayFolio}</a>`;
-    } else if (o.soporte) {
-      const knownFolio = (typeof window !== 'undefined' && window._ticketFolioMap) ? window._ticketFolioMap[o.soporte] : null;
-      if (knownFolio) {
-        ticketHtml = `<a href="#" onclick="verDetalleTicket('${o.soporte}'); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;" title="Ticket ${knownFolio}">${knownFolio}</a>`;
-      } else {
-        ticketHtml = `<span class="async-ticket-cell" data-tkt-id="${o.soporte}" style="color: var(--accent); font-weight: 600; font-size: 0.85rem;"><i data-lucide="loader" style="width:12px;height:12px;display:inline-block;animation:spin 1s linear infinite;vertical-align:middle;"></i> Ticket...</span>`;
+  let htmlRows = '';
+  let htmlMobileCards = '';
+
+  if (filtradas.length === 0) {
+    htmlRows = `<tr><td colspan="11" class="empty-state">Sin órdenes que coincidan.</td></tr>`;
+    htmlMobileCards = `<div class="empty-state" style="text-align:center; padding:2rem; color:var(--text-muted);">Sin órdenes que coincidan.</div>`;
+  } else {
+    paginatedOrdenes.forEach(o => {
+      let orderCanEdit = canEdit;
+      if (((o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__') || o.cierre_papel_pdf) && (!currentSession || !['superadmin', 'admin'].includes(currentSession.viewMode))) {
+        orderCanEdit = false;
       }
-    }
-    
-    return `
-    <tr>
-      <td data-label="Acciones" style="white-space:nowrap; width:60px;">
-        <div style="display:flex;gap:0.25rem;">
-          <button class="action-btn" onclick="verDetalle('${o.id}')" title="Ver"><i data-lucide="eye"></i></button>
-          ${orderCanEdit ? `<button class="action-btn" onclick="editarOrden('${o.id}')" title="Editar"><i data-lucide="pencil"></i></button>` : ''}
-        </div>
-      </td>
-      <td data-label="Folio"><strong>${o.folio||'-'}</strong></td>
-      <td data-label="Ticket">${ticketHtml}</td>
-      <td data-label="Cliente">${o.cliente||'-'}</td>
-      <td data-label="Ubicación">${o.ubicacion||'-'}</td>
-      <td data-label="Modelo">${o.modelo||'-'}</td>
+      const targetVal = o.soporte || o.ticket_id || o.ticket_folio;
+      const isUuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const ticketAsoc = targetVal
+        ? tickets.find(x => x.id === targetVal || x.folio === targetVal || (o.ticket_id && x.id === o.ticket_id) || (o.ticket_folio && x.folio === o.ticket_folio) || (o.soporte && (x.id === o.soporte || x.folio === o.soporte)))
+        : null;
+      let ticketHtml = '-';
+      let ticketCleanFolio = '';
+      let ticketCallId = '';
+      if (ticketAsoc) {
+        ticketCleanFolio = ticketAsoc.folio || ticketAsoc.id || '';
+        ticketCallId = ticketAsoc.id || ticketAsoc.folio || '';
+        ticketHtml = `<a href="#" onclick="event.stopPropagation(); verDetalleTicket('${ticketCallId}'); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;" title="${ticketAsoc.asunto || ''}">${ticketCleanFolio}</a>`;
+      } else if (o.ticket_folio || (o.soporte && !isUuidRegex.test(o.soporte))) {
+        const displayFolio = o.ticket_folio || o.soporte;
+        const callId = o.ticket_id || o.soporte;
+        ticketCleanFolio = displayFolio;
+        ticketCallId = callId;
+        ticketHtml = `<a href="#" onclick="event.stopPropagation(); verDetalleTicket('${callId}'); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;" title="Ticket ${displayFolio}">${displayFolio}</a>`;
+      } else if (o.soporte) {
+        const knownFolio = (typeof window !== 'undefined' && window._ticketFolioMap) ? window._ticketFolioMap[o.soporte] : null;
+        if (knownFolio) {
+          ticketCleanFolio = knownFolio;
+          ticketCallId = o.soporte;
+          ticketHtml = `<a href="#" onclick="event.stopPropagation(); verDetalleTicket('${o.soporte}'); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;" title="Ticket ${knownFolio}">${knownFolio}</a>`;
+        } else {
+          ticketHtml = `<span class="async-ticket-cell" data-tkt-id="${o.soporte}" style="color: var(--accent); font-weight: 600; font-size: 0.85rem;"><i data-lucide="loader" style="width:12px;height:12px;display:inline-block;animation:spin 1s linear infinite;vertical-align:middle;"></i> Ticket...</span>`;
+        }
+      }
 
-      <td data-label="Tipo"><span class="badge badge-${(o.tipo||'otro').toLowerCase().replace('é','e').replace('í','i')}">${o.tipo||'-'}</span></td>
-      <td data-label="Estado"><span class="badge ${badgeEstado(o.estado)}">${o.estado||'-'}</span></td>
-      <td data-label="Fecha">${safeFormatFechaAmigable(o.fecha)}</td>
-      <td data-label="" style="width:40px; text-align:center;">
-        ${canDelete ? `<button class="action-btn del" onclick="eliminarOrden('${o.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
-      </td>
-    </tr>
-    `;
-  }).join('');
+      let tecDisplay = '';
+      if (o.tecnicosAsignados && Array.isArray(o.tecnicosAsignados) && o.tecnicosAsignados.length > 0) {
+        tecDisplay = o.tecnicosAsignados.map(safeResolveTecnicoNombre).filter(Boolean).join(', ');
+      } else if (o.tecnico) {
+        tecDisplay = safeResolveTecnicoNombre(o.tecnico);
+      }
+      if (!tecDisplay && ticketAsoc && ticketAsoc.asignado && ticketAsoc.asignado !== 'Sin asignar') {
+        tecDisplay = ticketAsoc.asignado;
+      }
 
-  if (hasMoreOrdenes) {
-    const escapedCtx = String(ctx || '').replace(/'/g, "\\'");
-    htmlRows += `
-      <tr id="ordenes-load-more-row">
-        <td colspan="10" style="text-align:center; padding:14px; background:var(--bg-subtle, rgba(0,0,0,0.02)); border-top:1px solid var(--border-color);">
-          <div style="display:flex; align-items:center; justify-content:center; gap:12px; font-size:0.85rem; color:var(--text-secondary); flex-wrap:wrap;">
-            <span>Mostrando <strong>${paginatedOrdenes.length}</strong> de <strong>${totalMatching}</strong> órdenes</span>
-            <button type="button" class="btn btn-sm btn-secondary" onclick="window.cargarMasOrdenes('${escapedCtx}')" style="display:inline-flex; align-items:center; gap:5px; font-weight:600; padding:4px 12px; cursor:pointer;">
-              <i data-lucide="chevron-down" style="width:14px;height:14px;"></i> Cargar más (+50)
-            </button>
-            <button type="button" class="btn btn-sm btn-link" onclick="window.mostrarTodasLasOrdenes('${escapedCtx}')" style="color:var(--accent); text-decoration:underline; font-weight:500; background:none; border:none; cursor:pointer;">
-              Mostrar todas
-            </button>
+      // Fila 100% limpia para Desktop (Tabla tradicional)
+      htmlRows += `
+      <tr>
+        <td data-label="Acciones" style="white-space:nowrap; width:60px;">
+          <div style="display:flex;gap:0.25rem;">
+            <button class="action-btn" onclick="verDetalle('${o.id}')" title="Ver"><i data-lucide="eye"></i></button>
+            ${orderCanEdit ? `<button class="action-btn" onclick="editarOrden('${o.id}')" title="Editar"><i data-lucide="pencil"></i></button>` : ''}
           </div>
         </td>
+        <td data-label="Folio"><strong>${o.folio||'-'}</strong></td>
+        <td data-label="Ticket">${ticketHtml}</td>
+        <td data-label="Cliente">${o.cliente||'-'}</td>
+        <td data-label="Ubicación">${o.ubicacion||'-'}</td>
+        <td data-label="Modelo">${o.modelo||'-'}</td>
+        <td data-label="Responsables" style="max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${safeEscape(tecDisplay || '-')}">${tecDisplay ? `<span style="display:inline-flex;align-items:center;gap:4px;"><i data-lucide="user" style="width:13px;height:13px;color:var(--accent);flex-shrink:0;"></i> ${safeEscape(tecDisplay)}</span>` : '<span style="color:var(--text-muted);">—</span>'}</td>
+        <td data-label="Tipo"><span class="badge badge-${(o.tipo||'otro').toLowerCase().replace('é','e').replace('í','i')}">${o.tipo||'-'}</span></td>
+        <td data-label="Estado"><span class="badge ${badgeEstado(o.estado)}">${o.estado||'-'}</span></td>
+        <td data-label="Fecha">${safeFormatFechaAmigable(o.fecha)}</td>
+        <td data-label="" style="width:40px; text-align:center;">
+          ${canDelete ? `<button class="action-btn del" onclick="eliminarOrden('${o.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
+        </td>
       </tr>
-    `;
+      `;
+
+      // Determinación precisa de la clase de estado
+      const estadoRaw = String(o.estado || 'Pendiente').trim();
+      const estadoNorm = estadoRaw.toLowerCase();
+      let statusClass = 'pendiente';
+      if (estadoNorm.includes('proceso')) {
+        statusClass = 'proceso';
+      } else if (estadoNorm.includes('complet') || estadoNorm.includes('cerrad')) {
+        statusClass = 'completado';
+      } else if (estadoNorm.includes('refacc')) {
+        statusClass = 'refacciones';
+      } else if (estadoNorm.includes('cancel')) {
+        statusClass = 'cancelado';
+      }
+
+      // Ficha Ultra-Ligera Móvil desde Cero - Mínima información, máxima fluidez y legibilidad
+      const escFolio = safeEscape(o.folio || 'Sin Folio');
+      const escCliente = safeEscape(o.cliente || 'Sin Cliente');
+      const escUbicacion = safeEscape(String(o.ubicacion || o.ubicacion_sitio || o.sitio || '').trim());
+      const escModelo = safeEscape(o.modelo || '');
+      const escEstado = safeEscape(estadoRaw);
+      const escFecha = safeFormatFechaAmigable(o.fecha);
+      const subInfo = [escModelo, escFecha].filter(Boolean).join(' • ');
+
+      htmlMobileCards += `
+      <div class="order-card-mobile moc-card" onclick="verDetalle('${o.id}')">
+        <div class="ocm-header">
+          <span class="ocm-folio">${escFolio}</span>
+          <span class="ocm-status status-${statusClass}">${escEstado}</span>
+        </div>
+        <div class="ocm-cliente">${escCliente}</div>
+        <div class="ocm-location">
+          <i data-lucide="map-pin" class="ocm-pin"></i>
+          <span class="ocm-location-text">${escUbicacion || 'Sin ubicación registrada'}</span>
+        </div>
+        ${tecDisplay ? `
+        <div class="ocm-assigned" style="display:flex; align-items:center; gap:5px; font-size:0.8rem; color:var(--text-secondary); margin-top:3px;">
+          <i data-lucide="users" style="width:13px; height:13px; color:var(--accent); flex-shrink:0;"></i>
+          <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${safeEscape(tecDisplay)}</span>
+        </div>` : ''}
+        <div class="ocm-footer">
+          <span class="ocm-sub">${subInfo || 'Orden de Servicio'}</span>
+          <i data-lucide="chevron-right" class="ocm-arrow"></i>
+        </div>
+      </div>
+      `;
+    });
+
+    if (hasMoreOrdenes) {
+      const escapedCtx = String(ctx || '').replace(/'/g, "\\'");
+      htmlRows += `
+        <tr id="ordenes-load-more-row">
+          <td colspan="11" style="text-align:center; padding:14px; background:var(--bg-subtle, rgba(0,0,0,0.02)); border-top:1px solid var(--border-color);">
+            <div style="display:flex; align-items:center; justify-content:center; gap:12px; font-size:0.85rem; color:var(--text-secondary); flex-wrap:wrap;">
+              <span>Mostrando <strong>${paginatedOrdenes.length}</strong> de <strong>${totalMatching}</strong> órdenes</span>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="window.cargarMasOrdenes('${escapedCtx}')" style="display:inline-flex; align-items:center; gap:5px; font-weight:600; padding:4px 12px; cursor:pointer;">
+                <i data-lucide="chevron-down" style="width:14px;height:14px;"></i> Cargar más (+50)
+              </button>
+              <button type="button" class="btn btn-sm btn-link" onclick="window.mostrarTodasLasOrdenes('${escapedCtx}')" style="color:var(--accent); text-decoration:underline; font-weight:500; background:none; border:none; cursor:pointer;">
+                Mostrar todas
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+
+      htmlMobileCards += `
+        <div id="mobile-ordenes-load-more" class="mobile-order-load-more" style="display:flex; flex-direction:column; align-items:center; gap:8px; padding:12px; background:rgba(255,255,255,0.04); border-radius:12px; border:1px solid rgba(255,255,255,0.08); margin-top:8px;">
+          <span style="font-size:0.82rem; color:var(--text-secondary);">Mostrando <strong>${paginatedOrdenes.length}</strong> de <strong>${totalMatching}</strong> órdenes</span>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="window.cargarMasOrdenes('${escapedCtx}')" style="display:inline-flex; align-items:center; gap:5px; font-weight:600; padding:6px 16px; border-radius:8px;">
+            <i data-lucide="chevron-down" style="width:14px;height:14px;"></i> Cargar más (+50)
+          </button>
+        </div>
+      `;
+    }
   }
 
   body.innerHTML = htmlRows;
+
+  if (mobileContainer && (isServiciosView || bodyId === 'tabla-body-servicios')) {
+    mobileContainer.innerHTML = htmlMobileCards;
+  }
 
   if (!ctx) {
     if (typeof renderStats === 'function') renderStats();
@@ -709,6 +834,7 @@ if (typeof window !== 'undefined') {
     currentOrdSortCol,
     currentOrdSortDir,
     setFiltroEstadoServicios,
+    setFiltroEstadoServiciosChip,
     setFiltroTicketsV2,
     toggleSortOrdenes,
     renderTabla,
@@ -724,7 +850,7 @@ if (typeof window !== 'undefined') {
   window.currentOrdSortCol = currentOrdSortCol;
   window.currentOrdSortDir = currentOrdSortDir;
   window.setFiltroEstadoServicios = setFiltroEstadoServicios;
-  window.setFiltroTicketsV2 = setFiltroTicketsV2;
+  window.setFiltroEstadoServiciosChip = setFiltroEstadoServiciosChip;
   window.toggleSortOrdenes = toggleSortOrdenes;
   window.renderTabla = renderTabla;
   window.badgeEstado = badgeEstado;
@@ -742,6 +868,7 @@ export {
   currentOrdSortCol,
   currentOrdSortDir,
   setFiltroEstadoServicios,
+  setFiltroEstadoServiciosChip,
   setFiltroTicketsV2,
   toggleSortOrdenes,
   renderTabla,

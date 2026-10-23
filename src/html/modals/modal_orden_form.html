@@ -1,9 +1,16 @@
     <!-- MODAL FORMULARIO -->
-    <div class="modal-overlay" id="modal-overlay" >
-      <div class="modal" id="modal-form">
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal modal-app-fullscreen" id="modal-form">
         <div class="modal-header">
-          <h2 id="modal-title">Nueva Orden de Servicio</h2>
-          <button class="modal-close" onclick="cerrarFormulario()">✕</button>
+          <div class="modal-header-top-row" style="width:100%;">
+            <button type="button" class="modal-nav-back-btn" onclick="cerrarFormulario()" aria-label="Volver">
+              <i data-lucide="arrow-left"></i>
+            </button>
+            <div class="modal-title-box">
+              <h2 id="modal-title">Nueva Orden de Servicio</h2>
+            </div>
+            <button class="modal-close" onclick="cerrarFormulario()" aria-label="Cerrar">✕</button>
+          </div>
         </div>
         <div class="modal-body">
           <form id="form-orden" onsubmit="guardarOrden(event)">

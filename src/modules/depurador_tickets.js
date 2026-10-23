@@ -1169,17 +1169,48 @@ function sanitizarAsignacionesTickets() {
 
     if (modificado) {
       if (typeof safeSetJSON === 'function') safeSetJSON('sapi_tickets', tickets);
-      // Sincronizar hacia Supabase solo si hay cambios y no se han sincronizado previamente en esta sesión
-      if (window.pushToSupabase && repairedTickets.length > 0) {
+      
+      // Sincronizar hacia Supabase solo si:
+      // 1. Hay tickets reparados
+      // 2. No se ha deshabilitado el sync de sanitización por falta de permisos/RLS
+      // 3. El usuario actual cuenta con rol administrativo (superadmin, admin, supervisor)
+      // 4. No es una sesión local backdoor (superadmin/tecnico_test) que opera en anon sin JWT de Supabase
+      // 5. Hay un cliente Supabase con sesión activa autenticada
+      const session = (typeof safeGetJSON === 'function') 
+        ? safeGetJSON('eurorep_session', {}) 
+        : (typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('eurorep_session') || '{}') : {});
+      const isAdminOrSuper = ['superadmin', 'admin', 'supervisor'].includes(session.viewMode || session.rol || session.realRol);
+      const isBackdoor = session.userId === 'superadmin' || session.userId === 'tecnico_test';
+
+      if (!window._ticketsSanitizeSyncDisabled && isAdminOrSuper && !isBackdoor && window.pushToSupabase && repairedTickets.length > 0) {
         window._ticketsSanitizadosPushed = window._ticketsSanitizadosPushed || new Set();
-        repairedTickets.forEach(repT => {
-          if (!window._ticketsSanitizadosPushed.has(repT.id)) {
-            window._ticketsSanitizadosPushed.add(repT.id);
-            try {
-              window.pushToSupabase('tickets', repT).catch(e => console.warn('[Sanitize Sync] Error al persistir ticket reparado en Supabase:', repT.folio, e));
-            } catch(e) {}
-          }
-        });
+        const unpushedTickets = repairedTickets.filter(repT => repT && repT.id && !window._ticketsSanitizadosPushed.has(repT.id));
+
+        if (unpushedTickets.length > 0 && window.supabaseClient && window.supabaseClient.auth) {
+          window.supabaseClient.auth.getSession().then(({ data }) => {
+            if (!data || !data.session) return;
+            (async () => {
+              for (const repT of unpushedTickets) {
+                if (window._ticketsSanitizeSyncDisabled) break;
+                window._ticketsSanitizadosPushed.add(repT.id);
+                try {
+                  await window.pushToSupabase('tickets', repT, { silent: true });
+                } catch (e) {
+                  const isRlsOrAuth = e?.code === '42501' || e?.status === 401 || (e?.message && (
+                    e.message.includes('row-level security') ||
+                    e.message.includes('Unauthorized') ||
+                    e.message.includes('permission denied')
+                  ));
+                  if (isRlsOrAuth) {
+                    window._ticketsSanitizeSyncDisabled = true;
+                    console.info('[Sanitize Sync] Sincronización en la nube omitida: la sesión actual no cuenta con permisos administrativos en Supabase. Los datos se mantendrán sincronizados localmente.');
+                    break;
+                  }
+                }
+              }
+            })().catch(() => {});
+          }).catch(() => {});
+        }
       }
     }
   } finally {

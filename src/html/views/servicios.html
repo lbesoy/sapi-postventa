@@ -1,5 +1,5 @@
         <div id="view-servicios" class="view">
-          <div class="stats-grid-5" style="margin-bottom: 1.5rem;">
+          <div class="stats-grid-5 desktop-only-stats" style="margin-bottom: 1.5rem;">
             <div class="stat-card" style="cursor: pointer;" onclick="setFiltroEstadoServicios('')">
               <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="file-text"></i></div>
               <div>
@@ -36,52 +36,91 @@
               </div>
             </div>
           </div>
-          <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
-            <h2>Todas las Órdenes</h2>
-            <div style="display:flex; gap:0.5rem; flex-wrap:nowrap; align-items:center; flex:1; justify-content:flex-end;">
-              <div class="search-bar" style="width:100%; max-width:400px; margin:0;">
-                <input type="text" id="search-servicios" placeholder="Buscar por Folio, Ticket, Cliente, Ubicación..." oninput="debouncedFiltrarOrdenes('servicios')" autocomplete="off" />
+          <div class="servicios-mobile-sticky-top" id="servicios-mobile-sticky-top">
+            <div class="servicios-header-bar">
+              <h2 class="desktop-only-heading">Todas las Órdenes</h2>
+              <div class="servicios-actions-row">
+                <div class="search-bar mobile-search-bar">
+                  <i data-lucide="search" class="search-icon"></i>
+                  <input type="text" id="search-servicios" placeholder="Buscar por Folio, Ticket, Cliente, Ubicación..." oninput="debouncedFiltrarOrdenes('servicios')" autocomplete="off" />
+                </div>
+                <div class="servicios-action-buttons">
+                  <button type="button" id="btn-exportar-ordenes-excel" class="btn-secondary btn-exportar-compact" onclick="window.exportarOrdenesAExcel()" title="Exportar lista actual de órdenes de servicio a Excel (.xlsx)">
+                    <i data-lucide="download" style="width:14px; height:14px;"></i> <span class="btn-text-export">Exportar</span>
+                  </button>
+                  <button class="action-btn btn-regenerar-compact" onclick="regenerarOrdenesDesdeTickets()"
+                    id="btn-regenerar-ordenes"
+                    title="Regenerar Órdenes desde Tickets Cerrados"
+                    style="display:none;">
+                    <i data-lucide="refresh-cw" class="btn-icon" style="width:14px;height:14px;"></i> <span class="btn-text-regen">Regenerar</span>
+                  </button>
+                  <button class="action-btn btn-depurar-compact" onclick="window.abrirModalDepurarOrdenes()"
+                    id="btn-depurar-ordenes-ref"
+                    title="Depurar Órdenes de Refacciones y Garantías (Superadmin)"
+                    style="display:none;">
+                    <i data-lucide="trash-2" class="btn-icon" style="width:14px;height:14px;"></i> <span class="btn-text-depurar">Depurar</span> (<span id="badge-count-ordenes-ref">0</span>)
+                  </button>
+                </div>
               </div>
-              <button type="button" id="btn-exportar-ordenes-excel" class="btn-secondary" onclick="window.exportarOrdenesAExcel()" style="height:38px; display:inline-flex; align-items:center; gap:0.4rem; padding:0 0.85rem; font-size:0.85rem; white-space:nowrap; background:#10b981; color:#ffffff; border-color:#10b981; font-weight:600; cursor:pointer; border-radius:8px;" title="Exportar lista actual de órdenes de servicio a Excel (.xlsx)">
-                <i data-lucide="download" style="width:14px; height:14px;"></i> Exportar Excel
+            </div>
+
+            <!-- Filtros de Estado Nativo Móvil (Chips Desplazables) -->
+            <div class="mobile-status-chips-scroll" id="mobile-ordenes-chips">
+              <button type="button" class="status-chip active" data-estado="" onclick="window.setFiltroEstadoServiciosChip('', this)">
+                <span>Todas</span>
+                <span class="chip-count" id="chip-count-total">0</span>
               </button>
-              <button class="action-btn" onclick="regenerarOrdenesDesdeTickets()"
-                id="btn-regenerar-ordenes"
-                title="Regenerar Órdenes desde Tickets Cerrados"
-                style="height:38px; display:none; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--orange, #f59e0b); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
-                <i data-lucide="refresh-cw" class="btn-icon" style="width:14px;height:14px;"></i> Regenerar Órdenes
+              <button type="button" class="status-chip chip-amber" data-estado="En proceso" onclick="window.setFiltroEstadoServiciosChip('En proceso', this)">
+                <span class="chip-dot dot-amber"></span>
+                <span>En Proceso</span>
+                <span class="chip-count" id="chip-count-proceso">0</span>
               </button>
-              <button class="action-btn" onclick="window.abrirModalDepurarOrdenes()"
-                id="btn-depurar-ordenes-ref"
-                title="Depurar Órdenes de Refacciones y Garantías (Superadmin)"
-                style="height:38px; display:none; align-items:center; gap:0.4rem; padding:0 0.75rem; background:rgba(234, 88, 12, 0.1); border:1px solid rgba(234, 88, 12, 0.3); border-radius:var(--radius-sm); color:var(--accent, #ea580c); cursor:pointer; font-size:0.8rem; font-weight:600; white-space:nowrap;">
-                <i data-lucide="trash-2" class="btn-icon" style="width:14px;height:14px;"></i> Depurar Órdenes (<span id="badge-count-ordenes-ref">0</span>)
+              <button type="button" class="status-chip chip-red" data-estado="Pendiente" onclick="window.setFiltroEstadoServiciosChip('Pendiente', this)">
+                <span class="chip-dot dot-red"></span>
+                <span>Pendientes</span>
+                <span class="chip-count" id="chip-count-pendientes">0</span>
+              </button>
+              <button type="button" class="status-chip chip-pink" data-estado="Refacciones pendientes" onclick="window.setFiltroEstadoServiciosChip('Refacciones pendientes', this)">
+                <span class="chip-dot dot-pink"></span>
+                <span>Refacciones</span>
+                <span class="chip-count" id="chip-count-refacciones">0</span>
+              </button>
+              <button type="button" class="status-chip chip-green" data-estado="Completado" onclick="window.setFiltroEstadoServiciosChip('Completado', this)">
+                <span class="chip-dot dot-green"></span>
+                <span>Completadas</span>
+                <span class="chip-count" id="chip-count-completas">0</span>
               </button>
             </div>
           </div>
-          <div class="table-wrapper">
+          <!-- Vista Desktop: Tabla tradicional con columnas completas -->
+          <div class="table-wrapper desktop-only-table">
             <table class="orders-table" id="orders-table-servicios">
               <thead>
                 <tr>
                   <th style="width: 60px;">Acciones</th>
-                  <th id="th-ord-id">Folio </th>
+                  <th id="th-ord-id" onclick="toggleSortOrdenes('id')" style="cursor:pointer; user-select:none;">Folio </th>
                   <th>Ticket</th>
-                  <th id="th-ord-cliente">Cliente </th>
-                  <th id="th-ord-ubicacion">Ubicación </th>
-                  <th id="th-ord-modelo">Modelo </th>
-
-                  <th id="th-ord-tipo">Tipo </th>
-                  <th id="th-ord-estado">Estado </th>
-                  <th id="th-ord-fecha">Fecha </th>
+                  <th id="th-ord-cliente" onclick="toggleSortOrdenes('cliente')" style="cursor:pointer; user-select:none;">Cliente </th>
+                  <th id="th-ord-ubicacion" onclick="toggleSortOrdenes('ubicacion')" style="cursor:pointer; user-select:none;">Ubicación </th>
+                  <th id="th-ord-modelo" onclick="toggleSortOrdenes('modelo')" style="cursor:pointer; user-select:none;">Modelo </th>
+                  <th id="th-ord-tecnico" onclick="toggleSortOrdenes('tecnico')" style="cursor:pointer; user-select:none;">Responsables </th>
+                  <th id="th-ord-tipo" onclick="toggleSortOrdenes('tipo')" style="cursor:pointer; user-select:none;">Tipo </th>
+                  <th id="th-ord-estado" onclick="toggleSortOrdenes('estado')" style="cursor:pointer; user-select:none;">Estado </th>
+                  <th id="th-ord-fecha" onclick="toggleSortOrdenes('fecha')" style="cursor:pointer; user-select:none;">Fecha </th>
                   <th style="width: 40px; text-align:center;"></th>
                 </tr>
               </thead>
               <tbody id="tabla-body-servicios">
                 <tr>
-                  <td colspan="10" class="empty-state">Sin órdenes aún.</td>
+                  <td colspan="11" class="empty-state">Sin órdenes aún.</td>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <!-- Vista Móvil: Contenedor Nativo de Tarjetas de App (Sin tablas, 100% estable) -->
+          <div class="mobile-only-orders-container" id="mobile-orders-cards-container">
+            <div class="empty-state" style="text-align:center; padding:2rem; color:var(--text-muted);">Sin órdenes aún.</div>
           </div>
         </div>
 

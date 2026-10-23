@@ -766,7 +766,93 @@ updateEnviosBadge();
 assert.equal(mockBadgeEnv.textContent, 1, 'Badge de envíos debe mostrar 1 en tránsito de inmediato sin entrar a la vista');
 assert.equal(mockBadgeEnv.style.display, 'inline-flex', 'Badge de envíos debe ser visible con display inline-flex');
 global.document = origDocEnv;
-console.log('  ✅ Envíos y Guías de Paquetería (obtenerUrlRastreoPaqueteria multicarrier y updateEnviosBadge): OK');
+
+// Test C: Un ticket en cotización sin pedido no debe generar ni listar guías de envío
+const { ticketTienePedidoOEnvioValido } = await import('../src/modules/envios.js');
+const ticketCotizacion = {
+  id: 't-cot-1',
+  folio: 'TKT-26593',
+  categoria: 'Refacción',
+  cotAceptada: '',
+  pedidoSAP: '',
+  guiaPedido: '',
+  refaccionesSeleccionadas: [{ clave: '463221N', descripcion: 'Sensor de Presion', cantidad: 2, estatusPedido: 'Por Pedir' }]
+};
+assert.equal(ticketTienePedidoOEnvioValido(ticketCotizacion), false, 'Ticket en cotización sin pedido debe retornar false');
+const guiaNoGenerada = asegurarGuiaEnvioParaTicket(ticketCotizacion);
+assert.equal(guiaNoGenerada, null, 'No debe generarse guía para ticket en cotización');
+
+// Test C.1: Cotización aceptada por el cliente pero sin Pedido SAP ni PDF ni Guía aún
+const ticketCotAceptadaSinPedido = {
+  id: 't-cot-acep-sin-ped',
+  folio: 'TKT-26595',
+  categoria: 'Refacción',
+  cotAceptada: 'si',
+  pedidoSAP: '',
+  pdfPedido: '',
+  guiaPedido: '',
+  paqueteria: 'Por Definir',
+  refaccionesSeleccionadas: [{ clave: '463221N', descripcion: 'Sensor de Presion', cantidad: 2, estatusPedido: 'Por Pedir' }]
+};
+assert.equal(ticketTienePedidoOEnvioValido(ticketCotAceptadaSinPedido), false, 'Ticket con cotAceptada=si pero sin Pedido SAP ni PDF debe retornar false');
+assert.equal(asegurarGuiaEnvioParaTicket(ticketCotAceptadaSinPedido), null, 'No debe generar guía si no hay pedido formal');
+
+const ticketConPedido = {
+  id: 't-ped-1',
+  folio: 'TKT-26594',
+  categoria: 'Refacción',
+  cotAceptada: 'si',
+  pedidoSAP: '1100592',
+  refaccionesSeleccionadas: [{ clave: '463221N', descripcion: 'Sensor de Presion', cantidad: 2, estatusPedido: 'Por Pedir' }]
+};
+assert.equal(ticketTienePedidoOEnvioValido(ticketConPedido), true, 'Ticket con cotización aprobada y pedidoSAP debe retornar true');
+const guiaGenerada = asegurarGuiaEnvioParaTicket(ticketConPedido);
+assert.ok(guiaGenerada && guiaGenerada.id, 'Debe generarse guía para ticket con pedido confirmado');
+
+// Test D: Ticket con pedido pero sin refacciones del catálogo (subticket -A con pieza descrita en asunto ej. "Banda de motor")
+const ticketConAsuntoPieza = {
+  id: 't-asunto-1',
+  folio: 'TKT-26652-A',
+  asunto: 'Banda de motor',
+  categoria: 'Refacción',
+  cotAceptada: 'si',
+  pedidoSAP: '1100593',
+  refaccionesSeleccionadas: []
+};
+global.window.tickets = [ticketConAsuntoPieza];
+const enviosAsunto = obtenerTodosLosEnvios();
+assert.ok(enviosAsunto.length > 0, 'Debe incluir envío para subticket -A con pedido confirmado');
+assert.equal(enviosAsunto[0].parts[0].descripcion, 'Banda de motor', 'Debe tomar "Banda de motor" como descripción de refacción en lugar de "Sin piezas especificadas"');
+
+// Test E: Ticket de servicio técnico sin piezas no debe incluirse en envíos
+if (typeof localStorage !== 'undefined') localStorage.removeItem('sapi_envios_db');
+const ticketServicio = {
+  id: 't-serv-1',
+  folio: 'TKT-26658',
+  asunto: 'Montaje sistema Innowet',
+  categoria: 'Servicio Técnico',
+  cotAceptada: 'si',
+  pedidoSAP: '1100594',
+  refaccionesSeleccionadas: []
+};
+global.window.tickets = [ticketServicio];
+const enviosServicio = obtenerTodosLosEnvios();
+assert.equal(enviosServicio.length, 0, 'Ticket de servicio técnico sin refacciones ni guía no debe generar envío');
+
+// Test F: Ticket de cotización sin refacciones y sin guía (ej. "Cotización de filtro") no debe generar envío
+const ticketCotizacionSinPiezas = {
+  id: 't-cot-sin-piezas',
+  folio: 'TKT-26616',
+  asunto: 'Cotización de filtro',
+  categoria: 'Refacción',
+  cotAceptada: 'si',
+  pedidoSAP: '3200229',
+  refaccionesSeleccionadas: [],
+  envios: []
+};
+assert.equal(ticketTienePedidoOEnvioValido(ticketCotizacionSinPiezas), false, 'Ticket sin piezas ni guía no debe generar envío');
+
+console.log('  ✅ Envíos y Guías de Paquetería (obtenerUrlRastreoPaqueteria multicarrier, updateEnviosBadge, discriminación cotización vs pedido, fallback piezas y exclusión servicios): OK');
 
 // 22. Módulo de Asignación Semanal y Programación de Técnicos
 const {
@@ -4056,6 +4142,9 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
   // 8.5 Bitácora Semanal y Generación de Documento por Cliente
   dom.window.abrirModalReporteSemanalSNP();
   dom.window.document.getElementById('snp-reporte-filtro-cliente').value = 'Minera del Norte S.A.';
+  if (dom.window.document.getElementById('snp-reporte-filtro-semana')) {
+    dom.window.document.getElementById('snp-reporte-filtro-semana').value = '2026-W42';
+  }
   dom.window.alCambiarClienteEnReporteSNP();
 
   const docHtml = dom.window.document.getElementById('snp-reporte-semanal-documento')?.innerHTML;

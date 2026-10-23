@@ -315,30 +315,54 @@ async function cargarListaQueriesSAP() {
     if (!res.ok) throw new Error(data.error || 'Fallo al obtener queries');
 
     listaQueriesCargada = data.data || [];
+    if (listaQueriesCargada.length > 0 && typeof localStorage !== 'undefined') {
+      localStorage.setItem('eurorep_sap_queries_cache', JSON.stringify(listaQueriesCargada));
+    }
     
-    // Rellenar todos los selectores de Queries en la UI
-    const selectors = document.querySelectorAll('.query-sap-selector, #query-selector');
-    selectors.forEach(selector => {
-      const placeholder = selector.id === 'query-selector' ? '-- Seleccionar un Query existente --' : '-- Sin asignar --';
-      selector.innerHTML = `<option value="">${placeholder}</option>`;
-      listaQueriesCargada.forEach(q => {
-        selector.innerHTML += `<option value="${q.SqlCode}">${q.SqlCode} - ${q.SqlName}</option>`;
-      });
-    });
-
-    // Re-aplicar valores guardados
-    if (configData.queryClientes) document.getElementById('cfg-query-clientes').value = configData.queryClientes;
-    if (configData.queryMaquinaria) document.getElementById('cfg-query-maquinaria').value = configData.queryMaquinaria;
-    if (configData.querySitios) document.getElementById('cfg-query-sitios').value = configData.querySitios;
-    if (configData.queryOrdenes) document.getElementById('cfg-query-ordenes').value = configData.queryOrdenes;
-
-    if (configData.queryRefacciones) document.getElementById('cfg-query-refacciones').value = configData.queryRefacciones;
-
+    _renderizarSelectoresQueries(listaQueriesCargada);
     mostrarNotificacion('Lista de Queries actualizada desde SAP.', 'success');
   } catch (err) {
     console.error("Error al cargar lista de queries:", err);
-    mostrarNotificacion('No se pudo actualizar la lista de queries.', 'error');
+    
+    // Recuperar de cache local o fallback predeterminado para no dejar la UI vacía
+    let fallback = [];
+    if (typeof localStorage !== 'undefined') {
+      try {
+        fallback = JSON.parse(localStorage.getItem('eurorep_sap_queries_cache') || '[]');
+      } catch (eCache) { fallback = []; }
+    }
+    if (!fallback || fallback.length === 0) {
+      fallback = [
+        { SqlCode: 'eurorep_clientes', SqlName: 'Clientes Eurorep CRM' },
+        { SqlCode: 'CAT_REFACCIONES', SqlName: 'CAT_REFACCIONES' },
+        { SqlCode: 'CAT_Sitos', SqlName: 'Catalogo de Sitios' },
+        { SqlCode: 'eurorep_pedidos', SqlName: 'Eurorep Pedidos' },
+        { SqlCode: 'REFACCIONES_TEST', SqlName: 'REFACCIONES_TEST' }
+      ];
+    }
+    listaQueriesCargada = fallback;
+    _renderizarSelectoresQueries(listaQueriesCargada);
+    mostrarNotificacion('Usando catálogo de queries en caché (sin conexión directa al servidor SAP).', 'warning');
   }
+}
+
+function _renderizarSelectoresQueries(queries) {
+  if (typeof document === 'undefined') return;
+  const selectors = document.querySelectorAll('.query-sap-selector, #query-selector');
+  selectors.forEach(selector => {
+    const placeholder = selector.id === 'query-selector' ? '-- Seleccionar un Query existente --' : '-- Sin asignar --';
+    selector.innerHTML = `<option value="">${placeholder}</option>`;
+    queries.forEach(q => {
+      selector.innerHTML += `<option value="${q.SqlCode}">${q.SqlCode} - ${q.SqlName}</option>`;
+    });
+  });
+
+  // Re-aplicar valores guardados
+  if (configData.queryClientes && document.getElementById('cfg-query-clientes')) document.getElementById('cfg-query-clientes').value = configData.queryClientes;
+  if (configData.queryMaquinaria && document.getElementById('cfg-query-maquinaria')) document.getElementById('cfg-query-maquinaria').value = configData.queryMaquinaria;
+  if (configData.querySitios && document.getElementById('cfg-query-sitios')) document.getElementById('cfg-query-sitios').value = configData.querySitios;
+  if (configData.queryOrdenes && document.getElementById('cfg-query-ordenes')) document.getElementById('cfg-query-ordenes').value = configData.queryOrdenes;
+  if (configData.queryRefacciones && document.getElementById('cfg-query-refacciones')) document.getElementById('cfg-query-refacciones').value = configData.queryRefacciones;
 }
 
 function cargarDetalleQuery(sqlCode) {

@@ -80,10 +80,15 @@ function renderEvidenciasFotograficas(o) {
   const renderTarjetaFoto = (titulo, tipo, url, obligatoria) => {
     const isConsulta = currentSession.viewMode === 'consulta' || isClosed;
     const uploadBtn = isConsulta ? '' : `
-      <label class="btn-primary" style="font-size:0.72rem; min-height:auto; padding:0.35rem 0.75rem; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem; margin-top:0.5rem;">
-        <i data-lucide="upload" style="width:12px;height:12px;"></i> ${url ? 'Reemplazar' : 'Cargar Foto'}
-        <input type="file" accept="image/*" onchange="subirEvidenciaFoto('${o.id}', '${tipo}', this)" style="display:none;" />
-      </label>
+      <div style="display:flex; gap:0.4rem; margin-top:0.5rem; width:100%; justify-content:center;">
+        <button type="button" class="btn-primary" onclick="window.tomarFotoNativaEvidencia('${o.id}', '${tipo}')" style="font-size:0.72rem; min-height:auto; padding:0.35rem 0.65rem; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem;" title="Tomar foto con cámara">
+          <i data-lucide="camera" style="width:13px;height:13px;"></i> Cámara
+        </button>
+        <label class="btn-secondary" style="font-size:0.72rem; min-height:auto; padding:0.35rem 0.65rem; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:0.3rem; margin:0;" title="Subir desde galería o archivos">
+          <i data-lucide="image" style="width:13px;height:13px;"></i> Galería
+          <input type="file" accept="image/*" onchange="subirEvidenciaFoto('${o.id}', '${tipo}', this)" style="display:none;" />
+        </label>
+      </div>
     `;
 
     const hasImage = !!url;
@@ -116,11 +121,17 @@ function renderEvidenciasFotograficas(o) {
   const renderAdicionalesHtml = () => {
     const isConsulta = currentSession.viewMode === 'consulta' || isClosed;
     const uploadBtn = isConsulta ? '' : `
-      <label style="display:flex; flex-shrink:0; width:100px; height:100px; border:2px dashed var(--border); border-radius:6px; background:var(--bg-body); flex-direction:column; gap:0.25rem; align-items:center; justify-content:center; cursor:pointer; color:var(--text-muted); transition:var(--transition); position:relative; box-shadow:0 2px 4px rgba(0,0,0,0.01); margin:0;" onmouseover="this.style.borderColor='var(--accent)';" onmouseout="this.style.borderColor='var(--border)';">
-        <i data-lucide="plus" style="width:16px;height:16px;"></i>
-        <span style="font-size:0.65rem; font-weight:600;">Subir foto</span>
-        <input type="file" accept="image/*" onchange="subirEvidenciaFoto('${o.id}', 'adicional', this)" style="display:none;" />
-      </label>
+      <div style="display:flex; gap:0.5rem;">
+        <button type="button" onclick="window.tomarFotoNativaEvidencia('${o.id}', 'adicional')" style="display:flex; flex-shrink:0; width:100px; height:100px; border:2px dashed var(--accent); border-radius:6px; background:rgba(232, 130, 12, 0.04); flex-direction:column; gap:0.25rem; align-items:center; justify-content:center; cursor:pointer; color:var(--accent); transition:var(--transition); position:relative; box-shadow:0 2px 4px rgba(0,0,0,0.01); margin:0; outline:none;" title="Tomar foto con cámara">
+          <i data-lucide="camera" style="width:18px;height:18px;"></i>
+          <span style="font-size:0.65rem; font-weight:700;">+ Cámara</span>
+        </button>
+        <label style="display:flex; flex-shrink:0; width:100px; height:100px; border:2px dashed var(--border); border-radius:6px; background:var(--bg-body); flex-direction:column; gap:0.25rem; align-items:center; justify-content:center; cursor:pointer; color:var(--text-muted); transition:var(--transition); position:relative; box-shadow:0 2px 4px rgba(0,0,0,0.01); margin:0;" onmouseover="this.style.borderColor='var(--accent)';" onmouseout="this.style.borderColor='var(--border)';" title="Subir foto desde galería">
+          <i data-lucide="image" style="width:18px;height:18px;"></i>
+          <span style="font-size:0.65rem; font-weight:600;">+ Galería</span>
+          <input type="file" accept="image/*" onchange="subirEvidenciaFoto('${o.id}', 'adicional', this)" style="display:none;" />
+        </label>
+      </div>
     `;
 
     const fotosList = adicionales.map((url, idx) => `
@@ -426,6 +437,102 @@ async function subirEvidenciaFoto(ordenId, tipo, inputEl) {
     console.error("Error en subirEvidenciaFoto:", err);
     alert("Ocurrió un error inesperado al subir la imagen.");
   }
+}
+
+window.tomarFotoNativaEvidencia = async function(ordenId, tipo) {
+  if (typeof document === 'undefined') return;
+  const o = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes.find(x => x && x.id === ordenId) : null;
+  if (!o) return;
+
+  const hasTecnicoFirma = o.firma_tecnico_base64 && o.firma_tecnico_base64 !== '__DELETED__';
+  const hasClienteFirma = o.firma_cliente_base64 && o.firma_cliente_base64 !== '__DELETED__';
+  if (((o.estado === 'Completado' || o.estado === 'Cerrada' || o.estado === 'Cerrado') || o.estado === 'Finalizado' || o.cierre_papel_pdf) || hasTecnicoFirma || hasClienteFirma) {
+    if (window.mostrarNotificacion) {
+      window.mostrarNotificacion('No se pueden modificar evidencias en una orden cerrada o con firmas.', 'error');
+    }
+    return;
+  }
+
+  if (typeof window.capturarFotoNativa !== 'function') {
+    if (window.mostrarNotificacion) window.mostrarNotificacion('Cámara no disponible en este dispositivo.', 'warning');
+    return;
+  }
+
+  try {
+    const dataUrl = await window.capturarFotoNativa({ quality: 75, maxWidth: 1400, sourceType: 'camera' });
+    if (!dataUrl) return; // Cancelado por el usuario
+
+    if (window.mostrarNotificacion) {
+      window.mostrarNotificacion('Comprimiendo y preparando foto de evidencia...', 'info');
+    }
+
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const uniqueName = `${tipo}_${Date.now()}_${Math.random().toString(36).substring(2,7)}.jpg`;
+    const filePath = `ordenes/${ordenId}/${uniqueName}`.replace(/[\[\]\*?]/g, '');
+
+    let publicUrl = null;
+    let savedOffline = false;
+
+    if (!navigator.onLine || !window.supabaseClient) {
+      publicUrl = dataUrl;
+      savedOffline = true;
+    } else {
+      try {
+        const { data: uploadData, error: uploadErr } = await window.supabaseClient.storage
+          .from('evidencias')
+          .upload(filePath, blob, { cacheControl: '3600', upsert: true });
+
+        if (uploadErr) throw uploadErr;
+
+        const { data: urlData } = window.supabaseClient.storage
+          .from('evidencias')
+          .getPublicUrl(filePath);
+
+        publicUrl = urlData.publicUrl;
+      } catch (errUpload) {
+        console.warn('Fallo subida a storage, guardando offline:', errUpload);
+        publicUrl = dataUrl;
+        savedOffline = true;
+      }
+    }
+
+    let freshOrd = (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes.find(x => x && x.id === ordenId) : null;
+    if (!freshOrd) {
+      try {
+        const localList = JSON.parse(localStorage.getItem('sapi_ordenes') || '[]');
+        freshOrd = localList.find(x => x && x.id === ordenId);
+      } catch (e) {}
+    }
+    if (!freshOrd) freshOrd = o;
+
+    if (!freshOrd.evidencias) freshOrd.evidencias = { fotoInicio: null, fotoFin: null, adicionales: [] };
+
+    if (tipo === 'fotoInicio') freshOrd.evidencias.fotoInicio = publicUrl;
+    else if (tipo === 'fotoFin') freshOrd.evidencias.fotoFin = publicUrl;
+    else if (tipo === 'adicional') {
+      if (!Array.isArray(freshOrd.evidencias.adicionales)) freshOrd.evidencias.adicionales = [];
+      freshOrd.evidencias.adicionales.push(publicUrl);
+    }
+
+    o.evidencias = freshOrd.evidencias;
+    safeSetJSON('sapi_ordenes', (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) ? ordenes : [freshOrd]);
+
+    if (window.pushToSupabase) {
+      await window.pushToSupabase('ordenes', freshOrd);
+    }
+
+    if (window.mostrarNotificacion) {
+      window.mostrarNotificacion(savedOffline ? 'Evidencia guardada localmente (Offline)' : 'Foto capturada con cámara y guardada.', 'success');
+    }
+
+    verDetalle(ordenId);
+  } catch (err) {
+    console.error('Error en tomarFotoNativaEvidencia:', err);
+    if (window.mostrarNotificacion) {
+      window.mostrarNotificacion('Error al tomar foto de evidencia', 'error');
+    }
+  }
 };
 
 async function subirFotoRefaccion(inputEl) {
@@ -652,7 +759,18 @@ function verDetalle(id) {
     }
   }
 
-  document.getElementById('detalle-title').textContent = `Orden ${o.folio || o.id.slice(0,8)}`;
+  const detalleTitleEl = document.getElementById('detalle-title');
+  if (detalleTitleEl) {
+    detalleTitleEl.textContent = `Orden ${o.folio || o.id.slice(0,8)}`;
+  }
+  const detalleHeaderBadge = document.getElementById('detalle-header-status-badge');
+  if (detalleHeaderBadge) {
+    const estadoTxt = o.estado || 'Pendiente';
+    const badgeClass = (typeof badgeEstado === 'function') ? badgeEstado(estadoTxt) : '';
+    detalleHeaderBadge.textContent = estadoTxt;
+    detalleHeaderBadge.className = `detalle-header-badge badge ${badgeClass}`;
+    detalleHeaderBadge.style.display = 'inline-block';
+  }
   
   const btnCerrarAdmin = document.getElementById('btn-cerrar-orden-admin');
   const btnReabrirAdmin = document.getElementById('btn-reabrir-orden-admin');
@@ -1112,8 +1230,8 @@ function verDetalle(id) {
     `;
   };
 
-  const field = (label, val) => `
-    <div class="detalle-field">
+  const field = (label, val, fullWidth) => `
+    <div class="detalle-field ${fullWidth ? 'detalle-field-full' : ''} ${!val || val === '—' ? 'is-empty' : ''}">
       <div class="detalle-label">${label}</div>
       <div class="detalle-value">${val || '—'}</div>
     </div>`;
@@ -1171,8 +1289,11 @@ function verDetalle(id) {
     ${seccion('Información General', `
       <div class="detalle-grid">
         ${field('Folio', o.folio)} ${field('Pedido', o.pedido)} ${field('Fecha', formatFecha(o.fecha))}
-        ${field('Cliente', o.cliente)} ${field('Ubicación (Ticket)', o.ubicacion)} ${field('Ubicación en Sitio', o.ubicacion_sitio)} ${field('Operador', o.operador)}
-        ${field('No. ECO', o.eco)} ${field('Horómetro (Ticket)', o.horometro)} ${field('Horómetro Real', o.horometro_real)}
+        ${field('Cliente', o.cliente, true)}
+        ${field('Ubicación (Ticket)', o.ubicacion, true)}
+        ${field('Ubicación en Sitio', o.ubicacion_sitio, true)}
+        ${field('Operador', o.operador)} ${field('No. ECO', o.eco)}
+        ${field('Horómetro (Ticket)', o.horometro)} ${field('Horómetro Real', o.horometro_real)}
         ${field('Marca', (() => { 
           const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
           let m = o.marca || (o.equipo ? o.equipo.split(' ')[0] : '');
@@ -1213,7 +1334,7 @@ function verDetalle(id) {
           }
           return maq && (maq.idInterno || maq.id) ? `<span style="font-family:monospace; font-weight:600; color:var(--accent); background:var(--blue-light); padding:0.15rem 0.4rem; border-radius:4px; border:1px solid rgba(232, 133, 10, 0.3);">${maq.idInterno || maq.id}</span>` : '—';
         })())}
-        ${field('Técnico', o.tecnico)} ${field('Ticket Soporte', (() => { 
+        ${field('Técnico Asignado', o.tecnico, true)} ${field('Ticket Soporte', (() => { 
           const t = tickets.find(x => x.id === o.soporte || x.folio === o.soporte || (o.ticket_id && x.id === o.ticket_id) || (o.ticket_folio && x.folio === o.ticket_folio)); 
           if (t) {
             return `<a href="#" onclick="verDetalleTicket('${t.id}'); return false;" style="color:var(--accent); font-weight:600; text-decoration:underline;" title="${t.asunto || ''}">${t.folio}</a>`;
@@ -1270,12 +1391,12 @@ function verDetalle(id) {
       `}
     `)}
     ${seccion('Diagnóstico y Trabajos', `
-      ${field('Falla reportada', o.falla)}
-      <div style="margin-top:0.5rem">${field('Trabajos realizados', o.trabajos)}</div>
-      <div style="margin-top:0.5rem">${field('Dictamen', o.dictamen)}</div>
-      <div style="margin-top:0.5rem">${field('Condiciones del equipo', o.condiciones)}</div>
-      <div style="margin-top:0.5rem">${field('Observaciones', o.observaciones)}</div>
-      <div style="margin-top:0.5rem">${field('Pendientes', o.pendientes)}</div>`)}
+      ${field('Falla reportada', o.falla, true)}
+      <div style="margin-top:0.5rem">${field('Trabajos realizados', o.trabajos, true)}</div>
+      <div style="margin-top:0.5rem">${field('Dictamen', o.dictamen, true)}</div>
+      <div style="margin-top:0.5rem">${field('Condiciones del equipo', o.condiciones, true)}</div>
+      <div style="margin-top:0.5rem">${field('Observaciones', o.observaciones, true)}</div>
+      <div style="margin-top:0.5rem">${field('Pendientes', o.pendientes, true)}</div>`)}
     ${seccion('Refacciones Utilizadas', refTable(o.ref_utilizadas, false))}
     ${seccion('Refacciones Necesarias', refTable(o.ref_necesarias, false))}
     ${(o.noches || o.alimentacion || o.traslado_costo) ? seccion('Fecha de Servicio', `
@@ -1467,8 +1588,11 @@ function verDetalle(id) {
     `)}
   `;
 
-  document.getElementById('modal-detalle-overlay').classList.add('open');
+  const modalDetalleOverlay = document.getElementById('modal-detalle-overlay');
+  if (modalDetalleOverlay) modalDetalleOverlay.classList.add('open');
   document.body.style.overflow = 'hidden';
+  const fab = document.getElementById('mobile-fab-container');
+  if (fab) fab.classList.add('hidden');
   lucide.createIcons();
   
   setTimeout(() => {

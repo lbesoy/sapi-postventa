@@ -73,6 +73,9 @@ Abre tu navegador en: **`http://localhost:3005`**
 | `npm run watch:html` | Observa cambios en `src/html/` y recompila `index.html` automáticamente. |
 | `npm run check` | Ejecuta la **Auditoría Preventiva SAPI** (sincronización HTML, activos en Git y sintaxis JS). |
 | `npm test` | Corre las **56 suites de pruebas** unitarias y de integración del sistema. |
+| `npm run build:mobile` | Compila y empaqueta la versión móvil offline (reemplaza CDNs por librerías locales). |
+| `npm run cap:sync` | Sincroniza los activos web compilados (`dist/`) hacia el proyecto nativo Android. |
+| `npm run cap:open` | Abre el proyecto Android nativo en Android Studio para depurar o generar el APK. |
 
 ---
 

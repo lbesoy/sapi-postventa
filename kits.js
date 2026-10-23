@@ -687,22 +687,26 @@ window.loadKitsServicio = function() {
     const raw = (typeof safeGetJSON === 'function') 
       ? safeGetJSON(storageKey, null) 
       : JSON.parse(localStorage.getItem(storageKey) || 'null');
-    if (Array.isArray(raw) && raw.length > 0) {
-      return raw;
+    if (Array.isArray(raw)) {
+      if (raw.length > 0) return raw;
+      if (!isTest) return []; // En producción respetamos lista limpia
     }
   } catch (e) {
     console.warn('[Kits] Error leyendo kits locales:', e);
   }
 
-  // Si no hay datos registrados aún, inicializar con el catálogo de machotes oficiales precargados
-  const defaults = (typeof KITS_PRECARGADOS_DEFAULT !== 'undefined' && Array.isArray(KITS_PRECARGADOS_DEFAULT))
-    ? KITS_PRECARGADOS_DEFAULT
-    : [];
-  if (defaults.length > 0) {
-    window.saveKitsServicio(defaults);
-    return [...defaults];
+  // En Sandbox (Modo Pruebas), inicializar con los 36 machotes de ejemplo si aún no hay datos
+  if (isTest) {
+    const defaults = (typeof KITS_PRECARGADOS_DEFAULT !== 'undefined' && Array.isArray(KITS_PRECARGADOS_DEFAULT))
+      ? KITS_PRECARGADOS_DEFAULT
+      : [];
+    if (defaults.length > 0) {
+      window.saveKitsServicio(defaults);
+      return [...defaults];
+    }
   }
 
+  // En Modo Real (Producción), si no hay datos se mantiene limpio en 0 ([])
   return [];
 };
 

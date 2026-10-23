@@ -18,18 +18,76 @@ export function calcularEstadisticasLevantamientos(list = []) {
   };
 }
 
-window.setFiltroEstadoLevantamientos = function(estado) {
-  currentLevantamientosFilter = estado;
+window.setFiltroEstadoLevantamientos = function(estado, btnEl) {
+  currentLevantamientosFilter = estado || 'todos';
+
+  // Actualizar estado activo en chips móviles
+  const chips = document.querySelectorAll('#mobile-levantamientos-chips .status-chip');
+  if (chips && chips.length > 0) {
+    chips.forEach(chip => {
+      const chipEstado = chip.getAttribute('data-estado');
+      if (chipEstado === currentLevantamientosFilter) {
+        chip.classList.add('active');
+      } else {
+        chip.classList.remove('active');
+      }
+    });
+  }
+
   renderLevantamientos();
 };
 
+function syncSearchLevantamientos(val) {
+  const deskInput = document.getElementById('search-levantamientos');
+  const mobInput = document.getElementById('mobile-search-levantamientos');
+  const clearBtn = document.getElementById('btn-clear-search-lev');
+
+  if (deskInput && deskInput.value !== val) deskInput.value = val;
+  if (mobInput && mobInput.value !== val) mobInput.value = val;
+  if (clearBtn) {
+    clearBtn.style.display = (val && val.length > 0) ? 'flex' : 'none';
+  }
+
+  if (typeof window !== 'undefined' && typeof window.debouncedRenderLevantamientos === 'function') {
+    window.debouncedRenderLevantamientos();
+  } else {
+    renderLevantamientos();
+  }
+}
+
+function clearSearchLevantamientos() {
+  const deskInput = document.getElementById('search-levantamientos');
+  const mobInput = document.getElementById('mobile-search-levantamientos');
+  const clearBtn = document.getElementById('btn-clear-search-lev');
+
+  if (mobInput) mobInput.value = '';
+  if (deskInput) deskInput.value = '';
+  if (clearBtn) clearBtn.style.display = 'none';
+
+  renderLevantamientos();
+}
+
+if (typeof window !== 'undefined') {
+  window.syncSearchLevantamientos = syncSearchLevantamientos;
+  window.clearSearchLevantamientos = clearSearchLevantamientos;
+}
+
 function renderLevantamientos() {
   const tbody = document.getElementById('levantamientos-table-body');
-  if (!tbody) return;
-  tbody.innerHTML = '';
+  const mobContainer = document.getElementById('mobile-levantamientos-cards-container');
+  if (!tbody && !mobContainer) return;
   
-  const searchTerm = (document.getElementById('search-levantamientos')?.value || '').toLowerCase();
+  if (tbody) tbody.innerHTML = '';
   
+  const mobileSearchVal = document.getElementById('mobile-search-levantamientos')?.value || '';
+  const desktopSearchVal = document.getElementById('search-levantamientos')?.value || '';
+  const searchTerm = (mobileSearchVal || desktopSearchVal || '').toLowerCase().trim();
+  
+  const clearBtn = document.getElementById('btn-clear-search-lev');
+  if (clearBtn) {
+    clearBtn.style.display = (mobileSearchVal && mobileSearchVal.length > 0) ? 'flex' : 'none';
+  }
+
   let list = (typeof window !== 'undefined' && Array.isArray(window.levantamientos) && window.levantamientos.length > 0)
     ? window.levantamientos
     : ((typeof levantamientos !== 'undefined' && Array.isArray(levantamientos) && levantamientos.length > 0)
@@ -75,7 +133,7 @@ function renderLevantamientos() {
     });
   }
   
-  // Update stats before filtering
+  // Update stats before filtering (Desktop & Mobile)
   const total = list.length;
   const pendientes = list.filter(l => l.estado !== 'Completado').length;
   const completados = list.filter(l => l.estado === 'Completado').length;
@@ -83,7 +141,21 @@ function renderLevantamientos() {
   if (document.getElementById('stat-lev-total')) document.getElementById('stat-lev-total').textContent = total;
   if (document.getElementById('stat-lev-pendientes')) document.getElementById('stat-lev-pendientes').textContent = pendientes;
   if (document.getElementById('stat-lev-completados')) document.getElementById('stat-lev-completados').textContent = completados;
-  
+
+  if (document.getElementById('mob-lev-total')) document.getElementById('mob-lev-total').textContent = total;
+  if (document.getElementById('mob-lev-pendientes')) document.getElementById('mob-lev-pendientes').textContent = pendientes;
+  if (document.getElementById('mob-lev-completados')) document.getElementById('mob-lev-completados').textContent = completados;
+
+  // Sincronizar estado de chips móviles
+  document.querySelectorAll('#mobile-levantamientos-chips .status-chip').forEach(btn => {
+    const e = btn.getAttribute('data-estado');
+    if (e === currentLevantamientosFilter) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+
   if (currentLevantamientosFilter !== 'todos') {
     list = list.filter(l => l.estado === currentLevantamientosFilter || (currentLevantamientosFilter === 'Pendiente' && l.estado !== 'Completado'));
   }
@@ -93,46 +165,158 @@ function renderLevantamientos() {
       (l.folio || '').toLowerCase().includes(searchTerm) ||
       (l.cliente || '').toLowerCase().includes(searchTerm) ||
       (l.sitio || '').toLowerCase().includes(searchTerm) ||
-      (l.solicitante || '').toLowerCase().includes(searchTerm)
+      (l.solicitante || '').toLowerCase().includes(searchTerm) ||
+      (l.tecnico_asignado || '').toLowerCase().includes(searchTerm)
     );
   }
   
   list.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
   
   if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: var(--text-muted);">No hay levantamientos que coincidan con la búsqueda.</td></tr>`;
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: var(--text-muted);">No hay levantamientos que coincidan con la búsqueda.</td></tr>`;
+    }
+    if (mobContainer) {
+      mobContainer.innerHTML = `
+        <div class="empty-state" style="text-align:center; padding:3rem 1rem; color:var(--text-muted);">
+          <i data-lucide="clipboard-list" style="width:40px; height:40px; margin-bottom:0.75rem; opacity:0.35; display:block; margin-left:auto; margin-right:auto;"></i>
+          <div style="font-weight:600; font-size:0.95rem; margin-bottom:0.25rem;">No hay levantamientos</div>
+          <div style="font-size:0.8rem; opacity:0.75;">No se encontraron registros con los filtros actuales.</div>
+        </div>
+      `;
+    }
+    if (window.lucide) window.lucide.createIcons();
     return;
   }
   
+  // Cache de maquinarias para resolver modelos rápidamente
+  let maquinasDb = [];
+  try {
+    maquinasDb = JSON.parse(localStorage.getItem('sapi_maquinaria_db') || '[]');
+  } catch(e) {}
+
+  let htmlMobileCards = '';
+
   list.forEach(l => {
-    const syncIcon = (l._synced === false) ? '<i data-lucide="cloud-off" style="width:14px;height:14px;color:var(--warning);margin-left:0.5rem;" title="Pendiente de sincronizar"></i>' : '';
-    const tr = document.createElement('tr');
+    const isUnsynced = (l._synced === false);
+    const syncIcon = isUnsynced ? '<i data-lucide="cloud-off" style="width:14px;height:14px;color:var(--warning);margin-left:0.5rem;" title="Pendiente de sincronizar"></i>' : '';
     
     let badgeClass = 'badge-pendiente';
+    let statusColor = '#ef4444';
+    let statusBg = 'rgba(239, 68, 68, 0.12)';
+    let statusBorder = 'rgba(239, 68, 68, 0.3)';
+    let statusLabel = l.estado || 'Pendiente';
+
     if (l.estado === 'Completado') {
       badgeClass = 'badge-completado';
+      statusColor = '#10b981';
+      statusBg = 'rgba(16, 185, 129, 0.12)';
+      statusBorder = 'rgba(16, 185, 129, 0.3)';
     } else if (l.estado === 'Realizado') {
       badgeClass = 'badge-proceso';
+      statusColor = '#f59e0b';
+      statusBg = 'rgba(245, 158, 11, 0.12)';
+      statusBorder = 'rgba(245, 158, 11, 0.3)';
     }
-    
-    tr.innerHTML = `
-      <td data-label="Acciones" style="white-space:nowrap; width:60px;">
-        <div style="display:flex;gap:0.25rem;">
-          <button class="action-btn" onclick="verDetalleLevantamiento('${l.id}')" title="Ver Detalle"><i data-lucide="eye"></i></button>
+
+    // 1. Desktop Row
+    if (tbody) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td data-label="Acciones" style="white-space:nowrap; width:60px;">
+          <div style="display:flex;gap:0.25rem;">
+            <button class="action-btn" onclick="verDetalleLevantamiento('${l.id}')" title="Ver Detalle"><i data-lucide="eye"></i></button>
+          </div>
+        </td>
+        <td data-label="Folio"><strong>${l.folio || 'N/A'}</strong> ${syncIcon}</td>
+        <td data-label="Cliente">${l.cliente || 'No especificado'}</td>
+        <td data-label="Sitio">${l.sitio || 'No especificado'}</td>
+        <td data-label="Solicitante">${l.solicitante || 'N/A'}</td>
+        <td data-label="Asignado A">${l.tecnico_asignado || '-'}</td>
+        <td data-label="Fecha Esperada">${l.fecha_esperada ? l.fecha_esperada.substring(0,10) : 'N/A'}</td>
+        <td data-label="Estado"><span class="badge ${badgeClass}">${statusLabel}</span></td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    // 2. Mobile App Card
+    let maqShort = '';
+    if (l.maquina) {
+      const mObj = maquinasDb.find(x => x && (x.id === l.maquina || x.serie === l.maquina || x.idInterno === l.maquina));
+      if (mObj) {
+        maqShort = `${mObj.marca || ''} ${mObj.modelo || ''}`.trim();
+        if (mObj.serie && !maqShort.includes(mObj.serie)) {
+          maqShort += ` (${mObj.serie})`;
+        }
+      }
+    }
+
+    const fechaFormateada = l.fecha_esperada ? l.fecha_esperada.substring(0, 10) : 'Sin fecha';
+    const tecnicoNombre = l.tecnico_asignado || 'Sin asignar';
+    const clienteNombre = l.cliente || 'Cliente no especificado';
+    const sitioNombre = l.sitio || '';
+
+    htmlMobileCards += `
+      <div class="mlc-card" onclick="window.verDetalleLevantamiento('${l.id}')">
+        <div class="mlc-accent" style="background-color:${statusColor};"></div>
+        <div class="mlc-body">
+          <div class="mlc-header">
+            <div class="mlc-ids">
+              <span class="mlc-folio">${l.folio || 'S/F'}</span>
+              ${isUnsynced ? '<i data-lucide="cloud-off" class="mlc-sync-icon" title="Pendiente de sincronizar"></i>' : ''}
+            </div>
+            <span class="mlc-status" style="color:${statusColor}; background:${statusBg}; border-color:${statusBorder};">
+              <span class="mlc-dot" style="background-color:${statusColor};"></span>
+              ${statusLabel}
+            </span>
+          </div>
+
+          <div class="mlc-client" title="${clienteNombre}">${clienteNombre}</div>
+
+          <div class="mlc-details">
+            ${sitioNombre ? `
+            <span class="mlc-detail-item">
+              <i data-lucide="map-pin"></i>
+              <span>${sitioNombre}</span>
+            </span>` : ''}
+            ${maqShort ? `
+            <span class="mlc-detail-item">
+              <i data-lucide="wrench"></i>
+              <span>${maqShort}</span>
+            </span>` : (l.solicitante ? `
+            <span class="mlc-detail-item">
+              <i data-lucide="user"></i>
+              <span>${l.solicitante}</span>
+            </span>` : '')}
+          </div>
+
+          <div class="mlc-meta">
+            <span class="mlc-meta-item">
+              <i data-lucide="user-check"></i>
+              <span>${tecnicoNombre}</span>
+            </span>
+            <span class="mlc-meta-dot">•</span>
+            <span class="mlc-meta-item">
+              <i data-lucide="calendar"></i>
+              <span>${fechaFormateada}</span>
+            </span>
+            <span class="mlc-chevron">
+              <i data-lucide="chevron-right"></i>
+            </span>
+          </div>
         </div>
-      </td>
-      <td data-label="Folio"><strong>${l.folio || 'N/A'}</strong> ${syncIcon}</td>
-      <td data-label="Cliente">${l.cliente || 'No especificado'}</td>
-      <td data-label="Sitio">${l.sitio || 'No especificado'}</td>
-      <td data-label="Solicitante">${l.solicitante || 'N/A'}</td>
-      <td data-label="Asignado A">${l.tecnico_asignado || '-'}</td>
-      <td data-label="Fecha Esperada">${l.fecha_esperada ? l.fecha_esperada.substring(0,10) : 'N/A'}</td>
-      <td data-label="Estado"><span class="badge ${badgeClass}">${l.estado || 'Pendiente'}</span></td>
+      </div>
     `;
-    tbody.appendChild(tr);
   });
+
+  if (mobContainer) {
+    mobContainer.innerHTML = htmlMobileCards;
+  }
   
-  if (window.lucide) window.lucide.createIcons();
+  if (window.lucide) {
+    const viewLev = document.getElementById('view-levantamientos');
+    window.lucide.createIcons({ root: viewLev || undefined });
+  }
   
   // Update badge in sidebar
   if (typeof window.actualizarBadgeLevantamientos === 'function') {
@@ -232,13 +416,14 @@ function window_abrirModalNuevoLevantamiento() {
   
   const m = document.createElement('div');
   m.id = 'modal-nuevo-levantamiento';
+  m.className = 'modal-overlay modal-app-fullscreen modal-lev-fullscreen';
   m.style.position = 'fixed';
   m.style.top = '0'; m.style.left = '0'; m.style.width = '100vw'; m.style.height = '100vh';
-  m.style.background = 'rgba(0,0,0,0.5)'; m.style.display = 'flex';
-  m.style.alignItems = 'center'; m.style.justifyContent = 'center'; m.style.zIndex = '99999';
+  m.style.background = 'rgba(0,0,0,0.6)'; m.style.display = 'flex';
+  m.style.alignItems = 'center'; m.style.justifyContent = 'center'; m.style.zIndex = '10005';
   
   m.innerHTML = `
-    <div style="background:var(--bg-card); padding:1.5rem; border-radius:12px; width:100%; max-width:500px; box-shadow:var(--shadow-lg);">
+    <div class="modal-nuevo-lev-content" style="background:var(--bg-card); padding:1.5rem; border-radius:12px; width:100%; max-width:500px; box-shadow:var(--shadow-lg); max-height:90vh; overflow-y:auto;">
       <h3 style="margin-top:0;">Nuevo Levantamiento</h3>
       <p style="color:var(--text-secondary); font-size:0.9rem; margin-bottom:1rem;">Folio: <strong>${folio}</strong></p>
       
@@ -421,10 +606,11 @@ function verDetalleLevantamiento(id) {
   
   const m = document.createElement('div');
   m.id = 'modal-detalle-levantamiento';
+  m.className = 'modal-overlay modal-app-fullscreen modal-lev-fullscreen';
   m.style.position = 'fixed';
   m.style.top = '0'; m.style.left = '0'; m.style.width = '100vw'; m.style.height = '100vh';
-  m.style.background = 'rgba(0,0,0,0.5)'; m.style.display = 'flex';
-  m.style.alignItems = 'center'; m.style.justifyContent = 'center'; m.style.zIndex = '99999';
+  m.style.background = 'rgba(0,0,0,0.6)'; m.style.display = 'flex';
+  m.style.alignItems = 'center'; m.style.justifyContent = 'center'; m.style.zIndex = '10005';
   
   const isCompleted = lev.estado === 'Completado';
   const isTecnico = (typeof currentSession !== 'undefined' && currentSession.viewMode === 'tecnico');
@@ -456,7 +642,7 @@ function verDetalleLevantamiento(id) {
   }
 
   m.innerHTML = `
-    <div style="background:var(--bg-card); border-radius:12px; width:100%; max-width:600px; box-shadow:var(--shadow-lg); max-height:90vh; display:flex; flex-direction:column; overflow:hidden;">
+    <div class="modal-detalle-lev-content" style="background:var(--bg-card); border-radius:12px; width:100%; max-width:600px; box-shadow:var(--shadow-lg); max-height:90vh; display:flex; flex-direction:column; overflow:hidden;">
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding:1.5rem 2rem;">
         <h2 style="margin:0;">Levantamiento ${lev.folio}</h2>
         <span style="font-size:0.8rem; font-weight:700; padding:0.25rem 0.6rem; border-radius:999px; ${statusStyle}">${lev.estado || 'Pendiente'}</span>
@@ -936,6 +1122,8 @@ if (typeof window !== 'undefined') {
   window.completarLevantamiento = typeof completarLevantamiento !== 'undefined' ? completarLevantamiento : window.completarLevantamiento;
   window.guardarNuevoLevantamiento = guardarNuevoLevantamiento;
   window.enviarARevisionLevantamiento = window.enviarARevisionLevantamiento;
+  window.syncSearchLevantamientos = syncSearchLevantamientos;
+  window.clearSearchLevantamientos = clearSearchLevantamientos;
 
   // Actualizar badge inmediatamente al cargar el script
   if (typeof document !== 'undefined' && typeof window.actualizarBadgeLevantamientos === 'function') {
@@ -956,7 +1144,9 @@ export {
   actualizarLevantamiento,
   completarLevantamiento,
   enviarARevisionLevantamiento,
-  actualizarBadgeLevantamientos
+  actualizarBadgeLevantamientos,
+  syncSearchLevantamientos,
+  clearSearchLevantamientos
 };
 
 

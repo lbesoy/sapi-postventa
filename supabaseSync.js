@@ -1137,6 +1137,10 @@ function rowToRenta(r) {
     notas: r.notas || null,
     checklist_entrega: r.checklist_entrega || null,
     checklist_devolucion: r.checklist_devolucion || null,
+    bolsa_horas_total: (r.bolsa_horas_total != null) ? parseFloat(r.bolsa_horas_total) : 50,
+    bolsa_tarifa_excedente: (r.bolsa_tarifa_excedente != null) ? parseFloat(r.bolsa_tarifa_excedente) : 0,
+    bolsa_fecha_inicio: r.bolsa_fecha_inicio || null,
+    bolsa_notas: r.bolsa_notas || null,
     esPrueba: (r.es_prueba === true || (typeof r.folio === 'string' && r.folio.startsWith('REN-PRUEBA')) || false),
     es_prueba: (r.es_prueba === true || (typeof r.folio === 'string' && r.folio.startsWith('REN-PRUEBA')) || false),
     created_at: r.created_at || null,
@@ -1170,7 +1174,10 @@ function rentaToRow(r) {
     notas: r.notas || null,
     checklist_entrega: r.checklist_entrega || r.checklistEntrega || null,
     checklist_devolucion: r.checklist_devolucion || r.checklistDevolucion || null,
-    es_prueba: (r.esPrueba === true || r.es_prueba === true || (typeof r.folio === 'string' && r.folio.startsWith('REN-PRUEBA')) || false),
+    bolsa_horas_total: (r.bolsa_horas_total != null) ? parseFloat(r.bolsa_horas_total) : ((r.bolsaHorasTotal != null) ? parseFloat(r.bolsaHorasTotal) : 50),
+    bolsa_tarifa_excedente: (r.bolsa_tarifa_excedente != null) ? parseFloat(r.bolsa_tarifa_excedente) : ((r.bolsaTarifaExcedente != null) ? parseFloat(r.bolsaTarifaExcedente) : 0),
+    bolsa_fecha_inicio: r.bolsa_fecha_inicio || r.bolsaFechaInicio || null,
+    bolsa_notas: r.bolsa_notas || r.bolsaNotas || null,
     created_at: r.created_at || r.createdAt || new Date().toISOString(),
     updated_at: r.updated_at || new Date().toISOString()
   };
@@ -1852,21 +1859,21 @@ window.obtenerSiguienteFolioTicket = async function(esPrueba = false) {
 
 const _ordenPushQueues = new Map();
 
-window.pushToSupabase = async function(tabla, item) {
+window.pushToSupabase = async function(tabla, item, options = {}) {
   if (tabla === 'ordenes' && item && item.id) {
     const key = String(item.id);
     const lastOp = _ordenPushQueues.get(key) || Promise.resolve();
     const currentOp = (async () => {
       await lastOp.catch(() => {});
-      return _executePushToSupabase(tabla, item);
+      return _executePushToSupabase(tabla, item, options);
     })();
     _ordenPushQueues.set(key, currentOp);
     return currentOp;
   }
-  return _executePushToSupabase(tabla, item);
+  return _executePushToSupabase(tabla, item, options);
 };
 
-async function _executePushToSupabase(tabla, item) {
+async function _executePushToSupabase(tabla, item, options = {}) {
   // La telemetría es no-crítica: se envía directo sin cola para evitar
   // acumulación de errores "Failed to fetch" en la UI.
   if (tabla === 'sapi_telemetry') {
@@ -2166,6 +2173,20 @@ async function _executePushToSupabase(tabla, item) {
         }
         return { offlineQueued: true };
       }
+      const isRlsErr = error.code === '42501' || (error.message && (
+        error.message.includes('row-level security policy') ||
+        error.message.includes('permission denied')
+      ));
+      const isAuthErr = error.status === 401 || (error.message && (
+        error.message.includes('Unauthorized') ||
+        error.message.includes('JWT')
+      ));
+
+      if (options.silent || isRlsErr || isAuthErr) {
+        console.warn(`[Direct Push] Operación en ${tabla} omitida por permisos/sesión (${error.message || 'RLS'}).`);
+        throw error;
+      }
+
       console.error(`[Direct Push] Error al guardar en ${tabla}:`, error.message);
       if (typeof window.mostrarNotificacion === 'function') {
         window.mostrarNotificacion(`Error al guardar en ${tabla}: ${error.message}`, 'error');
@@ -4181,21 +4202,18 @@ window.cargarDatosDeSupabase = function() {
             }
           }
           const kitsCfg = configDb.find(c => c.id === 'kits_servicio' || c.id === 'machotes_servicio');
-          if (kitsCfg && Array.isArray(kitsCfg.data) && kitsCfg.data.length > 0) {
+          if (kitsCfg && Array.isArray(kitsCfg.data)) {
             if (typeof safeSetJSON === 'function') {
               safeSetJSON('sapi_kits_servicio', kitsCfg.data);
             } else {
               localStorage.setItem('sapi_kits_servicio', JSON.stringify(kitsCfg.data));
             }
           } else {
-            // Preservar kits existentes locales o recuperar desde precargados si no hay nada
-            const curLocal = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_kits_servicio', null) : JSON.parse(localStorage.getItem('sapi_kits_servicio') || 'null');
-            if (!Array.isArray(curLocal) || curLocal.length === 0) {
-              const defKits = (typeof KITS_PRECARGADOS_DEFAULT !== 'undefined' && Array.isArray(KITS_PRECARGADOS_DEFAULT)) ? KITS_PRECARGADOS_DEFAULT : [];
-              if (defKits.length > 0) {
-                if (typeof safeSetJSON === 'function') safeSetJSON('sapi_kits_servicio', defKits);
-                else localStorage.setItem('sapi_kits_servicio', JSON.stringify(defKits));
-              }
+            // En modo Real (Producción), si no hay kits en Supabase, la lista oficial inicia vacía []
+            if (typeof safeSetJSON === 'function') {
+              safeSetJSON('sapi_kits_servicio', []);
+            } else {
+              localStorage.setItem('sapi_kits_servicio', JSON.stringify([]));
             }
           }
 

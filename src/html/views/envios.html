@@ -1,6 +1,6 @@
         <div id="view-envios" class="view">
-          <!-- Stats Grid -->
-          <div class="stats-grid-5" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 1.5rem;">
+          <!-- Stats Grid Desktop (Oculto en Móvil) -->
+          <div class="stats-grid-5 desktop-only-stats" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 1.5rem;">
             <div class="stat-card" style="cursor: pointer;" onclick="document.getElementById('filter-envios-estado').value='todos'; window.renderEnvios();">
               <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="package"></i></div>
               <div>
@@ -31,10 +31,10 @@
             </div>
           </div>
 
-          <!-- Section Controls & Filter Bar -->
-          <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
-            <h2>Control de Envíos y Guías de Entrega</h2>
-            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; flex:1; justify-content:flex-end;">
+          <!-- Section Controls & Filter Bar Desktop (Oculto en Móvil) -->
+          <div class="section-header desktop-only-controls" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem; width:100%; max-width:100%; box-sizing:border-box;">
+            <h2 style="margin:0;">Control de Envíos y Guías de Entrega</h2>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; flex:1; justify-content:flex-end; min-width:0;">
               <div class="search-bar" style="width:100%; max-width:320px; margin:0;">
                 <input type="text" id="search-envios" placeholder="Buscar por guía, ticket, cliente, pieza..." oninput="debouncedRenderEnvios()" autocomplete="off" />
               </div>
@@ -68,9 +68,9 @@
             </div>
           </div>
 
-          <!-- Tabla de Envíos -->
-          <div class="table-wrapper">
-            <table id="tabla-envios" class="orders-table">
+          <!-- Tabla de Envíos Desktop (Oculto en Móvil) -->
+          <div class="table-wrapper desktop-only-table" style="width:100%; max-width:100%; box-sizing:border-box; overflow-x:auto;">
+            <table id="tabla-envios" class="orders-table" style="min-width:980px; width:100%;">
               <thead>
                 <tr>
                   <th style="width: 75px; text-align:center;">Acciones</th>
@@ -92,6 +92,46 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <!-- VISTA NATIVA MÓVIL APP (Solo visible en Pantallas Móviles y App) -->
+          <div class="mobile-only-envios-header" id="mobile-envios-sticky-top">
+            <!-- Buscador estilo App -->
+            <div class="mobile-search-bar mobile-env-search-bar">
+              <i data-lucide="search" class="search-icon"></i>
+              <input type="text" id="mobile-search-envios" placeholder="Buscar guía, ticket, cliente, pieza..." oninput="window.syncSearchEnvios(this.value)" autocomplete="off" />
+              <button type="button" class="mobile-search-clear" id="btn-clear-search-envios" onclick="window.clearSearchEnvios()" style="display:none;" title="Limpiar búsqueda">
+                <i data-lucide="x"></i>
+              </button>
+            </div>
+
+            <!-- Chips de Filtros de Estado Nativo Móvil -->
+            <div class="mobile-status-chips-scroll mobile-env-chips-scroll" id="mobile-envios-chips">
+              <button type="button" class="status-chip active" data-estado="todos" onclick="window.setFiltroEstadoEnviosChip('todos', this)">
+                <span>Todas</span>
+                <span class="chip-count" id="mob-env-total">0</span>
+              </button>
+              <button type="button" class="status-chip chip-sky" data-estado="En Tránsito" onclick="window.setFiltroEstadoEnviosChip('En Tránsito', this)">
+                <span class="chip-dot dot-sky"></span>
+                <span>En Tránsito</span>
+                <span class="chip-count" id="mob-env-transito">0</span>
+              </button>
+              <button type="button" class="status-chip chip-amber" data-estado="En Preparación" onclick="window.setFiltroEstadoEnviosChip('En Preparación', this)">
+                <span class="chip-dot dot-amber"></span>
+                <span>En Preparación</span>
+                <span class="chip-count" id="mob-env-preparando">0</span>
+              </button>
+              <button type="button" class="status-chip chip-green" data-estado="Entregado" onclick="window.setFiltroEstadoEnviosChip('Entregado', this)">
+                <span class="chip-dot dot-green"></span>
+                <span>Entregados</span>
+                <span class="chip-count" id="mob-env-entregados">0</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Contenedor Nativo de Tarjetas Móviles de Envíos (Estilo App) -->
+          <div class="mobile-only-envios-container" id="mobile-envios-cards-container">
+            <div class="empty-state" style="text-align:center; padding:2rem; color:var(--text-muted);">Cargando guías de envío...</div>
           </div>
         </div>
 

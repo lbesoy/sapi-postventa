@@ -8,6 +8,62 @@
 window.currentEnviosFiltroEstado = 'todos';
 window.currentEnviosFiltroPaqueteria = 'todas';
 
+// Filtro interactivo mediante chips en la versión app móvil
+window.setFiltroEstadoEnviosChip = function(estado, btnEl) {
+  window.currentEnviosFiltroEstado = estado || 'todos';
+
+  const selectEstado = document.getElementById('filter-envios-estado');
+  if (selectEstado) {
+    selectEstado.value = window.currentEnviosFiltroEstado;
+  }
+
+  // Actualizar estado activo en chips móviles
+  const chips = document.querySelectorAll('#mobile-envios-chips .status-chip');
+  if (chips && chips.length > 0) {
+    chips.forEach(chip => {
+      const chipEstado = chip.getAttribute('data-estado');
+      if (chipEstado === window.currentEnviosFiltroEstado) {
+        chip.classList.add('active');
+      } else {
+        chip.classList.remove('active');
+      }
+    });
+  }
+
+  window.renderEnvios();
+};
+
+// Sincronización bidireccional de buscador móvil y de escritorio
+window.syncSearchEnvios = function(val) {
+  const deskInput = document.getElementById('search-envios');
+  const mobInput = document.getElementById('mobile-search-envios');
+  const clearBtn = document.getElementById('btn-clear-search-envios');
+
+  if (deskInput && deskInput.value !== val) deskInput.value = val;
+  if (mobInput && mobInput.value !== val) mobInput.value = val;
+  if (clearBtn) {
+    clearBtn.style.display = (val && val.length > 0) ? 'flex' : 'none';
+  }
+
+  if (typeof window.debouncedRenderEnvios === 'function') {
+    window.debouncedRenderEnvios();
+  } else {
+    window.renderEnvios();
+  }
+};
+
+window.clearSearchEnvios = function() {
+  const deskInput = document.getElementById('search-envios');
+  const mobInput = document.getElementById('mobile-search-envios');
+  const clearBtn = document.getElementById('btn-clear-search-envios');
+
+  if (mobInput) mobInput.value = '';
+  if (deskInput) deskInput.value = '';
+  if (clearBtn) clearBtn.style.display = 'none';
+
+  window.renderEnvios();
+};
+
 // Generador de URLs inteligentes de rastreo según la transportista
 window.obtenerUrlRastreoPaqueteria = function(paqueteria, guia) {
   if (!guia) return '';
@@ -36,13 +92,100 @@ window.obtenerUrlRastreoPaqueteria = function(paqueteria, guia) {
   return '';
 };
 
-// Genera o asegura una guía de envío en estado 'En Preparación' para tickets con refacciones solicitadas
+// Comprueba si un ticket cuenta con piezas reales por despachar y un pedido formal o guía explícita
+window.ticketTienePedidoOEnvioValido = function(ticket) {
+  if (!ticket) return false;
+
+  const cat = String(ticket.categoria || '').toLowerCase();
+  const hasDirectParts = Array.isArray(ticket.refaccionesSeleccionadas) && ticket.refaccionesSeleccionadas.length > 0;
+  const isSubticketA = ticket.folio && String(ticket.folio).endsWith('-A');
+  const hasExplicitGuia = !!(ticket.guiaPedido && String(ticket.guiaPedido).trim());
+  const hasExplicitEnvios = Array.isArray(ticket.envios) && ticket.envios.length > 0;
+  const hasRealEnvio = hasExplicitEnvios && ticket.envios.some(e => {
+    if (!e) return false;
+    const tieneGuia = String(e.guiaPedido || '').trim().length > 0;
+    const paqDefinida = String(e.paqueteria || '').trim().toLowerCase();
+    const tienePaqReal = paqDefinida && paqDefinida !== 'por definir' && paqDefinida !== 'sin definir';
+    return tieneGuia || tienePaqReal;
+  });
+
+  // Verificar si tiene refacciones asociadas en orden de servicio
+  let hasAssocParts = false;
+  if (typeof ordenes !== 'undefined' && Array.isArray(ordenes)) {
+    const assocOrder = typeof window.obtenerOrdenAsociadaATicketRefacciones === 'function'
+      ? window.obtenerOrdenAsociadaATicketRefacciones(ticket)
+      : ordenes.find(o => o.soporte === ticket.id || o.folio === (ticket.folio || '').replace('-A', ''));
+    if (assocOrder && Array.isArray(assocOrder.ref_necesarias) && assocOrder.ref_necesarias.length > 0) {
+      hasAssocParts = true;
+    }
+  }
+
+  // REGLA FUNDAMENTAL: Para que exista un envío, debe haber piezas que enviar (o una guía/paquetería explícita ya capturada)
+  const tienePiezasParaEnviar = hasDirectParts || hasAssocParts || isSubticketA || hasExplicitGuia || hasRealEnvio;
+  if (!tienePiezasParaEnviar) {
+    return false;
+  }
+
+  const isRefaccionTicket = cat.includes('refacci') || cat.includes('garant') || isSubticketA || hasDirectParts || hasAssocParts || hasExplicitGuia || hasRealEnvio;
+  if (!isRefaccionTicket) return false;
+
+  // Si ya tiene una guía explícita o envío real capturado por el usuario, califica de inmediato
+  if (hasExplicitGuia || hasRealEnvio) return true;
+
+  // Comprobar si tiene pedido confirmado (SAP, PDF, paquetería o piezas en proceso)
+  const pedSAP = String(ticket.pedidoSAP || ticket.pedido_sap || '').trim();
+  const tienePedidoSAP = pedSAP && pedSAP !== '-' && pedSAP.toLowerCase() !== 'sin pedido' && pedSAP.toLowerCase() !== 's/n';
+  
+  const pdfPed = String(ticket.pdfPedido || ticket.pdf_pedido || '').trim();
+  const tienePdfPedido = pdfPed && pdfPed !== '-' && pdfPed.toLowerCase() !== 'null';
+
+  const paq = String(ticket.paqueteria || '').trim().toLowerCase();
+  const tienePaqueteria = paq && paq !== 'por definir' && paq !== 'sin definir';
+
+  const parts = Array.isArray(ticket.refaccionesSeleccionadas) ? ticket.refaccionesSeleccionadas : [];
+  const algunaPiezaPedida = parts.some(p => {
+    const est = String(p.estatusPedido || '').toLowerCase().trim();
+    return est && est !== 'por pedir' && est !== 'sin pedir' && est !== 'en cotizacion' && est !== 'en cotización' && est !== 'pendiente';
+  });
+
+  const estado = String(ticket.estado || '').toLowerCase().trim();
+  const esCotizacion = estado === 'cotización' || estado === 'cotizacion';
+
+  // Si el ticket está en fase de Cotización y NO tiene pedido SAP, ni PDF, ni piezas pedidas, NO genera envío
+  if (esCotizacion && !tienePedidoSAP && !tienePdfPedido && !algunaPiezaPedida) {
+    return false;
+  }
+
+  // Si tiene Pedido SAP, PDF de Pedido, Paquetería o Piezas en proceso, califica
+  if (tienePedidoSAP || tienePdfPedido || tienePaqueteria || algunaPiezaPedida) {
+    return true;
+  }
+
+  // Si es subticket de refacciones (-A) o está en estado de Refacciones en proceso
+  if (isSubticketA || estado === 'refacciones') {
+    return true;
+  }
+
+  // Si está cerrado pero tenía refacciones confirmadas en catálogo
+  if (estado === 'cerrado' && (hasDirectParts || hasAssocParts)) {
+    return true;
+  }
+
+  return false;
+};
+
+// Genera o asegura una guía de envío en estado 'En Preparación' ÚNICAMENTE cuando el ticket ya tiene pedido confirmado
 window.asegurarGuiaEnvioParaTicket = function(ticket) {
   if (!ticket) return null;
   const parts = ticket.refaccionesSeleccionadas || [];
   const cat = String(ticket.categoria || '').toLowerCase();
   const isRef = cat.includes('refacci') || cat.includes('garant') || (ticket.folio && ticket.folio.endsWith('-A')) || parts.length > 0;
   if (!isRef) return null;
+
+  // REGLA CLAVE DE NEGOCIO: No generar guía si el ticket aún está en cotización sin pedido
+  if (!window.ticketTienePedidoOEnvioValido(ticket)) {
+    return null;
+  }
 
   if (!ticket.envios) ticket.envios = [];
 
@@ -126,11 +269,16 @@ window.obtenerTodosLosEnvios = function() {
   const enviosList = [];
 
   tkts.forEach(t => {
+    // REGLA FUNDAMENTAL DE NEGOCIO:
+    // Los tickets en fase de cotización sin pedido en firme NO deben generar ni mostrar guías de envío
+    if (!window.ticketTienePedidoOEnvioValido(t)) return;
+
     let envios = t.envios || [];
     const cat = String(t.categoria || '').toLowerCase();
     const hasDirectParts = Array.isArray(t.refaccionesSeleccionadas) && t.refaccionesSeleccionadas.length > 0;
     const isSubticketA = t.folio && t.folio.endsWith('-A');
     const hasExplicitGuia = !!(t.guiaPedido && t.guiaPedido.trim());
+    const isRef = cat.includes('refacci') || cat.includes('garant') || isSubticketA;
 
     // Buscar refacciones en orden de servicio asociada si no las tiene directamente
     let partsList = (t.refaccionesSeleccionadas || []).map(p => ({
@@ -151,6 +299,19 @@ window.obtenerTodosLosEnvios = function() {
           cantidad: p.cantidad || 1,
           estatusPedido: p.estatusPedido || 'Por Pedir'
         }));
+      }
+    }
+
+    // Fallback inteligente: SOLO para subtickets -A o tickets con guía que describan la pieza en asunto
+    if (partsList.length === 0 && (isSubticketA || hasExplicitGuia)) {
+      const fallbackDesc = (t.asunto || t.descripcion || t.concepto || '').trim();
+      if (fallbackDesc) {
+        partsList = [{
+          clave: 'S/C',
+          descripcion: fallbackDesc,
+          cantidad: 1,
+          estatusPedido: t.estatusPedido || 'Por Pedir'
+        }];
       }
     }
 
@@ -226,6 +387,28 @@ window.obtenerTodosLosEnvios = function() {
       dbEnvios = dbEnvios.filter(dbe => isTestData(dbe) === activeSandbox);
     }
     dbEnvios.forEach(dbe => {
+      // Si el envío pertenece a un ticket, verificar que el ticket realmente tenga pedido válido
+      if (dbe.ticketId) {
+        const associatedTicket = tkts.find(tk => tk.id === dbe.ticketId || tk.folio === dbe.ticketFolio);
+        if (associatedTicket && !window.ticketTienePedidoOEnvioValido(associatedTicket)) {
+          return; // Omitir envío dummy de ticket en cotización sin pedido
+        }
+        if (associatedTicket) {
+          if (!dbe.parts || dbe.parts.length === 0) {
+            if (Array.isArray(associatedTicket.refaccionesSeleccionadas) && associatedTicket.refaccionesSeleccionadas.length > 0) {
+              dbe.parts = associatedTicket.refaccionesSeleccionadas;
+            } else if (associatedTicket.asunto || associatedTicket.descripcion) {
+              dbe.parts = [{
+                clave: 'S/C',
+                descripcion: (associatedTicket.asunto || associatedTicket.descripcion).trim(),
+                cantidad: 1,
+                estatusPedido: associatedTicket.estatusPedido || 'Por Pedir'
+              }];
+            }
+          }
+          if (!dbe.ticketAsunto) dbe.ticketAsunto = associatedTicket.asunto || '';
+        }
+      }
       if (!enviosList.some(x => x.id === dbe.id)) {
         enviosList.push(dbe);
       }
@@ -235,18 +418,93 @@ window.obtenerTodosLosEnvios = function() {
   return enviosList;
 };
 
-// Renderiza la tabla y KPIs de la vista Envíos
-window.renderEnvios = function() {
-  const tbody = document.getElementById('tabla-body-envios');
-  if (!tbody) return;
+// Limpia envíos ficticios generados en tickets que aún están en cotización sin pedido
+window.purgarEnviosEnCotizacionSinPedido = function() {
+  try {
+    let tkts = (typeof tickets !== 'undefined' && Array.isArray(tickets) && tickets.length > 0)
+      ? tickets
+      : (typeof window !== 'undefined' && Array.isArray(window.tickets) ? window.tickets : null);
+    
+    let dbEnvios = (typeof localStorage !== 'undefined') ? JSON.parse(localStorage.getItem('sapi_envios_db') || '[]') : [];
+    let modified = false;
 
-  const q = (document.getElementById('search-envios')?.value || '').toLowerCase().trim();
-  const fEstado = document.getElementById('filter-envios-estado')?.value || window.currentEnviosFiltroEstado || 'todos';
-  const fPaq = document.getElementById('filter-envios-paqueteria')?.value || window.currentEnviosFiltroPaqueteria || 'todas';
+    if (tkts && Array.isArray(tkts)) {
+      tkts.forEach(t => {
+        if (!window.ticketTienePedidoOEnvioValido(t) && Array.isArray(t.envios) && t.envios.length > 0) {
+          const reales = t.envios.filter(e => {
+            const tieneGuia = String(e.guiaPedido || '').trim().length > 0;
+            const paq = String(e.paqueteria || '').trim().toLowerCase();
+            return tieneGuia || (paq && paq !== 'por definir');
+          });
+          if (reales.length !== t.envios.length) {
+            t.envios = reales;
+            modified = true;
+          }
+        }
+      });
+      if (modified) {
+        if (typeof safeSetJSON === 'function') safeSetJSON('sapi_tickets', tkts);
+        else if (typeof localStorage !== 'undefined') localStorage.setItem('sapi_tickets', JSON.stringify(tkts));
+      }
+    }
+
+    if (dbEnvios.length > 0 && tkts && Array.isArray(tkts)) {
+      const dbLimpios = dbEnvios.filter(dbe => {
+        if (!dbe.ticketId) return true;
+        const associatedTicket = tkts.find(tk => tk.id === dbe.ticketId || tk.folio === dbe.ticketFolio);
+        if (associatedTicket && !window.ticketTienePedidoOEnvioValido(associatedTicket)) {
+          const tieneGuia = String(dbe.guiaPedido || '').trim().length > 0;
+          const paq = String(dbe.paqueteria || '').trim().toLowerCase();
+          const esDummy = !tieneGuia && (!paq || paq === 'por definir');
+          return !esDummy;
+        }
+        return true;
+      });
+      if (dbLimpios.length !== dbEnvios.length) {
+        if (typeof localStorage !== 'undefined') localStorage.setItem('sapi_envios_db', JSON.stringify(dbLimpios));
+      }
+    }
+  } catch (e) {
+    console.warn('[Envios] Error al purgar envíos huérfanos:', e);
+  }
+};
+
+// Renderiza la tabla y KPIs de la vista Envíos (Desktop y Tarjetas Mobile App)
+window.renderEnvios = function() {
+  if (typeof window.purgarEnviosEnCotizacionSinPedido === 'function') {
+    window.purgarEnviosEnCotizacionSinPedido();
+  }
+  if (typeof document === 'undefined') return;
+  const tbody = document.getElementById('tabla-body-envios');
+  const mobContainer = document.getElementById('mobile-envios-cards-container');
+  if (!tbody && !mobContainer) return;
+
+  const mobileSearchVal = document.getElementById('mobile-search-envios')?.value || '';
+  const desktopSearchVal = document.getElementById('search-envios')?.value || '';
+  const q = (mobileSearchVal || desktopSearchVal || '').toLowerCase().trim();
+
+  const clearBtn = document.getElementById('btn-clear-search-envios');
+  if (clearBtn) {
+    clearBtn.style.display = (mobileSearchVal && mobileSearchVal.length > 0) ? 'flex' : 'none';
+  }
+
+  // Sincronizar y obtener filtro de estado
+  const selectEstado = document.getElementById('filter-envios-estado');
+  let fEstado = selectEstado ? selectEstado.value : (window.currentEnviosFiltroEstado || 'todos');
+  if (!fEstado) fEstado = 'todos';
+  window.currentEnviosFiltroEstado = fEstado;
+  if (selectEstado && selectEstado.value !== fEstado) selectEstado.value = fEstado;
+
+  // Sincronizar y obtener filtro de paquetería
+  const selectPaq = document.getElementById('filter-envios-paqueteria');
+  let fPaq = selectPaq ? selectPaq.value : (window.currentEnviosFiltroPaqueteria || 'todas');
+  if (!fPaq) fPaq = 'todas';
+  window.currentEnviosFiltroPaqueteria = fPaq;
+  if (selectPaq && selectPaq.value !== fPaq) selectPaq.value = fPaq;
 
   const todos = window.obtenerTodosLosEnvios();
 
-  // Actualizar KPIs superiores
+  // Actualizar KPIs superiores (Desktop)
   const countTotal = todos.length;
   const countTransito = todos.filter(e => e.estatus === 'En Tránsito').length;
   const countEntregados = todos.filter(e => e.estatus === 'Entregado').length;
@@ -260,6 +518,26 @@ window.renderEnvios = function() {
   if (statEnt) statEnt.textContent = countEntregados;
   const statPrep = document.getElementById('stat-envios-preparando');
   if (statPrep) statPrep.textContent = countPreparando;
+
+  // Actualizar KPIs superiores (Mobile Chips)
+  const mobTot = document.getElementById('mob-env-total');
+  if (mobTot) mobTot.textContent = countTotal;
+  const mobTra = document.getElementById('mob-env-transito');
+  if (mobTra) mobTra.textContent = countTransito;
+  const mobPrep = document.getElementById('mob-env-preparando');
+  if (mobPrep) mobPrep.textContent = countPreparando;
+  const mobEnt = document.getElementById('mob-env-entregados');
+  if (mobEnt) mobEnt.textContent = countEntregados;
+
+  // Sincronizar estado de chips móviles
+  document.querySelectorAll('#mobile-envios-chips .status-chip').forEach(btn => {
+    const e = btn.getAttribute('data-estado');
+    if (e === fEstado) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
 
   // Actualizar badge en el menú lateral
   window.updateEnviosBadge(countTransito);
@@ -306,43 +584,89 @@ window.renderEnvios = function() {
   window._enviosFiltradosActuales = filtrados;
 
   if (filtrados.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="10" class="empty-state" style="padding:3rem 1rem; text-align:center; color:var(--text-muted);">
-          <i data-lucide="package" style="width:36px; height:36px; stroke-width:1.5; color:var(--accent); margin-bottom:0.5rem; display:block; margin-inline:auto;"></i>
-          ${q || fEstado !== 'todos' || fPaq !== 'todas' ? 'No se encontraron envíos que coincidan con los filtros aplicados.' : 'No hay guías de envío registradas aún.'}
-        </td>
-      </tr>
-    `;
-    if (typeof lucide !== 'undefined') lucide.createIcons();
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="11" class="empty-state" style="padding:3rem 1rem; text-align:center; color:var(--text-muted);">
+            <i data-lucide="package" style="width:36px; height:36px; stroke-width:1.5; color:var(--accent); margin-bottom:0.5rem; display:block; margin-inline:auto;"></i>
+            ${q || fEstado !== 'todos' || fPaq !== 'todas' ? 'No se encontraron envíos que coincidan con los filtros aplicados.' : 'No hay guías de envío registradas aún.'}
+          </td>
+        </tr>
+      `;
+    }
+    if (mobContainer) {
+      mobContainer.innerHTML = `
+        <div class="empty-state" style="text-align:center; padding:3rem 1rem; color:var(--text-muted);">
+          <i data-lucide="package-search" style="width:40px; height:40px; margin-bottom:0.75rem; opacity:0.35; display:block; margin-left:auto; margin-right:auto;"></i>
+          <div style="font-weight:600; font-size:0.95rem; margin-bottom:0.25rem;">No hay guías de envío</div>
+          <div style="font-size:0.8rem; opacity:0.75;">${q || fEstado !== 'todos' || fPaq !== 'todas' ? 'No se encontraron resultados para los filtros seleccionados.' : 'Aún no se han registrado guías.'}</div>
+        </div>
+      `;
+    }
+    if (typeof lucide !== 'undefined') {
+      const viewEnv = document.getElementById('view-envios');
+      lucide.createIcons({ root: viewEnv || undefined });
+    }
     return;
   }
 
   let html = '';
+  let htmlMobileCards = '';
+
+  const safeEscape = (str) => {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
   filtrados.forEach(e => {
     // Estatus Badge
     let statusBg = 'rgba(234, 179, 8, 0.15)';
-    let statusColor = '#ca8a04';
+    let statusColor = '#eab308';
+    let statusBorder = 'rgba(234, 179, 8, 0.3)';
     let statusIcon = 'clock';
 
     if (e.estatus === 'En Tránsito') {
       statusBg = 'rgba(14, 165, 233, 0.15)';
-      statusColor = '#0284c7';
+      statusColor = '#0ea5e9';
+      statusBorder = 'rgba(14, 165, 233, 0.3)';
       statusIcon = 'navigation';
     } else if (e.estatus === 'Entregado') {
       statusBg = 'rgba(16, 185, 129, 0.15)';
-      statusColor = '#16a34a';
-      statusIcon = 'check-circle';
+      statusColor = '#10b981';
+      statusBorder = 'rgba(16, 185, 129, 0.3)';
+      statusIcon = 'check-circle-2';
     }
 
-    // Piezas resumen
+    // Piezas resumen Desktop
     let partsSummary = 'Sin piezas especificadas';
-    if (e.parts && e.parts.length > 0) {
-      if (e.parts.length === 1) {
+    const partsCount = (e.parts && Array.isArray(e.parts)) ? e.parts.length : 0;
+    if (partsCount > 0) {
+      if (partsCount === 1) {
         partsSummary = e.parts[0].descripcion || e.parts[0].clave || '1 refacción';
       } else {
-        partsSummary = `<b>${e.parts.length} refacciones:</b> ${e.parts[0].descripcion || e.parts[0].clave} +${e.parts.length - 1} más`;
+        partsSummary = `<b>${partsCount} refacciones:</b> ${e.parts[0].descripcion || e.parts[0].clave} +${partsCount - 1} más`;
       }
+    } else if (e.ticketAsunto || e.notas) {
+      partsSummary = safeEscape(e.ticketAsunto || e.notas);
+    }
+
+    // Piezas resumen Mobile
+    let partsSummaryShort = 'Sin refacciones especificadas';
+    if (partsCount > 0) {
+      const firstPart = e.parts[0];
+      const firstDesc = firstPart.descripcion || firstPart.clave || firstPart.nombre || 'Pieza';
+      if (partsCount === 1) {
+        partsSummaryShort = `${firstPart.cantidad || 1}x ${firstDesc}`;
+      } else {
+        partsSummaryShort = `${firstPart.cantidad || 1}x ${firstDesc} +${partsCount - 1} más`;
+      }
+    } else if (e.ticketAsunto || e.notas) {
+      partsSummaryShort = safeEscape(e.ticketAsunto || e.notas);
     }
 
     // Tracking link
@@ -351,11 +675,29 @@ window.renderEnvios = function() {
       ? `<a href="${trackingUrl}" target="_blank" class="action-btn" title="Rastrear en web de paquetería" style="color:#0ea5e9; text-decoration:none;"><i data-lucide="external-link"></i></a>` 
       : '';
 
+    // Mobile tracking pill button
+    const trackingBtnMob = trackingUrl
+      ? `<a href="${trackingUrl}" target="_blank" rel="noopener noreferrer" class="mec-track-btn" onclick="event.stopPropagation();" title="Rastrear en ${e.paqueteria}"><i data-lucide="external-link"></i><span>Rastrear</span></a>`
+      : '';
+
     // PDF botón
     const pdfBtn = e.pdfGuia 
       ? `<button type="button" class="action-btn" onclick="window.visualizarPdfGuia('${e.ticketId}', '${e.id}')" title="Ver Comprobante / PDF"><i data-lucide="file-text" style="color:var(--accent);"></i></button>` 
       : '<span style="color:var(--text-muted); font-size:0.75rem;">—</span>';
 
+    // Fecha label Mobile
+    let dateLabel = '';
+    if (e.estatus === 'Entregado') {
+      dateLabel = `Entregado: ${e.fechaLlegada || e.fechaEntrega || 'Fecha no esp.'}`;
+    } else if (e.fechaEntrega) {
+      dateLabel = `Est. Entrega: ${e.fechaEntrega}`;
+    } else if (e.fechaEnvio) {
+      dateLabel = `Envío: ${e.fechaEnvio}`;
+    } else {
+      dateLabel = 'Fecha no especificada';
+    }
+
+    // 1. Fila para Escritorio
     html += `
       <tr style="cursor:pointer; transition:background 0.15s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
         <td data-label="Acciones" style="white-space:nowrap; width:75px; text-align:center;" onclick="event.stopPropagation();">
@@ -408,10 +750,71 @@ window.renderEnvios = function() {
         </td>
       </tr>
     `;
+
+    // 2. Tarjeta Nativa para App Móvil (Diseño minimalista unificado con Órdenes de Servicio)
+    const rawGuia = String(e.guiaPedido || '').trim();
+    const isGenericGuia = !rawGuia || ['-', 's/g', 'sin guia', 'sin guía', 'por asignar', 'n/a', 'na', 'null', 'undefined'].includes(rawGuia.toLowerCase());
+    const guiaDisplay = isGenericGuia
+      ? '# Sin guía'
+      : (rawGuia.startsWith('#') ? safeEscape(rawGuia) : `# ${safeEscape(rawGuia)}`);
+
+    let statusKey = 'preparacion';
+    const stLower = String(e.estatus || '').toLowerCase();
+    if (stLower.includes('tránsito') || stLower.includes('transito') || stLower.includes('camino') || stLower.includes('ruta')) {
+      statusKey = 'transito';
+    } else if (stLower.includes('entreg') || stLower.includes('complet')) {
+      statusKey = 'entregado';
+    } else if (stLower.includes('cancel')) {
+      statusKey = 'cancelado';
+    }
+
+    const clienteDisplay = safeEscape(String(e.cliente || 'Sin cliente asignado').trim());
+
+    const rawDestino = String(e.sitio || e.destino || e.direccion || '').trim();
+    const isDestinoEmpty = !rawDestino || ['-', 'n/a', 'na', 's/n', 'null', 'undefined', 'general', 'por definir', 'sin destino'].includes(rawDestino.toLowerCase());
+    const destinoDisplay = safeEscape(isDestinoEmpty ? 'Destino por confirmar' : rawDestino);
+
+    const paqRaw = String(e.paqueteria || '').trim();
+    const paqDisplay = (paqRaw && !['por definir', 'sin paqueteria', 'sin paquetería', 'n/a', 'na', '-'].includes(paqRaw.toLowerCase())) 
+      ? paqRaw 
+      : 'Paquetería por definir';
+    const tktOrParts = e.ticketFolio 
+      ? e.ticketFolio 
+      : (partsCount > 0 ? (partsCount === 1 ? '1 refacción' : `${partsCount} pzas`) : '');
+    const fechaRef = e.fechaEntrega || e.fechaLlegada || e.fechaEnvio || '';
+    const subParts = [paqDisplay, tktOrParts, fechaRef].filter(Boolean);
+    const subInfo = safeEscape(subParts.join(' • ') || 'Guía de Envío');
+
+    htmlMobileCards += `
+      <div class="mec-card" onclick="window.abrirDetalleEnvio('${e.id}')">
+        <div class="mec-header">
+          <span class="mec-guia">${guiaDisplay}</span>
+          <span class="mec-status status-${statusKey}" style="color:${statusColor}; background:${statusBg}; border-color:${statusBorder};">
+            ${safeEscape(e.estatus || 'En Preparación')}
+          </span>
+        </div>
+        <div class="mec-cliente">${clienteDisplay}</div>
+        <div class="mec-location">
+          <i data-lucide="map-pin" class="mec-pin"></i>
+          <span class="mec-location-text">${destinoDisplay}</span>
+        </div>
+        <div class="mec-footer">
+          <span class="mec-sub">${subInfo}</span>
+          <div class="mec-actions">
+            ${trackingBtnMob}
+            <i data-lucide="chevron-right" class="mec-arrow"></i>
+          </div>
+        </div>
+      </div>
+    `;
   });
 
-  tbody.innerHTML = html;
-  if (typeof lucide !== 'undefined') lucide.createIcons();
+  if (tbody) tbody.innerHTML = html;
+  if (mobContainer) mobContainer.innerHTML = htmlMobileCards;
+  if (typeof lucide !== 'undefined') {
+    const viewEnv = document.getElementById('view-envios');
+    lucide.createIcons({ root: viewEnv || undefined });
+  }
 };
 
 // Exportar guías de envío a archivo Excel (.xlsx)
@@ -886,11 +1289,25 @@ window.abrirDetalleEnvio = function(envioId) {
       </div>
     `;
   } else {
-    partsHtml = `
-      <div style="margin-top:1rem; border-top:1px solid var(--border); padding-top:0.75rem;">
-        <span style="color:var(--text-muted); font-style:italic; font-size:0.82rem;">No hay refacciones desglosadas en este envío.</span>
-      </div>
-    `;
+    const fallbackTxt = env.ticketAsunto || env.notas;
+    if (fallbackTxt) {
+      partsHtml = `
+        <div style="margin-top:1rem; border-top:1px solid var(--border); padding-top:0.75rem;">
+          <div style="font-size:0.8rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:0.5rem;">
+            <span>Contenido / Pieza Solicitada</span>
+          </div>
+          <div style="background:var(--bg-body); padding:0.5rem 0.75rem; border-radius:6px; border:1px solid var(--border); font-size:0.85rem; font-weight:600; color:var(--text-primary);">
+            ${fallbackTxt}
+          </div>
+        </div>
+      `;
+    } else {
+      partsHtml = `
+        <div style="margin-top:1rem; border-top:1px solid var(--border); padding-top:0.75rem;">
+          <span style="color:var(--text-muted); font-style:italic; font-size:0.82rem;">No hay refacciones desglosadas en este envío.</span>
+        </div>
+      `;
+    }
   }
 
   if (body) {

@@ -1,10 +1,17 @@
     <!-- MODAL DETALLE TICKET -->
-    <div class="modal-overlay" id="modal-ticket-detalle-overlay"  style="z-index: 500;">
-      <div class="modal modal-receipt" id="modal-ticket-detalle" style="max-width:640px; padding-bottom: 3rem;">
+    <div class="modal-overlay" id="modal-ticket-detalle-overlay">
+      <div class="modal modal-receipt modal-app-fullscreen" id="modal-ticket-detalle" style="max-width:640px; padding-bottom: 3rem;">
         <div class="receipt-edge-top"></div>
         <div class="modal-header">
-          <h2 id="ticket-detalle-title">Detalle del Ticket</h2>
-          <button class="modal-close" onclick="cerrarDetalleTicket()">✕</button>
+          <div class="modal-header-top-row" style="width:100%;">
+            <button type="button" class="modal-nav-back-btn" onclick="cerrarDetalleTicket()" aria-label="Volver">
+              <i data-lucide="arrow-left"></i>
+            </button>
+            <div class="modal-title-box">
+              <h2 id="ticket-detalle-title">Detalle del Ticket</h2>
+            </div>
+            <button class="modal-close" onclick="cerrarDetalleTicket()" aria-label="Cerrar">✕</button>
+          </div>
         </div>
         <div class="modal-body" id="ticket-detalle-body"></div>
         <div class="receipt-edge-bottom"></div>

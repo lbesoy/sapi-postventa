@@ -447,6 +447,12 @@ function _renderStatsInternal() {
     document.getElementById('stat-serv-completas').textContent = completas;
   }
 
+  setStat('chip-count-total', total);
+  setStat('chip-count-proceso', proceso);
+  setStat('chip-count-pendientes', pendientes);
+  setStat('chip-count-refacciones', refaccionesPendientes);
+  setStat('chip-count-completas', completas);
+
   // Stats Tickets
   const t_total = ticketsFilter.length;
   const t_abiertos = ticketsFilter.filter(t => t.estado === 'Abierto').length;
@@ -532,6 +538,9 @@ function _renderStatsInternal() {
   
   if (typeof renderDashboardV2 === 'function') {
     renderDashboardV2();
+  }
+  if (typeof renderMobileHomeDashboard === 'function') {
+    try { renderMobileHomeDashboard(); } catch (eMob) { console.warn('[Dashboard] Error renderizando vista móvil:', eMob); }
   }
 }
 
@@ -1160,6 +1169,11 @@ function renderDashboardV2() {
   }
 
   if (window.lucide) lucide.createIcons();
+  try {
+    renderMobileHomeDashboard();
+  } catch (eMob) {
+    console.warn('[Dashboard] Error renderizando vista móvil:', eMob);
+  }
 }
 
 // ===== DASHBOARD TABS =====
@@ -1423,6 +1437,91 @@ function renderDashboardTecnicos() {
   }
 
   if (window.lucide) window.lucide.createIcons();
+  try {
+    renderMobileHomeDashboard();
+  } catch (eMob) {
+    console.warn('[Dashboard] Error renderizando vista móvil:', eMob);
+  }
+}
+
+function renderMobileHomeDashboard() {
+  if (typeof document === 'undefined') return;
+  const mobContainer = document.getElementById('dash-mobile-home');
+  if (!mobContainer) return;
+
+  // 1. Saludo y fecha
+  const session = (typeof currentSession !== 'undefined' && currentSession) ? currentSession : (typeof window !== 'undefined' ? window.currentSession : null);
+  const uList = (typeof usuarios !== 'undefined' && Array.isArray(usuarios))
+    ? usuarios
+    : ((typeof safeGetJSON === 'function') ? safeGetJSON('eurorep_usuarios', safeGetJSON('sapi_usuarios', [])) : []);
+  const user = (session && session.userId) ? uList.find(u => u.id === session.userId) : null;
+  const rawNombre = (session && session.nombre) || (user && user.nombre) || '';
+  const primerNombre = rawNombre ? rawNombre.trim().split(' ')[0] : 'Técnico';
+
+  const greetEl = document.getElementById('mob-user-greeting');
+  if (greetEl) greetEl.textContent = `Hola, ${primerNombre} 👋`;
+
+  const avatarEl = document.getElementById('mob-avatar-char');
+  if (avatarEl) avatarEl.textContent = (primerNombre.charAt(0) || 'T').toUpperCase();
+
+  const dateEl = document.getElementById('mob-date-display');
+  if (dateEl) {
+    const ahora = new Date();
+    const opciones = { weekday: 'long', day: 'numeric', month: 'long' };
+    const str = ahora.toLocaleDateString('es-MX', opciones);
+    dateEl.textContent = str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
+  // 2. Métricas en vivo para los 4 Módulos Principales
+  let allOrders = (typeof ordenes !== 'undefined' && Array.isArray(ordenes) && ordenes.length > 0)
+    ? ordenes
+    : ((typeof safeGetJSON === 'function') ? safeGetJSON('sapi_ordenes', safeGetJSON('eurorep_ordenes', [])) : []);
+  const activeOrders = allOrders.filter(o => {
+    const st = String(o.estado || '').toLowerCase().trim();
+    return st !== 'completado' && st !== 'cancelado' && st !== 'cerrado';
+  });
+  const ordEl = document.getElementById('mob-stat-ordenes');
+  const ordCount = activeOrders.length || allOrders.length || 0;
+  if (ordEl) ordEl.textContent = ordCount;
+  const subOrdEl = document.getElementById('mob-sub-ordenes');
+  if (subOrdEl) subOrdEl.textContent = `${activeOrders.length} orden${activeOrders.length === 1 ? '' : 'es'} activa${activeOrders.length === 1 ? '' : 's'}`;
+
+  let allTickets = (typeof tickets !== 'undefined' && Array.isArray(tickets) && tickets.length > 0)
+    ? tickets
+    : ((typeof safeGetJSON === 'function') ? safeGetJSON('sapi_tickets', safeGetJSON('eurorep_tickets', [])) : []);
+  const openTickets = allTickets.filter(t => {
+    const st = String(t.estado || '').toLowerCase().trim();
+    return st !== 'cerrado' && st !== 'resuelto' && st !== 'cancelado';
+  });
+  const tktEl = document.getElementById('mob-stat-tickets');
+  const tktCount = openTickets.length || allTickets.length || 0;
+  if (tktEl) tktEl.textContent = tktCount;
+  const subTktEl = document.getElementById('mob-sub-tickets');
+  if (subTktEl) subTktEl.textContent = `${openTickets.length} ticket${openTickets.length === 1 ? '' : 's'} abierto${openTickets.length === 1 ? '' : 's'}`;
+
+  let levs = (typeof safeGetJSON === 'function') ? safeGetJSON('levantamientos', []) : [];
+  if ((!levs || levs.length === 0) && typeof safeGetJSON === 'function') {
+    levs = safeGetJSON('sapi_levantamientos', []);
+  }
+  const levEl = document.getElementById('mob-stat-levs');
+  const levCount = Array.isArray(levs) ? levs.length : 0;
+  if (levEl) levEl.textContent = levCount;
+  const subLevEl = document.getElementById('mob-sub-levs');
+  if (subLevEl) subLevEl.textContent = `${levCount} levantamiento${levCount === 1 ? '' : 's'} de campo`;
+
+  let envs = (typeof safeGetJSON === 'function') ? safeGetJSON('sapi_envios', []) : [];
+  if ((!envs || envs.length === 0) && typeof safeGetJSON === 'function') {
+    envs = safeGetJSON('eurorep_envios', []);
+  }
+  const envEl = document.getElementById('mob-stat-envios');
+  const envCount = Array.isArray(envs) ? envs.length : 0;
+  if (envEl) envEl.textContent = envCount;
+  const subEnvEl = document.getElementById('mob-sub-envios');
+  if (subEnvEl) subEnvEl.textContent = `${envCount} guía${envCount === 1 ? '' : 's'} y paquete${envCount === 1 ? '' : 's'}`;
+
+  if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
 }
 
 function onDashFilterChange() {
@@ -1439,9 +1538,20 @@ function onDashFilterChange() {
     global._renderStatsInternal = _renderStatsInternal;
     global.getFilteredByTimeframe = getFilteredByTimeframe;
     global.renderDashboardV2 = renderDashboardV2;
+    global.renderMobileHomeDashboard = renderMobileHomeDashboard;
     global.setDashView = setDashView;
     global.renderDashboardTecnicos = renderDashboardTecnicos;
     global.onDashFilterChange = onDashFilterChange;
     global._v2Charts = _v2Charts;
+  }
+
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        try { renderMobileHomeDashboard(); } catch(e){}
+      });
+    } else {
+      try { renderMobileHomeDashboard(); } catch(e){}
+    }
   }
 })(typeof window !== "undefined" ? window : globalThis);

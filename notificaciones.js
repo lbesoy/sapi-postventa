@@ -5,6 +5,7 @@
 (function(global) {
   "use strict";
 
+
 const getSession = () => (typeof currentSession !== 'undefined' && currentSession) ? currentSession : (typeof window !== 'undefined' && window.currentSession ? window.currentSession : null);
 const getUsuarios = () => (typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : (typeof window !== 'undefined' && Array.isArray(window.usuarios) ? window.usuarios : []);
 const getTickets = () => (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : (typeof window !== 'undefined' && Array.isArray(window.tickets) ? window.tickets : _getStorageJSON('sapi_tickets', []));
@@ -50,14 +51,21 @@ function toggleInternalNotificationDropdown(event) {
 
   const otherDd = document.getElementById('notification-dropdown');
   if (otherDd) otherDd.style.display = 'none';
+  const otherBell = document.getElementById('notification-bell-container');
+  if (otherBell) otherBell.classList.remove('active');
 
+  const bell = document.getElementById('internal-notification-bell-container');
   const dd = document.getElementById('internal-notification-dropdown');
   if (dd) {
     const isHidden = dd.style.display === 'none' || dd.style.display === '';
     if (isHidden) {
       sincronizarNotificacionesInternas();
+      dd.style.display = 'flex';
+      if (bell) bell.classList.add('active');
+    } else {
+      dd.style.display = 'none';
+      if (bell) bell.classList.remove('active');
     }
-    dd.style.display = isHidden ? 'block' : 'none';
   }
 }
 
@@ -291,7 +299,7 @@ function updateInternalNotificationBell() {
 
   if (container) {
     if (filtered.length === 0) {
-      container.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:0.75rem; padding:1.5rem; font-style:italic;">No hay notificaciones internas.</div>`;
+      container.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:0.75rem; padding:2rem 1rem; font-style:italic;">No hay notificaciones internas.</div>`;
     } else {
       let html = '';
       filtered.forEach(n => {
@@ -304,44 +312,44 @@ function updateInternalNotificationBell() {
         let readReceiptHtml = '';
         if (otrosLectores.length > 0) {
           readReceiptHtml = `
-            <div style="font-size:0.65rem; color:#10b981; margin-top:0.25rem; display:flex; align-items:center; gap:0.3rem; font-weight:500;">
-              <i data-lucide="check-check" style="width:12px; height:12px; color:#10b981; flex-shrink:0;"></i>
-              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Leído por: ${otrosLectores.join(', ')}">Leído por: <strong style="color:var(--text-primary);">${otrosLectores.join(', ')}</strong></span>
+            <div style="font-size:0.67rem; color:#10b981; display:flex; align-items:center; gap:0.3rem; font-weight:500;">
+              <i data-lucide="check-check" style="width:13px; height:13px; color:#10b981; flex-shrink:0;"></i>
+              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Leído por: ${otrosLectores.join(', ')}">Leído por: <strong style="color:var(--text-primary); font-weight:600;">${otrosLectores.join(', ')}</strong></span>
             </div>
           `;
         } else {
           readReceiptHtml = `
-            <div style="font-size:0.65rem; color:var(--text-muted); margin-top:0.25rem; display:flex; align-items:center; gap:0.3rem; opacity:0.75;">
-              <i data-lucide="check" style="width:11px; height:11px; flex-shrink:0;"></i>
+            <div style="font-size:0.67rem; color:var(--text-muted); display:flex; align-items:center; gap:0.3rem; opacity:0.8;">
+              <i data-lucide="check" style="width:12px; height:12px; flex-shrink:0;"></i>
               <span>Sin leer por otros</span>
             </div>
           `;
         }
 
         html += `
-          <div style="padding:0.6rem 1rem; border-bottom:1px solid rgba(255,255,255,0.02); display:flex; flex-direction:column; gap:0.2rem; cursor:pointer; transition:background 0.2s; position:relative; ${isUnread ? 'background:rgba(139,92,246,0.05);' : ''}" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='${isUnread ? 'rgba(139,92,246,0.05)' : 'transparent'}'" onclick="window.verTicketYMarcarInternaLeida('${n.ticketId}', '${n.id}')">
+          <div class="notif-item-card ${isUnread ? 'is-unread' : 'is-read'}" onclick="window.verTicketYMarcarInternaLeida('${n.ticketId}', '${n.id}')">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-weight:700; font-size:0.78rem; color:var(--text-primary);">${n.ticketFolio || 'Ticket'}</span>
-              <span style="font-size:0.65rem; color:var(--text-muted);">${fechaFormat}</span>
+              <span style="font-weight:700; font-size:0.8rem; color:var(--text-primary); letter-spacing:0.3px;">${n.ticketFolio || 'Ticket'}</span>
+              <span style="font-size:0.68rem; color:var(--text-muted);">${fechaFormat}</span>
             </div>
-            <span style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${n.ticketAsunto || 'Sin asunto'}</span>
+            <span style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${n.ticketAsunto || 'Sin asunto'}</span>
             ${n.tipo === 'comentario' ? `
-              <div style="font-size:0.7rem; color:var(--text-muted); margin-top:0.1rem; line-height:1.2; font-style:italic; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              <div class="notif-comment-bubble">
                 "${n.comentarioTexto || ''}"
               </div>
-              <div style="font-size:0.65rem; color:var(--text-muted); margin-top:0.1rem;">
+              <div style="font-size:0.68rem; color:var(--text-muted); display:flex; align-items:center; gap:0.25rem;">
                 Comentado por: <strong style="color:#8b5cf6;">${n.usuario}</strong>
               </div>
             ` : `
-              <div style="font-size:0.7rem; color:var(--text-muted); margin-top:0.1rem; line-height:1.2;">
-                Responsable: <span style="color:var(--text-primary); font-weight:500;">${n.asignadoAnterior || 'Sin asignar'}</span> → <span style="color:#8b5cf6; font-weight:700;">${n.asignadoNuevo || 'Sin asignar'}</span>
+              <div style="font-size:0.72rem; color:var(--text-muted); line-height:1.3; background:var(--bg-card); padding:0.3rem 0.5rem; border-radius:5px; border:1px solid var(--border);">
+                Responsable: <span style="color:var(--text-primary); font-weight:500;">${n.asignadoAnterior || 'Sin asignar'}</span> → <strong style="color:#8b5cf6;">${n.asignadoNuevo || 'Sin asignar'}</strong>
               </div>
-              <div style="font-size:0.65rem; color:var(--text-muted); margin-top:0.1rem;">
+              <div style="font-size:0.68rem; color:var(--text-muted);">
                 Modificado por: <strong>${n.usuario}</strong>
               </div>
             `}
             ${readReceiptHtml}
-            ${isUnread ? `<span style="position:absolute; right:8px; bottom:8px; width:6px; height:6px; border-radius:50%; background:#8b5cf6; box-shadow:0 0 6px rgba(139,92,246,0.6);"></span>` : ''}
+            ${isUnread ? `<span style="position:absolute; top:12px; right:12px; width:7px; height:7px; border-radius:50%; background:#8b5cf6; box-shadow:0 0 6px rgba(139,92,246,0.7);"></span>` : ''}
           </div>
         `;
       });
@@ -385,6 +393,8 @@ function verTicketYMarcarInternaLeida(ticketId, notificationId) {
   if (typeof document !== 'undefined') {
     const dd = document.getElementById('internal-notification-dropdown');
     if (dd) dd.style.display = 'none';
+    const bell = document.getElementById('internal-notification-bell-container');
+    if (bell) bell.classList.remove('active');
 
     const navItem = document.querySelector('.nav-item[data-view="tickets"]');
     if (navItem) navItem.click();
@@ -429,11 +439,26 @@ function toggleNotificationDropdown(event) {
 
   const intDd = document.getElementById('internal-notification-dropdown');
   if (intDd) intDd.style.display = 'none';
+  const intBell = document.getElementById('internal-notification-bell-container');
+  if (intBell) intBell.classList.remove('active');
 
+  const bell = document.getElementById('notification-bell-container');
   const dd = document.getElementById('notification-dropdown');
   if (dd) {
     const isHidden = dd.style.display === 'none' || dd.style.display === '';
-    dd.style.display = isHidden ? 'block' : 'none';
+    if (isHidden) {
+      dd.style.display = 'flex';
+      if (bell) bell.classList.add('active');
+      if (typeof updateNotificationBell === 'function') {
+        try { updateNotificationBell(); } catch(e) {}
+      }
+      if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+    } else {
+      dd.style.display = 'none';
+      if (bell) bell.classList.remove('active');
+    }
   }
 }
 
@@ -510,27 +535,27 @@ function updateNotificationBell() {
 
   if (container) {
     if (totalNotifications === 0) {
-      container.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:0.75rem; padding:1.5rem; font-style:italic;">No hay notificaciones pendientes.</div>`;
+      container.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:0.75rem; padding:2rem 1rem; font-style:italic;">No hay notificaciones pendientes.</div>`;
     } else {
       let html = '';
 
       // Renderizar Tickets Sin Asignar
       if (unassigned.length > 0) {
-        html += `<div style="padding:0.4rem 1rem; font-size:0.7rem; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid rgba(255,255,255,0.03); background:rgba(255,255,255,0.01); display:flex; align-items:center; gap:0.25rem;"><i data-lucide="user-minus" style="width:12px; height:12px;"></i> Sin Asignar (${unassigned.length})</div>`;
+        html += `<div class="notif-category-header orange"><span style="display:flex; align-items:center; gap:0.35rem;"><i data-lucide="user-minus" style="width:13px; height:13px;"></i> Sin Asignar</span><span style="font-size:0.7rem; background:rgba(232,130,12,0.2); padding:1px 6px; border-radius:10px; font-weight:700;">${unassigned.length}</span></div>`;
         unassigned.forEach(t => {
           const prioColor = t.prioridad === 'Alta' ? 'var(--red)' : (t.prioridad === 'Baja' ? 'var(--blue)' : 'var(--orange)');
           const fechaFormat = t.fecha ? new Date(t.fecha).toLocaleDateString('es-MX', { day:'numeric', month:'short' }) : 'Reciente';
 
           html += `
-            <div style="padding:0.6rem 1rem; border-bottom:1px solid rgba(255,255,255,0.02); display:flex; flex-direction:column; gap:0.2rem; cursor:pointer; transition:background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="window.abrirTicketDesdeNotification('${t.id}')">
+            <div class="notif-item-card is-read" onclick="window.abrirTicketDesdeNotification('${t.id}')">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-weight:700; font-size:0.78rem; color:var(--text-primary);">${t.folio || 'N/A'}</span>
-                <span style="background:${prioColor}15; color:${prioColor}; border:1px solid ${prioColor}30; padding:0.1rem 0.35rem; border-radius:4px; font-size:0.6rem; font-weight:600;">${t.prioridad || 'Media'}</span>
+                <span style="font-weight:700; font-size:0.8rem; color:var(--text-primary); letter-spacing:0.3px;">${t.folio || 'N/A'}</span>
+                <span style="background:${prioColor}15; color:${prioColor}; border:1px solid ${prioColor}35; padding:0.12rem 0.4rem; border-radius:4px; font-size:0.62rem; font-weight:600;">${t.prioridad || 'Media'}</span>
               </div>
-              <span style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.asunto || 'Sin asunto'}</span>
-              <div style="display:flex; justify-content:space-between; font-size:0.65rem; color:var(--text-muted);">
-                <span>Cliente: ${t.cliente || 'Genérico'}</span>
-                <span>${fechaFormat}</span>
+              <span style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${t.asunto || 'Sin asunto'}</span>
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.68rem; color:var(--text-muted); margin-top:0.1rem;">
+                <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:65%;">Cliente: <strong style="color:var(--text-primary); font-weight:500;">${t.cliente || 'Genérico'}</strong></span>
+                <span style="flex-shrink:0;">${fechaFormat}</span>
               </div>
             </div>
           `;
@@ -539,21 +564,21 @@ function updateNotificationBell() {
 
       // Renderizar Pedidos Pendientes
       if (pendingOrders.length > 0) {
-        html += `<div style="padding:0.4rem 1rem; font-size:0.7rem; font-weight:700; color:var(--green); text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid rgba(255,255,255,0.03); background:rgba(255,255,255,0.01); display:flex; align-items:center; gap:0.25rem; margin-top:0.4rem;"><i data-lucide="shopping-cart" style="width:12px; height:12px;"></i> Pedidos Pendientes (${pendingOrders.length})</div>`;
+        html += `<div class="notif-category-header green"><span style="display:flex; align-items:center; gap:0.35rem;"><i data-lucide="shopping-cart" style="width:13px; height:13px;"></i> Pedidos Pendientes</span><span style="font-size:0.7rem; background:rgba(16,185,129,0.2); padding:1px 6px; border-radius:10px; font-weight:700;">${pendingOrders.length}</span></div>`;
         pendingOrders.forEach(t => {
           const fechaFormat = t.fecha ? new Date(t.fecha).toLocaleDateString('es-MX', { day:'numeric', month:'short' }) : 'Reciente';
           const cotNum = t.cotizacionSAP || t.cotizacion_sap || 'N/A';
 
           html += `
-            <div style="padding:0.6rem 1rem; border-bottom:1px solid rgba(255,255,255,0.02); display:flex; flex-direction:column; gap:0.2rem; cursor:pointer; transition:background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="window.abrirTicketDesdeNotification('${t.id}')">
+            <div class="notif-item-card is-read" onclick="window.abrirTicketDesdeNotification('${t.id}')">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-weight:700; font-size:0.78rem; color:var(--text-primary);">${t.folio || 'N/A'}</span>
-                <span style="background:rgba(16,185,129,0.1); color:var(--green); border:1px solid rgba(16,185,129,0.2); padding:0.1rem 0.35rem; border-radius:4px; font-size:0.6rem; font-weight:600;">Cotización Aprobada</span>
+                <span style="font-weight:700; font-size:0.8rem; color:var(--text-primary); letter-spacing:0.3px;">${t.folio || 'N/A'}</span>
+                <span style="background:rgba(16,185,129,0.12); color:var(--green); border:1px solid rgba(16,185,129,0.25); padding:0.12rem 0.4rem; border-radius:4px; font-size:0.62rem; font-weight:600;">Cotización Aprobada</span>
               </div>
-              <span style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Cot. SAP: ${cotNum} – ${t.asunto || 'Sin asunto'}</span>
-              <div style="display:flex; justify-content:space-between; font-size:0.65rem; color:var(--text-muted);">
-                <span>Cliente: ${t.cliente || 'Genérico'}</span>
-                <span>${fechaFormat}</span>
+              <span style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">Cot. SAP: ${cotNum} – ${t.asunto || 'Sin asunto'}</span>
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.68rem; color:var(--text-muted); margin-top:0.1rem;">
+                <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:65%;">Cliente: <strong style="color:var(--text-primary); font-weight:500;">${t.cliente || 'Genérico'}</strong></span>
+                <span style="flex-shrink:0;">${fechaFormat}</span>
               </div>
             </div>
           `;
@@ -562,21 +587,21 @@ function updateNotificationBell() {
 
       // Renderizar Cotizaciones Rechazadas
       if (rejectedQuotes.length > 0) {
-        html += `<div style="padding:0.4rem 1rem; font-size:0.7rem; font-weight:700; color:var(--red); text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid rgba(255,255,255,0.03); background:rgba(255,255,255,0.01); display:flex; align-items:center; gap:0.25rem; margin-top:0.4rem;"><i data-lucide="x-circle" style="width:12px; height:12px;"></i> Cotizaciones Rechazadas (${rejectedQuotes.length})</div>`;
+        html += `<div class="notif-category-header red"><span style="display:flex; align-items:center; gap:0.35rem;"><i data-lucide="x-circle" style="width:13px; height:13px;"></i> Cotizaciones Rechazadas</span><span style="font-size:0.7rem; background:rgba(239,68,68,0.2); padding:1px 6px; border-radius:10px; font-weight:700;">${rejectedQuotes.length}</span></div>`;
         rejectedQuotes.forEach(t => {
           const fechaFormat = t.fecha ? new Date(t.fecha).toLocaleDateString('es-MX', { day:'numeric', month:'short' }) : 'Reciente';
           const cotNum = t.cotizacionSAP || t.cotizacion_sap || 'N/A';
 
           html += `
-            <div style="padding:0.6rem 1rem; border-bottom:1px solid rgba(255,255,255,0.02); display:flex; flex-direction:column; gap:0.2rem; cursor:pointer; transition:background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="window.abrirTicketDesdeNotification('${t.id}')">
+            <div class="notif-item-card is-read" onclick="window.abrirTicketDesdeNotification('${t.id}')">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-weight:700; font-size:0.78rem; color:var(--text-primary);">${t.folio || 'N/A'}</span>
-                <span style="background:rgba(239,68,68,0.1); color:var(--red); border:1px solid rgba(239,68,68,0.2); padding:0.1rem 0.35rem; border-radius:4px; font-size:0.6rem; font-weight:600;">Cotización Rechazada</span>
+                <span style="font-weight:700; font-size:0.8rem; color:var(--text-primary); letter-spacing:0.3px;">${t.folio || 'N/A'}</span>
+                <span style="background:rgba(239,68,68,0.12); color:var(--red); border:1px solid rgba(239,68,68,0.25); padding:0.12rem 0.4rem; border-radius:4px; font-size:0.62rem; font-weight:600;">Cotización Rechazada</span>
               </div>
-              <span style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Cot. SAP: ${cotNum} – ${t.asunto || 'Sin asunto'}</span>
-              <div style="display:flex; justify-content:space-between; font-size:0.65rem; color:var(--text-muted);">
-                <span>Cliente: ${t.cliente || 'Genérico'}</span>
-                <span>${fechaFormat}</span>
+              <span style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">Cot. SAP: ${cotNum} – ${t.asunto || 'Sin asunto'}</span>
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.68rem; color:var(--text-muted); margin-top:0.1rem;">
+                <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:65%;">Cliente: <strong style="color:var(--text-primary); font-weight:500;">${t.cliente || 'Genérico'}</strong></span>
+                <span style="flex-shrink:0;">${fechaFormat}</span>
               </div>
             </div>
           `;
@@ -595,6 +620,8 @@ function abrirTicketDesdeNotification(ticketId) {
   if (typeof document !== 'undefined') {
     const dd = document.getElementById('notification-dropdown');
     if (dd) dd.style.display = 'none';
+    const bell = document.getElementById('notification-bell-container');
+    if (bell) bell.classList.remove('active');
 
     const navItem = document.querySelector('.nav-item[data-view="tickets"]');
     if (navItem) navItem.click();
@@ -626,12 +653,14 @@ if (typeof document !== 'undefined') {
     const bellInt = document.getElementById('internal-notification-bell-container');
     if (ddInt && bellInt && !bellInt.contains(e.target)) {
       ddInt.style.display = 'none';
+      bellInt.classList.remove('active');
     }
 
     const ddOp = document.getElementById('notification-dropdown');
     const bellOp = document.getElementById('notification-bell-container');
     if (ddOp && bellOp && !bellOp.contains(e.target)) {
       ddOp.style.display = 'none';
+      bellOp.classList.remove('active');
     }
   });
 }
@@ -649,6 +678,20 @@ if (typeof window !== 'undefined') {
   window.updateNotificationBell = updateNotificationBell;
   window.abrirTicketDesdeNotification = abrirTicketDesdeNotification;
   window.abrirOrdenDesdePerfil = abrirOrdenDesdePerfil;
+  const allModuleExports = {
+    toggleInternalNotificationDropdown,
+    sincronizarNotificacionesInternas,
+    generarNotificacionInterna,
+    generarNotificacionComentarioInterno,
+    updateInternalNotificationBell,
+    verTicketYMarcarInternaLeida,
+    marcarTodasInternasLeidas,
+    toggleNotificationDropdown,
+    updateNotificationBell,
+    abrirTicketDesdeNotification,
+    abrirOrdenDesdePerfil
+  };
+  window.Notificaciones = allModuleExports;
 }
 
   // Exponer en global/window para retrocompatibilidad total

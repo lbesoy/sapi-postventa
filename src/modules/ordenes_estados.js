@@ -35,6 +35,9 @@ const safeFormatFechaAmigable = (f) => {
     return isNaN(d) ? f : d.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
   } catch(e) { return f; }
 };
+if (typeof window !== "undefined") {
+  window.safeFormatFechaAmigable = safeFormatFechaAmigable;
+}
 
 const safeMostrarNotificacion = (msg, tipo) => {
   if (typeof mostrarNotificacion === "function") return mostrarNotificacion(msg, tipo);
@@ -79,8 +82,11 @@ function calcularEstadoOrden(o) {
 function cerrarDetalle(e) {
   if (typeof document === "undefined") return;
   if (e && (e.target === document.getElementById('modal-detalle-overlay') || e.target?.classList?.contains('modal-overlay'))) return;
-  document.getElementById('modal-detalle-overlay').classList.remove('open');
+  const overlay = document.getElementById('modal-detalle-overlay');
+  if (overlay) overlay.classList.remove('open');
   document.body.style.overflow = '';
+  const fab = document.getElementById('mobile-fab-container');
+  if (fab) fab.classList.remove('hidden');
 }
 
 async function generarBase64Pdf(ordenId) {
@@ -100,7 +106,8 @@ async function generarBase64Pdf(ordenId) {
 
   const formatFecha = (fStr) => {
     if (!fStr) return '—';
-    if (typeof window.formatFechaAmigable === 'function') return window.safeFormatFechaAmigable(fStr);
+    if (typeof safeFormatFechaAmigable === 'function') return safeFormatFechaAmigable(fStr);
+    if (typeof window !== 'undefined' && typeof window.formatFechaAmigable === 'function') return window.formatFechaAmigable(fStr);
     if (fStr.includes('T')) {
       const parts = fStr.split('T')[0].split('-');
       if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;

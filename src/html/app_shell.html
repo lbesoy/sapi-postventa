@@ -253,34 +253,45 @@
         <img src="logo_transparent.png" alt="Eurorep" class="sidebar-logo-img" />
       </div>
       <nav class="sidebar-nav">
-        <a href="#" class="nav-item active" data-view="dashboard" data-title="Dashboards" id="nav-dashboard">
-          <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span><span>Dashboards</span>
+        <a href="#" class="nav-item active" data-view="dashboard" data-title="Inicio" id="nav-dashboard">
+          <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span>
+          <span class="label-desktop">Dashboards</span><span class="label-mobile">Inicio</span>
         </a>
         <a href="#" class="nav-item" data-view="tickets" data-title="Tickets" id="nav-tickets">
-          <span class="nav-icon"><i data-lucide="ticket"></i></span><span>Tickets</span>
+          <span class="nav-icon"><i data-lucide="ticket"></i></span>
+          <span class="label-desktop">Tickets</span><span class="label-mobile">Tickets</span>
           <span class="nav-badge" id="nav-badge-tickets" style="display:none;"></span>
         </a>
         <a href="#" class="nav-item" data-view="levantamientos" data-title="Levantamientos" id="nav-levantamientos">
-          <span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span>Levantamientos</span>
+          <span class="nav-icon"><i data-lucide="clipboard-list"></i></span>
+          <span class="label-desktop">Levantamientos</span><span class="label-mobile">Levantam.</span>
           <span class="nav-badge" id="nav-badge-levantamientos" style="display:none;"></span>
         </a>
         <a href="#" class="nav-item" data-view="servicios" data-title="Órdenes de Servicio" id="nav-servicios">
-          <span class="nav-icon"><i data-lucide="clipboard-list"></i></span><span>Órdenes de Servicio</span>
+          <span class="nav-icon"><i data-lucide="wrench"></i></span>
+          <span class="label-desktop">Órdenes de Servicio</span><span class="label-mobile">Órdenes</span>
           <span class="nav-badge" id="nav-badge-ordenes" style="display:none;"></span>
         </a>
         <a href="#" class="nav-item" data-view="envios" data-title="Envíos" id="nav-envios">
-          <span class="nav-icon"><i data-lucide="truck"></i></span><span>Envíos</span>
+          <span class="nav-icon"><i data-lucide="truck"></i></span>
+          <span class="label-desktop">Envíos</span><span class="label-mobile">Envíos</span>
           <span class="nav-badge" id="nav-badge-envios" style="display:none;"></span>
         </a>
         <a href="#" class="nav-item" data-view="calendario" data-title="Calendario" id="nav-calendario">
-          <span class="nav-icon"><i data-lucide="calendar"></i></span><span>Calendario</span>
+          <span class="nav-icon"><i data-lucide="calendar"></i></span>
+          <span class="label-desktop">Calendario</span><span class="label-mobile">Calendario</span>
+        </a>
+        <a href="#" class="nav-item" id="nav-mobile-mas" onclick="toggleMobileMoreSheet(event); return false;">
+          <span class="nav-icon"><i data-lucide="more-horizontal"></i></span>
+          <span class="label-mobile">Más</span>
         </a>
         <a href="#" class="nav-item" data-view="chat-soporte" data-title="Chat de Soporte" id="nav-chat-soporte">
           <span class="nav-icon"><i data-lucide="message-square"></i></span><span>Chat de Soporte</span>
           <span class="nav-badge" id="nav-badge-chat-soporte" style="display:none;"></span>
         </a>
         <a href="#" class="nav-item" data-view="gastos" data-title="Control de Gastos" id="nav-gastos">
-          <span class="nav-icon"><i data-lucide="receipt"></i></span><span>Control de Gastos</span>
+          <span class="nav-icon"><i data-lucide="receipt"></i></span>
+          <span class="label-desktop">Control de Gastos</span><span class="label-mobile">Gastos</span>
         </a>
         <a href="#" class="nav-item" data-view="rentas" data-title="Rentas (En Desarrollo)" id="nav-rentas">
           <span class="nav-icon"><i data-lucide="key-round"></i></span><span>Rentas</span>
@@ -339,7 +350,10 @@
           <button class="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Abrir Menú">
             <i data-lucide="menu"></i>
           </button>
-          <h1 id="page-title">Dashboard Órdenes</h1>
+          <div class="topbar-logo-badge" title="Eurorep">
+            <img src="logo_transparent.png" alt="Eurorep" class="topbar-logo-img" />
+          </div>
+          <h1 id="page-title">Inicio</h1>
         </div>
 
         <div class="topbar-right" id="topbar-right">
@@ -362,37 +376,43 @@
           </div>
 
           <!-- Internal Notification Bell -->
-          <div id="internal-notification-bell-container" title="Notificaciones Internas" style="position:relative; cursor:pointer; display:flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; background:var(--bg-card); border:1px solid var(--border); transition:var(--transition); margin-right: 0.5rem;" onclick="window.toggleInternalNotificationDropdown(event)">
+          <div id="internal-notification-bell-container" title="Notificaciones Internas" onclick="window.toggleInternalNotificationDropdown(event)">
             <img src="logo_transparent.png" style="width: 20px; height: 20px; object-fit: contain;" alt="Eurorep" />
             <span id="internal-notification-badge" style="position:absolute; top:-3px; right:-3px; background:#8b5cf6; color:white; font-size:0.65rem; font-weight:700; border-radius:50%; min-width:16px; height:16px; display:none; align-items:center; justify-content:center; padding:2px; box-shadow:0 0 8px rgba(139,92,246,0.4); border:2px solid var(--bg-secondary);">0</span>
             
             <!-- Floating Dropdown Menu -->
-            <div id="internal-notification-dropdown" class="notification-dropdown-menu" style="display:none; position:absolute; top:42px; right:0; width:320px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.5); z-index:1000; overflow:hidden; cursor:default;" onclick="event.stopPropagation()">
-              <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02);">
-                <span style="font-weight:700; font-size:0.85rem; color:var(--text-primary); display:flex; align-items:center; gap:0.25rem;"><i data-lucide="shield-alert" style="width:14px; height:14px; color:#8b5cf6;"></i> Notificaciones Internas</span>
-                <span id="internal-notification-dropdown-count" style="font-size:0.7rem; background:rgba(139,92,246,0.15); color:#8b5cf6; padding:2px 6px; border-radius:10px; font-weight:600;">0</span>
+            <div id="internal-notification-dropdown" class="notification-dropdown-menu" style="display:none;" onclick="event.stopPropagation()">
+              <div class="notification-header">
+                <span style="font-weight:700; font-size:0.85rem; color:var(--text-primary); display:flex; align-items:center; gap:0.35rem;"><i data-lucide="shield-alert" style="width:15px; height:15px; color:#8b5cf6;"></i> Notificaciones Internas</span>
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                  <span id="internal-notification-dropdown-count" style="font-size:0.7rem; background:rgba(139,92,246,0.15); color:#8b5cf6; padding:2px 7px; border-radius:10px; font-weight:700;">0</span>
+                  <button type="button" class="btn-close-notif" onclick="document.getElementById('internal-notification-dropdown').style.display='none'; document.getElementById('internal-notification-bell-container')?.classList.remove('active');" title="Cerrar">✕</button>
+                </div>
               </div>
-              <div id="internal-notification-items-container" style="max-height:280px; overflow-y:auto; display:flex; flex-direction:column; padding:0.5rem 0;">
+              <div id="internal-notification-items-container">
                 <!-- JS Rendered Internal Notification Items -->
               </div>
-              <div style="padding:0.5rem 1rem; border-top:1px solid var(--border); text-align:center; background:rgba(255,255,255,0.01);">
-                <button type="button" class="btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.7rem; border-radius:4px; width:100%;" onclick="window.marcarTodasInternasLeidas()">Marcar todas como leídas</button>
+              <div class="notification-dropdown-footer">
+                <button type="button" class="btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.72rem; border-radius:6px; width:100%; font-weight:600; cursor:pointer;" onclick="window.marcarTodasInternasLeidas()">Marcar todas como leídas</button>
               </div>
             </div>
           </div>
 
           <!-- Notification Bell -->
-          <div id="notification-bell-container" style="position:relative; cursor:pointer; display:flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; background:var(--bg-card); border:1px solid var(--border); transition:var(--transition); margin-right: 0.5rem;" onclick="window.toggleNotificationDropdown(event)">
+          <div id="notification-bell-container" title="Notificaciones Operativas" onclick="window.toggleNotificationDropdown(event)">
             <i data-lucide="bell" style="width: 16px; height: 16px; color:var(--text-secondary);"></i>
             <span id="notification-badge" style="position:absolute; top:-3px; right:-3px; background:var(--red); color:white; font-size:0.65rem; font-weight:700; border-radius:50%; min-width:16px; height:16px; display:none; align-items:center; justify-content:center; padding:2px; box-shadow:0 0 8px rgba(239,68,68,0.4); border:2px solid var(--bg-secondary);">0</span>
             
             <!-- Floating Dropdown Menu -->
-            <div id="notification-dropdown" class="notification-dropdown-menu" style="display:none; position:absolute; top:42px; right:0; width:320px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.5); z-index:1000; overflow:hidden; cursor:default;" onclick="event.stopPropagation()">
-              <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02);">
-                <span style="font-weight:700; font-size:0.85rem; color:var(--text-primary); display:flex; align-items:center; gap:0.25rem;"><i data-lucide="bell-ring" style="width:14px; height:14px; color:var(--accent);"></i> Notificaciones Activas</span>
-                <span id="notification-dropdown-count" style="font-size:0.7rem; background:rgba(232,130,12,0.15); color:var(--accent); padding:2px 6px; border-radius:10px; font-weight:600;">0</span>
+            <div id="notification-dropdown" class="notification-dropdown-menu" style="display:none;" onclick="event.stopPropagation()">
+              <div class="notification-header">
+                <span style="font-weight:700; font-size:0.85rem; color:var(--text-primary); display:flex; align-items:center; gap:0.35rem;"><i data-lucide="bell-ring" style="width:15px; height:15px; color:var(--accent);"></i> Notificaciones Activas</span>
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                  <span id="notification-dropdown-count" style="font-size:0.7rem; background:rgba(232,130,12,0.15); color:var(--accent); padding:2px 7px; border-radius:10px; font-weight:700;">0</span>
+                  <button type="button" class="btn-close-notif" onclick="document.getElementById('notification-dropdown').style.display='none'; document.getElementById('notification-bell-container')?.classList.remove('active');" title="Cerrar">✕</button>
+                </div>
               </div>
-              <div id="notification-items-container" style="max-height:280px; overflow-y:auto; display:flex; flex-direction:column; padding:0.5rem 0;">
+              <div id="notification-items-container">
                 <!-- JS Rendered Notification Items -->
               </div>
             </div>
@@ -412,7 +432,7 @@
             <i data-lucide="chevron-down" style="width:0.85rem;height:0.85rem;stroke:currentColor;stroke-width:2;"></i>
           </div>
           <div id="topbar-actions" style="display:flex;gap:0.5rem;">
-            <button class="btn-primary" id="btn-nueva-orden" onclick="abrirFormulario()"><i data-lucide="plus"
+            <button class="btn-primary desktop-only-controls" id="btn-nueva-orden" onclick="abrirFormulario()"><i data-lucide="plus"
                 class="btn-icon"></i> <span class="btn-text">Nueva Orden</span></button>
             <button class="btn-primary btn-ticket-action" id="btn-nuevo-ticket" onclick="abrirTicket()"
               style="display:none;"><i data-lucide="plus" class="btn-icon"></i> <span class="btn-text">Nuevo Ticket</span></button>
@@ -918,7 +938,8 @@
         "servicios_preventivos.js?v=2",
         "servicios_no_preventivos.js?v=1",
         "levantamientos.js?v=306",
-        "tecnicos_reporte.js?v=303"
+        "tecnicos_reporte.js?v=303",
+        "capacitor-bridge.js?v=1"
       ];
       var index = 0;
       function loadNext() {
@@ -947,6 +968,92 @@
     });
   </script>
   <datalist id="datalist-refacciones-claves"></datalist>
+
+  <!-- Botón Flotante de Acción Primaria (FAB) para App Móvil -->
+  <div id="mobile-fab-container" class="mobile-fab-container" style="display:none;">
+    <button id="mobile-main-fab" class="mobile-main-fab" type="button" aria-label="Crear Nuevo" onclick="window.handleMobileFabClick && window.handleMobileFabClick()">
+      <i data-lucide="plus" id="mobile-main-fab-icon"></i>
+    </button>
+  </div>
+
+  <!-- ===== BOTTOM SHEET: MÁS OPCIONES (MÓVIL) ===== -->
+  <div id="mobile-more-backdrop" class="mobile-sheet-backdrop" onclick="closeMobileMoreSheet()"></div>
+  <div id="mobile-more-sheet" class="mobile-sheet-container" role="dialog" aria-modal="true" aria-label="Menú de más opciones">
+    <div class="mobile-sheet-drag-handle" onclick="closeMobileMoreSheet()"></div>
+    <div class="mobile-sheet-header">
+      <div class="mobile-sheet-user-info">
+        <div class="mobile-sheet-avatar" id="mobile-sheet-avatar">T</div>
+        <div class="mobile-sheet-user-meta">
+          <div class="mobile-sheet-user-name" id="mobile-sheet-user-name">Técnico</div>
+          <div class="mobile-sheet-user-role" id="mobile-sheet-user-role">SAPI Móvil</div>
+        </div>
+      </div>
+      <button type="button" class="mobile-sheet-close-btn" onclick="closeMobileMoreSheet()">✕</button>
+    </div>
+
+    <div class="mobile-sheet-menu-list">
+      <!-- 1. Control de Gastos -->
+      <a href="#" class="mobile-sheet-item" onclick="selectMobileMoreView('gastos'); return false;">
+        <div class="mobile-sheet-icon icon-purple">
+          <i data-lucide="receipt"></i>
+        </div>
+        <div class="mobile-sheet-text">
+          <div class="mobile-sheet-title">Control de Gastos</div>
+          <div class="mobile-sheet-subtitle">Viáticos, facturas y comprobantes</div>
+        </div>
+        <i data-lucide="chevron-right" class="mobile-sheet-arrow"></i>
+      </a>
+
+      <!-- 2. Preferencias / Perfil -->
+      <a href="#" class="mobile-sheet-item" onclick="selectMobileMoreView('preferencias'); return false;">
+        <div class="mobile-sheet-icon icon-blue">
+          <i data-lucide="user"></i>
+        </div>
+        <div class="mobile-sheet-text">
+          <div class="mobile-sheet-title">Preferencias y Perfil</div>
+          <div class="mobile-sheet-subtitle">Datos de cuenta, contraseña y tema</div>
+        </div>
+        <i data-lucide="chevron-right" class="mobile-sheet-arrow"></i>
+      </a>
+
+      <!-- 3. Levantamientos -->
+      <a href="#" class="mobile-sheet-item" onclick="selectMobileMoreView('levantamientos'); return false;">
+        <div class="mobile-sheet-icon icon-emerald">
+          <i data-lucide="clipboard-check"></i>
+        </div>
+        <div class="mobile-sheet-text">
+          <div class="mobile-sheet-title">Levantamientos</div>
+          <div class="mobile-sheet-subtitle">Inspecciones técnicas de maquinaria</div>
+        </div>
+        <i data-lucide="chevron-right" class="mobile-sheet-arrow"></i>
+      </a>
+
+      <!-- 4. Envíos -->
+      <a href="#" class="mobile-sheet-item" onclick="selectMobileMoreView('envios'); return false;">
+        <div class="mobile-sheet-icon icon-indigo">
+          <i data-lucide="truck"></i>
+        </div>
+        <div class="mobile-sheet-text">
+          <div class="mobile-sheet-title">Envíos de Guías</div>
+          <div class="mobile-sheet-subtitle">Paquetería y refacciones en tránsito</div>
+        </div>
+        <i data-lucide="chevron-right" class="mobile-sheet-arrow"></i>
+      </a>
+
+      <div class="mobile-sheet-divider"></div>
+
+      <!-- 5. Cerrar Sesión -->
+      <a href="#" class="mobile-sheet-item item-logout" onclick="if(typeof cerrarSesion === 'function') cerrarSesion(); else if(typeof logout === 'function') logout(); return false;">
+        <div class="mobile-sheet-icon icon-red">
+          <i data-lucide="log-out"></i>
+        </div>
+        <div class="mobile-sheet-text">
+          <div class="mobile-sheet-title text-red">Cerrar Sesión</div>
+          <div class="mobile-sheet-subtitle">Salir de la cuenta de técnico</div>
+        </div>
+      </a>
+    </div>
+  </div>
 </body>
 
 </html>

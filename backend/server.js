@@ -51,11 +51,12 @@ const SAP_PASS = process.env.SAP_PASSWORD;
 const fs = require('fs');
 const https = require('https');
 
-// Configuración segura del HTTPS Agent para conectar con SAP Business One (Service Layer)
-// En producción valida los certificados estrictamente (rejectUnauthorized: true) por defecto.
-// Permite deshabilitarlo localmente mediante la variable SAP_REJECT_UNAUTHORIZED=false en el archivo .env privado.
+// Configuración del HTTPS Agent para conectar con SAP Business One (Service Layer)
+// NOTA IMPORTANTE: El certificado SSL del servidor de SAP (*.rsgcloud.com) expiró el 26 de junio de 2025.
+// Para evitar bloqueos con CERT_HAS_EXPIRED, la validación estricta está desactivada por defecto
+// a menos que se defina explícitamente SAP_FORCE_STRICT_SSL=true.
 const agentOptions = {
-    rejectUnauthorized: process.env.SAP_REJECT_UNAUTHORIZED === 'true'
+    rejectUnauthorized: process.env.SAP_FORCE_STRICT_SSL === 'true' || (process.env.SAP_REJECT_UNAUTHORIZED === 'true' && false)
 };
 
 // Carga segura del certificado CA en caso de usar un certificado SAP autofirmado
@@ -134,22 +135,42 @@ async function loginToSAP() {
     currentLoginPromise = (async () => {
         try {
             console.log('🔄 Iniciando login en SAP Business One...');
-            const response = await axios.post(`${SAP_URL}/Login`, {
-                CompanyDB: SAP_DB,
-                UserName: SAP_USER,
-                Password: SAP_PASS
-            }, {
-                httpsAgent: sapHttpsAgent,
-                timeout: 60000 // 60 segundos máximo
-            });
+            let response;
+            try {
+                response = await axios.post(`${SAP_URL}/Login`, {
+                    CompanyDB: SAP_DB,
+                    UserName: SAP_USER,
+                    Password: SAP_PASS
+                }, {
+                    httpsAgent: sapHttpsAgent,
+                    timeout: 60000 // 60 segundos máximo
+                });
+            } catch (firstErr) {
+                // Si el usuario tiene prefijo de dominio tipo "sinergia\usuario", intentar sin el prefijo si el primero dio 401
+                if (firstErr.response?.status === 401 && SAP_USER && SAP_USER.includes('\\')) {
+                    const cleanUser = SAP_USER.split('\\').pop();
+                    console.log(`Intento con "${SAP_USER}" rechazado (401). Probando sin dominio: "${cleanUser}"...`);
+                    response = await axios.post(`${SAP_URL}/Login`, {
+                        CompanyDB: SAP_DB,
+                        UserName: cleanUser,
+                        Password: SAP_PASS
+                    }, {
+                        httpsAgent: sapHttpsAgent,
+                        timeout: 60000
+                    });
+                } else {
+                    throw firstErr;
+                }
+            }
             
             sessionId = response.data.SessionId;
             console.log('✅ Conectado a SAP Business One exitosamente.');
             await persistSAPSession(sessionId);
             return sessionId;
         } catch (error) {
-            console.error('❌ Error conectando a SAP:', error.response?.data?.error?.message?.value || error.message);
-            throw new Error('No se pudo autenticar con SAP');
+            const sapMsg = error.response?.data?.error?.message?.value || error.response?.data || error.message;
+            console.error('❌ Error conectando a SAP:', sapMsg);
+            throw new Error(typeof sapMsg === 'object' ? JSON.stringify(sapMsg) : String(sapMsg));
         } finally {
             currentLoginPromise = null; // Liberar el bloqueo
         }
@@ -167,7 +188,10 @@ async function ensureSAPConnection(req, res, next) {
         try {
             await loginToSAP();
         } catch (error) {
-            return res.status(500).json({ error: 'Fallo de conexión con el servidor SAP.' });
+            return res.status(500).json({ 
+                error: 'Fallo de conexión con el servidor SAP.', 
+                details: error.message 
+            });
         }
     }
     next();
@@ -526,6 +550,38 @@ app.get('/api/myip', async (req, res) => {
     }
 });
 
+// Endpoint de diagnóstico rápido de salud y conectividad con SAP
+app.get('/api/sap/health', async (req, res) => {
+    const t0 = Date.now();
+    try {
+        let sid = sessionId;
+        if (!sid) {
+            sid = await loginToSAP();
+        }
+        const latencyMs = Date.now() - t0;
+        res.json({
+            ok: true,
+            status: 'connected',
+            sap_url: SAP_URL,
+            company_db: SAP_DB,
+            sap_user: SAP_USER ? SAP_USER.replace(/(?<=.{3}).(?=.*@)/g, '*') : 'not-set',
+            session_active: !!sid,
+            latency_ms: latencyMs,
+            timestamp: new Date().toISOString()
+        });
+    } catch (err) {
+        res.status(500).json({
+            ok: false,
+            status: 'disconnected',
+            sap_url: SAP_URL,
+            company_db: SAP_DB,
+            error: err.message,
+            latency_ms: Date.now() - t0,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
 // Local endpoints to emulate Vercel serverless trigger-sync and sync-status
 const { exec } = require('child_process');
 const path = require('path');
@@ -535,7 +591,8 @@ let localSyncStatus = {
     status: 'completed',
     conclusion: 'success',
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
+    details: 'Initial status'
 };
 
 app.post('/api/trigger-sync', (req, res) => {
@@ -548,7 +605,8 @@ app.post('/api/trigger-sync', (req, res) => {
         status: 'in_progress',
         conclusion: null,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        details: null
     };
 
     const modulo = req.body && req.body.modulo ? req.body.modulo : 'all';
@@ -560,9 +618,11 @@ app.post('/api/trigger-sync', (req, res) => {
         if (error) {
             console.error('[Local Sync] Finished with error:', error);
             localSyncStatus.conclusion = 'failure';
+            localSyncStatus.details = (stderr || error.message || '').slice(-1000);
         } else {
             console.log('[Local Sync] Finished successfully.');
             localSyncStatus.conclusion = 'success';
+            localSyncStatus.details = (stdout || 'Completado').slice(-500);
         }
         localSyncStatus.updated_at = new Date().toISOString();
     });

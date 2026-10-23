@@ -1,61 +1,89 @@
         <div id="view-calendario" class="view">
-          <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
-            <h2>Calendario de Servicios</h2>
-            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; flex:1; justify-content:flex-end;">
-              <select id="filter-cal-cliente" class="form-select" onchange="renderCalendario()">
-                <option value="">Todos los Clientes</option>
-              </select>
-              <select id="filter-cal-tecnico" class="form-select" onchange="renderCalendario()">
-                <option value="">Todos los Técnicos</option>
-              </select>
-              <button class="btn-primary" id="btn-programar-tecnico" style="display:none;" onclick="abrirProgramarTecnico()">
-                <i data-lucide="calendar-plus" class="btn-icon"></i> Programar Asignación
-              </button>
-              <button class="btn-primary" id="btn-registrar-actividad" style="display:none; background:var(--purple); border-color:var(--purple);" onclick="abrirRegistrarActividad()">
-                <i data-lucide="calendar-plus" class="btn-icon"></i> Registrar Actividad
-              </button>
+          <!-- BARRA DE CONTROLES Y FILTROS DEL CALENDARIO -->
+          <div class="calendar-controls-bar">
+            <div class="calendar-title-wrap">
+              <h2 class="calendar-page-title">Calendario de Servicios</h2>
+            </div>
+            <div class="calendar-filters-group">
+              <div class="calendar-filter-item">
+                <i data-lucide="users" class="calendar-filter-icon"></i>
+                <select id="filter-cal-tecnico" class="form-select cal-select" onchange="renderCalendario()">
+                  <option value="">Todos los Técnicos</option>
+                </select>
+              </div>
+              <div class="calendar-filter-item">
+                <i data-lucide="building-2" class="calendar-filter-icon"></i>
+                <select id="filter-cal-cliente" class="form-select cal-select" onchange="renderCalendario()">
+                  <option value="">Todos los Clientes</option>
+                </select>
+              </div>
+              <div class="calendar-actions-wrap">
+                <button class="btn-primary btn-cal-action" id="btn-programar-tecnico" style="display:none;" onclick="abrirProgramarTecnico()">
+                  <i data-lucide="calendar-plus" class="btn-icon"></i> <span>Programar</span>
+                </button>
+                <button class="btn-primary btn-cal-action" id="btn-registrar-actividad" style="display:none; background:var(--purple); border-color:var(--purple);" onclick="abrirRegistrarActividad()">
+                  <i data-lucide="calendar-plus" class="btn-icon"></i> <span>Actividad</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          <!-- SIMBOLOGÍA DE COLORES DEL CALENDARIO -->
-          <div class="calendar-legend" style="display: flex; gap: 0.75rem 1.25rem; flex-wrap: wrap; margin-bottom: 1.25rem; padding: 0.75rem 1rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); font-size: 0.78rem; align-items: center; width: 100%;">
-            <div style="font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 0.25rem; margin-right: 0.25rem;">
-              <i data-lucide="info" style="width: 14px; height: 14px; color: var(--accent);"></i> Leyenda de Colores:
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.4rem;">
-              <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #f59e0b; flex-shrink: 0;"></span>
-              <span style="color: var(--text-primary); font-weight: 500;">Vacaciones</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.4rem;">
-              <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #8b5cf6; flex-shrink: 0;"></span>
-              <span style="color: var(--text-primary); font-weight: 500;">Asignación Programada (Pendiente)</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.4rem;">
-              <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #10b981; flex-shrink: 0;"></span>
-              <span style="color: var(--text-primary); font-weight: 500;">Asignación Completada al 100%</span>
-            </div>
-             <div style="display: flex; align-items: center; gap: 0.4rem;">
-              <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #3b82f6; flex-shrink: 0;"></span>
-              <span style="color: var(--text-primary); font-weight: 500;">Asignación Completada (Diferencia de horas)</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.4rem;">
-              <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #ef4444; flex-shrink: 0;"></span>
-              <span style="color: var(--text-primary); font-weight: 500;">Trabajo Realizado sin Asignación</span>
-            </div>
-             <div style="display: flex; align-items: center; gap: 0.4rem;">
-              <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #475569; flex-shrink: 0;"></span>
-              <span style="color: var(--text-primary); font-weight: 500;">Traslado</span>
-            </div>
-             <div style="display: flex; align-items: center; gap: 0.4rem;">
-              <span style="display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #d946ef; flex-shrink: 0;"></span>
-              <span style="color: var(--text-primary); font-weight: 500;">Levantamiento</span>
+          <!-- SIMBOLOGÍA DE COLORES DEL CALENDARIO (COLAPSABLE EN MÓVIL) -->
+          <div class="calendar-legend-card" id="cal-legend-card">
+            <button type="button" class="calendar-legend-header" onclick="window.toggleCalendarLegend()" aria-expanded="false" aria-controls="cal-legend-items">
+              <div class="calendar-legend-title">
+                <i data-lucide="palette" class="calendar-legend-icon"></i>
+                <span class="legend-header-text">Leyenda de Colores</span>
+                <div class="calendar-legend-dots-preview">
+                  <span class="c-dot" style="background:#f59e0b" title="Vacaciones"></span>
+                  <span class="c-dot" style="background:#8b5cf6" title="Programada"></span>
+                  <span class="c-dot" style="background:#10b981" title="Completada 100%"></span>
+                  <span class="c-dot" style="background:#3b82f6" title="Completada Dif."></span>
+                  <span class="c-dot" style="background:#ef4444" title="Sin Asignación"></span>
+                  <span class="c-dot" style="background:#475569" title="Traslado"></span>
+                  <span class="c-dot" style="background:#d946ef" title="Levantamiento"></span>
+                </div>
+              </div>
+              <div class="calendar-legend-chevron-box">
+                <i data-lucide="chevron-down" id="cal-legend-chevron" class="cal-legend-chevron"></i>
+              </div>
+            </button>
+            <div class="calendar-legend-content" id="cal-legend-items">
+              <div class="legend-grid">
+                <div class="legend-item">
+                  <span class="legend-swatch" style="background: #f59e0b;"></span>
+                  <span class="legend-label">Vacaciones</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-swatch" style="background: #8b5cf6;"></span>
+                  <span class="legend-label">Asignación Programada (Pendiente)</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-swatch" style="background: #10b981;"></span>
+                  <span class="legend-label">Asignación Completada al 100%</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-swatch" style="background: #3b82f6;"></span>
+                  <span class="legend-label">Asignación Completada (Dif. horas)</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-swatch" style="background: #ef4444;"></span>
+                  <span class="legend-label">Trabajo sin Asignación</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-swatch" style="background: #475569;"></span>
+                  <span class="legend-label">Traslado</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-swatch" style="background: #d946ef;"></span>
+                  <span class="legend-label">Levantamiento</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div id="calendar-container"
-            style="background:var(--bg-card); padding:1rem; border-radius:var(--radius-lg); border:1px solid var(--border); box-shadow:var(--shadow-sm); min-height:600px;">
-            <!-- The calendar will be injected here -->
+          <!-- CONTENEDOR PRINCIPAL DE FULLCALENDAR -->
+          <div id="calendar-container" class="calendar-container-card">
+            <!-- FullCalendar se inyecta aquí -->
           </div>
         </div>
-
-        <!-- GASTOS VIEW -->

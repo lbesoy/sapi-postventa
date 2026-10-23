@@ -1,6 +1,8 @@
         <div id="view-levantamientos" class="view">
-          <div style="height: 3rem; width: 100%; flex-shrink: 0;"></div>
-          <div class="stats-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+          <div class="desktop-only-spacer" style="height: 1.5rem; width: 100%; flex-shrink: 0;"></div>
+
+          <!-- ESTADÍSTICAS ESCRITORIO (Solo visible en Desktop >= 769px) -->
+          <div class="stats-grid desktop-only-stats" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
             <div class="stat-card" style="cursor: pointer;" onclick="window.setFiltroEstadoLevantamientos('todos')">
               <div class="stat-icon" style="background:rgba(79,142,247,0.12);color:#4f8ef7;"><i data-lucide="file-text"></i></div>
               <div>
@@ -24,11 +26,13 @@
             </div>
           </div>
           
-          <div style="margin-bottom:1rem; display:flex;">
+          <!-- BUSCADOR ESCRITORIO (Solo visible en Desktop >= 769px) -->
+          <div class="desktop-only-search" style="margin-bottom:1rem; display:flex;">
             <input type="text" id="search-levantamientos" placeholder="Buscar por folio, cliente, sitio..." oninput="debouncedRenderLevantamientos()" style="flex:1; max-width: 400px; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px;" />
           </div>
 
-          <div class="table-container">
+          <!-- TABLA ESCRITORIO (Solo visible en Desktop >= 769px) -->
+          <div class="table-container desktop-only-table">
             <table class="orders-table" style="width:100%; border-collapse:collapse; text-align:left;">
               <thead>
                 <tr>
@@ -46,6 +50,41 @@
                 <!-- Se llena con JS -->
               </tbody>
             </table>
+          </div>
+
+          <!-- VISTA NATIVA MÓVIL APP (Solo visible en Pantallas Móviles y App) -->
+          <div class="mobile-only-lev-header" id="mobile-levantamientos-sticky-top">
+            <!-- Buscador estilo App -->
+            <div class="mobile-search-bar mobile-lev-search-bar">
+              <i data-lucide="search" class="search-icon"></i>
+              <input type="text" id="mobile-search-levantamientos" placeholder="Buscar folio, cliente, sitio..." oninput="window.syncSearchLevantamientos(this.value)" autocomplete="off" />
+              <button type="button" class="mobile-search-clear" id="btn-clear-search-lev" onclick="window.clearSearchLevantamientos()" style="display:none;" title="Limpiar búsqueda">
+                <i data-lucide="x"></i>
+              </button>
+            </div>
+
+            <!-- Chips de Filtros de Estado Nativo Móvil -->
+            <div class="mobile-status-chips-scroll mobile-lev-chips-scroll" id="mobile-levantamientos-chips">
+              <button type="button" class="status-chip active" data-estado="todos" onclick="window.setFiltroEstadoLevantamientos('todos', this)">
+                <span>Todos</span>
+                <span class="chip-count" id="mob-lev-total">0</span>
+              </button>
+              <button type="button" class="status-chip chip-red" data-estado="Pendiente" onclick="window.setFiltroEstadoLevantamientos('Pendiente', this)">
+                <span class="chip-dot dot-red"></span>
+                <span>Pendientes</span>
+                <span class="chip-count" id="mob-lev-pendientes">0</span>
+              </button>
+              <button type="button" class="status-chip chip-green" data-estado="Completado" onclick="window.setFiltroEstadoLevantamientos('Completado', this)">
+                <span class="chip-dot dot-green"></span>
+                <span>Completados</span>
+                <span class="chip-count" id="mob-lev-completados">0</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Contenedor Nativo de Tarjetas Móviles (Estilo App) -->
+          <div class="mobile-only-lev-container" id="mobile-levantamientos-cards-container">
+            <div class="empty-state" style="text-align:center; padding:2rem; color:var(--text-muted);">Sin levantamientos aún.</div>
           </div>
         </div>
 

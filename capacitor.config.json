@@ -1,0 +1,30 @@
+{
+  "appId": "com.eurorep.sapi",
+  "appName": "SAPI Postventa",
+  "webDir": "dist",
+  "backgroundColor": "#0f1117",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "android": {
+    "backgroundColor": "#0f1117",
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "backgroundColor": "#12141c",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#12141c"
+    }
+  }
+}
