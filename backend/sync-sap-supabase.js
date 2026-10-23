@@ -72,27 +72,42 @@ const err = (msg) => console.error(`[${new Date().toLocaleTimeString('es-MX')}] 
 async function loginSAP() {
   log(`Iniciando sesión en SAP B1 (${SAP_URL}) para CompanyDB "${SAP_DB}", usuario "${SAP_USER}"...`);
   
-  const attemptLogin = async (user) => {
-    return await axios.post(`${SAP_URL}/Login`, {
-      CompanyDB: SAP_DB,
-      UserName: user,
-      Password: SAP_PASS
-    }, { httpsAgent: agent, timeout: 30000 });
-  };
+  const candidates = [];
+  if (SAP_USER) candidates.push(SAP_USER);
+  if (SAP_USER && !SAP_USER.includes('\\')) {
+    candidates.push(`sinergia\\${SAP_USER}`);
+  }
+  if (SAP_USER && SAP_USER.startsWith('sinergiasap-')) {
+    candidates.push(`sinergia\\${SAP_USER.replace(/^sinergia/, '')}`);
+  }
+  if (SAP_USER && SAP_USER.includes('\\')) {
+    const clean = SAP_USER.split('\\').pop();
+    if (!candidates.includes(clean)) candidates.push(clean);
+  }
+  const fallbackMaster = 'sinergia\\sap-okanpro01';
+  if (!candidates.includes(fallbackMaster)) {
+    candidates.push(fallbackMaster);
+  }
 
   try {
-    let res;
-    try {
-      res = await attemptLogin(SAP_USER);
-    } catch (firstErr) {
-      // Si el usuario tiene prefijo de dominio tipo "sinergia\usuario", intentar sin el prefijo si el primero dio 401
-      if (firstErr.response?.status === 401 && SAP_USER && SAP_USER.includes('\\')) {
-        const cleanUser = SAP_USER.split('\\').pop();
-        log(`Intento con "${SAP_USER}" rechazado (401). Probando sin dominio: "${cleanUser}"...`);
-        res = await attemptLogin(cleanUser);
-      } else {
-        throw firstErr;
+    let res = null;
+    let lastErr = null;
+    for (const u of candidates) {
+      try {
+        log(`Probando credenciales con usuario "${u}"...`);
+        res = await axios.post(`${SAP_URL}/Login`, {
+          CompanyDB: SAP_DB,
+          UserName: u,
+          Password: SAP_PASS
+        }, { httpsAgent: agent, timeout: 15000 });
+        if (res && res.data && res.data.SessionId) break;
+      } catch (err) {
+        lastErr = err;
       }
+    }
+
+    if (!res || !res.data || !res.data.SessionId) {
+      throw lastErr || new Error('No se pudo autenticar con SAP');
     }
 
     sessionId = res.data.SessionId;

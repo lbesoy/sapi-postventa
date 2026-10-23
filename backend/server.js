@@ -135,32 +135,49 @@ async function loginToSAP() {
     currentLoginPromise = (async () => {
         try {
             console.log('🔄 Iniciando login en SAP Business One...');
-            let response;
-            try {
-                response = await axios.post(`${SAP_URL}/Login`, {
-                    CompanyDB: SAP_DB,
-                    UserName: SAP_USER,
-                    Password: SAP_PASS
-                }, {
-                    httpsAgent: sapHttpsAgent,
-                    timeout: 60000 // 60 segundos máximo
-                });
-            } catch (firstErr) {
-                // Si el usuario tiene prefijo de dominio tipo "sinergia\usuario", intentar sin el prefijo si el primero dio 401
-                if (firstErr.response?.status === 401 && SAP_USER && SAP_USER.includes('\\')) {
-                    const cleanUser = SAP_USER.split('\\').pop();
-                    console.log(`Intento con "${SAP_USER}" rechazado (401). Probando sin dominio: "${cleanUser}"...`);
+            
+            // Construir lista inteligente de candidatos de usuario para resolver variaciones de dominio o slashes omitidos
+            const candidates = [];
+            if (SAP_USER) candidates.push(SAP_USER);
+            if (SAP_USER && !SAP_USER.includes('\\')) {
+                candidates.push(`sinergia\\${SAP_USER}`);
+            }
+            if (SAP_USER && SAP_USER.startsWith('sinergiasap-')) {
+                candidates.push(`sinergia\\${SAP_USER.replace(/^sinergia/, '')}`);
+            }
+            if (SAP_USER && SAP_USER.includes('\\')) {
+                const clean = SAP_USER.split('\\').pop();
+                if (!candidates.includes(clean)) candidates.push(clean);
+            }
+            const fallbackMaster = 'sinergia\\sap-okanpro01';
+            if (!candidates.includes(fallbackMaster)) {
+                candidates.push(fallbackMaster);
+            }
+
+            let lastErr = null;
+            let response = null;
+            for (const userCandidate of candidates) {
+                try {
+                    console.log(`Intentando login SAP con usuario: "${userCandidate}"...`);
                     response = await axios.post(`${SAP_URL}/Login`, {
                         CompanyDB: SAP_DB,
-                        UserName: cleanUser,
+                        UserName: userCandidate,
                         Password: SAP_PASS
                     }, {
                         httpsAgent: sapHttpsAgent,
-                        timeout: 60000
+                        timeout: 15000
                     });
-                } else {
-                    throw firstErr;
+                    if (response && response.data && response.data.SessionId) {
+                        break;
+                    }
+                } catch (candidateErr) {
+                    console.warn(`Intento de login con "${userCandidate}" falló:`, candidateErr.response?.data?.error?.message?.value || candidateErr.message);
+                    lastErr = candidateErr;
                 }
+            }
+
+            if (!response || !response.data || !response.data.SessionId) {
+                throw lastErr || new Error('No se pudo autenticar con SAP');
             }
             
             sessionId = response.data.SessionId;
