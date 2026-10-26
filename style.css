@@ -934,11 +934,12 @@ body.light-mode {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
   display: none; align-items: center; justify-content: center;
-  z-index: 200; padding: 1rem;
+  z-index: 20000 !important; padding: 1rem;
   overscroll-behavior: contain;
   overscroll-behavior-x: none;
 }
-.modal-overlay.open { display: flex; }
+.modal-overlay.open { display: flex; z-index: 20000 !important; }
+#modal-onedrive-picker-overlay { z-index: 30000 !important; }
 .modal, .modal-content {
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: var(--radius); width: 100%; max-width: 860px;
@@ -3214,7 +3215,7 @@ body.light-mode {
     height: 100dvh !important;
     padding: 0 !important;
     margin: 0 !important;
-    z-index: 10005 !important;
+    z-index: 20000 !important;
     background: var(--bg-body) !important;
     display: flex !important;
     flex-direction: column !important;

@@ -4364,16 +4364,27 @@ window.cargarDatosDeSupabase = function() {
             
             // 2. Reconstrucción Dinámica de Maquinarias (Fuente de verdad: tabla maquinaria)
             const matchMaq = (maqDb || []).filter(m => {
-              if (m.cliente === row.id) return true;
-              if (m.cliente === row.nombre) return true;
+              if (m.cliente === row.id || m.cliente === row.nombre) return true;
               const cData = m.custom_data || {};
-              const addClients = (Array.isArray(m.clientes_adicionales) && m.clientes_adicionales.length > 0)
-                ? m.clientes_adicionales
-                : ((Array.isArray(m.empresas_vinculadas) && m.empresas_vinculadas.length > 0)
-                  ? m.empresas_vinculadas
-                  : (cData.clientesAdicionales || cData.empresasVinculadas || []));
-              if (Array.isArray(addClients) && (addClients.includes(row.id) || addClients.includes(row.nombre))) return true;
-              return false;
+              let rawAdd = [];
+              [
+                m.clientes_adicionales,
+                m.clientesAdicionales,
+                m.empresas_vinculadas,
+                m.empresasVinculadas,
+                cData.clientesAdicionales,
+                cData.empresasVinculadas,
+                cData.empresas_vinculadas
+              ].forEach(src => {
+                if (Array.isArray(src)) rawAdd.push(...src);
+                else if (typeof src === 'string' && src.trim()) rawAdd.push(...src.split(',').map(s => s.trim()));
+              });
+              const rId = String(row.id || '').toLowerCase().trim();
+              const rNom = String(row.nombre || '').toLowerCase().trim();
+              return rawAdd.some(c => {
+                const normC = String(c || '').toLowerCase().trim();
+                return (rId && normC === rId) || (rNom && normC === rNom);
+              });
             });
             row.maquinas = matchMaq.map(m => {
               const cData = m.custom_data || {};
@@ -4404,6 +4415,10 @@ window.cargarDatosDeSupabase = function() {
                 if (sMatch) ubiName = sMatch.nombre;
               }
 
+              const allEmpresas = (Array.isArray(m.empresas_vinculadas) && m.empresas_vinculadas.length > 0)
+                ? m.empresas_vinculadas
+                : (Array.isArray(cData.empresasVinculadas) ? cData.empresasVinculadas : []);
+
               return {
                 id: m.id,
                 serie: m.serie,
@@ -4421,7 +4436,15 @@ window.cargarDatosDeSupabase = function() {
                 sitio_id: m.sitio_id || null,
                 latitud: (m.latitud !== null && m.latitud !== undefined) ? m.latitud : cData.latitud,
                 longitud: (m.longitud !== null && m.longitud !== undefined) ? m.longitud : cData.longitud,
-                customData: cData
+                empresas_vinculadas: allEmpresas,
+                empresasVinculadas: allEmpresas,
+                clientes_adicionales: allEmpresas,
+                clientesAdicionales: allEmpresas,
+                customData: {
+                  ...cData,
+                  empresasVinculadas: allEmpresas,
+                  clientesAdicionales: allEmpresas
+                }
               };
             });
 
@@ -4547,6 +4570,13 @@ window.cargarDatosDeSupabase = function() {
             };
           });
           localStorage.setItem('sapi_maquinaria_db', JSON.stringify(mappedMaq));
+          if (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb)) {
+            maquinariaDb.length = 0;
+            maquinariaDb.push(...mappedMaq);
+          }
+          if (typeof window !== 'undefined') {
+            window.maquinariaDb = mappedMaq;
+          }
         }
       } catch (errCSM) {
         console.error('[Sync] Error al cargar clientes/sitios/maquinaria:', errCSM);

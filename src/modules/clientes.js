@@ -688,11 +688,73 @@ function verDetalleCliente(nombre) {
 
   // Máquinas
   let allClientMachines = [];
-  
+  const normTarget = String(nombre || '').toLowerCase().trim();
+  const targetId = clienteOb?.id ? String(clienteOb.id).toLowerCase().trim() : null;
+  const targetRfc = clienteOb?.rfc ? String(clienteOb.rfc).toLowerCase().trim() : null;
+
+  const matchesAnyClientName = (target, candidate) => {
+    if (!target || !candidate) return false;
+    const t = String(target).toLowerCase().trim();
+    const c = String(candidate).toLowerCase().trim();
+    if (t === c) return true;
+    if (t.length > 5 && c.length > 5 && (t.includes(c) || c.includes(t))) return true;
+    return false;
+  };
+
+  const isMatchingClient = (m, ownerName = '') => {
+    if (!m) return { matches: false, isMultiempresa: false };
+    const mCli = String(m.cliente || ownerName || '').toLowerCase().trim();
+    if (mCli && (matchesAnyClientName(normTarget, mCli) || (targetId && mCli === targetId) || (targetRfc && mCli === targetRfc))) {
+      return { matches: true, isMultiempresa: false };
+    }
+    let rawLinked = [];
+    const sources = [
+      m.empresas_vinculadas,
+      m.empresasVinculadas,
+      m.clientes_adicionales,
+      m.clientesAdicionales,
+      m.custom_data?.empresasVinculadas,
+      m.custom_data?.clientesAdicionales,
+      m.customData?.empresasVinculadas,
+      m.customData?.clientesAdicionales,
+      m.customData?.empresas_vinculadas
+    ];
+    sources.forEach(src => {
+      if (Array.isArray(src)) {
+        rawLinked.push(...src);
+      } else if (typeof src === 'string' && src.trim()) {
+        rawLinked.push(...src.split(',').map(s => s.trim()));
+      }
+    });
+    const linked = rawLinked.map(x => String(x).toLowerCase().trim());
+
+    if (linked.some(l => matchesAnyClientName(normTarget, l)) || (targetId && linked.includes(targetId)) || (targetRfc && linked.includes(targetRfc))) {
+      return { matches: true, isMultiempresa: true };
+    }
+    return { matches: false, isMultiempresa: false };
+  };
+
+  const effectiveMaquinariaDb = (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb) && maquinariaDb.length > 0)
+    ? maquinariaDb
+    : ((typeof window !== 'undefined' && Array.isArray(window.maquinariaDb) && window.maquinariaDb.length > 0)
+      ? window.maquinariaDb
+      : JSON.parse((typeof localStorage !== 'undefined' && localStorage.getItem('sapi_maquinaria_db')) || '[]'));
+  const effectiveClientesDb = (typeof clientesDb !== 'undefined' && Array.isArray(clientesDb) && clientesDb.length > 0)
+    ? clientesDb
+    : ((typeof window !== 'undefined' && Array.isArray(window.clientesDb) && window.clientesDb.length > 0)
+      ? window.clientesDb
+      : JSON.parse((typeof localStorage !== 'undefined' && localStorage.getItem('sapi_clientes_db')) || '[]'));
+
+  const addedKeys = new Set();
+
   // 1. Agregar de maquinariaDb (SAP/Supabase)
-  const maqClient = maquinariaDb.filter(m => m.cliente === nombre || (clienteOb?.id && m.cliente === clienteOb.id) || (clienteOb?.rfc && m.cliente === clienteOb.rfc));
-  maqClient.forEach(m => {
-      allClientMachines.push({
+  effectiveMaquinariaDb.forEach(m => {
+    const { matches, isMultiempresa } = isMatchingClient(m, m.cliente);
+    if (matches) {
+      const key = String(m.idInterno || m.id || m.serie || '').toLowerCase().trim();
+      if (key && !addedKeys.has(key)) {
+        addedKeys.add(key);
+        allClientMachines.push({
           idInterno: m.idInterno || m.id || m.serie || 'N/A',
           uniqueId: m.id || m.idInterno,
           marca: m.marca || '',
@@ -700,25 +762,37 @@ function verDetalleCliente(nombre) {
           serie: m.serie || 'N/A',
           anio: m.anio || 'N/A',
           venta: m.venta || m.customData?.venta || '',
-          ubicacion: m.ubicacion || m.customData?.ubicacion || m.cliente || 'N/A'
-      });
+          ubicacion: m.ubicacion || m.customData?.ubicacion || m.cliente || 'N/A',
+          isMultiempresa,
+          clienteTitular: m.cliente || nombre
+        });
+      }
+    }
   });
 
   // 2. Combinar con máquinas manuales (clientesDb)
-  (clienteOb?.maquinas || []).forEach(m => {
-      const isDuplicate = maqClient.some(sap => sap.id === m.idInterno || sap.serie === m.serie || sap.idInterno === m.idInterno);
-      if (!isDuplicate) {
+  effectiveClientesDb.forEach(c => {
+    (c.maquinas || []).forEach(m => {
+      const { matches, isMultiempresa } = isMatchingClient(m, c.nombre);
+      if (matches) {
+        const key = String(m.idInterno || m.id || m.serie || '').toLowerCase().trim();
+        if (key && !addedKeys.has(key)) {
+          addedKeys.add(key);
           allClientMachines.push({
-              idInterno: m.idInterno || 'N/A',
-              uniqueId: m.idInterno,
-              marca: m.marca || '',
-              modelo: m.modelo || m.descripcion || 'Sin Modelo',
-              serie: m.serie || 'N/A',
-              anio: m.anio || 'N/A',
-              venta: m.venta || m.customData?.venta || '',
-              ubicacion: m.ubicacion || m.customData?.ubicacion || nombre || 'N/A'
+            idInterno: m.idInterno || 'N/A',
+            uniqueId: m.idInterno,
+            marca: m.marca || '',
+            modelo: m.modelo || m.descripcion || 'Sin Modelo',
+            serie: m.serie || 'N/A',
+            anio: m.anio || 'N/A',
+            venta: m.venta || m.customData?.venta || '',
+            ubicacion: m.ubicacion || m.customData?.ubicacion || c.nombre || 'N/A',
+            isMultiempresa: isMultiempresa || (String(c.nombre).toLowerCase().trim() !== normTarget),
+            clienteTitular: c.nombre
           });
+        }
       }
+    });
   });
 
   if (allClientMachines.length > 0) {
@@ -784,8 +858,9 @@ function verDetalleCliente(nombre) {
                 ${logoPath ? `<img src="${logoPath}" alt="${m.marca}" onerror="this.onerror=null; this.outerHTML='<span>${m.marca} </span>';" style="height:24px; object-fit:contain; margin-right:8px;"/>` : `${m.marca || ''} `}
                 ${m.modelo || 'Sin Modelo'}
                 <span style="font-size:0.75rem; background:var(--bg-body); padding:0.15rem 0.4rem; border-radius:4px; border:1px solid var(--border); margin-left:0.5rem; color:var(--text-muted); font-family:monospace; font-weight:normal;">ID: ${m.idInterno || 'N/A'}</span>
+                ${m.isMultiempresa ? `<span style="font-size:0.7rem; background:rgba(234,88,12,0.1); color:#ea580c; border:1px solid rgba(234,88,12,0.3); padding:0.15rem 0.45rem; border-radius:4px; margin-left:0.5rem; display:inline-flex; align-items:center; gap:3px;"><i data-lucide="building" style="width:11px;height:11px;"></i> Multiempresa (${m.clienteTitular})</span>` : ''}
                 <div style="margin-left:auto; display:flex; gap:0.25rem;">
-                  <button class="action-btn" onclick="event.stopPropagation(); editarMaquina('${nombre.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Editar Máquina" style="padding:0.25rem; width:auto; height:auto;">
+                  <button class="action-btn" onclick="event.stopPropagation(); editarMaquina('${(m.clienteTitular || nombre).replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Editar Máquina" style="padding:0.25rem; width:auto; height:auto;">
                     <i data-lucide="edit-2" style="width:16px;height:16px;"></i>
                   </button>
                   <button class="action-btn" onclick="event.stopPropagation(); abrirModalMoverMaquina('${nombre.replace(/'/g, "\\'")}', '${m.uniqueId || m.idInterno}')" title="Cambiar Sitio" style="padding:0.25rem; width:auto; height:auto;">
@@ -2034,14 +2109,33 @@ function toggleMultiempresaSection() {
       if (!maquina) {
         maquina = maquinariaDb.find(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
       }
-      if (maquina && maquina.customData) {
-        linked = maquina.customData.empresasVinculadas || maquina.customData.clientesAdicionales || [];
-        if (!Array.isArray(linked)) linked = [];
+      if (maquina) {
+        let rawLinked = [];
+        const sources = [
+          maquina.empresas_vinculadas,
+          maquina.empresasVinculadas,
+          maquina.clientes_adicionales,
+          maquina.clientesAdicionales,
+          maquina.custom_data?.empresasVinculadas,
+          maquina.custom_data?.clientesAdicionales,
+          maquina.customData?.empresasVinculadas,
+          maquina.customData?.clientesAdicionales,
+          maquina.customData?.empresas_vinculadas
+        ];
+        sources.forEach(src => {
+          if (Array.isArray(src)) {
+            rawLinked.push(...src);
+          } else if (typeof src === 'string' && src.trim()) {
+            rawLinked.push(...src.split(',').map(s => s.trim()));
+          }
+        });
+        linked = rawLinked.map(x => String(x).toLowerCase().trim());
       }
     }
     
     otherClients.forEach(nombre => {
-      const isChecked = linked.includes(nombre);
+      const normN = String(nombre).toLowerCase().trim();
+      const isChecked = linked.includes(normN);
       const item = document.createElement('label');
       item.style.display = 'flex';
       item.style.alignItems = 'center';
@@ -2329,12 +2423,48 @@ function guardarNuevaMaquina(e) {
   const clienteSeleccionado = document.getElementById('am-cliente').value;
   
   // Read multiempresa checkboxes
-  const linkedCompanies = [];
+  let linkedCompanies = [];
+  const multiSection = document.getElementById('am-multiempresa-section');
   const multiempresaList = document.getElementById('am-multiempresa-list');
-  if (multiempresaList) {
+  const multiHasCheckboxes = multiempresaList && multiempresaList.querySelectorAll('input[type="checkbox"]').length > 0;
+
+  if (multiSection && multiSection.style.display !== 'none' && multiHasCheckboxes) {
     const checkboxes = multiempresaList.querySelectorAll('input[type="checkbox"]:checked');
     checkboxes.forEach(cb => linkedCompanies.push(cb.value));
+  } else if (editandoMaquinaId) {
+    let maquinaExistente = null;
+    if (editandoMaquinaCliente) {
+      const cObj = clientesDb.find(c => c.nombre === editandoMaquinaCliente);
+      maquinaExistente = cObj?.maquinas?.find(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
+    }
+    if (!maquinaExistente) {
+      maquinaExistente = maquinariaDb.find(m => m.idInterno === editandoMaquinaId || m.id === editandoMaquinaId || m.serie === editandoMaquinaId);
+    }
+    if (maquinaExistente) {
+      let rawLinked = [];
+      const sources = [
+        maquinaExistente.empresas_vinculadas,
+        maquinaExistente.empresasVinculadas,
+        maquinaExistente.clientes_adicionales,
+        maquinaExistente.clientesAdicionales,
+        maquinaExistente.custom_data?.empresasVinculadas,
+        maquinaExistente.custom_data?.clientesAdicionales,
+        maquinaExistente.customData?.empresasVinculadas,
+        maquinaExistente.customData?.clientesAdicionales,
+        maquinaExistente.customData?.empresas_vinculadas
+      ];
+      sources.forEach(src => {
+        if (Array.isArray(src)) {
+          rawLinked.push(...src);
+        } else if (typeof src === 'string' && src.trim()) {
+          rawLinked.push(...src.split(',').map(s => s.trim()));
+        }
+      });
+      linkedCompanies = [...new Set(rawLinked)];
+    }
   }
+  // SIEMPRE descartar al cliente principal seleccionado para evitar que una máquina se vincule a sí misma
+  linkedCompanies = linkedCompanies.filter(c => c && String(c).trim().toLowerCase() !== String(clienteSeleccionado || '').trim().toLowerCase());
 
   const selectMarca = document.getElementById('am-marca-select');
   const inputOtraMarca = document.getElementById('am-marca-otra');
@@ -2464,6 +2594,11 @@ function guardarNuevaMaquina(e) {
         maquinariaDb[maqDbIdx].latitud = latitud;
         maquinariaDb[maqDbIdx].longitud = longitud;
 
+        maquinariaDb[maqDbIdx].empresas_vinculadas = linkedCompanies;
+        maquinariaDb[maqDbIdx].empresasVinculadas = linkedCompanies;
+        maquinariaDb[maqDbIdx].clientes_adicionales = linkedCompanies;
+        maquinariaDb[maqDbIdx].clientesAdicionales = linkedCompanies;
+
         if (!maquinariaDb[maqDbIdx].customData) maquinariaDb[maqDbIdx].customData = {};
         maquinariaDb[maqDbIdx].customData.tipo = tipo;
         maquinariaDb[maqDbIdx].customData.numeroEconomico = numeroEconomico;
@@ -2474,12 +2609,14 @@ function guardarNuevaMaquina(e) {
         maquinariaDb[maqDbIdx].customData.longitud = longitud;
         maquinariaDb[maqDbIdx].customData.empresasVinculadas = linkedCompanies;
         maquinariaDb[maqDbIdx].customData.clientesAdicionales = linkedCompanies;
+        maquinariaDb[maqDbIdx].customData.empresas_vinculadas = linkedCompanies;
         
         if (transferEvent) {
           if (!maquinariaDb[maqDbIdx].customData.bitacora) maquinariaDb[maqDbIdx].customData.bitacora = [];
           maquinariaDb[maqDbIdx].customData.bitacora.unshift(transferEvent);
         }
 
+        if (typeof window !== 'undefined') window.maquinariaDb = maquinariaDb;
         localStorage.setItem('sapi_maquinaria_db', JSON.stringify(maquinariaDb));
         if (window.pushToSupabase) window.pushToSupabase('maquinaria', maquinariaDb[maqDbIdx]);
     } else {
@@ -2495,10 +2632,15 @@ function guardarNuevaMaquina(e) {
                if (window.pushToSupabase) window.pushToSupabase('clientes', clienteAntiguo);
             }
           }
+          maquinaDatos.empresas_vinculadas = linkedCompanies;
+          maquinaDatos.empresasVinculadas = linkedCompanies;
+          maquinaDatos.clientes_adicionales = linkedCompanies;
+          maquinaDatos.clientesAdicionales = linkedCompanies;
           maquinaDatos.customData = {
             ...(maquinaDatos.customData || {}),
             empresasVinculadas: linkedCompanies,
-            clientesAdicionales: linkedCompanies
+            clientesAdicionales: linkedCompanies,
+            empresas_vinculadas: linkedCompanies
           };
           
           if (transferEvent) {
@@ -2515,10 +2657,15 @@ function guardarNuevaMaquina(e) {
               ...clienteObj.maquinas[maquinaIdx],
               idInterno: finalIdInterno,
               marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, sitio_id: sitioId, latitud, longitud, tipo,
+              empresas_vinculadas: linkedCompanies,
+              empresasVinculadas: linkedCompanies,
+              clientes_adicionales: linkedCompanies,
+              clientesAdicionales: linkedCompanies,
               customData: {
                 ...(clienteObj.maquinas[maquinaIdx].customData || {}),
                 empresasVinculadas: linkedCompanies,
-                clientesAdicionales: linkedCompanies
+                clientesAdicionales: linkedCompanies,
+                empresas_vinculadas: linkedCompanies
               }
             };
             if (window.pushToSupabase) window.pushToSupabase('maquinaria', { ...clienteObj.maquinas[maquinaIdx], cliente: clienteObj.id });
@@ -2538,12 +2685,17 @@ function guardarNuevaMaquina(e) {
     const idInterno = generarIdInternoMaquina(marca, venta || anio);
     const nuevaMaq = {
       idInterno, marca, modelo, serie, numeroEconomico, numeroMotor, anio, venta, ubicacion, sitio_id: sitioId, latitud, longitud, tipo,
-      customData: { empresasVinculadas: linkedCompanies, clientesAdicionales: linkedCompanies }
+      empresas_vinculadas: linkedCompanies,
+      empresasVinculadas: linkedCompanies,
+      clientes_adicionales: linkedCompanies,
+      clientesAdicionales: linkedCompanies,
+      customData: { empresasVinculadas: linkedCompanies, clientesAdicionales: linkedCompanies, empresas_vinculadas: linkedCompanies }
     };
     clienteObj.maquinas.push(nuevaMaq);
     if (window.pushToSupabase) window.pushToSupabase('maquinaria', { ...nuevaMaq, cliente: clienteObj.id });
   }
   
+  if (typeof window !== 'undefined') window.clientesDb = clientesDb;
   localStorage.setItem('sapi_clientes_db', JSON.stringify(clientesDb));
   if (window.pushToSupabase) window.pushToSupabase('clientes', clienteObj);
   
@@ -2554,8 +2706,12 @@ function guardarNuevaMaquina(e) {
   if (document.getElementById('view-maquinaria').classList.contains('active')) {
     renderMaquinaria();
   }
-  if (document.getElementById('modal-detalle-cliente').classList.contains('open')) {
-    verDetalleCliente(clienteSeleccionado);
+  if (document.getElementById('modal-detalle-cliente')?.classList.contains('open')) {
+    if (typeof currentViewClientName !== 'undefined' && currentViewClientName) {
+      verDetalleCliente(currentViewClientName);
+    } else {
+      verDetalleCliente(clienteSeleccionado);
+    }
   }
   
   // Actualizar dropdowns si estamos en medio de crear un ticket o servicio
@@ -2563,17 +2719,17 @@ function guardarNuevaMaquina(e) {
   const mFullName = MARCAS_RENDER[(marca || '').toUpperCase()] || marca || '';
   const mName = `${mFullName} ${modelo || ''} (SN: ${serie || ''})`.trim();
   if (document.getElementById('modal-ticket')?.classList.contains('open')) {
-    const tCli = document.getElementById('t-cliente').value;
-    if (tCli === clienteSeleccionado) {
+    const tCli = document.getElementById('t-cliente')?.value;
+    if (tCli === clienteSeleccionado || linkedCompanies.some(lc => String(lc).trim().toLowerCase() === String(tCli || '').trim().toLowerCase())) {
       poblarMaquinasCliente('t-equipo', '', tCli);
-      if (window.agregarMaquinaChip) {
+      if (window.agregarMaquinaChip && tCli === clienteSeleccionado) {
         window.agregarMaquinaChip(mName);
       }
     }
   }
   if (document.getElementById('view-servicios')?.classList.contains('active')) {
-    const fCli = document.getElementById('f-cliente').value;
-    if (fCli === clienteSeleccionado) {
+    const fCli = document.getElementById('f-cliente')?.value;
+    if (fCli === clienteSeleccionado || linkedCompanies.some(lc => String(lc).trim().toLowerCase() === String(fCli || '').trim().toLowerCase())) {
       poblarMaquinasCliente('f-equipo', mName, fCli);
       if (typeof onEquipoOrdenChange === 'function') onEquipoOrdenChange();
     }

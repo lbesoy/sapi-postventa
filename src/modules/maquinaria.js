@@ -353,8 +353,9 @@ function renderMaquinaria() {
         <div style="font-weight:500;">${m.cliente}</div>
         ${m.ubicacion !== 'N/A' ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">${m.ubicacion}</div>` : ''}
         ${m.customData && (m.customData.empresasVinculadas || m.customData.clientesAdicionales) ? (() => {
-          const linked = m.customData.empresasVinculadas || m.customData.clientesAdicionales || [];
-          if (Array.isArray(linked) && linked.length > 0) {
+          const rawLinked = m.customData.empresasVinculadas || m.customData.clientesAdicionales || [];
+          const linked = (Array.isArray(rawLinked) ? rawLinked : []).filter(c => c && String(c).trim().toLowerCase() !== String(m.cliente || '').trim().toLowerCase());
+          if (linked.length > 0) {
             return `<div style="font-size:0.7rem; color:var(--accent); margin-top:0.2rem; font-weight:500; display:flex; align-items:center; gap:3px;"><i data-lucide="building" style="width:11px;height:11px;flex-shrink:0;"></i>Multi: ${linked.join(', ')}</div>`;
           }
           return '';

@@ -7417,7 +7417,7 @@
           <button type="button" id="btn-toggle-manual-kits" class="btn-secondary" onclick="window.toggleManualMachotes()" style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.8rem; padding:0.4rem 0.75rem; border-radius:6px; cursor:pointer;" title="Ver guía rápida de cómo agregar y gestionar machotes">
             <i data-lucide="book-open" style="width:13px; height:13px;"></i> Mini Manual
           </button>
-          <button type="button" class="btn-secondary" onclick="window.restablecerKitsOficiales()" style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.8rem; padding:0.4rem 0.75rem; border-radius:6px; cursor:pointer;" title="Restaura los machotes estándar oficiales de fábrica para la flota Eurorep">
+          <button type="button" id="btn-restablecer-kits-oficiales" class="btn-secondary" onclick="window.restablecerKitsOficiales()" style="display:none; align-items:center; gap:0.4rem; font-size:0.8rem; padding:0.4rem 0.75rem; border-radius:6px; cursor:pointer;" title="Restaura los machotes estándar oficiales de fábrica para la flota Eurorep (Solo Superadmin)">
             <i data-lucide="rotate-ccw" style="width:13px; height:13px;"></i> Restablecer Oficiales
           </button>
           <button type="button" class="btn-secondary" onclick="window.exportarKitsAExcel()" style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.8rem; padding:0.4rem 0.75rem; background:#10b981; color:#fff; border-color:#10b981; border-radius:6px; font-weight:600; cursor:pointer;" title="Exportar catálogo completo de machotes a Excel (.xlsx)">
@@ -10600,7 +10600,7 @@
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=329",
+        "supabaseSync.js?v=330",
         "store.js?v=1",
         "utils.js?v=9",
         "sap_sync.js?v=1",
@@ -10614,10 +10614,10 @@
         "ordenes_bitacora.js?v=1",
         "servicios_programados.js?v=1",
         "tickets_listado.js?v=1",
-        "tickets_form.js?v=1",
+        "tickets_form.js?v=435",
         "tickets_detalle.js?v=1",
-        "app_migrations.js?v=1",
-        "app.js?v=434",
+        "app_migrations.js?v=435",
+        "app.js?v=435",
         "dashboard.js?v=1",
         "usuarios.js?v=1",
         "refacciones_orden.js?v=1",
@@ -10629,8 +10629,8 @@
         "ideas_fallas.js?v=1",
         "preferencias.js?v=1",
         "sitios_clientes.js?v=1",
-        "clientes.js?v=1",
-        "maquinaria.js?v=1",
+        "clientes.js?v=435",
+        "maquinaria.js?v=435",
         "calendario.js?v=1",
         "soporte.js?v=1",
         "kits.js?v=1",

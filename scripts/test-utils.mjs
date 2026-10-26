@@ -2749,7 +2749,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 const swPath = path.resolve('sw.js');
 const swContent = fs.readFileSync(swPath, 'utf8');
-assert.ok(/const CACHE_NAME = 'eurorep-postventa-v(417|418|419)';/.test(swContent), 'sw.js debe declarar versión válida de caché');
+assert.ok(/const CACHE_NAME = 'eurorep-postventa-v(417|418|419|420|421|422)';/.test(swContent), 'sw.js debe declarar versión válida de caché');
 
 console.log('  ✅ Arquitectura Offline-First y Background Sync: OK');
 

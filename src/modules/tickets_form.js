@@ -762,9 +762,28 @@ function poblarMaquinasCliente(selectId, selectedValue = '', clienteNombre = nul
   select.innerHTML = '<option value="">Seleccione una máquina registrada...</option><option value="Otra / No registrada">Otra / Captura manual</option>';
   
   if (clienteNombre && clienteNombre !== 'Ninguno / Uso Interno' && clienteNombre !== 'Ninguno') {
-    const allClients = (typeof clientesDb !== 'undefined' && Array.isArray(clientesDb)) ? clientesDb : (typeof window !== 'undefined' && Array.isArray(window.clientesDb) ? window.clientesDb : []);
-    const c = allClients.find(x => x && (x.nombre === clienteNombre || x.id === clienteNombre || x.idInterno === clienteNombre || x.rfc === clienteNombre));
-    const allMaqs = (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb)) ? maquinariaDb : (typeof window !== 'undefined' && Array.isArray(window.maquinariaDb) ? window.maquinariaDb : []);
+    const allClients = (typeof clientesDb !== 'undefined' && Array.isArray(clientesDb) && clientesDb.length > 0)
+      ? clientesDb
+      : ((typeof window !== 'undefined' && Array.isArray(window.clientesDb) && window.clientesDb.length > 0)
+        ? window.clientesDb
+        : JSON.parse((typeof localStorage !== 'undefined' && localStorage.getItem('sapi_clientes_db')) || '[]'));
+    const cleanClienteNombre = String(clienteNombre || '').toLowerCase().trim();
+    const c = allClients.find(x => {
+      if (!x) return false;
+      const xNom = String(x.nombre || '').toLowerCase().trim();
+      return (
+        xNom === cleanClienteNombre ||
+        (cleanClienteNombre.length > 5 && xNom.length > 5 && (xNom.includes(cleanClienteNombre) || cleanClienteNombre.includes(xNom))) ||
+        String(x.id || '').toLowerCase().trim() === cleanClienteNombre ||
+        String(x.idInterno || '').toLowerCase().trim() === cleanClienteNombre ||
+        String(x.rfc || '').toLowerCase().trim() === cleanClienteNombre
+      );
+    });
+    const allMaqs = (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb) && maquinariaDb.length > 0)
+      ? maquinariaDb
+      : ((typeof window !== 'undefined' && Array.isArray(window.maquinariaDb) && window.maquinariaDb.length > 0)
+        ? window.maquinariaDb
+        : JSON.parse((typeof localStorage !== 'undefined' && localStorage.getItem('sapi_maquinaria_db')) || '[]'));
     
     const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
     
@@ -798,38 +817,71 @@ function poblarMaquinasCliente(selectId, selectedValue = '', clienteNombre = nul
       select.appendChild(opt);
     };
 
-    // 1. Máquinas de c.maquinas (manuales)
-    if (c && Array.isArray(c.maquinas)) {
-      c.maquinas.forEach(addOption);
-    }
+    const normName = cleanClienteNombre;
+    const cId = c?.id ? String(c.id).toLowerCase().trim() : null;
+    const cRfc = c?.rfc ? String(c.rfc).toLowerCase().trim() : null;
+    const cNombre = c?.nombre ? String(c.nombre).toLowerCase().trim() : null;
 
-    // 2. Máquinas de maquinariaDb (SAP / catálogo central)
-    const normName = String(clienteNombre).toLowerCase().trim();
-    const cId = c?.id?.toLowerCase().trim();
-    const cRfc = c?.rfc?.toLowerCase().trim();
+    const matchesAnyClientName = (target, candidate) => {
+      if (!target || !candidate) return false;
+      const t = String(target).toLowerCase().trim();
+      const cand = String(candidate).toLowerCase().trim();
+      if (t === cand) return true;
+      if (t.length > 5 && cand.length > 5 && (t.includes(cand) || cand.includes(t))) return true;
+      return false;
+    };
 
-    allMaqs.forEach(m => {
-      if (!m) return;
-      const mCli = String(m.cliente || '').toLowerCase().trim();
-      const linked = [
-        ...(Array.isArray(m.empresas_vinculadas) ? m.empresas_vinculadas : []),
-        ...(Array.isArray(m.empresasVinculadas) ? m.empresasVinculadas : []),
-        ...(Array.isArray(m.clientes_adicionales) ? m.clientes_adicionales : []),
-        ...(Array.isArray(m.clientesAdicionales) ? m.clientesAdicionales : []),
-        ...(Array.isArray(m.custom_data?.empresasVinculadas) ? m.custom_data.empresasVinculadas : []),
-        ...(Array.isArray(m.customData?.empresasVinculadas) ? m.customData.empresasVinculadas : [])
-      ].map(x => String(x).toLowerCase().trim());
+    const isMatchMachine = (m, ownerName = '') => {
+      if (!m) return false;
+      const mCli = String(m.cliente || ownerName || '').toLowerCase().trim();
+      let rawLinked = [];
+      const sources = [
+        m.empresas_vinculadas,
+        m.empresasVinculadas,
+        m.clientes_adicionales,
+        m.clientesAdicionales,
+        m.custom_data?.empresasVinculadas,
+        m.custom_data?.clientesAdicionales,
+        m.customData?.empresasVinculadas,
+        m.customData?.clientesAdicionales,
+        m.customData?.empresas_vinculadas
+      ];
+      sources.forEach(src => {
+        if (Array.isArray(src)) {
+          rawLinked.push(...src);
+        } else if (typeof src === 'string' && src.trim()) {
+          rawLinked.push(...src.split(',').map(s => s.trim()));
+        }
+      });
+      const linked = rawLinked.map(x => String(x).toLowerCase().trim());
 
-      const isMatch = mCli === normName ||
+      return (
+        (normName && matchesAnyClientName(normName, mCli)) ||
         (cId && mCli === cId) ||
         (cRfc && mCli === cRfc) ||
-        (c && c.nombre && mCli === c.nombre.toLowerCase().trim()) ||
-        linked.includes(normName) ||
+        (cNombre && matchesAnyClientName(cNombre, mCli)) ||
+        (normName && linked.some(l => matchesAnyClientName(normName, l))) ||
         (cId && linked.includes(cId)) ||
-        (c && c.nombre && linked.includes(c.nombre.toLowerCase().trim()));
+        (cRfc && linked.includes(cRfc)) ||
+        (cNombre && linked.some(l => matchesAnyClientName(cNombre, l)))
+      );
+    };
 
-      if (isMatch) {
+    // 1. Máquinas de maquinariaDb (SAP / catálogo central)
+    allMaqs.forEach(m => {
+      if (isMatchMachine(m, m.cliente)) {
         addOption(m);
+      }
+    });
+
+    // 2. Máquinas de clientesDb (manuales, de todos los clientes buscando titular o empresas vinculadas)
+    allClients.forEach(clientInDb => {
+      if (Array.isArray(clientInDb?.maquinas)) {
+        clientInDb.maquinas.forEach(m => {
+          if (isMatchMachine(m, clientInDb.nombre)) {
+            addOption(m);
+          }
+        });
       }
     });
   }

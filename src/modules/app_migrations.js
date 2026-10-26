@@ -639,6 +639,141 @@ function autoCorregirUuidsSoporteEnOrdenes() {
   }
 }
 
+function autoCorregirMultiempresaMaquinaria() {
+  try {
+    const rawMaqs = safeGetJSON('sapi_maquinaria_db', (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb)) ? maquinariaDb : []);
+    let modifiedMaqs = false;
+
+    const normalizeMachineMultiempresa = (m, defaultOwner = '') => {
+      if (!m) return false;
+      const owner = String(m.cliente || defaultOwner || '').trim().toLowerCase();
+      let rawLinked = [];
+      const sources = [
+        m.empresas_vinculadas,
+        m.empresasVinculadas,
+        m.clientes_adicionales,
+        m.clientesAdicionales,
+        m.custom_data?.empresasVinculadas,
+        m.custom_data?.clientesAdicionales,
+        m.customData?.empresasVinculadas,
+        m.customData?.clientesAdicionales,
+        m.customData?.empresas_vinculadas
+      ];
+      sources.forEach(src => {
+        if (Array.isArray(src)) rawLinked.push(...src);
+        else if (typeof src === 'string' && src.trim()) rawLinked.push(...src.split(',').map(s => s.trim()));
+      });
+      let cleanLinked = [...new Set(rawLinked.map(s => String(s).trim()).filter(Boolean))].filter(c => c.toLowerCase() !== owner);
+
+      // Garantizar que la máquina RU26085 / RM120X-01.271 tenga siempre vinculada a RUBBLE MASTER HMH GMB
+      const mId = String(m.idInterno || m.id || '').toUpperCase().trim();
+      const mSerie = String(m.serie || '').toUpperCase().trim();
+      if (mId === 'RU26085' || mSerie.includes('01.271')) {
+        const hasRubble = cleanLinked.some(c => c.toUpperCase().includes('RUBBLE MASTER'));
+        if (!hasRubble) {
+          cleanLinked.push('RUBBLE MASTER HMH GMB');
+        }
+      }
+
+      const currentRoot = Array.isArray(m.empresas_vinculadas) ? m.empresas_vinculadas : [];
+      if (cleanLinked.length > 0 || currentRoot.length > 0) {
+        if (JSON.stringify(currentRoot) !== JSON.stringify(cleanLinked)) {
+          m.empresas_vinculadas = cleanLinked;
+          m.empresasVinculadas = cleanLinked;
+          m.clientes_adicionales = cleanLinked;
+          m.clientesAdicionales = cleanLinked;
+          if (!m.customData) m.customData = {};
+          m.customData.empresasVinculadas = cleanLinked;
+          m.customData.clientesAdicionales = cleanLinked;
+          m.customData.empresas_vinculadas = cleanLinked;
+          return true;
+        }
+      }
+      return false;
+    };
+
+    if (Array.isArray(rawMaqs) && rawMaqs.length > 0) {
+      rawMaqs.forEach(m => {
+        if (normalizeMachineMultiempresa(m, m.cliente)) modifiedMaqs = true;
+      });
+
+      if (modifiedMaqs) {
+        safeSetJSON('sapi_maquinaria_db', rawMaqs);
+        if (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb)) {
+          maquinariaDb.splice(0, maquinariaDb.length, ...rawMaqs);
+        }
+        if (typeof window !== 'undefined' && Array.isArray(window.maquinariaDb)) {
+          window.maquinariaDb = rawMaqs;
+        }
+        console.log('[Auto-Repair] Se auto-repararon vinculaciones multiempresa en catálogo de maquinaria.');
+      }
+    }
+
+    // Normalizar también en clientesDb (máquinas manuales por cliente)
+    const rawClients = safeGetJSON('sapi_clientes_db', (typeof clientesDb !== 'undefined' && Array.isArray(clientesDb)) ? clientesDb : []);
+    let modifiedClients = false;
+    let foundRU26085 = false;
+
+    if (Array.isArray(rawClients) && rawClients.length > 0) {
+      rawClients.forEach(c => {
+        if (Array.isArray(c?.maquinas)) {
+          c.maquinas.forEach(m => {
+            const mId = String(m.idInterno || m.id || '').toUpperCase().trim();
+            const mSerie = String(m.serie || '').toUpperCase().trim();
+            if (mId === 'RU26085' || mSerie.includes('01.271')) foundRU26085 = true;
+            if (normalizeMachineMultiempresa(m, c.nombre)) modifiedClients = true;
+          });
+        }
+      });
+
+      // Si RU26085 no está en clientesDb ni en maquinariaDb, registrarla en el cliente Holcim
+      if (!foundRU26085 && !rawMaqs.some(m => String(m.idInterno || m.id || '').toUpperCase().trim() === 'RU26085' || String(m.serie || '').toUpperCase().trim().includes('01.271'))) {
+        const holcim = rawClients.find(c => String(c.nombre || '').toUpperCase().includes('HOLCIM'));
+        if (holcim) {
+          if (!Array.isArray(holcim.maquinas)) holcim.maquinas = [];
+          const nuevaRU = {
+            idInterno: 'RU26085',
+            id: 'RU26085',
+            marca: 'Rubble Master',
+            modelo: 'RM120X',
+            serie: 'RM120X-01.271',
+            anio: '2026',
+            tipo: 'Trituración',
+            ubicacion: 'Emiliano Zapata',
+            cliente: holcim.nombre,
+            empresas_vinculadas: ['RUBBLE MASTER HMH GMB'],
+            empresasVinculadas: ['RUBBLE MASTER HMH GMB'],
+            clientes_adicionales: ['RUBBLE MASTER HMH GMB'],
+            clientesAdicionales: ['RUBBLE MASTER HMH GMB'],
+            customData: {
+              tipo: 'Trituración',
+              empresasVinculadas: ['RUBBLE MASTER HMH GMB'],
+              clientesAdicionales: ['RUBBLE MASTER HMH GMB'],
+              empresas_vinculadas: ['RUBBLE MASTER HMH GMB']
+            }
+          };
+          holcim.maquinas.push(nuevaRU);
+          modifiedClients = true;
+          console.log('[Auto-Repair] Registrada máquina RU26085 en cliente Holcim con multiempresa Rubble Master.');
+        }
+      }
+
+      if (modifiedClients) {
+        safeSetJSON('sapi_clientes_db', rawClients);
+        if (typeof clientesDb !== 'undefined' && Array.isArray(clientesDb)) {
+          clientesDb.splice(0, clientesDb.length, ...rawClients);
+        }
+        if (typeof window !== 'undefined' && Array.isArray(window.clientesDb)) {
+          window.clientesDb = rawClients;
+        }
+        console.log('[Auto-Repair] Se auto-repararon vinculaciones multiempresa en clientesDb.');
+      }
+    }
+  } catch (e) {
+    console.warn('[Auto-Repair] Error en autoCorregirMultiempresaMaquinaria:', e);
+  }
+}
+
 // Interoperabilidad con window
 if (typeof window !== 'undefined') {
   window.generarTicketsRefaccionesFaltantes = generarTicketsRefaccionesFaltantes;
@@ -648,6 +783,7 @@ if (typeof window !== 'undefined') {
   window.reintentarSincronizacionGastosLocales = reintentarSincronizacionGastosLocales;
   window.repararCreadoresTicketsFaltantes = repararCreadoresTicketsFaltantes;
   window.autoCorregirUuidsSoporteEnOrdenes = autoCorregirUuidsSoporteEnOrdenes;
+  window.autoCorregirMultiempresaMaquinaria = autoCorregirMultiempresaMaquinaria;
 }
 
 export {
@@ -657,5 +793,6 @@ export {
   recuperarMaquinariaDesdeTickets,
   reintentarSincronizacionGastosLocales,
   repararCreadoresTicketsFaltantes,
-  autoCorregirUuidsSoporteEnOrdenes
+  autoCorregirUuidsSoporteEnOrdenes,
+  autoCorregirMultiempresaMaquinaria
 };

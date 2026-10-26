@@ -739,7 +739,34 @@ function saveKitsServicio(kits) {
   }
 };
 
+function _esSuperadmin() {
+  const sess = (typeof currentSession !== 'undefined' && currentSession)
+    ? currentSession
+    : ((typeof window !== 'undefined' && window.currentSession)
+      ? window.currentSession
+      : (typeof localStorage !== 'undefined'
+        ? (() => { try { return JSON.parse(localStorage.getItem('eurorep_session') || 'null'); } catch(e) { return null; } })()
+        : null));
+
+  if (!sess) return false;
+  const viewMode = String(sess.viewMode || '').toLowerCase().trim();
+  const rol = String(sess.rol || '').toLowerCase().trim();
+  const realRol = String(sess.realRol || '').toLowerCase().trim();
+  const userId = String(sess.userId || '').toLowerCase().trim();
+
+  return viewMode === 'superadmin' || rol === 'superadmin' || realRol === 'superadmin' || userId === 'superadmin';
+}
+
 async function restablecerKitsOficiales() {
+  if (!_esSuperadmin()) {
+    if (typeof mostrarNotificacion === 'function') {
+      mostrarNotificacion('Acceso denegado: Solo los Superadministradores tienen permiso para restablecer los machotes oficiales de fábrica.', 'error');
+    } else {
+      alert('Acceso denegado: Solo los Superadministradores tienen permiso para restablecer los machotes oficiales de fábrica.');
+    }
+    return;
+  }
+
   const isTest = typeof isTestModeActive === 'function' && isTestModeActive();
   const targetName = isTest ? 'el Sandbox de Pruebas' : 'Produccion Oficial (Supabase)';
 
@@ -880,6 +907,12 @@ function abrirModalKitsServicio(modeloPreseleccionado) {
   modal.style.display = 'flex';
   modal.classList.add('open');
   document.body.style.overflow = 'hidden';
+
+  // Control de visibilidad de botón Restablecer Oficiales (Solo Superadmin)
+  const btnRestablecer = document.getElementById('btn-restablecer-kits-oficiales');
+  if (btnRestablecer) {
+    btnRestablecer.style.display = _esSuperadmin() ? 'inline-flex' : 'none';
+  }
 
   window.filtrarKitsServicio();
 
@@ -1054,9 +1087,11 @@ function renderKitsServicioCards(kits) {
           <button type="button" class="btn-secondary" onclick="window.toggleManualMachotes(true)" style="font-size:0.82rem; padding:0.4rem 1rem; border-radius:6px; cursor:pointer;">
             <i data-lucide="book-open" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i> Ver Mini Manual
           </button>
+          ${_esSuperadmin() ? `
           <button type="button" class="btn-secondary" onclick="window.restablecerKitsOficiales()" style="font-size:0.82rem; padding:0.4rem 1rem; border-radius:6px; cursor:pointer;">
             <i data-lucide="rotate-ccw" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i> Restablecer Oficiales
           </button>
+          ` : ''}
         </div>
       </div>
     `;

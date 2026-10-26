@@ -784,6 +784,11 @@ async function procesarActualizacionSupabaseUI() {
       try { window.autoCorregirUuidsSoporteEnOrdenes(); } catch (eSop) { console.warn('[App] Error al auto-corregir soportes de órdenes:', eSop); }
     }
 
+    // Auto-corregir vinculaciones multiempresa en catálogo de maquinaria
+    if (typeof window.autoCorregirMultiempresaMaquinaria === 'function') {
+      try { window.autoCorregirMultiempresaMaquinaria(); } catch (eMaq) { console.warn('[App] Error al auto-corregir multiempresa:', eMaq); }
+    }
+
     // Ejecutar migraciones heredadas solo una vez por sesión y solo para administradores
     // Esto previene bucles infinitos de escritura y consultas redundantes en clientes no-admin
     const session = JSON.parse(localStorage.getItem('eurorep_session') || '{}');
