@@ -96,7 +96,7 @@ if (typeof window !== 'undefined' && !window.generarTicketsRefaccionesFaltantes)
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.341'; // Incrementar esta versión para obligar a todos los usuarios a descargar el nuevo código
+const APP_VERSION = 'v1.3.342'; // Incrementar esta versión para obligar a todos los usuarios a descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {
@@ -1369,12 +1369,22 @@ function entrarApp(user) {
 }
 
 function volverSeleccion() {
-  document.getElementById('login-step-crear').style.display = 'none';
-  document.getElementById('login-step-form').style.display = 'block';
-  document.getElementById('login-email').value = '';
-  document.getElementById('login-password').value = '';
-  document.getElementById('login-error').textContent = '';
+  const crear = document.getElementById('login-step-crear');
+  const recovery = document.getElementById('login-step-recovery');
+  const update = document.getElementById('login-step-update-password');
+  const form = document.getElementById('login-step-form');
+  if (crear) crear.style.display = 'none';
+  if (recovery) recovery.style.display = 'none';
+  if (update) update.style.display = 'none';
+  if (form) form.style.display = 'block';
+  const email = document.getElementById('login-email');
+  const pass = document.getElementById('login-password');
+  const err = document.getElementById('login-error');
+  if (email) email.value = '';
+  if (pass) pass.value = '';
+  if (err) err.textContent = '';
 }
+window.volverSeleccion = volverSeleccion;
 
 function cerrarSesion() {
   cerrarSesionModal();
@@ -1412,11 +1422,17 @@ function toggleSidebar() {
 }
 
 function loginCrearUsuario() {
-  document.getElementById('login-step-form').style.display = 'none';
-  document.getElementById('login-step-crear').style.display = 'block';
-  document.getElementById('lc-error').textContent = '';
-  lucide.createIcons();
+  const form = document.getElementById('login-step-form');
+  const crear = document.getElementById('login-step-crear');
+  const err = document.getElementById('lc-error');
+  if (form) form.style.display = 'none';
+  if (crear) crear.style.display = 'block';
+  if (err) err.textContent = '';
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    try { lucide.createIcons(); } catch (e) {}
+  }
 }
+window.loginCrearUsuario = loginCrearUsuario;
 
 async function confirmarCrearUsuario() {
   const nombre = document.getElementById('lc-nombre').value.trim();
@@ -1491,6 +1507,7 @@ async function confirmarCrearUsuario() {
     errEl.style.color = 'var(--red)';
   }
 }
+window.confirmarCrearUsuario = confirmarCrearUsuario;
 
 // ===== // Banderas globales
 let sidebarOpen = false;
@@ -3923,11 +3940,29 @@ function abrirRecuperarPassword(...args) {
   if (typeof window !== "undefined" && typeof window.abrirRecuperarPassword === "function" && window.abrirRecuperarPassword !== abrirRecuperarPassword) {
     return window.abrirRecuperarPassword(...args);
   }
+  var e = args[0];
+  if (e && e.preventDefault) e.preventDefault();
+  var f1 = document.getElementById('login-step-form');
+  if (f1) f1.style.display = 'none';
+  var f2 = document.getElementById('login-step-recovery');
+  if (f2) f2.style.display = 'block';
+  var recEmail = document.getElementById('recovery-email');
+  var logEmail = document.getElementById('login-email');
+  if (recEmail && logEmail) recEmail.value = logEmail.value || '';
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    try { lucide.createIcons(); } catch (errL) {}
+  }
 }
 function volverLoginDesdeRecovery(...args) {
   if (typeof window !== "undefined" && typeof window.volverLoginDesdeRecovery === "function" && window.volverLoginDesdeRecovery !== volverLoginDesdeRecovery) {
     return window.volverLoginDesdeRecovery(...args);
   }
+  var f1 = document.getElementById('login-step-recovery');
+  if (f1) f1.style.display = 'none';
+  var f2 = document.getElementById('login-step-form');
+  if (f2) f2.style.display = 'block';
+  var errEl = document.getElementById('recovery-error');
+  if (errEl) errEl.textContent = '';
 }
 function enviarRecoveryLink(...args) {
   if (typeof window !== "undefined" && typeof window.enviarRecoveryLink === "function" && window.enviarRecoveryLink !== enviarRecoveryLink) {

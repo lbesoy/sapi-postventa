@@ -1193,8 +1193,6 @@ function obtenerOrdenAsociadaTicket(t) {
 
   if (!allOrds || allOrds.length === 0) return null;
 
-  const allTkts = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets : [];
-
   // Helper para normalizar cadenas (sin espacios, sin guiones, mayúsculas)
   const norm = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   const getOrderFolio = (o) => String(o.folio || o.numero_orden || o.numeroOrden || o.noOrden || o.id || '').trim();
@@ -1203,6 +1201,18 @@ function obtenerOrdenAsociadaTicket(t) {
   const tFolio = String(t.folio || '').trim();
   const tFolioNorm = norm(tFolio);
   const tNumOnly = tFolio.replace(/\D/g, '');
+  const tCli = t.cliente ? String(t.cliente).trim() : '';
+
+  // Helper para verificar compatibilidad de cliente (evita vincular órdenes de otros clientes)
+  const clientesCompatibles = (c1, c2) => {
+    if (!c1 || !c2) return true;
+    const n1 = norm(c1);
+    const n2 = norm(c2);
+    if (!n1 || !n2) return true;
+    if (n1 === n2) return true;
+    if (n1.includes(n2) || n2.includes(n1)) return true;
+    return false;
+  };
 
   // Helper de verificación de conflicto: si la orden tiene soporte explícito hacia OTRO ticket diferente
   const ordenPerteneceAOtroTicket = (o) => {
@@ -1234,8 +1244,21 @@ function obtenerOrdenAsociadaTicket(t) {
     return true;
   };
 
-  // 2. Coincidencia directa por soporte en la orden (orden.soporte / orden.ticket_id / orden.ticket_folio apunta a este ticket)
-  // ESTA ES LA ASOCIACIÓN AUTORITATIVA MÁS FUERTE
+  // 1. Coincidencia directa por ordenId, orden_id, ordenFolio en el ticket (vínculo explícito más fuerte)
+  if (t.ordenId || t.orden_id) {
+    const targetId = String(t.ordenId || t.orden_id).trim();
+    const targetNorm = norm(targetId);
+    const found = allOrds.find(o => o && (o.id === targetId || o.folio === targetId || norm(getOrderFolio(o)) === targetNorm));
+    if (found && !ordenPerteneceAOtroTicket(found)) return found;
+  }
+  if (t.ordenFolio) {
+    const targetFolio = String(t.ordenFolio).trim();
+    const targetNorm = norm(targetFolio);
+    const found = allOrds.find(o => o && (norm(getOrderFolio(o)) === targetNorm || o.id === targetFolio));
+    if (found && !ordenPerteneceAOtroTicket(found)) return found;
+  }
+
+  // 2. Coincidencia directa por soporte en la orden (orden.soporte / orden.ticket_id / orden.ticket_folio)
   const foundBySoporte = allOrds.find(o => {
     if (!o) return false;
     // Por ticket_id
@@ -1248,41 +1271,29 @@ function obtenerOrdenAsociadaTicket(t) {
     const oSopNorm = norm(oSop);
     if (tId && (oSop === tId || oSopNorm === norm(tId))) return true;
     if (tFolio && (oSop === tFolio || oSopNorm === tFolioNorm)) return true;
-    // Soporte con número de ticket (ej. soporte 'TKT-26184' o '26184' para ticket 'TKT-26184')
-    if (tNumOnly && tFolioNorm.startsWith('TKT') && !tFolioNorm.includes('OS')) {
-      const sopNum = oSop.replace(/\D/g, '');
-      if (sopNum && sopNum === tNumOnly && (oSopNorm === ('TKT' + tNumOnly) || oSopNorm === tNumOnly)) {
-        return true;
-      }
-    }
     return false;
   });
-  if (foundBySoporte) return foundBySoporte;
-
-  // 3. Coincidencia por ordenId / orden_id / ordenFolio explícito en el ticket
-  if (t.ordenId || t.orden_id) {
-    const targetId = t.ordenId || t.orden_id;
-    const found = allOrds.find(o => o && (o.id === targetId || o.folio === targetId || norm(getOrderFolio(o)) === norm(targetId)));
-    if (found && !ordenPerteneceAOtroTicket(found)) return found;
-  }
-  if (t.ordenFolio) {
-    const found = allOrds.find(o => o && (norm(getOrderFolio(o)) === norm(t.ordenFolio) || getOrderFolio(o).includes(t.ordenFolio)));
-    if (found && !ordenPerteneceAOtroTicket(found)) return found;
+  if (foundBySoporte && clientesCompatibles(tCli, foundBySoporte.cliente)) {
+    return foundBySoporte;
   }
 
-  // 4. Subtickets de Refacciones (-A, TKT-OS-XXXXX-A, o derivado de ticket padre)
+  // 3. Subtickets de Refacciones (-A, TKT-OS-XXXXX-A, o subticket derivado de ticket padre)
   const esHijo = typeof esTicketHijoRefacciones === 'function' ? esTicketHijoRefacciones(t) : false;
-  if (esHijo || /-[Aa]$/i.test(tFolio) || tFolioNorm.includes('OS')) {
-    // A) Si el folio del ticket contiene explícitamente "OS-" (ej. TKT-OS-26112-A)
-    const osInFolio = tFolio.match(/(?:OS|ORD)[-_]?(\d{3,7})/i);
+  const tieneOsEnFolio = tFolioNorm.startsWith('TKTOS') || tFolioNorm.includes('OS');
+
+  if (esHijo || tieneOsEnFolio || /-[Aa]$/i.test(tFolio)) {
+    // A) Si el folio del ticket contiene explícitamente "OS-" (ej. TKT-OS-26112-A o OS-26112-A)
+    const osInFolio = tFolio.match(/(?:TKT[-_]?)?(OS[-_\s]?\d{3,7})/i);
     if (osInFolio && osInFolio[1]) {
-      const targetOsNum = osInFolio[1];
+      const targetOsNorm = norm(osInFolio[1]);
+      const targetOsNum = osInFolio[1].replace(/\D/g, '');
       const foundByOsInFolio = allOrds.find(o => {
         if (!o) return false;
         const oFol = getOrderFolio(o);
+        const oNorm = norm(oFol);
         const oNum = oFol.replace(/\D/g, '');
-        const isOs = norm(oFol).startsWith('OS') || norm(oFol).startsWith('ORD');
-        return isOs && oNum === targetOsNum;
+        const isOs = oNorm.startsWith('OS') || oNorm.startsWith('ORD');
+        return isOs && (oNorm === targetOsNorm || oNum === targetOsNum) && clientesCompatibles(tCli, o.cliente);
       });
       if (foundByOsInFolio) return foundByOsInFolio;
     }
@@ -1290,63 +1301,35 @@ function obtenerOrdenAsociadaTicket(t) {
     // B) Buscar si el ticket padre tiene una orden de servicio asignada
     const parentTicket = typeof obtenerTicketPadre === 'function' ? obtenerTicketPadre(t) : null;
     if (parentTicket && parentTicket.id !== t.id) {
-      const pId = parentTicket.id;
-      const pFolio = parentTicket.folio;
-      const pFolNorm = norm(pFolio);
-      const pNumOnly = String(pFolio || '').replace(/\D/g, '');
+      const foundByParent = obtenerOrdenAsociadaTicket(parentTicket);
+      if (foundByParent && clientesCompatibles(tCli, foundByParent.cliente)) {
+        return foundByParent;
+      }
+    }
 
-      const foundByParent = allOrds.find(o => {
-        if (!o) return false;
-        if (pId && (o.ticket_id === pId || o.soporte === pId || norm(o.soporte) === norm(pId))) return true;
-        if (pFolio && (o.ticket_folio === pFolio || norm(o.ticket_folio) === pFolNorm || o.soporte === pFolio || norm(o.soporte) === pFolNorm)) return true;
-        if (pNumOnly && o.soporte) {
-          const sNum = String(o.soporte).replace(/\D/g, '');
-          const sNorm = norm(o.soporte);
-          if (sNum === pNumOnly && (sNorm === ('TKT' + pNumOnly) || sNorm === pNumOnly)) return true;
-        }
-        return false;
-      });
-      if (foundByParent) return foundByParent;
+    // C) Mención explícita OS-XXXXX en Asunto o Descripción solo para subtickets
+    const fullText = `${t.asunto || ''} ${t.descripcion || ''}`;
+    const osMatches = fullText.match(/\b(?:OS|ORD)[-\s]?(\d{3,7})\b/gi);
+    if (osMatches && osMatches.length > 0) {
+      for (const matchStr of osMatches) {
+        const normMatch = norm(matchStr);
+        const numOnly = matchStr.replace(/\D/g, '');
+
+        const found = allOrds.find(o => {
+          if (!o) return false;
+          const oFol = getOrderFolio(o);
+          const oNorm = norm(oFol);
+          const oNum = oFol.replace(/\D/g, '');
+          const isMatch = (oNorm.startsWith('OS') || oNorm.startsWith('ORD')) && (oNorm === normMatch || (numOnly.length >= 4 && oNum === numOnly));
+          return isMatch && !ordenPerteneceAOtroTicket(o) && clientesCompatibles(tCli, o.cliente);
+        });
+        if (found) return found;
+      }
     }
   }
 
-  // 5. Coincidencia por folio limpio que empiece explícitamente con OS- u ORD- (ej. TKT-OS-26112 -> OS-26112)
-  if (tFolio) {
-    let cleanBase = tFolio.replace(/-[Aa]$/i, '').trim();
-    cleanBase = cleanBase.replace(/^\[(PRUEBA|TEST)\]\s*/i, '').trim();
-    if (/^TKT[-_]?(OS|ORD)/i.test(cleanBase)) {
-      cleanBase = cleanBase.replace(/^TKT[-_]?/i, '').trim();
-      const normBase = norm(cleanBase);
-      const foundDirect = allOrds.find(o => {
-        if (!o) return false;
-        const oFol = getOrderFolio(o);
-        return norm(oFol) === normBase || o.id === cleanBase;
-      });
-      if (foundDirect) return foundDirect;
-    }
-  }
-
-  // 6. Búsqueda por mención explícita OS-XXXXX en Asunto o Descripción
-  const fullText = `${t.asunto || ''} ${t.descripcion || ''}`;
-  const osMatches = fullText.match(/\b(?:OS|ORD)[-\s]?(\d{3,7})\b/gi);
-  if (osMatches && osMatches.length > 0) {
-    for (const matchStr of osMatches) {
-      const normMatch = norm(matchStr);
-      const numOnly = matchStr.replace(/\D/g, '');
-
-      const found = allOrds.find(o => {
-        if (!o) return false;
-        const oFol = getOrderFolio(o);
-        const oNorm = norm(oFol);
-        const oNum = oFol.replace(/\D/g, '');
-        const isMatch = oNorm === normMatch || (numOnly.length >= 4 && oNum === numOnly && (oNorm.startsWith('OS') || oNorm.startsWith('ORD')));
-        return isMatch && !ordenPerteneceAOtroTicket(o);
-      });
-      if (found) return found;
-    }
-  }
-
-  // IMPORTANTE: Si la orden NO existe o no tiene relación legítima comprobada, devolver null
+  // 4. IMPORTANTE: Para tickets normales (no subtickets), si no hay ordenId explícito ni soporte legítimo del mismo cliente,
+  // NO asociar órdenes para evitar falsos positivos por coincidencia de números secuenciales independientes.
   return null;
 };
 

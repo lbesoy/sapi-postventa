@@ -1490,24 +1490,37 @@ body.light-mode {
   margin-bottom: 1rem;
 }
 
-/* Remove grey boxes from ticket fields so it looks printed on paper */
+/* Remove boxes and borders from ticket fields so it looks printed on paper */
+.modal-receipt .detalle-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.85rem 1rem;
+}
+
 .modal-receipt .detalle-field {
   background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   border-radius: 0 !important;
   padding: 0 !important;
-  margin-bottom: 0.5rem;
+  margin: 0 !important;
 }
 
 .modal-receipt .detalle-label {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  color: var(--text-muted);
   margin-bottom: 0.25rem;
 }
 
 .modal-receipt .detalle-value {
-  font-family: monospace;
+  font-family: var(--font-mono, monospace);
   font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.35;
 }
 
 .receipt-edge-top, .receipt-edge-bottom {

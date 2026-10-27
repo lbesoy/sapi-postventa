@@ -1926,6 +1926,12 @@ assert.doesNotThrow(() => {
   obtenerTicketPadre({ folio: 'TK-1-A' });
   esTicketEnTransito({ envios: [] });
 }, 'Las funciones lógicas de tickets_listado no deben arrojar error en ausencia de DOM');
+
+// Test F2: Blindaje de asociación ticket-orden (no vincular por colisión numérica casual ni clientes incompatibles)
+global.ordenes = [{ id: 'ord-26447', folio: 'OS-26447', cliente: 'GRUPO CEMENTOS DE CHIHUAHUA' }];
+const ticketSinCot = { id: 'tkt-26447', folio: 'TKT-26447', cliente: 'EURO REPRESENTACIONES', asunto: 'PRE ENTREGA', estado: 'Abierto' };
+assert.strictEqual(obtenerOrdenAsociadaTicket(ticketSinCot), null, 'Ticket TKT-26447 sin cotización no debe asociarse con OS-26447 de otro cliente');
+
 assert.ok(ticketSortColumn !== undefined, 'ticketSortColumn debe estar definido');
 assert.ok(ticketSortDirection !== undefined, 'ticketSortDirection debe estar definido');
 
@@ -4157,6 +4163,56 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
   assert.ok(docHtml.includes('Excavadora HX220'), 'Documento debe incluir intervención de excavadora');
 
   console.log('  ✅ Módulo de Servicios NO Preventivos en Rentas (Bolsa de Horas por Cliente, Multi-Proyecto, Bitácora Semanal, Supabase & Sandbox): OK');
+}
+
+// 8.6 Verificación de Disponibilidad Inmediata de Handlers de Pantalla de Login
+{
+  console.log('🧪 Verificando Pantalla de Login y Disponibilidad Inmediata de Handlers (loginCrearUsuario, volverSeleccion, etc.)...');
+  const fs = await import('fs');
+  const path = await import('path');
+  const { fileURLToPath } = await import('url');
+  const { JSDOM } = await import('jsdom');
+
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const rootDir = path.resolve(__dirname, '..');
+
+  const indexHtml = fs.readFileSync(path.join(rootDir, 'index.html'), 'utf8');
+  // runScripts: 'dangerously' ejecuta los scripts inline síncronos en el primer frame
+  const dom = new JSDOM(indexHtml, { runScripts: 'dangerously', url: 'https://portal.eurorep.mx/' });
+  const win = dom.window;
+
+  // 1. Verificar existencia inmediata de funciones en window
+  assert.equal(typeof win.loginCrearUsuario, 'function', 'loginCrearUsuario debe estar definido inmediatamente en window');
+  assert.equal(typeof win.volverSeleccion, 'function', 'volverSeleccion debe estar definido inmediatamente en window');
+  assert.equal(typeof win.abrirRecuperarPassword, 'function', 'abrirRecuperarPassword debe estar definido inmediatamente en window');
+  assert.equal(typeof win.volverLoginDesdeRecovery, 'function', 'volverLoginDesdeRecovery debe estar definido inmediatamente en window');
+  assert.equal(typeof win.confirmarCrearUsuario, 'function', 'confirmarCrearUsuario debe tener handler o stub defensivo');
+
+  // 2. Verificar transición a "Crear Usuario"
+  const stepForm = win.document.getElementById('login-step-form');
+  const stepCrear = win.document.getElementById('login-step-crear');
+  const stepRecovery = win.document.getElementById('login-step-recovery');
+
+  win.loginCrearUsuario();
+  assert.equal(stepForm.style.display, 'none', 'Al hacer clic en Registrar nuevo usuario debe ocultarse login-step-form');
+  assert.equal(stepCrear.style.display, 'block', 'Al hacer clic en Registrar nuevo usuario debe mostrarse login-step-crear');
+
+  // 3. Verificar retorno a login
+  win.volverSeleccion();
+  assert.equal(stepForm.style.display, 'block', 'Al volver debe mostrarse login-step-form');
+  assert.equal(stepCrear.style.display, 'none', 'Al volver debe ocultarse login-step-crear');
+
+  // 4. Verificar recuperación de contraseña
+  win.abrirRecuperarPassword({ preventDefault: () => {} });
+  assert.equal(stepForm.style.display, 'none', 'Al solicitar recuperación debe ocultarse login-step-form');
+  assert.equal(stepRecovery.style.display, 'block', 'Al solicitar recuperación debe mostrarse login-step-recovery');
+
+  win.volverLoginDesdeRecovery();
+  assert.equal(stepForm.style.display, 'block', 'Al volver de recuperación debe mostrarse login-step-form');
+  assert.equal(stepRecovery.style.display, 'none', 'Al volver de recuperación debe ocultarse login-step-recovery');
+
+  console.log('  ✅ Handlers de Login Inmediatos (loginCrearUsuario, volverSeleccion, abrirRecuperarPassword, volverLoginDesdeRecovery): OK');
 }
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');
