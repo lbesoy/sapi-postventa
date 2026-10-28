@@ -1208,30 +1208,51 @@ body.light-mode {
   flex-wrap: wrap;
 }
 .detalle-section { 
-  margin-bottom: 1.25rem; 
+  margin-bottom: 1rem; 
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.15rem;
+  padding: 1rem 1.15rem;
   box-shadow: var(--shadow-sm);
 }
 .detalle-section-title {
-  font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+  font-size: 0.76rem; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.06em; color: var(--accent); margin-bottom: 0.75rem;
-  padding-bottom: 0.4rem; border-bottom: 1px solid var(--border);
+  padding-bottom: 0.35rem; border-bottom: 1.5px solid rgba(232, 130, 12, 0.25);
+  display: flex; align-items: center; justify-content: space-between;
 }
-.detalle-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 0.75rem; }
+.detalle-grid { 
+  display: grid; 
+  grid-template-columns: repeat(3, 1fr); 
+  gap: 0.5rem 1.25rem; 
+}
 .detalle-field { 
-  background: var(--bg-body); 
-  border: 1px solid var(--border); 
-  border-radius: var(--radius-sm); 
-  padding: 0.65rem 0.85rem; 
+  background: transparent; 
+  border: none;
+  border-bottom: 1px solid var(--border-light, rgba(148, 163, 184, 0.15)); 
+  border-radius: 0; 
+  padding: 0.25rem 0.15rem 0.35rem 0.15rem; 
   min-width: 0;
 }
-.detalle-field-full { grid-column: 1 / -1 !important; }
-.detalle-field.is-empty { opacity: 0.75; }
-.detalle-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); margin-bottom: 0.25rem; }
-.detalle-value { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); word-break: break-word; overflow-wrap: anywhere; }
+.detalle-field-full { grid-column: 1 / -1 !important; width: 100%; }
+.detalle-field-span2 { grid-column: span 2 !important; }
+.detalle-field.is-empty { opacity: 0.6; }
+.detalle-label { 
+  font-size: 0.68rem; 
+  font-weight: 700; 
+  text-transform: uppercase; 
+  letter-spacing: 0.05em; 
+  color: var(--text-muted); 
+  margin-bottom: 0.15rem; 
+}
+.detalle-value { 
+  font-size: 0.88rem; 
+  font-weight: 600; 
+  color: var(--text-primary); 
+  word-break: break-word; 
+  overflow-wrap: anywhere; 
+  line-height: 1.35;
+}
 .detalle-ref-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .detalle-ref-table th {
   background: var(--bg-body); padding: 0.5rem 0.75rem;
@@ -1253,8 +1274,10 @@ body.light-mode {
   .form-grid { grid-template-columns: repeat(2,1fr); }
   .refacciones-cols { grid-template-columns: 1fr; }
   .detalle-grid { grid-template-columns: repeat(2,1fr); }
+  .detalle-field-span2 { grid-column: 1 / -1 !important; }
 }
 @media (max-width: 640px) {
+  .detalle-grid { grid-template-columns: 1fr; }
   .sidebar { 
     transform: translateX(-100%);
     position: fixed;
@@ -1704,153 +1727,7 @@ body.light-mode {
 }
 .combo-add:hover { background: var(--blue-light); }
 
-/* ===== PRINT ===== */
-@media print {
-  @page { 
-    margin: 1cm;
-    size: auto;
-  }
-
-  html, body {
-    background: white !important; 
-    color: #000000 !important;
-    margin: 0 !important; 
-    padding: 0 !important; 
-    -webkit-print-color-adjust: exact !important; 
-    print-color-adjust: exact !important; 
-    display: block !important; 
-    height: auto !important;
-    min-height: auto !important;
-    overflow: visible !important;
-  }
-
-  /* Mostrar los contenedores principales para permitir que el modal visible se imprima */
-  body, #app-wrapper, .main-wrapper, .content {
-    display: block !important;
-    visibility: visible !important;
-    position: static !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    border: none !important;
-    width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
-  }
-
-  /* Ocultar navegacion, vistas de fondo, tarjetas de estadisticas, botones y elementos no imprimibles */
-  .sidebar, .topbar, .login-screen, #login-screen,
-  .btn-primary, .btn-secondary, .action-btn,
-  .modal-header button, .form-actions, #detalle-header-actions, .modal-close,
-  .no-print, .search-bar, .table-wrapper, .orders-table, .dashboard-grid, .stats-grid, .stats-grid-5, .stat-card, .section-header, .view,
-  .nav-item, .sidebar-logo, #chat-soporte-pane { 
-    display: none !important; 
-  }
-
-  /* Ocultar modales cerrados o que no estan activos */
-  .modal-overlay:not(.open) { 
-    display: none !important; 
-  }
-
-  /* Mostrar unicamente el modal abierto (.modal-overlay.open) */
-  .modal-overlay.open { 
-    display: block !important; 
-    visibility: visible !important;
-    position: static !important; 
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-    background: transparent !important; 
-    backdrop-filter: none !important; 
-    padding: 0 !important; 
-    margin: 0 !important;
-    border: none !important;
-    overflow: visible !important;
-  }
-
-  .modal-overlay.open .modal { 
-    display: block !important;
-    visibility: visible !important;
-    position: static !important;
-    box-shadow: none !important; 
-    border: none !important; 
-    max-height: none !important; 
-    width: 100% !important; 
-    max-width: 100% !important; 
-    margin: 0 !important; 
-    padding: 0 !important; 
-    background: white !important;
-    color: #0f172a !important;
-    animation: none !important;
-    transform: none !important;
-    overflow: visible !important;
-  }
-
-  .modal-overlay.open .modal-header {
-    border-bottom: 2px solid #cbd5e1 !important;
-    padding-bottom: 0.5rem !important;
-    margin-bottom: 1rem !important;
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-  }
-
-  .modal-overlay.open .modal-header h2,
-  .modal-overlay.open .modal-header h3 {
-    color: #0f172a !important;
-    font-size: 1.3rem !important;
-    font-weight: 700 !important;
-    display: block !important;
-  }
-
-  .modal-overlay.open .modal-body { 
-    padding: 0 !important; 
-    overflow: visible !important; 
-    height: auto !important; 
-    max-height: none !important; 
-    color: #0f172a !important;
-    display: block !important;
-  }
-
-  .print-only { display: block !important; }
-
-  /* Ajustes para firmas y botones de seccion */
-  #firma-canvas, canvas { display: none !important; }
-  .detalle-section button { display: none !important; }
-
-  /* Asegurar que el grid del detalle no se corte raro entre paginas */
-  .detalle-grid {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    gap: 1rem !important;
-  }
-  .detalle-grid > * {
-    flex: 1 1 180px !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-  .detalle-section {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    display: block !important;
-    margin-bottom: 1rem !important;
-  }
-
-  /* Asegurar visibilidad de etiquetas y textos del detalle */
-  .detail-label, .form-group label {
-    color: #475569 !important;
-    font-size: 0.75rem !important;
-    font-weight: 600 !important;
-  }
-
-  .detail-value {
-    color: #0f172a !important;
-    font-size: 0.9rem !important;
-    font-weight: 700 !important;
-  }
-}
+/* ===== PRINT STYLES ===== (Moved to the end of style.css for ultimate cascade precedence) */
 
 /* Tooltip styles */
 .tooltip-container { position: relative; display: inline-block; }
@@ -7321,9 +7198,338 @@ body.light-mode .sapi-ptr-pill {
   min-width: 980px !important;
 }
 
+/* ============================================================
+   ESTILOS DE IMPRESIÓN Y GENERACIÓN DE REPORTES PDF (OPTIMIZADOS)
+   Ubicados al final del archivo para máxima prioridad en cascada
+   ============================================================ */
+@media print {
+  @page {
+    margin: 1cm;
+    size: auto;
+  }
 
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    display: block !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
 
+  /* Mostrar los contenedores principales para permitir que el contenido impreso fluya libremente */
+  body, #app-wrapper, .main-wrapper, .content {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
 
+  /* ============================================================
+     1. OCULTACIÓN TOTAL DE ELEMENTOS DE NAVEGACIÓN, MENÚS Y OVERLAYS
+     ============================================================ */
+  /* Sidebar en todas sus variantes (desktop y móvil) */
+  .sidebar,
+  aside.sidebar,
+  #sidebar,
+  body.light-mode .sidebar,
+  .sidebar-nav,
+  .sidebar-logo,
+  .sidebar-footer,
+  .nav-item {
+    display: none !important;
+    visibility: hidden !important;
+    position: absolute !important;
+    top: -99999px !important;
+    left: -99999px !important;
+    width: 0 !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    pointer-events: none !important;
+  }
 
+  /* Menú inferior desplegable (#mobile-more-sheet) y fondo (#mobile-more-backdrop) */
+  .mobile-sheet-backdrop,
+  .mobile-sheet-container,
+  #mobile-more-backdrop,
+  #mobile-more-sheet,
+  body.light-mode .mobile-sheet-container,
+  .mobile-sheet-drag-handle,
+  .mobile-sheet-header,
+  .mobile-sheet-menu-list,
+  .mobile-sheet-item {
+    display: none !important;
+    visibility: hidden !important;
+    position: absolute !important;
+    top: -99999px !important;
+    left: -99999px !important;
+    width: 0 !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    pointer-events: none !important;
+    transform: none !important;
+  }
 
+  /* Botones flotantes (FAB) e indicadores de recarga */
+  #mobile-fab-container,
+  .mobile-fab-container,
+  .mobile-main-fab,
+  .sapi-ptr-indicator {
+    display: none !important;
+    visibility: hidden !important;
+    position: absolute !important;
+    top: -99999px !important;
+    left: -99999px !important;
+    width: 0 !important;
+    height: 0 !important;
+    opacity: 0 !important;
+  }
+
+  /* Topbar, login, chats, botones de acción y elementos de pantalla */
+  .topbar,
+  .login-screen,
+  #login-screen,
+  .btn-primary,
+  .btn-secondary,
+  .action-btn,
+  .form-actions,
+  #detalle-header-actions,
+  .modal-close,
+  .modal-nav-back-btn,
+  .no-print,
+  .search-bar,
+  .table-wrapper,
+  .orders-table,
+  .dashboard-grid,
+  .stats-grid,
+  .stats-grid-5,
+  .stat-card,
+  .section-header,
+  .view,
+  #chat-soporte-pane,
+  #test-mode-container,
+  .tooltip-box,
+  #toast {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Ocultar modales no activos */
+  .modal-overlay:not(.open) {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Ocultar la cabecera interactiva del modal de detalle de orden para evitar duplicidad
+     con el encabezado formal con logotipo Eurorep dentro de #detalle-body */
+  #modal-detalle .modal-header,
+  #modal-detalle .modal-header.modal-detail-header {
+    display: none !important;
+    visibility: hidden !important;
+    position: static !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+  }
+
+  /* ============================================================
+     2. FORMATO DEL CONTENEDOR MODAL ACTIVO PARA IMPRESIÓN
+     ============================================================ */
+  .modal-overlay.open,
+  #modal-detalle-overlay.open,
+  #modal-ticket-detalle-overlay.open,
+  #modal-overlay.open,
+  #modal-form-overlay.open {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    z-index: auto !important;
+    transform: none !important;
+  }
+
+  .modal-overlay.open .modal,
+  #modal-detalle-overlay.open #modal-detalle,
+  #modal-ticket-detalle-overlay.open #modal-ticket-detalle,
+  #modal-overlay.open #modal-form {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    inset: auto !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    animation: none !important;
+    transform: none !important;
+    overflow: visible !important;
+  }
+
+  .modal-overlay.open .modal-body,
+  #modal-detalle .modal-body,
+  #modal-ticket-detalle .modal-body,
+  #modal-form .modal-body {
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    color: #0f172a !important;
+    display: block !important;
+  }
+
+  /* Mostrar elementos marcados como print-only */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Firmas y canvas interactivos */
+  #firma-canvas, #firma-cliente-canvas, canvas {
+    display: none !important;
+  }
+  .detalle-section button {
+    display: none !important;
+  }
+
+  /* Paginación y distribución limpia entre páginas */
+  .detalle-section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    display: block !important;
+    margin-bottom: 0.85rem !important;
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+    padding: 0.75rem 1rem !important;
+    box-shadow: none !important;
+  }
+
+  .detalle-section-title {
+    color: #e8820c !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+    padding-bottom: 0.3rem !important;
+    margin-bottom: 0.6rem !important;
+    border-bottom: 1.5px solid #e8820c !important;
+  }
+
+  .detalle-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 0.45rem 1.25rem !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .detalle-field {
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    border-radius: 0 !important;
+    padding: 0.2rem 0.1rem 0.35rem 0.1rem !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    min-width: 0 !important;
+  }
+
+  .detalle-field-full {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+  }
+
+  .detalle-field-span2 {
+    grid-column: span 2 !important;
+  }
+
+  .detalle-field.is-empty {
+    opacity: 0.65 !important;
+  }
+
+  .detail-label, .form-group label, .detalle-label {
+    color: #64748b !important;
+    font-size: 0.68rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    margin-bottom: 0.15rem !important;
+  }
+
+  .detail-value, .detalle-value {
+    color: #0f172a !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    line-height: 1.3 !important;
+  }
+
+  table {
+    page-break-inside: auto !important;
+  }
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
 

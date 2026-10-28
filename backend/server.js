@@ -674,10 +674,13 @@ app.post('/api/extract-pdf', async (req, res) => {
                         },
                         {
                             text: `Extract the following fields from this quotation/order PDF:
-1. Document Number (Número de documento / Folio / Número de cotización / Pedido). It's usually a 7-digit number (e.g. 1100001) or similar format.
-2. Total Amount (Importe TOTAL / Total / Monto / Subtotal + Impuestos). It must be a decimal number representing the final total amount, e.g. 135043.49.
-3. Client Code (CardCode, e.g. CL029) or Client Name (e.g. Concretos Delese).
-5. Items table (Artículos / Partidas / Conceptos). Extract an array of items, where each item has the main columns:
+1. Document Numbers:
+   - "numero_pedido": The Sales Order / Pedido number (often a 7-digit number starting with 12xxxxx or labeled 'Pedido', 'Orden de Venta', 'Sales Order', 'Pedido de Venta').
+   - "numero_cotizacion": The quotation / Oferta de Venta number (often a 7-digit number starting with 11xxxxx or 42xxxxx, or labeled 'Oferta de Venta', 'Cotización', 'Presupuesto').
+   - "orden_compra": The client Purchase Order / OC number (e.g. labeled 'Orden de Compra', 'O.C.', 'P.O.', 'Pedido de Compra').
+2. Total Amount: "monto" (Importe TOTAL / Total / Monto / Subtotal + Impuestos). Must be a decimal number representing the final total amount, e.g. 135043.49.
+3. Client: "cliente" (CardCode e.g. CL029, or Client Name e.g. 'Industrial Minera México', 'Concretos Delese').
+4. Items table: "articulos" (Artículos / Partidas / Conceptos). Extract an array of items, where each item has the main columns:
    - "descripcion" (Descripción)
    - "cantidad" (Cantidad)
    - "unidad_medida" (Unidad de medida)
@@ -688,7 +691,7 @@ app.post('/api/extract-pdf', async (req, res) => {
    - "total" (Total)
    CRITICAL: You MUST extract EVERY SINGLE item row from the table into this array. Do NOT skip, summarize, or omit any items. Even if an item is related to travel logistics, lodging, or food, you MUST STILL include it in the Items array. Read all pages of the document to ensure 100% completeness.
 
-5. Travel Details (Detalles de Viaje / Logística). If the document mentions travel logistics (like locations for toll booths/KM, lodging, or food in the items), extract them into an object.
+5. Travel Details: "detalles_viaje" (Detalles de Viaje / Logística). If the document mentions travel logistics (like locations for toll booths/KM, lodging, or food in the items), extract them into an object:
    - "origen": The starting location (e.g. CDMX).
    - "destino": The destination (e.g. Cerca de Nuevo Laredo).
    - "num_hospedaje": Number of nights/lodging mentioned (e.g. 1 if "1 Hospedaje").
@@ -697,7 +700,9 @@ app.post('/api/extract-pdf', async (req, res) => {
 
 Return a JSON object matching this structure:
 {
-  "numero_cotizacion": "1100001",
+  "numero_pedido": "1200592",
+  "numero_cotizacion": "4200006",
+  "orden_compra": "OC-10023",
   "monto": 135043.49,
   "cliente": "Concretos Delese",
   "detalles_viaje": {

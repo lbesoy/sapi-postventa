@@ -96,7 +96,7 @@ if (typeof window !== 'undefined' && !window.generarTicketsRefaccionesFaltantes)
 }
 
 // CONTROL DE VERSION Y RECARGA/LOGOUT FORZADO PARA ACTUALIZACIONES CRÍTICAS
-const APP_VERSION = 'v1.3.342'; // Incrementar esta versión para obligar a todos los usuarios a descargar el nuevo código
+const APP_VERSION = 'v1.3.343'; // Incrementar esta versión para obligar a todos los usuarios a descargar el nuevo código
 if (typeof localStorage !== 'undefined') {
   const lastVersion = localStorage.getItem('eurorep_app_version');
   if (lastVersion !== APP_VERSION) {

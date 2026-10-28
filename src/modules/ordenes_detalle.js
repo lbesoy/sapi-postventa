@@ -1231,11 +1231,17 @@ function verDetalle(id) {
     `;
   };
 
-  const field = (label, val, fullWidth) => `
-    <div class="detalle-field ${fullWidth ? 'detalle-field-full' : ''} ${!val || val === '—' ? 'is-empty' : ''}">
-      <div class="detalle-label">${label}</div>
-      <div class="detalle-value">${val || '—'}</div>
-    </div>`;
+  const field = (label, val, span = 1) => {
+    const isFull = span === true || span === 'full' || span === 3;
+    const isSpan2 = span === 2;
+    const colClass = isFull ? 'detalle-field-full' : (isSpan2 ? 'detalle-field-span2' : '');
+    const colStyle = isFull ? 'grid-column: 1 / -1;' : (isSpan2 ? 'grid-column: span 2;' : '');
+    return `
+      <div class="detalle-field ${colClass} ${!val || val === '—' ? 'is-empty' : ''}" ${colStyle ? `style="${colStyle}"` : ''}>
+        <div class="detalle-label">${label}</div>
+        <div class="detalle-value">${val || '—'}</div>
+      </div>`;
+  };
 
   const seccion = (title, content) => `
     <div class="detalle-section">
@@ -1243,20 +1249,165 @@ function verDetalle(id) {
       ${content}
     </div>`;
 
+  const formatTecnicosDisplay = (ord) => {
+    const isUuid = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(s || '').trim());
+    const resolveName = (idOrName) => {
+      if (!idOrName) return '';
+      const raw = String(idOrName).trim();
+      if (!raw) return '';
+      if (typeof window !== 'undefined' && typeof window.resolveTecnicoNombre === 'function') {
+        const r = window.resolveTecnicoNombre(raw);
+        if (r && !isUuid(r)) return r;
+      }
+      if (typeof safeResolveTecnicoNombre === 'function') {
+        const r = safeResolveTecnicoNombre(raw);
+        if (r && !isUuid(r)) return r;
+      }
+      const users = (typeof window !== 'undefined' && Array.isArray(window.usuarios))
+        ? window.usuarios
+        : ((typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : []);
+      const tecs = (typeof window !== 'undefined' && Array.isArray(window.tecnicosDb))
+        ? window.tecnicosDb
+        : ((typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) ? tecnicosDb : []);
+      const match = users.find(u => u && (u.id === raw || u.nombre === raw)) || tecs.find(t => t && (t.id === raw || t.nombre === raw));
+      if (match && match.nombre) return match.nombre;
+      return isUuid(raw) ? '' : raw;
+    };
+
+    let items = [];
+    if (Array.isArray(ord.tecnicosAsignados) && ord.tecnicosAsignados.length > 0) {
+      items = ord.tecnicosAsignados.flatMap(x => String(x || '').split(','));
+    } else if (ord.tecnico) {
+      items = String(ord.tecnico).split(',');
+    }
+
+    const resolved = items
+      .map(s => resolveName(s))
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    // Deduplicar respetando orden
+    const seen = new Set();
+    const unique = [];
+    for (const n of resolved) {
+      const lower = n.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        unique.push(n);
+      }
+    }
+    return unique.length > 0 ? unique.join(', ') : '—';
+  };
+
+  const resolverInfoMaquinaria = (ord) => {
+    const MARCAS_RENDER = {
+      'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA',
+      'MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS',
+      'CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER',
+      'FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL',
+      'MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM',
+      'HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
+    };
+
+    let rawModelo = ord.modelo || '';
+    let rawMarca = ord.marca || (ord.equipo ? ord.equipo.split(' ')[0] : '');
+    let rawSerie = ord.serie || '';
+    let extractedId = '';
+
+    const matchMod = String(rawModelo).match(/^\s*\[([A-Za-z0-9_-]+)\]\s*(.*)$/);
+    if (matchMod) {
+      extractedId = matchMod[1];
+      rawModelo = matchMod[2].trim();
+    }
+    const matchMarca = String(rawMarca).match(/^\s*\[([A-Za-z0-9_-]+)\]\s*$/);
+    if (matchMarca) {
+      if (!extractedId) extractedId = matchMarca[1];
+      rawMarca = '';
+    }
+
+    let maq = null;
+    const targetId = ord.maquinaria_id || extractedId;
+    if (targetId) {
+      maq = (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb)) ? maquinariaDb.find(m => m && (m.id === targetId || m.idInterno === targetId)) : null;
+      if (!maq && typeof clientesDb !== 'undefined' && Array.isArray(clientesDb)) {
+        clientesDb.forEach(c => {
+          if (c && c.maquinas) {
+            const found = c.maquinas.find(m => m && (m.id === targetId || m.idInterno === targetId));
+            if (found) maq = found;
+          }
+        });
+      }
+    }
+    if (!maq && rawSerie) {
+      maq = (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb)) ? maquinariaDb.find(m => m && m.serie === rawSerie) : null;
+      if (!maq && typeof clientesDb !== 'undefined' && Array.isArray(clientesDb)) {
+        clientesDb.forEach(c => {
+          if (c && c.maquinas) {
+            const found = c.maquinas.find(m => m && m.serie === rawSerie);
+            if (found) maq = found;
+          }
+        });
+      }
+    }
+    if (!maq && rawModelo && ord.cliente) {
+      maq = (typeof maquinariaDb !== 'undefined' && Array.isArray(maquinariaDb)) ? maquinariaDb.find(m => m && m.modelo === rawModelo && m.cliente === ord.cliente) : null;
+      if (!maq && typeof clientesDb !== 'undefined' && Array.isArray(clientesDb)) {
+        clientesDb.forEach(c => {
+          if (c && c.maquinas && c.nombre === ord.cliente) {
+            const found = c.maquinas.find(m => m && m.modelo === rawModelo);
+            if (found) maq = found;
+          }
+        });
+      }
+    }
+
+    let finalMarca = (maq && maq.marca) ? maq.marca : rawMarca;
+    let finalModelo = (maq && maq.modelo) ? maq.modelo : rawModelo;
+    let finalSerie = (maq && maq.serie) ? maq.serie : rawSerie;
+    let finalId = (maq && (maq.idInterno || maq.id)) ? (maq.idInterno || maq.id) : extractedId;
+
+    if (!finalMarca || finalMarca.startsWith('[')) {
+      const lowerMod = (finalModelo || '').toLowerCase();
+      if (lowerMod.includes('casa grande') || lowerMod.includes('casagrande') || (finalId && finalId.startsWith('CA'))) {
+        finalMarca = 'CASAGRANDE';
+      } else if (lowerMod.includes('putzmeister') || (finalId && finalId.startsWith('PT'))) {
+        finalMarca = 'PUTZMEISTER';
+      } else if (lowerMod.includes('schwing') || (finalId && finalId.startsWith('SC'))) {
+        finalMarca = 'SCHWING';
+      } else if (lowerMod.includes('fiori') || (finalId && finalId.startsWith('FI'))) {
+        finalMarca = 'FIORI';
+      } else if (lowerMod.includes('everdigm') || (finalId && finalId.startsWith('EV'))) {
+        finalMarca = 'EVERDIGM';
+      } else if (lowerMod.includes('cifa') || (finalId && finalId.startsWith('CI'))) {
+        finalMarca = 'CIFA';
+      }
+    }
+    finalMarca = MARCAS_RENDER[(finalMarca || '').toUpperCase()] || finalMarca || '—';
+
+    return {
+      marca: finalMarca || '—',
+      modelo: finalModelo || '—',
+      serie: finalSerie || '—',
+      idInterno: finalId ? `<span style="font-family:monospace; font-weight:700; color:var(--accent); background:rgba(232,130,12,0.1); padding:0.15rem 0.45rem; border-radius:4px; border:1px solid rgba(232,130,12,0.25);">${finalId}</span>` : '—'
+    };
+  };
+
   const refTable = (items, hasPrice) => {
-    if (!items?.length) return '<p style="color:var(--text-muted);font-size:0.82rem;">Sin refacciones</p>';
-    return `<table class="detalle-ref-table">
-      <thead><tr>
-        <th>Descripción</th><th>Clave</th><th>Cant.</th>
-        ${hasPrice ? '<th>Precio</th>' : ''}
+    if (!items?.length) return '<p style="color:var(--text-muted);font-size:0.82rem;margin:0.25rem 0;">Sin refacciones registradas</p>';
+    return `<div style="overflow-x:auto;"><table class="detalle-ref-table" style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+      <thead><tr style="border-bottom:1.5px solid var(--border);">
+        <th style="padding:0.4rem 0.5rem; text-align:left; font-size:0.7rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Descripción</th>
+        <th style="padding:0.4rem 0.5rem; text-align:left; font-size:0.7rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Clave</th>
+        <th style="padding:0.4rem 0.5rem; text-align:center; font-size:0.7rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; width:70px;">Cant.</th>
+        ${hasPrice ? '<th style="padding:0.4rem 0.5rem; text-align:right; font-size:0.7rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; width:90px;">Precio</th>' : ''}
       </tr></thead>
-      <tbody>${items.map(r => `<tr>
-        <td>${r.descripcion||'—'}</td>
-        <td>${r.clave||'—'}</td>
-        <td>${r.cantidad||'—'}</td>
-        ${hasPrice ? `<td>$${r.precio||'0'}</td>` : ''}
+      <tbody>${items.map(r => `<tr style="border-bottom:1px solid var(--border-light, rgba(148, 163, 184, 0.15));">
+        <td style="padding:0.45rem 0.5rem; color:var(--text-primary); font-weight:500;">${r.descripcion||'—'}</td>
+        <td style="padding:0.45rem 0.5rem; color:var(--text-secondary); font-family:monospace; font-size:0.8rem;">${r.clave||'—'}</td>
+        <td style="padding:0.45rem 0.5rem; text-align:center; color:var(--text-primary); font-weight:600;">${r.cantidad||'—'}</td>
+        ${hasPrice ? `<td style="padding:0.45rem 0.5rem; text-align:right; color:var(--text-primary); font-weight:600;">$${r.precio||'0'}</td>` : ''}
       </tr>`).join('')}</tbody>
-    </table>`;
+    </table></div>`;
   };
 
   const diasRows = DIAS.map((dia, i) => {
@@ -1281,6 +1432,13 @@ function verDetalle(id) {
     return fStr;
   };
 
+  const maqInfo = resolverInfoMaquinaria(o);
+  const tecnicosStr = formatTecnicosDisplay(o);
+
+  const ubicSitio = (o.ubicacion_sitio || '').trim();
+  const ubicTkt = (o.ubicacion || '').trim();
+  const tieneAmbasUbicaciones = ubicSitio && ubicTkt && ubicSitio.toLowerCase() !== ubicTkt.toLowerCase();
+
   document.getElementById('detalle-body').innerHTML = `
     <div class="print-only" style="text-align:center; margin-bottom:1.5rem; padding-bottom:1rem; border-bottom:2px solid var(--border);">
       <img src="logo_transparent.png" alt="Eurorep Logo" style="height:60px; object-fit:contain; margin-bottom:0.5rem;"/>
@@ -1290,52 +1448,13 @@ function verDetalle(id) {
     ${seccion('Información General', `
       <div class="detalle-grid">
         ${field('Folio', o.folio)} ${field('Pedido', o.pedido)} ${field('Fecha', formatFecha(o.fecha))}
-        ${field('Cliente', o.cliente, true)}
-        ${field('Ubicación (Ticket)', o.ubicacion, true)}
-        ${field('Ubicación en Sitio', o.ubicacion_sitio, true)}
-        ${field('Operador', o.operador)} ${field('No. ECO', o.eco)}
-        ${field('Horómetro (Ticket)', o.horometro)} ${field('Horómetro Real', o.horometro_real)}
-        ${field('Marca', (() => { 
-          const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
-          let m = o.marca || (o.equipo ? o.equipo.split(' ')[0] : '');
-          return MARCAS_RENDER[m.toUpperCase()] || m || '—';
-        })())} ${field('Modelo', o.modelo)} ${field('Serie', o.serie)}
-        ${field('ID Máquina', (() => {
-          let maq = null;
-          if (o.maquinaria_id) {
-            maq = maquinariaDb.find(m => m.id === o.maquinaria_id || m.idInterno === o.maquinaria_id);
-            if (!maq) {
-              clientesDb.forEach(c => {
-                if (c.maquinas) {
-                  const found = c.maquinas.find(m => m.id === o.maquinaria_id || m.idInterno === o.maquinaria_id);
-                  if (found) maq = found;
-                }
-              });
-            }
-          } else if (o.serie) {
-            maq = maquinariaDb.find(m => m.serie === o.serie);
-            if (!maq) {
-              clientesDb.forEach(c => {
-                if (c.maquinas) {
-                  const found = c.maquinas.find(m => m.serie === o.serie);
-                  if (found) maq = found;
-                }
-              });
-            }
-          } else if (o.modelo && o.cliente) {
-            maq = maquinariaDb.find(m => m.modelo === o.modelo && m.cliente === o.cliente);
-            if (!maq) {
-              clientesDb.forEach(c => {
-                if (c.maquinas && c.nombre === o.cliente) {
-                  const found = c.maquinas.find(m => m.modelo === o.modelo);
-                  if (found) maq = found;
-                }
-              });
-            }
-          }
-          return maq && (maq.idInterno || maq.id) ? `<span style="font-family:monospace; font-weight:600; color:var(--accent); background:var(--blue-light); padding:0.15rem 0.4rem; border-radius:4px; border:1px solid rgba(232, 133, 10, 0.3);">${maq.idInterno || maq.id}</span>` : '—';
-        })())}
-        ${field('Técnico Asignado', o.tecnico, true)} ${field('Ticket Soporte', (() => { 
+        ${tieneAmbasUbicaciones 
+          ? `${field('Cliente', o.cliente, 1)} ${field('Ubicación en Sitio', ubicSitio, 1)} ${field('Ubicación (Ticket)', ubicTkt, 1)}`
+          : `${field('Cliente', o.cliente, 2)} ${field('Ubicación', ubicSitio || ubicTkt || '—', 1)}`
+        }
+        ${field('Marca', maqInfo.marca)} ${field('Modelo', maqInfo.modelo)} ${field('Serie', maqInfo.serie)}
+        ${field('ID Máquina', maqInfo.idInterno)} ${field('No. ECO', o.eco)} ${field('Operador', o.operador)}
+        ${field('Horómetro (Ticket)', o.horometro)} ${field('Horómetro Real', o.horometro_real)} ${field('Ticket Soporte', (() => { 
           const t = tickets.find(x => x.id === o.soporte || x.folio === o.soporte || (o.ticket_id && x.id === o.ticket_id) || (o.ticket_folio && x.folio === o.ticket_folio)); 
           if (t) {
             return `<a href="#" onclick="verDetalleTicket('${t.id}'); return false;" style="color:var(--accent); font-weight:600; text-decoration:underline;" title="${t.asunto || ''}">${t.folio}</a>`;
@@ -1351,56 +1470,48 @@ function verDetalle(id) {
           }
           return '—';
         })())}
+        ${field('Técnico Asignado', tecnicosStr, true)}
       </div>`)}
     ${seccion('Kilómetros / Tipo', `
       <div class="detalle-grid">
         ${field('Origen → Trabajo', (o.km_ida != null && o.km_ida !== '') ? o.km_ida + ' km' : null)}
         ${field('Trabajo → Origen', (o.km_vuelta != null && o.km_vuelta !== '') ? o.km_vuelta + ' km' : null)}
         ${field('Total Km', (o.km_total != null && o.km_total !== '') ? o.km_total + ' km' : null)}
-        ${field('Tipo de Visita', `<span class="badge badge-${(o.tipo||'otro').toLowerCase().replace(/ /g, '-').replace('é','e').replace('í','i')}">${o.tipo}</span>`)}
-        ${field('Estado', `<span class="badge ${badgeEstado(o.estado)}">${o.estado}</span>`)}
-        ${(o.estado === 'Cerrada' && o.cerrado_por_admin) ? field('Finiquito Formal', `<span style="font-weight:600; color:var(--text-primary);"><i data-lucide="check-check" style="width:13px;height:13px;color:#10b981;vertical-align:middle;margin-right:2px;"></i> ${o.cerrado_por_admin}</span> <small style="color:var(--text-muted);">(${formatFecha(o.fecha_cierre_admin)})</small>`) : ''}
+        ${field('Tipo de Visita', `<span class="badge badge-${(o.tipo||'otro').toLowerCase().replace(/ /g, '-').replace('é','e').replace('í','i')}">${o.tipo || 'Servicio'}</span>`)}
+        ${field('Estado', `<span class="badge ${badgeEstado(o.estado)}">${o.estado || 'Pendiente'}</span>`)}
+        ${field('Reembolso KM', o.reembolso_km 
+          ? `<span style="color:#059669; font-weight:700; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="check-circle" style="width:13px;height:13px;"></i> Aplica</span>`
+          : `<span style="color:var(--text-muted); font-weight:500; display:inline-flex; align-items:center; gap:0.25rem;"><i data-lucide="x-circle" style="width:13px;height:13px;"></i> No aplica</span>`
+        )}
+        ${(o.estado === 'Cerrada' && o.cerrado_por_admin) ? field('Finiquito Formal', `<span style="font-weight:600; color:var(--text-primary);"><i data-lucide="check-check" style="width:13px;height:13px;color:#10b981;vertical-align:middle;margin-right:2px;"></i> ${o.cerrado_por_admin}</span> <small style="color:var(--text-muted);">(${formatFecha(o.fecha_cierre_admin)})</small>`, true) : ''}
       </div>
-      ${o.reembolso_km ? `
-        <div style="margin-top:1rem; display:flex; flex-direction:row; align-items:center; gap:1rem; flex-wrap:wrap;">
-          ${(() => {
-            const hasTrasladoRegreso = o.bitacora && o.bitacora.some(b => b.nota === 'Traslado de regreso desde el sitio de trabajo');
-            return `
-            <div style="display:flex; flex-direction:column; gap:0.25rem; padding:0.5rem 0.75rem; border-left:3px solid var(--accent); background:rgba(232, 130, 12, 0.08); border-radius:0 6px 6px 0; width:fit-content;">
-              <div style="display:flex; align-items:center; gap:0.4rem; color:var(--accent); font-weight:700; font-size:0.85rem;">
-                <i data-lucide="check-circle" style="width:14px;height:14px;"></i>
-                Aplica Reembolso de KM
-              </div>
-              <div style="display:flex; align-items:center; gap:0.4rem; color:var(--accent); font-size:0.75rem; font-weight:600; opacity:0.85;">
-                <i data-lucide="${hasTrasladoRegreso ? 'check-check' : 'clock'}" style="width:13px;height:13px;"></i>
-                ${hasTrasladoRegreso ? 'Traslado de regreso registrado' : 'A la espera de traslado de regreso'}
-              </div>
-            </div>
-            ${(!hasTrasladoRegreso && ['tecnico', 'supervisor', 'superadmin', 'admin'].includes(currentSession.viewMode)) ? `
-            <button class="btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.6rem; display:flex; align-items:center; gap:0.3rem;" onclick="abrirBitacora('${o.id}', 'Traslado de regreso desde el sitio de trabajo', true)">
-              <i data-lucide="plus" style="width:12px;height:12px;"></i> Registrar Regreso
-            </button>
-            ` : ''}
-            `;
-          })()}
-        </div>
-      ` : `
-        <div style="margin-top:1rem; display:flex; align-items:center; gap:0.4rem; padding:0.4rem 0.6rem; border:1px solid var(--border); background:var(--bg-secondary); border-radius:6px; width:fit-content;">
-          <i data-lucide="x-circle" style="width:13px;height:13px;color:var(--text-muted);"></i>
-          <span style="color:var(--text-muted); font-size:0.75rem; font-weight:500;">No aplica Reembolso de KM</span>
-        </div>
-      `}
+      ${o.reembolso_km ? (() => {
+        const hasTrasladoRegreso = o.bitacora && o.bitacora.some(b => b.nota === 'Traslado de regreso desde el sitio de trabajo');
+        return `
+        <div style="margin-top:0.75rem; display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+          <div style="display:inline-flex; align-items:center; gap:0.4rem; color:var(--accent); font-size:0.75rem; font-weight:600; background:rgba(232, 130, 12, 0.08); padding:0.3rem 0.6rem; border-radius:4px; border-left:3px solid var(--accent);">
+            <i data-lucide="${hasTrasladoRegreso ? 'check-check' : 'clock'}" style="width:13px;height:13px;"></i>
+            ${hasTrasladoRegreso ? 'Traslado de regreso registrado' : 'A la espera de traslado de regreso'}
+          </div>
+          ${(!hasTrasladoRegreso && ['tecnico', 'supervisor', 'superadmin', 'admin'].includes(currentSession.viewMode)) ? `
+          <button class="btn-secondary" style="font-size:0.75rem; padding:0.3rem 0.6rem; display:inline-flex; align-items:center; gap:0.3rem;" onclick="abrirBitacora('${o.id}', 'Traslado de regreso desde el sitio de trabajo', true)">
+            <i data-lucide="plus" style="width:12px;height:12px;"></i> Registrar Regreso
+          </button>` : ''}
+        </div>`;
+      })() : ''}
     `)}
     ${seccion('Diagnóstico y Trabajos', `
-      ${field('Falla reportada', o.falla, true)}
-      <div style="margin-top:0.5rem">${field('Trabajos realizados', o.trabajos, true)}</div>
-      <div style="margin-top:0.5rem">${field('Dictamen', o.dictamen, true)}</div>
-      <div style="margin-top:0.5rem">${field('Condiciones del equipo', o.condiciones, true)}</div>
-      <div style="margin-top:0.5rem">${field('Observaciones', o.observaciones, true)}</div>
-      <div style="margin-top:0.5rem">${field('Pendientes', o.pendientes, true)}</div>`)}
+      <div style="display:flex; flex-direction:column; gap:0.5rem;">
+        ${field('Falla reportada', o.falla, true)}
+        ${field('Trabajos realizados', o.trabajos, true)}
+        ${field('Dictamen', o.dictamen, true)}
+        ${field('Condiciones del equipo', o.condiciones, true)}
+        ${field('Observaciones', o.observaciones, true)}
+        ${field('Pendientes', o.pendientes, true)}
+      </div>`)}
     ${seccion('Refacciones Utilizadas', refTable(o.ref_utilizadas, false))}
     ${seccion('Refacciones Necesarias', refTable(o.ref_necesarias, false))}
-    ${(o.noches || o.alimentacion || o.traslado_costo) ? seccion('Fecha de Servicio', `
+    ${(o.noches || o.alimentacion || o.traslado_costo) ? seccion('Gastos y Viáticos de Servicio', `
       <div class="detalle-grid">
         ${field('No. Noches', o.noches)} ${field('Alimentación', o.alimentacion)} ${field('Traslado', o.traslado_costo)}
       </div>`) : ''}

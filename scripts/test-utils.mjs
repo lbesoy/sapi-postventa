@@ -1813,6 +1813,7 @@ assert.equal(esTicketDeServicioEnCampo({ guiaPedido: 'GUIA123', categoria: 'Vent
 
 // Casos positivos de servicio en campo
 assert.equal(esTicketDeServicioEnCampo({ categoria: 'Servicio Técnico', tipo: 'Preventivo' }), true, 'Servicio Técnico debe ser true');
+assert.equal(esTicketDeServicioEnCampo({ folio: 'TKT-26692', categoria: 'Servicio Técnico', area: 'Operaciones', asunto: 'SOLOCITUD DE GARANTIA DEL CONTROLADOR' }), true, 'Servicio Técnico con garantía en asunto debe ser true');
 assert.equal(esTicketDeServicioEnCampo({ categoria: 'Mantenimiento en Campo' }), true, 'Mantenimiento debe ser true');
 assert.equal(esTicketDeServicioEnCampo({ categoria: 'Puesta en Marcha' }), true, 'Puesta en marcha debe ser true');
 assert.equal(esTicketDeServicioEnCampo({ area: 'Operaciones', tipo: 'Correctivo' }), true, 'Correctivo en operaciones debe ser true');
@@ -2755,7 +2756,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 const swPath = path.resolve('sw.js');
 const swContent = fs.readFileSync(swPath, 'utf8');
-assert.ok(/const CACHE_NAME = 'eurorep-postventa-v(417|418|419|420|421|422)';/.test(swContent), 'sw.js debe declarar versión válida de caché');
+assert.ok(/const CACHE_NAME = 'eurorep-postventa-v\d{3,4}';/.test(swContent), 'sw.js debe declarar versión válida de caché');
 
 console.log('  ✅ Arquitectura Offline-First y Background Sync: OK');
 
@@ -4213,6 +4214,39 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
   assert.equal(stepRecovery.style.display, 'none', 'Al volver de recuperación debe ocultarse login-step-recovery');
 
   console.log('  ✅ Handlers de Login Inmediatos (loginCrearUsuario, volverSeleccion, abrirRecuperarPassword, volverLoginDesdeRecovery): OK');
+}
+
+// 8.7 Verificación de Integridad de Reportes PDF e Impresión
+{
+  console.log('🧪 Verificando Integridad de Reportes PDF e Impresión (Blindaje contra superposición móvil)...');
+  const fs = await import('fs');
+  const path = await import('path');
+  const { fileURLToPath } = await import('url');
+
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const rootDir = path.resolve(__dirname, '..');
+
+  const css = fs.readFileSync(path.join(rootDir, 'style.css'), 'utf8');
+
+  // 1. @media print debe ubicarse al final de style.css
+  const printIdx = css.lastIndexOf('@media print');
+  assert.ok(printIdx > 50000, '@media print debe estar ubicado al final del archivo CSS para prevalecer');
+
+  const printBlock = css.substring(printIdx);
+
+  // 2. Debe ocultar rigurosamente el menú móvil #mobile-more-sheet y la barra inferior .sidebar
+  assert.ok(printBlock.includes('.mobile-sheet-container'), '@media print debe ocultar .mobile-sheet-container');
+  assert.ok(printBlock.includes('#mobile-more-sheet'), '@media print debe ocultar #mobile-more-sheet');
+  assert.ok(printBlock.includes('.sidebar'), '@media print debe ocultar .sidebar');
+  assert.ok(printBlock.includes('#mobile-fab-container'), '@media print debe ocultar #mobile-fab-container');
+  assert.ok(printBlock.includes('#modal-detalle .modal-header'), '@media print debe ocultar cabecera interactiva del modal');
+
+  // 3. Debe garantizar que el modal abierto se imprima con altura automática y sin scroll bloqueado
+  assert.ok(printBlock.includes('height: auto !important;'), 'El modal abierto debe tener height: auto');
+  assert.ok(printBlock.includes('position: static !important;'), 'El modal abierto debe tener position: static para fluir entre páginas');
+
+  console.log('  ✅ Integridad de Reportes PDF e Impresión (Ocultación de menús y barras móviles): OK');
 }
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');

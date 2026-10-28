@@ -410,6 +410,38 @@ async function agregarComentarioExterno(ticketId) {
 
 
 
+// ===== TOGGLE DESCRIPCIÓN TICKET =====
+function toggleDescripcionTicket(ticketId) {
+  if (typeof document === 'undefined') return;
+  const body = document.getElementById(`body-detalle-desc-${ticketId}`);
+  const preview = document.getElementById(`preview-detalle-desc-${ticketId}`);
+  const text = document.getElementById(`text-toggle-desc-${ticketId}`);
+  const icon = document.getElementById(`icon-toggle-desc-${ticketId}`);
+  if (!body) return;
+
+  const isCollapsed = body.style.display === 'none';
+  if (isCollapsed) {
+    body.style.display = 'block';
+    if (preview) preview.style.display = 'none';
+    if (text) text.textContent = 'Contraer';
+    if (icon) {
+      icon.setAttribute('data-lucide', 'chevron-up');
+    }
+  } else {
+    body.style.display = 'none';
+    if (preview) preview.style.display = 'block';
+    if (text) text.textContent = 'Expandir';
+    if (icon) {
+      icon.setAttribute('data-lucide', 'chevron-down');
+    }
+  }
+  if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  } else if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
+}
+
 // ===== DETALLE TICKET =====
 function verDetalleTicket(id) {
   if (typeof document === 'undefined') return;
@@ -504,6 +536,7 @@ function verDetalleTicket(id) {
   const assocOrder = window.obtenerOrdenAsociadaTicket(t);
   const parentTicket = !assocOrder ? (typeof window.obtenerTicketPadre === 'function' ? window.obtenerTicketPadre(t) : null) : null;
   const isSuperadmin = safeEsUsuarioSuperadmin();
+  const isStaffAdmin = isSuperadmin || (typeof currentSession !== 'undefined' && currentSession && ['superadmin', 'admin', 'supervisor'].includes(String(currentSession.viewMode || currentSession.realRol || currentSession.rol || '').toLowerCase().trim()));
   const isDecisionLocked = ['si', 'aprobada', 'no', 'rechazada'].includes(String(t.cotAceptada || '').toLowerCase().trim());
   document.getElementById('ticket-detalle-title').textContent = `Ticket ${t.folio}`;
 
@@ -567,7 +600,7 @@ function verDetalleTicket(id) {
         </button>
       </div>
     </div>
-    ` : (isSuperadmin ? `
+    ` : (isStaffAdmin ? `
     <div class="detalle-section" style="background: rgba(37, 99, 235, 0.04); border: 1px dashed rgba(37, 99, 235, 0.35); border-radius: 8px; padding: 0.75rem 1.1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
       <div style="display: flex; align-items: center; gap: 0.65rem;">
         <div style="width: 32px; height: 32px; border-radius: 6px; background: rgba(37, 99, 235, 0.12); color: #2563eb; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
@@ -580,7 +613,7 @@ function verDetalleTicket(id) {
       </div>
       <div>
         <button type="button" class="btn-primary" onclick="forzarCrearOrdenServicio('${t.id}')" style="display: inline-flex; align-items: center; gap: 6px; padding: 0.4rem 0.85rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; border-radius: 6px; background: #2563eb; color: #ffffff; border: none;">
-          <i data-lucide="file-plus" style="width: 14px; height: 14px;"></i> Forzar Orden de Servicio
+          <i data-lucide="file-plus" style="width: 14px; height: 14px;"></i> Generar Orden de Servicio
         </button>
       </div>
     </div>
@@ -607,9 +640,20 @@ function verDetalleTicket(id) {
         ${field('Equipo / Máquina', equipoDisplay, true)}
       </div>
     </div>
-    <div class="detalle-section">
-      <div class="detalle-section-title">Descripción</div>
-      <div class="detalle-field"><div class="detalle-value" style="white-space:pre-wrap;">${t.descripcion||'—'}</div></div>
+    <div class="detalle-section" id="section-detalle-desc-${t.id}">
+      <div class="detalle-section-title" onclick="window.toggleDescripcionTicket('${t.id}')" style="cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between;" title="Clic para contraer o expandir la descripción">
+        <span>Descripción</span>
+        <button type="button" id="btn-toggle-desc-${t.id}" onclick="event.stopPropagation(); window.toggleDescripcionTicket('${t.id}')" onmouseenter="this.style.background='rgba(232, 130, 12, 0.16)'" onmouseleave="this.style.background='rgba(232, 130, 12, 0.08)'" style="background: rgba(232, 130, 12, 0.08); border: 1px solid rgba(232, 130, 12, 0.25); border-radius: 4px; padding: 2px 8px; font-size: 0.7rem; font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, sans-serif); font-weight: 600; color: var(--accent); text-transform: none; letter-spacing: normal; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; transition: all 0.2s;">
+          <span id="text-toggle-desc-${t.id}">Contraer</span>
+          <i data-lucide="chevron-up" id="icon-toggle-desc-${t.id}" style="width: 14px; height: 14px;"></i>
+        </button>
+      </div>
+      <div id="preview-detalle-desc-${t.id}" onclick="window.toggleDescripcionTicket('${t.id}')" style="display: none; font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; padding: 0.2rem 0.1rem; font-style: italic; font-family: var(--font-sans, inherit); letter-spacing: normal;" title="Clic para expandir descripción completa">
+        ${safeEscapeHTML((t.descripcion || '—').replace(/\s+/g, ' ').trim())}
+      </div>
+      <div class="detalle-field" id="body-detalle-desc-${t.id}">
+        <div class="detalle-value" style="white-space: pre-wrap;">${t.descripcion || '—'}</div>
+      </div>
     </div>
     ${(t.notes || t.notas && currentSession.viewMode !== 'empresa') ? `
     <div class="detalle-section">
@@ -986,13 +1030,15 @@ function verDetalleTicket(id) {
     <div class="form-actions" style="border-top:2px dashed var(--border);padding-top:1rem;margin-top:0.5rem; justify-content:center; gap:0.5rem; flex-wrap:wrap;">
       <button class="btn-secondary" onclick="cerrarDetalleTicket()">Cerrar Vista</button>
       <button class="btn-primary" onclick="cerrarDetalleTicket();editarTicket('${t.id}')"><i data-lucide="pencil" style="width:16px;height:16px;"></i> Editar</button>
-      ${isSuperadmin ? `
+      ${isStaffAdmin ? `
+        ${isSuperadmin ? `
         <button class="btn-secondary" style="border-color:var(--accent); color:var(--accent);" onclick="forzarEstadoTicket('${t.id}')">
           <i data-lucide="zap" style="width:16px;height:16px;margin-right:4px;"></i> Forzar Estado
         </button>
+        ` : ''}
         ${!assocOrder ? `
           <button class="btn-secondary" style="border-color:#2563eb; color:#2563eb;" onclick="forzarCrearOrdenServicio('${t.id}')">
-            <i data-lucide="file-plus" style="width:16px;height:16px;margin-right:4px;"></i> Forzar Orden de Servicio
+            <i data-lucide="file-plus" style="width:16px;height:16px;margin-right:4px;"></i> Generar Orden de Servicio
           </button>
         ` : ''}
       ` : ''}
@@ -1042,6 +1088,72 @@ function verDetalleTicket(id) {
     }, 30);
   }
 
+  function safeExtraerArticulosDeTexto(text) {
+    if (!text || typeof text !== 'string') return { articulos: [], extras: [], logisticaTexto: '' };
+    const articulos = [];
+    
+    // Intento 1: Formato SAP Pedido Cliente / PED_TRI (ej: 1 4,113.11 16.00 4,113.11 001 1 MET SENSOR...)
+    const itemRegexSap = /(?:(\d+(?:\.\d+)?)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+)?(\d{3})\s+(\d+(?:\.\d+)?)\s+([A-Za-z0-9]{1,5})\s+(.*?)(?=\s+(?:ZFAC\d+|Item Code:|\d+(?:\.\d+)?\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+\d{3}|\d{3}\s+\d+|\bSubtotal:|\bImporte total:|$))/gi;
+    let sapMatch;
+    while ((sapMatch = itemRegexSap.exec(text)) !== null) {
+      const desc = (sapMatch[8] || '').trim();
+      if (desc && desc.length > 2) {
+        articulos.push({
+          partida: sapMatch[5],
+          cantidad: parseFloat(sapMatch[6] || sapMatch[1] || '1'),
+          unidad_medida: sapMatch[7] || 'MET',
+          descripcion: desc,
+          precio: sapMatch[2] ? parseFloat(sapMatch[2].replace(/,/g, '')) : 0,
+          impuesto_porcentaje: sapMatch[3] ? parseFloat(sapMatch[3].replace(/,/g, '')) : 16,
+          total: sapMatch[4] ? parseFloat(sapMatch[4].replace(/,/g, '')) : 0
+        });
+      }
+    }
+
+    // Intento 2: Formato estándar partida descripcion cant um x_surtir almacen precio imp total
+    if (articulos.length === 0) {
+      const itemRegex = /\b(\d{3})\s+(.*?)\s+(\d+(?:\.\d+)?)\s+([A-Za-z0-9]{1,5})\s+(\d+(?:\.\d+)?)\s+([A-Za-z0-9]{1,5})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\b/g;
+      let itemMatch;
+      while ((itemMatch = itemRegex.exec(text)) !== null) {
+        articulos.push({
+          partida: itemMatch[1],
+          descripcion: itemMatch[2].trim(),
+          cantidad: parseFloat(itemMatch[3]),
+          unidad_medida: itemMatch[4],
+          x_surtir: parseFloat(itemMatch[5]),
+          almacen: itemMatch[6],
+          precio: parseFloat(itemMatch[7].replace(/,/g, '')),
+          impuesto_porcentaje: parseFloat(itemMatch[8].replace(/,/g, '')),
+          total: parseFloat(itemMatch[9].replace(/,/g, ''))
+        });
+      }
+    }
+
+    const extraKeywords = ['consumibles', 'asistencia', 'casetas', 'viaticos', 'viáticos', 'reembolso', 'km', 'kilometraje', 'hospedaje', 'alimentos', 'traslado', 'logistica', 'logística', 'entrega', 'envio', 'envío', 'ocurre', 'flete'];
+    const mainArt = [];
+    const extArt = [];
+    articulos.forEach(art => {
+      const descLower = (art.descripcion || '').toLowerCase();
+      if (extraKeywords.some(kw => descLower.includes(kw))) {
+        extArt.push(art);
+      } else {
+        mainArt.push(art);
+      }
+    });
+
+    let logText = '';
+    const expMatch = text.match(/(?:Clase de expedición\s*:\s*|Dirección de entrega\s*:\s*|Envío a ocurre\s*:\s*)([^█\n\r]+)/i) ||
+                     text.match(/(?:Envío\s+(?:inmediato|a\s+ocurre)[^█\n\r]*)/i) ||
+                     text.match(/([A-Za-zÁÉÍÓÚáéíóúñÑ\s]+)\s*-\s*([A-Za-zÁÉÍÓÚáéíóúñÑ\s,]+)\s*-\s*(\d+)\s*-\s*KM/i);
+    if (expMatch) {
+      let rawLog = expMatch[1] ? expMatch[1].trim() : expMatch[0].trim();
+      rawLog = rawLog.split(/(?:Basado en|Permitir|Impreso por|Fecha de|Total|Subtotal)/i)[0].trim().replace(/[\.\s]+$/, '');
+      logText = rawLog;
+    }
+
+    return { articulos: mainArt, extras: extArt, logisticaTexto: logText };
+  }
+
   if (t.estado === 'Cerrado' && t.cotAceptada === 'si' && window.supabaseClient) {
     setTimeout(async () => {
       const container = document.getElementById(`closed-pdf-extraction-${t.id}`);
@@ -1057,8 +1169,19 @@ function verDetalleTicket(id) {
           
         if (data && data.length > 0) {
           const ex = data[0];
-          const mainArticulos = Array.isArray(ex.conceptos) ? ex.conceptos : [];
-          const extrasArticulos = Array.isArray(ex.extras) ? ex.extras : [];
+          let mainArticulos = Array.isArray(ex.conceptos) ? [...ex.conceptos] : [];
+          let extrasArticulos = Array.isArray(ex.extras) ? [...ex.extras] : [];
+          
+          // Si los conceptos/extras estaban vacíos y ex.ruta_servicio contiene texto del PDF, recuperar los artículos
+          if (mainArticulos.length === 0 && extrasArticulos.filter(x => !x.isViajeData).length === 0 && ex.ruta_servicio) {
+            const parsed = safeExtraerArticulosDeTexto(ex.ruta_servicio);
+            if (parsed.articulos.length > 0 || parsed.extras.length > 0) {
+              mainArticulos = parsed.articulos;
+              const viajeItem = extrasArticulos.find(x => x.isViajeData);
+              extrasArticulos = parsed.extras;
+              if (viajeItem) extrasArticulos.push(viajeItem);
+            }
+          }
           
           let logisticaHtml = '';
           const logisticaObj = extrasArticulos.find(e => e.isViajeData);
@@ -1089,12 +1212,31 @@ function verDetalleTicket(id) {
               </div>
             `;
           } else if (ex.ruta_servicio) {
-             logisticaHtml = `
-              <div style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
-                <div style="font-weight:600; color:var(--text-secondary); margin-bottom: 0.5rem;">✈️ Logística Extraída (Ruta)</div>
-                <div style="font-size:0.75rem; padding:0 8px;">${ex.ruta_servicio}</div>
-              </div>
-            `;
+            let rutaLimpia = ex.ruta_servicio;
+            if (rutaLimpia.length > 80 || /CFDI|PEDIDO|Subtotal|RFC:|Impreso por/i.test(rutaLimpia)) {
+              const expMatch = rutaLimpia.match(/(?:Clase de expedición\s*:\s*|Dirección de entrega\s*:\s*|Envío a ocurre\s*:\s*)([^█\n\r]+)/i) ||
+                               rutaLimpia.match(/(?:Envío\s+(?:inmediato|a\s+ocurre)[^█\n\r]*)/i) ||
+                               rutaLimpia.match(/([A-Za-zÁÉÍÓÚáéíóúñÑ\s]+)\s*-\s*([A-Za-zÁÉÍÓÚáéíóúñÑ\s,]+)\s*-\s*(\d+)\s*-\s*KM/i);
+              if (expMatch) {
+                let rawLog = expMatch[1] ? expMatch[1].trim() : expMatch[0].trim();
+                rutaLimpia = rawLog.split(/(?:Basado en|Permitir|Impreso por|Fecha de|Total|Subtotal)/i)[0].trim().replace(/[\.\s]+$/, '');
+              } else {
+                rutaLimpia = '';
+              }
+            }
+            if (rutaLimpia) {
+              logisticaHtml = `
+                <div style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+                  <div style="font-weight:600; color:var(--text-secondary); margin-bottom: 0.5rem; display:flex; align-items:center; gap:6px;">
+                    <span>✈️ Logística Extraída (Ruta / Envío)</span>
+                  </div>
+                  <div style="padding:0.5rem 0.75rem; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); font-size:0.75rem; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+                    <i data-lucide="truck" style="width:16px; height:16px; color:var(--accent); flex-shrink:0;"></i>
+                    <span>${rutaLimpia}</span>
+                  </div>
+                </div>
+              `;
+            }
           }
 
           const generateTable = (title, icon, items) => {
@@ -1566,7 +1708,9 @@ async function cerrarCotizacionTicket(id) {
   safeSetJSON('sapi_tickets', tickets);
   
   if (aceptada === 'si') {
-    if (typeof window.asegurarGuiaEnvioParaTicket === 'function') {
+    const isRefCat = String(t.categoria || '').toLowerCase().includes('refacci') || (t.folio && t.folio.endsWith('-A'));
+    const hasParts = Array.isArray(t.refaccionesSeleccionadas) && t.refaccionesSeleccionadas.length > 0;
+    if ((isRefCat || hasParts) && typeof window.asegurarGuiaEnvioParaTicket === 'function') {
       window.asegurarGuiaEnvioParaTicket(t);
     }
     if (typeof window.ejecutarAutomatizacion === 'function') {
@@ -1889,9 +2033,11 @@ async function forzarEstadoTicket(id) {
 async function forzarCrearOrdenServicio(id) {
   if (typeof document === 'undefined') return;
   const isSuperadmin = safeEsUsuarioSuperadmin();
+  const sess = (typeof currentSession !== 'undefined' && currentSession) ? currentSession : (typeof window !== 'undefined' ? window.currentSession : null);
+  const isStaff = isSuperadmin || (sess && ['superadmin', 'admin', 'supervisor'].includes(String(sess.viewMode || sess.realRol || sess.rol || '').toLowerCase().trim()));
   
-  if (!isSuperadmin) {
-    mostrarNotificacion('Acción restringida: Solo los usuarios con rol Superadmin pueden forzar órdenes de servicio.', 'error');
+  if (!isStaff) {
+    mostrarNotificacion('Acción restringida: Solo administradores y supervisores pueden generar órdenes de servicio.', 'error');
     return;
   }
 
@@ -1963,7 +2109,7 @@ async function forzarCrearOrdenServicio(id) {
     <div class="modal" style="max-width: 580px; width: 100%; max-height: 92vh; background: var(--bg-card, #1e2130); border: 1px solid var(--border, #2e3248); border-radius: var(--radius, 12px); box-shadow: 0 20px 40px rgba(0,0,0,0.5); display: flex; flex-direction: column; overflow: hidden; animation: slideUp 0.2s ease;">
       <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--border); background: var(--bg-secondary); flex-shrink: 0;">
         <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-          <i data-lucide="file-plus" style="color: #2563eb; width: 20px; height: 20px;"></i> Forzar Orden de Servicio (Superadmin)
+          <i data-lucide="file-plus" style="color: #2563eb; width: 20px; height: 20px;"></i> Generar Orden de Servicio
         </h3>
         <button class="modal-close" onclick="this.closest('.modal-overlay').remove()" style="background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 1.2rem; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-sm); transition: var(--transition);">
           <i data-lucide="x" style="width: 18px; height: 18px;"></i>
@@ -2274,7 +2420,8 @@ async function forzarCrearOrdenServicio(id) {
     cerrarDetalleTicket: cerrarDetalleTicket,
     forzarEstadoTicket: forzarEstadoTicket,
     forzarCrearOrdenServicio: forzarCrearOrdenServicio,
-    adjuntarDocumentoTicketDirecto: adjuntarDocumentoTicketDirecto
+    adjuntarDocumentoTicketDirecto: adjuntarDocumentoTicketDirecto,
+    toggleDescripcionTicket: toggleDescripcionTicket
   };
 
   if (typeof root !== "undefined") {
@@ -2287,6 +2434,7 @@ async function forzarCrearOrdenServicio(id) {
     window.agregarComentarioInterno = agregarComentarioInterno;
     window.agregarComentarioExterno = agregarComentarioExterno;
     window.verDetalleTicket = verDetalleTicket;
+    window.toggleDescripcionTicket = toggleDescripcionTicket;
     window.visualizarPdfOnDemand = visualizarPdfOnDemand;
     window.visualizarDestinoPdfActual = visualizarDestinoPdfActual;
     window.descargarPdfOnDemand = descargarPdfOnDemand;

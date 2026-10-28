@@ -347,8 +347,11 @@ function esTicketDeServicioEnCampo(t) {
     return false;
   }
 
-  // 2. Si el Área es Refacciones, Garantías, Piezas o Almacén
-  if (area.includes('refacci') || area.includes('garant') || area.includes('pieza') || area.includes('almacen')) {
+  // Explicit service category check
+  const esServicioTecnicoExplicito = cat.includes('servicio') || cat.includes('mantenimiento') || cat.includes('puesta en marcha') || cat.includes('pre-entrega') || cat.includes('inspeccion') || cat.includes('reparacion');
+
+  // 2. Si el Área es Refacciones, Garantías, Piezas o Almacén (y NO es servicio técnico explícito)
+  if (!esServicioTecnicoExplicito && (area.includes('refacci') || area.includes('garant') || area.includes('pieza') || area.includes('almacen'))) {
     return false;
   }
 
@@ -358,30 +361,30 @@ function esTicketDeServicioEnCampo(t) {
                         cat.includes('solicitud de informacion');
   if (esCatRefOrGar) {
     // Si el área o categoría es refacción/garantía sin ser servicio explícito
-    if (!cat.includes('servicio') && !cat.includes('mantenimiento') && !cat.includes('puesta en marcha') && !cat.includes('pre-entrega') && !cat.includes('inspeccion') && !cat.includes('reparacion')) {
+    if (!esServicioTecnicoExplicito) {
       return false;
     }
   }
 
-  // 4. Si el Tipo es Refacción, Garantía o Despacho
-  if (tipo.includes('refacci') || tipo.includes('garant') || tipo.includes('pieza') || tipo.includes('despacho')) {
+  // 4. Si el Tipo es Refacción, Garantía o Despacho (y NO es servicio técnico explícito)
+  if (!esServicioTecnicoExplicito && (tipo.includes('refacci') || tipo.includes('garant') || tipo.includes('pieza') || tipo.includes('despacho'))) {
     return false;
   }
 
-  // 5. Si el Asunto contiene términos explícitos de refacciones o garantías (y no es servicio técnico en campo)
+  // 5. Si el Asunto contiene términos explícitos de refacciones o garantías (y NO es servicio técnico en campo)
   const esAsuntoRef = (asunto.includes('refacci') || asunto.includes('garant') || asunto.includes('despacho')) &&
+                      !esServicioTecnicoExplicito &&
                       !asunto.includes('servicio') && !asunto.includes('mantenimiento') && !asunto.includes('puesta en marcha') && !asunto.includes('reparacion');
   if (esAsuntoRef) {
     return false;
   }
 
-  // 6. Si el destino de las piezas es directo al cliente
-  if (t.destinoPiezas === 'cliente') {
+  // 6. Si el destino de las piezas es directo al cliente (y NO es servicio técnico explícito)
+  if (!esServicioTecnicoExplicito && t.destinoPiezas === 'cliente') {
     return false;
   }
 
   // 7. Si el ticket tiene refacciones o envíos y no es un servicio técnico en campo explícito
-  const esServicioTecnicoExplicito = cat.includes('servicio') || cat.includes('mantenimiento') || cat.includes('puesta en marcha') || cat.includes('pre-entrega') || cat.includes('inspeccion') || cat.includes('reparacion');
   const tieneRefacciones = (Array.isArray(t.refaccionesSeleccionadas) && t.refaccionesSeleccionadas.length > 0) || (Array.isArray(t.envios) && t.envios.length > 0) || (t.guiaPedido && String(t.guiaPedido).trim().length > 0);
   
   if (tieneRefacciones && !esServicioTecnicoExplicito) {

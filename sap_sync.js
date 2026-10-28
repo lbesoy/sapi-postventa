@@ -1573,21 +1573,44 @@
       let extrasArticulos = [];
 
       const orders = (typeof global !== 'undefined' && global._cachePedidosSap) ? global._cachePedidosSap : _cachePedidosSap;
+      const tId = ticketId || (typeof editandoTicketId !== 'undefined' ? editandoTicketId : null);
+      const tkts = _getTickets();
+      const ticket = tId ? tkts.find(t => t.id === tId) : null;
+      const targetSapVal = isModal
+        ? (document.getElementById('t-pedido-sap')?.value || (ticket ? ticket.pedidoSAP : '') || '').trim()
+        : (document.getElementById(`quick-ped-sap-${tId}`)?.value || (ticket ? ticket.pedidoSAP : '') || '').trim();
+      const targetClientName = isModal
+        ? (document.getElementById('t-cliente')?.value || (ticket ? ticket.cliente : '') || '').trim()
+        : (ticket ? ticket.cliente : '').trim();
 
       if (file.name) {
-        const fnMatch = file.name.match(/\b([123]10[0-9]{4})\b/) || file.name.match(/\b([0-9]{5,8})\b/);
-        if (fnMatch) {
-          const docNum = fnMatch[1];
-          const found = (orders || []).find(o => o.numero_pedido === docNum);
+        if (targetSapVal && file.name.includes(targetSapVal)) {
+          const found = (orders || []).find(o => String(o.numero_pedido).trim() === targetSapVal);
           if (found) {
             isFileNameMatch = true;
             isSapMatch = true;
             extractedDoc = found.numero_pedido;
             extractedMonto = found.monto;
             detectedClientName = found.cliente_nombre;
-            console.log('[PDF Auto-Extract Pedido] Matched pedido from filename via SAP cache:', found);
+            console.log('[PDF Auto-Extract Pedido] Matched target pedido from filename via SAP cache:', found);
           } else {
-            extractedDoc = docNum;
+            extractedDoc = targetSapVal;
+          }
+        } else {
+          const fnMatch = file.name.match(/\b([123]10[0-9]{4})\b/) || file.name.match(/\b([0-9]{5,8})\b/);
+          if (fnMatch) {
+            const docNum = fnMatch[1];
+            const found = (orders || []).find(o => o.numero_pedido === docNum);
+            if (found) {
+              isFileNameMatch = true;
+              isSapMatch = true;
+              extractedDoc = found.numero_pedido;
+              extractedMonto = found.monto;
+              detectedClientName = found.cliente_nombre;
+              console.log('[PDF Auto-Extract Pedido] Matched pedido from filename via SAP cache:', found);
+            } else {
+              extractedDoc = docNum;
+            }
           }
         }
       }
@@ -1603,7 +1626,16 @@
           const result = await response.json();
           if (result.ai && result.data) {
             isAiExtracted = true;
-            extractedDoc = extractedDoc || result.data.numero_cotizacion || result.data.numero_pedido || null;
+            const aiPedido = result.data.numero_pedido ? String(result.data.numero_pedido).trim() : null;
+            const aiCot = result.data.numero_cotizacion ? String(result.data.numero_cotizacion).trim() : null;
+            const aiOc = result.data.orden_compra ? String(result.data.orden_compra).trim() : null;
+
+            if (targetSapVal && (aiPedido === targetSapVal || aiCot === targetSapVal)) {
+              extractedDoc = targetSapVal;
+            } else {
+              extractedDoc = extractedDoc || aiPedido || aiCot || aiOc || null;
+            }
+
             extractedMonto = extractedMonto || result.data.monto || null;
             detectedClientName = detectedClientName || result.data.cliente || null;
             detallesViaje = result.data.detalles_viaje || null;
@@ -1628,10 +1660,56 @@
 
       let detectedOrder = null;
       if (cleanText && orders) {
-        for (const o of orders) {
-          if (o.numero_pedido && cleanText.includes(o.numero_pedido)) {
-            detectedOrder = o;
-            break;
+        // 1. Prioridad: ¿El texto contiene el número de pedido objetivo del formulario/ticket?
+        if (targetSapVal) {
+          const targetRgx = new RegExp(`\\b${targetSapVal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+          if (targetRgx.test(cleanText)) {
+            const matchTarget = orders.find(o => String(o.numero_pedido).trim() === targetSapVal);
+            if (matchTarget) {
+              detectedOrder = matchTarget;
+              console.log('[PDF Auto-Extract Pedido] Matched target order from form in PDF text:', detectedOrder);
+            } else {
+              extractedDoc = targetSapVal;
+            }
+          }
+        }
+
+        // 2. Si no se detectó por objetivo, buscar en orders pero con delimitadores de palabra y filtrado de cliente
+        if (!detectedOrder) {
+          const candidates = [];
+          for (const o of orders) {
+            if (o.numero_pedido && String(o.numero_pedido).length >= 5) {
+              const numStr = String(o.numero_pedido).trim();
+              const rgx = new RegExp(`\\b${numStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+              if (rgx.test(cleanText)) {
+                candidates.push(o);
+              }
+            }
+          }
+
+          if (candidates.length > 0) {
+            // Si el cliente del ticket es conocido, dar máxima prioridad a la orden que coincida con el cliente
+            if (targetClientName) {
+              const targetClean = targetClientName.toLowerCase().replace(/[^a-z0-9]/g, '');
+              const clientMatch = candidates.find(c => {
+                if (!c.cliente_nombre) return false;
+                const cClean = c.cliente_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+                return cClean.includes(targetClean) || targetClean.includes(cClean);
+              });
+              if (clientMatch) {
+                detectedOrder = clientMatch;
+              }
+            }
+
+            // Si aún no se decide, buscar coincidencia de monto en el texto
+            if (!detectedOrder) {
+              const montoMatch = candidates.find(c => {
+                if (!c.monto) return false;
+                const formattedMonto = Number(c.monto).toFixed(2);
+                return cleanText.includes(formattedMonto) || cleanText.includes(Number(c.monto).toLocaleString('en-US', { minimumFractionDigits: 2 }));
+              });
+              detectedOrder = montoMatch || candidates[0];
+            }
           }
         }
       }
@@ -1642,8 +1720,12 @@
         extractedMonto = detectedOrder.monto;
         detectedClientName = detectedOrder.cliente_nombre;
       } else if (cleanText) {
-        const docMatch = cleanText.match(/\b([123]10[0-9]{4})\b/) || cleanText.match(/\b([0-9]{5,8})\b/);
-        extractedDoc = docMatch ? docMatch[1] : (extractedDoc || null);
+        if (targetSapVal && new RegExp(`\\b${targetSapVal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(cleanText)) {
+          extractedDoc = targetSapVal;
+        } else {
+          const docMatch = cleanText.match(/\b([123]10[0-9]{4})\b/) || cleanText.match(/\b([0-9]{5,8})\b/);
+          extractedDoc = docMatch ? docMatch[1] : (extractedDoc || null);
+        }
         
         const totalRegex = /(?:importe\s+total|total|importe|monto|neto)[:\s\$\-]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2}))/gi;
         let match;
@@ -1657,9 +1739,31 @@
         if (maxMonto > 0) {
           extractedMonto = extractedMonto || maxMonto;
         }
+      }
 
-        if (!extractedArticulos || extractedArticulos.length === 0) {
-          // Intento 1: Formato estándar partida descripcion cant um x_surtir almacen precio imp total
+      // Extracción de artículos de las tablas del PDF (SIEMPRE que cleanText exista y no hayan venido de la AI)
+      if (cleanText && (!extractedArticulos || extractedArticulos.length === 0)) {
+        // Intento 1: Formato SAP PEDIDO CLIENTE / PED_TRI
+        // Ej: 1 4,113.11 16.00 4,113.11 001 1 MET SENSOR DE TEMPERATURA...
+        const itemRegexSap = /(?:(\d+(?:\.\d+)?)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+)?(\d{3})\s+(\d+(?:\.\d+)?)\s+([A-Za-z0-9]{1,5})\s+(.*?)(?=\s+(?:ZFAC\d+|Item Code:|\d+(?:\.\d+)?\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+\d{3}|\d{3}\s+\d+|\bSubtotal:|\bImporte total:|$))/gi;
+        let sapMatch;
+        while ((sapMatch = itemRegexSap.exec(cleanText)) !== null) {
+          const desc = (sapMatch[8] || '').trim();
+          if (desc && desc.length > 2) {
+            extractedArticulos.push({
+              partida: sapMatch[5],
+              cantidad: parseFloat(sapMatch[6] || sapMatch[1] || '1'),
+              unidad_medida: sapMatch[7] || 'MET',
+              descripcion: desc,
+              precio: sapMatch[2] ? parseFloat(sapMatch[2].replace(/,/g, '')) : 0,
+              impuesto_porcentaje: sapMatch[3] ? parseFloat(sapMatch[3].replace(/,/g, '')) : 16,
+              total: sapMatch[4] ? parseFloat(sapMatch[4].replace(/,/g, '')) : 0
+            });
+          }
+        }
+
+        // Intento 2: Formato estándar partida descripcion cant um x_surtir almacen precio imp total
+        if (extractedArticulos.length === 0) {
           const itemRegex = /\b(\d{3})\s+(.*?)\s+(\d+(?:\.\d+)?)\s+([A-Za-z0-9]{1,5})\s+(\d+(?:\.\d+)?)\s+([A-Za-z0-9]{1,5})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\b/g;
           let itemMatch;
           while ((itemMatch = itemRegex.exec(cleanText)) !== null) {
@@ -1675,56 +1779,46 @@
               total: parseFloat(itemMatch[9].replace(/,/g, ''))
             });
           }
+        }
 
-          // Intento 2: Formato SAP PEDIDO CLIENTE / PED_TRI
-          // Ej: 1 8,800.00 16.00 8,800.00 002 1 MET Reembolso KM/Casetas E48 CDMX - Cardel,Veracruz - 800 - KM...
-          if (extractedArticulos.length === 0) {
-            const itemRegexSap = /(?:(\d+(?:\.\d+)?)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+)?(\d{3})\s+(\d+(?:\.\d+)?)\s+([A-Za-z0-9]{1,5})\s+(.*?)(?=\s+(?:ZFAC\d+|Item Code:|\d+(?:\.\d+)?\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+\d{3}|\d{3}\s+\d+|\bSubtotal:|\bImporte total:|$))/gi;
-            let sapMatch;
-            while ((sapMatch = itemRegexSap.exec(cleanText)) !== null) {
-              const desc = (sapMatch[8] || '').trim();
-              if (desc && desc.length > 2) {
-                extractedArticulos.push({
-                  partida: sapMatch[5],
-                  cantidad: parseFloat(sapMatch[6] || sapMatch[1] || '1'),
-                  unidad_medida: sapMatch[7] || 'MET',
-                  descripcion: desc,
-                  precio: sapMatch[2] ? parseFloat(sapMatch[2].replace(/,/g, '')) : 0,
-                  impuesto_porcentaje: sapMatch[3] ? parseFloat(sapMatch[3].replace(/,/g, '')) : 16,
-                  total: sapMatch[4] ? parseFloat(sapMatch[4].replace(/,/g, '')) : 0
-                });
-              }
-            }
-          }
-
-          // Intento 3: Salvaguarda directa para Reembolso KM si existe en texto pero no fue capturado por tablas
-          const cleanLower = cleanText.toLowerCase();
-          const hasKmInText = (cleanLower.includes('reembolso') && (cleanLower.includes('km') || cleanLower.includes('casetas') || cleanLower.includes('kilometraje'))) || cleanLower.includes('reembolso km');
-          const alreadyHasKm = extractedArticulos.some(a => {
-            const d = (a.descripcion || '').toLowerCase();
-            return (d.includes('reembolso') && (d.includes('km') || d.includes('casetas') || d.includes('kilometraje'))) || d.includes('reembolso km');
+        // Intento 3: Salvaguarda directa para Reembolso KM si existe en texto pero no fue capturado por tablas
+        const cleanLower = cleanText.toLowerCase();
+        const hasKmInText = (cleanLower.includes('reembolso') && (cleanLower.includes('km') || cleanLower.includes('casetas') || cleanLower.includes('kilometraje'))) || cleanLower.includes('reembolso km');
+        const alreadyHasKm = extractedArticulos.some(a => {
+          const d = (a.descripcion || '').toLowerCase();
+          return (d.includes('reembolso') && (d.includes('km') || d.includes('casetas') || d.includes('kilometraje'))) || d.includes('reembolso km');
+        });
+        if (hasKmInText && !alreadyHasKm) {
+          const kmSnippetMatch = cleanText.match(/(?:reembolso\s+(?:de\s+)?(?:km|kilometraje|casetas)[^\n\r]*|.*?(?:reembolso\s+km[^\n\r]*))/i);
+          const kmSnippet = kmSnippetMatch ? kmSnippetMatch[0].trim() : 'Reembolso KM / Casetas';
+          extractedArticulos.push({
+            partida: 'KM',
+            descripcion: kmSnippet,
+            cantidad: 1,
+            unidad_medida: 'MET',
+            precio: 0,
+            impuesto_porcentaje: 16,
+            total: 0
           });
-          if (hasKmInText && !alreadyHasKm) {
-            const kmSnippetMatch = cleanText.match(/(?:reembolso\s+(?:de\s+)?(?:km|kilometraje|casetas)[^\n\r]*|.*?(?:reembolso\s+km[^\n\r]*))/i);
-            const kmSnippet = kmSnippetMatch ? kmSnippetMatch[0].trim() : 'Reembolso KM / Casetas';
-            extractedArticulos.push({
-              partida: 'KM',
-              descripcion: kmSnippet,
-              cantidad: 1,
-              unidad_medida: 'MET',
-              precio: 0,
-              impuesto_porcentaje: 16,
-              total: 0
-            });
-          }
+        }
 
-          if (extractedArticulos.length > 0) {
-            console.log('[PDF Auto-Extract Pedido] Extraídos articulos con Regex fallback:', extractedArticulos);
-          }
+        if (extractedArticulos.length > 0) {
+          console.log('[PDF Auto-Extract Pedido] Extraídos articulos con Regex fallback:', extractedArticulos);
         }
       }
 
       // Extracción fallback de logística si no vino de la AI
+      let cleanRuta = '';
+      if (cleanText) {
+        const expMatch = cleanText.match(/(?:Clase de expedición\s*:\s*|Dirección de entrega\s*:\s*|Envío a ocurre\s*:\s*)([^█\n\r]+)/i) ||
+                         cleanText.match(/(?:Envío\s+(?:inmediato|a\s+ocurre)[^█\n\r]*)/i) ||
+                         cleanText.match(/([A-Za-zÁÉÍÓÚáéíóúñÑ\s]+)\s*-\s*([A-Za-zÁÉÍÓÚáéíóúñÑ\s,]+)\s*-\s*(\d+)\s*-\s*KM/i);
+        if (expMatch) {
+          let rawLog = expMatch[1] ? expMatch[1].trim() : expMatch[0].trim();
+          cleanRuta = rawLog.split(/(?:Basado en|Permitir|Impreso por|Fecha de|Total|Subtotal)/i)[0].trim().replace(/[\.\s]+$/, '');
+        }
+      }
+
       if (!detallesViaje && cleanText) {
         let nHospedaje = 0;
         let nAlimento = 0;
@@ -1767,7 +1861,7 @@
         }
       }
 
-      const extraKeywords = ['consumibles', 'asistencia', 'casetas', 'viaticos', 'viáticos', 'reembolso', 'km', 'kilometraje', 'hospedaje', 'alimentos', 'traslado'];
+      const extraKeywords = ['consumibles', 'asistencia', 'casetas', 'viaticos', 'viáticos', 'reembolso', 'km', 'kilometraje', 'hospedaje', 'alimentos', 'traslado', 'logistica', 'logística', 'entrega', 'envio', 'envío', 'ocurre', 'flete'];
       if (extractedArticulos && extractedArticulos.length > 0) {
         extractedArticulos.forEach(art => {
           const desc = (art.descripcion || '').toLowerCase();
@@ -1788,10 +1882,14 @@
         isSapMatch: isSapMatch,
         cleanText: cleanText,
         articulos: extractedArticulos,
-        mainArticulos: mainArticulos
+        mainArticulos: mainArticulos,
+        ticketId: tId
       };
       if (typeof global !== 'undefined') {
         global._lastPdfPedidoExtracted = lastPdfData;
+        global._lastPdfPedidoExtractedByTicket = global._lastPdfPedidoExtractedByTicket || {};
+        const contextKey = isModal ? 'modal' : String(tId || 'default');
+        global._lastPdfPedidoExtractedByTicket[contextKey] = lastPdfData;
       }
 
       if (isFileNameMatch) {
@@ -1905,6 +2003,17 @@
               </div>
             </div>
             ` : ''}
+            ${cleanRuta && !detallesViaje ? `
+            <div style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+              <div style="font-weight:600; color:var(--text-secondary); margin-bottom: 0.5rem; display:flex; align-items:center; gap:6px;">
+                <span>✈️ Logística y Envío</span>
+              </div>
+              <div style="padding:0.5rem 0.75rem; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); font-size:0.75rem; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+                <i data-lucide="truck" style="width:16px; height:16px; color:var(--accent); flex-shrink:0;"></i>
+                <span>${cleanRuta}</span>
+              </div>
+            </div>
+            ` : ''}
           </div>
         `;
       }
@@ -1925,12 +2034,20 @@
                extrasParaGuardar.push({ isViajeData: true, ...detallesViaje });
             }
             
+            let rutaGuardar = cleanRuta;
+            if (!rutaGuardar && detallesViaje) {
+              rutaGuardar = `${detallesViaje.origen || ''} - ${detallesViaje.destino || ''}`;
+            }
+            if (!rutaGuardar) {
+              rutaGuardar = cleanText;
+            }
+
             const insertData = {
               ticket_id: finalTicketId || null,
               folio_sap: extractedDoc,
               monto_total: extractedMonto,
               cliente: detectedClientName,
-              ruta_servicio: cleanText,
+              ruta_servicio: rutaGuardar,
               conceptos: mainArticulos,
               extras: extrasParaGuardar,
               origen_datos: origenDatos
@@ -1990,7 +2107,13 @@
     if (clearBtn) clearBtn.style.display = 'none';
 
     if (typeof global !== 'undefined') {
-      global._lastPdfPedidoExtracted = null;
+      const contextKey = isModal ? 'modal' : String(ticketId || 'default');
+      if (global._lastPdfPedidoExtractedByTicket) {
+        delete global._lastPdfPedidoExtractedByTicket[contextKey];
+      }
+      if (global._lastPdfPedidoExtracted && (global._lastPdfPedidoExtracted.ticketId === ticketId || !ticketId)) {
+        global._lastPdfPedidoExtracted = null;
+      }
     }
 
     validarPedidoConSAP(isModal, ticketId);
@@ -2071,20 +2194,48 @@
         isClientMatch = tClientClean.includes(sClientClean) || sClientClean.includes(tClientClean);
       }
 
-      const pdfData = typeof global !== 'undefined' ? global._lastPdfPedidoExtracted : null;
-      const hasPdf = !!pdfData;
+      const contextKey = isModal ? 'modal' : String(tId || 'default');
+      const fileInputId = isModal ? 't-pedido-pdf' : `quick-ped-pdf-${ticketId}`;
+      const fileInput = document.getElementById(fileInputId);
+      const hasFileInInput = !!(fileInput && fileInput.files && fileInput.files.length > 0);
+
+      const pdfData = typeof global !== 'undefined'
+        ? ((global._lastPdfPedidoExtractedByTicket && global._lastPdfPedidoExtractedByTicket[contextKey]) ||
+           (global._lastPdfPedidoExtracted && (global._lastPdfPedidoExtracted.ticketId === tId || (!global._lastPdfPedidoExtracted.ticketId && hasFileInInput)) ? global._lastPdfPedidoExtracted : null))
+        : null;
+      const hasPdf = !!pdfData && (hasFileInInput || (pdfData.ticketId && pdfData.ticketId === tId));
       
       let isPdfDocMatch = true;
       let isPdfMontoMatch = true;
       let isPdfClientMatch = true;
 
       if (hasPdf) {
-        isPdfDocMatch = String(pdfData.doc || '').trim() === String(sapVal).trim();
-        isPdfMontoMatch = pdfData.monto ? Math.abs(Number(pdfData.monto) - sapMonto) < 0.05 : true;
+        const sapValClean = String(sapVal).trim();
+        const docClean = String(pdfData.doc || '').trim();
+        const textHasDoc = pdfData.cleanText && new RegExp(`\\b${sapValClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(pdfData.cleanText);
+        isPdfDocMatch = (docClean === sapValClean) || !!textHasDoc;
+
+        const montoNum = pdfData.monto ? Number(pdfData.monto) : null;
+        let textHasMonto = false;
+        if (pdfData.cleanText && sapMonto > 0) {
+          const montoStr1 = sapMonto.toFixed(2);
+          const montoStr2 = sapMonto.toLocaleString('en-US', { minimumFractionDigits: 2 });
+          const montoStr3 = sapMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 });
+          textHasMonto = pdfData.cleanText.includes(montoStr1) || pdfData.cleanText.includes(montoStr2) || pdfData.cleanText.includes(montoStr3);
+        }
+        isPdfMontoMatch = (montoNum ? Math.abs(montoNum - sapMonto) < 0.05 : false) || textHasMonto;
+
         if (pdfData.cliente) {
           const pClientClean = String(pdfData.cliente).toLowerCase().replace(/[^a-z0-9]/g, '');
           const sClientClean = String(sapCliente).toLowerCase().replace(/[^a-z0-9]/g, '');
           isPdfClientMatch = pClientClean.includes(sClientClean) || sClientClean.includes(pClientClean);
+        }
+        if (!isPdfClientMatch && pdfData.cleanText && sapCliente) {
+          const clientWords = String(sapCliente).toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 4 && !['para','como','este','sa','cv','sadecv'].includes(w));
+          const matchedWords = clientWords.filter(w => pdfData.cleanText.toLowerCase().includes(w));
+          if (matchedWords.length >= Math.min(2, Math.max(1, clientWords.length))) {
+            isPdfClientMatch = true;
+          }
         }
       }
 
@@ -2093,7 +2244,9 @@
       if (isPdfMontoMatch) matchCount++;
       if (isPdfClientMatch) matchCount++;
 
-      const isBlocked = hasPdf && (matchCount < 2);
+      const isFormSapMatch = isMontoMatch && isClientMatch;
+      // Si Formulario y SAP coinciden plenamente, no se bloquea al usuario por temas de OCR
+      const isBlocked = !isFormSapMatch || (hasPdf && !isPdfDocMatch && matchCount === 0 && !isFormSapMatch);
       if (typeof global !== 'undefined') {
         global._isPedidoSapBlocked = isBlocked;
         if (tId) global._pedidoSapBlockedState[tId] = isBlocked;
@@ -2143,7 +2296,16 @@
         statusDiv.innerHTML = `
           <div style="padding:0.6rem 0.8rem; border-radius:8px; background:rgba(239,68,68,0.05); border:1px solid rgba(239,68,68,0.15); font-size:0.78rem; color:#ef4444; display:flex; flex-direction:column; gap:0.3rem;">
             <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="alert-octagon" style="width:14px; height:14px;"></i> Discrepancia Crítica Detectada</div>
-            <div style="font-size:0.74rem; color:var(--text-muted);">Los datos del PDF subido no coinciden con la información oficial de SAP. Verifique el archivo.</div>
+            <div style="font-size:0.74rem; color:var(--text-muted);">Los datos ingresados no coinciden con la información oficial de SAP. Verifique el número de pedido o monto.</div>
+            ${comparisonTableHtml}
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Fecha SAP: ${sapFecha}</div>
+          </div>
+        `;
+      } else if (hasPdf && matchCount < 2) {
+        statusDiv.innerHTML = `
+          <div style="padding:0.6rem 0.8rem; border-radius:8px; background:rgba(245,158,11,0.05); border:1px solid rgba(245,158,11,0.18); font-size:0.78rem; color:#f59e0b; display:flex; flex-direction:column; gap:0.3rem;">
+            <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="check-circle" style="width:14px; height:14px; color:#10b981;"></i> Pedido SAP Verificado Oficialmente</div>
+            <div style="font-size:0.74rem; color:var(--text-secondary);">El número de pedido y monto coinciden plenamente con el catálogo oficial de SAP. La lectura automática del PDF arrojó datos referenciales, pero la información de SAP es válida.</div>
             ${comparisonTableHtml}
             <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Fecha SAP: ${sapFecha}</div>
           </div>
@@ -2152,7 +2314,7 @@
         statusDiv.innerHTML = `
           <div style="padding:0.6rem 0.8rem; border-radius:8px; background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.15); font-size:0.78rem; color:#10b981; display:flex; flex-direction:column; gap:0.3rem;">
             <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="check-circle" style="width:14px; height:14px;"></i> Pedido Validado con SAP</div>
-            <div style="font-size:0.74rem; color:var(--text-muted);">El formulario, el archivo PDF y SAP coinciden plenamente.</div>
+            <div style="font-size:0.74rem; color:var(--text-muted);">${hasPdf ? 'El formulario, el archivo PDF y SAP coinciden plenamente.' : 'Información verificada con el catálogo oficial de SAP.'}</div>
             ${comparisonTableHtml}
             <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Fecha SAP: ${sapFecha}</div>
           </div>
@@ -2203,21 +2365,44 @@
       let isFileNameMatch = false;
 
       const quotes = (typeof global !== 'undefined' && global._cacheCotizacionesSap) ? global._cacheCotizacionesSap : _cacheCotizacionesSap;
+      const tId = ticketId || (typeof editandoTicketId !== 'undefined' ? editandoTicketId : null);
+      const tkts = _getTickets();
+      const ticket = tId ? tkts.find(t => t.id === tId) : null;
+      const targetCotVal = isModal
+        ? (document.getElementById('t-cotizacion-sap')?.value || (ticket ? ticket.cotizacionSAP : '') || '').trim()
+        : (document.getElementById(`quick-cot-sap-${tId}`)?.value || (ticket ? ticket.cotizacionSAP : '') || '').trim();
+      const targetClientName = isModal
+        ? (document.getElementById('t-cliente')?.value || (ticket ? ticket.cliente : '') || '').trim()
+        : (ticket ? ticket.cliente : '').trim();
 
       if (file.name) {
-        const fnMatch = file.name.match(/\b([123]10[0-9]{4})\b/) || file.name.match(/\b([0-9]{7})\b/);
-        if (fnMatch) {
-          const docNum = fnMatch[1];
-          const found = (quotes || []).find(q => q.numero_cotizacion === docNum);
+        if (targetCotVal && file.name.includes(targetCotVal)) {
+          const found = (quotes || []).find(q => String(q.numero_cotizacion).trim() === targetCotVal);
           if (found) {
             isFileNameMatch = true;
             isSapMatch = true;
             extractedDoc = found.numero_cotizacion;
             extractedMonto = found.monto;
             detectedClientName = found.cliente;
-            console.log('[PDF Auto-Extract] Matched quotation from filename via SAP cache:', found);
+            console.log('[PDF Auto-Extract] Matched target quotation from filename via SAP cache:', found);
           } else {
-            extractedDoc = docNum;
+            extractedDoc = targetCotVal;
+          }
+        } else {
+          const fnMatch = file.name.match(/\b([123]10[0-9]{4})\b/) || file.name.match(/\b([0-9]{7})\b/);
+          if (fnMatch) {
+            const docNum = fnMatch[1];
+            const found = (quotes || []).find(q => q.numero_cotizacion === docNum);
+            if (found) {
+              isFileNameMatch = true;
+              isSapMatch = true;
+              extractedDoc = found.numero_cotizacion;
+              extractedMonto = found.monto;
+              detectedClientName = found.cliente;
+              console.log('[PDF Auto-Extract] Matched quotation from filename via SAP cache:', found);
+            } else {
+              extractedDoc = docNum;
+            }
           }
         }
       }
@@ -2234,7 +2419,17 @@
           
           if (response.ok) {
             const result = await response.json();
-            if (result.text) {
+            if (result.ai && result.data) {
+              const aiCot = result.data.numero_cotizacion ? String(result.data.numero_cotizacion).trim() : null;
+              const aiPed = result.data.numero_pedido ? String(result.data.numero_pedido).trim() : null;
+              if (targetCotVal && (aiCot === targetCotVal || aiPed === targetCotVal)) {
+                extractedDoc = targetCotVal;
+              } else {
+                extractedDoc = aiCot || aiPed || null;
+              }
+              extractedMonto = result.data.monto || null;
+              detectedClientName = result.data.cliente || null;
+            } else if (result.text) {
               cleanText = result.text.replace(/\s+/g, ' ').trim();
             }
           }
@@ -2242,7 +2437,7 @@
           console.warn('[PDF Auto-Extract] Local backend extraction failed:', apiErr);
         }
 
-        if (!cleanText && typeof global !== 'undefined' && typeof global.extraerTextoPdf === 'function') {
+        if (!cleanText && !extractedDoc && typeof global !== 'undefined' && typeof global.extraerTextoPdf === 'function') {
           try {
             const text = await global.extraerTextoPdf(base64);
             cleanText = text.replace(/\s+/g, ' ').trim();
@@ -2255,10 +2450,51 @@
         
         let detectedQuote = null;
         if (cleanText && quotes) {
-          for (const q of quotes) {
-            if (q.numero_cotizacion && cleanText.includes(q.numero_cotizacion)) {
-              detectedQuote = q;
-              break;
+          // 1. Prioridad: ¿El texto contiene la cotización objetivo?
+          if (targetCotVal) {
+            const targetRgx = new RegExp(`\\b${targetCotVal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+            if (targetRgx.test(cleanText)) {
+              const matchTarget = quotes.find(q => String(q.numero_cotizacion).trim() === targetCotVal);
+              if (matchTarget) {
+                detectedQuote = matchTarget;
+                console.log('[PDF Auto-Extract] Matched target quotation from form in PDF text:', detectedQuote);
+              } else {
+                extractedDoc = targetCotVal;
+              }
+            }
+          }
+
+          // 2. Si no se detectó por objetivo, buscar con word boundaries y scoring de cliente
+          if (!detectedQuote) {
+            const candidates = [];
+            for (const q of quotes) {
+              if (q.numero_cotizacion && String(q.numero_cotizacion).length >= 5) {
+                const numStr = String(q.numero_cotizacion).trim();
+                const rgx = new RegExp(`\\b${numStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+                if (rgx.test(cleanText)) {
+                  candidates.push(q);
+                }
+              }
+            }
+
+            if (candidates.length > 0) {
+              if (targetClientName) {
+                const targetClean = targetClientName.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const clientMatch = candidates.find(c => {
+                  if (!c.cliente) return false;
+                  const cClean = c.cliente.toLowerCase().replace(/[^a-z0-9]/g, '');
+                  return cClean.includes(targetClean) || targetClean.includes(cClean);
+                });
+                if (clientMatch) detectedQuote = clientMatch;
+              }
+              if (!detectedQuote) {
+                const montoMatch = candidates.find(c => {
+                  if (!c.monto) return false;
+                  const formattedMonto = Number(c.monto).toFixed(2);
+                  return cleanText.includes(formattedMonto) || cleanText.includes(Number(c.monto).toLocaleString('en-US', { minimumFractionDigits: 2 }));
+                });
+                detectedQuote = montoMatch || candidates[0];
+              }
             }
           }
         }
@@ -2269,8 +2505,12 @@
           extractedMonto = detectedQuote.monto;
           detectedClientName = detectedQuote.cliente;
         } else if (cleanText) {
-          const docMatch = cleanText.match(/\b([123]10[0-9]{4})\b/) || cleanText.match(/\b([0-9]{7})\b/);
-          extractedDoc = docMatch ? docMatch[1] : (extractedDoc || null);
+          if (targetCotVal && new RegExp(`\\b${targetCotVal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(cleanText)) {
+            extractedDoc = targetCotVal;
+          } else {
+            const docMatch = cleanText.match(/\b([123]10[0-9]{4})\b/) || cleanText.match(/\b([0-9]{7})\b/);
+            extractedDoc = docMatch ? docMatch[1] : (extractedDoc || null);
+          }
           
           const totalRegex = /(?:importe\s+total|total|importe|monto|neto)[:\s\$\-]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2}))/gi;
           let match;
@@ -2321,10 +2561,14 @@
         cliente: detectedClientName,
         isFileNameMatch: isFileNameMatch,
         isSapMatch: isSapMatch,
-        cleanText: cleanText
+        cleanText: cleanText,
+        ticketId: tId
       };
       if (typeof global !== 'undefined') {
         global._lastPdfExtracted = lastPdfData;
+        global._lastPdfExtractedByTicket = global._lastPdfExtractedByTicket || {};
+        const contextKey = isModal ? 'modal' : String(tId || 'default');
+        global._lastPdfExtractedByTicket[contextKey] = lastPdfData;
       }
 
       if (isFileNameMatch) {
@@ -2407,7 +2651,13 @@
     }
     
     if (typeof global !== 'undefined') {
-      global._lastPdfExtracted = null;
+      const contextKey = isModal ? 'modal' : String(ticketId || 'default');
+      if (global._lastPdfExtractedByTicket) {
+        delete global._lastPdfExtractedByTicket[contextKey];
+      }
+      if (global._lastPdfExtracted && (global._lastPdfExtracted.ticketId === ticketId || !ticketId)) {
+        global._lastPdfExtracted = null;
+      }
     }
 
     validarCotizacionConSAP(isModal, ticketId);
@@ -2541,20 +2791,46 @@
         isClientMatch = tClientClean.includes(sClientClean) || sClientClean.includes(tClientClean);
       }
 
-      const pdfData = typeof global !== 'undefined' ? global._lastPdfExtracted : null;
-      const hasPdf = !!pdfData;
+      const contextKey = isModal ? 'modal' : String(tId || 'default');
+      const hasFileInInput = !!(fileInput && fileInput.files && fileInput.files.length > 0);
+
+      const pdfData = typeof global !== 'undefined'
+        ? ((global._lastPdfExtractedByTicket && global._lastPdfExtractedByTicket[contextKey]) ||
+           (global._lastPdfExtracted && (global._lastPdfExtracted.ticketId === tId || (!global._lastPdfExtracted.ticketId && hasFileInInput)) ? global._lastPdfExtracted : null))
+        : null;
+      const hasPdf = !!pdfData && (hasFileInInput || (pdfData.ticketId && pdfData.ticketId === tId));
       
       let isPdfDocMatch = true;
       let isPdfMontoMatch = true;
       let isPdfClientMatch = true;
 
       if (hasPdf) {
-        isPdfDocMatch = String(pdfData.doc || '').trim() === String(sapVal).trim();
-        isPdfMontoMatch = pdfData.monto ? Math.abs(Number(pdfData.monto) - sapMonto) < 0.05 : true;
+        const sapValClean = String(sapVal).trim();
+        const docClean = String(pdfData.doc || '').trim();
+        const textHasDoc = pdfData.cleanText && new RegExp(`\\b${sapValClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(pdfData.cleanText);
+        isPdfDocMatch = (docClean === sapValClean) || !!textHasDoc;
+
+        const montoNum = pdfData.monto ? Number(pdfData.monto) : null;
+        let textHasMonto = false;
+        if (pdfData.cleanText && sapMonto > 0) {
+          const montoStr1 = sapMonto.toFixed(2);
+          const montoStr2 = sapMonto.toLocaleString('en-US', { minimumFractionDigits: 2 });
+          const montoStr3 = sapMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 });
+          textHasMonto = pdfData.cleanText.includes(montoStr1) || pdfData.cleanText.includes(montoStr2) || pdfData.cleanText.includes(montoStr3);
+        }
+        isPdfMontoMatch = (montoNum ? Math.abs(montoNum - sapMonto) < 0.05 : false) || textHasMonto;
+
         if (pdfData.cliente) {
           const pClientClean = String(pdfData.cliente).toLowerCase().replace(/[^a-z0-9]/g, '');
           const sClientClean = String(sapCliente).toLowerCase().replace(/[^a-z0-9]/g, '');
           isPdfClientMatch = pClientClean.includes(sClientClean) || sClientClean.includes(pClientClean);
+        }
+        if (!isPdfClientMatch && pdfData.cleanText && sapCliente) {
+          const clientWords = String(sapCliente).toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 4 && !['para','como','este','sa','cv','sadecv'].includes(w));
+          const matchedWords = clientWords.filter(w => pdfData.cleanText.toLowerCase().includes(w));
+          if (matchedWords.length >= Math.min(2, Math.max(1, clientWords.length))) {
+            isPdfClientMatch = true;
+          }
         }
       }
 
@@ -2563,7 +2839,8 @@
       if (isPdfMontoMatch) matchCount++;
       if (isPdfClientMatch) matchCount++;
 
-      const isBlocked = hasPdf && (matchCount < 2);
+      const isFormSapMatch = isMontoMatch && isClientMatch;
+      const isBlocked = !isFormSapMatch || (hasPdf && !isPdfDocMatch && matchCount === 0 && !isFormSapMatch);
 
       let comparisonTableHtml = '';
       if (hasPdf) {

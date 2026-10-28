@@ -121,6 +121,151 @@ async function generarBase64Pdf(ordenId) {
     return 'badge-pendiente';
   };
 
+  const formatTecnicosDisplay = (ord) => {
+    const isUuid = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(s || '').trim());
+    const resolveName = (idOrName) => {
+      if (!idOrName) return '';
+      const raw = String(idOrName).trim();
+      if (!raw) return '';
+      if (typeof window !== 'undefined' && typeof window.resolveTecnicoNombre === 'function') {
+        const r = window.resolveTecnicoNombre(raw);
+        if (r && !isUuid(r)) return r;
+      }
+      if (typeof safeResolveTecnicoNombre === 'function') {
+        const r = safeResolveTecnicoNombre(raw);
+        if (r && !isUuid(r)) return r;
+      }
+      const users = (typeof window !== 'undefined' && Array.isArray(window.usuarios))
+        ? window.usuarios
+        : ((typeof usuarios !== 'undefined' && Array.isArray(usuarios)) ? usuarios : []);
+      const tecs = (typeof window !== 'undefined' && Array.isArray(window.tecnicosDb))
+        ? window.tecnicosDb
+        : ((typeof tecnicosDb !== 'undefined' && Array.isArray(tecnicosDb)) ? tecnicosDb : []);
+      const match = users.find(u => u && (u.id === raw || u.nombre === raw)) || tecs.find(t => t && (t.id === raw || t.nombre === raw));
+      if (match && match.nombre) return match.nombre;
+      return isUuid(raw) ? '' : raw;
+    };
+
+    let items = [];
+    if (Array.isArray(ord.tecnicosAsignados) && ord.tecnicosAsignados.length > 0) {
+      items = ord.tecnicosAsignados.flatMap(x => String(x || '').split(','));
+    } else if (ord.tecnico) {
+      items = String(ord.tecnico).split(',');
+    }
+
+    const resolved = items
+      .map(s => resolveName(s))
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    const seen = new Set();
+    const unique = [];
+    for (const n of resolved) {
+      const lower = n.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        unique.push(n);
+      }
+    }
+    return unique.length > 0 ? unique.join(', ') : '—';
+  };
+
+  const resolverInfoMaquinaria = (ord) => {
+    const MARCAS_RENDER = {
+      'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA',
+      'MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS',
+      'CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER',
+      'FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL',
+      'MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM',
+      'HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'
+    };
+
+    let rawModelo = ord.modelo || '';
+    let rawMarca = ord.marca || (ord.equipo ? ord.equipo.split(' ')[0] : '');
+    let rawSerie = ord.serie || '';
+    let extractedId = '';
+
+    const matchMod = String(rawModelo).match(/^\s*\[([A-Za-z0-9_-]+)\]\s*(.*)$/);
+    if (matchMod) {
+      extractedId = matchMod[1];
+      rawModelo = matchMod[2].trim();
+    }
+    const matchMarca = String(rawMarca).match(/^\s*\[([A-Za-z0-9_-]+)\]\s*$/);
+    if (matchMarca) {
+      if (!extractedId) extractedId = matchMarca[1];
+      rawMarca = '';
+    }
+
+    const maqList = getMaquinariaDb();
+    const cliList = getClientesDb();
+
+    let maq = null;
+    const targetId = ord.maquinaria_id || extractedId;
+    if (targetId) {
+      maq = maqList.find(m => m && (m.id === targetId || m.idInterno === targetId));
+      if (!maq) {
+        cliList.forEach(c => {
+          if (c && c.maquinas) {
+            const found = c.maquinas.find(m => m && (m.id === targetId || m.idInterno === targetId));
+            if (found) maq = found;
+          }
+        });
+      }
+    }
+    if (!maq && rawSerie) {
+      maq = maqList.find(m => m && m.serie === rawSerie);
+      if (!maq) {
+        cliList.forEach(c => {
+          if (c && c.maquinas) {
+            const found = c.maquinas.find(m => m && m.serie === rawSerie);
+            if (found) maq = found;
+          }
+        });
+      }
+    }
+    if (!maq && rawModelo && ord.cliente) {
+      maq = maqList.find(m => m && m.modelo === rawModelo && m.cliente === ord.cliente);
+      if (!maq) {
+        cliList.forEach(c => {
+          if (c && c.maquinas && c.nombre === ord.cliente) {
+            const found = c.maquinas.find(m => m && m.modelo === rawModelo);
+            if (found) maq = found;
+          }
+        });
+      }
+    }
+
+    let finalMarca = (maq && maq.marca) ? maq.marca : rawMarca;
+    let finalModelo = (maq && maq.modelo) ? maq.modelo : rawModelo;
+    let finalSerie = (maq && maq.serie) ? maq.serie : rawSerie;
+    let finalId = (maq && (maq.idInterno || maq.id)) ? (maq.idInterno || maq.id) : extractedId;
+
+    if (!finalMarca || finalMarca.startsWith('[')) {
+      const lowerMod = (finalModelo || '').toLowerCase();
+      if (lowerMod.includes('casa grande') || lowerMod.includes('casagrande') || (finalId && finalId.startsWith('CA'))) {
+        finalMarca = 'CASAGRANDE';
+      } else if (lowerMod.includes('putzmeister') || (finalId && finalId.startsWith('PT'))) {
+        finalMarca = 'PUTZMEISTER';
+      } else if (lowerMod.includes('schwing') || (finalId && finalId.startsWith('SC'))) {
+        finalMarca = 'SCHWING';
+      } else if (lowerMod.includes('fiori') || (finalId && finalId.startsWith('FI'))) {
+        finalMarca = 'FIORI';
+      } else if (lowerMod.includes('everdigm') || (finalId && finalId.startsWith('EV'))) {
+        finalMarca = 'EVERDIGM';
+      } else if (lowerMod.includes('cifa') || (finalId && finalId.startsWith('CI'))) {
+        finalMarca = 'CIFA';
+      }
+    }
+    finalMarca = MARCAS_RENDER[(finalMarca || '').toUpperCase()] || finalMarca || '—';
+
+    return {
+      marca: finalMarca || '—',
+      modelo: finalModelo || '—',
+      serie: finalSerie || '—',
+      idInterno: finalId || '—'
+    };
+  };
+
   const seccion = (title, content) => `
     <div class="detalle-section" style="margin-bottom:1.5rem; page-break-inside:avoid; break-inside:avoid;">
       <div class="detalle-section-title" style="font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#0f172a; margin-bottom:0.75rem; padding:0.35rem 0.6rem; background:#f1f5f9; border-left:4px solid #e8820c;">${title}</div>
@@ -333,31 +478,37 @@ async function generarBase64Pdf(ordenId) {
     </div>
 
     <!-- Información General -->
-    ${seccion('Información General', `
-      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:0.6rem 1.25rem;">
-        ${field('Folio', o.folio, 1)} ${field('Pedido', o.pedido, 1)} ${field('Fecha', formatFecha(o.fecha), 1)}
-        ${field('Cliente', o.cliente, 2)} ${field('Ubicación (Ticket)', o.ubicacion, 1)}
-        ${field('Ubicación en Sitio', o.ubicacion_sitio, 3)}
-        ${field('Operador', o.operador, 1)} ${field('No. ECO', o.eco, 1)} ${field('Horómetro (Ticket)', o.horometro, 1)}
-        ${field('Horómetro Real', o.horometro_real, 1)}
-        ${field('Marca', (() => { 
-          const MARCAS_RENDER = {'ETP':'ESSER TWIN PIPES','BCR':'BCR','PTZ':'PUTZMEISTER','SCH':'SCHWING','CIF':'CIFA','MTM':'MTM','MCN':'MCNELIUS','LON':'LONDON','CAS':'CASAGRANDE','OTM':'OTRAS MARCAS','CNF':'CONFORMS','TFB':'TEUFELBERGER','RBC':'REBEL CRUSHER','RBM':'RUBBLE MASTER','FIO':'FIORI','EVE':'EVERDIGM','POR':'PORTAFILL','SIM':'SIMEM','TUR':'TURBOSOL','MBC':'MB CUCHARAS','DOR':'DORNER','KNK':'KINGKONG','HYU':'HYUNDAI EVERDIGM','HER':'HERRAMIENTA','EBS':'EBOSS','RCR':'RUBBLE CRUSHER'};
-          let m = o.marca || (o.equipo ? o.equipo.split(' ')[0] : '');
-          return MARCAS_RENDER[m.toUpperCase()] || m || '—';
-        })(), 1)} ${field('Modelo', o.modelo, 1)} ${field('Serie', o.serie, 1)}
-        ${field('ID Máquina', (o.maquinaria_id || o.serie || '—'), 1)}
-        ${field('Técnico', o.tecnico, 1)}
-        ${field('Ticket Soporte', o.soporte || o.folio_ticket || '—', 1)}
-      </div>`)}
+    ${(() => {
+      const maqInfo = resolverInfoMaquinaria(o);
+      const tecnicosStr = formatTecnicosDisplay(o);
+      const ubicSitio = (o.ubicacion_sitio || '').trim();
+      const ubicTkt = (o.ubicacion || '').trim();
+      const tieneAmbasUbicaciones = ubicSitio && ubicTkt && ubicSitio.toLowerCase() !== ubicTkt.toLowerCase();
+
+      return seccion('Información General', `
+        <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:0.5rem 1.25rem;">
+          ${field('Folio', o.folio, 1)} ${field('Pedido', o.pedido, 1)} ${field('Fecha', formatFecha(o.fecha), 1)}
+          ${tieneAmbasUbicaciones 
+            ? `${field('Cliente', o.cliente, 1)} ${field('Ubicación en Sitio', ubicSitio, 1)} ${field('Ubicación (Ticket)', ubicTkt, 1)}`
+            : `${field('Cliente', o.cliente, 2)} ${field('Ubicación', ubicSitio || ubicTkt || '—', 1)}`
+          }
+          ${field('Marca', maqInfo.marca, 1)} ${field('Modelo', maqInfo.modelo, 1)} ${field('Serie', maqInfo.serie, 1)}
+          ${field('ID Máquina', maqInfo.idInterno, 1)} ${field('No. ECO', o.eco, 1)} ${field('Operador', o.operador, 1)}
+          ${field('Horómetro (Ticket)', o.horometro, 1)} ${field('Horómetro Real', o.horometro_real, 1)} ${field('Ticket Soporte', o.soporte || o.folio_ticket || '—', 1)}
+          ${field('Técnico Asignado', tecnicosStr, 3)}
+        </div>
+      `);
+    })()}
 
     <!-- Kilómetros / Tipo -->
     ${seccion('Kilómetros / Tipo', `
-      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:0.6rem 1.25rem;">
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:0.5rem 1.25rem;">
         ${field('Origen → Trabajo', (o.km_ida != null && o.km_ida !== '') ? o.km_ida + ' km' : null, 1)}
         ${field('Trabajo → Origen', (o.km_vuelta != null && o.km_vuelta !== '') ? o.km_vuelta + ' km' : null, 1)}
         ${field('Total Km', (o.km_total != null && o.km_total !== '') ? o.km_total + ' km' : null, 1)}
-        ${field('Tipo de Visita', o.tipo || 'Servicio', 2)}
+        ${field('Tipo de Visita', o.tipo || 'Servicio', 1)}
         ${field('Estado', o.estado || 'Completado', 1)}
+        ${field('Reembolso KM', o.reembolso_km ? 'Aplica' : 'No aplica', 1)}
       </div>`)}
 
     <!-- Diagnóstico y Trabajos -->
@@ -509,7 +660,18 @@ function ejecutarColorEditor(tipo, color) {
 };
 
 function imprimirOrden() {
-  if (typeof window !== "undefined" && typeof window.print === "function") window.print();
+  if (typeof document !== "undefined") {
+    if (typeof closeMobileMoreSheet === 'function') {
+      try { closeMobileMoreSheet(); } catch (e) {}
+    }
+    const sheet = document.getElementById('mobile-more-sheet');
+    if (sheet) sheet.classList.remove('open');
+    const backdrop = document.getElementById('mobile-more-backdrop');
+    if (backdrop) backdrop.classList.remove('open');
+  }
+  if (typeof window !== "undefined" && typeof window.print === "function") {
+    window.print();
+  }
 }
 
 function enviarCorreoOrden(ordenId) {
