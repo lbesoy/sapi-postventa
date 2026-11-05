@@ -857,159 +857,7 @@ window.cambiarPrioridadIdeaFalla = cambiarPrioridadIdeaFalla;
 window.eliminarIdeaFalla = eliminarIdeaFalla;
 window.renderIdeasFallas = renderIdeasFallas;
 
-// ── Sync SAP vía GitHub Actions (funciona desde cualquier dispositivo) ────────
-// El workflow corre en servidores de GitHub (Azure) que SÍ pueden llegar a SAP.
-// El token se guarda en localStorage del superadmin y se comparte en Supabase config.
-const GH_REPO = 'lbesoy/sapi-postventa';
-const GH_WORKFLOW = 'sync-sap.yml';
 
-async function sincronizarConGitHub(modulo = 'all', btnEl = null) {
-  if (typeof document === "undefined") return;
-  if (typeof window !== 'undefined' && window._sapSyncRunning) {
-    if (typeof mostrarNotificacion === 'function') mostrarNotificacion('⏳ Ya hay una sincronización en curso. Por favor espera un momento.', 'info');
-    return;
-  }
-  if (typeof window !== 'undefined') window._sapSyncRunning = true;
-
-  const origHTML = btnEl ? btnEl.innerHTML : '';
-  if (btnEl) { 
-    btnEl.innerHTML = '<i data-lucide="loader" class="btn-icon rotating"></i> Conectando SAP...'; 
-    btnEl.disabled = true;
-    lucide.createIcons(); 
-  }
-
-  try {
-    const headers = {
-      'Content-Type': 'application/json',
-      'X-Sapi-Client-Token': 'SapiSecuredClientToken'
-    };
-    
-    if (window.supabaseClient) {
-      const { data: { session } } = await window.supabaseClient.auth.getSession();
-      if (session) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
-      }
-    }
-
-    const triggerTime = new Date().getTime();
-
-    const resp = await fetch('/api/trigger-sync', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ modulo })
-    });
-
-    if (!resp.ok) {
-      const errData = await resp.json().catch(() => ({}));
-      throw new Error(errData.error || `Error ${resp.status}`);
-    }
-
-    mostrarNotificacion(`⏳ Sincronización iniciada en SAP. Procesando datos...`, 'info');
-    if (btnEl) {
-      btnEl.innerHTML = '<i data-lucide="loader" class="btn-icon rotating"></i> Procesando SAP...';
-      lucide.createIcons();
-    }
-
-    let targetRunId = null;
-    let attempts = 0;
-    const maxAttempts = 40; // max ~3 minutos (5s por intento)
-
-    const pollStatus = setInterval(async () => {
-      attempts++;
-      if (attempts > maxAttempts) {
-        clearInterval(pollStatus);
-        mostrarNotificacion('⚠️ Tiempo de espera agotado. Verifica la actualización en unos minutos.', 'warning');
-        finishSync();
-        return;
-      }
-
-      try {
-        const statusResp = await fetch('/api/sync-status', {
-          method: 'POST',
-          headers
-        });
-
-        if (statusResp.ok) {
-          const run = await statusResp.json();
-          const runCreatedTime = new Date(run.created_at).getTime();
-
-          if (!targetRunId) {
-            if (run.status !== 'completed' || (runCreatedTime > triggerTime - 120000)) {
-              targetRunId = run.id;
-              console.log(`[Sync] Detectado workflow run activo: ID ${targetRunId}, Estado: ${run.status}`);
-            }
-          }
-
-          if (targetRunId && run.id === targetRunId) {
-            if (btnEl) {
-              btnEl.innerHTML = `<i data-lucide="loader" class="btn-icon rotating"></i> SAP: ${run.status === 'in_progress' ? 'Procesando' : run.status}...`;
-              lucide.createIcons();
-            }
-
-            if (run.status === 'completed') {
-              clearInterval(pollStatus);
-              if (run.conclusion === 'success') {
-                mostrarNotificacion('⏳ Recargando base de datos...', 'info');
-                if (window.cargarDatosDeSupabase) {
-                  await window.cargarDatosDeSupabase();
-                }
-                mostrarNotificacion('✅ Sincronización SAP finalizada con éxito.', 'success');
-                if (window.validarCotizacionConSAP) {
-                  window.validarCotizacionConSAP(true);
-                  const activeInlineStatusEl = document.querySelector('[id^="quick-sap-validation-status-"]');
-                  if (activeInlineStatusEl) {
-                    const activeInlineTransitionId = activeInlineStatusEl.id.replace('quick-sap-validation-status-', '');
-                    window.validarCotizacionConSAP(false, activeInlineTransitionId);
-                  }
-                }
-                if (window.poblarPedidosDropdown) {
-                  window.poblarPedidosDropdown(true, null, document.getElementById('t-pedido-sap')?.value || '');
-                  const activeQuickPedEl = document.querySelector('[id^="quick-ped-sap-"]');
-                  if (activeQuickPedEl) {
-                    const activeQuickTicketId = activeQuickPedEl.id.replace('quick-ped-sap-', '');
-                    window.poblarPedidosDropdown(false, activeQuickTicketId, activeQuickPedEl.value || '');
-                  }
-                }
-                if (window.validarPedidoConSAP) {
-                  window.validarPedidoConSAP(true);
-                  const activeQuickPedEl = document.querySelector('[id^="quick-ped-sap-"]');
-                  if (activeQuickPedEl) {
-                    const activeQuickTicketId = activeQuickPedEl.id.replace('quick-ped-sap-', '');
-                    window.validarPedidoConSAP(false, activeQuickTicketId);
-                  }
-                }
-              } else {
-                mostrarNotificacion(`❌ Sincronización SAP fallida: ${run.conclusion || 'desconocido'}`, 'error');
-              }
-              finishSync();
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Error sondeando estado de sync:', err);
-      }
-    }, 5000);
-
-    function finishSync() {
-      if (typeof window !== 'undefined') window._sapSyncRunning = false;
-      if (btnEl) {
-        btnEl.innerHTML = origHTML;
-        btnEl.disabled = false;
-        lucide.createIcons();
-      }
-    }
-
-  } catch(e) {
-    if (typeof window !== 'undefined') window._sapSyncRunning = false;
-    mostrarNotificacion(`❌ Error al disparar sync: ${e.message}`, 'error');
-    if (btnEl) {
-      btnEl.innerHTML = origHTML;
-      btnEl.disabled = false;
-      lucide.createIcons();
-    }
-  }
-}
-window.sincronizarConGitHub = sincronizarConGitHub;
 
 
 // Asignación explícita a window para compatibilidad
@@ -1068,3 +916,9 @@ export {
   handleDrop,
   sincronizarConGitHub
 };
+
+function sincronizarConGitHub(...args) {
+  if (typeof window !== 'undefined' && typeof window.sincronizarConGitHub === 'function') {
+    return window.sincronizarConGitHub(...args);
+  }
+}

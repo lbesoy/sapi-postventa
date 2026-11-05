@@ -16,7 +16,10 @@ const https = require('https');
 const fs = require('fs');
 
 // ── Configuración ─────────────────────────────────────────────────
-const SAP_URL      = process.env.SAP_SL_URL;
+let SAP_URL        = (process.env.SAP_SL_URL || '').trim().replace(/\/+$/, '');
+if (SAP_URL && !SAP_URL.endsWith('/b1s/v1')) {
+  SAP_URL = `${SAP_URL}/b1s/v1`;
+}
 const SAP_DB       = process.env.SAP_COMPANY_DB;
 const SAP_USER     = process.env.SAP_USER;
 const SAP_PASS     = process.env.SAP_PASSWORD;
@@ -67,6 +70,20 @@ let sessionId = null;
 // ── Helper: log con timestamp ─────────────────────────────────────
 const log = (msg) => console.log(`[${new Date().toLocaleTimeString('es-MX')}] ${msg}`);
 const err = (msg) => console.error(`[${new Date().toLocaleTimeString('es-MX')}] ❌ ${msg}`);
+
+const parseSapDate = (val) => {
+  if (!val) return null;
+  const s = String(val).trim();
+  if (/^\d{8}$/.test(s)) {
+    const y = s.substring(0, 4);
+    const m = s.substring(4, 6);
+    const d = s.substring(6, 8);
+    const dt = new Date(`${y}-${m}-${d}T00:00:00Z`);
+    return isNaN(dt.getTime()) ? null : dt.toISOString();
+  }
+  const dt = new Date(val);
+  return isNaN(dt.getTime()) ? null : dt.toISOString();
+};
 
 // ── 1. Login a SAP ────────────────────────────────────────────────
 async function loginSAP() {
@@ -465,7 +482,7 @@ async function fetchCotizacionesFromSAP() {
       log(`✅ Cotizaciones obtenidas vía SQL Query (${res.data.value.length} registros).`);
       return res.data.value.map(q => ({
         numero_cotizacion: (q['Folio Pedido'] || q.DocNum || '').toString(),
-        fecha: q.DocDate ? new Date(q.DocDate).toISOString() : null,
+        fecha: parseSapDate(q.DocDate),
         monto: q['Importe MXN'] !== undefined ? Number(q['Importe MXN']) : (q.DocTotal !== undefined ? Number(q.DocTotal) : null),
         cliente: q.Nombre || q.CardName || null
       }));
@@ -497,7 +514,7 @@ async function fetchCotizacionesFromSAP() {
     log(`✅ Cotizaciones obtenidas de SAP (${allQuotes.length} registros).`);
     return allQuotes.map(q => ({
       numero_cotizacion: q.DocNum ? q.DocNum.toString() : null,
-      fecha: q.DocDate ? new Date(q.DocDate).toISOString() : null,
+      fecha: parseSapDate(q.DocDate),
       monto: q.DocTotal !== undefined ? Number(q.DocTotal) : null,
       cliente: q.CardName || null
     }));
@@ -565,8 +582,8 @@ async function fetchPedidosFromSAP() {
       log(`✅ Pedidos obtenidos vía SQL Query (${res.data.value.length} registros).`);
       return res.data.value.map(q => ({
         numero_pedido: (q['Folio Pedido'] || q.DocNum || '').toString(),
-        fecha: q.DocDate ? new Date(q.DocDate).toISOString() : null,
-        fecha_entrega: q.DocDueDate || q['Fecha Entrega'] ? new Date(q.DocDueDate || q['Fecha Entrega']).toISOString() : null,
+        fecha: parseSapDate(q.DocDate),
+        fecha_entrega: parseSapDate(q.DocDueDate || q['Fecha Entrega']),
         monto: q['Importe MXN'] !== undefined ? Number(q['Importe MXN']) : (q.DocTotal !== undefined ? Number(q.DocTotal) : null),
         moneda: q.DocCur || null,
         cliente_id: q.CardCode || q['ID_Cliente'] || null,
@@ -598,8 +615,8 @@ async function fetchPedidosFromSAP() {
     log(`✅ Pedidos obtenidos de SAP (${allOrders.length} registros).`);
     return allOrders.map(q => ({
       numero_pedido: q.DocNum ? q.DocNum.toString() : null,
-      fecha: q.DocDate ? new Date(q.DocDate).toISOString() : null,
-      fecha_entrega: q.DocDueDate ? new Date(q.DocDueDate).toISOString() : null,
+      fecha: parseSapDate(q.DocDate),
+      fecha_entrega: parseSapDate(q.DocDueDate),
       monto: q.DocTotal !== undefined ? Number(q.DocTotal) : null,
       moneda: q.DocCurrency || null,
       cliente_id: q.CardCode || null,

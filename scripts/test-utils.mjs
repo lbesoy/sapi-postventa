@@ -2058,7 +2058,29 @@ const {
   cerrarCotizacionTicket,
   cerrarDetalleTicket,
   forzarEstadoTicket,
-  forzarCrearOrdenServicio
+  forzarCrearOrdenServicio,
+  renderCotizadorInternoTicketHtml,
+  renderTablaCotizacionTicket,
+  toggleCotizadorInterno,
+  toggleAsistenteCotizadorTicket,
+  actualizarParametroCotizadorTicket,
+  cargarConceptosAsistenteEnCotizacion,
+  copiarResumenClaraTicket,
+  generarDatosExportacionExcel,
+  copiarTablaCotizacionExcel,
+  descargarCsvCotizacionExcel,
+  mostrarModalVistaExcel,
+  agregarItemCotizacionTicket,
+  eliminarItemCotizacionTicket,
+  actualizarItemCotizacionTicket,
+  toggleIvaCotizacionTicket,
+  recalcularCotizacionTicket,
+  guardarCotizacionInternaTicket,
+  limpiarCotizacionInternaTicket,
+  COTIZADOR_LINEAS,
+  COTIZADOR_DESCUENTOS_CLIENTE,
+  COTIZADOR_TARIFAS_CUADRILLA,
+  COTIZADOR_TARIFAS_HOSPEDAJE
 } = await import('../src/modules/tickets_detalle.js');
 
 // Test A: Existencia y tipo de las funciones exportadas
@@ -2075,10 +2097,21 @@ assert.equal(typeof cerrarCotizacionTicket, 'function', 'cerrarCotizacionTicket 
 assert.equal(typeof cerrarDetalleTicket, 'function', 'cerrarDetalleTicket debe ser función');
 assert.equal(typeof forzarEstadoTicket, 'function', 'forzarEstadoTicket debe ser función');
 assert.equal(typeof forzarCrearOrdenServicio, 'function', 'forzarCrearOrdenServicio debe ser función');
+assert.equal(typeof renderCotizadorInternoTicketHtml, 'function', 'renderCotizadorInternoTicketHtml debe ser función');
+assert.equal(typeof renderTablaCotizacionTicket, 'function', 'renderTablaCotizacionTicket debe ser función');
+assert.equal(typeof toggleCotizadorInterno, 'function', 'toggleCotizadorInterno debe ser función');
+assert.equal(typeof agregarItemCotizacionTicket, 'function', 'agregarItemCotizacionTicket debe ser función');
+assert.equal(typeof eliminarItemCotizacionTicket, 'function', 'eliminarItemCotizacionTicket debe ser función');
+assert.equal(typeof actualizarItemCotizacionTicket, 'function', 'actualizarItemCotizacionTicket debe ser función');
+assert.equal(typeof toggleIvaCotizacionTicket, 'function', 'toggleIvaCotizacionTicket debe ser función');
+assert.equal(typeof recalcularCotizacionTicket, 'function', 'recalcularCotizacionTicket debe ser función');
+assert.equal(typeof guardarCotizacionInternaTicket, 'function', 'guardarCotizacionInternaTicket debe ser función');
+assert.equal(typeof limpiarCotizacionInternaTicket, 'function', 'limpiarCotizacionInternaTicket debe ser función');
 
 // Test B: renderComentariosInternosHtml genera HTML válido para ticket de prueba
 const dummyTicket = {
   id: 't-test-1',
+  estado: 'Refacciones',
   comentariosInternos: [
     { usuario: 'Soporte Eurorep', texto: 'Comentario de prueba interno', fecha: '2026-10-05T12:00:00Z' }
   ],
@@ -2089,7 +2122,246 @@ const dummyTicket = {
 const htmlGenerado = renderComentariosInternosHtml(dummyTicket);
 assert.ok(typeof htmlGenerado === 'string' && htmlGenerado.includes('Comentario de prueba interno'), 'renderComentariosInternosHtml debe incluir el texto del comentario');
 
-// Test C: Invocación defensiva en Node.js (sin DOM)
+// Test C: Privacidad y Aislamiento de Cotizador Interno (Invisibilidad para Clientes)
+global.currentSession = { viewMode: 'cliente', realRol: 'cliente' };
+const htmlCliente = renderCotizadorInternoTicketHtml(dummyTicket);
+assert.equal(htmlCliente, '', 'Cotizador Interno debe ser 100% invisible para clientes');
+
+global.currentSession = { viewMode: 'empresa', realRol: 'empresa' };
+const htmlEmpresa = renderCotizadorInternoTicketHtml(dummyTicket);
+assert.equal(htmlEmpresa, '', 'Cotizador Interno debe ser 100% invisible para portal empresa');
+
+global.currentSession = { viewMode: 'cliente-consultor', realRol: 'cliente-consultor' };
+const htmlConsultor = renderCotizadorInternoTicketHtml(dummyTicket);
+assert.equal(htmlConsultor, '', 'Cotizador Interno debe ser 100% invisible para cliente-consultor');
+
+// Para administradores debe generar el bloque HTML cuando está en etapa Refacciones
+global.currentSession = { viewMode: 'superadmin', realRol: 'superadmin' };
+const htmlAdmin = renderCotizadorInternoTicketHtml(dummyTicket);
+assert.ok(htmlAdmin.includes('Cotizador Interno'), 'Cotizador Interno debe renderizarse para administradores');
+assert.ok(htmlAdmin.includes('Beta · Privado'), 'Cotizador Interno debe incluir badge de privacidad');
+
+// Validar que tickets en estado Abierto o Pendiente NO renderizan el cotizador bajo ninguna circunstancia
+const htmlAbierto = renderCotizadorInternoTicketHtml({ id: 't-abierto', estado: 'Abierto' });
+assert.equal(htmlAbierto, '', 'Tickets en estado Abierto no deben renderizar el cotizador');
+
+const htmlPendiente = renderCotizadorInternoTicketHtml({ id: 't-pendiente', estado: 'Pendiente' });
+assert.equal(htmlPendiente, '', 'Tickets en estado Pendiente no deben renderizar el cotizador');
+
+// Test D: Cálculo numérico y gestión de conceptos en el cotizador
+global.window._tempCotizaciones = {};
+agregarItemCotizacionTicket('t-test-1', 'refaccion');
+actualizarItemCotizacionTicket('t-test-1', 0, 'descripcion', 'Filtro Hidráulico');
+actualizarItemCotizacionTicket('t-test-1', 0, 'codigo', 'FIL-101');
+actualizarItemCotizacionTicket('t-test-1', 0, 'cantidad', 2);
+actualizarItemCotizacionTicket('t-test-1', 0, 'precioUnitario', 1500);
+
+agregarItemCotizacionTicket('t-test-1', 'servicio');
+actualizarItemCotizacionTicket('t-test-1', 1, 'descripcion', 'Diagnóstico técnico en campo');
+actualizarItemCotizacionTicket('t-test-1', 1, 'cantidad', 5);
+actualizarItemCotizacionTicket('t-test-1', 1, 'precioUnitario', 800);
+
+agregarItemCotizacionTicket('t-test-1', 'viaticos');
+actualizarItemCotizacionTicket('t-test-1', 2, 'descripcion', 'Kilometraje de traslado');
+actualizarItemCotizacionTicket('t-test-1', 2, 'cantidad', 100);
+actualizarItemCotizacionTicket('t-test-1', 2, 'precioUnitario', 15);
+
+// Subtotal esperado: (2*1500) + (5*800) + (100*15) = 3000 + 4000 + 1500 = 8500
+// IVA (16%): 8500 * 0.16 = 1360
+// Total: 8500 + 1360 = 9860
+recalcularCotizacionTicket('t-test-1');
+const draftTest = global.window._tempCotizaciones['t-test-1'];
+assert.equal(draftTest.subtotal, 8500, 'Subtotal debe ser 8500');
+assert.equal(draftTest.iva, 1360, 'IVA 16% debe ser 1360');
+assert.equal(draftTest.total, 9860, 'Total debe ser 9860');
+
+// Test de toggle de IVA
+toggleIvaCotizacionTicket('t-test-1', false);
+assert.equal(draftTest.iva, 0, 'IVA desactivado debe ser 0');
+assert.equal(draftTest.total, 8500, 'Total sin IVA debe ser igual al subtotal');
+
+toggleIvaCotizacionTicket('t-test-1', true);
+assert.equal(draftTest.iva, 1360, 'IVA reactivado debe ser 1360');
+
+// Test E: Serialización y Deserialización de cotización interna en notas (supabaseSync)
+if (typeof window.extraerCotizacionInternaDeNotas === 'function' && typeof window.inyectarCotizacionInternaEnNotas === 'function') {
+  const notaOriginal = 'Falla recurrente en bomba de concreto.';
+  const notaInyectada = window.inyectarCotizacionInternaEnNotas(notaOriginal, draftTest);
+  assert.ok(notaInyectada.includes('=== COTIZACION_INTERNA ==='), 'Debe contener delimitador');
+  const notaExtraida = window.extraerCotizacionInternaDeNotas(notaInyectada);
+  assert.equal(notaExtraida.notasLimpias, notaOriginal, 'Las notas limpias deben quedar sin JSON');
+  assert.equal(notaExtraida.cotizacionInterna.subtotal, 8500, 'Cotización extraída debe conservar subtotal');
+  assert.equal(notaExtraida.cotizacionInterna.total, 9860, 'Cotización extraída debe conservar total');
+}
+
+// Test E1: Verificación de Catálogos y Políticas de Cotizador Interno (Excel SAPI)
+assert.ok(Array.isArray(COTIZADOR_LINEAS) && COTIZADOR_LINEAS.length === 3, 'COTIZADOR_LINEAS debe incluir 3 líneas');
+assert.deepEqual(COTIZADOR_LINEAS.map(l => l.id), ['CON', 'TRI', 'CIM'], 'Líneas deben ser CON, TRI, CIM');
+
+assert.equal(COTIZADOR_DESCUENTOS_CLIENTE['Externo'].mo, 0, 'Externo MO desc 0%');
+assert.equal(COTIZADOR_DESCUENTOS_CLIENTE['Externo'].viaticos, 0, 'Externo Viáticos desc 0%');
+assert.equal(COTIZADOR_DESCUENTOS_CLIENTE['Externo AAA'].mo, 10, 'Externo AAA MO desc 10%');
+assert.equal(COTIZADOR_DESCUENTOS_CLIENTE['Externo AAA'].viaticos, 5, 'Externo AAA Viáticos desc 5%');
+assert.equal(COTIZADOR_DESCUENTOS_CLIENTE['Socio'].mo, 25, 'Socio MO desc 25%');
+assert.equal(COTIZADOR_DESCUENTOS_CLIENTE['Socio'].viaticos, 10, 'Socio Viáticos desc 10%');
+assert.equal(COTIZADOR_DESCUENTOS_CLIENTE['Interno'].mo, 35, 'Interno MO desc 35%');
+assert.equal(COTIZADOR_DESCUENTOS_CLIENTE['Interno'].viaticos, 15, 'Interno Viáticos desc 15%');
+
+// Matriz de Tarifas de Cuadrilla (1 a 6 personas)
+assert.equal(COTIZADOR_TARIFAS_CUADRILLA[1].externo, 3690.20, '1 Ing tarifa externo');
+assert.equal(COTIZADOR_TARIFAS_CUADRILLA[1].euro, 2398.63, '1 Ing tarifa interno/euro');
+assert.equal(COTIZADOR_TARIFAS_CUADRILLA[1].socio, 2767.65, '1 Ing tarifa socio');
+assert.equal(COTIZADOR_TARIFAS_CUADRILLA[2].externo, 6642.35, '2 pers tarifa externo');
+assert.equal(COTIZADOR_TARIFAS_CUADRILLA[3].externo, 9594.52, '3 pers tarifa externo');
+assert.equal(COTIZADOR_TARIFAS_CUADRILLA[4].externo, 12546.68, '4 pers tarifa externo');
+assert.equal(COTIZADOR_TARIFAS_CUADRILLA[5].externo, 15498.84, '5 pers tarifa externo');
+assert.equal(COTIZADOR_TARIFAS_CUADRILLA[6].externo, 18451.00, '6 pers tarifa externo');
+
+// Tarifas escalonadas de Hospedaje
+assert.equal(COTIZADOR_TARIFAS_HOSPEDAJE[1], 1000, 'Hospedaje 1p');
+assert.equal(COTIZADOR_TARIFAS_HOSPEDAJE[2], 1500, 'Hospedaje 2p');
+assert.equal(COTIZADOR_TARIFAS_HOSPEDAJE[3], 2500, 'Hospedaje 3p');
+assert.equal(COTIZADOR_TARIFAS_HOSPEDAJE[4], 3000, 'Hospedaje 4p');
+assert.equal(COTIZADOR_TARIFAS_HOSPEDAJE[5], 4000, 'Hospedaje 5p');
+assert.equal(COTIZADOR_TARIFAS_HOSPEDAJE[6], 4500, 'Hospedaje 6p');
+
+// Test E2: Asistente de Presupuesto y Cálculo Automático de Conceptos (ZFAC02, ZFAC10, ZFAC05)
+global.window._tempCotizaciones['t-test-asis'] = {
+  linea: 'CON',
+  tipoCliente: 'Externo AAA', // 10% MO, 5% Viáticos
+  items: [
+    { id: 'it-ref-1', origen: 'manual', tipo: 'refaccion', codigo: 'REF-123', descripcion: 'Válvula Reguladora', cantidad: 1, precioUnitario: 5000, descuento: 0, subtotalLista: 5000, descuentoMonto: 0, subtotal: 5000 }
+  ],
+  asistente: {
+    diasProyecto: 2,
+    numPersonas: 2, // Ing + Auxiliar ($6,642.35 lista/dia)
+    descripcionServicio: 'Instalación y puesta en marcha',
+    km: 100, // Ida y vuelta x2 = 200 km
+    idaYVueltaKm: true,
+    factorKm: 11, // $11/km
+    casetas: 500, // Ida y vuelta x2 = 1000
+    idaYVueltaCasetas: true,
+    diasAlimentos: 2, // 2p * 2d * $550 = 2,200
+    nochesHospedaje: 1, // 1 noche * $1500 = 1,500
+    nochesPorFuera: 1, // 1 noche * 2p * $300 = 600
+    rendimientoKml: 9,
+    precioCombustible: 30
+  }
+};
+
+cargarConceptosAsistenteEnCotizacion('t-test-asis');
+const draftAsis = global.window._tempCotizaciones['t-test-asis'];
+
+// Debe conservar la refacción previa
+const refaccionPreservada = draftAsis.items.find(it => it.codigo === 'REF-123');
+assert.ok(refaccionPreservada, 'Asistente debe preservar refacciones agregadas previamente');
+assert.equal(refaccionPreservada.subtotal, 5000, 'Refacción debe mantener subtotal 5000');
+
+// Debe generar ZFAC02 para Mano de Obra
+const itemMo = draftAsis.items.find(it => it.codigo === 'ZFAC02');
+assert.ok(itemMo, 'Debe generar partida ZFAC02');
+assert.equal(itemMo.cantidad, 2, '2 días de proyecto');
+assert.equal(itemMo.precioUnitario, 6642.35, 'Tarifa 2 personas');
+assert.equal(itemMo.descuento, 10, 'Descuento Externo AAA para MO debe ser 10%');
+assert.equal(itemMo.subtotalLista, 13284.7, 'Subtotal lista MO');
+assert.equal(Math.round(itemMo.subtotal * 100) / 100, 11956.23, 'Subtotal neto MO con 10% desc');
+
+// Debe generar ZFAC10 para Kilometraje
+const itemKm = draftAsis.items.find(it => it.codigo === 'ZFAC10' && it.descripcion.includes('KM'));
+assert.ok(itemKm, 'Debe generar partida ZFAC10 para KM');
+assert.equal(itemKm.cantidad, 200, 'KM total (ida y vuelta)');
+assert.equal(itemKm.precioUnitario, 11, 'Factor $11/km');
+assert.equal(itemKm.descuento, 5, 'Descuento Externo AAA para viáticos/KM debe ser 5%');
+assert.equal(itemKm.subtotalLista, 2200, 'Subtotal lista KM');
+assert.equal(itemKm.subtotal, 2090, 'Subtotal neto KM con 5% desc');
+
+// Debe generar ZFAC10 para Casetas
+const itemCasetas = draftAsis.items.find(it => it.codigo === 'ZFAC10' && it.descripcion.includes('Casetas'));
+assert.ok(itemCasetas, 'Debe generar partida ZFAC10 para Casetas');
+assert.equal(itemCasetas.subtotalLista, 1000, 'Subtotal lista casetas (500 x 2)');
+assert.equal(itemCasetas.descuento, 5, 'Descuento Externo AAA para casetas debe ser 5%');
+assert.equal(itemCasetas.subtotal, 950, 'Subtotal neto casetas');
+
+// Debe generar ZFAC05 para Alimentos
+const itemAlim = draftAsis.items.find(it => it.codigo === 'ZFAC05' && it.descripcion.includes('Alimentos'));
+assert.ok(itemAlim, 'Debe generar partida ZFAC05 para Alimentos');
+assert.equal(itemAlim.subtotalLista, 2200, 'Subtotal lista alimentos (2d x 2p x 550)');
+assert.equal(itemAlim.subtotal, 2090, 'Subtotal neto alimentos con 5% desc');
+
+// Debe generar ZFAC05 para Hospedaje
+const itemHosp = draftAsis.items.find(it => it.codigo === 'ZFAC05' && it.descripcion.includes('Hospedaje'));
+assert.ok(itemHosp, 'Debe generar partida ZFAC05 para Hospedaje');
+assert.equal(itemHosp.subtotalLista, 1500, 'Subtotal lista hospedaje (1 noche 2p = 1500)');
+assert.equal(itemHosp.subtotal, 1425, 'Subtotal neto hospedaje con 5% desc');
+
+// Debe generar ZFAC05 para Noches por fuera
+const itemFuera = draftAsis.items.find(it => it.codigo === 'ZFAC05' && it.descripcion.includes('fuera'));
+assert.ok(itemFuera, 'Debe generar partida ZFAC05 para Noches fuera');
+assert.equal(itemFuera.subtotalLista, 600, 'Subtotal lista noches fuera (1 noche x 2p x 300)');
+assert.equal(itemFuera.subtotal, 570, 'Subtotal neto noches fuera con 5% desc');
+
+// Cálculo de Fondeo Clara (Anticipo al Técnico)
+// Combustible: (200 km / 9 km/l) * $30/L = 666.67
+assert.equal(Math.round(draftAsis.claraCombustible * 100) / 100, 666.67, 'Combustible Clara');
+assert.equal(draftAsis.claraCasetas, 1000, 'Casetas Clara');
+assert.equal(draftAsis.claraHospedaje, 1500, 'Hospedaje Clara');
+assert.equal(draftAsis.claraAlimentos, 2800, 'Alimentos Clara (2200 + 600)');
+assert.equal(Math.round(draftAsis.claraTotal * 100) / 100, 5966.67, 'Total Fondeo Tarjeta Clara');
+
+// Invocación segura de resumen Clara y exportadores Excel
+assert.doesNotThrow(() => {
+  copiarResumenClaraTicket('t-test-asis');
+  toggleAsistenteCotizadorTicket('t-test-asis');
+  actualizarParametroCotizadorTicket('t-test-asis', 'global', 'linea', 'TRI');
+}, 'Funciones de asistente y clara deben ser seguras');
+
+// Test E3: Generación de Tabla y Datos para Copiar a Excel (TSV / HTML)
+const excelData = generarDatosExportacionExcel('t-test-asis');
+assert.ok(excelData && typeof excelData.tsv === 'string', 'Debe generar string TSV');
+assert.ok(excelData.tsv.includes('No artic\tDescr\tDescr Larga\tUnidad de N\tCanti\tPxU\tDescuento\tPrecio Neto\tTotal\tCosto unit\tTotal costo'), 'TSV debe incluir encabezados exactos de Excel');
+assert.ok(excelData.tsv.includes('ZFAC02'), 'TSV debe incluir Mano de Obra ZFAC02');
+assert.ok(excelData.tsv.includes('ZFAC10'), 'TSV debe incluir Kilometraje/Casetas ZFAC10');
+assert.ok(excelData.tsv.includes('ZFAC05'), 'TSV debe incluir Hospedaje/Alimentos ZFAC05');
+assert.ok(excelData.tsv.includes('SOLICITUD DE CLARA (CÁLCULO DE VIÁTICOS)'), 'TSV debe incluir bloque de Solicitud de Clara');
+assert.ok(excelData.html.includes('<table') && excelData.html.includes('background:#FFFF00;'), 'HTML debe incluir celdas amarillas para Cantidad');
+assert.ok(excelData.html.includes('TOTALES'), 'HTML debe incluir fila de totales');
+
+// Funciones de copiado, descarga CSV y modal
+assert.doesNotThrow(() => {
+  copiarTablaCotizacionExcel('t-test-asis');
+  descargarCsvCotizacionExcel('t-test-asis');
+  mostrarModalVistaExcel('t-test-asis');
+}, 'Funciones de copiado y exportación Excel deben ejecutarse de forma segura');
+
+// Test E4: recalcularCotizacionTicket con DOM activo (incluyendo margenEl y sin elementos)
+{
+  const mockElements = {};
+  const origDoc = global.document;
+  global.document = {
+    getElementById: (id) => {
+      if (!mockElements[id]) {
+        mockElements[id] = { textContent: '', innerHTML: '' };
+      }
+      return mockElements[id];
+    }
+  };
+  assert.doesNotThrow(() => {
+    recalcularCotizacionTicket('t-test-asis');
+  }, 'recalcularCotizacionTicket debe ejecutarse sin errores con DOM activo y margenEl presente');
+  assert.ok(mockElements['cot-margen-estimado-t-test-asis'].innerHTML.includes('Margen Bruto:'), 'margenEl debe actualizarse correctamente con el margen calculado');
+
+  // Con getElementById retornando null (como al renderizar antes de montar en DOM)
+  global.document = {
+    getElementById: () => null
+  };
+  assert.doesNotThrow(() => {
+    recalcularCotizacionTicket('t-test-asis');
+  }, 'recalcularCotizacionTicket debe ser seguro si los elementos DOM aún no existen');
+
+  global.document = origDoc;
+}
+
+// Test F: Invocación defensiva en Node.js (sin DOM)
 assert.doesNotThrow(() => {
   switchCommentTab('internos');
   switchCommentTab('externos');
@@ -2100,6 +2372,7 @@ assert.doesNotThrow(() => {
   cerrarDetalleTicket({ preventDefault: () => {} });
   forzarEstadoTicket('TK-1');
   forzarCrearOrdenServicio('TK-1');
+  toggleCotizadorInterno('TK-1');
 }, 'Las funciones de tickets_detalle no deben arrojar error en ausencia de DOM');
 
 console.log('  ✅ Detalle, Comentarios y Adjuntos de Tickets: OK');
@@ -4247,6 +4520,141 @@ console.log('🧪 Verificando Separación de Técnicos Combinados por Comas...')
   assert.ok(printBlock.includes('position: static !important;'), 'El modal abierto debe tener position: static para fluir entre páginas');
 
   console.log('  ✅ Integridad de Reportes PDF e Impresión (Ocultación de menús y barras móviles): OK');
+}
+
+// 8.8 Verificación de Mapeo en Supabase de Cotización Interna y Viáticos Clara (ticketToRow & rowToTicket)
+{
+  console.log('🧪 Verificando Mapeo en Supabase de Cotización Interna y Viáticos Clara (ticketToRow & rowToTicket)...');
+  const { JSDOM } = await import('jsdom');
+  const fs = await import('fs');
+  const path = await import('path');
+
+  const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
+    url: 'http://localhost:3005/',
+    runScripts: 'dangerously'
+  });
+  dom.window.localStorage.setItem('sapi_clientes_db', JSON.stringify([{ id: 'cli-001', nombre: 'Cliente Minero AAA S.A.' }]));
+  dom.window.localStorage.setItem('sapi_sitios_db', JSON.stringify([{ id: 'sitio-001', nombre: 'Planta Principal' }]));
+
+  const supaSyncCode = fs.readFileSync(path.resolve('./supabaseSync.js'), 'utf-8');
+  dom.window.eval(supaSyncCode);
+
+  assert.equal(typeof dom.window.ticketToRow, 'function', 'ticketToRow debe estar exportado en window');
+
+  const mockTicket = {
+    id: 'tkt-test-supa-01',
+    folio: 'TKT-26799',
+    fecha: '2026-10-30T10:00:00Z',
+    cliente: 'Cliente Minero AAA S.A.',
+    sitio: 'Planta Principal',
+    asunto: 'Reparación de Bomba y Viáticos Foráneos',
+    estado: 'Refacciones',
+    cotizacionInterna: {
+      linea: 'CON',
+      tipoCliente: 'Externo AAA',
+      subtotalLista: 15000,
+      descuentoTotal: 1500,
+      subtotal: 13500,
+      iva: 2160,
+      total: 15660,
+      moneda: 'MXN',
+      totalCosto: 8000,
+      margenEstimado: 5500,
+      margenPct: 40.7,
+      claraCombustible: 2500,
+      claraCasetas: 1200,
+      claraHospedaje: 3000,
+      claraAlimentos: 1800,
+      claraTotal: 8500,
+      items: [
+        {
+          id: 'it-1',
+          tipo: 'servicio',
+          codigo: 'ZFAC02',
+          unidad: 'CON',
+          descripcion: 'Mano de obra técnica especializada',
+          cantidad: 1,
+          precioUnitario: 10000,
+          descuento: 10,
+          precioNeto: 9000,
+          subtotal: 9000,
+          costoUnitario: 5000,
+          totalCosto: 5000
+        },
+        {
+          id: 'it-2',
+          tipo: 'viaticos',
+          codigo: 'ZFAC10',
+          unidad: 'CON',
+          descripcion: 'Traslado y kilometraje',
+          cantidad: 1,
+          precioUnitario: 5000,
+          descuento: 10,
+          precioNeto: 4500,
+          subtotal: 4500,
+          costoUnitario: 3000,
+          totalCosto: 3000
+        }
+      ]
+    }
+  };
+
+  // 1. Transformación de Ticket a Fila Supabase (ticketToRow)
+  const row = dom.window.ticketToRow(mockTicket);
+  assert.equal(row.id, 'tkt-test-supa-01', 'ID del ticket preservado');
+  assert.equal(row.folio, 'TKT-26799', 'Folio preservado');
+  assert.ok(row.cotizacion_interna && typeof row.cotizacion_interna === 'object', 'cotizacion_interna debe ser objeto JSON');
+  assert.equal(row.cot_linea, 'CON', 'cot_linea mapeada correctamente');
+  assert.equal(row.cot_tipo_cliente, 'Externo AAA', 'cot_tipo_cliente mapeado');
+  assert.equal(row.cot_subtotal, 13500, 'cot_subtotal mapeado');
+  assert.equal(row.cot_iva, 2160, 'cot_iva mapeado');
+  assert.equal(row.cot_total, 15660, 'cot_total mapeado');
+  assert.equal(row.monto_cotizacion, 15660, 'monto_cotizacion sincronizado con total');
+  assert.equal(row.cot_moneda, 'MXN', 'cot_moneda mapeada');
+  assert.equal(row.cot_descuento_total, 1500, 'cot_descuento_total mapeado');
+  assert.equal(row.cot_subtotal_lista, 15000, 'cot_subtotal_lista mapeado');
+  assert.equal(row.cot_total_costo, 8000, 'cot_total_costo mapeado');
+  assert.equal(row.cot_margen_estimado, 5500, 'cot_margen_estimado mapeado');
+  assert.equal(row.clara_combustible, 2500, 'clara_combustible mapeado');
+  assert.equal(row.clara_casetas, 1200, 'clara_casetas mapeado');
+  assert.equal(row.clara_hospedaje, 3000, 'clara_hospedaje mapeado');
+  assert.equal(row.clara_alimentos, 1800, 'clara_alimentos mapeado');
+  assert.equal(row.clara_total, 8500, 'clara_total mapeado');
+
+  // 2. Reconstrucción de Fila Supabase a Ticket (rowToTicket)
+  // Caso A: Con objeto cotizacion_interna directo
+  const restoredA = dom.window.eval(`rowToTicket(${JSON.stringify(row)})`);
+  assert.equal(restoredA.id, 'tkt-test-supa-01');
+  assert.equal(restoredA.montoCotizacion, 15660, 'montoCotizacion restaurado');
+  assert.equal(restoredA.cotizacionInterna.total, 15660, 'cotizacionInterna.total restaurado');
+  assert.equal(restoredA.cotizacionInterna.subtotal, 13500, 'cotizacionInterna.subtotal restaurado');
+  assert.equal(restoredA.cotizacionInterna.claraTotal, 8500, 'cotizacionInterna.claraTotal restaurado');
+  assert.equal(restoredA.cotizacionInterna.items.length, 2, 'items de cotización restaurados');
+
+  // Caso B: Fallback reconstructivo desde columnas directas si cotizacion_interna viene nula
+  const rowColsOnly = {
+    id: 'tkt-test-cols',
+    folio: 'TKT-26800',
+    notas: 'Sin cotizacion JSON en notas',
+    cot_linea: 'TRI',
+    cot_tipo_cliente: 'Socio',
+    cot_subtotal: 20000,
+    cot_iva: 3200,
+    cot_total: 23200,
+    monto_cotizacion: 23200,
+    cot_total_costo: 12000,
+    cot_margen_estimado: 8000,
+    clara_total: 5000
+  };
+  const restoredB = dom.window.eval(`rowToTicket(${JSON.stringify(rowColsOnly)})`);
+  assert.equal(restoredB.montoCotizacion, 23200, 'montoCotizacion restaurado desde columnas');
+  assert.ok(restoredB.cotizacionInterna, 'cotizacionInterna reconstruida desde columnas directas');
+  assert.equal(restoredB.cotizacionInterna.linea, 'TRI', 'Línea TRI reconstruida');
+  assert.equal(restoredB.cotizacionInterna.total, 23200, 'Total reconstruido');
+  assert.equal(restoredB.cotizacionInterna.subtotal, 20000, 'Subtotal reconstruido');
+  assert.equal(restoredB.cotizacionInterna.claraTotal, 5000, 'claraTotal reconstruido');
+
+  console.log('  ✅ Mapeo en Supabase de Cotización Interna y Viáticos Clara (ticketToRow & rowToTicket): OK');
 }
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DE MÓDULOS PASARON CON ÉXITO (100%)!\n');

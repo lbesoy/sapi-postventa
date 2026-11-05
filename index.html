@@ -2388,9 +2388,14 @@
                     oninput="debouncedRenderRefacciones()" />
                 </div>
                 <button class="action-btn" onclick="sincronizarConGitHub('refacciones', this)"
-                  title="Actualizar Refacciones desde SAP"
+                  title="Sincronizar Refacciones desde SAP (directo en 3-5 segundos)"
                   style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
                   <i data-lucide="refresh-cw" class="btn-icon" style="width:14px;height:14px;"></i> Actualizar SAP
+                </button>
+                <button class="action-btn" onclick="recargarCatalogoRefacciones(this)"
+                  title="Descargar catálogo actualizado desde la nube (1 segundo)"
+                  style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-muted); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
+                  <i data-lucide="cloud-download" class="btn-icon" style="width:14px;height:14px;"></i> Recargar Nube
                 </button>
               </div>
             </div>
@@ -10703,7 +10708,7 @@
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
         "supabaseClient.js?v=2",
-        "supabaseSync.js?v=330",
+        "supabaseSync.js?v=331",
         "store.js?v=1",
         "utils.js?v=9",
         "sap_sync.js?v=1",
@@ -10718,7 +10723,7 @@
         "servicios_programados.js?v=1",
         "tickets_listado.js?v=436",
         "tickets_form.js?v=435",
-        "tickets_detalle.js?v=1",
+        "tickets_detalle.js?v=439",
         "app_migrations.js?v=435",
         "app.js?v=436",
         "dashboard.js?v=1",

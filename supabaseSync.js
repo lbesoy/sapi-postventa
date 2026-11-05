@@ -297,6 +297,34 @@ window.inyectarCotizacionesEnNotas = function(rawOrCleanNotasStr, cotizaciones) 
   return `${clean}\n\n=== COTIZACIONES ===\n${JSON.stringify(sanitized)}`;
 };
 
+// Helpers de serialización de cotización interna en el campo 'notas' del ticket
+window.extraerCotizacionInternaDeNotas = function(notasStr) {
+  const str = notasStr || '';
+  const separator = '=== COTIZACION_INTERNA ===';
+  const idx = str.indexOf(separator);
+  if (idx > -1) {
+    const notasLimpias = str.substring(0, idx).trim();
+    const cotizacionJSON = str.substring(idx + separator.length).trim();
+    try {
+      const cotizacionInterna = JSON.parse(cotizacionJSON);
+      return { notasLimpias, cotizacionInterna: (cotizacionInterna && typeof cotizacionInterna === 'object') ? cotizacionInterna : null };
+    } catch (e) {
+      console.warn("Error parsing cotizacion interna JSON from notes:", e);
+      return { notasLimpias: str, cotizacionInterna: null };
+    }
+  }
+  return { notasLimpias: str, cotizacionInterna: null };
+};
+
+window.inyectarCotizacionInternaEnNotas = function(rawOrCleanNotasStr, cotizacionInterna) {
+  const extracted = (typeof window.extraerCotizacionInternaDeNotas === 'function')
+    ? window.extraerCotizacionInternaDeNotas(rawOrCleanNotasStr)
+    : { notasLimpias: rawOrCleanNotasStr };
+  const clean = (extracted.notasLimpias || '').trim();
+  if (!cotizacionInterna || !cotizacionInterna.items || cotizacionInterna.items.length === 0) return clean;
+  return `${clean}\n\n=== COTIZACION_INTERNA ===\n${JSON.stringify(cotizacionInterna)}`;
+};
+
 // ============================================================
 
 // Proteger contra errores fatales de parseo de JSON malformados o corruptos en sincronización
@@ -423,6 +451,9 @@ function ticketToRow(t) {
   const baseNotas = t.notas || '';
   let finalNotas = baseNotas;
   finalNotas = window.inyectarCotizacionesEnNotas(finalNotas, t.cotizacionesAdicionales || []);
+  if (typeof window.inyectarCotizacionInternaEnNotas === 'function') {
+    finalNotas = window.inyectarCotizacionInternaEnNotas(finalNotas, t.cotizacionInterna || null);
+  }
   finalNotas = window.inyectarRefaccionesEnNotas(finalNotas, t.refaccionesSeleccionadas || []);
   if (typeof finalNotas === 'string' && finalNotas.includes('data:application/pdf;base64')) {
     finalNotas = finalNotas.replace(/data:application\/pdf;base64,[A-Za-z0-9+/=]+/g, '');
@@ -475,12 +506,34 @@ function ticketToRow(t) {
     notas: prefix + finalNotas,
     estado: t.estado || null,
     cotizacion_sap: t.cotizacionSAP || null,
-    monto_cotizacion: (t.montoCotizacion !== undefined && t.montoCotizacion !== null) ? Number(t.montoCotizacion) : null,
+    monto_cotizacion: (t.montoCotizacion !== undefined && t.montoCotizacion !== null)
+      ? Number(t.montoCotizacion)
+      : (t.cotizacionInterna && t.cotizacionInterna.total !== undefined ? Number(t.cotizacionInterna.total) : null),
     cot_aceptada: t.cotAceptada || null,
     motivo_rechazo: t.motivoRechazo || null,
     pedido_sap: t.pedidoSAP || null,
     comentarios_internos: t.comentariosInternos || [],
     comentarios_clientes: t.comentariosClientes || [],
+    cotizacion_interna: (t.cotizacionInterna && typeof t.cotizacionInterna === 'object') ? t.cotizacionInterna : null,
+    cot_linea: t.cotizacionInterna?.linea || t.cotLinea || null,
+    cot_tipo_cliente: t.cotizacionInterna?.tipoCliente || t.cotTipoCliente || null,
+    cot_subtotal: t.cotizacionInterna?.subtotal !== undefined ? Number(t.cotizacionInterna.subtotal) : (t.cotSubtotal !== undefined && t.cotSubtotal !== null ? Number(t.cotSubtotal) : null),
+    cot_iva: t.cotizacionInterna?.iva !== undefined ? Number(t.cotizacionInterna.iva) : (t.cotIva !== undefined && t.cotIva !== null ? Number(t.cotIva) : null),
+    cot_total: t.cotizacionInterna?.total !== undefined ? Number(t.cotizacionInterna.total) : (t.cotTotal !== undefined && t.cotTotal !== null ? Number(t.cotTotal) : null),
+    cot_moneda: t.cotizacionInterna?.moneda || 'MXN',
+    cot_descuento_total: t.cotizacionInterna?.descuentoTotal !== undefined ? Number(t.cotizacionInterna.descuentoTotal) : null,
+    cot_subtotal_lista: t.cotizacionInterna?.subtotalLista !== undefined ? Number(t.cotizacionInterna.subtotalLista) : null,
+    cot_total_costo: (t.cotizacionInterna?.totalCosto !== undefined && t.cotizacionInterna.totalCosto !== null)
+      ? Number(t.cotizacionInterna.totalCosto)
+      : (Array.isArray(t.cotizacionInterna?.items) ? t.cotizacionInterna.items.reduce((acc, it) => acc + (Number(it.totalCosto) || 0), 0) : null),
+    cot_margen_estimado: (t.cotizacionInterna?.margenEstimado !== undefined && t.cotizacionInterna.margenEstimado !== null)
+      ? Number(t.cotizacionInterna.margenEstimado)
+      : (t.cotizacionInterna?.subtotal !== undefined && Array.isArray(t.cotizacionInterna?.items) ? Number(t.cotizacionInterna.subtotal) - t.cotizacionInterna.items.reduce((acc, it) => acc + (Number(it.totalCosto) || 0), 0) : null),
+    clara_combustible: t.cotizacionInterna?.claraCombustible !== undefined ? Number(t.cotizacionInterna.claraCombustible) : null,
+    clara_casetas: t.cotizacionInterna?.claraCasetas !== undefined ? Number(t.cotizacionInterna.claraCasetas) : null,
+    clara_hospedaje: t.cotizacionInterna?.claraHospedaje !== undefined ? Number(t.cotizacionInterna.claraHospedaje) : null,
+    clara_alimentos: t.cotizacionInterna?.claraAlimentos !== undefined ? Number(t.cotizacionInterna.claraAlimentos) : null,
+    clara_total: t.cotizacionInterna?.claraTotal !== undefined ? Number(t.cotizacionInterna.claraTotal) : (t.claraTotal !== undefined && t.claraTotal !== null ? Number(t.claraTotal) : null),
     creado_por: (t.creadoPor && String(t.creadoPor).trim() !== '' && t.creadoPor !== '—' && t.creadoPor !== 'null')
       ? String(t.creadoPor).trim()
       : ((typeof window.resolverCreadorTicket === 'function' ? window.resolverCreadorTicket(t) : (t.creado_por || null)) || null),
@@ -564,7 +617,10 @@ function rowToTicket(t, idsWithPedido, idsWithCotizacion) {
   const pdfCotizacionVal = hasCot ? '__HAS_PDF__' : null;
 
   const extracted = window.extraerRefaccionesDeNotas(t.notas);
-  const extractedCot = window.extraerCotizacionesDeNotas(extracted.notasLimpias);
+  const extractedCotInt = (typeof window.extraerCotizacionInternaDeNotas === 'function')
+    ? window.extraerCotizacionInternaDeNotas(extracted.notasLimpias)
+    : { notasLimpias: extracted.notasLimpias, cotizacionInterna: null };
+  const extractedCot = window.extraerCotizacionesDeNotas(extractedCotInt.notasLimpias);
 
   const refaccionesVal = (t.refacciones && Array.isArray(t.refacciones) && t.refacciones.length > 0)
     ? t.refacciones
@@ -596,11 +652,48 @@ function rowToTicket(t, idsWithPedido, idsWithCotizacion) {
     descripcion: t.descripcion,
     equipo: t.equipo,
     notas: extractedCot.notasLimpias,
+    cotizacionInterna: (() => {
+      if (t.cotizacion_interna && typeof t.cotizacion_interna === 'object' && Object.keys(t.cotizacion_interna).length > 0) {
+        return t.cotizacion_interna;
+      }
+      if (extractedCotInt && extractedCotInt.cotizacionInterna) {
+        return extractedCotInt.cotizacionInterna;
+      }
+      if (t.cot_total !== undefined && t.cot_total !== null && Number(t.cot_total) > 0) {
+        return {
+          linea: t.cot_linea || 'CON',
+          tipoCliente: t.cot_tipo_cliente || 'Externo AAA',
+          subtotalLista: Number(t.cot_subtotal_lista || t.cot_subtotal || 0),
+          descuentoTotal: Number(t.cot_descuento_total || 0),
+          subtotal: Number(t.cot_subtotal || 0),
+          iva: Number(t.cot_iva || 0),
+          total: Number(t.cot_total || 0),
+          moneda: t.cot_moneda || 'MXN',
+          totalCosto: Number(t.cot_total_costo || 0),
+          margenEstimado: Number(t.cot_margen_estimado || 0),
+          claraCombustible: Number(t.clara_combustible || 0),
+          claraCasetas: Number(t.clara_casetas || 0),
+          claraHospedaje: Number(t.clara_hospedaje || 0),
+          claraAlimentos: Number(t.clara_alimentos || 0),
+          claraTotal: Number(t.clara_total || 0),
+          items: []
+        };
+      }
+      return null;
+    })(),
+    cotLinea: t.cot_linea || null,
+    cotTipoCliente: t.cot_tipo_cliente || null,
+    cotSubtotal: (t.cot_subtotal !== undefined && t.cot_subtotal !== null) ? Number(t.cot_subtotal) : null,
+    cotIva: (t.cot_iva !== undefined && t.cot_iva !== null) ? Number(t.cot_iva) : null,
+    cotTotal: (t.cot_total !== undefined && t.cot_total !== null) ? Number(t.cot_total) : null,
+    claraTotal: (t.clara_total !== undefined && t.clara_total !== null) ? Number(t.clara_total) : null,
     refaccionesSeleccionadas: refaccionesVal,
     cotizacionesAdicionales: cotizacionesVal,
     estado: t.estado,
     cotizacionSAP: t.cotizacion_sap,
-    montoCotizacion: (t.monto_cotizacion !== undefined && t.monto_cotizacion !== null) ? Number(t.monto_cotizacion) : null,
+    montoCotizacion: (t.monto_cotizacion !== undefined && t.monto_cotizacion !== null)
+      ? Number(t.monto_cotizacion)
+      : (t.cot_total !== undefined && t.cot_total !== null ? Number(t.cot_total) : (extractedCotInt.cotizacionInterna?.total || null)),
     cotAceptada: t.cot_aceptada,
     motivoRechazo: t.motivo_rechazo,
     pedidoSAP: t.pedido_sap,
@@ -2076,7 +2169,12 @@ async function _executePushToSupabase(tabla, item, options = {}) {
         const resRetry = await sb.from(tabla).upsert(row);
         error = resRetry.error;
       } else {
-        const knownOptionals = ['prioridad', 'orden', 'fecha_modificacion', 'updated_at', 'modificado_por', 'fecha_resolucion', 'resolucion', 'resuelto_por', 'archivos'];
+        const knownOptionals = [
+          'prioridad', 'orden', 'fecha_modificacion', 'updated_at', 'modificado_por', 'fecha_resolucion', 'resolucion', 'resuelto_por', 'archivos',
+          'cotizacion_interna', 'cot_linea', 'cot_tipo_cliente', 'cot_subtotal', 'cot_iva', 'cot_total', 'cot_moneda',
+          'cot_descuento_total', 'cot_subtotal_lista', 'cot_total_costo', 'cot_margen_estimado',
+          'clara_combustible', 'clara_casetas', 'clara_hospedaje', 'clara_alimentos', 'clara_total'
+        ];
         let deletedAny = false;
         knownOptionals.forEach(col => {
           if (row[col] !== undefined) {
@@ -4595,12 +4693,13 @@ window.cargarDatosDeSupabase = function() {
         if (!sb) throw new Error('Supabase client no disponible');
 
         try {
-          // Descarga paralela indexada: atributos ligeros, comentarios JSONB y flags de existencia de PDFs
-          const [tktRes, comsRes, cotsRes, pedsRes] = await Promise.all([
+          // Descarga paralela indexada: atributos ligeros, comentarios JSONB, cotización interna y flags de existencia de PDFs
+          const [tktRes, comsRes, cotsRes, pedsRes, cotIntRes] = await Promise.all([
             sb.from('tickets').select(lightCols).order('created_at', { ascending: false }).limit(1500),
             sb.from('tickets').select('id, comentarios_internos, comentarios_clientes').limit(1500),
             sb.from('tickets').select('id').not('pdf_cotizacion', 'is', null).limit(1500),
-            sb.from('tickets').select('id').not('pdf_pedido', 'is', null).limit(1500)
+            sb.from('tickets').select('id').not('pdf_pedido', 'is', null).limit(1500),
+            sb.from('tickets').select('id, cotizacion_interna, cot_linea, cot_tipo_cliente, cot_subtotal, cot_iva, cot_total, cot_moneda, cot_descuento_total, cot_subtotal_lista, cot_total_costo, cot_margen_estimado, clara_combustible, clara_casetas, clara_hospedaje, clara_alimentos, clara_total').limit(1500).then(r => r).catch(() => ({ data: null }))
           ]);
           if (tktRes.error) throw tktRes.error;
           if (comsRes.error) throw comsRes.error;
@@ -4617,12 +4716,33 @@ window.cargarDatosDeSupabase = function() {
             if (comsRes.data && Array.isArray(comsRes.data)) {
               comsRes.data.forEach(c => comsMap.set(c.id, c));
             }
+            const cotIntMap = new Map();
+            if (cotIntRes && cotIntRes.data && Array.isArray(cotIntRes.data)) {
+              cotIntRes.data.forEach(ci => cotIntMap.set(ci.id, ci));
+            }
             ticketsDb = tktRes.data.map(t => {
               const c = comsMap.get(t.id);
+              const ci = cotIntMap.get(t.id);
               return {
                 ...t,
                 comentarios_internos: c?.comentarios_internos || [],
-                comentarios_clientes: c?.comentarios_clientes || []
+                comentarios_clientes: c?.comentarios_clientes || [],
+                cotizacion_interna: ci?.cotizacion_interna || null,
+                cot_linea: ci?.cot_linea || null,
+                cot_tipo_cliente: ci?.cot_tipo_cliente || null,
+                cot_subtotal: ci?.cot_subtotal || null,
+                cot_iva: ci?.cot_iva || null,
+                cot_total: ci?.cot_total || null,
+                cot_moneda: ci?.cot_moneda || null,
+                cot_descuento_total: ci?.cot_descuento_total || null,
+                cot_subtotal_lista: ci?.cot_subtotal_lista || null,
+                cot_total_costo: ci?.cot_total_costo || null,
+                cot_margen_estimado: ci?.cot_margen_estimado || null,
+                clara_combustible: ci?.clara_combustible || null,
+                clara_casetas: ci?.clara_casetas || null,
+                clara_hospedaje: ci?.clara_hospedaje || null,
+                clara_alimentos: ci?.clara_alimentos || null,
+                clara_total: ci?.clara_total || null
               };
             });
           }

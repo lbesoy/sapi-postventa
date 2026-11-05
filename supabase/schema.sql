@@ -73,11 +73,46 @@ CREATE TABLE public.tickets (
     pdf_cotizacion TEXT,
     comentarios_internos JSONB DEFAULT '[]'::jsonb,
     comentarios_clientes JSONB DEFAULT '[]'::jsonb,
+    cotizacion_interna JSONB DEFAULT '{}'::jsonb,
+    cot_linea TEXT,
+    cot_tipo_cliente TEXT,
+    cot_subtotal NUMERIC DEFAULT 0,
+    cot_iva NUMERIC DEFAULT 0,
+    cot_total NUMERIC DEFAULT 0,
+    cot_moneda TEXT DEFAULT 'MXN',
+    cot_descuento_total NUMERIC DEFAULT 0,
+    cot_subtotal_lista NUMERIC DEFAULT 0,
+    cot_total_costo NUMERIC DEFAULT 0,
+    cot_margen_estimado NUMERIC DEFAULT 0,
+    clara_combustible NUMERIC DEFAULT 0,
+    clara_casetas NUMERIC DEFAULT 0,
+    clara_hospedaje NUMERIC DEFAULT 0,
+    clara_alimentos NUMERIC DEFAULT 0,
+    clara_total NUMERIC DEFAULT 0,
     creado_por TEXT,
     modificado_por TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     fecha_modificacion TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 5.1 TABLE: ticket_cotizacion_items (Partidas cotizadas individuales)
+CREATE TABLE IF NOT EXISTS public.ticket_cotizacion_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ticket_id TEXT NOT NULL REFERENCES public.tickets(id) ON DELETE CASCADE,
+    tipo TEXT,
+    codigo TEXT,
+    unidad TEXT,
+    descripcion TEXT,
+    marca TEXT,
+    cantidad NUMERIC DEFAULT 1,
+    precio_unitario NUMERIC DEFAULT 0,
+    descuento NUMERIC DEFAULT 0,
+    precio_neto NUMERIC DEFAULT 0,
+    subtotal NUMERIC DEFAULT 0,
+    costo_unitario NUMERIC DEFAULT 0,
+    total_costo NUMERIC DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 6. TABLE: sitios

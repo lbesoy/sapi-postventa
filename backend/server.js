@@ -43,7 +43,10 @@ app.use(express.static(require('path').join(__dirname, '..'), {
 }));
 
 // Configuracion de SAP B1 Service Layer
-const SAP_URL = process.env.SAP_SL_URL;
+let SAP_URL = (process.env.SAP_SL_URL || '').trim().replace(/\/+$/, '');
+if (SAP_URL && !SAP_URL.endsWith('/b1s/v1')) {
+  SAP_URL = `${SAP_URL}/b1s/v1`;
+}
 const SAP_DB = process.env.SAP_COMPANY_DB;
 const SAP_USER = process.env.SAP_USER;
 const SAP_PASS = process.env.SAP_PASSWORD;
@@ -71,8 +74,9 @@ if (process.env.SAP_CA_CERT_PATH) {
 
 const sapHttpsAgent = new https.Agent(agentOptions);
 
-const SUPABASE_URL_SRV = process.env.SUPABASE_URL;
-const SUPABASE_KEY_SRV = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+const SUPABASE_URL_SRV = process.env.SUPABASE_URL || 'https://mupevytlssqcbhlmzmcp.supabase.co';
+const SUPABASE_KEY_SRV = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11cGV2eXRsc3NxY2JobG16bWNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NjE0MzUsImV4cCI6MjA5MzMzNzQzNX0.sdAI9nJluJCP6skq0lfdj8CQvFEyqqV4z6ntbqvQdPY';
+
 
 async function persistSAPSession(sid) {
     if (!SUPABASE_URL_SRV || !SUPABASE_KEY_SRV || !sid) return;
@@ -434,6 +438,20 @@ if (!SUPABASE_URL_SRV || !SUPABASE_KEY_SRV) {
     console.error('CRITICAL: SUPABASE_URL or SUPABASE_KEY is missing from environment variables.');
 }
 
+const parseSapDate = (val) => {
+    if (!val) return null;
+    const s = String(val).trim();
+    if (/^\d{8}$/.test(s)) {
+        const y = s.substring(0, 4);
+        const m = s.substring(4, 6);
+        const d = s.substring(6, 8);
+        const dt = new Date(`${y}-${m}-${d}T00:00:00Z`);
+        return isNaN(dt.getTime()) ? null : dt.toISOString();
+    }
+    const dt = new Date(val);
+    return isNaN(dt.getTime()) ? null : dt.toISOString();
+};
+
 async function upsertSupa(tabla, rows) {
     if (!rows || rows.length === 0) return 0;
     const BATCH = 500;
@@ -526,11 +544,26 @@ app.get('/api/sync-all', ensureSAPConnection, async (req, res) => {
             try {
                 const qc = process.env.QUERY_REFACCIONES || 'CAT_REFACCIONES';
                 const r = await sapApi.get(`${SAP_URL}/SQLQueries('${qc}')/List`, { headers: { 'B1S-PageSize': 5000 } });
-                const rows = (r.data.value || []).map(x => ({
-                    id: x.ItemCode || null, codigo: x.ItemCode || '', descripcion: x.ItemName || x.Dscription || '',
-                    precio: parseFloat(x.Price) || 0, moneda: x.Currency || 'MXN',
-                    stock: parseInt(x.OnHand) || 0, custom_data: {}
-                })).filter(x => x.id);
+                const rows = (r.data.value || []).map(x => {
+                    const idVal = x.ItemCode || null;
+                    const origen = (idVal && (idVal.endsWith('N') || idVal.endsWith('n'))) ? 'Nacional' : 'Importado';
+                    const marcaName = x.U_MARCA || 'N/A';
+                    return {
+                        id: idVal,
+                        codigo: idVal || '',
+                        descripcion: x.ItemName || x.Dscription || '',
+                        precio: parseFloat(x.Price) || 0,
+                        moneda: x.Currency || 'MXN',
+                        stock: parseInt(x.OnHand) || 0,
+                        custom_data: {
+                            marca: marcaName,
+                            grupo: '',
+                            ItmsGrpCod: x.ItmsGrpCod,
+                            origen: origen,
+                            nombre: x.ItemName || x.Dscription || ''
+                        }
+                    };
+                }).filter(x => x.id);
                 resultado.refacciones = await upsertSupa('refacciones', rows);
             } catch(e) { resultado.refacciones_error = e.message; }
         }
@@ -539,13 +572,53 @@ app.get('/api/sync-all', ensureSAPConnection, async (req, res) => {
             try {
                 const qc = process.env.QUERY_SITIOS || 'CAT_Sitos';
                 const r = await sapApi.get(`${SAP_URL}/SQLQueries('${qc}')/List`, { headers: { 'B1S-PageSize': 5000 } });
-                const rows = (r.data.value || []).map(x => ({
-                    id: x.Address || null, nombre: x.Street || x.Address || '', cliente: x.BPCode || '',
-                    direccion: x.Block || '', cp: x.ZipCode || '', ciudad: x.City || '',
-                    estado: x.State || '', custom_data: {}
-                })).filter(x => x.id);
+                const rows = Array.from(new Map((r.data.value || []).map(x => {
+                    const idVal = x.Address || null;
+                    return [idVal, {
+                        id: idVal,
+                        nombre: x.Street || x.Address || '',
+                        cliente: x.CardCode || x.BPCode || '',
+                        direccion: x.Block || x.Street || '',
+                        cp: x.ZipCode || '',
+                        ciudad: x.City || '',
+                        estado: x.State || '',
+                        custom_data: {}
+                    }];
+                }).filter(([id]) => id)).values());
                 resultado.sitios = await upsertSupa('sitios', rows);
             } catch(e) { resultado.sitios_error = e.message; }
+        }
+
+        if (modulo === 'all' || modulo === 'cotizaciones') {
+            try {
+                const qc = process.env.QUERY_COTIZACIONES || 'eurorep_cotizaciones';
+                const r = await sapApi.get(`${SAP_URL}/SQLQueries('${qc}')/List`, { headers: { 'B1S-PageSize': 5000 } });
+                const rows = (r.data.value || []).map(q => ({
+                    numero_cotizacion: (q['Folio Pedido'] || q.DocNum || '').toString(),
+                    fecha: parseSapDate(q.DocDate),
+                    monto: q['Importe MXN'] !== undefined ? Number(q['Importe MXN']) : (q.DocTotal !== undefined ? Number(q.DocTotal) : null),
+                    cliente: q.Nombre || q.CardName || null
+                })).filter(x => x.numero_cotizacion);
+                resultado.cotizaciones = await upsertSupa('cotizaciones_sap', rows);
+            } catch(e) { resultado.cotizaciones_error = e.message; }
+        }
+
+        if (modulo === 'all' || modulo === 'pedidos') {
+            try {
+                const qc = process.env.QUERY_PEDIDOS || 'eurorep_pedidos';
+                const r = await sapApi.get(`${SAP_URL}/SQLQueries('${qc}')/List`, { headers: { 'B1S-PageSize': 5000 } });
+                const rows = (r.data.value || []).map(q => ({
+                    numero_pedido: (q['Folio Pedido'] || q.DocNum || '').toString(),
+                    fecha: parseSapDate(q.DocDate),
+                    fecha_entrega: parseSapDate(q.DocDueDate || q['Fecha Entrega']),
+                    monto: q['Importe MXN'] !== undefined ? Number(q['Importe MXN']) : (q.DocTotal !== undefined ? Number(q.DocTotal) : null),
+                    moneda: q.DocCur || null,
+                    cliente_id: q.CardCode || q['ID_Cliente'] || null,
+                    cliente_nombre: q.CardName || q.Nombre || null,
+                    vendedor: q.Vendedor ? q.Vendedor.toString() : 'SIN Vendedor'
+                })).filter(x => x.numero_pedido);
+                resultado.pedidos = await upsertSupa('pedidos_sap', rows);
+            } catch(e) { resultado.pedidos_error = e.message; }
         }
 
         resultado.duracion_ms = Date.now() - inicio;
@@ -554,6 +627,91 @@ app.get('/api/sync-all', ensureSAPConnection, async (req, res) => {
         res.json(resultado);
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// Endpoint para sincronizar un artículo individual en tiempo real (< 500ms)
+app.get('/api/sap/items/:code/sync', ensureSAPConnection, async (req, res) => {
+    try {
+        const itemCode = req.params.code;
+        const r = await sapApi.get(`${SAP_URL}/Items('${encodeURIComponent(itemCode)}')`);
+        const item = r.data;
+        if (!item || !item.ItemCode) {
+            return res.status(404).json({ ok: false, error: 'Artículo no encontrado en SAP' });
+        }
+        const idVal = item.ItemCode;
+        const origen = (idVal && (idVal.endsWith('N') || idVal.endsWith('n'))) ? 'Nacional' : 'Importado';
+        const marcaName = item.U_MARCA || 'N/A';
+        const row = {
+            id: idVal,
+            codigo: idVal,
+            descripcion: item.ItemName || '',
+            precio: 0,
+            moneda: 'MXN',
+            stock: 0,
+            custom_data: {
+                marca: marcaName,
+                grupo: '',
+                ItmsGrpCod: item.ItemsGroupCode,
+                origen: origen,
+                nombre: item.ItemName || ''
+            }
+        };
+        await upsertSupa('refacciones', [row]);
+        res.json({ ok: true, item: row });
+    } catch (error) {
+        console.error(`Error sincronizando artículo ${req.params.code}:`, error.response?.data || error.message);
+        res.status(500).json({ ok: false, error: error.response?.data?.error?.message?.value || error.message });
+    }
+});
+
+// Endpoint para sincronizar una cotización individual en tiempo real (< 500ms)
+app.get('/api/sap/cotizaciones/:docNum/sync', ensureSAPConnection, async (req, res) => {
+    try {
+        const docNum = req.params.docNum;
+        const r = await sapApi.get(`${SAP_URL}/Quotations?$select=DocNum,DocDate,DocTotal,CardName,Cancelled&$filter=DocNum eq ${encodeURIComponent(docNum)}`);
+        const item = (r.data.value || [])[0];
+        if (!item || !item.DocNum) {
+            return res.status(404).json({ ok: false, error: 'Cotización no encontrada en SAP' });
+        }
+        const row = {
+            numero_cotizacion: item.DocNum.toString(),
+            fecha: parseSapDate(item.DocDate),
+            monto: item.DocTotal !== undefined ? Number(item.DocTotal) : null,
+            cliente: item.CardName || null
+        };
+        await upsertSupa('cotizaciones_sap', [row]);
+        res.json({ ok: true, cotizacion: row });
+    } catch (error) {
+        console.error(`Error sincronizando cotización ${req.params.docNum}:`, error.response?.data || error.message);
+        res.status(500).json({ ok: false, error: error.response?.data?.error?.message?.value || error.message });
+    }
+});
+
+// Endpoint para sincronizar un pedido individual en tiempo real (< 500ms)
+app.get('/api/sap/pedidos/:docNum/sync', ensureSAPConnection, async (req, res) => {
+    try {
+        const docNum = req.params.docNum;
+        const r = await sapApi.get(`${SAP_URL}/Orders?$select=DocNum,DocDate,DocDueDate,DocTotal,DocCurrency,CardCode,CardName,SalesPersonCode,Cancelled&$filter=DocNum eq ${encodeURIComponent(docNum)}`);
+        const item = (r.data.value || [])[0];
+        if (!item || !item.DocNum) {
+            return res.status(404).json({ ok: false, error: 'Pedido no encontrado en SAP' });
+        }
+        const row = {
+            numero_pedido: item.DocNum.toString(),
+            fecha: parseSapDate(item.DocDate),
+            fecha_entrega: parseSapDate(item.DocDueDate),
+            monto: item.DocTotal !== undefined ? Number(item.DocTotal) : null,
+            moneda: item.DocCurrency || null,
+            cliente_id: item.CardCode || null,
+            cliente_nombre: item.CardName || null,
+            vendedor: item.SalesPersonCode ? item.SalesPersonCode.toString() : null
+        };
+        await upsertSupa('pedidos_sap', [row]);
+        res.json({ ok: true, pedido: row });
+    } catch (error) {
+        console.error(`Error sincronizando pedido ${req.params.docNum}:`, error.response?.data || error.message);
+        res.status(500).json({ ok: false, error: error.response?.data?.error?.message?.value || error.message });
     }
 });
 

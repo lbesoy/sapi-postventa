@@ -25,9 +25,14 @@
                     oninput="debouncedRenderRefacciones()" />
                 </div>
                 <button class="action-btn" onclick="sincronizarConGitHub('refacciones', this)"
-                  title="Actualizar Refacciones desde SAP"
+                  title="Sincronizar Refacciones desde SAP (directo en 3-5 segundos)"
                   style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
                   <i data-lucide="refresh-cw" class="btn-icon" style="width:14px;height:14px;"></i> Actualizar SAP
+                </button>
+                <button class="action-btn" onclick="recargarCatalogoRefacciones(this)"
+                  title="Descargar catálogo actualizado desde la nube (1 segundo)"
+                  style="height:38px; display:flex; align-items:center; gap:0.4rem; padding:0 0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-muted); cursor:pointer; font-size:0.8rem; white-space:nowrap;">
+                  <i data-lucide="cloud-download" class="btn-icon" style="width:14px;height:14px;"></i> Recargar Nube
                 </button>
               </div>
             </div>

@@ -1806,7 +1806,34 @@ function renderRefacciones(resetPage = false) {
     }
   });
 
-  body.innerHTML = html || '<tr><td colspan="8" class="empty-state">No se encontraron refacciones.</td></tr>';
+  if (!html) {
+    if (qRaw) {
+      const safeQ = qRaw.replace(/'/g, "\\'");
+      body.innerHTML = `<tr><td colspan="8" class="empty-state" style="padding:2.5rem 1rem; text-align:center;">
+        <div style="font-size:0.95rem; font-weight:500; margin-bottom:0.5rem; color:var(--text-primary);">
+          No se encontraron refacciones para "<strong>${qRaw}</strong>" en el catálogo local.
+        </div>
+        <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:1rem;">
+          ¿Acabas de agregar o modificar este artículo en SAP? Puedes consultarlo directamente en tiempo real.
+        </div>
+        <div style="display:flex; justify-content:center; gap:0.5rem; flex-wrap:wrap;">
+          <button class="action-btn btn-primary" onclick="if(typeof sincronizarRefaccionEnVivo === 'function') sincronizarRefaccionEnVivo('${safeQ}', this); else if(typeof window.sincronizarRefaccionEnVivo === 'function') window.sincronizarRefaccionEnVivo('${safeQ}', this);" style="display:inline-flex; align-items:center; gap:0.4rem; padding:0.4rem 0.85rem; font-size:0.82rem; background:var(--primary); color:#fff; border:none; border-radius:var(--radius-sm); cursor:pointer;">
+            <i data-lucide="search" style="width:14px;height:14px;"></i> Consultar en SAP en vivo
+          </button>
+          <button class="action-btn" onclick="if(typeof recargarCatalogoRefacciones === 'function') recargarCatalogoRefacciones(this); else if(typeof window.recargarCatalogoRefacciones === 'function') window.recargarCatalogoRefacciones(this);" style="display:inline-flex; align-items:center; gap:0.4rem; padding:0.4rem 0.85rem; font-size:0.82rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); cursor:pointer;">
+            <i data-lucide="cloud-download" style="width:14px;height:14px;"></i> Recargar Nube
+          </button>
+        </div>
+      </td></tr>`;
+    } else {
+      body.innerHTML = '<tr><td colspan="8" class="empty-state">No se encontraron refacciones.</td></tr>';
+    }
+  } else {
+    body.innerHTML = html;
+  }
+  if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
 
   // Pagination + total footer
   let footer = document.getElementById('refacciones-footer');

@@ -628,10 +628,81 @@ async function sincronizarConGitHub(modulo = 'all', btnEl = null) {
   if (typeof window !== 'undefined') window._sapSyncRunning = true;
 
   const origHTML = btnEl ? btnEl.innerHTML : '';
+  const finishSync = () => {
+    if (typeof window !== 'undefined') window._sapSyncRunning = false;
+    if (btnEl) {
+      btnEl.innerHTML = origHTML;
+      btnEl.disabled = false;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+  };
+
   if (btnEl) { 
     btnEl.innerHTML = '<i data-lucide="loader" class="btn-icon rotating"></i> Conectando SAP...'; 
     btnEl.disabled = true;
     if (typeof lucide !== 'undefined') lucide.createIcons(); 
+  }
+
+  // 1. INTENTO DE SINCRONIZACIÓN DIRECTA Y ULTRA-RÁPIDA VÍA RENDER (3 a 5 seg)
+  try {
+    const backendUrl = API_CONFIG.BASE_URL; // 'https://eurorep-api.onrender.com/api'
+    if (backendUrl && (modulo === 'refacciones' || modulo === 'clientes' || modulo === 'sitios' || modulo === 'cotizaciones' || modulo === 'pedidos' || modulo === 'all')) {
+      if (btnEl) {
+        btnEl.innerHTML = '<i data-lucide="loader" class="btn-icon rotating"></i> SAP en vivo...';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      }
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+      const fastResp = await fetch(`${backendUrl}/sync-all?modulo=${encodeURIComponent(modulo)}`, {
+        method: 'GET',
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (fastResp.ok) {
+        const fastData = await fastResp.json();
+        if (fastData && fastData.ok && !fastData[`${modulo}_error`]) {
+          const duracion = fastData.duracion_ms ? `${(fastData.duracion_ms / 1000).toFixed(1)}s` : '';
+          const cantidad = fastData[modulo] ? ` (${fastData[modulo]} registros)` : '';
+          if (typeof _notify === 'function') _notify(`✅ Sincronización SAP en vivo completada${duracion ? ` en ${duracion}` : ''}${cantidad}.`, 'success');
+
+          if (typeof window !== 'undefined' && window.cargarDatosDeSupabase) {
+            await window.cargarDatosDeSupabase();
+          }
+          if (modulo === 'refacciones' && typeof window !== 'undefined' && typeof window.descargarRefaccionesSupabase === 'function') {
+            const data = await window.descargarRefaccionesSupabase();
+            if (data && data.length > 0 && typeof window.renderRefacciones === 'function') {
+              window.renderRefacciones();
+            }
+          }
+          if ((modulo === 'cotizaciones' || modulo === 'all') && typeof window !== 'undefined' && window.validarCotizacionConSAP) {
+            window.validarCotizacionConSAP(true);
+            const activeInlineStatusEl = document.querySelector('[id^="quick-sap-validation-status-"]');
+            if (activeInlineStatusEl) {
+              const activeInlineTransitionId = activeInlineStatusEl.id.replace('quick-sap-validation-status-', '');
+              window.validarCotizacionConSAP(false, activeInlineTransitionId);
+            }
+          }
+          if ((modulo === 'pedidos' || modulo === 'all') && typeof window !== 'undefined') {
+            if (window.poblarPedidosDropdown) {
+              window.poblarPedidosDropdown(true, null, document.getElementById('t-pedido-sap')?.value || '');
+            }
+            if (window.validarPedidoConSAP) {
+              window.validarPedidoConSAP(true);
+              const activeQuickPedEl = document.querySelector('[id^="quick-ped-sap-"]');
+              if (activeQuickPedEl) {
+                const activeQuickTicketId = activeQuickPedEl.id.replace('quick-ped-sap-', '');
+                window.validarPedidoConSAP(false, activeQuickTicketId);
+              }
+            }
+          }
+          finishSync();
+          return;
+        }
+      }
+    }
+  } catch (directErr) {
+    console.warn('[Sync] Backend directo no disponible o con timeout, recurriendo a GitHub Actions:', directErr.message);
   }
 
   try {
@@ -783,6 +854,86 @@ async function sincronizarConGitHub(modulo = 'all', btnEl = null) {
       }
     }
     _notify(`❌ Error al disparar sync: ${e.message}`, 'error');
+    if (btnEl) {
+      btnEl.innerHTML = origHTML;
+      btnEl.disabled = false;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+  }
+}
+
+/**
+ * Recarga el catálogo de refacciones directamente desde Supabase hacia IndexedDB (1-2s).
+ * No consulta SAP; ideal cuando los datos ya están en la nube.
+ */
+async function recargarCatalogoRefacciones(btnEl = null) {
+  const origHTML = btnEl ? btnEl.innerHTML : '';
+  if (btnEl) {
+    btnEl.innerHTML = '<i data-lucide="loader" class="btn-icon rotating"></i> Recargando...';
+    btnEl.disabled = true;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+  try {
+    if (typeof _notify === 'function') _notify('⏳ Descargando catálogo desde la nube...', 'info');
+    if (typeof window !== 'undefined' && typeof window.descargarRefaccionesSupabase === 'function') {
+      const data = await window.descargarRefaccionesSupabase();
+      if (typeof window.renderRefacciones === 'function') window.renderRefacciones();
+      if (typeof _notify === 'function') _notify(`✅ Catálogo actualizado (${data?.length || 0} refacciones).`, 'success');
+    }
+  } catch (err) {
+    if (typeof _notify === 'function') _notify(`❌ Error al recargar catálogo: ${err.message}`, 'error');
+  } finally {
+    if (btnEl) {
+      btnEl.innerHTML = origHTML;
+      btnEl.disabled = false;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+  }
+}
+
+/**
+ * Consulta un artículo específico directamente en SAP en tiempo real (<500ms),
+ * lo guarda en Supabase y actualiza la vista local.
+ */
+async function sincronizarRefaccionEnVivo(itemCode, btnEl = null) {
+  const cleanCode = (itemCode || '').trim();
+  if (!cleanCode) return;
+  const origHTML = btnEl ? btnEl.innerHTML : '';
+  if (btnEl) {
+    btnEl.innerHTML = '<i data-lucide="loader" class="btn-icon rotating"></i> SAP...';
+    btnEl.disabled = true;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+  try {
+    if (typeof _notify === 'function') _notify(`Consultando artículo "${cleanCode}" en SAP...`, 'info');
+    const resp = await fetch(`${API_CONFIG.BASE_URL}/sap/items/${encodeURIComponent(cleanCode)}/sync`);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+    const resData = await resp.json();
+    if (resData.ok && resData.item) {
+      // Actualizar en el catálogo en memoria y local
+      if (typeof window !== 'undefined') {
+        if (!Array.isArray(window.refaccionesDb)) window.refaccionesDb = [];
+        const idx = window.refaccionesDb.findIndex(r => r.codigo === cleanCode || r.id === cleanCode);
+        if (idx >= 0) {
+          window.refaccionesDb[idx] = { ...window.refaccionesDb[idx], ...resData.item };
+        } else {
+          window.refaccionesDb.unshift(resData.item);
+        }
+        if (typeof window.saveRefaccionesLocal === 'function') {
+          await window.saveRefaccionesLocal(window.refaccionesDb);
+        }
+        if (typeof window.renderRefacciones === 'function') {
+          window.renderRefacciones();
+        }
+      }
+      if (typeof _notify === 'function') _notify(`✅ Refacción ${cleanCode} actualizada desde SAP: "${resData.item.descripcion}"`, 'success');
+    }
+  } catch (err) {
+    if (typeof _notify === 'function') _notify(`❌ No se pudo actualizar refacción desde SAP: ${err.message}`, 'error');
+  } finally {
     if (btnEl) {
       btnEl.innerHTML = origHTML;
       btnEl.disabled = false;
@@ -2162,7 +2313,20 @@ async function validarPedidoConSAP(isModal = true, ticketId = null) {
     const { data, error } = await sb.from('pedidos_sap').select('*').eq('numero_pedido', sapVal).maybeSingle();
     if (error) throw error;
 
-    if (!data) {
+    let orderData = data;
+    if (!orderData && API_CONFIG.BASE_URL) {
+      try {
+        const liveRes = await fetch(`${API_CONFIG.BASE_URL}/sap/pedidos/${encodeURIComponent(sapVal)}/sync`);
+        if (liveRes.ok) {
+          const liveJson = await liveRes.json();
+          if (liveJson && liveJson.ok && liveJson.pedido) {
+            orderData = liveJson.pedido;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (!orderData) {
       statusDiv.innerHTML = `
         <div style="padding:0.5rem 0.75rem; border-radius:6px; background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.15); font-size:0.78rem; color:#ef4444; display:flex; flex-direction:column; gap:0.25rem;">
           <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="x-circle" style="width:14px; height:14px;"></i> Pedido no encontrado en SAP</div>
@@ -2177,9 +2341,9 @@ async function validarPedidoConSAP(isModal = true, ticketId = null) {
       return;
     }
 
-    const sapMonto = Number(data.monto) || 0;
-    const sapCliente = data.cliente_nombre || '';
-    const sapFecha = data.fecha ? new Date(data.fecha).toLocaleDateString('es-MX') : '—';
+    const sapMonto = Number(orderData.monto) || 0;
+    const sapCliente = orderData.cliente_nombre || '';
+    const sapFecha = orderData.fecha ? new Date(orderData.fecha).toLocaleDateString('es-MX') : '—';
     
     let isMontoMatch = Math.abs(montoVal - sapMonto) < 0.05;
     
@@ -2740,7 +2904,20 @@ async function validarCotizacionConSAP(isModal = true, ticketId = null) {
     
     if (error) throw error;
 
-    if (!data) {
+    let quoteData = data;
+    if (!quoteData && API_CONFIG.BASE_URL) {
+      try {
+        const liveRes = await fetch(`${API_CONFIG.BASE_URL}/sap/cotizaciones/${encodeURIComponent(sapVal)}/sync`);
+        if (liveRes.ok) {
+          const liveJson = await liveRes.json();
+          if (liveJson && liveJson.ok && liveJson.cotizacion) {
+            quoteData = liveJson.cotizacion;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (!quoteData) {
       statusDiv.innerHTML = `
         <div style="padding:0.5rem 0.75rem; border-radius:6px; background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.15); font-size:0.78rem; color:#ef4444; display:flex; flex-direction:column; gap:0.25rem;">
           <div style="font-weight:600; display:flex; align-items:center; gap:4px;"><i data-lucide="x-circle" style="width:14px; height:14px;"></i> Cotización no encontrada en SAP</div>
@@ -2757,9 +2934,9 @@ async function validarCotizacionConSAP(isModal = true, ticketId = null) {
       return;
     }
 
-    const sapMonto = Number(data.monto) || 0;
-    const sapCliente = data.cliente || '';
-    const sapFecha = data.fecha ? new Date(data.fecha).toLocaleDateString('es-MX') : '—';
+    const sapMonto = Number(quoteData.monto) || 0;
+    const sapCliente = quoteData.cliente || '';
+    const sapFecha = quoteData.fecha ? new Date(quoteData.fecha).toLocaleDateString('es-MX') : '—';
     
     // Auto-completar monto si estaba vacío o en 0 pero en Supabase ya tiene un valor válido
     if ((!montoVal || montoVal === 0) && sapMonto > 0 && montoInput) {
@@ -3022,6 +3199,8 @@ if (typeof window !== 'undefined') {
   window.sincronizarModuloSAP = sincronizarModuloSAP;
   window.sincronizarUnCliente = sincronizarUnCliente;
   window.sincronizarConGitHub = sincronizarConGitHub;
+  window.recargarCatalogoRefacciones = recargarCatalogoRefacciones;
+  window.sincronizarRefaccionEnVivo = sincronizarRefaccionEnVivo;
   window.renderLinkedCotizaciones = renderLinkedCotizaciones;
   window.togglePasarCotizacionBtn = togglePasarCotizacionBtn;
   window.deleteLinkedCotizacion = deleteLinkedCotizacion;
@@ -3055,6 +3234,8 @@ if (typeof window !== 'undefined') {
     sincronizarModuloSAP,
     sincronizarUnCliente,
     sincronizarConGitHub,
+    recargarCatalogoRefacciones,
+    sincronizarRefaccionEnVivo,
     renderLinkedCotizaciones,
     togglePasarCotizacionBtn,
     deleteLinkedCotizacion,
@@ -3092,6 +3273,8 @@ export {
   sincronizarModuloSAP,
   sincronizarUnCliente,
   sincronizarConGitHub,
+  recargarCatalogoRefacciones,
+  sincronizarRefaccionEnVivo,
   renderLinkedCotizaciones,
   togglePasarCotizacionBtn,
   deleteLinkedCotizacion,
